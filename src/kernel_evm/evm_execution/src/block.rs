@@ -11,7 +11,6 @@
 use super::storage::blocks::get_current_number_n_timestamp;
 use host::runtime::Runtime;
 use primitive_types::{H160, U256};
-use tezos_ethereum::basic::GasLimit;
 /// All data for an Ethereum block.
 ///
 /// This data does not change for the duration of the block. All balues are
@@ -29,7 +28,7 @@ pub struct BlockConstants {
     /// the value to an arbitrary value.
     pub difficulty: U256,
     /// Gas limit for the current block.
-    pub gas_limit: GasLimit,
+    pub gas_limit: U256,
     /// The base fee per gas for doing a transaction.
     pub base_fee_per_gas: U256,
     /// Identifier for the chain. Normally this would identify the chain (Ethereum
@@ -48,7 +47,7 @@ impl BlockConstants {
             coinbase: H160::zero(),
             timestamp: U256::zero(),
             difficulty: U256::zero(),
-            gas_limit: GasLimit::one(),
+            gas_limit: U256::one(),
             base_fee_per_gas: U256::one(),
             chain_id: U256::zero(),
         }

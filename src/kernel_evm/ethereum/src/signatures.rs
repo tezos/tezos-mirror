@@ -10,7 +10,6 @@
 //! as addresses and values.
 
 use crate::address::EthereumAddress;
-use crate::basic::GasLimit;
 use libsecp256k1::{
     curve::Scalar, recover, sign, verify, Message, PublicKey, RecoveryId, SecretKey,
     Signature,
@@ -61,7 +60,7 @@ pub struct EthereumTransactionCommon {
     /// this transaction. This is paid up-front, before any
     /// computation is done and may not be increased
     /// later
-    pub gas_limit: GasLimit,
+    pub gas_limit: U256,
     /// The 160-bit address of the message call’s recipient
     /// or, for a contract creation transaction
     pub to: EthereumAddress,
@@ -254,7 +253,7 @@ impl Decodable for EthereumTransactionCommon {
             let mut it = decoder.iter();
             let nonce: U256 = decode_field(&next(&mut it)?, "nonce")?;
             let gas_price: U256 = decode_field(&next(&mut it)?, "gas_price")?;
-            let gas_limit: GasLimit = decode_field(&next(&mut it)?, "gas_limit")?;
+            let gas_limit: U256 = decode_field(&next(&mut it)?, "gas_limit")?;
             let to: EthereumAddress = decode_field(&next(&mut it)?, "to")?;
             let value: U256 = decode_field(&next(&mut it)?, "value")?;
             let data: Vec<u8> = decode_field(&next(&mut it)?, "data")?;
@@ -291,7 +290,7 @@ impl Encodable for EthereumTransactionCommon {
         stream.begin_list(9);
         stream.append(&self.nonce);
         stream.append(&self.gas_price);
-        stream.append_internal(&self.gas_limit);
+        stream.append(&self.gas_limit);
         stream.append_internal(&self.to);
         stream.append(&self.value);
         if self.data.is_empty() {
@@ -402,7 +401,7 @@ mod test {
         // signed tx : 0xf86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83
         let nonce = U256::from(9);
         let gas_price = U256::from(20000000000u64);
-        let gas_limit = GasLimit::new(U256::from(21000));
+        let gas_limit = U256::from(21000);
         let to =
             EthereumAddress::from("3535353535353535353535353535353535353535".to_string());
         assert_ne!(
@@ -473,7 +472,7 @@ mod test {
         // signed tx : 0xf86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83
         let nonce = U256::from(9);
         let gas_price = U256::from(20000000000u64);
-        let gas_limit = GasLimit::new(U256::from(21000));
+        let gas_limit = U256::from(21000);
         let to =
             EthereumAddress::from("3535353535353535353535353535353535353535".to_string());
         let value = U256::from(1000000000000000000u64);
@@ -517,7 +516,7 @@ mod test {
         // signed tx : 0xf8572e8506c50218ba8304312280843b9aca0082ffff26a0e9637495be4c216a833ef390b1f6798917c8a102ab165c5085cced7ca1f2eb3aa057854e7044a8fee7bccb6a2c32c4229dd9cbacad74350789e0ce75bf40b6f713
         let nonce = U256::from(46);
         let gas_price = U256::from(29075052730u64);
-        let gas_limit = GasLimit::new(U256::from(274722));
+        let gas_limit = U256::from(274722);
         let to = EthereumAddress::from("".to_string());
         let value = U256::from(1000000000u64);
         let data: Vec<u8> = hex::decode("ffff").unwrap();
@@ -559,7 +558,7 @@ mod test {
         // signed tx : 0xf86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83
         let nonce = U256::from(9);
         let gas_price = U256::from(20000000000u64);
-        let gas_limit = GasLimit::new(U256::from(21000));
+        let gas_limit = U256::from(21000);
         let to =
             EthereumAddress::from("3535353535353535353535353535353535353535".to_string());
         let value = U256::from(1000000000000000000u64);
@@ -598,7 +597,7 @@ mod test {
         //setup
         let nonce = U256::from(0);
         let gas_price = U256::from(40000000000u64);
-        let gas_limit = GasLimit::new(U256::from(21000));
+        let gas_limit = U256::from(21000);
         let to =
             EthereumAddress::from("423163e58aabec5daa3dd1130b759d24bef0f6ea".to_string());
         let value = U256::from(5000000000000000u64);
@@ -643,7 +642,7 @@ mod test {
         // signed tx : 0xf86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83
         let nonce = U256::from(9);
         let gas_price = U256::from(20000000000u64);
-        let gas_limit = GasLimit::new(U256::from(21000));
+        let gas_limit = U256::from(21000);
         let to =
             EthereumAddress::from("3535353535353535353535353535353535353535".to_string());
         assert_ne!(
@@ -713,7 +712,7 @@ mod test {
         //setup
         let nonce = U256::from(46);
         let gas_price = U256::from(29075052730u64);
-        let gas_limit = GasLimit::new(U256::from(274722));
+        let gas_limit = U256::from(274722);
         let to =
             EthereumAddress::from("ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b".to_string());
         let value = U256::from(760460536160301065u64); // /!\ > 2^53 -1
@@ -761,7 +760,7 @@ mod test {
         //setup
         let nonce = U256::from(46);
         let gas_price = U256::from(29075052730u64);
-        let gas_limit = GasLimit::new(U256::from(274722));
+        let gas_limit = U256::from(274722);
         let to =
             EthereumAddress::from("ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b".to_string());
         let value = U256::from(760460536160301065u64); // /!\ > 2^53 -1
@@ -814,7 +813,7 @@ mod test {
             chain_id: U256::one(),
             nonce: U256::from(1),
             gas_price: U256::from(30000000000u64),
-            gas_limit: GasLimit::new(U256::from(1048576)),
+            gas_limit: U256::from(1048576),
             to: EthereumAddress::from(
                 "4e1b2c985d729ae6e05ef7974013eeb48f394449".to_string(),
             ),
@@ -858,7 +857,7 @@ mod test {
             chain_id: U256::one(),
             nonce: U256::from(1),
             gas_price: U256::from(30000000000u64),
-            gas_limit: GasLimit::new(U256::from(1048576)),
+            gas_limit: U256::from(1048576),
             to: EthereumAddress::from(
                 "4e1b2c985d729ae6e05ef7974013eeb48f394449".to_string(),
             ),
@@ -899,7 +898,7 @@ mod test {
             chain_id: U256::one(),
             nonce: U256::from(1),
             gas_price: U256::from(30000000000u64),
-            gas_limit: GasLimit::new(U256::from(1048576)),
+            gas_limit: U256::from(1048576),
             to: EthereumAddress::from(
                 "4e1b2c985d729ae6e05ef7974013eeb48f394449".to_string(),
             ),
@@ -965,7 +964,7 @@ mod test {
             chain_id: U256::one(),
             nonce: U256::from(9),
             gas_price: U256::from(20000000000u64),
-            gas_limit: GasLimit::new(U256::from(21000)),
+            gas_limit: U256::from(21000),
             to: EthereumAddress::from(
                 "3535353535353535353535353535353535353535".to_string(),
             ),
@@ -996,7 +995,7 @@ mod test {
             chain_id: U256::one(),
             nonce: U256::from(46),
             gas_price: U256::from(29075052730u64),
-            gas_limit: GasLimit::new(U256::from(274722)),
+            gas_limit: U256::from(274722),
             to: EthereumAddress::from(
                 "ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b".to_string(),
             ),
@@ -1027,7 +1026,7 @@ mod test {
             chain_id: U256::one(),
             nonce: U256::from(46),
             gas_price: U256::from(29075052730u64),
-            gas_limit: GasLimit::new(U256::from(274722)),
+            gas_limit: U256::from(274722),
             to: EthereumAddress::from(
                 "ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b".to_string(),
             ),
@@ -1061,7 +1060,7 @@ mod test {
             chain_id: U256::one(),
             nonce: U256::from(46),
             gas_price: U256::from(29075052730u64),
-            gas_limit: GasLimit::new(U256::from(274722)),
+            gas_limit: U256::from(274722),
             to: EthereumAddress::from(
                 "ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b".to_string(),
             ),
@@ -1103,7 +1102,7 @@ mod test {
             chain_id: U256::one(),
             nonce: U256::from(9),
             gas_price: U256::from(20000000000u64),
-            gas_limit: GasLimit::new(U256::from(21000)),
+            gas_limit: U256::from(21000),
             to: EthereumAddress::from(
                 "3535353535353535353535353535353535353535".to_string(),
             ),
