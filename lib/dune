@@ -1,6 +1,22 @@
+; This file is included in the link_flags stanza of binaries and static libraries
+; for which we should include -ccopt "-framework Security" on macOS.
+
+(rule
+ (target macos-link-flags.sexp)
+ (action
+  (with-stdout-to
+   %{target}
+   (system
+     "[ '%{system}' = 'macosx' ] && echo '(-ccopt \"-framework Security\")' || echo '()'"))))
+
 (library
  (name teztale_lib)
  (public_name teztale.lib)
  (libraries tezos-base)
  (flags
-  (:standard -open Tezos_base.TzPervasives -open Tezos_base)))
+  (:standard
+   (:include macos-link-flags.sexp)
+   -open
+   Tezos_base.TzPervasives
+   -open
+   Tezos_base)))
