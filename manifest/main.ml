@@ -3965,8 +3965,8 @@ let octez_dal_node_services =
     ~linkall:true
 
 let octez_dal_node_lib =
-  private_lib
-    "tezos_dal_node_lib"
+  public_lib
+    "tezos-dal-node-lib"
     ~path:"src/lib_dal_node"
     ~opam:"tezos-dal-node-lib"
     ~synopsis:"Tezos: `tezos-dal-node` library"
@@ -3980,6 +3980,17 @@ let octez_dal_node_lib =
         octez_client_base_unix |> open_;
         octez_stdlib_unix |> open_;
         octez_crypto_dal |> open_;
+      ]
+
+let octez_dal_node_gossipsub_lib =
+  public_lib
+    "tezos-dal-node-lib.gossipsub"
+    ~path:"src/lib_dal_node/gossipsub"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_crypto_dal |> open_;
+        octez_gossipsub |> open_;
       ]
 
 let octez_dac_lib =
@@ -7253,6 +7264,7 @@ let _octez_dal_node =
          octez_crypto_dal |> open_;
          octez_store_unix |> open_;
          octez_store_shared |> open_;
+         octez_dal_node_gossipsub_lib |> open_;
          irmin_pack;
          irmin_pack_unix;
          irmin;

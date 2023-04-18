@@ -490,7 +490,7 @@ opam:tezos-baking-alpha-commands:
 opam:tezos-base:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-base
 
@@ -951,7 +951,12 @@ opam:tezos-event-logging-test-helpers:
 
 # Ignoring unreleased package tezos-expect-helper.
 
-# Ignoring unreleased package tezos-gossipsub.
+opam:tezos-gossipsub:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_6
+  variables:
+    package: tezos-gossipsub
 
 # Ignoring unreleased package tezos-gossipsub-test.
 

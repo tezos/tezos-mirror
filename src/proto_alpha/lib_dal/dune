@@ -9,7 +9,7 @@
   tezos-base
   octez-protocol-compiler.registerer
   tezos-stdlib-unix
-  tezos_dal_node_lib
+  tezos-dal-node-lib
   tezos-client-alpha
   tezos-protocol-plugin-alpha
   tezos-embedded-protocol-alpha

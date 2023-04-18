@@ -9,7 +9,7 @@
   tezos-base
   octez-protocol-compiler.registerer
   tezos-stdlib-unix
-  tezos_dal_node_lib
+  tezos-dal-node-lib
   tezos-client-017-PtNairob
   tezos-protocol-plugin-017-PtNairob
   tezos-embedded-protocol-017-PtNairob
