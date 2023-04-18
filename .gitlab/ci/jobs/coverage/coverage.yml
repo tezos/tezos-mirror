@@ -56,6 +56,7 @@ unified_coverage:
     - "tezt 39/40"
     - "tezt 40/40"
     - "unit:non-proto-x86_64"
+    - "unit:proto-x86_64"
   script:
     # On the development branches, we compute coverage
     - ./scripts/ci/report_coverage.sh
