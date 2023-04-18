@@ -138,17 +138,17 @@ snapshot file name can be given as an additional argument. For example:
 
 .. note::
 
-   If your node's current storage was created with Octez v13 (or
-   earlier), it is not compatible with the context pruning storage
-   layout, and therefore it is no longer possible to export a storage
-   snapshot.
+   If your node's current storage was created with Octez v13.0 (or
+   earlier versions), it is not compatible with the context pruning
+   storage layout, and therefore it is no longer possible to export a
+   storage snapshot.
 
    In order to benefit from recent storage features and optimizations,
    it is strongly recommended to restart your node with the latest
    Octez version and with a fresh, up-to-date storage -- either by
    importing a recent snapshot (that is, exported by an Octez node
-   version >= v13 and <v15), or by bootstrapping from scratch if this
-   is not possible.
+   version >= v13.0), or by bootstrapping from scratch if this is not
+   possible.
 
 Rolling export
 ~~~~~~~~~~~~~~
