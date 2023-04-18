@@ -22,6 +22,30 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+module Distributed_db_event = struct
+  include Internal_event.Simple
+
+  let section = ["node"; "distributed_db"]
+
+  let multiple_p2p_reader =
+    declare_1
+      ~section
+      ~name:"multiple_p2p_reader"
+      ~msg:"multiple p2p_reader for {peer}, a connection may be stuck"
+      ~level:Warning
+      ("peer", P2p_peer.Id.encoding)
+
+  let p2p_reader_shutdown_failed =
+    declare_2
+      ~section
+      ~name:"p2p_reader_shutdow_failed"
+      ~msg:"p2p_reader of {peer} failed to shut down with {exn}"
+      ~level:Warning
+      ("peer", P2p_peer.Id.encoding)
+      ("exn", Data_encoding.string)
+end
+
 module Requester_event = struct
   include Internal_event.Simple
 
