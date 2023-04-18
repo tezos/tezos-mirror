@@ -64,6 +64,8 @@ module type SPAN = sig
 
   val zero : t
 
+  val of_int_s : int -> t
+
   val seconds : t -> int
 end
 
@@ -98,7 +100,7 @@ end
    Score decay is left to be implemented, and the associated
    parameters added here. *)
 
-type per_topic_score_parameters = {
+type 'span per_topic_score_parameters = {
   time_in_mesh_weight : float;
       (** P1: The weight of the score associated to the time spent in the mesh. *)
   time_in_mesh_cap : float;
@@ -112,23 +114,37 @@ type per_topic_score_parameters = {
   first_message_deliveries_cap : int;
       (** P2: The maximum value considered during score computation for the number of
           first message deliveries. *)
+  mesh_message_deliveries_weight : float;
+      (** P3: The weight of the score associated to the number of first/near-first
+          mesh message deliveries. *)
+  mesh_message_deliveries_window : 'span;
+      (** P3: The delay added to the first delivery of a message to obtain the upper bound up to which a
+          duplicate message is counted as nearly-first delivered. *)
+  mesh_message_deliveries_activation : 'span;
+      (** P3: How long should a peer be in the mesh before we start evaluating P3. *)
+  mesh_message_deliveries_cap : int;
+      (** P3: The maximum value considered during score computation for the number of
+          first/near-first mesh message deliveries. *)
+  mesh_message_deliveries_threshold : int;
+      (** P3: The number of messages received from a peer in the mesh in the
+          associated topic above which the peer won't be penalized  *)
 }
 
-type 'topic topic_score_parameters =
-  | Topic_score_parameters_single of per_topic_score_parameters
+type ('topic, 'span) topic_score_parameters =
+  | Topic_score_parameters_single of 'span per_topic_score_parameters
       (** Use this constructor when the topic score parameters do not
           depend on the topic. *)
-  | Topic_score_parameters_family : {
+  | Topic_score_parameters_family of {
       all_topics : 'topic Seq.t;
-      parameters : 'topic -> per_topic_score_parameters;
+      parameters : 'topic -> 'span per_topic_score_parameters;
       weights : 'topic -> float;
     }
-      -> 'topic topic_score_parameters
       (** Use this constructor when the topic score parameters may depend
           on the topic. *)
 
-type 'topic score_parameters = {
-  topics : 'topic topic_score_parameters;  (** Per-topic score parameters. *)
+type ('topic, 'span) score_parameters = {
+  topics : ('topic, 'span) topic_score_parameters;
+      (** Per-topic score parameters. *)
   behaviour_penalty_weight : float;
       (** The weight of the score associated to the behaviour penalty. This
           parameter must be negative. *)
@@ -237,7 +253,8 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
           avoid advertising messages that will be expired by the time they're
           requested. [history_gossip_length] must be less than or equal to
           [history_length]. *)
-  score_parameters : 'topic score_parameters;  (** score-specific parameters. *)
+  score_parameters : ('topic, 'span) score_parameters;
+      (** score-specific parameters. *)
 }
 
 type ('peer, 'message_id) parameters = {
@@ -256,6 +273,10 @@ type ('peer, 'message_id) parameters = {
 
     - P1: For each topic, we measure how long a peer has spent in the mesh for that topic. The longest, the better.
     - P2: For each topic, we measure how many times the peer was the first among all peers to send us a message on that topic.
+    - P3: For each topic, we measure the number of message deliveries. If the number is below a threshold,
+      we penalize the associated peer.
+    - P3b: Trigger P3 computation when the peer gets pruned or removed, so as to not forget yet unaccounted for bad message
+      delivery counts.
     - P7: When a peer is pruned from the mesh for a topic, we install a backoff that
       prevents that peer from regrafting too soon. If the peer does not respect this backoff,
       it is penalized.
@@ -273,7 +294,7 @@ module type SCORE = sig
   type topic
 
   (** [newly_connected params] creates a fresh statistics record. *)
-  val newly_connected : topic score_parameters -> t
+  val newly_connected : (topic, span) score_parameters -> t
 
   (** [value ps] evaluates the score of [ps]. *)
   val value : t -> value

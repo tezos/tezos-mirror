@@ -35,6 +35,11 @@ let per_topic_score_parameters =
       time_in_mesh_quantum = 1.0;
       first_message_deliveries_weight = 1.0;
       first_message_deliveries_cap = 2000;
+      mesh_message_deliveries_weight = ~-.1.0;
+      mesh_message_deliveries_window = Milliseconds.of_int_ms 10;
+      mesh_message_deliveries_activation = Milliseconds.of_int_s 5;
+      mesh_message_deliveries_cap = 100;
+      mesh_message_deliveries_threshold = 20;
     }
 
 let score_parameters =

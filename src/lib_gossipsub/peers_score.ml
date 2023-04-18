@@ -73,7 +73,7 @@ struct
     behaviour_penalty : int;  (** The score associated to a peer. *)
     topic_status : topic_status Topic.Map.t;
     peer_status : peer_status;
-    parameters : topic score_parameters;
+    parameters : (topic, span) score_parameters;
   }
 
   type t = {
