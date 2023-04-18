@@ -436,7 +436,7 @@ module Range_Checks = struct
         ~wires
         ~gates
         ~public_input_size
-        ~range_checks:([4; 6], 4)
+        ~range_checks:[(4, 4); (6, 4)]
         ()
     in
     {name; circuit; witness; outcome = Valid}
@@ -448,7 +448,7 @@ module Range_Checks = struct
         ~wires
         ~gates
         ~public_input_size
-        ~range_checks:([1; 2], 2)
+        ~range_checks:[(1, 2); (2, 2); (6, 4)]
         ()
     in
     {name; circuit; witness; outcome = Valid}
@@ -460,7 +460,7 @@ module Range_Checks = struct
         ~wires
         ~gates
         ~public_input_size
-        ~range_checks:([1; 3; 4; 6], 2)
+        ~range_checks:[(1, 2); (3, 2); (4, 2); (6, 2)]
         ()
     in
     {name; circuit; witness; outcome = Proof_error}

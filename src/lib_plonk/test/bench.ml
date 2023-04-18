@@ -102,15 +102,14 @@ let () =
      circuit ; it is just indexes I took to make it work *)
   let range_checks =
     List.(
-      rev (init nb_range_checks (fun i -> (1 lsl (nb_constraints + 1)) - i - 1)))
+      rev
+        (init nb_range_checks (fun i ->
+             ((1 lsl (nb_constraints + 1)) - i - 1, nb_bits))))
   in
   let cs_no_rc = Plompiler.LibCircuit.get_cs no_rc in
   let witness_no_rc = Plompiler.Solver.solve cs_no_rc.solver base_witness in
   let circuit_no_rc =
-    Plonk.Circuit.to_plonk
-      ~range_checks:(range_checks, nb_bits)
-      ~public_input_size:0
-      cs_no_rc.cs
+    Plonk.Circuit.to_plonk ~range_checks ~public_input_size:0 cs_no_rc.cs
   in
   let end_build_circuit = Unix.gettimeofday () in
   Printf.printf

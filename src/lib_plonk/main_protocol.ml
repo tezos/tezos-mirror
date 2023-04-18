@@ -288,7 +288,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       evaluations : Evaluations.t SMap.t;
       alpha : Scalar.t option;
       ultra : bool;
-      range_checks : int list * int;
+      range_checks : (int * int) list;
     }
     [@@deriving repr]
 
@@ -306,7 +306,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
     let build_all_keys pp nb_proofs_map =
       List.concat_map
         (fun (c_name, c) ->
-          if fst c.range_checks = [] then
+          if c.range_checks = [] then
             List.map (SMap.Aggregation.add_prefix c_name) Perm.shared_z_names
           else
             let shared =
@@ -460,7 +460,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         SMap.mapi
           (fun name w_list ->
             let circuit_pp = SMap.find name pp.circuits_map in
-            if fst circuit_pp.range_checks = [] then ([], [])
+            if circuit_pp.range_checks = [] then ([], [])
             else
               List.map
                 (fun values ->
@@ -487,7 +487,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       let batched_z_evals =
         SMap.mapi
           (fun name z_evals ->
-            if fst (SMap.find name pp.circuits_map).range_checks = [] then
+            if (SMap.find name pp.circuits_map).range_checks = [] then
               SMap.empty
             else
               SMap.singleton
@@ -505,7 +505,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       SMap.mapi
         (fun name values ->
           let circuit_pp = SMap.find name pp.circuits_map in
-          if fst circuit_pp.range_checks = [] then SMap.empty
+          if circuit_pp.range_checks = [] then SMap.empty
           else
             let zs =
               RangeCheck.f_map_contribution_2
@@ -577,7 +577,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
               ~n:pp.common_pp.n
               ()
           in
-          if fst circuit_pp.range_checks = [] then perm_id
+          if circuit_pp.range_checks = [] then perm_id
           else
             let rc2_ids =
               RangeCheck.prover_identities_2
@@ -655,7 +655,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                   inputs_list
             in
             let rc1_identities =
-              if fst circuit_pp.range_checks = [] then []
+              if circuit_pp.range_checks = [] then []
               else
                 List.mapi
                   (fun i _ ->
@@ -718,7 +718,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       let batched_wires_polys =
         Perm.Shared_argument.build_batched_witness_polys
           ~use_batched_wires:
-            (SMap.exists (fun _ c -> fst c.range_checks <> []) pp.circuits_map)
+            (SMap.exists (fun _ c -> c.range_checks <> []) pp.circuits_map)
           ~zero_knowledge:pp.common_pp.zk
           ~domain:pp.common_pp.domain
           ~delta:rd.delta
@@ -808,7 +808,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         alpha = prover_pp.alpha;
         ultra = prover_pp.ultra;
         input_com_sizes = prover_pp.input_com_sizes;
-        range_checks = fst prover_pp.range_checks <> [];
+        range_checks = prover_pp.range_checks <> [];
       }
 
     let build_identities circuits_map (n, generator) rd public_inputs_map =
@@ -1048,7 +1048,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         Array.map (fun w -> Array.pad (Array.append li_array w) n) c.wires
       in
       let adapted_range_checks =
-        (List.map (Int.add l) (fst c.range_checks), snd c.range_checks)
+        List.map (fun (i, n) -> (l + i, n)) c.range_checks
       in
       let extended_tables =
         if not c.ultra then []
@@ -1132,7 +1132,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                 alpha;
                 ultra = circuit.ultra;
                 input_com_sizes = circuit.input_com_sizes;
-                range_checks = fst range_checks <> [];
+                range_checks = range_checks <> [];
               }
           in
           ( SMap.add_unique circuit_name prover_pp prv,

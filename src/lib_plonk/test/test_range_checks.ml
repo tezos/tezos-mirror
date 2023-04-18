@@ -11,7 +11,7 @@ module Internal = struct
   let test_min_z () =
     let upper_bound = 4 in
     let x = Random.int (1 lsl upper_bound) |> Scalar.of_int in
-    let evals = RangeChecks.partial_z upper_bound x in
+    let evals = RangeChecks.partial_z (x, upper_bound) in
     assert (Scalar.eq (List.nth evals 0) x) ;
     let last = List.nth evals (upper_bound - 1) in
     assert (Scalar.(eq last one || eq last zero))
