@@ -170,7 +170,7 @@ let snap_to_grid ~inverse_scaling ~resolution x =
   else
     let not_significant = log10 x / inverse_scaling in
     let grid = resolution * pow 10 not_significant in
-    grid * (1 + (x / grid))
+    (x + grid - 1) / grid * grid
 
 (* ------------------------------------------------------------------------- *)
 (* Helpers *)

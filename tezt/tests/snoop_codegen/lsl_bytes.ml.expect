@@ -13,7 +13,7 @@ module S = Saturation_repr
 
 (* model interpreter/N_IHalt *)
 (* 15.2226327675 *)
-let cost_N_IHalt = let open S.Syntax in S.safe_int 20
+let cost_N_IHalt = let open S.Syntax in S.safe_int 15
 
 (* model interpreter/N_ILsl_bytes *)
 (* fun size1 -> fun size2 -> ((57.6973672325 + (0.611192190747 * size1)) + (0. * (sat_sub size2 1))) *)
