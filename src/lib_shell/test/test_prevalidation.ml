@@ -587,93 +587,79 @@ let () =
     ~additional_tags:["remove"]
   @@ fun ctxt ->
   (* Number of operations initially added to the validation state. *)
-  let nb_initial_ops = 20 in
+  let nb_initial_ops = 50 in
   (* Number of operations on which we will call [remove_operation]
      after we have added [nb_initial_ops] operations to the state. We
      must have [nb_ops_to_remove <= nb_initial_ops]; removal from an
      empty state will be tested separately. *)
-  let nb_ops_to_remove = 10 in
+  let nb_ops_to_remove = 30 in
   let open Lwt_result_syntax in
   let (module Chain_store) = make_chain_store ctxt in
   let module P = MakePrevalidation (Chain_store) (Toy_filter) in
+  let open P.Internal_for_tests in
   let timestamp : Time.Protocol.t = now () in
   let head = Init.genesis_block ~timestamp ctxt in
-  let* state = P.create chain_store ~head ~timestamp in
   (* Test removal from empty state. *)
-  let state = P.remove_operation state Operation_hash.zero in
-  assert (
-    Operation_hash.Map.is_empty
-      (P.Internal_for_tests.get_valid_operations state)) ;
-  assert (
-    Operation_hash.Set.is_empty (P.Internal_for_tests.get_filter_state state)) ;
-  (* For each operation that will be removed, we generate a boolean
-     that indicates whether the operation should be present in the
-     prevalidation state. *)
-  let removed_op_was_present =
-    QCheck2.Gen.(generate ~n:nb_ops_to_remove bool)
-  in
-  (* We will need as many original operations to remove as there are
-     occurrences of [false] in [removed_op_was_present]. *)
-  let nb_original_ops_to_remove =
-    List.fold_left (fun n b -> if b then n else n + 1) 0 removed_op_was_present
-  in
-  (* We generate all needed operations at the same time to have
-     [operations_gen]'s guarantee that their hashes are distinct. *)
-  let ops = mk_ops (nb_initial_ops + nb_original_ops_to_remove) in
-  (* Add [nb_initial_ops] operations to the prevalidation state. *)
-  let state = P.Internal_for_tests.set_validation_info state Proto_added in
-  let rec add_ops n state ops =
-    if n <= 0 then return (state, ops)
-    else
-      match ops with
-      | [] ->
-          (* We generated more than [nb_initial_ops] operations. *) assert false
-      | op :: remaining_ops ->
-          let*! state, _op, _classification, _replacement =
-            P.add_operation state F_no_replace op
-          in
-          add_ops (n - 1) state remaining_ops
-  in
-  let* state, ops = add_ops nb_initial_ops state ops in
-  assert (
-    Operation_hash.Map.cardinal
-      (P.Internal_for_tests.get_valid_operations state)
-    = nb_initial_ops) ;
-  (* Call [Prevalidation.remove_operation] on [nb_ops_to_remove]
-     operations, which are already present in the state or not as
-     specified by [removed_op_was_present]. *)
-  let rec remove_ops state old_cardinal removed_op_was_present ops =
-    match removed_op_was_present with
-    | [] -> ()
-    | was_present :: rest_was_present ->
-        let oph, remaining_ops =
-          if was_present then
-            match
-              Operation_hash.Map.choose
-                (P.Internal_for_tests.get_valid_operations state)
-            with
-            | Some (oph, _) -> (oph, ops)
-            | None ->
-                (* More operations have been added to the state than removed. *)
-                assert false
-          else
-            match ops with
-            | op :: remaining_ops -> (op.Shell_operation.hash, remaining_ops)
-            | [] ->
-                (* We generated enough operations for each occurrence of
-                   [false] in [removed_op_was_present]. *)
-                assert false
+  let* state = P.create chain_store ~head ~timestamp in
+  let oph = QCheck2.Gen.generate1 Generators.operation_hash_gen in
+  let state = P.remove_operation state oph in
+  assert (Operation_hash.Map.is_empty (get_valid_operations state)) ;
+  assert (Operation_hash.Set.is_empty (get_filter_state state)) ;
+  (* Prepare the initial state. *)
+  let state = set_validation_info state Proto_added in
+  let*! initial_state =
+    List.fold_left_s
+      (fun state op ->
+        let*! state, _op, _classification, _replacement =
+          P.add_operation state F_no_replace op
         in
-        let state = P.remove_operation state oph in
-        let valid_ops = P.Internal_for_tests.get_valid_operations state in
-        let filter_state = P.Internal_for_tests.get_filter_state state in
-        assert (not (Operation_hash.Map.mem oph valid_ops)) ;
-        assert (not (Operation_hash.Set.mem oph filter_state)) ;
-        let new_cardinal = Operation_hash.Map.cardinal valid_ops in
-        assert (
-          if was_present then new_cardinal = old_cardinal - 1
-          else new_cardinal = old_cardinal) ;
-        remove_ops state new_cardinal rest_was_present remaining_ops
+        Lwt.return state)
+      state
+      (mk_ops nb_initial_ops)
   in
-  remove_ops state nb_initial_ops removed_op_was_present ops ;
+  let initial_proto_ophmap = get_valid_operations initial_state in
+  let initial_cardinal = Operation_hash.Map.cardinal initial_proto_ophmap in
+  assert (initial_cardinal = nb_initial_ops) ;
+  (* Test the removal of present or fresh operations. *)
+  let test_remove (state, proto_ophmap_before, cardinal_before) =
+    if QCheck2.Gen.(generate1 bool) then (
+      (* Remove a present operation. *)
+      let present_ops = Operation_hash.Map.bindings proto_ophmap_before in
+      let oph = fst QCheck2.Gen.(generate1 (oneofl present_ops)) in
+      let state = P.remove_operation state oph in
+      let proto_ophmap = get_valid_operations state in
+      let filter_state = get_filter_state state in
+      assert (not (Operation_hash.Map.mem oph proto_ophmap)) ;
+      assert (not (Operation_hash.Set.mem oph filter_state)) ;
+      let cardinal = Operation_hash.Map.cardinal proto_ophmap in
+      assert (cardinal = cardinal_before - 1) ;
+      assert (Operation_hash.Set.cardinal filter_state = cardinal) ;
+      (state, proto_ophmap, cardinal))
+    else
+      (* Remove a fresh operation. *)
+      let filter_state_before = get_filter_state state in
+      let oph =
+        QCheck2.Gen.generate1 (Generators.fresh_oph_gen proto_ophmap_before)
+      in
+      let state = P.remove_operation state oph in
+      let proto_ophmap = get_valid_operations state in
+      let filter_state = get_filter_state state in
+      (* Internal states are physically unchanged. *)
+      assert (proto_ophmap == proto_ophmap_before) ;
+      assert (filter_state == filter_state_before) ;
+      (state, proto_ophmap, cardinal_before)
+  in
+  let rec fun_power f x n = if n <= 0 then x else fun_power f (f x) (n - 1) in
+  let final_state, final_proto_ophmap, final_cardinal =
+    fun_power
+      test_remove
+      (initial_state, initial_proto_ophmap, initial_cardinal)
+      nb_ops_to_remove
+  in
+  let final_filter_state = get_filter_state final_state in
+  assert (Operation_hash.Set.cardinal final_filter_state = final_cardinal) ;
+  assert (
+    Operation_hash.Map.for_all
+      (fun oph _op -> Operation_hash.Set.mem oph final_filter_state)
+      final_proto_ophmap) ;
   return_unit
