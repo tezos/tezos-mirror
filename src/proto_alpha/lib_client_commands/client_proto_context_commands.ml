@@ -2334,7 +2334,9 @@ let commands_rw () =
                 | Some hash -> Lwt_result_syntax.return hash))
       @@ param
            ~name:"ballot"
-           ~desc:"the ballot value (yea/yay, nay, or pass)"
+           ~desc:
+             "the ballot value (yea, nay, or pass; yay is a deprecated synonym \
+              for yea)"
            (parameter
               ~autocomplete:(fun _ ->
                 Lwt_result_syntax.return ["yea"; "nay"; "pass"])
