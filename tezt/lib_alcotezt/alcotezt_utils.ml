@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezt_core
 open Tezt_core.Base
 
-type return = unit Lwt.t
-
-type speed_level = [`Quick | `Slow]
-
-type 'a test_case = string * speed_level * ('a -> return)
-
-let test_case name speed_level body =
-  (* Not sure this is the right way to create the switch, maybe it should have
-     a larger scope. *)
-  let body args = Lwt_switch.with_switch (fun sw -> body sw args) in
-  (name, speed_level, body)
-
-let test_case_sync name speed_level body =
-  let body arg =
-    body arg ;
-    unit
-  in
-  (name, speed_level, body)
-
-type 'a test = string * 'a test_case list
-
-let run ~__FILE__ library_name tests =
-  let proto_tags = Alcotezt_utils.is_proto_test __FILE__ in
-  (tests
-  |> List.iter @@ fun (test_name, test_cases) ->
-     test_cases
-     |> List.iter @@ fun (test_case_name, speed_level, body) ->
-        let tags =
-          "alcotezt"
-          :: (match speed_level with `Quick -> ["quick"] | `Slow -> [])
-          @ proto_tags
-        in
-        Test.register
-          ~__FILE__
-          ~title:(library_name ^ ": " ^ test_name ^ " (" ^ test_case_name ^ ")")
-          ~tags
-        @@ fun () -> body ()) ;
-  unit
+(* Do not modify: it is automatically updated with [scripts/snapshot_alpha.sh]. *)
+let is_proto_test file =
+  match file =~* rex "^src/proto_(\\w+)/" with
+  | None -> []
+  | Some "alpha" -> ["alpha"]
+  | Some "016_PtMumbai" -> ["mumbai"]
+  | Some "017_PtNairob" -> ["nairobi"]
+  | Some _ -> assert false
