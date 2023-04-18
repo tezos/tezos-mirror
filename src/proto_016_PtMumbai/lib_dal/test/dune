@@ -24,7 +24,7 @@
   -open Tezos_base_test_helpers
   -open Tezos_016_PtMumbai_test_helpers
   -open Octez_alcotezt)
- (modules test_dal_slot_frame_encoding test_helpers))
+ (modules test_dal_slot_frame_encoding test_dac_pages_encoding test_helpers))
 
 (executable
  (name main)

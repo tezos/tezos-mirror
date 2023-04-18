@@ -620,3 +620,10 @@ let tests =
       `Quick
       Hash_chain.V0.test_serialize;
   ]
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    Protocol.name
+    [Test_helpers.Unit_test.spec "pages encoding" tests]
+  |> Lwt_main.run
