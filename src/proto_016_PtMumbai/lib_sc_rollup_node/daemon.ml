@@ -463,15 +463,6 @@ module Make (PVM : Pvm.S) = struct
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/3348
        Rollback state information on reorganization, i.e. for
        reorg.old_chain. *)
-    let* new_head = Layer1.fetch_tezos_block node_ctxt.cctxt head.Layer1.hash in
-    let header =
-      Block_header.(
-        raw
-          {
-            shell = new_head.header.shell;
-            protocol_data = new_head.header.protocol_data;
-          })
-    in
     let*! () = Daemon_event.processing_heads_iteration reorg.new_chain in
     let get_header Layer1.{hash; level} =
       if Block_hash.equal hash head.hash then return head
@@ -492,7 +483,7 @@ module Make (PVM : Pvm.S) = struct
     let* () = Components.Refutation_coordinator.process stripped_head in
     let* () = Components.Batcher.batch () in
     let* () = Components.Batcher.new_head stripped_head in
-    let*! () = Injector.inject ~header () in
+    let*! () = Injector.inject ~header:head.header () in
     return_unit
 
   let daemonize (node_ctxt : _ Node_context.t) =

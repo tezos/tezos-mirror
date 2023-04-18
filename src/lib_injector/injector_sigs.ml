@@ -236,7 +236,7 @@ module type PROTOCOL_CLIENT = sig
   (** [time_until_next_block state block_header] computes the time until the
       block following [block_header], with respect to the current time. *)
   val time_until_next_block :
-    state -> Tezos_base.Block_header.t option -> Ptime.span
+    state -> Tezos_base.Block_header.shell_header option -> Ptime.span
 end
 
 (** Output signature for functor {!Injector_functor.Make}. *)
@@ -332,7 +332,10 @@ module type S = sig
       operations. [header] must be provided for the [`Delay_block] strategy to
       compute the next block timestamp. *)
   val inject :
-    ?tags:tag list -> ?header:Tezos_base.Block_header.t -> unit -> unit Lwt.t
+    ?tags:tag list ->
+    ?header:Tezos_base.Block_header.shell_header ->
+    unit ->
+    unit Lwt.t
 
   (** Shutdown the injectors, waiting for the ongoing request to be processed. *)
   val shutdown : unit -> unit Lwt.t

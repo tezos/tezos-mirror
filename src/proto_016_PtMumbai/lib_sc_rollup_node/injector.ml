@@ -415,7 +415,7 @@ module Proto_client = struct
     Data_encoding.Binary.to_bytes_exn Operation.encoding op
 
   let time_until_next_block (node_ctxt : Node_context.ro)
-      (header : Tezos_base.Block_header.t option) =
+      (header : Tezos_base.Block_header.shell_header option) =
     let open Result_syntax in
     let Constants.Parametric.{minimal_block_delay; delay_increment_per_round; _}
         =
@@ -432,12 +432,10 @@ module Proto_client = struct
               ~first_round_duration:minimal_block_delay
               ~delay_increment_per_round
           in
-          let* predecessor_round =
-            Fitness.round_from_raw header.shell.fitness
-          in
+          let* predecessor_round = Fitness.round_from_raw header.fitness in
           Round.timestamp_of_round
             durations
-            ~predecessor_timestamp:header.shell.timestamp
+            ~predecessor_timestamp:header.timestamp
             ~predecessor_round
             ~round:Round.zero
         in
@@ -447,7 +445,7 @@ module Proto_client = struct
             ~default:
               (WithExceptions.Result.get_ok
                  ~loc:__LOC__
-                 Timestamp.(header.shell.timestamp +? minimal_block_delay))
+                 Timestamp.(header.timestamp +? minimal_block_delay))
         in
         Ptime.diff
           (Time.System.of_protocol_exn next_level_timestamp)
