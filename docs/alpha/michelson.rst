@@ -802,55 +802,14 @@ A detailed description of the following instructions can be found in the `intera
 Special operations
 ~~~~~~~~~~~~~~~~~~
 
--  ``NOW``: Push the minimal injection time for the current block,
-   namely the block whose validation triggered this execution. The
-   minimal injection time is 60 seconds after the timestamp of the
-   predecessor block. This value does not change during the execution
-   of the contract.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: 'S   ->   timestamp : 'S
-
--  ``CHAIN_ID``: Push the chain identifier.
-
-::
-
-    :: 'S   ->   chain_id : 'S
-
--  ``COMPARE``: Chain identifier comparison
-
-::
-
-    :: chain_id : chain_id : 'S   ->   int : 'S
-
-    > COMPARE / x : y : S  =>  -1 : S
-        iff x < y
-    > COMPARE / x : y : S  =>  0 : S
-        iff x = y
-    > COMPARE / x : y : S  =>  1 : S
-        iff x > y
-
--  ``LEVEL``: Push the level of the current transaction's block.
-
-::
-
-    :: 'S   ->   nat : 'S
-
--  ``TOTAL_VOTING_POWER``: Return the total voting power of all contracts. The total
-   voting power coincides with the sum of the voting power of every contract in
-   the voting listings (as returned by ``VOTING_POWER``). The voting listings is calculated at the beginning of every
-   voting period.
-
-::
-
-    :: 'S   ->   nat : 'S
-
-- ``MIN_BLOCK_TIME``: Push the current minimal block time in seconds.
-
-::
-
-    :: 'S   ->   nat : 'S
+- ``NOW``: Push the estimated injection time for the current block (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__).
+- ``CHAIN_ID``: Push the chain identifier (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CHAIN_ID>`__).
+- ``COMPARE``: Chain identifier comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
+- ``LEVEL``: Push the level of the current transaction's block (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LEVEL>`__).
+- ``TOTAL_VOTING_POWER``: Push the total voting power of all contracts (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-TOTAL_VOTING_POWER>`__).
+- ``MIN_BLOCK_TIME``: Push the current minimal block time in seconds (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MIN_BLOCK_TIME>`__).
 
 Operations on bytes
 ~~~~~~~~~~~~~~~~~~~
