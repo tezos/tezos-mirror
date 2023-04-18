@@ -5785,6 +5785,7 @@ module Protocol = Protocol
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             main |> open_;
+            parameters |> if_some |> if_ N.(number >= 18) |> open_;
             octez_stdlib_unix |> open_;
             octez_protocol_environment;
             octez_shell_services |> open_;

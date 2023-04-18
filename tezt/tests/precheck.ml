@@ -301,7 +301,12 @@ let propagate_precheckable_bad_block_payload =
   in
   Log.info "Cluster initialized" ;
   let* client = Client.(init ~endpoint:(Node node_client) ()) in
-  let* () = Client.activate_protocol ~protocol client in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Either.Right (protocol, None))
+      [(["proof_of_work_threshold"], `String "-1")]
+  in
+  let* () = Client.activate_protocol ~parameter_file ~protocol client in
   let bootstrap1 = Constant.bootstrap1.alias in
   let* () =
     List.init blocks_to_bake Fun.id

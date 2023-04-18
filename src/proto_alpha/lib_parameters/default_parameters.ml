@@ -323,7 +323,7 @@ let constants_sandbox =
     nonce_revelation_threshold = 4l;
     blocks_per_stake_snapshot = 4l;
     cycles_per_voting_period = 8l;
-    proof_of_work_threshold = Int64.of_int (-1);
+    proof_of_work_threshold = Int64.(sub (shift_left 1L 62) 1L);
     vdf_difficulty = 50_000L;
     liquidity_baking_subsidy;
     minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
@@ -370,7 +370,8 @@ let constants_test =
     nonce_revelation_threshold = 4l;
     blocks_per_stake_snapshot = 4l;
     cycles_per_voting_period = 2l;
-    proof_of_work_threshold = Int64.of_int (-1);
+    proof_of_work_threshold =
+      Int64.(sub (shift_left 1L 62) 1L) (* 1/4 of nonces are accepted *);
     vdf_difficulty = 50_000L;
     liquidity_baking_subsidy;
     consensus_committee_size;

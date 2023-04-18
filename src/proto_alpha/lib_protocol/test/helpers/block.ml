@@ -148,18 +148,39 @@ module Forge = struct
   let default_proof_of_work_nonce =
     Bytes.create Constants.proof_of_work_nonce_size
 
-  let make_contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ~payload_hash ~payload_round
+  let rec naive_pow_miner ~proof_of_work_threshold shell header =
+    match
+      Hacl_star.Hacl.RandomBuffer.randombytes
+        ~size:Constants.proof_of_work_nonce_size
+    with
+    | Some proof_of_work_nonce ->
+        let cand = Block_header.{header with proof_of_work_nonce} in
+        if
+          Block_header.Proof_of_work.check_header_proof_of_work_stamp
+            shell
+            cand
+            proof_of_work_threshold
+        then return cand
+        else naive_pow_miner ~proof_of_work_threshold shell header
+    | None -> failwith "Impossible to gather randomness"
+
+  let make_contents
+      ?(proof_of_work_threshold =
+        Tezos_protocol_alpha_parameters.Default_parameters.constants_test
+          .proof_of_work_threshold) ~payload_hash ~payload_round
       ?(liquidity_baking_toggle_vote = Liquidity_baking.LB_pass)
-      ~seed_nonce_hash () =
-    Block_header.
-      {
-        payload_hash;
-        payload_round;
-        proof_of_work_nonce;
-        seed_nonce_hash;
-        liquidity_baking_toggle_vote;
-      }
+      ~seed_nonce_hash shell =
+    naive_pow_miner
+      ~proof_of_work_threshold
+      shell
+      Block_header.
+        {
+          payload_hash;
+          payload_round;
+          proof_of_work_nonce = default_proof_of_work_nonce;
+          seed_nonce_hash;
+          liquidity_baking_toggle_vote;
+        }
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash =
     Tezos_base.Block_header.
@@ -175,9 +196,16 @@ module Forge = struct
         context = Context_hash.zero;
       }
 
-  let set_seed_nonce_hash seed_nonce_hash
+  let set_seed_nonce_hash
+      ?(proof_of_work_threshold =
+        Tezos_protocol_alpha_parameters.Default_parameters.constants_test
+          .proof_of_work_threshold) seed_nonce_hash
       {baker; consensus_key; shell; contents} =
-    {baker; consensus_key; shell; contents = {contents with seed_nonce_hash}}
+    naive_pow_miner
+      ~proof_of_work_threshold
+      shell
+      {contents with seed_nonce_hash}
+    >|=? fun contents -> {baker; consensus_key; shell; contents}
 
   let set_baker baker ?(consensus_key = baker) header =
     {header with baker; consensus_key}
@@ -230,7 +258,7 @@ module Forge = struct
     (Plugin.RPC.current_level ~offset:1l rpc_ctxt pred >|=? function
      | {expected_commitment = true; _} -> Some (fst (Proto_Nonce.generate ()))
      | {expected_commitment = false; _} -> None)
-    >|=? fun seed_nonce_hash ->
+    >>=? fun seed_nonce_hash ->
     let hashes = List.map Operation.hash_packed operations in
     let operations_hash =
       Operation_list_list_hash.compute [Operation_list_hash.compute hashes]
@@ -257,28 +285,31 @@ module Forge = struct
         ~payload_round
         hashes
     in
-    let contents =
-      make_contents
-        ~seed_nonce_hash
-        ?liquidity_baking_toggle_vote
-        ~payload_hash
-        ~payload_round
-        ()
-    in
-    {baker = delegate; consensus_key; shell; contents}
+    make_contents
+      ~seed_nonce_hash
+      ?liquidity_baking_toggle_vote
+      ~payload_hash
+      ~payload_round
+      shell
+    >|=? fun contents -> {baker = delegate; consensus_key; shell; contents}
 
   (* compatibility only, needed by incremental *)
-  let contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ?seed_nonce_hash
+  let contents
+      ?(proof_of_work_threshold =
+        Tezos_protocol_alpha_parameters.Default_parameters.constants_test
+          .proof_of_work_threshold) ?seed_nonce_hash
       ?(liquidity_baking_toggle_vote = Liquidity_baking.LB_pass) ~payload_hash
-      ~payload_round () =
-    {
-      Block_header.proof_of_work_nonce;
-      seed_nonce_hash;
-      liquidity_baking_toggle_vote;
-      payload_hash;
-      payload_round;
-    }
+      ~payload_round shell_header =
+    naive_pow_miner
+      ~proof_of_work_threshold
+      shell_header
+      {
+        Block_header.proof_of_work_nonce = default_proof_of_work_nonce;
+        seed_nonce_hash;
+        liquidity_baking_toggle_vote;
+        payload_hash;
+        payload_round;
+      }
 end
 
 (********* Genesis creation *************)
@@ -408,13 +439,12 @@ let genesis_with_parameters parameters =
       ~fitness
       ~operations_hash:Operation_list_list_hash.zero
   in
-  let contents =
-    Forge.make_contents
-      ~payload_hash:Block_payload_hash.zero
-      ~payload_round:Round.zero
-      ~seed_nonce_hash:None
-      ()
-  in
+  Forge.make_contents
+    ~payload_hash:Block_payload_hash.zero
+    ~payload_round:Round.zero
+    ~seed_nonce_hash:None
+    shell
+  >>=? fun contents ->
   let open Tezos_protocol_alpha_parameters in
   let json = Default_parameters.json_of_parameters parameters in
   let proto_params =
@@ -612,14 +642,13 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     constants
     shell
     bootstrap_accounts
-  >|=? fun context ->
-  let contents =
-    Forge.make_contents
-      ~payload_hash:Block_payload_hash.zero
-      ~payload_round:Round.zero
-      ~seed_nonce_hash:None
-      ()
-  in
+  >>=? fun context ->
+  Forge.make_contents
+    ~payload_hash:Block_payload_hash.zero
+    ~payload_round:Round.zero
+    ~seed_nonce_hash:None
+    shell
+  >|=? fun contents ->
   {
     hash;
     header = {shell; protocol_data = {contents; signature = Signature.zero}};

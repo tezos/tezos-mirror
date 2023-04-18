@@ -106,9 +106,8 @@ let test_no_commitment () =
   let* b = Block.bake_n (blocks_per_commitment - 2) b in
   (* Forge a block with empty commitment and apply it *)
   let* header = Block.Forge.forge_header b in
-  let* header =
-    Block.Forge.set_seed_nonce_hash None header |> Block.Forge.sign_header
-  in
+  let* header = Block.Forge.set_seed_nonce_hash None header in
+  let* header = Block.Forge.sign_header header in
   let*! e = Block.apply header b in
   Assert.proto_error_with_info
     ~loc:__LOC__

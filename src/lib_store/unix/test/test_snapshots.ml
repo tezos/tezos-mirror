@@ -595,6 +595,7 @@ let test_drag_after_import export_mode =
         blocks_per_cycle = 256l;
         cycles_per_voting_period = 1l;
         consensus_threshold = 0;
+        proof_of_work_threshold = -1L;
       }
   in
   let patch_context ctxt =

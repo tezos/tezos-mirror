@@ -27,7 +27,7 @@ open Protocol
 
 let default_constant = "\x00\x00\x00\x05"
 
-let is_updated_constant =
+let with_version_constant =
   let commit_hash =
     match Hex.to_string (`Hex Tezos_version.Current_git_info.commit_hash) with
     | None -> Tezos_version.Current_git_info.commit_hash
@@ -36,50 +36,96 @@ let is_updated_constant =
   if String.length commit_hash >= 4 then String.sub commit_hash 0 4
   else default_constant
 
-let is_updated_constant_len = String.length is_updated_constant
+let with_version_constant_len = String.length with_version_constant
 
-(* add a version to the pow *)
-let init_proof_of_work_nonce () =
-  let buf =
+let proof_of_work_nonce =
+  let out =
     Bytes.make Alpha_context.Constants.proof_of_work_nonce_size '\000'
   in
-  Bytes.blit_string is_updated_constant 0 buf 0 is_updated_constant_len ;
-  let max_z_len =
-    Alpha_context.Constants.proof_of_work_nonce_size - is_updated_constant_len
+  let () =
+    Bytes.blit_string with_version_constant 0 out 0 with_version_constant_len
   in
-  let rec aux z =
-    let z_len = (Z.numbits z + 7) / 8 in
-    if z_len > max_z_len then Seq.Nil
-    else (
-      Bytes.blit_string (Z.to_bits z) 0 buf is_updated_constant_len z_len ;
-      Seq.Cons (buf, fun () -> aux (Z.succ z)))
-  in
-  aux Z.zero
+  out
 
-(* This was used before November 2018 *)
-(* (\* Random proof of work *\)
- * let generate_proof_of_work_nonce () =
- *   Tezos_crypto.Rand.generate Alpha_context.Constants.proof_of_work_nonce_size *)
+(* [proof_of_work_nonce] will be modified in place so we make a clean copy to expose to the outside *)
+let empty_proof_of_work_nonce = Bytes.copy proof_of_work_nonce
 
-let empty_proof_of_work_nonce =
-  Bytes.make Constants_repr.proof_of_work_nonce_size '\000'
+let max_z_len =
+  Alpha_context.Constants.proof_of_work_nonce_size - with_version_constant_len
+
+(* Make a string of zeros to restore [proof_of_work_nonce] to its original value in 1 operation *)
+let zeros = String.make max_z_len '\000'
 
 let mine ~proof_of_work_threshold shell builder =
-  let rec loop nonce_seq =
-    match nonce_seq with
-    | Seq.Nil ->
-        failwith
-          "Client_baking_pow.mine: couldn't find nonce for required proof of \
-           work"
-    | Seq.Cons (nonce, seq) ->
-        let block = builder nonce in
-        if
-          Alpha_context.Block_header.Proof_of_work
-          .check_header_proof_of_work_stamp
-            shell
-            block
-            proof_of_work_threshold
-        then return block
-        else loop (seq ())
-  in
-  loop (init_proof_of_work_nonce ())
+  match
+    Option.bind
+      (Data_encoding.Binary.fixed_length Block_payload_hash.encoding)
+      (fun payload ->
+        Option.map
+          (fun round ->
+            let shell =
+              Data_encoding.Binary.length
+                Block_header.shell_header_encoding
+                shell
+            in
+            shell + payload + round + with_version_constant_len)
+          (Data_encoding.Binary.fixed_length Round_repr.encoding))
+    (* Where to put the proof of work value is in the bytes of the encoded header *)
+  with
+  | None -> failwith "Cannot compute block header offset"
+  | Some offset ->
+      let () =
+        (* Restore proof_of_work_nonce to its original value. *)
+        Bytes.blit_string
+          zeros
+          0
+          proof_of_work_nonce
+          with_version_constant_len
+          max_z_len
+      in
+      (* Build the binary of the block header with 0 as proof of work and compute its hash. *)
+      let block_0 = builder proof_of_work_nonce in
+      let block_header =
+        Data_encoding.Binary.to_bytes_exn
+          Alpha_context.Block_header.encoding
+          Alpha_context.Block_header.
+            {
+              shell;
+              protocol_data = {contents = block_0; signature = Signature.zero};
+            }
+      in
+      let block_hash = Block_header.hash_raw block_header in
+      let block_hash_bytes = Block_hash.to_bytes block_hash in
+      (* The loop edits [block_header] and [block_hash] (by editing its subpart [block_hash_bytes]!) in place. *)
+      let rec loop z =
+        let z_len = (Z.numbits z + 7) / 8 in
+        if z_len > max_z_len then
+          failwith
+            "Client_baking_pow.mine: couldn't find nonce for required proof of \
+             work"
+        else (
+          Bytes.blit_string (Z.to_bits z) 0 block_header offset z_len ;
+          (if Hacl_star.AutoConfig2.(has_feature VEC256) then
+           Hacl_star.Hacl.Blake2b_256.Noalloc.hash
+          else Hacl_star.Hacl.Blake2b_32.Noalloc.hash)
+            ~key:Bytes.empty
+            ~msg:block_header
+            ~digest:block_hash_bytes ;
+          if
+            Alpha_context.Block_header.Proof_of_work.check_hash
+              block_hash
+              proof_of_work_threshold
+          then
+            let () =
+              Bytes.blit_string
+                (Z.to_bits z)
+                0
+                proof_of_work_nonce
+                with_version_constant_len
+                z_len
+            in
+            let block = builder proof_of_work_nonce in
+            return block
+          else loop (Z.succ z))
+      in
+      loop Z.zero

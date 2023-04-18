@@ -230,6 +230,118 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
   [
     command
       ~group
+      ~desc:"Benchmark the proof of work challenge resolution"
+      (args2
+         (default_arg
+            ~doc:"Proof of work threshold"
+            ~long:"threshold"
+            ~placeholder:"int"
+            ~default:
+              (Int64.to_string
+                 Default_parameters.constants_mainnet.proof_of_work_threshold)
+            (parameter (fun (cctxt : Protocol_client_context.full) x ->
+                 try return (Int64.of_string x)
+                 with _ -> cctxt#error "Expect an integer")))
+         (arg
+            ~doc:"Random seed"
+            ~long:"seed"
+            ~placeholder:"int"
+            (parameter (fun (cctxt : Protocol_client_context.full) x ->
+                 try return (int_of_string x)
+                 with _ -> cctxt#error "Expect an integer"))))
+      (prefix "bench"
+      @@ param
+           ~name:"nb_draw"
+           ~desc:"number of draws"
+           (parameter (fun (cctxt : Protocol_client_context.full) x ->
+                match int_of_string x with
+                | x when x >= 1 -> return x
+                | _ | (exception _) ->
+                    cctxt#error "Expect a strictly positive integer"))
+      @@ fixed ["baking"; "PoW"; "challenges"])
+      (fun (proof_of_work_threshold, seed) nb_draw cctxt ->
+        let open Lwt_result_syntax in
+        let*! () =
+          cctxt#message
+            "Running %d iterations of proof-of-work challenge..."
+            nb_draw
+        in
+        let rstate =
+          match seed with
+          | None -> Random.State.make_self_init ()
+          | Some s -> Random.State.make [|s|]
+        in
+        let* all =
+          List.map_es
+            (fun i ->
+              let level = Int32.of_int (Random.State.int rstate (1 lsl 29)) in
+              let shell_header =
+                Tezos_base.Block_header.
+                  {
+                    level;
+                    proto_level = 1;
+                    (* uint8 *)
+                    predecessor = Tezos_crypto.Hashed.Block_hash.zero;
+                    timestamp = Time.Protocol.epoch;
+                    validation_passes = 3;
+                    (* uint8 *)
+                    operations_hash =
+                      Tezos_crypto.Hashed.Operation_list_list_hash.zero;
+                    fitness = [];
+                    context = Tezos_crypto.Hashed.Context_hash.zero;
+                  }
+              in
+              let now = Time.System.now () in
+              let* _ =
+                Baking_pow.mine
+                  ~proof_of_work_threshold
+                  shell_header
+                  (fun proof_of_work_nonce ->
+                    Protocol.Alpha_context.
+                      {
+                        Block_header.payload_hash =
+                          Protocol.Block_payload_hash.zero;
+                        payload_round = Round.zero;
+                        seed_nonce_hash = None;
+                        proof_of_work_nonce;
+                        liquidity_baking_toggle_vote = LB_pass;
+                      })
+              in
+              let _then = Time.System.now () in
+              let x = Ptime.diff _then now in
+              let*! () = cctxt#message "%d/%d: %a" i nb_draw Ptime.Span.pp x in
+              return x)
+            (1 -- nb_draw)
+        in
+        let sum = List.fold_left Ptime.Span.add Ptime.Span.zero all in
+        let base, tail = Stdlib.List.(hd all, tl all) in
+        let max =
+          List.fold_left
+            (fun x y -> if Ptime.Span.compare x y > 0 then x else y)
+            base
+            tail
+        in
+        let min =
+          List.fold_left
+            (fun x y -> if Ptime.Span.compare x y <= 0 then x else y)
+            base
+            tail
+        in
+        let div = Ptime.Span.to_float_s sum /. float (List.length all) in
+        let*! () =
+          cctxt#message
+            "%d runs: min: %a, max: %a, average: %a"
+            nb_draw
+            Ptime.Span.pp
+            min
+            Ptime.Span.pp
+            max
+            (Format.pp_print_option Ptime.Span.pp)
+            (Ptime.Span.of_float_s div)
+        in
+        return_unit);
+    command
+      ~group
       ~desc:"Forge and inject block using the delegates' rights."
       (args10
          minimal_fees_arg
