@@ -218,3 +218,93 @@ pub type BytesTicket = Ticket<MichelsonBytes>;
 
 /// Specialized version of ticket where the content must be unit
 pub type UnitTicket = Ticket<MichelsonUnit>;
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use tezos_data_encoding::enc::BinWriter;
+    use tezos_data_encoding::nom::NomReader;
+
+    #[test]
+    fn content_bytes() {
+        let ticket = BytesTicket::new(
+            Contract::from_b58check("KT1NgXQ6Mwu3XKFDcKdYFS6dkkY3iNKdBKEc").unwrap(),
+            MichelsonBytes(vec![1, 2, 3, 4, 5]),
+            500,
+        )
+        .unwrap();
+
+        assert_encode_decode(ticket);
+    }
+
+    #[test]
+    fn content_string() {
+        let ticket = StringTicket::new(
+            Contract::from_b58check("KT1NgXQ6Mwu3XKFDcKdYFS6dkkY3iNKdBKEc").unwrap(),
+            MichelsonString("Hello, Ticket".to_string()),
+            900,
+        )
+        .unwrap();
+
+        assert_encode_decode(ticket);
+    }
+
+    #[test]
+    fn content_unit() {
+        let ticket = UnitTicket::new(
+            Contract::from_b58check("KT1NgXQ6Mwu3XKFDcKdYFS6dkkY3iNKdBKEc").unwrap(),
+            MichelsonUnit,
+            900,
+        )
+        .unwrap();
+
+        assert_encode_decode(ticket);
+    }
+
+    #[test]
+    fn content_int() {
+        let ticket = IntTicket::new::<i32, i32>(
+            Contract::from_b58check("KT1NgXQ6Mwu3XKFDcKdYFS6dkkY3iNKdBKEc").unwrap(),
+            -25,
+            900,
+        )
+        .unwrap();
+
+        assert_encode_decode(ticket);
+    }
+
+    #[test]
+    fn content_pair() {
+        type NestedPair = MichelsonPair<
+            MichelsonUnit,
+            MichelsonPair<MichelsonPair<MichelsonString, MichelsonBytes>, MichelsonInt>,
+        >;
+        let ticket: Ticket<NestedPair> = Ticket::new::<_, i32>(
+            Contract::from_b58check("KT1NgXQ6Mwu3XKFDcKdYFS6dkkY3iNKdBKEc").unwrap(),
+            MichelsonPair(
+                MichelsonUnit,
+                MichelsonPair(
+                    MichelsonPair(
+                        MichelsonString("hello".to_string()),
+                        MichelsonBytes(b"a series of bytes".to_vec()),
+                    ),
+                    MichelsonInt::from(19),
+                ),
+            ),
+            17,
+        )
+        .unwrap();
+
+        assert_encode_decode(ticket);
+    }
+
+    fn assert_encode_decode<T: Michelson>(ticket: Ticket<T>) {
+        let mut bin = Vec::new();
+        ticket.bin_write(&mut bin).unwrap();
+
+        let (remaining, parsed) = Ticket::nom_read(&bin).unwrap();
+
+        assert_eq!(ticket, parsed);
+        assert!(remaining.is_empty());
+    }
+}
