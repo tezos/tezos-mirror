@@ -363,9 +363,14 @@ module type AUTOMATON = sig
     | Not_joined : [`Leave] output
         (** Attempting to leave a topic which we didn't join or had already
             left. *)
-    | Leaving_topic : {to_prune : Peer.Set.t} -> [`Leave] output
+    | Leaving_topic : {
+        to_prune : Peer.Set.t;
+        noPX_peers : Peer.Set.t;
+      }
+        -> [`Leave] output
         (** When successfully leaving a topic, the set of pruned peers for that
-            topic is returned. *)
+            topic is returned alongside a subset of those peers for which no
+            alternative PX will be proposed. *)
     | Heartbeat : {
         to_graft : Topic.Set.t Peer.Map.t;
             (** The set of topics per peer that have been grafted. *)

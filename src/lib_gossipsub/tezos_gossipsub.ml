@@ -157,7 +157,11 @@ module Make (C : AUTOMATON_CONFIG) :
     | Already_joined : [`Join] output
     | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
     | Not_joined : [`Leave] output
-    | Leaving_topic : {to_prune : Peer.Set.t} -> [`Leave] output
+    | Leaving_topic : {
+        to_prune : Peer.Set.t;
+        noPX_peers : Peer.Set.t;
+      }
+        -> [`Leave] output
     | Heartbeat : {
         to_graft : Topic.Set.t Peer.Map.t;
         to_prune : Topic.Set.t Peer.Map.t;
@@ -1047,6 +1051,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! unsubscribe_backoff in
       let*! backoff in
+      let*! scores in
       let* () =
         Peer.Set.fold
           (fun peer backoff ->
@@ -1055,7 +1060,12 @@ module Make (C : AUTOMATON_CONFIG) :
           backoff
         |> set_backoff
       in
-      Leaving_topic {to_prune = mesh} |> return
+      let noPX_peers =
+        (* no PX for peers with negative score. *)
+        let get_score = Score.(get_scores_score scores ~default:zero) in
+        Peer.Set.filter (fun peer -> Score.(get_score peer < zero)) mesh
+      in
+      Leaving_topic {to_prune = mesh; noPX_peers} |> return
 
     let handle topic : [`Leave] output Monad.t =
       let open Monad.Syntax in
