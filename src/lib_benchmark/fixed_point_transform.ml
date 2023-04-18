@@ -48,9 +48,7 @@ type options = {
 type fp_error = Bad_fpclass of Float.fpclass | Negative_or_zero_fp
 
 (* Handling codegen errors. *)
-type fixed_point_transform_error =
-  | Imprecise_integer_cast of float * float
-  | Term_is_not_closed of Free_variable.t
+type fixed_point_transform_error = Term_is_not_closed of Free_variable.t
 
 exception Bad_floating_point_number of fp_error
 
@@ -72,13 +70,6 @@ let default_options =
 
 let pp_fixed_point_transform_error fmtr (err : fixed_point_transform_error) =
   match err with
-  | Imprecise_integer_cast (f, p) ->
-      Format.fprintf
-        fmtr
-        "Fixed_point_transform: Imprecise integer cast of %f: %f %% relative \
-         error"
-        f
-        (p *. 100.)
   | Term_is_not_closed s ->
       Format.fprintf
         fmtr
@@ -191,13 +182,18 @@ let assert_fp_is_correct (x : float) =
       raise (Bad_floating_point_number Negative_or_zero_fp)
   | _ -> ()
 
-let cast_safely_to_int max_relative_error mode f : int =
+let cast_to_int max_relative_error mode f : int =
   let i = int_of_float mode f in
   let fi = float_of_int i in
   let re = abs_float (f -. fi) /. abs_float f in
   if re > max_relative_error then
-    raise (Fixed_point_transform_error (Imprecise_integer_cast (f, re)))
-  else i
+    Format.eprintf
+      "Warning: Fixed_point_transform: Imprecise integer cast of %f to %d: %f \
+       %% relative error@."
+      f
+      i
+      (re *. 100.) ;
+  i
 
 (* ------------------------------------------------------------------------- *)
 
@@ -318,7 +314,7 @@ end)
   let int i = X.int (snap_to_grid ~inverse_scaling ~resolution i)
 
   let float f =
-    let int = cast_safely_to_int max_relative_error cast_mode f in
+    let int = cast_to_int max_relative_error cast_mode f in
     let pretty_int = snap_to_grid ~inverse_scaling ~resolution int in
     X.int pretty_int
 end
@@ -347,14 +343,14 @@ end = struct
 
   let {precision; max_relative_error; cast_mode; _} = P.options
 
-  let cast_safely_to_int = cast_safely_to_int max_relative_error
+  let cast_to_int = cast_to_int max_relative_error
 
   (* Cast float to int verifying that the relative error is
      not too high. *)
   let cast_safe (type a) (x : a repr) : a repr =
     match x with
     | Term _ -> x
-    | Const f -> Term (X.int (cast_safely_to_int cast_mode f))
+    | Const f -> Term (X.int (cast_to_int cast_mode f))
 
   let lift_unop op x = match x with Term x -> Term (op x) | _ -> cast_safe x
 
