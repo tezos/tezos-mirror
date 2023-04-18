@@ -1900,18 +1900,23 @@ let _octez_base_tests =
     ~js_compatible:true
 
 let _octez_base_unix_tests =
-  test
-    "test_unix_error"
+  tezt
+    ["test_unix_error"; "test_syslog"]
     ~path:"src/lib_base/unix/test"
+    ~with_macos_security_framework:true
     ~opam:"tezos-base"
+    ~modes:[Native]
     ~deps:
       [
         octez_base |> open_;
         octez_base_unix |> open_;
+        octez_stdlib_unix |> open_;
         octez_error_monad |> open_;
         data_encoding;
         octez_test_helpers |> open_;
         qcheck_alcotest;
+        alcotezt;
+        tezt_lib;
       ]
 
 let octez_base_test_helpers =
