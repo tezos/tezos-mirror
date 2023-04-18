@@ -303,6 +303,8 @@ let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
       reconnection_delay =
         Option.value ~default:default_reconnection_delay reconnection_delay;
       dal_node_endpoint;
+      dac_observer_endpoint = None;
+      dac_timeout = None;
       metrics_addr;
       fee_parameters = Operator_purpose_map.empty;
       mode;

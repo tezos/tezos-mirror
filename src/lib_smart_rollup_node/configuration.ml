@@ -70,6 +70,33 @@ type t = {
   log_kernel_debug : bool;
 }
 
+type error +=
+  | Missing_mode_operators of {mode : string; missing_operators : string list}
+
+let () =
+  register_error_kind
+    ~id:"sc_rollup.node.missing_mode_operators"
+    ~title:"Missing operators for the chosen mode"
+    ~description:"Missing operators for the chosen mode."
+    ~pp:(fun ppf (mode, missing_operators) ->
+      Format.fprintf
+        ppf
+        "@[<hov>Missing operators %a for mode %s.@]"
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+           Format.pp_print_string)
+        missing_operators
+        mode)
+    `Permanent
+    Data_encoding.(
+      obj2 (req "mode" string) (req "missing_operators" (list string)))
+    (function
+      | Missing_mode_operators {mode; missing_operators} ->
+          Some (mode, missing_operators)
+      | _ -> None)
+    (fun (mode, missing_operators) ->
+      Missing_mode_operators {mode; missing_operators})
+
 let default_data_dir =
   Filename.concat (Sys.getenv "HOME") ".tezos-smart-rollup-node"
 
@@ -635,8 +662,7 @@ let check_mode config =
     if missing_operators <> [] then
       let mode = string_of_mode config.mode in
       let missing_operators = List.map string_of_purpose missing_operators in
-      tzfail
-        (Sc_rollup_node_errors.Missing_mode_operators {mode; missing_operators})
+      tzfail (Missing_mode_operators {mode; missing_operators})
     else return_unit
   in
   let narrow_purposes purposes =

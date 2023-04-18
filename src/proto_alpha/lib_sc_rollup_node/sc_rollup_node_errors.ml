@@ -31,7 +31,6 @@ let register_error_kind ~id = register_error_kind ~id:(make_id id)
 
 type error +=
   | Cannot_produce_proof of Sc_rollup.Game.t
-  | Missing_mode_operators of {mode : string; missing_operators : string list}
   | Bad_minimal_fees of string
   | Disagree_with_cemented of {
       inbox_level : Raw_level.t;
@@ -144,29 +143,6 @@ let () =
     Data_encoding.(obj1 (req "game" Sc_rollup.Game.encoding))
     (function Cannot_produce_proof game -> Some game | _ -> None)
     (fun game -> Cannot_produce_proof game) ;
-
-  register_error_kind
-    ~id:"sc_rollup.node.missing_mode_operators"
-    ~title:"Missing operators for the chosen mode"
-    ~description:"Missing operators for the chosen mode."
-    ~pp:(fun ppf (mode, missing_operators) ->
-      Format.fprintf
-        ppf
-        "@[<hov>Missing operators %a for mode %s.@]"
-        (Format.pp_print_list
-           ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
-           Format.pp_print_string)
-        missing_operators
-        mode)
-    `Permanent
-    Data_encoding.(
-      obj2 (req "mode" string) (req "missing_operators" (list string)))
-    (function
-      | Missing_mode_operators {mode; missing_operators} ->
-          Some (mode, missing_operators)
-      | _ -> None)
-    (fun (mode, missing_operators) ->
-      Missing_mode_operators {mode; missing_operators}) ;
 
   register_error_kind
     ~id:"sc_rollup.node.Wrong_initial_pvm_state"
