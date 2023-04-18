@@ -14,51 +14,6 @@ use rlp::{Decodable, DecoderError, Encodable, Rlp};
 /// The size of one 256 bit word. Size in bytes
 pub const WORD_SIZE: usize = 32_usize;
 
-/// Gas price newtype to wrap U256
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct GasPrice {
-    /// tezos_encoding doesn't support deriving reader and writer from newtypes so therefore this
-    /// public field instead.
-    pub value: U256,
-}
-
-impl GasPrice {
-    /// Create a new gas price from serilizable u256
-    pub fn new(value: U256) -> Self {
-        Self { value }
-    }
-
-    /// Create a new gas price from primitive type
-    pub fn from_u256(value: U256) -> Self {
-        Self { value }
-    }
-
-    /// Zero
-    pub fn zero() -> Self {
-        Self {
-            value: U256::zero(),
-        }
-    }
-
-    /// One
-    pub fn one() -> Self {
-        Self { value: U256::one() }
-    }
-}
-
-impl Decodable for GasPrice {
-    fn decode(decoder: &Rlp<'_>) -> Result<GasPrice, DecoderError> {
-        Ok(Self {
-            value: U256::decode(decoder)?,
-        })
-    }
-}
-impl Encodable for GasPrice {
-    fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.append(&self.value);
-    }
-}
-
 /// Gas limit newtype to wrap U256
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct GasLimit {

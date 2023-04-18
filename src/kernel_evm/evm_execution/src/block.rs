@@ -11,14 +11,14 @@
 use super::storage::blocks::get_current_number_n_timestamp;
 use host::runtime::Runtime;
 use primitive_types::{H160, U256};
-use tezos_ethereum::basic::{GasLimit, GasPrice};
+use tezos_ethereum::basic::GasLimit;
 /// All data for an Ethereum block.
 ///
 /// This data does not change for the duration of the block. All balues are
 /// updated when the block is finalized and may change for the next block.
 pub struct BlockConstants {
     /// Price of one unit of gas in Wei
-    pub gas_price: GasPrice,
+    pub gas_price: U256,
     /// The number of the current block
     pub number: U256,
     /// Who is the beneficiary of the current block
@@ -43,7 +43,7 @@ impl BlockConstants {
     /// To be done in <https://gitlab.com/tezos/tezos/-/milestones/114>.
     pub fn first_block() -> Self {
         Self {
-            gas_price: GasPrice::one(),
+            gas_price: U256::one(),
             number: U256::zero(),
             coinbase: H160::zero(),
             timestamp: U256::zero(),

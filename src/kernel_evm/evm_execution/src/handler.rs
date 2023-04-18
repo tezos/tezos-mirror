@@ -775,7 +775,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn gas_price(&self) -> U256 {
-        self.block.gas_price.value
+        self.block.gas_price
     }
 
     fn origin(&self) -> H160 {
