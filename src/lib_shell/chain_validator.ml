@@ -351,19 +351,15 @@ let may_switch_test_chain w active_chains spawn_child block =
       Lwt.return_unit
 
 let broadcast_head w ~previous block =
-  let open Lwt_syntax in
   let nv = Worker.state w in
   if not (is_bootstrapped nv) then Lwt.return_unit
   else
-    let* successor =
-      let* o =
-        Store.Block.read_predecessor_opt nv.parameters.chain_store block
-      in
-      match o with
-      | None -> Lwt.return_true
-      | Some predecessor -> Lwt.return (Store.Block.equal predecessor previous)
+    let predecessor_hash = Store.Block.predecessor block in
+    let successor_or_sibling =
+      Block_hash.equal predecessor_hash (Store.Block.hash previous)
+      || Block_hash.equal predecessor_hash (Store.Block.predecessor previous)
     in
-    if successor then (
+    if successor_or_sibling then (
       Distributed_db.Advertise.current_head nv.chain_db block ;
       Lwt.return_unit)
     else Distributed_db.Advertise.current_branch nv.chain_db
