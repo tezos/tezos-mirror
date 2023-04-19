@@ -121,6 +121,19 @@ struct
     in
     weighted_deliveries
 
+  let p3 {mesh_message_deliveries_threshold; mesh_message_deliveries_weight; _}
+      {mesh_message_deliveries; mesh_message_deliveries_active; _} =
+    if
+      mesh_message_deliveries_active
+      && mesh_message_deliveries < mesh_message_deliveries_threshold
+    then
+      let deficit =
+        mesh_message_deliveries_threshold - mesh_message_deliveries
+      in
+      let p3 = float_of_int (deficit * deficit) in
+      p3 *. mesh_message_deliveries_weight
+    else 0.0
+
   let topic_scores {parameters; topic_status; _} =
     Topic.Map.fold
       (fun topic status acc ->
@@ -128,7 +141,8 @@ struct
         let topic_weight = get_topic_weight parameters topic in
         let p1 = p1 topic_parameters status in
         let p2 = p2 topic_parameters status in
-        let tot = topic_weight *. (p1 +. p2) in
+        let p3 = p3 topic_parameters status in
+        let tot = topic_weight *. (p1 +. p2 +. p3) in
         acc +. tot)
       topic_status
       0.0
