@@ -63,9 +63,8 @@ module type S = sig
     (unit, tztrace) result Lwt.t
 end
 
-module Make (Interpreter : Interpreter.S) :
-  S with module PVM = Interpreter.PVM = struct
-  module PVM = Interpreter.PVM
+module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
+  module PVM = PVM
   open Sc_rollup.Game
 
   let node_role ~self Sc_rollup.Game.Index.{alice; bob} =

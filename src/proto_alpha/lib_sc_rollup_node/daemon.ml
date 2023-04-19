@@ -328,7 +328,7 @@ module Make (PVM : Pvm.S) = struct
         (* Avoid triggering the pvm execution if this has been done before for
            this head. *)
         let* ctxt, _num_messages, num_ticks, initial_tick =
-          Components.Interpreter.process_head
+          Interpreter.process_head
             node_ctxt
             ctxt
             ~predecessor
@@ -604,7 +604,7 @@ module Make (PVM : Pvm.S) = struct
           messages
       in
       let* ctxt, _num_messages, num_ticks, initial_tick =
-        Components.Interpreter.process_head
+        Interpreter.process_head
           node_ctxt
           ctxt
           ~predecessor

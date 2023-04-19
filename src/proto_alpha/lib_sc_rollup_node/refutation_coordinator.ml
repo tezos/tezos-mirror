@@ -41,9 +41,9 @@ end
    worker events without conflicts. *)
 let instances_count = ref 0
 
-module Make (Interpreter : Interpreter.S) = struct
-  include Refutation_game.Make (Interpreter)
-  module Player = Refutation_player.Make (Interpreter)
+module Make (PVM : Pvm.S) = struct
+  include Refutation_game.Make (PVM)
+  module Player = Refutation_player.Make (PVM)
   module Pkh_map = Signature.Public_key_hash.Map
   module Pkh_table = Signature.Public_key_hash.Table
 

@@ -49,4 +49,4 @@ module type S = sig
     (unit, tztrace) result Lwt.t
 end
 
-module Make (Interpreter : Interpreter.S) : S with module PVM = Interpreter.PVM
+module Make (PVM : Pvm.S) : S with module PVM = PVM

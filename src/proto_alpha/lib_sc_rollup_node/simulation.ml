@@ -27,9 +27,8 @@ open Protocol
 open Alpha_context
 
 module type S = sig
-  module Interpreter : Interpreter.S
+  module PVM : Pvm.S
 
-  module PVM = Interpreter.PVM
   module Fueled_pvm = Fueled_pvm.Free
 
   type level_position = Start | Middle | End
@@ -64,10 +63,8 @@ module type S = sig
   val end_simulation : Node_context.ro -> t -> (t * Z.t) tzresult Lwt.t
 end
 
-module Make (Interpreter : Interpreter.S) :
-  S with module Interpreter = Interpreter = struct
-  module Interpreter = Interpreter
-  module PVM = Interpreter.PVM
+module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
+  module PVM = PVM
   module Fueled_pvm = Fueled_pvm.Free
 
   type level_position = Start | Middle | End

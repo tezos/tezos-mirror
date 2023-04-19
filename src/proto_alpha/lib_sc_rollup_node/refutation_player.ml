@@ -70,8 +70,8 @@ module type S = sig
   val current_games : unit -> (public_key_hash * worker) list
 end
 
-module Make (Interpreter : Interpreter.S) : S = struct
-  open Refutation_game.Make (Interpreter)
+module Make (PVM : Pvm.S) : S = struct
+  open Refutation_game.Make (PVM)
 
   let on_play game Types.{node_ctxt; self; opponent; _} =
     play node_ctxt ~self game opponent

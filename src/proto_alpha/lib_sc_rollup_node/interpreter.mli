@@ -25,45 +25,38 @@
 
 open Protocol.Alpha_context
 
-module type S = sig
-  module PVM : Pvm.S
+(** [process_head node_ctxt ~predecessor head (inbox, messages)] interprets the
+    [messages] associated with a [head] (where [predecessor] is the predecessor
+    of [head] in the L1 chain). This requires the [inbox] to be updated
+    beforehand. It returns [(ctxt, num_messages, num_ticks, tick)] where [ctxt]
+    is the updated layer 2 context (with the new PVM state), [num_messages] is
+    the number of [messages], [num_ticks] is the number of ticks taken by the
+    PVM for the evaluation and [tick] is the tick reached by the PVM after the
+    evaluation. *)
+val process_head :
+  Node_context.rw ->
+  'a Context.t ->
+  predecessor:Layer1.header ->
+  Layer1.header ->
+  Sc_rollup.Inbox.t * Sc_rollup.Inbox_message.t list ->
+  ('a Context.t * int * int64 * Sc_rollup.Tick.t) tzresult Lwt.t
 
-  (** [process_head node_ctxt ~predecessor head (inbox, messages)] interprets
-      the [messages] associated with a [head] (where [predecessor] is the
-      predecessor of [head] in the L1 chain). This requires the [inbox] to be
-      updated beforehand. It returns [(ctxt, num_messages, num_ticks, tick)]
-      where [ctxt] is the updated layer 2 context (with the new PVM state),
-      [num_messages] is the number of [messages], [num_ticks] is the number of
-      ticks taken by the PVM for the evaluation and [tick] is the tick reached
-      by the PVM after the evaluation. *)
-  val process_head :
-    Node_context.rw ->
-    'a Context.t ->
-    predecessor:Layer1.header ->
-    Layer1.header ->
-    Sc_rollup.Inbox.t * Sc_rollup.Inbox_message.t list ->
-    ('a Context.t * int * int64 * Sc_rollup.Tick.t) tzresult Lwt.t
+(** [state_of_tick node_ctxt ?start_state tick level] returns [Some (state,
+    hash)] for a given [tick] if this [tick] happened before [level]. Otherwise,
+    returns [None]. If provided, the evaluation is resumed from
+    [start_state]. *)
+val state_of_tick :
+  _ Node_context.t ->
+  ?start_state:Fueled_pvm.Accounted.eval_state ->
+  Sc_rollup.Tick.t ->
+  Raw_level.t ->
+  Fueled_pvm.Accounted.eval_state option tzresult Lwt.t
 
-  (** [state_of_tick node_ctxt ?start_state tick level] returns [Some (state,
-      hash)] for a given [tick] if this [tick] happened before
-      [level]. Otherwise, returns [None]. If provided, the evaluation is resumed
-      from [start_state]. *)
-  val state_of_tick :
-    _ Node_context.t ->
-    ?start_state:Fueled_pvm.Accounted.eval_state ->
-    Sc_rollup.Tick.t ->
-    Raw_level.t ->
-    Fueled_pvm.Accounted.eval_state option tzresult Lwt.t
-
-  (** [state_of_head node_ctxt ctxt head] returns the state corresponding to the
-      block [head], or the state at rollup genesis if the block is before the
-      rollup origination. *)
-  val state_of_head :
-    'a Node_context.t ->
-    'a Context.t ->
-    Layer1.head ->
-    ('a Context.t * PVM.state) tzresult Lwt.t
-end
-
-(** Functor to construct an interpreter for a given PVM. *)
-module Make (PVM : Pvm.S) : S with module PVM = PVM
+(** [state_of_head node_ctxt ctxt head] returns the state corresponding to the
+    block [head], or the state at rollup genesis if the block is before the
+    rollup origination. *)
+val state_of_head :
+  'a Node_context.t ->
+  'a Context.t ->
+  Layer1.head ->
+  ('a Context.t * Context.tree) tzresult Lwt.t

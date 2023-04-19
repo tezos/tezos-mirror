@@ -50,4 +50,4 @@ module type S = sig
   val shutdown : unit -> unit Lwt.t
 end
 
-module Make (Interpreter : Interpreter.S) : S
+module Make (PVM : Pvm.S) : S

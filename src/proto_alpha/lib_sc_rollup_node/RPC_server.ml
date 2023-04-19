@@ -55,7 +55,6 @@ let get_dal_processed_slots node_ctxt block =
 
 module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
   module PVM = Simulation.PVM
-  module Interpreter = Simulation.Interpreter
   module Outbox = Outbox.Make (PVM)
 
   module Global_directory = Make_directory (struct

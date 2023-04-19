@@ -65,4 +65,4 @@ module type S = sig
   val current_games : unit -> (public_key_hash * worker) list
 end
 
-module Make (Interpreter : Interpreter.S) : S
+module Make (Interpreter : Pvm.S) : S
