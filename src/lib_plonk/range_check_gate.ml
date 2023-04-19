@@ -67,9 +67,8 @@ module type S = sig
     Poly.t SMap.t
 
   val prover_identities :
-    ?circuit_name:string ->
-    nb_proofs:int ->
-    proof_idx:int ->
+    ?circuit_prefix:(string -> string) ->
+    proof_prefix:(string -> string) ->
     beta:Scalar.t ->
     gamma:Scalar.t ->
     domain_size:int ->
@@ -77,9 +76,8 @@ module type S = sig
     prover_identities
 
   val verifier_identities :
-    ?circuit_name:string ->
-    nb_proofs:int ->
-    proof_idx:int ->
+    ?circuit_prefix:(string -> string) ->
+    proof_prefix:(string -> string) ->
     beta:Scalar.t ->
     gamma:Scalar.t ->
     domain_size:int ->
@@ -99,9 +97,7 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
 
   let z_name = "RC_Z"
 
-  let z_perm_name = "RC_Perm_Z"
-
-  let ids_label = "RC_Perm"
+  let rc_prefix = "RC_"
 
   let wire = Plompiler.Csir.wire_name 0
 
@@ -151,41 +147,42 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
      proofs as we do for wires ; for now & simplicity, we don’t handle several
      proofs in one circuit *)
   module Permutation = struct
-    module Perm = Permutation_gate.Permutation_gate_impl (PP)
+    module Perm = Permutation_gate.Permutation_gate (PP)
+
+    let external_prefix = rc_prefix
 
     let preprocessing ~permutation ~domain =
-      let ss_map =
-        Perm.Preprocessing.ssigma_map_non_quadratic_residues
-          permutation
-          domain
-          2
-      in
-      SMap.update_keys (String.cat "RC_") ss_map
+      Perm.preprocessing ~external_prefix ~domain ~permutation ~nb_wires:2 ()
 
     let f_map_contribution ~permutation ~beta ~gamma ~domain ~values =
-      SMap.singleton
-        z_perm_name
-        (Perm.Permutation_poly.compute_Z permutation domain beta gamma values)
+      Perm.f_map_contribution
+        ~external_prefix
+        ~permutation
+        ~values
+        ~beta
+        ~gamma
+        ~domain
+        ()
 
-    let prover_identities ~prefix_common ~prefix ~beta ~gamma domain_size =
+    let prover_identities ~circuit_prefix ~prefix:_ ~beta ~gamma domain_size =
       Perm.prover_identities
-        ~prefix:"RC_"
-        ~circuit_name:prefix_common
-        ~wires_names:[prefix z_name; prefix wire]
+        ~external_prefix
+        ~circuit_prefix
+        ~wires_names:[z_name; wire]
         ~beta
         ~gamma
         ~n:domain_size
         ()
 
-    let verifier_identities ~prefix_common ~prefix ~beta ~gamma domain_size
+    let verifier_identities ~circuit_prefix ~prefix:_ ~beta ~gamma domain_size
         generator =
       Perm.verifier_identities
-        ~prefix:"RC_"
-        ~circuit_name:prefix_common
+        ~external_prefix
+        ~circuit_prefix
         ~nb_proofs:1
         ~generator
         ~n:domain_size
-        ~wires_names:[prefix z_name; prefix wire]
+        ~wires_names:[z_name; wire]
         ~beta
         ~gamma
         ~delta:one
@@ -268,79 +265,75 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
       let evals, z = compute_Z domain upper_bound k check_indices wire in
       (evals, SMap.of_list [(z_name, z)])
 
-    let prover_identities ~prefix_common ~prefix n =
-      let prefix_common = SMap.Aggregation.add_prefix prefix_common in
-      fun evaluations ->
-        let z_evaluation =
-          Evaluations.find_evaluation evaluations (prefix z_name)
-        in
-        let z_evaluation_len = Evaluations.length z_evaluation in
-        let tmp_evaluation = Evaluations.create z_evaluation_len in
-        let tmp2_evaluation = Evaluations.create z_evaluation_len in
-        let idrca_evaluation = Evaluations.create z_evaluation_len in
-        let idrcb_evaluation = Evaluations.create z_evaluation_len in
+    let prover_identities ~circuit_prefix ~prefix n evaluations =
+      let z_evaluation =
+        Evaluations.find_evaluation evaluations (prefix z_name)
+      in
+      let z_evaluation_len = Evaluations.length z_evaluation in
+      let tmp_evaluation = Evaluations.create z_evaluation_len in
+      let tmp2_evaluation = Evaluations.create z_evaluation_len in
+      let idrca_evaluation = Evaluations.create z_evaluation_len in
+      let idrcb_evaluation = Evaluations.create z_evaluation_len in
 
-        (* Z × (1-Z) × Lnin1 *)
-        let identity_rca =
-          let lnin1_evaluation =
-            Evaluations.find_evaluation evaluations (prefix_common lnin1)
-          in
-          let one_m_z_evaluation =
-            Evaluations.linear_c
-              ~res:tmp_evaluation
-              ~linear_coeffs:[mone]
-              ~evaluations:[z_evaluation]
-              ~add_constant:one
-              ()
-          in
-          Evaluations.mul_c
-            ~res:idrca_evaluation
-            ~evaluations:[z_evaluation; one_m_z_evaluation; lnin1_evaluation]
+      (* Z × (1-Z) × Lnin1 *)
+      let identity_rca =
+        let lnin1_evaluation =
+          Evaluations.find_evaluation evaluations (circuit_prefix lnin1)
+        in
+        let one_m_z_evaluation =
+          Evaluations.linear_c
+            ~res:tmp_evaluation
+            ~linear_coeffs:[mone]
+            ~evaluations:[z_evaluation]
+            ~add_constant:one
             ()
         in
-        (* (Z - 2Zg) × (1 - Z + 2Zg) × Pnin1 *)
-        let identity_rcb =
-          let pnin1_evaluation =
-            Evaluations.find_evaluation evaluations (prefix_common pnin1)
-          in
-          let z_min_2Zg_evaluation =
-            Evaluations.linear_c
-              ~res:tmp_evaluation
-              ~linear_coeffs:[one; mtwo]
-              ~composition_gx:([0; 1], n)
-              ~evaluations:[z_evaluation; z_evaluation]
-              ()
-          in
-          let one_m_Z_p_2Zg_evaluation =
-            Evaluations.linear_c
-              ~res:tmp2_evaluation
-              ~linear_coeffs:[mone]
-              ~evaluations:[z_min_2Zg_evaluation]
-              ~add_constant:one
-              ()
-          in
-          Evaluations.mul_c
-            ~res:idrcb_evaluation
-            ~evaluations:
-              [z_min_2Zg_evaluation; one_m_Z_p_2Zg_evaluation; pnin1_evaluation]
+        Evaluations.mul_c
+          ~res:idrca_evaluation
+          ~evaluations:[z_evaluation; one_m_z_evaluation; lnin1_evaluation]
+          ()
+      in
+      (* (Z - 2Zg) × (1 - Z + 2Zg) × Pnin1 *)
+      let identity_rcb =
+        let pnin1_evaluation =
+          Evaluations.find_evaluation evaluations (circuit_prefix pnin1)
+        in
+        let z_min_2Zg_evaluation =
+          Evaluations.linear_c
+            ~res:tmp_evaluation
+            ~linear_coeffs:[one; mtwo]
+            ~composition_gx:([0; 1], n)
+            ~evaluations:[z_evaluation; z_evaluation]
             ()
         in
-        SMap.of_list
-          [(prefix "RC.a", identity_rca); (prefix "RC.b", identity_rcb)]
-
-    let verifier_identities ~prefix_common ~prefix =
-      let prefix_common = SMap.Aggregation.add_prefix prefix_common in
-      fun _x answers ->
-        let z = get_answer answers X (prefix z_name) in
-        let zg = get_answer answers GX (prefix z_name) in
-        let lnin1 = get_answer answers X (prefix_common lnin1) in
-        let pnin1 = get_answer answers X (prefix_common pnin1) in
-        let identity_rca = Scalar.(z * (one + negate z) * lnin1) in
-        let identity_rcb =
-          Scalar.((z + (mtwo * zg)) * (one + negate z + (two * zg)) * pnin1)
+        let one_m_Z_p_2Zg_evaluation =
+          Evaluations.linear_c
+            ~res:tmp2_evaluation
+            ~linear_coeffs:[mone]
+            ~evaluations:[z_min_2Zg_evaluation]
+            ~add_constant:one
+            ()
         in
-        SMap.of_list
-          [(prefix "RC.a", identity_rca); (prefix "RC.b", identity_rcb)]
+        Evaluations.mul_c
+          ~res:idrcb_evaluation
+          ~evaluations:
+            [z_min_2Zg_evaluation; one_m_Z_p_2Zg_evaluation; pnin1_evaluation]
+          ()
+      in
+      SMap.of_list
+        [(prefix "RC.a", identity_rca); (prefix "RC.b", identity_rcb)]
+
+    let verifier_identities ~circuit_prefix ~prefix _x answers =
+      let z = get_answer answers X (prefix z_name) in
+      let zg = get_answer answers GX (prefix z_name) in
+      let lnin1 = get_answer answers X (circuit_prefix lnin1) in
+      let pnin1 = get_answer answers X (circuit_prefix pnin1) in
+      let identity_rca = Scalar.(z * (one + negate z) * lnin1) in
+      let identity_rcb =
+        Scalar.((z + (mtwo * zg)) * (one + negate z + (two * zg)) * pnin1)
+      in
+      SMap.of_list
+        [(prefix "RC.a", identity_rca); (prefix "RC.b", identity_rcb)]
   end
 
   let preprocessing ~permutation ~range_checks ~domain =
@@ -368,21 +361,17 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
     in
     SMap.union_disjoint f_rc f_perm
 
-  let prover_identities ?(circuit_name = "") ~nb_proofs ~proof_idx ~beta ~gamma
+  let prover_identities ?(circuit_prefix = Fun.id) ~proof_prefix ~beta ~gamma
       ~domain_size () =
-    let proof_prefix =
-      SMap.Aggregation.add_prefix ~n:nb_proofs ~i:proof_idx ""
-    in
-    let prefix s = SMap.Aggregation.add_prefix circuit_name (proof_prefix s) in
     let rc_ids =
       RangeChecks.prover_identities
-        ~prefix_common:circuit_name
-        ~prefix
+        ~circuit_prefix
+        ~prefix:proof_prefix
         domain_size
     in
     let perm_ids =
       Permutation.prover_identities
-        ~prefix_common:circuit_name
+        ~circuit_prefix
         ~prefix:proof_prefix
         ~beta
         ~gamma
@@ -390,18 +379,14 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
     in
     Identities.merge_prover_identities [rc_ids; perm_ids]
 
-  let verifier_identities ?(circuit_name = "") ~nb_proofs ~proof_idx ~beta
-      ~gamma ~domain_size ~generator () =
-    let proof_prefix =
-      SMap.Aggregation.add_prefix ~n:nb_proofs ~i:proof_idx ""
-    in
-    let prefix s = SMap.Aggregation.add_prefix circuit_name (proof_prefix s) in
+  let verifier_identities ?(circuit_prefix = Fun.id) ~proof_prefix ~beta ~gamma
+      ~domain_size ~generator () =
     let rc_ids =
-      RangeChecks.verifier_identities ~prefix_common:circuit_name ~prefix
+      RangeChecks.verifier_identities ~circuit_prefix ~prefix:proof_prefix
     in
     let perm_ids =
       Permutation.verifier_identities
-        ~prefix_common:circuit_name
+        ~circuit_prefix
         ~prefix:proof_prefix
         ~beta
         ~gamma

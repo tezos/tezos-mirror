@@ -473,6 +473,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
               ~beta
               ~gamma
               ~domain:pp.common_pp.domain
+              ()
           in
           if pp.common_pp.zk then
             SMap.map
@@ -501,7 +502,6 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                     ~beta
                     ~gamma
                     ~domain:pp.common_pp.domain
-                    ~circuit_size:circuit_pp.circuit_size
                 in
                 if pp.common_pp.zk then
                   SMap.map
@@ -584,7 +584,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                 (wire_names @@ Array.length circuit_pp.wires)
             in
             Perm.prover_identities
-              ~circuit_name
+              ~circuit_prefix:(SMap.Aggregation.add_prefix circuit_name)
               ~wires_names
               ~beta:rd.beta_perm
               ~gamma:rd.gamma_perm
@@ -608,6 +608,13 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
               | None -> (0, List.length inputs_list)
               | Some shifts_map -> SMap.find circuit_name shifts_map
             in
+            let circuit_prefix = SMap.Aggregation.add_prefix circuit_name in
+            let proof_prefix i =
+              SMap.Aggregation.add_prefix
+                ~n:nb_proofs
+                ~i:(i + shift)
+                circuit_name
+            in
             let gates_identities =
               List.mapi
                 (fun i inputs ->
@@ -621,10 +628,9 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                       circuit_pp.public_input_size
                   in
                   Gates.aggregate_prover_identities
-                    ~circuit_name
-                    ~nb_proofs
+                    ~circuit_prefix
                     ~input_coms_size
-                    ~proof_idx:(i + shift)
+                    ~proof_prefix:(proof_prefix i)
                     ~gates:circuit_pp.gates
                     ~public_inputs
                     ~domain:pp.common_pp.domain
@@ -634,11 +640,10 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
             let plookup_identities =
               if not circuit_pp.ultra then []
               else
-                List.init nb_proofs (fun proof_idx ->
+                List.init nb_proofs (fun i ->
                     Plook.prover_identities
-                      ~circuit_name
-                      ~nb_proofs
-                      ~proof_idx
+                      ~circuit_prefix
+                      ~proof_prefix:(proof_prefix i)
                       ~wires_names
                       ~alpha:circuit_pp.alpha
                       ~beta:beta_plook
@@ -649,11 +654,10 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
             let rc_identities =
               if fst circuit_pp.range_checks = [] then []
               else
-                List.init nb_proofs (fun proof_idx ->
+                List.init nb_proofs (fun i ->
                     RangeCheck.prover_identities
-                      ~circuit_name
-                      ~nb_proofs
-                      ~proof_idx
+                      ~circuit_prefix
+                      ~proof_prefix:(proof_prefix i)
                       ~beta:beta_rc
                       ~gamma:gamma_rc
                       ~domain_size:pp.common_pp.n
@@ -791,10 +795,14 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
           (fun circuit_name pi_list ->
             let circuit_pp = SMap.find circuit_name circuits_map in
             let nb_proofs = List.length pi_list in
+            let circuit_prefix = SMap.Aggregation.add_prefix circuit_name in
+            let proof_prefix i =
+              SMap.Aggregation.add_prefix ~n:nb_proofs ~i circuit_name
+            in
             let wires_names = wire_names Plompiler.Csir.nb_wires_arch in
             let perm_identities =
               Perm.verifier_identities
-                ~circuit_name
+                ~circuit_prefix
                 ~wires_names
                 ~nb_proofs
                 ~generator
@@ -806,48 +814,45 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
             in
             let gates_identities =
               List.mapi
-                (fun proof_idx public_inputs ->
+                (fun i public_inputs ->
                   Gates.aggregate_verifier_identities
-                    ~circuit_name
+                    ~circuit_prefix
                     ~input_com_sizes:circuit_pp.input_com_sizes
-                    ~nb_proofs
-                    ~proof_idx
                     ~gates:circuit_pp.gates
                     ~public_inputs
                     ~generator
                     ~size_domain:n
-                    ())
+                    ()
+                    ~proof_prefix:(proof_prefix i))
                 pi_list
             in
             let plookup_identities =
               if not circuit_pp.ultra then []
               else
-                List.init nb_proofs (fun proof_idx ->
+                List.init nb_proofs (fun i ->
                     Plook.verifier_identities
-                      ~circuit_name
-                      ~nb_proofs
-                      ~proof_idx
+                      ~circuit_prefix
                       ~wires_names
                       ~generator
                       ~n
                       ~alpha:circuit_pp.alpha
                       ~beta:rd.beta_plook
                       ~gamma:rd.gamma_plook
+                      ~proof_prefix:(proof_prefix i)
                       ())
             in
             let rc_identities =
               if not circuit_pp.range_checks then []
               else
-                List.init nb_proofs (fun proof_idx ->
+                List.init nb_proofs (fun i ->
                     RangeCheck.verifier_identities
-                      ~circuit_name
-                      ~proof_idx
-                      ~nb_proofs
+                      ~circuit_prefix
                       ~beta:rd.beta_rc
                       ~gamma:rd.gamma_rc
                       ~domain_size:n
                       ~generator
-                      ())
+                      ()
+                      ~proof_prefix:(proof_prefix i))
             in
             merge_verifier_identities
               (perm_identities

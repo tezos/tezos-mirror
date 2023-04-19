@@ -126,8 +126,8 @@ module StringMap = struct
       let len = String.length (string_of_int (n - 1)) in
       String.(make (len - length str) '0') ^ str
 
-    let add_prefix ?(n = 1) ?(i = 0) ?(shift = 0) prefix str =
-      let prefix = if prefix = "" then "" else prefix ^ sep in
+    let add_prefix ?(no_sep = false) ?(n = 1) ?(i = 0) ?(shift = 0) prefix str =
+      let prefix = if prefix = "" || no_sep then prefix else prefix ^ sep in
       if n = 1 then prefix ^ str else prefix ^ padded ~n (i + shift) ^ sep ^ str
 
     let prefix_map ?n ?i ?shift prefix str_map =
@@ -222,9 +222,19 @@ module type S = sig
        allow a numbering until [n] with the same number of caracters
        for instance, [prefix ~n:11 ~i:5 ~shift:1 "hello" "world"] will return
        "06~hello~world"
+       [no_sep] is false by default ; if set to true, the separator before the
+        string to prefix will be ommitted :
+       [prefix ~no_sep:true ~n:11 ~i:5 ~shift:1 "hello" "world"] will return
+       "06~helloworld"
     *)
     val add_prefix :
-      ?n:int -> ?i:int -> ?shift:int -> string -> string -> string
+      ?no_sep:bool ->
+      ?n:int ->
+      ?i:int ->
+      ?shift:int ->
+      string ->
+      string ->
+      string
 
     (* adds prefix to each key of str_map ; [i] will be added as a string
        before the prefix

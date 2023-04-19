@@ -80,12 +80,12 @@ module Plookup_gate_impl (PP : Polynomial_protocol.S) = struct
     | Some alpha -> alpha
     | None -> failwith "Plookup alpha is undefined"
 
-  let gate_identity ~prefix_common ~prefix ~n ~generator ~wires_names ~alpha
+  let gate_identity ~circuit_prefix ~prefix ~n ~generator ~wires_names ~alpha
       ~beta ~gamma : verifier_identities =
    fun x answers ->
-    let q_label_name = prefix_common q_label in
-    let q_table_name = prefix_common q_table in
-    let t_name = prefix_common t in
+    let q_label_name = circuit_prefix q_label in
+    let q_table_name = circuit_prefix q_table in
+    let t_name = circuit_prefix t in
     let z_name = prefix z in
     let f_name = prefix f in
     let h1_name = prefix h1 in
@@ -168,12 +168,12 @@ module Plookup_gate_impl (PP : Polynomial_protocol.S) = struct
     in
     SMap.add (prefix "Plookup.ultra") id_ultra identities
 
-  let prover_identities ~prefix_common ~prefix ~wires_names ~alpha ~beta ~gamma
-      n : prover_identities =
+  let prover_identities_aux ~circuit_prefix ~prefix ~wires_names ~alpha ~beta
+      ~gamma n : prover_identities =
    fun evaluations ->
-    let q = prefix_common q_label in
-    let q_table = prefix_common q_table in
-    let t = prefix_common t in
+    let q = circuit_prefix q_label in
+    let q_table = circuit_prefix q_table in
+    let t = circuit_prefix t in
     let z = prefix z in
     let h1 = prefix h1 in
     let h2 = prefix h2 in
@@ -505,25 +505,24 @@ module Plookup_gate_impl (PP : Polynomial_protocol.S) = struct
         Array.append t padding)
       concatenated_table
 
-  let prover_identities ?(circuit_name = "") ~proof_idx ~nb_proofs ~wires_names
+  let prover_identities ?(circuit_prefix = Fun.id) ~proof_prefix ~wires_names
       ~alpha ~beta ~gamma ~n () : prover_identities =
     let alpha = get_alpha alpha in
-    let prefix_common = SMap.Aggregation.add_prefix circuit_name in
-    let prefix =
-      SMap.Aggregation.add_prefix ~n:nb_proofs ~i:proof_idx circuit_name
-    in
-    prover_identities ~prefix_common ~prefix ~wires_names ~alpha ~beta ~gamma n
+    prover_identities_aux
+      ~circuit_prefix
+      ~prefix:proof_prefix
+      ~wires_names
+      ~alpha
+      ~beta
+      ~gamma
+      n
 
-  let verifier_identities ?(circuit_name = "") ~proof_idx ~nb_proofs ~n
-      ~generator ~wires_names ~alpha ~beta ~gamma () : verifier_identities =
+  let verifier_identities ?(circuit_prefix = Fun.id) ~proof_prefix ~n ~generator
+      ~wires_names ~alpha ~beta ~gamma () : verifier_identities =
     let alpha = get_alpha alpha in
-    let prefix_common = SMap.Aggregation.add_prefix circuit_name in
-    let prefix =
-      SMap.Aggregation.add_prefix ~n:nb_proofs ~i:proof_idx circuit_name
-    in
     gate_identity
-      ~prefix_common
-      ~prefix
+      ~circuit_prefix
+      ~prefix:proof_prefix
       ~n
       ~generator
       ~wires_names
@@ -534,8 +533,7 @@ module Plookup_gate_impl (PP : Polynomial_protocol.S) = struct
   (* wires must be correctly padded *)
   (*TODO : do this in evaluation*)
   (*TODO : use mul z_s*)
-  let f_map_contribution ~wires ~gates ~tables ~alpha ~beta ~gamma ~domain
-      ~circuit_size:_ =
+  let f_map_contribution ~wires ~gates ~tables ~alpha ~beta ~gamma ~domain =
     (* TODO : remove this conversion *)
     let wires = SMap.map Evaluations.to_array wires in
     let size_domain = Domain.length domain in
@@ -601,9 +599,8 @@ module type S = sig
     Poly.t SMap.t
 
   val prover_identities :
-    ?circuit_name:string ->
-    proof_idx:int ->
-    nb_proofs:int ->
+    ?circuit_prefix:(string -> string) ->
+    proof_prefix:(string -> string) ->
     wires_names:string list ->
     alpha:Scalar.t option ->
     beta:Scalar.t ->
@@ -613,9 +610,8 @@ module type S = sig
     prover_identities
 
   val verifier_identities :
-    ?circuit_name:string ->
-    proof_idx:int ->
-    nb_proofs:int ->
+    ?circuit_prefix:(string -> string) ->
+    proof_prefix:(string -> string) ->
     n:int ->
     generator:Scalar.t ->
     wires_names:string list ->
@@ -633,7 +629,6 @@ module type S = sig
     beta:Scalar.t ->
     gamma:Scalar.t ->
     domain:Domain.t ->
-    circuit_size:int ->
     PP.PC.secret
 end
 
