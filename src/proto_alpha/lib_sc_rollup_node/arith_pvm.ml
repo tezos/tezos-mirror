@@ -52,10 +52,6 @@ module Impl : Pvm.S = struct
 
   module State = Context.PVMState
 
-  module RPC = struct
-    let build_directory _node_ctxt = Tezos_rpc.Directory.empty
-  end
-
   let new_dissection = Game_helpers.default_new_dissection
 
   let string_of_status status =

@@ -65,9 +65,27 @@ end
 module Make_backend (Tree : TreeS) =
   Tezos_scoru_wasm_fast.Pvm.Make (Make_wrapped_tree (Tree))
 
+(** Durable part of the storage of this PVM. *)
+module type Durable_state = sig
+  type state
+
+  (** [value_length state key] returns the length of data stored
+        for the [key] in the durable storage of the PVM state [state], if any. *)
+  val value_length : state -> string -> int64 option Lwt.t
+
+  (** [lookup state key] returns the data stored
+        for the [key] in the durable storage of the PVM state [state], if any. *)
+  val lookup : state -> string -> bytes option Lwt.t
+
+  (** [subtrees state key] returns subtrees
+        for the [key] in the durable storage of the PVM state [state].
+        Empty list in case if path doesn't exist. *)
+  val list : state -> string -> string list Lwt.t
+end
+
 module Make_durable_state
     (T : Tezos_tree_encoding.TREE with type tree = Context.tree) :
-  Wasm_2_0_0_rpc.Durable_state with type state = T.tree = struct
+  Durable_state with type state = T.tree = struct
   module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
 
   type state = T.tree
@@ -102,7 +120,13 @@ module Make_durable_state
     Tezos_scoru_wasm.Durable.list durable key
 end
 
-module Impl : Pvm.S = struct
+module type S = sig
+  module Durable_state : Durable_state with type state = Context.tree
+
+  include Pvm.S
+end
+
+module Impl : S = struct
   module PVM =
     Sc_rollup.Wasm_2_0_0PVM.Make (Make_backend) (Wasm_2_0_0_proof_format)
   include PVM
@@ -114,7 +138,6 @@ module Impl : Pvm.S = struct
   module State = Context.PVMState
   module Durable_state =
     Make_durable_state (Make_wrapped_tree (Wasm_2_0_0_proof_format.Tree))
-  module RPC = Wasm_2_0_0_rpc.Make_RPC (Durable_state)
 
   let string_of_status : status -> string = function
     | Waiting_for_input_message -> "Waiting for input message"
