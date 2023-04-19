@@ -222,19 +222,6 @@ struct
          apply score penalties due to mesh message deliveries deficit. *)
       make stats |> Option.some
 
-  let refresh_graft_status now {stats; _} =
-    let topic_status =
-      Topic.Map.map
-        (fun status ->
-          match status.mesh_status with
-          | Inactive -> status
-          | Active {since; during = _} ->
-              let during = Time.sub now (Time.to_span since) |> Time.to_span in
-              {status with mesh_status = Active {since; during}})
-        stats.topic_status
-    in
-    make {stats with topic_status}
-
   let first_message_delivered ({stats; _} : t) (topic : Topic.t) =
     let increment topic ts =
       let cap =
@@ -256,9 +243,26 @@ struct
     in
     make {stats with topic_status}
 
+  let refresh_mesh_status now mesh_status =
+    match mesh_status with
+    | Inactive -> mesh_status
+    | Active {since; during = _} ->
+        let during = Time.sub now (Time.to_span since) |> Time.to_span in
+        Active {since; during}
+
+  let refresh_topic_status_map now {stats; _} =
+    let topic_status =
+      Topic.Map.map
+        (fun status ->
+          let mesh_status = refresh_mesh_status now status.mesh_status in
+          {status with mesh_status})
+        stats.topic_status
+    in
+    make {stats with topic_status}
+
   let refresh ps =
     let current = Time.now () in
-    let refresh () = Some (refresh_graft_status current ps) in
+    let refresh () = Some (refresh_topic_status_map current ps) in
     match ps.stats.peer_status with
     | Connected -> refresh ()
     | Disconnected {expires = at} when Time.(at > current) -> refresh ()
