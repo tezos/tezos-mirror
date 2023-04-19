@@ -76,12 +76,9 @@ module MakeParser (Proto : Tezos_protocol_environment.PROTOCOL) :
 end
 
 module Internal_for_tests = struct
-  let to_raw {raw; _} = raw
-
-  let hash_of {hash; _} = hash
-
-  let make_operation ?(size = 0) op oph data =
-    {hash = oph; raw = op; protocol = data; signature_checked = false; size}
+  let make_operation ?(signature_checked = false) ?(size = 0) hash raw protocol
+      =
+    {hash; raw; protocol; signature_checked; size}
 
   let safe_binary_of_bytes = safe_binary_of_bytes
 end
