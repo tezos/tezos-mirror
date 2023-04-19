@@ -1082,6 +1082,9 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! heartbeat_ticks in
       let*! heartbeat_interval in
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5455
+
+         Move the heartbeat interval/span outside the automaton to the worker. *)
       let*! backoff_cleanup_ticks in
       (* NOTE: Probably the cleanup can also be done lazily: at use, if a
          backoff time is expired, then remove it *)
