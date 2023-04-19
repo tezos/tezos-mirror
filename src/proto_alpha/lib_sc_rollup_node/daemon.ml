@@ -440,7 +440,7 @@ module Make (PVM : Pvm.S) = struct
     let* () = Publisher.publish_commitments () in
     let* () = Publisher.cement_commitments () in
     let*! () = Daemon_event.new_heads_processed reorg.new_chain in
-    let* () = Components.Refutation_coordinator.process stripped_head in
+    let* () = Refutation_coordinator.process stripped_head in
     let* () = Components.Batcher.batch () in
     let* () = Components.Batcher.new_head stripped_head in
     let*! () = Injector.inject ~header:head.header () in
@@ -458,9 +458,7 @@ module Make (PVM : Pvm.S) = struct
     let*! () = message "Shutting down Commitment Publisher@." in
     let*! () = Publisher.shutdown () in
     Layer1.iter_heads node_ctxt.l1_ctxt @@ fun head ->
-    let* () =
-      Components.Refutation_coordinator.process (Layer1.head_of_header head)
-    in
+    let* () = Refutation_coordinator.process (Layer1.head_of_header head) in
     let*! () = Injector.inject () in
     return_unit
 
@@ -477,7 +475,7 @@ module Make (PVM : Pvm.S) = struct
     let* () = message "Shutting down Commitment Publisher@." in
     let* () = Publisher.shutdown () in
     let* () = message "Shutting down Refutation Coordinator@." in
-    let* () = Components.Refutation_coordinator.shutdown () in
+    let* () = Refutation_coordinator.shutdown () in
     let* (_ : unit tzresult) = Node_context.close node_ctxt in
     let* () = Event.shutdown_node exit_status in
     Tezos_base_unix.Internal_event_unix.close ()
@@ -531,7 +529,7 @@ module Make (PVM : Pvm.S) = struct
                (operator, strategy, purposes))
       in
       let* () = Publisher.init node_ctxt in
-      let* () = Components.Refutation_coordinator.init node_ctxt in
+      let* () = Refutation_coordinator.init node_ctxt in
       let* () =
         unless (signers = []) @@ fun () ->
         Injector.init

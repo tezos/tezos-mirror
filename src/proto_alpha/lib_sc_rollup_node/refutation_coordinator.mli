@@ -29,25 +29,19 @@
     the refutation game players. (See {!Refutation_player}).
 *)
 
-module type S = sig
-  module PVM : Pvm.S
+(** Initiatilize the refuation coordinator. *)
+val init : Node_context.rw -> unit tzresult Lwt.t
 
-  (** Initiatilize the refuation coordinator. *)
-  val init : Node_context.rw -> unit tzresult Lwt.t
-
-  (** Process a new l1 head. This means that the coordinator will:
-      {ol
-        {li Gather all existing conflicts}
-        {li Launch new refutation players for each conflict that doesn't
-            have a player in this node}
-        {li Kill all players whose conflict has disappeared from L1}
-        {li Make all players play a step in the refutation}
-      }
+(** Process a new l1 head. This means that the coordinator will:
+    {ol
+      {li Gather all existing conflicts}
+      {li Launch new refutation players for each conflict that doesn't
+          have a player in this node}
+      {li Kill all players whose conflict has disappeared from L1}
+      {li Make all players play a step in the refutation}
+    }
   *)
-  val process : Layer1.head -> unit tzresult Lwt.t
+val process : Layer1.head -> unit tzresult Lwt.t
 
-  (** Shutdown the refutation coordinator. *)
-  val shutdown : unit -> unit Lwt.t
-end
-
-module Make (PVM : Pvm.S) : S
+(** Shutdown the refutation coordinator. *)
+val shutdown : unit -> unit Lwt.t

@@ -27,7 +27,6 @@
 module Make (PVM : Pvm.S) = struct
   module PVM = PVM
   module Simulation = Simulation.Make (PVM)
-  module Refutation_coordinator = Refutation_coordinator.Make (PVM)
   module Batcher = Batcher.Make (Simulation)
   module RPC_server = RPC_server.Make (Simulation) (Batcher)
 end
