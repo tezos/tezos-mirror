@@ -64,7 +64,7 @@ pub enum EthereumError {
     /// A contract call transferred too much gas to sub-context or contract
     /// call itself got too much gas
     #[error("Gas limit overflow: {0}")]
-    GasLimitOverflow(tezos_ethereum::basic::U256),
+    GasLimitOverflow(U256),
 }
 
 impl From<ExitError> for EthereumError {

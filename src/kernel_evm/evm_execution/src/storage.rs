@@ -183,8 +183,8 @@ pub mod blocks {
     pub mod tests {
         use super::test_utils::blocks_iter;
         use super::*;
-        use primitive_types::U256 as PTU256;
-        use tezos_ethereum::basic::{H256, U256};
+        use primitive_types::U256;
+        use sha3::{Digest, Keccak256};
         use tezos_smart_rollup_mock::MockHost;
 
         #[test]
@@ -197,15 +197,16 @@ pub mod blocks {
                 .take(BLOCKS_STORED + DELETE_BLOCKS_N)
                 .enumerate()
                 .for_each(|(i, (hash, ts))| {
-                    let keccak_hash = H256::from(hash).into();
+                    let keccak_hash =
+                        H256::from_slice(Keccak256::digest(hash.0).as_slice());
                     if i == DELETE_BLOCKS_N {
                         last_kept_block_hash = Some(keccak_hash)
                     }
                     add_new_block(
                         &mut mock_host,
-                        PTU256::from(i as i32),
+                        U256::from(i as i32),
                         keccak_hash,
-                        U256::from(ts).into(),
+                        U256::from(ts.i64()),
                     )
                     .unwrap()
                 });
@@ -213,7 +214,7 @@ pub mod blocks {
             // Make sure that blocks are cleaned up
             (0..DELETE_BLOCKS_N).for_each(|i| {
                 assert_eq!(
-                    get_block_hash(&mock_host, PTU256::from(i as i32))
+                    get_block_hash(&mock_host, U256::from(i as i32))
                         .expect_err("Blocks should be cleaned up"),
                     EvmBlockStorageError::RuntimeError(
                         host::runtime::RuntimeError::PathNotFound
@@ -223,7 +224,7 @@ pub mod blocks {
 
             // Make sure that last block is kept
             assert_eq!(
-                get_block_hash(&mock_host, PTU256::from(DELETE_BLOCKS_N as i32))
+                get_block_hash(&mock_host, U256::from(DELETE_BLOCKS_N as i32))
                     .unwrap_or_else(|_| panic!(
                         "Block with number {} should be still kept",
                         DELETE_BLOCKS_N

@@ -9,9 +9,11 @@ use host::path::{concat, OwnedPath, Path, RefPath};
 use host::runtime::{Runtime, RuntimeError, ValueType};
 use primitive_types::{H160, H256, U256};
 use sha3::{Digest, Keccak256};
-use tezos_ethereum::basic::WORD_SIZE;
 use tezos_smart_rollup_storage::storage::Storage;
 use thiserror::Error;
+
+/// The size of one 256 bit word. Size in bytes
+pub const WORD_SIZE: usize = 32_usize;
 
 /// All errors that may happen as result of using the Ethereum account
 /// interface.

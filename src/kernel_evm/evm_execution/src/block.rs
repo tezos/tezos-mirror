@@ -11,14 +11,13 @@
 use super::storage::blocks::get_current_number_n_timestamp;
 use host::runtime::Runtime;
 use primitive_types::{H160, U256};
-use tezos_ethereum::basic::{GasLimit, GasPrice, Wei};
 /// All data for an Ethereum block.
 ///
 /// This data does not change for the duration of the block. All balues are
 /// updated when the block is finalized and may change for the next block.
 pub struct BlockConstants {
     /// Price of one unit of gas in Wei
-    pub gas_price: GasPrice,
+    pub gas_price: U256,
     /// The number of the current block
     pub number: U256,
     /// Who is the beneficiary of the current block
@@ -29,9 +28,9 @@ pub struct BlockConstants {
     /// the value to an arbitrary value.
     pub difficulty: U256,
     /// Gas limit for the current block.
-    pub gas_limit: GasLimit,
+    pub gas_limit: U256,
     /// The base fee per gas for doing a transaction.
-    pub base_fee_per_gas: Wei,
+    pub base_fee_per_gas: U256,
     /// Identifier for the chain. Normally this would identify the chain (Ethereum
     /// main net, or some other net). We can use it to identify rollup EVM kernel.
     pub chain_id: U256,
@@ -43,13 +42,13 @@ impl BlockConstants {
     /// To be done in <https://gitlab.com/tezos/tezos/-/milestones/114>.
     pub fn first_block() -> Self {
         Self {
-            gas_price: GasPrice::one(),
+            gas_price: U256::one(),
             number: U256::zero(),
             coinbase: H160::zero(),
             timestamp: U256::zero(),
             difficulty: U256::zero(),
-            gas_limit: GasLimit::one(),
-            base_fee_per_gas: Wei::one(),
+            gas_limit: U256::one(),
+            base_fee_per_gas: U256::one(),
             chain_id: U256::zero(),
         }
     }

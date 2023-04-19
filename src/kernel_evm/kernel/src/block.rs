@@ -128,7 +128,7 @@ fn validate_transaction<Host: Runtime>(
         storage::read_account_balance(host, &sender_path).unwrap_or_else(|_| Wei::zero());
     let sender_nonce =
         storage::read_account_nonce(host, &sender_path).unwrap_or(U256::zero());
-    let nonce: U256 = tx.nonce.into();
+    let nonce: U256 = tx.nonce;
     // For now, we consider there's no gas to pay
     let gas = Wei::zero();
 
@@ -202,7 +202,7 @@ fn apply_transaction<Host: Runtime>(
     index: u32,
 ) -> Result<TransactionReceipt, Error> {
     let tx = &transaction.transaction;
-    let value: U256 = tx.value.value.into();
+    let value: U256 = tx.value;
     let gas = Wei::zero();
 
     // First pay for the gas
