@@ -40,6 +40,13 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
 
   let ids_label = "Perm"
 
+  let si_name, ss_name =
+    let nb_digits =
+      string_of_int Plompiler.Csir.nb_wires_arch |> String.length
+    in
+    let name prefix i = prefix ^ Csir.string_key_of_int ~nb_digits (i + 1) in
+    (name "Si", name "Ss")
+
   (* element preprocessed and known by both prover and verifier *)
   type public_parameters = {
     g_map_perm_PP : Poly.t SMap.t;
@@ -165,15 +172,14 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
         SMap.of_list
           (List.init size (fun i ->
                let k = get_k i in
-               ("Si" ^ string_of_int (i + 1), Poly.of_coefficients [(k, 1)])))
+               (si_name i, Poly.of_coefficients [(k, 1)])))
 
     let evaluations_sid nb_sid evaluations =
       let domain_evals = Evaluations.find_evaluation evaluations "X" in
       SMap.of_list
         (List.init nb_sid (fun i ->
              let k = get_k i in
-             ( "Si" ^ string_of_int (i + 1),
-               Evaluations.mul_by_scalar k domain_evals )))
+             (si_name i, Evaluations.mul_by_scalar k domain_evals)))
 
     let ssigma_map_non_quadratic_residues permutation domain size =
       let n = Domain.length domain in
@@ -188,8 +194,7 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
                      let index = s_ij mod n in
                      Scalar.mul coeff (Domain.get domain index))
                in
-               ( "Ss" ^ string_of_int (i + 1),
-                 Evaluations.interpolation_fft2 domain coeff_list )))
+               (ss_name i, Evaluations.interpolation_fft2 domain coeff_list)))
       in
       ssigma_map
   end
@@ -261,9 +266,7 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
         (* changes f (resp g) array to f'(resp g') array, and multiply them together
             and with z (resp zg) *)
         let f_evaluation =
-          let sid_names =
-            List.init nb_wires (fun i -> "Si" ^ string_of_int (i + 1))
-          in
+          let sid_names = List.init nb_wires si_name in
           compute_prime
             ~prefix
             tmp_evaluation
@@ -279,8 +282,7 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
         in
         let g_evaluation =
           let ss_names =
-            List.init nb_wires (fun i ->
-                prefix @@ a_pref "Ss" ^ string_of_int (i + 1))
+            List.init nb_wires (fun i -> prefix @@ a_pref (ss_name i))
           in
           compute_prime
             ~prefix
@@ -448,8 +450,7 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
     in
     let z_name = a_pref z_name in
     let ss_names =
-      List.init (List.length wires_names) (fun i ->
-          a_pref "Ss" ^ string_of_int (i + 1))
+      List.init (List.length wires_names) (fun i -> a_pref (ss_name i))
     in
     fun x answers ->
       let get_ss i = get_answer answers X (prefix @@ List.nth ss_names i) in
