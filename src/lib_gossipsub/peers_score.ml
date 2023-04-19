@@ -103,35 +103,33 @@ struct
   (* Please refer to the `SCORE` module type documentation for the meaning of each
      score function. *)
 
-  let p1 {parameters; topic_status; _} =
-    Topic.Map.fold
-      (fun topic {mesh_status; _} acc ->
-        match mesh_status with
-        | Inactive -> acc
-        | Active {since = _; during} ->
-            let topic_parameters = get_topic_params parameters topic in
-            let topic_weight = get_topic_weight parameters topic in
-            let seconds_in_mesh = Span.seconds during |> float_of_int in
-            let weighted_time =
-              topic_parameters.time_in_mesh_weight *. seconds_in_mesh
-              /. topic_parameters.time_in_mesh_quantum
-            in
-            acc
-            +. topic_weight
-               *. Float.min weighted_time topic_parameters.time_in_mesh_cap)
-      topic_status
-      0.0
+  let p1 topic_parameters {mesh_status; _} =
+    match mesh_status with
+    | Inactive -> 0.0
+    | Active {since = _; during} ->
+        let seconds_in_mesh = Span.seconds during |> float_of_int in
+        let weighted_time =
+          topic_parameters.time_in_mesh_weight *. seconds_in_mesh
+          /. topic_parameters.time_in_mesh_quantum
+        in
+        Float.min weighted_time topic_parameters.time_in_mesh_cap
 
-  let p2 {parameters; topic_status; _} =
+  let p2 topic_parameters {first_message_deliveries; _} =
+    let weighted_deliveries =
+      topic_parameters.first_message_deliveries_weight
+      *. float_of_int first_message_deliveries
+    in
+    weighted_deliveries
+
+  let topic_scores {parameters; topic_status; _} =
     Topic.Map.fold
-      (fun topic {first_message_deliveries; _} acc ->
+      (fun topic status acc ->
         let topic_parameters = get_topic_params parameters topic in
         let topic_weight = get_topic_weight parameters topic in
-        let weighted_deliveries =
-          topic_weight *. topic_parameters.first_message_deliveries_weight
-          *. float_of_int first_message_deliveries
-        in
-        acc +. weighted_deliveries)
+        let p1 = p1 topic_parameters status in
+        let p2 = p2 topic_parameters status in
+        let tot = topic_weight *. (p1 +. p2) in
+        acc +. tot)
       topic_status
       0.0
 
@@ -143,10 +141,9 @@ struct
     else 0.0
 
   let float ps =
-    let p1 = p1 ps in
-    let p2 = p2 ps in
+    let topic_scores = topic_scores ps in
     let p7 = p7 ps in
-    p1 +. p2 +. p7
+    topic_scores +. p7
 
   let make stats = {stats; score = Lazy.from_fun (fun () -> float stats)}
 
