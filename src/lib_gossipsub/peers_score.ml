@@ -272,27 +272,46 @@ struct
       in
       make stats |> Option.some
 
+  let increment_first_message_deliveries parameters topic ts =
+    let cap =
+      let topic_parameters = get_topic_params parameters topic in
+      topic_parameters.first_message_deliveries_cap
+    in
+    Int.min cap (ts.first_message_deliveries + 1)
+
+  let increment_mesh_message_deliveries parameters topic ts =
+    match ts.mesh_status with
+    | Active _ ->
+        let cap =
+          let topic_parameters = get_topic_params parameters topic in
+          topic_parameters.mesh_message_deliveries_cap
+        in
+        Int.min cap (ts.mesh_message_deliveries + 1)
+    | Inactive -> ts.mesh_message_deliveries
+
   let first_message_delivered ({stats; _} : t) (topic : Topic.t) =
-    let increment topic ts =
-      let cap =
-        let topic_parameters = get_topic_params stats.parameters topic in
-        topic_parameters.first_message_deliveries_cap
+    let increment ts =
+      let first_message_deliveries =
+        increment_first_message_deliveries stats.parameters topic ts
+      in
+      let mesh_message_deliveries =
+        increment_mesh_message_deliveries stats.parameters topic ts
       in
       {
         mesh_status = ts.mesh_status;
         mesh_message_deliveries_active = ts.mesh_message_deliveries_active;
         mesh_failure_penalty = ts.mesh_failure_penalty;
-        mesh_message_deliveries = 0;
-        (* TODO: Accounting for [mesh_message_deliveries] is performed in a subsequent commit *)
-        first_message_deliveries = Int.min cap (ts.first_message_deliveries + 1);
+        mesh_message_deliveries;
+        first_message_deliveries;
       }
     in
+
     let topic_status =
       Topic.Map.update
         topic
         (function
-          | None -> fresh_topic_stats () |> increment topic |> Option.some
-          | Some ts -> increment topic ts |> Option.some)
+          | None -> fresh_topic_stats () |> increment |> Option.some
+          | Some ts -> increment ts |> Option.some)
         stats.topic_status
     in
     make {stats with topic_status}

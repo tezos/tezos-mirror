@@ -327,7 +327,8 @@ module type SCORE = sig
   val prune : t -> topic -> t
 
   (** [first_message_delivered ps topic] increments the counter related to
-      first message deliveries on [topic] by the associated peer. *)
+      first message deliveries and mesh message deliveries on [topic]
+      by the associated peer. *)
   val first_message_delivered : t -> topic -> t
 
   (** [refresh ps] returns [Some ps'] with [ps'] a refreshed score record or [None]
