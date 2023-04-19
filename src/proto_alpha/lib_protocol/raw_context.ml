@@ -836,7 +836,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
       };
   }
 
-type previous_protocol = Genesis of Parameters_repr.t | Mumbai_016
+type previous_protocol = Genesis of Parameters_repr.t | Nairobi_017
 
 let check_and_update_protocol_version ctxt =
   (Context.find ctxt version_key >>= function
@@ -848,7 +848,7 @@ let check_and_update_protocol_version ctxt =
          failwith "Internal error: previously initialized context."
        else if Compare.String.(s = "genesis") then
          get_proto_param ctxt >|=? fun (param, ctxt) -> (Genesis param, ctxt)
-       else if Compare.String.(s = "mumbai_016") then return (Mumbai_016, ctxt)
+       else if Compare.String.(s = "nairobi_017") then return (Nairobi_017, ctxt)
        else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
   Context.add ctxt version_key (Bytes.of_string version_value) >|= fun ctxt ->
@@ -899,7 +899,7 @@ let prepare_first_block ~level ~timestamp ctxt =
       Level_repr.create_cycle_eras [cycle_era] >>?= fun cycle_eras ->
       set_cycle_eras ctxt cycle_eras >>=? fun ctxt ->
       add_constants ctxt param.constants >|= ok
-  | Mumbai_016 ->
+  | Nairobi_017 ->
       get_previous_protocol_constants ctxt >>= fun c ->
       let tx_rollup =
         Constants_parametric_repr.

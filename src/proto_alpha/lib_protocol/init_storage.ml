@@ -160,7 +160,7 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
         ( ctxt,
           commitments_balance_updates @ bootstrap_balance_updates
           @ deposits_balance_updates )
-  | Mumbai_016
+  | Nairobi_017
   (* Please update [next_protocol] and [previous_protocol] in
      [tezt/lib_tezos/protocol.ml] when you update this value. *) ->
       (* TODO (#2704): possibly handle endorsements for migration block (in bakers);
@@ -169,9 +169,7 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
              inbox migration message. see `sc_rollup_inbox_storage`. *)
       Raw_level_repr.of_int32 level >>?= fun level ->
       Storage.Tenderbake.First_level_of_protocol.update ctxt level
-      >>=? fun ctxt ->
-      Storage.Legacy.Grand_parent_branch.remove ctxt >>= fun ctxt ->
-      return (ctxt, []))
+      >>=? fun ctxt -> return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   List.fold_left_es patch_script ctxt Legacy_script_patches.addresses_to_patch
   >>=? fun ctxt ->
