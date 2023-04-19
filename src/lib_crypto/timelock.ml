@@ -344,6 +344,7 @@ let create_chest_key chest ~time =
   unlock_and_prove chest.rsa_public ~time chest.locked_value
 
 let get_plaintext_size chest =
+  assert (Bytes.length chest.ciphertext.payload > Crypto_box.tag_length) ;
   Bytes.length chest.ciphertext.payload - Crypto_box.tag_length
 
 let open_chest chest chest_key ~time =
