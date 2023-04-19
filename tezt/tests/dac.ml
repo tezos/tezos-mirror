@@ -117,6 +117,38 @@ let assert_witnesses ~__LOC__ expected witnesses =
       int
       ~error_msg:"Expected witnesses bitset to be %L. Found: %R")
 
+let parse_certificate json =
+  JSON.
+    ( json |-> "witnesses" |> as_int,
+      json |-> "aggregate_signature" |> as_string,
+      json |-> "root_hash" |> as_string )
+
+(* Helper process that listens to certificate updates through a
+   RPC request. Upon termination, the list of certificate updates
+   is returned *)
+let streamed_certificates_client coordinator_node root_hash =
+  let endpoint =
+    Format.sprintf
+      "http://%s:%d/monitor/certificate/%s"
+      (Dac_node.rpc_host coordinator_node)
+      (Dac_node.rpc_port coordinator_node)
+      root_hash
+  in
+  RPC.Curl.get_raw endpoint
+  |> Runnable.map (fun output ->
+         let as_list = String.split_on_char '\n' output in
+         (* Each JSON item in the response of the curl request is
+            suffixed with the '\n' character, which will cause an
+            empty item to be inserted at the end of the list. *)
+         let rev_as_list_no_empty_element =
+           match List.rev as_list with
+           | [] -> assert false
+           | _ :: rev_list -> rev_list
+         in
+         List.rev_map
+           (fun raw -> parse_certificate @@ JSON.parse ~origin:endpoint raw)
+           rev_as_list_no_empty_element)
+
 (* Some initialization functions to start needed nodes. *)
 
 let setup_node ?(additional_bootstrap_accounts = 5) ~parameters ~protocol
@@ -618,6 +650,27 @@ let check_downloaded_preimage coordinator observer root_hash =
         go (hashes @ next_hashes)
   in
   go [root_hash]
+
+let check_certificate
+    (actual_witnesses, actual_aggregate_signature, actual_root_hash)
+    (expected_witnesses, expected_aggregate_signature, expected_root_hash) =
+  (* Because encodings of aggregate signature might be different (due to the
+     presence of two variants `Bls12_381` and `Unknown), the actual byte
+     representation needs to be checked.*)
+  let raw_signature s =
+    Data_encoding.Binary.to_string_exn Tezos_crypto.Aggregate_signature.encoding
+    @@ Tezos_crypto.Aggregate_signature.of_b58check_exn s
+  in
+  Check.(
+    (actual_witnesses = expected_witnesses)
+      int
+      ~error_msg:"Unexpected bitset for witnesses (Actual %L <> %R = Expected)") ;
+  Check.(
+    (raw_signature expected_aggregate_signature
+    = raw_signature actual_aggregate_signature)
+      string
+      ~error_msg:"Unexpected aggregate signature (Expected %L <> %R = Actual") ;
+  check_valid_root_hash expected_root_hash actual_root_hash
 
 let sample_payload example_filename =
   let json =
@@ -1546,6 +1599,124 @@ module Full_infrastructure = struct
       (fun dac_node ->
         check_downloaded_preimage coordinator_node dac_node expected_rh)
       (committee_members_nodes @ observer_nodes)
+
+  let test_streaming_certificates
+      Scenarios.
+        {
+          coordinator_node;
+          committee_members_nodes;
+          observer_nodes;
+          committee_members;
+          _;
+        } =
+    (* 0. Coordinator node is already running when the this function is
+          executed by the test
+       1. Client starts curl request to listen for certificate updates
+       2. Run committee members and observers
+       3. Client posts a preimage to coordinator
+       4. Check that a number of certificates equal to the number of committee
+          members are received via the streamed endpoint
+       5. Fetch certificate via GET endpoint, check that returned certificate
+          is equivalent to the last certificate of the streamed endpoint
+       6. Request certificate via streamed endpoints again, check that one
+          item is returned with the same certificate returned by the GET
+          endpoint.
+    *)
+    (* The test requires at least one committee member *)
+    assert (List.length committee_members > 0) ;
+    let payload, expected_rh = sample_payload "preimage" in
+    let certificate_stream_client =
+      Runnable.run @@ streamed_certificates_client coordinator_node expected_rh
+    in
+    let push_promise =
+      wait_for_root_hash_pushed_to_data_streamer coordinator_node expected_rh
+    in
+    let wait_for_node_subscribed_to_data_streamer () =
+      wait_for_handle_new_subscription_to_hash_streamer coordinator_node
+    in
+    (* Initialize configuration of all nodes. *)
+    let* _ =
+      Lwt_list.iter_s
+        (fun committee_member_node ->
+          let* _ = Dac_node.init_config committee_member_node in
+          return ())
+        committee_members_nodes
+    in
+    let* _ =
+      Lwt_list.iter_s
+        (fun observer_node ->
+          let* _ = Dac_node.init_config observer_node in
+          return ())
+        observer_nodes
+    in
+    (* 1. Run committee member and observer nodes.
+       Because the event resolution loop in the Daemon always resolves
+       all promises matching an event filter, when a new even is received,
+       we cannot wait for multiple subscription to the hash streamer, as
+       events of this kind are indistinguishable one from the other.
+       Instead, we wait for the subscription of one observer/committe_member
+       node to be notified before running the next node. *)
+    let* () =
+      Lwt_list.iter_s
+        (fun node ->
+          let node_is_subscribed =
+            wait_for_node_subscribed_to_data_streamer ()
+          in
+          let* () = Dac_node.run ~wait_ready:true node in
+          node_is_subscribed)
+        (committee_members_nodes @ observer_nodes)
+    in
+    (* 2. Post a preimage to the coordinator. *)
+    let* () =
+      coordinator_serializes_payload coordinator_node ~payload ~expected_rh
+    in
+    (* Assert [coordinator] emitted event that [expected_rh] was pushed
+       to the data_streamer. *)
+    let* () = push_promise in
+    (* 4. Check that a number of certificates equal to the number of committee
+          members are received via the streamed endpoint. *)
+    let* certificate_updates = certificate_stream_client in
+    Check.(
+      (List.length committee_members = List.length certificate_updates)
+        int
+        ~error_msg:
+          "Unexpected number of streamed certificate updates (Expected = %L <> \
+           %R = Actual)") ;
+    let () =
+      List.iter
+        (fun (_, _, root_hash) -> check_valid_root_hash expected_rh root_hash)
+        certificate_updates
+    in
+    let last_certificate_update =
+      List.nth certificate_updates (List.length certificate_updates - 1)
+    in
+    (* 5. Check that certificate is consistent with the one returned
+       from the GET /certificate endpoint. *)
+    let* get_certificate =
+      RPC.call
+        coordinator_node
+        (Dac_rpc.get_certificate ~hex_root_hash:(`Hex expected_rh))
+    in
+    check_certificate get_certificate last_certificate_update ;
+    (* 6. Request certificate via streamed endpoints again, check that one
+       item is returned with the same certificate returned by the GET
+       endpoint. *)
+    let* second_certificates_stream =
+      Runnable.run @@ streamed_certificates_client coordinator_node expected_rh
+    in
+    Check.(
+      (1 = List.length second_certificates_stream)
+        int
+        ~error_msg:
+          "Unexpected number of streamed certificate updates (Expected = %L <> \
+           %R = Actual)") ;
+    let certificate_update_from_second_stream =
+      match second_certificates_stream with
+      | [certificate] -> certificate
+      | _ -> assert false
+    in
+    check_certificate get_certificate certificate_update_from_second_stream ;
+    return ()
 end
 
 let register ~protocols =
@@ -1643,4 +1814,11 @@ let register ~protocols =
     ~tags:["dac"; "dac_node"]
     "committee members and observers download pages from coordinator"
     Full_infrastructure.test_download_and_retrieval_of_pages
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~observers:0
+    ~committee_members:2
+    ~tags:["dac"; "dac_node"]
+    "certificates are updated in streaming endpoint"
+    Full_infrastructure.test_streaming_certificates
     protocols
