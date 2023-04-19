@@ -29,25 +29,42 @@ module Map = Map.Make (struct
   let compare = Dac_plugin.raw_compare
 end)
 
+(* A [Certificate_streamer.t] is a mutable map that associates to root hashes
+   values of type [Certificate_repr.t Data_streamer.t]. Such data streamers are
+   used to notify clients of updates of DAC certificates. *)
 type t = Certificate_repr.t Data_streamer.t Map.t ref
 
 let init () = ref Map.empty
 
-let create_if_none t root_hash =
-  t :=
+let create_if_none certificate_streamers root_hash =
+  certificate_streamers :=
     Map.update
       root_hash
       (function
         | None -> Some (Data_streamer.init ()) | Some stream -> Some stream)
-      !t ;
-  !t |> Map.find root_hash |> Option.value_f ~default:(fun _ -> assert false)
+      !certificate_streamers ;
+  !certificate_streamers |> Map.find root_hash
+  |> Option.value_f ~default:(fun _ -> assert false)
 
-let handle_subscribe t root_hash =
-  let certificate_streamer = create_if_none t root_hash in
-  Data_streamer.handle_subscribe certificate_streamer
+let handle_subscribe certificate_streamers root_hash =
+  let certificate_streamer_for_root_hash =
+    create_if_none certificate_streamers root_hash
+  in
+  Data_streamer.handle_subscribe certificate_streamer_for_root_hash
 
-let push (t : t) root_hash certificate =
-  let certificate_streamer = create_if_none t root_hash in
-  (* TODO: insert issue here. Add logic for closing stream if certificate has
-     100% of signatures. *)
-  Data_streamer.publish certificate_streamer certificate
+let push certificate_streamers root_hash certificate =
+  let certificate_streamer_for_root_hash =
+    create_if_none certificate_streamers root_hash
+  in
+  Data_streamer.publish certificate_streamer_for_root_hash certificate
+
+let close certificate_streamers root_hash =
+  let certificate_streamer_for_root_hash =
+    Map.find root_hash !certificate_streamers
+  in
+  match certificate_streamer_for_root_hash with
+  | Some streamer ->
+      Data_streamer.close streamer ;
+      certificate_streamers := Map.remove root_hash !certificate_streamers ;
+      true
+  | None -> false

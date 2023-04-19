@@ -228,7 +228,8 @@ module Coordinator = struct
     in
     return root_hash
 
-  let handle_monitor_certificate ro_store certificate_streamers root_hash =
+  let handle_monitor_certificate ro_store certificate_streamers root_hash
+      committee_members =
     let open Lwt_result_syntax in
     let stream, stopper =
       Certificate_streamers.handle_subscribe certificate_streamers root_hash
@@ -253,19 +254,33 @@ module Coordinator = struct
               Certificate_streamers.push
                 certificate_streamers
                 root_hash
-                certificate)
+                certificate ;
+              if
+                Certificate_repr.all_committee_members_have_signed
+                  committee_members
+                  certificate
+              then
+                let _ =
+                  Certificate_streamers.close certificate_streamers root_hash
+                in
+                ()
+              else ())
             current_certificate_store_value
         in
         Tezos_rpc.Answer.return_stream {next; shutdown}
     | Error e -> Tezos_rpc.Answer.fail e
 
-  let register_monitor_certificate dac_plugin ro_store certificate_streamers dir
-      =
+  let register_monitor_certificate dac_plugin ro_store certificate_streamers
+      committee_members dir =
     Tezos_rpc.Directory.gen_register
       dir
       (Monitor_services.S.certificate dac_plugin)
       (fun ((), root_hash) () () ->
-        handle_monitor_certificate ro_store certificate_streamers root_hash)
+        handle_monitor_certificate
+          ro_store
+          certificate_streamers
+          root_hash
+          committee_members)
 
   let register_coordinator_post_preimage dac_plugin hash_streamer page_store =
     add_service
@@ -293,12 +308,17 @@ module Coordinator = struct
     let cctxt = Node_context.get_tezos_node_cctxt node_ctxt in
     let certificate_streamers = modal_node_ctxt.certificate_streamers in
     let ro_store = Node_context.get_node_store node_ctxt Store_sigs.Read_only in
+    let committee_members = modal_node_ctxt.committee_members in
     Tezos_rpc.Directory.empty
     |> register_coordinator_post_preimage dac_plugin hash_streamer page_store
     |> register_get_verify_signature dac_plugin public_keys_opt
     |> register_get_preimage dac_plugin page_store
     |> register_monitor_root_hashes dac_plugin hash_streamer
-    |> register_monitor_certificate dac_plugin ro_store certificate_streamers
+    |> register_monitor_certificate
+         dac_plugin
+         ro_store
+         certificate_streamers
+         committee_members
     |> register_put_dac_member_signature node_ctxt dac_plugin cctxt
     |> register_get_certificate node_ctxt dac_plugin
 end

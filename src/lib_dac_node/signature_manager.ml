@@ -414,6 +414,16 @@ module Coordinator = struct
                  Certificate_streamers.push
                    certificate_streamers
                    root_hash
-                   certificate)
+                   certificate ;
+                 if
+                   Certificate_repr.all_committee_members_have_signed
+                     dac_committee
+                     certificate
+                 then
+                   let _ =
+                     Certificate_streamers.close certificate_streamers root_hash
+                   in
+                   ()
+                 else ())
                certificate_streamers_opt
 end

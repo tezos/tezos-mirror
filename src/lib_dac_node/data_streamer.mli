@@ -40,7 +40,7 @@ type 'a t
 (** Initializes an instance of [Data_streamer.t]. *)
 val init : unit -> 'a t
 
-(** [publish streamer data] publishes [data] to all attached 
+(** [publish streamer data] publishes [data] to all attached
     subscribers of the [streamer]. *)
 val publish : 'a t -> 'a -> unit
 
@@ -48,3 +48,6 @@ val publish : 'a t -> 'a -> unit
     subscriber to consume. An [Lwt_watcher.stopper] function is also returned
     for the subscriber to close the stream. *)
 val handle_subscribe : 'a t -> 'a Lwt_stream.t * Lwt_watcher.stopper
+
+(** [close streamer] closes all the connections to [streamer]. *)
+val close : 'a t -> unit
