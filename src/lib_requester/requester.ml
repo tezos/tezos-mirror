@@ -315,6 +315,19 @@ end = struct
     let open Lwt_syntax in
     let shutdown = Lwt_canceler.when_canceling state.canceler in
     let rec loop state =
+      (* It is possible that numerous pending requests may be canceled
+         sequentially. If this occurs, we will recalculate the
+         subsequent timeout for each cancellation. Calculating the
+         next timeout could be resource-intensive. By allowing for a
+         brief sleep, multiple cancellations can take place
+         simultaneously.
+
+         Note: using `Lwt.pause` or `Lwt.yield` might not be
+         sufficient, e.g., when the scheduler does not  timeout cancelers are not given a
+         chance to be executed.
+
+         Note: This constant was selected using the sophisticated
+         "damp digit" method. *)
       let timeout = compute_timeout state in
       let* () =
         Lwt.choose
