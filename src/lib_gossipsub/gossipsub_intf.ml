@@ -59,30 +59,76 @@ module type AUTOMATON_SUBCONFIG = sig
   module Message : PRINTABLE
 end
 
+module type SPAN = sig
+  include PRINTABLE
+
+  val zero : t
+
+  val seconds : t -> int
+end
+
+module type TIME = sig
+  include Compare.S
+
+  include PRINTABLE with type t := t
+
+  type span
+
+  val now : unit -> t
+
+  val add : t -> span -> t
+
+  val sub : t -> span -> t
+
+  (** [mul_span s n] returns [n * s]. *)
+  val mul_span : span -> int -> span
+
+  val to_span : t -> span
+end
+
 module type AUTOMATON_CONFIG = sig
   module Subconfig : AUTOMATON_SUBCONFIG
 
-  module Span : PRINTABLE
+  module Span : SPAN
 
-  module Time : sig
-    include Compare.S
-
-    include PRINTABLE with type t := t
-
-    type span = Span.t
-
-    val now : unit -> t
-
-    val add : t -> span -> t
-
-    val sub : t -> span -> t
-
-    (** [mul_span s n] returns [n * s]. *)
-    val mul_span : span -> int -> span
-  end
+  module Time : TIME with type span = Span.t
 end
 
-type ('peer, 'message_id, 'span) limits = {
+type per_topic_score_parameters = {
+  time_in_mesh_weight : float;
+      (** The weight of the score associated to the time spent in the mesh. *)
+  time_in_mesh_cap : float;
+      (** The maximum value considered for the score associated to the time spent
+          by a peer in the mesh. *)
+  time_in_mesh_quantum : float;
+      (** The score associated to the time spent [t] in the mesh is
+          [(min t time_in_mesh_cap) / time_in_mesh_quantum]. *)
+}
+
+type 'topic topic_score_parameters =
+  | Topic_score_parameters_single of per_topic_score_parameters
+      (** Use this constructor when the topic score parameters do not
+          depend on the topic. *)
+  | Topic_score_parameters_family : {
+      all_topics : 'topic Seq.t;
+      parameters : 'topic -> per_topic_score_parameters;
+      weights : 'topic -> float;
+    }
+      -> 'topic topic_score_parameters
+      (** Use this constructor when the topic score parameters may depend
+          on the topic. *)
+
+type 'topic score_parameters = {
+  topics : 'topic topic_score_parameters;  (** Per-topic score parameters. *)
+  behaviour_penalty_weight : float;
+      (** The weight of the score associated to the behaviour penalty. This
+          parameter must be negative. *)
+  behaviour_penalty_threshold : float;
+      (** The threshold on the behaviour penalty
+          counter above which we start penalizing the peer. *)
+}
+
+type ('topic, 'peer, 'message_id, 'span) limits = {
   max_recv_ihave_per_heartbeat : int;
       (** The maximum number of IHave control messages we can receive from a
           peer between two heartbeats. It is called [MaxIHaveMessages] in the Go
@@ -182,6 +228,7 @@ type ('peer, 'message_id, 'span) limits = {
           avoid advertising messages that will be expired by the time they're
           requested. [history_gossip_length] must be less than or equal to
           [history_length]. *)
+  score_parameters : 'topic score_parameters;  (** score-specific parameters. *)
 }
 
 type ('peer, 'message_id) parameters = {
@@ -190,13 +237,58 @@ type ('peer, 'message_id) parameters = {
 }
 
 module type SCORE = sig
-  include Compare.S
+  (** The type of peer scoring statistics. *)
+  type t
 
-  val float : t -> float
+  type value
 
-  val zero : t
+  type span
 
+  type time
+
+  type topic
+
+  (** [newly_connected params] creates a fresh statistics record. *)
+  val newly_connected : topic score_parameters -> t
+
+  (** [value ps] evaluates the score of [ps]. *)
+  val value : t -> value
+
+  (** [penalty ps penalty] increments the behavioural penalty of [ps]. *)
   val penalty : t -> int -> t
+
+  (** [set_connected ps] marks [ps] as being associated to a connected peer. *)
+  val set_connected : t -> t
+
+  (** [remove_peer ps ~retain_duration] will either return [None] if
+      the peer statistics can be cleared, or [Some ps'] with [ps']
+      some statistics to be retained for at least [retain_duration]. *)
+  val remove_peer : t -> retain_duration:span -> t option
+
+  (** [expires ps] returns [None] if the score statistics has no expiration
+      time or [Some t] if it expires at time [t]. *)
+  val expires : t -> time option
+
+  (** [graft ps topic] allows to measure the time spent by the peer in the mesh.
+      It is to be called upon grafting a peer to [topic]. *)
+  val graft : t -> topic -> t
+
+  (** [prune ps topic] allows to measure the time spent by the peer in the mesh.
+      It is to be called upon pruning a peer from [topic]. *)
+  val prune : t -> topic -> t
+
+  (** [refresh ps] returns [Some ps'] with [ps'] a refreshed score record or [None]
+      if the score expired. Refreshing a [ps] allows to update time-dependent spects
+      of the scoring statistics. *)
+  val refresh : t -> t option
+
+  (** The zero score value, corresponding to a neutral score. *)
+  val zero : value
+
+  (** Convert a float into a score value. *)
+  val of_float : float -> value
+
+  include Compare.S with type t := value
 end
 
 module type AUTOMATON = sig
@@ -224,7 +316,7 @@ module type AUTOMATON = sig
   module Span : PRINTABLE
 
   (** Module for peers scores *)
-  module Score : SCORE
+  module Score : SCORE with type time = Time.t
 
   type message = Message.t
 
@@ -235,7 +327,7 @@ module type AUTOMATON = sig
   type state
 
   (** Limits of the gossipsub protocol. *)
-  type limits := (Peer.t, Message_id.t, span) limits
+  type limits := (Topic.t, Peer.t, Message_id.t, span) limits
 
   (** Parameters of the gossipsub protocol. *)
   type parameters := (Peer.t, Message_id.t) parameters
@@ -521,10 +613,6 @@ module type AUTOMATON = sig
   module Introspection : sig
     type connection = {topics : Topic.Set.t; direct : bool; outbound : bool}
 
-    type peer_status = Connected | Disconnected of {expires : Time.t}
-
-    type peer_score = {score : Score.t; peer_status : peer_status}
-
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 
     module Message_cache : sig
@@ -550,7 +638,7 @@ module type AUTOMATON = sig
       limits : limits;
       parameters : parameters;
       connections : connection Peer.Map.t;
-      scores : peer_score Peer.Map.t;
+      scores : Score.t Peer.Map.t;
       ihave_per_heartbeat : int Peer.Map.t;
       iwant_per_heartbeat : int Peer.Map.t;
       mesh : Peer.Set.t Topic.Map.t;
@@ -567,7 +655,7 @@ module type AUTOMATON = sig
     type connected_peers_filter =
       | Direct
       | Subscribed_to of Topic.t
-      | Score_above of {threshold : float}
+      | Score_above of {threshold : Score.value}
 
     val view : state -> view
 
@@ -692,7 +780,7 @@ module type WORKER = sig
       the given arguments. Then, it initializes and returns a worker for it. *)
   val make :
     Random.State.t ->
-    (GS.Peer.t, GS.Message_id.t, GS.span) limits ->
+    (GS.Topic.t, GS.Peer.t, GS.Message_id.t, GS.span) limits ->
     (GS.Peer.t, GS.Message_id.t) parameters ->
     t
 

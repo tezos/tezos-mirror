@@ -50,6 +50,10 @@ module Automaton_config :
   module Span = struct
     type t = int
 
+    let zero = 0
+
+    let seconds = Fun.id
+
     let pp = Format.pp_print_int
   end
 
@@ -65,6 +69,8 @@ module Automaton_config :
     let sub = ( - )
 
     let mul_span = ( * )
+
+    let to_span = Fun.id
 
     include Compare.Int
   end
@@ -104,7 +110,42 @@ end
 module C = Automaton_config
 module GS = Tezos_gossipsub.Make (C)
 
-let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
+let pp_per_topic_score_parameters =
+  Fmt.Dump.record
+    [
+      Fmt.Dump.field
+        "time_in_mesh_weight"
+        (fun l -> l.time_in_mesh_weight)
+        Fmt.float;
+      Fmt.Dump.field "time_in_mesh_cap" (fun l -> l.time_in_mesh_cap) Fmt.float;
+      Fmt.Dump.field
+        "time_in_mesh_quantum"
+        (fun l -> l.time_in_mesh_quantum)
+        Fmt.float;
+    ]
+
+let pp_topic_score_parameters fmtr tsp =
+  match tsp with
+  | Topic_score_parameters_single p -> pp_per_topic_score_parameters fmtr p
+  | Topic_score_parameters_family _ -> Format.fprintf fmtr "<...>"
+
+let pp_score_parameters =
+  Fmt.Dump.(
+    record
+      [
+        field "topics" (fun sp -> sp.topics) pp_topic_score_parameters;
+        field
+          "behaviour_penalty_weight"
+          (fun sp -> sp.behaviour_penalty_weight)
+          Fmt.float;
+        field
+          "behaviour_penalty_threshold"
+          (fun sp -> sp.behaviour_penalty_threshold)
+          Fmt.float;
+      ])
+
+let pp_limits fmtr
+    (l : (GS.Topic.t, GS.Peer.t, GS.Message_id.t, GS.span) limits) =
   let {
     max_recv_ihave_per_heartbeat;
     max_sent_iwant_per_heartbeat;
@@ -131,6 +172,7 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
     gossip_factor;
     history_length;
     history_gossip_length;
+    score_parameters;
   } =
     l
   in
@@ -161,7 +203,8 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
      degree_lazy = %d;@;\
      gossip_factor = %f;@;\
      history_length = %d;@;\
-     history_gossip_length = %d }@]"
+     history_gossip_length = %d;@;\
+     score_parameters= %a }@]"
     max_recv_ihave_per_heartbeat
     max_sent_iwant_per_heartbeat
     max_gossip_retransmission
@@ -193,6 +236,8 @@ let pp_limits fmtr (l : (GS.Peer.t, GS.Message_id.t, GS.span) limits) =
     gossip_factor
     history_length
     history_gossip_length
+    pp_score_parameters
+    score_parameters
 
 (** Instantiate the worker functor *)
 module Worker_config = struct

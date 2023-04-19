@@ -494,12 +494,8 @@ module Test_remove_peer = struct
         fprintf fmtr "%a:[%a]" Topic.pp topic pp_backoff backoff)
       v.backoff ;
     Peer.Map.iter
-      (fun peer {GS.Introspection.score = _; peer_status} ->
-        let expires =
-          match peer_status with
-          | GS.Introspection.Connected -> None
-          | GS.Introspection.Disconnected {expires} -> Some expires
-        in
+      (fun peer score ->
+        let expires = GS.Score.expires score in
         fprintf
           fmtr
           "peer %a, expire=%a, cleanup=%b"
