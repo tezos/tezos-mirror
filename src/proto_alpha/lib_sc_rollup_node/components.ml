@@ -26,7 +26,6 @@
 
 module Make (PVM : Pvm.S) = struct
   module PVM = PVM
-  module RPC_server = RPC_server.Make (PVM)
 end
 
 let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =

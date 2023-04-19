@@ -467,7 +467,7 @@ module Make (PVM : Pvm.S) = struct
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
     let message = node_ctxt.Node_context.cctxt#message in
     let* () = message "Shutting down RPC server@." in
-    let* () = Components.RPC_server.shutdown rpc_server in
+    let* () = RPC_server.shutdown rpc_server in
     let* () = message "Shutting down Injector@." in
     let* () = Injector.shutdown () in
     let* () = message "Shutting down Batcher@." in
@@ -502,7 +502,7 @@ module Make (PVM : Pvm.S) = struct
   let run node_ctxt configuration =
     let open Lwt_result_syntax in
     let* () = check_initial_state_hash node_ctxt in
-    let* rpc_server = Components.RPC_server.start node_ctxt configuration in
+    let* rpc_server = RPC_server.start node_ctxt configuration in
     let (_ : Lwt_exit.clean_up_callback_id) =
       install_finalizer node_ctxt rpc_server
     in
