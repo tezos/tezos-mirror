@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use evm_execution::address::EthereumAddress;
+use crate::address::EthereumAddress;
 use primitive_types::U256;
 
 use crate::eth_gen::{BlockHash, L2Level, OwnedHash};

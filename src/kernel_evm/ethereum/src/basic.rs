@@ -8,12 +8,11 @@
 //! Many of the functions in this module (all the `one` and `zero`) can be made
 //! constant, but the underlying library and functions we use are not constant.
 //! TODO: <https://gitlab.com/tezos/tezos/-/milestones/114>
-use crate::EthereumError;
 use core::ops::{Add, Div, Mul, Sub};
-use crypto::hash::BlockHash;
 use primitive_types::{H256 as PTH256, U256 as PTU256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
 use sha3::{Digest, Keccak256};
+use tezos_crypto_rs::hash::BlockHash;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
 /// The size of one 256 bit word. Size in bytes
@@ -75,15 +74,15 @@ pub struct GasLimit {
 impl GasLimit {
     /// Translate to unsigned 64 bit (should be adequate for all calls at the moment)
     /// Error can only be overflow.
-    pub fn to_u64(&self) -> Result<u64, EthereumError> {
+    pub fn to_u64(&self) -> Option<u64> {
         // Unfortunately, the `primitive_types` library doesn't implement u64 -> U256
         // conversion in `const`.
         let max_u64: U256 = U256::from(core::u64::MAX);
 
         if self.value <= max_u64 {
-            Ok(self.value.0.low_u64())
+            Some(self.value.0.low_u64())
         } else {
-            Err(EthereumError::GasLimitOverflow(self.value))
+            None
         }
     }
 

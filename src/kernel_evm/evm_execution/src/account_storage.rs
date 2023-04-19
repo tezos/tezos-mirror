@@ -4,12 +4,12 @@
 
 //! Ethereum account state and storage
 
-use super::basic::WORD_SIZE;
 use const_decoder::Decoder;
 use host::path::{concat, OwnedPath, Path, RefPath};
 use host::runtime::{Runtime, RuntimeError, ValueType};
 use primitive_types::{H160, H256, U256};
 use sha3::{Digest, Keccak256};
+use tezos_ethereum::basic::WORD_SIZE;
 use tezos_smart_rollup_storage::storage::Storage;
 use thiserror::Error;
 

@@ -183,8 +183,8 @@ pub mod blocks {
     pub mod tests {
         use super::test_utils::blocks_iter;
         use super::*;
-        use crate::basic::{H256, U256};
         use primitive_types::U256 as PTU256;
+        use tezos_ethereum::basic::{H256, U256};
         use tezos_smart_rollup_mock::MockHost;
 
         #[test]
