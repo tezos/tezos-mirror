@@ -386,14 +386,14 @@ end
 (* -------- Sampling functions for gas benchmarks -------- *)
 (* Those function are unsafe for wallet usage as they use the OCaml
    random generator. This is used to easily reproduce benchmarks. *)
+
+let vdf_tuples =
+  Array.map
+    (Data_encoding.Binary.of_string_exn vdf_tuple_encoding)
+    Timelock_precompute.vdf_tuples
+
 let gen_random_bytes_bench_unsafe size =
   Bytes.init size (fun _ -> Char.chr (Random.int 256))
-
-let gen_locked_value_bench_unsafe rsa_public =
-  let gen_random_z_unsafe size =
-    gen_random_bytes_bench_unsafe size |> Bytes.to_string |> Z.of_bits
-  in
-  Z.erem (gen_random_z_unsafe (size_rsa2048 / 8)) rsa_public
 
 let encrypt_unsafe symmetric_key plaintext =
   let nonce =
@@ -409,8 +409,14 @@ let encrypt_unsafe symmetric_key plaintext =
 let chest_sampler ~rng_state ~plaintext_size ~time =
   Random.set_state rng_state ;
   let plaintext = gen_random_bytes_bench_unsafe plaintext_size in
-  let locked_value = gen_locked_value_bench_unsafe rsa2048 in
-  let proof = unlock_and_prove rsa2048 ~time locked_value in
+  let locked_value, proof =
+    let log_time = Float.(of_int time |> log2 |> to_int) in
+    let vdf_tuple =
+      if log_time < 30 then vdf_tuples.(log_time)
+      else failwith "Timelock: trying to sample chest with too high time."
+    in
+    proof_of_vdf_tuple rsa2048 ~time vdf_tuple
+  in
   let sym_key = timelock_proof_to_symmetric_key rsa2048 proof in
   let ciphertext = encrypt_unsafe sym_key plaintext in
   ({locked_value; rsa_public = rsa2048; ciphertext}, proof)
