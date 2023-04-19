@@ -1150,27 +1150,35 @@ val name_for_errors : target -> string
 
     [default_profile] is the name of the profile to use for targets that
     were declared without [?profile]. See the documentation of the [?profile]
-    argument of type ['a maker]. *)
+    argument of type ['a maker].
+
+    Some checks are performed before generating:
+
+    - Check that there are no circular dependencies of opam packages.
+      If this check is not performed before [generate], generation may cause
+      a stack overflow.
+
+    - Check that the transitive closure of dependencies of a [js_compatible] target
+      is [js_compatible].
+
+    - Check that all targets of an opam package contain the same value for
+      [~opam_with_test]. *)
 val generate :
   make_tezt_exe:(target list -> target) ->
   default_profile:string ->
   add_to_meta_package:target list ->
   unit
 
-(** Run various checks.
+(** Run checks that should be performed after [generate].
 
-   1. Check that all [dune], [dune-project], [dune-workspace] and [.opam]
-   files are either generated or excluded. It is an error if a generated file is excluded.
-   You can use [exclude] to specify which files should be excluded. [exclude] is given a path relative to the [root]
-   directory and shall return [true] for excluded path.
+    - Check that all [dune], [dune-project], [dune-workspace] and [.opam] files
+      are either generated or excluded. It is an error if a generated file is excluded.
+      You can use [exclude] to specify which files should be excluded.
+      [exclude] is given a path relative to the [root] directory
+      and shall return [true] for excluded paths.
 
-   2. Check that the transitive closure of dependencies of a [js_compatible] target is [js_compatible].
-
-   3. Check that there are no circular dependencies of opam packages.
-
-   In case of errors, errors are printed and the process exits with exit code 1.
- *)
-val check : ?exclude:(string -> bool) -> unit -> unit
+    In case of errors, errors are printed and the process exits with exit code 1. *)
+val postcheck : ?exclude:(string -> bool) -> unit -> unit
 
 (** Generate dune-workspace file.
 

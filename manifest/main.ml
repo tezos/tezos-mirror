@@ -7422,7 +7422,7 @@ let () =
         ledgerwallet_tezos;
       ]
 
-(* Generate a dunw-workspace file at the root of the repo *)
+(* Generate a dune-workspace file at the root of the repo *)
 let () =
   let p_dev = Env.Profile "dev" in
   let p_static = Env.Profile "static" in
@@ -7476,4 +7476,4 @@ let () =
   write "script-inputs/active_protocol_versions_without_number" @@ fun fmt ->
   List.iter (write_protocol fmt) Protocol.active
 
-let () = check ~exclude ()
+let () = postcheck ~exclude ()
