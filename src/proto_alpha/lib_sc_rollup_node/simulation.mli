@@ -30,7 +30,7 @@ module type S = sig
   module Interpreter : Interpreter.S
 
   module PVM = Interpreter.PVM
-  module Fueled_pvm = Interpreter.Free_pvm
+  module Fueled_pvm = Fueled_pvm.Free
 
   type level_position = Start | Middle | End
 

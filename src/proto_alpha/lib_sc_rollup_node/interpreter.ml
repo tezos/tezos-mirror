@@ -29,12 +29,6 @@ open Alpha_context
 module type S = sig
   module PVM : Pvm.S
 
-  module Accounted_pvm :
-    Fueled_pvm.S with module PVM = PVM and type fuel = Fuel.Accounted.t
-
-  module Free_pvm :
-    Fueled_pvm.S with module PVM = PVM and type fuel = Fuel.Free.t
-
   val process_head :
     Node_context.rw ->
     'a Context.t ->
@@ -45,10 +39,10 @@ module type S = sig
 
   val state_of_tick :
     _ Node_context.t ->
-    ?start_state:Accounted_pvm.eval_state ->
+    ?start_state:Fueled_pvm.Accounted.eval_state ->
     Sc_rollup.Tick.t ->
     Raw_level.t ->
-    Accounted_pvm.eval_state option tzresult Lwt.t
+    Fueled_pvm.Accounted.eval_state option tzresult Lwt.t
 
   val state_of_head :
     'a Node_context.t ->
@@ -59,7 +53,6 @@ end
 
 module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   module PVM = PVM
-  module Fueled_pvm = Fueled_pvm.Make (PVM)
   module Accounted_pvm = Fueled_pvm.Accounted
   module Free_pvm = Fueled_pvm.Free
 

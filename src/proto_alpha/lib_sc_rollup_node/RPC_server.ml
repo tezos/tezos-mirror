@@ -57,7 +57,6 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
   module PVM = Simulation.PVM
   module Interpreter = Simulation.Interpreter
   module Outbox = Outbox.Make (PVM)
-  module Free_pvm = Interpreter.Free_pvm
 
   module Global_directory = Make_directory (struct
     include Sc_rollup_services.Global

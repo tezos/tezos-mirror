@@ -315,7 +315,7 @@ module Make (Interpreter : Interpreter.S) :
 
   type pvm_intermediate_state =
     | Hash of PVM.hash
-    | Evaluated of Interpreter.Accounted_pvm.eval_state
+    | Evaluated of Fueled_pvm.Accounted.eval_state
 
   let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level
       ok our_view =
@@ -323,7 +323,7 @@ module Make (Interpreter : Interpreter.S) :
     let state_of_tick ?start_state tick =
       Interpreter.state_of_tick node_ctxt ?start_state tick last_level
     in
-    let state_hash_of_eval_state Interpreter.Accounted_pvm.{state_hash; _} =
+    let state_hash_of_eval_state Fueled_pvm.Accounted.{state_hash; _} =
       state_hash
     in
     let start_hash, start_tick, start_state =
@@ -339,7 +339,7 @@ module Make (Interpreter : Interpreter.S) :
     let our_state, our_tick = our_view in
     let our_state_hash =
       Option.map
-        (fun Interpreter.Accounted_pvm.{state_hash; _} -> state_hash)
+        (fun Fueled_pvm.Accounted.{state_hash; _} -> state_hash)
         our_state
     in
     let our_stop_chunk =

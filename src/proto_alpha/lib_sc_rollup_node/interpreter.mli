@@ -28,12 +28,6 @@ open Protocol.Alpha_context
 module type S = sig
   module PVM : Pvm.S
 
-  module Accounted_pvm :
-    Fueled_pvm.S with module PVM = PVM and type fuel = Fuel.Accounted.t
-
-  module Free_pvm :
-    Fueled_pvm.S with module PVM = PVM and type fuel = Fuel.Free.t
-
   (** [process_head node_ctxt ~predecessor head (inbox, messages)] interprets
       the [messages] associated with a [head] (where [predecessor] is the
       predecessor of [head] in the L1 chain). This requires the [inbox] to be
@@ -56,10 +50,10 @@ module type S = sig
       from [start_state]. *)
   val state_of_tick :
     _ Node_context.t ->
-    ?start_state:Accounted_pvm.eval_state ->
+    ?start_state:Fueled_pvm.Accounted.eval_state ->
     Sc_rollup.Tick.t ->
     Raw_level.t ->
-    Accounted_pvm.eval_state option tzresult Lwt.t
+    Fueled_pvm.Accounted.eval_state option tzresult Lwt.t
 
   (** [state_of_head node_ctxt ctxt head] returns the state corresponding to the
       block [head], or the state at rollup genesis if the block is before the
