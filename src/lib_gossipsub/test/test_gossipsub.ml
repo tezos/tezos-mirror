@@ -40,6 +40,7 @@ let per_topic_score_parameters =
       mesh_message_deliveries_activation = Milliseconds.of_int_s 5;
       mesh_message_deliveries_cap = 100;
       mesh_message_deliveries_threshold = 20;
+      mesh_failure_penalty_weight = ~-.1.;
     }
 
 let score_parameters =

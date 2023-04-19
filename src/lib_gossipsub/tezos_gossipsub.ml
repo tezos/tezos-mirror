@@ -242,7 +242,8 @@ module Make (C : AUTOMATON_CONFIG) :
     assert (tsp.mesh_message_deliveries_weight <= 0.0) ;
     assert (Span.(tsp.mesh_message_deliveries_activation >= of_int_s 1)) ;
     assert (tsp.mesh_message_deliveries_cap >= 0) ;
-    assert (tsp.mesh_message_deliveries_threshold > 0)
+    assert (tsp.mesh_message_deliveries_threshold > 0) ;
+    assert (tsp.mesh_failure_penalty_weight <= 0.0)
 
   let check_score_parameters (sp : _ score_parameters) =
     (match sp.topics with

@@ -72,6 +72,9 @@ struct
     mesh_message_deliveries : int;
         (** The number of first or near-first messages delivered on this topic by
             the associated mesh peer. *)
+    mesh_failure_penalty : int;
+        (** The score penalty induced on the associated peer when pruned or removed due
+            to a mesh message delivry deficit. *)
   }
 
   type stats = {
@@ -121,7 +124,7 @@ struct
     in
     weighted_deliveries
 
-  let p3 {mesh_message_deliveries_threshold; mesh_message_deliveries_weight; _}
+  let mesh_message_delivery_penalty {mesh_message_deliveries_threshold; _}
       {mesh_message_deliveries; mesh_message_deliveries_active; _} =
     if
       mesh_message_deliveries_active
@@ -130,9 +133,15 @@ struct
       let deficit =
         mesh_message_deliveries_threshold - mesh_message_deliveries
       in
-      let p3 = float_of_int (deficit * deficit) in
-      p3 *. mesh_message_deliveries_weight
-    else 0.0
+      deficit * deficit
+    else 0
+
+  let p3 params status =
+    let penalty = mesh_message_delivery_penalty params status in
+    float_of_int penalty *. params.mesh_message_deliveries_weight
+
+  let p3b {mesh_failure_penalty_weight; _} {mesh_failure_penalty; _} =
+    float_of_int mesh_failure_penalty *. mesh_failure_penalty_weight
 
   let topic_scores {parameters; topic_status; _} =
     Topic.Map.fold
@@ -142,8 +151,9 @@ struct
         let p1 = p1 topic_parameters status in
         let p2 = p2 topic_parameters status in
         let p3 = p3 topic_parameters status in
-        let tot = topic_weight *. (p1 +. p2 +. p3) in
-        acc +. tot)
+        let p3b = p3b topic_parameters status in
+        let total = topic_weight *. (p1 +. p2 +. p3 +. p3b) in
+        acc +. total)
       topic_status
       0.0
 
@@ -189,6 +199,7 @@ struct
       first_message_deliveries = 0;
       mesh_message_deliveries_active = false;
       mesh_message_deliveries = 0;
+      mesh_failure_penalty = 0;
     }
 
   let expires {stats; _} =
@@ -216,10 +227,15 @@ struct
       Topic.Map.update
         topic
         (Option.map (fun status ->
+             let topic_parameters = get_topic_params stats.parameters topic in
+             let penalty =
+               mesh_message_delivery_penalty topic_parameters status
+             in
              {
                status with
                mesh_status = Inactive;
                mesh_message_deliveries_active = false;
+               mesh_failure_penalty = status.mesh_failure_penalty + penalty;
              }))
         stats.topic_status
     in
@@ -237,11 +253,16 @@ struct
       (* Update per-topic statistics *)
       let topic_status =
         Topic.Map.mapi
-          (fun _topic status ->
+          (fun topic status ->
+            let topic_parameters = get_topic_params stats.parameters topic in
+            let penalty =
+              mesh_message_delivery_penalty topic_parameters status
+            in
             {
               status with
               mesh_status = Inactive;
               mesh_message_deliveries_active = false;
+              mesh_failure_penalty = status.mesh_failure_penalty + penalty;
             })
           stats.topic_status
       in
@@ -249,8 +270,6 @@ struct
       let stats =
         {stats with peer_status = Disconnected {expires}; topic_status}
       in
-      (* TODO https://gitlab.com/tezos/tezos/-/issues/5447
-         apply score penalties due to mesh message deliveries deficit. *)
       make stats |> Option.some
 
   let first_message_delivered ({stats; _} : t) (topic : Topic.t) =
@@ -262,6 +281,7 @@ struct
       {
         mesh_status = ts.mesh_status;
         mesh_message_deliveries_active = ts.mesh_message_deliveries_active;
+        mesh_failure_penalty = ts.mesh_failure_penalty;
         mesh_message_deliveries = 0;
         (* TODO: Accounting for [mesh_message_deliveries] is performed in a subsequent commit *)
         first_message_deliveries = Int.min cap (ts.first_message_deliveries + 1);

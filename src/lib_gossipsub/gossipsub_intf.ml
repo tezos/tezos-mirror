@@ -130,6 +130,8 @@ type 'span per_topic_score_parameters = {
   mesh_message_deliveries_threshold : int;
       (** P3: The number of messages received from a peer in the mesh in the
           associated topic above which the peer won't be penalized  *)
+  mesh_failure_penalty_weight : float;
+      (** P3b: Penalty induced when a peer gets pruned with a non-zero mesh message delivery deficit. *)
 }
 
 type ('topic, 'span) topic_score_parameters =
