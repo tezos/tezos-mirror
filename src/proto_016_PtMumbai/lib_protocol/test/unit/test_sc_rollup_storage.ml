@@ -27,7 +27,8 @@
 (** Testing
     -------
     Component:  Protocol Sc_rollup_storage
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_sc_rollup_storage.ml
     Subject:    Tests for the SCORU storage module
 *)
 
@@ -2871,7 +2872,7 @@ module Stake_storage_tests = struct
           `Quick
           test_unrelated_commitments;
         Tztest.tztest
-          "test fresh index is correcly incremented"
+          "fresh index is correcly incremented"
           `Quick
           test_fresh_index_correctly_increment;
       ]
@@ -2925,3 +2926,7 @@ let tests = Stake_storage_tests.tests @ Rollup_storage_tests.tests
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2460
    Further tests to be added.
 *)
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("sc rollup storage", tests)]
+  |> Lwt_main.run

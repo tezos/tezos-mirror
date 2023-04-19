@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Destination_repr
-    Invocation:   dune exec -- ./src/proto_alpha/lib_protocol/test/unit/main.exe \
-                  test Destination_repr
+    Invocation:   dune exec src/proto_017_PtNairob/lib_protocol/test/unit/main.exe \
+                  -- --file test_destination_repr.ml
     Subject:      To test the encoding of [Destination_repr] and assert it is
                   compatible with [Contract_repr.encoding].
 *)
@@ -223,3 +223,7 @@ let tests =
     @@ test_encoding_json_compat;
     tztest "Comparison of destinations" `Quick test_compare_destination;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("Destination_repr.ml", tests)]
+  |> Lwt_main.run

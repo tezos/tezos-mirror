@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                -- test "^deactivation$"
+    Invocation: dune exec src/proto_017_PtNairob/lib_protocol/test/integration/consensus/main.exe \
+                  -- --file test_deactivation.ml
     Subject:    After a given number of cycles during which a delegate has not
                 made use of its baking and endorsing rights, its account will
                 be deactivated for validator selection. To bake/endorse
@@ -356,3 +355,7 @@ let tests =
       `Quick
       test_a_really_deactivated_account_is_not_in_the_committee;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("deactivation", tests)]
+  |> Lwt_main.run

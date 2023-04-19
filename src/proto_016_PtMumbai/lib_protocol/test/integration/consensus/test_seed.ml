@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Protocol (seed)
-    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/consensus/main.exe
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/consensus/main.exe \
+                  -- --file test_seed.ml
     Subject:      - seed_nonce_hash included in some blocks
                   - revelation operation of seed_nonce that should correspond
                   to each seed_nonce_hash
@@ -633,11 +634,14 @@ let tests =
       "revelation_missing_and_late"
       `Quick
       test_revelation_missing_and_late;
-    Tztest.tztest "test unrevealed" `Quick test_unrevealed;
+    Tztest.tztest "unrevealed" `Quick test_unrevealed;
     Tztest.tztest
-      "test_early_incorrect_unverified_correct_already_vdf"
+      "early_incorrect_unverified_correct_already_vdf"
       `Quick
       test_early_incorrect_unverified_correct_already_vdf;
-    Tztest.tztest "test VDF status" `Quick test_vdf_status;
+    Tztest.tztest "VDF status" `Quick test_vdf_status;
     Tztest.tztest "for_cycle cycle bounds" `Quick test_cycle_bounds;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("seed", tests)] |> Lwt_main.run

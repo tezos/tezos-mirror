@@ -27,7 +27,8 @@
 (** Testing
     -------
     Component:    Rollup layer 1 logic
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/unit/main.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+                  -- --file test_sc_rollup_wasm.ml
     Subject:      Unit test for the Wasm PVM
 *)
 
@@ -345,6 +346,10 @@ let tests =
       test_initial_state_hash_wasm_pvm;
     Tztest.tztest "size of a rollup metadata" `Quick test_metadata_size;
     Tztest.tztest "l1 input kind" `Quick test_l1_input_kind;
-    Tztest.tztest "test output proofs" `Quick test_output;
-    Tztest.tztest "test protocol names consistency" `Quick test_protocol_names;
+    Tztest.tztest "output proofs" `Quick test_output;
+    Tztest.tztest "protocol names consistency" `Quick test_protocol_names;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("sc rollup wasm", tests)]
+  |> Lwt_main.run

@@ -28,9 +28,8 @@
 (** Testing
     -------
     Component:    Protocol (baking)
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                  -- test "^baking$"
+    Invocation:   dune exec src/proto_017_PtNairob/lib_protocol/test/integration/consensus/main.exe \
+                  -- --file test_baking.ml
     Subject:      Rewards and bakers. Tests based on RPCs.
 *)
 
@@ -430,27 +429,27 @@ let test_committee_sampling () =
 let tests =
   [
     Tztest.tztest "cycle" `Quick test_cycle;
-    Tztest.tztest
-      "test_bake_n_cycles for 12 cycles"
-      `Quick
-      (test_bake_n_cycles 12);
+    Tztest.tztest "bake_n_cycles for 12 cycles" `Quick (test_bake_n_cycles 12);
     Tztest.tztest "voting_power" `Quick test_voting_power_cache;
     Tztest.tztest
       "the fixed baking reward is given after a bake"
       `Quick
       test_basic_baking_reward;
     Tztest.tztest
-      "test that the block producer gets the bonus while the payload producer \
-       gets the baking reward "
+      "the block producer gets the bonus while the payload producer gets the \
+       baking reward "
       `Quick
       test_rewards_block_and_payload_producer;
     Tztest.tztest
-      "test that a delegate with 8000 tez can bake"
+      "a delegate with 8000 tez can bake"
       `Quick
       (test_enough_active_stake_to_bake ~has_active_stake:true);
     Tztest.tztest
-      "test that a delegate with 7999 tez cannot bake"
+      "a delegate with 7999 tez cannot bake"
       `Quick
       (test_enough_active_stake_to_bake ~has_active_stake:false);
-    Tztest.tztest "test committee sampling" `Quick test_committee_sampling;
+    Tztest.tztest "committee sampling" `Quick test_committee_sampling;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("baking", tests)] |> Lwt_main.run

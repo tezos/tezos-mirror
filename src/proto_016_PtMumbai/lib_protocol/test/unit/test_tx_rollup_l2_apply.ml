@@ -28,7 +28,8 @@
 (** Testing
     -------
     Component:  Protocol (tx rollup l2)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_tx_rollup_l2_apply.ml
     Subject:    test the layer-2 apply implementation of transaction rollup
 *)
 
@@ -1762,20 +1763,20 @@ let tests =
     ([
        ("simple transaction", test_simple_deposit);
        ("returned transaction", test_returned_deposit);
-       ("test simple l1 transaction", test_simple_l1_transaction);
-       ( "test simple l1 transaction: inexistant ticket",
+       ("simple l1 transaction", test_simple_l1_transaction);
+       ( "simple l1 transaction: inexistant ticket",
          test_l1_transaction_inexistant_ticket );
-       ( "test simple l1 transaction: inexistant signer",
+       ( "simple l1 transaction: inexistant signer",
          test_l1_transaction_inexistant_signer );
-       ("test simple l1 transaction: overdraft", test_l1_transaction_overdraft);
-       ("test simple l1 transaction: zero", test_l1_transaction_zero);
-       ("test simple l1 transaction: partial", test_l1_transaction_partial);
-       ("test simple l2 transaction", test_simple_l2_transaction);
-       ( "test l2 transaction with l2 addr: good",
+       ("simple l1 transaction: overdraft", test_l1_transaction_overdraft);
+       ("simple l1 transaction: zero", test_l1_transaction_zero);
+       ("simple l1 transaction: partial", test_l1_transaction_partial);
+       ("simple l2 transaction", test_simple_l2_transaction);
+       ( "l2 transaction with l2 addr: good",
          test_l2_transaction_l2_addr_signer_good );
        ( "test l2 transaction with l2 addr: bad",
          test_l2_transaction_l2_addr_signer_bad );
-       ( "test simple transaction with indexes and values",
+       ( "simple transaction with indexes and values",
          test_transaction_with_unknown_indexable );
        ("invalid transaction", test_invalid_transaction);
        ("invalid counter", test_invalid_counter);
@@ -1786,7 +1787,7 @@ let tests =
          test_apply_message_batch_withdrawals );
        ("apply deposit from message", test_apply_message_deposit);
        ("apply unparseable message", test_apply_message_unparsable);
-       ("test transfer to self fail", test_transfer_to_self);
+       ("transfer to self fail", test_transfer_to_self);
        ( "nb withdrawals per batch below limit",
          nb_withdrawals_per_batch_below_limit );
        ( "nb withdrawals per batch equals limit",
@@ -1795,3 +1796,7 @@ let tests =
          nb_withdrawals_per_batch_above_limit );
      ]
     @ Indexes.tests)
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("tx rollup l2 apply", tests)]
+  |> Lwt_main.run

@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
-                  -- -f 'Smart rollup inbox'
+    Invocation:   dune exec src/proto_017_PtNairob/lib_protocol/test/pbt/main.exe \
+                  -- --file test_sc_rollup_inbox.ml
     Subject:      Smart rollup inbox
 *)
 
@@ -74,8 +74,4 @@ let test_add_info_per_level =
 
 let tests = [test_add_info_per_level]
 
-let () =
-  Alcotest.run
-    ~__FILE__
-    "Smart rollup inbox"
-    [(Protocol.name ^ ": safety", qcheck_wrap tests)]
+let () = Alcotest.run ~__FILE__ Protocol.name [("safety", qcheck_wrap tests)]

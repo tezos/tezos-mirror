@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/test_sampler.exe
+    Invocation:   dune exec src/proto_017_PtNairob/lib_protocol/test/pbt/main.exe \
+                  -- --file test_sampler.ml
     Subject:      Operations in Saturation_repr
 *)
 
@@ -267,8 +267,5 @@ let alias_z_test =
 let () =
   Alcotest.run
     ~__FILE__
-    "protocol > pbt > sampling"
-    [
-      ( Protocol.name ^ ": sampling",
-        qcheck_wrap [alias_float_test; alias_z_test] );
-    ]
+    Protocol.name
+    [("sampling", qcheck_wrap [alias_float_test; alias_z_test])]

@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (Merkle list)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_merkle_list.ml
     Subject:    test the ad-hoc merkle tree structure implemented to encode lists
 *)
 
@@ -234,20 +235,19 @@ let test_path_encoding () =
 
 let valid_tests =
   [
-    ("test_compute", test_compute);
-    ("test_snoc", test_snoc);
-    ("test_snoc_non_tr", test_snoc_non_tr);
-    ("test_compute_path", test_compute_path);
-    ("test_check_path", test_check_path);
-    ("test_path_encoding", test_path_encoding);
-    ("test_compute_path_negative_pos", test_compute_path_negative_pos);
-    ("test_compute_path_out_of_bounds", test_compute_path_out_of_bounds);
-    ("test_check_path_negative_pos", test_check_path_negative_pos);
-    ("test_check_path_out_of_bounds", test_check_path_out_of_bounds);
-    ( "test_compute_path_out_of_bounds_full",
-      test_compute_path_out_of_bounds_full );
-    ("test_check_path_wrong_pos", test_check_path_wrong_pos);
-    ("test_check_invalidated_path", test_check_invalidated_path);
+    ("compute", test_compute);
+    ("snoc", test_snoc);
+    ("snoc_non_tr", test_snoc_non_tr);
+    ("compute_path", test_compute_path);
+    ("check_path", test_check_path);
+    ("path_encoding", test_path_encoding);
+    ("compute_path_negative_pos", test_compute_path_negative_pos);
+    ("compute_path_out_of_bounds", test_compute_path_out_of_bounds);
+    ("check_path_negative_pos", test_check_path_negative_pos);
+    ("check_path_out_of_bounds", test_check_path_out_of_bounds);
+    ("compute_path_out_of_bounds_full", test_compute_path_out_of_bounds_full);
+    ("check_path_wrong_pos", test_check_path_wrong_pos);
+    ("check_invalidated_path", test_check_invalidated_path);
   ]
 
 let wrap (n, f) =
@@ -255,3 +255,7 @@ let wrap (n, f) =
       Lwt.return (f ()) >|= function Ok () -> () | Error _ -> assert false)
 
 let tests = List.map wrap valid_tests
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("merkle list", tests)]
+  |> Lwt_main.run

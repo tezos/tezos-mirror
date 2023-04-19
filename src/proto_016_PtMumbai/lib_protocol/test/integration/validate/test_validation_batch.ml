@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (validate manager)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/validate/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/validate/main.exe \
+                  -- --file test_validation_batch.ml
     Subject:    Validation of batched manager operation.
 *)
 
@@ -620,3 +621,10 @@ let tests =
           revealed,
           mk_high_gas_limit );
       ]
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    Protocol.name
+    [("batched managers validation", tests)]
+  |> Lwt_main.run

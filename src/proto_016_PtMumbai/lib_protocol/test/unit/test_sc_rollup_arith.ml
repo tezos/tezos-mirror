@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (saturated arithmetic)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_sc_rollup_arith.ml
     Subject:    Basic testing of the arithmetic rollup example
 *)
 
@@ -545,3 +546,7 @@ let tests =
       test_initial_state_hash_arith_pvm;
     Tztest.tztest "Filter internal message" `Quick test_filter_internal_message;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("sc rollup arith", tests)]
+  |> Lwt_main.run

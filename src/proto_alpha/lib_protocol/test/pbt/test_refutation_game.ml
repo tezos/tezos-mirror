@@ -27,7 +27,8 @@
 (** Testing
     -------
     Component:    PBT for the SCORU refutation game
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
+                  -- --file test_refutation_game.ml
     Subject:      SCORU refutation game
 *)
 open Protocol

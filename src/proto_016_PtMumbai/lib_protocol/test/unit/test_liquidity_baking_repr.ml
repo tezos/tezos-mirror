@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol Liquidity_baking_repr module
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_liquidity_baking_repr.ml
     Subject:    Tests for the Liquidity_baking_repr module
 *)
 
@@ -216,44 +217,39 @@ let test_ema_symmetry () =
 
 let tests =
   [
+    Tztest.tztest "EMA does not change when vote is Pass" `Quick test_ema_pass;
     Tztest.tztest
-      "Test EMA does not change when vote is Pass"
-      `Quick
-      test_ema_pass;
-    Tztest.tztest
-      "Test EMA remains in bounds when vote is Off"
+      "EMA remains in bounds when vote is Off"
       `Quick
       test_ema_in_bound_off;
+    Tztest.tztest "EMA increases when vote is Off" `Quick test_ema_increases_off;
     Tztest.tztest
-      "Test EMA increases when vote is Off"
-      `Quick
-      test_ema_increases_off;
-    Tztest.tztest
-      "Test EMA does not increase too much when vote is Off"
+      "EMA does not increase too much when vote is Off"
       `Quick
       test_ema_increases_off_bound;
     Tztest.tztest
-      "Test EMA remains in bounds when vote is On"
+      "EMA remains in bounds when vote is On"
       `Quick
       test_ema_in_bound_on;
+    Tztest.tztest "EMA decreases when vote is On" `Quick test_ema_decreases_on;
     Tztest.tztest
-      "Test EMA decreases when vote is On"
-      `Quick
-      test_ema_decreases_on;
-    Tztest.tztest
-      "Test EMA does not decrease too much when vote is On"
+      "EMA does not decrease too much when vote is On"
       `Quick
       test_ema_decreases_on_bound;
     Tztest.tztest
-      "Test EMA goes from 0 to one billion in 1386 Off votes"
+      "EMA goes from 0 to one billion in 1386 Off votes"
       `Quick
       test_ema_many_off;
     Tztest.tztest
-      "Test EMA goes from two billions to one billion in 1386 On votes"
+      "EMA goes from two billions to one billion in 1386 On votes"
       `Quick
       test_ema_many_on;
     Tztest.tztest
-      "Test that voting On and Off have symmetric effects on the EMA"
+      "voting On and Off have symmetric effects on the EMA"
       `Quick
       test_ema_symmetry;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("liquidity baking", tests)]
+  |> Lwt_main.run

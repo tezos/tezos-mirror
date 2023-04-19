@@ -27,7 +27,8 @@
 (** Testing
     -------
     Component:  Protocol (Ticket_scanner)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/main.exe
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_ticket_lazy_storage_diff.ml
     Subject:    Ticket scanner tests
 *)
 
@@ -660,38 +661,36 @@ let test_mix_lazy_diffs () =
 
 let tests =
   [
-    Tztest.tztest "Test allocate new empty" `Quick test_allocate_new_empty;
-    Tztest.tztest "Test allocate new" `Quick test_allocate_new;
-    Tztest.tztest
-      "Test allocate new no tickets"
-      `Quick
-      test_allocate_new_no_tickets;
+    Tztest.tztest "allocate new empty" `Quick test_allocate_new_empty;
+    Tztest.tztest "allocate new" `Quick test_allocate_new;
+    Tztest.tztest "allocate new no tickets" `Quick test_allocate_new_no_tickets;
     Tztest.tztest "Remove" `Quick test_remove_big_map;
     Tztest.tztest
-      "Test no updates to existing"
+      "no updates to existing"
       `Quick
       test_no_updates_to_existing_big_map;
+    Tztest.tztest "update existing big-map" `Quick test_update_existing_big_map;
     Tztest.tztest
-      "Test update existing big-map"
-      `Quick
-      test_update_existing_big_map;
-    Tztest.tztest
-      "Test update same key multiple times on existing big-map"
+      "update same key multiple times on existing big-map"
       `Quick
       test_update_same_key_multiple_times_existing_big_map;
     Tztest.tztest
-      "Test remove same key multiple times on existing big-map"
+      "remove same key multiple times on existing big-map"
       `Quick
       test_remove_same_key_multiple_times_existing_big_map;
     Tztest.tztest
-      "Test update and remove same key multiple times on existing big-map"
+      "update and remove same key multiple times on existing big-map"
       `Quick
       test_update_and_remove_same_key_multiple_times_existing_big_map;
-    Tztest.tztest "Test copy" `Quick test_copy_big_map;
-    Tztest.tztest "Test copy with updates" `Quick test_copy_big_map_with_updates;
+    Tztest.tztest "copy" `Quick test_copy_big_map;
+    Tztest.tztest "copy with updates" `Quick test_copy_big_map_with_updates;
     Tztest.tztest
-      "Test copy with multiple updates to same key"
+      "copy with multiple updates to same key"
       `Quick
       test_copy_big_map_with_updates_to_same_key;
-    Tztest.tztest "Test mix lazy diffs" `Quick test_mix_lazy_diffs;
+    Tztest.tztest "mix lazy diffs" `Quick test_mix_lazy_diffs;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("ticket lazy storage diff", tests)]
+  |> Lwt_main.run

@@ -27,7 +27,8 @@
 (** Testing
     -------
     Component:  Protocol (Ticket_scanner)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_ticket_scanner.ml
     Subject:    Ticket scanner tests
 *)
 
@@ -627,67 +628,67 @@ let test_tickets_remove_overlay_in_non_empty_in_big_map_ref () =
 
 let tests =
   [
+    Tztest.tztest "tickets in unit ticket" `Quick test_tickets_in_unit_ticket;
+    Tztest.tztest "tickets in list" `Quick test_tickets_in_list;
     Tztest.tztest
-      "Test tickets in unit ticket"
-      `Quick
-      test_tickets_in_unit_ticket;
-    Tztest.tztest "Test tickets in list" `Quick test_tickets_in_list;
-    Tztest.tztest
-      "Test tickets in list with zero amount"
+      "tickets in list with zero amount"
       `Quick
       test_tickets_in_list_with_zero_amount;
-    Tztest.tztest "Test tickets in pair" `Quick test_tickets_in_pair;
+    Tztest.tztest "tickets in pair" `Quick test_tickets_in_pair;
     Tztest.tztest
-      "Test tickets in pair with zero amount"
+      "tickets in pair with zero amount"
       `Quick
       test_tickets_in_pair_with_zero_amount;
-    Tztest.tztest "Test tickets in map" `Quick test_tickets_in_map;
+    Tztest.tztest "tickets in map" `Quick test_tickets_in_map;
     Tztest.tztest
-      "Test tickets in map with zero amount"
+      "tickets in map with zero amount"
       `Quick
       test_tickets_in_map_with_zero_amount;
-    Tztest.tztest "Test tickets in big map" `Quick test_tickets_in_big_map;
+    Tztest.tztest "tickets in big map" `Quick test_tickets_in_big_map;
     Tztest.tztest
-      "Test tickets in big map with include lazy set to false"
+      "tickets in big map with include lazy set to false"
       `Quick
       test_tickets_in_big_map_strict_only;
     Tztest.tztest
-      "Test tickets in list in big map"
+      "tickets in list in big map"
       `Quick
       test_tickets_in_list_in_big_map;
     Tztest.tztest
-      "Test tickets in a pair of big-map and list with include lazy set to \
-       false"
+      "tickets in a pair of big-map and list with include lazy set to false"
       `Quick
       test_tickets_in_pair_big_map_and_list_strict_only;
-    Tztest.tztest "Test tickets in or left" `Quick test_tickets_in_or_left;
+    Tztest.tztest "tickets in or left" `Quick test_tickets_in_or_left;
     Tztest.tztest
-      "Test tickets in or left with zero amount"
+      "tickets in or left with zero amount"
       `Quick
       test_tickets_in_or_left_with_zero_amount;
-    Tztest.tztest "Test tickets in or right" `Quick test_tickets_in_or_right;
+    Tztest.tztest "tickets in or right" `Quick test_tickets_in_or_right;
     Tztest.tztest
-      "Test tickets in empty big-map ref"
+      "tickets in empty big-map ref"
       `Quick
       test_tickets_overlay_in_empty_big_map_ref;
     Tztest.tztest
-      "Test tickets in big-map ref"
+      "tickets in big-map ref"
       `Quick
       test_tickets_in_empty_big_map_ref;
     Tztest.tztest
-      "Test tickets in non-empty big-map ref"
+      "tickets in non-empty big-map ref"
       `Quick
       test_tickets_in_non_empty_big_map_ref;
     Tztest.tztest
-      "Test tickets in non-empty big-map ref with overlay"
+      "tickets in non-empty big-map ref with overlay"
       `Quick
       test_tickets_overlay_in_non_empty_in_big_map_ref;
     Tztest.tztest
-      "Test tickets replace existing value from overlay"
+      "tickets replace existing value from overlay"
       `Quick
       test_tickets_replace_overlay_in_non_empty_in_big_map_ref;
     Tztest.tztest
-      "Test tickets remove existing value from overlay"
+      "tickets remove existing value from overlay"
       `Quick
       test_tickets_remove_overlay_in_non_empty_in_big_map_ref;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("ticket scanner", tests)]
+  |> Lwt_main.run

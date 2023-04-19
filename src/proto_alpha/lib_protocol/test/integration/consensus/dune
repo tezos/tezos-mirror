@@ -27,7 +27,6 @@
   -open Tezos_protocol_alpha_parameters
   -open Tezos_protocol_plugin_alpha)
  (modules
-  test_main
   test_baking
   test_consensus_key
   test_deactivation

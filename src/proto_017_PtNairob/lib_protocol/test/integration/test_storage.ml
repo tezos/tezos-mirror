@@ -27,8 +27,8 @@
     -------
     Component:  Context Storage
     Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/main.exe \
-                -- test storage
+                src/proto_017_PtNairob/lib_protocol/test/integration/main.exe \
+                -- --file test_storage.ml
     Subject:    Test the correctnesss of debug message from storage_functor
  *)
 
@@ -237,3 +237,7 @@ let tests =
       `Quick
       (fun _ -> test_register_indexed_subcontext_2);
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("storage description", tests)]
+  |> Lwt_main.run

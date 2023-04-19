@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (Michelson annotations)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_annotations.ml
     Subject:    This module tests that Michelson annotations are properly handled.
 *)
 
@@ -137,3 +138,7 @@ let tests =
       `Quick
       test_internal_origination;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("annotations", tests)]
+  |> Lwt_main.run

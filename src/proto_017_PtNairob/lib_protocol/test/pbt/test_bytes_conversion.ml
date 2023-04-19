@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    pbt for bytes <=> nat/int conversions
-    Invocation:   [QCHECK_SEED=<seed>] dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/test_bytes_conversion.exe
+    Invocation:   dune exec src/proto_017_PtNairob/lib_protocol/test/pbt/main.exe \
+                  -- --file test_bytes_conversion.ml
     Subject:      Test the conversions between bytes and int/nat
 *)
 
@@ -211,6 +211,5 @@ let tests =
 let () =
   Alcotest.run
     ~__FILE__
-    ("protocol > script_bytes > " ^ Protocol.name
-   ^ ": bytes and int/nat conversion ")
+    (Protocol.name ^ ": bytes and int/nat conversion ")
     tests

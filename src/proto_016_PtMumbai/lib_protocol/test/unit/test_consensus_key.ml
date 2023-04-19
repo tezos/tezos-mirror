@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (delegate_consensus_key)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_consensus_key.ml
     Subject:    Functions from the module `Delegate_consensus_key`
 *)
 
@@ -237,3 +238,7 @@ let test_consensus_key_storage () =
 
 let tests =
   [Tztest.tztest "consensus_key_storage" `Quick test_consensus_key_storage]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("Delegate consensus key", tests)]
+  |> Lwt_main.run

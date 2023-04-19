@@ -36,7 +36,6 @@
   -open Tezos_benchmark_type_inference_017_PtNairob
   -open Tezos_protocol_plugin_017_PtNairob)
  (modules
-  test_main
   test_annotations
   test_block_time_instructions
   test_contract_event

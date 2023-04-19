@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    protocol
-    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_round_repr.ml
     Subject:      test the Round_repr module
 *)
 
@@ -616,13 +617,13 @@ let test_round_and_offset_correction =
 let tests =
   Tztest.
     [
-      tztest "test_level_offset_of_round" `Quick test_level_offset_of_round;
-      tztest "test Round_duration" `Quick test_round;
+      tztest "level_offset_of_round" `Quick test_level_offset_of_round;
+      tztest "Round_duration" `Quick test_round;
       tztest "round_of_timestamp" `Quick test_round_of_timestamp;
       tztest "round_of_timestamp_perf" `Quick test_round_of_timestamp_perf;
       tztest "timestamp_of_round_perf" `Quick test_timestamp_of_round_perf;
       tztest
-        "test level offset too high error is triggered"
+        "level offset too high error is triggered"
         `Quick
         test_error_is_triggered_for_too_high_timestamp;
       tztest "round_of_ts (ts_of_round r) = r" `Quick test_ts_of_round_inverse;
@@ -632,3 +633,6 @@ let tests =
         test_round_of_ts_inverse;
       test_round_and_offset_correction;
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("round", tests)] |> Lwt_main.run

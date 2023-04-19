@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/pbt/main.exe
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/pbt/main.exe \
+                  -- --file test_sc_rollup_tick_repr.ml
     Subject:      Operations in Tick_repr
 *)
 
@@ -105,5 +106,5 @@ let tests =
 let () =
   Alcotest.run
     ~__FILE__
-    "Tick_repr"
-    [(Protocol.name ^ ": Tick_repr", Qcheck2_helpers.qcheck_wrap tests)]
+    Protocol.name
+    [("Tick_repr", Qcheck2_helpers.qcheck_wrap tests)]

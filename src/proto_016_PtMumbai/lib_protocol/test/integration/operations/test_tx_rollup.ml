@@ -28,7 +28,8 @@
 (** Testing
     -------
     Component:    Tx rollup layer 1 logic
-    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_tx_rollup.ml
     Subject:      Test rollup
 *)
 
@@ -5794,52 +5795,51 @@ module Withdraw = struct
 
   let tests =
     [
-      Tztest.tztest "Test withdraw" `Quick test_valid_withdraw;
+      Tztest.tztest "withdraw" `Quick test_valid_withdraw;
       Tztest.tztest
-        "Test reveal withdrawals w/ missing commitment"
+        "reveal withdrawals w/ missing commitment"
         `Quick
         test_invalid_reveal_withdrawals_no_commitment;
       Tztest.tztest
-        "Test reveal withdrawals w/ missing withdraw in commitment"
+        "reveal withdrawals w/ missing withdraw in commitment"
         `Quick
         test_invalid_reveal_withdrawals_missing_withdraw_in_commitment;
       Tztest.tztest
-        "Test reveal withdrawals w/ incorrect tickets info"
+        "reveal withdrawals w/ incorrect tickets info"
         `Quick
         test_reveal_withdrawals_invalid_tickets_info;
       Tztest.tztest
-        "Test to reveal withdrawals twice"
+        "reveal withdrawals twice"
         `Quick
         test_reveal_withdrawals_twice;
       Tztest.tztest
-        "Test withdraw w/ an invalid message index"
+        "withdraw w/ an invalid message index"
         `Quick
         test_invalid_index_or_context;
-      Tztest.tztest "Test withdrawing too late" `Quick test_too_late_withdrawal;
+      Tztest.tztest "withdrawing too late" `Quick test_too_late_withdrawal;
       Tztest.tztest
-        "Test storage clean up"
+        "storage clean up"
         `Quick
         test_withdrawal_accounting_is_cleaned_up_after_removal;
       Tztest.tztest
-        "Test deposits overflowing to withdrawals"
+        "deposits overflowing to withdrawals"
         `Quick
         test_deposit_overflow_to_withdrawal;
       Tztest.tztest
-        "Test deposit to multiple destinations don't overflow"
+        "deposit to multiple destinations don't overflow"
         `Quick
         test_deposit_multiple_destinations_at_limit;
       Tztest.tztest
-        "Test multiple withdrawals from the same batch and from different \
-         batches"
+        "multiple withdrawals from the same batch and from different batches"
         `Quick
         test_multiple_withdrawals_multiple_batches;
       Tztest.tztest
-        "Test deposit, followed by withdrawal, followed by deposit"
+        "deposit, followed by withdrawal, followed by deposit"
         `Quick
         test_forge_deposit_withdraw_deposit;
       Tztest.tztest
-        "Test deposit, followed by withdrawal, followed by transfer to an \
-         implicit account"
+        "deposit, followed by withdrawal, followed by transfer to an implicit \
+         account"
         `Quick
         test_forge_deposit_withdraw_implicit_transfer;
     ]
@@ -5847,19 +5847,15 @@ end
 
 let tests =
   [
+    Tztest.tztest "feature flag is disabled" `Quick test_disable_feature_flag;
+    Tztest.tztest "sunset" `Quick test_sunset;
+    Tztest.tztest "tx rollup origination and burn" `Quick test_origination;
     Tztest.tztest
-      "check feature flag is disabled"
-      `Quick
-      test_disable_feature_flag;
-    Tztest.tztest "check sunset" `Quick test_sunset;
-    Tztest.tztest "check tx rollup origination and burn" `Quick test_origination;
-    Tztest.tztest
-      "check two originated tx rollup in one operation have different address"
+      "two originated tx rollup in one operation have different address"
       `Quick
       test_two_originations;
     Tztest.tztest
-      "check the function that updates the burn per byte rate of a transaction \
-       rollup"
+      "the function that updates the burn per byte rate of a transaction rollup"
       `Quick
       test_burn_per_byte_update;
     Tztest.tztest "add one batch to a rollup" `Quick test_add_batch;
@@ -5880,80 +5876,78 @@ let tests =
       "Try to add several batches to reach the inbox count limit"
       `Quick
       test_inbox_count_too_big;
-    Tztest.tztest "Test deposit with valid contract" `Quick test_valid_deposit;
+    Tztest.tztest "deposit with valid contract" `Quick test_valid_deposit;
     Tztest.tztest
-      "Test deposit with invalid parameter"
+      "deposit with invalid parameter"
       `Quick
       test_invalid_deposit_not_ticket;
     Tztest.tztest
-      "Test deposit with too big ticket"
+      "deposit with too big ticket"
       `Quick
       test_invalid_deposit_too_big_ticket;
     Tztest.tztest
-      "Test deposit with too big ticket type"
+      "deposit with too big ticket type"
       `Quick
       test_invalid_deposit_too_big_ticket_type;
     Tztest.tztest
-      "Test valid deposit with big ticket"
+      "valid deposit with big ticket"
       `Quick
       test_valid_deposit_big_ticket;
     Tztest.tztest
-      "Test valid deposit to inexistant rollup"
+      "valid deposit to inexistant rollup"
       `Quick
       test_valid_deposit_inexistant_rollup;
-    Tztest.tztest "Test invalid entrypoint" `Quick test_invalid_entrypoint;
+    Tztest.tztest "invalid entrypoint" `Quick test_invalid_entrypoint;
     Tztest.tztest
-      "Test valid deposit to invalid L2 address"
+      "valid deposit to invalid L2 address"
       `Quick
       test_invalid_l2_address;
     Tztest.tztest
-      "Test valid deposit with non-zero amount"
+      "valid deposit with non-zero amount"
       `Quick
       test_valid_deposit_invalid_amount;
     Tztest.tztest
-      "Test depositing too many tickets"
+      "depositing too many tickets"
       `Quick
       test_deposit_too_many_tickets;
-    Tztest.tztest "Test finalization" `Quick test_finalization;
+    Tztest.tztest "finalization" `Quick test_finalization;
     Tztest.tztest "Smoke test commitment" `Quick test_commitment_duplication;
     Tztest.tztest
-      "Test commitment predecessor edge cases"
+      "commitment predecessor edge cases"
       `Quick
       test_commitment_predecessor;
-    Tztest.tztest "Test full inbox" `Quick test_full_inbox;
+    Tztest.tztest "full inbox" `Quick test_full_inbox;
     Tztest.tztest
-      "Test too many finalized commitments"
+      "too many finalized commitments"
       `Quick
       test_too_many_commitments;
-    Tztest.tztest
-      "Test finalization edge cases"
-      `Quick
-      test_finalization_edge_cases;
-    Tztest.tztest "Test bond finalization" `Quick test_bond_finalization;
-    Tztest.tztest "Test state" `Quick test_state;
+    Tztest.tztest "finalization edge cases" `Quick test_finalization_edge_cases;
+    Tztest.tztest "bond finalization" `Quick test_bond_finalization;
+    Tztest.tztest "state" `Quick test_state;
     Tztest.tztest
       "Try to commit to the current inbox and fail"
       `Quick
       test_commit_current_inbox;
+    Tztest.tztest "state with deleted commitment" `Quick test_state_with_deleted;
     Tztest.tztest
-      "Test state with deleted commitment"
-      `Quick
-      test_state_with_deleted;
-    Tztest.tztest
-      "Test upfront message preallocation"
+      "upfront message preallocation"
       `Quick
       test_state_message_storage_preallocation;
     Tztest.tztest
-      "Test storage burn for submitting batch"
+      "storage burn for submitting batch"
       `Quick
       test_storage_burn_for_adding_batch;
     Tztest.tztest
-      "Test additional space allocation for deposit"
+      "additional space allocation for deposit"
       `Quick
       test_additional_space_allocation_for_valid_deposit;
     Tztest.tztest
-      "Test additional space allocation for commitment"
+      "additional space allocation for commitment"
       `Quick
       test_storage_burn_for_commitment;
   ]
   @ Withdraw.tests @ Rejection.tests @ parsing_tests
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("tx rollup", tests)]
+  |> Lwt_main.run

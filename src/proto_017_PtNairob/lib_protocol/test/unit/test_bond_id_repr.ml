@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Bond_id_repr
-    Invocation:   dune exec ./src/proto_alpha/lib_protocol/test/unit/main.exe \
-      -- test Bond_id_repr
+    Invocation:   dune exec src/proto_017_PtNairob/lib_protocol/test/unit/main.exe \
+                  -- --file test_bond_id_repr.ml
     Dependencies: --
     Subject:      Test bond id representations for RPC definitions.
 *)
@@ -112,3 +112,7 @@ let tests =
       test_destruct_invalid_bond_id_repr;
     Tztest.tztest "Deserialize/serialize roundtrip" `Quick test_roundtrip;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("Bond_id_repr.ml", tests)]
+  |> Lwt_main.run

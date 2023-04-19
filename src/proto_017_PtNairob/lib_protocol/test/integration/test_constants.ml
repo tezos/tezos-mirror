@@ -28,8 +28,8 @@
     -------
     Component:  Protocol (baking)
     Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/main.exe \
-                -- test "^constants$"
+                src/proto_017_PtNairob/lib_protocol/test/integration/main.exe \
+                -- --file test_constants.ml
     Subject:    the consistency of parametric constants
  *)
 
@@ -210,8 +210,11 @@ let tests =
       `Quick
       test_sc_rollup_max_commitment_storage_size;
     Tztest.tztest
-      "test liquidity_baking_subsidy parameter is 1/16th of total baking \
-       rewards"
+      "liquidity_baking_subsidy parameter is 1/16th of total baking rewards"
       `Quick
       liquidity_baking_subsidy_param;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("constants", tests)]
+  |> Lwt_main.run

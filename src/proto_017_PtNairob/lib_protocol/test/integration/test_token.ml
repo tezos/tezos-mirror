@@ -27,8 +27,8 @@
     -------
     Component:  Protocol (token)
     Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/main.exe \
-                -- test "^token"
+                src/proto_017_PtNairob/lib_protocol/test/integration/main.exe \
+                -- --file test_token.ml
     Subject:    Token movements in the protocol.
 *)
 
@@ -777,3 +777,7 @@ let tests =
         `Quick
         test_transfer_n_with_several_givers;
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("token movements", tests)]
+  |> Lwt_main.run

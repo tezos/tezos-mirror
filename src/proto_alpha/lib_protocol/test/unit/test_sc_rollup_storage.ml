@@ -27,7 +27,8 @@
 (** Testing
     -------
     Component:  Protocol Sc_rollup_storage
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+                  -- --file test_sc_rollup_storage.ml
     Subject:    Tests for the SCORU storage module
 *)
 
@@ -2672,7 +2673,7 @@ module Stake_storage_tests = struct
           `Quick
           test_no_conflict_point_both_stakers_at_lcc;
         Tztest.tztest
-          "test_conflict_point_computation_fits_in_gas_limit"
+          "conflict_point_computation_fits_in_gas_limit"
           `Quick
           test_conflict_point_computation_fits_in_gas_limit;
         Tztest.tztest "can remove staker 1" `Quick test_can_remove_staker;
@@ -2743,7 +2744,7 @@ module Stake_storage_tests = struct
           `Quick
           test_unrelated_commitments;
         Tztest.tztest
-          "test fresh index is correcly incremented"
+          "fresh index is correcly incremented"
           `Quick
           test_fresh_index_correctly_increment;
       ]
@@ -2797,3 +2798,7 @@ let tests = Stake_storage_tests.tests @ Rollup_storage_tests.tests
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2460
    Further tests to be added.
 *)
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("sc rollup storage", tests)]
+  |> Lwt_main.run

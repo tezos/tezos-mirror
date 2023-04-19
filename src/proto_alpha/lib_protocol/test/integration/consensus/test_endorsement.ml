@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (endorsement)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
+                  -- --file test_endorsement.ml
     Subject:    Endorsing a block adds an extra layer of confidence
                 to the Tezos' PoS algorithm. The block endorsing
                 operation must be included in the following block.
@@ -684,3 +685,7 @@ let tests =
       `Quick
       (test_endorsement_threshold ~sufficient_threshold:false);
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("endorsement", tests)]
+  |> Lwt_main.run

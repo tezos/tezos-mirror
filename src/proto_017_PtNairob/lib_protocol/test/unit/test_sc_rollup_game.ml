@@ -27,8 +27,8 @@
 (** Testing
     -------
     Component:  Protocol Sc_rollup_refutation_storage
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-      -- test "^\[Unit\] sc rollup game$"
+    Invocation: dune exec src/proto_017_PtNairob/lib_protocol/test/unit/main.exe \
+                  -- --file test_sc_rollup_game.ml
     Subject:    Tests for the SCORU refutation game
 *)
 
@@ -460,21 +460,23 @@ let tests =
       `Quick
       test_invalid_serialized_inbox_proof;
     Tztest.tztest
-      "Test to start a game with invalid commitment hash (swap commitment)."
+      "start a game with invalid commitment hash (swap commitment)."
       `Quick
       test_first_move_with_swapped_commitment;
     Tztest.tztest
-      "Test to start a game with invalid commitment hash (op from outsider)."
+      "start a game with invalid commitment hash (op from outsider)."
       `Quick
       test_first_move_from_invalid_player;
     Tztest.tztest
-      "Test to start a game with invalid commitment hash (opponent is not in \
-       game)."
+      "start a game with invalid commitment hash (opponent is not in game)."
       `Quick
       test_first_move_with_invalid_opponent;
     Tztest.tztest
-      "Test to start a game with commitment hash that are not the first \
-       conflict."
+      "start a game with commitment hash that are not the first conflict."
       `Quick
       test_first_move_with_invalid_ancestor;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("sc rollup game", tests)]
+  |> Lwt_main.run

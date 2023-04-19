@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (Alpha_context.Ticket_balance)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_ticket_storage.ml
     Subject:    Ticket storage functions tested using the Ticket_balance module in Alpha_context.
 *)
 
@@ -269,3 +270,7 @@ let tests =
       test_ticket_balance_different_owners;
     Tztest.tztest "ticket storage space" `Quick test_storage_space;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("ticket storage", tests)]
+  |> Lwt_main.run

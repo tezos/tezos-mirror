@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (preendorsement)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
+                 -- --file test_preendorsement.ml
 *)
 
 open Protocol
@@ -234,3 +235,7 @@ let tests =
         `Quick
         test_preendorsement_for_next_round;
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("preendorsement", tests)]
+  |> Lwt_main.run

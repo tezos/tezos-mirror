@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Protocol (double endorsement)
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
+                  -- --file test_double_endorsement.ml
     Subject:      Double endorsement evidence operation may happen when an
                   endorser endorsed two different blocks on the same level.
 *)
@@ -555,3 +556,7 @@ let tests =
       `Quick
       test_freeze_more_with_low_balance;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("double endorsement", tests)]
+  |> Lwt_main.run

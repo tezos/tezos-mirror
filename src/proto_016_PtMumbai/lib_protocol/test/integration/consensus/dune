@@ -28,7 +28,6 @@
   -open Tezos_protocol_016_PtMumbai_parameters
   -open Tezos_protocol_plugin_016_PtMumbai)
  (modules
-  test_main
   test_baking
   test_consensus_key
   test_deactivation

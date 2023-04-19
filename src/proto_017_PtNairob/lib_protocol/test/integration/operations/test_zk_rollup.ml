@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:    Rollup layer 1 logic
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                  -- test "^zk rollup$"
+    Invocation:   dune exec src/proto_017_PtNairob/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_zk_rollup.ml
     Subject:      Test zk rollup
 *)
 
@@ -1280,3 +1279,7 @@ let tests =
       `Quick
       test_valid_deposit_and_external_withdrawal;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("zk rollup", tests)]
+  |> Lwt_main.run

@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (validate manager)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/validate/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/validate/main.exe \
+                  -- --file test_1m_restriction.ml
     Subject:    1M restriction in validation of manager operation.
 *)
 
@@ -225,3 +226,7 @@ let tests : (string * [`Quick | `Slow] * (unit -> unit Lwt.t)) trace =
       batch_is_not_singles_tests;
       conflict_free_tests;
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("one-manager restriction", tests)]
+  |> Lwt_main.run

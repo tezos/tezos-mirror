@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (Michelson block-time instructions)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                -- test "^block time instructions$"
+    Invocation: dune exec src/proto_017_PtNairob/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_block_time_instructions.ml
     Subject:    This module tests that Michelson instructions related to block time are correct.
 *)
 
@@ -78,3 +78,7 @@ let tests =
       `Quick
       test_min_block_time;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("block time instructions", tests)]
+  |> Lwt_main.run

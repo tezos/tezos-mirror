@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (origination)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                -- test "^origination$"
+    Invocation: dune exec src/proto_017_PtNairob/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_origination.ml
     Subject:    On originating contracts.
 *)
 
@@ -326,3 +325,7 @@ let tests =
     Tztest.tztest "counter" `Quick test_counter;
     Tztest.tztest "unparsable script" `Quick test_unparsable_script;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("origination", tests)]
+  |> Lwt_main.run

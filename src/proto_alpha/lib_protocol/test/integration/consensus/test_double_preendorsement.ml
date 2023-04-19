@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (double preendorsement) in Full_construction & Application modes
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
+                  -- --file test_double_preendorsement.ml
     Subject:    These tests target different cases for double preendorsement *)
 
 open Protocol
@@ -398,3 +399,7 @@ let tests =
     let baking_mode = Block.Baking
   end) in
   AppMode.tests @ ConstrMode.tests
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("double preendorsement", tests)]
+  |> Lwt_main.run

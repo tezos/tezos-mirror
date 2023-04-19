@@ -27,7 +27,8 @@
 (** Testing
     -------
     Component:  Protocol (voting)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/main.exe
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_voting.ml
     Subject:    On the voting process.
 
 *)
@@ -2096,3 +2097,6 @@ let tests =
       test_conflicting_ballot;
     Tztest.tztest "Valid Ballot operations" `Quick test_valid_ballot;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("voting", tests)] |> Lwt_main.run

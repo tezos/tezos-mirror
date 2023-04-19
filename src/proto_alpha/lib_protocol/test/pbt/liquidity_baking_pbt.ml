@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    pbt for liquidity baking
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
+                  -- --file liquidity_baking_pbt.ml
     Subject:      Test liquidity baking contracts using randomly generated inputs.
 *)
 
@@ -319,9 +320,8 @@ let () =
   let open Qcheck2_helpers in
   Alcotest.run
     ~__FILE__
-    "protocol > pbt > liquidity baking"
+    Protocol.name
     [
-      ( Protocol.name ^ ": Machines Cross-Validation",
-        qcheck_wrap machine_validation_tests );
-      (Protocol.name ^ ": Economic Properties", qcheck_wrap economic_tests);
+      ("Machines Cross-Validation", qcheck_wrap machine_validation_tests);
+      ("Economic Properties", qcheck_wrap economic_tests);
     ]

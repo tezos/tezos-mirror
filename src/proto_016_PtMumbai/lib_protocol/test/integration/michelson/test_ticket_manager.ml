@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component: Protocol (Ticket_balance_key)
-    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/main.exe
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_ticket_manager.ml
     Subject: Tests that compare the ticket-balance table against tickets in the
              contract storages. The tests include a lot of operations that
              sends and store tickets. After each operation we check that the
@@ -802,3 +803,7 @@ let tests =
       test_add_remove_from_lazy_storage;
     Tztest.tztest "Mix of operations" `Quick test_mixed_operations;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("ticket manager", tests)]
+  |> Lwt_main.run

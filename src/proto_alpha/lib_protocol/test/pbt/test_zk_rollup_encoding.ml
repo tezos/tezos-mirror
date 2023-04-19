@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
+                  -- --file test_zk_rollup_encoding.ml
     Subject:      Zk rollup encodings
 *)
 
@@ -222,8 +223,8 @@ let tests_to_scalar = [test_address_to_scalar; test_operation_to_scalar]
 let () =
   Alcotest.run
     ~__FILE__
-    "ZK rollup encoding"
+    (Protocol.name ^ ": ZK rollup encoding")
     [
-      (Protocol.name ^ ": roundtrip", qcheck_wrap tests_roundtrip);
-      (Protocol.name ^ ": to_scalar", qcheck_wrap tests_to_scalar);
+      (": roundtrip", qcheck_wrap tests_roundtrip);
+      (": to_scalar", qcheck_wrap tests_to_scalar);
     ]

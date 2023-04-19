@@ -27,7 +27,6 @@
   -open Tezos_base_test_helpers
   -open Tezos_protocol_plugin_alpha)
  (modules
-  test_main
   test_activation
   test_combined_operations
   test_failing_noop

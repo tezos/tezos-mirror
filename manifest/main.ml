@@ -4574,7 +4574,6 @@ end = struct
       let _integration_consensus =
         tezt
           [
-            "test_main";
             "test_baking";
             "test_consensus_key";
             "test_deactivation";
@@ -4607,7 +4606,7 @@ end = struct
       in
       let _integration_gas =
         tezt
-          ["test_main"; "test_gas_costs"; "test_gas_levels"]
+          ["test_gas_costs"; "test_gas_levels"]
           ~path:(path // "lib_protocol/test/integration/gas")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~with_macos_security_framework:true
@@ -4624,7 +4623,6 @@ end = struct
       let _integration_michelson =
         let modules =
           [
-            ("test_main", true);
             ("test_annotations", true);
             ("test_block_time_instructions", true);
             ("test_contract_event", true);
@@ -4687,7 +4685,6 @@ end = struct
       let _integration_operations =
         let modules =
           [
-            ("test_main", true);
             ("test_activation", true);
             ("test_combined_operations", true);
             ("test_failing_noop", true);
@@ -4726,7 +4723,6 @@ end = struct
         only_if N.(number >= 014) @@ fun () ->
         tezt
           [
-            "test_main";
             "generator_descriptors";
             "generators";
             "manager_operation_helpers";
@@ -4759,7 +4755,6 @@ end = struct
       let _integration =
         let modules =
           [
-            ("test_main", true);
             ("test_constants", true);
             ("test_frozen_bonds", true);
             ("test_liquidity_baking", true);
@@ -4852,7 +4847,6 @@ end = struct
       let _unit =
         let modules =
           [
-            ("test_main", true);
             ("test_bond_id_repr", true);
             ("test_consensus_key", true);
             ("test_contract_repr", true);
