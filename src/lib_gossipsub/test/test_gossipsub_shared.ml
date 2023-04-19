@@ -42,6 +42,14 @@ module Milliseconds = struct
 
   let seconds {ms} = ms / 1000
 
+  let compare m1 m2 = Int.compare m1.ms m2.ms
+
+  module Compare = Compare.Make (struct
+    type nonrec t = t
+
+    let compare = compare
+  end)
+
   module Span = struct
     type nonrec t = t
 
@@ -62,6 +70,8 @@ module Milliseconds = struct
     let mul m s = of_int_ms (m.ms * s)
 
     let pp = pp
+
+    include Compare
   end
 
   type span = Span.t
@@ -70,13 +80,7 @@ module Milliseconds = struct
 
   let to_span = Fun.id
 
-  let compare m1 m2 = Int.compare m1.ms m2.ms
-
-  include Compare.Make (struct
-    type nonrec t = t
-
-    let compare = compare
-  end)
+  include Compare
 end
 
 module Time = struct

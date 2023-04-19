@@ -60,7 +60,9 @@ module type AUTOMATON_SUBCONFIG = sig
 end
 
 module type SPAN = sig
-  include PRINTABLE
+  include Compare.S
+
+  include PRINTABLE with type t := t
 
   val zero : t
 

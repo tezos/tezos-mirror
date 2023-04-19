@@ -67,6 +67,11 @@ struct
             This field is updated when pruning, grafting or removing the associated peer. *)
     first_message_deliveries : int;
         (** The number of messages on this topic that the associated peer was the first to deliver. *)
+    mesh_message_deliveries_active : bool;
+        (** A flag indicating whether we started evaluating the score associated to mesh messages deliveries. *)
+    mesh_message_deliveries : int;
+        (** The number of first or near-first messages delivered on this topic by
+            the associated mesh peer. *)
   }
 
   type stats = {
@@ -168,7 +173,12 @@ struct
 
   let fresh_topic_stats () =
     let mesh_status = fresh_mesh_status () in
-    {mesh_status; first_message_deliveries = 0}
+    {
+      mesh_status;
+      first_message_deliveries = 0;
+      mesh_message_deliveries_active = false;
+      mesh_message_deliveries = 0;
+    }
 
   let expires {stats; _} =
     match stats.peer_status with
@@ -194,7 +204,12 @@ struct
     let topic_status =
       Topic.Map.update
         topic
-        (Option.map (fun status -> {status with mesh_status = Inactive}))
+        (Option.map (fun status ->
+             {
+               status with
+               mesh_status = Inactive;
+               mesh_message_deliveries_active = false;
+             }))
         stats.topic_status
     in
     make {stats with topic_status}
@@ -211,7 +226,12 @@ struct
       (* Update per-topic statistics *)
       let topic_status =
         Topic.Map.mapi
-          (fun _topic status -> {status with mesh_status = Inactive})
+          (fun _topic status ->
+            {
+              status with
+              mesh_status = Inactive;
+              mesh_message_deliveries_active = false;
+            })
           stats.topic_status
       in
       (* Mark peer as disconnected *)
@@ -230,6 +250,9 @@ struct
       in
       {
         mesh_status = ts.mesh_status;
+        mesh_message_deliveries_active = ts.mesh_message_deliveries_active;
+        mesh_message_deliveries = 0;
+        (* TODO: Accounting for [mesh_message_deliveries] is performed in a subsequent commit *)
         first_message_deliveries = Int.min cap (ts.first_message_deliveries + 1);
       }
     in
@@ -250,12 +273,23 @@ struct
         let during = Time.sub now (Time.to_span since) |> Time.to_span in
         Active {since; during}
 
+  let time_active_in_mesh mesh_status =
+    match mesh_status with
+    | Inactive -> Span.zero
+    | Active {during; _} -> during
+
   let refresh_topic_status_map now {stats; _} =
     let topic_status =
-      Topic.Map.map
-        (fun status ->
+      Topic.Map.mapi
+        (fun topic status ->
+          let topic_parameters = get_topic_params stats.parameters topic in
           let mesh_status = refresh_mesh_status now status.mesh_status in
-          {status with mesh_status})
+          let mesh_message_deliveries_active =
+            Span.(
+              topic_parameters.mesh_message_deliveries_activation
+              <= time_active_in_mesh mesh_status)
+          in
+          {status with mesh_status; mesh_message_deliveries_active})
         stats.topic_status
     in
     make {stats with topic_status}
