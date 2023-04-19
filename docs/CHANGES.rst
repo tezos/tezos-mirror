@@ -3,6 +3,115 @@
 Changelog
 '''''''''
 
+Version 17.0-beta1`
+===================
+
+Node
+----
+
+- **Breaking Change**: Shortened a few lib_shell log messages at the default level by
+   displaying only the completion time instead of the full status of the operation.
+
+- Added an option ``daily-logs`` to file-descriptor sinks, enabling
+  log rotation based on a daily frequency.
+
+- Fixed a bug manifested while reconstructing the storage after a snapshot import
+  that would result in wrong context hash mapping for some blocks.
+
+- Added an option ``create-dirs`` to file-descriptor sinks to allow
+  the node to create the log directory and its parents if they don't exist.
+
+- Added a default node configuration that enables disk logs as a
+  file-descriptor-sink in the data directory of the node with a 7 days rotation.
+
+- **Breaking Change**: Removed section in stdout logs lines
+
+- Removed the ``indexing-strategy`` option from the ``TEZOS_CONTEXT``
+  environment variable to prevent the usage of the ``always``
+  indexing strategy. For now, only the ``minimal`` indexing strategy
+  is allowed.
+
+- **Breaking Change** Removed the ``--network limanet``
+  built-in network alias.
+
+- Fixed a issue that may trigger unknown keys errors while reading the
+  context on a read-only instance.
+
+Baker
+-----
+
+- Consensus operations that do not use the minimal slot of the delegate are
+  not counted for the (pre)quorums. (MR :gl: `!8175`)
+
+- Consensus operations with identical consensus-related contents but different
+  ``branch`` fields are counted only once in the (pre)quorums. (MR :gl: `!8175`)
+
+- Improved efficiency to solve the anti-spam Proof-of-Work challenge.
+
+Accuser
+-------
+
+- Fixed a bug that made the accuser start without waiting for its
+  corresponding protocol.
+
+- The accuser now denounces double consensus operations that have the same
+  level, round, and delegate, but different slots. (MR :gl:`!8084`)
+
+Signer
+------
+
+- Reordered the display of ``octez-client list connected ledgers``
+  command. It is now ``Ed25519``, ``Secp256k1``, ``Secp256r1`` and
+  ``Bip32_ed25519``.
+
+Smart Rollup node
+-----------------
+
+- Fixed inverted logic for playing a timeout move in a refutation game (MR
+  :gl:`!7929`).
+
+- Stopped the node when the operator deposit is slashed (MR :gl:`!7579`).
+
+- Improved computations of refutation games’ dissections (MRs :gl:`!6948`,
+  :gl:`!7751`, :gl:`!8059`, :gl:`!8382`).
+
+- Improved WASM runtime performances (MR :gl:`!8252`).
+
+- Made the Fast Execution aware of the newly introduced WASM PVM versionning
+  (MR :gl:`!8079`).
+
+- Fixed UX issues related to the rollup node configuration (MRs :gl:`!8148`,
+  :gl:`!8254`, :gl:`!8156`).
+
+- Quality of life improvements in the Layer 1 injector (MRs :gl:`!7579`, :gl:`!7673`, :gl:`!7675`, :gl:`!7685`, :gl:`!7681`, :gl:`!7846`, :gl:`!8106`).
+
+- Fixed logs for kernel debug messages (MR :gl:`!7773`).
+
+Smart Rollup client
+-------------------
+
+- Fixed a JSON decoding error for the command ``get proof for message ...`` (MR
+  :gl:`!8000`).
+
+Smart Rollup WASM Debugger
+--------------------------
+
+- Let the user select the initial version of the WASM PVM (MR :gl:`!8078`).
+
+- Added commands to decode the contents of the memory and the durable storage
+  (MRs :gl:`!7464`, :gl:`!7709`, :gl:`!8303`).
+
+- Added the ``bench`` command (MR :gl:`!7551`).
+
+- Added commands to inspect the structure of the durable storage (MRs
+  :gl:`!7707`, :gl:`!8304`).
+
+
+Miscellaneous
+-------------
+
+- Removed binaries and mempool RPCs of Lima.
+
 Version 16.1
 ============
 
