@@ -314,6 +314,10 @@ end = struct
         (* TODO: Punish peer *)
         Events.(emit notify_duplicate) (key, peer)
 
+  type update_table_action =
+    | Replace of {key : key; status : status}
+    | Remove of {key : key}
+
   let worker_loop state =
     let open Lwt_syntax in
     let shutdown = Lwt_canceler.when_canceling state.canceler in
@@ -339,18 +343,16 @@ end = struct
         let* () = Events.(emit timeout) () in
         let now = Time.System.now () in
         let active_peers = Request.active state.param in
-        let requests =
+        let actions, requests =
           Table.fold
-            (fun key {peers; next_request; delay} acc ->
-              if Ptime.is_later next_request ~than:now then acc
+            (fun key {peers; next_request; delay} (actions, acc) ->
+              if Ptime.is_later next_request ~than:now then (actions, acc)
               else
                 let remaining_peers = P2p_peer.Set.inter peers active_peers in
                 if
                   P2p_peer.Set.is_empty remaining_peers
                   && not (P2p_peer.Set.is_empty peers)
-                then (
-                  Table.remove state.pending key ;
-                  acc)
+                then (Remove {key} :: actions, acc)
                 else
                   let requested_peer =
                     P2p_peer.Id.Set.random_elt
@@ -368,17 +370,23 @@ end = struct
                       delay = Time.System.Span.multiply_exn 1.5 delay;
                     }
                   in
-                  Table.replace state.pending key next ;
                   let requests =
                     key
                     :: Option.value
                          ~default:[]
                          (P2p_peer.Map.find requested_peer acc)
                   in
-                  P2p_peer.Map.add requested_peer requests acc)
+                  ( Replace {key; status = next} :: actions,
+                    P2p_peer.Map.add requested_peer requests acc ))
             state.pending
-            P2p_peer.Map.empty
+            ([], P2p_peer.Map.empty)
         in
+        (* Update pending table *)
+        List.iter
+          (function
+            | Remove {key} -> Table.remove state.pending key
+            | Replace {key; status} -> Table.replace state.pending key status)
+          actions ;
         P2p_peer.Map.iter (Request.send state.param) requests ;
         let* () =
           P2p_peer.Map.iter_s
