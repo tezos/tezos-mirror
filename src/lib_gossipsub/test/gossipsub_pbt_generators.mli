@@ -32,43 +32,48 @@ module M = QCheck2.Gen
 type 'a t := 'a QCheck2.Gen.t
 
 (** The type of inputs to the gossipsub automaton. *)
-type input =
-  | Add_peer of GS.add_peer (* case 0 *)
-  | Remove_peer of GS.remove_peer (* case 1 *)
-  | Ihave of GS.ihave (* case 2 *)
-  | Iwant of GS.iwant (* case 3 *)
-  | Graft of GS.graft (* case 4 *)
-  | Prune of GS.prune (* case 5 *)
-  | Publish of GS.publish (* case 6 *)
-  | Heartbeat (* case 7 *)
-  | Join of GS.join (* case 8 *)
-  | Leave of GS.leave (* case 9 *)
-  | Subscribe of GS.subscribe (* case 10 *)
-  | Unsubscribe of GS.unsubscribe (* case 11 *)
+type _ input =
+  | Add_peer : GS.add_peer -> [`Add_peer] input (* case 0 *)
+  | Remove_peer : GS.remove_peer -> [`Remove_peer] input (* case 1 *)
+  | Ihave : GS.ihave -> [`IHave] input (* case 2 *)
+  | Iwant : GS.iwant -> [`IWant] input (* case 3 *)
+  | Graft : GS.graft -> [`Graft] input (* case 4 *)
+  | Prune : GS.prune -> [`Prune] input (* case 5 *)
+  | Publish : GS.publish -> [`Publish] input (* case 6 *)
+  | Heartbeat : [`Heartbeat] input (* case 7 *)
+  | Join : GS.join -> [`Join] input (* case 8 *)
+  | Leave : GS.leave -> [`Leave] input (* case 9 *)
+  | Subscribe : GS.subscribe -> [`Subscribe] input (* case 10 *)
+  | Unsubscribe : GS.unsubscribe -> [`Unsubscribe] input (* case 11 *)
+
+(** Existentially packed input. *)
+type ex_input = I : _ input -> ex_input
 
 (** The type of outputs of the gossipsub automaton, wrapped for convenience. *)
 type output = O : _ GS.output -> output
 
 (** An [event] is either an input for the gossipsub automaton, or some time elapsing. *)
-type event = Input of input | Elapse of int
+type event = Input : 'a input -> event | Elapse of int
 
 (** A [transition] is a quadruple [(i, s, s', o)] corresponding to an
       automaton transition from state [s] to state [s'] under input [i],
       producing output [o].  *)
-type transition = private {
-  t : Time.t;
-  i : input;
-  s : GS.state;
-  s' : GS.state;
-  o : output;
-}
+type transition = private
+  | Transition : {
+      time : GS.Time.t;
+      input : 'a input;
+      state : GS.state;
+      state' : GS.state;
+      output : 'a GS.output;
+    }
+      -> transition
 
 (** A [trace] is a sequence of transitions. *)
 type trace = transition list
 
 (** { 2 Printers } *)
 
-val pp_input : Format.formatter -> input -> unit
+val pp_input : Format.formatter -> 'a input -> unit
 
 val pp_trace :
   ?pp_state:(Format.formatter -> state -> unit) ->
@@ -122,6 +127,33 @@ val subscribe : gen_topic:Topic.t t -> gen_peer:Peer.t t -> GS.subscribe t
 
 val unsubscribe : gen_topic:Topic.t t -> gen_peer:Peer.t t -> GS.unsubscribe t
 
+(** Existentially pack an input. *)
+module I : sig
+  val add_peer : add_peer -> ex_input
+
+  val remove_peer : remove_peer -> ex_input
+
+  val ihave : ihave -> ex_input
+
+  val iwant : iwant -> ex_input
+
+  val graft : graft -> ex_input
+
+  val prune : prune -> ex_input
+
+  val publish : publish -> ex_input
+
+  val join : join -> ex_input
+
+  val leave : leave -> ex_input
+
+  val subscribe : subscribe -> ex_input
+
+  val unsubscribe : unsubscribe -> ex_input
+
+  val heartbeat : ex_input
+end
+
 (** We fuzz the automaton by composing basic sequences of inputs, called {e fragments}.
     Fragments can be composed sequentially, but most importantly
     we can model concurrent interactions with the automaton by generating interleavings
@@ -131,11 +163,15 @@ module Fragment : sig
   type t
 
   (** [of_list inputs] injects a deterministic sequence of events as a fragment. *)
-  val of_list : input list -> t
+  val of_list : ex_input list -> t
+
+  (** [bind_gen gen f] creates a fragment parameterized by a generator [gen]
+      through [f]. *)
+  val bind_gen : 'a M.t -> ('a -> t) -> t
 
   (** [of_input_gen gen f] creates a fragment generated using
       [gen] mapped to an list of {!input} through [f]. *)
-  val of_input_gen : 'a M.t -> ('a -> input list) -> t
+  val of_input_gen : 'a M.t -> ('a -> ex_input list) -> t
 
   (** [tck] is a basic event that increments the time of one unit. *)
   val tick : t
@@ -177,4 +213,4 @@ val check_fold :
 
 (** [check_final f trace] applies [f] to the last state and the last output in [trace]. *)
 val check_final :
-  (GS.state -> output -> (unit, 'a) result) -> trace -> (unit, 'a) result
+  (transition -> (unit, 'a) result) -> trace -> (unit, 'a) result

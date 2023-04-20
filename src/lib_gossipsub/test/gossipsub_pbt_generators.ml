@@ -45,35 +45,39 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
   module Topic = GS.Topic
   module Message_id = GS.Message_id
 
-  type input =
-    | Add_peer of GS.add_peer (* case 0 *)
-    | Remove_peer of GS.remove_peer (* case 1 *)
-    | Ihave of GS.ihave (* case 2 *)
-    | Iwant of GS.iwant (* case 3 *)
-    | Graft of GS.graft (* case 4 *)
-    | Prune of GS.prune (* case 5 *)
-    | Publish of GS.publish (* case 6 *)
-    | Heartbeat (* case 7 *)
-    | Join of GS.join (* case 8 *)
-    | Leave of GS.leave (* case 9 *)
-    | Subscribe of GS.subscribe (* case 10 *)
-    | Unsubscribe of GS.unsubscribe (* case 11 *)
+  type _ input =
+    | Add_peer : GS.add_peer -> [`Add_peer] input (* case 0 *)
+    | Remove_peer : GS.remove_peer -> [`Remove_peer] input (* case 1 *)
+    | Ihave : GS.ihave -> [`IHave] input (* case 2 *)
+    | Iwant : GS.iwant -> [`IWant] input (* case 3 *)
+    | Graft : GS.graft -> [`Graft] input (* case 4 *)
+    | Prune : GS.prune -> [`Prune] input (* case 5 *)
+    | Publish : GS.publish -> [`Publish] input (* case 6 *)
+    | Heartbeat : [`Heartbeat] input (* case 7 *)
+    | Join : GS.join -> [`Join] input (* case 8 *)
+    | Leave : GS.leave -> [`Leave] input (* case 9 *)
+    | Subscribe : GS.subscribe -> [`Subscribe] input (* case 10 *)
+    | Unsubscribe : GS.unsubscribe -> [`Unsubscribe] input (* case 11 *)
+
+  type ex_input = I : _ input -> ex_input
 
   type output = O : _ GS.output -> output
 
-  type event = Input of input | Elapse of int
+  type event = Input : 'a input -> event | Elapse of int
 
-  type transition = {
-    t : GS.Time.t;
-    i : input;
-    s : GS.state;
-    s' : GS.state;
-    o : output;
-  }
+  type transition =
+    | Transition : {
+        time : GS.Time.t;
+        input : 'a input;
+        state : GS.state;
+        state' : GS.state;
+        output : 'a GS.output;
+      }
+        -> transition
 
   type trace = transition list
 
-  let pp_input fmtr (i : input) =
+  let pp_input fmtr (type a) (i : a input) =
     let open Format in
     match i with
     | Add_peer add_peer -> fprintf fmtr "Add_peer %a" GS.pp_add_peer add_peer
@@ -94,12 +98,12 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
 
   let pp_trace ?pp_state ?pp_state' ?pp_output () fmtr trace =
     let open Format in
-    let pp fmtr {t; i; s; s'; o} =
-      fprintf fmtr "[%a] " GS.Time.pp t ;
-      Option.iter (fun pp -> fprintf fmtr "%a => " pp s) pp_state ;
-      pp_input fmtr i ;
-      Option.iter (fun pp -> fprintf fmtr "/ %a" pp o) pp_output ;
-      Option.iter (fun pp -> fprintf fmtr " => %a" pp s') pp_state'
+    let pp fmtr (Transition {time; input; state; state'; output}) =
+      fprintf fmtr "[%a] " GS.Time.pp time ;
+      Option.iter (fun pp -> fprintf fmtr "%a => " pp state) pp_state ;
+      pp_input fmtr input ;
+      Option.iter (fun pp -> fprintf fmtr " / %a" pp (O output)) pp_output ;
+      Option.iter (fun pp -> fprintf fmtr " => %a" pp state') pp_state'
     in
     fprintf
       fmtr
@@ -164,26 +168,51 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
     let+ topic = gen_topic and+ peer = gen_peer in
     ({topic; peer} : GS.unsubscribe)
 
-  let wrap : GS.state * _ GS.output -> GS.state * output =
-   fun (state, out) -> (state, O out)
+  let input (I i) = Input i
 
-  let input i = Input i
+  module I = struct
+    let i input = I input
 
-  let dispatch : input -> GS.state -> GS.state * output =
+    let add_peer x = Add_peer x |> i
+
+    let remove_peer x = Remove_peer x |> i
+
+    let ihave x = Ihave x |> i
+
+    let iwant x = Iwant x |> i
+
+    let graft x = Graft x |> i
+
+    let prune x = Prune x |> i
+
+    let publish x = Publish x |> i
+
+    let join x = Join x |> i
+
+    let leave x = Leave x |> i
+
+    let subscribe x = Subscribe x |> i
+
+    let unsubscribe x = Unsubscribe x |> i
+
+    let heartbeat = i Heartbeat
+  end
+
+  let dispatch : type a. a input -> GS.state -> GS.state * a GS.output =
    fun i state ->
     match i with
-    | Add_peer m -> GS.add_peer m state |> wrap
-    | Remove_peer m -> GS.remove_peer m state |> wrap
-    | Ihave m -> GS.handle_ihave m state |> wrap
-    | Iwant m -> GS.handle_iwant m state |> wrap
-    | Graft m -> GS.handle_graft m state |> wrap
-    | Prune m -> GS.handle_prune m state |> wrap
-    | Publish m -> GS.publish m state |> wrap
-    | Heartbeat -> GS.heartbeat state |> wrap
-    | Join m -> GS.join m state |> wrap
-    | Leave m -> GS.leave m state |> wrap
-    | Subscribe m -> GS.handle_subscribe m state |> wrap
-    | Unsubscribe m -> GS.handle_unsubscribe m state |> wrap
+    | Add_peer m -> GS.add_peer m state
+    | Remove_peer m -> GS.remove_peer m state
+    | Ihave m -> GS.handle_ihave m state
+    | Iwant m -> GS.handle_iwant m state
+    | Graft m -> GS.handle_graft m state
+    | Prune m -> GS.handle_prune m state
+    | Publish m -> GS.publish m state
+    | Heartbeat -> GS.heartbeat state
+    | Join m -> GS.join m state
+    | Leave m -> GS.leave m state
+    | Subscribe m -> GS.handle_subscribe m state
+    | Unsubscribe m -> GS.handle_unsubscribe m state
 
   (** A fragment is a sequence of events encoding a basic interaction with
       the gossipsub automaton. Fragments support sequential and parallel
@@ -195,7 +224,7 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
 
     let raw_of_list l = Thread (List.to_seq l |> Seq.map input |> SeqM.of_seq)
 
-    let of_list l =
+    let of_list (l : ex_input list) =
       M.return (Thread (List.to_seq l |> Seq.map input |> SeqM.of_seq))
 
     (* Smart [raw] constructors *)
@@ -270,6 +299,10 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
      fun fragment -> next fragment M.return
 
     (* Combinators *)
+
+    let bind_gen m f : t =
+      let* m in
+      f m
 
     let of_input_gen gen f : t =
       let+ x = gen in
@@ -388,7 +421,9 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
             | Input i ->
                 Test_gossipsub_shared.Time.set time ;
                 let state', output = dispatch i state in
-                let step = {t = time; i; s = state; s' = state'; o = output} in
+                let step =
+                  Transition {time; input = i; state; state'; output}
+                in
                 (time, state', step :: acc)
             | Elapse d -> (time + d, state, acc))
           (0, state, [])
@@ -429,7 +464,7 @@ module Make (GS : AUTOMATON with type Time.t = int) = struct
     with Predicate_failed (e, prefix) -> Error (e, prefix)
 
   let check_final f (trace : trace) =
-    match List.rev trace with [] -> Ok () | t :: _ -> f t.s' t.o
+    match List.rev trace with [] -> Ok () | t :: _ -> f t
 end
 
 include Make (Test_gossipsub_shared.GS)

@@ -221,4 +221,49 @@ struct
 
     let compare = Float.compare
   end)
+
+  let pp_mesh_status fmtr status =
+    match status with
+    | Active {since; during} ->
+        let open Fmt in
+        let open Dump in
+        let p = (since, during) in
+        record [field "since" fst Time.pp; field "during" snd Span.pp] fmtr p
+    | Inactive -> Format.pp_print_string fmtr "Inactive"
+
+  let pp_topic_status =
+    let open Fmt in
+    Dump.record [field "mesh_status" (fun ts -> ts.mesh_status) pp_mesh_status]
+
+  let pp_topic_status_map =
+    let open Fmt in
+    Dump.iter_bindings Topic.Map.iter nop Topic.pp pp_topic_status
+
+  let pp_peer_status fmtr status =
+    match status with
+    | Connected -> Format.pp_print_string fmtr "Connected"
+    | Disconnected {expires} ->
+        Fmt.Dump.(record [field "expires" Fun.id Time.pp]) fmtr expires
+
+  let pp_stats =
+    let open Fmt in
+    let open Dump in
+    record
+      [
+        field "behaviour_penalty" (fun s -> s.behaviour_penalty) int;
+        field "topic_status" (fun s -> s.topic_status) pp_topic_status_map;
+        field "peer_status" (fun s -> s.peer_status) pp_peer_status;
+        (* Don't print parameters back *)
+      ]
+
+  let pp =
+    let open Fmt in
+    let open Dump in
+    record
+      [
+        field "stats" (fun x -> x.stats) pp_stats;
+        field "score" (fun x -> Lazy.force x.score) float;
+      ]
+
+  let pp_value = Fmt.float
 end

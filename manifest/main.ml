@@ -2438,6 +2438,7 @@ let octez_gossipsub =
       [
         ringo;
         aches;
+        fmt;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix |> open_;
@@ -2454,6 +2455,7 @@ let _octez_gossipsub_test =
     ~synopsis:"Tests for the gossipsub algorithm"
     ~deps:
       [
+        fmt;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_gossipsub |> open_;

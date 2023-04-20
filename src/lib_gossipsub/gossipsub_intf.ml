@@ -289,6 +289,10 @@ module type SCORE = sig
   val of_float : float -> value
 
   include Compare.S with type t := value
+
+  include PRINTABLE with type t := t
+
+  val pp_value : Format.formatter -> value -> unit
 end
 
 module type AUTOMATON = sig
@@ -610,6 +614,8 @@ module type AUTOMATON = sig
 
   val pp_unsubscribe : Format.formatter -> unsubscribe -> unit
 
+  val pp_output : Format.formatter -> 'a output -> unit
+
   module Introspection : sig
     type connection = {topics : Topic.Set.t; direct : bool; outbound : bool}
 
@@ -685,6 +691,20 @@ module type AUTOMATON = sig
         currently tracking messages for [topic]. That is, the local peer has joined
         and hasn't left the [topic]. *)
     val has_joined : Topic.t -> view -> bool
+
+    val pp_connection : connection Fmt.t
+
+    val pp_connections : connection Peer.Map.t Fmt.t
+
+    val pp_peer_map : 'a Fmt.t -> 'a Peer.Map.t Fmt.t
+
+    val pp_message_id_map : 'a Fmt.t -> 'a Message_id.Map.t Fmt.t
+
+    val pp_topic_map : 'a Fmt.t -> 'a Topic.Map.t Fmt.t
+
+    val pp_peer_set : Peer.Set.t Fmt.t
+
+    val pp_topic_set : Topic.Set.t Fmt.t
   end
 end
 

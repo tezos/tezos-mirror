@@ -1819,6 +1819,139 @@ module Make (C : AUTOMATON_CONFIG) :
     let open Format in
     fprintf fmtr "{ topic=%a; peer=%a }" Topic.pp topic Peer.pp peer
 
+  let pp_peer_map pp_elt =
+    Fmt.Dump.iter_bindings Peer.Map.iter Fmt.nop Peer.pp pp_elt
+
+  let pp_message_id_map pp_elt =
+    Fmt.Dump.iter_bindings Message_id.Map.iter Fmt.nop Message_id.pp pp_elt
+
+  let pp_peer_set = Fmt.Dump.iter Peer.Set.iter Fmt.nop Peer.pp
+
+  let pp_topic_set = Fmt.Dump.iter Topic.Set.iter Fmt.nop Topic.pp
+
+  let pp_topic_map pp_elt =
+    Fmt.Dump.iter_bindings Topic.Map.iter Fmt.nop Topic.pp pp_elt
+
+  let pp_output (type a) fmtr (o : a output) =
+    let open Format in
+    match o with
+    | Ihave_from_peer_with_low_score {score; threshold} ->
+        let r = (score, threshold) in
+        fprintf
+          fmtr
+          "Negative_peer_score %a"
+          Fmt.Dump.(
+            record [field "score" fst Score.pp; field "threshold" snd Fmt.float])
+          r
+    | Too_many_recv_ihave_messages {count; max} ->
+        fprintf
+          fmtr
+          "Too_many_recv_ihave_messages { count=%d; max=%d }"
+          count
+          max
+    | Too_many_sent_iwant_messages {count; max} ->
+        fprintf
+          fmtr
+          "Too_many_sent_iwant_messages { count=%d; max=%d }"
+          count
+          max
+    | Message_topic_not_tracked -> fprintf fmtr "Message_topic_not_tracked"
+    | Message_requested_message_ids ids ->
+        fprintf
+          fmtr
+          "Message_requested_message_ids %a"
+          (Fmt.Dump.list Message_id.pp)
+          ids
+    | Iwant_from_peer_with_low_score {score; threshold} ->
+        let r = (score, threshold) in
+        fprintf
+          fmtr
+          "Iwant_from_peer_with_low_score %a"
+          Fmt.Dump.(
+            record [field "score" fst Score.pp; field "threshold" snd Fmt.float])
+          r
+    | On_iwant_messages_to_route {routed_message_ids} ->
+        let pp_elt fmtr tag =
+          match tag with
+          | `Ignored -> fprintf fmtr "ignored"
+          | `Message m -> fprintf fmtr "message(%a)" Message.pp m
+          | `Not_found -> fprintf fmtr "not_found"
+          | `Too_many_requests -> fprintf fmtr "too_many_requests"
+        in
+        fprintf
+          fmtr
+          "On_iwant_messages_to_route %a"
+          (pp_message_id_map pp_elt)
+          routed_message_ids
+    | Peer_filtered -> fprintf fmtr "Peer_filtered"
+    | Unknown_topic -> fprintf fmtr "Unknown_topic"
+    | Peer_already_in_mesh -> fprintf fmtr "Peer_already_in_mesh"
+    | Grafting_direct_peer -> fprintf fmtr "Grafting_direct_peer"
+    | Unexpected_grafting_peer -> fprintf fmtr "Unexpected_grafting_peer"
+    | Grafting_peer_with_negative_score ->
+        fprintf fmtr "Grafting_peer_with_negative_score"
+    | Grafting_successfully -> fprintf fmtr "Grafting_successfully"
+    | Peer_backed_off -> fprintf fmtr "Peer_backed_off"
+    | Mesh_full -> fprintf fmtr "Mesh_full"
+    | No_peer_in_mesh -> fprintf fmtr "No_peer_in_mesh"
+    | Ignore_PX_score_too_low score ->
+        fprintf fmtr "Ignore_PX_score_too_low %a" Score.pp score
+    | No_PX -> fprintf fmtr "No_PX"
+    | PX peer_set -> fprintf fmtr "PX %a" pp_peer_set peer_set
+    | Publish_message {to_publish} ->
+        fprintf
+          fmtr
+          "Publish_message %a"
+          Fmt.Dump.(record [field "to_publish" Fun.id pp_peer_set])
+          to_publish
+    | Already_published -> fprintf fmtr "Already_published"
+    | Already_joined -> fprintf fmtr "Already_joined"
+    | Joining_topic {to_graft} ->
+        fprintf fmtr "Joining_topic %a" pp_peer_set to_graft
+    | Not_joined -> fprintf fmtr "Not_joined"
+    | Leaving_topic {to_prune; noPX_peers} ->
+        let p = (to_prune, noPX_peers) in
+        fprintf
+          fmtr
+          "Leaving_topic %a"
+          Fmt.Dump.(
+            record
+              [
+                field "to_prune" fst pp_peer_set;
+                field "noPX_peers" snd pp_peer_set;
+              ])
+          p
+    | Heartbeat {to_graft; to_prune; noPX_peers} ->
+        let r = (to_graft, to_prune, noPX_peers) in
+        Fmt.pf
+          fmtr
+          "Heartbeat %a"
+          Fmt.Dump.(
+            record
+              [
+                field
+                  "to_graft"
+                  (fun (to_graft, _, _) -> to_graft)
+                  (pp_peer_map pp_topic_set);
+                field
+                  "to_prune"
+                  (fun (_, to_prune, _) -> to_prune)
+                  (pp_peer_map pp_topic_set);
+                field
+                  "noPX_peers"
+                  (fun (_, _, noPX_peers) -> noPX_peers)
+                  pp_peer_set;
+              ])
+          r
+    | Peer_added -> fprintf fmtr "Peer_added"
+    | Peer_already_known -> fprintf fmtr "Peer_already_known"
+    | Removing_peer -> fprintf fmtr "Removing_peer"
+    | Subscribed -> fprintf fmtr "Subscribed"
+    | Subscribe_to_unknown_peer -> fprintf fmtr "Subscribe_to_unknown_peer"
+    | Unsubscribed -> fprintf fmtr "Unsubscribed"
+    | Unsubscribe_from_unknown_peer ->
+        fprintf fmtr "Unsubscribe_from_unknown_peer"
+
   module Introspection = struct
     (* This module reexport datatypes so that it can be used for
        introspection. While at the moment, this module reexport purely
@@ -1906,5 +2039,31 @@ module Make (C : AUTOMATON_CONFIG) :
     let limits state = state.limits
 
     let has_joined topic {mesh; _} = Topic.Map.mem topic mesh
+
+    let pp_connection fmtr c =
+      let fields =
+        List.concat
+          [
+            (if Topic.Set.is_empty c.topics then []
+            else [Fmt.field "topics" (fun c -> c.topics) pp_topic_set]);
+            [Fmt.field "direct" (fun c -> c.direct) Fmt.bool];
+            [Fmt.field "outbound" (fun c -> c.outbound) Fmt.bool];
+          ]
+      in
+      Fmt.record fields fmtr c
+
+    let pp_connections =
+      Fmt.Dump.iter_bindings Peer.Map.iter Fmt.nop Peer.pp pp_connection
+
+    (* re-export printers *)
+    let pp_peer_map = pp_peer_map
+
+    let pp_message_id_map = pp_message_id_map
+
+    let pp_topic_map = pp_topic_map
+
+    let pp_peer_set = pp_peer_set
+
+    let pp_topic_set = pp_topic_set
   end
 end
