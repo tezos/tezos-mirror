@@ -1540,19 +1540,21 @@ module Revamped = struct
     let* () = check_mempool ~applied:[oph4; oph3; oph2; oph1] client1 in
     check_mempool ~applied:[oph4; oph3; oph2; oph1] client2
 
-  let test_prefiltered_limit =
+  let test_full_mempool =
     Protocol.register_test
       ~__FILE__
-      ~title:"Test prefiltered limits of mempool"
-      ~tags:["mempool"; "gc"; "limit"]
+      ~title:"test full mempool"
+      ~tags:["mempool"; "gc"; "limit"; "bounding"; "full"]
     @@ fun protocol ->
-    log_step 0 "Connect and initialise two nodes." ;
-    (* We configure the filter with a limit of 4, in order to easily be able to
-       inject more with our 5 bootstrap accounts *)
+    Log.info "Test the bound on operation count in the mempool." ;
+    (* We configure the filter with a limit of 4 operations, so that
+       we can easily inject more with our 5 bootstrap accounts. *)
     let max_operations = 4 in
     (* Control fees and gas limits to easily influence weight (i.e. ratio) *)
     let fee = 1000 in
     let gas_limit = 1500 in
+
+    log_step 0 "Initialize and connect two nodes." ;
     let* node1 =
       Node.init
         ~event_sections_levels:[("prevalidator", `Debug)]
@@ -1568,7 +1570,7 @@ module Revamped = struct
 
     log_step
       1
-      "Update the nodes filter to allow only %d prechecked manager operations."
+      "Update the mempool filter to allow at most %d valid operations."
       max_operations ;
     let* () = Mempool.Config.set_filter ~log:true ~max_operations client1
     and* () = Mempool.Config.set_filter ~log:true ~max_operations client2 in
@@ -1599,31 +1601,19 @@ module Revamped = struct
       4
       "The client should report when the mempool is full and not enough fees \
        are provided." ;
-    let transfer_should_fail =
-      Client.spawn_transfer
-        ~giver:Constant.bootstrap5.alias
-        ~receiver:Constant.bootstrap2.alias
-        ~amount:(Tez.of_int 55)
-        ~fee:(Tez.of_mutez_int fee)
-        ~gas_limit
-        client1
+    let* () =
+      Process.check_error
+        ~msg:Constant.Error_msg.rejected_by_full_mempool
+        (Client.spawn_transfer
+           ~giver:Constant.bootstrap5.alias
+           ~receiver:Constant.bootstrap2.alias
+           ~amount:(Tez.of_int 55)
+           ~fee:(Tez.of_mutez_int (fee - 1))
+           ~gas_limit
+           client1)
     in
-    let* std_err =
-      Process.check_and_read_stderr ~expect_failure:true transfer_should_fail
-    in
-    (match std_err =~* rex "Increase operation fees to at least (.*)tz" with
-    | None ->
-        Test.fail
-          ~__LOC__
-          "The client should fail when the mempool is full and not enough fees \
-           are provided."
-    | Some required ->
-        Check.(
-          (required = "0.001001")
-            string
-            ~error_msg:"The required fees are %L but expected %R")) ;
 
-    log_step 5 "Inject an extra operation with same fees (but mempool is full)." ;
+    log_step 5 "Force inject an extra operation with not enough fees." ;
     let* (`OpHash oph5) =
       Operation.inject_transfer
         ~force:true
@@ -1631,7 +1621,7 @@ module Revamped = struct
         ~dest:Constant.bootstrap2
         ~wait_for_injection:node1
         ~amount:1
-        ~fee
+        ~fee:(fee - 1)
         ~gas_limit
         client1
     in
@@ -1707,18 +1697,21 @@ module Revamped = struct
     log_step 12 "Check mempool after flush." ;
     check_mempool ~branch_refused:[oph5] client1
 
-  let test_prefiltered_limit_remove =
+  let test_full_mempool_and_replace_same_manager =
     Protocol.register_test
       ~__FILE__
-      ~title:"Test prefiltered limits of mempool after a remove/replace"
-      ~tags:["mempool"; "gc"; "limit"; "replace"; "remove"]
+      ~title:"test full mempool and replace same manager"
+      ~tags:["mempool"; "gc"; "limit"; "bounding"; "full"; "replace"; "remove"]
     @@ fun protocol ->
-    log_step 0 "Connect and initialise two nodes." ;
+    Log.info
+      "Test the interaction between the mempool operation bound and \
+       same-manager replace-by-fees." ;
     (* We configure the filter with a limit of 1 *)
     let max_operations = 1 in
     (* Control fees and gas limits to easily influence weight (i.e. ratio) *)
     let fee = 1000 in
     let gas_limit = 1500 in
+    log_step 0 "Initialize and connect two nodes." ;
     let* node1 =
       Node.init
         ~event_sections_levels:[("prevalidator", `Debug)]
@@ -1734,7 +1727,7 @@ module Revamped = struct
 
     log_step
       1
-      "Update the nodes filter to allow only %d prechecked manager operations."
+      "Update the mempool filter to allow at most %d valid operations."
       max_operations ;
     let* () = Mempool.Config.set_filter ~log:true ~max_operations client1
     and* () = Mempool.Config.set_filter ~log:true ~max_operations client2 in
@@ -3883,8 +3876,8 @@ let register ~protocols =
   Revamped.ban_operation protocols ;
   Revamped.unban_operation_and_reinject protocols ;
   Revamped.unban_all_operations protocols ;
-  Revamped.test_prefiltered_limit protocols ;
-  Revamped.test_prefiltered_limit_remove protocols ;
+  Revamped.test_full_mempool protocols ;
+  Revamped.test_full_mempool_and_replace_same_manager protocols ;
   Revamped.precheck_with_empty_balance protocols ;
   Revamped.inject_operations protocols ;
   Revamped.test_inject_manager_batch protocols ;

@@ -129,4 +129,9 @@ module Error_msg = struct
     rex
       "Gas limit exceeded during typechecking or execution.\n\
        Try again with a higher gas limit."
+
+  let rejected_by_full_mempool =
+    rex
+      "The mempool is full and operation (.*) does not have enough fees to \
+       replace existing operations"
 end
