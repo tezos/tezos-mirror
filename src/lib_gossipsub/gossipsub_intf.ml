@@ -701,7 +701,7 @@ module type AUTOMATON = sig
       mesh : Peer.Set.t Topic.Map.t;
       fanout : fanout_peers Topic.Map.t;
       backoff : Time.t Peer.Map.t Topic.Map.t;
-      seen_messages : Message_id.Set.t;
+      seen_messages : Time.t Message_id.Map.t;
       message_cache : Message_cache.t;
       rng : Random.State.t;
       heartbeat_ticks : int64;
