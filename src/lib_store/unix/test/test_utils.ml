@@ -833,3 +833,5 @@ module Example_tree = struct
     in
     wrap_test ?keep_dir ?history_mode ?with_gc (name, f)
 end
+
+let speed_to_string = function `Slow -> "slow" | `Quick -> "quick"

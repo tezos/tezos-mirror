@@ -28,7 +28,7 @@
     _______
 
     Component: Store
-    Invocation: dune exec src/lib_store/unix/test/main.exe
+    Invocation: dune exec src/lib_store/unix/test/main.exe -- --match construct
     Subject: Store tests ( reconstruct )
 *)
 
@@ -174,6 +174,7 @@ let make_tests_bootstrapped speed patch_context =
           nb_blocks_to_bake
       in
       wrap_simple_store_init_test
+        ~speed
         ~patch_context
         ~history_mode
         ~keep_dir:false
@@ -325,6 +326,7 @@ let make_tests_snapshoted speed patch_context =
           nb_blocks_to_bake
       in
       wrap_simple_store_init_test
+        ~speed
         ~patch_context
         ~history_mode
         ~keep_dir:false

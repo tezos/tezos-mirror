@@ -1,0 +1,16 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name bench)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezt
+  octez-alcotezt
+  src_lib_store_unix_test_tezt_lib)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Octez_alcotezt
+  -open Src_lib_store_unix_test_tezt_lib))

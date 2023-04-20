@@ -6472,9 +6472,13 @@ let _octez_micheline_rewriting_tests =
       ]
 
 let _octez_store_tests =
-  tests
+  tezt
     [
       "test";
+      "test_snapshots";
+      "test_reconstruct";
+      "test_history_mode_switch";
+      "alpha_utils";
       "test_consistency";
       "test_locator";
       "test_cemented_store";
@@ -6506,55 +6510,46 @@ let _octez_store_tests =
         Protocol.(embedded alpha);
         Protocol.(parameters_exn alpha |> open_);
         Protocol.(plugin_exn alpha) |> open_;
-        alcotest_lwt;
+        alcotezt;
         octez_test_helpers |> open_;
       ]
-    ~alias:""
-    ~dune:
-      (* [test_slow_manual] is a very long test, running a huge
-         combination of tests that are useful for local testing for a
-         given test suite. In addition to that, there is a memory leak
-         is the tests (that could be in alcotest) which makes the test
-         to consumes like > 10Gb of ram. For these reasons, we do not
-         run these tests in the CI. *)
-      Dune.
-        [
-          alias_rule
-            "runtest"
-            ~package:"tezos-store"
-            ~action:(run_exe "test_cemented_store" []);
-          alias_rule
-            "runtest"
-            ~package:"tezos-store"
-            ~action:(run_exe "test_consistency" []);
-          alias_rule
-            "runtest"
-            ~package:"tezos-store"
-            ~action:(run_exe "test_block_store" []);
-          alias_rule
-            "runtest"
-            ~package:"tezos-store"
-            ~action:(run_exe "test_protocol_store" []);
-          alias_rule
-            "runtest"
-            ~package:"tezos-store"
-            ~action:(run_exe "test_store" []);
-          alias_rule
-            "runtest"
-            ~package:"tezos-store"
-            ~action:(run_exe "test_testchain" []);
-          alias_rule
-            "runtest"
-            ~package:"tezos-store"
-            ~action:(setenv "SLOW_TEST" "false" @@ run_exe "test" []);
-          alias_rule
-            "test_slow_manual"
-            ~action:(setenv "SLOW_TEST" "true" @@ run_exe "test" []);
-          alias_rule
-            "runtest_locator_bench"
-            ~package:"tezos-store"
-            ~action:(run_exe "test_locator" ["--bench"]);
-        ]
+
+(* [_octez_bench_store_lib_tests_exe] is a bench for the store locator,
+   We do not run these tests in the CI. *)
+let _octez_bench_store_lib_tests_exe =
+  private_exe
+    "bench"
+    ~path:"src/lib_store/unix/test/bench"
+    ~synopsis:"Bench store lib tests"
+    ~opam:""
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tezt_lib;
+        alcotezt;
+        _octez_store_tests |> open_;
+      ]
+
+(* [_octez_slow_store_lib_tests_exe] is a very long test, running a huge
+   combination of tests that are useful for local testing for a
+   given test suite. In addition to that, there is a memory leak
+   is the tests (that could be in alcotest) which makes the test
+   to consumes like > 10Gb of ram. For these reasons, we do not
+   run these tests in the CI. *)
+let _octez_slow_store_lib_tests_exe =
+  private_exe
+    "test_slow"
+    ~path:"src/lib_store/unix/test/slow"
+    ~synopsis:"Slow store lib tests"
+    ~modules:["test_slow"]
+    ~opam:""
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tezt_lib;
+        alcotezt;
+        _octez_store_tests |> open_;
+      ]
 
 let _octez_shell_tests =
   tezt

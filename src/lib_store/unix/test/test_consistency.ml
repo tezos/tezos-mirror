@@ -23,6 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    _______
+
+    Component: Store
+    Invocation: dune exec src/lib_store/unix/test/main.exe \
+                -- --file test_consistency.ml
+    Subject: Store consistency tests
+*)
+
 open Test_utils
 
 let nb_protocols = 5
@@ -302,6 +311,7 @@ let make_tests =
 let () =
   Lwt_main.run
   @@ Alcotest_lwt.run
+       ~__FILE__
        "tezos-store"
        [
          ( "consistency",
