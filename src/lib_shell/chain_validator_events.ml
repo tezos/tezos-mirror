@@ -183,6 +183,17 @@ let head_increment =
     ("view", Request.encoding)
     ("level", Data_encoding.int32)
 
+let bootstrap_head_increment =
+  declare_2
+    ~section
+    ~name:"bootstrap_time_remaining"
+    ~msg:"synchronizing: current head is {timediff} old (level: {level})"
+    ~level:Notice
+    ("level", Data_encoding.int32)
+    ~pp1:(fun fmt -> Format.fprintf fmt "%li")
+    ("timediff", Time.System.Span.encoding)
+    ~pp2:Time.System.Span.pp_hum
+
 let block_info =
   declare_2
     ~section

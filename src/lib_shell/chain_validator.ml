@@ -747,7 +747,18 @@ let on_completion (type a b) w (req : (a, b) Request.t) (update : a)
         match update with
         | Ignored_head -> Events.(emit ignore_head) (block_hash, level)
         | Branch_switch -> Events.(emit branch_switch) (block_hash, level)
-        | Head_increment -> Events.(emit head_increment) (block_hash, level)
+        | Head_increment ->
+            if
+              Synchronisation_heuristic.Bootstrapping.is_bootstrapped
+                nv.synchronisation_state
+            then Events.(emit head_increment) (block_hash, level)
+            else if Int32.rem level 50l = 0l then
+              (* Display a bootstrapping status message every 50 blocks *)
+              let now = Time.System.now () in
+              let block_time = Time.System.of_protocol_exn timestamp in
+              Chain_validator_events.(emit bootstrap_head_increment)
+                (level, Ptime.diff now block_time)
+            else Lwt.return_unit
       in
       Events.(emit block_info) (timestamp, fitness)
   | Request.Notify_head (peer_id, _, _, _) -> Events.(emit notify_head) peer_id

@@ -556,6 +556,10 @@ let handle_event node {name; value; timestamp = _} =
               fname
       | None ->
           Log.error "Protocol compilation failed but cannot read the payload")
+  | "set_head.v0" -> (
+      match JSON.(value |> geti 1 |> as_int_opt) with
+      | None -> ()
+      | Some level -> update_level node level)
   | _ -> ()
 
 let check_event ?where node name promise =
