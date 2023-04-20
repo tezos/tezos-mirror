@@ -972,6 +972,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             min_pending_to_process = c.zk_rollup.min_pending_to_process;
           }
       in
+      let adaptive_inflation = Constants_parametric_repr.{enable = false} in
       let constants =
         Constants_parametric_repr.
           {
@@ -1021,6 +1022,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             dal;
             sc_rollup;
             zk_rollup;
+            adaptive_inflation;
           }
       in
       add_constants ctxt constants >>= fun ctxt -> return ctxt)

@@ -274,6 +274,7 @@ let constants_mainnet =
         origination_size = 4_000;
         min_pending_to_process = 10;
       };
+    adaptive_inflation = {enable = false};
   }
 
 (* Sandbox and test networks's Dal cryptobox are computed by this function:

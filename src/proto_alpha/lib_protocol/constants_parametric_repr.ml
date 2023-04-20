@@ -123,6 +123,8 @@ type zk_rollup = {
   min_pending_to_process : int;
 }
 
+type adaptive_inflation = {enable : bool}
+
 type t = {
   preserved_cycles : int;
   blocks_per_cycle : int32;
@@ -168,6 +170,7 @@ type t = {
   dal : dal;
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;
+  adaptive_inflation : adaptive_inflation;
 }
 
 let tx_rollup_encoding =
@@ -322,6 +325,13 @@ let zk_rollup_encoding =
        (req "zk_rollup_origination_size" int31)
        (req "zk_rollup_min_pending_to_process" int31))
 
+let adaptive_inflation_encoding =
+  let open Data_encoding in
+  conv
+    (fun ({enable} : adaptive_inflation) -> enable)
+    (fun adaptive_inflation_enable -> {enable = adaptive_inflation_enable})
+    (obj1 (req "adaptive_inflation_enable" bool))
+
 let encoding =
   let open Data_encoding in
   conv
@@ -364,7 +374,9 @@ let encoding =
               ( ( c.cache_script_size,
                   c.cache_stake_distribution_cycles,
                   c.cache_sampler_state_cycles ),
-                (c.tx_rollup, (c.dal, (c.sc_rollup, c.zk_rollup))) ) ) ) ) ))
+                ( c.tx_rollup,
+                  (c.dal, ((c.sc_rollup, c.zk_rollup), c.adaptive_inflation)) )
+              ) ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -403,7 +415,9 @@ let encoding =
                  ( ( cache_script_size,
                      cache_stake_distribution_cycles,
                      cache_sampler_state_cycles ),
-                   (tx_rollup, (dal, (sc_rollup, zk_rollup))) ) ) ) ) ) ->
+                   ( tx_rollup,
+                     (dal, ((sc_rollup, zk_rollup), adaptive_inflation)) ) ) )
+             ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -447,6 +461,7 @@ let encoding =
         dal;
         sc_rollup;
         zk_rollup;
+        adaptive_inflation;
       })
     (merge_objs
        (obj10
@@ -506,4 +521,6 @@ let encoding =
                       tx_rollup_encoding
                       (merge_objs
                          (obj1 (req "dal_parametric" dal_encoding))
-                         (merge_objs sc_rollup_encoding zk_rollup_encoding))))))))
+                         (merge_objs
+                            (merge_objs sc_rollup_encoding zk_rollup_encoding)
+                            adaptive_inflation_encoding))))))))

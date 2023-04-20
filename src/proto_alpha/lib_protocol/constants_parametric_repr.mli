@@ -138,6 +138,8 @@ type zk_rollup = {
   min_pending_to_process : int;
 }
 
+type adaptive_inflation = {enable : bool}
+
 type t = {
   preserved_cycles : int;
   blocks_per_cycle : int32;
@@ -189,6 +191,7 @@ type t = {
   dal : dal;
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;
+  adaptive_inflation : adaptive_inflation;
 }
 
 val encoding : t Data_encoding.encoding
