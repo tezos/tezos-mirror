@@ -67,9 +67,9 @@ type t = {
       (** The size of the IP address greylist in kilobytes. *)
   ip_greylist_cleanup_delay : Time.System.Span.t;
       (** The time an IP address is kept in the greylist. *)
-  swap_linger : Time.System.Span.t;
+  swap_linger : Time.System.Span.t option;
       (** Peer swapping does not occur more than once during a timespan of
-      [swap_linger]. *)
+          [swap_linger]. If None, the swap mechanism is disabled.  *)
   binary_chunks_size : int option;
       (** Size (in bytes) of binary blocks that are sent to other
       peers. Default value is 64 kB. Max value is 64kB. *)

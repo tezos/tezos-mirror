@@ -75,6 +75,7 @@ type argument =
   | Connections of int  (** [--connections] *)
   | Private_mode  (** [--private-mode] *)
   | Disable_p2p_maintenance  (** [--disable-p2p-maintenance] *)
+  | Disable_p2p_swap  (** [--disable-p2p-swap] *)
   | Peer of string  (** [--peer] *)
   | No_bootstrap_peers  (** [--no-bootstrap-peers] *)
   | Disable_operations_precheck  (** [--disable-mempool-precheck] *)

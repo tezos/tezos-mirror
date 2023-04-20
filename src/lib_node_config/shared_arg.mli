@@ -60,6 +60,10 @@ type t = {
       (** If [disable_p2p_maintenance] is [true] the p2p layer will not open or
           close connections by itself. This flag is intended to be used for
           testing and debugging. *)
+  disable_p2p_swap : bool;
+      (** If [disable_p2p_swap] is [true] the p2p layer will neither initiate a
+          swap of connections with its neighbors nor answer to a swap request.
+          This flag is intended to be used for testing and debugging. *)
   disable_mempool : bool;
   disable_mempool_precheck : bool;
       (** If [disable_mempool_precheck] is [true] operations are executed by

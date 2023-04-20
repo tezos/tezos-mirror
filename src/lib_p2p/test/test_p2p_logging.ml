@@ -256,7 +256,7 @@ module P2p_net = struct
         peer_greylist_size = 1;
         ip_greylist_size_in_kilobytes = 64;
         ip_greylist_cleanup_delay = Ptime.Span.of_int_s 10;
-        swap_linger = Ptime.Span.of_int_s 10;
+        swap_linger = Some (Ptime.Span.of_int_s 10);
         (* can't be 0 *)
         binary_chunks_size = None;
       }

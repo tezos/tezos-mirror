@@ -840,6 +840,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?(private_mode = default_p2p.private_mode)
     ?(disable_p2p_maintenance =
       Option.is_none default_p2p.limits.maintenance_idle_time)
+    ?(disable_p2p_swap = Option.is_none default_p2p.limits.swap_linger)
     ?(disable_mempool = default_p2p.disable_mempool)
     ?(disable_mempool_precheck =
       Shell_limits.default_limits.prevalidator_limits.disable_precheck)
@@ -887,6 +888,8 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       maintenance_idle_time =
         (if disable_p2p_maintenance then None
         else cfg.p2p.limits.maintenance_idle_time);
+      swap_linger =
+        (if disable_p2p_swap then None else cfg.p2p.limits.swap_linger);
     }
   in
   let acl =
