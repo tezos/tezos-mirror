@@ -331,6 +331,11 @@ module type SCORE = sig
       by the associated peer. *)
   val first_message_delivered : t -> topic -> t
 
+  (** [duplicate_message_delivered ps topic validated] increments the counter related to
+      near-first mesh message deliveries on [topic] by the associated peer. [validated]
+      is the time at which the message was seen by the automaton for the first time. *)
+  val duplicate_message_delivered : t -> topic -> time -> t
+
   (** [refresh ps] returns [Some ps'] with [ps'] a refreshed score record or [None]
       if the score expired. Refreshing a [ps] allows to update time-dependent spects
       of the scoring statistics. *)

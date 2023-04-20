@@ -316,6 +316,30 @@ struct
     in
     make {stats with topic_status}
 
+  let duplicate_message_delivered ({stats; _} : t) (topic : Topic.t)
+      (validated : Time.t) =
+    let increment ts =
+      let topic_parameters = get_topic_params stats.parameters topic in
+      let window_upper_bound =
+        Time.add validated topic_parameters.mesh_message_deliveries_window
+      in
+      if Time.(now () <= window_upper_bound) then
+        let mesh_message_deliveries =
+          increment_mesh_message_deliveries stats.parameters topic ts
+        in
+        {ts with mesh_message_deliveries}
+      else ts
+    in
+    let topic_status =
+      Topic.Map.update
+        topic
+        (function
+          | None -> fresh_topic_stats () |> increment |> Option.some
+          | Some ts -> increment ts |> Option.some)
+        stats.topic_status
+    in
+    make {stats with topic_status}
+
   let refresh_mesh_status now mesh_status =
     match mesh_status with
     | Inactive -> mesh_status
