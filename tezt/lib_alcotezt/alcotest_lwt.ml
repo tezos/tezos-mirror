@@ -58,9 +58,6 @@ let run ~__FILE__ library_name tests =
           :: (match speed_level with `Quick -> ["quick"] | `Slow -> ["slow"])
           @ proto_tags
         in
-        Test.register
-          ~__FILE__
-          ~title:(library_name ^ ": " ^ test_name ^ " (" ^ test_case_name ^ ")")
-          ~tags
-        @@ fun () -> body ()) ;
+        let title = sf "%s: %s (%s)" library_name test_name test_case_name in
+        Test.register ~__FILE__ ~title ~tags @@ fun () -> body ()) ;
   unit
