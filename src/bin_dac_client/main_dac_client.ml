@@ -78,19 +78,23 @@ let wait_for_threshold_arg =
 let coordinator_rpc_parameter =
   Tezos_clic.parameter (fun _cctxt h ->
       match String.split ':' h with
-      | [host_name; port] -> (
-          try Lwt.return_ok (host_name, int_of_string port)
-          with _ -> failwith "Address not in format <rpc_address>:<rpc_port>")
+      | [host; port] ->
+          Lwt.catch
+            (fun () ->
+              Lwt_result.return
+              @@ Dac_node_client.make_unix_cctxt
+                   ~scheme:"http"
+                   ~host
+                   ~port:(int_of_string port))
+            (fun _ -> failwith "Address not in format <rpc_address>:<rpc_port>")
       | _ -> failwith "Address not in format <rpc_address>:<rpc_port>")
-
-let is_hex_char c =
-  (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f')
 
 let hex_parameter =
   Tezos_clic.parameter (fun _cctxt h ->
-      if String.for_all is_hex_char h then
-        failwith "Parameter is not a valid hex-encoded string"
-      else Lwt.return_ok @@ `Hex h)
+      let open Lwt_result_syntax in
+      match Hex.to_bytes (`Hex h) with
+      | None -> failwith "Parameter is not a valid hex-encoded string"
+      | Some b -> return b)
 
 let coordinator_rpc_param ?(name = "DAC coordinator rpc address parameter")
     ?(desc = "The address of the DAC coordinator") =
@@ -104,10 +108,14 @@ let hex_payload_param ?(name = "hex payload") ?(desc = "A hex encoded payload")
   let desc = String.concat "\n" [desc; "A hex encoded string"] in
   Tezos_clic.param ~name ~desc hex_parameter
 
-let hex_root_hash_param ?(name = "hex payload")
-    ?(desc = "A hex encoded payload") =
-  let desc = String.concat "\n" [desc; "A hex encoded string"] in
-  Tezos_clic.param ~name ~desc hex_parameter
+let hex_root_hash_param ?(name = "hex root hash")
+    ?(desc = "A hex encoded root hash") =
+  Tezos_clic.param
+    ~name
+    ~desc
+    (Tezos_clic.map_parameter
+       ~f:(fun h -> Dac_plugin.raw_hash_of_hex @@ String.of_bytes h)
+       hex_parameter)
 
 let group =
   {
@@ -125,12 +133,14 @@ let send_dac_payload =
     @@ coordinator_rpc_param
     @@ prefixes ["with"; "content"]
     @@ hex_payload_param @@ stop)
-    (fun _threshold
-         (_coordinator_rpc_addr, _coordinator_rpc_port)
-         _payload
-         _cctxt ->
+    (fun _threshold coordinator_cctxt payload _cctxt ->
       let open Lwt_result_syntax in
-      return @@ Format.printf "Send payload to coordinator")
+      let* root_hash =
+        Command_handlers.send_preimage coordinator_cctxt payload
+      in
+      let hex_root_hash = `Hex (Dac_plugin.raw_hash_to_hex root_hash) in
+      return
+      @@ Format.printf "Payload stored under root hash: %a" Hex.pp hex_root_hash)
 
 let get_dac_certificate =
   let open Tezos_clic in
