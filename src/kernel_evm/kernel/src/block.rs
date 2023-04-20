@@ -152,6 +152,8 @@ fn make_receipt(
 }
 
 // invariant: the transaction is valid
+// NB: when applying a transaction, we omit the payment of gas as it is not
+// properly implemented in the current state of the kernel.
 fn apply_transaction<Host: Runtime>(
     host: &mut Host,
     block: &L2Block,
@@ -166,14 +168,10 @@ fn apply_transaction<Host: Runtime>(
     let value: U256 = transaction.tx.value;
     let (dst_path, dst_address) = get_tx_receiver(&transaction.tx)?;
 
-    // First pay for the gas
-    let src_balance_without_gas = sender_balance - transaction.tx.gas_price;
-    // The gas is paid even if there's not enough balance for the total
-    // transaction
-    let (src_balance, status) = if src_balance_without_gas < value {
-        (src_balance_without_gas, TransactionStatus::Failure)
+    let (src_balance, status) = if sender_balance < value {
+        (sender_balance, TransactionStatus::Failure)
     } else {
-        (src_balance_without_gas - value, TransactionStatus::Success)
+        (sender_balance - value, TransactionStatus::Success)
     };
     update_account(
         host,
