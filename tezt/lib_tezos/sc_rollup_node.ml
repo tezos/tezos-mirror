@@ -182,6 +182,7 @@ let set_ready sc_node =
   trigger_ready sc_node (Some ())
 
 let check_event ?timeout ?where sc_node name promise =
+  let promise = Lwt.map Result.ok promise in
   let* result =
     match timeout with
     | None -> promise
@@ -190,14 +191,20 @@ let check_event ?timeout ?where sc_node name promise =
           [
             promise;
             (let* () = Lwt_unix.sleep timeout in
-             Lwt.return None);
+             Lwt.return_error ());
           ]
   in
   match result with
-  | None ->
+  | Ok (Some x) -> return x
+  | Ok None ->
       raise
         (Terminated_before_event {daemon = sc_node.name; event = name; where})
-  | Some x -> return x
+  | Error () ->
+      Format.ksprintf
+        failwith
+        "Timeout waiting for event %s of %s"
+        name
+        sc_node.name
 
 let wait_for_ready sc_node =
   match sc_node.status with

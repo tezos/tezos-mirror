@@ -473,6 +473,19 @@ module Make (PVM : Pvm.S) = struct
   let daemonize (node_ctxt : _ Node_context.t) =
     Layer1.iter_heads node_ctxt.l1_ctxt (on_layer_1_head node_ctxt)
 
+  let degraded_refutation_mode (node_ctxt : _ Node_context.t) =
+    let open Lwt_result_syntax in
+    let*! () = Daemon_event.degraded_mode () in
+    let message = node_ctxt.Node_context.cctxt#message in
+    let*! () = message "Shutting down Batcher@." in
+    let*! () = Components.Batcher.shutdown () in
+    let*! () = message "Shutting down Commitment Publisher@." in
+    let*! () = Components.Commitment.Publisher.shutdown () in
+    Layer1.iter_heads node_ctxt.l1_ctxt @@ fun head ->
+    let* () = Components.Refutation_coordinator.process head in
+    let*! () = Injector.inject () in
+    return_unit
+
   let install_finalizer node_ctxt rpc_server =
     let open Lwt_syntax in
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
@@ -587,10 +600,14 @@ module Make (PVM : Pvm.S) = struct
       ~genesis_level:node_ctxt.genesis_info.level
       ~genesis_hash:node_ctxt.genesis_info.commitment_hash
       ~pvm_kind:node_ctxt.kind ;
-    protect start ~on_error:(fun e ->
-        Format.eprintf "%!%a@.Exiting.@." pp_print_trace e ;
-        let*! _ = Lwt_exit.exit_and_wait 1 in
-        return_unit)
+    protect start ~on_error:(function
+        | Sc_rollup_node_errors.Lost_game _ :: _ as e ->
+            Format.eprintf "%!%a@.Exiting.@." pp_print_trace e ;
+            let*! _ = Lwt_exit.exit_and_wait 1 in
+            return_unit
+        | e ->
+            let*! () = Daemon_event.error e in
+            degraded_refutation_mode node_ctxt)
 
   module Internal_for_tests = struct
     (** Same as {!process_head} but only builds and stores the L2 block

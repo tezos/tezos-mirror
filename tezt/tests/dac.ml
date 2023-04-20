@@ -965,16 +965,14 @@ module Legacy = struct
     in
     let init_level = JSON.(genesis_info |-> "level" |> as_int) in
     let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
-    (* Prepare the handler to wait for the rollup node to fail before
-       sending the L1 message that will trigger the failure. This
-       ensures that the failure handler can access the status code
-       of the rollup node even after it has terminated. *)
-    let expect_failure =
-      let node_process = Option.get @@ Sc_rollup_node.process sc_rollup_node in
-      Process.check_error
-        ~exit_code:1
-        ~msg:(rex "Could not open file containing preimage of reveal hash")
-        node_process
+    let error_promise =
+      Sc_rollup_node.wait_for
+        sc_rollup_node
+        "sc_rollup_daemon_error.v0"
+        (fun e ->
+          let id = JSON.(e |=> 0 |-> "id" |> as_string) in
+          if id =~ rex "could_not_open_reveal_preimage_file" then Some (Ok ())
+          else Some (Error id))
     in
     let* _level =
       Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
@@ -985,7 +983,10 @@ module Legacy = struct
         ["hash:" ^ errorneous_hash]
         ~alter_final_msg:(fun s -> "text:" ^ s)
     in
-    expect_failure
+    let* ok = error_promise in
+    match ok with
+    | Ok () -> unit
+    | Error id -> Test.fail "Rollup node failed with unexpected error %s" id
 
   (* The following tests involve multiple legacy DAC nodes running at
      the same time and playing either the coordinator, committee member or
