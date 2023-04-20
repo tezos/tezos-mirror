@@ -45,7 +45,7 @@ let run ~__FILE__ library_name tests =
      |> List.iter @@ fun (test_case_name, speed_level, body) ->
         let tags =
           "alcotezt"
-          :: (match speed_level with `Quick -> ["quick"] | `Slow -> [])
+          :: (match speed_level with `Quick -> ["quick"] | `Slow -> ["slow"])
           @ proto_tags
         in
         Test.register
