@@ -308,3 +308,22 @@ val breakdown2_const_offset :
   break2:int ->
   offset:int ->
   (int * unit) model
+
+(* -------------------------------------------------------------------------- *)
+
+module type Binary_operation = sig
+  module Def (X : Costlang.S) : sig
+    val op : X.size X.repr -> X.size X.repr -> X.size X.repr
+  end
+end
+
+(** Synthesize two models of the same signature by the specified binary operation.
+*)
+val synthesize :
+  name:Namespace.t ->
+  binop:(module Binary_operation) ->
+  x_label:string ->
+  x_model:'a model ->
+  y_label:string ->
+  y_model:'a model ->
+  'a model
