@@ -5916,7 +5916,14 @@ module Protocol = Protocol
     let _dal_tests =
       only_if (active && N.(number >= 016)) @@ fun () ->
       tezt
-        ["test_dal_slot_frame_encoding"; "test_helpers"]
+        (* test [test_dac_pages_encoding] was removed after 016 *)
+        (if N.(number == 016) then
+         [
+           "test_dal_slot_frame_encoding";
+           "test_dac_pages_encoding";
+           "test_helpers";
+         ]
+        else ["test_dal_slot_frame_encoding"; "test_helpers"])
         ~path:(path // "lib_dal/test")
         ~opam:(sf "tezos-dal-%s" name_dash)
         ~with_macos_security_framework:true
