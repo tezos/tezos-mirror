@@ -288,15 +288,15 @@ curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=
 
 ./octez-client --mode proxy rpc get /chains/main/mempool/filter
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
-  "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ],
-  "max_prechecked_manager_operations": 5000 }
+  "minimal_nanotez_per_byte": [ "1000", "1" ],
+  "replace_by_fee_factor": [ "21", "20" ], "max_operations": 10000,
+  "max_total_bytes": 10000000 }
 
 ./octez-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=true'
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
-  "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ],
-  "max_prechecked_manager_operations": 5000 }
+  "minimal_nanotez_per_byte": [ "1000", "1" ],
+  "replace_by_fee_factor": [ "21", "20" ], "max_operations": 10000,
+  "max_total_bytes": 10000000 }
 
 ./octez-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=false'
 {}
@@ -311,70 +311,126 @@ curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=
     "56",
     "3"
   ],
-  "allow_script_failure": false
+  "replace_by_fee_factor": [
+    "21",
+    "20"
+  ],
+  "max_operations": 0,
+  "max_total_bytes": 100000000
 }'
 { "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
-  "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false,
-  "replace_by_fee_factor": [ "21", "20" ],
-  "max_prechecked_manager_operations": 5000 }
+  "minimal_nanotez_per_byte": [ "56", "3" ],
+  "replace_by_fee_factor": [ "21", "20" ], "max_operations": 0,
+  "max_total_bytes": 100000000 }
 
 ./octez-client --mode proxy rpc get /chains/main/mempool/filter
 { "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
-  "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false,
-  "replace_by_fee_factor": [ "21", "20" ],
-  "max_prechecked_manager_operations": 5000 }
+  "minimal_nanotez_per_byte": [ "56", "3" ],
+  "replace_by_fee_factor": [ "21", "20" ], "max_operations": 0,
+  "max_total_bytes": 100000000 }
 
 ./octez-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=true'
 { "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
-  "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false,
-  "replace_by_fee_factor": [ "21", "20" ],
-  "max_prechecked_manager_operations": 5000 }
+  "minimal_nanotez_per_byte": [ "56", "3" ],
+  "replace_by_fee_factor": [ "21", "20" ], "max_operations": 0,
+  "max_total_bytes": 100000000 }
 
 ./octez-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=false'
 { "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
-  "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false }
+  "minimal_nanotez_per_byte": [ "56", "3" ], "max_operations": 0,
+  "max_total_bytes": 100000000 }
 
 ./octez-client --mode proxy rpc post /chains/main/mempool/filter with '{
   "minimal_fees": "200",
-  "allow_script_failure": true
+  "replace_by_fee_factor": [
+    "1",
+    "1"
+  ]
 }'
 { "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
-  "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ],
-  "max_prechecked_manager_operations": 5000 }
+  "minimal_nanotez_per_byte": [ "1000", "1" ],
+  "replace_by_fee_factor": [ "1", "1" ], "max_operations": 10000,
+  "max_total_bytes": 10000000 }
 
 ./octez-client --mode proxy rpc get /chains/main/mempool/filter
 { "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
-  "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ],
-  "max_prechecked_manager_operations": 5000 }
+  "minimal_nanotez_per_byte": [ "1000", "1" ],
+  "replace_by_fee_factor": [ "1", "1" ], "max_operations": 10000,
+  "max_total_bytes": 10000000 }
 
 ./octez-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=true'
 { "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
-  "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ],
-  "max_prechecked_manager_operations": 5000 }
+  "minimal_nanotez_per_byte": [ "1000", "1" ],
+  "replace_by_fee_factor": [ "1", "1" ], "max_operations": 10000,
+  "max_total_bytes": 10000000 }
 
 ./octez-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=false'
-{ "minimal_fees": "200" }
+{ "minimal_fees": "200", "replace_by_fee_factor": [ "1", "1" ] }
+
+./octez-client --mode proxy rpc post /chains/main/mempool/filter with '{
+  "max_operations": 100,
+  "invalid_field_name": 100
+}'
+{ "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
+  "minimal_nanotez_per_byte": [ "1000", "1" ],
+  "replace_by_fee_factor": [ "1", "1" ], "max_operations": 10000,
+  "max_total_bytes": 10000000 }
+
+./octez-client --mode proxy rpc get /chains/main/mempool/filter
+{ "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
+  "minimal_nanotez_per_byte": [ "1000", "1" ],
+  "replace_by_fee_factor": [ "1", "1" ], "max_operations": 10000,
+  "max_total_bytes": 10000000 }
+
+./octez-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=true'
+{ "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
+  "minimal_nanotez_per_byte": [ "1000", "1" ],
+  "replace_by_fee_factor": [ "1", "1" ], "max_operations": 10000,
+  "max_total_bytes": 10000000 }
+
+./octez-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=false'
+{ "minimal_fees": "200", "replace_by_fee_factor": [ "1", "1" ] }
+
+./octez-client --mode proxy rpc post /chains/main/mempool/filter with '{
+  "minimal_fees": "toto"
+}'
+{ "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
+  "minimal_nanotez_per_byte": [ "1000", "1" ],
+  "replace_by_fee_factor": [ "1", "1" ], "max_operations": 10000,
+  "max_total_bytes": 10000000 }
+
+./octez-client --mode proxy rpc get /chains/main/mempool/filter
+{ "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
+  "minimal_nanotez_per_byte": [ "1000", "1" ],
+  "replace_by_fee_factor": [ "1", "1" ], "max_operations": 10000,
+  "max_total_bytes": 10000000 }
+
+./octez-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=true'
+{ "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
+  "minimal_nanotez_per_byte": [ "1000", "1" ],
+  "replace_by_fee_factor": [ "1", "1" ], "max_operations": 10000,
+  "max_total_bytes": 10000000 }
+
+./octez-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=false'
+{ "minimal_fees": "200", "replace_by_fee_factor": [ "1", "1" ] }
 
 ./octez-client --mode proxy rpc post /chains/main/mempool/filter with '{}'
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
-  "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ],
-  "max_prechecked_manager_operations": 5000 }
+  "minimal_nanotez_per_byte": [ "1000", "1" ],
+  "replace_by_fee_factor": [ "21", "20" ], "max_operations": 10000,
+  "max_total_bytes": 10000000 }
 
 ./octez-client --mode proxy rpc get /chains/main/mempool/filter
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
-  "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ],
-  "max_prechecked_manager_operations": 5000 }
+  "minimal_nanotez_per_byte": [ "1000", "1" ],
+  "replace_by_fee_factor": [ "21", "20" ], "max_operations": 10000,
+  "max_total_bytes": 10000000 }
 
 ./octez-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=true'
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
-  "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ],
-  "max_prechecked_manager_operations": 5000 }
+  "minimal_nanotez_per_byte": [ "1000", "1" ],
+  "replace_by_fee_factor": [ "21", "20" ], "max_operations": 10000,
+  "max_total_bytes": 10000000 }
 
 ./octez-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=false'
 {}
