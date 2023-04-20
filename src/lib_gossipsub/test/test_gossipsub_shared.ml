@@ -269,6 +269,8 @@ module Worker_config = struct
       | Some r -> Lwt.return r
       | None ->
           Stdlib.failwith "Invariant: we don't push None values in the stream"
+
+    let get_available t = Lwt_stream.get_available t.stream
   end
 end
 

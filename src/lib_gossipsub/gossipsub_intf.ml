@@ -741,6 +741,10 @@ module type WORKER_CONFIGURATION = sig
     (** Pops the oldest value that has been pushed to the stream. In case the
         stream is empty, the function will wait until some value is pushed. *)
     val pop : 'a t -> 'a Monad.t
+
+    (** Returns and removes all available elements of the stream l without
+        blocking. *)
+    val get_available : 'a t -> 'a list
   end
 end
 
