@@ -273,19 +273,10 @@ test-unit-alpha:
 	@dune build --profile=$(PROFILE) @src/proto_alpha/lib_protocol/runtest
 
 # TODO: https://gitlab.com/tezos/tezos/-/issues/5377
-# Running the runtest/runtezt targets in parallel causes a hang. Until we find the cause,
-# we run the targets sequentially.
+# Running the runtest_js targets intermittently hangs.
 .PHONY: test-js
 test-js:
 	@dune build --error-reporting=twice @runtest_js
-	@dune build --error-reporting=twice @runtezt_js
-
-# separate job to use tezt with js. Eventually should be merged with
-# the job about (test-js) . For the moment this is not run in the CI
-# TODO: https://gitlab.com/tezos/tezos/-/issues/5377
-.PHONY: tezt-js
-tezt-js:
-	@dune build --error-reporting=twice @runtezt_js
 
 .PHONY: build-tezt
 build-tezt:
