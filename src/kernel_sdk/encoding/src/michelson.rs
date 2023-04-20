@@ -45,6 +45,7 @@ impl Michelson for MichelsonUnit {}
 impl Michelson for MichelsonContract {}
 impl Michelson for MichelsonInt {}
 impl Michelson for MichelsonString {}
+impl Michelson for MichelsonBytes {}
 impl<Arg0, Arg1> Michelson for MichelsonPair<Arg0, Arg1>
 where
     Arg0: Michelson,
@@ -165,7 +166,7 @@ impl NomReader for MichelsonContract {
 impl NomReader for MichelsonUnit {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         map(
-            MichelinePrimNoArgsNoAnnots::<{ prim::PAIR_TAG }>::nom_read,
+            MichelinePrimNoArgsNoAnnots::<{ prim::UNIT_TAG }>::nom_read,
             |_prim| MichelsonUnit,
         )(input)
     }
