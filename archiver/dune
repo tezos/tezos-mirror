@@ -85,7 +85,12 @@
    PtMumbai_machine.ml
    from
    (tezos-client-016-PtMumbai -> PtMumbai_machine.real.ml)
-   (-> PtMumbai_machine.no.ml)))
+   (-> PtMumbai_machine.no.ml))
+  (select
+   PtNairob_machine.ml
+   from
+   (tezos-client-017-PtNairob -> PtNairob_machine.real.ml)
+   (-> PtNairob_machine.no.ml)))
  (flags
   (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix -open
     Tezos_shell_services -open Tezos_client_base -open Tezos_client_base_unix
@@ -213,4 +218,16 @@
 
 (rule
  (action
+  (write-file PtMumbai_machine.mli "module M : sig end")))
+
+(rule
+ (action
   (write-file PtMumbai_machine.no.ml "module M = struct end")))
+
+(rule
+ (action
+  (write-file PtNairob_machine.mli "module M : sig end")))
+
+(rule
+ (action
+  (write-file PtNairob_machine.no.ml "module M = struct end")))

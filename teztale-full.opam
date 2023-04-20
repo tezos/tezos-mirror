@@ -28,6 +28,7 @@ depends: [
   "tezos-client-014-PtKathma"
   "tezos-client-015-PtLimaPt"
   "tezos-client-016-PtMumbai"
+  "tezos-client-017-PtNairob"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
