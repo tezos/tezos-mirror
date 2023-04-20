@@ -248,10 +248,10 @@ Then, declare those files in ``manifest/main.ml``::
         ~deps:[octez_base]
 
 This causes the manifest to generate executable ``src/lib_base/tezt/main.exe`` for you.
-This executable calls ``Test.run``. It also declares a Dune alias ``runtezt``
+This executable calls ``Test.run``. It also declares a Dune alias ``runtest``
 so that you can run your tests with either of the following commands::
 
-    dune build @src/lib_base/runtezt
+    dune build @src/lib_base/runtest
     dune exec src/lib_base/tezt/main.exe
 
 Note that your tests will actually also be available in ``tezt/tests/main.exe``.

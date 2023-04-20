@@ -4862,7 +4862,7 @@ end = struct
              but the test uses absolute paths to find those files
              (thanks to [DUNE_SOURCEROOT] and [Filename.dirname __FILE__]),
              so those copies are not actually used. This is needed so that the test
-             can be run either with [dune build @runtezt],
+             can be run either with [dune build @runtest],
              with [dune exec src/proto_alpha/lib_protocol/test/regression/main.exe],
              or with [dune exec tezt/tests/main.exe -- -f test_logging.ml]. *)
           let _ =
