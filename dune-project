@@ -247,7 +247,6 @@
 (package (name tezos-stdlib-unix))
 (package (name tezos-store))
 (package (name tezos-test-helpers))
-(package (name tezos-test-helpers-extra))
 (package (name tezos-tooling))
 (package (name tezos-tps-evaluation))
 (package (name tezos-tree-encoding))

@@ -65,6 +65,7 @@
   src_lib_webassembly_tests_tezt_lib
   src_lib_version_test_tezt_lib
   src_lib_tree_encoding_test_tezt_lib
+  src_lib_store_unix_test_tezt_lib
   src_lib_stdlib_unix_test__tezt_lib
   src_lib_stdlib_test_unix_tezt_lib
   src_lib_stdlib_test_tezt_lib

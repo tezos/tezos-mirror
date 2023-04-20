@@ -14,7 +14,6 @@
   tezos-context.encoding
   tezos-stdlib-unix
   tezos-test-helpers
-  tezos-test-helpers-extra
   qcheck-alcotest
   octez-alcotezt)
  (library_flags (:standard -linkall))

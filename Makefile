@@ -239,7 +239,17 @@ test-proto-unit:
 		scripts/test_wrapper.sh test-proto-unit \
 		$(addprefix @, $(addsuffix /runtest,$(PROTO_DIRS)))
 
+.PHONY: test-lib-store-slow
+test-lib-store-slow:
+	DUNE_PROFILE=$(PROFILE) \
+		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
+		dune exec src/lib_store/unix/test/slow/test_slow.exe -- --file test_slow.ml --info
 
+.PHONY: test-lib-store-bench
+test-lib-store-bench:
+	DUNE_PROFILE=$(PROFILE) \
+		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
+		dune exec src/lib_store/unix/test/bench/bench.exe -- --file bench.ml --info
 
 .PHONY: test-nonproto-unit
 test-nonproto-unit:
@@ -253,7 +263,7 @@ test-lib-store-unit:
 	DUNE_PROFILE=$(PROFILE) \
 		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
 		scripts/test_wrapper.sh test-lib-store-unit \
-		@$(LIBSTORE_UNIX_DIR)/runtest
+		@$(LIBSTORE_UNIX_DIR)/runtezt
 
 .PHONY: test-unit
 test-unit: test-nonproto-unit test-proto-unit

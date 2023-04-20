@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 module Assert = Assert
-module Assert_lib = Lib_test_extra.Assert_lib
 open Alcotest_lwt
 open Filename.Infix
 
@@ -834,3 +833,5 @@ module Example_tree = struct
     in
     wrap_test ?keep_dir ?history_mode ?with_gc (name, f)
 end
+
+let speed_to_string = function `Slow -> "slow" | `Quick -> "quick"

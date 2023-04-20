@@ -939,7 +939,11 @@ val tests :
 
     The flag [with_macos_security_framework] has a default [false]. When set to
     [true], the [-ccopt "-framework Security"]flag is added at link time for
-    macOS system. *)
+    macOS system.
+
+    The function returns a target that is the local library created by tezt
+    to register all tests. This can be reused locally in the same module
+    to share code with other targets. *)
 val tezt :
   opam:string ->
   path:string ->
@@ -956,7 +960,7 @@ val tezt :
   ?with_macos_security_framework:bool ->
   ?dune:Dune.s_expr ->
   string list ->
-  unit
+  target
 
 (** Make an external vendored library, for use in internal target dependencies.
 

@@ -25,7 +25,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Assert_lib = Lib_test_extra.Assert_lib
+(** Testing
+    _______
+
+    Component: Store
+    Invocation: dune exec src/lib_store/unix/test/main.exe -- --match "tezos-store: snapshots"
+    Subject: Store tests ( snapshots )
+*)
+
 open Test_utils
 
 let check_import_invariants ~test_descr ~rolling
@@ -469,6 +476,7 @@ let make_tests speed genesis_parameters =
           | None | Some _ ->
               Some
                 (wrap_test
+                   ~speed
                    ~with_gc:true
                    ~keep_dir:false
                    ~history_mode
@@ -486,7 +494,7 @@ let make_tests speed genesis_parameters =
                          store ))))
     permutations
 
-let test_rolling export_mode =
+let test_rolling speed export_mode =
   let patch_context ctxt = Alpha_utils.default_patch_context ctxt in
   let test (store_dir, context_dir) store =
     let open Lwt_result_syntax in
@@ -561,6 +569,7 @@ let test_rolling export_mode =
     return_unit
   in
   wrap_test
+    ~speed
     ~keep_dir:false
     ~with_gc:true
     ~history_mode:History_mode.default
@@ -573,9 +582,9 @@ let test_rolling export_mode =
         export_mode,
       test )
 
-let make_tests_rolling =
+let make_tests_rolling speed =
   let export_mode = Snapshots.[Tar; Raw] in
-  List.map test_rolling export_mode
+  List.map (test_rolling speed) export_mode
 
 (* This test aims to check that the caboose and savepoint are well
    dragged when the first merge occurs, after a rolling snapshot
@@ -586,7 +595,7 @@ let make_tests_rolling =
    In this test, we need to increase the number of blocks per cycle to
    avoid the max_op_ttl to hide this potential issue. The exported
    block must be outside the max_op_ttl of the next checkpoint. *)
-let test_drag_after_import export_mode =
+let test_drag_after_import speed export_mode =
   let open Lwt_result_syntax in
   let constants =
     Default_parameters.
@@ -715,6 +724,7 @@ let test_drag_after_import export_mode =
     return_unit
   in
   wrap_test
+    ~speed
     ~keep_dir:false
     ~with_gc:true
     ~history_mode:History_mode.default
@@ -727,9 +737,9 @@ let test_drag_after_import export_mode =
         export_mode,
       test )
 
-let make_tests_drag_after_import =
+let make_tests_drag_after_import speed =
   let export_mode = Snapshots.[Tar; Raw] in
-  List.map test_drag_after_import export_mode
+  List.map (test_drag_after_import speed) export_mode
 
 (* TODO:
    export => import => export => import from full & rolling
@@ -745,8 +755,8 @@ let tests speed =
           parameters_of_constants
             {constants_sandbox with consensus_threshold = 0})
     in
-    let tests_rolling = make_tests_rolling in
-    let tests_drag_after_import = make_tests_drag_after_import in
+    let tests_rolling = make_tests_rolling speed in
+    let tests_drag_after_import = make_tests_drag_after_import speed in
     tests_rolling @ tests_drag_after_import @ generated_tests
   in
   ("snapshots", test_cases)

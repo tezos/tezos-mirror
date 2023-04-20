@@ -30,7 +30,30 @@
    Subject:      On context features.
 *)
 
-module Assert_lib = Lib_test_extra.Assert_lib
+(** Module concerning assertions about raw trees i.e. values of type
+    [[< `Tree of 'a Tezos_base.TzPervasives.String.Map.t | `Value of bytes] as 'a] *)
+module Raw_Tree = struct
+  (** [equal loc msg rt0 rt1] checks that the raw tree [rt0] and [rt1] are equal.
+      Will fail with the message [msg] displaying the location [loc] otherwise *)
+  let equal ?loc ?msg r1 r2 =
+    let rec aux r1 r2 =
+      match (r1, r2) with
+      | `Value v1, `Value v2 ->
+          Assert.Bytes.equal ?loc ?msg v1 v2 ;
+          true
+      | `Tree t1, `Tree t2 ->
+          if not (Tezos_base.TzPervasives.String.Map.equal aux t1 t2) then
+            Assert.String.fail "<tree>" "<tree>" ?msg ?loc
+          else true
+      | `Tree _, `Value v ->
+          Assert.String.fail ?loc ?msg "<tree>" (Bytes.to_string v)
+      | `Value v, `Tree _ ->
+          Assert.String.fail ?loc ?msg (Bytes.to_string v) "<tree>"
+    in
+    let _b : bool = aux r1 r2 in
+    ()
+end
+
 module Assert = Assert
 
 let equal_context_hash ?loc ?msg l1 l2 =
@@ -460,7 +483,7 @@ struct
         let c = String.Map.add "bar" (`Tree b) a in
         let d = String.Map.singleton "foo" (`Tree c) in
         let e = `Tree d in
-        Assert_lib.Raw_Tree.equal ~loc:__LOC__ e raw ;
+        Raw_Tree.equal ~loc:__LOC__ e raw ;
         Lwt.return ()
 
   let string n = String.make n 'a'

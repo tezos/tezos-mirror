@@ -1804,6 +1804,7 @@ type tezt_target = {
   opam_with_test : with_test option;
   with_macos_security_framework : bool;
   dune : Dune.s_expr;
+  tezt_local_test_lib : target;
 }
 
 let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
@@ -1815,6 +1816,23 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
       ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
+  let path_with_underscores =
+    String.map (function '-' | '/' -> '_' | c -> c) path
+  in
+  (* [linkall] is used to ensure that the test executable is linked with [module_name] and [tezt]. *)
+  let tezt_local_test_lib_name = path_with_underscores ^ "_tezt_lib" in
+  let tezt_local_test_lib =
+    Target.(
+      private_lib
+        ~path
+        ~opam:""
+        ?js_compatible
+        ~deps:lib_deps
+        ~modules
+        ~linkall:true
+        ~dune
+        tezt_local_test_lib_name)
+  in
   let tezt_target =
     {
       opam;
@@ -1831,46 +1849,30 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
       opam_with_test;
       with_macos_security_framework;
       dune;
+      tezt_local_test_lib;
     }
   in
-  tezt_targets_by_path := String_map.add path tezt_target !tezt_targets_by_path
+  tezt_targets_by_path := String_map.add path tezt_target !tezt_targets_by_path ;
+  tezt_local_test_lib
 
 let register_tezt_targets ~make_tezt_exe =
   let tezt_test_libs = ref [] in
   let register_path path
       {
         opam;
-        lib_deps;
         exe_deps;
         js_deps;
         dep_globs;
         dep_globs_rec;
         dep_files;
-        modules;
-        js_compatible;
         modes;
         synopsis;
         opam_with_test;
         with_macos_security_framework;
-        dune;
+        tezt_local_test_lib;
+        _;
       } =
-    let path_with_underscores =
-      String.map (function '-' | '/' -> '_' | c -> c) path
-    in
-    let lib =
-      (* [linkall] is used to ensure that the test executable is linked with
-         [module_name] and [tezt]. *)
-      Target.private_lib
-        (path_with_underscores ^ "_tezt_lib")
-        ~path
-        ~opam:""
-        ?js_compatible
-        ~deps:lib_deps
-        ~modules
-        ~linkall:true
-        ~dune
-    in
-    tezt_test_libs := lib :: !tezt_test_libs ;
+    tezt_test_libs := tezt_local_test_lib :: !tezt_test_libs ;
     let declare_exe ?js_compatible exe_name modes deps main =
       let (_ : Target.t option) =
         Target.test
@@ -1885,7 +1887,7 @@ let register_tezt_targets ~make_tezt_exe =
             (* Instrument with sigterm handler, to ensure that coverage from
                Tezt worker processes are collected. *)
           ~bisect_ppx:With_sigterm
-          ~deps:(lib :: deps)
+          ~deps:(tezt_local_test_lib :: deps)
           ~dep_globs
           ~dep_globs_rec
           ~dep_files

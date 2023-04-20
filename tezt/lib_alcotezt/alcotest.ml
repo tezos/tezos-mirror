@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Tezt_core
+open Tezt_core.Base
 
 type return = unit
 
@@ -45,14 +46,11 @@ let run ~__FILE__ library_name tests =
      |> List.iter @@ fun (test_case_name, speed_level, body) ->
         let tags =
           "alcotezt"
-          :: (match speed_level with `Quick -> ["quick"] | `Slow -> [])
+          :: (match speed_level with `Quick -> ["quick"] | `Slow -> ["slow"])
           @ proto_tags
         in
-        Test.register
-          ~__FILE__
-          ~title:(library_name ^ ": " ^ test_name ^ " (" ^ test_case_name ^ ")")
-          ~tags
-        @@ fun () ->
+        let title = sf "%s: %s (%s)" library_name test_name test_case_name in
+        Test.register ~__FILE__ ~title ~tags @@ fun () ->
         body () ;
         Base.unit
 
