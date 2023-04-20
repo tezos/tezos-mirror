@@ -2080,3 +2080,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let pp_topic_set = pp_topic_set
   end
 end
+
+module Internal_for_tests = struct
+  module Message_cache = Message_cache.Make
+end

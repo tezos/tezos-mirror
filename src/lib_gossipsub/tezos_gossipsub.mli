@@ -39,3 +39,8 @@ module Worker (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     with module GS = C.GS
      and module Monad = C.Monad
      and module Stream = C.Stream
+
+module Internal_for_tests : sig
+  (* Expose the message cache so we can write unit tests for them. *)
+  module Message_cache : module type of Message_cache.Make
+end
