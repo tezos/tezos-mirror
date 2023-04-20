@@ -519,25 +519,71 @@ module Merkle_tree = struct
         Define helper function that calculates expected number of pages given the
         payload and use it for PBT expected number of pages given payload *)
     module PBT = struct
-      open QCheck2.Gen
+      module Generators = struct
+        open QCheck2.Gen
 
-      (* Serialization requires [~max_page_size] that guarantees at least two
-         hashes per page. In orher words, we need at least 71 bytes in total since
-         5 bytes is used as a preamble and each hash is 32 bytes long and uses
-         aditional 1 byte for the tag used to identify the version scheme:
-         5 + 2 (32 + 1) = 71 *)
-      let gen_max_page_size = int_range 71 10_000
+        (* Serialization requires [~max_page_size] that guarantees at least two
+           hashes per page. In orher words, we need at least 71 bytes in total since
+           5 bytes is used as a preamble and each hash is 32 bytes long and uses
+           aditional 1 byte for the tag used to identify the version scheme:
+           5 + 2 (32 + 1) = 71 *)
+        let gen_max_page_size = int_range 71 10_000
 
-      let gen_non_empty_payload = bytes_size (int_range 1 10_000)
+        let gen_non_empty_payload = bytes_size (int_range 1 10_000)
 
-      let serialization_roundtrip_pbt =
-        let test_serialization_roundtrip (max_page_size, payload) =
-          test_serialization_roundtrip ~loc:__LOC__ ~max_page_size payload
+        let gen_non_empty_payloads =
+          list_size (int_range 1 100) gen_non_empty_payload
+
+        let max_page_size_with_non_empty_payload =
+          pair gen_max_page_size gen_non_empty_payload
+
+        let max_page_size_with_non_empty_payloads =
+          pair gen_max_page_size gen_non_empty_payloads
+      end
+
+      (** [serialization_roundtrip_pbt (max_page_size, payload)] tests
+          serialization scheme logic of [Pages_encoding.Merkle_tree.V0]
+          by varying [max_page_size] and [payload] (arbitrary byte
+          sequence). *)
+      let serialization_roundtrip_pbt (max_page_size, payload) =
+        test_serialization_roundtrip ~loc:__LOC__ ~max_page_size payload
+
+      (** [merkle_tree_make_buffered_roundtrip_pbt (max_page_size, messages)]
+          tests [Pages_encoding.Merkle_tree.Make_buffered] functor.
+          It takes a pair [max_page_size] and [messages] (a list of non-empty
+          byte sequances).Buffered payload handler is instantiated with given
+          [max_page_size] and messages are serialized by adding them one by one
+          in the order specified by [messages] sequence. Finally, we finalize
+          serialization, which results in single preimage hash. To test the
+          correctness we deserialize the original payload via beforementioned
+          preimage hash. If initial serialization was correct, the obtained
+          payload is equal to the result of of concatenating messages from
+          original [messages] sequence.
+      *)
+      let merkle_tree_make_buffered_roundtrip_pbt (max_page_size, messages) =
+        let open Lwt_result_syntax in
+        let page_store = Hashes_map_backend.init () in
+        let open
+          Make_V0_for_test
+            (struct
+              let max_page_size = max_page_size
+            end)
+            (Hashes_map_backend) in
+        let payload_handler = Buffered.empty () in
+        let add_message message =
+          Buffered.add dac_plugin ~page_store payload_handler message
         in
-        Tztest.tztest_qcheck2
-          ~name:"PBT for merkle_tree_V0 serialization/deserialization roundtrip"
-          (pair gen_max_page_size gen_non_empty_payload)
-          test_serialization_roundtrip
+        let* () = List.iter_es add_message messages in
+        let* hash = Buffered.finalize dac_plugin ~page_store payload_handler in
+        let* retrieved_payload =
+          deserialize_payload dac_plugin ~page_store hash
+        in
+        let expected_retrieved_payload = Bytes.concat Bytes.empty messages in
+        assert_equal_bytes
+          ~loc:__LOC__
+          "Deserialized payload do not match with original"
+          expected_retrieved_payload
+          retrieved_payload
     end
   end
 end
@@ -704,7 +750,16 @@ let tests =
       `Quick
       Merkle_tree.V0
       .deserialization_of_corrupt_data_with_hash_integrity_check_fails;
-    Merkle_tree.V0.PBT.serialization_roundtrip_pbt;
+    Tztest.tztest_qcheck2
+      ~name:"PBT for merkle_tree_V0 serialization/deserialization roundtrip"
+      Merkle_tree.V0.PBT.Generators.max_page_size_with_non_empty_payload
+      Merkle_tree.V0.PBT.serialization_roundtrip_pbt;
+    Tztest.tztest_qcheck2
+      ~name:
+        "PBT for [Merkle_tree.Make_buffered] functor via \
+         serialization/deserialization roundtrip"
+      Merkle_tree.V0.PBT.Generators.max_page_size_with_non_empty_payloads
+      Merkle_tree.V0.PBT.merkle_tree_make_buffered_roundtrip_pbt;
   ]
 
 let () =
