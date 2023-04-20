@@ -53,8 +53,7 @@ end
 let get_dal_processed_slots node_ctxt block =
   Node_context.list_slots_statuses node_ctxt ~confirmed_in_block_hash:block
 
-module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
-  module PVM = Simulation.PVM
+module Make (PVM : Pvm.S) = struct
   module Outbox = Outbox.Make (PVM)
 
   module Global_directory = Make_directory (struct

@@ -441,8 +441,8 @@ module Make (PVM : Pvm.S) = struct
     let* () = Publisher.cement_commitments () in
     let*! () = Daemon_event.new_heads_processed reorg.new_chain in
     let* () = Refutation_coordinator.process stripped_head in
-    let* () = Components.Batcher.batch () in
-    let* () = Components.Batcher.new_head stripped_head in
+    let* () = Batcher.batch () in
+    let* () = Batcher.new_head stripped_head in
     let*! () = Injector.inject ~header:head.header () in
     return_unit
 
@@ -454,7 +454,7 @@ module Make (PVM : Pvm.S) = struct
     let*! () = Daemon_event.degraded_mode () in
     let message = node_ctxt.Node_context.cctxt#message in
     let*! () = message "Shutting down Batcher@." in
-    let*! () = Components.Batcher.shutdown () in
+    let*! () = Batcher.shutdown () in
     let*! () = message "Shutting down Commitment Publisher@." in
     let*! () = Publisher.shutdown () in
     Layer1.iter_heads node_ctxt.l1_ctxt @@ fun head ->
@@ -471,7 +471,7 @@ module Make (PVM : Pvm.S) = struct
     let* () = message "Shutting down Injector@." in
     let* () = Injector.shutdown () in
     let* () = message "Shutting down Batcher@." in
-    let* () = Components.Batcher.shutdown () in
+    let* () = Batcher.shutdown () in
     let* () = message "Shutting down Commitment Publisher@." in
     let* () = Publisher.shutdown () in
     let* () = message "Shutting down Refutation Coordinator@." in
@@ -547,8 +547,7 @@ module Make (PVM : Pvm.S) = struct
             node_ctxt.operators
         with
         | None -> return_unit
-        | Some signer ->
-            Components.Batcher.init configuration.batcher ~signer node_ctxt
+        | Some signer -> Batcher.init configuration.batcher ~signer node_ctxt
       in
       Lwt.dont_wait
         (fun () ->
