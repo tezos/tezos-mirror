@@ -254,29 +254,21 @@ module Worker_config = struct
   end
 
   module Stream = struct
-    type 'a pending = {promise : 'a Lwt.t; resolver : 'a Lwt.u}
+    type 'a t = {stream : 'a Lwt_stream.t; pusher : 'a option -> unit}
 
-    type 'a t = {elements : 'a Queue.t; mutable pending : 'a pending option}
+    let empty () =
+      let stream, pusher = Lwt_stream.create () in
+      {stream; pusher}
 
-    let empty () = {elements = Queue.create (); pending = None}
-
-    let push e t =
-      match t.pending with
-      | None -> Queue.push e t.elements
-      | Some {resolver; _} ->
-          t.pending <- None ;
-          Lwt.wakeup resolver e
+    let push e t = t.pusher (Some e)
 
     let pop t =
-      if not @@ Queue.is_empty t.elements then
-        Monad.return @@ Queue.pop t.elements
-      else
-        match t.pending with
-        | Some {promise; _} -> promise
-        | None ->
-            let promise, resolver = Lwt.task () in
-            t.pending <- Some {promise; resolver} ;
-            promise
+      let open Lwt_syntax in
+      let* r = Lwt_stream.get t.stream in
+      match r with
+      | Some r -> Lwt.return r
+      | None ->
+          Stdlib.failwith "Invariant: we don't push None values in the stream"
   end
 end
 
