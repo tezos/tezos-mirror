@@ -60,6 +60,12 @@ Node
 - Add query parameter ``protocol`` to RPC ``/monitor/heads/<chain_id>`` in
   order to monitor new heads of the current protocol (or multiple ones) only.
 
+- **Breaking Change** Reworked some node logs. While bootstrapping,
+  the node will log one message every 50 validated block to indicate
+  the current head's level and how old it is giving an indication on
+  how long it will take to be synchronized. Also, gracefully indicates
+  peer disconnection instead of spurious "worker crashed" messages.
+
 Client
 ------
 
