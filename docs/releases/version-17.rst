@@ -3,7 +3,7 @@ Version 17.0~beta1
 
 .. warning::
 
-   For now, this is a `beta` version, it is not intended to be the stable version for Octez v17.0. Please use it only on testnets, such as `ghostnet` or `nairobinet`.
+   For now, this is a ``beta`` version, it is not intended to be the stable version for Octez v17.0. Please use it only on testnets, such as ghostnet or nairobinet.
    Please check :doc:`the release system documentation<./releases>` for more information.
 
 Version 17.0 contains a new version (V9) of the protocol environment,
