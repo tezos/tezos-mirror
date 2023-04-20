@@ -82,8 +82,7 @@ module Internal = struct
       let* p2 = input (Input.scalar p2) in
       let* x = input (Input.scalar x) in
       let* exp = input (Input.scalar expected_PIx) in
-      let* xn = Circuits.Constraints.compute_xn x n in
-      let* zs = Circuits.Constraints.compute_zs xn in
+      let* zs = Circuits.Constraints.compute_zs x n in
       let* res = Circuits.Gates.cs_pi ~generator ~n ~x ~zs [p1; p2] in
       assert_equal exp res
     in

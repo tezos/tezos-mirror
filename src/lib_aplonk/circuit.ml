@@ -183,17 +183,15 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       let wires_g = Array.of_list wires_g in
       Gates.get_cs name ~q ~wires ~wires_g ?precomputed_advice ()
 
-    (* Circuit that computes x^n for n given as a scalar *)
-    let compute_xn x n =
-      with_label ~label:"x^n"
+    (* Circuit that computes x^n - 1 *)
+    let compute_zs x n =
+      with_label ~label:"zs"
       @@
       let nb_bits = S.size_in_bytes in
       let* n_repr = constant_scalar n in
       let* n_bytes = bits_of_scalar ~nb_bits n_repr in
-      Num.pow x (of_list n_bytes)
-
-    (* Circuit that computes x^n - 1 *)
-    let compute_zs xn = Num.add_constant S.(negate one) xn
+      let* xn = Num.pow x (of_list n_bytes) in
+      Num.add_constant S.(negate one) xn
 
     (* Circuit that computes L1(x) := (g / n) * (x^n - 1) / (x - g) *)
     let compute_l1 x xn_minus_one n generator =
@@ -334,8 +332,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       let wires_g = match wires_g with [] -> wires | w -> w in
       (* precompute some constant *)
       let* t = Bool.constant_bool true in
-      let* xn = compute_xn x n in
-      let* zs = compute_zs xn in
+      let* zs = compute_zs x n in
       let* l1 = compute_l1 x zs n generator in
       (* split the arith selectors & other selectors in two lists *)
       let is_advice_sel s = String.starts_with ~prefix:Gates.qadv_label s in
