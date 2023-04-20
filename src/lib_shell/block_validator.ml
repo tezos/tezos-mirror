@@ -356,7 +356,13 @@ let on_error (type a b) (_w : t) st (r : (a, b) Request.t) (errs : b) =
   match r with
   | Request_validation v ->
       let view = Request.validation_view v in
-      let* () = Events.(emit validation_failure) (view.block, st, errs) in
+      let* () =
+        match errs with
+        | [Canceled] ->
+            (* Ignore requests cancelation *)
+            Lwt.return_unit
+        | errs -> Events.(emit validation_failure) (view.block, st, errs)
+      in
       (* Keep the worker alive. *)
       return_ok_unit
   | Request_preapplication v ->
@@ -390,7 +396,12 @@ let on_completion :
       Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one metrics.validation_errors_count ;
       match Request.view request with
-      | Validation v -> Events.(emit validation_failure) (v.block, st, errs)
+      | Validation v -> (
+          match errs with
+          | [Canceled] ->
+              (* Ignore requests cancellation *)
+              Lwt.return_unit
+          | errs -> Events.(emit validation_failure) (v.block, st, errs))
       | _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_preapplication _, Preapplied _ -> (
       Prometheus.Counter.inc_one metrics.preapplied_blocks_count ;
@@ -414,7 +425,12 @@ let on_completion :
       Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one metrics.precheck_failed_count ;
       match Request.view request with
-      | Validation v -> Events.(emit precheck_failure) (v.block, st, errs)
+      | Validation v -> (
+          match errs with
+          | [Canceled] ->
+              (* Ignore requests cancellation *)
+              Lwt.return_unit
+          | errs -> Events.(emit precheck_failure) (v.block, st, errs))
       | _ -> (* assert false *) Lwt.return_unit)
   | _ -> (* assert false *) Lwt.return_unit
 
