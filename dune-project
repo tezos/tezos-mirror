@@ -17,6 +17,7 @@
 (package (name octez-client))
 (package (name octez-codec))
 (package (name octez-crawler))
+(package (name octez-dac-client))
 (package (name octez-dac-node))
 (package (name octez-dal-node))
 (package (name octez-distributed-internal))

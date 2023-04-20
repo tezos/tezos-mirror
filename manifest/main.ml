@@ -7310,6 +7310,50 @@ let _octez_dac_node =
       @ protocol_deps)
     ~conflicts:[Conflicts.checkseum]
 
+let _octez_dac_client =
+  let protocol_deps =
+    let deps_for_protocol protocol =
+      let is_optional =
+        match (Protocol.status protocol, Protocol.number protocol) with
+        | _, V 000 ->
+            (* The node always needs to be linked with this protocol for Mainnet. *)
+            false
+        | Active, V _ ->
+            (* Active protocols cannot be optional because of a bug
+               that results in inconsistent hashes. Once this bug is fixed,
+               this exception can be removed. *)
+            false
+        | (Frozen | Overridden | Not_mainnet), _ | Active, (Alpha | Other) ->
+            (* Other protocols are optional. *)
+            true
+      in
+      let targets = List.filter_map Fun.id [Protocol.dac protocol] in
+      if is_optional then List.map optional targets else targets
+    in
+    List.map deps_for_protocol Protocol.all |> List.flatten
+  in
+  public_exe
+    "octez-dac-client"
+    ~path:"src/bin_dac_client"
+    ~internal_name:"main_dac_client"
+    ~synopsis:"Tezos: `octez-dac-client` binary"
+    ~release_status:Experimental
+    ~with_macos_security_framework:true
+    ~deps:
+      ([
+         octez_base |> open_ ~m:"TzPervasives";
+         octez_base_unix;
+         octez_clic;
+         octez_client_base |> open_;
+         octez_client_base_unix |> open_;
+         octez_client_commands |> open_;
+         octez_stdlib_unix |> open_;
+         octez_stdlib |> open_;
+         octez_dac_lib |> open_;
+         octez_dac_client_lib |> open_;
+       ]
+      @ protocol_deps)
+
 let _octez_scoru_wasm_debugger =
   public_exe
     (sf "octez-smart-rollup-wasm-debugger")
