@@ -761,8 +761,10 @@ let on_completion (type a b) w (req : (a, b) Request.t) (update : a)
             else Lwt.return_unit
       in
       Events.(emit block_info) (timestamp, fitness)
-  | Request.Notify_head (peer_id, _, _, _) -> Events.(emit notify_head) peer_id
-  | Request.Notify_branch (peer_id, _) -> Events.(emit notify_branch) peer_id
+  | Request.Notify_head (peer_id, block_hash, _, _) ->
+      Events.(emit notify_head) (peer_id, block_hash)
+  | Request.Notify_branch (peer_id, locator) ->
+      Events.(emit notify_branch) (peer_id, locator.head_hash)
   | Request.Disconnection peer_id -> Events.(emit disconnection) peer_id
 
 let on_close w =

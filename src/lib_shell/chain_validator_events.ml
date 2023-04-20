@@ -115,22 +115,26 @@ let request_failure =
     ("errors", Error_monad.trace_encoding)
 
 let notify_head =
-  declare_1
+  declare_2
     ~section
     ~name:"notify_head"
-    ~msg:"notify_head from {peer_id}"
+    ~msg:"head {block_hash} from {peer_id} processed"
     ~level:Debug
-    ~pp1:P2p_peer.Id.pp
+    ~pp1:P2p_peer.Id.pp_short
+    ~pp2:Block_hash.pp_short
     ("peer_id", P2p_peer.Id.encoding)
+    ("block_hash", Block_hash.encoding)
 
 let notify_branch =
-  declare_1
+  declare_2
     ~section
     ~name:"notify_branch"
-    ~msg:"notify branch from {peer_id}"
+    ~msg:"branch up to {head_hash} from {peer_id} processed"
     ~level:Info
-    ~pp1:P2p_peer.Id.pp
+    ~pp1:P2p_peer.Id.pp_short
+    ~pp2:Block_hash.pp_short
     ("peer_id", P2p_peer.Id.encoding)
+    ("head_hash", Block_hash.encoding)
 
 let connection =
   declare_1
