@@ -95,17 +95,19 @@ let register =
   in
   (* LEGACY: alphabetic field annotation in parameter root *)
   let* () =
-    Client.typecheck_script
-      ~legacy:true
-      ~script:"parameter %r unit; storage unit; code { FAILWITH }"
-      client
+    Process.check_error ~exit_code:1 ~msg:(rex "unexpected annotation")
+    @@ Client.spawn_typecheck_script
+         ~legacy:true
+         ~script:"parameter %r unit; storage unit; code { FAILWITH }"
+         client
   in
   (* LEGACY: numeric field annotation in parameter root *)
   let* () =
-    Client.typecheck_script
-      ~legacy:true
-      ~script:"parameter %1 unit; storage unit; code { FAILWITH }"
-      client
+    Process.check_error ~exit_code:1 ~msg:(rex "unexpected annotation")
+    @@ Client.spawn_typecheck_script
+         ~legacy:true
+         ~script:"parameter %1 unit; storage unit; code { FAILWITH }"
+         client
   in
   (* alphabetic field annotation in parameter root *)
   let* () =
