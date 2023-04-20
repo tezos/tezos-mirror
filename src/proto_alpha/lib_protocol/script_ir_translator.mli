@@ -297,7 +297,7 @@ val parse_ty :
   (ex_ty * context) tzresult
 
 val parse_toplevel :
-  context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult Lwt.t
+  context -> Script.expr -> (toplevel * context) tzresult Lwt.t
 
 (** High-level function to typecheck a Michelson script. This function is not
     used for validating operations but only for the [typecheck_code] RPC.

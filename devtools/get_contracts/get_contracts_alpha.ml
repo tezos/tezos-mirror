@@ -167,8 +167,7 @@ module Proto = struct
       let open Lwt_result_syntax in
       let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
       let+ toplevel, updated_ctxt =
-        Lwt.map wrap_tzresult
-        @@ Script_ir_translator.parse_toplevel ctxt ~legacy:true expr
+        Lwt.map wrap_tzresult @@ Script_ir_translator.parse_toplevel ctxt expr
       in
       let consumed =
         (Alpha_context.Gas.consumed ~since:ctxt ~until:updated_ctxt :> int)

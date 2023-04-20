@@ -31,6 +31,17 @@
    Subject:      Runs Michelson annotation tests using [octez-client typecheck data ...].
 *)
 
+let typecheck_wrapper ?res (f : Client.t -> Process.t) client =
+  match res with
+  | None -> Process.check @@ f client
+  | Some msg -> Process.check_error ~exit_code:1 ~msg @@ f client
+
+let typecheck_data ?res ?legacy ~data ~typ client =
+  typecheck_wrapper ?res (Client.spawn_typecheck_data ?legacy ~data ~typ) client
+
+let typecheck_script ?res ?legacy ~script client =
+  typecheck_wrapper ?res (Client.spawn_typecheck_script ?legacy ~script) client
+
 let register =
   Protocol.register_test
     ~__FILE__
@@ -40,112 +51,117 @@ let register =
   let* client = Client.init_mockup ~protocol () in
   (* annotation length limit positive case *)
   let* () =
-    Client.typecheck_data
-      ~data:"3"
-      ~typ:(sf "(int :%s)" @@ String.make 254 'a')
-      client
+    typecheck_data ~data:"3" ~typ:(sf "(int :%s)" @@ String.make 254 'a') client
   in
   (* annotation length limit negative case *)
   let* () =
-    Process.check_error
-      ~exit_code:1
-      ~msg:(rex "annotation exceeded maximum length \\(255 chars\\)")
-    @@ Client.spawn_typecheck_data
-         ~data:"3"
-         ~typ:(sf "(int :%s)" @@ String.make 255 'a')
-         client
+    typecheck_data
+      ~res:(rex "annotation exceeded maximum length \\(255 chars\\)")
+      ~data:"3"
+      ~typ:(sf "(int :%s)" @@ String.make 255 'a')
+      client
   in
   (* alphabetic field annotation in type positive case *)
   let* () =
-    Client.typecheck_data ~data:"Pair 0 0" ~typ:"pair (nat %x) (int %y)" client
+    typecheck_data ~data:"Pair 0 0" ~typ:"pair (nat %x) (int %y)" client
   in
   (* numeric field annotation in type positive case *)
   let* () =
-    Client.typecheck_data ~data:"Pair 0 0" ~typ:"pair (nat %1) (int %2)" client
+    typecheck_data ~data:"Pair 0 0" ~typ:"pair (nat %1) (int %2)" client
   in
   (* field annotation with invalid characters in type *)
   let* () =
-    Process.check_error ~exit_code:1 ~msg:(rex "unexpected annotation")
-    @@ Client.spawn_typecheck_data
-         ~data:"Pair 0 0"
-         ~typ:"pair (nat %.) (int %.)"
-         client
+    typecheck_data
+      ~res:(rex "unexpected annotation")
+      ~data:"Pair 0 0"
+      ~typ:"pair (nat %.) (int %.)"
+      client
   in
   (* alphabetic field annotation in lambda data *)
   let* () =
-    Client.typecheck_data
+    typecheck_data
       ~data:"{ CAR %x }"
       ~typ:"lambda (pair (nat %x) (int %y)) nat"
       client
   in
   (* numeric field annotation in lambda data *)
   let* () =
-    Client.typecheck_data
+    typecheck_data
       ~data:"{ CAR %1 }"
       ~typ:"lambda (pair (nat %1) (int %2)) nat"
       client
   in
   (* field annotation with invalid characters in lambda data *)
   let* () =
-    Process.check_error ~exit_code:1 ~msg:(rex "unexpected annotation")
-    @@ Client.spawn_typecheck_data
-         ~data:"{ CAR %. }"
-         ~typ:"lambda (pair (nat %.) (int %.)) nat"
-         client
+    typecheck_data
+      ~res:(rex "unexpected annotation")
+      ~data:"{ CAR %. }"
+      ~typ:"lambda (pair (nat %.) (int %.)) nat"
+      client
   in
-  (* LEGACY: alphabetic field annotation in parameter root *)
+  (* LEGACY: until Nairobi alphabetic field annotation in parameter
+     root was allowed in legacy mode *)
   let* () =
-    Client.typecheck_script
+    typecheck_script
+      ?res:
+        (if Protocol.(number protocol > number Nairobi) then
+         Some (rex "unexpected annotation")
+        else None)
       ~legacy:true
       ~script:"parameter %r unit; storage unit; code { FAILWITH }"
       client
   in
-  (* LEGACY: numeric field annotation in parameter root *)
+  (* LEGACY: until Nairobi numeric field annotation in parameter root
+     was allowed in legacy mode *)
   let* () =
-    Client.typecheck_script
+    typecheck_script
+      ?res:
+        (if Protocol.(number protocol > number Nairobi) then
+         Some (rex "unexpected annotation")
+        else None)
       ~legacy:true
       ~script:"parameter %1 unit; storage unit; code { FAILWITH }"
       client
   in
   (* alphabetic field annotation in parameter root *)
   let* () =
-    Process.check_error ~exit_code:1 ~msg:(rex "unexpected annotation")
-    @@ Client.spawn_typecheck_script
-         ~script:"parameter %r unit; storage unit; code { FAILWITH }"
-         client
+    typecheck_script
+      ~res:(rex "unexpected annotation")
+      ~script:"parameter %r unit; storage unit; code { FAILWITH }"
+      client
   in
   (* numeric field annotation in parameter root *)
   let* () =
-    Process.check_error ~exit_code:1 ~msg:(rex "unexpected annotation")
-    @@ Client.spawn_typecheck_script
-         ~script:"parameter %1 unit; storage unit; code { FAILWITH }"
-         client
+    typecheck_script
+      ~res:(rex "unexpected annotation")
+      ~script:"parameter %1 unit; storage unit; code { FAILWITH }"
+      client
   in
   (* field annotation with invalid characters in parameter root *)
   let* () =
-    Process.check_error ~exit_code:1 ~msg:(rex "unexpected annotation")
-    @@ Client.spawn_typecheck_script
-         ~script:"parameter %. unit; storage unit; code { FAILWITH }"
-         client
+    typecheck_script
+      ~res:(rex "unexpected annotation")
+      ~script:"parameter %. unit; storage unit; code { FAILWITH }"
+      client
   in
   (* alphabetic field annotation in parameter root *)
   let* () =
-    Client.typecheck_script
+    typecheck_script
       ~script:"parameter (unit %r); storage unit; code { FAILWITH }"
       client
   in
   (* numeric field annotation in parameter root *)
   let* () =
-    Client.typecheck_script
+    typecheck_script
       ~script:"parameter (unit %1); storage unit; code { FAILWITH }"
       client
   in
   (* field annotation with invalid characters in parameter root *)
   let* () =
-    Process.check_error ~exit_code:1 ~msg:(rex "unexpected annotation")
-    @@ Client.spawn_typecheck_script
-         ~script:"parameter (unit %.); storage unit; code { FAILWITH }"
-         client
+    typecheck_script
+      ~res:(rex "unexpected annotation")
+      ~script:"parameter (unit %.); storage unit; code { FAILWITH }"
+      client
   in
   unit
 

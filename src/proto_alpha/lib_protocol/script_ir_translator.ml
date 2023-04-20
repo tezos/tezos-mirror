@@ -738,12 +738,7 @@ let rec parse_ty :
         >>? fun (Ex_ty tr, ctxt) ->
         lambda_t loc ta tr >|? fun ty -> return ctxt ty
     | Prim (loc, T_option, [ut], annot) ->
-        (if legacy then
-         (* legacy semantics with (broken) field annotations *)
-         remove_field_annot ut >>? fun ut ->
-         check_composed_type_annot loc annot >>? fun () -> ok ut
-        else check_type_annot loc annot >>? fun () -> ok ut)
-        >>? fun ut ->
+        check_type_annot loc annot >>? fun () ->
         parse_ty
           ctxt
           ~stack_depth:(stack_depth + 1)
@@ -1767,9 +1762,8 @@ let parse_view_name ctxt : Script.node -> (Script_string.t * context) tzresult =
             Script_string.of_string v >|? fun s -> (s, ctxt) )
   | expr -> error @@ Invalid_kind (location expr, [String_kind], kind expr)
 
-let parse_toplevel :
-    context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult =
- fun ctxt ~legacy toplevel ->
+let parse_toplevel : context -> Script.expr -> (toplevel * context) tzresult =
+ fun ctxt toplevel ->
   record_trace (Ill_typed_contract (toplevel, []))
   @@
   match root toplevel with
@@ -1834,30 +1828,10 @@ let parse_toplevel :
           Some (s, sloc, sannot),
           Some (c, cloc, cannot),
           views ) ->
-          let p_pannot =
-            (* root name can be attached to either the parameter
-               primitive or the toplevel constructor (legacy only).
-
-               In the latter case we move it to the parameter type.
-            *)
-            Script_ir_annot.has_field_annot p >>? function
-            | true -> ok (p, pannot)
-            | false -> (
-                match pannot with
-                | [single] when legacy -> (
-                    is_field_annot ploc single >|? fun is_field_annot ->
-                    match (is_field_annot, p) with
-                    | true, Prim (loc, prim, args, annots) ->
-                        (Prim (loc, prim, args, single :: annots), [])
-                    | _ -> (p, []))
-                | _ -> ok (p, pannot))
-          in
-          (* only one field annot is allowed to set the root entrypoint name *)
-          p_pannot >>? fun (arg_type, pannot) ->
           Script_ir_annot.error_unexpected_annot ploc pannot >>? fun () ->
           Script_ir_annot.error_unexpected_annot cloc cannot >>? fun () ->
           Script_ir_annot.error_unexpected_annot sloc sannot >|? fun () ->
-          ({code_field = c; arg_type; views; storage_type = s}, ctxt))
+          ({code_field = c; arg_type = p; views; storage_type = s}, ctxt))
 
 (* Normalize lambdas during parsing *)
 
@@ -4025,7 +3999,7 @@ and parse_instr :
          contracts but then we throw away the typed version, except for the
          storage type which is kept for efficiency in the ticket scanner. *)
       let canonical_code = Micheline.strip_locations code in
-      parse_toplevel ctxt ~legacy canonical_code
+      parse_toplevel ctxt canonical_code
       >>?= fun ({arg_type; storage_type; code_field; views}, ctxt) ->
       record_trace
         (Ill_formed_type (Some "parameter", canonical_code, location arg_type))
@@ -4666,8 +4640,7 @@ and parse_contract :
                       code
                     >>? fun (code, ctxt) ->
                     (* can only fail because of gas *)
-                    parse_toplevel ctxt ~legacy:true code
-                    >>? fun ({arg_type; _}, ctxt) ->
+                    parse_toplevel ctxt code >>? fun ({arg_type; _}, ctxt) ->
                     parse_parameter_ty_and_entrypoints
                       ctxt
                       ~stack_depth:(stack_depth + 1)
@@ -4793,7 +4766,7 @@ let parse_code :
   >>?= fun (code, ctxt) ->
   let legacy = elab_conf.legacy in
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
-  parse_toplevel ctxt ~legacy code
+  parse_toplevel ctxt code
   >>?= fun ({arg_type; storage_type; code_field; views}, ctxt) ->
   let arg_type_loc = location arg_type in
   record_trace
@@ -4903,7 +4876,7 @@ let typecheck_code :
  fun ~unparse_code_rec ~legacy ~show_types ctxt code ->
   (* Constants need to be expanded or [parse_toplevel] may fail. *)
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
-  parse_toplevel ctxt ~legacy code >>?= fun (toplevel, ctxt) ->
+  parse_toplevel ctxt code >>?= fun (toplevel, ctxt) ->
   let {arg_type; storage_type; code_field; views} = toplevel in
   let type_map = ref [] in
   let arg_type_loc = location arg_type in
@@ -5538,9 +5511,9 @@ let unparse_code ctxt mode code =
 let parse_contract_data context loc arg_ty contract ~entrypoint =
   parse_contract_data ~stack_depth:0 context loc arg_ty contract ~entrypoint
 
-let parse_toplevel ctxt ~legacy toplevel =
+let parse_toplevel ctxt toplevel =
   Global_constants_storage.expand ctxt toplevel >>=? fun (ctxt, toplevel) ->
-  Lwt.return @@ parse_toplevel ctxt ~legacy toplevel
+  Lwt.return @@ parse_toplevel ctxt toplevel
 
 let parse_comparable_ty = parse_comparable_ty ~stack_depth:0
 
