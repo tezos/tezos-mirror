@@ -90,12 +90,12 @@ let handle_post_store_preimage dac_plugin cctxt dac_sk_uris page_store
   let* signature, witnesses =
     Signature_manager.sign_root_hash dac_plugin cctxt dac_sk_uris root_hash
   in
+  let raw_root_hash = Dac_plugin.hash_to_raw root_hash in
   let*! external_message =
-    External_message.Default.make dac_plugin root_hash signature witnesses
+    External_message.Default.make dac_plugin raw_root_hash signature witnesses
   in
   match external_message with
-  | Ok external_message ->
-      return @@ (Dac_plugin.hash_to_raw root_hash, external_message)
+  | Ok external_message -> return @@ (raw_root_hash, external_message)
   | Error _ -> tzfail @@ Cannot_construct_external_message
 
 let handle_get_verify_signature dac_plugin public_keys_opt encoded_l1_message =
@@ -104,8 +104,9 @@ let handle_get_verify_signature dac_plugin public_keys_opt encoded_l1_message =
     let open Option_syntax in
     let* encoded_l1_message in
     let* as_bytes = Hex.to_bytes @@ `Hex encoded_l1_message in
-    let ((module P) : Dac_plugin.t) = dac_plugin in
-    External_message.Default.of_bytes P.encoding as_bytes
+    External_message.Default.of_bytes
+      Dac_plugin.non_proto_encoding_unsafe
+      as_bytes
   in
   match external_message with
   | None -> tzfail @@ Cannot_deserialize_external_message
@@ -117,7 +118,9 @@ let handle_get_verify_signature dac_plugin public_keys_opt encoded_l1_message =
         signature
         witnesses
 
-let handle_get_preimage dac_plugin page_store hash =
+let handle_get_preimage dac_plugin page_store raw_hash =
+  let ((module P) : Dac_plugin.t) = dac_plugin in
+  let hash = P.raw_to_hash raw_hash in
   Page_store.Filesystem.load dac_plugin page_store hash
 
 (* Handler for subscribing to the streaming of root hashes via
@@ -142,15 +145,17 @@ let handle_get_certificate dac_plugin ctx raw_root_hash =
         {aggregate_signature; witnesses; root_hash = raw_root_hash})
     value_opt
 
-let handle_get_missing_page cctxt page_store dac_plugin root_hash =
+let handle_get_missing_page cctxt page_store dac_plugin raw_root_hash =
   let open Lwt_result_syntax in
+  let ((module P) : Dac_plugin.t) = dac_plugin in
+  let root_hash = P.raw_to_hash raw_root_hash in
   let remote_store = Page_store.Remote.(init {cctxt; page_store}) in
   let* preimage =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5142
         Retrieve missing page from dac committee via "flooding". *)
     Page_store.Remote.load dac_plugin remote_store root_hash
   in
-  let*! () = Event.(emit fetched_missing_page root_hash) in
+  let*! () = Event.(emit fetched_missing_page raw_root_hash) in
   return preimage
 
 let register_post_store_preimage ctx cctxt dac_sk_uris page_store hash_streamer

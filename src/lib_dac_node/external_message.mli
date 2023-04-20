@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022-2023 Trili Tech  <contact@trili.tech>                  *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -28,7 +29,7 @@
 type error += Could_not_serialize_rollup_external_message of string
 
 type t = {
-  root_hash : Dac_plugin.hash;
+  root_hash : Dac_plugin.raw_hash;
   signature : Tezos_crypto.Aggregate_signature.signature;
   witnesses : Z.t;
 }
@@ -40,12 +41,12 @@ module Default : sig
   *)
   val make :
     Dac_plugin.t ->
-    Dac_plugin.hash ->
+    Dac_plugin.raw_hash ->
     Tezos_crypto.Aggregate_signature.signature ->
     Z.t ->
     bytes tzresult Lwt.t
 
   (** [of_bytes dac_hash_encoding payload] deserializes [payload] into a 
       [dac_message]. *)
-  val of_bytes : Dac_plugin.hash Data_encoding.t -> bytes -> t option
+  val of_bytes : Dac_plugin.raw_hash Data_encoding.t -> bytes -> t option
 end

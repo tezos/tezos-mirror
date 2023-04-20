@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -32,11 +33,7 @@
 
 type hash
 
-type raw_hash
-
 val hash_to_bytes : hash -> bytes
-
-val raw_hash_to_bytes : raw_hash -> bytes
 
 val hash_to_hex : hash -> Hex.t
 
@@ -44,6 +41,9 @@ val hash_to_hex : hash -> Hex.t
     Because the internal representation of [Dac_plugin.hash]es is compared,
     this function does not require an instance of [Dac_plugin.t]. *)
 val raw_compare : hash -> hash -> int
+(** Protocol independant hash. Useful to avoid needing the Plugin in
+    the RPC APIs. *)
+type raw_hash
 
 (** Protocol independent encoding of Dac_plugin.hash values.
     Only use in situations where the plugin is not available,
@@ -51,12 +51,21 @@ val raw_compare : hash -> hash -> int
     an error). *)
 val non_proto_encoding_unsafe : raw_hash Data_encoding.t
 
+(** [raw_hash] is just an alias for [bytes],
+   so this is basically the identity function *)
+val raw_hash_to_bytes : raw_hash -> bytes
+
+(** Since [hash] and [raw_hash] are [bytes] this conversion is safe
+    and is the identity function *)
 val hash_to_raw : hash -> raw_hash
 
+(** [raw_hash_to_hex] encodes a [raw_hash] into hex *)
 val raw_hash_to_hex : raw_hash -> string
 
+(** [raw_hash_of_hex] decodes a hex string representation into [raw_hash] *)
 val raw_hash_of_hex : string -> raw_hash option
 
+(** [raw_hash] argument definition for RPC *)
 val raw_hash_rpc_arg : raw_hash Tezos_rpc.Arg.arg
 
 (** FIXME: https://gitlab.com/tezos/tezos/-/issues/4856
@@ -64,6 +73,10 @@ val raw_hash_rpc_arg : raw_hash Tezos_rpc.Arg.arg
 type supported_hashes = Blake2B
 
 module type T = sig
+  (** Unlike [hash_to_raw] this conversion is unsafe.
+      Under the hood, [raw_hash] will be encoded into hex
+      then this hex will be decoded to a [hash] using
+      the [Plugin.of_hex hex] *)
   val raw_to_hash : raw_hash -> hash
 
   (** The encoding of reveal hashes. *)

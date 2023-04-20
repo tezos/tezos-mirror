@@ -72,7 +72,7 @@ module type S = sig
   (** [load dac_plugin t hash] returns [content] of the storage backend [t]
       represented by a key. When reading fails it returns a
       [Cannot_read_page_from_page_storage] error. *)
-  val load : Dac_plugin.t -> t -> Dac_plugin.raw_hash -> bytes tzresult Lwt.t
+  val load : Dac_plugin.t -> t -> Dac_plugin.hash -> bytes tzresult Lwt.t
 end
 
 (** [Filesystem] is an implementation of the page store backed up by
@@ -114,10 +114,7 @@ module Internal_for_tests : sig
     type remote_context
 
     val fetch :
-      Dac_plugin.t ->
-      remote_context ->
-      Dac_plugin.raw_hash ->
-      bytes tzresult Lwt.t
+      Dac_plugin.t -> remote_context -> Dac_plugin.hash -> bytes tzresult Lwt.t
   end)
   (P : S) :
     S

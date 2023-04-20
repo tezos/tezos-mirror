@@ -47,7 +47,7 @@ val sign_root_hash :
 val verify :
   Dac_plugin.t ->
   public_keys_opt:Tezos_crypto.Aggregate_signature.public_key option trace ->
-  Dac_plugin.hash ->
+  Dac_plugin.raw_hash ->
   Tezos_crypto.Aggregate_signature.signature ->
   Z.t ->
   (bool, tztrace) result Lwt.t

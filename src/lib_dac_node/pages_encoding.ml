@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022-2023 Trili Tech  <contact@trili.tech>                  *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2022-2023 Marigold <contact@marigold.dev>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -497,9 +497,7 @@ module Merkle_tree = struct
         match retrieved_hashes with
         | [] -> return @@ Bytes.concat Bytes.empty retrieved_content
         | hash :: hashes -> (
-            let* serialized_page =
-              S.load dac_plugin page_store (Dac_plugin.hash_to_raw hash)
-            in
+            let* serialized_page = S.load dac_plugin page_store hash in
             let*? page = deserialize_page dac_plugin serialized_page in
             match page with
             | Hashes page_hashes ->

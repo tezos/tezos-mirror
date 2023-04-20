@@ -139,12 +139,11 @@ let sign_root_hash ((module P) : Dac_plugin.t) cctxt dac_sk_uris root_hash =
 let verify ((module P) : Dac_plugin.t) ~public_keys_opt root_page_hash signature
     witnesses =
   let open Lwt_result_syntax in
-  let hash_as_bytes =
-    Data_encoding.Binary.to_bytes_opt P.encoding root_page_hash
-  in
+  let root_hash = P.raw_to_hash root_page_hash in
+  let hash_as_bytes = Data_encoding.Binary.to_bytes_opt P.encoding root_hash in
+  let hex_root_hash = P.to_hex root_hash in
   match hash_as_bytes with
-  | None ->
-      tzfail @@ Cannot_convert_root_page_hash_to_bytes (P.to_hex root_page_hash)
+  | None -> tzfail @@ Cannot_convert_root_page_hash_to_bytes hex_root_hash
   | Some bytes ->
       let* pk_msg_list =
         public_keys_opt
@@ -155,8 +154,7 @@ let verify ((module P) : Dac_plugin.t) ~public_keys_opt root_page_hash signature
                | None ->
                    if is_witness then
                      tzfail
-                     @@ Public_key_for_witness_not_available
-                          (i, P.to_hex root_page_hash)
+                     @@ Public_key_for_witness_not_available (i, hex_root_hash)
                    else return None
                | Some public_key ->
                    if is_witness then return @@ Some (public_key, None, bytes)

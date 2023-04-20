@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022-2023 Trili Tech  <contact@trili.tech>                  *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -44,11 +45,12 @@
 let dac_plugin = Stdlib.Option.get (Dac_plugin.get Protocol.hash)
 
 module Hashes_map = Map.Make (struct
-  type t = Dac_plugin.raw_hash
+  type t = Dac_plugin.hash
 
   let compare h1 h2 =
-    let s1 = Dac_plugin.raw_hash_to_hex h1 in
-    let s2 = Dac_plugin.raw_hash_to_hex h2 in
+    let (module Dac_plugin) = dac_plugin in
+    let s1 = Dac_plugin.to_hex h1 in
+    let s2 = Dac_plugin.to_hex h2 in
     String.compare s1 s2
 end)
 
@@ -206,17 +208,17 @@ module Hashes_map_backend = struct
 
   let save (_plugin : Dac_plugin.t) t ~(hash : Dac_plugin.hash) ~content =
     let open Lwt_result_syntax in
-    let () = t := Hashes_map.add (Dac_plugin.hash_to_raw hash) content !t in
+    let () = t := Hashes_map.add hash content !t in
     return ()
 
   let mem (_plugin : Dac_plugin.t) t (hash : Dac_plugin.hash) =
-    Lwt_result_syntax.return @@ Hashes_map.mem (Dac_plugin.hash_to_raw hash) !t
+    Lwt_result_syntax.return @@ Hashes_map.mem hash !t
 
-  let load (_plugin : Dac_plugin.t) t (hash : Dac_plugin.raw_hash) =
+  let load (_plugin : Dac_plugin.t) t hash =
     let open Lwt_result_syntax in
     let bytes = Hashes_map.find hash !t in
     match bytes with
-    | None -> tzfail @@ Page_is_missing hash
+    | None -> tzfail @@ Page_is_missing (Dac_plugin.hash_to_raw hash)
     | Some bytes -> return bytes
 
   let number_of_pages t = List.length @@ Hashes_map.bindings !t
@@ -426,7 +428,7 @@ module Merkle_tree = struct
         Hashes_map_backend.load
           dac_plugin
           mock_remote_store
-          (Dac_plugin.hash_to_raw root_hash_of_corrupt_payload)
+          root_hash_of_corrupt_payload
       in
       let* () =
         Hashes_map_backend.save
@@ -630,12 +632,7 @@ module Hash_chain = struct
           (Hashes_map_backend.number_of_pages page_store)
           2
       in
-      let get_page hash =
-        Hashes_map_backend.load
-          dac_plugin
-          page_store
-          (Dac_plugin.hash_to_raw hash)
-      in
+      let get_page hash = Hashes_map_backend.load dac_plugin page_store hash in
       let* content = retrieve_content ~get_page root_hash in
       Assert.equal_string ~loc:__LOC__ long_payload content
 
