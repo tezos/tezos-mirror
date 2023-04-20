@@ -310,7 +310,7 @@ let make_big_map ctxt contract ~key_type ~value_type entries =
         },
       ctxt )
 
-let originate_script block ~script ~storage ~src ~baker ~forges_tickets =
+let originate_script block ~script ~storage ~sender ~baker ~forges_tickets =
   let open Lwt_result_syntax in
   let code = Expr.toplevel_from_string script in
   let storage = Expr.from_string storage in
@@ -318,7 +318,11 @@ let originate_script block ~script ~storage ~src ~baker ~forges_tickets =
     let script =
       Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
     in
-    Op.contract_origination_hash (B block) src ~fee:(Test_tez.of_int 10) ~script
+    Op.contract_origination_hash
+      (B block)
+      sender
+      ~fee:(Test_tez.of_int 10)
+      ~script
   in
   let* incr =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
@@ -333,7 +337,7 @@ let originate_script block ~script ~storage ~src ~baker ~forges_tickets =
   let script = (code, storage) in
   Incremental.finalize_block incr >|=? fun block -> (destination, script, block)
 
-let origination_operation ctxt ~src ~script:(code, storage) ~orig_contract =
+let origination_operation ctxt ~sender ~script:(code, storage) ~orig_contract =
   let open Lwt_result_wrap_syntax in
   let script = Script.{code = lazy_expr code; storage = lazy_expr storage} in
   let unparsed_storage = storage in
@@ -358,7 +362,7 @@ let origination_operation ctxt ~src ~script:(code, storage) ~orig_contract =
   let operation =
     Internal_operation
       {
-        source = src;
+        sender;
         operation =
           Origination
             {
@@ -375,17 +379,17 @@ let origination_operation ctxt ~src ~script:(code, storage) ~orig_contract =
   in
   return (operation, ctxt)
 
-let originate block ~src ~baker ~script ~storage ~forges_tickets =
+let originate block ~sender ~baker ~script ~storage ~forges_tickets =
   let open Lwt_result_syntax in
   let* orig_contract, script, block =
-    originate_script block ~script ~storage ~src ~baker ~forges_tickets
+    originate_script block ~script ~storage ~sender ~baker ~forges_tickets
   in
   let* incr =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
   in
   return (orig_contract, script, incr)
 
-let transfer_operation ctxt ~src ~destination ~arg_type ~arg =
+let transfer_operation ctxt ~sender ~destination ~arg_type ~arg =
   let open Lwt_result_wrap_syntax in
   let*@ params_node, ctxt =
     Script_ir_translator.unparse_data
@@ -397,7 +401,7 @@ let transfer_operation ctxt ~src ~destination ~arg_type ~arg =
   return
     ( Internal_operation
         {
-          source = src;
+          sender;
           operation =
             Transaction_to_smart_contract
               {
@@ -964,11 +968,11 @@ let test_diffs_args_storage_and_lazy_diffs () =
 (** Test that attempting to transfer a ticket that exceeds the budget fails. *)
 let test_update_invalid_transfer () =
   let open Lwt_result_syntax in
-  let* baker, src, block = init_for_operation () in
+  let* baker, sender, block = init_for_operation () in
   let* destination, _script, incr =
     originate
       block
-      ~src
+      ~sender
       ~baker
       ~script:ticket_list_script
       ~storage:"{}"
@@ -980,7 +984,12 @@ let test_update_invalid_transfer () =
     boxed_list [string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1]
   in
   let* operation, ctxt =
-    transfer_operation ctxt ~src:(Contract src) ~destination ~arg_type ~arg
+    transfer_operation
+      ctxt
+      ~sender:(Contract sender)
+      ~destination
+      ~arg_type
+      ~arg
   in
   assert_fail_with
     ~loc:__LOC__
@@ -990,7 +999,7 @@ let test_update_invalid_transfer () =
     (fun () ->
       Ticket_accounting.update_ticket_balances
         ctxt
-        ~self_contract:src
+        ~self_contract:sender
         ~ticket_diffs:Ticket_token_map.empty
         [operation])
 
@@ -998,11 +1007,11 @@ let test_update_invalid_transfer () =
     results in a balance update. *)
 let test_update_ticket_self_diff () =
   let open Lwt_result_wrap_syntax in
-  let* baker, src, block = init_for_operation () in
+  let* baker, sender, block = init_for_operation () in
   let* self, _script, incr =
     originate
       block
-      ~src
+      ~sender
       ~baker
       ~script:ticket_list_script
       ~storage:"{}"
@@ -1041,7 +1050,7 @@ let test_update_self_ticket_transfer () =
   let* ticket_receiver, _script, incr =
     originate
       block
-      ~src:self
+      ~sender:self
       ~baker
       ~script:ticket_list_script
       ~storage:"{}"
@@ -1066,7 +1075,7 @@ let test_update_self_ticket_transfer () =
     in
     transfer_operation
       ctxt
-      ~src:(Contract self)
+      ~sender:(Contract self)
       ~destination:ticket_receiver
       ~arg_type
       ~arg
@@ -1098,7 +1107,7 @@ let test_update_valid_transfer () =
   let* destination, _script, incr =
     originate
       block
-      ~src:self
+      ~sender:self
       ~baker
       ~script:ticket_list_script
       ~storage:"{}"
@@ -1124,7 +1133,7 @@ let test_update_valid_transfer () =
   let* operation, ctxt =
     let arg_type = ticket_string_list_type in
     let arg = boxed_list [string_ticket ticketer "red" 1] in
-    transfer_operation ctxt ~src:(Contract self) ~destination ~arg_type ~arg
+    transfer_operation ctxt ~sender:(Contract self) ~destination ~arg_type ~arg
   in
   let* _, ctxt =
     let*@ ticket_diffs, ctxt =
@@ -1150,11 +1159,11 @@ let test_update_valid_transfer () =
     the balance. *)
 let test_update_transfer_tickets_to_self () =
   let open Lwt_result_wrap_syntax in
-  let* baker, src, block = init_for_operation () in
+  let* baker, sender, block = init_for_operation () in
   let* self_hash, _script, incr =
     originate
       block
-      ~src
+      ~sender
       ~baker
       ~script:ticket_list_script
       ~storage:"{}"
@@ -1180,7 +1189,7 @@ let test_update_transfer_tickets_to_self () =
     let arg = boxed_list [string_ticket ticketer "red" 1] in
     transfer_operation
       ctxt
-      ~src:(Contract self)
+      ~sender:(Contract self)
       ~destination:self_hash
       ~arg_type
       ~arg
@@ -1208,7 +1217,7 @@ let test_update_transfer_tickets_to_self () =
     budget fails. *)
 let test_update_invalid_origination () =
   let open Lwt_result_syntax in
-  let* baker, src, block = init_for_operation () in
+  let* baker, sender, block = init_for_operation () in
   let* orig_contract, script, incr =
     let storage =
       let ticketer = "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" in
@@ -1220,7 +1229,7 @@ let test_update_invalid_origination () =
     in
     originate
       block
-      ~src
+      ~sender
       ~baker
       ~script:ticket_list_script
       ~storage
@@ -1228,7 +1237,7 @@ let test_update_invalid_origination () =
   in
   let ctxt = Incremental.alpha_ctxt incr in
   let* operation, ctxt =
-    origination_operation ctxt ~src:(Contract src) ~orig_contract ~script
+    origination_operation ctxt ~sender:(Contract sender) ~orig_contract ~script
   in
   assert_fail_with
     ~loc:__LOC__
@@ -1238,7 +1247,7 @@ let test_update_invalid_origination () =
     (fun () ->
       Ticket_accounting.update_ticket_balances
         ctxt
-        ~self_contract:src
+        ~self_contract:sender
         ~ticket_diffs:Ticket_token_map.empty
         [operation])
 
@@ -1252,7 +1261,7 @@ let test_update_valid_origination () =
     let storage = Printf.sprintf {|{ Pair %S "red" 1; }|} ticketer in
     originate
       block
-      ~src:self
+      ~sender:self
       ~baker
       ~script:ticket_list_script
       ~storage
@@ -1271,7 +1280,7 @@ let test_update_valid_origination () =
     Ticket_balance.adjust_balance ctxt red_self_token_hash ~delta:Z.one
   in
   let* operation, ctxt =
-    origination_operation ctxt ~src:(Contract self) ~orig_contract ~script
+    origination_operation ctxt ~sender:(Contract self) ~orig_contract ~script
   in
   let*@ _, ctxt =
     let* ticket_diffs, ctxt =
@@ -1304,7 +1313,7 @@ let test_update_self_origination () =
     let storage = Printf.sprintf {|{ Pair %S "red" 1; }|} ticketer in
     originate
       block
-      ~src:self
+      ~sender:self
       ~baker
       ~script:ticket_list_script
       ~storage
@@ -1319,7 +1328,7 @@ let test_update_self_origination () =
       red_token
   in
   let* operation, ctxt =
-    origination_operation ctxt ~src:(Contract self) ~orig_contract ~script
+    origination_operation ctxt ~sender:(Contract self) ~orig_contract ~script
   in
   let*@ _, ctxt =
     Ticket_accounting.update_ticket_balances
@@ -1335,11 +1344,11 @@ let test_update_self_origination () =
 (** Test ticket-token map of list with duplicates.  *)
 let test_ticket_token_map_of_list_with_duplicates () =
   let open Lwt_result_wrap_syntax in
-  let* baker, src, block = init_for_operation () in
+  let* baker, sender, block = init_for_operation () in
   let* self, _script, incr =
     originate
       block
-      ~src
+      ~sender
       ~baker
       ~script:ticket_list_script
       ~storage:"{}"

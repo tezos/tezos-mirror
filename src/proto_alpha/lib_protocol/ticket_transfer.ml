@@ -42,7 +42,7 @@ let parse_ticket ~consume_deserialization_gas ~ticketer ~contents ~ty ctxt =
   return (ctxt, token)
 
 let parse_ticket_and_operation ~consume_deserialization_gas ~ticketer ~contents
-    ~ty ~source ~destination ~entrypoint ~amount ctxt =
+    ~ty ~sender ~destination ~entrypoint ~amount ctxt =
   parse_ticket ~consume_deserialization_gas ~ticketer ~contents ~ty ctxt
   >>=? fun ( ctxt,
              (Ticket_token.Ex_token {contents; contents_type; ticketer} as
@@ -56,7 +56,7 @@ let parse_ticket_and_operation ~consume_deserialization_gas ~ticketer ~contents
   let op =
     Script_typed_ir.Internal_operation
       {
-        source;
+        sender;
         nonce;
         operation =
           Transaction_to_smart_contract
@@ -73,21 +73,21 @@ let parse_ticket_and_operation ~consume_deserialization_gas ~ticketer ~contents
   in
   return (ctxt, token, op)
 
-let transfer_ticket_with_hashes ctxt ~src_hash ~dst_hash (qty : Ticket_amount.t)
-    =
+let transfer_ticket_with_hashes ctxt ~sender_hash ~dst_hash
+    (qty : Ticket_amount.t) =
   let qty = Script_int.(to_zint (qty :> n num)) in
-  Ticket_balance.adjust_balance ctxt src_hash ~delta:(Z.neg qty)
-  >>=? fun (src_storage_diff, ctxt) ->
+  Ticket_balance.adjust_balance ctxt sender_hash ~delta:(Z.neg qty)
+  >>=? fun (sender_storage_diff, ctxt) ->
   Ticket_balance.adjust_balance ctxt dst_hash ~delta:qty
   >>=? fun (dst_storage_diff, ctxt) ->
   Ticket_balance.adjust_storage_space
     ctxt
-    ~storage_diff:(Z.add src_storage_diff dst_storage_diff)
+    ~storage_diff:(Z.add sender_storage_diff dst_storage_diff)
   >>=? fun (diff, ctxt) -> return (ctxt, diff)
 
-let transfer_ticket ctxt ~src ~dst ex_token qty =
-  Ticket_balance_key.of_ex_token ctxt ~owner:src ex_token
-  >>=? fun (src_hash, ctxt) ->
+let transfer_ticket ctxt ~sender ~dst ex_token qty =
+  Ticket_balance_key.of_ex_token ctxt ~owner:sender ex_token
+  >>=? fun (sender_hash, ctxt) ->
   Ticket_balance_key.of_ex_token ctxt ~owner:dst ex_token
   >>=? fun (dst_hash, ctxt) ->
-  transfer_ticket_with_hashes ctxt ~src_hash ~dst_hash qty
+  transfer_ticket_with_hashes ctxt ~sender_hash ~dst_hash qty

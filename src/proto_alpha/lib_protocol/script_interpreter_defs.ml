@@ -595,7 +595,7 @@ let emit_event (type t tc) (ctxt, sc) gas ~(event_type : (t, tc) ty)
   let operation = Event {ty = unparsed_ty; tag; unparsed_data} in
   let iop =
     {
-      source = Destination.Contract (Contract.Originated sc.self);
+      sender = Destination.Contract (Contract.Originated sc.self);
       operation;
       nonce;
     }
@@ -689,7 +689,7 @@ let transfer (type t) (ctxt, sc) gas amount location
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop =
     {
-      source = Destination.Contract (Contract.Originated sc.self);
+      sender = Destination.Contract (Contract.Originated sc.self);
       operation;
       nonce;
     }
@@ -732,8 +732,8 @@ let create_contract (ctxt, sc) gas storage_type code delegate credit init =
       }
   in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
-  let source = Destination.Contract (Contract.Originated sc.self) in
-  let piop = Internal_operation {source; operation; nonce} in
+  let sender = Destination.Contract (Contract.Originated sc.self) in
+  let piop = Internal_operation {sender; operation; nonce} in
   let res = {piop; lazy_storage_diff} in
   let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
   return (res, preorigination, ctxt, gas)

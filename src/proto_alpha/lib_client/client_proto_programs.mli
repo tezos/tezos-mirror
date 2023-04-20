@@ -38,7 +38,7 @@ type simulation_params = {
   unparsing_mode : Script_ir_unparser.unparsing_mode;
   now : Script_timestamp.t option;
   level : Script_int.n Script_int.num option;
-  source : Contract.t option;
+  sender : Contract.t option;
   payer : Signature.public_key_hash option;
   gas : Gas.Arith.integral option;
 }

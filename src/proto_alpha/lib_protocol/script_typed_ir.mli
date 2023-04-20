@@ -33,13 +33,13 @@ open Dependent_bool
 
     The step function of the interpreter is parametrized by a bunch of values called the step constants.
     These values are indeed constants during the call of a smart contract with the notable exception of
-    the IView instruction which modifies `source`, `self`, and `amount` and the KView_exit continuation
+    the IView instruction which modifies `sender`, `self`, and `amount` and the KView_exit continuation
     which restores them.
     ======================
 
 *)
 type step_constants = {
-  source : Destination.t;
+  sender : Destination.t;
       (** The address calling this contract, as returned by SENDER. *)
   payer : Signature.public_key_hash;
       (** The address of the implicit account that initiated the chain of contract calls, as returned by SOURCE. *)
@@ -1656,7 +1656,7 @@ and 'kind internal_operation_contents =
       -> Kind.delegation internal_operation_contents
 
 and 'kind internal_operation = {
-  source : Destination.t;
+  sender : Destination.t;
   operation : 'kind internal_operation_contents;
   nonce : int;
 }

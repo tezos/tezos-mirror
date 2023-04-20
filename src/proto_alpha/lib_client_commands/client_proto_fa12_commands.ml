@@ -176,7 +176,7 @@ let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =
               ~block:cctxt#block
               ~contract
               ~action
-              ~source:addr
+              ~sender:addr
               ?gas
               ?payer
               ~unparsing_mode
@@ -200,13 +200,13 @@ let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =
         @@ stop)
         (fun (gas, payer, unparsing_mode)
              contract
-             source
+             sender
              destination
              (cctxt : #Protocol_client_context.full) ->
           let open Lwt_syntax in
           let action =
             Client_proto_fa12.Get_allowance
-              (source, destination, (dummy_callback, None))
+              (sender, destination, (dummy_callback, None))
           in
           let* res =
             Client_proto_fa12.run_view_action
@@ -215,7 +215,7 @@ let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =
               ~block:cctxt#block
               ~contract
               ~action
-              ~source
+              ~sender
               ?gas
               ?payer
               ~unparsing_mode

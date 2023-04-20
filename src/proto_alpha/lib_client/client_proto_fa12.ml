@@ -960,7 +960,7 @@ let is_viewable_action action =
   | _ -> fail (Not_a_viewable_entrypoint (action_to_entrypoint action))
 
 let run_view_action (cctxt : #Protocol_client_context.full) ~chain ~block
-    ?source ~contract ~action ?payer ?gas ~unparsing_mode () =
+    ?sender ~contract ~action ?payer ?gas ~unparsing_mode () =
   is_viewable_action action >>=? fun () ->
   contract_has_fa12_interface cctxt ~chain ~block ~contract () >>=? fun () ->
   let entrypoint = action_to_entrypoint action in
@@ -972,7 +972,7 @@ let run_view_action (cctxt : #Protocol_client_context.full) ~chain ~block
     ~contract
     ~input
     ~chain_id
-    ?source
+    ?sender
     ?payer
     ?gas
     ~entrypoint

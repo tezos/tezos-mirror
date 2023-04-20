@@ -152,7 +152,7 @@ val run_view_action :
   full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  ?source:Contract.t ->
+  ?sender:Contract.t ->
   contract:Contract_hash.t ->
   action:action ->
   ?payer:Signature.public_key_hash ->

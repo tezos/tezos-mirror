@@ -42,7 +42,7 @@ type error +=
       Apply_internal_results.packed_internal_operation
   | Multiple_revelation
   | Invalid_transfer_to_sc_rollup
-  | Invalid_source of Destination.t
+  | Invalid_sender of Destination.t
 
 let () =
   register_error_kind
@@ -196,28 +196,28 @@ let () =
     ~pp:(fun ppf () ->
       Format.fprintf
         ppf
-        "Invalid source for transfer operation to smart rollup. Only \
+        "Invalid sender for transfer operation to smart rollup. Only \
          originated accounts are allowed.")
     Data_encoding.empty
     (function Invalid_transfer_to_sc_rollup -> Some () | _ -> None)
     (fun () -> Invalid_transfer_to_sc_rollup) ;
   register_error_kind
     `Permanent
-    ~id:"operations.invalid_source"
-    ~title:"Invalid source for an internal operation"
+    ~id:"operations.invalid_sender"
+    ~title:"Invalid sender for an internal operation"
     ~description:
-      "Invalid source for an internal operation restricted to implicit and \
+      "Invalid sender for an internal operation restricted to implicit and \
        originated accounts."
     ~pp:(fun ppf c ->
       Format.fprintf
         ppf
-        "Invalid source (%a) for this internal operation. Only implicit and \
+        "Invalid sender (%a) for this internal operation. Only implicit and \
          originated accounts are allowed"
         Destination.pp
         c)
     Data_encoding.(obj1 (req "contract" Destination.encoding))
-    (function Invalid_source c -> Some c | _ -> None)
-    (fun c -> Invalid_source c)
+    (function Invalid_sender c -> Some c | _ -> None)
+    (fun c -> Invalid_sender c)
 
 open Apply_results
 open Apply_operation_result
@@ -237,22 +237,22 @@ let update_script_storage_and_ticket_balances ctxt ~self_contract storage
     ~ticket_diffs
     operations
 
-let apply_delegation ~ctxt ~source ~delegate ~before_operation =
-  Contract.Delegate.set ctxt source delegate >|=? fun ctxt ->
+let apply_delegation ~ctxt ~sender ~delegate ~before_operation =
+  Contract.Delegate.set ctxt sender delegate >|=? fun ctxt ->
   (ctxt, Gas.consumed ~since:before_operation ~until:ctxt, [])
 
 type 'loc execution_arg =
   | Typed_arg : 'loc * ('a, _) Script_typed_ir.ty * 'a -> 'loc execution_arg
   | Untyped_arg : Script.expr -> _ execution_arg
 
-let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~before_operation =
+let apply_transaction_to_implicit ~ctxt ~sender ~amount ~pkh ~before_operation =
   let contract = Contract.Implicit pkh in
   (* Transfers of zero to implicit accounts are forbidden. *)
   error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
   (* If the implicit contract is not yet allocated at this point then
      the next transfer of tokens will allocate it. *)
   Contract.allocated ctxt contract >>= fun already_allocated ->
-  Token.transfer ctxt (`Contract source) (`Contract contract) amount
+  Token.transfer ctxt (`Contract sender) (`Contract contract) amount
   >>=? fun (ctxt, balance_updates) ->
   let result =
     Transaction_to_contract_result
@@ -270,16 +270,16 @@ let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~before_operation =
   in
   return (ctxt, result, [])
 
-let transfer_from_any_address ctxt source destination amount =
-  match source with
-  | Destination.Contract source ->
-      Token.transfer ctxt (`Contract source) (`Contract destination) amount
+let transfer_from_any_address ctxt sender destination amount =
+  match sender with
+  | Destination.Contract sender ->
+      Token.transfer ctxt (`Contract sender) (`Contract destination) amount
   | Destination.Sc_rollup _ | Destination.Zk_rollup _ ->
       (* We do not allow transferring tez from rollups to other contracts. *)
-      error_unless Tez.(amount = zero) (Non_empty_transaction_from source)
+      error_unless Tez.(amount = zero) (Non_empty_transaction_from sender)
       >>?= fun () -> return (ctxt, [])
 
-let apply_transaction_to_implicit_with_ticket ~source ~destination ~ty ~ticket
+let apply_transaction_to_implicit_with_ticket ~sender ~destination ~ty ~ticket
     ~amount ~before_operation ctxt =
   let destination = Contract.Implicit destination in
   Contract.allocated ctxt destination >>= fun already_allocated ->
@@ -288,7 +288,7 @@ let apply_transaction_to_implicit_with_ticket ~source ~destination ~ty ~ticket
     @@ Ticket_scanner.Ex_ticket (ty, ticket)
   in
   Ticket_token_unparser.unparse ctxt ex_token >>=? fun (ticket_token, ctxt) ->
-  transfer_from_any_address ctxt source destination amount
+  transfer_from_any_address ctxt sender destination amount
   >>=? fun (ctxt, balance_updates) ->
   let ticket_receipt =
     Ticket_receipt.
@@ -321,7 +321,7 @@ let apply_transaction_to_implicit_with_ticket ~source ~destination ~ty ~ticket
         },
       [] )
 
-let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
+let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
     ~entrypoint ~before_operation ~payer ~chain_id ~internal ~parameter =
   let contract = Contract.Originated contract_hash in
   (* Since the contract is originated, nothing will be allocated or this
@@ -330,7 +330,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
      does not exist, [Script_cache.find] will signal that by returning [None]
      and we'll fail.
   *)
-  transfer_from_any_address ctxt source contract amount
+  transfer_from_any_address ctxt sender contract amount
   >>=? fun (ctxt, balance_updates) ->
   Script_cache.find ctxt contract_hash >>=? fun (ctxt, cache_key, script) ->
   match script with
@@ -347,7 +347,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
       let step_constants =
         let open Script_interpreter in
         {
-          source;
+          sender;
           payer;
           self = contract_hash;
           amount;
@@ -427,7 +427,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
           (ctxt, result, operations) )
 
 let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
-    ~contract:contract_hash ~delegate ~source ~credit ~before_operation =
+    ~contract:contract_hash ~delegate ~sender ~credit ~before_operation =
   Script_ir_translator.collect_lazy_storage ctxt storage_type storage
   >>?= fun (to_duplicate, ctxt) ->
   let to_update = Script_ir_translator.no_lazy_storage_id in
@@ -462,7 +462,7 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
   | None -> return ctxt
   | Some delegate -> Contract.Delegate.init ctxt contract delegate)
   >>=? fun ctxt ->
-  Token.transfer ctxt (`Contract source) (`Contract contract) credit
+  Token.transfer ctxt (`Contract sender) (`Contract contract) credit
   >>=? fun (ctxt, balance_updates) ->
   Fees.record_paid_storage_space ctxt contract_hash
   >|=? fun (ctxt, size, paid_storage_size_diff) ->
@@ -480,7 +480,7 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
 
 (**
 
-   Retrieving the source code of a contract from its address is costly
+   Retrieving the script of a contract from its address is costly
    because it requires I/Os. For this reason, we put the corresponding
    Micheline expression in the cache.
 
@@ -490,15 +490,15 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
 
 *)
 
-let assert_source_is_contract = function
-  | Destination.Contract source -> ok source
-  | source -> error (Invalid_source source)
+let assert_sender_is_contract = function
+  | Destination.Contract sender -> ok sender
+  | sender -> error (Invalid_sender sender)
 
 let apply_internal_operation_contents :
     type kind.
     context ->
     payer:public_key_hash ->
-    source:Destination.t ->
+    sender:Destination.t ->
     chain_id:Chain_id.t ->
     kind Script_typed_ir.internal_operation_contents ->
     (context
@@ -506,8 +506,8 @@ let apply_internal_operation_contents :
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
- fun ctxt_before_op ~payer ~source ~chain_id operation ->
-  Destination.must_exist ctxt_before_op source >>=? fun ctxt ->
+ fun ctxt_before_op ~payer ~sender ~chain_id operation ->
+  Destination.must_exist ctxt_before_op sender >>=? fun ctxt ->
   (* There is no signature being checked for internal operations so in
      this case the fixed cost is exactly
      [Michelson_v1_gas.Cost_of.manager_operation]. *)
@@ -518,10 +518,10 @@ let apply_internal_operation_contents :
      application). *)
   match operation with
   | Transaction_to_implicit {destination = pkh; amount} ->
-      assert_source_is_contract source >>?= fun source ->
+      assert_sender_is_contract sender >>?= fun sender ->
       apply_transaction_to_implicit
         ~ctxt
-        ~source
+        ~sender
         ~amount
         ~pkh
         ~before_operation:ctxt_before_op
@@ -538,7 +538,7 @@ let apply_internal_operation_contents :
         unparsed_ticket = _;
       } ->
       apply_transaction_to_implicit_with_ticket
-        ~source
+        ~sender
         ~destination
         ~ty
         ~ticket
@@ -561,7 +561,7 @@ let apply_internal_operation_contents :
       } ->
       apply_transaction_to_smart_contract
         ~ctxt
-        ~source
+        ~sender
         ~contract_hash
         ~amount
         ~entrypoint
@@ -580,7 +580,7 @@ let apply_internal_operation_contents :
         unparsed_parameters = payload;
       } ->
       assert_sc_rollup_feature_enabled ctxt >>?= fun () ->
-      (match source with
+      (match sender with
       | Destination.Contract (Originated hash) -> ok hash
       | _ -> error Invalid_transfer_to_sc_rollup)
       >>?= fun sender ->
@@ -652,7 +652,7 @@ let apply_internal_operation_contents :
         storage_type;
         storage;
       } ->
-      assert_source_is_contract source >>?= fun source ->
+      assert_sender_is_contract sender >>?= fun sender ->
       apply_origination
         ~ctxt
         ~storage_type
@@ -660,14 +660,14 @@ let apply_internal_operation_contents :
         ~unparsed_code
         ~contract:preorigination
         ~delegate
-        ~source
+        ~sender
         ~credit
         ~before_operation:ctxt_before_op
       >|=? fun (ctxt, origination_result, ops) ->
       (ctxt, IOrigination_result origination_result, ops)
   | Delegation delegate ->
-      assert_source_is_contract source >>?= fun source ->
-      apply_delegation ~ctxt ~source ~delegate ~before_operation:ctxt_before_op
+      assert_sender_is_contract sender >>?= fun sender ->
+      apply_delegation ~ctxt ~sender ~delegate ~before_operation:ctxt_before_op
       >|=? fun (ctxt, consumed_gas, ops) ->
       (ctxt, IDelegation_result {consumed_gas}, ops)
 
@@ -750,7 +750,7 @@ let apply_manager_operation :
       >>?= fun () ->
       apply_transaction_to_implicit
         ~ctxt
-        ~source:source_contract
+        ~sender:source_contract
         ~amount
         ~pkh
         ~before_operation:ctxt_before_op
@@ -765,7 +765,7 @@ let apply_manager_operation :
       >>?= fun (parameters, ctxt) ->
       apply_transaction_to_smart_contract
         ~ctxt
-        ~source:(Destination.Contract source_contract)
+        ~sender:(Destination.Contract source_contract)
         ~contract_hash
         ~amount
         ~entrypoint
@@ -792,7 +792,7 @@ let apply_manager_operation :
           >>=? fun (ctxt, ticket) ->
           Ticket_transfer.transfer_ticket
             ctxt
-            ~src:(Contract source_contract)
+            ~sender:(Contract source_contract)
             ~dst:(Contract destination)
             ticket
             amount
@@ -829,7 +829,7 @@ let apply_manager_operation :
             ~ticketer
             ~contents
             ~ty
-            ~source:(Destination.Contract source_contract)
+            ~sender:(Destination.Contract source_contract)
             ~destination:destination_hash
             ~entrypoint
             ~amount
@@ -837,7 +837,7 @@ let apply_manager_operation :
           >>=? fun (ctxt, token, op) ->
           Ticket_transfer.transfer_ticket
             ctxt
-            ~src:(Contract source_contract)
+            ~sender:(Contract source_contract)
             ~dst:(Contract destination)
             token
             amount
@@ -909,7 +909,7 @@ let apply_manager_operation :
         ~unparsed_code
         ~contract
         ~delegate
-        ~source:source_contract
+        ~sender:source_contract
         ~credit
         ~before_operation:ctxt_before_op
       >|=? fun (ctxt, origination_result, ops) ->
@@ -917,7 +917,7 @@ let apply_manager_operation :
   | Delegation delegate ->
       apply_delegation
         ~ctxt
-        ~source:source_contract
+        ~sender:source_contract
         ~delegate
         ~before_operation:ctxt_before_op
       >|=? fun (ctxt, consumed_gas, ops) ->
@@ -1144,7 +1144,7 @@ let apply_internal_operations ctxt ~payer ~chain_id ops =
   let rec apply ctxt applied worklist =
     match worklist with
     | [] -> Lwt.return (Success ctxt, List.rev applied)
-    | Script_typed_ir.Internal_operation ({source; operation; nonce} as op)
+    | Script_typed_ir.Internal_operation ({sender; operation; nonce} as op)
       :: rest -> (
         (if internal_nonce_already_recorded ctxt nonce then
          let op_res = Apply_internal_results.internal_operation op in
@@ -1153,7 +1153,7 @@ let apply_internal_operations ctxt ~payer ~chain_id ops =
           let ctxt = record_internal_nonce ctxt nonce in
           apply_internal_operation_contents
             ctxt
-            ~source
+            ~sender
             ~payer
             ~chain_id
             operation)
@@ -1943,10 +1943,10 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       let blinded_pkh =
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh
       in
-      let src = `Collected_commitments blinded_pkh in
+      let sender = `Collected_commitments blinded_pkh in
       let contract = Contract.Implicit (Signature.Ed25519 pkh) in
-      Token.balance ctxt src >>=? fun (ctxt, amount) ->
-      Token.transfer ctxt src (`Contract contract) amount
+      Token.balance ctxt sender >>=? fun (ctxt, amount) ->
+      Token.transfer ctxt sender (`Contract contract) amount
       >>=? fun (ctxt, bupds) ->
       return (ctxt, Single_result (Activate_account_result bupds))
   | Single (Proposals _ as contents) ->
@@ -2092,7 +2092,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                 since they are not used within the CPMM default
                 entrypoint. *)
              {
-               source = Destination.Contract liquidity_baking_cpmm_contract;
+               sender = Destination.Contract liquidity_baking_cpmm_contract;
                payer = Signature.Public_key_hash.zero;
                self = liquidity_baking_cpmm_contract_hash;
                amount = liquidity_baking_subsidy;

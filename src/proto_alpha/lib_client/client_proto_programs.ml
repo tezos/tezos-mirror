@@ -125,7 +125,7 @@ type simulation_params = {
   unparsing_mode : Script_ir_unparser.unparsing_mode;
   now : Script_timestamp.t option;
   level : Script_int.n Script_int.num option;
-  source : Contract.t option;
+  sender : Contract.t option;
   payer : Signature.public_key_hash option;
   gas : Gas.Arith.integral option;
 }
@@ -156,7 +156,7 @@ type run_params = {
 let run_view (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block (params : run_view_params) =
   let {
-    shared_params = {input; unparsing_mode; now; level; source; payer; gas};
+    shared_params = {input; unparsing_mode; now; level; sender; payer; gas};
     contract;
     entrypoint;
   } =
@@ -171,7 +171,7 @@ let run_view (cctxt : #Protocol_client_context.rpc_context)
     ~entrypoint
     ~input:input.expanded
     ~chain_id
-    ?source
+    ?sender
     ?payer
     ~unparsing_mode
     ~now
@@ -180,7 +180,7 @@ let run_view (cctxt : #Protocol_client_context.rpc_context)
 let run_script_view (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block (params : run_script_view_params) =
   let {
-    shared_params = {input; unparsing_mode; now; level; source; payer; gas};
+    shared_params = {input; unparsing_mode; now; level; sender; payer; gas};
     contract;
     view;
     unlimited_gas;
@@ -197,7 +197,7 @@ let run_script_view (cctxt : #Protocol_client_context.rpc_context)
     ~input:input.expanded
     ~unlimited_gas
     ~chain_id
-    ?source
+    ?sender
     ?payer
     ~unparsing_mode
     ~now
@@ -207,7 +207,7 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block (params : run_params) =
   Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   let {
-    shared_params = {input; unparsing_mode; now; level; source; payer; gas};
+    shared_params = {input; unparsing_mode; now; level; sender; payer; gas};
     program;
     amount;
     balance;
@@ -230,7 +230,7 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     ~amount
     ?balance
     ~chain_id
-    ~source
+    ~sender
     ~payer
     ~self
     ~now
@@ -240,7 +240,7 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block (params : run_params) =
   Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   let {
-    shared_params = {input; unparsing_mode; now; level; source; payer; gas};
+    shared_params = {input; unparsing_mode; now; level; sender; payer; gas};
     program;
     amount;
     balance;
@@ -263,7 +263,7 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     ~amount
     ?balance
     ~chain_id
-    ~source
+    ~sender
     ~payer
     ~self
     ~now

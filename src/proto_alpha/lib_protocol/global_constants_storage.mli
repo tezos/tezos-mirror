@@ -25,7 +25,7 @@
 
 (** This module represents access to a global table of constant
     Micheline values. Users may register a Micheline value in the
-    table, paying the cost of storage. Once stored, contracts source code may
+    table, paying the cost of storage. Once stored, scripts may
     reference this value by its hash. 
     
     Note: the table does not typecheck the values stored in it.
