@@ -617,30 +617,42 @@ let is_cementable_candidate_commitment ctxt rollup lcc commitment_hash =
   else (* Dangling commitment. *)
     return (ctxt, None)
 
-let cementable_candidate_commitments_of_inbox_level ctxt rollup ~old_lcc
+let cementable_candidate_commitment_of_inbox_level ctxt rollup ~old_lcc
     inbox_level =
   let open Lwt_result_syntax in
   let* ctxt, commitments =
     Commitments_per_inbox_level.get ctxt rollup inbox_level
   in
-  List.fold_left_es
-    (fun (ctxt, candidate_commitments, dangling_commitments) commitment_hash ->
-      let* ctxt, candidate_commitment =
-        is_cementable_candidate_commitment ctxt rollup old_lcc commitment_hash
-      in
-      match candidate_commitment with
-      | Some commitment ->
-          return
-            ( ctxt,
-              (commitment, commitment_hash) :: candidate_commitments,
-              dangling_commitments )
-      | None ->
-          return
-            ( ctxt,
-              candidate_commitments,
-              commitment_hash :: dangling_commitments ))
-    (ctxt, [], [])
-    commitments
+  let rec collect_commitments ctxt candidate_commitment_res dangling_commitments
+      = function
+    | [] -> return (ctxt, candidate_commitment_res, dangling_commitments)
+    | candidate_commitment_hash :: rst -> (
+        let* ctxt, candidate_commitment =
+          is_cementable_candidate_commitment
+            ctxt
+            rollup
+            old_lcc
+            candidate_commitment_hash
+        in
+        match (candidate_commitment, candidate_commitment_res) with
+        | Some _, Some _ ->
+            (* Second candidate commitment to cement, the inbox level is disputed. *)
+            tzfail Sc_rollup_disputed
+        | Some candidate_commitment, None ->
+            (* First candidate commitment to cement, it becomes the result. *)
+            collect_commitments
+              ctxt
+              (Some (candidate_commitment, candidate_commitment_hash))
+              dangling_commitments
+              rst
+        | None, _ ->
+            collect_commitments
+              ctxt
+              candidate_commitment_res
+              (candidate_commitment_hash :: dangling_commitments)
+              rst)
+  in
+  collect_commitments ctxt None [] commitments
 
 (** [find_commitment_to_cement ctxt rollup ~old_lcc new_lcc_level] tries to find
     the commitment to cement at inbox level [new_lcc_level].
@@ -655,17 +667,17 @@ let cementable_candidate_commitments_of_inbox_level ctxt rollup ~old_lcc
 let find_commitment_to_cement ctxt rollup ~old_lcc new_lcc_level =
   let open Lwt_result_syntax in
   (* Checks that the commitment is the only active commitment. *)
-  let* ctxt, candidate_commitments, dangling_commitments =
-    cementable_candidate_commitments_of_inbox_level
+  let* ctxt, candidate_commitment, dangling_commitments =
+    cementable_candidate_commitment_of_inbox_level
       ctxt
       rollup
       ~old_lcc
       new_lcc_level
   in
-  match candidate_commitments with
+  match candidate_commitment with
   (* A commitment can be cemented if there is only one valid
      commitment. *)
-  | [(candidate_commitment, candidate_commitment_hash)] ->
+  | Some (candidate_commitment, candidate_commitment_hash) ->
       let* ctxt, candidate_commitment_added =
         Store.Commitment_added.get (ctxt, rollup) candidate_commitment_hash
       in
@@ -688,7 +700,7 @@ let find_commitment_to_cement ctxt rollup ~old_lcc new_lcc_level =
         ( ctxt,
           (candidate_commitment, candidate_commitment_hash),
           dangling_commitments )
-  | _ -> tzfail Sc_rollup_disputed
+  | None -> tzfail Sc_rollup_no_valid_commitment_to_cement
 
 let deallocate_inbox_level ctxt rollup inbox_level new_lcc_hash
     dangling_commitments =

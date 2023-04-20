@@ -48,3 +48,6 @@ Minor Changes
 
 Internal
 --------
+
+- Fail earlier when a smart rollup commitment is in conflict when cementing.
+  (MR :gl:`!8128`)
