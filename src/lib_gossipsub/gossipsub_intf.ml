@@ -741,6 +741,10 @@ module type WORKER_CONFIGURATION = sig
     (** Pops the oldest value that has been pushed to the stream. In case the
         stream is empty, the function will wait until some value is pushed. *)
     val pop : 'a t -> 'a Monad.t
+
+    (** Returns and removes all available elements of the stream l without
+        blocking. *)
+    val get_available : 'a t -> 'a list
   end
 end
 
@@ -826,4 +830,10 @@ module type WORKER = sig
   (** [app_output_stream t] returns the output stream containing data for the
       application layer. *)
   val app_output_stream : t -> app_output Stream.t
+
+  (** Pretty-printer for values of type {!p2p_output}. *)
+  val pp_p2p_output : Format.formatter -> p2p_output -> unit
+
+  (** Pretty-printer for values of type {!app_output}. *)
+  val pp_app_output : Format.formatter -> app_output -> unit
 end
