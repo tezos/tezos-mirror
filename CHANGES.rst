@@ -141,6 +141,8 @@ Smart Rollup WASM Debugger
 - Added commands to inspect the structure of the durable storage (MRs
   :gl:`!7707`, :gl:`!8304`).
 
+- Automatically ``load inputs`` when ``step inbox`` is called. (MR :gl:`!8444`)
+
 Miscellaneous
 -------------
 

@@ -218,13 +218,6 @@ let eval_until_input_requested config tree =
       ( tree,
         Z.to_int64 @@ Z.sub info_after.current_tick info_before.current_tick ))
 
-(* Eval dispatcher. *)
-let eval config = function
-  | Tick -> compute_step
-  | Result -> eval_to_result config
-  | Kernel_run -> eval_kernel_run config
-  | Inbox -> eval_until_input_requested config
-
 let set_raw_message_input_step level counter encoded_message tree =
   Wasm.set_input_step (input_info level counter) encoded_message tree
 
@@ -275,6 +268,26 @@ let load_inputs inboxes level tree =
       Format.printf "%s\n%!" msg ;
       return (tree, inboxes, level)
 
+(* Eval dispatcher. *)
+let eval level inboxes config step tree =
+  let open Lwt_result_syntax in
+  let return' ?(inboxes = inboxes) f =
+    let* tree, count = f in
+    return (tree, count, inboxes)
+  in
+  match step with
+  | Tick -> return' (compute_step tree)
+  | Result -> return' (eval_to_result config tree)
+  | Kernel_run -> return' (eval_kernel_run config tree)
+  | Inbox -> (
+      let*! status = check_input_request tree in
+      match status with
+      | Ok () ->
+          let* tree, inboxes, count1 = load_inputs inboxes level tree in
+          let* tree, count2 = eval_until_input_requested config tree in
+          return (tree, Int64.(add (of_int32 count1) count2), inboxes)
+      | Error _ -> return' (eval_until_input_requested config tree))
+
 let pp_input_request ppf = function
   | Wasm_pvm_state.No_input_required -> Format.fprintf ppf "Evaluating"
   | Input_required -> Format.fprintf ppf "Waiting for input"
@@ -296,14 +309,14 @@ let show_status tree =
        pp_state
        state)
 
-(* [step kind tree] evals according to the step kind and prints the number of
-   ticks elapsed and the new status. *)
-let step config kind tree =
+(* [step level inboxes config kind tree] evals according to the step kind and
+   prints the number of ticks elapsed and the new status. *)
+let step level inboxes config kind tree =
   let open Lwt_result_syntax in
-  let* tree, ticks = eval config kind tree in
+  let* tree, ticks, inboxes = eval level inboxes config kind tree in
   let*! () = Lwt_io.printf "Evaluation took %Ld ticks so far\n" ticks in
   let*! () = show_status tree in
-  return tree
+  return (tree, inboxes)
 
 let bench config tree =
   let open Lwt_syntax in
@@ -534,7 +547,9 @@ let reveal_metadata config tree =
 let handle_command c config tree inboxes level =
   let open Lwt_result_syntax in
   let command = parse_commands c in
-  let return ?(tree = tree) () = return (tree, inboxes, level) in
+  let return ?(tree = tree) ?(inboxes = inboxes) () =
+    return (tree, inboxes, level)
+  in
   let rec go = function
     | Bench ->
         let*! tree = bench config tree in
@@ -554,8 +569,8 @@ let handle_command c config tree inboxes level =
         let*! () = show_status tree in
         return ()
     | Step kind ->
-        let* tree = step config kind tree in
-        return ~tree ()
+        let* tree, inboxes = step level inboxes config kind tree in
+        return ~tree ~inboxes ()
     | Show_inbox ->
         let*! () = show_inbox tree in
         return ()
