@@ -297,10 +297,9 @@ let headers_fetch_worker_loop pipeline =
             pipeline.locator
     in
     let locator_length = Block_locator.estimated_length seed pipeline.locator in
-    let number_of_steps = List.length steps in
     let*! () =
       Bootstrap_pipeline_event.(emit fetching_locator)
-        (locator_length, pipeline.peer_id, number_of_steps)
+        (locator_length, pipeline.peer_id)
     in
     match steps with
     | [] -> tzfail (Too_short_locator (sender_id, pipeline.locator))
@@ -338,6 +337,7 @@ let headers_fetch_worker_loop pipeline =
           | [] -> return_unit
           | current :: rest ->
               let open Block_locator in
+              let number_of_steps = List.length steps in
               let*! () =
                 Bootstrap_pipeline_event.(emit fetching_step_from_peer)
                   ( counter,

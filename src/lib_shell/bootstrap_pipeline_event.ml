@@ -30,16 +30,13 @@ let section = ["node"; "validator"; "bootstrap_pipeline"]
 (* notice level events *)
 
 let fetching_locator =
-  declare_3
+  declare_2
     ~section
     ~name:"fetching_locator"
-    ~msg:
-      "fetching branch of about {locator_length} blocks from peer {peer_id} in \
-       {steps_number} steps"
+    ~msg:"fetching branch of about {locator_length} blocks from peer {peer_id}"
     ~level:Notice
     ("locator_length", Data_encoding.int31)
     ("peer_id", P2p_peer.Id.encoding)
-    ("steps_number", Data_encoding.int31)
 
 let still_fetching_large_step_from_peer =
   declare_3
