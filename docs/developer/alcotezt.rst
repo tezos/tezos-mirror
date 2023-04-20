@@ -90,8 +90,8 @@ forthcoming release of Tezt will ameliorate this.
 Notable Differences Between Alcotest and Alcotezt
 -------------------------------------------------
 
-Test grouping
-+++++++++++++
+Test naming
++++++++++++
 
 First of all, some definitions:
 
@@ -99,10 +99,10 @@ First of all, some definitions:
    each composed of a sequence of "test cases".
  - In Tezt, there are only "tests", no "test suites".
 
-With Alcotezt,
-we group each Alcotest "test" into a Tezt "test". Consequently,
-Alcotezt cannot execute in isolation what in Alcotest were individual
-test cases.
+With Alcotezt, each Alcotest "test case" becomes a Tezt "test". The
+Alcotest suite, test and case name are used to form the title of
+the Tezt test with following format: ``SUITE_NAME: TEST_NAME
+(TEST_CASE_NAME)``.
 
 Given an Alcotest consisting of a suite ``Suite A`` that contains a
 test ``Test a`` that itself contains the test cases ``Test case a1``
@@ -138,29 +138,11 @@ Running it in with Alcotest produces::
   Full test results in `/home/tezos/_build/_tests/Suite A'.
   Test Successful in 0.000s. 2 tests run.
 
-Alcotezt will group the test cases together into two tests titled
-``Suite A: Test a`` and ``Suite A: Test b``. They both will be registered
-under the Tezt file ``Suite A``. So running the entrypoint of this test
-produces::
+And running it with Alcotezt produces::
 
-  [17:07:42.289] [SUCCESS] (1/2) Suite A: Test a
-  [17:07:42.290] [SUCCESS] (2/2) Suite A: Test b
-
-You can have Alcotezt print each test case as it executes by passing
-the ``--info`` flag::
-
-  [17:09:19.061] Starting test: Suite A: Test a
-  [17:09:19.061] Test: Test case a1
-  [17:09:19.061] Test: Test case a2
-  [17:09:19.061] [SUCCESS] (1/2) Suite A: Test a
-  [17:09:19.061] Starting test: Suite A: Test b
-  [17:09:19.061] Test: Test case b1
-  [17:09:19.061] [SUCCESS] (2/2) Suite A: Test b
-
-If the Tezt test ``Suite A: Test a`` is selected when Tezt is
-executed, then Tezt will run ``Test case a1`` and ``Test case a2`` in
-sequence. There is currently no way of dynamically selecting just a
-subset of test cases.
+  [17:07:42.289] [SUCCESS] (1/2) Suite A: Test a (Test case a1)
+  [17:07:42.289] [SUCCESS] (2/3) Suite A: Test a (Test case a2)
+  [17:07:42.290] [SUCCESS] (3/3) Suite A: Test b (Test case b1)
 
 Test Output
 +++++++++++
