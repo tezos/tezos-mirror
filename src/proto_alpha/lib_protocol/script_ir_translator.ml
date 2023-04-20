@@ -4337,7 +4337,7 @@ and parse_instr :
       typed ctxt loc instr (Item_t (or_bytes_bool_t, rest))
   (* Events *)
   | Prim (loc, I_EMIT, [], annot), Item_t (data, rest) ->
-      check_packable ~allow_contract:legacy loc data >>?= fun () ->
+      check_packable ~allow_contract:false loc data >>?= fun () ->
       parse_entrypoint_annot_strict loc annot >>?= fun tag ->
       unparse_ty ~loc:() ctxt data >>?= fun (unparsed_ty, ctxt) ->
       Gas.consume ctxt (Script.strip_locations_cost unparsed_ty)
