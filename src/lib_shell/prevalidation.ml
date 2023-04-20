@@ -87,13 +87,13 @@ module type T = sig
   val remove_operation : t -> Operation_hash.t -> t
 
   module Internal_for_tests : sig
-    val get_valid_operations : t -> protocol_operation Operation_hash.Map.t
+    val get_mempool_operations : t -> protocol_operation Operation_hash.Map.t
 
     val get_filter_state : t -> filter_state
 
-    type validation_info
+    type mempool
 
-    val set_validation_info : t -> validation_info -> t
+    val set_mempool : t -> mempool -> t
   end
 end
 
@@ -104,8 +104,7 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
      and type filter_state = Filter.Mempool.state
      and type filter_config = Filter.Mempool.config
      and type chain_store = Chain_store.chain_store
-     and type Internal_for_tests.validation_info =
-      Filter.Proto.Mempool.validation_info = struct
+     and type Internal_for_tests.mempool = Filter.Proto.Mempool.t = struct
   module Proto = Filter.Proto
 
   type protocol_operation = Proto.operation
@@ -311,13 +310,13 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
     {state with mempool; filter_state}
 
   module Internal_for_tests = struct
-    let get_valid_operations {mempool; _} = Proto.Mempool.operations mempool
+    let get_mempool_operations {mempool; _} = Proto.Mempool.operations mempool
 
     let get_filter_state {filter_state; _} = filter_state
 
-    type validation_info = Proto.Mempool.validation_info
+    type mempool = Proto.Mempool.t
 
-    let set_validation_info state validation_info = {state with validation_info}
+    let set_mempool state mempool = {state with mempool}
   end
 end
 
