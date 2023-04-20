@@ -26,10 +26,24 @@
 open Wasm_utils
 
 (* [parse_binary_module module_name module_stream] parses a binary encoded
-   module. Parsing outside of the PVM allows locations in case of errors. *)
+   module and its custom sections. Parsing outside of the PVM allows locations
+   in case of errors. *)
 let parse_binary_module name module_ =
+  let open Lwt_syntax in
   let bytes = Tezos_lazy_containers.Chunked_byte_vector.of_string module_ in
-  Tezos_webassembly_interpreter.Decode.decode ~allow_floats:false ~name ~bytes
+  let* modl_ =
+    Tezos_webassembly_interpreter.Decode.decode ~allow_floats:false ~name ~bytes
+  in
+  let+ custom =
+    Tezos_webassembly_interpreter.Decode.decode_custom "name" ~name ~bytes
+  in
+  let functions_section =
+    List.map Custom_section.parse_function_subsection custom
+    |> List.fold_left
+         (Custom_section.FuncMap.merge (fun _ -> Option.either))
+         Custom_section.FuncMap.empty
+  in
+  (modl_, functions_section)
 
 (* [typecheck_module module_ast] runs the typechecker on the module, which is
    not done by the PVM. *)
@@ -61,10 +75,10 @@ let link module_ =
 let handle_module version binary name module_ =
   let open Lwt_result_syntax in
   let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
-  let* ast =
+  let* ast, functions_section =
     Repl_helpers.trap_exn (fun () ->
         if binary then parse_binary_module name module_
-        else Lwt.return (parse_module module_))
+        else Lwt.return (parse_module module_, Custom_section.FuncMap.empty))
   in
   let* () = typecheck_module ast in
   let* () = import_pvm_host_functions ~version () in
@@ -79,7 +93,7 @@ let handle_module version binary name module_ =
       module_
   in
   let*! tree = eval_until_input_requested tree in
-  return tree
+  return (tree, functions_section)
 
 let start version binary file =
   let open Lwt_result_syntax in
@@ -196,7 +210,7 @@ let main_command =
         else if Filename.check_suffix wasm_file ".wast" then Ok false
         else error_with "Kernels should have .wasm or .wast file extension"
       in
-      let* tree = start version binary wasm_file in
+      let* tree, _ = start version binary wasm_file in
       let* inboxes =
         match inputs with
         | Some inputs -> Messages.parse_inboxes inputs config
