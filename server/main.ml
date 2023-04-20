@@ -202,6 +202,26 @@ let maybe_create_tables db_pool =
             Sql_requests.create_tables))
     db_pool
 
+let maybe_alter_tables db_pool =
+  Caqti_lwt.Pool.use
+    (fun (module Db : Caqti_lwt.CONNECTION) ->
+      Db.with_transaction (fun () ->
+          Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+            (fun req ->
+              Lwt.bind
+                (Db.exec
+                   (Caqti_request.Infix.(Caqti_type.(unit ->. unit)) req)
+                   ())
+                (* IF NOT EXISTS expression not supported by sqlite instead ignore error if column already exists *)
+                  (fun _ -> Lwt.return_ok ()))
+            Sql_requests.alter_tables))
+    db_pool
+
+let maybe_create_and_alter_tables db_pool =
+  Lwt.bind (maybe_create_tables db_pool) (function
+      | Error e -> Lwt.return_error e
+      | Ok () -> maybe_alter_tables db_pool)
+
 let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) level
     block_hash operations =
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
@@ -523,7 +543,7 @@ let () =
     (match Caqti_lwt.connect_pool uri with
     | Error e -> Lwt_io.eprintl (Caqti_error.show e)
     | Ok pool ->
-        Lwt.bind (maybe_create_tables pool) (function
+        Lwt.bind (maybe_create_and_alter_tables pool) (function
             | Error e -> Lwt_io.eprintl (Caqti_error.show e)
             | Ok () ->
                 let stop, paf = Lwt.task () in

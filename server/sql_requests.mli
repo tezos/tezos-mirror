@@ -37,6 +37,8 @@ end
 
 val create_tables : string list
 
+val alter_tables : string list
+
 val db_schema : string
 
 val maybe_insert_source : (string, unit, [`Zero]) Caqti_request.t

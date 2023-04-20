@@ -38,6 +38,7 @@ let create_nodes =
 let create_blocks =
   "   CREATE TABLE IF NOT EXISTS blocks(\n\
   \     id INTEGER PRIMARY KEY,\n\
+  \     previous_block INTEGER,\n\
   \     timestamp INTEGER NOT NULL, -- Unix time\n\
   \     hash BLOB UNIQUE NOT NULL,\n\
   \     level INTEGER NOT NULL,\n\
@@ -130,6 +131,10 @@ let create_tables =
     create_operations_reception_operation_idx;
     create_operations_inclusion_operation_idx;
   ]
+
+let alter_blocks = "   ALTER TABLE blocks ADD COLUMN previous_block INTEGER"
+
+let alter_tables = [alter_blocks]
 
 let db_schema = String.concat "; " create_tables
 
