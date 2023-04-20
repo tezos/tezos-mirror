@@ -66,6 +66,9 @@ Node
   how long it will take to be synchronized. Also, gracefully indicates
   peer disconnection instead of spurious "worker crashed" messages.
 
+- Fixed an issue where a node lagging behind would end up freezing and
+  never be able to catch up.
+
 Client
 ------
 
