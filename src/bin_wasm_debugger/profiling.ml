@@ -316,3 +316,134 @@ let eval_and_profile ?write_debug ?reveal_builtins tree =
     | n -> n
   in
   (tree, ticks, call_stack)
+
+(** Flamegraph building
+
+    Flamegraph are an aggregation of all the same callstacks, thus there is no
+    longer a notion of time. We can easily collapse all nodes into a single one.
+*)
+
+module StringMap = Map.Make (String)
+
+(** [collapse_stack ~max_depth pp_call call_stack] collapses a call stack into a
+    valid flamegraph. Node deeper than [max_depth] are not considered. [pp_call]
+    is used to print the identifiers. *)
+let collapse_stack ~max_depth pp_call call_stack =
+  let rec handle_node ~prefix ~depth ~max_depth accumulated_nodes = function
+    | Node (name, ticks, subnodes) ->
+        let prefix =
+          if prefix = "" then Format.asprintf "%a" pp_call name
+          else Format.asprintf "%s;%a" prefix pp_call name
+        in
+        let map =
+          StringMap.update
+            prefix
+            (function
+              | None -> Some ticks | Some prev -> Some (Z.add prev ticks))
+            accumulated_nodes
+        in
+        handle_nodes ~prefix ~depth:(succ depth) ~max_depth map subnodes
+    | Toplevel nodes ->
+        handle_nodes ~prefix ~depth ~max_depth accumulated_nodes nodes
+  and handle_nodes ~prefix ~depth ~max_depth accumulated_nodes nodes =
+    if depth > max_depth then accumulated_nodes
+    else
+      List.fold_left
+        (fun acc node -> handle_node ~prefix ~depth ~max_depth acc node)
+        accumulated_nodes
+        nodes
+  in
+  handle_node ~prefix:"" ~depth:0 ~max_depth StringMap.empty call_stack
+  |> StringMap.bindings
+
+(** Pretty printing and flamegraph output *)
+
+(** [pp_indent ppf depth] prints an indentation corresponding to the given
+    [depth]. *)
+let pp_indent ppf depth = Format.fprintf ppf "%s" (String.make (depth * 2) ' ')
+
+let rec pp_nodes ?(max_depth = 10) depth pp_call ppf nodes =
+  if depth > max_depth then ()
+  else
+    Format.fprintf
+      ppf
+      "\n%a"
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
+         (pp_stack (depth + 1) pp_call))
+      nodes
+
+and pp_stack ?max_depth depth pp_call ppf = function
+  | Node (call, ticks, sub_nodes) ->
+      Format.fprintf
+        ppf
+        "%a- %a : %a ticks%a"
+        pp_indent
+        depth
+        pp_call
+        call
+        Z.pp_print
+        ticks
+        (pp_nodes ?max_depth depth pp_call)
+        sub_nodes
+  | Toplevel nodes -> pp_nodes ?max_depth depth pp_call ppf nodes
+
+(** [pp_stack ~max_depth ppf stack] pretty prints the stack. It should be used
+    for debug only. *)
+let pp_stack ?max_depth = pp_stack ?max_depth 0
+
+let rec pp_flame_callstack_node ~prefix ~depth ~max_depth pp_call ppf = function
+  | Node (call, ticks, subnodes) ->
+      let prefix =
+        if prefix = "" then Format.asprintf "%a" pp_call call
+        else Format.asprintf "%s;%a" prefix pp_call call
+      in
+      Format.fprintf
+        ppf
+        "%s %a\n%a"
+        prefix
+        Z.pp_print
+        ticks
+        (pp_flame_callstack_nodes
+           ~prefix
+           ~depth:(succ depth)
+           ~max_depth
+           pp_call)
+        subnodes
+  | Toplevel nodes ->
+      pp_flame_callstack_nodes ~prefix ~depth ~max_depth pp_call ppf nodes
+
+and pp_flame_callstack_nodes ~prefix ~depth ~max_depth pp_call ppf nodes =
+  if depth > max_depth then ()
+  else
+    (Format.pp_print_list
+       ~pp_sep:(fun _ () -> ())
+       (pp_flame_callstack_node ~prefix ~depth ~max_depth pp_call))
+      ppf
+      nodes
+
+(** [pp_callstack_as_flamegraph] if [pp_stack] with the syntax of flamegraphs. *)
+let pp_callstack_as_flamegraph ~max_depth pp_call =
+  (* `pp_call` is repeated to enforce generalization, it leads to a typechecking
+     error otherwise. *)
+  pp_flame_callstack_node ~prefix:"" ~depth:0 ~max_depth pp_call
+
+(** [pp_flamegraph] collapses the stack and print it as a valid flamegraph. *)
+let pp_collapsed_flamegraph ~max_depth pp_call ppf call_stack =
+  let nodes = collapse_stack ~max_depth pp_call call_stack in
+  Format.fprintf
+    ppf
+    "%a"
+    (Format.pp_print_list
+       ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
+       (fun ppf (name, ticks) ->
+         Format.fprintf ppf "%s %a" name Z.pp_print ticks))
+    nodes
+
+(** [pp_flamegraph ~collapsed ~max_depth pp_call ppf call_stack] outputs the
+    given [call_stack] with its `flamegraph` representation. If [collapse =
+    true], the stacks are collapsed. This can be useful to output smaller files,
+    but the stack cannot be analyzed on a time basis (i.e. as a flamechart). *)
+let pp_flamegraph ~collapse ~max_depth pp_call ppf call_stack =
+  if collapse then pp_collapsed_flamegraph ~max_depth pp_call ppf call_stack
+  else pp_callstack_as_flamegraph ~max_depth pp_call ppf call_stack
