@@ -77,8 +77,7 @@ end
 
 module L2_head : SINGLETON_STORE with type value := Sc_rollup_block.t
 
-module Last_finalized_head :
-  SINGLETON_STORE with type value := Sc_rollup_block.t
+module Last_finalized_level : SINGLETON_STORE with type value := int32
 
 module Levels_to_hashes :
   INDEXABLE_STORE with type key := int32 and type value := Block_hash.t
@@ -142,7 +141,7 @@ type +'a store = {
   commitments : 'a Commitments.t;
   commitments_published_at_level : 'a Commitments_published_at_level.t;
   l2_head : 'a L2_head.t;
-  last_finalized_head : 'a Last_finalized_head.t;
+  last_finalized_level : 'a Last_finalized_level.t;
   levels_to_hashes : 'a Levels_to_hashes.t;
   irmin_store : 'a Irmin_store.t;
 }

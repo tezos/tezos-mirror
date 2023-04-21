@@ -193,9 +193,12 @@ val last_processed_head_opt : _ t -> Sc_rollup_block.t option tzresult Lwt.t
 (** [mark_finalized_head store head] remembers that the [head] is finalized. By
     construction, every block whose level is smaller than [head]'s is also
     finalized. *)
-val mark_finalized_head : rw -> Block_hash.t -> unit tzresult Lwt.t
+val mark_finalized_level : rw -> int32 -> unit tzresult Lwt.t
 
-(** [last_finalized_head_opt store] returns the last finalized head if it exists. *)
+(** [get_finalized_level t] returns the last finalized level. *)
+val get_finalized_level : _ t -> int32 tzresult Lwt.t
+
+(** [get_finalized_head_opt store] returns the last finalized head if it exists. *)
 val get_finalized_head_opt : _ t -> Sc_rollup_block.t option tzresult Lwt.t
 
 (** [hash_of_level node_ctxt level] returns the current block hash for a given
@@ -218,12 +221,6 @@ val get_predecessor_opt :
 (** [get_predecessor state head] returns the predecessor block of [head]. *)
 val get_predecessor : _ t -> Layer1.head -> Layer1.head tzresult Lwt.t
 
-(** [nth_predecessor n head] return [block, history] where [block] is the nth
-    predecessor of [head] and [history] is the list of blocks between [block]
-    (excluded) and [head] (included) on the chain. *)
-val nth_predecessor :
-  _ t -> int -> Layer1.head -> (Layer1.head * Layer1.head list) tzresult Lwt.t
-
 (** Same as {!get_predecessor_opt} with headers. *)
 val get_predecessor_header_opt :
   _ t -> Layer1.header -> Layer1.header option tzresult Lwt.t
@@ -231,13 +228,6 @@ val get_predecessor_header_opt :
 (** Same as {!get_predecessor} with headers. *)
 val get_predecessor_header :
   _ t -> Layer1.header -> Layer1.header tzresult Lwt.t
-
-(** Same as {!nth_predecessor} with headers. *)
-val nth_predecessor_header :
-  _ t ->
-  int ->
-  Layer1.header ->
-  (Layer1.header * Layer1.header list) tzresult Lwt.t
 
 (** [get_tezos_reorg_for_new_head node_ctxt old_head new_head] returns the L1
     reorganization between [old_head] and [new_head]. *)
