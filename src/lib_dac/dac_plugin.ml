@@ -48,6 +48,8 @@ let raw_hash_to_hex raw_hash =
 
 let raw_hash_of_hex hex = Hex.to_bytes (`Hex hex)
 
+let raw_hash_of_bytes = Fun.id
+
 let raw_hash_rpc_arg =
   let construct = raw_hash_to_hex in
   let destruct hash =

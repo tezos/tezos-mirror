@@ -133,14 +133,37 @@ let send_dac_payload =
     @@ coordinator_rpc_param
     @@ prefixes ["with"; "content"]
     @@ hex_payload_param @@ stop)
-    (fun _threshold coordinator_cctxt payload _cctxt ->
+    (fun threshold coordinator_cctxt payload _cctxt ->
       let open Lwt_result_syntax in
       let* root_hash =
         Command_handlers.send_preimage coordinator_cctxt payload
       in
       let hex_root_hash = `Hex (Dac_plugin.raw_hash_to_hex root_hash) in
-      return
-      @@ Format.printf "Payload stored under root hash: %a" Hex.pp hex_root_hash)
+      match threshold with
+      | None ->
+          return
+          @@ Format.printf
+               "Payload stored under root hash: %a"
+               Hex.pp
+               hex_root_hash
+      | Some threshold -> (
+          let* certificate_opt =
+            Command_handlers.wait_for_certificate
+              coordinator_cctxt
+              root_hash
+              threshold
+          in
+          match certificate_opt with
+          | None ->
+              return
+              @@ Format.printf
+                   "No certificate could be obtained.\n\
+                    Payload stored under root hash: %a\n"
+                   Hex.pp
+                   hex_root_hash
+          | Some certificate ->
+              return
+              @@ Format.printf "Certificate received: %a\n" Hex.pp certificate))
 
 let get_dac_certificate =
   let open Tezos_clic in

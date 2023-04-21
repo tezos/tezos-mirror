@@ -65,6 +65,9 @@ val raw_hash_to_hex : raw_hash -> string
 (** [raw_hash_of_hex] decodes a hex string representation into [raw_hash]. *)
 val raw_hash_of_hex : string -> raw_hash option
 
+(** This conversion is safe. *)
+val raw_hash_of_bytes : bytes -> raw_hash
+
 (** [raw_hash] argument definition for RPC. *)
 val raw_hash_rpc_arg : raw_hash Tezos_rpc.Arg.arg
 

@@ -45,8 +45,8 @@ val make_unix_cctxt : scheme:string -> host:string -> port:int -> cctxt
 val get_preimage :
   #cctxt -> page_hash:Dac_plugin.raw_hash -> bytes tzresult Lwt.t
 
-(** [post_store_preimage cctxt ~payload ~pagination_scheme] posts a [payload] to dac/store_preimage 
-    using a given [pagination_scheme]. It returns the base58 encoded root page hash 
+(** [post_store_preimage cctxt ~payload ~pagination_scheme] posts a [payload] to dac/store_preimage
+    using a given [pagination_scheme]. It returns the base58 encoded root page hash
     and the raw bytes. *)
 val post_store_preimage :
   #cctxt ->
@@ -74,6 +74,13 @@ val get_certificate :
   #cctxt ->
   root_page_hash:Dac_plugin.raw_hash ->
   Certificate_repr.t option tzresult Lwt.t
+
+(** [monitor_certificate cctxt ~root_hash] returns a stream and a
+    stopper for monitoring certificate updates for [root_hash]. *)
+val monitor_certificate :
+  #cctxt ->
+  root_hash:Dac_plugin.raw_hash ->
+  (Certificate_repr.t Lwt_stream.t * Tezos_rpc.Context.stopper) tzresult Lwt.t
 
 module Coordinator : sig
   (** [post_preimage cctxt ~payload] sends a [payload] to the DAC
