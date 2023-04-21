@@ -91,7 +91,7 @@ let metrics_serve metrics_addr =
         List.iter_p
           (fun (addr, port) ->
             let host = Ipaddr.V6.to_string addr in
-            let*! () = Event.starting_metrics_server ~host ~port in
+            let*! () = Node_events.starting_metrics_server ~host ~port in
             let*! ctx = Conduit_lwt_unix.init ~src:host () in
             let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
             let mode = `TCP (`Port port) in

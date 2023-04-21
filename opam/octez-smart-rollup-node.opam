@@ -13,6 +13,9 @@ depends: [
   "tezos-base"
   "tezos-stdlib-unix"
   "tezos-crypto"
+  "cohttp-lwt-unix" { >= "4.0.0" }
+  "octez-node-config"
+  "prometheus-app" { >= "1.2" }
   "octez-injector"
 ]
 build: [

@@ -10,6 +10,9 @@
   tezos-base.unix
   tezos-stdlib-unix
   tezos-crypto
+  cohttp-lwt-unix
+  octez-node-config
+  prometheus-app
   octez-injector)
  (flags
   (:standard)

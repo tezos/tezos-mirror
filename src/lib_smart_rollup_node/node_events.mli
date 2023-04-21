@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,40 +24,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The collector registry for the rollup node metrics. *)
-val sc_rollup_node_registry : Prometheus.CollectorRegistry.t
+(** This module defines functions that emit the events used when the smart
+    rollup node is running. *)
 
-(** [metrics_server metrics_addr] runs a server for the rollup metrics on [metrics_addr].
-    The metrics are accessible thanks to a [/metrics] request. *)
-val metrics_serve : string option -> (unit, tztrace) result Lwt.t
+(** [starting_metrics_server ~metrics_addr ~metrics_port] emits the event
+    that the metrics server for the rollup node is starting. *)
+val starting_metrics_server : host:string -> port:int -> unit Lwt.t
 
-(** [print_csv_metrics ppf metrics] prints the [metrics] as CSV. *)
-val print_csv_metrics :
-  Format.formatter -> 'a Prometheus.MetricFamilyMap.t -> unit
+(** [metrics_ended error] emits the event that the metrics server
+    has ended with a failure. *)
+val metrics_ended : string -> unit Lwt.t
 
-(** The node info metrics *)
-module Info : sig
-  (** Initializes the metric for rollup info
-      with a the given arguments as label values *)
-  val init_rollup_node_info :
-    id:Tezos_crypto.Hashed.Smart_rollup_address.t ->
-    mode:Configuration.mode ->
-    genesis_level:int32 ->
-    pvm_kind:string ->
-    unit
-end
-
-(** The metrics related to Inboxes *)
-module Inbox : sig
-  (** The type of an inbox metrics *)
-  type t = {head_inbox_level : Prometheus.Gauge.t}
-
-  (** The stats for the inboxes *)
-  module Stats : sig
-    (** Set the number of messages from the head *)
-    val set : is_internal:('a -> bool) -> 'a list -> unit
-  end
-
-  (** The inboxes metrics *)
-  val metrics : t
-end
+(** [metrics_ended error] emits the event that the metrics server
+    has ended with a failure.
+    (Doesn't wait for event to be emited. *)
+val metrics_ended_dont_wait : string -> unit

@@ -40,9 +40,7 @@
   octez-smart-rollup-node
   tezos-scoru-wasm
   tezos-scoru-wasm-fast
-  tezos-crypto-dal
-  prometheus-app
-  octez-node-config)
+  tezos-crypto-dal)
  (flags
   (:standard)
   -open Tezos_base
