@@ -72,19 +72,6 @@ module Revamped = struct
     let* () = flush_waiter in
     Node.wait_for_level node (level + 1)
 
-  (** Calls RPC [POST /chains/main/mempool/filter] from [client], with [data]
-      formatted from string [config_str]. If [log] is [true], also logs this
-      string. *)
-  let set_filter ?(log = false) config_str client =
-    let* res =
-      RPC.Client.call client
-      @@ RPC.post_chain_mempool_filter
-           ~data:(Data (Ezjsonm.from_string config_str))
-           ()
-    in
-    if log then Log.info "Updated filter config with: %s." config_str ;
-    return res
-
   (* Wait for the [operation_to_reclassify] event from the prevalidator and
      return the number of operations that were set to be reclassified. *)
   let wait_for_operations_not_flushed_event node =
@@ -1562,7 +1549,7 @@ module Revamped = struct
     log_step 0 "Connect and initialise two nodes." ;
     (* We configure the filter with a limit of 4, in order to easily be able to
        inject more with our 5 bootstrap accounts *)
-    let max_prechecked_manager_operations = 4 in
+    let max_operations = 4 in
     (* Control fees and gas limits to easily influence weight (i.e. ratio) *)
     let fee = 1000 in
     let gas_limit = 1500 in
@@ -1582,27 +1569,11 @@ module Revamped = struct
     log_step
       1
       "Update the nodes filter to allow only %d prechecked manager operations."
-      max_prechecked_manager_operations ;
-    let* _ =
-      set_filter
-        ~log:true
-        (sf
-           {|{ "max_prechecked_manager_operations" : %d }|}
-           max_prechecked_manager_operations)
-        client1
-    and* _ =
-      set_filter
-        ~log:true
-        (sf
-           {|{ "max_prechecked_manager_operations" : %d }|}
-           max_prechecked_manager_operations)
-        client2
-    in
+      max_operations ;
+    let* () = Mempool.Config.set_filter ~log:true ~max_operations client1
+    and* () = Mempool.Config.set_filter ~log:true ~max_operations client2 in
 
-    log_step
-      2
-      "Inject max_prechecked_manager_operations %d operations."
-      max_prechecked_manager_operations ;
+    log_step 2 "Inject max_operations = %d operations." max_operations ;
     let* ops =
       Lwt.all
       @@ List.mapi
@@ -1744,7 +1715,7 @@ module Revamped = struct
     @@ fun protocol ->
     log_step 0 "Connect and initialise two nodes." ;
     (* We configure the filter with a limit of 1 *)
-    let max_prechecked_manager_operations = 1 in
+    let max_operations = 1 in
     (* Control fees and gas limits to easily influence weight (i.e. ratio) *)
     let fee = 1000 in
     let gas_limit = 1500 in
@@ -1764,22 +1735,9 @@ module Revamped = struct
     log_step
       1
       "Update the nodes filter to allow only %d prechecked manager operations."
-      max_prechecked_manager_operations ;
-    let* _ =
-      set_filter
-        ~log:true
-        (sf
-           {|{ "max_prechecked_manager_operations" : %d }|}
-           max_prechecked_manager_operations)
-        client1
-    and* _ =
-      set_filter
-        ~log:true
-        (sf
-           {|{ "max_prechecked_manager_operations" : %d }|}
-           max_prechecked_manager_operations)
-        client2
-    in
+      max_operations ;
+    let* () = Mempool.Config.set_filter ~log:true ~max_operations client1
+    and* () = Mempool.Config.set_filter ~log:true ~max_operations client2 in
 
     log_step 2 "Inject an operation" ;
     let* (`OpHash oph1) =
@@ -2939,8 +2897,10 @@ let wait_for_arrival_of_ophash ophash node =
 (** [set_filter_no_fee_requirement client] sets all fields [minimal_*]
     to 0 in the filter configuration of [client]'s mempool. *)
 let set_filter_no_fee_requirement =
-  Revamped.set_filter
-    {|{ "minimal_fees": "0", "minimal_nanotez_per_gas_unit": [ "0", "1" ], "minimal_nanotez_per_byte": [ "0", "1" ] }|}
+  Mempool.Config.set_filter
+    ~minimal_fees:0
+    ~minimal_nanotez_per_gas_unit:(0, 1)
+    ~minimal_nanotez_per_byte:(0, 1)
 
 (** Checks that arguments [applied] and [refused] are the number of operations
     in the mempool of [client] with the corresponding classification,
@@ -3455,181 +3415,6 @@ let injecting_old_operation_fails =
   in
   Process.check_error ~msg:injection_error_rex process
 
-(** Mempool filter configuration. *)
-module Filter_config = struct
-  type t = {
-    minimal_fees : int option;
-    minimal_nanotez_per_gas_unit : (int * int) option;
-    minimal_nanotez_per_byte : (int * int) option;
-    allow_script_failure : bool option;
-  }
-
-  let eq_int_pair (f1, s1) (f2, s2) = Int.equal f1 f2 && Int.equal s1 s2
-
-  let equal
-      {
-        minimal_fees = mf1;
-        minimal_nanotez_per_gas_unit = mng1;
-        minimal_nanotez_per_byte = mnb1;
-        allow_script_failure = asf1;
-      }
-      {
-        minimal_fees = mf2;
-        minimal_nanotez_per_gas_unit = mng2;
-        minimal_nanotez_per_byte = mnb2;
-        allow_script_failure = asf2;
-      } =
-    Option.equal Int.equal mf1 mf2
-    && Option.equal eq_int_pair mng1 mng2
-    && Option.equal eq_int_pair mnb1 mnb2
-    && Option.equal Bool.equal asf1 asf2
-
-  let pp fmt
-      {
-        minimal_fees = mf;
-        minimal_nanotez_per_gas_unit = mng;
-        minimal_nanotez_per_byte = mnb;
-        allow_script_failure = asf;
-      } =
-    [
-      Option.map (sf {|"minimal_fees": "%d"|}) mf;
-      Option.map
-        (fun (n1, n2) ->
-          sf {|"minimal_nanotez_per_gas_unit": [ "%d", "%d" ]|} n1 n2)
-        mng;
-      Option.map
-        (fun (n1, n2) ->
-          sf {|"minimal_nanotez_per_byte": [ "%d", "%d" ]|} n1 n2)
-        mnb;
-      Option.map (sf {|"allow_script_failure": %b|}) asf;
-    ]
-    |> List.map Option.to_list |> List.flatten |> String.concat ", "
-    |> Format.fprintf fmt {|{ %s }|}
-
-  let show : t -> string = Format.asprintf "%a" pp
-
-  let check_equal expected actual =
-    Check.(
-      (expected = actual)
-        (equalable pp equal)
-        ~error_msg:"Wrong filter configuration: %R.@.Expected: %L.")
-
-  (** Returns the filter configuration corresponding to [json]. If any field
-      of {!filter_config} is missing from [json], it is set to the default
-      value (i.e. the corresponding value in {!default_config}. *)
-  let of_json json =
-    let open JSON in
-    let as_int_pair_opt t =
-      match as_list_opt t with
-      | Some [x; y] -> Some (as_int x, as_int y)
-      (* A missing field is interpreted as [`Null], from which [as_list_opt]
-         produces [Some []]. *)
-      | Some [] -> None
-      | Some _ | None ->
-          Test.fail
-            "Constructing a filter_config from json: %s. Expected a list of \
-             length 2, found: %s."
-            (encode json)
-            (encode t)
-    in
-    {
-      minimal_fees = json |-> "minimal_fees" |> as_int_opt;
-      minimal_nanotez_per_gas_unit =
-        json |-> "minimal_nanotez_per_gas_unit" |> as_int_pair_opt;
-      minimal_nanotez_per_byte =
-        json |-> "minimal_nanotez_per_byte" |> as_int_pair_opt;
-      allow_script_failure = json |-> "allow_script_failure" |> as_bool_opt;
-    }
-
-  (** Default filter configuration for protocol alpha
-      (in proto_alpha/lib_plugin/plugin.ml). *)
-
-  let default_minimal_fees = 100
-
-  let default_minimal_nanotez_per_gas_unit = (100, 1)
-
-  let default_minimal_nanotez_per_byte = (1000, 1)
-
-  let default_allow_script_failure = true
-
-  let default =
-    {
-      minimal_fees = Some default_minimal_fees;
-      minimal_nanotez_per_gas_unit = Some default_minimal_nanotez_per_gas_unit;
-      minimal_nanotez_per_byte = Some default_minimal_nanotez_per_byte;
-      allow_script_failure = Some default_allow_script_failure;
-    }
-
-  (** Returns a copy of the given filter config, where missing fields
-      (i.e. containing [None]) have been set to their default value. *)
-  let fill_with_default
-      {
-        minimal_fees = mf;
-        minimal_nanotez_per_gas_unit = mng;
-        minimal_nanotez_per_byte = mnb;
-        allow_script_failure = asf;
-      } =
-    Option.
-      {
-        minimal_fees = Some (value mf ~default:default_minimal_fees);
-        minimal_nanotez_per_gas_unit =
-          Some (value mng ~default:default_minimal_nanotez_per_gas_unit);
-        minimal_nanotez_per_byte =
-          Some (value mnb ~default:default_minimal_nanotez_per_byte);
-        allow_script_failure =
-          Some (value asf ~default:default_allow_script_failure);
-      }
-
-  (** Returns a copy of the given filter config, where fields equal
-      to their default value have been removed (i.e. set to [None]). *)
-  let clear_default
-      {
-        minimal_fees = mf;
-        minimal_nanotez_per_gas_unit = mng;
-        minimal_nanotez_per_byte = mnb;
-        allow_script_failure = asf;
-      } =
-    let clear_if_default eq_fun default = function
-      | Some x when eq_fun default x -> None
-      | x -> x
-    in
-    {
-      minimal_fees = clear_if_default Int.equal default_minimal_fees mf;
-      minimal_nanotez_per_gas_unit =
-        clear_if_default eq_int_pair default_minimal_nanotez_per_gas_unit mng;
-      minimal_nanotez_per_byte =
-        clear_if_default eq_int_pair default_minimal_nanotez_per_byte mnb;
-      allow_script_failure =
-        clear_if_default Bool.equal default_allow_script_failure asf;
-    }
-
-  (** Checks that RPC [GET /chains/main/mempool/filter] returns the
-      appropriate result for [expected_config], testing all possibilities
-      for optional argument [include_default] (omitted/[true]/[false]). *)
-  let check_RPC_GET_all_variations ?(log = false) expected_config client =
-    let expected_full = fill_with_default expected_config in
-    let* json = RPC.Client.call client @@ RPC.get_chain_mempool_filter () in
-    check_equal expected_full (of_json json) ;
-    let* json =
-      RPC.Client.call client
-      @@ RPC.get_chain_mempool_filter ~include_default:true ()
-    in
-    check_equal expected_full (of_json json) ;
-    let expected_partial = clear_default expected_config in
-    let* json =
-      RPC.Client.call client
-      @@ RPC.get_chain_mempool_filter ~include_default:false ()
-    in
-    check_equal expected_partial (of_json json) ;
-    if log then
-      Log.info
-        "GET /chains/main/mempool/filter returned expected configurations \
-         (respectively including/excluding default fields): %s and %s."
-        (show expected_full)
-        (show expected_partial) ;
-    unit
-end
-
 (* Probably to be replaced during upcoming mempool tests refactoring *)
 let init_single_node_and_activate_protocol
     ?(arguments = Node.[Synchronisation_threshold 0; Connections 0])
@@ -3685,7 +3470,7 @@ let test_get_post_mempool_filter =
      value."
   in
   Protocol.register_test ~__FILE__ ~title ~tags @@ fun protocol ->
-  let open Filter_config in
+  let open Mempool.Config in
   log_step 1 step1_msg ;
   let* node1, client1 =
     (* We need event level [debug] for event
@@ -3695,13 +3480,13 @@ let test_get_post_mempool_filter =
       protocol
   in
   log_step 2 step2_msg ;
-  let* () = check_RPC_GET_all_variations ~log:true default client1 in
+  let* () = check_get_filter_all_variations ~log:true default client1 in
   log_step 3 step3_msg ;
   let set_config_and_check msg config =
     Log.info "%s" msg ;
-    let* output = Revamped.set_filter ~log:true (show config) client1 in
+    let* output = post_filter ~log:true config client1 in
     check_equal (fill_with_default config) (of_json output) ;
-    check_RPC_GET_all_variations ~log:true config client1
+    check_get_filter_all_variations ~log:true config client1
   in
   let* () =
     set_config_and_check
@@ -3711,7 +3496,9 @@ let test_get_post_mempool_filter =
         minimal_fees = Some 25;
         minimal_nanotez_per_gas_unit = None;
         minimal_nanotez_per_byte = Some (1050, 1);
-        allow_script_failure = Some false;
+        replace_by_fee_factor = None;
+        max_operations = Some 0;
+        max_total_bytes = Some 11;
       }
   in
   let* () =
@@ -3721,7 +3508,9 @@ let test_get_post_mempool_filter =
         minimal_fees = Some 1;
         minimal_nanotez_per_gas_unit = Some (2, 3);
         minimal_nanotez_per_byte = Some (4, 5);
-        allow_script_failure = Some false;
+        replace_by_fee_factor = Some (6, 7);
+        max_operations = Some 8;
+        max_total_bytes = Some 9;
       }
   in
   let config3 =
@@ -3729,7 +3518,9 @@ let test_get_post_mempool_filter =
       minimal_fees = None;
       minimal_nanotez_per_gas_unit = Some default_minimal_nanotez_per_gas_unit;
       minimal_nanotez_per_byte = Some (4, 2);
-      allow_script_failure = Some default_allow_script_failure;
+      replace_by_fee_factor = None;
+      max_operations = Some default_max_operations;
+      max_total_bytes = Some 10_000_000;
     }
   in
   let* () =
@@ -3747,7 +3538,7 @@ let test_get_post_mempool_filter =
         "invalid_mempool_filter_configuration.v0"
         (Fun.const (Some ()))
     in
-    let* output = Revamped.set_filter invalid_config_str client1 in
+    let* output = post_filter_str invalid_config_str client1 in
     check_equal config3_full (of_json output) ;
     let* () = waiter in
     let* output = RPC.Client.call client1 @@ RPC.get_chain_mempool_filter () in
@@ -3759,16 +3550,20 @@ let test_get_post_mempool_filter =
     Tezos_base__TzPervasives.List.iter_s
       test_invalid_config
       [
-        {|{ "minimal_fees": "100", "minimal_nanotez_per_byte": [ "1050", "1" ], "allow_script_failure": false, "invalid_field_name": 0 }|};
+        (* invalid field name *)
+        {|{ "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "1050", "1" ], "minimal_nanotez_per_byte": [ "7", "5" ], "replace_by_fee_factor": ["21", "20"], "max_operations": 0, "max_total_bytes": 10_000_000, "invalid_field_name": 0 }|};
+        (* wrong type *)
         {|{ "minimal_fees": true}|};
+        (* not enough elements in a pair *)
         {|{ "minimal_nanotez_per_gas_unit": [ "100" ]}|};
+        (* too many elements in a pair *)
         {|{ "minimal_nanotez_per_gas_unit": [ "100", "1", "10" ]}|};
       ]
   in
   log_step 5 step5_msg ;
-  let* output = Revamped.set_filter ~log:true "{}" client1 in
+  let* output = post_filter_str ~log:true "{}" client1 in
   check_equal default (of_json output) ;
-  check_RPC_GET_all_variations ~log:true default client1
+  check_get_filter_all_variations ~log:true default client1
 
 (** Similar to [Node_event_level.transfer_and_wait_for_injection] but more general.
     Should be merged with it during upcoming mempool tests refactoring. *)
@@ -3969,9 +3764,10 @@ let test_mempool_filter_operation_arrival =
   in
   log_step 5 step5 ;
   let* _ =
-    Revamped.set_filter
+    Mempool.Config.set_filter
       ~log:true
-      {|{ "minimal_nanotez_per_gas_unit": [ "0", "1" ], "minimal_nanotez_per_byte": [ "0", "1" ] }|}
+      ~minimal_nanotez_per_gas_unit:(0, 1)
+      ~minimal_nanotez_per_byte:(0, 1)
       client1
   in
   let waiterB = wait_for_arrival node1 in
@@ -3990,8 +3786,10 @@ let test_mempool_filter_operation_arrival =
   in
   log_step 7 step7 ;
   let* _ =
-    Revamped.set_filter
-      {|{ "minimal_fees": "10", "minimal_nanotez_per_gas_unit": [ "0", "1" ], "minimal_nanotez_per_byte": [ "0", "1" ] }|}
+    Mempool.Config.set_filter
+      ~minimal_fees:10
+      ~minimal_nanotez_per_gas_unit:(0, 1)
+      ~minimal_nanotez_per_byte:(0, 1)
       client1
   in
   let waiterC = wait_for_arrival node1 in
