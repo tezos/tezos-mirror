@@ -7,6 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
+  tezos-base.unix
   tezos-stdlib-unix
   tezos-shell-services
   tezos-rpc-http
@@ -18,6 +19,7 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base
+  -open Tezos_base_unix
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
   -open Tezos_rpc_http

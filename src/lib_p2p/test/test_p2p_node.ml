@@ -99,10 +99,10 @@ let wrap addr n f =
 
 let main () =
   let () =
-    let lwt_log_sink =
+    let log_cfg =
       Lwt_log_sink_unix.create_cfg ~rules:"test.p2p.node -> info;" ()
     in
-    Lwt_main.run (Tezos_base_unix.Internal_event_unix.init ~lwt_log_sink ())
+    Lwt_main.run (Tezos_base_unix.Internal_event_unix.init ~log_cfg ())
   in
   let addr = Node.default_ipv6_addr in
   Lwt_main.run

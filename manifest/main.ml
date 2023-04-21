@@ -1875,12 +1875,13 @@ let octez_base_unix =
       [
         octez_error_monad |> open_;
         octez_crypto;
-        octez_base |> open_;
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_hacl;
         octez_stdlib |> open_;
         octez_stdlib_unix |> open_;
         data_encoding |> open_;
         uri;
+        octez_event_logging |> open_;
       ]
 
 let _octez_base_tests =
@@ -4098,6 +4099,7 @@ let octez_node_config =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_base_unix |> open_;
         octez_stdlib_unix |> open_;
         octez_shell_services |> open_;
         octez_rpc_http |> open_;

@@ -508,21 +508,24 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     (config : Config_file.t) =
   let open Lwt_result_syntax in
   (* Main loop *)
-  let lwt_log_sink_unix, internal_events =
-    Log_config.make_internal_events_with_defaults
-      ~internal_events:(config.internal_events, config.data_dir)
-      ?verbosity
-      ~log_cfg:config.log
+  let log_cfg =
+    {
+      config.log with
+      default_level = Option.value verbosity ~default:config.log.default_level;
+    }
+  in
+  let internal_events =
+    Tezos_base_unix.Internal_event_unix.make_with_defaults
+      ~enable_default_daily_logs_at:
+        Filename.Infix.(config.data_dir // "daily_logs")
+      ?internal_events:config.internal_events
       ()
   in
   let*! () =
-    Tezos_base_unix.Internal_event_unix.init
-      ~lwt_log_sink:lwt_log_sink_unix
-      ~configuration:internal_events
-      ()
+    Tezos_base_unix.Internal_event_unix.init ~log_cfg ~internal_events ()
   in
   let external_validator_log_config =
-    External_validation.{internal_events; lwt_log_sink_unix}
+    External_validation.{internal_events; lwt_log_sink_unix = log_cfg}
   in
   let*! () =
     Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings

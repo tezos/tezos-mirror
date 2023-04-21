@@ -49,13 +49,13 @@ let nb_oph = 1000
 let no_check = false
 
 let init_logs =
-  let lwt_log_sink =
+  let log_cfg =
     Some
       (Lwt_log_sink_unix.create_cfg
          ~rules:"test.p2p.connection-pool -> info; p2p.connection-pool -> info"
          ())
   in
-  lazy (Tezos_base_unix.Internal_event_unix.init ?lwt_log_sink ())
+  lazy (Tezos_base_unix.Internal_event_unix.init ?log_cfg ())
 
 let points = ref []
 

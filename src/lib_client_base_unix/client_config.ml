@@ -203,6 +203,8 @@ let default_endpoint = Uri.of_string "http://localhost:8732"
 
 let default_media_type = Media_type.Command_line.Any
 
+let default_daily_logs_path = None
+
 open Filename.Infix
 
 module Cfg_file = struct
@@ -220,6 +222,7 @@ module Cfg_file = struct
     remote_signer : Uri.t option;
     confirmations : int option;
     password_filename : string option;
+    internal_events : Tezos_base.Internal_event_config.t option;
   }
 
   let default =
@@ -234,6 +237,7 @@ module Cfg_file = struct
       remote_signer = None;
       confirmations = Some 0;
       password_filename = None;
+      internal_events = None;
     }
 
   open Data_encoding
@@ -251,27 +255,30 @@ module Cfg_file = struct
              remote_signer;
              confirmations;
              password_filename;
+             internal_events;
            } ->
-        ( base_dir,
-          node_addr,
-          node_port,
-          tls,
-          media_type,
-          endpoint,
-          Some web_port,
-          remote_signer,
-          confirmations,
-          password_filename ))
-      (fun ( base_dir,
-             node_addr,
-             node_port,
-             tls,
-             media_type,
-             endpoint,
-             web_port,
-             remote_signer,
-             confirmations,
-             password_filename ) ->
+        ( ( base_dir,
+            node_addr,
+            node_port,
+            tls,
+            media_type,
+            endpoint,
+            Some web_port,
+            remote_signer,
+            confirmations,
+            password_filename ),
+          internal_events ))
+      (fun ( ( base_dir,
+               node_addr,
+               node_port,
+               tls,
+               media_type,
+               endpoint,
+               web_port,
+               remote_signer,
+               confirmations,
+               password_filename ),
+             internal_events ) ->
         let web_port = Option.value ~default:default.web_port web_port in
         {
           base_dir;
@@ -284,18 +291,22 @@ module Cfg_file = struct
           remote_signer;
           confirmations;
           password_filename;
+          internal_events;
         })
-      (obj10
-         (req "base_dir" string)
-         (opt "node_addr" string)
-         (opt "node_port" uint16)
-         (opt "tls" bool)
-         (opt "media_type" Media_type.Command_line.encoding)
-         (opt "endpoint" Tezos_rpc.Encoding.uri_encoding)
-         (opt "web_port" uint16)
-         (opt "remote_signer" Tezos_rpc.Encoding.uri_encoding)
-         (opt "confirmations" int8)
-         (opt "password_filename" string))
+      (merge_objs
+         (obj10
+            (req "base_dir" string)
+            (opt "node_addr" string)
+            (opt "node_port" uint16)
+            (opt "tls" bool)
+            (opt "media_type" Media_type.Command_line.encoding)
+            (opt "endpoint" Tezos_rpc.Encoding.uri_encoding)
+            (opt "web_port" uint16)
+            (opt "remote_signer" Tezos_rpc.Encoding.uri_encoding)
+            (opt "confirmations" int8)
+            (opt "password_filename" string))
+         (obj1
+            (opt "internal_events" Tezos_base.Internal_event_config.encoding)))
 
   let from_json json = Data_encoding.Json.destruct encoding json
 
