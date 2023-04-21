@@ -157,8 +157,6 @@ let hacl_star =
 
 let hacl_star_raw = external_lib ~js_compatible:true "hacl-star-raw" V.True
 
-let hacl_x25519 = external_lib "hacl_x25519" V.True
-
 let hashcons = external_lib "hashcons" V.True
 
 let hex = external_lib ~js_compatible:true "hex" V.(at_least "1.3.0")
@@ -349,6 +347,17 @@ let zarith =
 let zarith_stubs_js = external_lib ~js_compatible:true "zarith_stubs_js" V.True
 
 let ledgerwallet_tezos = external_lib "ledgerwallet-tezos" V.(at_least "0.3.0")
+
+(* This modules aims to define the list of packages versions that
+   generate conflicts. *)
+module Conflicts = struct
+  (* Checkseum is an irmin-pack dependency, and thus a transitive
+     dependency for Octez. Version 0.5.0 is known to be bugged and
+     this release was disabled. *)
+  let checkseum = external_lib "checkseum" V.(exactly "0.5.0")
+
+  let hacl_x25519 = external_lib "hacl_x25519" V.True
+end
 
 (* DEVELOPMENT-ONLY DEPENDENCIES *)
 
@@ -698,7 +707,7 @@ let octez_hacl =
           G (Dune.of_atom_list (js_generated :: js_helper :: js_stubs));
         ];
       ]
-    ~conflicts:[hacl_x25519]
+    ~conflicts:[Conflicts.hacl_x25519]
     ~dune:
       Dune.
         [
@@ -2482,6 +2491,7 @@ let octez_context_encoding =
         irmin;
         irmin_pack;
       ]
+    ~conflicts:[Conflicts.checkseum]
 
 let octez_context_helpers =
   public_lib
@@ -2497,6 +2507,7 @@ let octez_context_helpers =
         irmin;
         irmin_pack;
       ]
+    ~conflicts:[Conflicts.checkseum]
 
 let octez_context_memory =
   public_lib
@@ -2512,6 +2523,7 @@ let octez_context_memory =
         octez_context_encoding;
         octez_context_helpers;
       ]
+    ~conflicts:[Conflicts.checkseum]
 
 let octez_scoru_wasm =
   public_lib
@@ -2574,6 +2586,7 @@ let octez_context_disk =
         octez_context_memory;
         octez_context_dump;
       ]
+    ~conflicts:[Conflicts.checkseum]
 
 let _tree_encoding_tests =
   tezt
@@ -3140,6 +3153,7 @@ let octez_store_unix =
         "store_metrics";
         "store";
       ]
+    ~conflicts:[Conflicts.checkseum]
 
 let octez_store_unix_reconstruction =
   public_lib
@@ -3967,6 +3981,7 @@ let octez_layer2_store =
         octez_context_encoding;
       ]
     ~linkall:true
+    ~conflicts:[Conflicts.checkseum]
 
 let _octez_layer2_indexed_store_test =
   tezt
@@ -6040,6 +6055,7 @@ module Protocol = Protocol
             prometheus_app |> if_ N.(number >= 016);
             octez_node_config |> if_ N.(number >= 016);
           ]
+        ~conflicts:[Conflicts.checkseum]
     in
     let _octez_sc_rollup_node_test =
       only_if N.(number >= 016) @@ fun () ->
@@ -7205,6 +7221,7 @@ let _octez_dal_node =
          irmin;
        ]
       @ protocol_deps)
+    ~conflicts:[Conflicts.checkseum]
 
 let _octez_dac_node =
   let protocol_deps =
@@ -7256,6 +7273,7 @@ let _octez_dac_node =
          irmin;
        ]
       @ protocol_deps)
+    ~conflicts:[Conflicts.checkseum]
 
 let _octez_scoru_wasm_debugger =
   public_exe

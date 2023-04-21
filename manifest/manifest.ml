@@ -751,6 +751,14 @@ module Opam = struct
     Option.iter (pp_line "description: %a" pp_string) description
 end
 
+module Opam_dependency_set = Set.Make (struct
+  type t = Opam.dependency
+
+  let compare x y =
+    let pkg = String.compare x.Opam.package y.Opam.package in
+    if pkg = 0 then Stdlib.compare x.version y.version else pkg
+end)
+
 module Flags = struct
   type t = {standard : bool; rest : Dune.s_expr list}
 
@@ -2580,7 +2588,11 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     deduplicate_list ~merge (fun {Opam.package; _} -> package) depends
   in
   let conflicts =
-    List.flatten @@ map internals
+    List.of_seq @@ Opam_dependency_set.to_seq
+    @@ List.fold_left
+         (fun set c -> Opam_dependency_set.add c set)
+         Opam_dependency_set.empty
+    @@ List.flatten @@ map internals
     @@ fun internal ->
     List.concat_map
       (as_opam_dependency
@@ -3318,6 +3330,11 @@ let generate_profiles ~default_profile =
           match String_map.find_opt name profile_deps with
           | None -> version
           | Some old_version ->
+              (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5434
+                 This comparison is wrong as it compares the terms as
+                 a whole. It results in duplicated
+                 versions. Additionally, for the conflicts, the `||`
+                 operator must be used. *)
               if old_version <> version then Version.(version && old_version)
               else version
         in
