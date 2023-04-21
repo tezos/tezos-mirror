@@ -430,17 +430,9 @@ let main (module C : M) ~select_commands =
         in
         let*! r =
           let* parsed, remaining = C.parse_config_args full original_args in
-          let parsed_config_file = parsed.Client_config.parsed_config_file
-          and parsed_args = parsed.Client_config.parsed_args
-          and config_commands = parsed.Client_config.config_commands in
-          let*! () =
-            Tezos_base_unix.Internal_event_unix.init_with_defaults
-              ?enable_default_daily_logs_at:C.default_daily_logs_path
-              ?internal_events:
-                (Option.bind parsed_config_file (fun cf ->
-                     cf.Client_config.Cfg_file.internal_events))
-              ()
-          in
+          let parsed_config_file = parsed.Client_config.parsed_config_file in
+          let parsed_args = parsed.Client_config.parsed_args in
+          let config_commands = parsed.Client_config.config_commands in
           let base_dir : string =
             match parsed.Client_config.base_dir with
             | Some p -> p
@@ -448,7 +440,21 @@ let main (module C : M) ~select_commands =
                 match parsed_config_file with
                 | None -> C.default_base_dir
                 | Some p -> p.Client_config.Cfg_file.base_dir)
-          and require_auth = parsed.Client_config.require_auth in
+          in
+          let daily_logs_path =
+            C.default_daily_logs_path
+            |> Option.map
+                 Filename.Infix.(fun logdir -> base_dir // "logs" // logdir)
+          in
+          let require_auth = parsed.Client_config.require_auth in
+          let*! () =
+            Tezos_base_unix.Internal_event_unix.init_with_defaults
+              ?enable_default_daily_logs_at:daily_logs_path
+              ?internal_events:
+                (Option.bind parsed_config_file (fun cf ->
+                     cf.Client_config.Cfg_file.internal_events))
+              ()
+          in
           let rpc_config =
             let rpc_config : RPC_client_unix.config =
               match parsed_config_file with
