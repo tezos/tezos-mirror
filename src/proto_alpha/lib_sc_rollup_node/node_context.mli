@@ -224,12 +224,6 @@ val get_predecessor_opt :
 (** [get_predecessor state head] returns the predecessor block of [head]. *)
 val get_predecessor : _ t -> Layer1.head -> Layer1.head tzresult Lwt.t
 
-(** [nth_predecessor n head] return [block, history] where [block] is the nth
-    predecessor of [head] and [history] is the list of blocks between [block]
-    (excluded) and [head] (included) on the chain. *)
-val nth_predecessor :
-  _ t -> int -> Layer1.head -> (Layer1.head * Layer1.head list) tzresult Lwt.t
-
 (** Same as {!get_predecessor_opt} with headers. *)
 val get_predecessor_header_opt :
   _ t -> Layer1.header -> Layer1.header option tzresult Lwt.t
@@ -237,13 +231,6 @@ val get_predecessor_header_opt :
 (** Same as {!get_predecessor} with headers. *)
 val get_predecessor_header :
   _ t -> Layer1.header -> Layer1.header tzresult Lwt.t
-
-(** Same as {!nth_predecessor} with headers. *)
-val nth_predecessor_header :
-  _ t ->
-  int ->
-  Layer1.header ->
-  (Layer1.header * Layer1.header list) tzresult Lwt.t
 
 (** [get_tezos_reorg_for_new_head node_ctxt old_head new_head] returns the L1
     reorganization between [old_head] and [new_head]. *)
