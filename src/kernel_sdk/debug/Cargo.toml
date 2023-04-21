@@ -4,8 +4,14 @@
 
 [package]
 name = "tezos-smart-rollup-debug"
-version = "0.1.0"
 edition = "2021"
+version = "0.1.0"
+license = "MIT"
+authors = ["TriliTech <contact@trili.tech>"]
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "Output formatted messages to Tezos Smart Rollup debug log."
+keywords = ["tezos", "smart", "rollup"]
+categories = ["no-std", "no-std::no-alloc", "api-bindings", "wasm"]
 
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
