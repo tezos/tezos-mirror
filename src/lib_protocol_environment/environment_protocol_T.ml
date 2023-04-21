@@ -49,11 +49,11 @@ open Environment_context
    environment ([module type Vx_T]).
 
    If you want to mock this module type, see {!Environment_protocol_T_test}. *)
-module type T = Environment_protocol_T_V7.T
+module type T = Environment_protocol_T_V10.T
 (* Documentation for this interface may be found in
    module type [PROTOCOL] of [sigs/v6/updater.mli]. *)
 
-module V0toV7
+module V0toV10
     (E : Environment_protocol_T_V0.T
            with type context := Context.t
             and type quota := quota
@@ -61,7 +61,7 @@ module V0toV7
             and type rpc_context := rpc_context
             and type tztrace := Error_monad.tztrace
             and type 'a tzresult := 'a Error_monad.tzresult) :
-  Environment_protocol_T_V7.T
+  Environment_protocol_T_V10.T
     with type context := Context.t
      and type quota := quota
      and type validation_result := validation_result
