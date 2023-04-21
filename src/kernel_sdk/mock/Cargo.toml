@@ -6,6 +6,12 @@
 name = "tezos-smart-rollup-mock"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+authors = ["TriliTech <contact@trili.tech>"]
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "Mock implementation of Tezos Smart Rollup host functions to enable unit testing of kernel logic."
+keywords = ["tezos", "smart", "rollup"]
+categories = ["development-tools", "development-tools::testing"]
 
 [dependencies]
 hex = "0.4"
