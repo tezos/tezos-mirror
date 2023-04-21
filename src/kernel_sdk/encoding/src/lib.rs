@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! Library for encodings related to the Tezos SCORU system.
+#![doc = include_str!("../README.md")]
 #![cfg_attr(not(feature = "alloc"), no_std)]
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]

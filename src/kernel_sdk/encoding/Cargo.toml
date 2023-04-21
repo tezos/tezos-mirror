@@ -7,7 +7,12 @@
 name = "tezos-smart-rollup-encoding"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 authors = ["TriliTech <contact@trili.tech>"]
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "Data Encodings used by Tezos Smart Rollup kernels."
+keywords = ["tezos", "smart", "rollup"]
+categories = ["no-std", "no-std::no-alloc", "encoding", "wasm"]
 
 [dependencies]
 tezos_data_encoding = { version = "0.4", optional = true }
