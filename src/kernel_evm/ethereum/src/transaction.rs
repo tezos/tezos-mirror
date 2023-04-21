@@ -22,6 +22,37 @@ pub enum TransactionStatus {
     Failure,
 }
 
+pub enum TransactionStatusDecodingError {
+    InvalidEncoding,
+    InvalidVectorLength,
+}
+
+impl TryFrom<&u8> for TransactionStatus {
+    type Error = TransactionStatusDecodingError;
+
+    fn try_from(v: &u8) -> Result<Self, Self::Error> {
+        if *v == 0 {
+            Ok(Self::Failure)
+        } else if *v == 1 {
+            Ok(Self::Success)
+        } else {
+            Err(TransactionStatusDecodingError::InvalidEncoding)
+        }
+    }
+}
+
+impl TryFrom<&Vec<u8>> for TransactionStatus {
+    type Error = TransactionStatusDecodingError;
+
+    fn try_from(v: &Vec<u8>) -> Result<Self, Self::Error> {
+        if v.len() == 1 {
+            TransactionStatus::try_from(&v[0])
+        } else {
+            Err(TransactionStatusDecodingError::InvalidVectorLength)
+        }
+    }
+}
+
 /// Transaction receipt, see https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionreceipt
 pub struct TransactionReceipt {
     /// Hash of the transaction.

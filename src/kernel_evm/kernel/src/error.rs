@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 use core::str::Utf8Error;
-use tezos_smart_rollup_host::path::PathError;
+use tezos_smart_rollup_host::path::{OwnedPath, PathError};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 
 #[derive(Debug)]
@@ -18,6 +18,7 @@ pub enum StorageError {
     Path(PathError),
     Runtime(RuntimeError),
     InvalidLoadValue { expected: usize, actual: usize },
+    InvalidEncoding { path: OwnedPath, value: Vec<u8> },
 }
 
 #[derive(Debug)]
