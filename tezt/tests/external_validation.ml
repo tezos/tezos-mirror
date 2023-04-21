@@ -78,7 +78,17 @@ let test_kill =
   Protocol.register_test
     ~__FILE__
     ~title:"external validator kill"
-    ~tags:["node"; "external"; "validator"; "kill"]
+    ~tags:
+      [
+        "node";
+        "external";
+        "validator";
+        "kill";
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5467
+
+           This test is flaky and has been disabled. *)
+        "ci_disable";
+      ]
   @@ fun protocol ->
   let node = Node.create [] in
   let wait_for_validator_pid = wait_for_external_validator_pid node in
