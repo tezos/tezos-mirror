@@ -159,7 +159,7 @@ let round_durations (rpc_context : Tezos_rpc.Context.generic)
 let () =
   let open Tezos_proxy.Registration in
   let module M : Proxy_sig = struct
-    module Protocol = Protocol_client_context.Lifted_protocol
+    module Protocol = Lifted_protocol
 
     let protocol_hash = Protocol.hash
 

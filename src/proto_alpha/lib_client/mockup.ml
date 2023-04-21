@@ -570,7 +570,7 @@ let migrate :
 
 module M :
   Tezos_mockup_registration.Registration_intf.MOCKUP
-    with module Protocol = Protocol_client_context.Lifted_protocol = struct
+    with module Protocol = Lifted_protocol = struct
   type parameters = Protocol_parameters.t
 
   type protocol_constants = Protocol_constants_overrides.t
@@ -587,7 +587,7 @@ module M :
 
   let protocol_hash = Protocol.hash
 
-  module Protocol = Protocol_client_context.Lifted_protocol
+  module Protocol = Lifted_protocol
   module Block_services = Protocol_client_context.Alpha_block_services
 
   let directory = Plugin.RPC.rpc_services

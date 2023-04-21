@@ -5482,7 +5482,7 @@ let hash = Protocol.hash
             octez_shell_services |> open_;
             octez_client_base |> open_;
             main |> open_;
-            lifted;
+            lifted |> open_if N.(number >= 018);
             octez_mockup_registration |> if_ N.(number >= 011);
             octez_proxy |> if_ N.(number >= 011);
             octez_signer_backends |> if_ N.(number >= 001);
@@ -5689,6 +5689,7 @@ let hash = Protocol.hash
             octez_clic;
             octez_version;
             main |> open_;
+            lifted |> if_ N.(number >= 018) |> open_;
             plugin |> if_some |> open_;
             octez_protocol_environment;
             octez_shell_services |> open_;
