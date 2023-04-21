@@ -4564,7 +4564,7 @@ end = struct
     List.filter_map (fun (x, b) -> if b then Some x else None)
 
   module Lib_protocol = struct
-    type t = {main : target; embedded : target}
+    type t = {main : target; lifted : target; embedded : target}
 
     let make_tests ?test_helpers ?parameters ?plugin ?client ?benchmark
         ?benchmark_type_inference ?octez_sc_rollup ~main ~name () =
@@ -5127,6 +5127,36 @@ module Protocol = Protocol
                     ];
               ]
       in
+      let lifted =
+        public_lib
+          (sf "tezos-protocol-%s.lifted" name_dash)
+          ~path:(path // "lib_protocol")
+          ~opam:(sf "tezos-protocol-%s" name_dash)
+          ~modules:["Lifted_protocol"]
+          ~flags:(Flags.standard ~nopervasives:true ~disable_warnings ())
+          ~deps:
+            [
+              octez_protocol_environment;
+              tezos_protocol_environment_sigs;
+              main |> open_;
+            ]
+          ~dune:
+            Dune.
+              [
+                targets_rule
+                  ["lifted_protocol.ml"]
+                  ~action:
+                    [
+                      S "write-file";
+                      S "%{targets}";
+                      S
+                        {|
+include Environment.Lift (Protocol)
+let hash = Protocol.hash
+|};
+                    ];
+              ]
+      in
       let _functor =
         private_lib
           (sf "tezos_protocol_%s_functor" name_underscore)
@@ -5235,12 +5265,12 @@ module Protocol = Protocol
                     ];
               ]
       in
-      {main; embedded}
+      {main; lifted; embedded}
   end
 
   let genesis =
     let name = Name.other "genesis" in
-    let {Lib_protocol.main; embedded} =
+    let {Lib_protocol.main; lifted = _; embedded} =
       Lib_protocol.make ~name ~status:Not_mainnet
     in
     let client =
@@ -5266,14 +5296,14 @@ module Protocol = Protocol
 
   let demo_noops =
     let name = Name.other "demo-noops" in
-    let {Lib_protocol.main; embedded} =
+    let {Lib_protocol.main; lifted = _; embedded} =
       Lib_protocol.make ~name ~status:Not_mainnet
     in
     register @@ make ~name ~status:Not_mainnet ~main ~embedded ()
 
   let _demo_counter =
     let name = Name.other "demo-counter" in
-    let {Lib_protocol.main; embedded} =
+    let {Lib_protocol.main; lifted = _; embedded} =
       Lib_protocol.make ~name ~status:Not_mainnet
     in
     let client =
@@ -5333,7 +5363,9 @@ module Protocol = Protocol
     let both o1 o2 =
       match (o1, o2) with Some x, Some y -> Some (x, y) | _, _ -> None
     in
-    let {Lib_protocol.main; embedded} = Lib_protocol.make ~name ~status in
+    let {Lib_protocol.main; lifted = _; embedded} =
+      Lib_protocol.make ~name ~status
+    in
     let parameters =
       only_if (N.(number >= 011) && not_overridden) @@ fun () ->
       public_lib
