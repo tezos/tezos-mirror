@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! Rollup Metadata definition
+//! Rollup Metadata: `sr1..` address & origination level.
 #[cfg(feature = "crypto")]
 use tezos_crypto_rs::hash::SmartRollupHash;
 

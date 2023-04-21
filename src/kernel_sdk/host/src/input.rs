@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! The possible types that may be returned by (Runtime)[crate::runtime::Runtime] when reading an input.
+//! The possible types that may be returned by [Runtime](crate::runtime::Runtime) when reading an input.
 //!
 //! *N.B.* Reading input is currently only supported when the `alloc` feature is enabled.
 #![cfg(feature = "alloc")]
