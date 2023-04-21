@@ -396,17 +396,13 @@ let is_processed {store; _} head = Store.L2_blocks.mem store.l2_blocks head
 
 let last_processed_head_opt {store; _} = Store.L2_head.read store.l2_head
 
-let mark_finalized_head {store; _} head_hash =
-  let open Lwt_result_syntax in
-  let* block = Store.L2_blocks.read store.l2_blocks head_hash in
-  match block with
-  | None -> return_unit
-  | Some (block_info, header) ->
-      let block = {block_info with header} in
-      Store.Last_finalized_head.write store.last_finalized_head block
+let mark_finalized_level {store; _} level =
+  Store.Last_finalized_level.write store.last_finalized_level level
 
-let get_finalized_head_opt {store; _} =
-  Store.Last_finalized_head.read store.last_finalized_head
+let get_finalized_level {store; _} =
+  let open Lwt_result_syntax in
+  let+ level = Store.Last_finalized_level.read store.last_finalized_level in
+  Option.value level ~default:0l
 
 let get_l2_block {store; _} block_hash =
   let open Lwt_result_syntax in
@@ -433,6 +429,15 @@ let find_l2_block_by_level node_ctxt level =
   match block_hash with
   | None -> return_none
   | Some block_hash -> find_l2_block node_ctxt block_hash
+
+let get_finalized_head_opt node_ctxt =
+  let open Lwt_result_syntax in
+  let* level =
+    Store.Last_finalized_level.read node_ctxt.store.last_finalized_level
+  in
+  match level with
+  | None -> return_none
+  | Some level -> find_l2_block_by_level node_ctxt level
 
 let head_of_block_level (hash, level) = {Layer1.hash; level}
 
