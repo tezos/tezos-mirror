@@ -7,6 +7,12 @@
 name = "tezos-smart-rollup-storage"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+authors = ["TriliTech <contact@trili.tech>"]
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "Higher-level transactional account view over Tezos Smart Rollup durable storage."
+keywords = ["tezos", "smart", "rollup"]
+categories = ["database", "wasm"]
 
 [dependencies]
 thiserror = "1.0"
