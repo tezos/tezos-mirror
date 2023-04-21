@@ -50,6 +50,7 @@ type commands =
   | Load_inputs
   | Reveal_preimage of string option
   | Reveal_metadata
+  | Profile of bool
   | Unknown of string
   | Stop
 
@@ -109,6 +110,8 @@ let parse_commands s =
     | ["reveal"; "metadata"] -> Reveal_metadata
     | ["stop"] -> Stop
     | ["bench"] -> Bench
+    | ["profile"] -> Profile false
+    | ["profile"; "--collapsed"] -> Profile true
     | _ -> Unknown s
   in
   go command
@@ -220,6 +223,43 @@ let eval_until_input_requested config tree =
       ( tree,
         Z.to_int64 @@ Z.sub info_after.current_tick info_before.current_tick ))
 
+let produce_flamegraph ~collapse ~max_depth (current_node, remaining_nodes) =
+  let filename =
+    Time.System.(
+      Format.asprintf "wasm-debugger-profiling-%a.out" pp_hum (now ()))
+  in
+  let path = Filename.(concat (get_temp_dir_name ()) filename) in
+  let file = open_out path in
+  if remaining_nodes <> [] then
+    Format.printf
+      "The resulting call graph is inconsistent, please open an issue.\n%!" ;
+  Profiling.pp_flamegraph
+    ~collapse
+    ~max_depth
+    Profiling.pp_call
+    (Format.formatter_of_out_channel file)
+    current_node ;
+  close_out file ;
+  Format.printf "Profiling result can be found in %s\n%!" path
+
+let eval_and_profile ~collapse config tree =
+  let open Lwt_syntax in
+  trap_exn (fun () ->
+      Format.printf
+        "Starting the profiling until new messages are expected. Please note \
+         that it will take some time and does not reflect a real computation \
+         time.\n\
+         %!" ;
+      let+ tree, ticks, graph =
+        Profiling.eval_and_profile
+          ~write_debug
+          ~reveal_builtins:(reveal_builtins config)
+          tree
+      in
+      produce_flamegraph ~collapse ~max_depth:100 graph ;
+      Format.printf "The execution took %a ticks.\n%!" Z.pp_print ticks ;
+      tree)
+
 let set_raw_message_input_step level counter encoded_message tree =
   Wasm.set_input_step (input_info level counter) encoded_message tree
 
@@ -289,6 +329,18 @@ let eval level inboxes config step tree =
           let* tree, count2 = eval_until_input_requested config tree in
           return (tree, Int64.(add (of_int32 count1) count2), inboxes)
       | Error _ -> return' (eval_until_input_requested config tree))
+
+let profile ~collapse level inboxes config tree =
+  let open Lwt_result_syntax in
+  let*! status = check_input_request tree in
+  match status with
+  | Ok () ->
+      let* tree, inboxes, level = load_inputs inboxes level tree in
+      let* tree = eval_and_profile ~collapse config tree in
+      return (tree, inboxes, level)
+  | Error _ ->
+      let* tree = eval_and_profile ~collapse config tree in
+      return (tree, inboxes, level)
 
 let pp_input_request ppf = function
   | Wasm_pvm_state.No_input_required -> Format.fprintf ppf "Evaluating"
@@ -608,6 +660,11 @@ let handle_command c config extra tree inboxes level =
     | Reveal_metadata ->
         let*! tree = reveal_metadata config tree in
         return ~tree ()
+    | Profile collapse ->
+        let* tree, inboxes, level =
+          profile ~collapse level inboxes config tree
+        in
+        Lwt.return_ok (tree, inboxes, level)
     | Unknown s ->
         let*! () = Lwt_io.eprintf "Unknown command `%s`\n%!" s in
         return ()
