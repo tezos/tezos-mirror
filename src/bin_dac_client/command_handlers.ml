@@ -54,6 +54,14 @@ let certificate_client_encoding =
           (fun certificate -> certificate);
       ])
 
+let serialize_certificate certificate =
+  let as_bytes_res =
+    Data_encoding.Binary.to_bytes certificate_client_encoding certificate
+  in
+  match as_bytes_res with
+  | Ok as_bytes -> Lwt_result_syntax.return @@ Hex.of_bytes as_bytes
+  | Error _ -> failwith "Error while serializing the certificate"
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/5339
    rename PUT v1/preimage into v1/payload, and change name
    of function accordingly. *)
@@ -86,12 +94,11 @@ let wait_for_certificate cctxt root_hash threshold =
         else go certificate_opt num_witnesses
   in
   let* certificate_opt = go None 0 in
-  Option.map_es
-    (fun certificate ->
-      let as_bytes_res =
-        Data_encoding.Binary.to_bytes certificate_client_encoding certificate
-      in
-      match as_bytes_res with
-      | Ok as_bytes -> return @@ Hex.of_bytes as_bytes
-      | Error _ -> failwith "Error while serializing the certificate")
-    certificate_opt
+  Option.map_es serialize_certificate certificate_opt
+
+let get_certificate cctxt root_page_hash =
+  let open Lwt_result_syntax in
+  let* certificate_opt =
+    Dac_node_client.get_certificate cctxt ~root_page_hash
+  in
+  Option.map_es serialize_certificate certificate_opt

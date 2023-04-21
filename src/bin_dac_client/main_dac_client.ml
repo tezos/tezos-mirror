@@ -113,9 +113,7 @@ let hex_root_hash_param ?(name = "hex root hash")
   Tezos_clic.param
     ~name
     ~desc
-    (Tezos_clic.map_parameter
-       ~f:(fun h -> Dac_plugin.raw_hash_of_hex @@ String.of_bytes h)
-       hex_parameter)
+    (Tezos_clic.map_parameter ~f:Dac_plugin.raw_hash_of_bytes hex_parameter)
 
 let group =
   {
@@ -175,9 +173,19 @@ let get_dac_certificate =
     @@ coordinator_rpc_param
     @@ prefixes ["for"; "root"; "hash"]
     @@ hex_root_hash_param @@ stop)
-    (fun () _coordinator_cctxt _root_hash _cctxt ->
+    (fun () coordinator_cctxt root_hash _cctxt ->
       let open Lwt_result_syntax in
-      return @@ Format.printf "Get certificate")
+      let* certificate_opt =
+        Command_handlers.get_certificate coordinator_cctxt root_hash
+      in
+      match certificate_opt with
+      | None ->
+          let hex_root_hash = `Hex (Dac_plugin.raw_hash_to_hex root_hash) in
+          return
+          @@ Format.printf "No certificate known for %a\n" Hex.pp hex_root_hash
+      | Some certificate ->
+          return
+          @@ Format.printf "Certificate received: %a\n" Hex.pp certificate)
 
 let commands () = [send_dac_payload; get_dac_certificate]
 
