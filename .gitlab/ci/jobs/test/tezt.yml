@@ -38,10 +38,9 @@ tezt:
     - .template__coverage_files
     - .tezt_template
   variables:
-    # FIXME: https://gitlab.com/tezos/tezos/-/issues/4459
-    # Re-enable the "synchronisation_threshold" tests once the flakiness has
-    # been fixed.
-    TESTS: "/synchronisation_threshold"
+    # Do not tests with the tag 'ci_disable'. See the registration of
+    # the individual test for the disabling rationale.
+    TESTS: "/ci_disable"
   dependencies:
     - "build_x86_64"
     - "build_kernels"
