@@ -75,6 +75,9 @@ module External = struct
       (Plonk_test.Cases.Unit_tests_for_each_selector.next_linear_selector_test
          0)
 
+  let upper_bound_no_pi_rc ~zero_knowledge () =
+    upper_bound_no_pi ~zero_knowledge "RC" Plonk_test.Cases.Range_Checks.basic
+
   let upper_bound_pi_rollup ~zero_knowledge () =
     let module Main = Aplonk.Main_protocol.Make (Rollup_PIs) in
     let module H = Plonk_test.Helpers.Make (Main) in
@@ -178,6 +181,7 @@ module External = struct
     @ [
         ("nb_proofs no pi", upper_bound_no_pi_simple);
         ("nb_proofs no pi (next wire)", upper_bound_no_pi_next_wire);
+        ("nb_proofs no pi (RC)", upper_bound_no_pi_rc);
         ("nb_proofs pi_rollup", upper_bound_pi_rollup);
       ]
     @ multi_tests
