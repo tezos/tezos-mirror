@@ -33,9 +33,6 @@ default-features = false
 path = "../host"
 default-features = false
 
-[dev-dependencies.tezos-smart-rollup-mock]
-path = "../mock"
-
 [features]
 default = ["alloc", "tezos-encoding"]
 testing = ["crypto", "num-bigint", "num-traits", "proptest"]
