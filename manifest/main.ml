@@ -458,6 +458,7 @@ let octez_test_helpers =
     ~deps:[uri; fmt; qcheck_alcotest; lwt; pure_splitmix; data_encoding]
     ~js_compatible:true
     ~linkall:true
+    ~release_status:Released
     ~dune:
       Dune.
         [
