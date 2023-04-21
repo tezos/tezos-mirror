@@ -297,13 +297,8 @@ module Make (PVM : Pvm.S) = struct
   let rec processed_finalized_block (node_ctxt : _ Node_context.t)
       (block : Layer1.header) =
     let open Lwt_result_syntax in
-    let* last_finalized = Node_context.get_finalized_head_opt node_ctxt in
-    let already_finalized =
-      match last_finalized with
-      | Some finalized ->
-          block.level <= Raw_level.to_int32 finalized.header.level
-      | None -> false
-    in
+    let* finalized_level = Node_context.get_finalized_level node_ctxt in
+    let already_finalized = block.level <= finalized_level in
     unless (already_finalized || before_origination node_ctxt block)
     @@ fun () ->
     let* predecessor =
