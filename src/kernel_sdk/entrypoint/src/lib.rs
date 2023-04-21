@@ -3,15 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! Contains entrypoint of the SCORU wasm kernel.
-//!
-//! A kernel must expose a `fn kernel_run();` entrypoint, which is called on a loop
-//! by the runtime.  The kernel *yields* to the runtime by returning out of
-//! `kernel_run`.
-//!
-//! There is a limit on how many computation ticks a kernel may perform per entry. It is
-//! called a number of times per non-empty level.  The kernel must take care not to perform
-//! arbitrarily long computations, to avoid breaching the computation limit.
+#![doc = include_str!("../README.md")]
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![cfg_attr(not(feature = "std"), no_std)]
