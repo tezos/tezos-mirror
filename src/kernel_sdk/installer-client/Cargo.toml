@@ -10,7 +10,8 @@ authors = ["TriliTech <contact@trili.tech>"]
 include = [
   "build.rs",
   "src/*",
-  "../installer_kernel/src/*"
+  "../installer_kernel/src/*",
+  "../installer.wasm"
 ]
 
 [[bin]]
