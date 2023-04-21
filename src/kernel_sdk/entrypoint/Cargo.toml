@@ -7,6 +7,12 @@
 name = "tezos-smart-rollup-entrypoint"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+authors = ["TriliTech <contact@trili.tech>"]
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "Setup kernel_entry entrypoint for Tezos Smart Rollup kernels."
+keywords = ["tezos", "smart", "rollup"]
+categories = ["no-std", "no-std::no-alloc", "api-bindings", "wasm"]
 
 [lib]
 crate-type = ["rlib"]

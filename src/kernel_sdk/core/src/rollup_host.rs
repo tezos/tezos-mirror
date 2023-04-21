@@ -18,8 +18,8 @@ use crate::SmartRollupCore;
 /// ever holds *one* reference of its *runtime*.
 ///
 /// Therefore, `WasmHost` **does not** implement `Debug`, `Copy` or `Clone`. This prevents
-/// the `kernel` from attempting to either create a new host, or to store the reference to
-/// it within its *cache*.
+/// the `kernel` from creating duplicate Hosts, which may break invariants in other SDK
+/// crates.
 pub struct RollupHost {}
 
 impl RollupHost {

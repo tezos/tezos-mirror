@@ -67,8 +67,9 @@ pub mod types {
     //! Types used/returned elswhere in the SDK.
 
     pub use tezos_smart_rollup_encoding::{
-        contract::Contract, entrypoint::Entrypoint, public_key_hash::PublicKeyHash,
-        smart_rollup::SmartRollupAddress, timestamp::Timestamp,
+        contract::Contract, entrypoint::Entrypoint, entrypoint::EntrypointError,
+        public_key_hash::PublicKeyHash, smart_rollup::SmartRollupAddress,
+        timestamp::Timestamp,
     };
     pub use tezos_smart_rollup_host::input::Message;
     pub use tezos_smart_rollup_host::metadata::RollupMetadata;

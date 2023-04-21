@@ -4,16 +4,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! Wrapper for the [tezos_smart_rollup_core] host functions as a safe API.
-//!
-//! The rollup exposes _host functions_ as a set of **C-style APIs**.  The
-//! [tezos_smart_rollup_core] crate defines these as `extern "C"` functions
-//! (see [smart_rollup_core]) that are unsafe to call.
-//!
-//! Using *tezos_smart_rollup_host* allows a kernel to access these capabilites
-//! without relying on `unsafe` code.
-//!
-//! [smart_rollup_core]: tezos_smart_rollup_core::smart_rollup_core
+#![doc = include_str!("../README.md")]
 #![cfg_attr(not(any(feature = "testing", feature = "std")), no_std)]
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
