@@ -129,9 +129,9 @@ module StringMap = struct
       let len = String.length (string_of_int (n - 1)) in
       String.(make (len - length str) '0') ^ str
 
-    let add_prefix ?(no_sep = false) ?(n = 1) ?(i = 0) ?(shift = 0) prefix str =
+    let add_prefix ?(no_sep = false) ?(n = 0) ?(i = 0) ?(shift = 0) prefix str =
       let prefix = if prefix = "" || no_sep then prefix else prefix ^ sep in
-      if n = 1 then prefix ^ str else prefix ^ padded ~n (i + shift) ^ sep ^ str
+      if n = 0 then prefix ^ str else prefix ^ padded ~n (i + shift) ^ sep ^ str
 
     let build_all_names prefix n name =
       List.init n (fun i -> add_prefix ~n ~i prefix name)
@@ -229,6 +229,8 @@ module type S = sig
        allow a numbering until [n] with the same number of caracters
        for instance, [prefix ~n:11 ~i:5 ~shift:1 "hello" "world"] will return
        "06~hello~world"
+       [n] is zero by default, this means if no n is specified, no idx will be
+        added
        [no_sep] is false by default ; if set to true, the separator before the
         string to prefix will be ommitted :
        [prefix ~no_sep:true ~n:11 ~i:5 ~shift:1 "hello" "world"] will return
