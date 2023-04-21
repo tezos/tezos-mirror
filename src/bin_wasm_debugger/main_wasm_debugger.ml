@@ -75,7 +75,7 @@ let link module_ =
 let handle_module version binary name module_ =
   let open Lwt_result_syntax in
   let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
-  let* ast, functions_section =
+  let* ast, functions =
     Repl_helpers.trap_exn (fun () ->
         if binary then parse_binary_module name module_
         else Lwt.return (parse_module module_, Custom_section.FuncMap.empty))
@@ -93,7 +93,7 @@ let handle_module version binary name module_ =
       module_
   in
   let*! tree = eval_until_input_requested tree in
-  return (tree, functions_section)
+  return (tree, Commands.{functions})
 
 let start version binary file =
   let open Lwt_result_syntax in
@@ -102,7 +102,7 @@ let start version binary file =
   handle_module version binary module_name buffer
 
 (* REPL main loop: reads an input, does something out of it, then loops. *)
-let repl tree inboxes level config =
+let repl tree inboxes level config extra =
   let open Lwt_result_syntax in
   let rec loop tree inboxes level =
     let*! () = Lwt_io.printf "> " in
@@ -116,7 +116,7 @@ let repl tree inboxes level config =
     match input with
     | Some command ->
         let* tree, inboxes, level =
-          Commands.handle_command command config tree inboxes level
+          Commands.handle_command command config extra tree inboxes level
         in
         loop tree inboxes level
     | None -> return tree
@@ -210,13 +210,13 @@ let main_command =
         else if Filename.check_suffix wasm_file ".wast" then Ok false
         else error_with "Kernels should have .wasm or .wast file extension"
       in
-      let* tree, _ = start version binary wasm_file in
+      let* tree, extra = start version binary wasm_file in
       let* inboxes =
         match inputs with
         | Some inputs -> Messages.parse_inboxes inputs config
         | None -> return []
       in
-      let+ _tree = repl tree inboxes 0l config in
+      let+ _tree = repl tree inboxes 0l config extra in
       ())
 
 (* List of program commands *)
