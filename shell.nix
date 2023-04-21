@@ -74,8 +74,8 @@ in
     inherit (mainPackage) NIX_LDFLAGS NIX_CFLAGS_COMPILE TEZOS_WITHOUT_OPAM OPAM_SWITCH_PREFIX;
 
     buildInputs = with pkgs;
-      mainPackage.buildInputs
-      ++ kernelPackageSet
+      kernelPackageSet
+      ++ mainPackage.buildInputs
       ++ [
         nodejs
         cacert
