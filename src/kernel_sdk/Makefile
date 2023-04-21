@@ -19,6 +19,8 @@ ifneq ($(NATIVE_TARGET),)
 NATIVE_OPT := --target "$(NATIVE_TARGET)"
 endif
 
+SDK_VERSION := "0.1.0"
+
 check:
 	@cargo fmt --check
 	@cargo clippy --all-targets --all-features -- --deny warnings
@@ -53,3 +55,11 @@ build-deps:
 clean:
 	@cargo clean
 	@rm installer.wasm
+
+publish-deps: build-deps
+	@cargo install cargo-publish-workspace-v2 --version "0.2.1"
+
+publish: installer.wasm
+	@cargo publish-workspace -p 'tezos-smart-rollup-' \
+		--exclude installer-kernel \
+		--target-version $(SDK_VERSION)
