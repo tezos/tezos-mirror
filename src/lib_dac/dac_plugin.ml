@@ -31,6 +31,8 @@ let hash_to_hex hash = Hex.of_bytes hash
 
 type supported_hashes = Blake2B
 
+let raw_compare = Bytes.compare
+
 let non_proto_encoding_unsafe = Data_encoding.bytes' Hex
 
 module type T = sig

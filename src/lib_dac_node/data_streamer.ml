@@ -31,3 +31,5 @@ let init () = Lwt_watcher.create_input ()
 let publish streamer hash = Lwt_watcher.notify streamer hash
 
 let handle_subscribe streamer = Lwt_watcher.create_stream streamer
+
+let close streamer = Lwt_watcher.shutdown_input streamer

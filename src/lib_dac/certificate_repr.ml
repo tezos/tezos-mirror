@@ -53,3 +53,13 @@ let encoding ((module P) : Dac_plugin.t) =
       (fun (root_hash, aggregate_signature, witnesses) ->
         {root_hash; aggregate_signature; witnesses})
       obj_enc)
+
+let all_committee_members_have_signed committee_members {witnesses; _} =
+  let length = List.length committee_members in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4562
+     The following is equivalent to Bitset.fill length. The Bitset module
+     should be used once it is moved from the protocol to the environment. *)
+  let expected_witnesses = Z.(pred (shift_left one length)) in
+  (* Equivalent to Bitset.diff expected_witnesses witnesses. *)
+  let missing_witnesses = Z.logand expected_witnesses (Z.lognot witnesses) in
+  Z.(equal missing_witnesses zero)

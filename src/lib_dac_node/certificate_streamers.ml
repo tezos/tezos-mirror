@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
+(* Copyright (c) 2023 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,31 +23,48 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [Data_streamer] is an in-memory data structure for handling pub-sub
-    mechanism of streaming data from publishers to subscribers.
-*)
+module Map = Map.Make (struct
+  type t = Dac_plugin.hash
 
-(* TODO https://gitlab.com/tezos/tezos/-/issues/4848
-   To make [Data_streamer] interface implementation agnostic we should
-   replace [Lwt_watcher.stopper] with an abstract [stopper] type,
-   and add [unsubscribe] method that uses it.
-*)
+  let compare = Dac_plugin.raw_compare
+end)
 
-(** ['a t] represents an instance of [Data_streamer], where ['a]
-    is the type of the data that we stream. *)
-type 'a t
+(* A [Certificate_streamer.t] is a mutable map that associates to root hashes
+   values of type [Certificate_repr.t Data_streamer.t]. Such data streamers are
+   used to notify clients of updates of DAC certificates. *)
+type t = Certificate_repr.t Data_streamer.t Map.t ref
 
-(** Initializes an instance of [Data_streamer.t]. *)
-val init : unit -> 'a t
+let init () = ref Map.empty
 
-(** [publish streamer data] publishes [data] to all attached
-    subscribers of the [streamer]. *)
-val publish : 'a t -> 'a -> unit
+let create_if_none certificate_streamers root_hash =
+  certificate_streamers :=
+    Map.update
+      root_hash
+      (function
+        | None -> Some (Data_streamer.init ()) | Some stream -> Some stream)
+      !certificate_streamers ;
+  !certificate_streamers |> Map.find root_hash
+  |> Option.value_f ~default:(fun _ -> assert false)
 
-(** [handle_subscribe streamer] returns a new stream of data for the
-    subscriber to consume. An [Lwt_watcher.stopper] function is also returned
-    for the subscriber to close the stream. *)
-val handle_subscribe : 'a t -> 'a Lwt_stream.t * Lwt_watcher.stopper
+let handle_subscribe certificate_streamers root_hash =
+  let certificate_streamer_for_root_hash =
+    create_if_none certificate_streamers root_hash
+  in
+  Data_streamer.handle_subscribe certificate_streamer_for_root_hash
 
-(** [close streamer] closes all the connections to [streamer]. *)
-val close : 'a t -> unit
+let push certificate_streamers root_hash certificate =
+  let certificate_streamer_for_root_hash =
+    create_if_none certificate_streamers root_hash
+  in
+  Data_streamer.publish certificate_streamer_for_root_hash certificate
+
+let close certificate_streamers root_hash =
+  let certificate_streamer_for_root_hash =
+    Map.find root_hash !certificate_streamers
+  in
+  match certificate_streamer_for_root_hash with
+  | Some streamer ->
+      Data_streamer.close streamer ;
+      certificate_streamers := Map.remove root_hash !certificate_streamers ;
+      true
+  | None -> false

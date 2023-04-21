@@ -306,7 +306,7 @@ module Coordinator = struct
             root_hash
             Store.{aggregate_signature; witnesses}
         in
-        return @@ aggregate_signature
+        return @@ (aggregate_signature, witnesses)
 
   let check_dac_member_has_signed ((module P) : Dac_plugin.t) signature_store
       root_hash dac_member_pkh =
@@ -325,16 +325,11 @@ module Coordinator = struct
          (fun pkh -> Aggregate_signature.Public_key_hash.equal signer_pkh pkh)
          dac_committee
 
-  let handle_put_dac_member_signature ctx cctxt dac_member_signature =
+  let check_coordinator_knows_root_hash ((module Plugin) : Dac_plugin.t)
+      page_store root_hash =
     let open Lwt_result_syntax in
-    let*? dac_plugin = Node_context.get_dac_plugin ctx in
-    let ((module Plugin) : Dac_plugin.t) = dac_plugin in
-    let page_store = Node_context.get_page_store ctx in
-    let Signature_repr.{signer_pkh; root_hash; signature} =
-      dac_member_signature
-    in
     let*! has_payload =
-      Page_store.Filesystem.mem dac_plugin page_store root_hash
+      Page_store.Filesystem.mem (module Plugin) page_store root_hash
     in
     match has_payload with
     | Error _ ->
@@ -343,51 +338,97 @@ module Coordinator = struct
              (Plugin.to_hex root_hash)
     (* Return an HTTP 404 error when hash provided in signature is unknown *)
     | Ok false -> raise Not_found
-    | Ok true ->
-        let*? dac_committee = Node_context.get_committee_members ctx in
-        let* () =
-          fail_unless
-            (check_is_dac_member dac_committee signer_pkh)
-            (Public_key_is_non_dac_member signer_pkh)
-        in
-        let* pub_key_opt =
-          Wallet_cctxt_helpers.get_public_key cctxt signer_pkh
-        in
-        let* pub_key =
-          Option.fold_f
-            ~none:(fun () ->
-              tzfail (Public_key_for_dac_member_not_available signer_pkh))
-            ~some:return
-            pub_key_opt
-        in
-        let ro_node_store =
-          Node_context.get_node_store ctx Store_sigs.Read_only
-        in
-        let* dac_member_has_signed =
-          check_dac_member_has_signed
-            dac_plugin
-            ro_node_store
-            root_hash
-            signer_pkh
-        in
-        if dac_member_has_signed then return_unit
-        else
-          let* () = verify_signature dac_plugin pub_key signature root_hash in
-          let rw_node_store =
-            Node_context.get_node_store ctx Store_sigs.Read_write
-          in
-          let* () =
-            add_dac_member_signature
-              dac_plugin
-              rw_node_store
-              dac_member_signature
-          in
-          let* _aggregate_sig =
-            update_aggregate_sig_store
-              dac_plugin
-              rw_node_store
-              dac_committee
-              dac_member_signature.root_hash
-          in
-          return_unit
+    | Ok true -> return ()
+
+  let should_update_certificate dac_plugin cctxt ro_node_store committee_members
+      Signature_repr.{signer_pkh; root_hash; signature} =
+    let open Lwt_result_syntax in
+    let* () =
+      fail_unless
+        (check_is_dac_member committee_members signer_pkh)
+        (Public_key_is_non_dac_member signer_pkh)
+    in
+    let* pub_key_opt = Wallet_cctxt_helpers.get_public_key cctxt signer_pkh in
+    let* pub_key =
+      Option.fold_f
+        ~none:(fun () ->
+          tzfail (Public_key_for_dac_member_not_available signer_pkh))
+        ~some:return
+        pub_key_opt
+    in
+    let* dac_member_has_signed =
+      check_dac_member_has_signed dac_plugin ro_node_store root_hash signer_pkh
+    in
+    if dac_member_has_signed then return false
+    else
+      let* () = verify_signature dac_plugin pub_key signature root_hash in
+      return true
+
+  let stream_certificate_update committee_members
+      (Certificate_repr.{root_hash; _} as certificate) certificate_streamers =
+    Certificate_streamers.push certificate_streamers root_hash certificate ;
+    if
+      Certificate_repr.all_committee_members_have_signed
+        committee_members
+        certificate
+    then
+      let _ = Certificate_streamers.close certificate_streamers root_hash in
+      ()
+    else ()
+
+  let handle_put_dac_member_signature ctx cctxt committee_member_signature =
+    let open Lwt_result_syntax in
+    let* certificate_streamers_opt =
+      match Node_context.mode ctx with
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5292
+                  Make type non optional when Legacy mode has been removed. *)
+      | Node_context.Coordinator {certificate_streamers; _} ->
+          return @@ Some certificate_streamers
+      | Legacy _ -> return None
+      | _ ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/5370
+             This line will never be executed as
+             [handle_put_dac_member_signature] is only invoked when the
+             DAC node is running in either coordinator or legacy mode.
+          *)
+          failwith "Operation not supported for operating mode"
+    in
+    let*? dac_plugin = Node_context.get_dac_plugin ctx in
+    let ((module Plugin) : Dac_plugin.t) = dac_plugin in
+    let page_store = Node_context.get_page_store ctx in
+    let*? committee_members = Node_context.get_committee_members ctx in
+    let rw_node_store = Node_context.get_node_store ctx Store_sigs.Read_write in
+    let Signature_repr.{root_hash; _} = committee_member_signature in
+    let* () =
+      check_coordinator_knows_root_hash dac_plugin page_store root_hash
+    in
+    let* should_update_certificate =
+      should_update_certificate
+        dac_plugin
+        cctxt
+        rw_node_store
+        committee_members
+        committee_member_signature
+    in
+    if should_update_certificate then
+      let* () =
+        add_dac_member_signature
+          dac_plugin
+          rw_node_store
+          committee_member_signature
+      in
+      let* aggregate_signature, witnesses =
+        update_aggregate_sig_store
+          dac_plugin
+          rw_node_store
+          committee_members
+          root_hash
+      in
+      return
+      @@ Option.iter
+           (stream_certificate_update
+              committee_members
+              Certificate_repr.{root_hash; aggregate_signature; witnesses})
+           certificate_streamers_opt
+    else return ()
 end

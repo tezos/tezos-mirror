@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
+(* Copyright (c) 2023 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,31 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [Data_streamer] is an in-memory data structure for handling pub-sub
-    mechanism of streaming data from publishers to subscribers.
+(** [Certificate_streamers] handles the streams of certificate updates used to
+      notify clients of a Coordinator node that a certificate has been updated.
 *)
 
-(* TODO https://gitlab.com/tezos/tezos/-/issues/4848
-   To make [Data_streamer] interface implementation agnostic we should
-   replace [Lwt_watcher.stopper] with an abstract [stopper] type,
-   and add [unsubscribe] method that uses it.
+(** The type of [Certificate_streamers]. Values of type
+    [Certificate_streamers.t] map root hashes to
+    [Certificate_repr.t Data_streamer.t]. *)
+type t
+
+(** [init ()] returns an empty map of certificate streams. *)
+val init : unit -> t
+
+(** [handle_subscribe t root_hash] creates a new watcher for [root_hash] in
+    [t], and returns the corresponding [Lwt_stream] and [Lwt_watcher.stopper].
 *)
+val handle_subscribe :
+  t -> Dac_plugin.hash -> Certificate_repr.t Lwt_stream.t * Lwt_watcher.stopper
 
-(** ['a t] represents an instance of [Data_streamer], where ['a]
-    is the type of the data that we stream. *)
-type 'a t
+(** [push t root_hash certificate] streams the updated certificate for
+    [root_hash]. *)
+val push : t -> Dac_plugin.hash -> Certificate_repr.t -> unit
 
-(** Initializes an instance of [Data_streamer.t]. *)
-val init : unit -> 'a t
-
-(** [publish streamer data] publishes [data] to all attached
-    subscribers of the [streamer]. *)
-val publish : 'a t -> 'a -> unit
-
-(** [handle_subscribe streamer] returns a new stream of data for the
-    subscriber to consume. An [Lwt_watcher.stopper] function is also returned
-    for the subscriber to close the stream. *)
-val handle_subscribe : 'a t -> 'a Lwt_stream.t * Lwt_watcher.stopper
-
-(** [close streamer] closes all the connections to [streamer]. *)
-val close : 'a t -> unit
+(** [close t root_hash] closes the certificate [Data_streamer.t] for
+    [root_hash]. Returns true if the [Data_streamer.t] associated to
+    [root_hash] was open before the function was invoked, false otherwise. *)
+val close : t -> Dac_plugin.hash -> bool
