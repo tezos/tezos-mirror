@@ -223,6 +223,8 @@ let eval_until_input_requested config tree =
       ( tree,
         Z.to_int64 @@ Z.sub info_after.current_tick info_before.current_tick ))
 
+type extra = {functions : string Custom_section.FuncMap.t}
+
 let produce_flamegraph ~collapse ~max_depth (current_node, remaining_nodes) =
   let filename =
     Time.System.(
@@ -242,7 +244,7 @@ let produce_flamegraph ~collapse ~max_depth (current_node, remaining_nodes) =
   close_out file ;
   Format.printf "Profiling result can be found in %s\n%!" path
 
-let eval_and_profile ~collapse config tree =
+let eval_and_profile ~collapse config extra tree =
   let open Lwt_syntax in
   trap_exn (fun () ->
       Format.printf
@@ -254,6 +256,7 @@ let eval_and_profile ~collapse config tree =
         Profiling.eval_and_profile
           ~write_debug
           ~reveal_builtins:(reveal_builtins config)
+          extra.functions
           tree
       in
       produce_flamegraph ~collapse ~max_depth:100 graph ;
@@ -330,16 +333,16 @@ let eval level inboxes config step tree =
           return (tree, Int64.(add (of_int32 count1) count2), inboxes)
       | Error _ -> return' (eval_until_input_requested config tree))
 
-let profile ~collapse level inboxes config tree =
+let profile ~collapse level inboxes config extra tree =
   let open Lwt_result_syntax in
   let*! status = check_input_request tree in
   match status with
   | Ok () ->
       let* tree, inboxes, level = load_inputs inboxes level tree in
-      let* tree = eval_and_profile ~collapse config tree in
+      let* tree = eval_and_profile ~collapse config extra tree in
       return (tree, inboxes, level)
   | Error _ ->
-      let* tree = eval_and_profile ~collapse config tree in
+      let* tree = eval_and_profile ~collapse config extra tree in
       return (tree, inboxes, level)
 
 let pp_input_request ppf = function
@@ -562,8 +565,6 @@ let show_memory tree address length kind =
             state
       | exn -> Lwt_io.printf "Error: %s\n%!" (Printexc.to_string exn))
 
-type extra = {functions : string Custom_section.FuncMap.t}
-
 let dump_function_symbols extra =
   let functions =
     Format.asprintf "%a" Custom_section.pp_function_subsection extra.functions
@@ -662,7 +663,7 @@ let handle_command c config extra tree inboxes level =
         return ~tree ()
     | Profile collapse ->
         let* tree, inboxes, level =
-          profile ~collapse level inboxes config tree
+          profile ~collapse level inboxes config extra tree
         in
         Lwt.return_ok (tree, inboxes, level)
     | Unknown s ->

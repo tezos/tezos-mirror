@@ -128,30 +128,19 @@ let call_function called_function current_tick current_function call_stack =
 (** A function call can be either a direct call, a call through a reference or
     an internal step of the PVM. *)
 type function_call =
+  | Function of string
   | CallDirect of int32
   | CallRef of int32
   | Internal of string
 
 let pp_call ppf = function
+  | Function f -> Format.fprintf ppf "%s" f
   | CallDirect i -> Format.fprintf ppf "function[%ld]" i
   | CallRef i -> Format.fprintf ppf "function_ref[%ld]" i
   | Internal s -> Format.fprintf ppf "%%interpreter(%s)" s
 
-(** [initial_eval_call module_] creates the node with the correct identifier for
-    `kernel_run` according to the profiled module. *)
-let initial_eval_call (module_exports : Ast.export Vector.t) =
-  let open Lwt_syntax in
-  let+ exports = Vector.to_list module_exports in
-  let var =
-    List.find_map
-      (function
-        | {Source.it = {Ast.name; edesc = {it = Ast.FuncExport var; _}}; _}
-          when name = Constants.wasm_entrypoint ->
-            Some var
-        | _ -> None)
-      exports
-  in
-  match var with Some {it = id; _} -> CallDirect id | None -> assert false
+(** [initial_eval_call] is `kernel_run` function call. *)
+let initial_eval_call = Function Constants.wasm_entrypoint
 
 (** [update_on_decode current_tick current_call_context] starts and stop
     `internal` calls related to the {Decode} step of the PVM. *)
@@ -184,27 +173,27 @@ let update_on_link current_tick (current_node, call_stack) module_
 
 (** [update_on_init current_tick current_call_context] starts and stop
     `internal` call to the {Init} step of the PVM. *)
-let update_on_init current_tick (current_node, call_stack) module_ =
+let update_on_init current_tick (current_node, call_stack) =
   let open Lwt_syntax in
   function
   | Eval.IK_Stop ->
       let current_node, call_stack =
         end_function_call current_tick current_node call_stack
       in
-      let* start = initial_eval_call module_.Source.it.Ast.exports in
-      return_some @@ call_function start current_tick current_node call_stack
+      return_some
+      @@ call_function initial_eval_call current_tick current_node call_stack
   | _ -> return_none
 
 (** [update_on_instr current_tick current_node call_stack] handle function calls
     during the evaluation. *)
-let update_on_instr current_tick current_node call_stack = function
+let update_on_instr current_tick current_node call_stack symbols = function
   | Eval.Plain (Ast.Call f) ->
-      Lwt.return_some
-        (call_function
-           (CallDirect f.Source.it)
-           current_tick
-           current_node
-           call_stack)
+      let id =
+        match Custom_section.FuncMap.find f.Source.it symbols with
+        | None -> CallDirect f.Source.it
+        | Some f -> Function f
+      in
+      Lwt.return_some (call_function id current_tick current_node call_stack)
   | Eval.Plain (CallIndirect (f, _)) ->
       Lwt.return_some
         (call_function
@@ -216,7 +205,7 @@ let update_on_instr current_tick current_node call_stack = function
 
 (** [update_on_eval current_tick current_call_context] handle function calls and
     end during the evaluation. *)
-let update_on_eval current_tick (current_node, call_stack) =
+let update_on_eval current_tick (current_node, call_stack) symbols =
   let open Lwt_syntax in
   function
   (* Instruction evaluation step *)
@@ -224,7 +213,7 @@ let update_on_eval current_tick (current_node, call_stack) =
       let _, es = label.Eval.label_code in
       if 0l < Vector.num_elements es then
         let* e = Vector.get 0l es in
-        update_on_instr current_tick current_node call_stack e.Source.it
+        update_on_instr current_tick current_node call_stack symbols e.Source.it
       else return_none
   (* Labels `result` or `trapped` implies the end of a function call and the pop of
      the current stack frame, this can be interpreted as an end of the current
@@ -243,9 +232,10 @@ let update_on_eval current_tick (current_node, call_stack) =
       return_some @@ end_function_call current_tick current_node call_stack
   | _ -> return_none
 
-(** [update_call_stack current_tick current_context_call state] returns the call
-    context changes for any state. Returns [None] if no change happened. *)
-let update_call_stack current_tick (current_node, call_stack) state =
+(** [update_call_stack current_tick current_context_call symbols state] returns
+    the call context changes for any state. Returns [None] if no change
+    happened. *)
+let update_call_stack current_tick (current_node, call_stack) symbols state =
   let open Lwt_syntax in
   match state with
   | Wasm_pvm_state.Internal_state.Decode {Decode.module_kont; _} ->
@@ -259,12 +249,12 @@ let update_call_stack current_tick (current_node, call_stack) state =
   | Init {init_kont; _} ->
       update_on_init current_tick (current_node, call_stack) init_kont
   | Eval {config = {step_kont; _}; _} ->
-      update_on_eval current_tick (current_node, call_stack) step_kont
+      update_on_eval current_tick (current_node, call_stack) symbols step_kont
   | _ -> return_none
 
-(** [eval_and_profile ?write_debug ?reveal_builtins tree] profiles a kernel up
-    to the next result, and returns the call stack. *)
-let eval_and_profile ?write_debug ?reveal_builtins tree =
+(** [eval_and_profile ?write_debug ?reveal_builtins symbols tree] profiles a
+    kernel up to the next result, and returns the call stack. *)
+let eval_and_profile ?write_debug ?reveal_builtins symbols tree =
   let open Lwt_syntax in
   (* The call context is built as a side effect of the evaluation. *)
   let call_stack = ref (Toplevel [], []) in
@@ -274,6 +264,7 @@ let eval_and_profile ?write_debug ?reveal_builtins tree =
       update_call_stack
         pvm_state.Wasm_pvm_state.Internal_state.current_tick
         !call_stack
+        symbols
         pvm_state.tick_state
     in
     Option.iter
