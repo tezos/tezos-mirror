@@ -10,6 +10,7 @@
   tezos-shell-services
   tezos-client-base
   tezos-protocol-002-PsYLVpVv
+  tezos-protocol-002-PsYLVpVv.lifted
   tezos-signer-backends
   tezos-rpc
   uri)

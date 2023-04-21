@@ -10,6 +10,7 @@
   tezos-shell-services
   tezos-client-base
   tezos-protocol-000-Ps9mPmXa
+  tezos-protocol-000-Ps9mPmXa.lifted
   tezos-rpc
   tezos-client-commands
   tezos-stdlib-unix)

@@ -11,6 +11,7 @@
   tezos-shell-services
   tezos-client-base
   tezos-protocol-016-PtMumbai
+  tezos-protocol-016-PtMumbai.lifted
   tezos-mockup-registration
   tezos-proxy
   tezos-signer-backends

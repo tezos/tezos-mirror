@@ -10,6 +10,7 @@
   tezos-shell-services
   tezos-client-base
   tezos-protocol-005-PsBabyM1
+  tezos-protocol-005-PsBabyM1.lifted
   tezos-signer-backends
   tezos-rpc
   uri)

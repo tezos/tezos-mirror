@@ -11,6 +11,7 @@
   tezos-shell-services
   tezos-client-base
   tezos-protocol-008-PtEdo2Zk
+  tezos-protocol-008-PtEdo2Zk.lifted
   tezos-signer-backends
   tezos-protocol-plugin-008-PtEdo2Zk
   tezos-rpc

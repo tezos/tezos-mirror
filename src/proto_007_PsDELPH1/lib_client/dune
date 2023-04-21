@@ -10,6 +10,7 @@
   tezos-shell-services
   tezos-client-base
   tezos-protocol-007-PsDELPH1
+  tezos-protocol-007-PsDELPH1.lifted
   tezos-signer-backends
   tezos-protocol-plugin-007-PsDELPH1
   tezos-rpc

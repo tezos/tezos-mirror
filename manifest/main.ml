@@ -5270,7 +5270,7 @@ let hash = Protocol.hash
 
   let genesis =
     let name = Name.other "genesis" in
-    let {Lib_protocol.main; lifted = _; embedded} =
+    let {Lib_protocol.main; lifted; embedded} =
       Lib_protocol.make ~name ~status:Not_mainnet
     in
     let client =
@@ -5286,6 +5286,7 @@ let hash = Protocol.hash
             octez_client_base |> open_;
             octez_protocol_environment;
             main |> open_;
+            lifted;
             octez_client_commands |> open_;
             octez_proxy;
             octez_stdlib_unix;
@@ -5303,7 +5304,7 @@ let hash = Protocol.hash
 
   let _demo_counter =
     let name = Name.other "demo-counter" in
-    let {Lib_protocol.main; lifted = _; embedded} =
+    let {Lib_protocol.main; lifted; embedded} =
       Lib_protocol.make ~name ~status:Not_mainnet
     in
     let client =
@@ -5319,6 +5320,7 @@ let hash = Protocol.hash
             octez_client_base |> open_;
             octez_client_commands |> open_;
             main |> open_;
+            lifted;
           ]
         ~linkall:true
     in
@@ -5363,7 +5365,7 @@ let hash = Protocol.hash
     let both o1 o2 =
       match (o1, o2) with Some x, Some y -> Some (x, y) | _, _ -> None
     in
-    let {Lib_protocol.main; lifted = _; embedded} =
+    let {Lib_protocol.main; lifted; embedded} =
       Lib_protocol.make ~name ~status
     in
     let parameters =
@@ -5480,6 +5482,7 @@ let hash = Protocol.hash
             octez_shell_services |> open_;
             octez_client_base |> open_;
             main |> open_;
+            lifted;
             octez_mockup_registration |> if_ N.(number >= 011);
             octez_proxy |> if_ N.(number >= 011);
             octez_signer_backends |> if_ N.(number >= 001);
