@@ -44,4 +44,10 @@ let select_commands _ _ =
    validation will not be more expensive. *)
 let () = Tezos_sapling.Core.Validator.init_params ()
 
-let () = Client_main_run.run (module Daemon_config) ~select_commands
+module Config = struct
+  include Daemon_config
+
+  let default_daily_logs_path = Some ("octez-baker-" ^ Protocol.name)
+end
+
+let () = Client_main_run.run (module Config) ~select_commands
