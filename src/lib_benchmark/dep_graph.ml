@@ -260,7 +260,7 @@ module Graph : sig
   val warn_ambiguities : providers_map -> unit
 
   type result = {
-    (* Graph without ambiguities. The ambiguities are resolved by heuristics *)
+    (* Graph without ambiguities.  The ambiguities are resolved by heuristics *)
     resolved : t;
     (* Graph with possible ambiguities *)
     with_ambiguities : t;
@@ -273,8 +273,6 @@ module Graph : sig
   val fold : (Solver.Solved.t -> 'a -> 'a) -> t -> 'a -> 'a
 
   val iter : (Solver.Solved.t -> unit) -> t -> unit
-
-  val dependencies : t -> Free_variable.Set.t -> Solver.Solved.t list
 
   val save_graphviz : t -> string -> unit
 end = struct
@@ -437,44 +435,6 @@ end = struct
   let fold = G.fold
 
   let iter = G.iter
-
-  module Reachability =
-    Graph.Fixpoint.Make
-      (G)
-      (struct
-        type vertex = G.E.vertex
-
-        type edge = G.E.t
-
-        type g = G.t
-
-        type data = bool
-
-        let direction = Graph.Fixpoint.Backward
-
-        let equal = ( = )
-
-        let join = ( || )
-
-        let analyze _ x = x
-      end)
-
-  let dependencies g free_variables =
-    let init =
-      G.fold_vertex
-        (fun solved acc ->
-          if Fv_set.disjoint solved.provides free_variables then acc
-          else solved :: acc)
-        g
-        []
-    in
-    let p =
-      Reachability.analyze
-        (fun n -> List.mem ~equal:Solver.Solved.ForGraph.equal n init)
-        g
-    in
-    List.rev
-    @@ G.fold (fun solved acc -> if p solved then solved :: acc else acc) g []
 
   let save_graphviz g fn =
     Graphviz.save fn @@ G.fold_vertex (fun s acc -> s :: acc) g []
