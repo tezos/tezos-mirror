@@ -42,7 +42,7 @@ type 'workload timed_workload = {
   allocated_words : int option;  (** Measured allocation in words *)
 }
 
-type 'workload workload_data = 'workload timed_workload trace
+type 'workload workload_data = 'workload timed_workload list
 
 type 'workload measurement = {
   bench_opts : options;
