@@ -67,24 +67,6 @@ type workloads_stats = {
 
 (* ------------------------------------------------------------------------- *)
 
-let flush_cache_encoding : [`Cache_megabytes of int | `Dont] Data_encoding.t =
-  let open Data_encoding in
-  union
-    [
-      case
-        ~title:"cache_megabytes"
-        (Tag 0)
-        Benchmark_helpers.int_encoding
-        (function `Cache_megabytes i -> Some i | `Dont -> None)
-        (fun i -> `Cache_megabytes i);
-      case
-        ~title:"dont"
-        (Tag 1)
-        unit
-        (function `Cache_megabytes _ -> None | `Dont -> Some ())
-        (fun () -> `Dont);
-    ]
-
 let heap_size_encoding : [`words of int] Data_encoding.t =
   let open Data_encoding in
   conv
@@ -129,59 +111,6 @@ let rfc3339_encoding =
     (fun tm -> of_tm tm)
     (fun str -> to_tm str)
     Data_encoding.string
-
-(* Encoding for workload data files for compatabilty *)
-let unix_tm_encoding : Unix.tm Data_encoding.encoding =
-  let to_tuple tm =
-    let open Unix in
-    ( tm.tm_sec,
-      tm.tm_min,
-      tm.tm_hour,
-      tm.tm_mday,
-      tm.tm_mon,
-      tm.tm_year,
-      tm.tm_wday,
-      tm.tm_yday,
-      tm.tm_isdst )
-  in
-  let of_tuple
-      ( tm_sec,
-        tm_min,
-        tm_hour,
-        tm_mday,
-        tm_mon,
-        tm_year,
-        tm_wday,
-        tm_yday,
-        tm_isdst ) =
-    let open Unix in
-    {
-      tm_sec;
-      tm_min;
-      tm_hour;
-      tm_mday;
-      tm_mon;
-      tm_year;
-      tm_wday;
-      tm_yday;
-      tm_isdst;
-    }
-  in
-  let open Data_encoding in
-  def "unix_tm_encoding"
-  @@ conv
-       to_tuple
-       of_tuple
-       (tup9
-          Benchmark_helpers.int_encoding
-          Benchmark_helpers.int_encoding
-          Benchmark_helpers.int_encoding
-          Benchmark_helpers.int_encoding
-          Benchmark_helpers.int_encoding
-          Benchmark_helpers.int_encoding
-          Benchmark_helpers.int_encoding
-          Benchmark_helpers.int_encoding
-          bool)
 
 let vec_encoding : Maths.vector Data_encoding.t =
   Data_encoding.(conv Maths.vector_to_array Maths.vector_of_array (array float))
@@ -405,13 +334,6 @@ let to_csv :
 let fmin (x : float) (y : float) = if x < y then x else y
 
 let fmax (x : float) (y : float) = if x > y then x else y
-
-let farray_min (arr : float array) =
-  let minimum = ref max_float in
-  for i = 0 to Array.length arr - 1 do
-    minimum := fmin !minimum arr.(i)
-  done ;
-  !minimum
 
 let farray_min_max (arr : float array) =
   let maximum = ref @@ ~-.max_float in
