@@ -16,6 +16,7 @@ build:
 build-deps:
 	@rustup target add wasm32-unknown-unknown
 	@rustup component add rustfmt clippy
+	@cargo install cargo-make
 
 test:
-	@cargo test
+	@cargo make test
