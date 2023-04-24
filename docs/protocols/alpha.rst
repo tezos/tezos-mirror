@@ -51,3 +51,5 @@ Internal
 
 - Fail earlier when a smart rollup commitment is in conflict when cementing.
   (MR :gl:`!8128`)
+
+- split smart rollup origination fct for readibility. (MR :gl:`!8276`)
