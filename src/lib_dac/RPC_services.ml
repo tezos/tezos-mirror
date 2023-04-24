@@ -24,6 +24,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Api = struct
+  type version = V0
+
+  let version_rpc_arg =
+    let construct = function V0 -> "v0" in
+    let destruct version =
+      match version with
+      | "v0" -> Ok V0
+      | invalid_version -> Error invalid_version
+    in
+    Tezos_rpc.Arg.make
+      ~descr:"API version"
+      ~name:"api_version"
+      ~destruct
+      ~construct
+      ()
+end
+
 (* A variant of [Sc_rollup_reveal_hash.encoding] that prefers hex
    encoding over b58check encoding for JSON. *)
 let store_preimage_request_encoding =

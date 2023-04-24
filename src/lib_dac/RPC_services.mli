@@ -23,6 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [Api] module is used for versioning DAC API. *)
+module Api : sig
+  (** [version] type is used to version DAC API. *)
+  type version =
+    | V0
+        (** [V0] is experimental DAC API. [V0] is deprecated, however for the
+            time being the API will be binding. It will be used by
+            1M/tps demo. The plan is to remove it once we get rid of the 
+            [Legacy] mode. Use at your own risk! *)
+
+  (** [version_rpc_arg] is a API version argument for the RPCs.*)
+  val version_rpc_arg : version Tezos_rpc.Arg.arg
+end
+
 (** POST dac/store_preimage to post a payload using a given [pagination_scheme].
   It returns the base58 encoded root page hash 
   and the raw bytes. *)
