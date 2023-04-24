@@ -2334,9 +2334,6 @@ let _octez_p2p_tests =
       "test_p2p_buffer_reader";
       "test_p2p_banned_peers";
       "test_p2p_node";
-      (* Deactivated because it fails on CI (but not locally) *)
-      (* See https://gitlab.com/tezos/tezos/-/issues/1184 *)
-      (* "test_p2p_logging"; *)
       "test_p2p_connect_handler";
       "test_p2p_maintenance";
     ]
