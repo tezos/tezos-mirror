@@ -103,10 +103,6 @@ module type AUTOMATON_CONFIG = sig
   module Time : TIME with type span = Span.t
 end
 
-(* TODO https://gitlab.com/tezos/tezos/-/issues/5462
-   Score decay is left to be implemented, and the associated
-   parameters added here. *)
-
 type 'span per_topic_score_parameters = {
   time_in_mesh_weight : float;
       (** P1: The weight of the score associated to the time spent in the mesh. *)
@@ -121,6 +117,9 @@ type 'span per_topic_score_parameters = {
   first_message_deliveries_cap : int;
       (** P2: The maximum value considered during score computation for the number of
           first message deliveries. *)
+  first_message_deliveries_decay : float;
+      (** [P2] score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
+          This parameter must be in the unit interval. *)
   mesh_message_deliveries_weight : float;
       (** P3: The weight of the score associated to the number of first/near-first
           mesh message deliveries. *)
@@ -135,10 +134,19 @@ type 'span per_topic_score_parameters = {
   mesh_message_deliveries_threshold : int;
       (** P3: The number of messages received from a peer in the mesh in the
           associated topic above which the peer won't be penalized  *)
+  mesh_message_deliveries_decay : float;
+      (** [P3] score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
+          This parameter must be in the unit interval. *)
   mesh_failure_penalty_weight : float;
       (** P3b: Penalty induced when a peer gets pruned with a non-zero mesh message delivery deficit. *)
+  mesh_failure_penalty_decay : float;
+      (** [P3b] score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
+          This parameter must be in the unit interval. *)
   invalid_message_deliveries_weight : float;
       (** P4: Penalty induced when a peer sends an invalid message. *)
+  invalid_message_deliveries_decay : float;
+      (** [P4] score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
+          This parameter must be in the unit interval. *)
 }
 
 type ('topic, 'span) topic_score_parameters =
@@ -153,6 +161,9 @@ type ('topic, 'span) topic_score_parameters =
       (** Use this constructor when the topic score parameters may depend
           on the topic. *)
 
+(* N.B.: unlike the Go/Rust implementations, scores are not refreshed in an asynchronous
+   loop but rather in the heartbeat. Hence, we do not have the [decay_interval] parameter.
+   Scores are refreshed and decayed every [score_cleanup_ticks] heartbeats (see [limits]). *)
 type ('topic, 'span) score_parameters = {
   topics : ('topic, 'span) topic_score_parameters;
       (** Per-topic score parameters. *)
@@ -162,7 +173,13 @@ type ('topic, 'span) score_parameters = {
   behaviour_penalty_threshold : float;
       (** The threshold on the behaviour penalty
           counter above which we start penalizing the peer. *)
+  behaviour_penalty_decay : float;
+      (** [P7] score is multiplied by a factor of [behaviour_penalty_decay] every [score_cleanup_ticks] heartbeat.
+          This parameter must be in the unit interval. *)
   app_specific_weight : float;  (** P5: Application-specific peer scoring *)
+  decay_zero : float;
+      (** The minimum value under which a score is considered to be equal to 0 after
+          applying decay. This parameter must be non-negative. *)
 }
 
 type ('topic, 'peer, 'message_id, 'span) limits = {
@@ -216,8 +233,8 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
       (** The number of heartbeat ticks setting the frequency at which the
           backoffs are checked and potentially cleared. *)
   score_cleanup_ticks : int;
-      (** The number of heartbeat ticks setting the frequency at which the
-          scores are checked and potentially cleared. *)
+      (** [score_cleanup_ticks] is the number of heartbeat ticks setting the
+          frequency at which the scores are refreshed and potentially cleared. *)
   degree_low : int;
       (** The lower bound on the number of peers we keep in a
           topic mesh. If we have fewer than [degree_low] peers, the heartbeat will attempt

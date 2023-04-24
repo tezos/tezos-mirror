@@ -235,18 +235,24 @@ module Make (C : AUTOMATON_CONFIG) :
     include State_monad.M
   end
 
+  let assert_in_unit_interval v = assert (v >= 0.0 && v <= 1.0)
+
   let check_per_topic_score_parameters tsp =
     assert (tsp.time_in_mesh_weight >= 0.0) ;
     assert (tsp.time_in_mesh_cap >= 0.0) ;
     assert (tsp.time_in_mesh_quantum > 0.0) ;
     assert (tsp.first_message_deliveries_weight >= 0.0) ;
     assert (tsp.first_message_deliveries_cap >= 0) ;
+    assert_in_unit_interval tsp.first_message_deliveries_decay ;
     assert (tsp.mesh_message_deliveries_weight <= 0.0) ;
     assert (Span.(tsp.mesh_message_deliveries_activation >= of_int_s 1)) ;
     assert (tsp.mesh_message_deliveries_cap >= 0) ;
     assert (tsp.mesh_message_deliveries_threshold > 0) ;
+    assert_in_unit_interval tsp.mesh_message_deliveries_decay ;
     assert (tsp.mesh_failure_penalty_weight <= 0.0) ;
-    assert (tsp.invalid_message_deliveries_weight <= 0.0)
+    assert_in_unit_interval tsp.mesh_failure_penalty_decay ;
+    assert (tsp.invalid_message_deliveries_weight <= 0.0) ;
+    assert_in_unit_interval tsp.invalid_message_deliveries_decay
 
   let check_score_parameters (sp : _ score_parameters) =
     (match sp.topics with
@@ -255,7 +261,9 @@ module Make (C : AUTOMATON_CONFIG) :
         Seq.map parameters all_topics
         |> Seq.iter check_per_topic_score_parameters) ;
     assert (sp.behaviour_penalty_weight <= 0.0) ;
-    assert (sp.behaviour_penalty_threshold >= 0.0)
+    assert (sp.behaviour_penalty_threshold >= 0.0) ;
+    assert_in_unit_interval sp.behaviour_penalty_decay ;
+    assert (sp.decay_zero >= 0.0)
 
   let check_limits l =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5129
