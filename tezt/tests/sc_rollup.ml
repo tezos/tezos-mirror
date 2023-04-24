@@ -1201,7 +1201,6 @@ let test_rollup_list ~kind =
   let* rollups =
     RPC.Client.call client @@ RPC.get_chain_block_context_smart_rollups_all ()
   in
-  let rollups = JSON.as_list rollups in
   let () =
     match rollups with
     | _ :: _ ->
@@ -1218,9 +1217,7 @@ let test_rollup_list ~kind =
   let* rollups =
     RPC.Client.call client @@ RPC.get_chain_block_context_smart_rollups_all ()
   in
-  let rollups =
-    JSON.as_list rollups |> List.map JSON.as_string |> String_set.of_list
-  in
+  let rollups = String_set.of_list rollups in
   Check.(
     (rollups = scoru_addresses)
       (comparable_module (module String_set))

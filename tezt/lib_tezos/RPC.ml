@@ -833,7 +833,7 @@ let get_chain_block_context_smart_rollups_all ?(chain = "main")
   make
     GET
     ["chains"; chain; "blocks"; block; "context"; "smart_rollups"; "all"]
-    Fun.id
+    (fun rollups -> JSON.as_list rollups |> List.map JSON.as_string)
 
 let get_chain_block_context_smart_rollups_smart_rollup_staker_games
     ?(chain = "main") ?(block = "head") ~staker sc_rollup () =
