@@ -417,7 +417,8 @@ let commands () =
                   ~emacs:emacs_mode
                   ~show_types
                   ~print_source_on_error:(not no_print_source)
-                  ~name:(if display_names then Some name else None)
+                  ~display_names
+                  ~name
                   program
                   res
                   cctxt)
@@ -926,14 +927,23 @@ let commands () =
          Micheline, JSON, binary or OCaml"
       (args3 zero_loc_switch legacy_switch enforce_indentation_flag)
       (prefixes ["convert"; "script"]
-      @@ file_or_literal_param () @@ prefix "from" @@ convert_input_format_param
-      @@ prefix "to" @@ convert_output_format_param @@ stop)
+      @@ file_or_literal_with_origin_param ()
+      @@ prefix "from" @@ convert_input_format_param @@ prefix "to"
+      @@ convert_output_format_param @@ stop)
       (fun (zero_loc, legacy, check)
-           expr_string
+           content_with_origin
            from_format
            to_format
            (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
+        let expr_string =
+          Client_proto_args.content_of_file_or_text content_with_origin
+        in
+        let name =
+          match content_with_origin with
+          | Client_proto_args.File {path; _} -> path
+          | Text _ -> "Literal script"
+        in
         let* (expression : Alpha_context.Script.expr) =
           match from_format with
           | `Michelson ->
@@ -957,7 +967,8 @@ let commands () =
                       ~emacs:false
                       ~show_types:true
                       ~print_source_on_error:true
-                      ~name:None
+                      ~display_names:false
+                      ~name
                       program
                       res
                       cctxt

@@ -300,8 +300,8 @@ let script_size cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
     ~script:program.expanded
     ~storage:storage.expanded
 
-let print_typecheck_result ~emacs ~show_types ~print_source_on_error ~name
-    program res (cctxt : #Client_context.printer) =
+let print_typecheck_result ~emacs ~show_types ~print_source_on_error
+    ~display_names ~name program res (cctxt : #Client_context.printer) =
   if emacs then
     let type_map, errs, _gas =
       match res with
@@ -325,12 +325,8 @@ let print_typecheck_result ~emacs ~show_types ~print_source_on_error ~name
     | Ok (type_map, gas) ->
         let program = Michelson_v1_printer.inject_types type_map program in
         cctxt#message
-          "@[<v 0>%aWell typed@,Gas remaining: %a@]"
-          (fun fmt filename ->
-            match filename with
-            | None -> ()
-            | Some filename -> Format.fprintf fmt "%s@," filename)
-          name
+          "@[<v 0>%tWell typed@,Gas remaining: %a@]"
+          (fun fmt -> if display_names then Format.fprintf fmt "%s@," name)
           Gas.pp
           gas
         >>= fun () ->

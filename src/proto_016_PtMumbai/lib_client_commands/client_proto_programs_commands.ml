@@ -421,7 +421,8 @@ let commands () =
                   ~emacs:emacs_mode
                   ~show_types
                   ~print_source_on_error:(not no_print_source)
-                  ~name:(if display_names then Some name else None)
+                  ~display_names
+                  ~name
                   program
                   res
                   cctxt)
@@ -887,11 +888,14 @@ let commands () =
       @@ file_or_literal_param () @@ prefix "from" @@ convert_input_format_param
       @@ prefix "to" @@ convert_output_format_param @@ stop)
       (fun (zero_loc, legacy, check)
-           (_, expr_string)
+           (origin, expr_string)
            from_format
            to_format
            (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
+        let name =
+          match origin with Some path -> path | None -> "Literal script"
+        in
         let* (expression : Alpha_context.Script.expr) =
           match from_format with
           | `Michelson ->
@@ -915,7 +919,8 @@ let commands () =
                       ~emacs:false
                       ~show_types:true
                       ~print_source_on_error:true
-                      ~name:None
+                      ~display_names:false
+                      ~name
                       program
                       res
                       cctxt
