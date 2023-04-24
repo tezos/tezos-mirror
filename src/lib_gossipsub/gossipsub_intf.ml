@@ -137,6 +137,8 @@ type 'span per_topic_score_parameters = {
           associated topic above which the peer won't be penalized  *)
   mesh_failure_penalty_weight : float;
       (** P3b: Penalty induced when a peer gets pruned with a non-zero mesh message delivery deficit. *)
+  invalid_message_deliveries_weight : float;
+      (** P4: Penalty induced when a peer sends an invalid message. *)
 }
 
 type ('topic, 'span) topic_score_parameters =
@@ -298,6 +300,7 @@ type ('peer, 'message_id) parameters = {
       we penalize the associated peer.
     - P3b: Trigger P3 computation when the peer gets pruned or removed, so as to not forget yet unaccounted for bad message
       delivery counts.
+    - P4: For each topic, penalize peers sending invalid messages on that topic.
     - P7: When a peer is pruned from the mesh for a topic, we install a backoff that
       prevents that peer from regrafting too soon. If the peer does not respect this backoff,
       it is penalized.
@@ -352,6 +355,10 @@ module type SCORE = sig
       near-first mesh message deliveries on [topic] by the associated peer. [validated]
       is the time at which the message was seen by the automaton for the first time. *)
   val duplicate_message_delivered : t -> topic -> time -> t
+
+  (** [invalid_message_delivered ps topic] increments the counter related to
+      invalid messages sent by the associated peer. *)
+  val invalid_message_delivered : t -> topic -> t
 
   (** [refresh ps] returns [Some ps'] with [ps'] a refreshed score record or [None]
       if the score expired. Refreshing a [ps] allows to update time-dependent spects
@@ -527,6 +534,9 @@ module type AUTOMATON = sig
               topic. Otherwise, the peers in the topic's fanout. *)
     | Already_published : [`Publish] output
         (** Attempting to publish a message that has already been published. *)
+    | Invalid_message : [`Publish] output
+    | Unknown_validity : [`Publish] output
+        (** Attempting to publish a message that is invalid. *)
     | Already_joined : [`Join] output
         (** Attempting to join a topic we already joined. *)
     | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output

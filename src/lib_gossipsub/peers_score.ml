@@ -74,7 +74,9 @@ struct
             the associated mesh peer. *)
     mesh_failure_penalty : int;
         (** The score penalty induced on the associated peer when pruned or removed due
-            to a mesh message delivry deficit. *)
+            to a mesh message delivery deficit. *)
+    invalid_messages : int;
+        (** The number of invalid messages sent by the associated mesh peer. *)
   }
 
   type stats = {
@@ -143,6 +145,9 @@ struct
   let p3b {mesh_failure_penalty_weight; _} {mesh_failure_penalty; _} =
     float_of_int mesh_failure_penalty *. mesh_failure_penalty_weight
 
+  let p4 {invalid_message_deliveries_weight; _} {invalid_messages; _} =
+    float_of_int invalid_messages *. invalid_message_deliveries_weight
+
   let topic_scores {parameters; topic_status; _} =
     Topic.Map.fold
       (fun topic status acc ->
@@ -152,7 +157,8 @@ struct
         let p2 = p2 topic_parameters status in
         let p3 = p3 topic_parameters status in
         let p3b = p3b topic_parameters status in
-        let total = topic_weight *. (p1 +. p2 +. p3 +. p3b) in
+        let p4 = p4 topic_parameters status in
+        let total = topic_weight *. (p1 +. p2 +. p3 +. p3b +. p4) in
         acc +. total)
       topic_status
       0.0
@@ -200,6 +206,7 @@ struct
       mesh_message_deliveries_active = false;
       mesh_message_deliveries = 0;
       mesh_failure_penalty = 0;
+      invalid_messages = 0;
     }
 
   let expires {stats; _} =
@@ -308,6 +315,7 @@ struct
         mesh_status = ts.mesh_status;
         mesh_message_deliveries_active = ts.mesh_message_deliveries_active;
         mesh_failure_penalty = ts.mesh_failure_penalty;
+        invalid_messages = ts.invalid_messages;
         mesh_message_deliveries;
         first_message_deliveries;
       }
@@ -337,6 +345,18 @@ struct
         {ts with mesh_message_deliveries}
       else ts
     in
+    let topic_status =
+      Topic.Map.update
+        topic
+        (function
+          | None -> fresh_topic_stats () |> increment |> Option.some
+          | Some ts -> increment ts |> Option.some)
+        stats.topic_status
+    in
+    make {stats with topic_status}
+
+  let invalid_message_delivered ({stats; _} : t) (topic : Topic.t) =
+    let increment ts = {ts with invalid_messages = ts.invalid_messages + 1} in
     let topic_status =
       Topic.Map.update
         topic

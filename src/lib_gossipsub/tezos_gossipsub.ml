@@ -129,6 +129,8 @@ module Make (C : AUTOMATON_CONFIG) :
     | PX : Peer.Set.t -> [`Prune] output
     | Publish_message : {to_publish : Peer.Set.t} -> [`Publish] output
     | Already_published : [`Publish] output
+    | Invalid_message : [`Publish] output
+    | Unknown_validity : [`Publish] output
     | Already_joined : [`Join] output
     | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
     | Not_joined : [`Leave] output
@@ -240,7 +242,8 @@ module Make (C : AUTOMATON_CONFIG) :
     assert (Span.(tsp.mesh_message_deliveries_activation >= of_int_s 1)) ;
     assert (tsp.mesh_message_deliveries_cap >= 0) ;
     assert (tsp.mesh_message_deliveries_threshold > 0) ;
-    assert (tsp.mesh_failure_penalty_weight <= 0.0)
+    assert (tsp.mesh_failure_penalty_weight <= 0.0) ;
+    assert (tsp.invalid_message_deliveries_weight <= 0.0)
 
   let check_score_parameters (sp : _ score_parameters) =
     (match sp.topics with
@@ -907,6 +910,27 @@ module Make (C : AUTOMATON_CONFIG) :
    fun {peer; topic; px; backoff} -> Prune.handle peer topic ~px ~backoff
 
   module Publish = struct
+    let check_valid sender topic message =
+      let open Monad.Syntax in
+      match Message.valid message with
+      | `Valid -> unit
+      | `Unknown ->
+          (* FIXME https://gitlab.com/tezos/tezos/-/issues/5486
+             It is not clear yet what we should do here. *)
+          fail Unknown_validity
+      | `Invalid -> (
+          match sender with
+          | None ->
+              (* We don't let ourselves send an invalid message, but
+                 we don't punish ourselves. *)
+              fail Invalid_message
+          | Some sender ->
+              let* () =
+                update_score sender (fun stats ->
+                    Score.invalid_message_delivered stats topic)
+              in
+              fail Invalid_message)
+
     let check_seen sender topic message_id =
       let open Monad.Syntax in
       let*! message_cache in
@@ -948,6 +972,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let handle ~sender topic message_id message : [`Publish] output Monad.t =
       let open Monad.Syntax in
       let*? () = check_seen sender topic message_id in
+      let*? () = check_valid sender topic message in
       let* () = put_message_in_cache message_id message topic in
       let*! mesh_opt = find_mesh topic in
       let* peers =
@@ -2008,6 +2033,8 @@ module Make (C : AUTOMATON_CONFIG) :
           Fmt.Dump.(record [field "to_publish" Fun.id pp_peer_set])
           to_publish
     | Already_published -> fprintf fmtr "Already_published"
+    | Invalid_message -> fprintf fmtr "Invalid_message"
+    | Unknown_validity -> fprintf fmtr "Unknown_validity"
     | Already_joined -> fprintf fmtr "Already_joined"
     | Joining_topic {to_graft} ->
         fprintf fmtr "Joining_topic %a" pp_peer_set to_graft
