@@ -342,7 +342,7 @@ let print_typecheck_result ~emacs ~show_types ~print_source_on_error
              ~show_source:print_source_on_error
              ~parsed:program)
           errs
-        >>= fun () -> cctxt#error "ill-typed script"
+        >>= fun () -> cctxt#error "script %S is ill-typed" name
 
 let entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
     (program : Michelson_v1_parser.parsed) ~entrypoint =
