@@ -502,16 +502,12 @@ module Triggers = struct
   end
 end
 
-(** [gen_points clients addr] generates a number of [clients]
-    [P2p_point.Id.t] values created by using the given [addr] and
-    generated port numbers. *)
-let gen_points ?(clients = 42) addr = Node.gen_points clients addr
-
 let wrap addr n f =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       let open Lwt_syntax in
       let rec aux n f =
-        let* r = f (gen_points addr) in
+        let points = Node.gen_points 42 addr in
+        let* r = f points in
         match r with
         | Ok () -> Lwt.return_unit
         | Error (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _)
