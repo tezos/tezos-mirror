@@ -9,7 +9,6 @@
   uri
   fmt
   qcheck-alcotest
-  alcotest
   lwt
   pure-splitmix
   data-encoding)

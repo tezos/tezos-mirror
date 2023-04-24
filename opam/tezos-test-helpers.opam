@@ -13,7 +13,6 @@ depends: [
   "uri" { >= "3.1.0" }
   "fmt" { >= "0.8.7" }
   "qcheck-alcotest" { >= "0.20" }
-  "alcotest" { >= "1.5.0" }
   "lwt" { >= "5.6.0" }
   "pure-splitmix" { = "0.3" }
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
