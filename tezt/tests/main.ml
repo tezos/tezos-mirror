@@ -112,6 +112,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Client_run_view.register ~protocols ;
   Client_simulation_flag.register ~protocols ;
   Comparable_datatype.register ~protocols ;
+  Consensus_key.register ~protocols ;
   Contract_baker.register ~protocols ;
   Contract_big_map_to_self.register ~protocols ;
   Contract_entrypoints.register ~protocols ;
@@ -135,6 +136,8 @@ let register_protocol_tests_that_use_supports_correctly () =
   Fork.register ~protocols ;
   Gas_bound.register ~protocols ;
   Global_constants.register ~protocols ;
+  Hash_data.register ~protocols ;
+  Increase_paid_storage.register ~protocols ;
   Large_metadata.register ~protocols ;
   Light.register ~protocols ;
   Liquidity_baking_per_block_votes.register ~protocols ;
@@ -174,6 +177,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Script_manager_contracts.register ~protocols ;
   Script_conversion.register ~protocols ;
   Script_illtyped.register ~protocols ;
+  Sc_rollup.register ~protocols ;
   Self_address_transfer.register ~protocols ;
   Signer_test.register ~protocols ;
   Storage_reconstruction.register ~protocols ;
@@ -182,18 +186,21 @@ let register_protocol_tests_that_use_supports_correctly () =
   Synchronisation_heuristic.register ~protocols ;
   Tenderbake.register ~protocols ;
   Testnet_dictator.register ~protocols ;
+  Test_contract_bls12_381.register ~protocols ;
+  Ticket_receipt_and_rpc.register ~protocols ;
   Transfer.register ~protocols ;
   Tickets.register ~protocols ;
   Tzip4_view.register ~protocols ;
   Used_paid_storage_spaces.register ~protocols ;
-  Vdf_test.register ~protocols
+  Vdf_test.register ~protocols ;
+  Views.register ~protocols ;
+  Zk_rollup.register ~protocols
 
 (* Regression tests are not easy to maintain for multiple protocols because one needs
    to update and maintain all the expected output files. Some of them, such as
    those in [create_contract.ml] and [deposits_limit.ml], already support all protocols.
    Some do not. Those that do not are declared here. *)
 let register_protocol_specific_because_regression_tests () =
-  Consensus_key.register ~protocols:[Mumbai; Alpha] ;
   Dal.register ~protocols:[Alpha] ;
   Dac.register ~protocols:[Alpha] ;
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4652
@@ -202,16 +209,9 @@ let register_protocol_specific_because_regression_tests () =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4652
          re-enable Mumbai when DAC is separated from Dal node. *)
   Tx_sc_rollup.register ~protocols:[Alpha] ;
-  Hash_data.register ~protocols:[Mumbai; Alpha] ;
-  Increase_paid_storage.register ~protocols:[Mumbai; Alpha] ;
-  Sc_rollup.register ~protocols:[Mumbai; Alpha] ;
   Snoop_codegen.register ~protocols:[Alpha] ;
-  Test_contract_bls12_381.register ~protocols:[Mumbai; Alpha] ;
-  Ticket_receipt_and_rpc.register ~protocols:[Mumbai; Alpha] ;
   Timelock.register ~protocols:[Alpha] ;
-  Timelock_disabled.register ~protocols:[Mumbai] ;
-  Views.register [Mumbai; Alpha] ;
-  Zk_rollup.register ~protocols:[Mumbai; Alpha]
+  Timelock_disabled.register ~protocols:[Mumbai]
 
 let () =
   register_protocol_independent_tests () ;

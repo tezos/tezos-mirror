@@ -522,7 +522,7 @@ let test_typecheck_suite protocols =
        (test_typecheck ~contract ~error)
        protocols
 
-let register protocols =
+let register ~protocols =
   test_regression protocols ;
   test_all_view_runs protocols ;
   test_create_contract protocols ;

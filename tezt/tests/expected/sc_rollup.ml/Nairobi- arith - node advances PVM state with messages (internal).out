@@ -1,0 +1,188 @@
+
+./octez-client --wait none originate smart rollup from bootstrap1 of kind arith of type bytes with kernel  --burn-cap 9999999
+Node is bootstrapped.
+Estimated gas: 1920.157 units (will add 100 for safety)
+Estimated storage: 6552 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000551
+    Expected counter: 1
+    Gas limit: 2021
+    Storage limit: 6572 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000551
+      payload fees(the block proposer) ....... +ꜩ0.000551
+    Smart rollup origination:
+      Kind: arith
+      Parameter type: bytes
+      Kernel Blake2B hash: '0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8'
+      This smart rollup origination was successfully applied
+      Consumed gas: 1920.124
+      Storage size: 6552 bytes
+      Address: [SMART_ROLLUP_HASH]
+      Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ1.638
+        storage fees ........................... +ꜩ1.638
+
+
+./octez-client rpc get '/chains/main/blocks/head/context/smart_rollups/smart_rollup/[SMART_ROLLUP_HASH]/genesis_info'
+{ "level": 2,
+  "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"5"
+
+./octez-smart-rollup-client-PtNairob get state value for vars/value --block head
+"\000\000\000\007"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"26"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"26"
+
+./octez-smart-rollup-client-PtNairob get state value for vars/value --block head
+"\000\000\000\n"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"47"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"47"
+
+./octez-smart-rollup-client-PtNairob get state value for vars/value --block head
+"\000\000\000\r"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"69"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"69"
+
+./octez-smart-rollup-client-PtNairob get state value for vars/value --block head
+"\000\000\000\016"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"91"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"91"
+
+./octez-smart-rollup-client-PtNairob get state value for vars/value --block head
+"\000\000\000\019"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"113"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"113"
+
+./octez-smart-rollup-client-PtNairob get state value for vars/value --block head
+"\000\000\000\022"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"135"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"135"
+
+./octez-smart-rollup-client-PtNairob get state value for vars/value --block head
+"\000\000\000\025"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"157"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"157"
+
+./octez-smart-rollup-client-PtNairob get state value for vars/value --block head
+"\000\000\000\028"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"179"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"179"
+
+./octez-smart-rollup-client-PtNairob get state value for vars/value --block head
+"\000\000\000\031"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"201"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"201"
+
+./octez-smart-rollup-client-PtNairob get state value for vars/value --block head
+"\000\000\000\""
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
+"224"
