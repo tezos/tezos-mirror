@@ -48,20 +48,25 @@ let create_if_none certificate_streamers root_hash =
 
 let handle_subscribe ((module Plugin) : Dac_plugin.t) certificate_streamers
     raw_root_hash =
+  let open Result_syntax in
+  let* root_hash = Plugin.raw_to_hash raw_root_hash in
   let certificate_streamer_for_root_hash =
-    create_if_none certificate_streamers (Plugin.raw_to_hash raw_root_hash)
+    create_if_none certificate_streamers root_hash
   in
-  Data_streamer.handle_subscribe certificate_streamer_for_root_hash
+  return @@ Data_streamer.handle_subscribe certificate_streamer_for_root_hash
 
-let push ((module Plugin) : Dac_plugin.t) certificate_streamers root_hash
+let push ((module Plugin) : Dac_plugin.t) certificate_streamers raw_root_hash
     certificate =
+  let open Result_syntax in
+  let* root_hash = Plugin.raw_to_hash raw_root_hash in
   let certificate_streamer_for_root_hash =
-    create_if_none certificate_streamers (Plugin.raw_to_hash root_hash)
+    create_if_none certificate_streamers root_hash
   in
-  Data_streamer.publish certificate_streamer_for_root_hash certificate
+  return @@ Data_streamer.publish certificate_streamer_for_root_hash certificate
 
 let close ((module Plugin) : Dac_plugin.t) certificate_streamers raw_root_hash =
-  let root_hash = Plugin.raw_to_hash raw_root_hash in
+  let open Result_syntax in
+  let* root_hash = Plugin.raw_to_hash raw_root_hash in
   let certificate_streamer_for_root_hash =
     Map.find root_hash !certificate_streamers
   in
@@ -69,5 +74,5 @@ let close ((module Plugin) : Dac_plugin.t) certificate_streamers raw_root_hash =
   | Some streamer ->
       Data_streamer.close streamer ;
       certificate_streamers := Map.remove root_hash !certificate_streamers ;
-      true
-  | None -> false
+      return true
+  | None -> return false

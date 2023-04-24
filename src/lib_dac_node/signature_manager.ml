@@ -142,7 +142,7 @@ let sign_root_hash ((module Plugin) : Dac_plugin.t) cctxt dac_sk_uris root_hash
 let verify ((module Plugin) : Dac_plugin.t) ~public_keys_opt root_page_hash
     signature witnesses =
   let open Lwt_result_syntax in
-  let root_hash = Plugin.raw_to_hash root_page_hash in
+  let*? root_hash = Plugin.raw_to_hash root_page_hash in
   let hash_as_bytes =
     Data_encoding.Binary.to_bytes_opt Plugin.encoding root_hash
   in
@@ -267,9 +267,11 @@ module Coordinator = struct
 
   let add_dac_member_signature ((module Plugin) : Dac_plugin.t) signature_store
       Signature_repr.{root_hash; signer_pkh; signature} =
+    let open Lwt_result_syntax in
+    let*? root_hash = Plugin.raw_to_hash root_hash in
     Store.Signature_store.add
       signature_store
-      ~primary_key:(Plugin.raw_to_hash root_hash)
+      ~primary_key:root_hash
       ~secondary_key:signer_pkh
       signature
 
@@ -328,8 +330,8 @@ module Coordinator = struct
 
   let check_coordinator_knows_root_hash ((module Plugin) : Dac_plugin.t)
       page_store raw_root_hash =
-    let root_hash = Plugin.raw_to_hash raw_root_hash in
     let open Lwt_result_syntax in
+    let*? root_hash = Plugin.raw_to_hash raw_root_hash in
     let*! has_payload =
       Page_store.Filesystem.mem (module Plugin) page_store root_hash
     in
@@ -345,8 +347,8 @@ module Coordinator = struct
   let should_update_certificate dac_plugin cctxt ro_node_store committee_members
       Signature_repr.{signer_pkh; root_hash; signature} =
     let ((module Plugin) : Dac_plugin.t) = dac_plugin in
-    let root_hash = Plugin.raw_to_hash root_hash in
     let open Lwt_result_syntax in
+    let*? root_hash = Plugin.raw_to_hash root_hash in
     let* () =
       fail_unless
         (check_is_dac_member committee_members signer_pkh)
@@ -371,11 +373,14 @@ module Coordinator = struct
   let stream_certificate_update ((module Plugin) : Dac_plugin.t)
       committee_members (Certificate_repr.{root_hash; _} as certificate)
       certificate_streamers =
-    Certificate_streamers.push
-      ((module Plugin) : Dac_plugin.t)
-      certificate_streamers
-      root_hash
-      certificate ;
+    let open Result_syntax in
+    let* () =
+      Certificate_streamers.push
+        ((module Plugin) : Dac_plugin.t)
+        certificate_streamers
+        root_hash
+        certificate
+    in
     if
       Certificate_repr.all_committee_members_have_signed
         committee_members
@@ -387,8 +392,8 @@ module Coordinator = struct
           certificate_streamers
           root_hash
       in
-      ()
-    else ()
+      return ()
+    else return ()
 
   let handle_put_dac_member_signature ctx cctxt committee_member_signature =
     let open Lwt_result_syntax in
@@ -431,18 +436,18 @@ module Coordinator = struct
           rw_node_store
           committee_member_signature
       in
+      let*? root_hash' = Plugin.raw_to_hash root_hash in
       let* aggregate_signature, witnesses =
-        update_aggregate_sig_store
-          rw_node_store
-          committee_members
-          (Plugin.raw_to_hash root_hash)
+        update_aggregate_sig_store rw_node_store committee_members root_hash'
       in
-      return
-      @@ Option.iter
-           (stream_certificate_update
-              dac_plugin
-              committee_members
-              Certificate_repr.{root_hash; aggregate_signature; witnesses})
-           certificate_streamers_opt
+      let*? () =
+        Option.iter_e
+          (stream_certificate_update
+             dac_plugin
+             committee_members
+             Certificate_repr.{root_hash; aggregate_signature; witnesses})
+          certificate_streamers_opt
+      in
+      return ()
     else return ()
 end

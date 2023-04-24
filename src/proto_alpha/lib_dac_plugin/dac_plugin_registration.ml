@@ -96,10 +96,9 @@ end) : Dac_plugin.T = struct
   let raw_to_hash raw_hash =
     let hex_raw_hash = Dac_plugin.raw_hash_to_hex raw_hash in
     match of_hex hex_raw_hash with
-    | Some hash -> hash
+    | Some hash -> Ok hash
     | None ->
-        Stdlib.failwith @@ "Cannot convert raw_hash " ^ hex_raw_hash
-        ^ " to hash"
+        Result_syntax.tzfail @@ Dac_plugin.Cannot_convert_raw_hash hex_raw_hash
 
   module Proto = Registerer.Registered
 end

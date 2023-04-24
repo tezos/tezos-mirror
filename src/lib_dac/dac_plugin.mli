@@ -73,12 +73,14 @@ val raw_hash_rpc_arg : raw_hash Tezos_rpc.Arg.arg
     Fix static supported_hashes type *)
 type supported_hashes = Blake2B
 
+type error += Cannot_convert_raw_hash of string
+
 module type T = sig
   (** Unlike [hash_to_raw] this conversion is unsafe.
       Under the hood, [raw_hash] will be encoded into hex
       then this hex will be decoded to a [hash] using
       the [Plugin.of_hex hex] *)
-  val raw_to_hash : raw_hash -> hash
+  val raw_to_hash : raw_hash -> hash tzresult
 
   (** The encoding of reveal hashes. *)
   val encoding : hash Data_encoding.t

@@ -120,7 +120,8 @@ let handle_get_verify_signature dac_plugin public_keys_opt encoded_l1_message =
 
 let handle_get_preimage dac_plugin page_store raw_hash =
   let ((module Plugin) : Dac_plugin.t) = dac_plugin in
-  let hash = Plugin.raw_to_hash raw_hash in
+  let open Lwt_result_syntax in
+  let*? hash = Plugin.raw_to_hash raw_hash in
   Page_store.Filesystem.load dac_plugin page_store hash
 
 (* Handler for subscribing to the streaming of root hashes via
@@ -135,7 +136,7 @@ let handle_monitor_root_hashes hash_streamer =
 
 let handle_get_certificate ((module Plugin) : Dac_plugin.t) ctx raw_root_hash =
   let open Lwt_result_syntax in
-  let root_hash = Plugin.raw_to_hash raw_root_hash in
+  let*? root_hash = Plugin.raw_to_hash raw_root_hash in
   let node_store = Node_context.get_node_store ctx Store_sigs.Read_only in
   let+ value_opt = Store.Certificate_store.find node_store root_hash in
   Option.map
@@ -147,7 +148,7 @@ let handle_get_certificate ((module Plugin) : Dac_plugin.t) ctx raw_root_hash =
 let handle_get_missing_page cctxt page_store dac_plugin raw_root_hash =
   let open Lwt_result_syntax in
   let ((module Plugin) : Dac_plugin.t) = dac_plugin in
-  let root_hash = Plugin.raw_to_hash raw_root_hash in
+  let*? root_hash = Plugin.raw_to_hash raw_root_hash in
   let remote_store = Page_store.Remote.(init {cctxt; page_store}) in
   let* preimage =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5142
@@ -242,13 +243,13 @@ module Coordinator = struct
       raw_root_hash committee_members =
     let open Lwt_result_syntax in
     let ((module Plugin) : Dac_plugin.t) = dac_plugin in
-    let stream, stopper =
+    let*? stream, stopper =
       Certificate_streamers.handle_subscribe
         dac_plugin
         certificate_streamers
         raw_root_hash
     in
-    let root_hash = Plugin.raw_to_hash raw_root_hash in
+    let*? root_hash = Plugin.raw_to_hash raw_root_hash in
     let*! () = Event.emit_new_subscription_to_certificate_updates root_hash in
     let shutdown () = Lwt_watcher.shutdown stopper in
     let next () = Lwt_stream.get stream in
@@ -267,11 +268,13 @@ module Coordinator = struct
                 Certificate_repr.
                   {root_hash = raw_root_hash; aggregate_signature; witnesses}
               in
-              Certificate_streamers.push
-                dac_plugin
-                certificate_streamers
-                raw_root_hash
-                certificate ;
+              let _ =
+                Certificate_streamers.push
+                  dac_plugin
+                  certificate_streamers
+                  raw_root_hash
+                  certificate
+              in
               if
                 Certificate_repr.all_committee_members_have_signed
                   committee_members
@@ -287,8 +290,8 @@ module Coordinator = struct
               else ())
             current_certificate_store_value
         in
-        Tezos_rpc.Answer.return_stream {next; shutdown}
-    | Error e -> Tezos_rpc.Answer.fail e
+        return (next, shutdown)
+    | Error e -> fail e
 
   let register_monitor_certificate dac_plugin ro_store certificate_streamers
       committee_members dir =
@@ -296,12 +299,18 @@ module Coordinator = struct
       dir
       Monitor_services.S.certificate
       (fun ((), root_hash) () () ->
-        handle_monitor_certificate
-          dac_plugin
-          ro_store
-          certificate_streamers
-          root_hash
-          committee_members)
+        let open Lwt_result_syntax in
+        let*! handler =
+          handle_monitor_certificate
+            dac_plugin
+            ro_store
+            certificate_streamers
+            root_hash
+            committee_members
+        in
+        match handler with
+        | Ok (next, shutdown) -> Tezos_rpc.Answer.return_stream {next; shutdown}
+        | Error e -> Tezos_rpc.Answer.fail e)
 
   let register_coordinator_post_preimage dac_plugin hash_streamer page_store =
     add_service

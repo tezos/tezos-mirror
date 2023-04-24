@@ -93,8 +93,11 @@ end) : Dac_plugin.T = struct
       ~scheme:(dac_hash_to_proto_supported_hashes scheme)
 
   let raw_to_hash raw_hash =
-    let hex = Dac_plugin.raw_hash_to_hex raw_hash in
-    match of_hex hex with Some hash -> hash | None -> Stdlib.failwith "error"
+    let hex_raw_hash = Dac_plugin.raw_hash_to_hex raw_hash in
+    match of_hex hex_raw_hash with
+    | Some hash -> Ok hash
+    | None ->
+        Result_syntax.tzfail @@ Dac_plugin.Cannot_convert_raw_hash hex_raw_hash
 
   module Proto = Registerer.Registered
 end

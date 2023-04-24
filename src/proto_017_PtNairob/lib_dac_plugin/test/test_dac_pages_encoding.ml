@@ -47,11 +47,7 @@ let dac_plugin = Stdlib.Option.get (Dac_plugin.get Protocol.hash)
 module Hashes_map = Map.Make (struct
   type t = Dac_plugin.hash
 
-  let compare h1 h2 =
-    let (module Dac_plugin) = dac_plugin in
-    let s1 = Dac_plugin.to_hex h1 in
-    let s2 = Dac_plugin.to_hex h2 in
-    String.compare s1 s2
+  let compare h1 h2 = Dac_plugin.raw_compare h1 h2
 end)
 
 type hashes_map = bytes Hashes_map.t
