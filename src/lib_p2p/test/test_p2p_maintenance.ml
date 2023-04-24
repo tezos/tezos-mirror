@@ -342,17 +342,20 @@ module Triggers = struct
      * List.length points = 42
      * max_connections = 36
      *)
-    let run points =
+    let run points_with_holding_fd =
       let expected_connections = 24 in
       let max_connections i =
-        if i = 0 then 3 * expected_connections / 2 else List.length points
+        if i = 0 then 3 * expected_connections / 2
+        else List.length points_with_holding_fd
       in
       (* min connection set to zero to avoid triggering the
          maintenance at node start *)
       let min_connections _ = 0 in
       let initial_points, overconnect_points =
-        let client_points = filteri (fun i _ -> i > 1) points in
-        (* we create a list of points. some of them are going to be the initial
+        let client_points =
+          filteri (fun i _ -> i > 1) points_with_holding_fd |> List.map fst
+        in
+        (* We create a list of points. some of them are going to be the initial
          * points, and other used to trigger too_many_connections. We discriminate
          * this using the index of the list *)
         partitioni (fun i _ -> i < expected_connections) client_points
@@ -362,7 +365,7 @@ module Triggers = struct
         ~max_connections
         ~min_connections
         (node expected_connections (max_connections 0) overconnect_points)
-        points
+        points_with_holding_fd
         ~trusted:(trusted initial_points)
   end
 
@@ -499,13 +502,12 @@ module Triggers = struct
   end
 end
 
-let gen_points ?(clients = 42) addr = Node.gen_points clients addr
-
 let wrap addr n f =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       let open Lwt_syntax in
       let rec aux n f =
-        let* r = f (gen_points addr) in
+        let points = Node.gen_points 42 addr in
+        let* r = f points in
         match r with
         | Ok () -> Lwt.return_unit
         | Error (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _)

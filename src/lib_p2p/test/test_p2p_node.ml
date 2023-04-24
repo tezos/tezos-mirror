@@ -79,13 +79,12 @@ let propagation_tzresult points =
   in
   match r with Ok () -> tzfail Invalid_test_result | Error _ -> return_unit
 
-let gen_points ?(clients = 4) addr = Node.gen_points clients addr
-
 let wrap addr n f =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       let rec aux n f =
         let open Lwt_syntax in
-        let* r = f (gen_points addr) in
+        let points = Node.gen_points 4 addr in
+        let* r = f points in
         match r with
         | Ok () -> Lwt.return_unit
         | Error (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _)

@@ -43,10 +43,15 @@ type error += Failed_to_open_listening_socket of listening_socket_open_failure
 (** Type of a welcome worker. *)
 type t
 
-(** [create ?addr ~backlog pool port] returns a running welcome worker
+(** [create ?reuse_port ?addr ~backlog pool port] returns a running welcome worker
     adding connections into [pool] listening on [addr:port]. [backlog]
-    is passed to [Lwt_unix.listen]. *)
+    is passed to [Lwt_unix.listen].
+
+    [reuse_port] should be used for testing purposes. This option
+    sets [SO_REUSEPORT] on the socket, allowing to reuse a port opened 
+    elsewhere. *)
 val create :
+  ?reuse_port:bool ->
   ?addr:P2p_addr.t ->
   backlog:int ->
   ('msg, 'meta, 'meta_conn) P2p_connect_handler.t ->

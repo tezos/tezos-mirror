@@ -152,7 +152,8 @@ let sync_nodes nodes =
 (**Detach a process with a p2p_pool and a welcome worker.  *)
 let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
     ?max_connections ?max_incoming_connections ?p2p_versions
-    ?(msg_config = msg_config) canceler f trusted_points all_points addr port =
+    ?(msg_config = msg_config) canceler f trusted_points all_points_with_fd addr
+    port =
   let trusted_points =
     List.filter
       (fun p -> not (P2p_point.Id.equal (addr, port) p))
@@ -213,6 +214,31 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
         let*! () = Lwt_unix.sleep ti in
         Event.(emit process_timeout) ()
       in
+      (* The [fd] is a socket bind to a point. This point is the one
+         that will be stolen by the welcome worker fd. This process
+         only starts one welcome worker, namely the one using
+         [port]. [Process.detach] starts a process duplicating all the
+         [fds]. It is important to close the sockets we do not own. *)
+      let own_fd, other_points =
+        List.partition_map
+          (fun ((addr, port'), fd) ->
+            if port' = port then Left fd
+            else (
+              Unix.close fd ;
+              Right (addr, port')))
+          all_points_with_fd
+      in
+      let own_fd =
+        match own_fd with
+        | [fd] -> fd
+        | _ ->
+            (* All those [fd] where generated with [Unix.bind] using the
+               port [0]. It is an invariant given by the OS that the
+               assigned port is always different while those sockets are
+               opened. Hence there is only one socket with a given
+               port. *)
+            assert false
+      in
       with_timeout
         ~canceler
         (Option.fold_f ~some:timer ~none:Lwt_utils.never_ending timeout)
@@ -247,16 +273,17 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
                 Lwt.return_unit)
               trusted_points
           in
-          let*! welcome =
-            P2p_welcome.create ~backlog:10 connect_handler ~addr port
-          in
           let* welcome =
-            match welcome with
-            | Ok w -> Lwt.return @@ Ok w
-            | Error _ ->
-                let*! () = Lwt_unix.sleep 2. in
-                P2p_welcome.create ~backlog:10 connect_handler ~addr port
+            P2p_welcome.create
+              ~reuse_port:true
+              ~backlog:10
+              connect_handler
+              ~addr
+              port
           in
+          (* The P2p_welcome worker has stolen the port. We can now
+             close this dummy socket. *)
+          Unix.close own_fd ;
           P2p_welcome.activate welcome ;
           let*! () = Event.(emit node_ready) port in
           let node =
@@ -268,7 +295,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
               watcher;
               trigger;
               trusted_points;
-              points = all_points;
+              points = other_points;
             }
           in
           let* () = sync node in
@@ -284,73 +311,35 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
           let*! () = Event.(emit bye) () in
           return_unit))
 
-let select_nth_point n points =
-  if n < 0 then
-    raise (Invalid_argument "P2p.Test.Node.select_nth_point: negative input") ;
-  let rec loop n acc = function
-    | [] -> invalid_arg "Utils.select"
-    | x :: xs when n <= 0 -> (x, List.rev_append acc xs)
-    | x :: xs -> loop (pred n) (x :: acc) xs
-  in
-  loop n [] points
-
 let default_ipv6_addr = Ipaddr.V6.localhost
 
-let gen_points ?(max_iterations = 1000) npoints ?port addr =
-  match port with
-  | Some port ->
-      let ports = port -- (port + npoints - 1) in
-      List.map (fun port -> (addr, port)) ports
-  | None ->
-      let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
-      let rec loop ~iterations i ports =
-        if i <= 0 then ports
-        else if iterations <= max_iterations then
-          try
-            let main_socket =
-              Unix.(socket ~cloexec:true PF_INET6 SOCK_STREAM 0)
-            in
-            try
-              Unix.setsockopt main_socket Unix.SO_REUSEPORT true ;
-              Unix.setsockopt main_socket Unix.SO_REUSEADDR true ;
-              Unix.set_close_on_exec main_socket ;
-              Unix.bind
-                main_socket
-                (ADDR_INET
-                   ( uaddr,
-                     match port with
-                     | None -> 0
-                     | Some port -> port + (npoints - i) )) ;
-              Unix.listen main_socket 50 ;
-              let port =
-                match Unix.getsockname main_socket with
-                | ADDR_UNIX _ -> assert false
-                | ADDR_INET (_, port) -> port
-              in
-              Unix.close main_socket ;
-              if not (List.mem ~equal:Int.equal port ports) then
-                loop ~iterations:(iterations + 1) (i - 1) (port :: ports)
-              else loop ~iterations:(iterations + 1) i ports
-            with
-            | Unix.Unix_error ((Unix.EADDRINUSE | Unix.EADDRNOTAVAIL), _, _)
-              when port = None ->
-                Unix.close main_socket ;
-                loop ~iterations:(iterations + 1) i ports
-            | Unix.Unix_error (e, _, _) ->
-                Unix.close main_socket ;
-                Format.kasprintf Stdlib.failwith "%s" (Unix.error_message e)
-          with Unix.Unix_error (e, _, _) ->
-            Format.kasprintf Stdlib.failwith "%s" (Unix.error_message e)
-        else
-          Format.kasprintf
-            Stdlib.failwith
-            "[gen_points] could not generate %d points after %d attempts"
-            npoints
-            iterations
+let gen_points npoints addr =
+  let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
+  let rec loop i ports =
+    if i <= 0 then ports
+    else
+      let main_socket = Unix.(socket PF_INET6 SOCK_STREAM 0) in
+      (* [SO_REUSEPORT] allows the welcome worker to steal the socket if
+         the welcome worker socket also use this option. This way, we
+         can reserve the port on which the welcome worker will run.
+         This could be done the other way around, but it
+         requires deeper modifications since functions in this modules
+         assume that we know the ports on which the welcome worker
+         will run beforehand. *)
+      Unix.setsockopt main_socket Unix.SO_REUSEPORT true ;
+      Unix.setsockopt main_socket Unix.SO_REUSEADDR true ;
+      Unix.set_close_on_exec main_socket ;
+      Unix.bind main_socket (ADDR_INET (uaddr, 0)) ;
+      Unix.listen main_socket 50 ;
+      let port =
+        match Unix.getsockname main_socket with
+        | ADDR_UNIX _ -> assert false
+        | ADDR_INET (_, port) -> port
       in
-
-      let ports = loop ~iterations:0 npoints [] in
-      List.map (fun port -> (addr, port)) ports
+      loop (i - 1) ((port, main_socket) :: ports)
+  in
+  let ports = loop npoints [] in
+  List.map (fun (port, socket) -> ((addr, port), socket)) ports
 
 (**Detach one process per id in [points], each with a p2p_pool and a
    welcome worker.
@@ -363,12 +352,13 @@ let gen_points ?(max_iterations = 1000) npoints ?port addr =
   *)
 let detach_nodes ?timeout ?prefix ?min_connections ?max_connections
     ?max_incoming_connections ?p2p_versions ?msg_config
-    ?(trusted = fun _ points -> points) run_node points =
+    ?(trusted = fun _ points -> points) run_node points_with_holding_fd =
   let open Lwt_result_syntax in
   let canceler = Lwt_canceler.create () in
+  let points = List.map fst points_with_holding_fd in
   let*! nodes =
     List.mapi_s
-      (fun n _ ->
+      (fun n ((addr, port), _holding_fd) ->
         let prefix = Option.map (fun f -> f n) prefix in
         let p2p_versions = Option.map (fun f -> f n) p2p_versions in
         let msg_config = Option.map (fun f -> f n) msg_config in
@@ -377,7 +367,6 @@ let detach_nodes ?timeout ?prefix ?min_connections ?max_connections
         let max_incoming_connections =
           Option.map (fun f -> f n) max_incoming_connections
         in
-        let (addr, port), other_points = select_nth_point n points in
         detach_node
           ?prefix
           ?p2p_versions
@@ -389,11 +378,12 @@ let detach_nodes ?timeout ?prefix ?min_connections ?max_connections
           canceler
           (run_node n)
           (trusted n points)
-          other_points
+          points_with_holding_fd
           addr
           port)
-      points
+      points_with_holding_fd
   in
+  List.iter (fun (_, fd) -> Unix.close fd) points_with_holding_fd ;
   let*? nodes = Error_monad.Result_syntax.tzall nodes in
   Lwt.ignore_result (sync_nodes nodes) ;
   Process.wait_all nodes

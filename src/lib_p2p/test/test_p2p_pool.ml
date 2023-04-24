@@ -726,30 +726,19 @@ let init_logs =
   in
   lazy (Tezos_base_unix.Internal_event_unix.init ~log_cfg ())
 
-let points = ref []
-
-let wrap ?port ?(clients = 10) n f =
-  let gen_points addr = points := Node.gen_points ?port clients addr in
+let wrap ?(clients = 10) n f =
   let addr = Node.default_ipv6_addr in
-  gen_points addr ;
+  let points = Node.gen_points clients addr in
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       let open Lwt_syntax in
       let* () = Lazy.force init_logs in
-      let rec aux n f =
-        let* r = f () in
-        match r with
-        | Ok () -> Lwt.return_unit
-        | Error (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _)
-          ->
-            warn "Conflict on ports, retry the test." ;
-            gen_points addr ;
-            aux n f
-        | Error error ->
-            Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
-      in
-      aux n f)
+      let* r = f points in
+      match r with
+      | Ok () -> Lwt.return_unit
+      | Error error ->
+          Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 
-let main () =
+let () =
   let repeat_connections = 5 in
   Lwt_main.run
   @@ Alcotest_lwt.run
@@ -757,18 +746,14 @@ let main () =
        [
          ( "p2p-connection-pool",
            [
-             wrap "simple" (fun _ -> Simple.run !points);
-             wrap "random" (fun _ ->
-                 Random_connections.run !points repeat_connections);
-             wrap "garbled" (fun _ -> Garbled.run !points);
-             wrap "overcrowded" (fun _ -> Overcrowded.run !points);
-             wrap "overcrowded-mixed" (fun _ ->
-                 Overcrowded.run_mixed_versions !points);
-             wrap "no-common-network-protocol" (fun _ ->
-                 No_common_network.run !points);
+             wrap "simple" (fun points -> Simple.run points);
+             wrap "random" (fun points ->
+                 Random_connections.run points repeat_connections);
+             wrap "garbled" (fun points -> Garbled.run points);
+             wrap "overcrowded" (fun points -> Overcrowded.run points);
+             wrap "overcrowded-mixed" (fun points ->
+                 Overcrowded.run_mixed_versions points);
+             wrap "no-common-network-protocol" (fun points ->
+                 No_common_network.run points);
            ] );
        ]
-
-let () =
-  Sys.catch_break true ;
-  try main () with _ -> ()

@@ -57,12 +57,6 @@ let init_logs =
   in
   lazy (Tezos_base_unix.Internal_event_unix.init ?log_cfg ())
 
-let points = ref []
-
-let gen_points addr =
-  let clients = 3 in
-  points := Node.gen_points clients addr
-
 (** Detaches [!client] nodes. Each of them will send a [BigPing] to each
     other node, then await for reading one from each other node.
 *)
@@ -296,18 +290,17 @@ module Simple = struct
 end
 
 let wrap addr n f =
-  gen_points addr ;
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       let open Lwt_syntax in
       let* () = Lazy.force init_logs in
       let rec aux n f =
-        let* r = f () in
+        let points = Node.gen_points 3 addr in
+        let* r = f points in
         match r with
         | Ok () -> Lwt.return_unit
         | Error (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _)
           ->
             warn "Conflict on ports, retry the test." ;
-            gen_points addr ;
             aux n f
         | Error error ->
             Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
@@ -319,7 +312,7 @@ let main () =
   Lwt_main.run
   @@ Alcotest_lwt.run
        "tezos-p2p-broadcast"
-       [("p2p-broadcast", [wrap addr "simple" (fun _ -> Simple.run !points)])]
+       [("p2p-broadcast", [wrap addr "simple" Simple.run])]
 
 let () =
   Sys.catch_break true ;
