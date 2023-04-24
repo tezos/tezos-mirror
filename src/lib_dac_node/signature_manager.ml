@@ -341,6 +341,8 @@ module Coordinator = struct
 
   let should_update_certificate dac_plugin cctxt ro_node_store committee_members
       Signature_repr.{signer_pkh; root_hash; signature} =
+    let ((module P) : Dac_plugin.t) = dac_plugin in
+    let root_hash = P.raw_to_hash root_hash in
     let open Lwt_result_syntax in
     let* () =
       fail_unless
@@ -363,8 +365,10 @@ module Coordinator = struct
       let* () = verify_signature dac_plugin pub_key signature root_hash in
       return true
 
-  let stream_certificate_update committee_members
-      (Certificate_repr.{root_hash; _} as certificate) certificate_streamers =
+  let stream_certificate_update ((module Plugin) : Dac_plugin.t)
+      committee_members (Certificate_repr.{root_hash; _} as certificate)
+      certificate_streamers =
+    let root_hash = Plugin.raw_to_hash root_hash in
     Certificate_streamers.push certificate_streamers root_hash certificate ;
     if
       Certificate_repr.all_committee_members_have_signed
@@ -421,11 +425,12 @@ module Coordinator = struct
           dac_plugin
           rw_node_store
           committee_members
-          root_hash
+          (Plugin.raw_to_hash root_hash)
       in
       return
       @@ Option.iter
            (stream_certificate_update
+              dac_plugin
               committee_members
               Certificate_repr.{root_hash; aggregate_signature; witnesses})
            certificate_streamers_opt

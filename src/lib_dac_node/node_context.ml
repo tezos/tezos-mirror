@@ -32,7 +32,7 @@ type dac_plugin_module = (module Dac_plugin.T)
 module Coordinator = struct
   type t = {
     committee_members : Wallet_account.Coordinator.t list;
-    hash_streamer : Dac_plugin.hash Data_streamer.t;
+    hash_streamer : Dac_plugin.raw_hash Data_streamer.t;
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4895
            This could be problematic in case coordinator and member/observer
            use two different plugins that bind different underlying hashes. *)
@@ -116,7 +116,7 @@ module Legacy = struct
   type t = {
     committee_members : Wallet_account.Legacy.t list;
     coordinator_cctxt : Dac_node_client.cctxt option;
-    hash_streamer : Dac_plugin.hash Data_streamer.t;
+    hash_streamer : Dac_plugin.raw_hash Data_streamer.t;
     committee_member_opt : Wallet_account.Legacy.t option;
   }
 

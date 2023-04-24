@@ -41,6 +41,7 @@ val hash_to_hex : hash -> Hex.t
     Because the internal representation of [Dac_plugin.hash]es is compared,
     this function does not require an instance of [Dac_plugin.t]. *)
 val raw_compare : hash -> hash -> int
+
 (** Protocol independant hash. Useful to avoid needing the Plugin in
     the RPC APIs. *)
 type raw_hash

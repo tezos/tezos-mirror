@@ -75,7 +75,9 @@ let handle_post_store_preimage dac_plugin cctxt dac_sk_uris page_store
             ~page_store
             data
         in
-        let () = Data_streamer.publish hash_streamer root_hash in
+        let () =
+          Data_streamer.publish hash_streamer (Dac_plugin.hash_to_raw root_hash)
+        in
         let*! () =
           Event.emit_root_hash_pushed_to_data_streamer dac_plugin root_hash
         in
@@ -187,10 +189,10 @@ let register_get_preimage dac_plugin page_store =
     RPC_services.get_preimage
     (fun hash () () -> handle_get_preimage dac_plugin page_store hash)
 
-let register_monitor_root_hashes dac_plugin hash_streamer dir =
+let register_monitor_root_hashes hash_streamer dir =
   Tezos_rpc.Directory.gen_register
     dir
-    (Monitor_services.S.root_hashes dac_plugin)
+    Monitor_services.S.root_hashes
     (fun () () () -> handle_monitor_root_hashes hash_streamer)
 
 let register_put_dac_member_signature ctx cctxt =
@@ -231,7 +233,9 @@ module Coordinator = struct
         ~page_store
         payload
     in
-    let () = Data_streamer.publish hash_streamer root_hash in
+    let () =
+      Data_streamer.publish hash_streamer (Dac_plugin.hash_to_raw root_hash)
+    in
     let*! () =
       Event.emit_root_hash_pushed_to_data_streamer dac_plugin root_hash
     in
@@ -258,7 +262,12 @@ module Coordinator = struct
           Option.iter
             (fun Store.{aggregate_signature; witnesses} ->
               let certificate =
-                Certificate_repr.{root_hash; aggregate_signature; witnesses}
+                Certificate_repr.
+                  {
+                    root_hash = Dac_plugin.hash_to_raw root_hash;
+                    aggregate_signature;
+                    witnesses;
+                  }
               in
               Certificate_streamers.push
                 certificate_streamers
@@ -281,14 +290,15 @@ module Coordinator = struct
 
   let register_monitor_certificate dac_plugin ro_store certificate_streamers
       committee_members dir =
+    let ((module P) : Dac_plugin.t) = dac_plugin in
     Tezos_rpc.Directory.gen_register
       dir
-      (Monitor_services.S.certificate dac_plugin)
+      Monitor_services.S.certificate
       (fun ((), root_hash) () () ->
         handle_monitor_certificate
           ro_store
           certificate_streamers
-          root_hash
+          (P.raw_to_hash root_hash)
           committee_members)
 
   let register_coordinator_post_preimage dac_plugin hash_streamer page_store =
@@ -322,7 +332,7 @@ module Coordinator = struct
     |> register_coordinator_post_preimage dac_plugin hash_streamer page_store
     |> register_get_verify_signature dac_plugin public_keys_opt
     |> register_get_preimage dac_plugin page_store
-    |> register_monitor_root_hashes dac_plugin hash_streamer
+    |> register_monitor_root_hashes hash_streamer
     |> register_monitor_certificate
          dac_plugin
          ro_store
@@ -371,7 +381,7 @@ module Legacy = struct
          hash_streamer
     |> register_get_verify_signature dac_plugin public_keys_opt
     |> register_get_preimage dac_plugin page_store
-    |> register_monitor_root_hashes dac_plugin hash_streamer
+    |> register_monitor_root_hashes hash_streamer
     |> register_put_dac_member_signature node_ctxt cctxt
     |> register_get_certificate node_ctxt dac_plugin
     |> register_get_missing_page node_ctxt dac_plugin

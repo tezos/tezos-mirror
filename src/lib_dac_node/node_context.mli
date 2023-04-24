@@ -34,7 +34,7 @@ module Coordinator : sig
         (** The list of [Wallet.Coordinator] values associated with the Data
             Availability Committee members managed by the [Coordinator] node.
         *)
-    hash_streamer : Dac_plugin.hash Data_streamer.t;
+    hash_streamer : Dac_plugin.raw_hash Data_streamer.t;
         (** The [Dac_plugin.hash Data_streamer.t] that the [Coordinator] node
             use to advertise root hashes to [Committee_member] and [Observer]
             nodes. *)
@@ -95,7 +95,7 @@ module Legacy : sig
             enables a [Legacy] node to act as if it were an [Observer], using
             the associated [Dac_node_client.cctxt] value to send requests to
             a [Coordinator] node.  *)
-    hash_streamer : Dac_plugin.hash Data_streamer.t;
+    hash_streamer : Dac_plugin.raw_hash Data_streamer.t;
         (** A [Dac_plugin.hash Data_streamer.t] that the [Legacy] node
             use to advertise root hashes to other nodes *)
     committee_member_opt : Wallet_account.Legacy.t option;
