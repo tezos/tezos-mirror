@@ -398,12 +398,9 @@ let commands () =
               (fun i (src, expr_string) ->
                 let program = Michelson_v1_parser.parse_toplevel expr_string in
                 let name =
-                  if display_names then
-                    Some
-                      (Option.value
-                         src
-                         ~default:("Literal script " ^ string_of_int (i + 1)))
-                  else None
+                  Option.value
+                    src
+                    ~default:("Literal script " ^ string_of_int (i + 1))
                 in
                 handle_parsing_error "types" cctxt setup program
                 @@ fun program ->
@@ -424,7 +421,7 @@ let commands () =
                   ~emacs:emacs_mode
                   ~show_types
                   ~print_source_on_error:(not no_print_source)
-                  ~name
+                  ~name:(if display_names then Some name else None)
                   program
                   res
                   cctxt)
