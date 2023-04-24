@@ -2,178 +2,175 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::panic::catch_unwind;
+
 use crate::blueprint::Queue;
-use crate::error::{Error, TransferError};
-use crate::helpers::address_to_hash;
-use crate::inbox::Transaction;
+use crate::error::Error;
+use crate::error::StorageError::AccountInitialisation;
+use crate::error::TransferError::CumulativeGasUsedOverflow;
+use crate::error::TransferError::InvalidCallerAddress;
 use crate::storage;
+use evm_execution::account_storage::init_account_storage;
+use evm_execution::handler::ExecutionOutcome;
+use evm_execution::{precompiles, run_transaction};
+
 use tezos_ethereum::address::EthereumAddress;
-use tezos_ethereum::signatures::EthereumTransactionCommon;
-use tezos_smart_rollup_host::path::OwnedPath;
+use tezos_ethereum::transaction::TransactionHash;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 use primitive_types::U256;
-use tezos_ethereum::account::Account;
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::transaction::{
     TransactionReceipt, TransactionStatus, TransactionType,
 };
-use tezos_ethereum::wei::Wei;
 
-fn get_tx_sender(
-    tx: &EthereumTransactionCommon,
-) -> Result<(OwnedPath, EthereumAddress), Error> {
-    let address = tx
-        .caller()
-        .or(Err(Error::Transfer(TransferError::InvalidSignature)))?;
-    // We reencode in hexadecimal, since the accounts hash are encoded in
-    // hexadecimal in the storage.
-    let hash = address_to_hash(address);
-    let path = storage::account_path(&hash)?;
-    Ok((path, address))
+struct TransactionReceiptInfo {
+    tx_hash: TransactionHash,
+    index: u32,
+    execution_outcome: Option<ExecutionOutcome>,
+    caller: EthereumAddress,
+    to: EthereumAddress,
 }
 
-fn get_tx_receiver(
-    tx: &EthereumTransactionCommon,
-) -> Result<(OwnedPath, EthereumAddress), Error> {
-    let hash = address_to_hash(tx.to);
-    let path = storage::account_path(&hash)?;
-    Ok((path, tx.to))
-}
-
-// Update an account with the given balance and nonce (if one is given), and
-// initialize it if it doesn't already appear in the storage.
-fn update_account<Host: Runtime>(
-    host: &mut Host,
-    account_path: &OwnedPath,
-    balance: Wei,
-    nonce: Option<U256>, // if none is given, only the balance is updated. This
-                         // avoids updating the storage with the same value.
-) -> Result<(), Error> {
-    if storage::has_account(host, account_path)? {
-        storage::store_balance(host, account_path, balance)?;
-        if let Some(nonce) = nonce {
-            storage::store_nonce(host, account_path, nonce)?
-        };
-        Ok(())
-    } else {
-        let account = Account::with_assets(balance);
-        storage::store_account(host, &account, account_path)
+fn make_receipt_info(
+    tx_hash: TransactionHash,
+    index: u32,
+    execution_outcome: Option<ExecutionOutcome>,
+    caller: EthereumAddress,
+    to: EthereumAddress,
+) -> TransactionReceiptInfo {
+    TransactionReceiptInfo {
+        tx_hash,
+        index,
+        execution_outcome,
+        caller,
+        to,
     }
 }
 
 fn make_receipt(
     block: &L2Block,
-    tx: &Transaction,
-    status: TransactionStatus,
-    index: u32,
-    sender: EthereumAddress,
-    to: EthereumAddress,
-) -> TransactionReceipt {
-    TransactionReceipt {
-        hash: tx.tx_hash,
-        index,
-        block_hash: block.hash,
-        block_number: block.number,
-        from: sender,
-        to: Some(to),
-        cumulative_gas_used: U256::zero(),
-        effective_gas_price: U256::zero(),
-        gas_used: U256::zero(),
-        contract_address: None,
-        type_: TransactionType::Legacy,
-        status,
-    }
-}
-
-// invariant: the transaction is valid
-// NB: when applying a transaction, we omit the payment of gas as it is not
-// properly implemented in the current state of the kernel.
-fn apply_transaction<Host: Runtime>(
-    host: &mut Host,
-    block: &L2Block,
-    transaction: &Transaction,
-    index: u32,
+    receipt_info: TransactionReceiptInfo,
+    cumulative_gas_used: &mut U256,
 ) -> Result<TransactionReceipt, Error> {
-    let (sender_path, sender_address) = get_tx_sender(&transaction.tx)?;
-    let sender_balance =
-        storage::read_account_balance(host, &sender_path).unwrap_or_else(|_| Wei::zero());
-    let sender_nonce =
-        storage::read_account_nonce(host, &sender_path).unwrap_or(U256::zero());
-    let value: U256 = transaction.tx.value;
-    let (dst_path, dst_address) = get_tx_receiver(&transaction.tx)?;
+    let hash = receipt_info.tx_hash;
+    let index = receipt_info.index;
+    let block_hash = block.hash;
+    let block_number = block.number;
+    let from = receipt_info.caller;
+    let to = Some(receipt_info.to);
+    let effective_gas_price = block.constants().gas_price;
 
-    if sender_balance < value
-        || sender_nonce != transaction.tx.nonce
-        || transaction.tx.clone().verify_signature().is_err()
-    {
-        Ok(make_receipt(
-            block,
-            transaction,
-            TransactionStatus::Failure,
+    let tx_receipt = match receipt_info.execution_outcome {
+        Some(outcome) => TransactionReceipt {
+            hash,
             index,
-            sender_address,
-            dst_address,
-        ))
-    } else {
-        update_account(
-            host,
-            &sender_path,
-            sender_balance - value,
-            Some(sender_nonce + U256::one()),
-        )?;
-
-        let dst_balance = storage::read_account_balance(host, &dst_path)
-            .unwrap_or_else(|_| Wei::zero());
-        update_account(host, &dst_path, dst_balance + value, None)?;
-
-        Ok(make_receipt(
-            block,
-            transaction,
-            TransactionStatus::Success,
+            block_hash,
+            block_number,
+            from,
+            to,
+            cumulative_gas_used: cumulative_gas_used
+                .checked_add(U256::from(outcome.gas_used))
+                .ok_or(Error::Transfer(CumulativeGasUsedOverflow))?,
+            effective_gas_price,
+            gas_used: U256::from(outcome.gas_used),
+            contract_address: outcome.new_address,
+            type_: TransactionType::Legacy,
+            status: if outcome.is_success {
+                TransactionStatus::Success
+            } else {
+                TransactionStatus::Failure
+            },
+        },
+        None => TransactionReceipt {
+            hash,
             index,
-            sender_address,
-            dst_address,
-        ))
-    }
+            block_hash,
+            block_number,
+            from,
+            to,
+            cumulative_gas_used: *cumulative_gas_used,
+            effective_gas_price,
+            gas_used: U256::zero(),
+            contract_address: None,
+            type_: TransactionType::Legacy,
+            status: TransactionStatus::Failure,
+        },
+    };
+
+    Ok(tx_receipt)
 }
 
-// This function is only available in nightly, hence the need for redefinition
-fn try_collect<T, E>(vec: Vec<Result<T, E>>) -> Result<Vec<T>, E> {
-    let mut new_vec = Vec::new();
-    for v in vec {
-        match v {
-            Ok(v) => new_vec.push(v),
-            Err(e) => return Err(e),
-        }
-    }
-    Ok(new_vec)
-}
-
-fn apply_transactions<Host: Runtime>(
-    host: &mut Host,
+fn make_receipts(
     block: &L2Block,
-    transactions: &[Transaction],
+    receipt_infos: Vec<TransactionReceiptInfo>,
 ) -> Result<Vec<TransactionReceipt>, Error> {
-    try_collect(
-        transactions
-            .iter()
-            .enumerate()
-            .map(|(index, tx)| (apply_transaction(host, block, tx, index as u32)))
-            .collect(),
-    )
+    let mut cumulative_gas_used = U256::zero();
+    receipt_infos
+        .into_iter()
+        .map(|receipt_info| make_receipt(block, receipt_info, &mut cumulative_gas_used))
+        .collect()
 }
 
 pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error> {
+    let mut current_block = storage::read_current_block(host)?;
+    let mut evm_account_storage =
+        init_account_storage().map_err(|_| Error::Storage(AccountInitialisation))?;
+    let precompiles = precompiles::precompile_set::<Host>();
+
     for proposal in queue.proposals {
-        let current_level = storage::read_current_block_number(host)?;
-        let next_level = current_level + 1;
-        let transaction_hashes =
-            proposal.transactions.iter().map(|tx| tx.tx_hash).collect();
-        let valid_block = L2Block::new(next_level, transaction_hashes);
-        storage::store_current_block(host, &valid_block)?;
-        let receipts = apply_transactions(host, &valid_block, &proposal.transactions)?;
-        storage::store_transaction_receipts(host, &receipts)?;
+        let mut valid_txs = Vec::new();
+        let mut receipts_infos = Vec::new();
+        let transactions = proposal.transactions;
+
+        for (transaction, index) in transactions.into_iter().zip(0u32..) {
+            // TODO: https://gitlab.com/tezos/tezos/-/issues/5487
+            // gas_limit representation should be the same through all modules to avoid
+            // odd conversions
+            let gas_limit = catch_unwind(|| transaction.tx.gas_limit.as_u64()).ok();
+            let caller = transaction
+                .tx
+                .caller()
+                .map_err(|_| Error::Transfer(InvalidCallerAddress))?;
+            let receipt_info = match run_transaction(
+                host,
+                &current_block.constants(),
+                &mut evm_account_storage,
+                &precompiles,
+                transaction.tx.to.into(),
+                caller.into(),
+                transaction.tx.data,
+                gas_limit,
+                Some(transaction.tx.value),
+            ) {
+                Ok(outcome) => {
+                    valid_txs.push(transaction.tx_hash);
+                    make_receipt_info(
+                        transaction.tx_hash,
+                        index,
+                        Some(outcome),
+                        caller,
+                        transaction.tx.to,
+                    )
+                }
+                Err(_) => make_receipt_info(
+                    transaction.tx_hash,
+                    index,
+                    None,
+                    caller,
+                    transaction.tx.to,
+                ),
+            };
+            receipts_infos.push(receipt_info)
+        }
+
+        let new_block = L2Block::new(current_block.number + 1, valid_txs);
+        storage::store_current_block(host, &new_block)?;
+        storage::store_transaction_receipts(
+            host,
+            &make_receipts(&new_block, receipts_infos)?,
+        )?;
+        current_block = new_block;
     }
     Ok(())
 }
@@ -187,7 +184,8 @@ mod tests {
     use crate::storage::read_transaction_receipt_status;
     use primitive_types::H256;
     use tezos_ethereum::address::EthereumAddress;
-    use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
+    use tezos_ethereum::signatures::EthereumTransactionCommon;
+    use tezos_ethereum::transaction::{TransactionStatus, TRANSACTION_HASH_SIZE};
     use tezos_smart_rollup_mock::MockHost;
 
     fn string_to_h256_unsafe(s: &str) -> H256 {
