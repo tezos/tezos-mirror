@@ -14,78 +14,11 @@ use tezos_smart_rollup_host::runtime::Runtime;
 
 use primitive_types::U256;
 use tezos_ethereum::account::Account;
-use tezos_ethereum::eth_gen::{BlockHash, L2Level, OwnedHash, BLOCK_HASH_SIZE};
+use tezos_ethereum::block::L2Block;
 use tezos_ethereum::transaction::{
-    TransactionHash, TransactionReceipt, TransactionStatus, TransactionType,
+    TransactionReceipt, TransactionStatus, TransactionType,
 };
-
 use tezos_ethereum::wei::Wei;
-
-pub struct L2Block {
-    // This choice of a L2 block representation is totally
-    // arbitrarily based on what is an Ethereum block and is
-    // subject to change.
-    pub number: L2Level,
-    pub hash: BlockHash,
-    pub parent_hash: BlockHash,
-    pub nonce: U256,
-    pub sha3_uncles: OwnedHash,
-    pub logs_bloom: Option<OwnedHash>,
-    pub transactions_root: OwnedHash,
-    pub state_root: OwnedHash,
-    pub receipts_root: OwnedHash,
-    pub miner: OwnedHash,
-    pub difficulty: U256,
-    pub total_difficulty: U256,
-    pub extra_data: OwnedHash,
-    pub size: U256,
-    pub gas_limit: U256,
-    pub gas_used: U256,
-    pub timestamp: U256,
-    pub transactions: Vec<TransactionHash>,
-    pub uncles: Vec<OwnedHash>,
-}
-
-impl L2Block {
-    const DUMMY_QUANTITY: U256 = U256::zero();
-    const DUMMY_HASH: &str = "0000000000000000000000000000000000000000";
-
-    fn dummy_hash() -> OwnedHash {
-        L2Block::DUMMY_HASH.into()
-    }
-
-    fn dummy_block_hash() -> BlockHash {
-        [0; BLOCK_HASH_SIZE]
-    }
-
-    pub fn new(number: L2Level, transactions: Vec<TransactionHash>) -> Self {
-        let hash: BlockHash = {
-            let number: U256 = number.into();
-            number.into()
-        };
-        L2Block {
-            number,
-            hash,
-            parent_hash: L2Block::dummy_block_hash(),
-            nonce: L2Block::DUMMY_QUANTITY,
-            sha3_uncles: L2Block::dummy_hash(),
-            logs_bloom: None,
-            transactions_root: L2Block::dummy_hash(),
-            state_root: L2Block::dummy_hash(),
-            receipts_root: L2Block::dummy_hash(),
-            miner: L2Block::dummy_hash(),
-            difficulty: L2Block::DUMMY_QUANTITY,
-            total_difficulty: L2Block::DUMMY_QUANTITY,
-            extra_data: L2Block::dummy_hash(),
-            size: L2Block::DUMMY_QUANTITY,
-            gas_limit: L2Block::DUMMY_QUANTITY,
-            gas_used: L2Block::DUMMY_QUANTITY,
-            timestamp: L2Block::DUMMY_QUANTITY,
-            transactions,
-            uncles: Vec::new(),
-        }
-    }
-}
 
 fn get_tx_sender(
     tx: &EthereumTransactionCommon,

@@ -4,6 +4,7 @@
 
 pub mod account;
 pub mod address;
+pub mod block;
 pub mod eth_gen;
 pub mod signatures;
 pub mod transaction;

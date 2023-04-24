@@ -9,7 +9,6 @@ use crate::L2Block;
 use primitive_types::U256;
 use tezos_ethereum::account::Account;
 use tezos_ethereum::address::EthereumAddress;
-use tezos_ethereum::eth_gen::L2Level;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_ethereum::transaction::TransactionReceipt;
 use tezos_ethereum::transaction::TransactionStatus;
@@ -28,7 +27,7 @@ struct MintAccount {
 
 const GENESIS_ADDRESSS: [u8; 20] = [0; 20];
 
-const GENESIS_LEVEL: L2Level = 0;
+const GENESIS_LEVEL: U256 = U256::zero();
 
 const MINT_ACCOUNTS_NUMBER: usize = 3;
 

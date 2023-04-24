@@ -9,16 +9,16 @@ use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 
 use std::str::from_utf8;
 
-use crate::block::L2Block;
 use crate::error::{Error, StorageError};
 use tezos_ethereum::account::*;
-use tezos_ethereum::eth_gen::{BlockHash, Hash, L2Level};
+use tezos_ethereum::block::L2Block;
+use tezos_ethereum::eth_gen::Hash;
 use tezos_ethereum::transaction::{
     TransactionHash, TransactionReceipt, TransactionStatus, TRANSACTION_HASH_SIZE,
 };
 use tezos_ethereum::wei::Wei;
 
-use primitive_types::{H160, U256};
+use primitive_types::{H160, H256, U256};
 
 const SMART_ROLLUP_ADDRESS: RefPath =
     RefPath::assert_from(b"/metadata/smart_rollup_address");
@@ -134,7 +134,7 @@ pub fn account_path(address: Hash) -> Result<OwnedPath, Error> {
     concat(&EVM_ACCOUNTS, &address_hash).map_err(Error::from)
 }
 
-pub fn block_path(number: L2Level) -> Result<OwnedPath, Error> {
+pub fn block_path(number: U256) -> Result<OwnedPath, Error> {
     let number: &str = &number.to_string();
     let raw_number_path: Vec<u8> = format!("/{}", &number).into();
     let number_path = OwnedPath::try_from(raw_number_path)?;
@@ -235,11 +235,11 @@ pub fn store_account<Host: Runtime>(
     store_code_hash(host, account_path, &account.code_hash)
 }
 
-pub fn read_current_block_number<Host: Runtime>(host: &mut Host) -> Result<u64, Error> {
+pub fn read_current_block_number<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     let path = concat(&EVM_CURRENT_BLOCK, &EVM_BLOCKS_NUMBER)?;
     let mut buffer = [0_u8; 8];
     store_read_slice(host, &path, &mut buffer, 8)?;
-    Ok(u64::from_le_bytes(buffer))
+    Ok(U256::from_little_endian(&buffer))
 }
 
 fn read_nth_block_transactions<Host: Runtime>(
@@ -270,20 +270,23 @@ pub fn read_current_block<Host: Runtime>(host: &mut Host) -> Result<L2Block, Err
 fn store_block_number<Host: Runtime>(
     host: &mut Host,
     block_path: &OwnedPath,
-    block_number: L2Level,
+    block_number: U256,
 ) -> Result<(), Error> {
     let path = concat(block_path, &EVM_BLOCKS_NUMBER)?;
-    host.store_write(&path, &u64::to_le_bytes(block_number), 0)
+    let mut le_block_number: [u8; 32] = [0; 32];
+    block_number.to_little_endian(&mut le_block_number);
+    host.store_write(&path, &le_block_number, 0)
         .map_err(Error::from)
 }
 
 fn store_block_hash<Host: Runtime>(
     host: &mut Host,
     block_path: &OwnedPath,
-    block_hash: &BlockHash,
+    block_hash: &H256,
 ) -> Result<(), Error> {
     let path = concat(block_path, &EVM_BLOCKS_HASH)?;
-    host.store_write(&path, block_hash, 0).map_err(Error::from)
+    host.store_write(&path, block_hash.as_bytes(), 0)
+        .map_err(Error::from)
 }
 
 fn store_block_transactions<Host: Runtime>(
@@ -342,14 +345,14 @@ pub fn store_transaction_receipt<Host: Runtime>(
     host.store_write(&index_path, &receipt.index.to_le_bytes(), 0)?;
     // Block hash
     let block_hash_path = concat(receipt_path, &TRANSACTION_RECEIPT_BLOCK_HASH)?;
-    host.store_write(&block_hash_path, &receipt.block_hash, 0)?;
+    host.store_write(&block_hash_path, receipt.block_hash.as_bytes(), 0)?;
     // Block number
     let block_number_path = concat(receipt_path, &TRANSACTION_RECEIPT_BLOCK_NUMBER)?;
-    host.store_write(
-        &block_number_path,
-        &u64::to_le_bytes(receipt.block_number),
-        0,
-    )?;
+    let mut le_receipt_block_number: [u8; 32] = [0; 32];
+    receipt
+        .block_number
+        .to_little_endian(&mut le_receipt_block_number);
+    host.store_write(&block_number_path, &le_receipt_block_number, 0)?;
     // From
     let from_path = concat(receipt_path, &TRANSACTION_RECEIPT_FROM)?;
     let from: H160 = receipt.from.into();

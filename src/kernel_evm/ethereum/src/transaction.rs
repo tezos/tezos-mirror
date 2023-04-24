@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 use crate::address::EthereumAddress;
-use primitive_types::U256;
+use primitive_types::{H256, U256};
 
-use crate::eth_gen::{BlockHash, L2Level, OwnedHash};
+use crate::eth_gen::OwnedHash;
 
 pub const TRANSACTION_HASH_SIZE: usize = 32;
 pub type TransactionHash = [u8; TRANSACTION_HASH_SIZE];
@@ -60,9 +60,9 @@ pub struct TransactionReceipt {
     /// Integer of the transactions index position in the block.
     pub index: u32,
     /// Hash of the block where this transaction was in.
-    pub block_hash: BlockHash,
+    pub block_hash: H256,
     /// Block number where this transaction was in.
-    pub block_number: L2Level,
+    pub block_number: U256,
     /// Address of the sender.
     pub from: EthereumAddress,
     /// Address of the receiver. null when its a contract creation transaction.
