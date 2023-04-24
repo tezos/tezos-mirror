@@ -88,14 +88,23 @@ type parameter_overrides =
 let default_bootstrap_accounts =
   Array.to_list Account.Bootstrap.keys |> List.map @@ fun key -> (key, None)
 
+type bootstrap_smart_rollup = {
+  address : string;
+  pvm_kind : string;
+  boot_sector : string;
+  parameters_ty : Ezjsonm.value;
+}
+
 let write_parameter_file :
     ?bootstrap_accounts:(Account.key * int option) list ->
     ?additional_bootstrap_accounts:(Account.key * int option * bool) list ->
+    ?bootstrap_smart_rollups:bootstrap_smart_rollup list ->
     base:(string, t * constants option) Either.t ->
     parameter_overrides ->
     string Lwt.t =
  fun ?(bootstrap_accounts = default_bootstrap_accounts)
      ?(additional_bootstrap_accounts = [])
+     ?(bootstrap_smart_rollups = [])
      ~base
      parameter_overrides ->
   (* make a copy of the parameters file and update the given constants *)
@@ -126,6 +135,31 @@ let write_parameter_file :
           bootstrap_accounts
       in
       (["bootstrap_accounts"], `A bootstrap_accounts) :: parameter_overrides
+  in
+  let parameter_overrides =
+    if List.mem_assoc ["bootstrap_smart_rollups"] parameter_overrides then
+      parameter_overrides
+    else
+      let bootstrap_smart_rollups =
+        List.map
+          (fun {address; pvm_kind; boot_sector; parameters_ty} ->
+            `O
+              [
+                ("address", `String address);
+                ("pvm_kind", `String pvm_kind);
+                ("kernel", `String boot_sector);
+                ("parameters_ty", parameters_ty);
+              ])
+          bootstrap_smart_rollups
+      in
+      match bootstrap_smart_rollups with
+      | [] ->
+          (* This is useful for tests on protocol before bootstrap smart rollups
+             support. Otherwise the protocol cannot decode this new field. *)
+          parameter_overrides
+      | bootstrap_smart_rollups ->
+          (["bootstrap_smart_rollups"], `A bootstrap_smart_rollups)
+          :: parameter_overrides
   in
   let parameters =
     List.fold_left
