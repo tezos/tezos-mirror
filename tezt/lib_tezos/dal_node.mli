@@ -38,6 +38,7 @@ val create :
   ?event_pipe:string ->
   ?rpc_host:string ->
   ?rpc_port:int ->
+  ?listen_addr:string ->
   node:Node.t ->
   client:Client.t ->
   unit ->
