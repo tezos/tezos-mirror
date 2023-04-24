@@ -40,7 +40,7 @@ let encoding =
       (fun (root_hash, signature, signer_pkh) ->
         {root_hash; signature; signer_pkh})
       (obj3
-         (req "root_hash" Dac_plugin.non_proto_encoding_unsafe)
+         (req "root_hash" Dac_plugin.raw_hash_encoding)
          (req "signature" Tezos_crypto.Aggregate_signature.encoding)
          (req
             "signer_pkh"

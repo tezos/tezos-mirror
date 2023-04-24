@@ -106,9 +106,7 @@ let handle_get_verify_signature dac_plugin public_keys_opt encoded_l1_message =
     let open Option_syntax in
     let* encoded_l1_message in
     let* as_bytes = Hex.to_bytes @@ `Hex encoded_l1_message in
-    External_message.Default.of_bytes
-      Dac_plugin.non_proto_encoding_unsafe
-      as_bytes
+    External_message.Default.of_bytes Dac_plugin.raw_hash_encoding as_bytes
   in
   match external_message with
   | None -> tzfail @@ Cannot_deserialize_external_message
@@ -241,12 +239,17 @@ module Coordinator = struct
     in
     return @@ Dac_plugin.hash_to_raw root_hash
 
-  let handle_monitor_certificate ro_store certificate_streamers root_hash
-      committee_members =
+  let handle_monitor_certificate dac_plugin ro_store certificate_streamers
+      raw_root_hash committee_members =
     let open Lwt_result_syntax in
+    let ((module P) : Dac_plugin.t) = dac_plugin in
     let stream, stopper =
-      Certificate_streamers.handle_subscribe certificate_streamers root_hash
+      Certificate_streamers.handle_subscribe
+        dac_plugin
+        certificate_streamers
+        raw_root_hash
     in
+    let root_hash = P.raw_to_hash raw_root_hash in
     let*! () = Event.emit_new_subscription_to_certificate_updates root_hash in
     let shutdown () = Lwt_watcher.shutdown stopper in
     let next () = Lwt_stream.get stream in
@@ -263,15 +266,12 @@ module Coordinator = struct
             (fun Store.{aggregate_signature; witnesses} ->
               let certificate =
                 Certificate_repr.
-                  {
-                    root_hash = Dac_plugin.hash_to_raw root_hash;
-                    aggregate_signature;
-                    witnesses;
-                  }
+                  {root_hash = raw_root_hash; aggregate_signature; witnesses}
               in
               Certificate_streamers.push
+                dac_plugin
                 certificate_streamers
-                root_hash
+                raw_root_hash
                 certificate ;
               if
                 Certificate_repr.all_committee_members_have_signed
@@ -279,7 +279,9 @@ module Coordinator = struct
                   certificate
               then
                 let _ =
-                  Certificate_streamers.close certificate_streamers root_hash
+                  Certificate_streamers.close dac_plugin
+                    certificate_streamers
+                    raw_root_hash
                 in
                 ()
               else ())
@@ -290,15 +292,15 @@ module Coordinator = struct
 
   let register_monitor_certificate dac_plugin ro_store certificate_streamers
       committee_members dir =
-    let ((module P) : Dac_plugin.t) = dac_plugin in
     Tezos_rpc.Directory.gen_register
       dir
       Monitor_services.S.certificate
       (fun ((), root_hash) () () ->
         handle_monitor_certificate
+          dac_plugin
           ro_store
           certificate_streamers
-          (P.raw_to_hash root_hash)
+          root_hash
           committee_members)
 
   let register_coordinator_post_preimage dac_plugin hash_streamer page_store =

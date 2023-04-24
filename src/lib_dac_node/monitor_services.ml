@@ -30,7 +30,7 @@ module S = struct
         "Monitor a stream of root hashes that are produced by another dac node \
          responsible for the serialization of the dac payload (coordinator).  "
       ~query:Tezos_rpc.Query.empty
-      ~output:Dac_plugin.non_proto_encoding_unsafe
+      ~output:Dac_plugin.raw_hash_encoding
       Tezos_rpc.Path.(open_root / "monitor" / "root_hashes")
 
   let certificate =

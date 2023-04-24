@@ -307,4 +307,4 @@ let fetched_missing_page =
     ~name:"missing_page_fetched"
     ~msg:"Successfully fetched missing page for hash: {hash}"
     ~level:Notice
-    ("hash", Dac_plugin.non_proto_encoding_unsafe)
+    ("hash", Dac_plugin.raw_hash_encoding)

@@ -107,8 +107,8 @@ let () =
         (Dac_plugin.raw_hash_to_bytes actual))
     Data_encoding.(
       obj2
-        (req "expected" Dac_plugin.non_proto_encoding_unsafe)
-        (req "acual" Dac_plugin.non_proto_encoding_unsafe))
+        (req "expected" Dac_plugin.raw_hash_encoding)
+        (req "acual" Dac_plugin.raw_hash_encoding))
     (function
       | Incorrect_page_hash {expected; actual} -> Some (expected, actual)
       | _ -> None)

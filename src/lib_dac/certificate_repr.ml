@@ -41,7 +41,7 @@ let encoding =
   let obj_enc =
     Data_encoding.(
       obj3
-        (req "root_hash" Dac_plugin.non_proto_encoding_unsafe)
+        (req "root_hash" Dac_plugin.raw_hash_encoding)
         (req "aggregate_signature" Tezos_crypto.Aggregate_signature.encoding)
         (req "witnesses" z))
   in

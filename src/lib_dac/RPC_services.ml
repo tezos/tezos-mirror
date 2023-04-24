@@ -36,7 +36,7 @@ let store_preimage_request_encoding =
 let store_preimage_response_encoding =
   Data_encoding.(
     obj2
-      (req "root_hash" Dac_plugin.non_proto_encoding_unsafe)
+      (req "root_hash" Dac_plugin.raw_hash_encoding)
       (req "external_message" (bytes' Hex)))
 
 let external_message_query =
@@ -150,6 +150,6 @@ module Coordinator = struct
          of root page hash to subscribed committee members and observers. "
       ~query:Tezos_rpc.Query.empty
       ~input:Data_encoding.bytes
-      ~output:Dac_plugin.non_proto_encoding_unsafe
+      ~output:Dac_plugin.raw_hash_encoding
       Tezos_rpc.Path.(open_root / "preimage")
 end

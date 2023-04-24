@@ -46,19 +46,22 @@ let create_if_none certificate_streamers root_hash =
   !certificate_streamers |> Map.find root_hash
   |> Option.value_f ~default:(fun _ -> assert false)
 
-let handle_subscribe certificate_streamers root_hash =
+let handle_subscribe ((module P) : Dac_plugin.t) certificate_streamers raw_root_hash
+    =
   let certificate_streamer_for_root_hash =
-    create_if_none certificate_streamers root_hash
+    create_if_none certificate_streamers (P.raw_to_hash raw_root_hash)
   in
   Data_streamer.handle_subscribe certificate_streamer_for_root_hash
 
-let push certificate_streamers root_hash certificate =
+let push ((module P) : Dac_plugin.t) certificate_streamers root_hash certificate
+    =
   let certificate_streamer_for_root_hash =
-    create_if_none certificate_streamers root_hash
+    create_if_none certificate_streamers (P.raw_to_hash root_hash)
   in
   Data_streamer.publish certificate_streamer_for_root_hash certificate
 
-let close certificate_streamers root_hash =
+let close ((module P) : Dac_plugin.t) certificate_streamers raw_root_hash =
+  let root_hash = P.raw_to_hash raw_root_hash in
   let certificate_streamer_for_root_hash =
     Map.find root_hash !certificate_streamers
   in

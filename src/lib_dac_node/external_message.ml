@@ -92,7 +92,7 @@ struct
     let message = {root_hash; signature; witnesses} in
     let res =
       Data_encoding.Binary.to_bytes
-        (dac_message_encoding Dac_plugin.non_proto_encoding_unsafe)
+        (dac_message_encoding Dac_plugin.raw_hash_encoding)
         message
     in
     match res with

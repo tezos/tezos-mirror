@@ -368,14 +368,22 @@ module Coordinator = struct
   let stream_certificate_update ((module Plugin) : Dac_plugin.t)
       committee_members (Certificate_repr.{root_hash; _} as certificate)
       certificate_streamers =
-    let root_hash = Plugin.raw_to_hash root_hash in
-    Certificate_streamers.push certificate_streamers root_hash certificate ;
+    Certificate_streamers.push
+      ((module Plugin) : Dac_plugin.t)
+      certificate_streamers
+      root_hash
+      certificate ;
     if
       Certificate_repr.all_committee_members_have_signed
         committee_members
         certificate
     then
-      let _ = Certificate_streamers.close certificate_streamers root_hash in
+      let _ =
+        Certificate_streamers.close
+          ((module Plugin) : Dac_plugin.t)
+          certificate_streamers
+          root_hash
+      in
       ()
     else ()
 

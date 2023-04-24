@@ -38,7 +38,7 @@ type supported_hashes = Blake2B
 
 let raw_compare = Bytes.compare
 
-let non_proto_encoding_unsafe = Data_encoding.bytes' Hex
+let raw_hash_encoding = Data_encoding.bytes' Hex
 
 let hash_to_raw = Fun.id
 

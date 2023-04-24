@@ -50,7 +50,7 @@ type raw_hash
     Only use in situations where the plugin is not available,
     and for reporting purposes (e.g. when emitting an event or registering
     an error). *)
-val non_proto_encoding_unsafe : raw_hash Data_encoding.t
+val raw_hash_encoding : raw_hash Data_encoding.t
 
 (** [raw_hash] is just an alias for [bytes],
    so this is basically the identity function *)
