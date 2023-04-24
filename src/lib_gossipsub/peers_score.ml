@@ -183,6 +183,10 @@ struct
     let p7 = p7 ps in
     topic_scores +. p5 +. p7
 
+  let decay ~decay_zero ~decay_rate value =
+    let decayed = value *. decay_rate in
+    if decayed < decay_zero then 0.0 else decayed
+
   let make stats = {stats; score = Lazy.from_fun (fun () -> float stats)}
 
   let value ps = Lazy.force ps.score
@@ -396,7 +400,9 @@ struct
     | Inactive -> Span.zero
     | Active {during; _} -> during
 
-  let refresh_topic_status_map now {stats; _} =
+  let refresh_stats now {stats; _} =
+    let parameters = stats.parameters in
+    let decay_zero = parameters.decay_zero in
     let topic_status =
       Topic.Map.mapi
         (fun topic status ->
@@ -407,14 +413,52 @@ struct
               topic_parameters.mesh_message_deliveries_activation
               <= time_active_in_mesh mesh_status)
           in
-          {status with mesh_status; mesh_message_deliveries_active})
+          (* Apply decay to counters *)
+          let first_message_deliveries =
+            decay
+              ~decay_zero
+              ~decay_rate:topic_parameters.first_message_deliveries_decay
+              status.first_message_deliveries
+          in
+          let mesh_message_deliveries =
+            decay
+              ~decay_zero
+              ~decay_rate:topic_parameters.mesh_message_deliveries_decay
+              status.mesh_message_deliveries
+          in
+          let mesh_failure_penalty =
+            decay
+              ~decay_zero
+              ~decay_rate:topic_parameters.mesh_failure_penalty_decay
+              status.mesh_failure_penalty
+          in
+          let invalid_messages =
+            decay
+              ~decay_zero
+              ~decay_rate:topic_parameters.invalid_message_deliveries_decay
+              status.invalid_messages
+          in
+          {
+            mesh_status;
+            mesh_message_deliveries_active;
+            first_message_deliveries;
+            mesh_message_deliveries;
+            mesh_failure_penalty;
+            invalid_messages;
+          })
         stats.topic_status
     in
-    make {stats with topic_status}
+    let behaviour_penalty =
+      decay
+        ~decay_zero
+        ~decay_rate:parameters.behaviour_penalty_decay
+        stats.behaviour_penalty
+    in
+    make {stats with topic_status; behaviour_penalty}
 
   let refresh ps =
     let current = Time.now () in
-    let refresh () = Some (refresh_topic_status_map current ps) in
+    let refresh () = Some (refresh_stats current ps) in
     match ps.stats.peer_status with
     | Connected -> refresh ()
     | Disconnected {expires = at} when Time.(at > current) -> refresh ()
