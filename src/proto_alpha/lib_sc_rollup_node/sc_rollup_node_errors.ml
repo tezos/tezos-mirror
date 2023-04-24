@@ -59,7 +59,9 @@ type error +=
   | No_refutation_coordinator
   | Could_not_acquire_lock of string
 
-type error += Lost_game of Protocol.Alpha_context.Sc_rollup.Game.game_result
+type error +=
+  | Lost_game of Protocol.Alpha_context.Sc_rollup.Game.game_result
+  | Unparsable_boot_sector of {path : string}
 
 let () =
   register_error_kind
@@ -295,6 +297,17 @@ let () =
            Protocol.Alpha_context.Sc_rollup.Game.game_result_encoding))
     (function Lost_game result -> Some result | _ -> None)
     (fun result -> Lost_game result) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup.node.unparsable_boot_sector"
+    ~title:"Unparsable boot sector"
+    ~description:"The boot sector provided is not parsable by the PVM."
+    ~pp:(fun ppf path ->
+      Format.fprintf ppf "The boot sector at path %S is unparsable" path)
+    Data_encoding.(obj1 (req "path" string))
+    (function Unparsable_boot_sector {path} -> Some path | _ -> None)
+    (fun path -> Unparsable_boot_sector {path}) ;
 
   register_error_kind
     ~id:"sc_rollup.node.no_batcher"

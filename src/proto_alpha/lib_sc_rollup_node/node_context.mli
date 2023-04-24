@@ -48,6 +48,9 @@ type 'a t = {
   l1_ctxt : Layer1.t;
       (** Layer 1 context to fetch blocks and monitor heads, etc.*)
   rollup_address : Sc_rollup.t;  (** Smart rollup tracked by the rollup node. *)
+  boot_sector_file : string option;
+      (** Optional path to the boot sector file. Useful only if the smart
+          rollup was bootstrapped and not originated. *)
   mode : Configuration.mode;
       (** Mode of the node, see {!Configuration.mode}. *)
   operators : Configuration.operators;

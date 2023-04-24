@@ -109,6 +109,23 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         | Found_boot_sector boot_sector -> return boot_sector
         | _ -> missing_boot_sector ())
 
+  let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
+    let open Lwt_result_syntax in
+    match node_ctxt.boot_sector_file with
+    | None -> get_boot_sector block_hash node_ctxt
+    | Some boot_sector_file ->
+        let*! boot_sector = Lwt_utils_unix.read_file boot_sector_file in
+        let*? boot_sector =
+          Option.value_e
+            ~error:
+              [
+                Sc_rollup_node_errors.Unparsable_boot_sector
+                  {path = boot_sector_file};
+              ]
+            (PVM.parse_boot_sector boot_sector)
+        in
+        return boot_sector
+
   let genesis_state block_hash node_ctxt ctxt =
     let open Lwt_result_syntax in
     let* boot_sector = get_boot_sector block_hash node_ctxt in

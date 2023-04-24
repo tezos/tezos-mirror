@@ -87,6 +87,10 @@ Smart Rollup node
 
 - Fixed logs for kernel debug messages (MR :gl:`!7773`).
 
+- New argument ``--boot-sector-file`` to specify a path to the boot sector used
+  for the rollup. This is an optional argument that is required *only* if the
+  smart rollup was bootstrapped and not originated (MR :gl:`!8556`).
+
 Smart Rollup client
 -------------------
 
