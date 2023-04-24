@@ -1197,9 +1197,6 @@ and 'ctx tree =
   | TNonTerminalSeq : 'ctx non_terminal_seq_level -> 'ctx tree
   | TEmpty : 'ctx tree
 
-let has_options : type ctx. ctx command -> bool =
- fun (Command {options; _}) -> has_args options
-
 let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
  fun root (Command {params; conv; _} as command) ->
   let rec insert_tree :
@@ -1230,9 +1227,7 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
         TPrefix {stop = None; prefix = [(n, insert_tree TEmpty next)]}
     | TStop cmd, Param (_, _, {autocomplete; _}, next) ->
         let autocomplete = conv_autocomplete autocomplete in
-        if not (has_options cmd) then
-          TParam {tree = insert_tree TEmpty next; stop = Some cmd; autocomplete}
-        else Stdlib.failwith "Command cannot have both prefix and options"
+        TParam {tree = insert_tree TEmpty next; stop = Some cmd; autocomplete}
     | TStop cmd, Prefix (n, next) ->
         TPrefix {stop = Some cmd; prefix = [(n, insert_tree TEmpty next)]}
     | TStop cmd, NonTerminalSeq (name, desc, {autocomplete; _}, suffix, next) ->
@@ -1297,6 +1292,13 @@ and gather_assoc ?(acc = []) trees =
 
 let find_command tree initial_arguments =
   let open Lwt_result_syntax in
+  let is_short_option s =
+    String.length s = 2
+    && s.[0] = '-'
+    && match s.[1] with 'a' .. 'z' | 'A' .. 'Z' -> true | _ -> false
+  in
+  let is_long_option s = String.length s >= 2 && s.[0] = '-' && s.[1] = '-' in
+  let is_option s = is_short_option s || is_long_option s in
   let rec traverse tree arguments acc =
     match (tree, arguments) with
     | ( ( TStop _ | TSeq _
@@ -1362,6 +1364,10 @@ let find_command tree initial_arguments =
         | Some tree' -> traverse tree' tl (hd_arg :: acc))
     | TParam {stop = None; _}, ([] | ("-h" | "--help") :: _) ->
         tzfail (Unterminated_command (initial_arguments, gather_commands tree))
+    | TParam {stop = Some c; _}, hd :: _ when is_option hd ->
+        (* If the argument looks like an option, we choose the "stop"
+           command. *)
+        traverse (TStop c) arguments acc
     | TParam {stop = Some c; _}, [] ->
         return (c, empty_args_dict, initial_arguments)
     | TParam {tree; _}, parameter :: arguments' ->
