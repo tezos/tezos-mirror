@@ -96,13 +96,20 @@ let init_contract ~typecheck (ctxt, balance_updates)
   >|=? fun (ctxt, new_balance_updates) ->
   (ctxt, new_balance_updates @ balance_updates)
 
-let init ctxt ~typecheck ?no_reward_cycles accounts contracts =
+let init_smart_rollup ctxt
+    ({address = _; boot_sector = _; pvm_kind = _; parameters_ty = _} :
+      Parameters_repr.bootstrap_smart_rollup) =
+  (* The implementation comes in the next commit. *)
+  return ctxt
+
+let init ctxt ~typecheck ?no_reward_cycles accounts contracts smart_rollups =
   let nonce = Operation_hash.hash_string ["Un festival de GADT."] in
   let ctxt = Raw_context.init_origination_nonce ctxt nonce in
   List.fold_left_es init_account (ctxt, []) accounts
   >>=? fun (ctxt, balance_updates) ->
   List.fold_left_es (init_contract ~typecheck) (ctxt, balance_updates) contracts
   >>=? fun (ctxt, balance_updates) ->
+  List.fold_left_es init_smart_rollup ctxt smart_rollups >>=? fun ctxt ->
   (match no_reward_cycles with
   | None -> return ctxt
   | Some cycles ->

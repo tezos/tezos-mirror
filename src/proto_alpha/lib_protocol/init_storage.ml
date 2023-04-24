@@ -196,6 +196,7 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
         ?no_reward_cycles:param.no_reward_cycles
         param.bootstrap_accounts
         param.bootstrap_contracts
+        param.bootstrap_smart_rollups
       >>=? fun (ctxt, bootstrap_balance_updates) ->
       Delegate_cycles.init_first_cycles ctxt ~origin:Protocol_migration
       >>=? fun (ctxt, deposits_balance_updates) ->

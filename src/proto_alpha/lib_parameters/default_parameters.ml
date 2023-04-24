@@ -441,11 +441,13 @@ let make_bootstrap_account (pkh, pk, amount, delegate_to, consensus_key) =
     }
 
 let parameters_of_constants ?(bootstrap_accounts = bootstrap_accounts)
-    ?(bootstrap_contracts = []) ?(commitments = []) constants =
+    ?(bootstrap_contracts = []) ?(bootstrap_smart_rollups = [])
+    ?(commitments = []) constants =
   Parameters.
     {
       bootstrap_accounts;
       bootstrap_contracts;
+      bootstrap_smart_rollups;
       commitments;
       constants;
       security_deposit_ramp_up_cycles = None;
