@@ -5170,7 +5170,6 @@ let test_arg_boot_sector_file ~kind =
       description = "Rollup node uses argument boot sector file";
     }
   @@ fun _protocol rollup_node _rollup_client rollup _node client ->
-  let _ = client in
   let invalid_boot_sector =
     hex_if_wasm "Nairobi est un bien meilleur nom de protocol que Nantes"
   in
@@ -5206,6 +5205,43 @@ let test_arg_boot_sector_file ~kind =
   in
   let* () = Client.bake_for_and_wait client in
   let* _ = Sc_rollup_node.wait_sync ~timeout:10. rollup_node in
+  unit
+
+let test_bootstrap_smart_rollup_originated =
+  register_test
+    ~supports:(From_protocol 018)
+    ~__FILE__
+    ~tags:["bootstrap"; "parameter"]
+    ~title:"Bootstrap smart rollups are listed"
+  @@ fun protocol ->
+  let bootstrap_arith : Protocol.bootstrap_smart_rollup =
+    {
+      address = "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf";
+      pvm_kind = "arith";
+      boot_sector = "";
+      parameters_ty = `O [("prim", `String "unit")];
+    }
+  in
+  let bootstrap_wasm : Protocol.bootstrap_smart_rollup =
+    {
+      address = "sr163Lv22CdE8QagCwf48PWDTquk6isQwv57";
+      pvm_kind = "wasm_2_0_0";
+      boot_sector = "";
+      parameters_ty = `O [("prim", `String "unit")];
+    }
+  in
+  let bootstrap_smart_rollups = [bootstrap_arith; bootstrap_wasm] in
+  let* _node, client = setup_l1 ~bootstrap_smart_rollups protocol in
+  let* rollups =
+    RPC.Client.call client @@ RPC.get_chain_block_context_smart_rollups_all ()
+  in
+  let bootstrap_smart_rollups_addresses =
+    List.map (fun Protocol.{address; _} -> address) bootstrap_smart_rollups
+  in
+  Check.(
+    (rollups = bootstrap_smart_rollups_addresses)
+      (list string)
+      ~error_msg:"Expected %R bootstrapped smart rollups, got %L") ;
   unit
 
 let register ~kind ~protocols =
@@ -5381,7 +5417,9 @@ let register ~protocols =
   test_injector_auto_discard protocols ;
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
-  register ~kind:"arith" ~protocols
+  register ~kind:"arith" ~protocols ;
+  (* Both Arith and Wasm PVM tezts *)
+  test_bootstrap_smart_rollup_originated protocols
 
 let register_migration ~kind ~migrate_from ~migrate_to =
   test_migration_inbox ~kind ~migrate_from ~migrate_to ;
