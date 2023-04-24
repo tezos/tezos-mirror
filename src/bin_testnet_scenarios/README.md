@@ -22,3 +22,6 @@ to match the current Mondaynet).
   "snapshot": "http://mondaynet.snapshots.s3-website.eu-central-1.amazonaws.com/mondaynet-rolling-snapshot"
 }
 ```
+
+The `snapshot` can be omitted and the nodes will bootstrap themself (but it
+can becomes very long).

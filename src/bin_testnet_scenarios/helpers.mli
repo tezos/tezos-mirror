@@ -23,18 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [download ?runner url filename] downloads the file at [url],
-    stores it in a temporary file named [filename], and returns the
-    complete path to the downloaded file. *)
-val download : ?runner:Runner.t -> string -> string -> string Lwt.t
-
 (** [wait_for_funded_key node client amount key] will not return
     before [key] has been funded with [amount] tez. *)
 val wait_for_funded_key :
   Node.t -> Client.t -> Tez.t -> Account.key -> unit Lwt.t
 
-(** [setup_octez_node ~testnet ?runner snapshot_path] setups a new
-    Octez node from the snapshot stored at [snapshot_path], and waits
-    for it to be bootstrapped. *)
+(** [setup_octez_node ~testnet ?runner ()] setups a new Octez node.
+    Bootstrap the node using the snapshot in [testnet.snapshot] if provided,
+    otherwise bootstrap itself. *)
 val setup_octez_node :
-  testnet:Testnet.t -> ?runner:Runner.t -> string -> (Client.t * Node.t) Lwt.t
+  testnet:Testnet.t -> ?runner:Runner.t -> unit -> (Client.t * Node.t) Lwt.t

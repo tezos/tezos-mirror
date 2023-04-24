@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [download ?runner url filename] downloads the file at [url],
+    stores it in a temporary file named [filename], and returns the
+    complete path to the downloaded file. *)
 let download ?runner url filename =
   Log.info "Download %s" url ;
   let path = Tezt.Temp.file filename in
@@ -42,7 +45,7 @@ let rec wait_for_funded_key node client expected_amount key =
     wait_for_funded_key node client expected_amount key)
   else unit
 
-let setup_octez_node ~(testnet : Testnet.t) ?runner snapshot =
+let setup_octez_node ~(testnet : Testnet.t) ?runner () =
   (* By default, Tezt set the difficulty to generate the identity file
      of the Octez node to 0 (`--expected-pow 0`). The default value
      used in network like mainnet, Mondaynet etc. is 26 (see
@@ -52,9 +55,16 @@ let setup_octez_node ~(testnet : Testnet.t) ?runner snapshot =
   in
   let node = Node.create ?runner l1_node_args in
   let* () = Node.config_init node [] in
-  Log.info "Import snapshot" ;
-  let* () = Node.snapshot_import node snapshot in
-  Log.info "Snapshot imported" ;
+  let* () =
+    match testnet.snapshot with
+    | Some snapshot ->
+        Log.info "Import snapshot" ;
+        let* snapshot = download ?runner snapshot "snapshot" in
+        let* () = Node.snapshot_import node snapshot in
+        Log.info "Snapshot imported" ;
+        unit
+    | None -> unit
+  in
   let* () = Node.run node [] in
   let* () = Node.wait_for_ready node in
   let client = Client.create ~endpoint:(Node node) () in
