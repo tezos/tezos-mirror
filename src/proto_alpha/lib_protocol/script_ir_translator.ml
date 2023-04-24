@@ -798,7 +798,7 @@ let rec parse_ty :
         parse_memo_size memo_size >|? fun memo_size ->
         return ctxt (sapling_transaction_t ~memo_size)
     | Prim (loc, T_sapling_transaction_deprecated, [memo_size], annot) ->
-        if legacy then
+        if legacy (* Legacy check introduced in Jakarta. *) then
           check_type_annot loc annot >>? fun () ->
           parse_memo_size memo_size >|? fun memo_size ->
           return ctxt (sapling_transaction_deprecated_t ~memo_size)
@@ -959,7 +959,7 @@ and parse_big_map_value_ty ctxt ~stack_depth ~legacy value_ty =
     ~legacy
     ~allow_lazy_storage:false
     ~allow_operation:false
-    ~allow_contract:legacy
+    ~allow_contract:false
     ~allow_ticket:true
     ~ret:Don't_parse_entrypoints
     value_ty
@@ -971,7 +971,7 @@ let parse_packable_ty ctxt ~stack_depth ~legacy node =
     ~legacy
     ~allow_lazy_storage:false
     ~allow_operation:false
-    ~allow_contract:legacy
+    ~allow_contract:false
       (* type contract is forbidden in UNPACK because of
          https://gitlab.com/tezos/tezos/-/issues/301 *)
     ~allow_ticket:false
@@ -1009,7 +1009,7 @@ let parse_normal_storage_ty ctxt ~stack_depth ~legacy node =
     ~legacy
     ~allow_lazy_storage:true
     ~allow_operation:false
-    ~allow_contract:legacy
+    ~allow_contract:false
     ~allow_ticket:true
     ~ret:Don't_parse_entrypoints
     node
@@ -1027,7 +1027,7 @@ let parse_storage_ty :
         T_pair,
         [Prim (big_map_loc, T_big_map, args, map_annot); remaining_storage],
         storage_annot )
-    when legacy -> (
+    when legacy (* Legacy check introduced before Ithaca. *) -> (
       match storage_annot with
       | [] ->
           (parse_normal_storage_ty [@tailcall]) ctxt ~stack_depth ~legacy node
@@ -1058,7 +1058,7 @@ let parse_storage_ty :
   | _ -> (parse_normal_storage_ty [@tailcall]) ctxt ~stack_depth ~legacy node
 
 (* check_packable: determine if a `ty` is packable into Michelson *)
-let check_packable ~legacy loc root =
+let check_packable ~allow_contract loc root =
   let rec check : type t tc. (t, tc) ty -> unit tzresult = function
     (* /!\ When adding new lazy storage kinds, be sure to return an error. /!\
        Lazy storage should not be packable. *)
@@ -1091,7 +1091,7 @@ let check_packable ~legacy loc root =
     | Option_t (v_ty, _, _) -> check v_ty
     | List_t (elt_ty, _) -> check elt_ty
     | Map_t (_, elt_ty, _) -> check elt_ty
-    | Contract_t (_, _) when legacy -> Result.return_unit
+    | Contract_t (_, _) when allow_contract -> Result.return_unit
     | Contract_t (_, _) -> error (Unexpected_contract loc)
     | Sapling_transaction_t _ -> ok ()
     | Sapling_transaction_deprecated_t _ -> ok ()
@@ -1395,7 +1395,8 @@ let parse_parameter_ty_and_entrypoints :
     ~ret:Parse_entrypoints
   >>? fun (Ex_parameter_ty_and_entrypoints_node {arg_type; entrypoints}, ctxt)
     ->
-  (if legacy then Result.return_unit
+  (if legacy (* Legacy check introduced before Ithaca. *) then
+   Result.return_unit
   else well_formed_entrypoints arg_type entrypoints)
   >|? fun () ->
   let entrypoints = {root = entrypoints; original_type_expr = node} in
@@ -1432,7 +1433,9 @@ let opened_ticket_type loc ty = comparable_pair_3_t loc address_t ty nat_t
 
 let parse_unit ctxt ~legacy = function
   | Prim (loc, D_Unit, [], annot) ->
-      (if legacy then Result.return_unit else error_unexpected_annot loc annot)
+      (if legacy (* Legacy check introduced before Ithaca. *) then
+       Result.return_unit
+      else error_unexpected_annot loc annot)
       >>? fun () ->
       Gas.consume ctxt Typecheck_costs.unit >|? fun ctxt -> ((), ctxt)
   | Prim (loc, D_Unit, l, _) ->
@@ -1441,11 +1444,15 @@ let parse_unit ctxt ~legacy = function
 
 let parse_bool ctxt ~legacy = function
   | Prim (loc, D_True, [], annot) ->
-      (if legacy then Result.return_unit else error_unexpected_annot loc annot)
+      (if legacy (* Legacy check introduced before Ithaca. *) then
+       Result.return_unit
+      else error_unexpected_annot loc annot)
       >>? fun () ->
       Gas.consume ctxt Typecheck_costs.bool >|? fun ctxt -> (true, ctxt)
   | Prim (loc, D_False, [], annot) ->
-      (if legacy then Result.return_unit else error_unexpected_annot loc annot)
+      (if legacy (* Legacy check introduced before Ithaca. *) then
+       Result.return_unit
+      else error_unexpected_annot loc annot)
       >>? fun () ->
       Gas.consume ctxt Typecheck_costs.bool >|? fun ctxt -> (false, ctxt)
   | Prim (loc, ((D_True | D_False) as c), l, _) ->
@@ -1695,7 +1702,9 @@ let parse_pair (type r) parse_l parse_r ctxt ~legacy
   in
   match expr with
   | Prim (loc, D_Pair, l :: rs, annot) ->
-      (if legacy then Result.return_unit else error_unexpected_annot loc annot)
+      (if legacy (* Legacy check introduced before Ithaca. *) then
+       Result.return_unit
+      else error_unexpected_annot loc annot)
       >>?= fun () -> parse_comb loc l rs
   | Prim (loc, D_Pair, l, _) ->
       tzfail @@ Invalid_arity (loc, D_Pair, 2, List.length l)
@@ -1706,13 +1715,17 @@ let parse_pair (type r) parse_l parse_r ctxt ~legacy
 
 let parse_or parse_l parse_r ctxt ~legacy = function
   | Prim (loc, D_Left, [v], annot) ->
-      (if legacy then Result.return_unit else error_unexpected_annot loc annot)
+      (if legacy (* Legacy check introduced before Ithaca. *) then
+       Result.return_unit
+      else error_unexpected_annot loc annot)
       >>?= fun () ->
       parse_l ctxt v >|=? fun (v, ctxt) -> (L v, ctxt)
   | Prim (loc, D_Left, l, _) ->
       tzfail @@ Invalid_arity (loc, D_Left, 1, List.length l)
   | Prim (loc, D_Right, [v], annot) ->
-      (if legacy then Result.return_unit else error_unexpected_annot loc annot)
+      (if legacy (* Legacy check introduced before Ithaca. *) then
+       Result.return_unit
+      else error_unexpected_annot loc annot)
       >>?= fun () ->
       parse_r ctxt v >|=? fun (v, ctxt) -> (R v, ctxt)
   | Prim (loc, D_Right, l, _) ->
@@ -1721,14 +1734,17 @@ let parse_or parse_l parse_r ctxt ~legacy = function
 
 let parse_option parse_v ctxt ~legacy = function
   | Prim (loc, D_Some, [v], annot) ->
-      (if legacy then Result.return_unit else error_unexpected_annot loc annot)
+      (if legacy (* Legacy check introduced before Ithaca. *) then
+       Result.return_unit
+      else error_unexpected_annot loc annot)
       >>?= fun () ->
       parse_v ctxt v >|=? fun (v, ctxt) -> (Some v, ctxt)
   | Prim (loc, D_Some, l, _) ->
       tzfail @@ Invalid_arity (loc, D_Some, 1, List.length l)
   | Prim (loc, D_None, [], annot) ->
       Lwt.return
-        ( (if legacy then Result.return_unit
+        ( (if legacy (* Legacy check introduced before Ithaca. *) then
+           Result.return_unit
           else error_unexpected_annot loc annot)
         >|? fun () -> (None, ctxt) )
   | Prim (loc, D_None, l, _) ->
@@ -1896,7 +1912,8 @@ let rec parse_data :
       (fun (last_value, map, ctxt) item ->
         match item with
         | Prim (loc, D_Elt, [k; v], annot) ->
-            (if elab_conf.legacy then Result.return_unit
+            (if elab_conf.legacy (* Legacy check introduced before Ithaca. *)
+            then Result.return_unit
             else error_unexpected_annot loc annot)
             >>?= fun () ->
             non_terminal_recursion ctxt key_type k >>=? fun (k, ctxt) ->
@@ -1944,7 +1961,8 @@ let rec parse_data :
       (fun (last_key, {map; size}, ctxt) item ->
         match item with
         | Prim (loc, D_Elt, [k; v], annot) ->
-            (if elab_conf.legacy then Result.return_unit
+            (if elab_conf.legacy (* Legacy check introduced before Ithaca. *)
+            then Result.return_unit
             else error_unexpected_annot loc annot)
             >>?= fun () ->
             non_terminal_recursion ctxt key_type k >>=? fun (k, ctxt) ->
@@ -3236,7 +3254,7 @@ and parse_instr :
       Item_t
         ( Sapling_transaction_deprecated_t transaction_memo_size,
           Item_t ((Sapling_state_t state_memo_size as state_ty), rest) ) ) ->
-      if legacy then
+      if legacy (* Legacy check introduced in Jakarta. *) then
         memo_size_eq
           ~error_details:(Informative ())
           state_memo_size
@@ -3453,7 +3471,7 @@ and parse_instr :
         ( capture,
           Item_t (Lambda_t (Pair_t (capture_ty, arg_ty, _, _), ret, _), rest) )
     ) ->
-      check_packable ~legacy:false loc capture_ty >>?= fun () ->
+      check_packable ~allow_contract:false loc capture_ty >>?= fun () ->
       check_item_ty ctxt capture capture_ty loc I_APPLY 1 2
       >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
@@ -3526,9 +3544,7 @@ and parse_instr :
   | Prim (loc, I_FAILWITH, [], annot), Item_t (v, _rest) ->
       Lwt.return
         ( error_unexpected_annot loc annot >>? fun () ->
-          (if legacy then Result.return_unit
-          else check_packable ~legacy:false loc v)
-          >|? fun () ->
+          check_packable ~allow_contract:false loc v >|? fun () ->
           let instr = {apply = (fun _k -> IFailwith (loc, v))} in
           let descr aft = {loc; instr; bef = stack_ty; aft} in
           log_stack loc stack_ty Bot_t ;
@@ -3632,7 +3648,7 @@ and parse_instr :
       typed ctxt loc instr stack
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Mutez_t, (Item_t (Mutez_t, _) as stack)) ) ->
-      if legacy then
+      if legacy (* Legacy check introduced in Ithaca. *) then
         check_var_annot loc annot >>?= fun () ->
         let instr = {apply = (fun k -> ISub_tez_legacy (loc, k))} in
         typed ctxt loc instr stack
@@ -3915,7 +3931,7 @@ and parse_instr :
   (* packing *)
   | Prim (loc, I_PACK, [], annot), Item_t (t, rest) ->
       check_packable
-        ~legacy:true
+        ~allow_contract:true
         (* allow to pack contracts for hash/signature checks *) loc
         t
       >>?= fun () ->
@@ -4321,7 +4337,7 @@ and parse_instr :
       typed ctxt loc instr (Item_t (or_bytes_bool_t, rest))
   (* Events *)
   | Prim (loc, I_EMIT, [], annot), Item_t (data, rest) ->
-      check_packable ~legacy loc data >>?= fun () ->
+      check_packable ~allow_contract:false loc data >>?= fun () ->
       parse_entrypoint_annot_strict loc annot >>?= fun tag ->
       unparse_ty ~loc:() ctxt data >>?= fun (unparsed_ty, ctxt) ->
       Gas.consume ctxt (Script.strip_locations_cost unparsed_ty)
