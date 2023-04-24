@@ -545,7 +545,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       ~uniq:`False
       ~contents
       tree
-      (Tezos_context_memory.make_empty_tree ())
+      (Tezos_context_memory.Context.make_empty_tree ())
 
   let to_memory_tree (ctxt : t) (key : string list) :
       Tezos_context_memory.Context.tree option Lwt.t =

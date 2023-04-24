@@ -106,7 +106,7 @@ let rec raw_context_to_tree (raw : Proof.raw_context) : Local.tree option Lwt.t
         String.Map.bindings map
         |> List.fold_left_s
              add_to_tree
-             (Tezos_context_memory.make_empty_tree ())
+             (Tezos_context_memory.Context.make_empty_tree ())
       in
       if Local.Tree.is_empty dir then return_none else return_some dir
 
@@ -170,7 +170,8 @@ struct
 
   type key = Local.key
 
-  let empty = Local.Tree.empty (Tezos_context_memory.make_empty_context ())
+  let empty =
+    Local.Tree.empty (Tezos_context_memory.Context.make_empty_context ())
 
   let get = Local.Tree.find_tree
 

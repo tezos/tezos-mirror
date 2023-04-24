@@ -36,7 +36,7 @@ module M = struct
      behave like [Memory_context]. *)
   type t = {proxy : Proxy_delegate.t option; local : Local.t}
 
-  let empty = Tezos_context_memory.make_empty_tree ()
+  let empty = Tezos_context_memory.Context.make_empty_tree ()
 end
 
 module C = struct
@@ -401,7 +401,7 @@ include Environment_context.Register (C)
 let proxy_impl_name = "proxy"
 
 let empty proxy =
-  let local = Tezos_context_memory.make_empty_context () in
+  let local = Tezos_context_memory.Context.make_empty_context () in
   let ctxt = M.{proxy; local} in
   Context.make
     ~ops

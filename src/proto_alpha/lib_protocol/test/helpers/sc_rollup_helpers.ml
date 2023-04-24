@@ -122,26 +122,9 @@ module Wasm_pvm :
       Tezos_context_memory.Context.Proof.t =
   Sc_rollup.Wasm_2_0_0PVM.Make (Environment.Wasm_2_0_0.Make) (In_memory_context)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4386
-   Extracted and adapted from {!Tezos_context_memory}. *)
-let make_empty_context ?(root = "/tmp") () =
-  let open Lwt_syntax in
-  let context_promise =
-    let+ index = Tezos_context_memory.Context_binary.init root in
-    Tezos_context_memory.Context_binary.empty index
-  in
-  match Lwt.state context_promise with
-  | Lwt.Return result -> result
-  | Lwt.Fail exn -> raise exn
-  | Lwt.Sleep ->
-      (* The in-memory context should never block *)
-      assert false
+let make_empty_context = Tezos_context_memory.Context_binary.make_empty_context
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4386
-   Extracted and adapted from {!Tezos_context_memory}. *)
-let make_empty_tree =
-  let dummy_context = make_empty_context ~root:"dummy" () in
-  fun () -> Tezos_context_memory.Context_binary.Tree.empty dummy_context
+let make_empty_tree = Tezos_context_memory.Context_binary.make_empty_tree
 
 let compute_origination_proof ~boot_sector = function
   | Sc_rollup.Kind.Example_arith ->
@@ -167,7 +150,7 @@ let compute_origination_proof ~boot_sector = function
     about the arity of its trees. *)
 let wrong_arith_origination_proof ~alter_binary_bit ~boot_sector =
   let open Lwt_syntax in
-  let context = Tezos_context_memory.make_empty_context () in
+  let context = Tezos_context_memory.Context.make_empty_context () in
   let+ proof = Wrong_arith_pvm.produce_origination_proof context boot_sector in
   let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
   let proof =

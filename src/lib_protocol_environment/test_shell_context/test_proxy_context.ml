@@ -56,7 +56,7 @@ let key_to_string : String.t list -> String.t = String.concat ";"
 (* Initialize the Context before starting the tests *)
 let init_contexts (f : Context.t -> unit Lwt.t) _ () : 'a Lwt.t =
   let open Lwt_syntax in
-  let ctxt = Tezos_context_memory.make_empty_context () in
+  let ctxt = Tezos_context_memory.Context.make_empty_context () in
   let* ctxt = create_block ctxt in
   let proxy : Context.t =
     Tezos_protocol_environment.Proxy_context.empty

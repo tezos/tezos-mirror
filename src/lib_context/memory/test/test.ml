@@ -66,7 +66,8 @@ end
 module M = struct
   include Tezos_context_memory.Context
 
-  let make_context () = Lwt.return (Tezos_context_memory.make_empty_context ())
+  let make_context () =
+    Lwt.return (Tezos_context_memory.Context.make_empty_context ())
 end
 
 module Make (A : sig
