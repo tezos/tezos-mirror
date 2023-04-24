@@ -96,10 +96,43 @@ let init_contract ~typecheck (ctxt, balance_updates)
   >|=? fun (ctxt, new_balance_updates) ->
   (ctxt, new_balance_updates @ balance_updates)
 
+let genesis_hash ~boot_sector kind =
+  let open Lwt_result_syntax in
+  let (module Machine) = Sc_rollups.Kind.no_proof_machine_of kind in
+  let empty = Sc_rollup_machine_no_proofs.empty_tree () in
+  let*! state = Machine.initial_state ~empty in
+  let*! state = Machine.install_boot_sector state boot_sector in
+  let*! genesis_hash = Machine.state_hash state in
+  return genesis_hash
+
 let init_smart_rollup ctxt
-    ({address = _; boot_sector = _; pvm_kind = _; parameters_ty = _} :
+    ({address; boot_sector; pvm_kind; parameters_ty} :
       Parameters_repr.bootstrap_smart_rollup) =
-  (* The implementation comes in the next commit. *)
+  let open Lwt_result_syntax in
+  let* genesis_hash = genesis_hash ~boot_sector pvm_kind in
+  let genesis_commitment : Sc_rollup_commitment_repr.t =
+    {
+      compressed_state = genesis_hash;
+      (* Level 0: Genesis block.
+         Level 1: Block on protocol genesis, that only activates protocols.
+         Level 2: First block on the activated protocol.
+
+         Therefore we originate the rollup at level 2 so the rollup node
+         doesn't ask a block on a different protocol.
+      *)
+      inbox_level = Raw_level_repr.of_int32_exn 2l;
+      predecessor = Sc_rollup_commitment_repr.Hash.zero;
+      number_of_ticks = Sc_rollup_repr.Number_of_ticks.zero;
+    }
+  in
+  let* _, _, ctxt =
+    Sc_rollup_storage.raw_originate
+      ctxt
+      ~kind:pvm_kind
+      ~genesis_commitment
+      ~parameters_ty
+      ~address
+  in
   return ctxt
 
 let init ctxt ~typecheck ?no_reward_cycles accounts contracts smart_rollups =
