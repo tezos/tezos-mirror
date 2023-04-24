@@ -91,11 +91,6 @@ end
 
 type signature = Script_signature.t
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2466
-   The various attributes of this type should be checked with
-   appropriate testing. *)
-type tx_rollup_l2_address = Tx_rollup_l2_address.Indexable.value
-
 type ('a, 'b) pair = 'a * 'b
 
 (* We cannot call this type "or" as in Michelson because "or" is an
@@ -1305,7 +1300,6 @@ and ('ty, 'comparable) ty =
   | Key_t : (public_key, yes) ty
   | Timestamp_t : (Script_timestamp.t, yes) ty
   | Address_t : (address, yes) ty
-  | Tx_rollup_l2_address_t : (tx_rollup_l2_address, yes) ty
   | Bool_t : (bool, yes) ty
   | Pair_t :
       ('a, 'ac) ty
@@ -1747,9 +1741,6 @@ let chain_id_metadata : Script_chain_id.t ty_metadata = meta_basic
 
 let address_metadata : address ty_metadata = meta_basic
 
-let tx_rollup_l2_address_metadata : tx_rollup_l2_address ty_metadata =
-  meta_basic
-
 let sapling_transaction_metadata : Sapling.transaction ty_metadata = meta_basic
 
 let sapling_transaction_deprecated_metadata :
@@ -1841,7 +1832,6 @@ let ty_metadata : type a ac. (a, ac) ty -> a ty_metadata = function
   | Timestamp_t -> timestamp_metadata
   | Chain_id_t -> chain_id_metadata
   | Address_t -> address_metadata
-  | Tx_rollup_l2_address_t -> tx_rollup_l2_address_metadata
   | Pair_t (_, _, meta, _) -> meta
   | Or_t (_, _, meta, _) -> meta
   | Option_t (_, meta, _) -> meta
@@ -1880,7 +1870,6 @@ let is_comparable : type v c. (v, c) ty -> c dbool = function
   | Timestamp_t -> Yes
   | Chain_id_t -> Yes
   | Address_t -> Yes
-  | Tx_rollup_l2_address_t -> Yes
   | Pair_t (_, _, _, dand) -> dbool_of_dand dand
   | Or_t (_, _, _, dand) -> dbool_of_dand dand
   | Option_t (_, _, cmp) -> cmp
@@ -1936,8 +1925,6 @@ let timestamp_t = Timestamp_t
 let address_t = Address_t
 
 let bool_t = Bool_t
-
-let tx_rollup_l2_address_t = Tx_rollup_l2_address_t
 
 let pair_t :
     type a ac b bc.
@@ -2277,8 +2264,8 @@ let ty_traverse =
     let accu = f.apply accu ty in
     match ty with
     | Unit_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t | Mutez_t
-    | Key_hash_t | Key_t | Timestamp_t | Address_t | Tx_rollup_l2_address_t
-    | Bool_t | Sapling_transaction_t _ | Sapling_transaction_deprecated_t _
+    | Key_hash_t | Key_t | Timestamp_t | Address_t | Bool_t
+    | Sapling_transaction_t _ | Sapling_transaction_deprecated_t _
     | Sapling_state_t _ | Operation_t | Chain_id_t | Never_t | Bls12_381_g1_t
     | Bls12_381_g2_t | Bls12_381_fr_t ->
         (continue [@ocaml.tailcall]) accu
@@ -2348,8 +2335,8 @@ let value_traverse (type t tc) (ty : (t, tc) ty) (x : t) init f =
     in
     match ty with
     | Unit_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t | Mutez_t
-    | Key_hash_t | Key_t | Timestamp_t | Address_t | Tx_rollup_l2_address_t
-    | Bool_t | Sapling_transaction_t _ | Sapling_transaction_deprecated_t _
+    | Key_hash_t | Key_t | Timestamp_t | Address_t | Bool_t
+    | Sapling_transaction_t _ | Sapling_transaction_deprecated_t _
     | Sapling_state_t _ | Operation_t | Chain_id_t | Never_t | Bls12_381_g1_t
     | Bls12_381_g2_t | Bls12_381_fr_t | Chest_key_t | Chest_t
     | Lambda_t (_, _, _) ->

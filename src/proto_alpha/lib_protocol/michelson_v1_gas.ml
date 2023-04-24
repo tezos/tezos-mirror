@@ -514,10 +514,6 @@ module Cost_of = struct
       let sz = Signature.Public_key_hash.size + entrypoint_size in
       atomic_step_cost (cost_N_ICompare sz sz)
 
-    (** TODO: https://gitlab.com/tezos/tezos/-/issues/2340
-        Refine the gas model *)
-    let compare_tx_rollup_l2_address = atomic_step_cost (cost_N_ICompare 48 48)
-
     let compare_chain_id = atomic_step_cost (S.safe_int 30)
 
     (* Defunctionalized CPS *)
@@ -546,8 +542,6 @@ module Cost_of = struct
         | Timestamp_t ->
             (apply [@tailcall]) Gas.(acc +@ compare_timestamp x y) k
         | Address_t -> (apply [@tailcall]) Gas.(acc +@ compare_address) k
-        | Tx_rollup_l2_address_t ->
-            (apply [@tailcall]) Gas.(acc +@ compare_tx_rollup_l2_address) k
         | Chain_id_t -> (apply [@tailcall]) Gas.(acc +@ compare_chain_id) k
         | Pair_t (tl, tr, _, YesYes) ->
             (* Reasonable over-approximation of the cost of lexicographic comparison. *)
@@ -839,10 +833,6 @@ module Cost_of = struct
     let timestamp_readable s =
       atomic_step_cost (cost_TIMESTAMP_READABLE_DECODING (String.length s))
 
-    (** TODO: https://gitlab.com/tezos/tezos/-/issues/2340
-        Refine the gas model *)
-    let tx_rollup_l2_address = bls12_381_g1
-
     (* Balance stored at /contracts/index/hash/balance, on 64 bits *)
     let contract_exists =
       Gas.cost_of_repr @@ Storage_costs.read_access ~path_length:4 ~read_bytes:8
@@ -952,10 +942,6 @@ module Cost_of = struct
     let unparse_data_cycle = atomic_step_cost cost_UNPARSING_DATA
 
     let unit = Gas.free
-
-    (** TODO: https://gitlab.com/tezos/tezos/-/issues/2340
-        Refine the gas model *)
-    let tx_rollup_l2_address = bls12_381_g1
 
     (* Reuse 006 costs. *)
     let operation bytes = Script.bytes_node_cost bytes

@@ -235,7 +235,7 @@ module Proto = struct
       | Big_map_t _ | Contract_t _ | Operation_t | Sapling_transaction_t _
       | Sapling_transaction_deprecated_t _ | Sapling_state_t _ | Never_t
       | Bls12_381_g1_t | Bls12_381_g2_t | Bls12_381_fr_t | Ticket_t _
-      | Chain_id_t | Chest_key_t | Chest_t | Tx_rollup_l2_address_t ->
+      | Chain_id_t | Chest_key_t | Chest_t ->
           []
       | Pair_t (t1, t2, _, _) ->
           let g1 = List.map (fun g (v, _) -> g v) @@ find_lambda_tys t1 in

@@ -99,9 +99,6 @@ let address (addr : Script_typed_ir.address) : t =
   Signature.Public_key_hash.size
   + String.length (Alpha_context.Entrypoint.to_string entrypoint)
 
-let tx_rollup_l2_address x =
-  Tx_rollup_l2_address.Indexable.size @@ Indexable.forget x
-
 let timestamp (tstamp : Script_timestamp.t) : t =
   Z.numbits (Script_timestamp.to_zint tstamp) / 8
 
@@ -120,7 +117,6 @@ let rec size_of_comparable_value :
    | Key_hash_t -> key_hash v
    | Timestamp_t -> timestamp v
    | Address_t -> address v
-   | Tx_rollup_l2_address_t -> tx_rollup_l2_address v
    | Pair_t (leaf, node, _, YesYes) ->
        let lv, rv = v in
        let size =

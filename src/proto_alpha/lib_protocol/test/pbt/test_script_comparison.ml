@@ -64,8 +64,6 @@ let rec reference_compare_comparable : type a. a comparable_ty -> a -> a -> int
   | Timestamp_t, x, y -> normalize_compare @@ Script_timestamp.compare x y
   | Address_t, x, y ->
       normalize_compare @@ Script_comparable.compare_address x y
-  | Tx_rollup_l2_address_t, x, y ->
-      normalize_compare @@ Script_comparable.compare_tx_rollup_l2_address x y
   | Bytes_t, x, y -> normalize_compare @@ Compare.Bytes.compare x y
   | Chain_id_t, x, y -> normalize_compare @@ Script_chain_id.compare x y
   | Pair_t (tl, tr, _, YesYes), (lx, rx), (ly, ry) ->

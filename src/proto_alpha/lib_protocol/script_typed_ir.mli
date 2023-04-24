@@ -92,8 +92,6 @@ end
 
 type signature = Script_signature.t
 
-type tx_rollup_l2_address = Tx_rollup_l2_address.Indexable.value
-
 type ('a, 'b) pair = 'a * 'b
 
 type ('a, 'b) or_ = L of 'a | R of 'b
@@ -1429,7 +1427,6 @@ and ('ty, 'comparable) ty =
   | Key_t : (public_key, yes) ty
   | Timestamp_t : (Script_timestamp.t, yes) ty
   | Address_t : (address, yes) ty
-  | Tx_rollup_l2_address_t : (tx_rollup_l2_address, yes) ty
   | Bool_t : (bool, yes) ty
   | Pair_t :
       ('a, 'ac) ty
@@ -1716,8 +1713,6 @@ val key_t : public_key comparable_ty
 val timestamp_t : Script_timestamp.t comparable_ty
 
 val address_t : address comparable_ty
-
-val tx_rollup_l2_address_t : tx_rollup_l2_address comparable_ty
 
 val bool_t : bool comparable_ty
 

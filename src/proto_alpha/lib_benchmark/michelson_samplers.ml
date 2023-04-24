@@ -630,9 +630,6 @@ end)
         | Bls12_381_g2_t -> generate_bls12_381_g2
         | Bls12_381_fr_t -> generate_bls12_381_fr
         | Ticket_t (contents_ty, _) -> generate_ticket contents_ty
-        | Tx_rollup_l2_address_t ->
-            fail_sampling
-              "Michelson_samplers: tx_rollup_l2_address is deprecated"
         | Sapling_transaction_t _ ->
             fail_sampling
               "Michelson_samplers: sapling transactions not handled yet"

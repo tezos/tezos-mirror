@@ -633,7 +633,6 @@ module Scripts = struct
       | Key_t -> return (T_key, [], [])
       | Timestamp_t -> return (T_timestamp, [], [])
       | Address_t -> return (T_address, [], [])
-      | Tx_rollup_l2_address_t -> return (T_tx_rollup_l2_address, [], [])
       | Operation_t -> return (T_operation, [], [])
       | Chain_id_t -> return (T_chain_id, [], [])
       | Never_t -> return (T_never, [], [])
