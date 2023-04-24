@@ -12,8 +12,8 @@ branch of Octez.
 Environment Version
 -------------------
 
-This protocol requires the same protocol environment than Mumbai., that is
-environment V9.
+This protocol requires a different protocol environment version than Nairobi.
+It requires protocol environment V10, compared to V9 for Nairobi.
 
 Smart Rollups
 -------------

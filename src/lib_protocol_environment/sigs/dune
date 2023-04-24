@@ -81,3 +81,12 @@
  (deps v9.in.ml (glob_files v9/*.mli))
  (action
   (with-stdout-to %{targets} (run %{dep:../ppinclude/ppinclude.exe} v9.in.ml))))
+
+(rule
+ (targets v10.ml)
+ (mode promote)
+ (deps v10.in.ml (glob_files v10/*.mli))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run %{dep:../ppinclude/ppinclude.exe} v10.in.ml))))
