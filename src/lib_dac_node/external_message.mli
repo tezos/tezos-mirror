@@ -40,7 +40,6 @@ module Default : sig
       as a byte sequence of the form [tag] ^ [root_hash] ^ [signature] ^ [witnesses].
   *)
   val make :
-    Dac_plugin.t ->
     Dac_plugin.raw_hash ->
     Tezos_crypto.Aggregate_signature.signature ->
     Z.t ->

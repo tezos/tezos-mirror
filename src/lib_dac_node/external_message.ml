@@ -87,7 +87,7 @@ struct
             (fun msg -> msg);
         ])
 
-  let make ((module P) : Dac_plugin.t) root_hash signature witnesses =
+  let make root_hash signature witnesses =
     let open Lwt_result_syntax in
     let message = {root_hash; signature; witnesses} in
     let res =

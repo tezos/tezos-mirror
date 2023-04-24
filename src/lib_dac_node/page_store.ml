@@ -158,9 +158,9 @@ module Filesystem : S with type configuration = string = struct
   let path data_dir hash_string_key =
     Filename.(concat data_dir @@ hash_string_key)
 
-  let save ((module P) : Dac_plugin.t) data_dir ~hash ~content =
+  let save ((module Plugin) : Dac_plugin.t) data_dir ~hash ~content =
     let open Lwt_result_syntax in
-    let hash_string = P.to_hex hash in
+    let hash_string = Plugin.to_hex hash in
     let path = path data_dir hash_string in
     let*! result =
       Lwt_utils_unix.with_atomic_open_out path @@ fun chan ->
@@ -172,9 +172,9 @@ module Filesystem : S with type configuration = string = struct
         tzfail
         @@ Cannot_write_page_to_page_storage {hash = hash_string; content}
 
-  let mem ((module P) : Dac_plugin.t) data_dir hash =
+  let mem ((module Plugin) : Dac_plugin.t) data_dir hash =
     let open Lwt_result_syntax in
-    let hash_string = P.to_hex hash in
+    let hash_string = Plugin.to_hex hash in
     let path = path data_dir hash_string in
     let*! result =
       Lwt_utils_unix.with_open_in path (fun _fd -> Lwt.return ())
@@ -184,9 +184,9 @@ module Filesystem : S with type configuration = string = struct
     | Error {unix_code = Unix.ENOENT; _} -> return false
     | Error _ -> tzfail @@ Cannot_read_page_from_page_storage hash_string
 
-  let load ((module P) : Dac_plugin.t) data_dir hash =
+  let load ((module Plugin) : Dac_plugin.t) data_dir hash =
     let open Lwt_result_syntax in
-    let hash_string = P.to_hex hash in
+    let hash_string = Plugin.to_hex hash in
     let path = path data_dir hash_string in
     Lwt.catch
       (fun () ->
