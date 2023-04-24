@@ -51,7 +51,7 @@ let test_deprecated_typecheck script ~legacy =
   let script_path = Michelson_script.path script in
   let expected_error =
     if List.mem (Michelson_script.name_s script) ill_typed_scripts then
-      "ill-typed script"
+      sf "script %S is ill-typed" script_path
     else "Use of deprecated instruction"
   in
   Client.spawn_typecheck_script ~scripts:[script_path] ~legacy client
