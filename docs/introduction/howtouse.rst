@@ -22,6 +22,8 @@ After a successful compilation, you should have the following binaries:
   note that prior to v12 of Octez, there was also an endorser daemon ``octez-endorser-*``;
 - ``octez-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
+- ``octez-smart-rollup-{client,node}-*``: executables for using and running a smart rollup as Layer 2 (see :doc:`../active/smart_rollups`)
+- ``octez-smart-rollup-wasm-debugger``: debugger for smart rollup kernels (see :doc:`../active/smart_rollups`)
 - ``octez-proxy-server``: a readonly frontend to ``octez-node`` designed to lower the load of full nodes (see :doc:`../user/proxy-server`)
 - ``octez-codec``: a utility for documenting the data encodings and for performing data encoding/decoding (see `Codec`_)
 - ``octez-protocol-compiler``: a domain-specific compiler for Tezos protocols (see `Protocol compiler`_)

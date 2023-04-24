@@ -1,12 +1,18 @@
 Logging
 =======
 
-Logging features in Octez allow to monitor its execution and be informed in real
-time about *events* of interest, such as errors, completion of certain steps,
+Logging features in Octez allow to monitor the execution of Octez binaries, informing in real
+time about events of interest, such as errors, completion of certain steps,
 etc. This is why various software components emit *events* throughout the
 codebase (see :doc:`../developer/event_logging_framework`), the logging
 framework dispatches them to an arbitrary number of (active) *sinks* which can
 filter print, store, or otherwise handle events.
+
+The logging framework can be configured with environment variables, which specify how events are mapped to sinks.
+Some Octez binaries provide additional configurations means.
+
+Events
+------
 
 Events have:
 
@@ -202,8 +208,12 @@ where ``<section-dirname>`` is either ``no-section`` or
 Global Defaults
 ---------------
 
+By default, the Octez binaries generate **user logs** as follows:
+
 - ``lwt-log://`` sinks are activated by default and configured to
   output events of level at least ``Notice``. Their goal is the stdout logging.
+
+The node additionally generates by default more detailed **internal logs** as follows:
 
 - A file-descriptor-sink is activated to store logs from last seven days with
   an ``Info`` level. The path is ``<node-data-dir>/daily-logs/``.
@@ -231,7 +241,7 @@ Environment Variables
 ---------------------
 
 The logging framework can be configured with environment variables
-before starting the node. Those variables work on all the code using the
+before starting an Octez executable (e.g., the node). Those variables work on all the code using the
 ``tezos-stdlib-unix`` library as long as ``Internal_event_unix.init`` is
 called; this should include *all* the regular ``octez-*`` binaries.
 
@@ -267,6 +277,8 @@ environment variable, see :ref:`context_component`.
 
 Node-Specific Configuration
 ---------------------------
+
+The node supports some additional means to configure logging, besides environment variables.
 
 Configuration File
 ~~~~~~~~~~~~~~~~~~
@@ -311,8 +323,8 @@ events) this call adds a sink to suddenly start pretty-printing all
    octez-client rpc put /config/logging with \
      '{ "active_sinks": [ "file-descriptor-path:///tmp/rpclogs?section-prefix=rpc:debug&format=pp&fresh=true" ] }'
 
-Client and Baking Daemons
--------------------------
+Client and baker configuration
+------------------------------
 
 For now, ``octez-client``, ``octez-{baker,accuser}-*``, etc.
 can only be configured using the environment variables.

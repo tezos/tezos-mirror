@@ -306,6 +306,8 @@ run them.
 The Final Executables
 ~~~~~~~~~~~~~~~~~~~~~
 
+The Octez executables are generated from packages such as the following ones (for the complete list of binaries, see :ref:`tezos_binaries`):
+
   - :package:`octez-node` provides the node launcher binary
     ``octez-node``. All the algorithmic being implemented in the
     shell, this package only implements the node's CLI. It also

@@ -78,7 +78,7 @@ type step_constants = Script_typed_ir.step_constants = {
 
    This will update the local storage of the contract
    [step_constants.self]. Other pieces of contextual information
-   ([sender], [payer], [amount], and [chaind_id]) are also passed in
+   ([sender], [payer], [amount], and [chain_id]) are also passed in
    [step_constant].
 
    [internal] is [true] if and only if the execution happens within an
