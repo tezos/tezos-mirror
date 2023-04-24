@@ -120,31 +120,39 @@ let spawn_command sc_node args =
   @@ ["--base-dir"; base_dir sc_node]
   @ args
 
+let common_node_args ?loser_mode sc_node =
+  [
+    "--data-dir";
+    data_dir sc_node;
+    "--rpc-addr";
+    rpc_host sc_node;
+    "--rpc-port";
+    string_of_int @@ rpc_port sc_node;
+  ]
+  @ (match loser_mode with None -> [] | Some mode -> ["--loser-mode"; mode])
+  @
+  match sc_node.persistent_state.dal_node with
+  | None -> []
+  | Some dal_node ->
+      let endpoint =
+        sf
+          "http://%s:%d"
+          (Dal_node.rpc_host dal_node)
+          (Dal_node.rpc_port dal_node)
+      in
+      ["--dal-node"; endpoint]
+
 let node_args ?loser_mode sc_node rollup_address =
   let mode = string_of_mode sc_node.persistent_state.mode in
   ( mode,
     ["for"; rollup_address; "with"; "operators"]
     @ operators_params sc_node
-    @ [
-        "--data-dir";
-        data_dir sc_node;
-        "--rpc-addr";
-        rpc_host sc_node;
-        "--rpc-port";
-        string_of_int @@ rpc_port sc_node;
-      ]
-    @ (match loser_mode with None -> [] | Some mode -> ["--loser-mode"; mode])
-    @
-    match sc_node.persistent_state.dal_node with
-    | None -> []
-    | Some dal_node ->
-        let endpoint =
-          sf
-            "http://%s:%d"
-            (Dal_node.rpc_host dal_node)
-            (Dal_node.rpc_port dal_node)
-        in
-        ["--dal-node"; endpoint] )
+    @ common_node_args ?loser_mode sc_node )
+
+let legacy_node_args ?loser_mode sc_node rollup_address =
+  let mode = string_of_mode sc_node.persistent_state.mode in
+  ["--mode"; mode; "--rollup"; rollup_address]
+  @ common_node_args ?loser_mode sc_node
 
 let spawn_config_init sc_node ?(force = false) ?loser_mode rollup_address =
   let mode, args = node_args ?loser_mode sc_node rollup_address in
@@ -325,19 +333,23 @@ let do_runlike_command ?event_level ?event_sections_levels node arguments =
     arguments
     ~on_terminate
 
-let run ?event_level ?event_sections_levels ?loser_mode node rollup_address
-    extra_arguments =
-  let mode, args = node_args ?loser_mode node rollup_address in
-  do_runlike_command
-    ?event_level
-    ?event_sections_levels
-    node
-    (["run"; mode] @ args @ extra_arguments)
+let run ?(legacy = false) ?event_level ?event_sections_levels ?loser_mode node
+    rollup_address extra_arguments =
+  let cmd =
+    if legacy then
+      let args = legacy_node_args ?loser_mode node rollup_address in
+      ["run"] @ args @ extra_arguments
+    else
+      let mode, args = node_args ?loser_mode node rollup_address in
+      ["run"; mode] @ args @ extra_arguments
+  in
+  do_runlike_command ?event_level ?event_sections_levels node cmd
 
-let run ?event_level ?event_sections_levels ?loser_mode node rollup_address
-    arguments =
+let run ?legacy ?event_level ?event_sections_levels ?loser_mode node
+    rollup_address arguments =
   let* () =
     run
+      ?legacy
       ?event_level
       ?event_sections_levels
       ?loser_mode

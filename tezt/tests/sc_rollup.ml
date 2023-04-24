@@ -823,7 +823,9 @@ let basic_scenario sc_rollup_node _rollup_client sc_rollup _node client =
        must end up at level 4. *)
     4
   in
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  (* Here we use the legacy `run` command. *)
+  let* _ = Sc_rollup_node.config_init sc_rollup_node sc_rollup in
+  let* () = Sc_rollup_node.run ~legacy:true sc_rollup_node sc_rollup [] in
   let* () = send_messages num_messages client in
   let* _ =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node expected_level
