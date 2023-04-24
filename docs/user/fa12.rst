@@ -25,7 +25,7 @@ supply. The Michelson interface is then described by the following entrypoints:
 Multiple implementations of such a standard exist within the ecosystem. For
 example, one is provided with the `TZIP-007 specification
 <https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-7/ManagedLedger.tz>`_.
-`Edukera <https://assets.tqtezos.com/docs/token-contracts/fa12/4-fa12-archetype/>`_ and
+`Edukera <https://archetype-lang.org/docs/templates/fa12/>`_ and
 `camlCase <https://gitlab.com/camlcase-dev/fa1.2>`_ both provide a contract that
 implements the standard, and both have been verified using the `Mi-Cho-Coq
 <https://gitlab.com/nomadic-labs/mi-cho-coq/>`_ framework (see related :gl:`merge
