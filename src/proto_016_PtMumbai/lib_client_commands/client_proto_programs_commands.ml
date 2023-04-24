@@ -394,39 +394,50 @@ let commands () =
             in
             return_unit
         | _ :: _ ->
-            List.iteri_es
-              (fun i (src, expr_string) ->
-                let program = Michelson_v1_parser.parse_toplevel expr_string in
-                let name =
-                  Option.value
-                    src
-                    ~default:("Literal script " ^ string_of_int (i + 1))
-                in
-                handle_parsing_error "types" cctxt setup program
-                @@ fun program ->
-                let* original_gas =
-                  resolve_max_gas cctxt cctxt#block original_gas
-                in
-                let*! res =
-                  typecheck_program
-                    cctxt
-                    ~chain:cctxt#chain
-                    ~block:cctxt#block
-                    ~gas:original_gas
-                    ~legacy
-                    ~show_types
-                    program
-                in
-                print_typecheck_result
-                  ~emacs:emacs_mode
-                  ~show_types
-                  ~print_source_on_error:(not no_print_source)
-                  ~display_names
-                  ~name
-                  program
-                  res
-                  cctxt)
-              expr_strings);
+            let* _number_of_literal_scripts =
+              List.fold_left_es
+                (fun i (src, expr_string) ->
+                  let program =
+                    Michelson_v1_parser.parse_toplevel expr_string
+                  in
+                  let name, i =
+                    match src with
+                    | Some src -> (src, i)
+                    | None ->
+                        let i = i + 1 in
+                        ("Literal script " ^ string_of_int i, i)
+                  in
+                  let* () =
+                    handle_parsing_error "types" cctxt setup program
+                    @@ fun program ->
+                    let* original_gas =
+                      resolve_max_gas cctxt cctxt#block original_gas
+                    in
+                    let*! res =
+                      typecheck_program
+                        cctxt
+                        ~chain:cctxt#chain
+                        ~block:cctxt#block
+                        ~gas:original_gas
+                        ~legacy
+                        ~show_types
+                        program
+                    in
+                    print_typecheck_result
+                      ~emacs:emacs_mode
+                      ~show_types
+                      ~print_source_on_error:(not no_print_source)
+                      ~display_names
+                      ~name
+                      program
+                      res
+                      cctxt
+                  in
+                  return i)
+                0
+                expr_strings
+            in
+            return_unit);
     command
       ~group
       ~desc:"Ask the node to typecheck a data expression."
@@ -568,9 +579,9 @@ let commands () =
             in
             return_unit
         | _ :: _ ->
-            let* hash_name_rows =
-              List.mapi_ep
-                (fun i (src, expr_string) ->
+            let* hash_name_rows_rev, _number_of_literal_scripts =
+              List.fold_left_es
+                (fun (l, i) (src, expr_string) ->
                   let program =
                     Michelson_v1_parser.parse_toplevel ~check expr_string
                   in
@@ -587,14 +598,18 @@ let commands () =
                       Script_expr_hash.pp
                       (Script_expr_hash.hash_bytes [bytes])
                   in
-                  let name =
-                    Option.value
-                      src
-                      ~default:("Literal script " ^ string_of_int (i + 1))
+                  let name, i =
+                    match src with
+                    | Some src -> (src, i)
+                    | None ->
+                        let i = i + 1 in
+                        ("Literal script " ^ string_of_int i, i)
                   in
-                  return (hash, name))
+                  return ((hash, name) :: l, i))
+                ([], 0)
                 expr_strings
             in
+            let hash_name_rows = List.rev hash_name_rows_rev in
             Tezos_clic_unix.Scriptable.output
               scriptable
               ~for_human:(fun () ->

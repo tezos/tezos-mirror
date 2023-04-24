@@ -387,42 +387,54 @@ let commands () =
             in
             return_unit
         | _ :: _ ->
-            List.iteri_es
-              (fun i content_with_origin ->
-                let expr_string =
-                  Client_proto_args.content_of_file_or_text content_with_origin
-                in
-                let program = Michelson_v1_parser.parse_toplevel expr_string in
-                let name =
-                  match content_with_origin with
-                  | Client_proto_args.File {path; _} -> path
-                  | Text _ -> "Literal script " ^ string_of_int (i + 1)
-                in
-                handle_parsing_error "types" cctxt setup program
-                @@ fun program ->
-                let* original_gas =
-                  resolve_max_gas cctxt cctxt#block original_gas
-                in
-                let*! res =
-                  typecheck_program
-                    cctxt
-                    ~chain:cctxt#chain
-                    ~block:cctxt#block
-                    ~gas:original_gas
-                    ~legacy
-                    ~show_types
-                    program
-                in
-                print_typecheck_result
-                  ~emacs:emacs_mode
-                  ~show_types
-                  ~print_source_on_error:(not no_print_source)
-                  ~display_names
-                  ~name
-                  program
-                  res
-                  cctxt)
-              expr_strings);
+            let* _number_of_literal_scripts =
+              List.fold_left_es
+                (fun i content_with_origin ->
+                  let expr_string =
+                    Client_proto_args.content_of_file_or_text
+                      content_with_origin
+                  in
+                  let program =
+                    Michelson_v1_parser.parse_toplevel expr_string
+                  in
+                  let name, i =
+                    match content_with_origin with
+                    | Client_proto_args.File {path; _} -> (path, i)
+                    | Text _ ->
+                        let i = i + 1 in
+                        ("Literal script " ^ string_of_int i, i)
+                  in
+                  let* () =
+                    handle_parsing_error "types" cctxt setup program
+                    @@ fun program ->
+                    let* original_gas =
+                      resolve_max_gas cctxt cctxt#block original_gas
+                    in
+                    let*! res =
+                      typecheck_program
+                        cctxt
+                        ~chain:cctxt#chain
+                        ~block:cctxt#block
+                        ~gas:original_gas
+                        ~legacy
+                        ~show_types
+                        program
+                    in
+                    print_typecheck_result
+                      ~emacs:emacs_mode
+                      ~show_types
+                      ~print_source_on_error:(not no_print_source)
+                      ~display_names
+                      ~name
+                      program
+                      res
+                      cctxt
+                  in
+                  return i)
+                0
+                expr_strings
+            in
+            return_unit);
     command
       ~group
       ~desc:"Ask the node to typecheck a data expression."
@@ -566,9 +578,9 @@ let commands () =
             in
             return_unit
         | _ :: _ ->
-            let* hash_name_rows =
-              List.mapi_ep
-                (fun i content_with_origin ->
+            let* hash_name_rows_rev, _number_of_literal_scripts =
+              List.fold_left_es
+                (fun (l, i) content_with_origin ->
                   let expr_string =
                     Client_proto_args.content_of_file_or_text
                       content_with_origin
@@ -589,14 +601,18 @@ let commands () =
                       Script_expr_hash.pp
                       (Script_expr_hash.hash_bytes [bytes])
                   in
-                  let name =
+                  let name, i =
                     match content_with_origin with
-                    | Client_proto_args.File {path; _} -> path
-                    | Text _ -> "Literal script " ^ string_of_int (i + 1)
+                    | Client_proto_args.File {path; _} -> (path, i)
+                    | Text _ ->
+                        let i = i + 1 in
+                        ("Literal script " ^ string_of_int i, i)
                   in
-                  return (hash, name))
+                  return ((hash, name) :: l, i))
+                ([], 0)
                 expr_strings
             in
+            let hash_name_rows = List.rev hash_name_rows_rev in
             Tezos_clic_unix.Scriptable.output
               scriptable
               ~for_human:(fun () ->
