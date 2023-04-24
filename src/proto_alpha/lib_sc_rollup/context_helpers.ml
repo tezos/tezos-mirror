@@ -73,18 +73,6 @@ module In_memory = struct
     Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2
     .tree_proof_encoding
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4386
-     Extracted and adapted from {!Tezos_context_memory}. *)
-  let make_empty_context ?(root = "/tmp") () =
-    let open Lwt_syntax in
-    let context_promise =
-      let+ index = Tezos_context_memory.Context_binary.init root in
-      Tezos_context_memory.Context_binary.empty index
-    in
-    match Lwt.state context_promise with
-    | Lwt.Return result -> result
-    | Lwt.Fail exn -> raise exn
-    | Lwt.Sleep ->
-        (* The in-memory context should never block *)
-        assert false
+  let make_empty_context =
+    Tezos_context_memory.Context_binary.make_empty_context
 end

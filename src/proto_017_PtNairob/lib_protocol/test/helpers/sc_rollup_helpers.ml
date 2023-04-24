@@ -167,7 +167,7 @@ let compute_origination_proof ~boot_sector = function
     about the arity of its trees. *)
 let wrong_arith_origination_proof ~alter_binary_bit ~boot_sector =
   let open Lwt_syntax in
-  let context = Tezos_context_memory.make_empty_context () in
+  let context = Tezos_context_memory.Context.make_empty_context () in
   let+ proof = Wrong_arith_pvm.produce_origination_proof context boot_sector in
   let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
   let proof =

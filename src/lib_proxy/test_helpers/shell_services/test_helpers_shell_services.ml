@@ -53,7 +53,7 @@ let print_raw_context = Format.asprintf "%a" Proof.pp_raw_context
 
 module Store = Tezos_context_memory.Context
 
-let empty = Tezos_context_memory.make_empty_context ()
+let empty = Tezos_context_memory.Context.make_empty_context ()
 
 (* Stolen from src/lib_proxy/test/test_fuzzing_light.ml *)
 let irmin_tree_gen =
