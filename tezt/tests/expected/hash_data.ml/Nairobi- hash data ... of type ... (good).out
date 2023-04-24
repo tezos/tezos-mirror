@@ -1,0 +1,594 @@
+
+./octez-client --mode mockup hash data -92233720368547758089223372036854775807 of type int
+Raw packed data: 0x0500ffffffffffffffffff8180c09e91c191c79502
+Script-expression-ID-Hash: expruG5Q9N4beaRnBNDX9c1rQ1QUGRyPgQyTpwJedPhTpxXfTkguXn
+Raw Script-expression-ID-Hash: 0x6216452f655bf0e4ba4f86c58a7bface77c01dc88e9db83102212e1fe3d50ca7
+Ledger Blake2b hash: 7bteidcLhhSczK6rV7WZQMFW1S7jEApuMPPEUvZDk2B8
+Raw Sha256 hash: 0x19392ac75f657ecb477bf79085a4490f1be98a31c03434b40d38e089cf345e33
+Raw Sha512 hash: 0x94afe9bdf473c06f33fb1c59854e1c15b13d76eeef4b2c4d27605f9be3f3113d13fc0b979870fff2604bf816510522abdee8622535917fc112813fabb5d38a9a
+Gas remaining: 1039999.224 units remaining
+
+./octez-client --mode mockup hash data -9223372036854775808 of type int
+Raw packed data: 0x0500c0808080808080808002
+Script-expression-ID-Hash: exprv3Fy2Seq49zs6JYAGd9zGkFFqiACPjyyHf3sCZFFRnxVvYKUPz
+Raw Script-expression-ID-Hash: 0xc8adbddf5949c1d4d104c1b7d658baa7a4c5813c1ae7cbee9d099bbb73ccb5a3
+Ledger Blake2b hash: EWNCTfpNyM4iYvGgWPNoCxkFbGYnNzM61zTAUkc2gh4E
+Raw Sha256 hash: 0x6ff401ab35f93209f6c1c8c4d7c36adfd58dba53bca644ecd9107edb30e184cd
+Raw Sha512 hash: 0x9ae07221db7b28fdd73a89744a7d7b94fbe44a150cf752a864aa554adf9ac849a73cfdf0bc682c2b830b4dcaec5ac4de71a19eb1fbc58ded3d7a793f96cc4afa
+Gas remaining: 1039999.424 units remaining
+
+./octez-client --mode mockup hash data -4611686018427387904 of type int
+Raw packed data: 0x0500c0808080808080808001
+Script-expression-ID-Hash: exprtdBSRcCcmApcTq7pu378scXyxCVPbLxfiQ5uCsqNATnXQGaDbQ
+Raw Script-expression-ID-Hash: 0x0e4f763b32f9f61a670de9049e17b51051a7eb39110a2fc978d4075fcad01cb1
+Ledger Blake2b hash: xrz5vpBWhFXPadfA7xjRBmhCRahN5UzoQE73iBMnkbi
+Raw Sha256 hash: 0x99f3e8cb5de4405979d25b07b08d7e0c040c185f9e1ba22f4165f23f959b5765
+Raw Sha512 hash: 0x21f8c0bdb48495f65e9933b9a66ab86e5f980acd2e1c247c17c1f707474682e8f88fbd0ff6ad7eece958bb80c1963a2cc30ebd81708de4bb79f86878468c651e
+Gas remaining: 1039999.424 units remaining
+
+./octez-client --mode mockup hash data -1 of type int
+Raw packed data: 0x050041
+Script-expression-ID-Hash: expru57wdzZCHCeGnKwUzxCJjG1HjveGXp1CCusScXEMq9kbidSvDG
+Raw Script-expression-ID-Hash: 0x4935af0cbcc38e08fae2742399a95eaa2a8aa3c4504971b72afbf1e336fd9d8b
+Ledger Blake2b hash: 5vnEvsKtB8ojf9DuVntudWnfy6yRLfY4Duwx2j6a36dp
+Raw Sha256 hash: 0x5db11f873d99e0d9c25e52c9137676326f8a03f18c6c802fecbcd4a5543c28f7
+Raw Sha512 hash: 0x45256a6d4fe9afc4eda42131ad62e28b5903c43243afdbc69709e8bb9a7cf49a0c117c26d58849f41757beae1052d00d78deb10bd62728a7c04afb32afb637e2
+Gas remaining: 1039999.599 units remaining
+
+./octez-client --mode mockup hash data 1 of type int
+Raw packed data: 0x050001
+Script-expression-ID-Hash: expru2dKqDfZG8hu4wNGkiyunvq2hdSKuVYtcKta7BWP6Q18oNxKjS
+Raw Script-expression-ID-Hash: 0x438c52065d4605460b12d1b9446876a1c922b416103a20d44e994a9fd2b8ed07
+Ledger Blake2b hash: 5YgR7rjfSbSbzGEYhhBG9ENRHhdVSUu2TJ6RyNLawjiv
+Raw Sha256 hash: 0x57072915640d052f4e2843e1498b10c4f71b62df565525d33c4a66a724e3e20a
+Raw Sha512 hash: 0x112e6b61a60ecf001d501f39284ff8a575d818f2f79295b90b24f045d165a490c19cac2add9149dbdd23a8f2cf956dbee0efe17449111e6326e97ab21532f445
+Gas remaining: 1039999.599 units remaining
+
+./octez-client --mode mockup hash data 2 of type int
+Raw packed data: 0x050002
+Script-expression-ID-Hash: expruDuAZnFKqmLoisJqUGqrNzXTvw7PJM2rYk97JErM5FHCerQqgn
+Raw Script-expression-ID-Hash: 0x5d2525095b5382da2c9c295a739a189382cfaa2ebfa54e320d15bc6f178d6820
+Ledger Blake2b hash: 7GbmUchPX2Y61XEnLc2xfFHA8bAqQ8Qj8o1xEkU4g3VR
+Raw Sha256 hash: 0x0a8efab5eba4157330b3113690508ee944e684a3c6949c00d64fcab2d565e5a6
+Raw Sha512 hash: 0x4747a1aba769d89519dddbee3a1fb9d79555831b9044508efee0bd4f1837bd78dfeb585bf1e150d3c7f8dc79e815c4c3f7e4c7ef477e77bdc84dc4f5fb0598c5
+Gas remaining: 1039999.599 units remaining
+
+./octez-client --mode mockup hash data 4611686018427387903 of type int
+Raw packed data: 0x0500bfffffffffffffff7f
+Script-expression-ID-Hash: exprtucdegDH8uqtjprBzMMVaAFJxsctauXP7Qzmfu3KxcyTwnRnfk
+Raw Script-expression-ID-Hash: 0x33a06c095748ee4505cba0c1b7ef8d7666ff5cff1ebf865d7b75b4fb8606a130
+Ledger Blake2b hash: 4UXfu1ECmNSrir6LkbB1wkcptuVFk1Supjch6Si4PfkT
+Raw Sha256 hash: 0x563ee067653bda5b3609ef10c5fba6f76392642b950dca8ab70e85343caa6c41
+Raw Sha512 hash: 0x40691c0bb573951c3c48c13db7acf03cbb3c5164197555c98ff5a4858acbb2957e2daf0178bedcfd7e5cbd2cf045d693d822cb218b417e10ed517da1f34fe8c5
+Gas remaining: 1039999.424 units remaining
+
+./octez-client --mode mockup hash data 9223372036854775807 of type int
+Raw packed data: 0x0500bfffffffffffffffff01
+Script-expression-ID-Hash: exprupFUK8vtnxuBeiwi8ajvzyqT3eytHd5RueTNQztXn6Q1rFGPKM
+Raw Script-expression-ID-Hash: 0xab242636b94a88d317af40fe4928ede501f51249840fa44b2e57c2ff6d7d326b
+Ledger Blake2b hash: CX4gqnkyYpudVKQVtwkvq2JbfjzPPZsgQG547UGxcKg6
+Raw Sha256 hash: 0x15d152f6eeb5baf6bf2630719997223fe2c1bedf2730656a755b36f841cc8606
+Raw Sha512 hash: 0x63af709255528779eeb42613bc0385b3564aa4882a7b8a3f9387850a907e7cee3f2a8a22b881f1222400dae352b1363b7ffb4ff7528995f8b8384932be5af625
+Gas remaining: 1039999.424 units remaining
+
+./octez-client --mode mockup hash data 92233720368547758079223372036854775807 of type int
+Raw packed data: 0x0500bfffbfe1eebeeeb8eaffffbf9e91c191c79502
+Script-expression-ID-Hash: expruEdpvhN7bLdgrLpgAGvrzHSu9gs2K7V474qz6BjpAP9uXegr3q
+Raw Script-expression-ID-Hash: 0x5ed0b316a2ab47e3698fa3b046ebefc2e775ad37426a0886c4f14d3f7650c462
+Ledger Blake2b hash: 7P7u7hLd2MNuGyXfWD6bzYdXhBxfGn8LPmcMRgzEYath
+Raw Sha256 hash: 0xeb749cd1d6d7184d6d0d6f0aae0cf379082bc340f468e2b89a9beb3190f59a91
+Raw Sha512 hash: 0xb8bec79fbca40add468205be6c6ec631f3977fadcf843ef65ca288dd6b8f18ddaa822608163d825ca00e4d348bb3c79abacc0b1555d45ac9c235fd38234dbe31
+Gas remaining: 1039999.224 units remaining
+
+./octez-client --mode mockup hash data False of type bool
+Raw packed data: 0x050303
+Script-expression-ID-Hash: exprvDnoPjyKeR9FSnvwYg5a1v6mDyB6TmnATwWySSP6VmJxrzQb9E
+Raw Script-expression-ID-Hash: 0xe0978ddc9329cbd84d25fd15a161a7d2e7e555da91e2a335ece8c8bc11ade245
+Ledger Blake2b hash: G7iMrYNckCFRujDLFgtj3cDMCnfeSQ2cmhnDtkh9REc4
+Raw Sha256 hash: 0x35ef99f7718e7d1f065bae635780f41c0cd201e9ffb3390ba6ef428c2815fa66
+Raw Sha512 hash: 0x2c9ca967bf47f6cc76861693379b7397f65e6a1b6e633df28cf02be0b0d18319ae783b4c199fd61115e000a15a5ba8a292a3b1468c2cfe2b3e3a9fa08d419698
+Gas remaining: 1039999.624 units remaining
+
+./octez-client --mode mockup hash data True of type bool
+Raw packed data: 0x05030a
+Script-expression-ID-Hash: exprvMjTcyX8e8HskSUV3ipMhPzMLKTn92vsWZkiJTTYj7U9J8sAyP
+Raw Script-expression-ID-Hash: 0xf2a04e59c51d374e01df59a69495e400c6548415d628cf212a108f46697e4f53
+Ledger Blake2b hash: HL7SRbwe6n7r92rqsPQqN1hu1kd8uJhECY6Z5PJTwSRp
+Raw Sha256 hash: 0xfb2a0db46fe82f0aeb2824b2f0840cc1437bf7bdf836d5164351e0cfe5b0f330
+Raw Sha512 hash: 0xcd0d052ce182cb449207cbb0781be4c9eb3f48c631fe210a03996f6a287e528d8a94817758102a647820007d18cb8e94f0f8bb829ca571287d390b47ab6ae389
+Gas remaining: 1039999.624 units remaining
+
+./octez-client --mode mockup hash data '{}' of type 'list(bool)'
+Raw packed data: 0x050200000000
+Script-expression-ID-Hash: exprvLcRMXArBMo4ZGN2fxbyDgW4hQTTTRd48VUbEwC4o2dMR2YjFP
+Raw Script-expression-ID-Hash: 0xf0147b0fcd9ed958297e3e663f25d0427f7f70576f22047a8d52953941a8b057
+Ledger Blake2b hash: HAAxipLZ7LdX9GLgN7p1bX9KneQ82FcCsss3YicsKaAS
+Raw Sha256 hash: 0x077e8b5d0b528d84284d773f8cc36da052248bb96c341d68d51b86e0ce098262
+Raw Sha512 hash: 0x7553bc601c56a361eb537e2bcba685ae6fbf3b68003bd9426db318352db433445aee770bab94631ce5bdf29b948caf1665e208c9be33d8b70fa67d2839d4a16a
+Gas remaining: 1039999.564 units remaining
+
+./octez-client --mode mockup hash data '{}' of type 'list(int)'
+Raw packed data: 0x050200000000
+Script-expression-ID-Hash: exprvLcRMXArBMo4ZGN2fxbyDgW4hQTTTRd48VUbEwC4o2dMR2YjFP
+Raw Script-expression-ID-Hash: 0xf0147b0fcd9ed958297e3e663f25d0427f7f70576f22047a8d52953941a8b057
+Ledger Blake2b hash: HAAxipLZ7LdX9GLgN7p1bX9KneQ82FcCsss3YicsKaAS
+Raw Sha256 hash: 0x077e8b5d0b528d84284d773f8cc36da052248bb96c341d68d51b86e0ce098262
+Raw Sha512 hash: 0x7553bc601c56a361eb537e2bcba685ae6fbf3b68003bd9426db318352db433445aee770bab94631ce5bdf29b948caf1665e208c9be33d8b70fa67d2839d4a16a
+Gas remaining: 1039999.564 units remaining
+
+./octez-client --mode mockup hash data '{}' of type 'list(unit)'
+Raw packed data: 0x050200000000
+Script-expression-ID-Hash: exprvLcRMXArBMo4ZGN2fxbyDgW4hQTTTRd48VUbEwC4o2dMR2YjFP
+Raw Script-expression-ID-Hash: 0xf0147b0fcd9ed958297e3e663f25d0427f7f70576f22047a8d52953941a8b057
+Ledger Blake2b hash: HAAxipLZ7LdX9GLgN7p1bX9KneQ82FcCsss3YicsKaAS
+Raw Sha256 hash: 0x077e8b5d0b528d84284d773f8cc36da052248bb96c341d68d51b86e0ce098262
+Raw Sha512 hash: 0x7553bc601c56a361eb537e2bcba685ae6fbf3b68003bd9426db318352db433445aee770bab94631ce5bdf29b948caf1665e208c9be33d8b70fa67d2839d4a16a
+Gas remaining: 1039999.564 units remaining
+
+./octez-client --mode mockup hash data '{True; False}' of type 'list(bool)'
+Raw packed data: 0x050200000004030a0303
+Script-expression-ID-Hash: exprvAgoBrfufCNYoqAjdTcW2zD965bvLPD76xT7bVBNSn9SU6UgVd
+Raw Script-expression-ID-Hash: 0xd98b8c66ef2fb29d4d2ad21a667a753e0dd7044571e709330d4b92a5dc3d622c
+Ledger Blake2b hash: FeCtVSz9QEDR78yiR1aQwQaFMaoGES8VjX2HQCjZAfz3
+Raw Sha256 hash: 0xc939a10e1f26f0fddb7d00e26595b383bcd8d5fad6cc5427e8b0385a323d2a78
+Raw Sha512 hash: 0x98e4f14ef8e5ad0fa7520f07459fec0d5eb2f5759f0beebd5fa63beb950f6afa0d51c2573402d09684308677bae667ae8323fc2a32b5358be3155f56b73e263f
+Gas remaining: 1039998.932 units remaining
+
+./octez-client --mode mockup hash data '{True; True}' of type 'list(bool)'
+Raw packed data: 0x050200000004030a030a
+Script-expression-ID-Hash: expruRvaTS59Lau3wHMFuiADbSkSTPf61W3UCW25ej1kY8TnioYiG4
+Raw Script-expression-ID-Hash: 0x7872a58d23f32f0e045de43738dc925bcab9c84c4ea5e7d25774832cdf66f2a8
+Ledger Blake2b hash: 97BKSDXQr12DzEiMg2HiFoA2Aq9QnzDpmVatc2nrr5xB
+Raw Sha256 hash: 0x709190aaed8bda9abbca553974949a4a81dcdb927ebbc89aa7aef53bee218ff4
+Raw Sha512 hash: 0x7e67d91c4bb7a7c56e66ca752878e07ec45d61c6ff413b210384be67e946ca63cb1f852137d29494a7e232e2439092270e3b7abd834bcf2b18d192729794dbf7
+Gas remaining: 1039998.932 units remaining
+
+./octez-client --mode mockup hash data '{-1; 0}' of type 'list(int)'
+Raw packed data: 0x05020000000400410000
+Script-expression-ID-Hash: expruNySy7xWaeniq7qraAeEtFzBvJvFA4Jt3op3Dt2m6PddU2Hqr7
+Raw Script-expression-ID-Hash: 0x71bf94bc4515cc0afc439e3714423dfa3ef180fa8ff2c671f245dba990eb41ce
+Ledger Blake2b hash: 8f2WHzqFH7YhWa1rrFtHehTMxTUFJg49iwSNokpdZLSR
+Raw Sha256 hash: 0x28e46755a35977ff466f50cb4224bf71541ca519ca1a3f900e1d2cd7da4537b3
+Raw Sha512 hash: 0x0f79f40cb2c56e753120d405b1bb5bb843ac34fc2b362b4f8f684913318ecbf3d99e4be5fc6f8ed16ee11fef6f4c412ecfc8c6efbab1684585b0ceb8a6bad3b1
+Gas remaining: 1039998.907 units remaining
+
+./octez-client --mode mockup hash data '"[CONTRACT_HASH]"' of type address
+Raw packed data: 0x050a0000001601d1a37c088a1221b636bb5fccb35e05181038ba7c00
+Script-expression-ID-Hash: expruKMyQaSREJvvRY1engxJjG9eExbrS22JaZUiBmMnhVew5nyu98
+Raw Script-expression-ID-Hash: 0x698c356a1846c517db5b16f7a8ff507c3eb4aaa46c316a6936e955123358b306
+Ledger Blake2b hash: 871oxBK1GsehvbFAwL4bBF4w22oBKfxom746gk7wnr8d
+Raw Sha256 hash: 0xa5f6f6520cfa43309e72f6745efcbebc1edd1486ab219421e349c8000ddfe485
+Raw Sha512 hash: 0x4618bdd8850b8707c52bbf7f64526f8d83e59ccb3f2f1067ca33b5c470c709be21dc9242db15d5428af7b13dfb77353ab39d9367e2a6a12986e95aaf2d4285a7
+Gas remaining: 1039995.724 units remaining
+
+./octez-client --mode mockup hash data '"[CONTRACT_HASH]%entrypoint"' of type address
+Raw packed data: 0x050a00000020011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600656e747279706f696e74
+Script-expression-ID-Hash: exprttX9EL2UJb6Jw6tALybjjfRB3YUC4XsXdYjoGs7SnwZwwiEDHB
+Raw Script-expression-ID-Hash: 0x31241f23ec93014cd7b7cfe1e0a21517bfd0f08b38e348d78f45d37a40da530c
+Ledger Blake2b hash: 4JpvZAMQiWdgASBEyfLJB45oCrsFocB5ApSNa99DbRPZ
+Raw Sha256 hash: 0xf1c661a1663f788977e3508c6fe3c85346a34101d76b1d47783839ed2d756303
+Raw Sha512 hash: 0x781bd064edc01ff80b436682932dd2f0550a6dbf26be32ac434c6386235f4b4c5bb4610b9fad23374d606dcf853a7e16fcce4e3c20fd796e116adb587cdddcbd
+Gas remaining: 1039995.624 units remaining
+
+./octez-client --mode mockup hash data '"[PUBLIC_KEY_HASH]"' of type address
+Raw packed data: 0x050a00000016000002298c03ed7d454a101eb7022bc95f7e5f41ac78
+Script-expression-ID-Hash: expruH3qgknRBJVLVkwdzf6wfBxd7Y1uqNxr7zuMFxTC12e5PacLfv
+Raw Script-expression-ID-Hash: 0x644beb3894b35023de5b76a4c054a32eb7a818b2a83a1b0eb3974184faad1cbe
+Ledger Blake2b hash: 7kWuwaa65KxeAcBTC9U9TvSn4d7eo4hzmTReXrFU6QA1
+Raw Sha256 hash: 0x690cf3688186dafd5f78765b514f62ebf98804ed4732d3e9504d1e5d10f62c64
+Raw Sha512 hash: 0x9fe6e4a006013a541dde89aeef0db58a39c1b6d06f12554c8d01dc67dff183602d4e5d4a04ac37088d8e7e7836d08f044b279bc70a752b3ad3f1ed0131a9ea03
+Gas remaining: 1039995.724 units remaining
+
+./octez-client --mode mockup hash data '"[PUBLIC_KEY_HASH]"' of type address
+Raw packed data: 0x050a000000160001e5c6d1f726796e98b2bad2a819a36f742b2fe25b
+Script-expression-ID-Hash: exprte1BpSKiw9DnLocxVhaUQYqPGZiCbHrENpe2VsvfjvNZ3LTiGf
+Raw Script-expression-ID-Hash: 0x102dff270630ac032e24ae0a62b478930f56f4f5a27c9c3c799a8496d749b8a6
+Ledger Blake2b hash: 26ACmTEYpcjnxbUcXQZxYQgWbig1zpHXpmjKecLqMJEH
+Raw Sha256 hash: 0xc7016dde1b3b0a15dbfc476de05480386d8781f996769b0113bcf8d3a0f73502
+Raw Sha512 hash: 0x8446a69748c9e209bbd9e2d7ec652b3edd1516905b2ef11008993c27d239a237b3372c26854b8a1d393aa504478de76560a9fdd96fef24faff8483851814c6c7
+Gas remaining: 1039995.724 units remaining
+
+./octez-client --mode mockup hash data '"[PUBLIC_KEY_HASH]"' of type address
+Raw packed data: 0x050a0000001600026c9b3ad59e0f8bdc2bd2011675825f9f547131da
+Script-expression-ID-Hash: expruXqtng8pcQAshhkrVpENv9xXSirB19McDD4geN3aFFSbjJQMRy
+Raw Script-expression-ID-Hash: 0x85e36142a913e3c8d6fb5a77aaad753b01ebe40096bf46090737b8e80effbee3
+Ledger Blake2b hash: A1eKYfrX11WNdtxr3QeEzEpY95epaJtJhmeTQEhw3BTg
+Raw Sha256 hash: 0x1520063584bffabc0cc4d64d1d9f35c205ee403789653fef4465fad7da23a484
+Raw Sha512 hash: 0xe8fa1be3ab9fc177a731fdea29e3242831ccea70db15fa5f0dd8f592794261c9e49b51311e0b5387a81472c77edd87cba3afa6207e36ef0bce7f30b0c03bacb0
+Gas remaining: 1039995.724 units remaining
+
+./octez-client --mode mockup hash data 0 of type bls12_381_fr
+Raw packed data: 0x050a000000200000000000000000000000000000000000000000000000000000000000000000
+Script-expression-ID-Hash: exprvGRJUuBnkCc3vi2nFiCKonniDQhcJxTGRuJY68uJubvS1bxnmA
+Raw Script-expression-ID-Hash: 0xe68feee8b6ba14292b006b585748c4bd4757955f04320efd37fc0c719bdd7258
+Ledger Blake2b hash: GX24pFg5TqeFyCjH3dpXHP3tWZs8ZMm4MVo61DQnXRzo
+Raw Sha256 hash: 0xc928f798bdcab5fc59c9c06f348c2b1dd1d846ef8d2694ff3359a7fa98e5aaf1
+Raw Sha512 hash: 0x56d50c63bacfbac2102091e99071b824150d2c61cbfba9b65a9bad467f1e364a3e1286b0c5de1e7084c7dd3d27a29c19ecbac42d4f5d7797c003b75063f688b4
+Gas remaining: 1039999.104 units remaining
+
+./octez-client --mode mockup hash data 1 of type bls12_381_fr
+Raw packed data: 0x050a000000200100000000000000000000000000000000000000000000000000000000000000
+Script-expression-ID-Hash: exprtgCbDCSxBsG1xnR5B2MmdvwomjRwGZdM2MxfW5NdcB3uXiUUgD
+Raw Script-expression-ID-Hash: 0x152ad70bf1a27b6885d3085953411591cbeccd289c0c9fae3257cec340745254
+Ledger Blake2b hash: 2RdT5REqvvzsKNsc2wkGeVcve9j8srXqAqbz6ZPECHi3
+Raw Sha256 hash: 0x251c21e3c764b0993d4e49a7939ebc0192c9af7f6fbb5073f1035ea17a2cbe22
+Raw Sha512 hash: 0x31a063e0701b89ff1a19364d44c39c7ba28fbeb20b95e5a12be432fcc419666fcf030ed6349e3bca6f7446989b5cb9fb3b4425c4eff01ca1993efca695db199b
+Gas remaining: 1039999.104 units remaining
+
+./octez-client --mode mockup hash data 0x01 of type bls12_381_fr
+Raw packed data: 0x050a000000200100000000000000000000000000000000000000000000000000000000000000
+Script-expression-ID-Hash: exprtgCbDCSxBsG1xnR5B2MmdvwomjRwGZdM2MxfW5NdcB3uXiUUgD
+Raw Script-expression-ID-Hash: 0x152ad70bf1a27b6885d3085953411591cbeccd289c0c9fae3257cec340745254
+Ledger Blake2b hash: 2RdT5REqvvzsKNsc2wkGeVcve9j8srXqAqbz6ZPECHi3
+Raw Sha256 hash: 0x251c21e3c764b0993d4e49a7939ebc0192c9af7f6fbb5073f1035ea17a2cbe22
+Raw Sha512 hash: 0x31a063e0701b89ff1a19364d44c39c7ba28fbeb20b95e5a12be432fcc419666fcf030ed6349e3bca6f7446989b5cb9fb3b4425c4eff01ca1993efca695db199b
+Gas remaining: 1039999.104 units remaining
+
+./octez-client --mode mockup hash data 0x0001 of type bls12_381_fr
+Raw packed data: 0x050a000000200001000000000000000000000000000000000000000000000000000000000000
+Script-expression-ID-Hash: exprtitZpQKmhwwbedezDJBMs2aC9a9xwK1QgAEyZXsArw4d2FQ5Kt
+Raw Script-expression-ID-Hash: 0x1b460a4d53d8b7029da22adfcaa257555be45259e3480690cafa1e997212afcf
+Ledger Blake2b hash: 2qTxCogJudjrxMBHHvtNsurx1dc1P9Gx1JPUbBaJXDre
+Raw Sha256 hash: 0xe7038c6478963c7e52c61c9590b774280cfacf0547adc4943a26a608bdb0f277
+Raw Sha512 hash: 0x70e7340161a29e3dc08258b154fc797e2ea407ed35dcaf7782e0ad693906c75d15fd68887f2b03375f5c869c9912c390d020b47aee1ca6d20c5ac714c45b678e
+Gas remaining: 1039999.104 units remaining
+
+./octez-client --mode mockup hash data 0x0572cbea904d67468808c8eb50a9450c9721db309128012543902d0ac358a62ae28f75bb8f1c7c42c39a8c5529bf0f4e166a9d8cabc673a322fda673779d8e3822ba3ecb8670e461f73bb9021d5fd76a4c56d9d4cd16bd1bba86881979749d28 of type bls12_381_g1
+Raw packed data: 0x050a000000600572cbea904d67468808c8eb50a9450c9721db309128012543902d0ac358a62ae28f75bb8f1c7c42c39a8c5529bf0f4e166a9d8cabc673a322fda673779d8e3822ba3ecb8670e461f73bb9021d5fd76a4c56d9d4cd16bd1bba86881979749d28
+Script-expression-ID-Hash: exprupSAayZNCY4pMsSxx2Cbqr8LUcZ5YUnRG38hXjqRhkCAkVvt9q
+Raw Script-expression-ID-Hash: 0xab8f542bd84f792908f266964e5329c1532fd6e932de8c34256c3dd5d972fd91
+Ledger Blake2b hash: CYhUfj7xreN4aQ1vV8YWApwu8o1Yuhuv9JrHKdFivGuN
+Raw Sha256 hash: 0xeb0effa0878f7c1dfba8a579b282f45ae24715eebc01929bad29dcd9ab44d4da
+Raw Sha512 hash: 0x918f9b3b2b615817b4108beca643225a11796825fb00a9126c950f59afbf95364b11ac468150e6fd458b01d1ad3d77ccb0c08a2849e9262e66058014c41cd487
+Gas remaining: 1039940.864 units remaining
+
+./octez-client --mode mockup hash data 0x0a4edef9c1ed7f729f520e47730a124fd70662a904ba1074728114d1031e1572c6c886f6b57ec72a6178288c47c335771638533957d540a9d2370f17cc7ed5863bc0b995b8825e0ee1ea1e1e4d00dbae81f14b0bf3611b78c952aacab827a0530f6d4552fa65dd2638b361543f887136a43253d9c66c411697003f7a13c308f5422e1aa0a59c8967acdefd8b6e36ccf30468fb440d82b0630aeb8dca2b5256789a66da69bf91009cbfe6bd221e47aa8ae88dece9764bf3bd999d95d71e4c9899 of type bls12_381_g2
+Raw packed data: 0x050a000000c00a4edef9c1ed7f729f520e47730a124fd70662a904ba1074728114d1031e1572c6c886f6b57ec72a6178288c47c335771638533957d540a9d2370f17cc7ed5863bc0b995b8825e0ee1ea1e1e4d00dbae81f14b0bf3611b78c952aacab827a0530f6d4552fa65dd2638b361543f887136a43253d9c66c411697003f7a13c308f5422e1aa0a59c8967acdefd8b6e36ccf30468fb440d82b0630aeb8dca2b5256789a66da69bf91009cbfe6bd221e47aa8ae88dece9764bf3bd999d95d71e4c9899
+Script-expression-ID-Hash: expruyowq2jYmYPBWkdc5ZSgqP4daGevfjJePrhDTUtP7YQL4Dzi5x
+Raw Script-expression-ID-Hash: 0xc0d91f9ad81185f09853efcfc5951eca5c19f9b983808d824637f7bdc03ff595
+Ledger Blake2b hash: DyoJaUpE63MSnYEmW1pBQCK4DjLCURe2My2snWkmyC9S
+Raw Sha256 hash: 0xa160577bd9510066d5aa8043d4ce365f03a4f5057516d951c380a521c04fddd8
+Raw Sha512 hash: 0xb0ce4a3348adff71470fc470d700b28fd991a91d4013cc6d89bd34a2f1c05f9d0be5cfe64f6b5d79fdbc27eb3e84be520e4e2d864d6b6649722b22061bbfbd7b
+Gas remaining: 1039924.804 units remaining
+
+./octez-client --mode mockup hash data 0x of type bytes
+Raw packed data: 0x050a00000000
+Script-expression-ID-Hash: expru3w5vUB5kLiEvvbFA81Su29kZM9bvCuVVPDNqVQq9RJ5PZ8oRw
+Raw Script-expression-ID-Hash: 0x468397e139c257d8cd242c3e9a9a821f987eaab1e2e5098f11095258f1f11eec
+Ledger Blake2b hash: 5kFvPvb5eUSrt99ekYQYag1Yfz5AsvsUTzVQFHeNPoW3
+Raw Sha256 hash: 0x59b7ebd426a428d05b6f1d634e56708f7711bd6d0495578281115368c1635e2d
+Raw Sha512 hash: 0xb3dd201d5209fd911e193f3490154db2335205f472f0a7730e28182c5a3f07fa997f266226b12efb1bb39e8bc39d7a54d9c69fb575664bfb0be3bdd0550f7d65
+Gas remaining: 1039999.624 units remaining
+
+./octez-client --mode mockup hash data 0xABCDEF42 of type bytes
+Raw packed data: 0x050a00000004abcdef42
+Script-expression-ID-Hash: exprtbzFhHQHhmEMHRqKi6k1fzAQYiVtuCXauZvM1VrN1p8iJLhJeG
+Raw Script-expression-ID-Hash: 0x0b9a15faff1a1effa06a876cb86e81c9df2ca55fa8adfc4759449c602720a8c9
+Ledger Blake2b hash: nHm2FU2b9wwdwJVPrUS4tYmBbrsTrhsqY1U4moGsFNG
+Raw Sha256 hash: 0x616628cdbcd057574ae41c224271249cd8b1cca683b206d58c088922cb9f9222
+Raw Sha512 hash: 0xc93e6e937d63f506af719edccc50d15d0faf7b213e5f572dd3ac73271815816ebdf738fc6345464af7a2ce7fbace473a03ae38157dea3fb4cc34a6c3b17b7dbc
+Gas remaining: 1039999.584 units remaining
+
+./octez-client --mode mockup hash data 0x7a06a770 of type chain_id
+Raw packed data: 0x050a000000047a06a770
+Script-expression-ID-Hash: expruWMYwqN4LDi29J8v47jRfpLkqjEkUaYtn6N9RZL8PB6z7Kca2w
+Raw Script-expression-ID-Hash: 0x82820dedcd30b1b2c3253042b252e0b385dd365eaffdac09fbadf19cea1fab4a
+Ledger Blake2b hash: 9nT2FHdDkNKBJZie1VRm6WookGzwzZ57FYetGbjvgam7
+Raw Sha256 hash: 0x092220899acefcdc4870e3c2d6ce436cf3e7a27855ebca4d3b24da62bc294a5c
+Raw Sha512 hash: 0x99d8d47bed4a102b519062df6f04a65ce5ab7f98fadd3fdf7cdc6c21c652d9a59e8116781683c08b2094bb4fd99f516b690978d0a1f105aa05443a3e7e087697
+Gas remaining: 1039999.484 units remaining
+
+./octez-client --mode mockup hash data '"NetXynUjJNZm7wi"' of type chain_id
+Raw packed data: 0x050a00000004f3d48554
+Script-expression-ID-Hash: exprtXgy1oXtj7HHY7Vw9rw3nKoPmrWaGE9iYF6ToeYfvcwmKTFECY
+Raw Script-expression-ID-Hash: 0x01d7b61758f39c12865684f612da8f479d3755efaa0af26636254068a31c5083
+Ledger Blake2b hash: 8CBfWC4xY9SgFvQidL2r53pwquTtGhW8UJGcgu5wcYa
+Raw Sha256 hash: 0xf6a25e29f615b4f5edb309db8229c4e607828111795f6ac68a30684bd04bcda5
+Raw Sha512 hash: 0x09ef7ad4129366f7c7e3beae66514b91728428b1b6b62454876fd7b07621bffa068de15dbc4cf3b550682481663df2a64435f65ed231787feeec183221dd4c6b
+Gas remaining: 1039997.934 units remaining
+
+./octez-client --mode mockup hash data '"[PUBLIC_KEY]"' of type key
+Raw packed data: 0x050a00000021004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f
+Script-expression-ID-Hash: exprtbUKNrgLiggTQePME77Tgz9QcD1HK2pEVWHFLnR1qaah41D2XF
+Raw Script-expression-ID-Hash: 0x0a6e0f781438d15aea8aeb41e8f00ea25bacc3d1efedfc62ca2eed7fcf299e3a
+Ledger Blake2b hash: hiR4yro9kA38FKWeB8Ps8hzNyeqSoskUNGePRJQi4Uy
+Raw Sha256 hash: 0x30467dc415ef58a775a6aa618f515d856287ad20b56477a16c0cfdf0f2a2ed3c
+Raw Sha512 hash: 0x1b3f5993512659e0164d186381de64bd6a4c678cefd7ca756ec087769208fc62b4563df31cd4680707e3c43a5a8c7a4579ad5c34ae471a5731ebcbe0db2255ec
+Gas remaining: 1039673.839 units remaining
+
+./octez-client --mode mockup hash data '"[PUBLIC_KEY]"' of type key
+Raw packed data: 0x050a000000210057b0e07666fe26167f92bffe667dc2ba2214a404f4fe5d1bb8ce01baef5663a5
+Script-expression-ID-Hash: expruJXx976B1KtYQeE96FS74k4VRXRKBAWx5e9TMWEBGPwv8VG5tt
+Raw Script-expression-ID-Hash: 0x67aaee572e9d4e0673e66273b43e2300393ee44eb95984304b1407abb5809c24
+Ledger Blake2b hash: 7ygAaVU28qwNcCvg5stUKDPUikjnoMtDJM6FbNnrEmeT
+Raw Sha256 hash: 0x13830142ebb330c5f0177637a05894338307e1179b67c45d90eb2e98151175a9
+Raw Sha512 hash: 0x075b346f72fb69759345eff13f52ad51b9c5c138fc6155742c309910412e2efc9a33615a8d4a3e6724c15de7960807cd7e83185d24ab5c096f766916ac035982
+Gas remaining: 1039673.839 units remaining
+
+./octez-client --mode mockup hash data '"[PUBLIC_KEY_HASH]"' of type key_hash
+Raw packed data: 0x050a000000150002298c03ed7d454a101eb7022bc95f7e5f41ac78
+Script-expression-ID-Hash: expru6fotvwsd3SnSHp5qhcUTHAmd1hqQA24srgXcGRRaCA2gPLYkf
+Raw Script-expression-ID-Hash: 0x4cba54c206c1ccfd72a4a5492b21ae41f1faa6a7a7cce3f1b270218dc79814d3
+Ledger Blake2b hash: 6AWn5TRUkgYJe4fjjZrovKq81K9bNDNNgcS7xiTszkbC
+Raw Sha256 hash: 0x4156dbe479999c7df14d90ae46e304304534cc38795d73ecc76d60c78724f2a1
+Raw Sha512 hash: 0xffb476c7d1ae269c82ea4d09a1513a8d915a8b50acb759c351228edc5e623e6f7390f2bd856625476ba14bb17b4dac07572fc40341e9eedf44e372a40550d798
+Gas remaining: 1039995.734 units remaining
+
+./octez-client --mode mockup hash data '"[PUBLIC_KEY_HASH]"' of type key_hash
+Raw packed data: 0x050a000000150080dfbed18097a4cb62dea643ebc5346600b5204d
+Script-expression-ID-Hash: expruEg1o4eXzeCwhgod4hTPbJjdpULmL2cbYphGFC9trLLhNaK3kw
+Raw Script-expression-ID-Hash: 0x5ee69f25f750a193690ec32802a7a33b9572c7856791471d21fc4e73199dbaf3
+Ledger Blake2b hash: 7PTHd1XgawoAQDjiktNjDyPC5tsse21LnNFufiRifYbc
+Raw Sha256 hash: 0x6f54374213823a79f912fb52cb57793466b4a39267dfbdcfdc918eeef296499f
+Raw Sha512 hash: 0x2cb036951cd1725c7863f5c04f6f81a879bd0a533b1422a60a2a38d0c8243b10a0a879766e2a04c3cd47c532e417089839c3cf621621060f00bc5c79bda058bb
+Gas remaining: 1039995.734 units remaining
+
+./octez-client --mode mockup hash data '{ }' of type 'lambda unit unit'
+Raw packed data: 0x050200000000
+Script-expression-ID-Hash: exprvLcRMXArBMo4ZGN2fxbyDgW4hQTTTRd48VUbEwC4o2dMR2YjFP
+Raw Script-expression-ID-Hash: 0xf0147b0fcd9ed958297e3e663f25d0427f7f70576f22047a8d52953941a8b057
+Ledger Blake2b hash: HAAxipLZ7LdX9GLgN7p1bX9KneQ82FcCsss3YicsKaAS
+Raw Sha256 hash: 0x077e8b5d0b528d84284d773f8cc36da052248bb96c341d68d51b86e0ce098262
+Raw Sha512 hash: 0x7553bc601c56a361eb537e2bcba685ae6fbf3b68003bd9426db318352db433445aee770bab94631ce5bdf29b948caf1665e208c9be33d8b70fa67d2839d4a16a
+Gas remaining: 1039998.843 units remaining
+
+./octez-client --mode mockup hash data '{ PUSH nat 1; ADD }' of type 'lambda nat nat'
+Raw packed data: 0x0502000000080743036200010312
+Script-expression-ID-Hash: expru2DqBT8sxeHNp8FZnU3yEsE3eBRttz553dx3ct4fLZKvag6KXz
+Raw Script-expression-ID-Hash: 0x42a0dcc26c782dcc094ba725e4bcc4f8710c72203a895b5e888990c12d03d7df
+Ledger Blake2b hash: 5V6BBTaoBmSdwu8pv5xNMNBwm1mQGdPJ8e8N3s22Gcwp
+Raw Sha256 hash: 0x113616e40fd9fcf4cb73a9cf9c57fc0ab1853fa4432b9ca975b472d0173bc007
+Raw Sha512 hash: 0x2256250f59e3c1c708eae9aa4d6f7d2dafdf82cb12b872db8320048c0dab3e225e96e846e284382fcfc832b83f0bf3ee3945fc6936357b2c29d96f29ba90315a
+Gas remaining: 1039995.855 units remaining
+
+./octez-client --mode mockup hash data '{}' of type 'list unit'
+Raw packed data: 0x050200000000
+Script-expression-ID-Hash: exprvLcRMXArBMo4ZGN2fxbyDgW4hQTTTRd48VUbEwC4o2dMR2YjFP
+Raw Script-expression-ID-Hash: 0xf0147b0fcd9ed958297e3e663f25d0427f7f70576f22047a8d52953941a8b057
+Ledger Blake2b hash: HAAxipLZ7LdX9GLgN7p1bX9KneQ82FcCsss3YicsKaAS
+Raw Sha256 hash: 0x077e8b5d0b528d84284d773f8cc36da052248bb96c341d68d51b86e0ce098262
+Raw Sha512 hash: 0x7553bc601c56a361eb537e2bcba685ae6fbf3b68003bd9426db318352db433445aee770bab94631ce5bdf29b948caf1665e208c9be33d8b70fa67d2839d4a16a
+Gas remaining: 1039999.564 units remaining
+
+./octez-client --mode mockup hash data '{ 0 ; 10 }' of type 'list nat'
+Raw packed data: 0x0502000000040000000a
+Script-expression-ID-Hash: expru4vWphhWxDfcnCeXUdGZAhDpNTNt7qSvcoEAF58Se8dVgC2fBR
+Raw Script-expression-ID-Hash: 0x48c32738e9d3772486ca8e0d150d6b94cebcd2421e3e8112434192c3c1df3a86
+Ledger Blake2b hash: 5u2x2XQZVxYHKm1LpjamMs894nT2CnvMKTQmeZsrtPH7
+Raw Sha256 hash: 0xaf9e7cce96fb6243ab05cd630f260862264dfe7eccda6fa24050a7cb9043134d
+Raw Sha512 hash: 0xc699a04538d2cc260b183e65a02b1ea9fdeeca4c3bc253ae8e70d9824b7e79ebae34f6da3dd5eb3ceb29e9d18dc5e6f36d630b13be50adf566e9badb810f3349
+Gas remaining: 1039998.907 units remaining
+
+./octez-client --mode mockup hash data '{ Some 10 ; None }' of type 'list (option int)'
+Raw packed data: 0x0502000000060509000a0306
+Script-expression-ID-Hash: exprv7yYyxehrZrCaxT9CLhMtAmQCUjjv9PDBZMkqASKLHUVGQUQHk
+Raw Script-expression-ID-Hash: 0xd363a18306b7fc740debf0d1a981b5c4e5a3b7914eb04b90d6d406bce9f74d41
+Ledger Blake2b hash: FEB92G5KaAbrFnAp7UjD1AR9daiKQinjcvrAi3sRYG3S
+Raw Sha256 hash: 0xa24baf1b39078a1811069da825039c4e6e8ab2de34d58f29baab4ffa9323fdfd
+Raw Sha512 hash: 0xb92f1245587939c4ade1554874192d1bbd83f9d34a044e778fca611a6eac5f1a91a259b5fb0682495c1735a0f50e7da5fbdc4e4029e66ed64ecdc7a832a36e7c
+Gas remaining: 1039998.531 units remaining
+
+./octez-client --mode mockup hash data '{}' of type 'map nat unit'
+Raw packed data: 0x050200000000
+Script-expression-ID-Hash: exprvLcRMXArBMo4ZGN2fxbyDgW4hQTTTRd48VUbEwC4o2dMR2YjFP
+Raw Script-expression-ID-Hash: 0xf0147b0fcd9ed958297e3e663f25d0427f7f70576f22047a8d52953941a8b057
+Ledger Blake2b hash: HAAxipLZ7LdX9GLgN7p1bX9KneQ82FcCsss3YicsKaAS
+Raw Sha256 hash: 0x077e8b5d0b528d84284d773f8cc36da052248bb96c341d68d51b86e0ce098262
+Raw Sha512 hash: 0x7553bc601c56a361eb537e2bcba685ae6fbf3b68003bd9426db318352db433445aee770bab94631ce5bdf29b948caf1665e208c9be33d8b70fa67d2839d4a16a
+Gas remaining: 1039999.504 units remaining
+
+./octez-client --mode mockup hash data '{ Elt 0 0xCB ; Elt 1 0xAB }' of type 'map nat bytes'
+Raw packed data: 0x050200000014070400000a00000001cb070400010a00000001ab
+Script-expression-ID-Hash: exprupowg2SRTtvx8kU3J6iV3Nta1rZ54KFMMHvX9ADcB9kg8vDR8u
+Raw Script-expression-ID-Hash: 0xac6995309e75f33132a6819b36c2ae787684be3c23e7cf2a44533229b0aec974
+Ledger Blake2b hash: Cc2W7aPZgPoiuVfuxR8j6gjxgpuZDBJGjSaRQemzTnFM
+Raw Sha256 hash: 0x732bb539d52c41e6cc09d6116b1b3d25257b27dfd7adc7a09e03d345c09e0594
+Raw Sha512 hash: 0x0d565633ca0b3c3751aee0fe54d9be744bea79b1a714d97227397dfe79b5058d6385bc86dcdabbb280c5fc2fb56fc073550ac63d947df2787a5927a1342c343b
+Gas remaining: 1039997.698 units remaining
+
+./octez-client --mode mockup hash data 0 of type mutez
+Raw packed data: 0x050000
+Script-expression-ID-Hash: exprtZBwZUeYYYfUs9B9Rg2ywHezVHnCCnmF9WsDQVrs582dSK63dC
+Raw Script-expression-ID-Hash: 0x053f610929e2b6ea458c54dfd8b29716d379c13f5c8fd82d5c793a9e31271743
+Ledger Blake2b hash: MV6HviXsJnEwxPKHLSUxEvxZVZr14cYYiQth4DFa2NN
+Raw Sha256 hash: 0x69c492e24afa52c556de5ea70e1b5d7da3f0bc7a5a7fd1d413444c1a42a7e9b3
+Raw Sha512 hash: 0x6fb0c536a65271998988dffee83efeb370514fcfecd339ebda1f97bde876ea5ecde4a2e8e93b22071849f5625639936ebc55b71c3b4118254f5bff444e515a85
+Gas remaining: 1039999.624 units remaining
+
+./octez-client --mode mockup hash data 1 of type mutez
+Raw packed data: 0x050001
+Script-expression-ID-Hash: expru2dKqDfZG8hu4wNGkiyunvq2hdSKuVYtcKta7BWP6Q18oNxKjS
+Raw Script-expression-ID-Hash: 0x438c52065d4605460b12d1b9446876a1c922b416103a20d44e994a9fd2b8ed07
+Ledger Blake2b hash: 5YgR7rjfSbSbzGEYhhBG9ENRHhdVSUu2TJ6RyNLawjiv
+Raw Sha256 hash: 0x57072915640d052f4e2843e1498b10c4f71b62df565525d33c4a66a724e3e20a
+Raw Sha512 hash: 0x112e6b61a60ecf001d501f39284ff8a575d818f2f79295b90b24f045d165a490c19cac2add9149dbdd23a8f2cf956dbee0efe17449111e6326e97ab21532f445
+Gas remaining: 1039999.599 units remaining
+
+./octez-client --mode mockup hash data 99999 of type mutez
+Raw packed data: 0x05009f9a0c
+Script-expression-ID-Hash: expruQUsZtokRsnKdzPwveAiq1QX2TgnMeRdhQ3rqBJw6LbfK7nJEa
+Raw Script-expression-ID-Hash: 0x752bc02931fa202b4f7c174c0cea1254e6a007bc42f53d00d7f51556392f84f0
+Ledger Blake2b hash: 8tPPr8hLWFsY27xsdiM85nrPUoCXxEPR3PTWyma5JTyH
+Raw Sha256 hash: 0xd794d67b0648f7a498c96eb5b8b8ab14d15c45dd13ae8168b4a3741e7b4cc701
+Raw Sha512 hash: 0xed76e4309dcbd480e19bb3e942adaada5ead9eeec944c0f90798c978cccee14b80d2a1b8f0f2346ca54b56d1662b02c6b0b58a2caa1a7187d5281e70ccd43ce6
+Gas remaining: 1039999.549 units remaining
+
+./octez-client --mode mockup hash data 0 of type nat
+Raw packed data: 0x050000
+Script-expression-ID-Hash: exprtZBwZUeYYYfUs9B9Rg2ywHezVHnCCnmF9WsDQVrs582dSK63dC
+Raw Script-expression-ID-Hash: 0x053f610929e2b6ea458c54dfd8b29716d379c13f5c8fd82d5c793a9e31271743
+Ledger Blake2b hash: MV6HviXsJnEwxPKHLSUxEvxZVZr14cYYiQth4DFa2NN
+Raw Sha256 hash: 0x69c492e24afa52c556de5ea70e1b5d7da3f0bc7a5a7fd1d413444c1a42a7e9b3
+Raw Sha512 hash: 0x6fb0c536a65271998988dffee83efeb370514fcfecd339ebda1f97bde876ea5ecde4a2e8e93b22071849f5625639936ebc55b71c3b4118254f5bff444e515a85
+Gas remaining: 1039999.624 units remaining
+
+./octez-client --mode mockup hash data 1 of type nat
+Raw packed data: 0x050001
+Script-expression-ID-Hash: expru2dKqDfZG8hu4wNGkiyunvq2hdSKuVYtcKta7BWP6Q18oNxKjS
+Raw Script-expression-ID-Hash: 0x438c52065d4605460b12d1b9446876a1c922b416103a20d44e994a9fd2b8ed07
+Ledger Blake2b hash: 5YgR7rjfSbSbzGEYhhBG9ENRHhdVSUu2TJ6RyNLawjiv
+Raw Sha256 hash: 0x57072915640d052f4e2843e1498b10c4f71b62df565525d33c4a66a724e3e20a
+Raw Sha512 hash: 0x112e6b61a60ecf001d501f39284ff8a575d818f2f79295b90b24f045d165a490c19cac2add9149dbdd23a8f2cf956dbee0efe17449111e6326e97ab21532f445
+Gas remaining: 1039999.599 units remaining
+
+./octez-client --mode mockup hash data 99999 of type nat
+Raw packed data: 0x05009f9a0c
+Script-expression-ID-Hash: expruQUsZtokRsnKdzPwveAiq1QX2TgnMeRdhQ3rqBJw6LbfK7nJEa
+Raw Script-expression-ID-Hash: 0x752bc02931fa202b4f7c174c0cea1254e6a007bc42f53d00d7f51556392f84f0
+Ledger Blake2b hash: 8tPPr8hLWFsY27xsdiM85nrPUoCXxEPR3PTWyma5JTyH
+Raw Sha256 hash: 0xd794d67b0648f7a498c96eb5b8b8ab14d15c45dd13ae8168b4a3741e7b4cc701
+Raw Sha512 hash: 0xed76e4309dcbd480e19bb3e942adaada5ead9eeec944c0f90798c978cccee14b80d2a1b8f0f2346ca54b56d1662b02c6b0b58a2caa1a7187d5281e70ccd43ce6
+Gas remaining: 1039999.549 units remaining
+
+./octez-client --mode mockup hash data None of type 'option unit'
+Raw packed data: 0x050306
+Script-expression-ID-Hash: exprtn5DaoF31YMuSLAJFjARQmKwsdUUnHMCKBqZ6zoH1SiAyqHkFh
+Raw Script-expression-ID-Hash: 0x22809fd952c3478272e90aa2f8e59260e81bfa5c35329845dddbd462470f61bc
+Ledger Blake2b hash: 3KgcqHyPuSS1yTH3UyqenupZv8z2dDJjXmuDNUoZa8ew
+Raw Sha256 hash: 0xe61760f1647df1aa8f3f64cf8a93fecddf536ed4867d4111cbedab7652f8267f
+Raw Sha512 hash: 0x4a3457a98c4f863fb53dfa90af26aa46becda18150cda8e2d3d1de2a1f6536b7c5bc7c99f0216610650e90653d69badca147cd88e3d6f472b5be617c076980e0
+Gas remaining: 1039999.564 units remaining
+
+./octez-client --mode mockup hash data 'Some "foo"' of type 'option string'
+Raw packed data: 0x0505090100000003666f6f
+Script-expression-ID-Hash: expruWj1i3NoT1rSzrv22q9uTuL8Ax5LcRkhHQJLDbRfaHSydRmpx4
+Raw Script-expression-ID-Hash: 0x83592457741d2dbb22af78846b3040e92614170c2e4850110a88b2d924a10ac7
+Ledger Blake2b hash: 9qjFGa2NhRMBbutDccsFotBEpNeCuK4mJu95q3hiJZ3U
+Raw Sha256 hash: 0xcd56882646da9e0c3309537fb762087316b9bd0c754e7c858b30445e5a4df6a0
+Raw Sha512 hash: 0xb7c841f6c2ab26702ce4b2a72b0f70e63c561ed97bc77df78c2f763e492eb8c86ecf755b60aa1246cc1ba95b0de2d1a3afa3de408325b3b2c764efcb24d1a9e5
+Gas remaining: 1039999.174 units remaining
+
+./octez-client --mode mockup hash data '(Left True)' of type 'or bool string'
+Raw packed data: 0x050505030a
+Script-expression-ID-Hash: exprufiG2ZNeHqrtWKs4bJ3yPwqxxe2W1jPv8NfHezGjadF15ruvUw
+Raw Script-expression-ID-Hash: 0x97c11ba899e5d0cb4772b7932f1669b4ab29113b0f17c88e22fd10fc1faf991e
+Ledger Blake2b hash: BDPMBz4ejDv6jv7uARzSz4Uv5LbixRHZJ2K7vfXGhzhT
+Raw Sha256 hash: 0x07b7ad9ed53b16bf17d52aa7eb3ae77fba8671f6f979eccc92ecf9e6702f7b1f
+Raw Sha512 hash: 0xb2de8eb67db0b449a7b5b844e6c7d1cb8ca874003a1e43b802bf273474e621deaefe7cdfb27c2bd2c78326e2e0506f1ecae038be143cf5b4b4d7e918b6ebc72e
+Gas remaining: 1039999.188 units remaining
+
+./octez-client --mode mockup hash data '(Right "foo")' of type 'or bool string'
+Raw packed data: 0x0505080100000003666f6f
+Script-expression-ID-Hash: exprvD9V6jDDCiYUQjkqNdnD2eFyqMA76Rkoa6rpVXkim7hcqHFFEz
+Raw Script-expression-ID-Hash: 0xdf2193b9a689f10ac5c8a48c577f3e2a94221bd9ac884b5fa1b74f3f916d7dd3
+Ledger Blake2b hash: G21cWq5PkGo84UkfufjDCMXWsSQA3PEDBLKYPt1qtvan
+Raw Sha256 hash: 0x2477b0dad8808245eacf22a51ef1f6b9bcb59b8f4d4b3a979132fa74dd129abf
+Raw Sha512 hash: 0x64d21e4c66c2c1da70cda80a9609a28e8571734e42a63927753c2027f5c168086fd9925ddaee1544b254fbf63b055bc5ee4e9a987f457b58be04abbdfd29ac57
+Gas remaining: 1039999.114 units remaining
+
+./octez-client --mode mockup hash data '(Pair 0 True)' of type 'pair int bool'
+Raw packed data: 0x0507070000030a
+Script-expression-ID-Hash: exprubgTpz2xzfqw7VxoZ9CfmYeQCayFc4mAA9pgnXDKXo64FD2tDw
+Raw Script-expression-ID-Hash: 0x8e99fc570ca12731c2a09203fb84b25f93264a234dc1dc6abd8b920a06309794
+Ledger Blake2b hash: Abf5a9UGQ2gcU7V918Pcss2DaTVaqdkBrDYUi55p4Bfh
+Raw Sha256 hash: 0x754da3f12fe6c0317d39bc71ff0489d763047648833d3403cdb348c93f9c2678
+Raw Sha512 hash: 0xfc2f3d753f8749bec06d6cccadd8263d69ca4121af57d0fce69b62bdb82173d3403b28cd69eb551827c7b80384d77e48b42be7399f06e310762a80ebcdfb5e1b
+Gas remaining: 1039998.872 units remaining
+
+./octez-client --mode mockup hash data '(Pair 0 (Pair True 0x))' of type 'pair int bool bytes'
+Raw packed data: 0x05070700000707030a0a00000000
+Script-expression-ID-Hash: expruJK4yoH9hmZUDgbb5DBtjekERQd913ar43wFgkLVL4eYcFtDsT
+Raw Script-expression-ID-Hash: 0x6729d37ba0b7c4f8746e53816067fec805fbbd37253d81cf974b6edd054da22b
+Ledger Blake2b hash: 7whz5UYUjV52kQv1B1QUoYk1pMwRay1gEsB8XwP5ce5Q
+Raw Sha256 hash: 0x2ee3aa1d789b740d21b535384a8ec28c7c375484576f070a0ea03f0ada7917fd
+Raw Sha512 hash: 0x83faf6a6c5c205a86087d77460f54a582f285918f45847376b7a722520f69acf23d6a9f09cce2646fcd279f33241ab345e2e17613f0babd1ebc5979713bff784
+Gas remaining: 1039998.120 units remaining
+
+./octez-client --mode mockup hash data '(Pair 0 True 0x)' of type 'pair int bool bytes'
+Raw packed data: 0x05070700000707030a0a00000000
+Script-expression-ID-Hash: expruJK4yoH9hmZUDgbb5DBtjekERQd913ar43wFgkLVL4eYcFtDsT
+Raw Script-expression-ID-Hash: 0x6729d37ba0b7c4f8746e53816067fec805fbbd37253d81cf974b6edd054da22b
+Ledger Blake2b hash: 7whz5UYUjV52kQv1B1QUoYk1pMwRay1gEsB8XwP5ce5Q
+Raw Sha256 hash: 0x2ee3aa1d789b740d21b535384a8ec28c7c375484576f070a0ea03f0ada7917fd
+Raw Sha512 hash: 0x83faf6a6c5c205a86087d77460f54a582f285918f45847376b7a722520f69acf23d6a9f09cce2646fcd279f33241ab345e2e17613f0babd1ebc5979713bff784
+Gas remaining: 1039998.120 units remaining
+
+./octez-client --mode mockup hash data '{0; True; 0x}' of type 'pair int bool bytes'
+Raw packed data: 0x05070700000707030a0a00000000
+Script-expression-ID-Hash: expruJK4yoH9hmZUDgbb5DBtjekERQd913ar43wFgkLVL4eYcFtDsT
+Raw Script-expression-ID-Hash: 0x6729d37ba0b7c4f8746e53816067fec805fbbd37253d81cf974b6edd054da22b
+Ledger Blake2b hash: 7whz5UYUjV52kQv1B1QUoYk1pMwRay1gEsB8XwP5ce5Q
+Raw Sha256 hash: 0x2ee3aa1d789b740d21b535384a8ec28c7c375484576f070a0ea03f0ada7917fd
+Raw Sha512 hash: 0x83faf6a6c5c205a86087d77460f54a582f285918f45847376b7a722520f69acf23d6a9f09cce2646fcd279f33241ab345e2e17613f0babd1ebc5979713bff784
+Gas remaining: 1039998.120 units remaining
+
+./octez-client --mode mockup hash data '{}' of type 'set bool'
+Raw packed data: 0x050200000000
+Script-expression-ID-Hash: exprvLcRMXArBMo4ZGN2fxbyDgW4hQTTTRd48VUbEwC4o2dMR2YjFP
+Raw Script-expression-ID-Hash: 0xf0147b0fcd9ed958297e3e663f25d0427f7f70576f22047a8d52953941a8b057
+Ledger Blake2b hash: HAAxipLZ7LdX9GLgN7p1bX9KneQ82FcCsss3YicsKaAS
+Raw Sha256 hash: 0x077e8b5d0b528d84284d773f8cc36da052248bb96c341d68d51b86e0ce098262
+Raw Sha512 hash: 0x7553bc601c56a361eb537e2bcba685ae6fbf3b68003bd9426db318352db433445aee770bab94631ce5bdf29b948caf1665e208c9be33d8b70fa67d2839d4a16a
+Gas remaining: 1039999.564 units remaining
+
+./octez-client --mode mockup hash data '{ 0 ; 3 ; 4 }' of type 'set nat'
+Raw packed data: 0x050200000006000000030004
+Script-expression-ID-Hash: expruTArjjBYFarD9wM3cZJWXr4ZGzDNmZ4NzJja4evPDhDaGRRS5F
+Raw Script-expression-ID-Hash: 0x7b470c4d4cd099659964e7ae56f49599a16e5c4ddbe03898a7f87b08f8cb4a6f
+Ledger Blake2b hash: 9JDyxjR1Pex14hzrrVN6wUuVdug418EbGy9PytyWi36E
+Raw Sha256 hash: 0x79b8b0a86bb4e9939b552d8bfc98c50b991ae227235a3d39381349817ebdda9f
+Raw Sha512 hash: 0x34de860c30437423f988cff5ed945981ed4b82dc8a9153f1fbb387e3a05d502d494aa3fb627698a2d7d3b769715e24f844274d0a86bbddff3d955d97ba39d410
+Gas remaining: 1039998.106 units remaining
+
+./octez-client --mode mockup hash data '"ABC\n123"' of type string
+Raw packed data: 0x0501000000074142430a313233
+Script-expression-ID-Hash: expru9epr1Q99NjjgfhQBBmLiAb55ATvHcpvXqVfxnjQyAo3qLpTSU
+Raw Script-expression-ID-Hash: 0x53804fa1fb0854914ed6562bc7dde5d9c2307bbf5ac70e787a715c113e36d6c6
+Ledger Blake2b hash: 6cxKSKRL7E2Bpg1ZPZkWT7hXgLKyHJxLc5NA2Q2H1jqX
+Raw Sha256 hash: 0x3ebab0c348173626afcb9c982d06ee1189fb1a6359eecd33b30af851aacdcc0f
+Raw Sha512 hash: 0x086fccde9f22aba378cd47833d9613f6d1cfd3f15fb6a8dde0eb57e1da651de8ef69886a7a4ebbadf50155910d1fbcc9048e0d9acb196be04adf519476d52307
+Gas remaining: 1039999.470 units remaining
+
+./octez-client --mode mockup hash data '"edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"' of type signature
+Raw packed data: 0x050a0000004049d47dba27bd76208b092f3e500f64818920c817491b8b9094f28c2c2b9c6721b257b8878ce47182122b8ea84aeacd84a8aa28cb1f1fe48a26355a7bca4b8306
+Script-expression-ID-Hash: exprtXK3xDMDMu3vGVkb6m9JxwRb3t62tZZNWZPS6FGCY5oFVcZuaM
+Raw Script-expression-ID-Hash: 0x00fc144dd18ae1a2d0c6247aa7dad67b2f8bec1b26984437b4bdf02e2d296783
+Ledger Blake2b hash: 14qwXuZ6GDwjvb9GEyurnLg9ZABtnQUAVuDXuGtFAYhp
+Raw Sha256 hash: 0xf432ec1cf86bc818d9dff9f69870eaedbbfaee429f2619500757f3ce1d7bc1a9
+Raw Sha512 hash: 0xd7f46bdf12090e235e59f0a61af1ca90f64f6022bd5df479a62f16fd829c6cec431dc081ee16f0c103eec70be968d3f70ec9f584f8948d31c804a87ddc82b1b3
+Gas remaining: 1039992.529 units remaining
+
+./octez-client --mode mockup hash data '"spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm"' of type signature
+Raw packed data: 0x050a00000040865b0ceaa2decd64fea1b7e0e97d6ae8035125d821ebe99d7d5c8a559f36fdd43388a570e475011f6d2bbef184ece9bafbf0ac12157f7257988e9575ae2cbca9
+Script-expression-ID-Hash: expruiLTZFkM8c6b9yURRmpLK3f7AAQbPQc11DeCSLoWUqGMUwLiSn
+Raw Script-expression-ID-Hash: 0x9db673f2907fafceb934a674351b57e76ba2bf9b3ee2f6edac327089ef5aa749
+Ledger Blake2b hash: BceNWVXjPX5jc4D1kauy4Evh21C8q53aQRJFMzEpLXWx
+Raw Sha256 hash: 0x42fe71aa3f9fa7d868a2a8aee492b2a559fba87f8c15403ffe753fc0effffd17
+Raw Sha512 hash: 0xc9a9d704af153d9a2d046bd428f817c9db9ec5d52881ac31e28ed1faca821d34b797bee5171855d6f35ecefed7db2800a20639fc1f877672d03b456af7cf296e
+Gas remaining: 1039992.529 units remaining
+
+./octez-client --mode mockup hash data '"foo"' of type string
+Raw packed data: 0x050100000003666f6f
+Script-expression-ID-Hash: expruTFUPVsqkuD5iwLMJuzoyGSFABnxLo7CZrgnS1czt1WbTwpVrJ
+Raw Script-expression-ID-Hash: 0x7b754bee2b13dd9f9486e6f933e27afc2c31765a8414fc98422255138b04a366
+Ledger Blake2b hash: 9JvtJaNHvYP5bpF7tjbbtpr8o7Jtptz445dZ8pemDnvH
+Raw Sha256 hash: 0xe9341dd81166c9253032c8296ae443fbe0d6878502c31cdc431407c4f46dd094
+Raw Sha512 hash: 0x8bf21486ea4a0789bf772b75b3cd8f9edace809f79c38146dbbe2d447edf99f9fcc7c53f511063fe9de21b22baa01710ef6a300546fcc6529812128488e91309
+Gas remaining: 1039999.550 units remaining
+
+./octez-client --mode mockup hash data '"[TIMESTAMP]"' of type timestamp
+Raw packed data: 0x0500a7e8e4d80b
+Script-expression-ID-Hash: expruPr6RXBVA966PMQk4kFKyiph9smByS7tFn1hKE6RwAv77VxPes
+Raw Script-expression-ID-Hash: 0x73bb27e87ad251d54484fc93a59fac977e3e1af83dfaaa33df4cb7646e01ffdf
+Ledger Blake2b hash: 8nmQbgYU3gU2uTXAoJ77miKgQicBLCYYWtnoLzvF5k7Q
+Raw Sha256 hash: 0x883ec8d70eeb0beb91bb34dbb5a9a49ffdbe79fd99d8a5fe2b5b508381597bce
+Raw Sha512 hash: 0x2b7e8c38c164c6fd93d454fc2ac07122c45616cc616e2789bfb77cc023ef005cf97c8fb8e7c38565d52d0a5fd941a5be0e26e0fd323261069445b89f7ba6086a
+Gas remaining: 1039999.416 units remaining
+
+./octez-client --mode mockup hash data 1571659294 of type timestamp
+Raw packed data: 0x05009ef8ecda0b
+Script-expression-ID-Hash: exprvPBUjsoev8w7shCt9SLykngSNL393Q8xHJS5eTMSrA2KbecS2x
+Raw Script-expression-ID-Hash: 0xf5ea5a2add84cb09fcf97c1d6e931a177dc6b47c27859d0a8c67e6a89c87098c
+Ledger Blake2b hash: HYx9bgNpSXhVfVKjoToFJ55LGxpZ8NGNwnfZJdGkYJSP
+Raw Sha256 hash: 0xa4e6a8748a04d460e75e1420baa3f4e9d53c758f076a0a5e3730941eade9c72f
+Raw Sha512 hash: 0x69c9ac176f1c5da7b15e859224d9877da0ecb9ecb84e0fa580405c46f13cc8ea11365502298f45354dc21ddeccd7ad3772c8d11091870536f156a6fc94aad89a
+Gas remaining: 1039999.524 units remaining
+
+./octez-client --mode mockup hash data Unit of type unit
+Raw packed data: 0x05030b
+Script-expression-ID-Hash: expruaDPoTWXcTR6fiQPy4KZSW72U6Swc1rVmMiP1KdwmCceeEpVjd
+Raw Script-expression-ID-Hash: 0x8b456a4530fb6d0fea9a0dcd0e9d6ff6b30d13b05d05cb4a375dd91bf2a7eadc
+Ledger Blake2b hash: ANf4YSkDc71Uy14uWg3wL8u49LUAHdVVnVHbSwNKyEJo
+Raw Sha256 hash: 0x5f6d1c5a35306dc8be3a54058774f9cb8f1bc71a6a743a253aad0bfe3a43feef
+Raw Sha512 hash: 0xe89c39b714a041046cf421532526b466a8ad29a89a4f027954e4dbdc61b4557f54721ba9e12bf4b901d511037d39481379394e7f86a571bba60f2414e2a56b4c
+Gas remaining: 1039999.624 units remaining
