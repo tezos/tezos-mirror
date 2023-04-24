@@ -574,9 +574,11 @@ let test_full_requester_test_pending_requests _ () =
       [
         (let* _ = Test_Requester.fetch req key precheck_pass in
          Lwt.return_unit);
-        (* Ensure that the request is registered before [k] is scheduled. *)
-        (let* v = Lwt.pause () in
-         k v);
+        (* Ensure that the request is registered before [k] is
+           scheduled and that enough time is given to the
+           throttler. *)
+        (let* () = Lwt_unix.sleep 0.1 in
+         k ());
       ]
   in
   (* Variant of [with_request] for requests that are never satisfied. When [k]
@@ -586,23 +588,25 @@ let test_full_requester_test_pending_requests _ () =
       [
         (let+ _ = Test_Requester.fetch req key precheck_pass in
          Alcotest.fail "Request should not have been satisfied");
-        (let* v = Lwt.pause () in
-         k v);
+        (let* () = Lwt_unix.sleep 0.1 in
+         k ());
       ]
   in
   (* Fetch value  *)
   check_pending_count "0 pending requests" 0 ;
-  let foo_cancelled : unit Lwt.t =
-    with_request "foo" @@ fun () ->
-    check_pending_count "1 pending requests" 1 ;
-    with_unmet_request "bar" @@ fun () ->
-    check_pending_count "2 pending requests" 2 ;
-    with_unmet_request "bar" @@ fun () ->
-    check_pending_count "still 2 pending requests" 2 ;
-    Lwt.return (Test_Requester.clear_or_cancel req "foo")
+  let* () =
+    with_request "foo" (fun () ->
+        check_pending_count "1 pending requests" 1 ;
+        with_unmet_request "bar" (fun () ->
+            check_pending_count "2 pending requests" 2 ;
+            with_unmet_request "bar" (fun () ->
+                check_pending_count "still 2 pending requests" 2 ;
+                Test_Requester.clear_or_cancel req "foo" ;
+                (* The first "foo" fetch should be resolved *)
+                Lwt_unix.sleep 0.1)))
   in
-  let+ () = foo_cancelled in
-  check_pending_count "back to 1 pending requests" 1
+  check_pending_count "back to 1 pending requests" 1 ;
+  Lwt.return_unit
 
 (** Test memory_table_length *)
 
