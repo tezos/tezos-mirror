@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Shell (Plugin)
-    Invocation:   dune exec src/proto_alpha/lib_plugin/test/test_plugin.exe
+    Invocation:   dune exec src/proto_017_PtNairob/lib_plugin/test/main.exe \
+                  -- --file test_plugin.ml
     Subject:      Unit tests the plugin
 *)
 
@@ -70,9 +71,9 @@ let test_flush () =
 let () =
   Alcotest_lwt.run
     ~__FILE__
-    "Plugin"
+    Protocol.name
     [
-      ( Protocol.name ^ ": on_flush",
+      ( "on_flush",
         [
           Tztest.tztest
             "[on_flush ~validation_state ...] yields an empty state "

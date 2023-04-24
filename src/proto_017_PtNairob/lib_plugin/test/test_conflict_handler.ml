@@ -26,8 +26,9 @@
 (** Testing
     -------
     Component:    Plugin.Mempool
-    Invocation:   dune exec src/proto_alpha/lib_plugin/test/test_conflict_handler.exe
-    Subject:      Unit tests the Mempool.conflict_handler fonction of the plugin
+    Invocation:   dune exec src/proto_017_PtNairob/lib_plugin/test/main.exe \
+                  -- --file test_conflict_handler.ml
+    Subject:      Unit tests the Mempool.conflict_handler function of the plugin
 *)
 
 let pp_answer fmt = function
@@ -261,9 +262,9 @@ let test_manager_ops () =
 let () =
   Alcotest_lwt.run
     ~__FILE__
-    "conflict_handler"
+    Protocol.name
     [
-      ( Protocol.name ^ ": conflict_handler",
+      ( "conflict_handler",
         [
           Tztest.tztest
             "Random operations (not both manager)"

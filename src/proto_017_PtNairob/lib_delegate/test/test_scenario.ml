@@ -1,3 +1,11 @@
+(* Testing
+   -------
+   Component:    Protocol, delegate
+   Invocation:   dune exec src/proto_017_PtNairob/lib_delegate/test/main.exe \
+                  -- --file test_scenario.ml
+   Subject:      Test different scenario for delegate
+*)
+
 open Mockup_simulator
 
 let bootstrap1 = Signature.Public_key.hash bootstrap1

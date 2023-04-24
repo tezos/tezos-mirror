@@ -26,7 +26,8 @@
 (* Testing
    -------
    Component:    Base
-   Invocation:   dune exec src/lib_base/test/main.exe
+   Invocation:   dune exec src/lib_base/test/main.exe \
+                  -- --file test_time.ml
    Subject:      Check that the Protocol and System times behave correctly
                  regarding addition and encoding (binary and JSON)
 *)

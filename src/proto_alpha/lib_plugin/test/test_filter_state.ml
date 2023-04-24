@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Shell (Plugin)
-    Invocation:   dune exec src/proto_alpha/lib_plugin/test/main.exe
+    Invocation:   dune exec src/proto_alpha/lib_plugin/test/main.exe \
+                  -- --file test_filter_state.ml
     Subject:      Unit tests the filter state functions of the plugin
 *)
 
@@ -186,9 +187,8 @@ let test_remove_unknown =
 let () =
   Alcotest.run
     ~__FILE__
-    "Filter_state"
+    Protocol.name
     [
-      (Protocol.name ^ ": add_manager_op", qcheck_wrap [test_add_manager_op]);
-      ( Protocol.name ^ ": remove",
-        qcheck_wrap [test_remove_present; test_remove_unknown] );
+      ("add_manager_op", qcheck_wrap [test_add_manager_op]);
+      ("remove", qcheck_wrap [test_remove_present; test_remove_unknown]);
     ]

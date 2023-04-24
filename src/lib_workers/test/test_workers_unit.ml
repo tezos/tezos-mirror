@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Workers
-    Invocation:   dune exec src/lib_workers/test/main.exe
+    Invocation:   dune exec src/lib_workers/test/main.exe \
+                  -- --file test_workers_unit.ml
     Subject:      Unit tests for [Worker]
 *)
 

@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Error Monad
-    Invocation:   dune exec src/lib_error_monad/test/main.exe
+    Invocation:   dune exec src/lib_error_monad/test/main.exe \
+                  -- --file test_registration.ml
     Subject:      On the registration and query of errors.
 *)
 

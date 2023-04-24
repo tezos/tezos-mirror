@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Client
-    Invocation:   dune exec src/lib_proxy/test/main.exe
+    Invocation:   dune exec src/lib_proxy/test/main.exe \
+                  -- --file test_proxy.ml
     Subject:      --mode proxy of the client
 *)
 

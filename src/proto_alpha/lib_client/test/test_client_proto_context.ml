@@ -26,7 +26,8 @@
 (* Testing
    -------
    Component:    Client
-   Invocation:   dune exec src/proto_alpha/lib_client/test/main.exe
+   Invocation:   dune exec src/proto_alpha/lib_client/test/main.exe \
+                  -- --file test_client_proto_context.ml
    Subject:      Tests roundtrips of batch_transfer_operation_encoding
 *)
 
@@ -65,8 +66,4 @@ let tests =
       (binary_roundtrip Client_proto_context.batch_transfer_operation_encoding);
   ]
 
-let () =
-  Alcotest.run
-    ~__FILE__
-    "Client proto context"
-    [(Protocol.name ^ ": Encodings", qcheck_wrap tests)]
+let () = Alcotest.run ~__FILE__ Protocol.name [("Encodings", qcheck_wrap tests)]

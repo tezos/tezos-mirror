@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Prevalidation
-    Invocation:   dune exec src/lib_shell/test/main.exe -- -f test_prevalidation.ml
+    Invocation:   dune exec src/lib_shell/test/main.exe \
+                  -- --file test_prevalidation.ml
     Subject:      Unit tests for {!Prevalidation.T}
 *)
 

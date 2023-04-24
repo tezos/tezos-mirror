@@ -26,7 +26,8 @@
 (* Testing
    -------
    Component:    Shell
-   Invocation:   dune exec src/lib_shell/test/main.exe
+   Invocation:   dune exec src/lib_shell/test/main.exe \
+                  -- --file test_synchronisation_heuristic_fuzzy.ml
    Subject:      Test the synchronisation heuristic with a reference implementation
 *)
 

@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Plugin.Mempool
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_plugin/test/main.exe \
+                  -- --file test_consensus_filter.ml
+    Subject:      Unit tests the Mempool consensus filter
+*)
+
 open Qcheck2_helpers
 open Plugin.Mempool
 open Alpha_context
@@ -434,9 +442,9 @@ let test_not_acceptable_next_level =
 let () =
   Alcotest.run
     ~__FILE__
-    "Filter"
+    Protocol.name
     [
-      ( Protocol.name ^ ": pre_filter",
+      ( "pre_filter",
         qcheck_wrap
           [
             test_acceptable_past_level;

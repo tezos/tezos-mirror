@@ -26,7 +26,8 @@
 (* Testing
    -------
    Component:    Base, Protocol
-   Invocation:   dune exec src/lib_base/test/main.exe
+   Invocation:   dune exec src/lib_base/test/main.exe \
+                  -- --file test_protocol.ml
    Subject:      Check the ordering of protocol versions
 *)
 

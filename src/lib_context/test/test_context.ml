@@ -26,7 +26,8 @@
 (* Testing
    -------
    Component:    Context
-   Invocation:   dune exec src/lib_context/test/main.exe
+   Invocation:   dune exec src/lib_context/test/main.exe \
+                  -- --file test_context.ml
    Subject:      On context features.
 *)
 

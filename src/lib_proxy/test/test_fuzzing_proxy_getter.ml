@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Proxy getter
-    Invocation:   dune exec src/lib_proxy/test/main.exe
+    Invocation:   dune exec src/lib_proxy/test/main.exe \
+                  -- --file test_fuzzing_proxy_getter.ml
     Subject:      Fuzzing tests of internals of the client's --mode proxy
 *)
 

@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Shell (Node)
-    Invocation:   dune exec src/lib_shell/test/main.exe
+    Invocation:   dune exec src/lib_shell/test/main.exe \
+                  -- --file test_node.ml
     Dependencies: src/lib_shell/test/shell_test_helpers.ml
     Subject:      Unit tests for node. Currently only tests that
                   events are emitted.
@@ -231,3 +232,7 @@ let tests =
       `Quick
       (wrap node_initialization_events);
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "tezos-shell" [("test node", tests)]
+  |> Lwt_main.run

@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Lib_dac_node Dac_hash
-    Invocation: dune exec src/proto_alpha/lib_dac_plugin/test/main.exe
+    Invocation: dune exec src/proto_alpha/lib_dac_plugin/test/main.exe \
+                  -- --file test_dac_plugin_registration.ml
     Subject:    Tests for the interoperability between Dac hash
                 and given protocol hash
 *)
@@ -153,10 +154,6 @@ let tests =
 let () =
   Alcotest_lwt.run
     ~__FILE__
-    "protocol > unit"
-    [
-      Test_helpers.Unit_test.spec
-        (Protocol.name ^ ": Dac_plugin_registration.ml")
-        tests;
-    ]
+    Protocol.name
+    [Test_helpers.Unit_test.spec "Dac_plugin_registration.ml" tests]
   |> Lwt_main.run

@@ -26,7 +26,8 @@
 (** Testing
     _______
 
-    Invocation: dune exec src/lib_stdlib/test/main.exe
+    Invocation: dune exec src/lib_stdlib/test/main.exe \
+                  -- --file test_tzBytes.ml
     Subject: Bitwise byte operation and Bytes <=> nat/int conversion
 *)
 

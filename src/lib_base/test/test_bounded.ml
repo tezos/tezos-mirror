@@ -26,7 +26,8 @@
 (* Testing
    -------
    Component:    Base
-   Invocation:   dune exec src/lib_base/test/main.exe
+   Invocation:   dune exec src/lib_base/test/main.exe \
+                  -- --file test_bounded.ml
    Subject:      Test the [Bounded] module.
 *)
 

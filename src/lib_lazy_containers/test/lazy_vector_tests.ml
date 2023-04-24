@@ -26,7 +26,8 @@
 (* Testing
    -------
    Component:    Lazy containers
-   Invocation:   dune exec src/lib_lazy_containers/test/main.exe
+   Invocation:   dune exec src/lib_lazy_containers/test/main.exe \
+                  -- --file lazy_vector_tests.ml
    Subject:      Test lazy vector
 *)
 

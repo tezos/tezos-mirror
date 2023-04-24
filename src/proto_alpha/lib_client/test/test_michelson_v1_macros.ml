@@ -27,7 +27,8 @@
 (** Testing
     -------
     Component:    Client
-    Invocation:   dune exec src/proto_alpha/lib_client/test/main.exe
+    Invocation:   dune exec src/proto_alpha/lib_client/test/main.exe \
+                  -- --file test_michelson_v1_macros.ml
     Dependencies: src/proto_alpha/lib_client/test/assert.ml
     Subject:      Expansion and unexpansion of Micheline terms.
 *)
@@ -1342,6 +1343,6 @@ let wrap (n, f) =
 let () =
   Alcotest_lwt.run
     ~__FILE__
-    "tezos-lib-client"
-    [(Protocol.name ^ ": micheline v1 macros", List.map wrap tests)]
+    Protocol.name
+    [("micheline v1 macros", List.map wrap tests)]
   |> Lwt_main.run

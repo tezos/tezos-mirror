@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Tree_encoding
-    Invocation:   dune exec src/lib_tree_encoding/test/main.exe
+    Invocation:   dune exec src/lib_tree_encoding/test/main.exe \
+                  -- --file test_encoding.ml
     Subject:      Encoding tests for the tree-encoding library
 *)
 
@@ -575,3 +576,7 @@ let tests =
     tztest "Swap maps" `Quick test_swap_maps;
     tztest "Swap vectors" `Quick test_swap_vectors;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib tree encoding" [("Encodings", tests)]
+  |> Lwt_main.run

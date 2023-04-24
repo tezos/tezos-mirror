@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Shell_operation and others
-    Invocation:   dune exec src/lib_shell/test/main.exe
+    Invocation:   dune exec src/lib_shell/test/main.exe \
+                  -- --file test_shell_operation.ml
     Subject:      Unit tests for [Shell_operation], and for other
                   components e.g. [Requester] when the tests rely on
                   the operation representation provided by

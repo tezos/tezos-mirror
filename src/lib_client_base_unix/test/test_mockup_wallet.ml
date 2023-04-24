@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Mockup wallet library
-    Invocation:   dune exec src/lib_client_base_unix/test/main.exe
+    Invocation:   dune exec src/lib_client_base_unix/test/main.exe \
+                  -- --file test_mockup_wallet.ml
     Subject:      Unit tests of the Mockup wallet library
 *)
 

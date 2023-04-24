@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Block_services
-    Invocation:   dune exec src/lib_shell_services/test/main.exe
+    Invocation:   dune exec src/lib_shell_services/test/main.exe \
+                  -- --file test_block_services.ml
     Subject:      Unit tests for [Block_services]
 *)
 

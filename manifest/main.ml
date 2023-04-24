@@ -2590,7 +2590,7 @@ let octez_context_disk =
 
 let _tree_encoding_tests =
   tezt
-    ["test_tree_encoding"; "test_proofs"; "test_encoding"]
+    ["test_proofs"; "test_encoding"]
     ~path:"src/lib_tree_encoding/test"
     ~opam:"tezos-tree-encoding-test"
     ~synopsis:"Tests for the tree encoding library"
@@ -4074,7 +4074,7 @@ let octez_dac_node_lib =
 
 let _octez_dac_node_lib_tests =
   tezt
-    ["test_main"; "test_data_streamer"]
+    ["test_data_streamer"]
     ~path:"src/lib_dac_node/test"
     ~opam:"tezos-dac-node-lib-test"
     ~synopsis:"Test for dac node lib"
@@ -6582,7 +6582,6 @@ let _octez_shell_tests =
       "test_prevalidator_classification_operations";
       "test_prevalidator_pending_operations";
       "test_protocol_validator";
-      "test_shell";
       "test_shell_operation";
       "test_synchronisation_heuristic";
       "test_synchronisation_heuristic_fuzzy";

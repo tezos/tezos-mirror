@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Lib_dac_node Data_streamer
-    Invocation: dune exec src/lib_dac_node/test/main.exe   
+    Invocation: dune exec src/lib_dac_node/test/main.exe \
+                  -- --file test_data_streamer.ml
     Subject:    Tests for the data streamer component.
 *)
 
@@ -113,3 +114,7 @@ let tests =
       `Quick
       test_closing_subscriber_stream;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "lib_dac_node" [("Data_streamer.ml", tests)]
+  |> Lwt_main.run
