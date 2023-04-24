@@ -747,8 +747,6 @@ Domain specific data types
 -  ``chest_key``: used to open a chest, also contains a proof
    to check the correctness of the opening. see :doc:`Timelock <timelock>` .
 
-- ``tx_rollup_l2_address``: An address used to identify an account in a transaction rollup ledger. It is the hash of a BLS public key, used to authenticate layer-2 operations to transfer tickets from this account.
-
 
 Domain specific operations
 --------------------------
@@ -1196,8 +1194,8 @@ Events
     :: 'ty : 'S -> operation : 'S
 
 
-Removed instructions
-~~~~~~~~~~~~~~~~~~~~
+Removed instructions and types
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :doc:`../protocols/005_babylon` deprecated the following instructions. Because no smart
 contract used these on Mainnet before they got deprecated, they have been
@@ -1235,7 +1233,15 @@ parameter if the sender is the contract's manager.
 
     :: 'S   ->   nat : 'S
 
-.. _MichelsonViews_alpha:
+:doc:`../protocols/016_mumbai` deprecated the following
+type. Because no smart contract used it on Mainnet before it got
+deprecated, it has been removed. The Michelson type-checker will
+reject any contract using it.
+
+-  ``tx_rollup_l2_address``: An address used to identify an account in
+   a transaction rollup ledger. It is the hash of a BLS public key,
+   used to authenticate layer-2 operations to transfer tickets from
+   this account.
 
 Operations on views
 ~~~~~~~~~~~~~~~~~~~~
@@ -2692,7 +2698,6 @@ Full grammar
       | signature
       | timestamp
       | address
-      | tx_rollup_l2_address
       | option <comparable type>
       | or <comparable type> <comparable type>
       | pair <comparable type> <comparable type> ...
