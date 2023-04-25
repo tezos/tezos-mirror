@@ -178,7 +178,7 @@ let next_protocol = function
   | Alpha -> None
 
 let previous_protocol = function
-  | Alpha -> Some Mumbai
+  | Alpha -> Some Nairobi
   | Nairobi -> Some Mumbai
   | Mumbai -> None
 

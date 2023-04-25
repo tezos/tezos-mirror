@@ -836,7 +836,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
       };
   }
 
-type previous_protocol = Genesis of Parameters_repr.t | Mumbai_016
+type previous_protocol = Genesis of Parameters_repr.t | Nairobi_017
 
 let check_and_update_protocol_version ctxt =
   (Context.find ctxt version_key >>= function
@@ -848,7 +848,7 @@ let check_and_update_protocol_version ctxt =
          failwith "Internal error: previously initialized context."
        else if Compare.String.(s = "genesis") then
          get_proto_param ctxt >|=? fun (param, ctxt) -> (Genesis param, ctxt)
-       else if Compare.String.(s = "mumbai_016") then return (Mumbai_016, ctxt)
+       else if Compare.String.(s = "nairobi_017") then return (Nairobi_017, ctxt)
        else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
   Context.add ctxt version_key (Bytes.of_string version_value) >|= fun ctxt ->
@@ -899,12 +899,12 @@ let prepare_first_block ~level ~timestamp ctxt =
       Level_repr.create_cycle_eras [cycle_era] >>?= fun cycle_eras ->
       set_cycle_eras ctxt cycle_eras >>=? fun ctxt ->
       add_constants ctxt param.constants >|= ok
-  | Mumbai_016 ->
+  | Nairobi_017 ->
       get_previous_protocol_constants ctxt >>= fun c ->
       let tx_rollup =
         Constants_parametric_repr.
           {
-            enable = false;
+            enable = c.tx_rollup.enable;
             origination_size = c.tx_rollup.origination_size;
             hard_size_limit_per_inbox = c.tx_rollup.hard_size_limit_per_inbox;
             hard_size_limit_per_message =
@@ -936,16 +936,16 @@ let prepare_first_block ~level ~timestamp ctxt =
             feature_enable = c.dal.feature_enable;
             number_of_slots = c.dal.number_of_slots;
             attestation_lag = c.dal.attestation_lag;
-            attestation_threshold = c.dal.availability_threshold;
-            blocks_per_epoch = 32l;
+            attestation_threshold = c.dal.attestation_threshold;
+            blocks_per_epoch = c.dal.blocks_per_epoch;
             cryptobox_parameters;
           }
       in
       let sc_rollup =
         Constants_parametric_repr.
           {
-            enable = true;
-            arith_pvm_enable = false;
+            enable = c.sc_rollup.enable;
+            arith_pvm_enable = c.sc_rollup.arith_pvm_enable;
             origination_size = c.sc_rollup.origination_size;
             challenge_window_in_blocks = c.sc_rollup.challenge_window_in_blocks;
             stake_amount = c.sc_rollup.stake_amount;
@@ -972,20 +972,6 @@ let prepare_first_block ~level ~timestamp ctxt =
             min_pending_to_process = c.zk_rollup.min_pending_to_process;
           }
       in
-      let proof_of_work_threshold =
-        let mainnet_previous_proof_of_work_threshold =
-          Int64.(sub (shift_left 1L 46) 1L)
-        in
-        let new_proof_of_work_threshold = Int64.(sub (shift_left 1L 48) 1L) in
-        (* Only override constants that match the mainnet's existing
-           value; otherwise, it might affect testnets that set
-           different values. *)
-        if
-          Compare.Int64.(
-            c.proof_of_work_threshold = mainnet_previous_proof_of_work_threshold)
-        then new_proof_of_work_threshold
-        else c.proof_of_work_threshold
-      in
       let constants =
         Constants_parametric_repr.
           {
@@ -997,7 +983,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             cycles_per_voting_period = c.cycles_per_voting_period;
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
             hard_gas_limit_per_block = c.hard_gas_limit_per_block;
-            proof_of_work_threshold;
+            proof_of_work_threshold = c.proof_of_work_threshold;
             minimal_stake = c.minimal_stake;
             vdf_difficulty = c.vdf_difficulty;
             seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;

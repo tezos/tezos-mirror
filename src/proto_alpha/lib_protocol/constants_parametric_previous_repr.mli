@@ -29,7 +29,8 @@ type dal = {
   feature_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
-  availability_threshold : int;
+  attestation_threshold : int;
+  blocks_per_epoch : int32;
   cryptobox_parameters : Dal.parameters;
 }
 
