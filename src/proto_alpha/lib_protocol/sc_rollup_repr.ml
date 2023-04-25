@@ -26,32 +26,13 @@
 (*****************************************************************************)
 
 module Address = struct
+  include Smart_rollup_address
+
   let prefix = "sr1"
 
-  let encoded_size = 36
+  let () = Base58.check_encoded_prefix b58check_encoding prefix 36
 
-  let decoded_prefix = "\006\124\117" (* "sr1(36)" decoded from base 58. *)
-
-  module H =
-    Blake2B.Make
-      (Base58)
-      (struct
-        let name = "Smart_rollup_hash"
-
-        let title = "A smart rollup address"
-
-        let b58check_prefix = decoded_prefix
-
-        let size = Some 20
-      end)
-
-  include H
-
-  let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
-
-  include Path_encoding.Make_hex (H)
-
-  let of_b58data = function H.Data h -> Some h | _ -> None
+  let of_b58data = function Smart_rollup_address.Data h -> Some h | _ -> None
 end
 
 module Internal_for_tests = struct
@@ -106,27 +87,16 @@ module State_hash = struct
   let hash_string = function (_ : unreachable) -> .
 end
 
-type t = Address.t
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/5506
+   Remove type and module aliases for Smart_rollup_address. *)
 
-let description =
-  "A smart rollup is identified by a base58 address starting with "
-  ^ Address.prefix
+type t = Address.t
 
 let pp = Address.pp
 
-let encoding =
-  let open Data_encoding in
-  def
-    "smart_rollup_address"
-    ~title:"A smart rollup address"
-    ~description
-    Address.encoding
+let encoding = Address.encoding
 
-let rpc_arg =
-  RPC_arg.like
-    Address.rpc_arg
-    ~descr:"A smart rollup address."
-    "smart_rollup_address"
+let rpc_arg = Address.rpc_arg
 
 let in_memory_size (_ : t) =
   let open Cache_memory_helpers in

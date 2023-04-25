@@ -42,14 +42,12 @@
 
 (** A smart rollup has an address starting with "sr1". *)
 module Address : sig
-  include S.HASH
-
-  (** [encoded_size] is the number of bytes needed to represent an address. *)
-  val encoded_size : int
+  include
+    module type of Smart_rollup_address with type t = Smart_rollup_address.t
 
   val of_b58data : Base58.data -> t option
 
-  (** [prefix] is the prefix of smart contract rollup addresses. *)
+  (** Prefix of smart rollup addresses in base58-check. *)
   val prefix : string
 end
 

@@ -55,6 +55,8 @@ module Prefix : sig
 
   val bls12_381_public_key_hash : string
 
+  val smart_rollup_address : string
+
   val cryptobox_public_key_hash : string
 
   val ed25519_seed : string

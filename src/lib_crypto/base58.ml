@@ -384,6 +384,8 @@ module Prefix = struct
 
   let bls12_381_public_key_hash = "\006\161\166" (* tz4(36) *)
 
+  let smart_rollup_address = "\006\124\117" (* sr1(36) *)
+
   (* 16 *)
   let cryptobox_public_key_hash = "\153\103" (* id(30) *)
 
