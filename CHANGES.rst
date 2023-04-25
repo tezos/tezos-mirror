@@ -57,6 +57,9 @@ Node
 - Fixed a issue that may trigger unknown keys errors while reading the
   context on a read-only instance.
 
+- Add query parameter ``protocol`` to RPC ``/monitor/heads/<chain_id>`` in
+  order to monitor new heads of the current protocol (or multiple ones) only.
+
 Client
 ------
 

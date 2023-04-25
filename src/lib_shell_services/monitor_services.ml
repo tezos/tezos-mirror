@@ -145,10 +145,13 @@ module S = struct
 
   let heads_query =
     let open Tezos_rpc.Query in
-    query (fun next_protocols ->
+    query (fun protocols next_protocols ->
         object
+          method protocols = protocols
+
           method next_protocols = next_protocols
         end)
+    |+ multi_field "protocol" Protocol_hash.rpc_arg (fun t -> t#protocols)
     |+ multi_field "next_protocol" Protocol_hash.rpc_arg (fun t ->
            t#next_protocols)
     |> seal
@@ -241,12 +244,14 @@ let applied_blocks ctxt ?(chains = [`Main]) ?(protocols = [])
     end)
     ()
 
-let heads ctxt ?(next_protocols = []) chain =
+let heads ctxt ?(protocols = []) ?(next_protocols = []) chain =
   make_streamed_call
     S.heads
     ctxt
     ((), chain)
     (object
+       method protocols = protocols
+
        method next_protocols = next_protocols
     end)
     ()
