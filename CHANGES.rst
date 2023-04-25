@@ -28,6 +28,46 @@ General
 Node
 ----
 
+- Changed the bounding specification of valid operations in the mempool:
+
+  + Before, the number of valid **manager operations** in the mempool
+    was at most ``max_prechecked_manager_operations`` (default 5_000),
+    with no other constraints. (Operations to keep were selected
+    according to a "weight" that consists in the ratio of fee over
+    "resources"; the latter is the maximum between the following
+    ratios: operation gas over maximal allowed gas, and operation size
+    over maximal allowed size. The baker uses the same notion of
+    "weight" to select operations.)
+
+  + Now, the number of valid **operations of any kind** is at most
+    ``max_operations`` (default 10_000), and also the **sum of the
+    sizes in bytes** of all valid operations is at most
+    ``max_total_bytes`` (default 10_000_000). See
+    [src/lib_shell/prevalidator_bounding.mli] for the reasoning behind
+    the default values. (Operations are selected according to the
+    protocol's ``compare_operations`` function, which currently orders
+    operations according to their validation pass (consensus is
+    highest and manager is lowest); note that two manager operations
+    are ordered using their fee over gas ratio.)
+
+  The values of ``max_operations`` and ``max_total_bytes`` can be
+  retrieved with ``GET /chains/<chain>/mempool/filter`` and configured
+  with ``POST /chains/<chain>/mempool/filter`` (just as
+  ``max_prechecked_manager_operations`` used to be). As a result, the
+  JSON format of the outputs of these two RPCs and the input of the
+  second one have slightly changed; see their updated descriptions.
+  (MR :gl:`!6787`)
+
+- Errors ``prefilter.fees_too_low_for_mempool`` and
+  ``plugin.removed_fees_too_low_for_mempool`` have been replaced with
+  ``node.mempool.rejected_by_full_mempool`` and
+  ``node.mempool.removed_from_full_mempool`` with different
+  descriptions and messages. In particular, the
+  ``rejected_by_full_mempool`` error no longer indicates the minimal
+  fee needed by the rejected operation to be accepted by the full
+  mempool (however, we are working on providing this information
+  again). (MR :gl:`!6787`)
+
 Client
 ------
 
