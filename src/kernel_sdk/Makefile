@@ -27,7 +27,23 @@ check:
 	@cargo check --no-default-features
 	@cargo check --target wasm32-unknown-unknown
 
-build: check installer.wasm
+# Ensure that individual crates have setup features on
+# their own dependencies correctly - when building as
+# a workspace, features enabled by one crate are enabled
+# on all.
+publish-check: check installer.wasm
+	@cargo check -p tezos-smart-rollup-core
+	@cargo check -p tezos-smart-rollup-host
+	@cargo check -p tezos-smart-rollup-debug
+	@cargo check -p tezos-smart-rollup-panic-hook
+	@cargo check -p tezos-smart-rollup-entrypoint
+	@cargo check -p tezos-smart-rollup-encoding
+	@cargo check -p tezos-smart-rollup-storage
+	@cargo check -p tezos-smart-rollup-mock
+	@cargo check -p tezos-smart-rollup-installer
+	@cargo check -p tezos-smart-rollup
+
+build: check installer.wasm publish-check
 	@cargo build -p tezos-smart-rollup-installer \
 		--release \
                 $(NATIVE_OPT)

@@ -21,7 +21,6 @@ tezos_data_encoding = "0.4"
 [dependencies.tezos-smart-rollup-encoding]
 path = "../encoding"
 version = "0.1.0"
-default-features = false
 
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
