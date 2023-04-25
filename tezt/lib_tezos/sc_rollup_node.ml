@@ -111,14 +111,21 @@ let layer1_addr sc_node = Node.rpc_host sc_node.persistent_state.node
 
 let layer1_port sc_node = Node.rpc_port sc_node.persistent_state.node
 
+let make_arguments node =
+  [
+    "--endpoint";
+    Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
+    "--base-dir";
+    base_dir node;
+  ]
+
 let spawn_command sc_node args =
   Process.spawn
     ?runner:sc_node.persistent_state.runner
     ~name:sc_node.name
     ~color:sc_node.color
     sc_node.path
-  @@ ["--base-dir"; base_dir sc_node]
-  @ args
+  @@ make_arguments sc_node @ args
 
 let common_node_args ?loser_mode sc_node =
   [
@@ -306,16 +313,6 @@ let create ~protocol ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
   on_event sc_node (handle_event sc_node) ;
   sc_node
 
-let make_arguments node =
-  List.filter_map Fun.id
-  @@ [
-       Some "--endpoint";
-       Some
-         (Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node));
-       Some "--base-dir";
-       Some (base_dir node);
-     ]
-
 let do_runlike_command ?event_level ?event_sections_levels node arguments =
   if node.status <> Not_running then
     Test.fail "Smart contract rollup node %s is already running" node.name ;
@@ -359,6 +356,10 @@ let run ?legacy ?event_level ?event_sections_levels ?loser_mode node
   in
   let* () = wait_for_ready node in
   return ()
+
+let spawn_run node rollup_address extra_arguments =
+  let mode, args = node_args node rollup_address in
+  spawn_command node (["run"; mode] @ args @ extra_arguments)
 
 let change_node_and_restart ?event_level sc_rollup_node rollup_address node =
   let* () = terminate sc_rollup_node in

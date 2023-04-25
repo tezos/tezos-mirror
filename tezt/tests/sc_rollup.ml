@@ -4998,6 +4998,61 @@ let test_injector_auto_discard =
   Lwt.cancel monitor_injector_queue ;
   unit
 
+let test_arg_boot_sector_file ~kind =
+  let hex_if_wasm s =
+    match kind with "wasm_2_0_0" -> Hex.(of_string s |> show) | _ -> s
+  in
+  let boot_sector =
+    hex_if_wasm "Nantes aurait été un meilleur nom de protocol"
+  in
+  test_full_scenario
+    ~supports:(Protocol.From_protocol 018)
+    ~kind
+    ~boot_sector
+    {
+      variant = None;
+      tags = ["node"; "boot_sector"; "boot_sector_file"];
+      description = "Rollup node uses argument boot sector file";
+    }
+  @@ fun _protocol rollup_node _rollup_client rollup _node client ->
+  let _ = client in
+  let invalid_boot_sector =
+    hex_if_wasm "Nairobi est un bien meilleur nom de protocol que Nantes"
+  in
+  let invalid_boot_sector_file =
+    Filename.temp_file "invalid-boot-sector" ".hex"
+  in
+  let () = write_file invalid_boot_sector_file ~contents:invalid_boot_sector in
+  let valid_boot_sector_file = Filename.temp_file "valid-boot-sector" ".hex" in
+  let () = write_file valid_boot_sector_file ~contents:boot_sector in
+  (* Starts the rollup node with an invalid boot sector. Asserts that the
+     node fails with an invalid genesis state. *)
+  let process =
+    Sc_rollup_node.spawn_run
+      rollup_node
+      rollup
+      ["--boot-sector-file"; invalid_boot_sector_file]
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* err = Process.check_and_read_stderr ~expect_failure:true process in
+  if
+    err
+    =~ rex "Genesis commitment computed * is not equal to the rollup genesis"
+  then
+    Test.fail
+      "The rollup node failed as expected but not with the expected error" ;
+  (* Starts the rollup node with a valid boot sector. Asserts that the node
+     works as expected by processing blocks. *)
+  let* () =
+    Sc_rollup_node.run
+      rollup_node
+      rollup
+      ["--boot-sector-file"; valid_boot_sector_file]
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* _ = Sc_rollup_node.wait_sync ~timeout:10. rollup_node in
+  unit
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -5120,7 +5175,8 @@ let register ~kind ~protocols =
   test_late_rollup_node_2 protocols ~kind ;
   test_interrupt_rollup_node protocols ~kind ;
   test_outbox_message protocols ~kind ;
-  test_messages_processed_by_commitment ~kind protocols
+  test_messages_processed_by_commitment ~kind protocols ;
+  test_arg_boot_sector_file ~kind protocols
 
 let register ~protocols =
   (* PVM-independent tests. We still need to specify a PVM kind
