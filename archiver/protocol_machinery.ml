@@ -73,6 +73,7 @@ module type PROTOCOL_SERVICES = sig
     (Tezos_crypto.Signature.public_key_hash
     * Time.Protocol.t
     * int
+    * Block_hash.t
     * Block_hash.t)
     tzresult
     Lwt.t

@@ -26,7 +26,7 @@
 open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
 
 let parse_block_row
-    ( (hash, delegate, delegate_alias, round),
+    ( ((hash, predecessor), delegate, delegate_alias, round),
       (timestamp, reception_time, source) ) acc =
   Tezos_crypto.Hashed.Block_hash.Map.update
     hash
@@ -35,6 +35,7 @@ let parse_block_row
           Teztale_lib.Data.Block.
             {
               hash;
+              predecessor;
               delegate;
               delegate_alias;
               round;
@@ -46,6 +47,7 @@ let parse_block_row
             Teztale_lib.Data.Block.
               {
                 hash;
+                predecessor;
                 delegate;
                 delegate_alias;
                 round;
@@ -58,6 +60,7 @@ let parse_block_row
             Teztale_lib.Data.Block.
               {
                 hash;
+                predecessor;
                 delegate;
                 delegate_alias;
                 round;
@@ -69,7 +72,7 @@ let parse_block_row
 
 let select_blocks db_pool level =
   let q =
-    "SELECT b.hash, d.address, d.alias, b.round, b.timestamp, r.timestamp, \
+    "SELECT b.hash, b.previous_block, d.address, d.alias, b.round, b.timestamp, r.timestamp, \
      n.name FROM blocks b, blocks_reception r, delegates d , nodes n ON \
      r.block = b.id AND d.id = b.baker AND n.id = r.source WHERE b.level = ?"
   in
@@ -79,7 +82,9 @@ let select_blocks db_pool level =
       ->* Caqti_type.(
             tup2
               (tup4
-                 Sql_requests.Type.block_hash
+                 (tup2
+                    Sql_requests.Type.block_hash
+                    Sql_requests.Type.block_hash)
                  Sql_requests.Type.public_key_hash
                  (option string)
                  int32)

@@ -284,7 +284,7 @@ let add_inclusion_in_block aliases block_hash validators delegate_operations =
         updated_known
         unknown
 
-let dump_included_in_block cctxt path block_level block_hash block_round
+let dump_included_in_block cctxt path block_level block_hash block_predecessor block_round
     timestamp reception_times baker consensus_ops =
   let open Lwt.Infix in
   Wallet.of_context cctxt >>= fun aliases_opt ->
@@ -341,6 +341,7 @@ let dump_included_in_block cctxt path block_level block_hash block_round
         Data.Block.
           {
             hash = block_hash;
+            predecessor = block_predecessor;
             delegate = baker;
             delegate_alias = Wallet.alias_of_pkh aliases baker;
             round = block_round;
@@ -500,6 +501,7 @@ type chunk =
   | Block of
       Int32.t
       * Block_hash.t
+      * Block_hash.t
       * Int32.t
       * Time.Protocol.t
       * (string * Time.System.t) list
@@ -515,6 +517,7 @@ let launch cctxt prefix =
       | Block
           ( level,
             block_hash,
+            predecessor,
             round,
             timestamp,
             reception_times,
@@ -525,6 +528,7 @@ let launch cctxt prefix =
             prefix
             level
             block_hash
+            predecessor
             round
             timestamp
             reception_times
@@ -545,6 +549,7 @@ let add_block ~level (block, (endos, preendos)) =
        (Block
           ( level,
             block.Data.Block.hash,
+            block.Data.Block.predecessor,
             block.round,
             block.timestamp,
             block.reception_times,

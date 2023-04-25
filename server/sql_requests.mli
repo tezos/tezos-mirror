@@ -62,6 +62,7 @@ val maybe_insert_operation :
 val maybe_insert_block :
   ( (int32 (* level *)
     * Tezos_base.Time.Protocol.t
+    * Tezos_crypto.Hashed.Block_hash.t
     * Tezos_crypto.Hashed.Block_hash.t)
     * (Tezos_crypto.Signature.public_key_hash * int32 (* round *)),
     unit,

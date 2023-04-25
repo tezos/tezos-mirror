@@ -182,6 +182,7 @@ end
 module Block = struct
   type t = {
     hash : Block_hash.t;
+    predecessor : Block_hash.t;
     delegate : Tezos_crypto.Signature.public_key_hash;
     delegate_alias : string option;
     round : Int32.t;
@@ -195,6 +196,7 @@ module Block = struct
     conv
       (fun {
              hash;
+             predecessor;
              delegate;
              delegate_alias;
              round;
@@ -203,6 +205,7 @@ module Block = struct
              nonce;
            } ->
         ( hash,
+          predecessor,
           delegate,
           delegate_alias,
           round,
@@ -210,6 +213,7 @@ module Block = struct
           timestamp,
           nonce ))
       (fun ( hash,
+             predecessor,
              delegate,
              delegate_alias,
              round,
@@ -218,6 +222,7 @@ module Block = struct
              nonce ) ->
         {
           hash;
+          predecessor;
           delegate;
           delegate_alias;
           round;
@@ -225,8 +230,9 @@ module Block = struct
           timestamp;
           nonce;
         })
-      (obj7
+      (obj8
          (req "hash" Block_hash.encoding)
+         (req "predecessor" Block_hash.encoding)
          (dft
             "delegate"
             Tezos_crypto.Signature.Public_key_hash.encoding

@@ -89,7 +89,8 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
 
   let () = Protocol_hash.Table.add rights_machine Services.hash rights_of
 
-  let block_data cctx (delegate, timestamp, round, hash) reception_times =
+  let block_data cctx (delegate, timestamp, round, hash, predecessor)
+      reception_times =
     let* operations = Services.consensus_ops_info_of_block cctx hash in
     return
       ( Data.Block.
@@ -98,6 +99,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
             timestamp;
             round = Int32.of_int round;
             hash;
+            predecessor;
             nonce = None;
             delegate_alias = None;
             reception_times;
@@ -116,7 +118,11 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     let timestamp = header.Block_header.shell.Block_header.timestamp in
     let*? round = Services.block_round header in
     let* delegate = Services.baker cctx hash in
-    block_data cctx (delegate, timestamp, round, hash) reception_times
+    let predecessor = header.Block_header.shell.Block_header.predecessor in
+    block_data
+      cctx
+      (delegate, timestamp, round, hash, predecessor)
+      reception_times
 
   let () =
     Protocol_hash.Table.add

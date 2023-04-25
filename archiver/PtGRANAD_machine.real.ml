@@ -203,7 +203,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       ( public_key_hash_of_v0 metadata.protocol_data.baker,
         header.shell.timestamp,
         header.protocol_data.contents.priority,
-        header.hash )
+        header.hash,
+        header.shell.predecessor )
 end
 
 module M = General_archiver.Define (Services)

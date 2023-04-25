@@ -1,5 +1,5 @@
 {
     "db":"sqlite3:db",
-    "interfaces":[{"port":8880}],
+    "interfaces":[{"address":"127.0.0.1", "port":8880}],
     "users":[ { "login":"admin", "password":"secret" } ]
 }
