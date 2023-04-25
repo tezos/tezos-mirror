@@ -24,3 +24,11 @@ test-kernels:
 
 .PHONY: build-kernels
 build-kernels: ${KERNELS}
+
+.PHONY: publish-sdk-deps
+publish-sdk-deps: build-deps
+	@make -C src/kernel_sdk publish-deps
+
+.PHONY: publish-sdk
+publish-sdk:
+	@make -C src/kernel_sdk publish
