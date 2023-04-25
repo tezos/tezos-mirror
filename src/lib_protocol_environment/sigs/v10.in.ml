@@ -134,4 +134,6 @@ module type T = sig
   module Plonk : [%sig "v10/plonk.mli"]
 
   module Dal : [%sig "v10/dal.mli"]
+
+  module Smart_rollup_address : [%sig "v10/smart_rollup_address.mli"]
 end
