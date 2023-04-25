@@ -22,4 +22,5 @@ features = ["portable"]
 
 [dependencies.tezos-smart-rollup]
 path = "../sdk"
+version = "0.1.0"
 default-features = false

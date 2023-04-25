@@ -16,6 +16,7 @@ categories = ["no-std", "no-std::no-alloc", "api-bindings", "wasm"]
 
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
+version = "0.1.0"
 
 [features]
 default = ["abort", "debug"]

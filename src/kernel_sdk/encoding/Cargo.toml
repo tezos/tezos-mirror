@@ -32,10 +32,12 @@ thiserror = { version = "1.0", optional = true }
 
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
+version = "0.1.0"
 default-features = false
 
 [dependencies.tezos-smart-rollup-host]
 path = "../host"
+version = "0.1.0"
 default-features = false
 
 [features]
