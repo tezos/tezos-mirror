@@ -652,16 +652,8 @@ module type AUTOMATON = sig
     module Message_cache : sig
       type t
 
-      val create : history_slots:int -> gossip_slots:int -> t
-
-      val add_message : Message_id.t -> Message.t -> Topic.t -> t -> t
-
       val get_message_for_peer :
         Peer.t -> Message_id.t -> t -> (t * Message.t * int) option
-
-      val get_message_ids_to_gossip : Topic.t -> t -> Message_id.t list
-
-      val shift : t -> t
 
       module Internal_for_tests : sig
         val get_access_counters : t -> (Message_id.t * int Peer.Map.t) Seq.t
