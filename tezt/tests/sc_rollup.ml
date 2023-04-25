@@ -4666,6 +4666,53 @@ let test_migration_cement ~kind ~migrate_from ~migrate_to =
     ~description
     ()
 
+(** Test to recover stakes when the commitment was cemented
+    pre-migration. *)
+let test_migration_recover ~kind ~migrate_from ~migrate_to =
+  let tags = ["commitment"; "cement"; "recover"]
+  and description = "Test recover bond with cementation made pre-migration."
+  and scenario_prior tezos_client ~sc_rollup =
+    let* commitment, hash =
+      bake_period_then_publish_commitment
+        ~sc_rollup
+        ~src:Constant.bootstrap1.public_key_hash
+        tezos_client
+    in
+    let* {challenge_window_in_blocks = challenge_window; _} =
+      get_sc_rollup_constants tezos_client
+    in
+    let* current_level = Client.level tezos_client in
+    let missing_blocks_to_cement =
+      commitment.inbox_level + challenge_window - current_level + 2
+    in
+    let* () =
+      repeat missing_blocks_to_cement (fun () ->
+          Client.bake_for_and_wait tezos_client)
+    in
+    cement_commitment ~sc_rollup ~hash tezos_client
+  and scenario_after tezos_client ~sc_rollup () =
+    let*! () =
+      let recover_bond_fee = 1_000_000 in
+      Client.Sc_rollup.submit_recover_bond
+        ~hooks
+        ~rollup:sc_rollup
+        ~src:Constant.bootstrap2.alias
+        ~fee:(Tez.of_mutez_int recover_bond_fee)
+        ~staker:Constant.bootstrap1.alias
+        tezos_client
+    in
+    Client.bake_for_and_wait tezos_client
+  in
+  test_l1_migration_scenario
+    ~kind
+    ~migrate_from
+    ~migrate_to
+    ~scenario_prior
+    ~scenario_after
+    ~tags
+    ~description
+    ()
+
 let test_injector_auto_discard =
   test_full_scenario
     {
@@ -4894,7 +4941,8 @@ let register ~protocols =
 let register_migration ~kind ~migrate_from ~migrate_to =
   test_migration_inbox ~kind ~migrate_from ~migrate_to ;
   test_migration_ticket_inbox ~kind ~migrate_from ~migrate_to ;
-  test_migration_cement ~kind ~migrate_from ~migrate_to
+  test_migration_cement ~kind ~migrate_from ~migrate_to ;
+  test_migration_recover ~kind ~migrate_from ~migrate_to
 
 let register_migration ~migrate_from ~migrate_to =
   register_migration ~kind:"arith" ~migrate_from ~migrate_to ;
