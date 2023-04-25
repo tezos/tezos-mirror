@@ -81,6 +81,7 @@ struct
 
   type stats = {
     behaviour_penalty : int;  (** The score associated to a peer. *)
+    application_score : float;  (** Application-specific score. *)
     topic_status : topic_status Topic.Map.t;
     peer_status : peer_status;
     parameters : (topic, span) score_parameters;
@@ -163,6 +164,9 @@ struct
       topic_status
       0.0
 
+  let p5 {application_score; parameters; _} =
+    application_score *. parameters.app_specific_weight
+
   let p7 {behaviour_penalty; parameters; _} =
     let penalty = float_of_int behaviour_penalty in
     if penalty > parameters.behaviour_penalty_threshold then
@@ -172,8 +176,9 @@ struct
 
   let float ps =
     let topic_scores = topic_scores ps in
+    let p5 = p5 ps in
     let p7 = p7 ps in
-    topic_scores +. p7
+    topic_scores +. p5 +. p7
 
   let make stats = {stats; score = Lazy.from_fun (fun () -> float stats)}
 
@@ -183,6 +188,7 @@ struct
     make
       {
         behaviour_penalty = 0;
+        application_score = 0.0;
         topic_status = Topic.Map.empty;
         peer_status = Connected;
         parameters;
@@ -366,6 +372,10 @@ struct
         stats.topic_status
     in
     make {stats with topic_status}
+
+  let set_application_score ({stats; _} : t) application_score =
+    let stats = {stats with application_score} in
+    make stats
 
   let refresh_mesh_status now mesh_status =
     match mesh_status with

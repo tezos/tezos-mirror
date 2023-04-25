@@ -157,11 +157,12 @@ type ('topic, 'span) score_parameters = {
   topics : ('topic, 'span) topic_score_parameters;
       (** Per-topic score parameters. *)
   behaviour_penalty_weight : float;
-      (** The weight of the score associated to the behaviour penalty. This
+      (** P7: The weight of the score associated to the behaviour penalty. This
           parameter must be negative. *)
   behaviour_penalty_threshold : float;
       (** The threshold on the behaviour penalty
           counter above which we start penalizing the peer. *)
+  app_specific_weight : float;  (** P5: Application-specific peer scoring *)
 }
 
 type ('topic, 'peer, 'message_id, 'span) limits = {
@@ -301,6 +302,7 @@ type ('peer, 'message_id) parameters = {
     - P3b: Trigger P3 computation when the peer gets pruned or removed, so as to not forget yet unaccounted for bad message
       delivery counts.
     - P4: For each topic, penalize peers sending invalid messages on that topic.
+    - P5: The applicative layer can assign an arbitrary application-specific score to a peer.
     - P7: When a peer is pruned from the mesh for a topic, we install a backoff that
       prevents that peer from regrafting too soon. If the peer does not respect this backoff,
       it is penalized.
@@ -359,6 +361,10 @@ module type SCORE = sig
   (** [invalid_message_delivered ps topic] increments the counter related to
       invalid messages sent by the associated peer. *)
   val invalid_message_delivered : t -> topic -> t
+
+  (** [set_application_score ps score] sets the application-specific score. This score can
+      be positive or negative.  *)
+  val set_application_score : t -> float -> t
 
   (** [refresh ps] returns [Some ps'] with [ps'] a refreshed score record or [None]
       if the score expired. Refreshing a [ps] allows to update time-dependent spects
