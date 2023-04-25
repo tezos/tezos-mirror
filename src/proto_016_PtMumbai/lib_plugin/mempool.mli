@@ -103,6 +103,22 @@ val pre_filter :
     able to call {!Protocol.Alpha_context.Operation.compare}). *)
 val conflict_handler : config -> Protocol.Mempool.conflict_handler
 
+(** Compute the minimal fee (expressed in mutez) that [candidate_op] would
+    need to have in order to be strictly greater than [op_to_overtake]
+    according to {!Protocol.Alpha_context.Operation.compare}, when both
+    operations are manager operations.
+
+    Return [None] when at least one operation is not a manager operation.
+
+    Also return [None] if both operations are manager operations but
+    there was an error while computing the needed fee. However, note
+    that this cannot happen when both manager operations have been
+    successfully validated by the protocol. *)
+val fee_needed_to_overtake :
+  op_to_overtake:Protocol.Alpha_context.packed_operation ->
+  candidate_op:Protocol.Alpha_context.packed_operation ->
+  int64 option
+
 (** The following type, encoding, and default values are exported for
     [bin_sc_rollup_node/configuration.ml]. *)
 
