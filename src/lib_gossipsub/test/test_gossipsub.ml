@@ -32,6 +32,8 @@ let per_topic_score_parameters =
       time_in_mesh_weight = 1.0;
       time_in_mesh_cap = 3600.0;
       time_in_mesh_quantum = 1.0;
+      first_message_deliveries_weight = 1.0;
+      first_message_deliveries_cap = 2000;
     }
 
 let score_parameters =
