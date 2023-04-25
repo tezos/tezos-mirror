@@ -43,7 +43,7 @@ let replace_variables string =
       ("srib3\\w{50}\\b", "[SC_ROLLUP_INBOX_MESSAGE_HASH]");
       ("edpk\\w{50}\\b", "[PUBLIC_KEY]");
       ("\\bo\\w{50}\\b", "[OPERATION_HASH]");
-      ("tz[123]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
+      ("tz[1234]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
       ("sr1\\w{33}\\b", "[SMART_ROLLUP_HASH]");
       ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
       ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
