@@ -36,9 +36,10 @@
  (modules main))
 
 (rule
- (alias runtezt)
+ (alias runtest)
  (package octez-bls12-381-polynomial)
  (deps srs_zcash_g1_5)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 
 (rule

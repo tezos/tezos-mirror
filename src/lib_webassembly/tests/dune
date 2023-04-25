@@ -28,8 +28,9 @@
  (modules main))
 
 (rule
- (alias runtezt)
+ (alias runtest)
  (package tezos-webassembly-interpreter)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 
 (rule

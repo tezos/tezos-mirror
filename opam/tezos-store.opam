@@ -48,7 +48,6 @@ build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
-  ["dune" "build" "@runtezt" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: store for `octez-node`"
 description: "This library provides abstraction for storing and iterating over blocks.

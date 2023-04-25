@@ -48,9 +48,10 @@
  (modules main))
 
 (rule
- (alias runtezt)
+ (alias runtest)
  (package tezos-protocol-017-PtNairob-tests)
  (deps (glob_files wasm_kernel/*.wasm))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 
 (rule

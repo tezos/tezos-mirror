@@ -54,9 +54,10 @@
  (modules main))
 
 (rule
- (alias runtezt)
+ (alias runtest)
  (package tezos-protocol-016-PtMumbai-tests)
  (deps (glob_files contracts/*))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 
 (rule

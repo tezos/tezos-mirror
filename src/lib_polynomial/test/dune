@@ -27,8 +27,9 @@
  (modules main))
 
 (rule
- (alias runtezt)
+ (alias runtest)
  (package octez-polynomial)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 
 (rule

@@ -20,6 +20,5 @@ build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
-  ["dune" "build" "@runtezt" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: version information generated from Git"
