@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
-
 type mode = Observer | Accuser | Batcher | Maintenance | Operator | Custom
 
 type purpose = Publish | Add_messages | Cement | Timeout | Refute
@@ -53,7 +51,7 @@ type batcher = {
 type injector = {retention_period : int; attempts : int; injection_ttl : int}
 
 type t = {
-  sc_rollup_address : Sc_rollup.t;
+  sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   boot_sector_file : string option;
   sc_rollup_node_operators : operators;
   rpc_addr : string;
@@ -582,7 +580,7 @@ let encoding : t Data_encoding.t =
           (req
              "smart-rollup-address"
              ~description:"Smart rollup address"
-             Protocol.Alpha_context.Sc_rollup.Address.encoding)
+             Tezos_crypto.Hashed.Smart_rollup_address.encoding)
           (opt "boot-sector" ~description:"Boot sector" string)
           (req
              "smart-rollup-node-operator"
