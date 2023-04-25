@@ -62,4 +62,5 @@ publish-deps: build-deps
 publish: installer.wasm
 	@cargo publish-workspace -p 'tezos-smart-rollup-' \
 		--exclude installer-kernel \
-		--target-version $(SDK_VERSION)
+		--target-version $(SDK_VERSION) \
+		--aligned-versions-only

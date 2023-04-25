@@ -15,7 +15,8 @@ publish_kernel_sdk:
   interruptible: false
   script:
     - make -f kernels.mk publish-sdk-deps
-    - CC=clang make -f kernels.mk publish-sdk
+    # Manually set SSL_CERT_DIR as default setting points to empty dir
+    - SSL_CERT_DIR=/etc/ssl/certs CC=clang make -f kernels.mk publish-sdk
   variables:
     CARGO_HOME: $CI_PROJECT_DIR/cargo
   cache:

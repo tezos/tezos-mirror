@@ -10,4 +10,5 @@ should be mindful that the SDK is being used by external developers already.
 
 - [ ] Changes are documented in [./CHANGES.rst]
 - [ ] `SDK_VERSION` is updated in [./Makefile]
+- [ ] All versions bumped in the crates' `Cargo.toml`s.
 - [ ] once version update is merged, manually trigger the `publish_kernel_sdk` job on master.
