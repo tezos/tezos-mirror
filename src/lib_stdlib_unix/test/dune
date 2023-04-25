@@ -8,6 +8,8 @@
   tezt.core
   tezos-error-monad
   tezos-stdlib-unix
+  tezos-event-logging
+  tezos-test-helpers
   qcheck-alcotest
   octez-alcotezt)
  (library_flags (:standard -linkall))
@@ -18,8 +20,10 @@
   -open Tezos_error_monad
   -open Tezos_error_monad.TzLwtreslib
   -open Tezos_stdlib_unix
+  -open Tezos_event_logging
+  -open Tezos_test_helpers
   -open Octez_alcotezt)
- (modules test_key_value_store_fuzzy))
+ (modules test_key_value_store_fuzzy test_log_config_rules))
 
 (executable
  (name main)

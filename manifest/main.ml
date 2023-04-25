@@ -1749,13 +1749,15 @@ let octez_stdlib_unix =
 
 let _octez_stdlib_unix_test =
   tezt
-    ["test_key_value_store_fuzzy"]
+    ["test_key_value_store_fuzzy"; "test_log_config_rules"]
     ~path:"src/lib_stdlib_unix/test/"
     ~opam:"tezos-stdlib-unix"
     ~deps:
       [
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_stdlib_unix |> open_;
+        octez_event_logging |> open_;
+        octez_test_helpers |> open_;
         qcheck_alcotest;
         alcotezt;
       ]
