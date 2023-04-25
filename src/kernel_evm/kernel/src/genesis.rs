@@ -2,12 +2,18 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::str::FromStr;
+
 use crate::error::Error;
+use crate::error::StorageError::{GenesisAccountInitialisation, Path};
 use crate::storage;
 use crate::storage::receipt_path;
 use crate::L2Block;
-use primitive_types::U256;
-use tezos_ethereum::account::Account;
+use evm_execution::account_storage::account_path;
+use evm_execution::account_storage::init_account_storage;
+use evm_execution::account_storage::AccountStorageError;
+use evm_execution::account_storage::EthereumAccountStorage;
+use primitive_types::{H160, U256};
 use tezos_ethereum::address::EthereumAddress;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_ethereum::transaction::TransactionReceipt;
@@ -16,7 +22,7 @@ use tezos_ethereum::transaction::TransactionType;
 use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
 use tezos_ethereum::wei::{self, Wei};
 use tezos_smart_rollup_debug::debug_msg;
-use tezos_smart_rollup_host::path::OwnedPath;
+use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 struct MintAccount {
@@ -49,22 +55,15 @@ const MINT_ACCOUNTS: [MintAccount; MINT_ACCOUNTS_NUMBER] = [
     },
 ];
 
-fn store_genesis_mint_account<Host: Runtime>(
-    host: &mut Host,
-    account: &Account,
-    path: &OwnedPath,
-) -> Result<(), Error> {
-    storage::store_account(host, account, path)
-}
-
 fn forge_genesis_mint_account<Host: Runtime>(
     host: &mut Host,
-    mint_address: &str,
+    mint_address: &H160,
     balance: Wei,
-) -> Result<(), Error> {
-    let account = Account::with_assets(balance);
-    let path = storage::account_path(&mint_address.as_bytes().to_vec())?;
-    store_genesis_mint_account(host, &account, &path)
+    evm_account_storage: &mut EthereumAccountStorage,
+) -> Result<(), AccountStorageError> {
+    let mut account =
+        evm_account_storage.get_or_create_account(host, &account_path(mint_address)?)?;
+    account.balance_add(host, balance)
 }
 
 fn collect_mint_transactions<T, E>(
@@ -83,13 +82,23 @@ fn collect_mint_transactions<T, E>(
 fn bootstrap_genesis_accounts<Host: Runtime>(
     host: &mut Host,
 ) -> Result<Vec<TransactionHash>, Error> {
+    let mut evm_account_storage =
+        init_account_storage().map_err(|_| Error::Storage(Path(PathError::PathEmpty)))?;
     let transactions_hashes = MINT_ACCOUNTS.map(
         |MintAccount {
              mint_address,
              genesis_tx_hash,
              eth_amount,
          }| {
-            forge_genesis_mint_account(host, mint_address, wei::from_eth(eth_amount))?;
+            let mint_address =
+                H160::from_str(mint_address).map_err(|_| Error::InvalidConversion)?;
+            forge_genesis_mint_account(
+                host,
+                &mint_address,
+                wei::from_eth(eth_amount),
+                &mut evm_account_storage,
+            )
+            .map_err(|_| Error::Storage(GenesisAccountInitialisation))?;
             Ok(genesis_tx_hash)
         },
     );
@@ -110,11 +119,8 @@ fn store_genesis_receipts<Host: Runtime>(
 ) -> Result<(), Error> {
     let genesis_address: EthereumAddress = GENESIS_ADDRESSS.into();
 
-    for (i, hash) in genesis_block.transactions.iter().enumerate() {
-        let mint_account = &MINT_ACCOUNTS[i];
-        // There are very few genesis transactions, the conversion from usize to u32 is safe
-        // and truncate won't lead to a loss of data
-        let index = i as u32;
+    for (hash, index) in genesis_block.transactions.iter().zip(0u32..) {
+        let mint_account = &MINT_ACCOUNTS[index as usize];
 
         let receipt = TransactionReceipt {
             hash: *hash,

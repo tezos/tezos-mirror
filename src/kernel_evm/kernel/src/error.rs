@@ -20,6 +20,7 @@ pub enum StorageError {
     Path(PathError),
     Runtime(RuntimeError),
     AccountInitialisation,
+    GenesisAccountInitialisation,
     InvalidLoadValue { expected: usize, actual: usize },
     InvalidEncoding { path: OwnedPath, value: Vec<u8> },
 }
@@ -28,6 +29,7 @@ pub enum StorageError {
 pub enum Error {
     Transfer(TransferError),
     Storage(StorageError),
+    InvalidConversion,
 }
 
 impl From<PathError> for Error {
