@@ -65,9 +65,12 @@ let raw_hash_rpc_arg =
     ~construct
     ()
 
-type error += Cannot_convert_raw_hash of string
-
 module type T = sig
+  type cannot_convert_raw_hash_to_hash
+
+  type error +=
+    | Cannot_convert_raw_hash_to_hash of cannot_convert_raw_hash_to_hash
+
   val raw_to_hash : raw_hash -> hash tzresult
 
   val encoding : hash Data_encoding.t

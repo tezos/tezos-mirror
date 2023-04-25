@@ -28,6 +28,14 @@
 module Make (Mapper : sig
   val of_bytes : bytes -> Dac_plugin.hash
 end) : Dac_plugin.T = struct
+  type cannot_convert_raw_hash_to_hash = {
+    raw_hash : Dac_plugin.raw_hash;
+    proto : Protocol_hash.t;
+  }
+
+  type error +=
+    | Cannot_convert_raw_hash_to_hash of cannot_convert_raw_hash_to_hash
+
   let to_bytes = Dac_plugin.hash_to_bytes
 
   let to_reveal_hash dac_hash =
@@ -93,14 +101,43 @@ end) : Dac_plugin.T = struct
     Protocol.Sc_rollup_reveal_hash.size
       ~scheme:(dac_hash_to_proto_supported_hashes scheme)
 
-  let raw_to_hash raw_hash =
-    let hex_raw_hash = Dac_plugin.raw_hash_to_hex raw_hash in
-    match of_hex hex_raw_hash with
-    | Some hash -> Ok hash
-    | None ->
-        Result_syntax.tzfail @@ Dac_plugin.Cannot_convert_raw_hash hex_raw_hash
-
   module Proto = Registerer.Registered
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"alpha.cannot_convert_raw_hash_to_hash"
+      ~title:"Impossible to retrieve hash from raw_hash"
+      ~description:
+        "Impossible to validate the provided raw_hash against the protocol"
+      ~pp:(fun ppf (raw_hash, _) ->
+        Format.fprintf
+          ppf
+          "Impossible to validate the provided raw_hash %s against the actual \
+           protocol and transform it to a valid hash"
+          (Dac_plugin.raw_hash_to_hex raw_hash))
+      Data_encoding.(
+        obj2
+          (req "raw_hash" Dac_plugin.raw_hash_encoding)
+          (req "proto" Protocol_hash.encoding))
+      (function
+        | Cannot_convert_raw_hash_to_hash {raw_hash; proto} ->
+            Some (raw_hash, proto)
+        | _ -> None)
+      (fun (raw_hash, proto) ->
+        Cannot_convert_raw_hash_to_hash {raw_hash; proto})
+
+  let raw_to_hash raw_hash =
+    let of_bytes_opt =
+      Data_encoding.Binary.of_bytes_opt
+        Protocol.Sc_rollup_reveal_hash.encoding
+        (Dac_plugin.raw_hash_to_bytes raw_hash)
+    in
+    match of_bytes_opt with
+    | Some hash -> Ok (of_reveal_hash hash)
+    | None ->
+        Result_syntax.tzfail
+        @@ Cannot_convert_raw_hash_to_hash {raw_hash; proto = Proto.hash}
 end
 
 let make_plugin : (bytes -> Dac_plugin.hash) -> (module Dac_plugin.T) =
