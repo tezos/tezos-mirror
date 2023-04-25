@@ -132,6 +132,28 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let*! initial_state = PVM.initial_state ~empty:(PVM.State.empty ()) in
     let*! genesis_state = PVM.install_boot_sector initial_state boot_sector in
     let*! ctxt = PVM.State.set ctxt genesis_state in
+    (* Assert that the initial genesis state is equal to the rollup's genesis
+       state in the protocol. *)
+    let* () =
+      let genesis_commitment = node_ctxt.genesis_info.commitment_hash in
+      let*! compressed_state = PVM.state_hash genesis_state in
+      let our_genesis_commitment =
+        Sc_rollup.Commitment.(
+          hash_uncarbonated
+            {
+              compressed_state;
+              inbox_level = node_ctxt.genesis_info.level;
+              predecessor = Sc_rollup.Commitment.Hash.zero;
+              number_of_ticks = Sc_rollup.Number_of_ticks.zero;
+            })
+      in
+      fail_unless
+        (Sc_rollup.Commitment.Hash.equal
+           genesis_commitment
+           our_genesis_commitment)
+        (Sc_rollup_node_errors.Invalid_genesis_state
+           {expected = genesis_commitment; actual = our_genesis_commitment})
+    in
     return (ctxt, genesis_state)
 
   let state_of_head node_ctxt ctxt Layer1.{hash; level} =
