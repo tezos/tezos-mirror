@@ -18,6 +18,7 @@
   re
   ezjsonm
   ptime
+  ptime.clock.os
   mtime
   mtime.clock.os
   lwt_log
