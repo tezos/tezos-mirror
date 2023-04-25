@@ -182,7 +182,9 @@ mod tests {
     use crate::genesis;
     use crate::inbox::Transaction;
     use crate::storage::read_transaction_receipt_status;
-    use primitive_types::H256;
+    use evm_execution::account_storage::{account_path, EthereumAccountStorage};
+    use primitive_types::{H160, H256};
+    use std::str::FromStr;
     use tezos_ethereum::address::EthereumAddress;
     use tezos_ethereum::signatures::EthereumTransactionCommon;
     use tezos_ethereum::transaction::{TransactionStatus, TRANSACTION_HASH_SIZE};
@@ -194,7 +196,29 @@ mod tests {
         H256::from(v)
     }
 
+    fn set_balance(
+        host: &mut MockHost,
+        evm_account_storage: &mut EthereumAccountStorage,
+        address: &H160,
+        balance: U256,
+    ) {
+        let mut account = evm_account_storage
+            .get_or_create_account(host, &account_path(address).unwrap())
+            .unwrap();
+        let current_balance = account.balance(host).unwrap();
+        if current_balance > balance {
+            account
+                .balance_remove(host, current_balance - balance)
+                .unwrap();
+        } else {
+            account
+                .balance_add(host, balance - current_balance)
+                .unwrap();
+        }
+    }
+
     fn dummy_eth_transaction() -> EthereumTransactionCommon {
+        // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
         let nonce = U256::from(0);
         let gas_price = U256::from(40000000000u64);
         let gas_limit = U256::from(21000);
@@ -248,6 +272,44 @@ mod tests {
             Ok(TransactionStatus::Success) => {
                 panic!("The receipt should have a failing status.")
             }
+            Err(_) => panic!("Reading the receipt failed."),
+        }
+    }
+
+    #[test]
+    // Test if a valid transaction is producing a receipt with a success status
+    fn test_valid_transactions_receipt_status() {
+        let mut host = MockHost::default();
+        let _ = genesis::init_block(&mut host);
+
+        let tx_hash = [0; TRANSACTION_HASH_SIZE];
+
+        let valid_tx = Transaction {
+            tx_hash,
+            tx: dummy_eth_transaction(),
+        };
+
+        let transactions: Vec<Transaction> = vec![valid_tx];
+        let queue = Queue {
+            proposals: vec![Blueprint { transactions }],
+        };
+
+        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &sender,
+            U256::from(5000000000000000u64),
+        );
+
+        produce(&mut host, queue).expect("The block production failed.");
+
+        match read_transaction_receipt_status(&mut host, &tx_hash) {
+            Ok(TransactionStatus::Failure) => {
+                panic!("The receipt should have a success status.")
+            }
+            Ok(TransactionStatus::Success) => (),
             Err(_) => panic!("Reading the receipt failed."),
         }
     }
