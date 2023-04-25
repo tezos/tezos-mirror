@@ -98,4 +98,5 @@ let () =
   Test_unit.register rng default_limits parameters ;
   Test_integration_worker.register rng default_limits parameters ;
   Test_pbt.register rng default_limits parameters ;
+  Test_message_cache.register () ;
   Tezt.Test.run ()

@@ -87,7 +87,7 @@ module Basic_fragments = struct
 end
 
 module Test_message_cache = struct
-  module L = GS.Introspection.Message_cache
+  module L = Message_cache
 
   module R = struct
     module M = Map.Make (Int)
