@@ -418,7 +418,7 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
             ( pv.peer_id,
               Format.asprintf "unknown ancestor or too short locator: kick" )
         in
-        let* () = Events.(emit request_error) (request_view, st, err) in
+        let* () = Events.(emit insufficient_history) pv.peer_id in
         Worker.trigger_shutdown w ;
         return_ok_unit
     | Distributed_db.Operations.Canceled _ :: _ -> (

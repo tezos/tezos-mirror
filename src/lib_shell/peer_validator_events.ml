@@ -247,3 +247,12 @@ let peer_disconnection =
     ~level:Notice
     ("peer", P2p_peer.Id.encoding)
     ~pp1:P2p_peer.Id.pp
+
+let insufficient_history =
+  declare_1
+    ~section
+    ~name:"insufficient_history"
+    ~msg:"disconnected from peer {peer}: insufficient history"
+    ~level:Notice
+    ("peer", P2p_peer.Id.encoding)
+    ~pp1:P2p_peer.Id.pp
