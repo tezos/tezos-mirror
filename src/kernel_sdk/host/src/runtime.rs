@@ -131,6 +131,9 @@ pub trait Runtime {
     /// Delete `path` from storage.
     fn store_delete<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError>;
 
+    /// Delete value under `path` from storage.
+    fn store_delete_value<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError>;
+
     /// Count the number of subkeys under `prefix`.
     ///
     /// See [SmartRollupCore::store_list_size].
@@ -363,6 +366,16 @@ where
 
         let res =
             unsafe { SmartRollupCore::store_delete(self, path.as_ptr(), path.size()) };
+        match Error::wrap(res) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(RuntimeError::HostErr(e)),
+        }
+    }
+
+    fn store_delete_value<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
+        let res = unsafe {
+            SmartRollupCore::store_delete_value(self, path.as_ptr(), path.size())
+        };
         match Error::wrap(res) {
             Ok(_) => Ok(()),
             Err(e) => Err(RuntimeError::HostErr(e)),
@@ -865,6 +878,39 @@ mod tests {
 
         // Assert
         assert_eq!(Err(RuntimeError::PathNotFound), result);
+    }
+
+    #[test]
+    fn store_delete_value() {
+        // Arrange
+        const PATH: RefPath<'static> =
+            RefPath::assert_from("/a/PATH.which/does/exist".as_bytes());
+
+        const REMAINING_PATH: RefPath<'static> =
+            RefPath::assert_from("/a/PATH.which/does/exist/and/survived".as_bytes());
+
+        let mut mock = mock_path_exists(PATH.as_bytes());
+        mock.expect_store_delete()
+            .withf(|ptr, size| {
+                let slice = unsafe { from_raw_parts(*ptr, *size) };
+
+                PATH.as_bytes() == slice
+            })
+            .return_const(0);
+        mock.expect_store_has()
+            .withf(move |ptr, size| {
+                let bytes = unsafe { from_raw_parts(*ptr, *size) };
+                REMAINING_PATH.as_bytes() == bytes
+            })
+            .return_const(tezos_smart_rollup_core::VALUE_TYPE_VALUE);
+
+        // Act
+        let result = mock.store_delete(&PATH);
+        let result_remaining = mock.store_has(&REMAINING_PATH);
+
+        // Assert
+        assert_eq!(Ok(()), result);
+        assert!(matches!(result_remaining, Ok(Some(_))));
     }
 
     #[test]
