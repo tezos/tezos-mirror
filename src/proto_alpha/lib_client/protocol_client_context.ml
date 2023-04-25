@@ -23,12 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Lifted_protocol = struct
-  include Environment.Lift (Protocol)
-
-  let hash = Protocol.hash
-end
-
 module Alpha_block_services =
   Block_services.Make (Lifted_protocol) (Lifted_protocol)
 

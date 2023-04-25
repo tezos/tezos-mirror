@@ -11,6 +11,7 @@
   tezos-shell-services
   tezos-client-base
   tezos-protocol-009-PsFLoren
+  tezos-protocol-009-PsFLoren.lifted
   tezos-signer-backends
   tezos-protocol-plugin-009-PsFLoren
   tezos-rpc

@@ -433,6 +433,28 @@
  (action (run %{bin:octez-protocol-compiler} -warning -51 -warn-error +a .)))
 
 (library
+ (name tezos_protocol_013_PtJakart_lifted)
+ (public_name tezos-protocol-013-PtJakart.lifted)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-013-PtJakart)
+ (flags
+  (:standard)
+  -w -51
+  -nopervasives
+  -open Tezos_protocol_013_PtJakart)
+ (modules Lifted_protocol))
+
+(rule
+ (targets lifted_protocol.ml)
+ (action
+  (write-file
+   %{targets}
+   "\ninclude Environment.Lift (Protocol)\nlet hash = Protocol.hash\n")))
+
+(library
  (name tezos_protocol_013_PtJakart_functor)
  (libraries
   tezos-protocol-environment

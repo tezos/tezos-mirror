@@ -11,6 +11,7 @@
   tezos-shell-services
   tezos-client-base
   tezos-protocol-017-PtNairob
+  tezos-protocol-017-PtNairob.lifted
   tezos-mockup-registration
   tezos-proxy
   tezos-signer-backends

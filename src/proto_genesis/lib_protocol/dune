@@ -73,6 +73,27 @@
  (action (run %{bin:octez-protocol-compiler} -no-hash-check -warn-error +a .)))
 
 (library
+ (name tezos_protocol_genesis_lifted)
+ (public_name tezos-protocol-genesis.lifted)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-genesis)
+ (flags
+  (:standard)
+  -nopervasives
+  -open Tezos_protocol_genesis)
+ (modules Lifted_protocol))
+
+(rule
+ (targets lifted_protocol.ml)
+ (action
+  (write-file
+   %{targets}
+   "\ninclude Environment.Lift (Protocol)\nlet hash = Protocol.hash\n")))
+
+(library
  (name tezos_protocol_genesis_functor)
  (libraries
   tezos-protocol-environment

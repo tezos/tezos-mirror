@@ -10,6 +10,7 @@
   tezos-shell-services
   tezos-client-base
   tezos-protocol-004-Pt24m4xi
+  tezos-protocol-004-Pt24m4xi.lifted
   tezos-signer-backends
   tezos-rpc
   uri)

@@ -10,6 +10,7 @@
   tezos-shell-services
   tezos-client-base
   tezos-protocol-001-PtCJ7pwo
+  tezos-protocol-001-PtCJ7pwo.lifted
   tezos-signer-backends
   tezos-rpc
   uri)

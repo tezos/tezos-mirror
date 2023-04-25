@@ -213,6 +213,28 @@
    .)))
 
 (library
+ (name tezos_protocol_002_PsYLVpVv_lifted)
+ (public_name tezos-protocol-002-PsYLVpVv.lifted)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-002-PsYLVpVv)
+ (flags
+  (:standard)
+  -w -6-7-9-16-29-32-51-68
+  -nopervasives
+  -open Tezos_protocol_002_PsYLVpVv)
+ (modules Lifted_protocol))
+
+(rule
+ (targets lifted_protocol.ml)
+ (action
+  (write-file
+   %{targets}
+   "\ninclude Environment.Lift (Protocol)\nlet hash = Protocol.hash\n")))
+
+(library
  (name tezos_protocol_002_PsYLVpVv_functor)
  (libraries
   tezos-protocol-environment

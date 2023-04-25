@@ -11,6 +11,7 @@
   tezos-shell-services
   tezos-client-base
   tezos-protocol-015-PtLimaPt
+  tezos-protocol-015-PtLimaPt.lifted
   tezos-mockup-registration
   tezos-proxy
   tezos-signer-backends

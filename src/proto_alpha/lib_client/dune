@@ -11,6 +11,7 @@
   tezos-shell-services
   tezos-client-base
   tezos-protocol-alpha
+  tezos-protocol-alpha.lifted
   tezos-mockup-registration
   tezos-proxy
   tezos-signer-backends
@@ -29,6 +30,7 @@
   -open Tezos_shell_services
   -open Tezos_client_base
   -open Tezos_protocol_alpha
+  -open Tezos_protocol_alpha_lifted
   -open Tezos_protocol_plugin_alpha
   -open Tezos_protocol_alpha_parameters
   -open Tezos_smart_rollup_alpha))

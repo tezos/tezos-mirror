@@ -23,10 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Genesis_block_services = Block_services.Make (Protocol) (Protocol)
-
-module Lifted_protocol = struct
-  include Environment.Lift (Protocol)
-
-  let hash = Protocol.hash
-end
+module Lifted_protocol = Tezos_protocol_genesis_lifted.Lifted_protocol
+module Genesis_block_services =
+  Block_services.Make (Lifted_protocol) (Lifted_protocol)
