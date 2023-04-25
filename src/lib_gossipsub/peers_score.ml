@@ -254,15 +254,22 @@ struct
       let topic_status =
         Topic.Map.mapi
           (fun topic status ->
-            let topic_parameters = get_topic_params stats.parameters topic in
-            let penalty =
-              mesh_message_delivery_penalty topic_parameters status
+            let mesh_failure_penalty =
+              match status.mesh_status with
+              | Active _ ->
+                  let topic_parameters =
+                    get_topic_params stats.parameters topic
+                  in
+                  status.mesh_failure_penalty
+                  + mesh_message_delivery_penalty topic_parameters status
+              | Inactive -> status.mesh_failure_penalty
             in
             {
               status with
               mesh_status = Inactive;
+              first_message_deliveries = 0;
               mesh_message_deliveries_active = false;
-              mesh_failure_penalty = status.mesh_failure_penalty + penalty;
+              mesh_failure_penalty;
             })
           stats.topic_status
       in
