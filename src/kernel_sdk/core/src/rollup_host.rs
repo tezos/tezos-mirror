@@ -82,6 +82,10 @@ unsafe impl SmartRollupCore for RollupHost {
         core::store_delete(path, len)
     }
 
+    unsafe fn store_delete_value(&self, path: *const u8, len: usize) -> i32 {
+        core::store_delete_value(path, len)
+    }
+
     unsafe fn store_list_size(&self, path: *const u8, path_len: usize) -> i64 {
         core::store_list_size(path, path_len)
     }
