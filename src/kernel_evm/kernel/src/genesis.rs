@@ -161,16 +161,38 @@ pub fn init_block<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
 mod tests {
     use super::*;
 
+    use tezos_ethereum::wei;
     use tezos_smart_rollup_mock::MockHost;
 
+    fn get_balance(
+        host: &mut MockHost,
+        evm_account_storage: &mut EthereumAccountStorage,
+        address: &H160,
+    ) -> U256 {
+        let account = evm_account_storage
+            .get_or_create_account(host, &account_path(address).unwrap())
+            .unwrap();
+        account.balance(host).unwrap()
+    }
+
     #[test]
-    // Test if the genesis block can be initialized
+    // Test if the genesis block can be initialized and that the mint accounts
+    // are initialized with the appropriate amounts.
     fn test_init_genesis_block() {
         let mut host = MockHost::default();
+        let mut evm_account_storage = init_account_storage().unwrap();
 
         match init_block(&mut host) {
             Ok(()) => (),
             Err(_) => panic!("The initialization of block genesis failed."),
+        }
+
+        for account in MINT_ACCOUNTS {
+            let mint_address = H160::from_str(account.mint_address).unwrap();
+            assert_eq!(
+                get_balance(&mut host, &mut evm_account_storage, &mint_address),
+                wei::from_eth(9999)
+            );
         }
     }
 }
