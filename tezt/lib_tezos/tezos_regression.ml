@@ -37,12 +37,6 @@ let replace_variables string =
       ("\\bB\\w{50}\\b", "[BLOCK_HASH]");
       ("SRCo\\w{50}\\b", "[SC_ROLLUP_CONTEXT_HASH]");
       ("Co\\w{50}\\b", "[CONTEXT_HASH]");
-      ("txi\\w{50}\\b", "[TX_ROLLUP_INBOX_HASH]");
-      ("txmr\\w{50}\\b", "[TX_ROLLUP_MESSAGE_RESULT_HASH]");
-      ("txm\\w{50}\\b", "[TX_ROLLUP_MESSAGE_HASH]");
-      ("txmr\\w{50}\\b", "[TX_ROLLUP_MESSAGE_RESULT_HASH]");
-      ("txM\\w{50}\\b", "[TX_ROLLUP_MESSAGE_RESULT_LIST_HASH]");
-      ("txc\\w{50}\\b", "[TX_ROLLUP_COMMITMENT_HASH]");
       ("src1\\w{50}\\b", "[SC_ROLLUP_COMMITMENT_HASH]");
       ("srib1\\w{50}\\b", "[SC_ROLLUP_INBOX_HASH]");
       ("srib2\\w{50}\\b", "[SC_ROLLUP_INBOX_MERKELIZED_PAYLOAD_HASHES_HASH]");
@@ -50,8 +44,6 @@ let replace_variables string =
       ("edpk\\w{50}\\b", "[PUBLIC_KEY]");
       ("\\bo\\w{50}\\b", "[OPERATION_HASH]");
       ("tz[123]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
-      ("txr1\\w{33}\\b", "[TX_ROLLUP_HASH]");
-      ("tz4\\w{33}\\b", "[TX_ROLLUP_PUBLIC_KEY_HASH]");
       ("sr1\\w{33}\\b", "[SMART_ROLLUP_HASH]");
       ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
       ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");

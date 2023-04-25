@@ -78,10 +78,6 @@ let sc_rollup_node proto = "./octez-smart-rollup-node-" ^ daemon_name proto
 
 let sc_rollup_client proto = "./octez-smart-rollup-client-" ^ daemon_name proto
 
-let tx_rollup_node proto = "./octez-tx-rollup-node-" ^ daemon_name proto
-
-let tx_rollup_client proto = "./octez-tx-rollup-client-" ^ daemon_name proto
-
 let encoding_prefix = function
   | Alpha -> "alpha"
   | p -> sf "%03d-%s" (number p) (String.sub (hash p) 0 8)
