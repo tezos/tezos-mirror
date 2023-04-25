@@ -57,7 +57,8 @@ This sink is the one currently activated by default:
    ``TEZOS_LOG`` environment variable or the specific section in the
    node’s configuration file (see below).
 
-This sink can only output pretty-printed versions of the events.
+This sink can only output pretty-printed versions of the events, by default
+on standard output (stdout).
 
 File-Descriptor Sinks
 ~~~~~~~~~~~~~~~~~~~~~
@@ -213,11 +214,12 @@ By default, the Octez binaries generate **user logs** as follows:
 - ``lwt-log://`` sinks are activated by default and configured to
   output events of level at least ``Notice``. Their goal is the stdout logging.
 
-The node additionally generates by default more detailed **internal logs** as follows:
+The node and the baker additionally generate by default more detailed
+**internal logs** as follows:
 
-- A file-descriptor-sink is activated to store logs from last seven days with
-  an ``Info`` level. The path is ``<node-data-dir>/daily-logs/``.
-
+- A file-descriptor-sink is activated to store logs from last seven days with an
+  ``Info`` level. For the node, the path is ``<node-data-dir>/daily-logs/``. For
+  other tools, see the corresponding sections in this page.
 
 JSON Configuration Format
 -------------------------
@@ -326,12 +328,18 @@ events) this call adds a sink to suddenly start pretty-printing all
 Client and baker configuration
 ------------------------------
 
-For now, ``octez-client``, ``octez-{baker,accuser}-*``, etc.
-can only be configured using the environment variables.
+Both ``octez-client`` and ``octez-{baker,accuser}-*`` can be configured either
+using environment variables or using ``internal-events`` in the client configuration
+file, with the file-descriptor sinks described above.
 
-There is one common option ``--log-requests`` which can be used to trace
+There is also one common option ``--log-requests`` which can be used to trace
 all the interactions with the node (but it does *not* use the logging
 framework).
+
+By default, the baker also generates internal logs, which are stored at
+``<client-base-dir>/logs/baker-<protocol-name>/*``. Hence, running two bakers
+(for two different accounts) using the same protocol with the same base
+directory is not recommended.
 
 Processing Structured Events
 ----------------------------
