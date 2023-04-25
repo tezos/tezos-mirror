@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+// SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -146,6 +147,13 @@ impl Store {
             node.inner.insert(VALUE_NAME.to_string(), Box::default());
             self.node_insert(path, node);
         }
+    }
+
+    pub fn delete_value(&mut self, path: &str) {
+        if let Some(mut node) = self.node_from_path_mut(path) {
+            node.value = None;
+            node.inner.remove(VALUE_NAME);
+        };
     }
 
     pub fn has_entry(&self, path: &str) -> bool {
