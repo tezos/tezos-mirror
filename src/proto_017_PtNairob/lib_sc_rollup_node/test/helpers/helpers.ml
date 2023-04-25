@@ -180,6 +180,24 @@ module Make (PVM : Pvm.S) = struct
     in
     return_unit
 
+  let head_of_level ~predecessor level =
+    let hash = block_hash_of_level level in
+    let timestamp = Time.Protocol.of_seconds (Int64.of_int32 level) in
+    let header : Block_header.shell_header =
+      {
+        level;
+        predecessor;
+        timestamp;
+        (* dummy values below *)
+        proto_level = 0;
+        validation_passes = 3;
+        operations_hash = Tezos_crypto.Hashed.Operation_list_list_hash.zero;
+        fitness = [];
+        context = Tezos_crypto.Hashed.Context_hash.zero;
+      }
+    in
+    {Layer1.hash; level; header}
+
   let append_l2_block (node_ctxt : _ Node_context.t)
       ?(is_migration_block = false) messages =
     let open Lwt_result_syntax in
@@ -192,26 +210,19 @@ module Make (PVM : Pvm.S) = struct
       | None ->
           failwith "No genesis block, please add one with add_l2_genesis_block"
     in
-    let level =
-      Raw_level.(to_int32 @@ succ predecessor_l2_block.header.level)
-    in
-    let hash = block_hash_of_level level in
+    let pred_level = Raw_level.to_int32 predecessor_l2_block.header.level in
     let predecessor =
-      Layer1.
-        {
-          hash = predecessor_l2_block.header.block_hash;
-          level = Raw_level.to_int32 predecessor_l2_block.header.level;
-        }
+      head_of_level
+        ~predecessor:predecessor_l2_block.header.predecessor
+        pred_level
     in
-    let head = Layer1.{hash; level} in
-    let predecessor_timestamp =
-      Time.Protocol.of_seconds (Int64.of_int32 level)
+    let head =
+      head_of_level ~predecessor:predecessor.hash (Int32.succ pred_level)
     in
     Daemon.Internal_for_tests.process_messages
       node_ctxt
       ~is_migration_block
       ~predecessor
-      ~predecessor_timestamp
       head
       messages
 end

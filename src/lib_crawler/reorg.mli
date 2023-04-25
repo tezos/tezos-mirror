@@ -38,3 +38,7 @@ val no_reorg : 'a t
 val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
 
 val map : ('a -> 'b) -> 'a t -> 'b t
+
+val map_es : ('a -> 'b tzresult Lwt.t) -> 'a t -> 'b t tzresult Lwt.t
+
+val map_ep : ('a -> 'b tzresult Lwt.t) -> 'a t -> 'b t tzresult Lwt.t

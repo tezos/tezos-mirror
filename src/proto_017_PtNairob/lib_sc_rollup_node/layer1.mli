@@ -30,9 +30,19 @@
    subscribing to the head monitoring RPC offered by the Tezos node.
 *)
 
+type header = {
+  hash : Block_hash.t;
+  level : int32;
+  header : Block_header.shell_header;
+}
+
 type head = {hash : Block_hash.t; level : int32}
 
+val header_encoding : header Data_encoding.t
+
 val head_encoding : head Data_encoding.t
+
+val head_of_header : header -> head
 
 include module type of Octez_crawler.Layer_1
 
@@ -43,9 +53,13 @@ include module type of Octez_crawler.Layer_1
     chain. In case of a disconnection with the layer 1 node, it reconnects
     automatically. If [f] returns an error (other than a disconnection) it,
     [iter_heads] terminates and returns the error.  *)
-val iter_heads : t -> (head -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
+val iter_heads : t -> (header -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
 
 (** {2 Helpers } *)
+
+(** [cache_shell_header hash header] saves in the local cache the shell [header]
+    for the block [hash]. *)
+val cache_shell_header : Block_hash.t -> Block_header.shell_header -> unit
 
 (** [fetch_tezos_shell_header cctxt hash] returns the block shell header of
     [hash]. Looks for the block in the blocks cache first, and fetches it from

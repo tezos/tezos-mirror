@@ -175,8 +175,8 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         Some commitment
       else return_none
 
-  let process_head (node_ctxt : _ Node_context.t) ~predecessor Layer1.{level; _}
-      ctxt =
+  let process_head (node_ctxt : _ Node_context.t) ~predecessor
+      Layer1.{level; header = _; _} ctxt =
     let open Lwt_result_syntax in
     let current_level = Raw_level.of_int32_exn level in
     let* commitment =

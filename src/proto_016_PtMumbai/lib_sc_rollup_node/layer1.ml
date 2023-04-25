@@ -58,14 +58,31 @@ let () =
 
 *)
 
+type header = {
+  hash : Block_hash.t;
+  level : int32;
+  header : Block_header.shell_header;
+}
+
+let header_encoding =
+  let open Data_encoding in
+  conv
+    (fun {hash; level = _; header} -> (hash, header))
+    (fun (hash, header) -> {hash; level = header.level; header})
+    (merge_objs
+       (obj1 (req "hash" Block_hash.encoding))
+       Block_header.shell_header_encoding)
+
 type head = {hash : Block_hash.t; level : int32}
 
 let head_encoding =
-  Data_encoding.(
-    conv
-      (fun {hash; level} -> (hash, level))
-      (fun (hash, level) -> {hash; level})
-      (obj2 (req "hash" Block_hash.encoding) (req "level" Data_encoding.int32)))
+  let open Data_encoding in
+  conv
+    (fun {hash; level} -> (hash, level))
+    (fun (hash, level) -> {hash; level})
+    (obj2 (req "hash" Block_hash.encoding) (req "level" Data_encoding.int32))
+
+let head_of_header {hash; level; header = _} = {hash; level}
 
 module Blocks_cache =
   Aches_lwt.Lache.Make_option
@@ -73,13 +90,23 @@ module Blocks_cache =
 
 type blocks_cache = Alpha_block_services.block_info Blocks_cache.t
 
+type headers_cache = Block_header.shell_header Blocks_cache.t
+
 (** Global blocks cache for the smart rollup node. *)
 let blocks_cache : blocks_cache = Blocks_cache.create 32
 
+(** Global block headers cache for the smart rollup node. *)
+let headers_cache : headers_cache = Blocks_cache.create 32
+
 include Octez_crawler.Layer_1
 
+let cache_shell_header hash header =
+  Blocks_cache.put headers_cache hash (Lwt.return_some header)
+
 let iter_heads l1_ctxt f =
-  iter_heads l1_ctxt @@ fun (hash, {shell = {level; _}; _}) -> f {hash; level}
+  iter_heads l1_ctxt @@ fun (hash, {shell = {level; _} as header; _}) ->
+  cache_shell_header hash header ;
+  f {hash; level; header}
 
 (**
 
@@ -111,12 +138,7 @@ let fetch_tezos_shell_header cctxt hash =
     | Ok shell_header -> return_some shell_header
   in
   let+ shell_header =
-    let res =
-      Blocks_cache.bind blocks_cache hash (function
-          | Some block_info -> Lwt.return_some block_info.header.shell
-          | None -> Lwt.return_none)
-    in
-    match res with Some lwt -> lwt | None -> fetch hash
+    Blocks_cache.bind_or_put headers_cache hash fetch Lwt.return
   in
   match (shell_header, !errors) with
   | None, None ->
