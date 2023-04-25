@@ -34,6 +34,8 @@ type t = {
   neighbors : neighbor list;  (** List of neighbors to reach withing the DAL *)
   listen_addr : P2p_point.Id.t;
       (** The TCP address and port at which this instance can be reached. *)
+  peers : P2p_point.Id.t list;
+      (** A list of P2P peers to connect to at startup. *)
 }
 
 (** [filename config] gets the path to config file *)

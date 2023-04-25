@@ -116,6 +116,7 @@ let config_init_command =
           rpc_port;
           use_unsafe_srs;
           neighbors = [];
+          peers = [];
           listen_addr;
         }
       in

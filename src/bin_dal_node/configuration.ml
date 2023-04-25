@@ -32,6 +32,7 @@ type t = {
   rpc_port : int;
   neighbors : neighbor list;
   listen_addr : P2p_point.Id.t;
+  peers : P2p_point.Id.t list;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -53,6 +54,8 @@ let default_listen_addr =
 
 let default_neighbors = []
 
+let default_peers = []
+
 let default_use_unsafe_srs = false
 
 let neighbor_encoding : neighbor Data_encoding.t =
@@ -65,11 +68,39 @@ let neighbor_encoding : neighbor Data_encoding.t =
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {use_unsafe_srs; data_dir; rpc_addr; rpc_port; listen_addr; neighbors} ->
-      (use_unsafe_srs, data_dir, rpc_addr, rpc_port, listen_addr, neighbors))
-    (fun (use_unsafe_srs, data_dir, rpc_addr, rpc_port, listen_addr, neighbors) ->
-      {use_unsafe_srs; data_dir; rpc_addr; rpc_port; listen_addr; neighbors})
-    (obj6
+    (fun {
+           use_unsafe_srs;
+           data_dir;
+           rpc_addr;
+           rpc_port;
+           listen_addr;
+           neighbors;
+           peers;
+         } ->
+      ( use_unsafe_srs,
+        data_dir,
+        rpc_addr,
+        rpc_port,
+        listen_addr,
+        neighbors,
+        peers ))
+    (fun ( use_unsafe_srs,
+           data_dir,
+           rpc_addr,
+           rpc_port,
+           listen_addr,
+           neighbors,
+           peers ) ->
+      {
+        use_unsafe_srs;
+        data_dir;
+        rpc_addr;
+        rpc_port;
+        listen_addr;
+        neighbors;
+        peers;
+      })
+    (obj7
        (dft
           "use_unsafe_srs"
           ~description:"use unsafe srs for tests"
@@ -91,7 +122,12 @@ let encoding : t Data_encoding.t =
           "neighbors"
           ~description:"DAL Neighbors"
           (list neighbor_encoding)
-          default_neighbors))
+          default_neighbors)
+       (dft
+          "peers"
+          ~description:"P2P addresses of remote peers"
+          (list P2p_point.Id.encoding)
+          default_peers))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 
