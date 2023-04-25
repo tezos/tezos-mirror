@@ -88,14 +88,6 @@ val sc_rollup_node : t -> string
     ["./octez-smart-rollup-client-alpha"]. *)
 val sc_rollup_client : t -> string
 
-(** Get the path of the Tx rollup node of a protocol, such as
-    ["./octez-tx-rollup-node-alpha"]. *)
-val tx_rollup_node : t -> string
-
-(** Get the path of the Tx rollup client of a protocol, such as
-    ["./octez-tx-rollup-client-alpha"]. *)
-val tx_rollup_client : t -> string
-
 (** Get the part of the daemon name that is specific to a protocol (e.g. ["PtEdo2Zk"]).
 
     This should not be used for anything except to compute the name of executables. *)

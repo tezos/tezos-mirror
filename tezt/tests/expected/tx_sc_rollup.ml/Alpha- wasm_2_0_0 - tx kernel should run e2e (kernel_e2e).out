@@ -6,7 +6,7 @@
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1000 --arg 'Pair (Pair "[SMART_ROLLUP_HASH]" "[TX_ROLLUP_PUBLIC_KEY_HASH]") (Pair 450 "Hello, Ticket!")'
+./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1000 --arg 'Pair (Pair "[SMART_ROLLUP_HASH]" "[PUBLIC_KEY_HASH]") (Pair 450 "Hello, Ticket!")'
 Node is bootstrapped.
 Estimated gas: 2330.278 units (will add 100 for safety)
 Estimated storage: 67 bytes added (will add 20 for safety)
@@ -30,7 +30,7 @@ This sequence of operations was run:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
       To: [CONTRACT_HASH]
-      Parameter: (Pair (Pair "[SMART_ROLLUP_HASH]" "[TX_ROLLUP_PUBLIC_KEY_HASH]")
+      Parameter: (Pair (Pair "[SMART_ROLLUP_HASH]" "[PUBLIC_KEY_HASH]")
                        (Pair 450 "Hello, Ticket!"))
       This transaction was successfully applied
       Updated storage: Unit
@@ -45,7 +45,7 @@ This sequence of operations was run:
           Amount: ꜩ0
           From: [CONTRACT_HASH]
           To: [SMART_ROLLUP_HASH]
-          Parameter: (Pair "[TX_ROLLUP_PUBLIC_KEY_HASH]"
+          Parameter: (Pair "[PUBLIC_KEY_HASH]"
                            (Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 450)))
           This transaction was successfully applied
           Consumed gas: 106.960
