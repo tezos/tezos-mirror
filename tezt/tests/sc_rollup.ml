@@ -4597,6 +4597,82 @@ let test_migration_ticket_inbox ~kind ~migrate_from ~migrate_to =
     ~description
     ()
 
+(* Test to cement a commitment pre-migration. *)
+let test_migration_cement ~kind ~migrate_from ~migrate_to =
+  let tags = ["commitment"; "cement"]
+  and description =
+    "Test to cement a commitment made pre migration then publish a new \
+     commitment."
+  and scenario_prior tezos_client ~sc_rollup =
+    let* {commitment_period_in_blocks = commitment_period; _} =
+      get_sc_rollup_constants tezos_client
+    in
+    let* predecessor, starting_level =
+      last_cemented_commitment_hash_with_level ~sc_rollup tezos_client
+    in
+    let inbox_level = starting_level + commitment_period in
+    let* () =
+      repeat (commitment_period + 1) (fun () ->
+          Client.bake_for_and_wait tezos_client)
+    in
+    let* hash =
+      publish_dummy_commitment
+        ~number_of_ticks:1
+        ~inbox_level
+        ~predecessor
+        ~sc_rollup
+        ~src:Constant.bootstrap1.public_key_hash
+        tezos_client
+    in
+    (* This is the equal to commitment forged by
+       [publish_dummy_commitment] *)
+    let commitment : Sc_rollup_client.commitment =
+      {
+        compressed_state = Constant.sc_rollup_compressed_state;
+        inbox_level;
+        predecessor;
+        number_of_ticks = 1;
+      }
+    in
+    return (hash, commitment)
+  and scenario_after tezos_client ~sc_rollup
+      (hash, (commitment : Sc_rollup_client.commitment)) =
+    let* {commitment_period_in_blocks = commitment_period; _} =
+      get_sc_rollup_constants tezos_client
+    in
+    let last_inbox_level = commitment.inbox_level in
+    let* current_level = Client.level tezos_client in
+    let missing_blocks_to_commit =
+      last_inbox_level + commitment_period - current_level + 1
+    in
+    let* () =
+      repeat missing_blocks_to_commit (fun () ->
+          Client.bake_for_and_wait tezos_client)
+    in
+    let* _next_hash =
+      publish_dummy_commitment
+        ~number_of_ticks:1
+        ~inbox_level:(last_inbox_level + commitment_period)
+        ~predecessor:hash
+        ~sc_rollup
+        ~src:Constant.bootstrap1.public_key_hash
+        tezos_client
+    in
+    (* no need to bake more to have the correct level for the
+       cementation because commitment_period = challenge_period and we
+       baked to be able to published a commit. *)
+    cement_commitment ~sc_rollup ~hash tezos_client
+  in
+  test_l1_migration_scenario
+    ~kind
+    ~migrate_from
+    ~migrate_to
+    ~scenario_prior
+    ~scenario_after
+    ~tags
+    ~description
+    ()
+
 let test_injector_auto_discard =
   test_full_scenario
     {
@@ -4824,7 +4900,8 @@ let register ~protocols =
 
 let register_migration ~kind ~migrate_from ~migrate_to =
   test_migration_inbox ~kind ~migrate_from ~migrate_to ;
-  test_migration_ticket_inbox ~kind ~migrate_from ~migrate_to
+  test_migration_ticket_inbox ~kind ~migrate_from ~migrate_to ;
+  test_migration_cement ~kind ~migrate_from ~migrate_to
 
 let register_migration ~migrate_from ~migrate_to =
   register_migration ~kind:"arith" ~migrate_from ~migrate_to ;
