@@ -119,8 +119,14 @@ let check_samples protocols =
   protocol_sample "nonce" ;
   protocol_sample "operation.internal" ;
   protocol_sample "operation" ;
+  protocol_sample
+    ~supports:Protocol.(From_protocol 18)
+    "operation_with_attestation" ;
   protocol_sample "operation.raw" ;
   protocol_sample "operation.unsigned" ;
+  protocol_sample
+    ~supports:Protocol.(From_protocol 18)
+    "operation_with_attestation.unsigned" ;
   protocol_sample "period" ;
   protocol_sample "raw_level" ;
   protocol_sample "seed" ;
