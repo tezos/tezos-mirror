@@ -392,6 +392,13 @@ opam:octez-smart-rollup-client-PtNairob:
 
 # Ignoring unreleased package octez-smart-rollup-client-alpha.
 
+opam:octez-smart-rollup-node:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-smart-rollup-node
+
 opam:octez-smart-rollup-node-PtMumbai:
   extends:
     - .opam_template
@@ -519,7 +526,7 @@ opam:tezos-base-test-helpers:
 opam:tezos-clic:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-clic
 
@@ -673,7 +680,7 @@ opam:tezos-client-base-unix:
 opam:tezos-client-commands:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-client-commands
 
@@ -687,7 +694,7 @@ opam:tezos-client-demo-counter:
 opam:tezos-client-genesis:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-client-genesis
 
@@ -1018,7 +1025,7 @@ opam:tezos-mockup-commands:
 opam:tezos-mockup-proxy:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-mockup-proxy
 
@@ -1264,7 +1271,7 @@ opam:tezos-protocol-plugin-009-PsFLoren:
 opam:tezos-protocol-plugin-009-PsFLoren-registerer:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_1
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: tezos-protocol-plugin-009-PsFLoren-registerer
 
@@ -1387,7 +1394,7 @@ opam:tezos-protocol-plugin-017-PtNairob-registerer:
 opam:tezos-protocol-plugin-alpha:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-protocol-plugin-alpha
 

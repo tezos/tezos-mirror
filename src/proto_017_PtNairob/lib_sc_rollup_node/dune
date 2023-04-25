@@ -36,6 +36,7 @@
   aches
   aches-lwt
   octez-injector
+  octez-smart-rollup-node
   tezos-scoru-wasm
   tezos-scoru-wasm-fast
   tezos-crypto-dal
@@ -62,4 +63,5 @@
   -open Tezos_layer2_store
   -open Octez_crawler
   -open Octez_injector
+  -open Octez_smart_rollup_node
   -open Tezos_crypto_dal))

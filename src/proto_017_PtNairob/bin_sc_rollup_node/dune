@@ -15,6 +15,7 @@
   tezos-client-base-unix
   tezos-client-commands
   tezos-client-017-PtNairob
+  octez-smart-rollup-node
   octez_smart_rollup_node_PtNairob)
  (link_flags
   (:standard)
@@ -31,4 +32,5 @@
   -open Tezos_client_base_unix
   -open Tezos_client_commands
   -open Tezos_client_017_PtNairob
+  -open Octez_smart_rollup_node
   -open Octez_smart_rollup_node_PtNairob))
