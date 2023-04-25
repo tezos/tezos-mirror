@@ -91,6 +91,8 @@ module Make (C : AUTOMATON_CONFIG) :
 
   type unsubscribe = {topic : Topic.t; peer : Peer.t}
 
+  type set_application_score = {peer : Peer.t; score : float}
+
   (* FIXME not sure subtyping for output is useful. If it is, it is
      probably for few ouputs and could be removed. *)
   type _ output =
@@ -152,6 +154,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | Subscribe_to_unknown_peer : [`Subscribe] output
     | Unsubscribed : [`Unsubscribe] output
     | Unsubscribe_from_unknown_peer : [`Unsubscribe] output
+    | Set_application_score : [`Set_application_score] output
 
   type connection = {
     topics : Topic.Set.t;  (** The set of topics the peer subscribed to. *)
@@ -1120,6 +1123,15 @@ module Make (C : AUTOMATON_CONFIG) :
   let leave : leave -> [`Leave] output Monad.t =
    fun {topic} -> Leave.handle topic
 
+  let set_application_score :
+      set_application_score -> [`Set_application_score] output Monad.t =
+   fun {peer; score} ->
+    let open Monad.Syntax in
+    let* () =
+      update_score peer (fun s -> Score.set_application_score s score)
+    in
+    return Set_application_score
+
   module Heartbeat = struct
     let clear_backoff =
       let open Monad.Syntax in
@@ -2081,6 +2093,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | Unsubscribed -> fprintf fmtr "Unsubscribed"
     | Unsubscribe_from_unknown_peer ->
         fprintf fmtr "Unsubscribe_from_unknown_peer"
+    | Set_application_score -> fprintf fmtr "Set_application_score"
 
   module Introspection = struct
     (* This module reexport datatypes so that it can be used for

@@ -459,6 +459,8 @@ module type AUTOMATON = sig
 
   type unsubscribe = {topic : Topic.t; peer : Peer.t}
 
+  type set_application_score = {peer : Peer.t; score : float}
+
   (** Output produced by one of the actions below. *)
   type _ output =
     | Ihave_from_peer_with_low_score : {
@@ -588,6 +590,8 @@ module type AUTOMATON = sig
     | Unsubscribe_from_unknown_peer : [`Unsubscribe] output
         (** The output returned when we receive an unsubscribe message from a
             peer we don't know.*)
+    | Set_application_score : [`Set_application_score] output
+        (** The output returned when we set the application score of a peer *)
 
   (** A type alias for the state monad. *)
   type 'a monad := state -> state * 'a output
@@ -654,6 +658,11 @@ module type AUTOMATON = sig
       returns the set of peers, forming the mesh, that have been pruned for that
       topic. *)
   val leave : leave -> [`Leave] monad
+
+  (** [set_application_score {peer; score}] handles setting the application score
+      of [peer]. If the peer is not known, this does nothing. *)
+  val set_application_score :
+    set_application_score -> [`Set_application_score] monad
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5352
      Handle the random state explicitly for [select_px_peers] and
