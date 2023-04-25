@@ -72,6 +72,19 @@ let rpc_port_arg =
     ~default
     int_parameter
 
+let listen_addr_arg =
+  let default = P2p_point.Id.to_string Configuration.default_listen_addr in
+  Tezos_clic.default_arg
+    ~long:"net-addr"
+    ~placeholder:"ADDR:PORT"
+    ~doc:
+      (Format.sprintf
+         "The TCP address and port at which this instance can be reached. \
+          Default value is %s"
+         default)
+    ~default
+    (Client_config.string_parameter ())
+
 let use_unsafe_srs_for_tests_arg =
   Tezos_clic.switch
     ~long:"use-unsafe-srs-for-tests"
@@ -86,12 +99,25 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure DAL node."
-    (args4 data_dir_arg rpc_addr_arg rpc_port_arg use_unsafe_srs_for_tests_arg)
+    (args5
+       data_dir_arg
+       rpc_addr_arg
+       rpc_port_arg
+       listen_addr_arg
+       use_unsafe_srs_for_tests_arg)
     (prefixes ["init-config"] stop)
-    (fun (data_dir, rpc_addr, rpc_port, use_unsafe_srs) cctxt ->
+    (fun (data_dir, rpc_addr, rpc_port, listen_addr, use_unsafe_srs) cctxt ->
       let open Configuration in
+      let listen_addr = P2p_point.Id.of_string_exn listen_addr in
       let config =
-        {data_dir; rpc_addr; rpc_port; use_unsafe_srs; neighbors = []}
+        {
+          data_dir;
+          rpc_addr;
+          rpc_port;
+          use_unsafe_srs;
+          neighbors = [];
+          listen_addr;
+        }
       in
       let* () = save config in
       let*! _ =

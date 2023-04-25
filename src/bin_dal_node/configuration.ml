@@ -31,6 +31,7 @@ type t = {
   rpc_addr : string;
   rpc_port : int;
   neighbors : neighbor list;
+  listen_addr : P2p_point.Id.t;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -44,6 +45,11 @@ let filename config = relative_filename config.data_dir
 let default_rpc_addr = "127.0.0.1"
 
 let default_rpc_port = 10732
+
+let default_listen_addr =
+  let default_net_host = "[::]" in
+  let default_net_port = 11732 in
+  P2p_point.Id.of_string_exn ~default_port:default_net_port default_net_host
 
 let default_neighbors = []
 
@@ -59,11 +65,11 @@ let neighbor_encoding : neighbor Data_encoding.t =
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {use_unsafe_srs; data_dir; rpc_addr; rpc_port; neighbors} ->
-      (use_unsafe_srs, data_dir, rpc_addr, rpc_port, neighbors))
-    (fun (use_unsafe_srs, data_dir, rpc_addr, rpc_port, neighbors) ->
-      {use_unsafe_srs; data_dir; rpc_addr; rpc_port; neighbors})
-    (obj5
+    (fun {use_unsafe_srs; data_dir; rpc_addr; rpc_port; listen_addr; neighbors} ->
+      (use_unsafe_srs, data_dir, rpc_addr, rpc_port, listen_addr, neighbors))
+    (fun (use_unsafe_srs, data_dir, rpc_addr, rpc_port, listen_addr, neighbors) ->
+      {use_unsafe_srs; data_dir; rpc_addr; rpc_port; listen_addr; neighbors})
+    (obj6
        (dft
           "use_unsafe_srs"
           ~description:"use unsafe srs for tests"
@@ -76,6 +82,11 @@ let encoding : t Data_encoding.t =
           default_data_dir)
        (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
        (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
+       (dft
+          "net-addr"
+          ~description:"P2P address of this node"
+          P2p_point.Id.encoding
+          default_listen_addr)
        (dft
           "neighbors"
           ~description:"DAL Neighbors"

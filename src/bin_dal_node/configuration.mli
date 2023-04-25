@@ -32,6 +32,8 @@ type t = {
   rpc_addr : string;  (** The address the DAL node listens to *)
   rpc_port : int;  (** The port the DAL node listens to *)
   neighbors : neighbor list;  (** List of neighbors to reach withing the DAL *)
+  listen_addr : P2p_point.Id.t;
+      (** The TCP address and port at which this instance can be reached. *)
 }
 
 (** [filename config] gets the path to config file *)
@@ -46,6 +48,9 @@ val default_data_dir : string
 val default_rpc_addr : string
 
 val default_rpc_port : int
+
+(** The default TCP address and port at which this instance can be reached. *)
+val default_listen_addr : P2p_point.Id.t
 
 (** [save config] writes config file in [config.data_dir] *)
 val save : t -> unit tzresult Lwt.t
