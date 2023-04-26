@@ -160,7 +160,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
   type fanout_peers = {peers : Peer.Set.t; last_published_time : time}
 
-  module Message_cache = Message_cache.Make (C.Subconfig)
+  module Message_cache = Message_cache.Make (C.Subconfig) (Time)
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/4983
 
@@ -197,11 +197,6 @@ module Make (C : AUTOMATON_CONFIG) :
              set, we refuse any `graft` from this peer. As a consequence, if a
              backoff is set for a peer and a topic, this peer is not expected
              to be in the mesh of the given topic.  *)
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5302
-       Introduce TTL to [seen_messages]. *)
-    seen_messages : Time.t Message_id.Map.t;
-        (** A map from published messages to their publish time
-            (ie first time the message was seen by the automaton). *)
     message_cache : Message_cache.t;
     rng : Random.State.t;
     heartbeat_ticks : int64;
@@ -289,7 +284,6 @@ module Make (C : AUTOMATON_CONFIG) :
       mesh = Topic.Map.empty;
       fanout = Topic.Map.empty;
       backoff = Topic.Map.empty;
-      seen_messages = Message_id.Map.empty;
       message_cache =
         Message_cache.create
           ~history_slots:limits.history_length
@@ -367,8 +361,6 @@ module Make (C : AUTOMATON_CONFIG) :
     let connections state = state.connections
 
     let scores state = state.scores
-
-    let seen_messages state = state.seen_messages
 
     let peer_filter state = state.parameters.peer_filter
 
@@ -518,16 +510,6 @@ module Make (C : AUTOMATON_CONFIG) :
               message
               topic
               state.message_cache;
-        }
-      in
-      (state, ())
-
-    let put_in_seen_messages message_id state =
-      let now = Time.now () in
-      let state =
-        {
-          state with
-          seen_messages = Message_id.Map.add message_id now state.seen_messages;
         }
       in
       (state, ())
@@ -696,9 +678,9 @@ module Make (C : AUTOMATON_CONFIG) :
     let filter peer message_ids : Message_id.t list Monad.t =
       let open Monad.Syntax in
       let*! peer_filter in
-      let*! seen_messages in
+      let*! message_cache in
       let should_handle_message_id message_id : bool =
-        (not (Message_id.Map.mem message_id seen_messages))
+        (not (Message_cache.seen_message message_id message_cache))
         && peer_filter peer (`IHave message_id)
       in
       List.filter should_handle_message_id message_ids |> return
@@ -927,8 +909,8 @@ module Make (C : AUTOMATON_CONFIG) :
   module Publish = struct
     let check_seen sender topic message_id =
       let open Monad.Syntax in
-      let*! seen_messages in
-      match Message_id.Map.find message_id seen_messages with
+      let*! message_cache in
+      match Message_cache.get_first_seen_time message_id message_cache with
       | None -> unit
       | Some validated -> (
           match sender with
@@ -979,8 +961,6 @@ module Make (C : AUTOMATON_CONFIG) :
           ~some:(fun peer -> Peer.Set.remove peer peers)
           sender
       in
-
-      let* () = put_in_seen_messages message_id in
 
       let* () =
         match sender with
@@ -2106,7 +2086,6 @@ module Make (C : AUTOMATON_CONFIG) :
       mesh : Peer.Set.t Topic.Map.t;
       fanout : fanout_peers Topic.Map.t;
       backoff : time Peer.Map.t Topic.Map.t;
-      seen_messages : time Message_id.Map.t;
       message_cache : Message_cache.t;
       rng : Random.State.t;
       heartbeat_ticks : int64;

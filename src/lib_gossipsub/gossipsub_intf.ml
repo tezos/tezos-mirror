@@ -267,6 +267,10 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
           grafting; this should have a small positive value. *)
   score_parameters : ('topic, 'span) score_parameters;
       (** score-specific parameters. *)
+  seen_history_length : int;
+      (** [seen_history_length] controls the size of the message cache used for
+          recording seen messages. The seen messages cache will remember messages for
+          [seen_history_length] heartbeats. *)
 }
 
 type ('peer, 'message_id) parameters = {
@@ -709,7 +713,6 @@ module type AUTOMATON = sig
       mesh : Peer.Set.t Topic.Map.t;
       fanout : fanout_peers Topic.Map.t;
       backoff : Time.t Peer.Map.t Topic.Map.t;
-      seen_messages : Time.t Message_id.Map.t;
       message_cache : Message_cache.t;
       rng : Random.State.t;
       heartbeat_ticks : int64;
