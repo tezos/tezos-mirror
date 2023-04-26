@@ -330,7 +330,7 @@ module Dune = struct
 
   let glob_files_rec expr = [S "glob_files_rec"; S expr]
 
-  let runtest ?(alias = "runtest") ?action ?package ~dep_files ~dep_globs
+  let runtest ?(alias = "runtest") ?action ?package ?locks ~dep_files ~dep_globs
       ~dep_globs_rec name =
     let deps_dune =
       let files = List.map (fun s -> S s) dep_files in
@@ -343,12 +343,20 @@ module Dune = struct
     let action =
       Option.value ~default:[S "run"; S ("%{dep:./" ^ name ^ ".exe}")] action
     in
-    alias_rule alias ?package ?deps_dune ~action
+    alias_rule alias ?package ?deps_dune ?locks ~action
 
-  let runtest_js ?(alias = "runtest_js") ?package ~dep_files ~dep_globs
+  let runtest_js ?(alias = "runtest_js") ?package ?locks ~dep_files ~dep_globs
       ~dep_globs_rec name =
     let action = [S "run"; S "node"; S ("%{dep:./" ^ name ^ ".bc.js}")] in
-    runtest ~alias ~action ?package ~dep_files ~dep_globs ~dep_globs_rec name
+    runtest
+      ~alias
+      ~action
+      ?package
+      ?locks
+      ~dep_files
+      ~dep_globs
+      ~dep_globs_rec
+      name
 
   let setenv name value followup = [G [S "setenv"; S name; S value]; followup]
 
@@ -999,6 +1007,7 @@ module Target = struct
     | Test_executable of {
         names : string Ne_list.t;
         runtest_alias : string option;
+        locks : string option;
       }
 
   type preprocessor_dep = File of string
@@ -1525,7 +1534,8 @@ module Target = struct
         | Some modes -> List.mem Dune.Native modes
       in
       match (kind, opam, dep_files) with
-      | Test_executable {names; runtest_alias = Some alias}, package, _ ->
+      | Test_executable {names; runtest_alias = Some alias; locks}, package, _
+        ->
           let runtest_js_rules =
             if run_js then
               List.map
@@ -1535,6 +1545,7 @@ module Target = struct
                     ~dep_files
                     ~dep_globs
                     ~dep_globs_rec
+                    ?locks
                     ?package
                     name)
                 (Ne_list.to_list names)
@@ -1549,13 +1560,16 @@ module Target = struct
                     ~dep_files
                     ~dep_globs
                     ~dep_globs_rec
+                    ?locks
                     ?package
                     name)
                 (Ne_list.to_list names)
             else []
           in
           runtest_rules @ runtest_js_rules
-      | Test_executable {names = name, _; runtest_alias = None}, _, _ :: _ ->
+      | ( Test_executable {names = name, _; runtest_alias = None; locks = _},
+          _,
+          _ :: _ ) ->
           invalid_argf
             "for targets which provide test executables such as %S, ~dep_files \
              is only meaningful for the runtest alias. It cannot be used with \
@@ -1671,17 +1685,18 @@ module Target = struct
     | [] -> invalid_argf "Target.private_exes: at least one name must be given"
     | head :: tail -> Private_executable (head, tail)
 
-  let test ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec =
+  let test ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec ?locks =
     let runtest_alias = if alias = "" then None else Some alias in
     internal ?dep_files ?dep_globs ?dep_globs_rec @@ fun test_name ->
-    Test_executable {names = (test_name, []); runtest_alias}
+    Test_executable {names = (test_name, []); runtest_alias; locks}
 
-  let tests ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec =
+  let tests ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec ?locks =
     let runtest_alias = if alias = "" then None else Some alias in
     internal ?dep_files ?dep_globs ?dep_globs_rec @@ fun test_names ->
     match test_names with
     | [] -> invalid_arg "Target.tests: at least one name must be given"
-    | head :: tail -> Test_executable {names = (head, tail); runtest_alias}
+    | head :: tail ->
+        Test_executable {names = (head, tail); runtest_alias; locks}
 
   let vendored_lib ?(released_on_opam = true) ?main_module
       ?(js_compatible = false) ?(npm_deps = []) name version =

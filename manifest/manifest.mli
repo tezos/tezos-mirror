@@ -889,7 +889,8 @@ val private_exes : string list maker
     - [alias]: if non-empty, an alias is set up for the given test, named [alias].
       Default is ["runtest"]. Note that for JS tests, ["_js"] is appended to this alias.
       Also note that if [alias] is non-empty, the target must belong to an opam package
-      (i.e. [~opam] must also be non-empty).
+      (i.e. [~opam] must also be non-empty). If given, [locks] is set for this alias
+      (see {!Dune.alias_rule} for more information).
 
     - [dep_files]: a list of files to add as dependencies using [(deps (file ...))]
       in the [runtest] alias.
@@ -907,6 +908,7 @@ val test :
   ?dep_files:string list ->
   ?dep_globs:string list ->
   ?dep_globs_rec:string list ->
+  ?locks:string ->
   string maker
 
 (** Same as {!test} but with several names, to define multiple tests at once. *)
@@ -915,6 +917,7 @@ val tests :
   ?dep_files:string list ->
   ?dep_globs:string list ->
   ?dep_globs_rec:string list ->
+  ?locks:string ->
   string list maker
 
 (** Register a Tezt test.
