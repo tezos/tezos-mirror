@@ -28,10 +28,10 @@ open Plonk_test
 module HashPV = Poseidon128
 module MerklePV = Gadget.Merkle (HashPV)
 module SchnorrPV = Plompiler.Schnorr (HashPV)
+module Curve = SchnorrPV.Curve
 module Hash = HashPV.P
 module Merkle = MerklePV.P
 module Schnorr = SchnorrPV.P
-module Curve = Mec.Curve.Jubjub.AffineEdwards
 
 let two = Z.of_int 2
 
@@ -412,7 +412,7 @@ module Benchmark (L : LIB) = struct
 
   let make_rollup init_tree tx_list () =
     let* generator =
-      Plompiler_Curve.(input_point @@ affine_to_point Schnorr.g)
+      Plompiler_Curve.(input_point @@ affine_to_point Curve.one)
     in
     let* init_root = Input.scalar init_tree |> input in
     let* inputs_rollup =

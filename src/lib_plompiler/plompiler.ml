@@ -70,9 +70,11 @@ module Gadget = struct
   module PoseidonFull = Gadget_poseidon.PoseidonFull
   module Merkle = Gadget_merkle.Make
   module Merkle_narity = Gadget_merkle_narity
-  module JubjubEdwards = Gadget_edwards.Jubjub
-  module JubjubWeierstrass = Gadget_weierstrass.Jubjub
-  module Schnorr = Gadget_schnorr.Make
+  module JubjubEdwards =
+    Gadget_edwards.MakeAffine (Mec.Curve.Jubjub.AffineEdwards)
+  module JubjubWeierstrass =
+    Gadget_weierstrass.MakeAffine (Mec.Curve.Jubjub.AffineWeierstrass)
+  module Schnorr = Gadget_schnorr.Make (Mec.Curve.Jubjub.AffineEdwards)
   module Blake2s = Gadget_blake2s.Blake2s
   module ArithMod25519 = Gadget_mod_arith.ArithMod25519
 end

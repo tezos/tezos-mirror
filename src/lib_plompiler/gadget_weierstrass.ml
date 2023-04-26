@@ -26,16 +26,6 @@
 open Lang_core
 open Lang_stdlib
 
-module type CURVE_PARAMETERS = sig
-  val a : S.t
-
-  val b : S.t
-
-  val scalar_order : Z.t
-
-  val base_order : Z.t
-end
-
 let zero = S.zero
 
 let one = S.one
@@ -80,15 +70,20 @@ module type AFFINE = functor (L : LIB) -> sig
   val base_order : Z.t
 end
 
-module MakeAffine (Params : CURVE_PARAMETERS) : AFFINE =
+module MakeAffine (Curve : Mec.CurveSig.AffineWeierstrassT) : AFFINE =
 functor
   (L : LIB)
   ->
   struct
-    include Params
     open L
 
     type point = scalar * scalar
+
+    let scalar_order = Curve.Scalar.order
+
+    let base_order = Curve.Base.order
+
+    let param_a = Curve.a |> Curve.Base.to_z |> S.of_z
 
     let input_point ?(kind = `Private) (x, y) =
       Input.(pair (scalar x) (scalar y)) |> input ~kind
@@ -113,8 +108,8 @@ functor
                 |          |
                 ql         qr
       *)
-      let ql = Params.a in
-      let qc = Params.b in
+      let ql = param_a in
+      let qc = Curve.b |> Curve.Base.to_z |> S.of_z in
       let* tmp = Num.custom ~qm:one ~ql ~qc x x2 in
       Num.assert_custom ~ql:mone ~qr:one y2 tmp tmp
 
@@ -140,7 +135,7 @@ functor
       @@
       let x, y = of_pair p in
       (* lambda = (3 * x^2 + a) / (2 * y) *)
-      let* num_lambda = Num.custom ~qm:three x x ~qc:Params.a in
+      let* num_lambda = Num.custom ~qm:three x x ~qc:param_a in
       let* lambda = Num.div ~den_coeff:two num_lambda y in
       (* x_r = lambda^2 - 2 * x *)
       let* lambda_square = Num.square lambda in
@@ -178,21 +173,3 @@ functor
       let result, _ = of_pair res in
       ret result
   end
-
-module Jubjub = MakeAffine (struct
-  let a =
-    S.of_string
-      "52296097456646850916096512823759002727550416093741407922227928430486925478210"
-
-  let b =
-    S.of_string
-      "48351165704696163914533707656614864561753505123260775585269522553028192119009"
-
-  let scalar_order =
-    Z.of_string
-      "6554484396890773809930967563523245729705921265872317281365359162392183254199"
-
-  let base_order =
-    Z.of_string
-      "52435875175126190479447740508185965837690552500527637822603658699938581184513"
-end)

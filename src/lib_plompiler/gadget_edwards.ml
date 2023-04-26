@@ -26,21 +26,7 @@
 open Lang_core
 open Lang_stdlib
 
-module type CURVE_PARAMETERS = sig
-  val a : S.t
-
-  val d : S.t
-
-  val scalar_order : Z.t
-
-  val base_order : Z.t
-end
-
-let zero = S.zero
-
 let one = S.one
-
-let two = S.add one one
 
 let mone = S.negate one
 
@@ -81,15 +67,20 @@ module type AFFINE = functor (L : LIB) -> sig
   val multi_scalar_mul : bool list list repr -> point list repr -> point repr t
 end
 
-module MakeAffine (Params : CURVE_PARAMETERS) : AFFINE =
+module MakeAffine (Curve : Mec.CurveSig.AffineEdwardsT) : AFFINE =
 functor
   (L : LIB)
   ->
   struct
-    include Params
     open L
 
     type point = scalar * scalar
+
+    let scalar_order = Curve.Scalar.order
+
+    let base_order = Curve.Base.order
+
+    let param_d = Curve.(d |> Base.to_z) |> S.of_z
 
     let input_point ?(kind = `Private) (u, v) =
       Input.(pair (scalar u) (scalar v)) |> input ~kind
@@ -112,7 +103,7 @@ functor
       (* -1 * u^2 + 1 * v^2 - d * u^2 v^2 -  1  = 0  *)
       (*  |         |         |              |    |  *)
       (*  ql        qr        qm             qc   qo *)
-      let qm = S.(negate Params.d) in
+      let qm = S.(negate param_d) in
       (* The last wire is multiplied by 0 so we can put any value, we chose u here. *)
       let* o = Num.custom ~qc:mone ~ql:mone ~qr:one ~qm u2 v2 in
       Num.is_zero o
@@ -190,19 +181,3 @@ functor
         init
         List.(map to_list (tl ls))
   end
-
-module Jubjub = MakeAffine (struct
-  let a = mone
-
-  let d =
-    S.of_string
-      "19257038036680949359750312669786877991949435402254120286184196891950884077233"
-
-  let scalar_order =
-    Z.of_string
-      "6554484396890773809930967563523245729705921265872317281365359162392183254199"
-
-  let base_order =
-    Z.of_string
-      "52435875175126190479447740508185965837690552500527637822603658699938581184513"
-end)

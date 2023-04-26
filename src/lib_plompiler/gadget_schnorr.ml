@@ -23,22 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Curve = Mec.Curve.Jubjub.AffineEdwards
+module Make
+    (Curve : Mec.CurveSig.AffineEdwardsT) (H : sig
+      module P : Hash_sig.P_HASH
 
-module Make (H : sig
-  module P : Hash_sig.P_HASH
-
-  module V : Hash_sig.HASH
-end) =
+      module V : Hash_sig.HASH
+    end) =
 struct
+  module Curve = Curve
   open Lang_core
 
   (* vanilla implementation of Schnorr signature using ec-jubjub
      * general idea based on
      * https://github.com/dusk-network/schnorr/blob/main/src/key_variants/single_key.rs *)
   module P : sig
-    val g : Curve.t
-
     type pk = Curve.t
 
     type signature = {
@@ -66,13 +64,6 @@ struct
     (* S.t and Curve.t are the same but Curve.t is abstract *)
     let of_bls_scalar s = S.of_z (Curve.Base.to_z s)
 
-    let g =
-      Curve.from_coordinates_exn
-        ~u:
-          (Curve.Base.of_string
-             "0x3fd2814c43ac65a6f1fbf02d0fd6cce62e3ebb21fd6c54ed4df7b7ffec7beaca")
-        ~v:(Curve.Base.of_string "0x12")
-
     type sk = Curve.Scalar.t
 
     type pk = Curve.t
@@ -83,7 +74,7 @@ struct
       c_bytes : bool list;
     }
 
-    let neuterize sk = Curve.mul g sk
+    let neuterize sk = Curve.mul Curve.one sk
 
     let bls_scalar_to_curve_scalar s = Curve.Scalar.of_z (S.to_z s)
 
@@ -93,7 +84,7 @@ struct
       H.get ctx
 
     let sign ?(compressed = false) sk msg rand =
-      let r = Curve.mul g rand in
+      let r = Curve.mul Curve.one rand in
       let r_u = Curve.get_u_coordinate r |> of_bls_scalar in
       let r_v = Curve.get_v_coordinate r |> of_bls_scalar in
       let c =
@@ -127,7 +118,7 @@ struct
       let c_check = S.eq c sig_c in
       let challenge_r =
         Curve.add
-          (Curve.mul g sig_u)
+          (Curve.mul Curve.one sig_u)
           (Curve.mul
              pk
              (Curve.Scalar.of_z @@ Utils.bool_list_to_z signature.c_bytes))
@@ -140,7 +131,7 @@ struct
 
   module V : functor (L : LIB) -> sig
     open L
-    open Jubjub(L)
+    open MakeAffine(Curve)(L)
     open Encoding.Encodings(L)
 
     (* TODO make abstract once compression is done with encodings *)
@@ -157,8 +148,6 @@ struct
     val signature_encoding :
       (P.signature, signature, bool list * (pk * bool list)) encoding
 
-    val g : Curve.t
-
     val verify :
       ?compressed:bool ->
       g:point repr ->
@@ -174,7 +163,7 @@ struct
     struct
       open L
 
-      open Jubjub (L)
+      open MakeAffine (Curve) (L)
 
       open H.V (L)
 
@@ -217,8 +206,6 @@ struct
              (atomic_list_encoding bool_encoding)
              point_encoding
              (atomic_list_encoding bool_encoding))
-
-      let g = P.g
 
       (* In the compressed variant, we drop sig_r_v of the challenge input as it
          can be represented with a single bit: its parity (because of Edwards curves
