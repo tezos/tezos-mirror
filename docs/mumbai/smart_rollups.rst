@@ -336,16 +336,19 @@ the Octez client:
 
 .. code:: sh
 
-    octez-client originate smart rollup from "${OPERATOR_ADDR}" \
+    octez-client originate smart rollup "${SOR_ALIAS}" \
+      from "${OPERATOR_ADDR}" \
       of kind wasm_2_0_0 \
       of type bytes \
       with kernel "${KERNEL}" \
       --burn-cap 999
 
-where ``${KERNEL}`` is a hex representation of a WebAssembly
-bytecode serving as an initial program to boot on. From a
-WASM bytecode file named ``kernel.wasm``, such representation
-can be obtained through
+where ``${SOR_ALIAS}`` is an alias to memorize the smart rollup
+address in the client. This alias can be used in any command where a
+smart rollup address is expected. ``${KERNEL}`` is a hex
+representation of a WebAssembly bytecode serving as an initial program
+to boot on. From a WASM bytecode file named ``kernel.wasm``, such
+representation can be obtained through
 
 .. code:: sh
 
@@ -418,7 +421,7 @@ The rollup node can then be run with:
 .. code:: sh
 
    octez-smart-rollup-node-alpha --base-dir "${OCLIENT_DIR}" \
-                    run operator for "${SOR_ADDR}" \
+                    run operator for "${SOR_ALIAS_OR_ADDR}" \
                     with operators "${OPERATOR_ADDR}" \
                     --data-dir "${ROLLUP_NODE_DIR}"
 
@@ -489,7 +492,7 @@ uses the same arguments as the ``run`` command:
 .. code:: sh
 
    octez-smart-rollup-node-alpha --base-dir "${OCLIENT_DIR}" \
-                    init operator config for "${SOR_ADDR}" \
+                    init operator config for "${SOR_ALIAS_OR_ADDR}" \
                     with operators "${OPERATOR_ADDR}" \
                     --data-dir "${ROLLUP_NODE_DIR}"
 
@@ -627,7 +630,7 @@ Finally, the execution of the outbox message is done as follows:
 .. code:: sh
 
    "${TEZOS_PATH}/octez-client" -d "${OCLIENT_DIR}" -p PtMumbai \
-           execute outbox message of smart rollup "${SOR_ADDR}" \
+           execute outbox message of smart rollup "${SOR_ALIAS_OR_ADDR}" \
            from "${OPERATOR_ADDR}" for commitment hash "${LCC}" \
            and output proof "${PROOF}"
 
@@ -657,7 +660,8 @@ Remember that our running example rollup has been originated with:
 
 .. code:: sh
 
-    octez-client originate smart rollup from "${OPERATOR_ADDR}" \
+    octez-client originate smart rollup "${SOR_ALIAS}" \
+      from "${OPERATOR_ADDR}" \
       of kind wasm_2_0_0 \
       of type bytes \
       booting with "${KERNEL}" \
@@ -1274,7 +1278,7 @@ evaluate the WASM PVM without relying on any node and network:
 
 .. code:: sh
 
-  octez-smart-rollup-wasm-debugger ${WASM_FILE} --inputs ${JSON_INPUTS} --rollup ${ROLLUP_ADDRESS}
+  octez-smart-rollup-wasm-debugger "${WASM_FILE}" --inputs "${JSON_INPUTS}" --rollup "${SOR_ADDR}"
 
 ``octez-smart-rollup-wasm-debugger`` takes as its argument the WASM kernel to be debugged, either a a ``.wasm`` file (the binary
 representation of WebAssembly modules) or as a ``.wast`` file (its textual
