@@ -31,16 +31,8 @@ let is_connected node ~peer_id =
   | code ->
       Test.fail "unexpected response code in Bootstrap.is_connected: %d" code
 
-let wait_for_unknown_ancestor node =
-  let filter json =
-    let err_id = JSON.(json |-> "error" |=> 0 |-> "id" |> as_string) in
-    if err_id = "node.peer_validator.unknown_ancestor" then Some () else None
-  in
-  Node.wait_for
-    node
-    "request_error.v0"
-    ~where:"[1].event.error[0].id is node.peer_validator.unknown_ancestor"
-    filter
+let wait_for_insufficient_history node =
+  Node.wait_for node "insufficient_history.v0" (fun _ -> Some ())
 
 (* FIXME: this is not robust since we cannot catch the bootstrapped event precisely. *)
 let bootstrapped_event =
@@ -235,7 +227,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
              Test.fail
                "node_2 is not supposed to progress when node_1 is in rolling \
                 mode");
-            wait_for_unknown_ancestor node_2;
+            wait_for_insufficient_history node_2;
           ]
   in
   let* () = Client.Admin.connect_address client ~peer:node_2 in

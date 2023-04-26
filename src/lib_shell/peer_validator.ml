@@ -109,9 +109,13 @@ let bootstrap_new_branch w unknown_prefix =
       unknown_prefix
   in
   pv.pipeline <- Some pipeline ;
+  let worker_canceler = Worker.canceler w in
+  Lwt_canceler.on_cancel worker_canceler (fun () ->
+      pv.pipeline <- None ;
+      Bootstrap_pipeline.cancel pipeline) ;
   let* () =
     protect
-      ~canceler:(Worker.canceler w)
+      ~canceler:worker_canceler
       ~on_error:(fun error ->
         (* if the peer_validator is killed, let's cancel the pipeline *)
         pv.pipeline <- None ;
@@ -414,7 +418,7 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
             ( pv.peer_id,
               Format.asprintf "unknown ancestor or too short locator: kick" )
         in
-        let* () = Events.(emit request_error) (request_view, st, err) in
+        let* () = Events.(emit insufficient_history) pv.peer_id in
         Worker.trigger_shutdown w ;
         return_ok_unit
     | Distributed_db.Operations.Canceled _ :: _ -> (
@@ -442,6 +446,14 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
             Prometheus.Counter.inc_one
               metrics.operations_fetching_canceled_new_branch ;
             Lwt.return_error err)
+    | Canceled :: _ ->
+        let* () =
+          Events.(emit terminating_worker)
+            (pv.peer_id, Format.asprintf "canceled")
+        in
+        let* () = Peer_validator_events.(emit peer_disconnection) pv.peer_id in
+        Worker.trigger_shutdown w ;
+        return_ok_unit
     | _ ->
         Prometheus.Counter.inc_one metrics.unknown_error ;
         let* () = Events.(emit request_error) (request_view, st, err) in
