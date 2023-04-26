@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A sliding window map of message ids.  *)
 module Sliding_message_id_map (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) : sig
   (** A data structure containing a mapping from message ids to values of type
       ['a]. Message ids are grouped by topic and by slot (which is a just an
@@ -32,8 +31,9 @@ module Sliding_message_id_map (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) : sig
 
   type 'a t
 
-  (** An empty map.  *)
-  val empty : 'a t
+  (** [make ~window_size] creates an empty map with window size [window_size].
+      This means that the values will be removed from the map after [window_size] shifts. *)
+  val make : window_size:int -> 'a t
 
   (** [add topic message_id ~update_value t] adds an entry to the map for [message_id] with [topic].
       [update_value] is used to update the value stored for [message_id]. *)
@@ -60,7 +60,7 @@ module Sliding_message_id_map (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) : sig
     slots:int -> 'a t -> (Int64.t * C.Message_id.t list C.Topic.Map.t) Seq.t
 
   (** Shifts the sliding window by one slot. *)
-  val shift : history_slots:int -> 'a t -> 'a t
+  val shift : 'a t -> 'a t
 
   module Internal_for_tests : sig
     val get_values : 'a t -> (C.Message_id.t * 'a) Seq.t
@@ -92,14 +92,16 @@ end = struct
             separately, see next field. *)
     latest_slot_entry : slot_entry;
     latest_slot : Int64.t;
+    window_size : int;
   }
 
-  let empty =
+  let make ~window_size =
     {
       values_with_counter = Message_id.Map.empty;
       slot_entries = Map.empty;
       latest_slot_entry = Topic.Map.empty;
       latest_slot = 0L;
+      window_size;
     }
 
   let add topic message_id ~update_value t =
@@ -154,7 +156,7 @@ end = struct
     in
     Seq.cons (t.latest_slot, t.latest_slot_entry) slots
 
-  let shift ~history_slots t =
+  let shift t =
     let drop_old_values oldest_entries =
       Topic.Map.fold
         (fun _topic message_ids messages ->
@@ -181,12 +183,13 @@ end = struct
     match Map.min_binding slot_entries with
     | None -> {t with slot_entries; latest_slot; latest_slot_entry}
     | Some (first_slot, entry) ->
-        if Int64.(sub latest_slot first_slot < of_int history_slots) then
+        if Int64.(sub latest_slot first_slot < of_int t.window_size) then
           {
             slot_entries;
             latest_slot;
             latest_slot_entry;
             values_with_counter = t.values_with_counter;
+            window_size = t.window_size;
           }
         else
           {
@@ -194,6 +197,7 @@ end = struct
             latest_slot_entry;
             latest_slot;
             values_with_counter = drop_old_values entry;
+            window_size = t.window_size;
           }
 
   module Internal_for_tests = struct
@@ -204,7 +208,10 @@ end = struct
   end
 end
 
-module Make (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) = struct
+module Make
+    (C : Gossipsub_intf.AUTOMATON_SUBCONFIG)
+    (Time : Gossipsub_intf.TIME) =
+struct
   module Peer = C.Peer
   module Topic = C.Topic
   module Message_id = C.Message_id
@@ -217,15 +224,21 @@ module Make (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) = struct
   }
 
   type t = {
-    history_slots : int;
     gossip_slots : int;
     messages : message_with_access_counter Sliding_message_id_map.t;
+    first_seen_times : Time.t Sliding_message_id_map.t;
   }
 
-  let create ~history_slots ~gossip_slots =
+  let create ~history_slots ~gossip_slots ~seen_message_slots =
     assert (gossip_slots > 0) ;
     assert (gossip_slots <= history_slots) ;
-    {history_slots; gossip_slots; messages = Sliding_message_id_map.empty}
+    assert (seen_message_slots > 0) ;
+    {
+      gossip_slots;
+      messages = Sliding_message_id_map.make ~window_size:history_slots;
+      first_seen_times =
+        Sliding_message_id_map.make ~window_size:seen_message_slots;
+    }
 
   let add_message message_id message topic t =
     let messages =
@@ -237,7 +250,15 @@ module Make (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) = struct
           | Some m -> Some m)
         t.messages
     in
-    {t with messages}
+    let first_seen_times =
+      Sliding_message_id_map.add
+        topic
+        message_id
+        ~update_value:(function
+          | None -> Some (Time.now ()) | Some time -> Some time)
+        t.first_seen_times
+    in
+    {t with messages; first_seen_times}
 
   let get_message_for_peer peer message_id t =
     let access_count = ref 0 in
@@ -275,11 +296,18 @@ module Make (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) = struct
            | Some message_ids -> List.rev_append message_ids acc_message_ids)
          []
 
+  let get_first_seen_time message_id t =
+    Sliding_message_id_map.get_value message_id t.first_seen_times
+
+  let seen_message message_id t =
+    Option.is_some
+    @@ Sliding_message_id_map.get_value message_id t.first_seen_times
+
   let shift t =
     {
       t with
-      messages =
-        Sliding_message_id_map.shift ~history_slots:t.history_slots t.messages;
+      messages = Sliding_message_id_map.shift t.messages;
+      first_seen_times = Sliding_message_id_map.shift t.first_seen_times;
     }
 
   module Internal_for_tests = struct

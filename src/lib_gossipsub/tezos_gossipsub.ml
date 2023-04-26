@@ -293,7 +293,8 @@ module Make (C : AUTOMATON_CONFIG) :
       message_cache =
         Message_cache.create
           ~history_slots:limits.history_length
-          ~gossip_slots:limits.history_gossip_length;
+          ~gossip_slots:limits.history_gossip_length
+          ~seen_message_slots:limits.seen_history_length;
       rng;
       heartbeat_ticks = 0L;
     }

@@ -113,7 +113,9 @@ let test_message_cache () =
     ~title:"Gossipsub/Message Cache: Test message cache"
     ~tags:["gossipsub"; "cache"; "message_cache"]
   @@ fun () ->
-  let m = Message_cache.create ~gossip_slots:3 ~history_slots:5 in
+  let m =
+    Message_cache.create ~gossip_slots:3 ~history_slots:5 ~seen_message_slots:99
+  in
   let topic = "topic" in
   let message_batches =
     [|

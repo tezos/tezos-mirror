@@ -81,6 +81,7 @@ let default_limits =
     opportunistic_graft_ticks = 60L;
     opportunistic_graft_peers = 2;
     opportunistic_graft_threshold = 1.;
+    seen_history_length = 120;
     score_parameters;
   }
 

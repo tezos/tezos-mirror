@@ -221,6 +221,7 @@ let pp_limits fmtr
     opportunistic_graft_ticks;
     opportunistic_graft_peers;
     opportunistic_graft_threshold;
+    seen_history_length;
     score_parameters;
   } =
     l
@@ -256,6 +257,7 @@ let pp_limits fmtr
      opportunistic_graft_ticks = %Ld;@;\
      opportunistic_graft_peers = %d;@;\
      opportunistic_graft_threshold = %f;@;\
+     seen_history_length = %d;@;\
      score_parameters= %a }@]"
     max_recv_ihave_per_heartbeat
     max_sent_iwant_per_heartbeat
@@ -291,6 +293,7 @@ let pp_limits fmtr
     opportunistic_graft_ticks
     opportunistic_graft_peers
     opportunistic_graft_threshold
+    seen_history_length
     pp_score_parameters
     score_parameters
 
@@ -332,4 +335,6 @@ end
 
 module Worker = Tezos_gossipsub.Worker (Worker_config)
 module Message_cache =
-  Tezos_gossipsub.Internal_for_tests.Message_cache (Automaton_config.Subconfig)
+  Tezos_gossipsub.Internal_for_tests.Message_cache
+    (Automaton_config.Subconfig)
+    (Automaton_config.Time)
