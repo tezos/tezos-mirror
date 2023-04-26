@@ -31,24 +31,24 @@ pub enum TransactionError {
     DecoderError(#[from] DecoderError),
 
     #[error("Error extracting a slice")]
-    SlicingError(),
+    SlicingError,
 
     #[error("Error manipulating ECDSA key")]
-    ECDSAError(),
+    ECDSAError,
 
     #[error("Error recomputing parity of signature")]
-    Parity(),
+    Parity,
 }
 
 impl From<libsecp256k1::Error> for TransactionError {
     fn from(_: libsecp256k1::Error) -> Self {
-        Self::ECDSAError()
+        Self::ECDSAError
     }
 }
 
 impl From<TryFromSliceError> for TransactionError {
     fn from(_: TryFromSliceError) -> Self {
-        Self::SlicingError()
+        Self::SlicingError
     }
 }
 /// produces address from a secret key
@@ -56,7 +56,7 @@ pub fn string_to_sk_and_address(
     s: String,
 ) -> Result<(SecretKey, EthereumAddress), TransactionError> {
     let mut data: [u8; 32] = [0u8; 32];
-    let () = hex::decode_to_slice(s, &mut data)?;
+    hex::decode_to_slice(s, &mut data)?;
     let sk = SecretKey::parse(&data)?;
     let pk = PublicKey::from_secret_key(&sk);
     let serialised = &pk.serialize()[1..];
@@ -132,6 +132,15 @@ impl EthereumTransactionCommon {
         Message::parse(&hash)
     }
 
+    /// recompute parity from v and chain_id
+    fn compute_parity(&self) -> Option<U256> {
+        let chain_id_encoding = self
+            .chain_id
+            .checked_mul(U256::from(2))?
+            .checked_add(U256::from(35))?;
+        self.v.checked_sub(chain_id_encoding)
+    }
+
     /// Extracts the signature from an EthereumTransactionCommon
     pub fn signature(&self) -> Result<(Signature, RecoveryId), TransactionError> {
         // copy r to Scalar
@@ -145,10 +154,8 @@ impl EthereumTransactionCommon {
         let mut s = Scalar([0; 8]);
         let _ = s.set_b32(&s1);
         // recompute parity from v and chain_id
-        let ri_val =
-            U256::checked_sub(self.v, self.chain_id * U256::from(2) + U256::from(35))
-                .ok_or(TransactionError::Parity());
-        let ri = RecoveryId::parse(ri_val?.byte(0))?;
+        let ri_val = self.compute_parity().ok_or(TransactionError::Parity)?;
+        let ri = RecoveryId::parse(ri_val.byte(0))?;
         Ok((Signature { r, s }, ri))
     }
     /// Find the caller address from r and s of the common data
@@ -165,6 +172,21 @@ impl EthereumTransactionCommon {
 
         Ok(EthereumAddress::from(value))
     }
+
+    /// compute v from parity and chain_id
+    fn compute_v(&self, parity: u8) -> Option<U256> {
+        if self.chain_id == U256::zero() {
+            // parity is 0 or 1
+            Some((27 + parity).into())
+        } else {
+            let chain_id_encoding = self
+                .chain_id
+                .checked_mul(U256::from(2))?
+                .checked_add(U256::from(35))?;
+            U256::from(parity).checked_add(chain_id_encoding)
+        }
+    }
+
     ///produce a signed EthereumTransactionCommon. If the initial one was signed
     ///  you should get the same thing.
     pub fn sign_transaction(&self, string_sk: String) -> Result<Self, TransactionError> {
@@ -176,11 +198,7 @@ impl EthereumTransactionCommon {
         let (r, s) = (H256::from(r.b32()), H256::from(s.b32()));
 
         let parity: u8 = ri.into();
-        let v = if self.chain_id == U256::zero() {
-            (27 + parity).into()
-        } else {
-            U256::from(parity) + U256::from(2) * self.chain_id + U256::from(35)
-        };
+        let v = self.compute_v(parity).ok_or(TransactionError::Parity)?;
         Ok(EthereumTransactionCommon {
             v,
             r,
@@ -1140,7 +1158,42 @@ mod test {
         // check signature fails gracefully
         assert!(
             transaction.signature().is_err(),
-            "testing parity is invalid"
+            "testing signature checking fails gracefully"
+        );
+    }
+
+    #[test]
+    fn test_signature_invalid_chain_id_fails_gracefully() {
+        // most data is not relevant here, the point is to test failure mode of signature verification
+        let transaction = EthereumTransactionCommon {
+            chain_id: U256::max_value(), // chain_id will overflow parity computation
+            ..basic_eip155_transaction()
+        };
+
+        // check signature fails gracefully
+        assert!(
+            transaction.signature().is_err(),
+            "testing signature checking fails gracefully"
+        );
+    }
+
+    #[test]
+    fn test_sign_invalid_chain_id_fails_gracefully() {
+        // most data is not relevant here, the point is to test failure mode of signature verification
+        let transaction = EthereumTransactionCommon {
+            chain_id: U256::max_value(),
+            ..basic_eip155_transaction_unsigned()
+        };
+
+        // check signature fails gracefully
+        assert!(
+            transaction
+                .sign_transaction(
+                    "4646464646464646464646464646464646464646464646464646464646464646"
+                        .to_string()
+                )
+                .is_err(),
+            "testing signature fails gracefully"
         );
     }
 }
