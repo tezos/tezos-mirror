@@ -58,3 +58,7 @@ Internal
   type. (MR :gl:`!8546`)
 
 - Add an internal represention case for the ``UNIT`` Michelson instruction. (MR :gl:`!8579`)
+
+- Encoding that supports ``endorsement`` kind in JSON are now suffixed with
+  ``_with_legacy_attestation_name``. Non legacy encoding supports
+  ``attestation`` kind. (MR :gl:`!8563`)
