@@ -27,7 +27,7 @@
     the number of accesses to a message by a peer, thus indirectly tracking the
     number of IWant requests a peer makes for the same message.
 
-    The module assumes that no two messages have the same message id. However,
+    The module assumes that no two different messages have the same message id. However,
     the cache stores duplicates; for instance, if [add_message id msg topic] is
     called twice, then [msg] will appear (at least) twice in
     [get_message_ids_to_gossip]'s result (assuming not more than [gossip_slots]

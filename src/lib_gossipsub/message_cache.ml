@@ -23,115 +23,139 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) = struct
-  module Peer = C.Peer
+(** A sliding window map of message ids.  *)
+module Sliding_message_id_map (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) : sig
+  (** A data structure containing a mapping from message ids to values of type
+      ['a]. Message ids are grouped by topic and by slot (which is a just an
+      integer). The grouping by slots is used to remove entries from old slots,
+      thus it allows to use this data structure as a sliding window. *)
+
+  type 'a t
+
+  (** An empty map.  *)
+  val empty : 'a t
+
+  (** [add topic message_id ~update_value t] adds an entry to the map for [message_id] with [topic].
+      [update_value] is used to update the value stored for [message_id]. *)
+  val add :
+    C.Topic.t ->
+    C.Message_id.t ->
+    update_value:('a option -> 'a option) ->
+    'a t ->
+    'a t
+
+  (** [update_value message_id f t] updates the value stored for key [message_id]
+      by applying [f] to the stored value. Returns [None] if no value was stored
+      for the [message_id], and otherwise returns [Some (t, value)] where [t] is the new map
+      and [value] is the updated value. *)
+  val update_value : C.Message_id.t -> ('a -> 'a) -> 'a t -> ('a t * 'a) option
+
+  (** [get_value message_id t] returns the value stored for key [message_id].
+      Returns [None] if nothing is stored. *)
+  val get_value : C.Message_id.t -> 'a t -> 'a option
+
+  (** [get_message_ids ~slots t] returns the [topic] to [message list] mapping
+      for the past [slots] slots. *)
+  val get_latest_message_ids :
+    slots:int -> 'a t -> (Int64.t * C.Message_id.t list C.Topic.Map.t) Seq.t
+
+  (** Shifts the sliding window by one slot. *)
+  val shift : history_slots:int -> 'a t -> 'a t
+
+  module Internal_for_tests : sig
+    val get_values : 'a t -> (C.Message_id.t * 'a) Seq.t
+  end
+end = struct
   module Topic = C.Topic
   module Message_id = C.Message_id
-  module Message = C.Message
-
-  type message_with_counters = {
-    message : Message.t;
-    store_counter : int;
-    (* This field is used to count how many times the message has been added to
-       the cache. Normally the caller ensures that the same messages (that is,
-       with the same id) is not insert twice; however, this module does not make
-       this assumption. *)
-    access_counters : int Peer.Map.t;
-  }
-
-  (* A slot is just an index, normally a heartbeat tick, and this is why the
-     same type, namely [Int64], is used. Note that a bigger slots is a more
-     recent slot. *)
-  module SlotMap = Map.Make (Int64)
 
   type slot_entry = Message_id.t list Topic.Map.t
 
-  type t = {
-    history_slots : int;
-    gossip_slots : int;
-    messages : message_with_counters Message_id.Map.t;
-    cache : slot_entry SlotMap.t;
-        (** The cache without the entry for the last slot, which is stored
-            separately, see next field. *)
-    last_slot_entry : slot_entry;
-    last_slot : Int64.t;
+  (* A slot is just an index, normally a heartbeat tick, and this is why the
+     same type, namely [Int64], is used. Note that a bigger slot is a more
+     recent slot. *)
+  module Map = Map.Make (Int64)
+
+  type 'a value_with_counter = {
+    value : 'a;
+    store_counter : int;
+        (* This field is used to count how many times the message has been added to
+           the map. Normally the caller ensures that the same messages (that is,
+           with the same id) is not inserted twice; however, this module does not make
+           this assumption. *)
   }
 
-  let create ~history_slots ~gossip_slots =
-    assert (gossip_slots > 0) ;
-    assert (gossip_slots <= history_slots) ;
+  type 'a t = {
+    values_with_counter : 'a value_with_counter Message_id.Map.t;
+    slot_entries : slot_entry Map.t;
+        (** The slot entries without the entry for the last slot, which is stored
+            separately, see next field. *)
+    latest_slot_entry : slot_entry;
+    latest_slot : Int64.t;
+  }
+
+  let empty =
     {
-      history_slots;
-      gossip_slots;
-      messages = Message_id.Map.empty;
-      cache = SlotMap.empty;
-      last_slot_entry = Topic.Map.empty;
-      last_slot = 0L;
+      values_with_counter = Message_id.Map.empty;
+      slot_entries = Map.empty;
+      latest_slot_entry = Topic.Map.empty;
+      latest_slot = 0L;
     }
 
-  let add_message message_id message topic t =
-    let last_slot_entry =
+  let add topic message_id ~update_value t =
+    let latest_slot_entry =
       Topic.Map.update
         topic
         (function
           | None -> Some [message_id]
           | Some message_ids -> Some (message_id :: message_ids))
-        t.last_slot_entry
+        t.latest_slot_entry
     in
-    let messages =
+    let values_with_counter =
       Message_id.Map.update
         message_id
         (function
           | None ->
-              Some
-                {message; store_counter = 1; access_counters = Peer.Map.empty}
-          | Some {message; store_counter; access_counters} ->
-              Some {message; store_counter = store_counter + 1; access_counters})
-        t.messages
+              update_value None
+              |> Option.map (fun value -> {value; store_counter = 1})
+          | Some {value; store_counter} ->
+              update_value (Some value)
+              |> Option.map (fun value ->
+                     {value; store_counter = store_counter + 1}))
+        t.values_with_counter
     in
-    {t with messages; last_slot_entry}
+    {t with latest_slot_entry; values_with_counter}
 
-  let get_message_for_peer peer message_id t =
-    match Message_id.Map.find message_id t.messages with
-    | None -> None
-    | Some {message; store_counter; access_counters} ->
-        let counter = ref 1 in
-        let access_counters =
-          Peer.Map.update
-            peer
-            (function
-              | None -> Some 1
-              | Some c ->
-                  counter := c + 1 ;
-                  Some !counter)
-            access_counters
-        in
-        let t =
-          {
-            t with
-            messages =
-              Message_id.Map.add
-                message_id
-                {message; store_counter; access_counters}
-                t.messages;
-          }
-        in
-        Some (t, message, !counter)
+  let update_value message_id f t =
+    let updated_value = ref None in
+    let values_with_counter =
+      Message_id.Map.update
+        message_id
+        (function
+          | None -> None
+          | Some {value; store_counter} ->
+              let value = f value in
+              updated_value := Some value ;
+              Some {value; store_counter})
+        t.values_with_counter
+    in
+    !updated_value
+    |> Option.map (fun value -> ({t with values_with_counter}, value))
 
-  let get_message_ids_to_gossip topic t =
-    SlotMap.to_rev_seq t.cache
-    |> Seq.take ~when_negative_length:() (t.gossip_slots - 1)
-    |> WithExceptions.Result.get_ok ~loc:__LOC__
-    |> Seq.cons (t.last_slot, t.last_slot_entry)
-    |> Seq.fold_left
-         (fun acc_message_ids (_slot, entries) ->
-           match Topic.Map.find topic entries with
-           | None -> acc_message_ids
-           | Some message_ids -> List.rev_append message_ids acc_message_ids)
-         []
+  let get_value message_id t =
+    Message_id.Map.find message_id t.values_with_counter
+    |> Option.map (fun {value; _} -> value)
 
-  let shift t =
-    let drop_old_messages oldest_entries =
+  let get_latest_message_ids ~slots t =
+    let slots =
+      Map.to_rev_seq t.slot_entries
+      |> Seq.take ~when_negative_length:() (slots - 1)
+      |> WithExceptions.Result.get_ok ~loc:__LOC__
+    in
+    Seq.cons (t.latest_slot, t.latest_slot_entry) slots
+
+  let shift ~history_slots t =
+    let drop_old_values oldest_entries =
       Topic.Map.fold
         (fun _topic message_ids messages ->
           List.fold_left
@@ -140,36 +164,127 @@ module Make (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) = struct
                 message_id
                 (function
                   | None -> None
-                  | Some {message; store_counter; access_counters} ->
+                  | Some {value; store_counter} ->
                       if store_counter = 1 then None
-                      else
-                        Some
-                          {
-                            message;
-                            store_counter = store_counter - 1;
-                            access_counters;
-                          })
+                      else Some {value; store_counter = store_counter - 1})
                 messages)
             messages
             message_ids)
         oldest_entries
-        t.messages
+        t.values_with_counter
     in
-    let cache = SlotMap.add t.last_slot t.last_slot_entry t.cache in
-    let last_slot = Int64.succ t.last_slot in
-    let cache, messages =
-      match SlotMap.min_binding cache with
-      | None -> (* impossible *) (cache, t.messages)
-      | Some (first_slot, entries) ->
-          if Int64.(sub last_slot first_slot < of_int t.history_slots) then
-            (cache, t.messages)
-          else (SlotMap.remove first_slot cache, drop_old_messages entries)
+    let slot_entries =
+      Map.add t.latest_slot t.latest_slot_entry t.slot_entries
     in
-    {t with cache; messages; last_slot; last_slot_entry = Topic.Map.empty}
+    let latest_slot = Int64.succ t.latest_slot in
+    let latest_slot_entry = Topic.Map.empty in
+    match Map.min_binding slot_entries with
+    | None -> {t with slot_entries; latest_slot; latest_slot_entry}
+    | Some (first_slot, entry) ->
+        if Int64.(sub latest_slot first_slot < of_int history_slots) then
+          {
+            slot_entries;
+            latest_slot;
+            latest_slot_entry;
+            values_with_counter = t.values_with_counter;
+          }
+        else
+          {
+            slot_entries = Map.remove first_slot slot_entries;
+            latest_slot_entry;
+            latest_slot;
+            values_with_counter = drop_old_values entry;
+          }
 
   module Internal_for_tests = struct
-    let get_access_counters cache =
-      Message_id.Map.to_seq cache.messages
+    let get_values t =
+      t.values_with_counter |> Message_id.Map.to_seq
+      |> Seq.map (fun (message_id, {value; store_counter = _}) ->
+             (message_id, value))
+  end
+end
+
+module Make (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) = struct
+  module Peer = C.Peer
+  module Topic = C.Topic
+  module Message_id = C.Message_id
+  module Message = C.Message
+  module Sliding_message_id_map = Sliding_message_id_map (C)
+
+  type message_with_access_counter = {
+    message : Message.t;
+    access_counters : int Peer.Map.t;
+  }
+
+  type t = {
+    history_slots : int;
+    gossip_slots : int;
+    messages : message_with_access_counter Sliding_message_id_map.t;
+  }
+
+  let create ~history_slots ~gossip_slots =
+    assert (gossip_slots > 0) ;
+    assert (gossip_slots <= history_slots) ;
+    {history_slots; gossip_slots; messages = Sliding_message_id_map.empty}
+
+  let add_message message_id message topic t =
+    let messages =
+      Sliding_message_id_map.add
+        topic
+        message_id
+        ~update_value:(function
+          | None -> Some {message; access_counters = Peer.Map.empty}
+          | Some m -> Some m)
+        t.messages
+    in
+    {t with messages}
+
+  let get_message_for_peer peer message_id t =
+    let access_count = ref 0 in
+    let update_result =
+      Sliding_message_id_map.update_value
+        message_id
+        (fun {message; access_counters} ->
+          let access_counters =
+            Peer.Map.update
+              peer
+              (function
+                | None ->
+                    access_count := 1 ;
+                    Some !access_count
+                | Some c ->
+                    access_count := c + 1 ;
+                    Some !access_count)
+              access_counters
+          in
+          {message; access_counters})
+        t.messages
+    in
+    update_result
+    |> Option.map (fun (messages, {message; access_counters = _}) ->
+           ({t with messages}, message, !access_count))
+
+  let get_message_ids_to_gossip topic t =
+    Sliding_message_id_map.get_latest_message_ids
+      ~slots:t.gossip_slots
+      t.messages
+    |> Seq.fold_left
+         (fun acc_message_ids (_slot, entries) ->
+           match Topic.Map.find topic entries with
+           | None -> acc_message_ids
+           | Some message_ids -> List.rev_append message_ids acc_message_ids)
+         []
+
+  let shift t =
+    {
+      t with
+      messages =
+        Sliding_message_id_map.shift ~history_slots:t.history_slots t.messages;
+    }
+
+  module Internal_for_tests = struct
+    let get_access_counters t =
+      Sliding_message_id_map.Internal_for_tests.get_values t.messages
       |> Seq.map (fun (message_id, {access_counters; _}) ->
              (message_id, access_counters))
   end
