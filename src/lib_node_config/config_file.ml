@@ -345,7 +345,7 @@ type t = {
   disable_config_validation : bool;
   p2p : p2p;
   rpc : rpc;
-  log : Lwt_log_sink_unix.cfg;
+  log : Logs_simple_config.cfg;
   internal_events : Internal_event_config.t option;
   shell : Shell_limits.limits;
   blockchain_network : blockchain_network;
@@ -407,7 +407,7 @@ let default_disable_config_validation = false
 
 let lwt_log_sink_default_cfg =
   {
-    Lwt_log_sink_unix.default_cfg with
+    Logs_simple_config.default_cfg with
     template = "$(date).$(milliseconds): $(message)";
   }
 
@@ -718,7 +718,7 @@ let encoding =
           "log"
           ~description:
             "Configuration of the Lwt-log sink (part of the logging framework)"
-          Lwt_log_sink_unix.cfg_encoding
+          Logs_simple_config.cfg_encoding
           lwt_log_sink_default_cfg)
        (opt
           "internal-events"
@@ -931,7 +931,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       media_type;
     }
   and metrics_addr = unopt_list ~default:cfg.metrics_addr metrics_addr
-  and log : Lwt_log_sink_unix.cfg =
+  and log : Logs_simple_config.cfg =
     {cfg.log with output = Option.value ~default:cfg.log.output log_output}
   and shell =
     Shell_limits.

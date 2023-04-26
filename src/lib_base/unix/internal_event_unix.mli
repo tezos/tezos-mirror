@@ -52,7 +52,7 @@ val env_var_name : string
     [export TEZOS_EVENTS_CONFIG="unix-files:///tmp/events-unix debug://"], or
     [export TEZOS_EVENTS_CONFIG="debug://  /path/to/config.json"].
 
-    The function also initializes the {!Lwt_log_sink_unix} module
+    The function also initializes the {!Logs_simple_config} module
     (corresponding to the ["TEZOS_LOG"] environment variable).
 
     - [internal_events] is the value of configured sinks of command calling
@@ -62,7 +62,7 @@ val env_var_name : string
     applicable.
 *)
 val init :
-  ?log_cfg:Lwt_log_sink_unix.cfg ->
+  ?log_cfg:Logs_simple_config.cfg ->
   ?internal_events:Internal_event_config.t ->
   unit ->
   unit Lwt.t
@@ -91,6 +91,6 @@ val make_with_defaults :
 val init_with_defaults :
   ?internal_events:Internal_event_config.t ->
   ?enable_default_daily_logs_at:string ->
-  ?log_cfg:Lwt_log_sink_unix.cfg ->
+  ?log_cfg:Logs_simple_config.cfg ->
   unit ->
   unit Lwt.t

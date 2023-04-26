@@ -51,7 +51,7 @@ type t = {
   disable_config_validation : bool;
   p2p : p2p;
   rpc : rpc;
-  log : Lwt_log_sink_unix.cfg;
+  log : Logs_simple_config.cfg;
   internal_events : Tezos_base.Internal_event_config.t option;
   shell : Shell_limits.limits;
   blockchain_network : blockchain_network;
@@ -129,7 +129,7 @@ val update :
   ?cors_origins:string list ->
   ?cors_headers:string list ->
   ?rpc_tls:tls ->
-  ?log_output:Lwt_log_sink_unix.Output.t ->
+  ?log_output:Logs_simple_config.Output.t ->
   ?synchronisation_threshold:int ->
   ?history_mode:History_mode.t ->
   ?network:blockchain_network ->

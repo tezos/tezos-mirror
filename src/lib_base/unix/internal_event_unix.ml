@@ -53,7 +53,7 @@ let init ?log_cfg ?(internal_events = Internal_event_config.lwt_log) () =
   in
   let open Lwt_result_syntax in
   let*! r =
-    let* () = Lwt_result.ok @@ Lwt_log_sink_unix.initialize ?cfg:log_cfg () in
+    let* () = Lwt_result.ok @@ Logs_simple_config.initialize ?cfg:log_cfg () in
     let* () =
       match Sys.(getenv_opt env_var_name) with
       | None -> return_unit

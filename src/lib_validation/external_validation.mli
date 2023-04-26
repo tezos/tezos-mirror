@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 type log_config = {
-  lwt_log_sink_unix : Lwt_log_sink_unix.cfg;
+  lwt_log_sink_unix : Tezos_base_unix.Logs_simple_config.cfg;
   internal_events : Tezos_base.Internal_event_config.t;
 }
 

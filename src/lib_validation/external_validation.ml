@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 type log_config = {
-  lwt_log_sink_unix : Lwt_log_sink_unix.cfg;
+  lwt_log_sink_unix : Tezos_base_unix.Logs_simple_config.cfg;
   internal_events : Tezos_base.Internal_event_config.t;
 }
 
@@ -147,7 +147,7 @@ let log_config_encoding =
       {internal_events; lwt_log_sink_unix})
     (obj2
        (req "internal_events" Tezos_base.Internal_event_config.encoding)
-       (req "lwt_log_sink_unix" Lwt_log_sink_unix.cfg_encoding))
+       (req "lwt_log_sink_unix" Tezos_base_unix.Logs_simple_config.cfg_encoding))
 
 let parameters_encoding =
   let open Data_encoding in

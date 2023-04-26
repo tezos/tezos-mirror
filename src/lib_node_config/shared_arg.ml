@@ -58,7 +58,7 @@ type t = {
   cors_origins : string list;
   cors_headers : string list;
   rpc_tls : Config_file.tls option;
-  log_output : Lwt_log_sink_unix.Output.t option;
+  log_output : Logs_simple_config.Output.t option;
   bootstrap_threshold : int option;
   history_mode : History_mode.t option;
   synchronisation_threshold : int option;
@@ -259,10 +259,10 @@ end
 module Term = struct
   let log_output_converter =
     ( (fun s ->
-        match Lwt_log_sink_unix.Output.of_string s with
+        match Logs_simple_config.Output.of_string s with
         | Some res -> `Ok res
         | None -> `Error s),
-      Lwt_log_sink_unix.Output.pp )
+      Logs_simple_config.Output.pp )
 
   let history_mode_converter =
     let open History_mode in

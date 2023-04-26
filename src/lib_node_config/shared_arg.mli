@@ -73,7 +73,7 @@ type t = {
   cors_origins : string list;
   cors_headers : string list;
   rpc_tls : Config_file.tls option;
-  log_output : Lwt_log_sink_unix.Output.t option;
+  log_output : Logs_simple_config.Output.t option;
   bootstrap_threshold : int option;
   history_mode : History_mode.t option;
   synchronisation_threshold : int option;
