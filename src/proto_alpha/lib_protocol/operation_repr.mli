@@ -530,6 +530,14 @@ val manager_kind : 'kind manager_operation -> 'kind Kind.manager
 
 val encoding : packed_operation Data_encoding.t
 
+(** Operation encoding that accepts legacy attestation name : `endorsement`
+    (and preendorsement, double_<op>_evidence) in JSON
+
+    https://gitlab.com/tezos/tezos/-/issues/5529
+
+    This encoding is temporary and should be removed when the endorsements kinds
+    in JSON will not be accepted any more by the protocol.
+*)
 val encoding_with_legacy_attestation_name : packed_operation Data_encoding.t
 
 val contents_encoding : packed_contents Data_encoding.t

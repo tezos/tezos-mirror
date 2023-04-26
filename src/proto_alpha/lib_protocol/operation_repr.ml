@@ -1043,6 +1043,18 @@ module Encoding = struct
         inj = (fun preendorsement -> Preendorsement preendorsement);
       }
 
+  let preattestation_case =
+    Case
+      {
+        tag = 20;
+        name = "preattestation";
+        encoding = consensus_content_encoding;
+        select =
+          (function Contents (Preendorsement _ as op) -> Some op | _ -> None);
+        proj = (fun (Preendorsement preendorsement) -> preendorsement);
+        inj = (fun preendorsement -> Preendorsement preendorsement);
+      }
+
   let preendorsement_encoding =
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
@@ -1069,6 +1081,32 @@ module Encoding = struct
                   @@ union [make preendorsement_case]))
                (varopt "signature" Signature.encoding)))
 
+  let preattestation_encoding =
+    let make (Case {tag; name; encoding; select = _; proj; inj}) =
+      case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
+    in
+    let to_list : Kind.preendorsement contents_list -> _ = function
+      | Single o -> o
+    in
+    let of_list : Kind.preendorsement contents -> _ = function
+      | o -> Single o
+    in
+    def "inlined.preattestation"
+    @@ conv
+         (fun ({shell; protocol_data = {contents; signature}} : _ operation) ->
+           (shell, (contents, signature)))
+         (fun (shell, (contents, signature)) : _ operation ->
+           {shell; protocol_data = {contents; signature}})
+         (merge_objs
+            Operation.shell_header_encoding
+            (obj2
+               (req
+                  "operations"
+                  (conv to_list of_list
+                  @@ def "inlined.preattestation.contents"
+                  @@ union [make preattestation_case]))
+               (varopt "signature" Signature.encoding)))
+
   let endorsement_encoding =
     obj4
       (req "slot" Slot_repr.encoding)
@@ -1081,6 +1119,25 @@ module Encoding = struct
       {
         tag = 21;
         name = "endorsement";
+        encoding = endorsement_encoding;
+        select =
+          (function Contents (Endorsement _ as op) -> Some op | _ -> None);
+        proj =
+          (fun (Endorsement consensus_content) ->
+            ( consensus_content.slot,
+              consensus_content.level,
+              consensus_content.round,
+              consensus_content.block_payload_hash ));
+        inj =
+          (fun (slot, level, round, block_payload_hash) ->
+            Endorsement {slot; level; round; block_payload_hash});
+      }
+
+  let attestation_case =
+    Case
+      {
+        tag = 21;
+        name = "attestation";
         encoding = endorsement_encoding;
         select =
           (function Contents (Endorsement _ as op) -> Some op | _ -> None);
@@ -1115,6 +1172,28 @@ module Encoding = struct
                   (conv to_list of_list
                   @@ def "inlined.endorsement_mempool.contents"
                   @@ union [make endorsement_case]))
+               (varopt "signature" Signature.encoding)))
+
+  let attestation_encoding =
+    let make (Case {tag; name; encoding; select = _; proj; inj}) =
+      case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
+    in
+    let to_list : Kind.endorsement contents_list -> _ = fun (Single o) -> o in
+    let of_list : Kind.endorsement contents -> _ = fun o -> Single o in
+    def "inlined.attestation"
+    @@ conv
+         (fun ({shell; protocol_data = {contents; signature}} : _ operation) ->
+           (shell, (contents, signature)))
+         (fun (shell, (contents, signature)) : _ operation ->
+           {shell; protocol_data = {contents; signature}})
+         (merge_objs
+            Operation.shell_header_encoding
+            (obj2
+               (req
+                  "operations"
+                  (conv to_list of_list
+                  @@ def "inlined.attestation_mempool.contents"
+                  @@ union [make attestation_case]))
                (varopt "signature" Signature.encoding)))
 
   let dal_attestation_encoding =
@@ -1186,6 +1265,24 @@ module Encoding = struct
         inj = (fun (op1, op2) -> Double_preendorsement_evidence {op1; op2});
       }
 
+  let double_preattestation_evidence_case :
+      Kind.double_preendorsement_evidence case =
+    Case
+      {
+        tag = 7;
+        name = "double_preattestation_evidence";
+        encoding =
+          obj2
+            (req "op1" (dynamic_size preattestation_encoding))
+            (req "op2" (dynamic_size preattestation_encoding));
+        select =
+          (function
+          | Contents (Double_preendorsement_evidence _ as op) -> Some op
+          | _ -> None);
+        proj = (fun (Double_preendorsement_evidence {op1; op2}) -> (op1, op2));
+        inj = (fun (op1, op2) -> Double_preendorsement_evidence {op1; op2});
+      }
+
   let double_endorsement_evidence_case : Kind.double_endorsement_evidence case =
     Case
       {
@@ -1195,6 +1292,23 @@ module Encoding = struct
           obj2
             (req "op1" (dynamic_size endorsement_encoding))
             (req "op2" (dynamic_size endorsement_encoding));
+        select =
+          (function
+          | Contents (Double_endorsement_evidence _ as op) -> Some op
+          | _ -> None);
+        proj = (fun (Double_endorsement_evidence {op1; op2}) -> (op1, op2));
+        inj = (fun (op1, op2) -> Double_endorsement_evidence {op1; op2});
+      }
+
+  let double_attestation_evidence_case : Kind.double_endorsement_evidence case =
+    Case
+      {
+        tag = 2;
+        name = "double_attestation_evidence";
+        encoding =
+          obj2
+            (req "op1" (dynamic_size attestation_encoding))
+            (req "op2" (dynamic_size attestation_encoding));
         select =
           (function
           | Contents (Double_endorsement_evidence _ as op) -> Some op
@@ -1443,15 +1557,11 @@ module Encoding = struct
 
   type packed_case = PCase : 'b case -> packed_case
 
-  let contents_cases =
+  let common_cases =
     [
-      PCase endorsement_case;
-      PCase preendorsement_case;
       PCase dal_attestation_case;
       PCase seed_nonce_revelation_case;
       PCase vdf_revelation_case;
-      PCase double_endorsement_evidence_case;
-      PCase double_preendorsement_evidence_case;
       PCase double_baking_evidence_case;
       PCase activate_account_case;
       PCase proposals_case;
@@ -1481,6 +1591,16 @@ module Encoding = struct
       PCase zk_rollup_update_case;
     ]
 
+  let contents_cases =
+    PCase preattestation_case :: PCase attestation_case
+    :: PCase double_preattestation_evidence_case
+    :: PCase double_attestation_evidence_case :: common_cases
+
+  let contents_cases_with_legacy_attestation_name =
+    PCase preendorsement_case :: PCase endorsement_case
+    :: PCase double_preendorsement_evidence_case
+    :: PCase double_endorsement_evidence_case :: common_cases
+
   let contents_encoding =
     let make (PCase (Case {tag; name; encoding; select; proj; inj})) =
       assert (not @@ reserved_tag tag) ;
@@ -1504,7 +1624,7 @@ module Encoding = struct
         (fun x -> Contents (inj x))
     in
     def "operation_with_legacy_attestation_name.alpha.contents"
-    @@ union (List.map make contents_cases)
+    @@ union (List.map make contents_cases_with_legacy_attestation_name)
 
   let contents_list_encoding =
     conv_with_guard to_list of_list_internal (Variable.list contents_encoding)
