@@ -24,11 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type log_config = {
-  lwt_log_sink_unix : Tezos_base_unix.Logs_simple_config.cfg;
-  internal_events : Tezos_base.Internal_event_config.t;
-}
-
 type parameters = {
   context_root : string;
   protocol_root : string;
@@ -38,7 +33,7 @@ type parameters = {
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
   dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
-  log_config : log_config;
+  internal_events : Tezos_base.Internal_event_config.t;
 }
 
 type request =
@@ -138,17 +133,6 @@ let request_pp ppf = function
 
 let magic = Bytes.of_string "TEZOS_FORK_VALIDATOR_MAGIC_0"
 
-let log_config_encoding =
-  let open Data_encoding in
-  conv
-    (fun {internal_events; lwt_log_sink_unix} ->
-      (internal_events, lwt_log_sink_unix))
-    (fun (internal_events, lwt_log_sink_unix) ->
-      {internal_events; lwt_log_sink_unix})
-    (obj2
-       (req "internal_events" Tezos_base.Internal_event_config.encoding)
-       (req "lwt_log_sink_unix" Tezos_base_unix.Logs_simple_config.cfg_encoding))
-
 let parameters_encoding =
   let open Data_encoding in
   conv
@@ -161,7 +145,7 @@ let parameters_encoding =
            operation_metadata_size_limit;
            sandbox_parameters;
            dal_config;
-           log_config;
+           internal_events;
          } ->
       ( context_root,
         protocol_root,
@@ -171,7 +155,7 @@ let parameters_encoding =
         operation_metadata_size_limit,
         sandbox_parameters,
         dal_config,
-        log_config ))
+        internal_events ))
     (fun ( context_root,
            protocol_root,
            genesis,
@@ -180,7 +164,7 @@ let parameters_encoding =
            operation_metadata_size_limit,
            sandbox_parameters,
            dal_config,
-           log_config ) ->
+           internal_events ) ->
       {
         context_root;
         protocol_root;
@@ -190,7 +174,7 @@ let parameters_encoding =
         operation_metadata_size_limit;
         sandbox_parameters;
         dal_config;
-        log_config;
+        internal_events;
       })
     (obj9
        (req "context_root" string)
@@ -205,7 +189,7 @@ let parameters_encoding =
           Shell_limits.operation_metadata_size_limit_encoding)
        (opt "sandbox_parameters" json)
        (req "dal_config" Tezos_crypto_dal.Cryptobox.Config.encoding)
-       (req "log_config" log_config_encoding))
+       (req "internal_events" Tezos_base.Internal_event_config.encoding))
 
 let case_validate tag =
   let open Data_encoding in

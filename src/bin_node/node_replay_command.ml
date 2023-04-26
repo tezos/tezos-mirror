@@ -422,7 +422,7 @@ let replay ~internal_events ~singleprocess ~strict
                process_path = Sys.executable_name;
                sandbox_parameters = None;
                dal_config = Tezos_crypto_dal.Cryptobox.Config.default;
-               log_config = {lwt_log_sink_unix = config.log; internal_events};
+               internal_events;
              })
       in
       let commit_genesis =

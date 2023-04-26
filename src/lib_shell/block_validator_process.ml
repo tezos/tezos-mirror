@@ -42,7 +42,7 @@ type validator_kind =
       process_path : string;
       sandbox_parameters : Data_encoding.json option;
       dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
-      log_config : External_validation.log_config;
+      internal_events : Tezos_base.Internal_event_config.t;
     }
       -> validator_kind
 
@@ -576,7 +576,7 @@ module External_validator_process = struct
     lock : Lwt_mutex.t;
     sandbox_parameters : Data_encoding.json option;
     dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
-    log_config : External_validation.log_config;
+    internal_events : Tezos_base.Internal_event_config.t;
   }
 
   let kind = External_process
@@ -648,7 +648,7 @@ module External_validator_process = struct
         user_activated_protocol_overrides = vp.user_activated_protocol_overrides;
         operation_metadata_size_limit = vp.operation_metadata_size_limit;
         dal_config = vp.dal_config;
-        log_config = vp.log_config;
+        internal_events = vp.internal_events;
       }
     in
     let*! () =
@@ -863,7 +863,8 @@ module External_validator_process = struct
          _;
        } :
         validator_environment) ~genesis ~data_dir ~readonly ~context_root
-      ~protocol_root ~process_path ~sandbox_parameters ~dal_config ~log_config =
+      ~protocol_root ~process_path ~sandbox_parameters ~dal_config
+      ~internal_events =
     let open Lwt_result_syntax in
     let*! () = Events.(emit init ()) in
     let validator =
@@ -881,7 +882,7 @@ module External_validator_process = struct
         lock = Lwt_mutex.create ();
         sandbox_parameters;
         dal_config;
-        log_config;
+        internal_events;
       }
     in
     let* (_ :
@@ -1071,7 +1072,7 @@ let init validator_environment validator_kind =
         process_path;
         sandbox_parameters;
         dal_config;
-        log_config;
+        internal_events;
       } ->
       let* (validator : 'b) =
         External_validator_process.init
@@ -1084,7 +1085,7 @@ let init validator_environment validator_kind =
           ~process_path
           ~sandbox_parameters
           ~dal_config
-          ~log_config
+          ~internal_events
       in
       let validator_process : (module S with type t = 'b) =
         (module External_validator_process)
