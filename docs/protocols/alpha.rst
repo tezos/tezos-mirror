@@ -56,3 +56,5 @@ Internal
 
 - Remove the deprecated and unused ``tx_rollup_l2_address`` Michelson
   type. (MR :gl:`!8546`)
+
+- Add an internal represention case for the ``UNIT`` Michelson instruction. (MR :gl:`!8579`)
