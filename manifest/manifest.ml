@@ -1919,7 +1919,14 @@ let register_tezt_targets ~make_tezt_exe =
       let (_ : Target.t option) =
         Target.test
           exe_name
-          ~alias:"runtezt"
+          (* Tezts can be deselected from the runtest alias by setting
+             the environment variable [RUNTEZTALIAS] to [false]. If
+             this environment variable is unset, or set to any value
+             other than [false], then they are selected.
+
+             For more info on [%{env:VAR=VAL}] see
+             https://dune.readthedocs.io/en/stable/concepts.html#variables *)
+          ~enabled_if:Dune.[S "<>"; S "false"; S "%{env:RUNTEZTALIAS=true}"]
           ~path
           ~with_macos_security_framework
           ~opam
