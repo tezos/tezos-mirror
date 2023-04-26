@@ -397,7 +397,7 @@ let tezt_lib =
   external_lib
     ~js_compatible:false
     "tezt"
-    V.(at_least "3.0.0")
+    V.(at_least "3.1.0")
     ~main_module:"Tezt"
 
 let tezt_core_lib =
