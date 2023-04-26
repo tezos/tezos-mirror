@@ -485,22 +485,18 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     (config : Config_file.t) =
   let open Lwt_result_syntax in
   (* Main loop *)
-  let log_cfg =
-    {
-      config.log with
-      default_level = Option.value verbosity ~default:config.log.default_level;
-    }
-  in
   let internal_events =
-    Tezos_base_unix.Internal_event_unix.make_with_defaults
-      ~enable_default_daily_logs_at:
-        Filename.Infix.(config.data_dir // "daily_logs")
-      ?internal_events:config.internal_events
-      ()
+    match config.internal_events with
+    | Some ie -> ie
+    | None ->
+        Tezos_base_unix.Internal_event_unix.make_with_defaults
+          ~enable_default_daily_logs_at:
+            Filename.Infix.(config.data_dir // "daily_logs")
+          ?verbosity
+          ~log_cfg:config.log
+          ()
   in
-  let*! () =
-    Tezos_base_unix.Internal_event_unix.init ~log_cfg ~internal_events ()
-  in
+  let*! () = Tezos_base_unix.Internal_event_unix.init ~internal_events () in
   let*! () =
     Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings
   in

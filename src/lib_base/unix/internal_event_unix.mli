@@ -44,52 +44,53 @@ end
     URIs on which events can be reported (see {!val:init}). *)
 val env_var_name : string
 
-(** Initialize the internal-event sinks by looking at the
-    [?internal_events] argument and then at the (whitespace separated) list
-    of URIs in the ["TEZOS_EVENTS_CONFIG"] environment variable, if an URI
-    does not have a scheme it is expected to be a path to a configuration
-    JSON file (cf. {!Configuration.of_file}), e.g.:
-    [export TEZOS_EVENTS_CONFIG="unix-files:///tmp/events-unix debug://"], or
-    [export TEZOS_EVENTS_CONFIG="debug://  /path/to/config.json"].
-
-    The function also initializes the {!Logs_simple_config} module
-    (corresponding to the ["TEZOS_LOG"] environment variable).
-
-    - [internal_events] is the value of configured sinks of command calling
-    init.
-
-    - [log_cfg] is the configuration specific to the default sinks if
-    applicable.
-*)
-val init :
-  ?log_cfg:Logs_simple_config.cfg ->
-  ?internal_events:Internal_event_config.t ->
-  unit ->
-  unit Lwt.t
-
 (** Call [close] on all the sinks. *)
 val close : unit -> unit Lwt.t
 
-(** [make_with_defaults ?enable_default_daily_logs_at ?internal_events ] creates
-    internal event configuration using default values depending on parameters.
+(** [make_defaults ?verbosity ?enable_default_daily_logs_at ?internal_events]
+    creates internal event configuration using default values depending on
+    parameters.
+
+    - [verbosity] overrides the default level on stdout. Usually provided
+      through -v instead of configuration.
 
     - If [internal_events] is provided, nothing is modified. Otherwise default
-    values are used.
+      values are used.
 
     - [enable_default_daily_logs_at] adds daily rotating sink at the given path
     with the following value:
     ["file-descriptor-path:///<daily_logs_path>/daily.log
-    ?create-dirs=true&daily-logs=7&section-prefix=info&format=pp"] *)
+    ?create-dirs=true&daily-logs=7&section-prefix=info&format=pp"]
 
+    This function handles [TEZOS_LOG] environment variables and rules
+    provided through it.
+*)
 val make_with_defaults :
-  ?internal_events:Internal_event_config.t ->
+  ?verbosity:Internal_event.level ->
   ?enable_default_daily_logs_at:string ->
+  ?log_cfg:Logs_simple_config.cfg ->
   unit ->
   Internal_event_config.t
 
-(** Calls [init] with the same arguments as [make_with_defaults] *)
-val init_with_defaults :
+(** [init] initializes the internal-event sinks using either
+  - ["TEZOS_EVENTS_CONFIG"] environment variable,
+  - [internal_events], the value of configured sinks of command calling
+    init, if provided,
+  - internally build an [Internal_event_config.t] using [make_with_defaults]
+    with the same arguments,
+
+  Note that if [internal_events] is provided, other parameters are ignored and
+  [TEZOS_LOG] environment variable aswell.
+
+  ["TEZOS_EVENTS_CONFIG"] is expected to be a (whitespace separated) list of
+  URIs. If an URI does not have a scheme it is expected to be a path to a
+  configuration JSON file (cf. {!Configuration.of_file}), e.g.: [export
+  TEZOS_EVENTS_CONFIG="unix-files:///tmp/events-unix debug://"], or [export
+  TEZOS_EVENTS_CONFIG="debug:// /path/to/config.json"].
+*)
+val init :
   ?internal_events:Internal_event_config.t ->
+  ?verbosity:Internal_event.level ->
   ?enable_default_daily_logs_at:string ->
   ?log_cfg:Logs_simple_config.cfg ->
   unit ->

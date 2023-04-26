@@ -448,7 +448,7 @@ let main (module C : M) ~select_commands =
           in
           let require_auth = parsed.Client_config.require_auth in
           let*! () =
-            Tezos_base_unix.Internal_event_unix.init_with_defaults
+            Tezos_base_unix.Internal_event_unix.init
               ?enable_default_daily_logs_at:daily_logs_path
               ?internal_events:
                 (Option.bind parsed_config_file (fun cf ->

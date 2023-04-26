@@ -49,7 +49,7 @@ let init_config (* (f : 'a -> unit -> unit Lwt.t) *) f test_dir switch () :
       user_activated_upgrades = [];
       user_activated_protocol_overrides = [];
       operation_metadata_size_limit = Unlimited;
-      internal_events = Tezos_base.Internal_event_config.lwt_log;
+      internal_events = Tezos_base.Internal_event_config.stdout;
       data_dir = test_dir;
       store_root = test_dir // "store";
       context_root = test_dir // "context";

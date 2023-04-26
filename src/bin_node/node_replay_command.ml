@@ -480,18 +480,13 @@ let run ?verbosity ~singleprocess ~strict ~operation_metadata_size_limit
     ~filename:(Data_version.lock_file config.data_dir)
   @@ fun () ->
   (* Main loop *)
-  let log_cfg =
-    {
-      config.log with
-      default_level = Option.value verbosity ~default:config.log.default_level;
-    }
-  in
   let internal_events =
-    Tezos_base_unix.Internal_event_unix.make_with_defaults ()
+    Tezos_base_unix.Internal_event_unix.make_with_defaults
+      ?verbosity
+      ~log_cfg:config.log
+      ()
   in
-  let*! () =
-    Tezos_base_unix.Internal_event_unix.init ~log_cfg ~internal_events ()
-  in
+  let*! () = Tezos_base_unix.Internal_event_unix.init ~internal_events () in
   Updater.init (Data_version.protocol_dir config.data_dir) ;
   Lwt_exit.(
     wrap_and_exit
