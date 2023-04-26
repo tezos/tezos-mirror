@@ -609,19 +609,50 @@ let wait_for_publish_commitment node =
   let level = JSON.(json |-> "level" |> as_int) in
   Some (hash, level)
 
-let publish_dummy_commitment ?(number_of_ticks = 1) ~inbox_level ~predecessor
-    ~sc_rollup ~src client =
-  let commitment : Sc_rollup_client.commitment =
-    {
-      compressed_state = Constant.sc_rollup_compressed_state;
-      inbox_level;
-      predecessor;
-      number_of_ticks;
-    }
+let forged_commitment ?(compressed_state = Constant.sc_rollup_compressed_state)
+    ?(number_of_ticks = 1) ~inbox_level ~predecessor () :
+    Sc_rollup_client.commitment =
+  {compressed_state; inbox_level; predecessor; number_of_ticks}
+
+let forge_and_publish_commitment ?compressed_state ?number_of_ticks ~inbox_level
+    ~predecessor ~sc_rollup ~src client =
+  let commitment =
+    forged_commitment
+      ?compressed_state
+      ?number_of_ticks
+      ~inbox_level
+      ~predecessor
+      ()
   in
   let*! () = publish_commitment ~src ~commitment client sc_rollup in
   let* () = Client.bake_for_and_wait client in
-  get_staked_on_commitment ~sc_rollup ~staker:src client
+  let* hash = get_staked_on_commitment ~sc_rollup ~staker:src client in
+  return (commitment, hash)
+
+let bake_period_then_publish_commitment ?compressed_state ?number_of_ticks
+    ~sc_rollup ~src client =
+  let* {commitment_period_in_blocks = commitment_period; _} =
+    get_sc_rollup_constants client
+  in
+  let* predecessor, last_inbox_level =
+    last_cemented_commitment_hash_with_level ~sc_rollup client
+  in
+  let inbox_level = last_inbox_level + commitment_period in
+  let* current_level = Client.level client in
+  let missing_blocks_to_commit =
+    last_inbox_level + commitment_period - current_level + 1
+  in
+  let* () =
+    repeat missing_blocks_to_commit (fun () -> Client.bake_for_and_wait client)
+  in
+  forge_and_publish_commitment
+    ?compressed_state
+    ?number_of_ticks
+    ~inbox_level
+    ~predecessor
+    ~sc_rollup
+    ~src
+    client
 
 (* Pushing message in the inbox
    ----------------------------
@@ -2642,29 +2673,15 @@ let test_consecutive_commitments _protocol _rollup_node _rollup_client sc_rollup
       ~msg:(rex "This implicit account is not a staker of this smart rollup")
       process
   in
-  let* predecessor, _ =
-    last_cemented_commitment_hash_with_level ~sc_rollup tezos_client
-  in
-  (* Bake commitment_period_in_blocks blocks in order prevent commitment being
-     posted for future inbox_level *)
-  let* () =
-    repeat (commitment_period_in_blocks + 1) (fun () ->
-        Client.bake_for_and_wait tezos_client)
-  in
-  let* commit_hash =
-    publish_dummy_commitment
-      ~inbox_level:(inbox_level + commitment_period_in_blocks)
-      ~predecessor
-      ~sc_rollup
-      ~src:operator
-      tezos_client
+  let* _commit, commit_hash =
+    bake_period_then_publish_commitment ~sc_rollup ~src:operator tezos_client
   in
   let* () =
     repeat (commitment_period_in_blocks + 2) (fun () ->
         Client.bake_for_and_wait tezos_client)
   in
-  let* _commit_hash =
-    publish_dummy_commitment
+  let* _commit, _commit_hash =
+    forge_and_publish_commitment
       ~inbox_level:(inbox_level + (2 * commitment_period_in_blocks))
       ~predecessor:commit_hash
       ~sc_rollup
@@ -3229,13 +3246,16 @@ let mk_forking_commitments node client ~sc_rollup ~operator1 ~operator2 =
     (* Bake sufficiently many blocks to be able to commit for the desired inbox
        level. We may actually bake no blocks if d <= 0 *)
     let* () = repeat d (fun () -> Client.bake_for_and_wait client) in
-    publish_dummy_commitment
-      ~inbox_level
-      ~predecessor:pred
-      ~sc_rollup
-      ~number_of_ticks:ticks
-      ~src
-      client
+    let* _, commitment_hash =
+      forge_and_publish_commitment
+        ~inbox_level
+        ~predecessor:pred
+        ~sc_rollup
+        ~number_of_ticks:ticks
+        ~src
+        client
+    in
+    return commitment_hash
   in
   (* Retrieve the latest commitment *)
   let* c0, _ = last_cemented_commitment_hash_with_level ~sc_rollup client in
@@ -3682,8 +3702,8 @@ let test_refutation_reward_and_punishment ~kind =
   let* () = repeat d (fun () -> Client.bake_for_and_wait client) in
 
   (* [operator1] stakes on a commitment. *)
-  let* operator1_commitment =
-    publish_dummy_commitment
+  let* _, operator1_commitment =
+    forge_and_publish_commitment
       ~inbox_level
       ~predecessor:c0
       ~sc_rollup
@@ -3702,8 +3722,8 @@ let test_refutation_reward_and_punishment ~kind =
       ~error_msg:"expecting frozen balance for operator1: %R, got %L") ;
 
   (* [operator2] stakes on a commitment. *)
-  let* operator2_commitment =
-    publish_dummy_commitment
+  let* _, operator2_commitment =
+    forge_and_publish_commitment
       ~inbox_level
       ~predecessor:c0
       ~sc_rollup
@@ -4439,16 +4459,16 @@ let test_recover_bond_of_stakers =
         Client.bake_for_and_wait tezos_client)
   in
   (* Both accounts stakes on a commitment. *)
-  let* commitment1 =
-    publish_dummy_commitment
+  let* _, commitment1 =
+    forge_and_publish_commitment
       ~inbox_level:(level + commitment_period_in_blocks)
       ~predecessor
       ~sc_rollup
       ~src:staker1.public_key_hash
       tezos_client
   in
-  let* commitment2 =
-    publish_dummy_commitment
+  let* _, commitment2 =
+    forge_and_publish_commitment
       ~inbox_level:(level + commitment_period_in_blocks)
       ~predecessor
       ~sc_rollup
@@ -4604,39 +4624,12 @@ let test_migration_cement ~kind ~migrate_from ~migrate_to =
     "Test to cement a commitment made pre migration then publish a new \
      commitment."
   and scenario_prior tezos_client ~sc_rollup =
-    let* {commitment_period_in_blocks = commitment_period; _} =
-      get_sc_rollup_constants tezos_client
-    in
-    let* predecessor, starting_level =
-      last_cemented_commitment_hash_with_level ~sc_rollup tezos_client
-    in
-    let inbox_level = starting_level + commitment_period in
-    let* () =
-      repeat (commitment_period + 1) (fun () ->
-          Client.bake_for_and_wait tezos_client)
-    in
-    let* hash =
-      publish_dummy_commitment
-        ~number_of_ticks:1
-        ~inbox_level
-        ~predecessor
-        ~sc_rollup
-        ~src:Constant.bootstrap1.public_key_hash
-        tezos_client
-    in
-    (* This is the equal to commitment forged by
-       [publish_dummy_commitment] *)
-    let commitment : Sc_rollup_client.commitment =
-      {
-        compressed_state = Constant.sc_rollup_compressed_state;
-        inbox_level;
-        predecessor;
-        number_of_ticks = 1;
-      }
-    in
-    return (hash, commitment)
+    bake_period_then_publish_commitment
+      ~sc_rollup
+      ~src:Constant.bootstrap1.public_key_hash
+      tezos_client
   and scenario_after tezos_client ~sc_rollup
-      (hash, (commitment : Sc_rollup_client.commitment)) =
+      ((commitment : Sc_rollup_client.commitment), hash) =
     let* {commitment_period_in_blocks = commitment_period; _} =
       get_sc_rollup_constants tezos_client
     in
@@ -4649,8 +4642,8 @@ let test_migration_cement ~kind ~migrate_from ~migrate_to =
       repeat missing_blocks_to_commit (fun () ->
           Client.bake_for_and_wait tezos_client)
     in
-    let* _next_hash =
-      publish_dummy_commitment
+    let* _commitment, _next_hash =
+      forge_and_publish_commitment
         ~number_of_ticks:1
         ~inbox_level:(last_inbox_level + commitment_period)
         ~predecessor:hash
@@ -4662,6 +4655,53 @@ let test_migration_cement ~kind ~migrate_from ~migrate_to =
        cementation because commitment_period = challenge_period and we
        baked to be able to published a commit. *)
     cement_commitment ~sc_rollup ~hash tezos_client
+  in
+  test_l1_migration_scenario
+    ~kind
+    ~migrate_from
+    ~migrate_to
+    ~scenario_prior
+    ~scenario_after
+    ~tags
+    ~description
+    ()
+
+(** Test to recover stakes when the commitment was cemented
+    pre-migration. *)
+let test_migration_recover ~kind ~migrate_from ~migrate_to =
+  let tags = ["commitment"; "cement"; "recover"]
+  and description = "Test recover bond with cementation made pre-migration."
+  and scenario_prior tezos_client ~sc_rollup =
+    let* commitment, hash =
+      bake_period_then_publish_commitment
+        ~sc_rollup
+        ~src:Constant.bootstrap1.public_key_hash
+        tezos_client
+    in
+    let* {challenge_window_in_blocks = challenge_window; _} =
+      get_sc_rollup_constants tezos_client
+    in
+    let* current_level = Client.level tezos_client in
+    let missing_blocks_to_cement =
+      commitment.inbox_level + challenge_window - current_level + 2
+    in
+    let* () =
+      repeat missing_blocks_to_cement (fun () ->
+          Client.bake_for_and_wait tezos_client)
+    in
+    cement_commitment ~sc_rollup ~hash tezos_client
+  and scenario_after tezos_client ~sc_rollup () =
+    let*! () =
+      let recover_bond_fee = 1_000_000 in
+      Client.Sc_rollup.submit_recover_bond
+        ~hooks
+        ~rollup:sc_rollup
+        ~src:Constant.bootstrap2.alias
+        ~fee:(Tez.of_mutez_int recover_bond_fee)
+        ~staker:Constant.bootstrap1.alias
+        tezos_client
+    in
+    Client.bake_for_and_wait tezos_client
   in
   test_l1_migration_scenario
     ~kind
@@ -4901,7 +4941,8 @@ let register ~protocols =
 let register_migration ~kind ~migrate_from ~migrate_to =
   test_migration_inbox ~kind ~migrate_from ~migrate_to ;
   test_migration_ticket_inbox ~kind ~migrate_from ~migrate_to ;
-  test_migration_cement ~kind ~migrate_from ~migrate_to
+  test_migration_cement ~kind ~migrate_from ~migrate_to ;
+  test_migration_recover ~kind ~migrate_from ~migrate_to
 
 let register_migration ~migrate_from ~migrate_to =
   register_migration ~kind:"arith" ~migrate_from ~migrate_to ;
