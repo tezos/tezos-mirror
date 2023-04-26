@@ -4,7 +4,7 @@
 # within 10 blocks of the game initialization.
 #
 # More particularly, the game relies on a timelock primitive using a difficulty
-# set to 1_000 and a hardwritten threshold for guessing of 10 blocks. Beware,
+# set to 1_024 and a hardwritten threshold for guessing of 10 blocks. Beware,
 # this contract is for education purpose only to demonstrate the use of
 # timelock. In particular, the contract may not be secure, the game can be
 # reinitialised at any time and the timelock difficulty and threshold values
@@ -69,7 +69,7 @@ code { UNPAIR 5;
                            DIP 4 {DROP};
                            DUP 3;
                            SWAP;
-                           DIP 2 {PUSH nat 1000};
+                           DIP 2 {PUSH nat 1024};
                            OPEN_CHEST;
                            IF_LEFT { # If the chest opens successfully,
                                      # we compare the guess with the locked value.
