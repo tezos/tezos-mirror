@@ -332,7 +332,7 @@ let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
   (* Merge operators *)
   let sc_rollup_node_operators =
     Operator_purpose_map.merge
-      (fun _purpose new_operator _old_operator -> new_operator)
+      (fun _purpose -> Option.either)
       new_sc_rollup_node_operators
       configuration.sc_rollup_node_operators
   in
