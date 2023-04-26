@@ -7,12 +7,12 @@ name = "tezos-smart-rollup-installer"
 version = "0.1.0"
 edition = "2021"
 authors = ["TriliTech <contact@trili.tech>"]
-include = [
-  "build.rs",
-  "src/*",
-  "../installer_kernel/src/*",
-  "../installer.wasm"
-]
+include = ["src/", "installer.wasm", "README.md"]
+license = "MIT"
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "Installer client for Tezos Smart Rollups."
+keywords = ["tezos", "smart", "rollup", "installer"]
+categories = ["development-tools", "command-line-utilities"]
 
 [[bin]]
 name = "smart-rollup-installer"
