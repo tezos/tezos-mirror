@@ -392,6 +392,9 @@ let vdf_tuples =
 let gen_random_bytes_bench_unsafe size =
   Bytes.init size (fun _ -> Char.chr (Random.int 256))
 
+let gen_random_z_unsafe size =
+  gen_random_bytes_bench_unsafe size |> Bytes.to_string |> Z.of_bits
+
 let encrypt_unsafe symmetric_key plaintext =
   let nonce =
     Data_encoding.Binary.of_bytes_exn
@@ -403,6 +406,18 @@ let encrypt_unsafe symmetric_key plaintext =
     payload = Crypto_box.Secretbox.secretbox symmetric_key plaintext nonce;
   }
 
+let proof_of_vdf_tuple_unsafe rsa_public ~time vdf_tuple =
+  if verify_wesolowski rsa_public ~time vdf_tuple then
+    let nonce =
+      gen_random_z_unsafe (128 + (Z.to_bits rsa_public |> String.length))
+    in
+    let randomized_locked_value =
+      Z.powm vdf_tuple.locked_value nonce rsa_public
+    in
+    let proof = {vdf_tuple; nonce} in
+    (randomized_locked_value, proof)
+  else raise (Invalid_argument "Timelock tuple verification failed.")
+
 let chest_sampler ~rng_state ~plaintext_size ~time =
   Random.set_state rng_state ;
   let plaintext = gen_random_bytes_bench_unsafe plaintext_size in
@@ -412,7 +427,7 @@ let chest_sampler ~rng_state ~plaintext_size ~time =
       if log_time < 30 then vdf_tuples.(log_time)
       else failwith "Timelock: trying to sample chest with too high time."
     in
-    proof_of_vdf_tuple rsa2048 ~time vdf_tuple
+    proof_of_vdf_tuple_unsafe rsa2048 ~time vdf_tuple
   in
   let sym_key = timelock_proof_to_symmetric_key rsa2048 proof in
   let ciphertext = encrypt_unsafe sym_key plaintext in
