@@ -34,6 +34,7 @@ type t = {
   listen_addr : P2p_point.Id.t;
   peers : P2p_point.Id.t list;
   expected_pow : float;
+  network_name : string;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -61,6 +62,8 @@ let default_use_unsafe_srs = false
 
 let default_expected_pow = 26.
 
+let default_network_name = "dal-sandbox"
+
 let neighbor_encoding : neighbor Data_encoding.t =
   let open Data_encoding in
   conv
@@ -80,6 +83,7 @@ let encoding : t Data_encoding.t =
            neighbors;
            peers;
            expected_pow;
+           network_name;
          } ->
       ( use_unsafe_srs,
         data_dir,
@@ -88,7 +92,8 @@ let encoding : t Data_encoding.t =
         listen_addr,
         neighbors,
         peers,
-        expected_pow ))
+        expected_pow,
+        network_name ))
     (fun ( use_unsafe_srs,
            data_dir,
            rpc_addr,
@@ -96,7 +101,8 @@ let encoding : t Data_encoding.t =
            listen_addr,
            neighbors,
            peers,
-           expected_pow ) ->
+           expected_pow,
+           network_name ) ->
       {
         use_unsafe_srs;
         data_dir;
@@ -106,8 +112,9 @@ let encoding : t Data_encoding.t =
         neighbors;
         peers;
         expected_pow;
+        network_name;
       })
-    (obj8
+    (obj9
        (dft
           "use_unsafe_srs"
           ~description:"use unsafe srs for tests"
@@ -139,7 +146,12 @@ let encoding : t Data_encoding.t =
           "expected-pow"
           ~description:"Expected P2P identity's PoW"
           float
-          default_expected_pow))
+          default_expected_pow)
+       (dft
+          "network-name"
+          ~description:"The name that identifies the network"
+          string
+          default_network_name))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 

@@ -119,6 +119,7 @@ let config_init_command =
           peers = [];
           listen_addr;
           expected_pow = default_expected_pow;
+          network_name = default_network_name;
         }
       in
       let* () = save config in
