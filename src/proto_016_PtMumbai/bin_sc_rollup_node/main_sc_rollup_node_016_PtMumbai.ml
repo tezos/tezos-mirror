@@ -30,24 +30,17 @@ let force_switch =
     ~doc:"Overwrites the configuration file when it exists."
     ()
 
-let sc_rollup_address_parameter =
-  Tezos_clic.parameter (fun _ s ->
-      match Protocol.Alpha_context.Sc_rollup.Address.of_b58check_opt s with
-      | None -> failwith "Invalid smart rollup address"
-      | Some addr -> return addr)
-
 let sc_rollup_address_param =
-  Tezos_clic.param
+  Client_proto_args.Sc_rollup_params.sc_rollup_address_param
     ~name:"smart-rollup-address"
     ~desc:"The smart rollup address"
-    sc_rollup_address_parameter
 
 let sc_rollup_address_arg =
   Tezos_clic.arg
     ~long:"rollup"
     ~placeholder:"smart-rollup-address"
     ~doc:"The smart rollup address (required when no configuration file exists)"
-    sc_rollup_address_parameter
+    Client_proto_args.Sc_rollup_params.sc_rollup_address_parameter
 
 let sc_rollup_node_operator_param =
   let open Lwt_result_syntax in
