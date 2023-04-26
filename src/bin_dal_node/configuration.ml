@@ -31,6 +31,8 @@ type t = {
   rpc_addr : string;
   rpc_port : int;
   neighbors : neighbor list;
+  listen_addr : P2p_point.Id.t;
+  peers : P2p_point.Id.t list;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -45,7 +47,14 @@ let default_rpc_addr = "127.0.0.1"
 
 let default_rpc_port = 10732
 
+let default_listen_addr =
+  let default_net_host = "[::]" in
+  let default_net_port = 11732 in
+  P2p_point.Id.of_string_exn ~default_port:default_net_port default_net_host
+
 let default_neighbors = []
+
+let default_peers = []
 
 let default_use_unsafe_srs = false
 
@@ -59,11 +68,39 @@ let neighbor_encoding : neighbor Data_encoding.t =
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {use_unsafe_srs; data_dir; rpc_addr; rpc_port; neighbors} ->
-      (use_unsafe_srs, data_dir, rpc_addr, rpc_port, neighbors))
-    (fun (use_unsafe_srs, data_dir, rpc_addr, rpc_port, neighbors) ->
-      {use_unsafe_srs; data_dir; rpc_addr; rpc_port; neighbors})
-    (obj5
+    (fun {
+           use_unsafe_srs;
+           data_dir;
+           rpc_addr;
+           rpc_port;
+           listen_addr;
+           neighbors;
+           peers;
+         } ->
+      ( use_unsafe_srs,
+        data_dir,
+        rpc_addr,
+        rpc_port,
+        listen_addr,
+        neighbors,
+        peers ))
+    (fun ( use_unsafe_srs,
+           data_dir,
+           rpc_addr,
+           rpc_port,
+           listen_addr,
+           neighbors,
+           peers ) ->
+      {
+        use_unsafe_srs;
+        data_dir;
+        rpc_addr;
+        rpc_port;
+        listen_addr;
+        neighbors;
+        peers;
+      })
+    (obj7
        (dft
           "use_unsafe_srs"
           ~description:"use unsafe srs for tests"
@@ -77,10 +114,20 @@ let encoding : t Data_encoding.t =
        (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
        (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
        (dft
+          "net-addr"
+          ~description:"P2P address of this node"
+          P2p_point.Id.encoding
+          default_listen_addr)
+       (dft
           "neighbors"
           ~description:"DAL Neighbors"
           (list neighbor_encoding)
-          default_neighbors))
+          default_neighbors)
+       (dft
+          "peers"
+          ~description:"P2P addresses of remote peers"
+          (list P2p_point.Id.encoding)
+          default_peers))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 
