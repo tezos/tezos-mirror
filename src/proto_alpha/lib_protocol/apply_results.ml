@@ -1009,7 +1009,7 @@ module Encoding = struct
       (req (Format.asprintf "%s_power" power_name) int31)
       (req "consensus_key" Signature.Public_key_hash.encoding)
 
-  type 'kind case =
+  type case =
     | Case : {
         op_case : 'kind Operation.Encoding.case;
         encoding : 'a Data_encoding.t;
@@ -1020,7 +1020,7 @@ module Encoding = struct
         proj : 'kind contents_result -> 'a;
         inj : 'a -> 'kind contents_result;
       }
-        -> 'kind case
+        -> case
 
   let tagged_case tag name args proj inj =
     let open Data_encoding in
@@ -1587,118 +1587,105 @@ module Encoding = struct
         | _ -> None)
 end
 
-let contents_result_encoding =
+let common_cases =
   let open Encoding in
-  let make
-      (Case
-        {
-          op_case = Operation.Encoding.Case {tag; name; _};
-          encoding;
-          mselect = _;
-          select;
-          proj;
-          inj;
-        }) =
-    let proj x = match select x with None -> None | Some x -> Some (proj x) in
-    let inj x = Contents_result (inj x) in
-    tagged_case (Tag tag) name encoding proj inj
-  in
+  [
+    seed_nonce_revelation_case;
+    vdf_revelation_case;
+    dal_attestation_case;
+    double_baking_evidence_case;
+    activate_account_case;
+    proposals_case;
+    ballot_case;
+    drain_delegate_case;
+    reveal_case;
+    transaction_case;
+    origination_case;
+    delegation_case;
+    register_global_constant_case;
+    set_deposits_limit_case;
+    increase_paid_storage_case;
+    update_consensus_key_case;
+    transfer_ticket_case;
+    dal_publish_slot_header_case;
+    sc_rollup_originate_case;
+    sc_rollup_add_messages_case;
+    sc_rollup_cement_case;
+    sc_rollup_publish_case;
+    sc_rollup_refute_case;
+    sc_rollup_timeout_case;
+    sc_rollup_execute_outbox_message_case;
+    sc_rollup_recover_bond_case;
+    zk_rollup_origination_case;
+    zk_rollup_publish_case;
+    zk_rollup_update_case;
+  ]
+
+let contents_cases =
+  let open Encoding in
+  endorsement_case :: preendorsement_case :: double_endorsement_evidence_case
+  :: double_preendorsement_evidence_case :: common_cases
+
+let contents_cases_with_legacy_attestation_name =
+  let open Encoding in
+  endorsement_case :: preendorsement_case :: double_endorsement_evidence_case
+  :: double_preendorsement_evidence_case :: common_cases
+
+let make_contents_result
+    (Encoding.Case
+      {
+        op_case = Operation.Encoding.Case {tag; name; _};
+        encoding;
+        mselect = _;
+        select;
+        proj;
+        inj;
+      }) =
+  let proj x = match select x with None -> None | Some x -> Some (proj x) in
+  let inj x = Contents_result (inj x) in
+  Encoding.tagged_case (Tag tag) name encoding proj inj
+
+let contents_result_encoding =
   def "operation.alpha.contents_result"
+  @@ union (List.map make_contents_result contents_cases)
+
+let contents_result_encoding_with_legacy_attestation_name =
+  def "operation_with_legacy_attestation_name.alpha.contents_result"
   @@ union
-       [
-         make seed_nonce_revelation_case;
-         make vdf_revelation_case;
-         make endorsement_case;
-         make preendorsement_case;
-         make dal_attestation_case;
-         make double_preendorsement_evidence_case;
-         make double_endorsement_evidence_case;
-         make double_baking_evidence_case;
-         make activate_account_case;
-         make proposals_case;
-         make ballot_case;
-         make drain_delegate_case;
-         make reveal_case;
-         make transaction_case;
-         make origination_case;
-         make delegation_case;
-         make register_global_constant_case;
-         make set_deposits_limit_case;
-         make increase_paid_storage_case;
-         make update_consensus_key_case;
-         make transfer_ticket_case;
-         make dal_publish_slot_header_case;
-         make sc_rollup_originate_case;
-         make sc_rollup_add_messages_case;
-         make sc_rollup_cement_case;
-         make sc_rollup_publish_case;
-         make sc_rollup_refute_case;
-         make sc_rollup_timeout_case;
-         make sc_rollup_execute_outbox_message_case;
-         make sc_rollup_recover_bond_case;
-         make zk_rollup_origination_case;
-         make zk_rollup_publish_case;
-         make zk_rollup_update_case;
-       ]
+       (List.map
+          make_contents_result
+          contents_cases_with_legacy_attestation_name)
+
+let make_contents_and_result
+    (Encoding.Case
+      {
+        op_case = Operation.Encoding.Case {tag; name; encoding; proj; inj; _};
+        mselect;
+        encoding = meta_encoding;
+        proj = meta_proj;
+        inj = meta_inj;
+        _;
+      }) =
+  let proj c =
+    match mselect c with
+    | Some (op, res) -> Some (proj op, meta_proj res)
+    | _ -> None
+  in
+  let inj (op, res) = Contents_and_result (inj op, meta_inj res) in
+  let encoding = merge_objs encoding (obj1 (req "metadata" meta_encoding)) in
+  Encoding.tagged_case (Tag tag) name encoding proj inj
 
 let contents_and_result_encoding =
-  let open Encoding in
-  let make
-      (Case
-        {
-          op_case = Operation.Encoding.Case {tag; name; encoding; proj; inj; _};
-          mselect;
-          encoding = meta_encoding;
-          proj = meta_proj;
-          inj = meta_inj;
-          _;
-        }) =
-    let proj c =
-      match mselect c with
-      | Some (op, res) -> Some (proj op, meta_proj res)
-      | _ -> None
-    in
-    let inj (op, res) = Contents_and_result (inj op, meta_inj res) in
-    let encoding = merge_objs encoding (obj1 (req "metadata" meta_encoding)) in
-    tagged_case (Tag tag) name encoding proj inj
-  in
   def "operation.alpha.operation_contents_and_result"
+  @@ union (List.map make_contents_and_result contents_cases)
+
+let contents_and_result_encoding_with_legacy_attestation_name =
+  def
+    "operation_with_legacy_attestation_name.alpha.operation_contents_and_result"
   @@ union
-       [
-         make seed_nonce_revelation_case;
-         make vdf_revelation_case;
-         make endorsement_case;
-         make preendorsement_case;
-         make dal_attestation_case;
-         make double_preendorsement_evidence_case;
-         make double_endorsement_evidence_case;
-         make double_baking_evidence_case;
-         make activate_account_case;
-         make proposals_case;
-         make ballot_case;
-         make reveal_case;
-         make transaction_case;
-         make origination_case;
-         make delegation_case;
-         make register_global_constant_case;
-         make set_deposits_limit_case;
-         make increase_paid_storage_case;
-         make update_consensus_key_case;
-         make drain_delegate_case;
-         make transfer_ticket_case;
-         make dal_publish_slot_header_case;
-         make sc_rollup_originate_case;
-         make sc_rollup_add_messages_case;
-         make sc_rollup_cement_case;
-         make sc_rollup_publish_case;
-         make sc_rollup_refute_case;
-         make sc_rollup_timeout_case;
-         make sc_rollup_execute_outbox_message_case;
-         make sc_rollup_recover_bond_case;
-         make zk_rollup_origination_case;
-         make zk_rollup_publish_case;
-         make zk_rollup_update_case;
-       ]
+       (List.map
+          make_contents_and_result
+          contents_cases_with_legacy_attestation_name)
 
 type 'kind contents_result_list =
   | Single_result : 'kind contents_result -> 'kind contents_result_list
@@ -1712,7 +1699,8 @@ type packed_contents_result_list =
       'kind contents_result_list
       -> packed_contents_result_list
 
-let contents_result_list_encoding =
+let contents_result_list_conv_with_guard =
+  let open Result_syntax in
   let rec to_list = function
     | Contents_result_list (Single_result o) -> [Contents_result o]
     | Contents_result_list (Cons_result (o, os)) ->
@@ -1722,7 +1710,7 @@ let contents_result_list_encoding =
     | [] -> Error "cannot decode empty operation result"
     | [Contents_result o] -> Ok (Contents_result_list (Single_result o))
     | Contents_result o :: os -> (
-        of_list os >>? fun (Contents_result_list os) ->
+        let* (Contents_result_list os) = of_list os in
         match (o, os) with
         | Manager_operation_result _, Single_result (Manager_operation_result _)
           ->
@@ -1731,8 +1719,16 @@ let contents_result_list_encoding =
             Ok (Contents_result_list (Cons_result (o, os)))
         | _ -> Error "cannot decode ill-formed operation result")
   in
+  conv_with_guard to_list of_list
+
+let contents_result_list_encoding =
   def "operation.alpha.contents_list_result"
-  @@ conv_with_guard to_list of_list (list contents_result_encoding)
+  @@ contents_result_list_conv_with_guard (list contents_result_encoding)
+
+let contents_result_list_encoding_with_legacy_attestation_name =
+  def "operation_with_legacy_attestation_name.alpha.contents_list_result"
+  @@ contents_result_list_conv_with_guard
+       (list contents_result_encoding_with_legacy_attestation_name)
 
 type 'kind contents_and_result_list =
   | Single_and_result :
@@ -1749,7 +1745,8 @@ type packed_contents_and_result_list =
       'kind contents_and_result_list
       -> packed_contents_and_result_list
 
-let contents_and_result_list_encoding =
+let contents_and_result_conv_with_guard =
+  let open Result_syntax in
   let rec to_list = function
     | Contents_and_result_list (Single_and_result (op, res)) ->
         [Contents_and_result (op, res)]
@@ -1761,7 +1758,7 @@ let contents_and_result_list_encoding =
     | [Contents_and_result (op, res)] ->
         Ok (Contents_and_result_list (Single_and_result (op, res)))
     | Contents_and_result (op, res) :: rest -> (
-        of_list rest >>? fun (Contents_and_result_list rest) ->
+        let* (Contents_and_result_list rest) = of_list rest in
         match (op, rest) with
         | Manager_operation _, Single_and_result (Manager_operation _, _) ->
             Ok (Contents_and_result_list (Cons_and_result (op, res, rest)))
@@ -1769,7 +1766,15 @@ let contents_and_result_list_encoding =
             Ok (Contents_and_result_list (Cons_and_result (op, res, rest)))
         | _ -> Error "cannot decode ill-formed combined operation result")
   in
-  conv_with_guard to_list of_list (Variable.list contents_and_result_encoding)
+  conv_with_guard to_list of_list
+
+let contents_and_result_list_encoding =
+  contents_and_result_conv_with_guard
+    (Variable.list contents_and_result_encoding)
+
+let contents_and_result_list_encoding_with_legacy_attestation_name =
+  contents_and_result_conv_with_guard
+    (Variable.list contents_and_result_encoding_with_legacy_attestation_name)
 
 type 'kind operation_metadata = {contents : 'kind contents_result_list}
 
@@ -1785,6 +1790,28 @@ let operation_metadata_encoding =
            (Tag 0)
            ~title:"Operation_metadata"
            contents_result_list_encoding
+           (function
+             | Operation_metadata {contents} ->
+                 Some (Contents_result_list contents)
+             | _ -> None)
+           (fun (Contents_result_list contents) ->
+             Operation_metadata {contents});
+         case
+           (Tag 1)
+           ~title:"No_operation_metadata"
+           empty
+           (function No_operation_metadata -> Some () | _ -> None)
+           (fun () -> No_operation_metadata);
+       ]
+
+let operation_metadata_encoding_with_legacy_attestation_name =
+  def "operation_with_legacy_attestation_name.alpha.result"
+  @@ union
+       [
+         case
+           (Tag 0)
+           ~title:"Operation_metadata"
+           contents_result_list_encoding_with_legacy_attestation_name
            (function
              | Operation_metadata {contents} ->
                  Some (Contents_result_list contents)
@@ -2447,6 +2474,49 @@ let operation_data_and_metadata_encoding =
            ~title:"Operation_with_metadata"
            (obj2
               (req "contents" (dynamic_size contents_and_result_list_encoding))
+              (opt "signature" Signature.encoding))
+           (function
+             | Operation_data _, No_operation_metadata -> None
+             | Operation_data op, Operation_metadata res -> (
+                 match kind_equal_list op.contents res.contents with
+                 | None ->
+                     Pervasives.failwith
+                       "cannot decode inconsistent combined operation result"
+                 | Some Eq ->
+                     Some
+                       ( Contents_and_result_list
+                           (pack_contents_list op.contents res.contents),
+                         op.signature )))
+           (fun (Contents_and_result_list contents, signature) ->
+             let op_contents, res_contents = unpack_contents_list contents in
+             ( Operation_data {contents = op_contents; signature},
+               Operation_metadata {contents = res_contents} ));
+         case
+           (Tag 1)
+           ~title:"Operation_without_metadata"
+           (obj2
+              (req "contents" (dynamic_size Operation.contents_list_encoding))
+              (opt "signature" Signature.encoding))
+           (function
+             | Operation_data op, No_operation_metadata ->
+                 Some (Contents_list op.contents, op.signature)
+             | Operation_data _, Operation_metadata _ -> None)
+           (fun (Contents_list contents, signature) ->
+             (Operation_data {contents; signature}, No_operation_metadata));
+       ]
+
+let operation_data_and_metadata_encoding_with_legacy_attestation_name =
+  def "operation_with_legacy_attestation_name.alpha.operation_with_metadata"
+  @@ union
+       [
+         case
+           (Tag 0)
+           ~title:"Operation_with_metadata"
+           (obj2
+              (req
+                 "contents"
+                 (dynamic_size
+                    contents_and_result_list_encoding_with_legacy_attestation_name))
               (opt "signature" Signature.encoding))
            (function
              | Operation_data _, No_operation_metadata -> None

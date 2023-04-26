@@ -53,10 +53,12 @@ type operation_receipt = Apply_results.packed_operation_metadata =
       -> operation_receipt
   | No_operation_metadata : operation_receipt
 
-let operation_receipt_encoding = Apply_results.operation_metadata_encoding
+let operation_receipt_encoding =
+  Apply_results.operation_metadata_encoding_with_legacy_attestation_name
 
 let operation_data_and_receipt_encoding =
-  Apply_results.operation_data_and_metadata_encoding
+  Apply_results
+  .operation_data_and_metadata_encoding_with_legacy_attestation_name
 
 type operation = Alpha_context.packed_operation = {
   shell : Operation.shell_header;

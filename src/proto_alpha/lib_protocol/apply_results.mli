@@ -269,7 +269,13 @@ val pack_migration_operation_results :
 (** Serializer for {!packed_operation_result}. *)
 val operation_metadata_encoding : packed_operation_metadata Data_encoding.t
 
+val operation_metadata_encoding_with_legacy_attestation_name :
+  packed_operation_metadata Data_encoding.t
+
 val operation_data_and_metadata_encoding :
+  (Operation.packed_protocol_data * packed_operation_metadata) Data_encoding.t
+
+val operation_data_and_metadata_encoding_with_legacy_attestation_name :
   (Operation.packed_protocol_data * packed_operation_metadata) Data_encoding.t
 
 type 'kind contents_and_result_list =
@@ -288,6 +294,9 @@ type packed_contents_and_result_list =
       -> packed_contents_and_result_list
 
 val contents_and_result_list_encoding :
+  packed_contents_and_result_list Data_encoding.t
+
+val contents_and_result_list_encoding_with_legacy_attestation_name :
   packed_contents_and_result_list Data_encoding.t
 
 val pack_contents_list :
