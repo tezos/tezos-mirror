@@ -190,6 +190,8 @@ module Inner = struct
 
     let share_encoding = array fr_encoding
 
+    let shard_proof_encoding = g1_encoding
+
     let shard_encoding =
       conv
         (fun {index; share} -> (index, share))
