@@ -58,7 +58,7 @@ module type T = sig
     state ->
     config ->
     protocol_operation operation ->
-    (state * Operation_hash.t list) option
+    (state * Operation_hash.t list, protocol_operation operation option) result
 
   val remove_operation : state -> Operation_hash.t -> state
 end
@@ -181,10 +181,31 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
     in
     aux state []
 
+  (* Remove the minimal operation until there is room for [op], and
+     return the last operation removed this way.
+
+     Precondition: the [state] satisfies the invariants but does not
+     already have room for [op].
+
+     We don't need to check the [config.max_operations] bound because
+     removing one operation is always enough to add [op] without
+     breaking it.
+
+     Note that this can only return [None] when removing all
+     operations is still not enough to make room for [op] -- ie., when
+     [op.size > config.max_total_bytes]. *)
+  let rec find_op_to_overtake config state op =
+    match state.minop with
+    | None -> None
+    | Some minop ->
+        if state.total_bytes - minop.size + op.size <= config.max_total_bytes
+        then Some minop
+        else find_op_to_overtake config (remove_present state minop) op
+
   (* Precondition: [op] is valid (otherwise calling
      [Proto.compare_operations] on it may return an error). *)
   let add_operation state config op =
-    if Operation_hash.Map.mem op.hash state.ophmap then Some (state, [])
+    if Operation_hash.Map.mem op.hash state.ophmap then Ok (state, [])
     else
       let state =
         {
@@ -203,9 +224,15 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
       if List.mem ~equal:Operation_hash.equal op.hash removed then
         (* If the new operation needs to be immediately removed in
            order to maintain the mempool bound invariants, then it
-           should actually be rejected. *)
-        None
-      else Some (state, removed)
+           should actually be rejected.
+
+           We feed to [find_op_to_overtake] the [state] returned by
+           [enforce_bound_invariants] to avoid handling again the
+           operations removed by it: we already know that removing
+           them is not enough to make room for [op]. *)
+        let op_to_overtake = find_op_to_overtake config state op in
+        Error op_to_overtake
+      else Ok (state, removed)
 end
 
 module Internal_for_tests = struct

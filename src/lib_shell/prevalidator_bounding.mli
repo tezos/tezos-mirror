@@ -77,17 +77,25 @@ module type T = sig
 
   (** Try and add an operation to the state.
 
-      When the mempool is not full (i.e. adding the operation does not
+      When the state is not full (i.e. adding the operation does not
       break the {!max_operations} nor the {!max_total_bytes} limits),
       return the updated state and an empty list.
 
-      When the mempool is full, return either:
+      When the state is full, return either:
       - an updated state and a list of replaced operations, which are
         all smaller than the new operation (according to the protocol's
         [compare_operations] function) and have been removed from the
         state to make room for the new operation, or
-      - [None] when it is not possible to make room for the new
+      - an [Error] when it is not possible to make room for the new
         operation by removing only operations that are smaller than it.
+        In that case, the error contains [op_to_overtake], that is, the
+        smallest operation such that if the new operation were greater
+        than [op_to_overtake] according to [compare_operations] (but
+        with an unchanged byte size), then it could be successfully
+        added to the state. The [Error] can only contain [None] when
+        no matter how the new operation compares to others, it can
+        never be added, ie. the new operation has a bigger size than
+        {!config.max_total_bytes} by itself.
 
       When the operation is already present in the state, do nothing
       i.e. return the unchanged state and an empty replacement list.
@@ -99,7 +107,9 @@ module type T = sig
     state ->
     config ->
     protocol_operation Shell_operation.operation ->
-    (state * Operation_hash.t list) option
+    ( state * Operation_hash.t list,
+      protocol_operation Shell_operation.operation option )
+    result
 
   (** Remove the operation from the state.
 

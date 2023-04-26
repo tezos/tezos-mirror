@@ -243,8 +243,8 @@ module MakeAbstract
       | Some (replaced, _) -> Bounding.remove_operation bounding_state replaced
     in
     let* bounding_state, removed_by_bounding =
-      Option.to_result
-        ~none:[Validation_errors.Rejected_by_full_mempool op.hash]
+      Result.map_error
+        (fun _ -> [Validation_errors.Rejected_by_full_mempool op.hash])
         (Bounding.add_operation bounding_state bounding_config op)
     in
     let mempool =

@@ -426,13 +426,15 @@ type bounding_outcome =
           than [n]).
           In practice we generate [0 <= n <= 3], and very often [n = 0]
           meaning that there is no replacement. *)
-  | B_none  (** Return [None]. *)
+  | B_error
+      (** Return [Error op_to_overtake_opt] where [op_to_overtake_opt] is
+          randomly [None] or an operation present in the state. *)
   | B_crash  (** Raise an exception. *)
 
 (** This generator returns:
     - with odds 3/5: [B_success 0]
     - with odds 1/15 each: [B_success n], for [1 <= n <= 3]
-    - with odds 2/15: [B_none]
+    - with odds 2/15: [B_error]
     - with odds 1/15: [B_crash]
 
     We strongly favor [B_success 0] (aka add the operation without any
@@ -444,7 +446,7 @@ let bounding_outcome_gen =
       ( 12,
         let* n = frequencyl [(9, 0); (1, 1); (1, 2); (1, 3)] in
         return (B_success n) );
-      (2, pure B_none);
+      (2, pure B_error);
       (1, pure B_crash);
     ]
 
@@ -462,41 +464,50 @@ let bounding_outcome_gen =
 module Toy_bounding :
   Prevalidator_bounding.T
     with type protocol_operation = Toy_proto.operation
-     and type state = Operation_hash.Set.t * bounding_outcome = struct
-  type state = Operation_hash.Set.t * bounding_outcome
+     and type state =
+      Toy_proto.operation Shell_operation.operation Operation_hash.Map.t
+      * bounding_outcome = struct
+  type protocol_operation = Toy_proto.operation
+
+  type state =
+    Toy_proto.operation Shell_operation.operation Operation_hash.Map.t
+    * bounding_outcome
 
   (* Similarly to [Toy_proto.Mempool.t], we initialize the [state]
      with the outcome [B_success 0] so that it is easy to add
      operations to the mempool and make it grow. *)
-  let empty = (Operation_hash.Set.empty, B_success 0)
+  let empty = (Operation_hash.Map.empty, B_success 0)
 
-  type protocol_operation = Toy_proto.operation
-
-  (** Remove and return [n] random elements from [set].
-      If [n > cardinal set], then return all the elements of [set] instead.
+  (** Remove and return [n] random hashes from [ophmap].
+      If [n > cardinal ophmap], return all the keys of [ophmap] instead.
       Not tail-rec because in practice it is used with n <= 3. *)
-  let rec pop_n set n =
-    if n <= 0 || Operation_hash.Set.is_empty set then (set, [])
+  let rec pop_n ophmap n =
+    if n <= 0 || Operation_hash.Map.is_empty ophmap then (ophmap, [])
     else
-      let oph =
-        QCheck2.Gen.(generate1 (oneofl (Operation_hash.Set.elements set)))
-      in
-      let set = Operation_hash.Set.remove oph set in
-      let set, popped = pop_n set (n - 1) in
-      (set, oph :: popped)
+      let oph = random_oph_from_map ophmap in
+      let ophmap = Operation_hash.Map.remove oph ophmap in
+      let ophmap, popped = pop_n ophmap (n - 1) in
+      (ophmap, oph :: popped)
 
-  let add_operation (set, desired_outcome) _config {Shell_operation.hash; _} =
+  let add_operation (ophmap, desired_outcome) _config op =
     match desired_outcome with
     | B_success n ->
-        let set, replaced = pop_n set n in
-        let set = Operation_hash.Set.add hash set in
-        Some ((set, desired_outcome), replaced)
-    | B_none -> None
+        let ophmap, replaced = pop_n ophmap n in
+        let ophmap = Operation_hash.Map.add op.Shell_operation.hash op ophmap in
+        Ok ((ophmap, desired_outcome), replaced)
+    | B_error ->
+        let op_to_overtake =
+          let open QCheck2.Gen in
+          if Operation_hash.Map.is_empty ophmap || generate1 bool then None
+          else
+            Some (snd (generate1 (oneofl (Operation_hash.Map.bindings ophmap))))
+        in
+        Error op_to_overtake
     | B_crash -> assert false
 
-  let remove_operation ((set, outcome) as state) oph =
-    if Operation_hash.Set.mem oph set then
-      (Operation_hash.Set.remove oph set, outcome)
+  let remove_operation ((ophmap, outcome) as state) oph =
+    if Operation_hash.Map.mem oph ophmap then
+      (Operation_hash.Map.remove oph ophmap, outcome)
     else state
 end
 
@@ -520,12 +531,12 @@ let () =
   let open P.Internal_for_tests in
   let add_op state (op, (proto_outcome, bounding_outcome)) =
     let proto_ophmap_before = get_mempool_operations state in
-    let bounding_ophset_before = fst (get_bounding_state state) in
+    let bounding_ophmap_before = fst (get_bounding_state state) in
     assert (not (Operation_hash.Map.mem op.hash proto_ophmap_before)) ;
-    assert (not (Operation_hash.Set.mem op.hash bounding_ophset_before)) ;
+    assert (not (Operation_hash.Map.mem op.hash bounding_ophmap_before)) ;
     let state = set_mempool state (proto_ophmap_before, proto_outcome) in
     let state =
-      set_bounding_state state (bounding_ophset_before, bounding_outcome)
+      set_bounding_state state (bounding_ophmap_before, bounding_outcome)
     in
     let*! state, returned_op, classification, replacements =
       P.add_operation state P.default_config op
@@ -533,7 +544,7 @@ let () =
     (* Check the classification. *)
     (match (proto_outcome, bounding_outcome) with
     | Proto_success _, B_success _ -> assert_success ~__LOC__ classification
-    | Proto_success _, B_none ->
+    | Proto_success _, B_error ->
         assert_rejected_by_full_mempool ~__LOC__ classification
     | Proto_unchanged, _ -> assert_operation_conflict ~__LOC__ classification
     | Proto_branch_delayed, _ ->
@@ -545,19 +556,19 @@ let () =
         assert_exn ~__LOC__ classification) ;
     (* Check that the states have been correctly updated. *)
     let proto_ophmap = get_mempool_operations state in
-    let bounding_ophset = fst (get_bounding_state state) in
+    let bounding_ophmap = fst (get_bounding_state state) in
     let count_before = Operation_hash.Map.cardinal proto_ophmap_before in
     let count = Operation_hash.Map.cardinal proto_ophmap in
     (match (proto_outcome, bounding_outcome) with
     | Proto_success proto_replacement, B_success nb_replaced_bounding ->
         assert (Operation_hash.Map.mem op.hash proto_ophmap) ;
-        assert (Operation_hash.Set.mem op.hash bounding_ophset) ;
+        assert (Operation_hash.Map.mem op.hash bounding_ophmap) ;
         List.iter
           (fun (replaced, replacement_classification) ->
             assert (Operation_hash.Map.mem replaced proto_ophmap_before) ;
-            assert (Operation_hash.Set.mem replaced bounding_ophset_before) ;
+            assert (Operation_hash.Map.mem replaced bounding_ophmap_before) ;
             assert (not (Operation_hash.Map.mem replaced proto_ophmap)) ;
-            assert (not (Operation_hash.Set.mem replaced bounding_ophset)) ;
+            assert (not (Operation_hash.Map.mem replaced bounding_ophmap)) ;
             assert_replacement ~__LOC__ replacement_classification)
           replacements ;
         let nb_replaced_proto =
@@ -569,7 +580,7 @@ let () =
         assert (count = count_before + 1 - nb_replaced)
     | _ ->
         assert (not (Operation_hash.Map.mem op.hash proto_ophmap)) ;
-        assert (not (Operation_hash.Set.mem op.hash bounding_ophset)) ;
+        assert (not (Operation_hash.Map.mem op.hash bounding_ophmap)) ;
         assert (List.is_empty replacements) ;
         assert (count = count_before)) ;
     (* Check that the operation has been correctly updated (or left alone). *)
@@ -592,14 +603,14 @@ let () =
     List.fold_left_s add_op prevalidation_state ops_and_outcomes
   in
   let final_proto_ophmap = get_mempool_operations final_prevalidation_state in
-  let final_bounding_ophset =
+  let final_bounding_ophmap =
     fst (get_bounding_state final_prevalidation_state)
   in
   assert (
     Operation_hash.Map.cardinal final_proto_ophmap
-    = Operation_hash.Set.cardinal final_bounding_ophset) ;
+    = Operation_hash.Map.cardinal final_bounding_ophmap) ;
   Operation_hash.Map.iter
-    (fun oph _ -> assert (Operation_hash.Set.mem oph final_bounding_ophset))
+    (fun oph _ -> assert (Operation_hash.Map.mem oph final_bounding_ophmap))
     final_proto_ophmap ;
   return_unit
 
@@ -627,7 +638,7 @@ let () =
   let oph = QCheck2.Gen.generate1 Generators.operation_hash_gen in
   let state = P.remove_operation state oph in
   assert (Operation_hash.Map.is_empty (get_mempool_operations state)) ;
-  assert (Operation_hash.Set.is_empty (fst (get_bounding_state state))) ;
+  assert (Operation_hash.Map.is_empty (fst (get_bounding_state state))) ;
   (* Prepare the initial state. *)
   let*! initial_state =
     List.fold_left_s
@@ -649,25 +660,25 @@ let () =
       let oph = random_oph_from_map proto_ophmap_before in
       let state = P.remove_operation state oph in
       let proto_ophmap = get_mempool_operations state in
-      let bounding_ophset = fst (get_bounding_state state) in
+      let bounding_ophmap = fst (get_bounding_state state) in
       assert (not (Operation_hash.Map.mem oph proto_ophmap)) ;
-      assert (not (Operation_hash.Set.mem oph bounding_ophset)) ;
+      assert (not (Operation_hash.Map.mem oph bounding_ophmap)) ;
       let cardinal = Operation_hash.Map.cardinal proto_ophmap in
       assert (cardinal = cardinal_before - 1) ;
-      assert (Operation_hash.Set.cardinal bounding_ophset = cardinal) ;
+      assert (Operation_hash.Map.cardinal bounding_ophmap = cardinal) ;
       (state, proto_ophmap, cardinal))
     else
       (* Remove a fresh operation. *)
-      let bounding_ophset_before = get_bounding_state state in
+      let bounding_ophmap_before = get_bounding_state state in
       let oph =
         QCheck2.Gen.generate1 (Generators.fresh_oph_gen proto_ophmap_before)
       in
       let state = P.remove_operation state oph in
       let proto_ophmap = get_mempool_operations state in
-      let bounding_ophset = get_bounding_state state in
+      let bounding_ophmap = get_bounding_state state in
       (* Internal states are physically unchanged. *)
       assert (proto_ophmap == proto_ophmap_before) ;
-      assert (bounding_ophset == bounding_ophset_before) ;
+      assert (bounding_ophmap == bounding_ophmap_before) ;
       (state, proto_ophmap, cardinal_before)
   in
   let rec fun_power f x n = if n <= 0 then x else fun_power f (f x) (n - 1) in
@@ -677,10 +688,10 @@ let () =
       (initial_state, initial_proto_ophmap, initial_cardinal)
       nb_ops_to_remove
   in
-  let final_bounding_ophset = fst (get_bounding_state final_state) in
-  assert (Operation_hash.Set.cardinal final_bounding_ophset = final_cardinal) ;
+  let final_bounding_ophmap = fst (get_bounding_state final_state) in
+  assert (Operation_hash.Map.cardinal final_bounding_ophmap = final_cardinal) ;
   assert (
     Operation_hash.Map.for_all
-      (fun oph _op -> Operation_hash.Set.mem oph final_bounding_ophset)
+      (fun oph _op -> Operation_hash.Map.mem oph final_bounding_ophmap)
       final_proto_ophmap) ;
   return_unit
