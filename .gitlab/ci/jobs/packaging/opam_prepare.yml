@@ -23,6 +23,8 @@
       - opam_logs/
     expire_in: 1 week
     when: always
+  variables:
+    RUNTEZTALIAS: "true"
 
 opam:prepare:
   extends:
