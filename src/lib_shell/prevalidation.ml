@@ -220,6 +220,21 @@ module MakeAbstract
         return_some (removed, `Outdated trace)
     | Unchanged -> error [Operation_conflict {new_hash = op.hash}]
 
+  let bounding_add_operation bounding_state bounding_config op =
+    Result.map_error
+      (fun op_to_overtake ->
+        let needed_fee_in_mutez =
+          Option.bind op_to_overtake (fun op_to_overtake ->
+              Filter.Mempool.fee_needed_to_overtake
+                ~op_to_overtake:op_to_overtake.protocol
+                ~candidate_op:op.protocol)
+        in
+        [
+          Validation_errors.Rejected_by_full_mempool
+            {hash = op.hash; needed_fee_in_mutez};
+        ])
+      (Bounding.add_operation bounding_state bounding_config op)
+
   (* Analyze the output of [Proto.Mempool.add_operation] to handle a
      potential operation conflict. Then use the [Bounding] module to
      ensure that the mempool remains bounded.
@@ -243,9 +258,7 @@ module MakeAbstract
       | Some (replaced, _) -> Bounding.remove_operation bounding_state replaced
     in
     let* bounding_state, removed_by_bounding =
-      Result.map_error
-        (fun _ -> [Validation_errors.Rejected_by_full_mempool op.hash])
-        (Bounding.add_operation bounding_state bounding_config op)
+      bounding_add_operation bounding_state bounding_config op
     in
     let mempool =
       List.fold_left Proto.Mempool.remove_operation mempool removed_by_bounding

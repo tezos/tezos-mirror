@@ -34,7 +34,10 @@ type error +=
       old_hash : Operation_hash.t;
       new_hash : Operation_hash.t;
     }
-  | Rejected_by_full_mempool of Operation_hash.t
+  | Rejected_by_full_mempool of {
+      hash : Operation_hash.t;
+      needed_fee_in_mutez : int64 option;
+    }
   | Removed_from_full_mempool of Operation_hash.t
 
 type error += Too_many_operations
@@ -110,16 +113,37 @@ let () =
     ~id:"node.mempool.rejected_by_full_mempool"
     ~title:"Operation fees are too low to be considered in full mempool"
     ~description:"Operation fees are too low to be considered in full mempool"
-    ~pp:(fun ppf oph ->
+    ~pp:(fun ppf (oph, fee_opt) ->
       Format.fprintf
         ppf
-        "The mempool is full and operation %a does not have enough fees to \
-         replace existing operations."
+        "Operation %a has been rejected because the mempool is full. %s"
         Operation_hash.pp
-        oph)
-    Data_encoding.(obj1 (req "operation_hash" Operation_hash.encoding))
-    (function Rejected_by_full_mempool oph -> Some oph | _ -> None)
-    (fun oph -> Rejected_by_full_mempool oph) ;
+        oph
+        (match fee_opt with
+        | Some fee ->
+            Format.sprintf
+              "This specific operation would need a total fee of at least %Ld \
+               mutez to be considered and propagated by the mempool of this \
+               particular node right now. Note that if the node receives \
+               operations with a better fee over gas limit ratio in the \
+               future, the operation may be rejected even with the indicated \
+               fee, or it may be successfully injected but removed at a later \
+               date."
+              fee
+        | None ->
+            "The operation cannot be accepted by this node at the moment, \
+             regardless of its fee. Try again after the next block has been \
+             baked."))
+    Data_encoding.(
+      obj2
+        (req "operation_hash" Operation_hash.encoding)
+        (req "needed_fee_in_mutez" (option int64)))
+    (function
+      | Rejected_by_full_mempool {hash; needed_fee_in_mutez} ->
+          Some (hash, needed_fee_in_mutez)
+      | _ -> None)
+    (fun (hash, needed_fee_in_mutez) ->
+      Rejected_by_full_mempool {hash; needed_fee_in_mutez}) ;
   (* Removed_from_full_mempool *)
   register_error_kind
     `Temporary
