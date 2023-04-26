@@ -160,7 +160,7 @@ fn read_u256(
     if bytes.len() != WORD_SIZE {
         Ok(None)
     } else {
-        Ok(Some(U256::from_big_endian(&bytes)))
+        Ok(Some(U256::from_little_endian(&bytes)))
     }
 }
 
@@ -227,7 +227,8 @@ impl EthereumAccount {
             .checked_add(U256::one())
             .ok_or(AccountStorageError::NonceOverflow)?;
 
-        let new_value_bytes: [u8; WORD_SIZE] = new_value.into();
+        let mut new_value_bytes: [u8; WORD_SIZE] = [0; WORD_SIZE];
+        new_value.to_little_endian(&mut new_value_bytes);
 
         host.store_write(&path, &new_value_bytes, 0)
             .map_err(AccountStorageError::from)
@@ -259,7 +260,8 @@ impl EthereumAccount {
         let value = self.balance(host)?;
 
         if let Some(new_value) = value.checked_add(amount) {
-            let new_value_bytes: [u8; WORD_SIZE] = new_value.into();
+            let mut new_value_bytes: [u8; WORD_SIZE] = [0; WORD_SIZE];
+            new_value.to_little_endian(&mut new_value_bytes);
 
             host.store_write(&path, &new_value_bytes, 0)
                 .map_err(AccountStorageError::from)
@@ -281,7 +283,8 @@ impl EthereumAccount {
         let value = self.balance(host)?;
 
         if let Some(new_value) = value.checked_sub(amount) {
-            let new_value_bytes: [u8; WORD_SIZE] = new_value.into();
+            let mut new_value_bytes: [u8; WORD_SIZE] = [0; WORD_SIZE];
+            new_value.to_little_endian(&mut new_value_bytes);
 
             host.store_write(&path, &new_value_bytes, 0)
                 .map_err(AccountStorageError::from)
