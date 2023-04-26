@@ -14,7 +14,15 @@ let
     })
     pkgs.rust-analyzer
     pkgs.wabt
+
+    # Bring Clang into scope in case the stdenv doesn't come with it already.
     pkgs.clang
+
+    # This brings in things like llvm-ar which are needed for Rust WebAssembly
+    # compilation on Mac.
+    # It isn't used by default. Configure the AR environment variable to
+    # make rustc use it.
+    pkgs.llvmPackages.bintools
   ];
 
   mainPackage = (import ./default.nix).overrideAttrs (old: {
