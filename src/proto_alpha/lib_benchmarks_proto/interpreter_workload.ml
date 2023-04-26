@@ -45,6 +45,7 @@ type instruction_name =
   | N_IDup
   | N_ISwap
   | N_IPush
+  | N_IUnit
   (* pairs *)
   | N_ICons_pair
   | N_ICar
@@ -268,6 +269,7 @@ let string_of_instruction_name : instruction_name -> string =
   | N_IDup -> "N_IDup"
   | N_ISwap -> "N_ISwap"
   | N_IPush -> "N_IPush"
+  | N_IUnit -> "N_IUnit"
   | N_ICons_pair -> "N_ICons_pair"
   | N_ICar -> "N_ICar"
   | N_ICdr -> "N_ICdr"
@@ -754,6 +756,8 @@ module Instructions = struct
 
   let push = ir_sized_step N_IPush nullary
 
+  let unit = ir_sized_step N_IUnit nullary
+
   let cons_pair = ir_sized_step N_ICons_pair nullary
 
   let car = ir_sized_step N_ICar nullary
@@ -1223,6 +1227,7 @@ let extract_ir_sized_step :
   | IDup (_, _), _ -> Instructions.dup
   | ISwap (_, _), _ -> Instructions.swap
   | IPush (_, _, _, _), _ -> Instructions.push
+  | IUnit (_, _), _ -> Instructions.unit
   | ICons_pair (_, _), _ -> Instructions.cons_pair
   | ICar (_, _), _ -> Instructions.car
   | ICdr (_, _), _ -> Instructions.cdr

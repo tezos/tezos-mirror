@@ -446,6 +446,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IPush :
       Script.location * ('ty, _) ty * 'ty * ('ty, 'a * 'S, 'r, 'F) kinstr
       -> ('a, 'S, 'r, 'F) kinstr
+  | IUnit :
+      Script.location * (unit, 'a * 'S, 'r, 'F) kinstr
+      -> ('a, 'S, 'r, 'F) kinstr
   (*
      Pairs
      -----

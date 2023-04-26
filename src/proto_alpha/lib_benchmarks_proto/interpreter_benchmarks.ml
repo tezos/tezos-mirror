@@ -771,6 +771,14 @@ module Registration_section = struct
         ~kinstr:(IPush (dummy_loc, unit, (), halt))
         ()
 
+    let () =
+      simple_benchmark
+        ~amplification:100
+        ~name:Interpreter_workload.N_IUnit
+        ~stack_type:(unit @$ unit @$ bot)
+        ~kinstr:(IUnit (dummy_loc, halt))
+        ()
+
     (* deep stack manipulation *)
 
     (* Constructing these instructions is made especially painful by the

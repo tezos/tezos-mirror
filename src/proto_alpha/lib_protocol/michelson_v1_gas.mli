@@ -315,6 +315,8 @@ module Cost_of : sig
 
     val push : Gas.cost
 
+    val unit : Gas.cost
+
     val empty_big_map : Gas.cost
 
     val lt : Gas.cost
