@@ -65,13 +65,39 @@ let raw_hash_rpc_arg =
     ~construct
     ()
 
+type cannot_convert_raw_hash_to_hash = {
+  raw_hash : raw_hash;
+  proto : Protocol_hash.t;
+}
+
+type error += Cannot_convert_raw_hash_to_hash of cannot_convert_raw_hash_to_hash
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"cannot_convert_raw_hash_to_hash"
+    ~title:"Impossible to retrieve hash from raw_hash"
+    ~description:
+      "Impossible to validate the provided raw_hash against the protocol"
+    ~pp:(fun ppf (raw_hash, proto) ->
+      Format.fprintf
+        ppf
+        "Impossible to validate the provided raw_hash %s against the actual \
+         protocol %s and transform it to a valid hash"
+        (raw_hash_to_hex raw_hash)
+        (Protocol_hash.to_string proto))
+    Data_encoding.(
+      obj2
+        (req "raw_hash" raw_hash_encoding)
+        (req "proto" Protocol_hash.encoding))
+    (function
+      | Cannot_convert_raw_hash_to_hash {raw_hash; proto} ->
+          Some (raw_hash, proto)
+      | _ -> None)
+    (fun (raw_hash, proto) -> Cannot_convert_raw_hash_to_hash {raw_hash; proto})
+
 module type T = sig
-  type cannot_convert_raw_hash_to_hash
-
-  type error +=
-    | Cannot_convert_raw_hash_to_hash of cannot_convert_raw_hash_to_hash
-
-  val raw_to_hash : raw_hash -> hash tzresult
+  
 
   val encoding : hash Data_encoding.t
 
@@ -89,6 +115,8 @@ module type T = sig
   val to_hex : hash -> string
 
   val size : scheme:supported_hashes -> int
+
+  val raw_to_hash : raw_hash -> hash tzresult
 
   module Proto : Registered_protocol.T
 end

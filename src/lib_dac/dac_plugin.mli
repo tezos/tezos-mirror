@@ -73,18 +73,16 @@ val raw_hash_rpc_arg : raw_hash Tezos_rpc.Arg.arg
     Fix static supported_hashes type *)
 type supported_hashes = Blake2B
 
+(** Type used to track exception when impossible to convert
+    [raw_hash] to [hash] *)
+type cannot_convert_raw_hash_to_hash = {
+  raw_hash : raw_hash;
+  proto : Protocol_hash.t;
+}
+
+type error += Cannot_convert_raw_hash_to_hash of cannot_convert_raw_hash_to_hash
+
 module type T = sig
-  type cannot_convert_raw_hash_to_hash
-
-  type error +=
-    | Cannot_convert_raw_hash_to_hash of cannot_convert_raw_hash_to_hash
-          (** Unlike [hash_to_raw] this conversion is unsafe.
-      Under the hood, [raw_hash] will be encoded into hex
-      then this hex will be decoded to a [hash] using
-      the [Plugin.of_hex hex] *)
-
-  val raw_to_hash : raw_hash -> hash tzresult
-
   (** The encoding of reveal hashes. *)
   val encoding : hash Data_encoding.t
 
@@ -113,6 +111,12 @@ module type T = sig
   (** [size ~scheme] returns the size of reveal hashes using the [scheme]
       specified in input. *)
   val size : scheme:supported_hashes -> int
+
+  (** Unlike [hash_to_raw] this conversion is unsafe.
+      Under the hood, [raw_hash] will be encoded into hex
+      then this hex will be decoded to a [hash] using
+      the [Plugin.of_hex hex] *)
+  val raw_to_hash : raw_hash -> hash tzresult
 
   module Proto : Registered_protocol.T
 end

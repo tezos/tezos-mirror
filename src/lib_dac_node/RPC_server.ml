@@ -94,7 +94,7 @@ let handle_post_store_preimage dac_plugin cctxt dac_sk_uris page_store
   in
   let raw_root_hash = Dac_plugin.hash_to_raw root_hash in
   let*! external_message =
-    External_message.Default.make raw_root_hash signature witnesses
+    External_message.Default.make dac_plugin root_hash signature witnesses
   in
   match external_message with
   | Ok external_message -> return @@ (raw_root_hash, external_message)
@@ -102,11 +102,12 @@ let handle_post_store_preimage dac_plugin cctxt dac_sk_uris page_store
 
 let handle_get_verify_signature dac_plugin public_keys_opt encoded_l1_message =
   let open Lwt_result_syntax in
+  let ((module Plugin) : Dac_plugin.t) = dac_plugin in
   let external_message =
     let open Option_syntax in
     let* encoded_l1_message in
     let* as_bytes = Hex.to_bytes @@ `Hex encoded_l1_message in
-    External_message.Default.of_bytes Dac_plugin.raw_hash_encoding as_bytes
+    External_message.Default.of_bytes Plugin.encoding as_bytes
   in
   match external_message with
   | None -> tzfail @@ Cannot_deserialize_external_message
@@ -114,7 +115,7 @@ let handle_get_verify_signature dac_plugin public_keys_opt encoded_l1_message =
       Signature_manager.verify
         dac_plugin
         ~public_keys_opt
-        root_hash
+        (Dac_plugin.hash_to_raw root_hash)
         signature
         witnesses
 

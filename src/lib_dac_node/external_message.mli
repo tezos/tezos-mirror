@@ -29,7 +29,7 @@
 type error += Could_not_serialize_rollup_external_message of string
 
 type t = {
-  root_hash : Dac_plugin.raw_hash;
+  root_hash : Dac_plugin.hash;
   signature : Tezos_crypto.Aggregate_signature.signature;
   witnesses : Z.t;
 }
@@ -40,12 +40,13 @@ module Default : sig
       as a byte sequence of the form [tag] ^ [root_hash] ^ [signature] ^ [witnesses].
   *)
   val make :
-    Dac_plugin.raw_hash ->
+    Dac_plugin.t ->
+    Dac_plugin.hash ->
     Tezos_crypto.Aggregate_signature.signature ->
     Z.t ->
     bytes tzresult Lwt.t
 
   (** [of_bytes dac_hash_encoding payload] deserializes [payload] into a 
       [dac_message]. *)
-  val of_bytes : Dac_plugin.raw_hash Data_encoding.t -> bytes -> t option
+  val of_bytes : Dac_plugin.hash Data_encoding.t -> bytes -> t option
 end
