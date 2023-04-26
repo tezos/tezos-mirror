@@ -25,12 +25,7 @@
 (*****************************************************************************)
 
 module Output : sig
-  type t =
-    | Null
-    | Stdout
-    | Stderr
-    | File of string
-    | Syslog of Lwt_log.syslog_facility
+  type t = Null | Stdout | Stderr | File of string | Syslog of Syslog.facility
 
   val encoding : t Data_encoding.t
 
@@ -45,7 +40,6 @@ type cfg = {
   output : Output.t;
   default_level : Internal_event.level;
   rules : string option;
-  template : Lwt_log_core.template;
 }
 
 val default_cfg : cfg
@@ -54,14 +48,7 @@ val create_cfg :
   ?output:Output.t ->
   ?default_level:Internal_event.level ->
   ?rules:string ->
-  ?template:Lwt_log_core.template ->
   unit ->
   cfg
 
 val cfg_encoding : cfg Data_encoding.t
-
-(** Configure the event-logging sink defined in
-    {!Internal_event.Lwt_log_sink} by merging the contents of [?cfg]
-    (default: {!default_cfg}) and the value of the ["TEZOS_LOG"]
-    environment variable. *)
-val initialize : ?cfg:cfg -> unit -> unit Lwt.t

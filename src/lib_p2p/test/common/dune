@@ -6,6 +6,7 @@
  (package tezos-p2p)
  (instrumentation (backend bisect_ppx))
  (libraries
+  tezt
   tezos-base
   tezos-base.unix
   tezos-stdlib-unix
@@ -14,6 +15,8 @@
   tezos-p2p-services)
  (flags
   (:standard)
+  -open Tezt
+  -open Tezt.Base
   -open Tezos_base.TzPervasives
   -open Tezos_base_unix
   -open Tezos_stdlib_unix

@@ -405,18 +405,12 @@ let default_rpc =
 
 let default_disable_config_validation = false
 
-let lwt_log_sink_default_cfg =
-  {
-    Logs_simple_config.default_cfg with
-    template = "$(date).$(milliseconds): $(message)";
-  }
-
 let default_config =
   {
     data_dir = default_data_dir;
     p2p = default_p2p;
     rpc = default_rpc;
-    log = lwt_log_sink_default_cfg;
+    log = Logs_simple_config.default_cfg;
     internal_events = None;
     shell = Shell_limits.default_limits;
     blockchain_network = blockchain_network_mainnet;
@@ -719,7 +713,7 @@ let encoding =
           ~description:
             "Configuration of the Lwt-log sink (part of the logging framework)"
           Logs_simple_config.cfg_encoding
-          lwt_log_sink_default_cfg)
+          Logs_simple_config.default_cfg)
        (opt
           "internal-events"
           ~description:"Configuration of the structured logging framework"

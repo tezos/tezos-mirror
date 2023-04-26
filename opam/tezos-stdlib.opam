@@ -21,7 +21,6 @@ depends: [
   "bigstring" {with-test}
   "tezos-test-helpers" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
-  "lwt_log" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

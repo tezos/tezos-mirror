@@ -53,24 +53,36 @@ let check_name_exn : string -> (string -> char -> exn) -> unit =
 (* Levels are declared from the lowest to the highest so that
    polymorphic comparison can be used to check whether a message
    should be printed. *)
-type level = Lwt_log_core.level =
-  | Debug
-  | Info
-  | Notice
-  | Warning
-  | Error
-  | Fatal
+type level = Debug | Info | Notice | Warning | Error | Fatal
+
+let default_error_fallback_logger =
+  ref (fun s ->
+      Format.eprintf "%s" s ;
+      Lwt.return_unit)
 
 module Level = struct
   type t = level
 
   let default = Info
 
-  let to_lwt_log t = t
+  let to_string = function
+    | Debug -> "debug"
+    | Info -> "info"
+    | Notice -> "notice"
+    | Warning -> "warning"
+    | Error -> "error"
+    | Fatal -> "fatal"
 
-  let to_string = Lwt_log_core.string_of_level
-
-  let of_string = Lwt_log_core.level_of_string
+  let of_string str =
+    let str = String.lowercase_ascii str in
+    match str with
+    | "debug" -> Some Debug
+    | "info" -> Some Info
+    | "notice" -> Some Notice
+    | "warning" -> Some Warning
+    | "error" -> Some Error
+    | "fatal" -> Some Fatal
+    | _ -> None
 
   let encoding =
     let open Data_encoding in
@@ -97,7 +109,7 @@ module Section : sig
 
   val make_sanitized : string list -> t
 
-  val to_lwt_log : t -> Lwt_log_core.section
+  val name : t -> string
 
   val is_prefix : prefix:t -> t -> bool
 
@@ -109,7 +121,7 @@ module Section : sig
 
   val equal : t -> t -> bool
 end = struct
-  type t = {path : string list; lwt_log_section : Lwt_log_core.section}
+  type t = {path : string list}
 
   include Compare.Make (struct
     type nonrec t = t
@@ -117,7 +129,9 @@ end = struct
     let compare = Stdlib.compare
   end)
 
-  let empty = {path = []; lwt_log_section = Lwt_log_core.Section.make ""}
+  let empty = {path = []}
+
+  let name s = String.concat "." s.path
 
   let make sl =
     List.iter
@@ -129,17 +143,12 @@ end = struct
               name
               char))
       sl ;
-    {
-      path = sl;
-      lwt_log_section = Lwt_log_core.Section.make (String.concat "." sl);
-    }
+    {path = sl}
 
   let make_sanitized sl =
     List.map (String.map (fun c -> if valid_char c then c else '_')) sl |> make
 
   let to_string_list s = s.path
-
-  let to_lwt_log s = s.lwt_log_section
 
   let is_prefix ~prefix main =
     try
@@ -175,9 +184,7 @@ let get_registered_sections () = String.Set.to_seq !registered_sections
 
 let register_section section =
   registered_sections :=
-    String.Set.add
-      (Lwt_log_core.Section.name (Section.to_lwt_log section))
-      !registered_sections
+    String.Set.add (Section.name section) !registered_sections
 
 module type EVENT_DEFINITION = sig
   type t
@@ -1221,7 +1228,11 @@ module Legacy_logging = struct
           match r with
           | Ok () -> Lwt.return_unit
           | Error el ->
-              Format.kasprintf Lwt_log_core.error "%a@\n" pp_print_trace el)
+              Format.kasprintf
+                !default_error_fallback_logger
+                "%a@\n"
+                pp_print_trace
+                el)
         fmt
 
     let debug f = emit_async Debug_event.emit f
@@ -1347,55 +1358,8 @@ module Lwt_worker_logger = struct
     | Ok () -> Lwt.return_unit
     | Error errs ->
         Format.kasprintf
-          Lwt_log_core.error
+          !default_error_fallback_logger
           "failed to log worker event:@ %a@\n"
           Error_monad.pp_print_trace
           errs
-end
-
-module Lwt_log_sink = struct
-  (* let default_template = "$(date) - $(section): $(message)" *)
-
-  let default_section = Lwt_log_core.Section.main
-
-  module Sink : SINK = struct
-    type t = unit
-
-    let uri_scheme = "lwt-log"
-
-    let configure _ = Lwt_result_syntax.return_unit
-
-    let should_handle (type a) ?section () m =
-      let module M = (val m : EVENT_DEFINITION with type t = a) in
-      (* Same criteria as [Lwt_log_core.log] *)
-      let section =
-        Option.fold ~none:default_section ~some:Section.to_lwt_log section
-      in
-      M.level >= Lwt_log_core.Section.level section
-
-    let handle (type a) () m ?section (ev : a) =
-      let open Lwt_syntax in
-      let module M = (val m : EVENT_DEFINITION with type t = a) in
-      protect (fun () ->
-          let section =
-            Option.fold ~some:Section.to_lwt_log section ~none:default_section
-          in
-          let* () =
-            Format.kasprintf
-              (Lwt_log_core.log ~section ~level:M.level)
-              "%a"
-              (M.pp ~all_fields:true ~block:true)
-              ev
-          in
-          return_ok_unit)
-
-    let close _ =
-      let open Lwt_syntax in
-      let* () = Lwt_log_core.close !Lwt_log_core.default in
-      return_ok_unit
-  end
-
-  include Sink
-
-  let () = All_sinks.register (module Sink)
 end

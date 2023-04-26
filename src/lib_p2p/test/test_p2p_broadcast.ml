@@ -51,7 +51,7 @@ let no_check = false
 let init_logs =
   let log_cfg =
     Some
-      (Lwt_log_sink_unix.create_cfg
+      (Tezos_base_unix.Logs_simple_config.create_cfg
          ~rules:"test.p2p.connection-pool -> info; p2p.connection-pool -> info"
          ())
   in
