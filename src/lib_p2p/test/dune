@@ -13,6 +13,7 @@
   test_p2p_node
   test_p2p_connect_handler
   test_p2p_maintenance)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   tezos-base
   tezos-base.unix
@@ -25,11 +26,8 @@
   tezos_p2p_test_common
   tezos-p2p-services
   tezt-tezos
-  alcotest-lwt
+  octez-alcotezt
   astring)
- (link_flags
-  (:standard)
-  (-linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -40,66 +38,65 @@
   -open Tezos_base_test_helpers
   -open Tezos_event_logging_test_helpers
   -open Tezos_p2p_test_common
-  -open Tezos_p2p_services))
-
-(rule
- (alias runtest_p2p_pool)
- (locks /ports/49152-65535)
- (action (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_pool.exe}))))
-
-(rule
- (alias runtest_p2p_broadcast)
- (locks /ports/49152-65535)
- (action (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_broadcast.exe}))))
-
-(rule
- (alias runtest_p2p_io_scheduler)
- (locks /ports/49152-65535)
- (action (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_io_scheduler.exe}))))
-
-(rule
- (alias runtest_p2p_socket)
- (locks /ports/49152-65535)
- (action (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_socket.exe}))))
-
-(rule
- (alias runtest_p2p_node)
- (locks /ports/49152-65535)
- (action (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_node.exe}))))
-
-(rule
- (alias runtest_p2p_peerset)
- (action (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_peerset.exe}))))
-
-(rule
- (alias runtest_p2p_buffer_reader)
- (action (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_buffer_reader.exe}))))
-
-(rule
- (alias runtest_p2p_banned_peers)
- (action (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_banned_peers.exe}))))
-
-(rule
- (alias runtest_p2p_connect_handler)
- (action
-  (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_connect_handler.exe}))))
-
-(rule
- (alias runtest_p2p_maintenance)
- (action (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_maintenance.exe}))))
+  -open Tezos_p2p_services
+  -open Octez_alcotezt))
 
 (rule
  (alias runtest)
  (package tezos-p2p)
- (deps
-  (alias runtest_p2p_socket)
-  (alias runtest_p2p_pool)
-  (alias runtest_p2p_broadcast)
-  (alias runtest_p2p_io_scheduler)
-  (alias runtest_p2p_peerset)
-  (alias runtest_p2p_buffer_reader)
-  (alias runtest_p2p_banned_peers)
-  (alias runtest_p2p_node)
-  (alias runtest_p2p_connect_handler)
-  (alias runtest_p2p_maintenance))
- (action (progn)))
+ (locks /locks/p2p)
+ (action (run %{dep:./test_p2p_socket.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-p2p)
+ (locks /locks/p2p)
+ (action (run %{dep:./test_p2p_pool.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-p2p)
+ (locks /locks/p2p)
+ (action (run %{dep:./test_p2p_broadcast.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-p2p)
+ (locks /locks/p2p)
+ (action (run %{dep:./test_p2p_io_scheduler.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-p2p)
+ (locks /locks/p2p)
+ (action (run %{dep:./test_p2p_peerset.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-p2p)
+ (locks /locks/p2p)
+ (action (run %{dep:./test_p2p_buffer_reader.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-p2p)
+ (locks /locks/p2p)
+ (action (run %{dep:./test_p2p_banned_peers.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-p2p)
+ (locks /locks/p2p)
+ (action (run %{dep:./test_p2p_node.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-p2p)
+ (locks /locks/p2p)
+ (action (run %{dep:./test_p2p_connect_handler.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-p2p)
+ (locks /locks/p2p)
+ (action (run %{dep:./test_p2p_maintenance.exe})))

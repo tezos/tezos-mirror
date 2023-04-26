@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_peerset
+    Invocation:   dune exec src/lib_p2p/test/test_p2p_peerset.exe
     Subject:      On banning peers and usage of Access Control Lists (ACL)
                   using FIFO caches filled with peers' ids.
 *)
@@ -100,6 +100,7 @@ let test_LRU_overflow _ =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "tezos-p2p"
     [
       ( "p2p.peerset",
@@ -110,3 +111,5 @@ let () =
           ("remove", `Quick, test_remove);
         ] );
     ]
+
+let () = Tezt.Test.run ()

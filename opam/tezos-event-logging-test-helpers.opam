@@ -16,7 +16,7 @@ depends: [
   "tezos-error-monad"
   "tezos-event-logging"
   "tezos-test-helpers"
-  "alcotest" { >= "1.5.0" }
+  "octez-alcotezt"
 ]
 build: [
   ["rm" "-r" "vendors"]

@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_broadcast
+    Invocation:   dune exec src/lib_p2p/test/test_p2p_broadcast.exe
     Dependencies: src/lib_p2p/test/process.ml
     Subject:      Testing of the Broadcast
                   Each test launches nodes in separate process, each node
@@ -311,9 +311,12 @@ let main () =
   let addr = Node.default_ipv6_addr in
   Lwt_main.run
   @@ Alcotest_lwt.run
+       ~__FILE__
        "tezos-p2p-broadcast"
        [("p2p-broadcast", [wrap addr "simple" Simple.run])]
 
 let () =
   Sys.catch_break true ;
   try main () with _ -> ()
+
+let () = Tezt.Test.run ()
