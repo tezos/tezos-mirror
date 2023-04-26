@@ -689,7 +689,11 @@ module Encoding : sig
 
   val preendorsement_case : Kind.preendorsement case
 
+  val preattestation_case : Kind.preendorsement case
+
   val endorsement_case : Kind.endorsement case
+
+  val attestation_case : Kind.endorsement case
 
   val dal_attestation_case : Kind.dal_attestation case
 
@@ -700,7 +704,12 @@ module Encoding : sig
   val double_preendorsement_evidence_case :
     Kind.double_preendorsement_evidence case
 
+  val double_preattestation_evidence_case :
+    Kind.double_preendorsement_evidence case
+
   val double_endorsement_evidence_case : Kind.double_endorsement_evidence case
+
+  val double_attestation_evidence_case : Kind.double_endorsement_evidence case
 
   val double_baking_evidence_case : Kind.double_baking_evidence case
 
