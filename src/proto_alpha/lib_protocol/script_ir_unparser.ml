@@ -57,7 +57,6 @@ let rec unparse_ty_and_entrypoints_uncarbonated :
     | Key_t -> (T_key, [])
     | Timestamp_t -> (T_timestamp, [])
     | Address_t -> (T_address, [])
-    | Tx_rollup_l2_address_t -> (T_tx_rollup_l2_address, [])
     | Operation_t -> (T_operation, [])
     | Chain_id_t -> (T_chain_id, [])
     | Never_t -> (T_never, [])
@@ -227,23 +226,6 @@ let unparse_address ~loc ctxt mode {destination; entrypoint} =
         ^ Entrypoint.to_address_suffix entrypoint
       in
       (String (loc, notation), ctxt)
-
-let unparse_tx_rollup_l2_address ~loc ctxt mode
-    (tx_address : tx_rollup_l2_address) =
-  let tx_address = Indexable.to_value tx_address in
-  match mode with
-  | Optimized | Optimized_legacy ->
-      Gas.consume ctxt Unparse_costs.contract_optimized >|? fun ctxt ->
-      let bytes =
-        Data_encoding.Binary.to_bytes_exn
-          Tx_rollup_l2_address.encoding
-          tx_address
-      in
-      (Bytes (loc, bytes), ctxt)
-  | Readable ->
-      Gas.consume ctxt Unparse_costs.contract_readable >|? fun ctxt ->
-      let b58check = Tx_rollup_l2_address.to_b58check tx_address in
-      (String (loc, b58check), ctxt)
 
 let unparse_contract ~loc ctxt mode typed_contract =
   let destination = Typed_contract.destination typed_contract in
@@ -423,8 +405,6 @@ let rec unparse_comparable_data_rec :
   | Bool_t, b -> Lwt.return @@ unparse_bool ~loc ctxt b
   | Timestamp_t, t -> Lwt.return @@ unparse_timestamp ~loc ctxt mode t
   | Address_t, address -> Lwt.return @@ unparse_address ~loc ctxt mode address
-  | Tx_rollup_l2_address_t, address ->
-      Lwt.return @@ unparse_tx_rollup_l2_address ~loc ctxt mode address
   | Signature_t, s -> Lwt.return @@ unparse_signature ~loc ctxt mode s
   | Mutez_t, v -> Lwt.return @@ unparse_mutez ~loc ctxt v
   | Key_t, k -> Lwt.return @@ unparse_key ~loc ctxt mode k
@@ -512,8 +492,6 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
     | Bool_t, b -> Lwt.return @@ unparse_bool ~loc ctxt b
     | Timestamp_t, t -> Lwt.return @@ unparse_timestamp ~loc ctxt mode t
     | Address_t, address -> Lwt.return @@ unparse_address ~loc ctxt mode address
-    | Tx_rollup_l2_address_t, address ->
-        Lwt.return @@ unparse_tx_rollup_l2_address ~loc ctxt mode address
     | Contract_t _, contract ->
         Lwt.return @@ unparse_contract ~loc ctxt mode contract
     | Signature_t, s -> Lwt.return @@ unparse_signature ~loc ctxt mode s

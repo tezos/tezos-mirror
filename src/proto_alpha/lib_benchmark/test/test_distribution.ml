@@ -64,7 +64,6 @@ let rec tnames_of_type :
   | Script_typed_ir.Key_t -> `TKey :: acc
   | Script_typed_ir.Timestamp_t -> `TTimestamp :: acc
   | Script_typed_ir.Address_t -> `TAddress :: acc
-  | Script_typed_ir.Tx_rollup_l2_address_t -> assert false
   | Script_typed_ir.Bool_t -> `TBool :: acc
   | Script_typed_ir.Pair_t (lty, rty, _, _) ->
       tnames_of_type lty (tnames_of_type rty (`TPair :: acc))

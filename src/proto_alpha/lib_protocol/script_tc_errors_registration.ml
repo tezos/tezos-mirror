@@ -263,15 +263,6 @@ let () =
     Data_encoding.empty
     (function Forbidden_zero_ticket_quantity -> Some () | _ -> None)
     (fun () -> Forbidden_zero_ticket_quantity) ;
-  (* Tx rollup addresses disabled *)
-  register_error_kind
-    `Permanent
-    ~id:"michelson_v1.tx_rollup_addresses_disabled"
-    ~title:"Tx rollup addresses are disabled"
-    ~description:"Cannot parse a tx_rollup address as tx rollups are disabled."
-    (obj1 (req "location" Script.location_encoding))
-    (function Tx_rollup_addresses_disabled loc -> Some loc | _ -> None)
-    (fun loc -> Tx_rollup_addresses_disabled loc) ;
   (* Sc rollup disabled *)
   register_error_kind
     `Permanent

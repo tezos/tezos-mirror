@@ -27,8 +27,3 @@
 val compare_comparable : 'a Script_typed_ir.comparable_ty -> 'a -> 'a -> int
 
 val compare_address : Script_typed_ir.address -> Script_typed_ir.address -> int
-
-val compare_tx_rollup_l2_address :
-  Script_typed_ir.tx_rollup_l2_address ->
-  Script_typed_ir.tx_rollup_l2_address ->
-  int

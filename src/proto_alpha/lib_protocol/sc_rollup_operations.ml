@@ -123,7 +123,6 @@ let rec validate_ty :
       | Bls12_381_fr_t -> (k [@ocaml.tailcall]) ()
       | Bool_t -> (k [@ocaml.tailcall]) ()
       | Never_t -> (k [@ocaml.tailcall]) ()
-      | Tx_rollup_l2_address_t -> (k [@ocaml.tailcall]) ()
       | Chain_id_t -> (k [@ocaml.tailcall]) ()
       (* Valid collection types. *)
       | Ticket_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k

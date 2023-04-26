@@ -53,3 +53,6 @@ Internal
   (MR :gl:`!8128`)
 
 - split smart rollup origination fct for readibility. (MR :gl:`!8276`)
+
+- Remove the deprecated and unused ``tx_rollup_l2_address`` Michelson
+  type. (MR :gl:`!8546`)

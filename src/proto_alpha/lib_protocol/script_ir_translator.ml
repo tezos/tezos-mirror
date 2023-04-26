@@ -182,7 +182,7 @@ let hash_comparable_data ctxt ty data =
 let check_dupable_comparable_ty : type a. a comparable_ty -> unit = function
   | Unit_t | Never_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t
   | Mutez_t | Bool_t | Key_hash_t | Key_t | Timestamp_t | Chain_id_t | Address_t
-  | Tx_rollup_l2_address_t | Pair_t _ | Or_t _ | Option_t _ ->
+  | Pair_t _ | Or_t _ | Option_t _ ->
       ()
 
 let check_dupable_ty ctxt loc ty =
@@ -202,7 +202,6 @@ let check_dupable_ty ctxt loc ty =
     | Key_t -> return_unit
     | Timestamp_t -> return_unit
     | Address_t -> return_unit
-    | Tx_rollup_l2_address_t -> return_unit
     | Bool_t -> return_unit
     | Contract_t _ -> return_unit
     | Operation_t -> return_unit
@@ -345,8 +344,6 @@ let ty_eq :
     | Timestamp_t, _ -> not_equal ()
     | Address_t, Address_t -> return Eq
     | Address_t, _ -> not_equal ()
-    | Tx_rollup_l2_address_t, Tx_rollup_l2_address_t -> return Eq
-    | Tx_rollup_l2_address_t, _ -> not_equal ()
     | Bool_t, Bool_t -> return Eq
     | Bool_t, _ -> not_equal ()
     | Chain_id_t, Chain_id_t -> return Eq
@@ -612,11 +609,6 @@ let rec parse_ty :
         check_type_annot loc annot >|? fun () -> return ctxt timestamp_t
     | Prim (loc, T_address, [], annot) ->
         check_type_annot loc annot >|? fun () -> return ctxt address_t
-    | Prim (loc, T_tx_rollup_l2_address, [], annot) ->
-        if Constants.tx_rollup_enable ctxt || legacy then
-          check_type_annot loc annot >|? fun () ->
-          return ctxt tx_rollup_l2_address_t
-        else error @@ Tx_rollup_addresses_disabled loc
     | Prim (loc, T_signature, [], annot) ->
         check_type_annot loc annot >|? fun () -> return ctxt signature_t
     | Prim (loc, T_operation, [], annot) ->
@@ -827,9 +819,8 @@ let rec parse_ty :
     | Prim
         ( loc,
           (( T_unit | T_signature | T_int | T_nat | T_string | T_bytes | T_mutez
-           | T_bool | T_key | T_key_hash | T_timestamp | T_address
-           | T_tx_rollup_l2_address | T_chain_id | T_operation | T_never ) as
-          prim),
+           | T_bool | T_key | T_key_hash | T_timestamp | T_address | T_chain_id
+           | T_operation | T_never ) as prim),
           l,
           _ ) ->
         error (Invalid_arity (loc, prim, 0, List.length l))
@@ -841,6 +832,8 @@ let rec parse_ty :
         error (Invalid_arity (loc, prim, 1, List.length l))
     | Prim (loc, ((T_pair | T_or | T_map | T_lambda) as prim), l, _) ->
         error (Invalid_arity (loc, prim, 2, List.length l))
+    | Prim (_, T_tx_rollup_l2_address, _, _) ->
+        error @@ Deprecated_instruction T_tx_rollup_l2_address
     | expr ->
         error
         @@ unexpected
@@ -873,7 +866,6 @@ let rec parse_ty :
                T_string;
                T_ticket;
                T_timestamp;
-               T_tx_rollup_l2_address;
                T_unit;
              ]
 
@@ -1076,7 +1068,6 @@ let check_packable ~allow_contract loc root =
     | Key_t -> Result.return_unit
     | Timestamp_t -> Result.return_unit
     | Address_t -> Result.return_unit
-    | Tx_rollup_l2_address_t -> Result.return_unit
     | Bool_t -> Result.return_unit
     | Chain_id_t -> Result.return_unit
     | Never_t -> Result.return_unit
@@ -1655,31 +1646,6 @@ let parse_address ctxt : Script.node -> (address * context) tzresult =
   | expr ->
       error @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 
-let parse_tx_rollup_l2_address ctxt :
-    Script.node -> (tx_rollup_l2_address * context) tzresult = function
-  | Bytes (loc, bytes) as expr (* As unparsed with [Optimized]. *) -> (
-      Gas.consume ctxt Typecheck_costs.tx_rollup_l2_address >>? fun ctxt ->
-      match Tx_rollup_l2_address.of_bytes_opt bytes with
-      | Some txa -> ok (Tx_rollup_l2_address.Indexable.value txa, ctxt)
-      | None ->
-          error
-          @@ Invalid_syntactic_constant
-               ( loc,
-                 strip_locations expr,
-                 "a valid transaction rollup L2 address" ))
-  | String (loc, str) as expr (* As unparsed with [Readable]. *) -> (
-      Gas.consume ctxt Typecheck_costs.tx_rollup_l2_address >>? fun ctxt ->
-      match Tx_rollup_l2_address.of_b58check_opt str with
-      | Some txa -> ok (Tx_rollup_l2_address.Indexable.value txa, ctxt)
-      | None ->
-          error
-          @@ Invalid_syntactic_constant
-               ( loc,
-                 strip_locations expr,
-                 "a valid transaction rollup L2 address" ))
-  | expr ->
-      error @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
-
 let parse_never expr : (never * context) tzresult =
   error @@ Invalid_never_expr (location expr)
 
@@ -2038,10 +2004,6 @@ let rec parse_data :
       assert false
   | Chain_id_t, expr -> Lwt.return @@ traced_no_lwt @@ parse_chain_id ctxt expr
   | Address_t, expr -> Lwt.return @@ traced_no_lwt @@ parse_address ctxt expr
-  | Tx_rollup_l2_address_t, expr ->
-      if Constants.tx_rollup_enable ctxt || legacy then
-        Lwt.return @@ traced_no_lwt @@ parse_tx_rollup_l2_address ctxt expr
-      else tzfail (Deprecated_instruction T_tx_rollup_l2_address)
   | Contract_t (arg_ty, _), expr ->
       traced
         ( parse_address ctxt expr >>?= fun (address, ctxt) ->
@@ -5237,7 +5199,6 @@ let rec has_lazy_storage : type t tc. (t, tc) ty -> t has_lazy_storage =
   | Key_t -> False_f
   | Timestamp_t -> False_f
   | Address_t -> False_f
-  | Tx_rollup_l2_address_t -> False_f
   | Bool_t -> False_f
   | Lambda_t (_, _, _) -> False_f
   | Set_t (_, _) -> False_f

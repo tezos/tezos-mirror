@@ -34,8 +34,6 @@ let compare_address {destination = destination1; entrypoint = entrypoint1}
   if Compare.Int.(lres = 0) then Entrypoint.compare entrypoint1 entrypoint2
   else lres
 
-let compare_tx_rollup_l2_address = Tx_rollup_l2_address.Indexable.compare_values
-
 type compare_comparable_cont =
   | Compare_comparable :
       'a comparable_ty * 'a * 'a * compare_comparable_cont
@@ -60,8 +58,6 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
     | Nat_t, x, y -> (apply [@tailcall]) (Script_int.compare x y) k
     | Timestamp_t, x, y -> (apply [@tailcall]) (Script_timestamp.compare x y) k
     | Address_t, x, y -> (apply [@tailcall]) (compare_address x y) k
-    | Tx_rollup_l2_address_t, x, y ->
-        (apply [@tailcall]) (compare_tx_rollup_l2_address x y) k
     | Bytes_t, x, y -> (apply [@tailcall]) (Compare.Bytes.compare x y) k
     | Chain_id_t, x, y -> (apply [@tailcall]) (Script_chain_id.compare x y) k
     | Pair_t (tl, tr, _, YesYes), (lx, rx), (ly, ry) ->
