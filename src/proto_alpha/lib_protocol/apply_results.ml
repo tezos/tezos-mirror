@@ -1009,6 +1009,11 @@ module Encoding = struct
       (req (Format.asprintf "%s_power" power_name) int31)
       (req "consensus_key" Signature.Public_key_hash.encoding)
 
+  let consensus_result_encoding_legacy power_name =
+    consensus_result_encoding power_name
+
+  let consensus_result_encoding = consensus_result_encoding "consensus"
+
   type case =
     | Case : {
         op_case : 'kind Operation.Encoding.case;
@@ -1035,7 +1040,31 @@ module Encoding = struct
     Case
       {
         op_case = Operation.Encoding.preendorsement_case;
-        encoding = consensus_result_encoding "preendorsement";
+        encoding = consensus_result_encoding_legacy "preendorsement";
+        select =
+          (function
+          | Contents_result (Preendorsement_result _ as op) -> Some op
+          | _ -> None);
+        mselect =
+          (function
+          | Contents_and_result ((Preendorsement _ as op), res) -> Some (op, res)
+          | _ -> None);
+        proj =
+          (function
+          | Preendorsement_result
+              {balance_updates; delegate; consensus_key; consensus_power} ->
+              (balance_updates, delegate, consensus_power, consensus_key));
+        inj =
+          (fun (balance_updates, delegate, consensus_power, consensus_key) ->
+            Preendorsement_result
+              {balance_updates; delegate; consensus_key; consensus_power});
+      }
+
+  let preattestation_case =
+    Case
+      {
+        op_case = Operation.Encoding.preattestation_case;
+        encoding = consensus_result_encoding;
         select =
           (function
           | Contents_result (Preendorsement_result _ as op) -> Some op
@@ -1059,7 +1088,30 @@ module Encoding = struct
     Case
       {
         op_case = Operation.Encoding.endorsement_case;
-        encoding = consensus_result_encoding "endorsement";
+        encoding = consensus_result_encoding_legacy "endorsement";
+        select =
+          (function
+          | Contents_result (Endorsement_result _ as op) -> Some op | _ -> None);
+        mselect =
+          (function
+          | Contents_and_result ((Endorsement _ as op), res) -> Some (op, res)
+          | _ -> None);
+        proj =
+          (function
+          | Endorsement_result
+              {balance_updates; delegate; consensus_key; consensus_power} ->
+              (balance_updates, delegate, consensus_power, consensus_key));
+        inj =
+          (fun (balance_updates, delegate, consensus_power, consensus_key) ->
+            Endorsement_result
+              {balance_updates; delegate; consensus_key; consensus_power});
+      }
+
+  let attestation_case =
+    Case
+      {
+        op_case = Operation.Encoding.attestation_case;
+        encoding = consensus_result_encoding;
         select =
           (function
           | Contents_result (Endorsement_result _ as op) -> Some op | _ -> None);
@@ -1153,10 +1205,51 @@ module Encoding = struct
         inj = (fun bus -> Double_endorsement_evidence_result bus);
       }
 
+  let double_attestation_evidence_case =
+    Case
+      {
+        op_case = Operation.Encoding.double_attestation_evidence_case;
+        encoding =
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
+        select =
+          (function
+          | Contents_result (Double_endorsement_evidence_result _ as op) ->
+              Some op
+          | _ -> None);
+        mselect =
+          (function
+          | Contents_and_result ((Double_endorsement_evidence _ as op), res) ->
+              Some (op, res)
+          | _ -> None);
+        proj = (fun (Double_endorsement_evidence_result bus) -> bus);
+        inj = (fun bus -> Double_endorsement_evidence_result bus);
+      }
+
   let double_preendorsement_evidence_case =
     Case
       {
         op_case = Operation.Encoding.double_preendorsement_evidence_case;
+        encoding =
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
+        select =
+          (function
+          | Contents_result (Double_preendorsement_evidence_result _ as op) ->
+              Some op
+          | _ -> None);
+        mselect =
+          (function
+          | Contents_and_result ((Double_preendorsement_evidence _ as op), res)
+            ->
+              Some (op, res)
+          | _ -> None);
+        proj = (fun (Double_preendorsement_evidence_result bus) -> bus);
+        inj = (fun bus -> Double_preendorsement_evidence_result bus);
+      }
+
+  let double_preattestation_evidence_case =
+    Case
+      {
+        op_case = Operation.Encoding.double_preattestation_evidence_case;
         encoding =
           obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
@@ -1623,8 +1716,8 @@ let common_cases =
 
 let contents_cases =
   let open Encoding in
-  endorsement_case :: preendorsement_case :: double_endorsement_evidence_case
-  :: double_preendorsement_evidence_case :: common_cases
+  attestation_case :: preattestation_case :: double_attestation_evidence_case
+  :: double_preattestation_evidence_case :: common_cases
 
 let contents_cases_with_legacy_attestation_name =
   let open Encoding in
