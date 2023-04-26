@@ -23,7 +23,7 @@ depends: [
   "zarith_stubs_js"
   "bls12-381" { >= "6.1.0" & < "6.2.0" }
   "octez-bls12-381-signature"
-  "tezt" { with-test & >= "3.0.0" }
+  "tezt" { with-test & >= "3.1.0" }
   "octez-alcotezt" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
   "tezos-test-helpers" {with-test}

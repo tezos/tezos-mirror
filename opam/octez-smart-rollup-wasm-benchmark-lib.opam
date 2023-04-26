@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "ppx_deriving"
   "tezos-base"
-  "tezt" { >= "3.0.0" }
+  "tezt" { >= "3.1.0" }
   "tezos-webassembly-interpreter"
   "tezos-context"
   "tezos-scoru-wasm"

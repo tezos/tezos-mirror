@@ -16,7 +16,7 @@ depends: [
   "tezos-error-monad"
   "zarith" { >= "1.12" & < "1.13" }
   "tezos-lazy-containers"
-  "tezt" { with-test & >= "3.0.0" }
+  "tezt" { with-test & >= "3.1.0" }
   "octez-alcotezt" {with-test}
 ]
 build: [

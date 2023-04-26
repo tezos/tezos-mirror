@@ -19,7 +19,7 @@ depends: [
   "tezos-client-017-PtNairob"
   "tezos-embedded-protocol-017-PtNairob"
   "tezos-protocol-017-PtNairob"
-  "tezt" { with-test & >= "3.0.0" }
+  "tezt" { with-test & >= "3.1.0" }
   "tezos-base-test-helpers" {with-test}
   "tezos-017-PtNairob-test-helpers" {with-test}
   "tezos-dac-node-lib" {with-test}

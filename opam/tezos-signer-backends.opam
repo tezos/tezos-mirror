@@ -23,7 +23,7 @@ depends: [
   "tezos-clic"
   "tezos-stdlib-unix"
   "tezos-rpc-http-client-unix"
-  "tezt" { with-test & >= "3.0.0" }
+  "tezt" { with-test & >= "3.1.0" }
   "tezos-error-monad" {with-test}
   "tezos-crypto" {with-test}
   "octez-alcotezt" {with-test}

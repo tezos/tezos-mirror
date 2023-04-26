@@ -20,7 +20,7 @@ depends: [
   "tezos-client-alpha"
   "tezos-client-base-unix"
   "tezos-protocol-alpha"
-  "tezt" { >= "3.0.0" }
+  "tezt" { >= "3.1.0" }
   "tezt-tezos"
   "tezt-performance-regression"
   "uri" { >= "3.1.0" }
