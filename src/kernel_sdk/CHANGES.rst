@@ -37,3 +37,14 @@ The installer client enables installation of kernels which are too big to fit in
 operation. Instead, the client generates an installer which immediately upgrades to desired kernel. This
 *installer kernel* may then be used to originate the rollup with.
 
+
+Version next
+=============
+
+SDK
+---
+
+- Implements trait ``Error`` and ``Display`` for ``PathError`` in ``tezos-smart-rollup-host``.
+
+Installer client
+----------------
