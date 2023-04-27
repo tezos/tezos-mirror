@@ -121,6 +121,14 @@ module type LIB = sig
     val band : bl repr -> bl repr -> bl repr t
 
     val rotate_right : bl repr -> int -> bl repr
+
+    (* [shift_left bl 1] shifts all bits left by 1 position, so each bit is more
+       significant. The most signigicant bit is lost and the least significant
+       bit is set to zero. More precisely, if we interpret the [bl] as an integer
+       [shift_left bl i = bl * 2^i mod 2^{length a}] *)
+    val shift_left : bl repr -> int -> bl repr t
+
+    val shift_right : bl repr -> int -> bl repr t
   end
 
   val add2 :
@@ -676,6 +684,25 @@ module Lib (C : COMMON) = struct
       in
       let head, tail = split_n i (of_list a) in
       to_list @@ tail @ head
+
+    let shift_left a i =
+      let* zero = Bool.constant false in
+      let l = of_list a in
+      let length = List.length l - i in
+      assert (length >= 0) ;
+      let res =
+        List.init i (fun _ -> zero) @ List.filteri (fun j _x -> j < length) l
+      in
+      ret @@ to_list res
+
+    let shift_right a i =
+      let* zero = Bool.constant false in
+      let l = of_list a in
+      assert (List.compare_length_with l i >= 0) ;
+      let res =
+        List.filteri (fun j _x -> j >= i) l @ List.init i (fun _ -> zero)
+      in
+      ret @@ to_list res
   end
 
   let add2 p1 p2 =

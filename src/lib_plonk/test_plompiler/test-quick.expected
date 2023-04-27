@@ -1378,6 +1378,114 @@ Constraints: 40
 Bytes.test_band_optimized:
 Constraints: 24
 
+Bytes.test_shift_left:
+Constraints: 25
+
+Bytes.test_shift_left_optimized:
+Constraints: 16
+
+Bytes.test_shift_left:
+Constraints: 25
+
+Bytes.test_shift_left_optimized:
+Constraints: 16
+
+Bytes.test_shift_left:
+Constraints: 25
+
+Bytes.test_shift_left_optimized:
+Constraints: 16
+
+Bytes.test_shift_left:
+Constraints: 25
+
+Bytes.test_shift_left_optimized:
+Constraints: 16
+
+Bytes.test_shift_left:
+Constraints: 25
+
+Bytes.test_shift_left_optimized:
+Constraints: 16
+
+Bytes.test_shift_left:
+Constraints: 25
+
+Bytes.test_shift_left_optimized:
+Constraints: 16
+
+Bytes.test_shift_left:
+Constraints: 25
+
+Bytes.test_shift_left_optimized:
+Constraints: 16
+
+Bytes.test_shift_left:
+Constraints: 25
+
+Bytes.test_shift_left_optimized:
+Constraints: 16
+
+Bytes.test_shift_left:
+Constraints: 25
+
+Bytes.test_shift_left_optimized:
+Constraints: 16
+
+Bytes.test_shift_right:
+Constraints: 25
+
+Bytes.test_shift_right_optimized:
+Constraints: 16
+
+Bytes.test_shift_right:
+Constraints: 25
+
+Bytes.test_shift_right_optimized:
+Constraints: 16
+
+Bytes.test_shift_right:
+Constraints: 25
+
+Bytes.test_shift_right_optimized:
+Constraints: 16
+
+Bytes.test_shift_right:
+Constraints: 25
+
+Bytes.test_shift_right_optimized:
+Constraints: 16
+
+Bytes.test_shift_right:
+Constraints: 25
+
+Bytes.test_shift_right_optimized:
+Constraints: 16
+
+Bytes.test_shift_right:
+Constraints: 25
+
+Bytes.test_shift_right_optimized:
+Constraints: 16
+
+Bytes.test_shift_right:
+Constraints: 25
+
+Bytes.test_shift_right_optimized:
+Constraints: 16
+
+Bytes.test_shift_right:
+Constraints: 25
+
+Bytes.test_shift_right_optimized:
+Constraints: 16
+
+Bytes.test_shift_right:
+Constraints: 25
+
+Bytes.test_shift_right_optimized:
+Constraints: 16
+
 Blake.test_mixing:
 Constraints: 2638
 

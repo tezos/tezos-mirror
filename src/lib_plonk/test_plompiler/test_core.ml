@@ -886,9 +886,60 @@ functor
           (false, "0F", "00", "0F");
         ]
 
+    let test_shift_left l i z () =
+      let* l = input ~kind:`Public l in
+      let* z = input z in
+      let* o = shift_left l i in
+      assert_equal o z
+
+    let tests_shift_left =
+      List.map
+        (fun (i, a, b) ->
+          let a = Bytes.input_bytes @@ bytes_of_hex a in
+          let b = Bytes.input_bytes @@ bytes_of_hex b in
+          test ~valid:true ~name:"Bytes.test_shift_left"
+          @@ test_shift_left a i b)
+        [
+          (0, "B0", "B0");
+          (1, "B0", "60");
+          (2, "B0", "C0");
+          (3, "B0", "80");
+          (4, "B0", "00");
+          (5, "B0", "00");
+          (6, "B0", "00");
+          (7, "B0", "00");
+          (8, "B0", "00");
+        ]
+
+    let test_shift_right l i z () =
+      let* l = input ~kind:`Public l in
+      let* z = input z in
+      let* o = shift_right l i in
+      assert_equal o z
+
+    let tests_shift_right =
+      List.map
+        (fun (i, a, b) ->
+          let a = Bytes.input_bytes @@ bytes_of_hex a in
+          let b = Bytes.input_bytes @@ bytes_of_hex b in
+          test ~valid:true ~name:"Bytes.test_shift_right"
+          @@ test_shift_right a i b)
+        [
+          (0, "B0", "B0");
+          (1, "B0", "58");
+          (2, "B0", "2C");
+          (3, "B0", "16");
+          (4, "B0", "0B");
+          (5, "B0", "05");
+          (6, "B0", "02");
+          (7, "B0", "01");
+          (8, "B0", "00");
+        ]
+
     let tests =
       tests_constant @ tests_add @ tests_xor @ tests_ifthenelse_bytes
-      @ tests_rotate_right @ tests_not @ tests_band
+      @ tests_rotate_right @ tests_not @ tests_band @ tests_shift_left
+      @ tests_shift_right
   end
 
 module ECC : Test =
