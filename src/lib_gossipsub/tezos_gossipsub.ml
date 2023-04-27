@@ -1246,6 +1246,11 @@ module Make (C : AUTOMATON_CONFIG) :
        the same conditions for grafting) to ensure that there are at least
        [degree_out] outbound peers in the mesh.
 
+       - Attempt opportunistic grafting: if the median score of the remaining
+       peers is below a given threshold, then graft a few peers at random with
+       score above the median and remove them from the peers to be pruned (if
+       they were indeed meant to be pruned).
+
        Finally, for pruned peers, back them off for [prune_backoff] time.
     *)
     let maintain_mesh =
