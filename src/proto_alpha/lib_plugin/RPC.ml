@@ -755,7 +755,7 @@ module Scripts = struct
       | IDup _ -> pp_print_string fmt "DUP"
       | ISwap _ -> pp_print_string fmt "SWAP"
       | IPush _ -> pp_print_string fmt "PUSH"
-      | IUnit _ -> pp_print_string fmt "PUSH"
+      | IUnit _ -> pp_print_string fmt "UNIT"
       | ICons_pair _ -> pp_print_string fmt "PAIR"
       | ICar _ -> pp_print_string fmt "CAR"
       | ICdr _ -> pp_print_string fmt "CDR"
