@@ -21,7 +21,7 @@ endif
 
 SDK_VERSION := "0.1.0"
 
-check:
+check: installer-template
 	@cargo fmt --check
 	@cargo clippy --all-targets --all-features -- --deny warnings
 	@cargo check --no-default-features
@@ -31,7 +31,7 @@ check:
 # their own dependencies correctly - when building as
 # a workspace, features enabled by one crate are enabled
 # on all.
-publish-check: check installer.wasm
+publish-check: check installer-template
 	@cargo check -p tezos-smart-rollup-core
 	@cargo check -p tezos-smart-rollup-host
 	@cargo check -p tezos-smart-rollup-debug
@@ -43,25 +43,30 @@ publish-check: check installer.wasm
 	@cargo check -p tezos-smart-rollup-installer
 	@cargo check -p tezos-smart-rollup
 
-build: check installer.wasm publish-check
+build: check installer-template publish-check
 	@cargo build -p tezos-smart-rollup-installer \
 		--release \
                 $(NATIVE_OPT)
 
-installer.wasm:
+.PHONY: sdk-readme
+sdk-readme:
+	@cp README.md sdk/README.md
+
+.PHONY: installer-template
+installer-template: sdk-readme
 	@cargo build -p installer-kernel \
 		--target wasm32-unknown-unknown \
 		--release \
 		--no-default-features \
 		--features entrypoint
 	@cp target/wasm32-unknown-unknown/release/installer_kernel.wasm \
-		installer.wasm
-	@wasm-strip installer.wasm
+		installer-client/installer.wasm
+	@wasm-strip installer-client/installer.wasm
 
 test:
 	@cargo test --all-features
 
-doc:
+doc: sdk-readme
 	@cargo doc  --no-deps --all-features
 
 build-deps:
@@ -70,13 +75,17 @@ build-deps:
 
 clean:
 	@cargo clean
-	@rm installer.wasm
+	@rm -rf installer-client/installer.wasm
+	@rm -rf sdk/README.md
 
 publish-deps: build-deps
 	@cargo install cargo-publish-workspace-v2 --version "0.2.1"
 
-publish: installer.wasm
+# --allow-dirty required to include the built installer.wasm
+# and README copied to sdk/, which are not checked in
+publish: installer-template sdk-readme
 	@cargo publish-workspace -p 'tezos-smart-rollup-' \
 		--exclude installer-kernel \
 		--target-version $(SDK_VERSION) \
-		--aligned-versions-only
+		--aligned-versions-only \
+		-- --allow-dirty

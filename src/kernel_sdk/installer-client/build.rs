@@ -5,7 +5,7 @@
 use std::process::Command;
 
 fn main() {
-    println!("cargo:rerun-if-changed=../installer.wasm");
+    println!("cargo:rerun-if-changed=./installer.wasm");
 
     Command::new("sh")
         .arg("-c")

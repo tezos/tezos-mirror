@@ -6,7 +6,6 @@
 name = "tezos-smart-rollup"
 version = "0.1.0"
 edition = "2021"
-include = ["../../README.md"]
 license = "MIT"
 authors = ["TriliTech <contact@trili.tech>"]
 repository = "https://gitlab.com/tezos/tezos.git"

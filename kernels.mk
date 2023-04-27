@@ -1,7 +1,7 @@
 KERNELS = kernel_sdk evm_kernel.wasm kernel_sequencer
 
 kernel_sdk:
-	@make -C src/kernel_sdk
+	@make -C src/kernel_sdk build
 	@cp src/kernel_sdk/target/$(NATIVE_TARGET)/release/smart-rollup-installer .
 
 evm_kernel.wasm::
