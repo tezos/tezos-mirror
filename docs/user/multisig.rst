@@ -1,7 +1,7 @@
 Multi-signature smart contracts
 ===============================
 
-A multi-signed account, or `multisig` for short, is a way to share the
+A multi-signed account, or *multisig* for short, is a way to share the
 ownership of an address (and of the associated balance) between
 several participants.
 

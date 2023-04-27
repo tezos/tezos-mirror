@@ -139,7 +139,7 @@ baking rights at higher rounds, like 2 in the example above.
 Inactive delegates
 ~~~~~~~~~~~~~~~~~~
 
-If a delegate doesn't show any sign of activity for `preserved_cycles`
+If a delegate doesn't show any sign of activity for ``preserved_cycles``
 it is marked **inactive** and its rights are removed.
 This mechanism is important to remove inactive delegates and reallocate
 their rights to the active ones so that the network is always working

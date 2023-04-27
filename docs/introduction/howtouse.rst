@@ -98,12 +98,12 @@ Using this peer-to-peer network, an operation originated by a user can
 hop several times through other nodes until it finds its way in a
 block baked by a baker.
 Using the blocks it receives on the gossip network the node also
-keeps up to date the current `context`, that is the full state of
+keeps up to date the current *context*, that is the full state of
 the blockchain shared by all peers.
 Approximately every 30 seconds a new block is created and, when the node
 receives it, it applies each operation in the block to its current
 context and computes a new context.
-The last block received on a chain is also called the `head` of that
+The last block received on a chain is also called the *head* of that
 chain.
 Each new head is then advertised by the node to its peers,
 disseminating this information to build a consensus across the
@@ -170,7 +170,7 @@ when a node launches for the first time. The node starts with the
 genesis protocol and then goes through all previous protocols until it
 finally switches to the current protocol.
 
-Throughout the documentation, `Alpha` refers to the protocol in the
+Throughout the documentation, "Alpha" refers to the protocol in the
 ``src/proto_alpha`` directory of the ``master`` branch, that is, a protocol under development, which serves as a basis to propose replacements
 for the currently active protocol. The Alpha protocol is used by
 default in :doc:`sandbox mode <../user/sandbox>` and in the various test
@@ -202,7 +202,7 @@ default.  More detailed documentation can be found in the :doc:`RPC index
 <../active/rpc>`. The RPC interface must be enabled for the clients
 to communicate with the node but it should not be publicly accessible on the
 internet. With the following command, it is available uniquely on the
-`localhost` address of your machine, on the default port ``8732``.
+``localhost`` address of your machine, on the default port ``8732``.
 
 ::
 
@@ -327,8 +327,8 @@ Transfers and Receipts
 ~~~~~~~~~~~~~~~~~~~~~~
 
 To fund our newly created account for Bob, we need to transfer some
-tez using the `transfer` operation.
-Every operation returns a `receipt` that recapitulates all the effects
+tez using the *transfer* operation.
+Every operation returns a *receipt* that recapitulates all the effects
 of the operation on the blockchain.
 A useful option for any operation is ``--dry-run``, which instructs
 the client to simulate the operation without actually sending it to
@@ -348,7 +348,7 @@ The reason is that when we fund a new address we are also storing it
 on the blockchain.
 Any storage on chain has a cost associated to it which should be
 accounted for either by paying a fee to a baker or by destroying
-(`burning`) some tez.
+(``burning``) some tez.
 This is particularly important to protect the system from spam.
 Because storing an address requires burning ꜩ0.257 and the client has
 a default of 0, we need to explicitly set a cap on the amount that we
@@ -391,20 +391,20 @@ produced, here's an excerpt::
 
 The client does a bit of magic to simplify our life and here we see
 that many details were automatically set for us.
-Surprisingly, our transfer operation resulted in `two` operations,
-first a `revelation`, and then a transfer.
+Surprisingly, our transfer operation resulted in **two** operations,
+first a *revelation*, and then a transfer.
 Alice's address, obtained from the faucet, is already present on the
-blockchain, but only in the form of a `public key hash`
+blockchain, but only in the form of a *public key hash*
 ``tz1Rj...5w``.
-To sign operations, Alice needs to first reveal the `public
-key` ``edpkuk...3X`` behind the hash, so that other users can verify
+To sign operations, Alice needs to first reveal the *public
+key* ``edpkuk...3X`` behind the hash, so that other users can verify
 her signatures.
 The client is kind enough to prepend a reveal operation before the
 first transfer of a new address, this has to be done only once, future
 transfers will consist of a single operation as expected.
 
 Another interesting thing we learn from the receipt is that there are
-more costs being added on top of the transfer and the burn: `fees`.
+more costs being added on top of the transfer and the burn: *fees*.
 To encourage a baker to include our operation, and in general
 to pay for the cost of running the blockchain, each operation usually
 includes a fee that goes to the baker.
@@ -477,7 +477,7 @@ be seen as an object with a single method taking one parameter (``parameter``), 
 The method updates the state (the storage), and submits operations as a side
 effect.
 
-For the sake of this example, here is the `id.tz` contract:
+For the sake of this example, here is the ``id.tz`` contract:
 
 .. code-block:: michelson
 
@@ -627,16 +627,16 @@ Environment variables for the client
 
 The behavior of the client can be configured using the following environment variables:
 
-- `TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER`: Setting this variable to "YES" (or: "yes", "Y", "y") disables the warning displayed by the client at startup when it is not launched on Mainnet.
-- `TEZOS_CLIENT_DIR`: This variable may be used to supply the client data directory (by default, ``~/.tezos-client``).
+- ``TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER``: Setting this variable to "YES" (or: "yes", "Y", "y") disables the warning displayed by the client at startup when it is not launched on Mainnet.
+- ``TEZOS_CLIENT_DIR``: This variable may be used to supply the client data directory (by default, ``~/.tezos-client``).
   Its value is overridden by option ``-d``.
-- `TEZOS_SIGNER_*`: These variables are used for connecting the client to a remote :ref:`signer <signer>` (see there for details).
-- `TEZOS_CLIENT_RPC_TIMEOUT_SECONDS`: This variable controls how long (in seconds, as an integer)
+- ``TEZOS_SIGNER_*``: These variables are used for connecting the client to a remote :ref:`signer <signer>` (see there for details).
+- ``TEZOS_CLIENT_RPC_TIMEOUT_SECONDS``: This variable controls how long (in seconds, as an integer)
   the client will wait for a response from the node, for each of the two RPC calls made during startup.
   If this variable is not set, or otherwise cannot be parsed as a positive integer, a default value of ``10`` seconds is used for each call.
   The two RPC calls this variable affects are queries that the client makes to the node in order to determine:
   (1) the protocol version of the node it connects to, and (2) the commands supported in that version.
-- `TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS`: This variable specifies
+- ``TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS``: This variable specifies
   custom HTTP headers to use with the ``--operations-pool`` option. Only the Host
   header is supported as of now (see description in `rfc2616, section 14.23
   <https://datatracker.ietf.org/doc/html/rfc2616#section-14.23>`_

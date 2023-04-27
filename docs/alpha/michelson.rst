@@ -1115,7 +1115,7 @@ Operations on tickets
 The following operations deal with tickets. Tickets are a way for smart-contracts
 to authenticate data with respect to a Tezos address. This authentication can
 then be used to build composable permission systems. For a high-level explanation of
-tickets in Tezos, see :doc: `Tickets <tickets>`.
+tickets in Tezos, see :doc:`Tickets <tickets>`.
 
 A contract can create a ticket from a value and an amount. The ticket, when
 inspected reveals the value, the amount, and the address of the ticketer (the contract that created the ticket). It is
@@ -1132,7 +1132,7 @@ This process can happen without the need to interact with a centralized NFT cont
 simplifying the code.
 
 - ``TICKET``: Create a ticket with the given content and amount. The ticketer is the address
-  of `SELF`. The resulting value is ``NONE`` if the amount is zero.
+  of ``SELF``. The resulting value is ``NONE`` if the amount is zero.
 
 ::
 
@@ -1441,7 +1441,7 @@ These macros are simply more convenient syntax for various common
 operations.
 
 -  ``P(\left=A|P(\left)(\right))(\right=I|P(\left)(\right))R``: A syntactic sugar
-   for building nested pairs. In the case of right combs, `PAIR n` is more efficient.
+   for building nested pairs. In the case of right combs, ``PAIR n`` is more efficient.
 
 ::
 
@@ -1522,7 +1522,7 @@ A typing rule can be inferred:
     > SET_CDR  =>  CAR ; PAIR
 
 -  ``SET_C[AD]+R``: A syntactic sugar for setting fields in nested
-   pairs. In the case of right combs, `UPDATE n` is more efficient.
+   pairs. In the case of right combs, ``UPDATE n`` is more efficient.
 
 ::
 
@@ -1583,7 +1583,7 @@ There are three kinds of constants:
    ``\"``. Unescaped line-breaks (both ``\n`` and ``\r``) cannot
    appear in a Michelson string. Moreover, the current version of
    Michelson restricts strings to be the printable subset of 7-bit
-   ASCII, namely characters with codes from within `[32, 126]` range,
+   ASCII, namely characters with codes from within ``[32, 126]`` range,
    plus the escaped characters mentioned above.
 3. Byte sequences in hexadecimal notation, prefixed with ``0x``.
 
@@ -1640,7 +1640,7 @@ data on the stack and to give additional type constraints. Except for
 a single exception specified just after, annotations are only here to
 add constraints, *i.e.* they cannot turn an otherwise rejected program
 into an accepted one. The notable exception to this rule is for
-entrypoints: the semantics of the `CONTRACT` and `SELF` instructions vary depending on
+entrypoints: the semantics of the ``CONTRACT`` and ``SELF`` instructions vary depending on
 their constructor annotations, and some contract origination may fail due
 to invalid entrypoint constructor annotations.
 

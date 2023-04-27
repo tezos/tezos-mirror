@@ -104,14 +104,14 @@ change to the structure of blocks. All other users should be
 wholly unaffected.
 
 Most notably, the first list of operations is now composed of
-`endorsement_with_slot` instead of `endorsement` operations.
+``endorsement_with_slot`` instead of ``endorsement`` operations.
 
 The change will not affect custom signing stacks, as the
-`endorsement_with_slot` is just an unsigned wrapper around the
-Edo-compatible `endorsement` format.
+``endorsement_with_slot`` is just an unsigned wrapper around the
+Edo-compatible ``endorsement`` format.
 
-The reference endorser forges an `endorsement`, sends it to the
-signer, and then wraps the result in an `endorsement_with_slot`
+The reference endorser forges an ``endorsement``, sends it to the
+signer, and then wraps the result in an ``endorsement_with_slot``
 before injection.
 
 -  Solves issue:

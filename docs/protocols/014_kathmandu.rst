@@ -145,10 +145,10 @@ Operation receipts
 Bug Fixes
 ---------
 
-- Consume constant gas `Michelson_v1_gas.Cost_of.manager_operation`
+- Consume constant gas ``Michelson_v1_gas.Cost_of.manager_operation``
   during precheck: this fixes some cases of operations passing
   precheck even though they obviously do not have enough gas to apply
-  the external operation, e.g. when `gas_limit = 0`. (MR :gl:`!5506`)
+  the external operation, e.g. when ``gas_limit = 0``. (MR :gl:`!5506`)
 
 - Emptying an implicit account does not cost extra-gas anymore. (MR
   :gl:`!5566`)
@@ -165,9 +165,9 @@ Bug Fixes
 Minor Changes
 -------------
 
-- New error `Remove_commitment_too_early` in TORU. (MR :gl:`!4895`)
+- New error ``Remove_commitment_too_early`` in TORU. (MR :gl:`!4895`)
 
-- New error `Inconsistent_sources`. (MR :gl:`!5475`)
+- New error ``Inconsistent_sources``. (MR :gl:`!5475`)
 
 - Fix name of encoding of round_overflow. (MR :gl:`!5089`)
 
@@ -190,19 +190,19 @@ Internal
 
 - Uncurry some functions in Michelson interpreter. (MR :gl:`!5406`)
 
-- Make carbonated maps available to the Raw context (MRs :gl:`!4815`, `!4891`)
+- Make carbonated maps available to the Raw context (MRs :gl:`!4815`, :gl:`!4891`)
 
 - Move Michelson representation modules above the Alpha_context abstraction
   barrier. (MR :gl:`!4418`)
 
 - Further cleanup on Tenderbake code. (MR :gl:`!4513`)
 
-- Rename `run_view` into `run_tzip4_view` for consistency with
-  `run_script_view`. Does not affect the existing `run_view` RPC.
+- Rename ``run_view`` into ``run_tzip4_view`` for consistency with
+  ``run_script_view``. Does not affect the existing ``run_view`` RPC.
   (MR :gl:`!4810`)
 
 - Precheck no longer returns the gas it has consumed. Instead of
-  "replaying" the gas from precheck, `apply_manager_contents` consumes
+  "replaying" the gas from precheck, ``apply_manager_contents`` consumes
   the same gas again step by step. (MR :gl:`!5506`)
 
 - Precheck no longer tries to deserialize scripts. It does still check

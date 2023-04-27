@@ -58,7 +58,7 @@ More details on the metrics specifications are available :doc:`here <../develope
 Scraping Octez Metrics
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Once your node is correctly set up to export metrics, you can scrape them by querying the metrics server of your node with the request `/metrics`.
+Once your node is correctly set up to export metrics, you can scrape them by querying the metrics server of your node with the request ``/metrics``.
 
 Ex.:
 

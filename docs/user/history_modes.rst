@@ -91,10 +91,10 @@ details.
 History modes use some markers which are used to describe the state
 of the storage:
 
-- `checkpoint`: the last allowed fork level of the chain (as defined
+- *checkpoint*: the last allowed fork level of the chain (as defined
   in the Tezos position paper),
-- `savepoint`: the last known block which contains metadata,
-- `caboose`: the last known block.
+- *savepoint*: the last known block which contains metadata,
+- *caboose*: the last known block.
 
 .. _Set_up_a_full_node:
 
@@ -128,8 +128,8 @@ You can then verify that your history mode is set to full by using the checkpoin
     { "block": { "some": "data" },
        "savepoint": 4096, "caboose": 0, "history_mode": "full" }
 
-In full mode, the `savepoint` is the last block which contains its
-metadata. The `caboose` is the last known block which is pruned (that
+In full mode, the savepoint is the last block which contains its
+metadata. The caboose is the last known block which is pruned (that
 contains partial data).
 
 .. _Set_up_a_rolling_node:
@@ -151,9 +151,9 @@ or use your configuration file as described in :doc:`here <node-configuration>`:
        "history_mode": "rolling"
    }}
 
-In ``rolling`` mode, the `caboose` is the genesis at its early state,
+In ``rolling`` mode, the caboose is the genesis at its early state,
 and then, it is updated to the last known block of the rolling
-window. The `savepoint` is moved in accordance to the number of
+window. The savepoint is moved in accordance to the number of
 configured additional cycles.
 
 ``$ tezos rpc get /chains/main/checkpoint``
@@ -174,7 +174,7 @@ If you want to start an ``archive`` node, it is now mandatory to pass
 this argument the first time you launch your node. Indeed, there are
 some restrictions when switching from one mode to another.
 
-In ``archive`` mode, both the `savepoint` and `caboose` are located
+In ``archive`` mode, both the savepoint and caboose are located
 down to the genesis.
 
 .. _History_mode_additional_cycles:

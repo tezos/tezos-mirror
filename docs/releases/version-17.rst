@@ -17,7 +17,7 @@ Note that, as all the other protocol dependent executables, the Smart rollup nod
 Octez v17 includes a significant improvement of Octez node logging output.
 The node now outputs less verbose and clearer logs.
 Only essential information is displayed, while a more detailed log is written to disk in the background.
-More details can be found in a recent `blog post <https://research-development.nomadic-labs.com/introducing-new-octez-node-logs-for-better-ux.html>`_, and in the `:doc:`Logging <../user/logging>` entry.
+More details can be found in a recent `blog post <https://research-development.nomadic-labs.com/introducing-new-octez-node-logs-for-better-ux.html>`_, and in the :doc:`Logging <../user/logging>` entry.
 
 
 Update Instructions

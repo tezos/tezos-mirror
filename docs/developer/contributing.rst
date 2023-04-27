@@ -208,7 +208,7 @@ While working on your branch to prepare a Merge Request, make sure you respect t
    commits later.
 -  We expect every commit to compile and pass tests.
    Obviously, we require tests to pass between each MR.
--  Follow the format of commit names, `<Component>: <message>`, with
+-  Follow the format of commit names, ``<Component>: <message>``, with
    message in indicative or imperative present mood e.g. ``Shell: fix
    bug #13`` rather than ``Shell: fixed bug #13``.
    Use multiline commit messages for important commits.
@@ -323,9 +323,9 @@ Therefore, when creating your MR, observe the following rules:
 - *MR Options*: When opening an MR you should probably tick the following
   options:
 
-  + `Delete source branch when merge request is accepted.`
+  + ``Delete source branch when merge request is accepted.``
     Helps keeping the repository clean of old branches.
-  + `Squash commits when merge request is accepted.`
+  + ``Squash commits when merge request is accepted.``
     Sometimes it's useful to have many small commits to ease the
     review and see the story of a branch, but they are not relevant
     for the history of the project. In this case they can be squashed
@@ -333,7 +333,7 @@ Therefore, when creating your MR, observe the following rules:
     should squash yourself all fix-up commits when all discussions are resolved,
     as described above in the :ref:`MR workflow <mr_workflow>`, in order
     to ease the reviewers' task.
-  + `Allow commits from members who can merge to the target branch.`
+  + ``Allow commits from members who can merge to the target branch.``
     This option is useful to allow members of the :doc:`Octez merge team <merge_team>`, who are
     not developers in your project, to commit to your branch.
     It helps to rebase and propose fixes.

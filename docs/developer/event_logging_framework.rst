@@ -6,7 +6,7 @@ for the :doc:`Logging subsystem <../user/logging>`.
 
 In the Octez code base, logging is instrumented using an asynchronous event
 system, where log events are emitted in various part of the code and consumed by
-the so called sinks.  This is done by using the `tezos-event-logging` library.
+the so called sinks.  This is done by using the :opam:`tezos-event-logging` library.
 
 We use two levels of abstraction to define these events. Heavy events are
 defined using the most generic API and have the full expressive power and
@@ -26,7 +26,7 @@ Simple events are record-like structures which are constructed directly
 programmatically). The API is less generic than the “Heavy” Events'.
 
 See for instance
-:src:`src/lib_node_config/config_file.ml` (search for the string `declare_`):
+:src:`src/lib_node_config/config_file.ml` (search for the string ``declare_``):
 
 -  one declares typed-record events with
    ``Internal_event.Simple.declare_<number-of-fields>``,

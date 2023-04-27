@@ -201,8 +201,8 @@ Indeed, by relying on the ancestor context, this mode can *only*
 assert the validity of consensus-related preconditions (endorsing
 power, block fitness, etc.), as future consensus slots are known in
 advance -- how much in advance being specified by the
-``<PRESERVED_CYCLES>`` protocol constant. Thus, the `Partial
-application` mode provides an over-approximation of the branch's
+``<PRESERVED_CYCLES>`` protocol constant. Thus, the ``Partial
+application`` mode provides an over-approximation of the branch's
 validity, and as a result intermediate results are not committed on
 disk in order to prevent potential attacks.
 
@@ -347,7 +347,7 @@ defined as the conjunction of the following conditions:
 - When a ``Reveal`` operation is present, **it must only occur once**,
   and **it must be placed at the head** of the batch -- that is, the
   ``Reveal`` operation must be the first operation in the batch.
-- Every operation in the batch should declare the same `source`.
+- Every operation in the batch should declare the same ``source``.
 - Each of the individual operation counters must be incremented
   correctly and sequentially.
 - The sum of each individual operation's declared fees must be lower
@@ -394,7 +394,7 @@ For example, let's consider a simple batch of three manager operations
 ticket result for the application of the manager operation batch will
 report:
 
-* ``op1`` -- ``Backtracked``, ```op1`` was applied successfully, but
+* ``op1`` -- ``Backtracked``, ``op1`` was applied successfully, but
   after ``op2`` failed, the operation was canceled;
 * ``op2`` -- ``Failed``, the application of this particular operation failed;
 * ``op3`` -- ``Skipped``, this operation was never executed because

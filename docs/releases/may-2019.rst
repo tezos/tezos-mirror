@@ -25,8 +25,8 @@ For this reason, once the storage migrated, it will not be possible to
 use the old Tezos node.
 
 Here is an example migration from Mainnet April 2019 to a node in mode
-`full`. Assuming a running node from Mainnet April 2019 with default
-storage directory `~/.tezos-node`, begin by gracefully stopping the
+``full``. Assuming a running node from Mainnet April 2019 with default
+storage directory ``~/.tezos-node``, begin by gracefully stopping the
 node.
 Back up your storage and upgrade it, it will only take a few seconds::
 
@@ -34,9 +34,9 @@ Back up your storage and upgrade it, it will only take a few seconds::
   tezos-node upgrade storage
 
 We now have the option to restart the node and it will automatically
-run in `archive` mode.
+run in ``archive`` mode.
 This mode is useful only in specific cases and most users should run a
-`full` node.
+``full`` node.
 
 We can proceed to export a snapshot::
 
@@ -58,7 +58,7 @@ We can now delete our upgraded archive storage and import the snapshot
     rm -r ~/.tezos-node
     tezos-node snapshot import ./mainnet-*.full
 
-There should be a rather smaller `~/.tezos-node` directory populated
+There should be a rather smaller ``~/.tezos-node`` directory populated
 from which we can start our node::
 
     tezos-node run
@@ -70,7 +70,7 @@ with a cron job, once compressed the files are rather small.
 Docker
 ~~~~~~
 
-If you are running Docker with the helper script `mainnet.sh` there
+If you are running Docker with the helper script ``mainnet.sh`` there
 are two new commands.
 The node storage can be upgraded, before running the new node in
 archive mode, using::
@@ -367,7 +367,7 @@ LEDGER
 - Drop support for Wallet and Baking apps older than 1.4.0.
 - Drop support for firmware older that 1.4.0
 - CLI and performance improvements.
-- Baking: support test-chain high-water mark, improve configuration (`setup ledger ...`).
+- Baking: support test-chain high-water mark, improve configuration (``setup ledger ...``).
 - APDU support
 - Commits:
     - ``6ce10791b``: ``Ledger: add deauth APDU support, better get-authorized-key support, and friendlier CLI``

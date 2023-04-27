@@ -62,7 +62,7 @@ larger.
 
 In all cases, it is recommended to simulate an operation before
 injecting it on the chain.
-Using `tezos-client`, it is possible to run only a simulation using
+Using ``tezos-client``, it is possible to run only a simulation using
 the ``--dry-run`` option.
 
 
@@ -72,24 +72,24 @@ Changelog
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
-- [Alpha/Delegation: set the tokens_per_roll constant to 8000 tez](:gl:`nomadic-labs/tezos@5e2b9790`)
+- Alpha/Delegation: set the tokens_per_roll constant to 8000 tez (:gl:`nomadic-labs/tezos@5e2b9790`)
 
     This patch sets the new default roll size to 8000 tez.
 
-- [Alpha/Delegation: do not activate delegate when crediting](:gl:`nomadic-labs/tezos@a96b03dd`)
+- Alpha/Delegation: do not activate delegate when crediting (:gl:`nomadic-labs/tezos@a96b03dd`)
 
     Remove the unneeded method for a delegate to reactivate itself by
     provisioning its account. The delegate should simply re-register as
     delegate.
 
-- [Alpha/Michelson: double gas limit, except for I/Os that stay unchanged](:gl:`nomadic-labs/tezos@3a39d70a`)
+- Alpha/Michelson: double gas limit, except for I/Os that stay unchanged (:gl:`nomadic-labs/tezos@3a39d70a`)
 
     This change doubles the maximum amount of gas for the block and for
     each transaction. The cost of I/Os is updated accordingly, so that the
     number of computation steps is increased, while the number of possible
     I/Os in a block stays unchanged.
 
-- [Alpha/Michelson: do not allow spendable smart contracts](:gl:`nomadic-labs/tezos@01b5bb08`)
+- Alpha/Michelson: do not allow spendable smart contracts (:gl:`nomadic-labs/tezos@01b5bb08`)
 
     This patches forbids the creation of spendable smart contracts, a
     current feature that is not necessary (it can be implemented from the
@@ -101,17 +101,17 @@ Breaking changes
     This is done by checking the flag in the origination operation rather
     than removing it so the change is lighter for third party software.
 
-- [Alpha/RPCs: fix wrong encoding name fields](:gl:`nomadic-labs/tezos@5b410693`)
+- Alpha/RPCs: fix wrong encoding name fields (:gl:`nomadic-labs/tezos@5b410693`)
 
     This patch fixes a mislabeled field in the JSON encoding of operation receipts.
-    The balance updates had a field `level` that actually contained a cycle.
-    It is now named `cycle`.
+    The balance updates had a field ``level`` that actually contained a cycle.
+    It is now named ``cycle``.
 
     Third party software that make use of receipts such as block explorers
     or wallets may need to be updated accordingly. A simple solution is to
     support both during the protocol change period.
 
-- [Alpha/RPCs: change `managerPubkey` to underscores in json field names](:gl:`nomadic-labs/tezos@50cf26f0`)
+- Alpha/RPCs: change ``managerPubkey`` to underscores in json field names (:gl:`nomadic-labs/tezos@50cf26f0`)
 
     This renames a field in the JSON format of origination operations to
     make it consistent with the others.
@@ -120,15 +120,15 @@ Breaking changes
     For applications that just consume this format, it is enough to just recognise
     both field names during the protocol change period. For applications that send
     this format to the node, it is necessary to send the right one depending on the
-    `next_protocol` field of the interrogated block.
+    ``next_protocol`` field of the interrogated block.
 
-- [Alpha/RPCs: rename field labels in Michelson typechecker output](:gl:`nomadic-labs/tezos@7b4fe1b9`)
+- Alpha/RPCs: rename field labels in Michelson typechecker output (:gl:`nomadic-labs/tezos@7b4fe1b9`)
 
     This is a change in field names in the Michelson typechecking RPC output.
     A simple solution for third party tools to handle the change is to
     recognise both field names during the protocol update period.
 
-- [Alpha/RPCs: rename Michelson interpreter diagnostics field names](:gl:`nomadic-labs/tezos@94cfcfd2`)
+- Alpha/RPCs: rename Michelson interpreter diagnostics field names (:gl:`nomadic-labs/tezos@94cfcfd2`)
 
     This patch changes some error IDs and error attributes to make it
     consistent with the rest of the codebase.
@@ -141,32 +141,32 @@ Breaking changes
 Minor changes
 ~~~~~~~~~~~~~
 
-- [Alpha/RPCs: optional fields for source, payer, gas in run and trace](:gl:`nomadic-labs/tezos@2d51e996`)
+- Alpha/RPCs: optional fields for source, payer, gas in run and trace (:gl:`nomadic-labs/tezos@2d51e996`)
 
     This patch adds new options to the Michelson interpreter RPCs.
     They allow customization of interpreter behaviour.
     It only makes utility RPCs more flexible, and does not change the
     semantics of Michelson.
 
-- [Alpha/Vote: fix initialization of voting rights from genesis](:gl:`nomadic-labs/tezos@91fa2d7f`)
+- Alpha/Vote: fix initialization of voting rights from genesis (:gl:`nomadic-labs/tezos@91fa2d7f`)
 
     This patch fixes the voting system initialisation from genesis.
 
     It improves voting in sandbox mode and test networks.
     It has no effect on mainnet.
 
-- [Alpha/Vote: docstrings and one renaming](:gl:`nomadic-labs/tezos@09794e40`)
+- Alpha/Vote: docstrings and one renaming (:gl:`nomadic-labs/tezos@09794e40`)
 
     This patch adds documentation to the code.
     It does not change the semantics.
 
-- [Alpha/Vote: fix potential overflow in quorum computation](:gl:`nomadic-labs/tezos@d98fe4e5`)
+- Alpha/Vote: fix potential overflow in quorum computation (:gl:`nomadic-labs/tezos@d98fe4e5`)
 
     This patch prevents a potential overflow if the number of rolls gets
     too big in a future update. This bug cannot happen with the current
     value.
 
-- [Alpha/Vote: new constant `test_chain_duration`](:gl:`nomadic-labs/tezos@34aaf6c7`)
+- Alpha/Vote: new constant ``test_chain_duration`` (:gl:`nomadic-labs/tezos@34aaf6c7`)
 
     This patch turns the test chain lifetime from a hardcoded two-days
     constant in the code to a parameter. This is useful for testing of
@@ -177,7 +177,7 @@ Minor changes
     to the end of period. The test chain is now spawned at the beginning of
     the third voting period and lasts the whole period.
 
-- [Alpha/Michelson: allows big maps in genesis blocks](:gl:`nomadic-labs/tezos@f6d67b7a`)
+- Alpha/Michelson: allows big maps in genesis blocks (:gl:`nomadic-labs/tezos@f6d67b7a`)
 
     This patch allows to create a sandbox chain with bootstrap contracts
     that use big_maps. This change is mostly useful for testing in
@@ -185,11 +185,11 @@ Minor changes
 
     This has no effect on mainnet.
 
-- [Alpha/Delegation: allow to change the roll value](:gl:`nomadic-labs/tezos@079eda15`)
+- Alpha/Delegation: allow to change the roll value (:gl:`nomadic-labs/tezos@079eda15`)
 
     This patch adds a function to reassign rolls given a new roll size.
 
-- [Alpha/Contracts: uniform indexation for both implicit and originated contracts](:gl:`nomadic-labs/tezos@82fc0334`)
+- Alpha/Contracts: uniform indexation for both implicit and originated contracts (:gl:`nomadic-labs/tezos@82fc0334`)
 
     This patch change the way contracts are indexed internally, using the
     same database paths for implicit contracts, delegate accounts,
@@ -197,16 +197,16 @@ Minor changes
 
     It simplifies future updates, for instance to add new account types.
 
-- [Alpha/Refactor: remove unused compare module in constants](:gl:`nomadic-labs/tezos@dcec0442`)
+- Alpha/Refactor: remove unused compare module in constants (:gl:`nomadic-labs/tezos@dcec0442`)
 
     This commit removes a small piece of unused code.
 
-- [Alpha/Refactor: use return_*](:gl:`nomadic-labs/tezos@e8213708`)
+- Alpha/Refactor: use return_* (:gl:`nomadic-labs/tezos@e8213708`)
 
     Replaces some allocations of common return values by preallocated constants.
     This is a cosmetic change that does not alter the semantics.
 
-- [Alpha/Refactor: simplify code of `Raw_context.prepare_first_block`](:gl:`nomadic-labs/tezos@a3d04dd2`)
+- Alpha/Refactor: simplify code of ``Raw_context.prepare_first_block`` (:gl:`nomadic-labs/tezos@a3d04dd2`)
 
     This patch simplifies the protocol migration code.
     It does not change the semantics.
@@ -215,22 +215,22 @@ Minor changes
 Migration
 ~~~~~~~~~
 
-- [Alpha/Michelson/Migration: double hard_gas_limit_per_{operation,block}](:gl:`nomadic-labs/tezos@d65c58c2`)
+- Alpha/Michelson/Migration: double hard_gas_limit_per_{operation,block} (:gl:`nomadic-labs/tezos@d65c58c2`)
 
-    This patch is part of the migration code from `alpha_003` to `athens_004`.
+    This patch is part of the migration code from ``alpha_003`` to ``athens_004``.
 
     It performs the migration of the constants in mainnet to update them
     to the new (doubled) default values.
 
-- [Alpha/Delegation/Migration: reassign rolls](:gl:`nomadic-labs/tezos@b9408be7`)
+- Alpha/Delegation/Migration: reassign rolls (:gl:`nomadic-labs/tezos@b9408be7`)
 
-    This patch is part of the migration code from `alpha_003` to `athens_004`.
+    This patch is part of the migration code from ``alpha_003`` to ``athens_004``.
 
     It performs the roll size update to 8000 tez.
 
-- [Alpha/Migration: invoicing example](:gl:`nomadic-labs/tezos@e010d700`)
+- Alpha/Migration: invoicing example (:gl:`nomadic-labs/tezos@e010d700`)
 
-    This patch is part of the migration code from `alpha_003` to `athens_004`.
+    This patch is part of the migration code from ``alpha_003`` to ``athens_004``.
 
     It credits the account of the authors of this protocol with a symbolic
     value of a hundred tez.
@@ -238,16 +238,16 @@ Migration
     The authors hereby declare that these tez will be used exclusively
     to pay for a round of drinks for the Nomadic team.
 
-- [Alpha/Vote/Migration: update constants binary representation](:gl:`nomadic-labs/tezos@d0c16b4f`)
+- Alpha/Vote/Migration: update constants binary representation (:gl:`nomadic-labs/tezos@d0c16b4f`)
 
-    This patch is part of the migration code from `alpha_003` to `athens_004`.
+    This patch is part of the migration code from ``alpha_003`` to ``athens_004``.
 
-    Since we changed `Constants_repr.parametric_encoding` for adding the
-    new constant `test_chain_duration`, we need to upgrade the content
-    of the `constants_key` in the context.
+    Since we changed ``Constants_repr.parametric_encoding`` for adding the
+    new constant ``test_chain_duration``, we need to upgrade the content
+    of the ``constants_key`` in the context.
 
-- [Alpha/Contracts/Migration: reindex contracts](:gl:`nomadic-labs/tezos@8618b475`)
+- Alpha/Contracts/Migration: reindex contracts (:gl:`nomadic-labs/tezos@8618b475`)
 
-    This patch is part of the migration code from `alpha_003` to `athens_004`.
+    This patch is part of the migration code from ``alpha_003`` to ``athens_004``.
 
     It performs the migration of contracts to the new uniform storage format.

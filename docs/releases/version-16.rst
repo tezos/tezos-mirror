@@ -10,7 +10,7 @@ New executables have been introduced for Smart Rollups.
 This includes ``octez-smart-rollup-node-PtMumbai``, ``octez-smart-rollup-client-PtMumbai`` and ``octez-smart-rollup-wasm-debugger``.
 They can be used with the ``Mumbai`` protocol.
 
-Note that the Octez v16.0 uses the `PtMumbai2` variant of the Mumbai protocol, as announced `here <https://research-development.nomadic-labs.com/mumbai2-announcement.html>`_, instead of `PtMumbaii`.
+Note that the Octez v16.0 uses the ``PtMumbai2`` variant of the Mumbai protocol, as announced `here <https://research-development.nomadic-labs.com/mumbai2-announcement.html>`_, instead of ``PtMumbaii``.
 
 
 .. warning::

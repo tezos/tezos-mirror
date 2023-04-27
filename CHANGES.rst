@@ -96,10 +96,10 @@ Baker
 -----
 
 - Consensus operations that do not use the minimal slot of the delegate are
-  not counted for the (pre)quorums. (MR :gl: `!8175`)
+  not counted for the (pre)quorums. (MR :gl:`!8175`)
 
 - Consensus operations with identical consensus-related contents but different
-  ``branch`` fields are counted only once in the (pre)quorums. (MR :gl: `!8175`)
+  ``branch`` fields are counted only once in the (pre)quorums. (MR :gl:`!8175`)
 
 - Improved efficiency to solve the anti spam proof of work challenge.
 

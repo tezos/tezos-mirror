@@ -1,9 +1,9 @@
 Protocol Ithaca
 ===============
 
-**Important**: revision `PsiThaCaT...jVP` of protocol Ithaca contains
+**Important**: revision ``PsiThaCaT...jVP`` of protocol Ithaca contains
 `bugs <https://research-development.nomadic-labs.com/announcing-ithaca-2.html>`_
-that have been corrected in the latest version `Psithaca2...z6A`.
+that have been corrected in the latest version ``Psithaca2...z6A``.
 
 This page contains all the relevant information for protocol Ithaca
 (see :ref:`naming_convention`).
@@ -63,7 +63,7 @@ Tenderbake
 Precheck of operations
 ----------------------
 
-- Expose `precheck_manager` and `check_manager_signature` (MR :gl:`!3872`)
+- Expose ``precheck_manager`` and ``check_manager_signature`` (MR :gl:`!3872`)
 
 - Remove the gas block limit for prevalidator mode. (MR :gl:`!3802`)
 
@@ -125,8 +125,8 @@ Minor Changes
 
 - Update migration for protocol "I". (MR :gl:`!3668`)
 
-- Make `max_operations_ttl` a parametric constant of the protocol, now called
-  `max_operations_time_to_live`. (MR :gl:`!3709`)
+- Make ``max_operations_ttl`` a parametric constant of the protocol, now called
+  ``max_operations_time_to_live``. (MR :gl:`!3709`)
 
 - ``NOW`` and ``LEVEL`` are now passed to the Michelson interpreter as
   step constants instead of being read from the context each time
