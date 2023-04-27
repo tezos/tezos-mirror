@@ -1174,7 +1174,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let* () = reset_ihave_per_heartbeat in
       let* () = reset_iwant_per_heartbeat in
 
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4967
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5532
          Apply IWANT request penalties *)
       return ()
 
