@@ -169,7 +169,7 @@ let branch_switch =
   declare_2
     ~section
     ~name:"branch_switch"
-    ~msg:"switching branch to {view} ({level})"
+    ~msg:"switch branch to {view} ({level})"
     ~level:Notice
     ~pp1:Request.pp
     ~pp2:(fun fmt -> Format.fprintf fmt "%li")
