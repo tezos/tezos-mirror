@@ -150,3 +150,23 @@ let last_cemented_commitment_hash_with_level ~sc_rollup client =
   let hash = JSON.(json |-> "hash" |> as_string) in
   let level = JSON.(json |-> "level" |> as_int) in
   return (hash, level)
+
+let genesis_commitment ~sc_rollup tezos_client =
+  let* genesis_info =
+    RPC.Client.call ~hooks tezos_client
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+         sc_rollup
+  in
+  let genesis_commitment_hash =
+    JSON.(genesis_info |-> "commitment_hash" |> as_string)
+  in
+  let* json =
+    RPC.Client.call ~hooks tezos_client
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_commitment
+         ~sc_rollup
+         ~hash:genesis_commitment_hash
+         ()
+  in
+  match Sc_rollup_client.commitment_from_json json with
+  | None -> failwith "genesis commitment have been removed"
+  | Some commitment -> return commitment
