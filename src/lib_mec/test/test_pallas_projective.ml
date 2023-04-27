@@ -8,7 +8,7 @@ module PallasECProperties =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "Pallas projective coordinates"
     [
       PallasValueGeneration.get_tests ();

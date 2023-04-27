@@ -8,7 +8,7 @@ module Secp256r1ECProperties =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "secp256r1 jacobian coordinates"
     [
       Secp256r1ValueGeneration.get_tests ();

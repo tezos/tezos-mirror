@@ -12,7 +12,7 @@ module BandersnatchAffineRepresentation =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "Bandersnatch Weierstrass form, affine coordinates"
     [
       BandersnatchAffineValueGeneration.get_tests ();

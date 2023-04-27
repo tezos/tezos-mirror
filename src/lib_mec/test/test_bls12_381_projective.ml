@@ -7,7 +7,7 @@ module G1ECProperties = Utils.PBT.MakeECProperties (BLS12_381.G1.Projective)
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "BLS12-381 G1 projective form"
     [
       G1ValueGeneration.get_tests ();

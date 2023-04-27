@@ -8,7 +8,7 @@ module TweedledumECProperties =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "Tweedledum projective coordinates"
     [
       TweedledumValueGeneration.get_tests ();

@@ -8,7 +8,7 @@ module BN254ProjectiveECProperties =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "BN254 projective form"
     [
       BN254ProjectiveValueGeneration.get_tests ();

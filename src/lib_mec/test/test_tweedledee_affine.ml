@@ -11,7 +11,7 @@ module TweedledeeRepresentation =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "Tweedledee affine coordinates"
     [
       TweedledeeValueGeneration.get_tests ();

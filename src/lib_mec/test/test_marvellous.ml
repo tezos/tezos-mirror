@@ -127,7 +127,7 @@ let test_regression () =
 
 let () =
   Alcotest.run
-    ~verbose:true
+    ~__FILE__
     "Marvellous permutation"
     [
       ( "Built on scalar field of BLS12-381",

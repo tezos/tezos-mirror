@@ -10,7 +10,7 @@ module PallasRepresentation =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "Pallas affine coordinates"
     [
       PallasValueGeneration.get_tests ();

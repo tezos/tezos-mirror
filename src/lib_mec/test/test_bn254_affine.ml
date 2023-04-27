@@ -10,7 +10,7 @@ module BN254AffineRepresentation =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "BN254 affine form"
     [
       BN254AffineValueGeneration.get_tests ();

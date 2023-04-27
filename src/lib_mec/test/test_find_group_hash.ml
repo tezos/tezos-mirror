@@ -75,7 +75,7 @@ let test_vectors () =
 
 let () =
   Alcotest.run
-    ~verbose:true
+    ~__FILE__
     "Find group hash"
     [
       ( "Zcash test vectors",

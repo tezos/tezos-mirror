@@ -11,7 +11,7 @@ module EdwardsCurveProperties =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "Bandersnatch Edwards form, affine coordinates"
     [
       ValueGeneration.get_tests ();

@@ -59,7 +59,7 @@ let test_vectors () =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "secp256k1 affine coordinates"
     [
       ("Vectors", [Alcotest.test_case "test vectors" `Quick test_vectors]);

@@ -106,7 +106,7 @@ let test_no_padding () =
 
 let () =
   Alcotest.run
-    ~verbose:true
+    ~__FILE__
     "Orchard"
     [
       ( "Properties",

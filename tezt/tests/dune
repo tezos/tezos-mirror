@@ -86,6 +86,7 @@
   src_lib_polynomial_test_tezt_lib
   src_lib_p2p_tezt_tezt_lib
   src_lib_mockup_test_tezt_lib
+  src_lib_mec_test_tezt_lib
   src_lib_lwt_result_stdlib_test_tezt_lib
   src_lib_lazy_containers_test_tezt_lib
   src_lib_layer2_store_test__tezt_lib

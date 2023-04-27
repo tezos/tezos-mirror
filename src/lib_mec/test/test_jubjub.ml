@@ -730,7 +730,7 @@ let test_vector_compressed_and_uncompressed () =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "Jubjub"
     [
       ( "Vectors",

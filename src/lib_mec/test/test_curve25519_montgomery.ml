@@ -8,7 +8,7 @@ module Properties_Mt =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "Curve25519"
     [
       ValueGeneration_Mt.get_tests ();

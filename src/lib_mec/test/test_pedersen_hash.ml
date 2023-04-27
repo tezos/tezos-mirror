@@ -49,7 +49,7 @@ let test_zcash_bitstring_too_long () =
 
 let () =
   Alcotest.run
-    ~verbose:true
+    ~__FILE__
     "Pedersen Hash Zcash"
     [
       ( "Vectors",

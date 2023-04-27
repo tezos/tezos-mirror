@@ -133,7 +133,7 @@ let test_vectors_poseidon252 () =
 
 let () =
   Alcotest.run
-    ~verbose:true
+    ~__FILE__
     "Poseidon252"
     [
       ( "Properties",

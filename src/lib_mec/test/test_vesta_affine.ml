@@ -9,7 +9,7 @@ module VestaRepresentation =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "Vesta affine coordinates"
     [
       VestaValueGeneration.get_tests ();

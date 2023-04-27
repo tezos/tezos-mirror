@@ -8,7 +8,7 @@ module TweedledeeECProperties =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "Tweedledee projective coordinates"
     [
       TweedledeeValueGeneration.get_tests ();

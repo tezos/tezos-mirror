@@ -98,7 +98,7 @@ let test_vectors_blake2b () =
 
 let () =
   Alcotest.run
-    ~verbose:true
+    ~__FILE__
     "Digestif fork"
     [
       ( "Blake2b test vectors",

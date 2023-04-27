@@ -224,7 +224,7 @@ end
 
 let () =
   Alcotest.run
-    ~verbose:true
+    ~__FILE__
     "Sinsemilla"
     [
       ( "Test vectors for Sinsemilla",

@@ -11,7 +11,7 @@ module JubjubAffineRepresentation =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "Jubjub - Weierstrass - Affine coordinates"
     [
       JubjubAffineValueGeneration.get_tests ();

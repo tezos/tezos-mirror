@@ -150,7 +150,7 @@ let test_vectors () =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "RedJubjub"
     [
       ( "Signature scheme properties",

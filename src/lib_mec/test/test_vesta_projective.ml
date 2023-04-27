@@ -8,7 +8,7 @@ module VestaECProperties =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "Vesta projective coordinates"
     [
       VestaValueGeneration.get_tests ();

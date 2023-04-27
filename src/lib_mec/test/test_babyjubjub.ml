@@ -121,7 +121,7 @@ let test_random_points_not_on_curve () =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "BabyJubjub"
     [
       ( "Vectors",

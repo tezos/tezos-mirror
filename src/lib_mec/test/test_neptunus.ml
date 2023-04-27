@@ -29,7 +29,7 @@ let test_perm_is_consistent () =
 
 let () =
   Alcotest.run
-    ~verbose:true
+    ~__FILE__
     "Neptunus"
     [
       ( "Properties",

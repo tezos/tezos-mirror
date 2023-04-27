@@ -36,7 +36,7 @@ let test_poseidon128_batch4_optim () =
 
 let () =
   Alcotest.run
-    ~verbose:true
+    ~__FILE__
     "Linear trick"
     [
       ( "Regression test",

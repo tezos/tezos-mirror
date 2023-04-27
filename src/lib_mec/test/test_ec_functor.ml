@@ -20,7 +20,7 @@ let test_b_cannot_be_null_for_weierstrass_form () =
 
 let () =
   Alcotest.run
-    ~verbose:true
+    ~__FILE__
     "Curve functors"
     [
       ( "Check initialisation strengthen conditions",

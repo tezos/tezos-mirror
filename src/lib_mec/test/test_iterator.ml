@@ -146,7 +146,7 @@ let test_get_chunk () =
 
 let () =
   Alcotest.run
-    ~verbose:true
+    ~__FILE__
     "Iterator"
     [
       ( "Bytes",

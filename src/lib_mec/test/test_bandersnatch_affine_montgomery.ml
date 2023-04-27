@@ -9,7 +9,7 @@ module Properties =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "Bandersnatch Montgomery form and affine coordinates"
     [
       ValueGeneration.get_tests ();

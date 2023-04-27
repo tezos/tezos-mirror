@@ -93,6 +93,6 @@ let get_tests () =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "Curve 25519 conversions between the different forms"
     [get_tests ()]

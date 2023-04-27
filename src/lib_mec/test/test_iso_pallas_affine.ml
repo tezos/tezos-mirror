@@ -11,7 +11,7 @@ let test_isogeny () =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "Iso Pallas affine form"
     [
       ("Test isogeny", [test_case "With random point" `Quick test_isogeny]);

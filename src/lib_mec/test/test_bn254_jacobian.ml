@@ -8,7 +8,7 @@ module BN254JacobianECProperties =
 let () =
   let open Alcotest in
   run
-    ~verbose:true
+    ~__FILE__
     "BN254 jacobian coordinates"
     [
       BN254JacobianValueGeneration.get_tests ();
