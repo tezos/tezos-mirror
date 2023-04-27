@@ -847,9 +847,23 @@ functor
           (9, "\000\000\001", "\000\128\000");
         ]
 
+    let test_not a z () =
+      let* a = input ~kind:`Public a in
+      let* z = input z in
+      let* z' = not a in
+      assert_equal z z'
+
+    let tests_not =
+      let i = Bytes.input_bytes @@ bytes_of_hex "0F" in
+      let o = Bytes.input_bytes @@ bytes_of_hex "F0" in
+      [
+        test ~valid:true ~name:"Bytes.test_not" @@ test_not i o;
+        test ~valid:true ~name:"Bytes.test_not" @@ test_not o i;
+      ]
+
     let tests =
       tests_constant @ tests_add @ tests_xor @ tests_ifthenelse_bytes
-      @ tests_rotate_right
+      @ tests_rotate_right @ tests_not
   end
 
 module ECC : Test =

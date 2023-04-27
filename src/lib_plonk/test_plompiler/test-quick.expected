@@ -1324,6 +1324,18 @@ Constraints: 72
 Bytes.test_rotate_right_optimized:
 Constraints: 48
 
+Bytes.test_not:
+Constraints: 32
+
+Bytes.test_not_optimized:
+Constraints: 16
+
+Bytes.test_not:
+Constraints: 32
+
+Bytes.test_not_optimized:
+Constraints: 16
+
 Blake.test_mixing:
 Constraints: 2638
 

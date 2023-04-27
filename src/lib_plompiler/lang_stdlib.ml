@@ -116,6 +116,8 @@ module type LIB = sig
 
     val xor : bl repr -> bl repr -> bl repr t
 
+    val not : bl repr -> bl repr t
+
     val rotate_right : bl repr -> int -> bl repr
   end
 
@@ -645,6 +647,10 @@ module Lib (C : COMMON) = struct
     let xor a b =
       check_args_length "Bytes.xor" a b ;
       let* l = map2M Bool.xor (of_list a) (of_list b) in
+      ret @@ to_list l
+
+    let not a =
+      let* l = mapM Bool.bnot (of_list a) in
       ret @@ to_list l
 
     let rotate_right a i =
