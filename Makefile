@@ -477,7 +477,7 @@ coverage-clean:
 .PHONY: clean
 clean: coverage-clean clean-old-names clean-kernels
 	@-dune clean
-	@-rm -f ${OCTEZ_BIN} ${UNRELEASED_OCTEZ_BIN}
+	@-rm -f ${ALL_EXECUTABLES}
 	@-${MAKE} -C docs clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html
 
