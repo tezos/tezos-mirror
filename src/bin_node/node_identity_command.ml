@@ -59,7 +59,7 @@ let show data_dir config_file expected_pow =
     let* {Config_file.data_dir; _} =
       get_config data_dir config_file expected_pow
     in
-    let* id = Node_identity_file.read (identity_file data_dir) in
+    let* id = Identity_file.read (identity_file data_dir) in
     Format.printf "Peer_id: %a.@." P2p_peer.Id.pp id.peer_id ;
     return_unit)
 
@@ -69,7 +69,7 @@ let check data_dir config_file expected_pow =
     let* {Config_file.data_dir; p2p = {expected_pow; _}; _} =
       get_config data_dir config_file expected_pow
     in
-    let* id = Node_identity_file.read ~expected_pow (identity_file data_dir) in
+    let* id = Identity_file.read ~expected_pow (identity_file data_dir) in
     Format.printf
       "Peer_id: %a. Proof of work is higher than %.2f.@."
       P2p_peer.Id.pp
@@ -94,7 +94,7 @@ let generate data_dir config_file expected_pow =
       Data_version.ensure_data_dir ~mode:Exists dummy_genesis data_dir
     in
     let* _id =
-      Node_identity_file.generate
+      Identity_file.generate
         ~check_data_dir
         (identity_file data_dir)
         expected_pow

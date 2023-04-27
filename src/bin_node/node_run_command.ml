@@ -223,7 +223,7 @@ let init_identity_file (config : Config_file.t) =
     config.data_dir // Data_version.default_identity_file_name
   in
   if Sys.file_exists identity_file then
-    let* identity = Node_identity_file.read identity_file in
+    let* identity = Identity_file.read identity_file in
     let*! () = Event.(emit read_identity) identity.peer_id in
     return identity
   else
@@ -239,7 +239,7 @@ let init_identity_file (config : Config_file.t) =
       Data_version.ensure_data_dir ~mode:Exists dummy_genesis data_dir
     in
     let* identity =
-      Node_identity_file.generate
+      Identity_file.generate
         ~check_data_dir
         identity_file
         config.p2p.expected_pow
