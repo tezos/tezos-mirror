@@ -45,14 +45,7 @@ let external_message_query =
   |+ opt_field "external_message" Tezos_rpc.Arg.string (fun s -> s)
   |> seal
 
-let post_store_preimage :
-    ( [`POST],
-      unit,
-      unit,
-      unit,
-      Bytes.t * Pagination_scheme.t,
-      Dac_plugin.raw_hash * Bytes.t )
-    Tezos_rpc.Service.service =
+let post_store_preimage =
   Tezos_rpc.Service.post_service
     ~description:"Split DAC reveal data"
     ~query:Tezos_rpc.Query.empty
@@ -62,22 +55,14 @@ let post_store_preimage :
 
 (* DAC/FIXME: https://gitlab.com/tezos/tezos/-/issues/4263
    remove this endpoint once end-to-end tests are in place. *)
-let get_verify_signature :
-    ([`GET], unit, unit, string option, unit, bool) Tezos_rpc.Service.service =
+let get_verify_signature =
   Tezos_rpc.Service.get_service
     ~description:"Verify signature of an external message to inject in L1"
     ~query:external_message_query
     ~output:Data_encoding.bool
     Tezos_rpc.Path.(open_root / "verify_signature")
 
-let get_preimage :
-    ( [`GET],
-      unit,
-      unit * Dac_plugin.raw_hash,
-      unit,
-      unit,
-      bytes )
-    Tezos_rpc.Service.service =
+let get_preimage =
   Tezos_rpc.Service.get_service
     ~description:"Retrieves a page by its page hash and returns its contents"
     ~query:Tezos_rpc.Query.empty
@@ -93,14 +78,7 @@ let put_dac_member_signature =
     ~output:Data_encoding.empty
     Tezos_rpc.Path.(open_root / "dac_member_signature")
 
-let get_certificate :
-    ( [`GET],
-      unit,
-      unit * Dac_plugin.raw_hash,
-      unit,
-      unit,
-      Certificate_repr.t option )
-    Tezos_rpc.Service.service =
+let get_certificate =
   Tezos_rpc.Service.get_service
     ~description:
       "Retrieve the Dac certificate associated with the given root page hash"
@@ -108,14 +86,7 @@ let get_certificate :
     ~output:(Data_encoding.option Certificate_repr.encoding)
     Tezos_rpc.Path.(open_root / "certificates" /: Dac_plugin.raw_hash_rpc_arg)
 
-let get_missing_page :
-    ( [`GET],
-      unit,
-      unit * Dac_plugin.raw_hash,
-      unit,
-      unit,
-      bytes )
-    Tezos_rpc.Service.service =
+let get_missing_page =
   Tezos_rpc.Service.get_service
     ~description:
       "Fetch a given page by forwarding the request to a Coordinator's GET \
@@ -135,14 +106,7 @@ module Coordinator = struct
   (** [Coordinator]'s endpoint for serializing dac payload. In addition to
     returning a root page hash, it also pushes it to the subscribed [Observer]s
     and [Dac_member]s. *)
-  let post_preimage :
-      ( [`POST],
-        unit,
-        unit,
-        unit,
-        bytes,
-        Dac_plugin.raw_hash )
-      Tezos_rpc.Service.service =
+  let post_preimage =
     Tezos_rpc.Service.post_service
       ~description:
         "Stores the preimage in a sequence of pages. Returns a root page hash \

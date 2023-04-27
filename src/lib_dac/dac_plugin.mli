@@ -52,29 +52,28 @@ type raw_hash
     an error). *)
 val raw_hash_encoding : raw_hash Data_encoding.t
 
-(** [raw_hash] is just an alias for [bytes],
-   so this is basically the identity function *)
+(** This conversion is safe. *)
 val raw_hash_to_bytes : raw_hash -> bytes
 
-(** Since [hash] and [raw_hash] are [bytes] this conversion is safe
-    and is the identity function *)
+(** Thanks to [hash] and [raw_hash] internal representation,
+    this conversion is safe. *)
 val hash_to_raw : hash -> raw_hash
 
-(** [raw_hash_to_hex] encodes a [raw_hash] into hex *)
+(** [raw_hash_to_hex] encodes a [raw_hash] into hex. *)
 val raw_hash_to_hex : raw_hash -> string
 
-(** [raw_hash_of_hex] decodes a hex string representation into [raw_hash] *)
+(** [raw_hash_of_hex] decodes a hex string representation into [raw_hash]. *)
 val raw_hash_of_hex : string -> raw_hash option
 
-(** [raw_hash] argument definition for RPC *)
+(** [raw_hash] argument definition for RPC. *)
 val raw_hash_rpc_arg : raw_hash Tezos_rpc.Arg.arg
 
 (** FIXME: https://gitlab.com/tezos/tezos/-/issues/4856
-    Fix static supported_hashes type *)
+    Fix static supported_hashes type. *)
 type supported_hashes = Blake2B
 
 (** Type used to track exception when impossible to convert
-    [raw_hash] to [hash] *)
+    [raw_hash] to [hash]. *)
 type cannot_convert_raw_hash_to_hash = {
   raw_hash : raw_hash;
   proto : Protocol_hash.t;
@@ -112,16 +111,13 @@ module type T = sig
       specified in input. *)
   val size : scheme:supported_hashes -> int
 
-  (** Unlike [hash_to_raw] this conversion is unsafe.
-      Under the hood, [raw_hash] will be encoded into hex
-      then this hex will be decoded to a [hash] using
-      the [Plugin.of_hex hex] *)
+  (** Unlike [hash_to_raw] this conversion is unsafe. *)
   val raw_to_hash : raw_hash -> hash tzresult
 
   module Proto : Registered_protocol.T
 end
 
-(** Dac plugin module type *)
+(** Dac plugin module type. *)
 type t = (module T)
 
 (** [register make_plugin] derives and registers a new [Dac_plugin.T] given an

@@ -44,7 +44,6 @@ let hash_to_raw = Fun.id
 
 let raw_hash_to_hex raw_hash =
   let (`Hex hash) =
-    (* The [encoding] of a hash here never, so [to_string_exn] is safe. *)
     Hex.of_bytes raw_hash
   in
   hash

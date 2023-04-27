@@ -370,13 +370,12 @@ module Coordinator = struct
       let* () = verify_signature dac_plugin pub_key signature root_hash in
       return true
 
-  let stream_certificate_update ((module Plugin) : Dac_plugin.t)
-      committee_members (Certificate_repr.{root_hash; _} as certificate)
-      certificate_streamers =
+  let stream_certificate_update dac_plugin committee_members
+      (Certificate_repr.{root_hash; _} as certificate) certificate_streamers =
     let open Result_syntax in
     let* () =
       Certificate_streamers.push
-        ((module Plugin) : Dac_plugin.t)
+        dac_plugin
         certificate_streamers
         root_hash
         certificate
@@ -387,10 +386,7 @@ module Coordinator = struct
         certificate
     then
       let _ =
-        Certificate_streamers.close
-          ((module Plugin) : Dac_plugin.t)
-          certificate_streamers
-          root_hash
+        Certificate_streamers.close dac_plugin certificate_streamers root_hash
       in
       return ()
     else return ()
