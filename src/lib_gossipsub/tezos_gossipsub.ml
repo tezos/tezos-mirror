@@ -1689,9 +1689,6 @@ module Make (C : AUTOMATON_CONFIG) :
       (* cleaning up *)
       let* () = cleanup in
 
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4967
-         Cache scores throughout the heartbeat *)
-
       (* Maintain the mesh for topics we have joined. Concretely, in case the
          number of peers per topic (in the mesh) is lower than [degree_low] or
          higher than [degree_high], then select peers to graft or prune
