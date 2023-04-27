@@ -47,12 +47,11 @@ module Scalar = struct
 
   let mone = negate one
 
-  let string_of_scalar x =
-    if eq x (of_string "-1") then "-1"
-    else if eq x (of_string "-2") then "-2"
-    else
-      let s = to_string x in
-      if String.length s > 3 then "h" ^ string_of_int (Z.hash (to_z x)) else s
+  let string_of_scalar s =
+    if String.length (to_string s) < 10 then to_string s
+    else if String.length (to_string (negate s)) < 10 then
+      "-" ^ to_string (negate s)
+    else "H" ^ (to_z s |> Z.hash |> string_of_int)
 
   let equal a b = Bytes.equal (to_bytes a) (to_bytes b)
 
