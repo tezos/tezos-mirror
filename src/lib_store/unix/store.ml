@@ -770,7 +770,6 @@ module Block = struct
             Stored_data.update_with
               chain_state.invalid_blocks_data
               (fun invalid_blocks ->
-                Prometheus.Gauge.inc_one Store_metrics.metrics.invalid_blocks ;
                 Lwt.return
                   (Block_hash.Map.add hash {level; errors} invalid_blocks)))
       in
@@ -781,7 +780,6 @@ module Block = struct
         Stored_data.update_with
           chain_state.invalid_blocks_data
           (fun invalid_blocks ->
-            Prometheus.Gauge.dec_one Store_metrics.metrics.invalid_blocks ;
             Lwt.return (Block_hash.Map.remove hash invalid_blocks)))
 
   (** Accessors *)
@@ -1566,18 +1564,12 @@ module Chain = struct
             (* Remove potentially outdated invalid blocks if the
                checkpoint changed *)
             let* () =
-              Prometheus.Gauge.set Store_metrics.metrics.invalid_blocks 0. ;
               Stored_data.update_with
                 chain_state.invalid_blocks_data
                 (fun invalid_blocks ->
                   Lwt.return
                     (Block_hash.Map.filter
-                       (fun _k {level; _} ->
-                         if level > snd new_checkpoint then (
-                           Prometheus.Gauge.inc_one
-                             Store_metrics.metrics.invalid_blocks ;
-                           true)
-                         else false)
+                       (fun _k {level; _} -> level > snd new_checkpoint)
                        invalid_blocks))
             in
             write_checkpoint chain_state new_checkpoint
@@ -2592,6 +2584,14 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     then Store_events.(emit context_gc_is_not_allowed) ()
     else Lwt.return_unit
   in
+  let invalid_blocks_collector () =
+    let*! invalid_blocks =
+      Shared.use main_chain_store.chain_state (fun state ->
+          Stored_data.get state.invalid_blocks_data)
+    in
+    Lwt.return @@ float_of_int @@ Block_hash.Map.cardinal invalid_blocks
+  in
+  Store_metrics.set_invalid_blocks_collector invalid_blocks_collector ;
   return store
 
 let close_store global_store =
