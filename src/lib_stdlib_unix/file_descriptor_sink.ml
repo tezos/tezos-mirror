@@ -73,7 +73,7 @@ let wrapped_encoding event_encoding =
       Ptime.to_float_s
       (fun f ->
         match Ptime.of_float_s f with
-        | None -> invalid_arg "Time.System.Span.encoding"
+        | None -> invalid_arg "File-descriptor-sink: invalid timestamp"
         | Some s -> s)
       float
   in
@@ -90,6 +90,105 @@ let wrapped_encoding event_encoding =
   in
   With_version.(encoding ~name:"fd-sink-item" (first_version v0))
 
+let make_with_pp_rfc5424 pp wrapped_event name =
+  (* See https://tools.ietf.org/html/rfc5424#section-6 *)
+  Format.asprintf
+    "%a [%s.%s] %a\n"
+    (Ptime.pp_rfc3339 ~frac_s:3 ())
+    wrapped_event.time_stamp
+    (Internal_event.Section.to_string_list wrapped_event.section
+    |> String.concat ".")
+    name
+    (pp ~all_fields:false ~block:false)
+    wrapped_event.event
+
+let make_with_pp_short pp wrapped_event =
+  let pp_date fmt time =
+    let time = Ptime.to_float_s time in
+    let tm = Unix.localtime time in
+    let month_string =
+      match tm.Unix.tm_mon with
+      | 0 -> "Jan"
+      | 1 -> "Feb"
+      | 2 -> "Mar"
+      | 3 -> "Apr"
+      | 4 -> "May"
+      | 5 -> "Jun"
+      | 6 -> "Jul"
+      | 7 -> "Aug"
+      | 8 -> "Sep"
+      | 9 -> "Oct"
+      | 10 -> "Nov"
+      | 11 | _ -> "Dec"
+    in
+    let ms = mod_float (time *. 1000.) 1000. in
+    Format.fprintf
+      fmt
+      "%s %2d %02d:%02d:%02d.%03.0f"
+      month_string
+      tm.Unix.tm_mday
+      tm.Unix.tm_hour
+      tm.Unix.tm_min
+      tm.Unix.tm_sec
+      ms
+  in
+  let lines =
+    String.split_on_char
+      '\n'
+      (Format.asprintf
+         "%a"
+         (pp ~all_fields:false ~block:true)
+         wrapped_event.event)
+  in
+  let timestamp = Format.asprintf "%a: " pp_date wrapped_event.time_stamp in
+  let timestamp_size = String.length timestamp in
+  let lines_size =
+    List.fold_left
+      (fun acc s ->
+        (* total length of a line is (timestamp + message + \n *)
+        acc + timestamp_size + String.length s + 1)
+      0
+      lines
+  in
+  let buf = Bytes.create lines_size in
+  let prev_pos = ref 0 in
+  let () =
+    List.iter
+      (fun s ->
+        Bytes.blit_string timestamp 0 buf !prev_pos timestamp_size ;
+        prev_pos := !prev_pos + timestamp_size ;
+        let s_len = String.length s in
+        Bytes.blit_string s 0 buf !prev_pos s_len ;
+        prev_pos := !prev_pos + s_len ;
+        Bytes.set buf !prev_pos '\n' ;
+        prev_pos := !prev_pos + 1)
+      lines
+  in
+  Bytes.unsafe_to_string buf
+
+let day_of_the_year ts =
+  let today =
+    match Ptime.of_float_s ts with Some s -> s | None -> Ptime.min
+  in
+  let (y, m, d), _ = Ptime.to_date_time today in
+  (y, m, d)
+
+let string_of_day_of_the_year (y, m, d) = Format.sprintf "%d%02d%02d" y m d
+
+let check_file_format_with_date base_filename s =
+  let name_no_ext = Filename.remove_extension base_filename in
+  let ext = Filename.extension base_filename in
+  let open Re.Perl in
+  let re_ext = "(." ^ ext ^ ")?" in
+  let re_date = "-\\d{4}\\d{2}\\d{2}" in
+  let re = compile @@ re (name_no_ext ^ re_date ^ re_ext) in
+  Re.execp re s
+
+let filename_insert_before_ext ~path s =
+  let ext = Filename.extension path in
+  let chopped = if ext = "" then path else Filename.chop_extension path in
+  Format.asprintf "%s-%s%s" chopped s ext
+
 module Make_sink (K : sig
   val kind : [`Path | `Stdout | `Stderr]
 end) : Internal_event.SINK with type t = t = struct
@@ -103,29 +202,6 @@ end) : Internal_event.SINK with type t = t = struct
 
   let fail_parsing uri fmt =
     Format.kasprintf (failwith "Parsing URI: %s: %s" (Uri.to_string uri)) fmt
-
-  let day_of_the_year ts =
-    let today =
-      match Ptime.of_float_s ts with Some s -> s | None -> Ptime.min
-    in
-    let (y, m, d), _ = Ptime.to_date_time today in
-    (y, m, d)
-
-  let string_of_day_of_the_year (y, m, d) = Format.sprintf "%d%02d%02d" y m d
-
-  let check_file_format_with_date base_filename s =
-    let name_no_ext = Filename.remove_extension base_filename in
-    let ext = Filename.extension base_filename in
-    let open Re.Perl in
-    let re_ext = "(." ^ ext ^ ")?" in
-    let re_date = "-\\d{4}\\d{2}\\d{2}" in
-    let re = compile @@ re (name_no_ext ^ re_date ^ re_ext) in
-    Re.execp re s
-
-  let filename_insert_before_ext ~path s =
-    let ext = Filename.extension path in
-    let chopped = if ext = "" then path else Filename.chop_extension path in
-    Format.asprintf "%s-%s%s" chopped s ext
 
   let configure uri =
     let open Lwt_result_syntax in
@@ -384,79 +460,6 @@ end) : Internal_event.SINK with type t = t = struct
         | Some (_, None) -> (* exclude list *) false
         | Some (_, Some lvl) -> Internal_event.Level.compare M.level lvl >= 0)
 
-  let make_with_pp_rfc5424 pp event wrapped_event name =
-    (* See https://tools.ietf.org/html/rfc5424#section-6 *)
-    Format.asprintf
-      "%a [%s.%s] %a\n"
-      (Ptime.pp_rfc3339 ~frac_s:3 ())
-      wrapped_event.time_stamp
-      (Internal_event.Section.to_string_list wrapped_event.section
-      |> String.concat ".")
-      name
-      (pp ~all_fields:false ~block:false)
-      event
-
-  let make_with_pp_short pp event wrapped_event =
-    let pp_date fmt time =
-      let time = Ptime.to_float_s time in
-      let tm = Unix.localtime time in
-      let month_string =
-        match tm.Unix.tm_mon with
-        | 0 -> "Jan"
-        | 1 -> "Feb"
-        | 2 -> "Mar"
-        | 3 -> "Apr"
-        | 4 -> "May"
-        | 5 -> "Jun"
-        | 6 -> "Jul"
-        | 7 -> "Aug"
-        | 8 -> "Sep"
-        | 9 -> "Oct"
-        | 10 -> "Nov"
-        | 11 | _ -> "Dec"
-      in
-      let ms = mod_float (time *. 1000.) 1000. in
-      Format.fprintf
-        fmt
-        "%s %2d %02d:%02d:%02d.%03.0f"
-        month_string
-        tm.Unix.tm_mday
-        tm.Unix.tm_hour
-        tm.Unix.tm_min
-        tm.Unix.tm_sec
-        ms
-    in
-    let lines =
-      String.split_on_char
-        '\n'
-        (Format.asprintf "%a" (pp ~all_fields:false ~block:true) event)
-    in
-    let timestamp = Format.asprintf "%a: " pp_date wrapped_event.time_stamp in
-    let timestamp_size = String.length timestamp in
-    let lines_size =
-      List.fold_left
-        (fun acc s ->
-          (* total length of a line is (timestamp + message + \n *)
-          acc + timestamp_size + String.length s + 1)
-        0
-        lines
-    in
-    let buf = Bytes.create lines_size in
-    let prev_pos = ref 0 in
-    let () =
-      List.iter
-        (fun s ->
-          Bytes.blit_string timestamp 0 buf !prev_pos timestamp_size ;
-          prev_pos := !prev_pos + timestamp_size ;
-          let s_len = String.length s in
-          Bytes.blit_string s 0 buf !prev_pos s_len ;
-          prev_pos := !prev_pos + s_len ;
-          Bytes.set buf !prev_pos '\n' ;
-          prev_pos := !prev_pos + 1)
-        lines
-    in
-    Bytes.unsafe_to_string buf
-
   let handle (type a) {output; lwt_bad_citizen_hack; format; _} m
       ?(section = Internal_event.Section.empty) (event : a) =
     let open Lwt_result_syntax in
@@ -468,8 +471,8 @@ end) : Internal_event.SINK with type t = t = struct
         Data_encoding.Json.construct (wrapped_encoding M.encoding) wrapped_event
       in
       match format with
-      | `Pp_RFC5424 -> make_with_pp_rfc5424 M.pp event wrapped_event M.name
-      | `Pp_short -> make_with_pp_short M.pp event wrapped_event
+      | `Pp_RFC5424 -> make_with_pp_rfc5424 M.pp wrapped_event M.name
+      | `Pp_short -> make_with_pp_short M.pp wrapped_event
       | `One_per_line -> Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
       | `Netstring ->
           let bytes = Ezjsonm.value_to_string ~minify:true (json ()) in
