@@ -83,8 +83,21 @@ let generate data_dir config_file expected_pow =
     let* {Config_file.data_dir; p2p = {expected_pow; _}; _} =
       get_config data_dir config_file expected_pow
     in
+    let check_data_dir ~data_dir =
+      let dummy_genesis =
+        {
+          Genesis.time = Time.Protocol.epoch;
+          block = Block_hash.zero;
+          protocol = Protocol_hash.zero;
+        }
+      in
+      Data_version.ensure_data_dir ~mode:Exists dummy_genesis data_dir
+    in
     let* _id =
-      Node_identity_file.generate (identity_file data_dir) expected_pow
+      Node_identity_file.generate
+        ~check_data_dir
+        (identity_file data_dir)
+        expected_pow
     in
     return_unit)
 

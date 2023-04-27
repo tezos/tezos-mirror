@@ -179,23 +179,11 @@ let () =
     (function Existent_identity_file file -> Some file | _ -> None)
     (fun file -> Existent_identity_file file)
 
-let write file identity =
+let write ~check_data_dir file identity =
   let open Lwt_result_syntax in
   if Sys.file_exists file then tzfail (Existent_identity_file file)
   else
-    let dummy_genesis =
-      {
-        Genesis.time = Time.Protocol.epoch;
-        block = Block_hash.zero;
-        protocol = Protocol_hash.zero;
-      }
-    in
-    let* () =
-      Data_version.ensure_data_dir
-        ~mode:Exists
-        dummy_genesis
-        (Filename.dirname file)
-    in
+    let* () = check_data_dir ~data_dir:(Filename.dirname file) in
     Lwt_utils_unix.Json.write_file
       file
       (Data_encoding.Json.construct P2p_identity.encoding identity)
@@ -221,7 +209,7 @@ let generate_with_animation ppf target =
       Lwt.return count)
     10000
 
-let generate identity_file expected_pow =
+let generate ~check_data_dir identity_file expected_pow =
   let open Lwt_result_syntax in
   if Sys.file_exists identity_file then
     tzfail (Existent_identity_file identity_file)
@@ -229,7 +217,7 @@ let generate identity_file expected_pow =
     let target = Tezos_crypto.Crypto_box.make_pow_target expected_pow in
     Format.eprintf "Generating a new identity... (level: %.2f) " expected_pow ;
     let*! id = generate_with_animation Format.err_formatter target in
-    let* () = write identity_file id in
+    let* () = write ~check_data_dir identity_file id in
     Format.eprintf
       "Stored the new identity (%a) into '%s'.@."
       P2p_peer.Id.pp

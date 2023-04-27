@@ -31,6 +31,14 @@ type error += Existent_identity_file of string
 
 val read : ?expected_pow:float -> string -> P2p_identity.t tzresult Lwt.t
 
-val write : string -> P2p_identity.t -> unit tzresult Lwt.t
+val write :
+  check_data_dir:(data_dir:string -> unit tzresult Lwt.t) ->
+  string ->
+  P2p_identity.t ->
+  unit tzresult Lwt.t
 
-val generate : string -> float -> P2p_identity.t tzresult Lwt.t
+val generate :
+  check_data_dir:(data_dir:string -> unit tzresult Lwt.t) ->
+  string ->
+  float ->
+  P2p_identity.t tzresult Lwt.t
