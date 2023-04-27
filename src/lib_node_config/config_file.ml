@@ -125,7 +125,7 @@ let blockchain_network_mainnet =
           "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1" );
       ]
     ~default_bootstrap_peers:
-      ["boot.tzbeta.net"; "boot.mainnet.oxheadhosted.com"]
+      ["boot.tzboot.net"; "boot.tzbeta.net"; "boot.mainnet.oxheadhosted.com"]
 
 let blockchain_network_ghostnet =
   make_blockchain_network
