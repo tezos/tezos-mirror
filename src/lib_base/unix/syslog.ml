@@ -83,6 +83,57 @@ let facility_code = function
   | Local6 -> 22
   | Local7 -> 23
 
+let facility_to_string = function
+  | Auth -> "auth"
+  | Authpriv -> "authpriv"
+  | Cron -> "cron"
+  | Daemon -> "daemon"
+  | FTP -> "ftp"
+  | Kernel -> "kernel"
+  | Local0 -> "local0"
+  | Local1 -> "local1"
+  | Local2 -> "local2"
+  | Local3 -> "local3"
+  | Local4 -> "local4"
+  | Local5 -> "local5"
+  | Local6 -> "local6"
+  | Local7 -> "local7"
+  | LPR -> "lpr"
+  | Mail -> "mail"
+  | News -> "news"
+  | Syslog -> "syslog"
+  | User -> "user"
+  | UUCP -> "uucp"
+  | NTP -> "ntp"
+  | Security -> "security"
+  | Console -> "console"
+
+let facility_of_string_opt = function
+  | "auth" -> Some Auth
+  | "authpriv" -> Some Authpriv
+  | "cron" -> Some Cron
+  | "daemon" -> Some Daemon
+  | "ftp" -> Some FTP
+  | "kernel" -> Some Kernel
+  | "local0" -> Some Local0
+  | "local1" -> Some Local1
+  | "local2" -> Some Local2
+  | "local3" -> Some Local3
+  | "local4" -> Some Local4
+  | "local5" -> Some Local5
+  | "local6" -> Some Local6
+  | "local7" -> Some Local7
+  | "lpr" -> Some LPR
+  | "mail" -> Some Mail
+  | "news" -> Some News
+  | "syslog" -> Some Syslog
+  | "user" -> Some User
+  | "uucp" -> Some UUCP
+  | "ntp" -> Some NTP
+  | "security" -> Some Security
+  | "console" -> Some Console
+  | _ -> None
+
 exception Syslog_error of string
 
 let show_date Unix.{tm_sec; tm_min; tm_hour; tm_mday; tm_mon; _} =
@@ -179,13 +230,15 @@ let create ~tag ?path ?(with_pid = false) facility =
   let* fd = open_fd path in
   Lwt.return {fd; tag; facility; with_pid; path}
 
-let format_message ?(max_buflen = 1024) ~tag ~facility ~with_pid level str =
+let format_message ?(max_buflen = 1024) ?timestamp ~tag ~facility ~with_pid
+    level str =
   (* For efficiency reason, the buffer is used both directy using
      Buffer.add_* functions, and as a formatter. *)
   let msg_buf = Buffer.create 128 in
   let msg_fmt = Format.formatter_of_buffer msg_buf in
   let level_facility = (facility_code facility lsl 3) lor level_code level in
-  let now = show_date Unix.(localtime (time ())) in
+  let timestamp = match timestamp with None -> Unix.time () | Some t -> t in
+  let now = show_date Unix.(localtime timestamp) in
   Format.fprintf msg_fmt "<%d>%s @?" level_facility now ;
   if String.length tag > 32 then Buffer.add_substring msg_buf tag 0 32
   else Buffer.add_string msg_buf tag ;
@@ -199,10 +252,11 @@ let format_message ?(max_buflen = 1024) ~tag ~facility ~with_pid level str =
   else Buffer.add_string msg_buf str ;
   Buffer.contents msg_buf
 
-let syslog ?max_buflen logger level str =
+let syslog ?max_buflen ?timestamp logger level str =
   let open Lwt_syntax in
   let msg =
     format_message
+      ?timestamp
       ?max_buflen
       ~tag:logger.tag
       ~facility:logger.facility

@@ -26,10 +26,11 @@
 (** An implementation of {!Tezos_base.Internal_event.SINK} which
     writes the events as JSON or pretty printed into a single file-descriptor.
 
-    It is registered with the URI scheme ["file-descriptor-path"] to
-    output to a file or
-    ["file-descriptor-stdout"]/["file-descriptor-stderr"] for [stdout]
-    and [stderr] respectively.
+    An URI scheme is used to describe such file descriptors:
+    - ["file-descriptor-path"] outputs to the file at the URI path
+    - ["file-descriptor-stdout"] outputs to [stdout]
+    - ["file-descriptor-stderr"] outputs to [stderr]
+    - ["file-descriptor-syslog"] ouputs to a [syslog] facility
 
     Available options are
 
@@ -61,6 +62,13 @@
       path provided.
     - ["create-dirs=true"] allows to create the directory where the log
       files are stored and all its parents recursively if they don't exist.
+
+    Option available only for ["file-descriptor-syslog://"]:
+
+    - ["facility=<facility>"] is the targeted syslog output. [User] is the
+    default value if not value is providede. See
+    {{:https://www.rfc-editor.org/rfc/rfc3164}RFC 3164} for more information.
+    The possible values are defined in module [Syslog].
 
     Examples:
 
