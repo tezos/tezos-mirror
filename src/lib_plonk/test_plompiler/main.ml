@@ -35,6 +35,7 @@ let () =
               ("Core", Test_core.tests);
               ("Blake", Test_blake.tests);
               ("Poseidon", Test_poseidon.tests);
+              ("Sha2", Test_sha2.tests);
               ("Anemoi", Test_anemoi.tests);
               ("Enum", Test_enum.tests);
               ("Schnorr", Test_schnorr.tests);

@@ -1768,6 +1768,66 @@ Constraints: 1215
 Poseidon.test_poseidon.fixed_length_optimized:
 Constraints: 373
 
+SHA256.test_ch:
+Constraints: 72
+
+SHA256.test_ch_optimized:
+Constraints: 56
+
+SHA256.test_maj:
+Constraints: 80
+
+SHA256.test_maj_optimized:
+Constraints: 56
+
+SHA256.test_sigma0:
+Constraints: 161
+
+SHA256.test_sigma0_optimized:
+Constraints: 97
+
+SHA256.test_sigma1:
+Constraints: 161
+
+SHA256.test_sigma1_optimized:
+Constraints: 97
+
+SHA256.test_sum0:
+Constraints: 160
+
+SHA256.test_sum0_optimized:
+Constraints: 96
+
+SHA256.test_sum1:
+Constraints: 160
+
+SHA256.test_sum1_optimized:
+Constraints: 96
+
+SHA256.test_padding:
+Constraints: 1536
+
+SHA256.test_padding_optimized:
+Constraints: 536
+
+SHA256.test_initial_hash:
+Constraints: 320
+
+SHA256.test_initial_hash_optimized:
+Constraints: 32
+
+SHA256.test_digestabc:
+Constraints: 259416
+
+SHA256.test_digestabc_optimized:
+Constraints: 130136
+
+SHA256.test_digestabcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq:
+Constraints: 518064
+
+SHA256.test_digestabcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq_optimized:
+Constraints: 259344
+
 Anemoi.test_round.valid:
 Constraints: 20
 
