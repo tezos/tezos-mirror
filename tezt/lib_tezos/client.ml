@@ -2212,7 +2212,7 @@ let show_voting_period ?endpoint client =
   | Some period -> return period
 
 module Sc_rollup = struct
-  let spawn_originate ?hooks ?(wait = "none") ?burn_cap ~src ~kind
+  let spawn_originate ?hooks ?(wait = "none") ?burn_cap ~alias ~src ~kind
       ~parameters_ty ~boot_sector client =
     spawn_command
       ?hooks
@@ -2222,6 +2222,7 @@ module Sc_rollup = struct
           "originate";
           "smart";
           "rollup";
+          alias;
           "from";
           src;
           "of";
@@ -2241,13 +2242,14 @@ module Sc_rollup = struct
     | None -> Test.fail "Cannot extract rollup address from receipt."
     | Some x -> return x
 
-  let originate ?hooks ?wait ?burn_cap ~src ~kind ~parameters_ty ~boot_sector
-      client =
+  let originate ?hooks ?wait ?burn_cap ~alias ~src ~kind ~parameters_ty
+      ~boot_sector client =
     let process =
       spawn_originate
         ?hooks
         ?wait
         ?burn_cap
+        ~alias
         ~src
         ~kind
         ~boot_sector
@@ -2256,6 +2258,59 @@ module Sc_rollup = struct
     in
     let* output = Process.check_and_read_stdout process in
     parse_rollup_address_in_receipt output
+
+  let remember_smart_rollup ?hooks ?(force = false) client ~alias ~address =
+    let process =
+      spawn_command
+        ?hooks
+        client
+        (["remember"; "smart"; "rollup"; alias; address]
+        @ optional_switch "force" force)
+    in
+    let parse process = Process.check process in
+    {value = process; run = parse}
+
+  let list_known_smart_rollups ?hooks client =
+    let process =
+      spawn_command ?hooks client ["list"; "known"; "smart"; "rollups"]
+    in
+    let parse process =
+      let* output = Process.check_and_read_stdout process in
+      let output = String.trim output in
+      if output = "" then return []
+      else
+        let alias_and_address =
+          String.split_on_char '\n' output
+          |> List.map @@ fun line ->
+             match line =~** rex "(.*): ([^ ]*)" with
+             | Some (alias, pkh) -> (alias, pkh)
+             | None ->
+                 Test.fail
+                   "Cannot parse line %S from list of known smart rollups from \
+                    client_output: %s"
+                   line
+                   output
+        in
+        return alias_and_address
+    in
+    {value = process; run = parse}
+
+  let forget_all_smart_rollups ?hooks ?(force = false) client =
+    let process =
+      spawn_command
+        ?hooks
+        client
+        (["forget"; "all"; "smart"; "rollups"] @ optional_switch "force" force)
+    in
+    let parse process = Process.check process in
+    {value = process; run = parse}
+
+  let show_known_smart_rollup ?hooks client ~alias =
+    let process =
+      spawn_command ?hooks client ["show"; "known"; "smart"; "rollup"; alias]
+    in
+    let parse process = Process.check_and_read_stdout process in
+    {value = process; run = parse}
 
   let spawn_send_message ?hooks ?(wait = "none") ?burn_cap ~msg ~src client =
     spawn_command

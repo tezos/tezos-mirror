@@ -1692,11 +1692,33 @@ val show_voting_period : ?endpoint:endpoint -> t -> string Lwt.t
 val spawn_show_voting_period : ?endpoint:endpoint -> t -> Process.t
 
 module Sc_rollup : sig
-  (** Run [octez-client originate sc rollup from <src> of kind <kind> booting with <boot_sector>]. *)
+  (** Run [octez-client remember smart rollup <alias> <address>]. *)
+  val remember_smart_rollup :
+    ?hooks:Process.hooks ->
+    ?force:bool ->
+    t ->
+    alias:string ->
+    address:string ->
+    unit Runnable.process
+
+  (** Run [octez-client list known smart rollups]. *)
+  val list_known_smart_rollups :
+    ?hooks:Process.hooks -> t -> (string * string) list Runnable.process
+
+  (** Run [octez-client forget all smart rollups]. *)
+  val forget_all_smart_rollups :
+    ?hooks:Process.hooks -> ?force:bool -> t -> unit Runnable.process
+
+  (** Run [octez-client show known smart rollup <alias>]. *)
+  val show_known_smart_rollup :
+    ?hooks:Process.hooks -> t -> alias:string -> string Runnable.process
+
+  (** Run [octez-client originate sc rollup <alias> from <src> of kind <kind> booting with <boot_sector>]. *)
   val originate :
     ?hooks:Process.hooks ->
     ?wait:string ->
     ?burn_cap:Tez.t ->
+    alias:string ->
     src:string ->
     kind:string ->
     parameters_ty:string ->
@@ -1709,6 +1731,7 @@ module Sc_rollup : sig
     ?hooks:Process.hooks ->
     ?wait:string ->
     ?burn_cap:Tez.t ->
+    alias:string ->
     src:string ->
     kind:string ->
     parameters_ty:string ->

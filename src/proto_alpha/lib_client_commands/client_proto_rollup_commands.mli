@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,13 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
-
-type rollup_entity = {rollup : Tx_rollup.t; origination_level : int32 option}
-
-module TxRollupAlias : Client_aliases.Alias with type t = rollup_entity
-
-module EpoxyAlias : Client_aliases.Alias with type t = Zk_rollup.t
-
-module SoruAlias : Client_aliases.Alias with type t = Sc_rollup.t
+val commands : unit -> Protocol_client_context.full Tezos_clic.command list

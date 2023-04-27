@@ -29,6 +29,7 @@ let () =
   List.map (Tezos_clic.map_command (new Protocol_client_context.wrap_full))
   @@ Client_proto_programs_commands.commands ()
   @ Client_proto_contracts_commands.commands ()
+  @ Client_proto_rollup_commands.commands ()
   @ Client_proto_context_commands.commands network ()
   @ Client_proto_multisig_commands.commands ()
   @ Client_proto_mockup_commands.commands ()

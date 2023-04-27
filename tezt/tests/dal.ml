@@ -157,6 +157,7 @@ let with_fresh_rollup ~protocol ?(pvm_name = "arith") ?dal_node f tezos_node
     Client.Sc_rollup.originate
       ~hooks
       ~burn_cap:Tez.(of_int 9999999)
+      ~alias:"rollup"
       ~src:bootstrap1_key
       ~kind:pvm_name
       ~boot_sector:""
