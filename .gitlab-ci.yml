@@ -7,27 +7,27 @@ default:
 # Basic configuration to guard against double-pipelines
 workflow:
   rules:
-    # This workflow entry allows pipelines for schedules events in which case it checks the
-    # CI_PIPELINE_SOURCE which is automatically set by Gitlab.
-    # See https://docs.gitlab.com/ee/ci/yaml/README.html#workflow for additional
-    # details.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: always
-    # Switch between branch pipelines and merge request pipelines.
-    # https://docs.gitlab.com/13.12/ee/ci/yaml/README.html#switch-between-branch-pipelines-and-merge-request-pipelines
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
-      when: never
-    # No branch pipelines outside of the tezos namespace, except for testing releases.
-    # The goal is to avoid triggering two pipelines for each MR:
-    # - one when pushing the branch, before the MR exists;
-    # - and one when the MR is created.
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != "latest-release-test" && $CI_PROJECT_NAMESPACE != "tezos"'
-      when: never
-    # This workflow entry allows pipelines for push events (including force-push, push of fixup commits, rebase, etc.)
-    - if: '$CI_PIPELINE_SOURCE == "push"'
-      when: always
-    - when: never # default
+    # /!\ These rules should be kept in sync with the corresponding
+    # 'if'-rules on the pipeline includes below.
+
+    # Allow 'Before merging' pipelines
+    - if: '($CI_PIPELINE_SOURCE == "merge_request_event") && ($CI_PROJECT_NAMESPACE == "tezos")'
+    # Allow 'Latest release' pipelines
+    - if: '($CI_COMMIT_BRANCH == "latest-release") && ($CI_PROJECT_NAMESPACE == "tezos")'
+    # Allow 'Test latest release' pipelines
+    - if: '($CI_COMMIT_BRANCH  == "latest-release-test") && ($CI_PROJECT_NAMESPACE != "tezos")'
+    # Allow 'Master branch' pipelines
+    - if: '($CI_PROJECT_NAMESPACE == "tezos") && ($CI_COMMIT_BRANCH == "master")'
+    # Allow 'Release tag' pipelines
+    - if: '($CI_COMMIT_TAG =~ /^v\d+\.\d+(?:\-rc\d+)?$/) && ($CI_PROJECT_NAMESPACE == "tezos")'
+    # Allow 'Beta release tag' pipelines
+    - if: '($CI_COMMIT_TAG =~ /^v\d+\.\d+\-beta\d*$/) && ($CI_PROJECT_NAMESPACE == "tezos")'
+    # Allow 'Test release tag' pipelines
+    - if: '($CI_COMMIT_TAG =~ /^v\d+\.\d+(?:\-(rc|beta)\d+)?$/) && ($CI_PROJECT_NAMESPACE != "tezos")'
+    # Allow 'Scheduled pipeline for extended tests' pipelines
+    - if: '($CI_PIPELINE_SOURCE == "schedule") && ($TZ_SCHEDULE_KIND == "EXTENDED_TESTS")'
+    # Disallow all other pipelines
+    - when: never
 
 variables:
   # /!\ CI_REGISTRY is overriden to use a private Docker registry mirror in AWS ECR
@@ -117,6 +117,8 @@ trigger:
     - echo 'Trigger pipeline 🤠'
 
 include:
+  # /!\ These rules should be kept in sync with the corresponding
+  # 'if'-rules on the workflow rules above.
 
   # Common templates
   - local: .gitlab/ci/jobs/shared/templates.yml
@@ -126,7 +128,7 @@ include:
     rules:
       - if: '($CI_PIPELINE_SOURCE == "merge_request_event") && ($CI_PROJECT_NAMESPACE == "tezos")'
 
-  # Latest release and test latest release
+  # Latest release
   - local: .gitlab/ci/pipelines/latest_release.yml
     rules:
       - if: '($CI_COMMIT_BRANCH == "latest-release") && ($CI_PROJECT_NAMESPACE == "tezos")'
