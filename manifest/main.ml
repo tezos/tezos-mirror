@@ -409,7 +409,7 @@ let tezt_js_lib = external_sublib tezt_lib ~js_compatible:true "tezt.js"
 
 let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
     ?dep_globs_rec ?dep_files ?opam_with_test ?synopsis
-    ?(with_macos_security_framework = false) ?dune ?preprocess
+    ?(with_macos_security_framework = false) ?flags ?dune ?preprocess
     ?preprocessor_deps l =
   tezt_without_tezt_lib_dependency
     ~with_macos_security_framework
@@ -425,6 +425,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
     ?dep_globs_rec
     ?dep_files
     ?opam_with_test
+    ?flags
     ?dune
     ?preprocess
     ?preprocessor_deps
@@ -1013,11 +1014,11 @@ let octez_bls12_381_hash =
     ~linkall:true
 
 let _octez_bls12_381_hash_tests =
-  tests
+  tezt
     ["test_poseidon"; "test_rescue"; "test_anemoi"; "test_griffin"; "test_jive"]
     ~path:"src/lib_bls12_381_hash/test"
     ~opam:"octez-bls12-381-hash"
-    ~deps:[alcotest; bls12_381; octez_bls12_381_hash]
+    ~deps:[alcotezt; bls12_381; octez_bls12_381_hash]
     ~flags:(Flags.standard ~disable_warnings:[3] ())
 
 let octez_mec =

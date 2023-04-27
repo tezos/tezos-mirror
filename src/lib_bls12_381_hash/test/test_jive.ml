@@ -142,6 +142,7 @@ let test_anemoi_state_size_6 () =
 let () =
   let open Alcotest in
   run
+    ~__FILE__
     "The mode of operation Jive"
     [
       ( "Exceptions",

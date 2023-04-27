@@ -210,6 +210,7 @@ let test_regression_tests_for_poseidon252 () =
 let () =
   let open Alcotest in
   run
+    ~__FILE__
     "Poseidon"
     [
       ("State", [test_case "get and set" `Quick test_state_getter_setter]);

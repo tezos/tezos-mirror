@@ -95,6 +95,7 @@ let test_consistent_with_mec () =
 let () =
   let open Alcotest in
   run
+    ~__FILE__
     "Rescue"
     [
       ( "Consistency with MEC",

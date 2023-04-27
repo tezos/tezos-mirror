@@ -966,6 +966,7 @@ val tezt :
   ?synopsis:string ->
   ?opam_with_test:with_test ->
   ?with_macos_security_framework:bool ->
+  ?flags:Flags.t ->
   ?dune:Dune.s_expr ->
   ?preprocess:preprocessor list ->
   ?preprocessor_deps:preprocessor_dep list ->

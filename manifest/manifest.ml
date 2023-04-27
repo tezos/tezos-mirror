@@ -1845,6 +1845,7 @@ type tezt_target = {
   synopsis : string option;
   opam_with_test : with_test option;
   with_macos_security_framework : bool;
+  flags : Flags.t option;
   dune : Dune.s_expr;
   tezt_local_test_lib : target;
   preprocess : Target.preprocessor list;
@@ -1855,7 +1856,7 @@ let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
 
 let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
     ?(js_deps = []) ?(dep_globs = []) ?(dep_globs_rec = []) ?(dep_files = [])
-    ?synopsis ?opam_with_test ?(with_macos_security_framework = false)
+    ?synopsis ?opam_with_test ?(with_macos_security_framework = false) ?flags
     ?(dune = Dune.[]) ?(preprocess = []) ?(preprocessor_deps = []) modules =
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
@@ -1874,6 +1875,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
         ~deps:lib_deps
         ~modules
         ~linkall:true
+        ?flags
         ~dune
         tezt_local_test_lib_name)
   in
@@ -1892,6 +1894,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
       synopsis;
       opam_with_test;
       with_macos_security_framework;
+      flags;
       dune;
       tezt_local_test_lib;
       preprocess;
@@ -1915,6 +1918,7 @@ let register_tezt_targets ~make_tezt_exe =
         synopsis;
         opam_with_test;
         with_macos_security_framework;
+        flags;
         tezt_local_test_lib;
         preprocess;
         preprocessor_deps;
@@ -1950,6 +1954,7 @@ let register_tezt_targets ~make_tezt_exe =
           ?opam_with_test
           ~preprocess
           ~preprocessor_deps
+          ?flags
           ~dune:
             Dune.
               [

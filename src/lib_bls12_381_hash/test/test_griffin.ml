@@ -154,6 +154,7 @@ let test_vectors_griffin_4 () =
 let () =
   let open Alcotest in
   run
+    ~__FILE__
     "Griffin"
     [
       ( "Test vectors",

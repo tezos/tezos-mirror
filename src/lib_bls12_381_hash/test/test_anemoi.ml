@@ -374,7 +374,10 @@ let test_state_functions () =
   let state_size = 2 * l in
   let state = Array.init state_size (fun _ -> Bls12_381.Fr.random ()) in
   let parameters =
-    Bls12_381_hash.Permutation.Anemoi.Parameters.create 128 state_size mds
+    (Bls12_381_hash.Permutation.Anemoi.Parameters.create
+       128
+       state_size
+       mds [@warning "-3"])
   in
   let ctxt = Bls12_381_hash.Permutation.Anemoi.allocate_ctxt parameters in
   let () = Bls12_381_hash.Permutation.Anemoi.set_state ctxt state in
@@ -521,6 +524,7 @@ let test_anemoi_generate_constants () =
 let () =
   let open Alcotest in
   run
+    ~__FILE__
     "The permutation Anemoi and the mode of operation Jive"
     [
       ( "From reference implementation",
