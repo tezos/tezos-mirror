@@ -38,6 +38,7 @@ module Peer = Worker.GS.Peer
 module Topic = Worker.GS.Topic
 module Message_id = Worker.GS.Message_id
 module Message = Worker.GS.Message
+module Span = Worker.GS.Span
 
 (* Helpers *)
 
@@ -56,7 +57,7 @@ type context = {
   worker : Worker.t;
   expected_p2p_output : Worker.p2p_output Queue.t;
   expected_app_output : Worker.app_output Queue.t;
-  heartbeat_span : int;
+  heartbeat_span : Span.t;
 }
 
 (** [step worker expected_p2p_output expected_app_output input expected_outputs]
@@ -71,7 +72,10 @@ let step context input expected_outputs =
     match input with
     | In_p2p i -> return @@ Worker.p2p_input context.worker i
     | In_app i -> return @@ Worker.app_input context.worker i
-    | Heartbeat -> Lwt_unix.sleep (1.1 *. float_of_int context.heartbeat_span)
+    | Heartbeat ->
+        Lwt_unix.sleep
+          (1.1
+          *. float_of_int (Milliseconds.Span.seconds context.heartbeat_span))
   in
   List.iter (function
       | Out_p2p o -> Queue.push o context.expected_p2p_output

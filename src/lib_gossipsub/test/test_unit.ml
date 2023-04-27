@@ -574,7 +574,9 @@ let test_handle_graft_for_joined_topic rng limits parameters =
   (* Prune peer with backoff 0 to be sure that the peer is not in mesh. *)
   let peer = peers.(7) in
   let state, _ =
-    GS.handle_prune {peer; topic; px = Seq.empty; backoff = 0} state
+    GS.handle_prune
+      {peer; topic; px = Seq.empty; backoff = Milliseconds.Span.zero}
+      state
   in
   assert_mesh_inclusion ~__LOC__ ~peer ~topic state ~is_included:false ;
   (* Graft peer. *)
@@ -831,7 +833,7 @@ let test_do_not_graft_within_backoff_period rng limits parameters =
           (* Run backoff clearing on every heartbeat tick. *)
           backoff_cleanup_ticks = 1;
           (* We will run the heartbeat tick on each time tick to simplify the test. *)
-          heartbeat_interval = 1;
+          heartbeat_interval = Milliseconds.Span.of_int_s 1;
         }
       ~parameters
       ~peers
@@ -841,14 +843,17 @@ let test_do_not_graft_within_backoff_period rng limits parameters =
   in
   let peers = Array.of_list peers in
   (* Prune peer with backoff of 30 time ticks. *)
-  let backoff = 30 in
+  let backoff = Milliseconds.of_int_s 30 in
   let state, _ =
     GS.handle_prune {peer = peers.(0); topic; px = Seq.empty; backoff} state
   in
   (* No graft should be emitted until 32 time ticks pass.
      The additional 2 time ticks is due to the "backoff slack". *)
   let state =
-    List.init ~when_negative_length:() (backoff + 1) (fun i -> i + 1)
+    List.init
+      ~when_negative_length:()
+      (Milliseconds.seconds backoff + 1)
+      (fun i -> i + 1)
     |> WithExceptions.Result.get_ok ~loc:__LOC__
     |> List.fold_left
          (fun state i ->
@@ -895,9 +900,9 @@ let test_unsubscribe_backoff rng limits parameters =
           (* Run backoff clearing on every heartbeat tick. *)
           backoff_cleanup_ticks = 1;
           (* We will run the heartbeat tick on each time tick to simplify the test. *)
-          heartbeat_interval = 1;
+          heartbeat_interval = Milliseconds.of_int_s 1;
           (* Set unsubscribe backoff to 5. *)
-          unsubscribe_backoff = 5;
+          unsubscribe_backoff = Milliseconds.of_int_s 5;
         }
       ~parameters
       ~peers

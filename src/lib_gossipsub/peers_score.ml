@@ -67,13 +67,21 @@ struct
             This field is updated when pruning, grafting or removing the associated peer. *)
     first_message_deliveries : int;
         (** The number of messages on this topic that the associated peer was the first to deliver. *)
+    mesh_message_deliveries_active : bool;
+        (** A flag indicating whether we started evaluating the score associated to mesh messages deliveries. *)
+    mesh_message_deliveries : int;
+        (** The number of first or near-first messages delivered on this topic by
+            the associated mesh peer. *)
+    mesh_failure_penalty : int;
+        (** The score penalty induced on the associated peer when pruned or removed due
+            to a mesh message delivry deficit. *)
   }
 
   type stats = {
     behaviour_penalty : int;  (** The score associated to a peer. *)
     topic_status : topic_status Topic.Map.t;
     peer_status : peer_status;
-    parameters : topic score_parameters;
+    parameters : (topic, span) score_parameters;
   }
 
   type t = {
@@ -98,35 +106,54 @@ struct
   (* Please refer to the `SCORE` module type documentation for the meaning of each
      score function. *)
 
-  let p1 {parameters; topic_status; _} =
-    Topic.Map.fold
-      (fun topic {mesh_status; _} acc ->
-        match mesh_status with
-        | Inactive -> acc
-        | Active {since = _; during} ->
-            let topic_parameters = get_topic_params parameters topic in
-            let topic_weight = get_topic_weight parameters topic in
-            let seconds_in_mesh = Span.seconds during |> float_of_int in
-            let weighted_time =
-              topic_parameters.time_in_mesh_weight *. seconds_in_mesh
-              /. topic_parameters.time_in_mesh_quantum
-            in
-            acc
-            +. topic_weight
-               *. Float.min weighted_time topic_parameters.time_in_mesh_cap)
-      topic_status
-      0.0
+  let p1 topic_parameters {mesh_status; _} =
+    match mesh_status with
+    | Inactive -> 0.0
+    | Active {since = _; during} ->
+        let seconds_in_mesh = Span.seconds during |> float_of_int in
+        let weighted_time =
+          topic_parameters.time_in_mesh_weight *. seconds_in_mesh
+          /. topic_parameters.time_in_mesh_quantum
+        in
+        Float.min weighted_time topic_parameters.time_in_mesh_cap
 
-  let p2 {parameters; topic_status; _} =
+  let p2 topic_parameters {first_message_deliveries; _} =
+    let weighted_deliveries =
+      topic_parameters.first_message_deliveries_weight
+      *. float_of_int first_message_deliveries
+    in
+    weighted_deliveries
+
+  let mesh_message_delivery_penalty {mesh_message_deliveries_threshold; _}
+      {mesh_message_deliveries; mesh_message_deliveries_active; _} =
+    if
+      mesh_message_deliveries_active
+      && mesh_message_deliveries < mesh_message_deliveries_threshold
+    then
+      let deficit =
+        mesh_message_deliveries_threshold - mesh_message_deliveries
+      in
+      deficit * deficit
+    else 0
+
+  let p3 params status =
+    let penalty = mesh_message_delivery_penalty params status in
+    float_of_int penalty *. params.mesh_message_deliveries_weight
+
+  let p3b {mesh_failure_penalty_weight; _} {mesh_failure_penalty; _} =
+    float_of_int mesh_failure_penalty *. mesh_failure_penalty_weight
+
+  let topic_scores {parameters; topic_status; _} =
     Topic.Map.fold
-      (fun topic {first_message_deliveries; _} acc ->
+      (fun topic status acc ->
         let topic_parameters = get_topic_params parameters topic in
         let topic_weight = get_topic_weight parameters topic in
-        let weighted_deliveries =
-          topic_weight *. topic_parameters.first_message_deliveries_weight
-          *. float_of_int first_message_deliveries
-        in
-        acc +. weighted_deliveries)
+        let p1 = p1 topic_parameters status in
+        let p2 = p2 topic_parameters status in
+        let p3 = p3 topic_parameters status in
+        let p3b = p3b topic_parameters status in
+        let total = topic_weight *. (p1 +. p2 +. p3 +. p3b) in
+        acc +. total)
       topic_status
       0.0
 
@@ -138,10 +165,9 @@ struct
     else 0.0
 
   let float ps =
-    let p1 = p1 ps in
-    let p2 = p2 ps in
+    let topic_scores = topic_scores ps in
     let p7 = p7 ps in
-    p1 +. p2 +. p7
+    topic_scores +. p7
 
   let make stats = {stats; score = Lazy.from_fun (fun () -> float stats)}
 
@@ -168,7 +194,13 @@ struct
 
   let fresh_topic_stats () =
     let mesh_status = fresh_mesh_status () in
-    {mesh_status; first_message_deliveries = 0}
+    {
+      mesh_status;
+      first_message_deliveries = 0;
+      mesh_message_deliveries_active = false;
+      mesh_message_deliveries = 0;
+      mesh_failure_penalty = 0;
+    }
 
   let expires {stats; _} =
     match stats.peer_status with
@@ -194,7 +226,17 @@ struct
     let topic_status =
       Topic.Map.update
         topic
-        (Option.map (fun status -> {status with mesh_status = Inactive}))
+        (Option.map (fun status ->
+             let topic_parameters = get_topic_params stats.parameters topic in
+             let penalty =
+               mesh_message_delivery_penalty topic_parameters status
+             in
+             {
+               status with
+               mesh_status = Inactive;
+               mesh_message_deliveries_active = false;
+               mesh_failure_penalty = status.mesh_failure_penalty + penalty;
+             }))
         stats.topic_status
     in
     make {stats with topic_status}
@@ -211,54 +253,131 @@ struct
       (* Update per-topic statistics *)
       let topic_status =
         Topic.Map.mapi
-          (fun _topic status -> {status with mesh_status = Inactive})
+          (fun topic status ->
+            let mesh_failure_penalty =
+              match status.mesh_status with
+              | Active _ ->
+                  let topic_parameters =
+                    get_topic_params stats.parameters topic
+                  in
+                  status.mesh_failure_penalty
+                  + mesh_message_delivery_penalty topic_parameters status
+              | Inactive -> status.mesh_failure_penalty
+            in
+            {
+              status with
+              mesh_status = Inactive;
+              first_message_deliveries = 0;
+              mesh_message_deliveries_active = false;
+              mesh_failure_penalty;
+            })
           stats.topic_status
       in
       (* Mark peer as disconnected *)
       let stats =
         {stats with peer_status = Disconnected {expires}; topic_status}
       in
-      (* TODO https://gitlab.com/tezos/tezos/-/issues/5447
-         apply score penalties due to mesh message deliveries deficit. *)
       make stats |> Option.some
 
-  let refresh_graft_status now {stats; _} =
+  let increment_first_message_deliveries parameters topic ts =
+    let cap =
+      let topic_parameters = get_topic_params parameters topic in
+      topic_parameters.first_message_deliveries_cap
+    in
+    Int.min cap (ts.first_message_deliveries + 1)
+
+  let increment_mesh_message_deliveries parameters topic ts =
+    match ts.mesh_status with
+    | Active _ ->
+        let cap =
+          let topic_parameters = get_topic_params parameters topic in
+          topic_parameters.mesh_message_deliveries_cap
+        in
+        Int.min cap (ts.mesh_message_deliveries + 1)
+    | Inactive -> ts.mesh_message_deliveries
+
+  let first_message_delivered ({stats; _} : t) (topic : Topic.t) =
+    let increment ts =
+      let first_message_deliveries =
+        increment_first_message_deliveries stats.parameters topic ts
+      in
+      let mesh_message_deliveries =
+        increment_mesh_message_deliveries stats.parameters topic ts
+      in
+      {
+        mesh_status = ts.mesh_status;
+        mesh_message_deliveries_active = ts.mesh_message_deliveries_active;
+        mesh_failure_penalty = ts.mesh_failure_penalty;
+        mesh_message_deliveries;
+        first_message_deliveries;
+      }
+    in
+
     let topic_status =
-      Topic.Map.map
-        (fun status ->
-          match status.mesh_status with
-          | Inactive -> status
-          | Active {since; during = _} ->
-              let during = Time.sub now (Time.to_span since) |> Time.to_span in
-              {status with mesh_status = Active {since; during}})
+      Topic.Map.update
+        topic
+        (function
+          | None -> fresh_topic_stats () |> increment |> Option.some
+          | Some ts -> increment ts |> Option.some)
         stats.topic_status
     in
     make {stats with topic_status}
 
-  let first_message_delivered ({stats; _} : t) (topic : Topic.t) =
-    let increment topic ts =
-      let cap =
-        let topic_parameters = get_topic_params stats.parameters topic in
-        topic_parameters.first_message_deliveries_cap
+  let duplicate_message_delivered ({stats; _} : t) (topic : Topic.t)
+      (validated : Time.t) =
+    let increment ts =
+      let topic_parameters = get_topic_params stats.parameters topic in
+      let window_upper_bound =
+        Time.add validated topic_parameters.mesh_message_deliveries_window
       in
-      {
-        mesh_status = ts.mesh_status;
-        first_message_deliveries = Int.min cap (ts.first_message_deliveries + 1);
-      }
+      if Time.(now () <= window_upper_bound) then
+        let mesh_message_deliveries =
+          increment_mesh_message_deliveries stats.parameters topic ts
+        in
+        {ts with mesh_message_deliveries}
+      else ts
     in
     let topic_status =
       Topic.Map.update
         topic
         (function
-          | None -> fresh_topic_stats () |> increment topic |> Option.some
-          | Some ts -> increment topic ts |> Option.some)
+          | None -> fresh_topic_stats () |> increment |> Option.some
+          | Some ts -> increment ts |> Option.some)
+        stats.topic_status
+    in
+    make {stats with topic_status}
+
+  let refresh_mesh_status now mesh_status =
+    match mesh_status with
+    | Inactive -> mesh_status
+    | Active {since; during = _} ->
+        let during = Time.sub now (Time.to_span since) |> Time.to_span in
+        Active {since; during}
+
+  let time_active_in_mesh mesh_status =
+    match mesh_status with
+    | Inactive -> Span.zero
+    | Active {during; _} -> during
+
+  let refresh_topic_status_map now {stats; _} =
+    let topic_status =
+      Topic.Map.mapi
+        (fun topic status ->
+          let topic_parameters = get_topic_params stats.parameters topic in
+          let mesh_status = refresh_mesh_status now status.mesh_status in
+          let mesh_message_deliveries_active =
+            Span.(
+              topic_parameters.mesh_message_deliveries_activation
+              <= time_active_in_mesh mesh_status)
+          in
+          {status with mesh_status; mesh_message_deliveries_active})
         stats.topic_status
     in
     make {stats with topic_status}
 
   let refresh ps =
     let current = Time.now () in
-    let refresh () = Some (refresh_graft_status current ps) in
+    let refresh () = Some (refresh_topic_status_map current ps) in
     match ps.stats.peer_status with
     | Connected -> refresh ()
     | Disconnected {expires = at} when Time.(at > current) -> refresh ()

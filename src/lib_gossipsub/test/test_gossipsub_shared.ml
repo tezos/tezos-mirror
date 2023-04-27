@@ -25,54 +25,92 @@
 
 open Gossipsub_intf
 
+module Milliseconds = struct
+  type t = {ms : int}
+
+  let pp fmtr {ms} = Format.fprintf fmtr "%dms" ms
+
+  let of_int_ms ms = {ms}
+
+  let of_int_s s = {ms = s * 1000}
+
+  let zero = {ms = 0}
+
+  let add m1 m2 = of_int_ms (m1.ms + m2.ms)
+
+  let sub m1 m2 = of_int_ms (m1.ms - m2.ms)
+
+  let seconds {ms} = ms / 1000
+
+  let compare m1 m2 = Int.compare m1.ms m2.ms
+
+  module Compare = Compare.Make (struct
+    type nonrec t = t
+
+    let compare = compare
+  end)
+
+  module Span = struct
+    type nonrec t = t
+
+    let zero = zero
+
+    let one_second = {ms = 1000}
+
+    let seconds = seconds
+
+    let of_int_ms = of_int_ms
+
+    let of_int_s = of_int_s
+
+    let add = add
+
+    let sub = sub
+
+    let mul m s = of_int_ms (m.ms * s)
+
+    let pp = pp
+
+    include Compare
+  end
+
+  type span = Span.t
+
+  let mul_span = Span.mul
+
+  let to_span = Fun.id
+
+  include Compare
+end
+
 module Time = struct
-  let t = ref 0
+  let t = ref Milliseconds.zero
 
   let now () = !t
 
-  let elapse dt =
-    assert (dt >= 0) ;
-    t := !t + dt
+  let elapse s =
+    assert (s >= 0) ;
+    t := Milliseconds.add !t (Milliseconds.of_int_s s)
 
   let set now = t := now
 
-  let reset () = t := 0
+  let reset () = t := Milliseconds.zero
 end
 
 module Automaton_config :
   AUTOMATON_CONFIG
-    with type Time.t = int
-     and type Span.t = int
+    with type Time.t = Milliseconds.t
+     and type Span.t = Milliseconds.span
      and type Subconfig.Peer.t = int
      and type Subconfig.Topic.t = string
      and type Subconfig.Message_id.t = int
      and type Subconfig.Message.t = string = struct
-  module Span = struct
-    type t = int
-
-    let zero = 0
-
-    let seconds = Fun.id
-
-    let pp = Format.pp_print_int
-  end
+  module Span = Milliseconds.Span
 
   module Time = struct
-    type span = Span.t
-
-    let pp = Format.pp_print_int
+    include Milliseconds
 
     let now = Time.now
-
-    let add = ( + )
-
-    let sub = ( - )
-
-    let mul_span = ( * )
-
-    let to_span = Fun.id
-
-    include Compare.Int
   end
 
   module Int_iterable = struct
@@ -258,7 +296,8 @@ module Worker_config = struct
 
     let return = Lwt.return
 
-    let sleep i = Lwt_unix.sleep @@ float_of_int i
+    let sleep (span : GS.Span.t) =
+      Lwt_unix.sleep @@ float_of_int (Milliseconds.Span.seconds span)
   end
 
   module Stream = struct
