@@ -444,10 +444,10 @@ let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
     command
       ~group
       ~desc:"Launch the VDF daemon"
-      (* no_options *)
-      (args1 keep_alive_arg)
+      (args2 pidfile_arg keep_alive_arg)
       (prefixes ["run"; "vdf"] @@ stop)
-      (fun keep_alive cctxt ->
+      (fun (pidfile, keep_alive) cctxt ->
+        may_lock_pidfile pidfile @@ fun () ->
         Client_daemon.VDF.run cctxt ~chain:cctxt#chain ~keep_alive);
   ]
 
