@@ -425,14 +425,7 @@ and kinstr_size :
           (accu ++ ty_size ty)
           ty
           x
-    | IUnit (loc, k) ->
-        let accu = ret_succ_adding accu (base1 loc k +! (word_size *? 2)) in
-        let ty = unit_t in
-        (value_size [@ocaml.tailcall])
-          ~count_lambda_nodes
-          (accu ++ ty_size ty)
-          ty
-          ()
+    | IUnit (loc, k) -> ret_succ_adding accu (base1 loc k)
     | ICons_pair (loc, k) -> ret_succ_adding accu (base1 loc k)
     | ICar (loc, k) -> ret_succ_adding accu (base1 loc k)
     | ICdr (loc, k) -> ret_succ_adding accu (base1 loc k)
