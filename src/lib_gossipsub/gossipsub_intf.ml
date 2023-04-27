@@ -203,21 +203,20 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
           it's been [fanout_ttl] since we've published to a topic that we're not
           subscribed to, then we don't track that topic anymore, that is, we
           delete it from the fanout map. *)
-  heartbeat_interval : 'span;
-      (** [heartbeat_interval] controls the time between heartbeats. *)
+  heartbeat_interval : 'span;  (** The time between heartbeats. *)
   backoff_cleanup_ticks : int;
-      (** [backoff_cleanup_ticks] is the number of heartbeat ticks setting the
-          frequency at which the backoffs are checked and potentially cleared. *)
+      (** The number of heartbeat ticks setting the frequency at which the
+          backoffs are checked and potentially cleared. *)
   score_cleanup_ticks : int;
-      (** [score_cleanup_ticks] is the number of heartbeat ticks setting the
-          frequency at which the scores are checked and potentially cleared. *)
+      (** The number of heartbeat ticks setting the frequency at which the
+          scores are checked and potentially cleared. *)
   degree_low : int;
-      (** [degree_low] sets the lower bound on the number of peers we keep in a
+      (** The lower bound on the number of peers we keep in a
           topic mesh. If we have fewer than [degree_low] peers, the heartbeat will attempt
           to graft some more into the mesh at the next heartbeat. *)
   degree_high : int;
-      (** [degree_high] sets the upper bound on the number of peers we keep in a
-          topic mesh.  If there are more than [degree_high] peers, the heartbeat will select
+      (** The upper bound on the number of peers we keep in a topic mesh. If
+          there are more than [degree_high] peers, the heartbeat will select
           some to prune from the mesh at the next heartbeat. *)
   degree_score : int;
       (** [degree_score] affects how peers are selected when pruning a mesh due
@@ -226,13 +225,12 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5052
      [degree_score] must not exceed [degree_optimal - degree_out]. *)
   degree_out : int;
-      (** [degree_out] is the quota for the number of outbound connections to
-          maintain in a topic mesh.  When the mesh is pruned due to over
-          subscription, we make sure that we have outbound connections to at
-          least [degree_out] of the survivor peers. This prevents Sybil
-          attackers from overwhelming our mesh with incoming connections.
-	        [degree_out] must be set below {degree_low}, and must not exceed
-          [degree_optimal / 2]. *)
+      (** The number of outbound connections to maintain in a topic mesh.  When
+          the mesh is pruned due to over subscription, we make sure that we have
+          outbound connections to at least [degree_out] of the survivor
+          peers. This prevents Sybil attackers from overwhelming our mesh with
+          incoming connections. [degree_out] must be set below {degree_low}, and
+          must not exceed [degree_optimal / 2]. *)
   degree_lazy : int;
       (** [degree_lazy] affects how many peers the local peer will emit gossip
           to at each heartbeat. The local peer will send gossip to at least
@@ -245,9 +243,8 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
           [gossip_factor] * (total number of non-mesh/non-fanout peers), or
           [degree_lazy] peers, whichever is greater. *)
   history_length : int;
-      (** [history_length] controls the size of the message cache used for
-          gossip. The message cache will remember messages for [history_length]
-          heartbeats. *)
+      (** The size of the message cache used for gossip. The message cache will
+          remember messages for [history_length] heartbeats. *)
   history_gossip_length : int;
       (** [history_gossip_length] controls how many cached message ids the local
           peer will advertise in IHave gossip messages. When asked for its seen
@@ -257,6 +254,17 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
           avoid advertising messages that will be expired by the time they're
           requested. [history_gossip_length] must be less than or equal to
           [history_length]. *)
+  opportunistic_graft_ticks : int64;
+      (** The number of heartbeat ticks setting the frequency at which to
+          attempt to improve the mesh with opportunistic grafting. Every
+          [opportunistic_graft_ticks], if the median score of the mesh peers
+          falls below the {opportunistic_graft_threshold}, then the local peer
+          will select some high-scoring mesh peers to graft.  *)
+  opportunistic_graft_peers : int;
+      (** The number of peers to opportunistically graft. *)
+  opportunistic_graft_threshold : float;
+      (** The median mesh score threshold before triggering opportunistic
+          grafting; this should have a small positive value. *)
   score_parameters : ('topic, 'span) score_parameters;
       (** score-specific parameters. *)
 }

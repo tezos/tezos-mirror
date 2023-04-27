@@ -78,6 +78,9 @@ let default_limits =
     gossip_factor = 0.25;
     history_length = 5;
     history_gossip_length = 3;
+    opportunistic_graft_ticks = 60L;
+    opportunistic_graft_peers = 2;
+    opportunistic_graft_threshold = 1.;
     score_parameters;
   }
 
