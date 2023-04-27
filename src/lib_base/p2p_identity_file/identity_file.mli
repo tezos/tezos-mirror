@@ -42,3 +42,9 @@ val generate :
   string ->
   float ->
   P2p_identity.t tzresult Lwt.t
+
+val init :
+  check_data_dir:(data_dir:string -> unit tzresult Lwt.t) ->
+  identity_file:string ->
+  expected_pow:float ->
+  P2p_identity.t tzresult Lwt.t

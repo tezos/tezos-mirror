@@ -224,3 +224,45 @@ let generate ~check_data_dir identity_file expected_pow =
       id.peer_id
       identity_file ;
     return id
+
+module Event = struct
+  include Internal_event.Simple
+
+  let section = ["node"; "identity"]
+
+  let read_identity =
+    declare_1
+      ~section
+      ~name:"read_identity"
+      ~msg:"read identity file"
+      ~level:Notice
+      ("peer_id", P2p_peer.Id.encoding)
+
+  let generating_identity =
+    declare_0
+      ~section
+      ~name:"generating_identity"
+      ~msg:"generating an identity file"
+      ~level:Notice
+      ()
+
+  let identity_generated =
+    declare_1
+      ~section
+      ~name:"identity_generated"
+      ~msg:"identity file generated"
+      ~level:Notice
+      ("peer_id", P2p_peer.Id.encoding)
+end
+
+let init ~check_data_dir ~identity_file ~expected_pow =
+  let open Lwt_result_syntax in
+  if Sys.file_exists identity_file then
+    let* identity = read identity_file in
+    let*! () = Event.(emit read_identity) identity.peer_id in
+    return identity
+  else
+    let*! () = Event.(emit generating_identity) () in
+    let* identity = generate ~check_data_dir identity_file expected_pow in
+    let*! () = Event.(emit identity_generated) identity.peer_id in
+    return identity

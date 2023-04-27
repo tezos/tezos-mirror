@@ -95,30 +95,6 @@ module Event = struct
       ~level:Notice
       ()
 
-  let read_identity =
-    declare_1
-      ~section
-      ~name:"read_identity"
-      ~msg:"read identity file"
-      ~level:Notice
-      ("peer_id", P2p_peer.Id.encoding)
-
-  let generating_identity =
-    declare_0
-      ~section
-      ~name:"generating_identity"
-      ~msg:"generating an identity file"
-      ~level:Notice
-      ()
-
-  let identity_generated =
-    declare_1
-      ~section
-      ~name:"identity_generated"
-      ~msg:"identity file generated"
-      ~level:Notice
-      ("peer_id", P2p_peer.Id.encoding)
-
   let disabled_config_validation =
     declare_0
       ~section
@@ -218,34 +194,23 @@ end
 open Filename.Infix
 
 let init_identity_file (config : Config_file.t) =
-  let open Lwt_result_syntax in
+  let check_data_dir ~data_dir =
+    let dummy_genesis =
+      {
+        Genesis.time = Time.Protocol.epoch;
+        block = Block_hash.zero;
+        protocol = Protocol_hash.zero;
+      }
+    in
+    Data_version.ensure_data_dir ~mode:Exists dummy_genesis data_dir
+  in
   let identity_file =
     config.data_dir // Data_version.default_identity_file_name
   in
-  if Sys.file_exists identity_file then
-    let* identity = Identity_file.read identity_file in
-    let*! () = Event.(emit read_identity) identity.peer_id in
-    return identity
-  else
-    let*! () = Event.(emit generating_identity) () in
-    let check_data_dir ~data_dir =
-      let dummy_genesis =
-        {
-          Genesis.time = Time.Protocol.epoch;
-          block = Block_hash.zero;
-          protocol = Protocol_hash.zero;
-        }
-      in
-      Data_version.ensure_data_dir ~mode:Exists dummy_genesis data_dir
-    in
-    let* identity =
-      Identity_file.generate
-        ~check_data_dir
-        identity_file
-        config.p2p.expected_pow
-    in
-    let*! () = Event.(emit identity_generated) identity.peer_id in
-    return identity
+  Identity_file.init
+    ~check_data_dir
+    ~identity_file
+    ~expected_pow:config.p2p.expected_pow
 
 let init_node ?sandbox ?target ~identity ~singleprocess
     ~external_validator_log_config ~force_history_mode_switch
