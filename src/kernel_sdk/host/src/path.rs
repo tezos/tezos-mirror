@@ -241,6 +241,7 @@ impl<'a> TryFrom<&'a [u8]> for RefPath<'a> {
         validate_path(slice)?;
 
         // SAFETY: we've validated that every byte is either alphanumeric or SEPARATOR
+        // and it is not pointing to a read-only store
         let inner = unsafe { core::str::from_utf8_unchecked(slice) };
 
         Ok(RefPath { inner })

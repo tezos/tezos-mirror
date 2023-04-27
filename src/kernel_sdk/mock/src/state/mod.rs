@@ -10,7 +10,11 @@ use crypto::hash::SmartRollupHash;
 use tezos_smart_rollup_core::{
     MAX_FILE_CHUNK_SIZE, MAX_INPUT_MESSAGE_SIZE, MAX_OUTPUT_SIZE, PREIMAGE_HASH_SIZE,
 };
-use tezos_smart_rollup_host::{metadata::RollupMetadata, path::RefPath, Error};
+use tezos_smart_rollup_host::{
+    metadata::RollupMetadata,
+    path::{PathError, RefPath},
+    Error,
+};
 
 pub(crate) mod store;
 
@@ -156,7 +160,7 @@ impl HostState {
         offset: usize,
         max_bytes: usize,
     ) -> Result<Vec<u8>, Error> {
-        let path = validate_path(path)?;
+        let path = validate_path_maybe_readonly(path)?;
 
         if !self.store.has_entry(&path) {
             return Err(Error::StoreNotAValue);
@@ -277,9 +281,30 @@ impl HostState {
 }
 
 fn validate_path(s: &[u8]) -> Result<String, Error> {
-    use tezos_smart_rollup_host::path::PathError;
-
     match RefPath::try_from(s) {
+        Err(PathError::PathTooLong) => Err(Error::StoreKeyTooLarge),
+        Err(_) => Err(Error::StoreInvalidKey),
+        Ok(_) => {
+            // SAFETY: a valid path is valid UTF-8
+            Ok(unsafe { String::from_utf8_unchecked(s.to_vec()) })
+        }
+    }
+}
+
+fn validate_path_maybe_readonly(s: &[u8]) -> Result<String, Error> {
+    const READONLY_PATH_SEGMENT: &[u8] = b"/readonly/";
+    const READONLY_PREFIX: &[u8] = b"/readonly";
+    let to_check = if s.len() > READONLY_PATH_SEGMENT.len()
+        && &s[..READONLY_PATH_SEGMENT.len()] == READONLY_PATH_SEGMENT
+    {
+        // the path has form "/readonly/(.+)", so we check the "/(.+)" part
+        &s[READONLY_PREFIX.len()..]
+    } else if s == READONLY_PREFIX {
+        return Ok(unsafe { String::from_utf8_unchecked(READONLY_PREFIX.to_vec()) });
+    } else {
+        s
+    };
+    match RefPath::try_from(to_check) {
         Err(PathError::PathTooLong) => Err(Error::StoreKeyTooLarge),
         Err(_) => Err(Error::StoreInvalidKey),
         Ok(_) => {
@@ -594,5 +619,14 @@ mod tests {
         let value_size = state.handle_store_value_size(path);
 
         assert_eq!(Ok(size), value_size);
+    }
+
+    #[test]
+    fn read_from_readonly() {
+        let mut state = HostState::default();
+        let path = "/readonly/kernel/env/reboot_count";
+        state.store.set_value(path, 4i32.to_le_bytes().to_vec());
+        let read_back = state.handle_store_read(path.as_bytes(), 0, 4).unwrap();
+        assert_eq!(read_back, [4, 0, 0, 0]);
     }
 }
