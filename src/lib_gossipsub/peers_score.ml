@@ -178,7 +178,11 @@ struct
     else 0.0
 
   let float ps =
-    let topic_scores = topic_scores ps in
+    let topic_scores =
+      match ps.parameters.topic_score_cap with
+      | None -> topic_scores ps
+      | Some cap -> Float.min cap (topic_scores ps)
+    in
     let p5 = p5 ps in
     let p7 = p7 ps in
     topic_scores +. p5 +. p7

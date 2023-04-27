@@ -163,10 +163,16 @@ type ('topic, 'span) topic_score_parameters =
 
 (* N.B.: unlike the Go/Rust implementations, scores are not refreshed in an asynchronous
    loop but rather in the heartbeat. Hence, we do not have the [decay_interval] parameter.
-   Scores are refreshed and decayed every [score_cleanup_ticks] heartbeats (see [limits]). *)
+   Scores are refreshed and decayed every [score_cleanup_ticks] heartbeats (see [limits]).
+
+   TODO: https://gitlab.com/tezos/tezos/-/issues/5545
+   We did not implement P6, aka IP colocation factor *)
 type ('topic, 'span) score_parameters = {
   topics : ('topic, 'span) topic_score_parameters;
       (** Per-topic score parameters. *)
+  topic_score_cap : float option;
+      (** An optional cap on the total positive contribution of topics to the score of the peer.
+          If not equal to [None], must be non-negative. *)
   behaviour_penalty_weight : float;
       (** P7: The weight of the score associated to the behaviour penalty. This
           parameter must be negative. *)

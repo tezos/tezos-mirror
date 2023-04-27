@@ -260,6 +260,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | Topic_score_parameters_family {all_topics; parameters; weights = _} ->
         Seq.map parameters all_topics
         |> Seq.iter check_per_topic_score_parameters) ;
+    Option.iter (fun cap -> assert (cap >= 0.0)) sp.topic_score_cap ;
     assert (sp.behaviour_penalty_weight <= 0.0) ;
     assert (sp.behaviour_penalty_threshold >= 0.0) ;
     assert_in_unit_interval sp.behaviour_penalty_decay ;

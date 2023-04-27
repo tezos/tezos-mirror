@@ -51,6 +51,7 @@ let per_topic_score_parameters =
 let score_parameters =
   {
     topics = per_topic_score_parameters;
+    topic_score_cap = Some 3600.;
     behaviour_penalty_weight = ~-.10.0;
     behaviour_penalty_threshold = 0.0;
     behaviour_penalty_decay = 0.2;
