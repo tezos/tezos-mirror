@@ -1336,6 +1336,48 @@ Constraints: 32
 Bytes.test_not_optimized:
 Constraints: 16
 
+Bytes.test_band:
+Constraints: 40
+
+Bytes.test_band_optimized:
+Constraints: 24
+
+Bytes.test_band:
+Constraints: 40
+
+Bytes.test_band_optimized:
+Constraints: 24
+
+Bytes.test_band:
+Constraints: 40
+
+Bytes.test_band_optimized:
+Constraints: 24
+
+Bytes.test_band:
+Constraints: 40
+
+Bytes.test_band_optimized:
+Constraints: 24
+
+Bytes.test_band:
+Constraints: 40
+
+Bytes.test_band_optimized:
+Constraints: 24
+
+Bytes.test_band:
+Constraints: 40
+
+Bytes.test_band_optimized:
+Constraints: 24
+
+Bytes.test_band:
+Constraints: 40
+
+Bytes.test_band_optimized:
+Constraints: 24
+
 Blake.test_mixing:
 Constraints: 2638
 

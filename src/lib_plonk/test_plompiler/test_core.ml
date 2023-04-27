@@ -861,9 +861,34 @@ functor
         test ~valid:true ~name:"Bytes.test_not" @@ test_not o i;
       ]
 
+    let test_band a b o () =
+      let* a = input ~kind:`Public a in
+      let* b = input ~kind:`Public b in
+      let* o = input o in
+      let* o' = band a b in
+      assert_equal o o'
+
+    let tests_band =
+      List.map
+        (fun (valid, a, b, o) ->
+          let a = Bytes.input_bytes @@ bytes_of_hex a in
+          let b = Bytes.input_bytes @@ bytes_of_hex b in
+          let o = Bytes.input_bytes @@ bytes_of_hex o in
+          test ~valid ~name:"Bytes.test_band" @@ test_band a b o)
+        [
+          (true, "00", "00", "00");
+          (true, "0F", "00", "00");
+          (true, "00", "0F", "00");
+          (true, "0F", "0F", "0F");
+          (true, "F0", "00", "00");
+          (true, "00", "F0", "00");
+          (true, "F0", "F0", "F0");
+          (false, "0F", "00", "0F");
+        ]
+
     let tests =
       tests_constant @ tests_add @ tests_xor @ tests_ifthenelse_bytes
-      @ tests_rotate_right @ tests_not
+      @ tests_rotate_right @ tests_not @ tests_band
   end
 
 module ECC : Test =

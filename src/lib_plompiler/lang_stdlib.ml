@@ -118,6 +118,8 @@ module type LIB = sig
 
     val not : bl repr -> bl repr t
 
+    val band : bl repr -> bl repr -> bl repr t
+
     val rotate_right : bl repr -> int -> bl repr
   end
 
@@ -651,6 +653,11 @@ module Lib (C : COMMON) = struct
 
     let not a =
       let* l = mapM Bool.bnot (of_list a) in
+      ret @@ to_list l
+
+    let band a b =
+      check_args_length "Bytes.band" a b ;
+      let* l = map2M Bool.band (of_list a) (of_list b) in
       ret @@ to_list l
 
     let rotate_right a i =
