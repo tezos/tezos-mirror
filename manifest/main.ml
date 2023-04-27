@@ -324,6 +324,9 @@ let tar_unix = external_lib "tar-unix" V.(at_least "2.0.1" && less_than "3.0.0")
 let tezos_rust_lib =
   opam_only ~can_vendor:false "tezos-rust-libs" V.(exactly "1.5")
 
+let tezos_sapling_parameters =
+  opam_only ~can_vendor:false "tezos-sapling-parameters" V.(at_least "1.1.0")
+
 let tls_lwt = external_lib "tls-lwt" V.(at_least "0.16.0")
 
 let unix = external_lib ~opam:"base-unix" "unix" V.True
@@ -2524,6 +2527,7 @@ let octez_sapling =
         octez_crypto;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         tezos_rust_lib;
+        tezos_sapling_parameters;
         octez_lwt_result_stdlib;
       ]
     ~js_of_ocaml:[[S "javascript_files"; S "runtime.js"]]

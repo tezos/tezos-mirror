@@ -20,6 +20,7 @@ depends: [
   "tezos-crypto"
   "tezos-error-monad"
   "tezos-rust-libs" { = "1.5" }
+  "tezos-sapling-parameters" { >= "1.1.0" }
   "tezos-lwt-result-stdlib"
   "tezos-hacl" {with-test}
   "tezt" { with-test & >= "3.1.0" }
@@ -30,6 +31,7 @@ depends: [
 ]
 x-opam-monorepo-opam-provided: [
   "tezos-rust-libs"
+  "tezos-sapling-parameters"
 ]
 build: [["rm" "-r" "vendors" "contrib"] ["dune" "build" "-p" name "-j" jobs]]
 synopsis: "OCaml library for the Sapling protocol, using librustzcash"
