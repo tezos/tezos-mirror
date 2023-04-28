@@ -44,7 +44,8 @@ type operation_data = Alpha_context.packed_protocol_data =
       'kind Alpha_context.Operation.protocol_data
       -> operation_data
 
-let operation_data_encoding = Alpha_context.Operation.protocol_data_encoding
+let operation_data_encoding =
+  Alpha_context.Operation.protocol_data_encoding_with_legacy_attestation_name
 
 type operation_receipt = Apply_results.packed_operation_metadata =
   | Operation_metadata :

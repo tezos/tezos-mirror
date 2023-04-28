@@ -36,7 +36,9 @@ let default_operation_inclusion_latency = 3
 
 let parse_operation (op : Operation.raw) =
   match
-    Data_encoding.Binary.of_bytes_opt Operation.protocol_data_encoding op.proto
+    Data_encoding.Binary.of_bytes_opt
+      Operation.protocol_data_encoding_with_legacy_attestation_name
+      op.proto
   with
   | Some protocol_data -> ok {shell = op.shell; protocol_data}
   | None -> error Plugin_errors.Cannot_parse_operation
@@ -426,7 +428,7 @@ module Scripts = struct
         ~query:RPC_query.empty
         ~input:
           (obj2
-             (req "operation" Operation.encoding)
+             (req "operation" Operation.encoding_with_legacy_attestation_name)
              (req "chain_id" Chain_id.encoding))
         ~output:Apply_results.operation_data_and_metadata_encoding
         RPC_path.(path / "run_operation")
@@ -459,7 +461,7 @@ module Scripts = struct
         ~input:
           (obj4
              (opt "blocks_before_activation" int32)
-             (req "operation" Operation.encoding)
+             (req "operation" Operation.encoding_with_legacy_attestation_name)
              (req "chain_id" Chain_id.encoding)
              (dft "latency" int16 default_operation_inclusion_latency))
         ~output:Apply_results.operation_data_and_metadata_encoding
@@ -2643,7 +2645,7 @@ module Forge = struct
       RPC_service.post_service
         ~description:"Forge an operation"
         ~query:RPC_query.empty
-        ~input:Operation.unsigned_encoding
+        ~input:Operation.unsigned_encoding_with_legacy_attestation_name
         ~output:(bytes Hex)
         RPC_path.(path / "operations")
 
@@ -2681,7 +2683,7 @@ module Forge = struct
       (fun () (shell, proto) ->
         return
           (Data_encoding.Binary.to_bytes_exn
-             Operation.unsigned_encoding
+             Operation.unsigned_encoding_with_legacy_attestation_name
              (shell, proto))) ;
     Registration.register0_noctxt
       ~chunked:true
@@ -2866,7 +2868,8 @@ module Parse = struct
           (obj2
              (req "operations" (list (dynamic_size Operation.raw_encoding)))
              (opt "check_signature" bool))
-        ~output:(list (dynamic_size Operation.encoding))
+        ~output:
+          (list (dynamic_size Operation.encoding_with_legacy_attestation_name))
         RPC_path.(path / "operations")
 
     let block =

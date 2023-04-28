@@ -165,7 +165,9 @@ module Proto_client = struct
           storage_limit = Z.zero;
         }
     in
-    Data_encoding.Binary.length Operation.contents_encoding (Contents contents)
+    Data_encoding.Binary.length
+      Operation.contents_encoding_with_legacy_attestation_name
+      (Contents contents)
 
   let operation_size op =
     manager_operation_size (L1_operation.to_manager_operation op)
@@ -196,7 +198,7 @@ module Proto_client = struct
     in
     let dummy_size =
       Data_encoding.Binary.length
-        Operation.contents_encoding
+        Operation.contents_encoding_with_legacy_attestation_name
         (Contents dummy_contents)
     in
     dummy_size - manager_operation_size (Manager dummy_operation)
@@ -394,7 +396,9 @@ module Proto_client = struct
       ((shell, Contents_list contents) as unsigned_op) =
     let open Lwt_result_syntax in
     let unsigned_bytes =
-      Data_encoding.Binary.to_bytes_exn Operation.unsigned_encoding unsigned_op
+      Data_encoding.Binary.to_bytes_exn
+        Operation.unsigned_encoding_with_legacy_attestation_name
+        unsigned_op
     in
     let cctxt =
       new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
@@ -412,7 +416,9 @@ module Proto_client = struct
         protocol_data = Operation_data {contents; signature = Some signature};
       }
     in
-    Data_encoding.Binary.to_bytes_exn Operation.encoding op
+    Data_encoding.Binary.to_bytes_exn
+      Operation.encoding_with_legacy_attestation_name
+      op
 
   let time_until_next_block (node_ctxt : Node_context.ro)
       (header : Tezos_base.Block_header.shell_header option) =
