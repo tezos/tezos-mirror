@@ -111,14 +111,14 @@ module type T = sig
       specified in input. *)
   val size : scheme:supported_hashes -> int
 
-  (** Unlike [hash_to_raw] this conversion is unsafe. *)
-  val raw_to_hash : raw_hash -> hash tzresult
-
   module Proto : Registered_protocol.T
 end
 
 (** Dac plugin module type. *)
 type t = (module T)
+
+(** Unlike [hash_to_raw] this conversion is unsafe. *)
+val raw_to_hash : t -> raw_hash -> hash tzresult
 
 (** [register make_plugin] derives and registers a new [Dac_plugin.T] given an
     [of_bytes]. Implementers of plugin are responsible for providing the

@@ -43,9 +43,7 @@ let raw_hash_encoding = Data_encoding.bytes' Hex
 let hash_to_raw = Fun.id
 
 let raw_hash_to_hex raw_hash =
-  let (`Hex hash) =
-    Hex.of_bytes raw_hash
-  in
+  let (`Hex hash) = Hex.of_bytes raw_hash in
   hash
 
 let raw_hash_of_hex hex = Hex.to_bytes (`Hex hex)
@@ -96,8 +94,6 @@ let () =
     (fun (raw_hash, proto) -> Cannot_convert_raw_hash_to_hash {raw_hash; proto})
 
 module type T = sig
-  
-
   val encoding : hash Data_encoding.t
 
   val equal : hash -> hash -> bool
@@ -115,12 +111,20 @@ module type T = sig
 
   val size : scheme:supported_hashes -> int
 
-  val raw_to_hash : raw_hash -> hash tzresult
-
   module Proto : Registered_protocol.T
 end
 
 type t = (module T)
+
+let raw_to_hash ((module Plugin) : t) raw_hash =
+  let of_bytes_opt =
+    Data_encoding.Binary.of_bytes_opt Plugin.encoding raw_hash
+  in
+  match of_bytes_opt with
+  | Some hash -> Ok hash
+  | None ->
+      Result_syntax.tzfail
+      @@ Cannot_convert_raw_hash_to_hash {raw_hash; proto = Plugin.Proto.hash}
 
 let table : t Protocol_hash.Table.t = Protocol_hash.Table.create 5
 

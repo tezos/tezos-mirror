@@ -94,19 +94,6 @@ end) : Dac_plugin.T = struct
       ~scheme:(dac_hash_to_proto_supported_hashes scheme)
 
   module Proto = Registerer.Registered
-
-  let raw_to_hash raw_hash =
-    let of_bytes_opt =
-      Data_encoding.Binary.of_bytes_opt
-        Protocol.Sc_rollup_reveal_hash.encoding
-        (Dac_plugin.raw_hash_to_bytes raw_hash)
-    in
-    match of_bytes_opt with
-    | Some hash -> Ok (of_reveal_hash hash)
-    | None ->
-        Result_syntax.tzfail
-        @@ Dac_plugin.Cannot_convert_raw_hash_to_hash
-             {raw_hash; proto = Proto.hash}
 end
 
 let make_plugin : (bytes -> Dac_plugin.hash) -> (module Dac_plugin.T) =

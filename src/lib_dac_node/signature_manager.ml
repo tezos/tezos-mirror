@@ -139,10 +139,10 @@ let sign_root_hash ((module Plugin) : Dac_plugin.t) cctxt dac_sk_uris root_hash
       | None -> tzfail @@ Cannot_compute_aggregate_signature root_hash
       | Some signature -> return @@ (signature, witnesses))
 
-let verify ((module Plugin) : Dac_plugin.t) ~public_keys_opt root_page_hash
-    signature witnesses =
+let verify dac_plugin ~public_keys_opt root_page_hash signature witnesses =
   let open Lwt_result_syntax in
-  let*? root_hash = Plugin.raw_to_hash root_page_hash in
+  let ((module Plugin) : Dac_plugin.t) = dac_plugin in
+  let*? root_hash = Dac_plugin.raw_to_hash dac_plugin root_page_hash in
   let hash_as_bytes =
     Data_encoding.Binary.to_bytes_opt Plugin.encoding root_hash
   in
@@ -265,10 +265,10 @@ module Coordinator = struct
       (Aggregate_signature.check pk signature root_hash_bytes)
       (Signature_verification_failed (pk, signature, Plugin.to_hex root_hash))
 
-  let add_dac_member_signature ((module Plugin) : Dac_plugin.t) signature_store
+  let add_dac_member_signature dac_plugin signature_store
       Signature_repr.{root_hash; signer_pkh; signature} =
     let open Lwt_result_syntax in
-    let*? root_hash = Plugin.raw_to_hash root_hash in
+    let*? root_hash = Dac_plugin.raw_to_hash dac_plugin root_hash in
     Store.Signature_store.add
       signature_store
       ~primary_key:root_hash
@@ -328,10 +328,10 @@ module Coordinator = struct
          (fun pkh -> Aggregate_signature.Public_key_hash.equal signer_pkh pkh)
          dac_committee
 
-  let check_coordinator_knows_root_hash ((module Plugin) : Dac_plugin.t)
-      page_store raw_root_hash =
+  let check_coordinator_knows_root_hash dac_plugin page_store raw_root_hash =
     let open Lwt_result_syntax in
-    let*? root_hash = Plugin.raw_to_hash raw_root_hash in
+    let ((module Plugin) : Dac_plugin.t) = dac_plugin in
+    let*? root_hash = Dac_plugin.raw_to_hash dac_plugin raw_root_hash in
     let*! has_payload =
       Page_store.Filesystem.mem (module Plugin) page_store root_hash
     in
@@ -348,7 +348,7 @@ module Coordinator = struct
       Signature_repr.{signer_pkh; root_hash; signature} =
     let ((module Plugin) : Dac_plugin.t) = dac_plugin in
     let open Lwt_result_syntax in
-    let*? root_hash = Plugin.raw_to_hash root_hash in
+    let*? root_hash = Dac_plugin.raw_to_hash dac_plugin root_hash in
     let* () =
       fail_unless
         (check_is_dac_member committee_members signer_pkh)
@@ -409,7 +409,6 @@ module Coordinator = struct
           failwith "Operation not supported for operating mode"
     in
     let*? dac_plugin = Node_context.get_dac_plugin ctx in
-    let ((module Plugin) : Dac_plugin.t) = dac_plugin in
     let page_store = Node_context.get_page_store ctx in
     let*? committee_members = Node_context.get_committee_members ctx in
     let rw_node_store = Node_context.get_node_store ctx Store_sigs.Read_write in
@@ -432,7 +431,7 @@ module Coordinator = struct
           rw_node_store
           committee_member_signature
       in
-      let*? root_hash' = Plugin.raw_to_hash root_hash in
+      let*? root_hash' = Dac_plugin.raw_to_hash dac_plugin root_hash in
       let* aggregate_signature, witnesses =
         update_aggregate_sig_store rw_node_store committee_members root_hash'
       in

@@ -120,9 +120,8 @@ let handle_get_verify_signature dac_plugin public_keys_opt encoded_l1_message =
         witnesses
 
 let handle_get_preimage dac_plugin page_store raw_hash =
-  let ((module Plugin) : Dac_plugin.t) = dac_plugin in
   let open Lwt_result_syntax in
-  let*? hash = Plugin.raw_to_hash raw_hash in
+  let*? hash = Dac_plugin.raw_to_hash dac_plugin raw_hash in
   Page_store.Filesystem.load dac_plugin page_store hash
 
 (* Handler for subscribing to the streaming of root hashes via
@@ -135,9 +134,9 @@ let handle_monitor_root_hashes hash_streamer =
   let* () = Event.(emit handle_new_subscription_to_hash_streamer ()) in
   Tezos_rpc.Answer.return_stream {next; shutdown}
 
-let handle_get_certificate ((module Plugin) : Dac_plugin.t) ctx raw_root_hash =
+let handle_get_certificate dac_plugin ctx raw_root_hash =
   let open Lwt_result_syntax in
-  let*? root_hash = Plugin.raw_to_hash raw_root_hash in
+  let*? root_hash = Dac_plugin.raw_to_hash dac_plugin raw_root_hash in
   let node_store = Node_context.get_node_store ctx Store_sigs.Read_only in
   let+ value_opt = Store.Certificate_store.find node_store root_hash in
   Option.map
@@ -148,8 +147,7 @@ let handle_get_certificate ((module Plugin) : Dac_plugin.t) ctx raw_root_hash =
 
 let handle_get_missing_page cctxt page_store dac_plugin raw_root_hash =
   let open Lwt_result_syntax in
-  let ((module Plugin) : Dac_plugin.t) = dac_plugin in
-  let*? root_hash = Plugin.raw_to_hash raw_root_hash in
+  let*? root_hash = Dac_plugin.raw_to_hash dac_plugin raw_root_hash in
   let remote_store = Page_store.Remote.(init {cctxt; page_store}) in
   let* preimage =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5142
@@ -243,14 +241,13 @@ module Coordinator = struct
   let handle_monitor_certificate dac_plugin ro_store certificate_streamers
       raw_root_hash committee_members =
     let open Lwt_result_syntax in
-    let ((module Plugin) : Dac_plugin.t) = dac_plugin in
     let*? stream, stopper =
       Certificate_streamers.handle_subscribe
         dac_plugin
         certificate_streamers
         raw_root_hash
     in
-    let*? root_hash = Plugin.raw_to_hash raw_root_hash in
+    let*? root_hash = Dac_plugin.raw_to_hash dac_plugin raw_root_hash in
     let*! () = Event.emit_new_subscription_to_certificate_updates root_hash in
     let shutdown () = Lwt_watcher.shutdown stopper in
     let next () = Lwt_stream.get stream in
