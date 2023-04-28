@@ -51,11 +51,13 @@ let new_address ctxt =
 
 let init_genesis_info ctxt address genesis_commitment =
   let open Lwt_result_syntax in
-  let level = (Raw_context.current_level ctxt).level in
   let*? ctxt, commitment_hash =
     Sc_rollup_commitment_storage.hash ctxt genesis_commitment
   in
-  let genesis_info = Commitment.{commitment_hash; level} in
+  (* The [genesis_commitment.inbox_level] is equal to the current level. *)
+  let genesis_info : Commitment.genesis_info =
+    {commitment_hash; level = genesis_commitment.inbox_level}
+  in
   let* ctxt, size = Store.Genesis_info.init ctxt address genesis_info in
   return (ctxt, genesis_info, size)
 
