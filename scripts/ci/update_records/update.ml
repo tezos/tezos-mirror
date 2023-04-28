@@ -3,13 +3,13 @@ open Base
 
 let usage () =
   prerr_endline
-    {|Usage: PIPELINE=<PIPELINE_ID> dune exec tezt/records/update.exe
+    {|Usage: PIPELINE=<PIPELINE_ID> dune exec scripts/ci/update_records/update.exe
 
 Example: to fetch test result records from
 https://gitlab.com/tezos/tezos/-/pipelines/426773806, run
 (from the root of the repository):
 
-dune exec tezt/records/update.exe -- -a from=426773806
+dune exec scripts/ci/update_records/update.exe -- -a from=426773806
 
 You can use the PROJECT environment variable to specify which GitLab
 repository to fetch records from. Default is: tezos/tezos
@@ -18,7 +18,7 @@ The script can also be used to fetch records from the last successful pipeline o
 latest MR merged to the default branch (configurable through the DEFAULT_BRANCH
 environment variable) for a given PROJECT:
 
-dune exec tezt/records/update.exe -- -a from=last-merged-pipeline
+dune exec scripts/ci/update_records/update.exe -- -a from=last-merged-pipeline
 
 |} ;
   exit 1
