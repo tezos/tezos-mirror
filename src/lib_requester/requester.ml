@@ -198,6 +198,8 @@ end = struct
   type t = {
     param : Request.param;
     pending : status Table.t;
+    mutable min_next_request : Time.System.t option;
+    (* The time of the next pending request to timeout. *)
     queue : event Lwt_pipe.Unbounded.t;
     mutable events : event list Lwt.t;
     canceler : Lwt_canceler.t;
@@ -253,16 +255,7 @@ end = struct
     Lwt.return ()
 
   let compute_timeout state =
-    let next =
-      Table.fold
-        (fun _ {next_request; _} acc ->
-          match acc with
-          | None -> Some next_request
-          | Some x -> Some (Time.System.min x next_request))
-        state.pending
-        None
-    in
-    match next with
+    match state.min_next_request with
     | None -> fst @@ Lwt.task ()
     | Some next ->
         let now = Time.System.now () in
@@ -293,7 +286,7 @@ end = struct
               | None -> P2p_peer.Set.empty
               | Some peer -> P2p_peer.Set.singleton peer
             in
-            Table.add
+            Table.replace
               state.pending
               key
               {peers; next_request = now; delay = Request.initial_delay} ;
@@ -314,10 +307,27 @@ end = struct
         (* TODO: Punish peer *)
         Events.(emit notify_duplicate) (key, peer)
 
+  type update_table_action =
+    | Replace of {key : key; status : status}
+    | Remove of {key : key}
+
   let worker_loop state =
     let open Lwt_syntax in
     let shutdown = Lwt_canceler.when_canceling state.canceler in
     let rec loop state =
+      (* It is possible that numerous pending requests may be canceled
+         sequentially. If this occurs, we will recalculate the
+         subsequent timeout for each cancellation. Calculating the
+         next timeout could be resource-intensive. By allowing for a
+         brief sleep, multiple cancellations can take place
+         simultaneously.
+
+         Note: using `Lwt.pause` or `Lwt.yield` might not be
+         sufficient, e.g., when the scheduler does not  timeout cancelers are not given a
+         chance to be executed.
+
+         Note: This constant was selected using the sophisticated
+         "damp digit" method. *)
       let timeout = compute_timeout state in
       let* () =
         Lwt.choose
@@ -334,23 +344,40 @@ end = struct
         let* events = state.events in
         state.events <- Lwt_pipe.Unbounded.pop_all state.queue ;
         let* () = List.iter_s (process_event state now) events in
+        (* Requests are either added or deleted: either way, we need
+           to go through the table to update the timeout. Setting it
+           to now do just that. As a consequence, of that, the next
+           call to `compute_timeout` will always return
+           instantaneously. *)
+        state.min_next_request <- Some now ;
         loop state)
       else
         let* () = Events.(emit timeout) () in
         let now = Time.System.now () in
         let active_peers = Request.active state.param in
-        let requests =
+        let compute_new_min_next_request min_next_request next_request =
+          match min_next_request with
+          | None -> Some next_request
+          | Some min_next_request' ->
+              if Ptime.is_earlier min_next_request' ~than:next_request then
+                min_next_request
+              else Some next_request
+        in
+        let actions, min_next_request, requests =
           Table.fold
-            (fun key {peers; next_request; delay} acc ->
-              if Ptime.is_later next_request ~than:now then acc
+            (fun key
+                 {peers; next_request; delay}
+                 (actions, min_next_request, acc) ->
+              if Ptime.is_later next_request ~than:now then
+                ( actions,
+                  compute_new_min_next_request min_next_request next_request,
+                  acc )
               else
                 let remaining_peers = P2p_peer.Set.inter peers active_peers in
                 if
                   P2p_peer.Set.is_empty remaining_peers
                   && not (P2p_peer.Set.is_empty peers)
-                then (
-                  Table.remove state.pending key ;
-                  acc)
+                then (Remove {key} :: actions, min_next_request, acc)
                 else
                   let requested_peer =
                     P2p_peer.Id.Set.random_elt
@@ -368,17 +395,26 @@ end = struct
                       delay = Time.System.Span.multiply_exn 1.5 delay;
                     }
                   in
-                  Table.replace state.pending key next ;
-                  let requests =
-                    key
-                    :: Option.value
-                         ~default:[]
-                         (P2p_peer.Map.find requested_peer acc)
+                  let new_acc =
+                    P2p_peer.Map.update
+                      requested_peer
+                      (function
+                        | None -> Some [key] | Some l -> Some (key :: l))
+                      acc
                   in
-                  P2p_peer.Map.add requested_peer requests acc)
+                  ( Replace {key; status = next} :: actions,
+                    compute_new_min_next_request min_next_request next_request,
+                    new_acc ))
             state.pending
-            P2p_peer.Map.empty
+            ([], None, P2p_peer.Map.empty)
         in
+        (* Update pending table *)
+        List.iter
+          (function
+            | Remove {key} -> Table.remove state.pending key
+            | Replace {key; status} -> Table.replace state.pending key status)
+          actions ;
+        state.min_next_request <- min_next_request ;
         P2p_peer.Map.iter (Request.send state.param) requests ;
         let* () =
           P2p_peer.Map.iter_s
@@ -397,6 +433,7 @@ end = struct
       {
         param;
         queue = Lwt_pipe.Unbounded.create ();
+        min_next_request = None;
         pending = Table.create ~entry_type:"pending_requests" ~random:true 17;
         events = Lwt.return_nil;
         canceler = Lwt_canceler.create ();
