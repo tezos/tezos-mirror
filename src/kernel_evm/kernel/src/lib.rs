@@ -40,20 +40,24 @@ pub fn stage_one<Host: Runtime>(
 pub fn stage_two<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error> {
     block::produce(host, queue)?;
 
-    if let Ok(L2Block {
-        number,
-        hash,
-        transactions,
-        ..
-    }) = storage::read_current_block(host)
-    {
-        debug_msg!(
-            host,
-            "Block {} at number {} contains {} transaction(s).\n",
-            String::from_utf8(hash.to_vec()).expect("INVALID HASH"),
+    match storage::read_current_block(host) {
+        Ok(L2Block {
             number,
-            transactions.len()
-        )
+            hash,
+            transactions,
+            ..
+        }) => {
+            debug_msg!(
+                host,
+                "Block {} at number {} contains {} transaction(s).\n",
+                String::from_utf8(hash.to_vec()).expect("INVALID HASH"),
+                number,
+                transactions.len()
+            )
+        }
+        Err(e) => {
+            debug_msg!(host, "Block reading failed: {:?}\n", e)
+        }
     }
 
     Ok(())

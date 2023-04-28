@@ -52,6 +52,24 @@ const TRANSACTION_RECEIPT_STATUS_SIZE: usize = 1;
 // TRANSACTION_HASH_SIZE * 128 = 4096.
 const MAX_TRANSACTION_HASHES: usize = TRANSACTION_HASH_SIZE * 128;
 
+// This function should be used when it makes sense that the value
+// stored under [path] can be empty.
+fn store_read_empty_safe<Host: Runtime>(
+    host: &mut Host,
+    path: &OwnedPath,
+    offset: usize,
+    max_bytes: usize,
+) -> Result<Vec<u8>, Error> {
+    let stored_value_size = host.store_value_size(path)?;
+
+    if stored_value_size == 0 {
+        Ok(vec![])
+    } else {
+        host.store_read(path, offset, max_bytes)
+            .map_err(Error::from)
+    }
+}
+
 fn store_read_slice<Host: Runtime, T: Path>(
     host: &mut Host,
     path: &T,
@@ -230,7 +248,8 @@ fn read_nth_block_transactions<Host: Runtime>(
 ) -> Result<Vec<TransactionHash>, Error> {
     let path = concat(block_path, &EVM_BLOCKS_TRANSACTIONS)?;
 
-    let transactions_bytes = host.store_read(&path, 0, MAX_TRANSACTION_HASHES)?;
+    let transactions_bytes =
+        store_read_empty_safe(host, &path, 0, MAX_TRANSACTION_HASHES)?;
 
     Ok(transactions_bytes
         .chunks(TRANSACTION_HASH_SIZE)
