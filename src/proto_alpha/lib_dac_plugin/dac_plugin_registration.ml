@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -91,20 +92,6 @@ end) : Dac_plugin.T = struct
   let size ~scheme =
     Protocol.Sc_rollup_reveal_hash.size
       ~scheme:(dac_hash_to_proto_supported_hashes scheme)
-
-  let hash_rpc_arg =
-    let construct = to_hex in
-    let destruct hash =
-      match of_hex hash with
-      | None -> Error "Cannot parse reveal hash"
-      | Some reveal_hash -> Ok reveal_hash
-    in
-    Tezos_rpc.Arg.make
-      ~descr:"A reveal hash"
-      ~name:"reveal_hash"
-      ~destruct
-      ~construct
-      ()
 
   module Proto = Registerer.Registered
 end

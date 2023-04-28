@@ -24,16 +24,16 @@
 (*****************************************************************************)
 
 module S = struct
-  let root_hashes ((module P) : Dac_plugin.t) =
+  let root_hashes =
     Tezos_rpc.Service.get_service
       ~description:
         "Monitor a stream of root hashes that are produced by another dac node \
          responsible for the serialization of the dac payload (coordinator).  "
       ~query:Tezos_rpc.Query.empty
-      ~output:P.encoding
+      ~output:Dac_plugin.raw_hash_encoding
       Tezos_rpc.Path.(open_root / "monitor" / "root_hashes")
 
-  let certificate ((module P) : Dac_plugin.t) =
+  let certificate =
     Tezos_rpc.Service.get_service
       ~description:
         "Monitor a stream of updates to certificates for a given root hash. \
@@ -43,21 +43,17 @@ module S = struct
          once delivery, i.e. a certificate update could be streamed multiple \
          times."
       ~query:Tezos_rpc.Query.empty
-      ~output:(Certificate_repr.encoding (module P))
-      Tezos_rpc.Path.(open_root / "monitor" / "certificate" /: P.hash_rpc_arg)
+      ~output:Certificate_repr.encoding
+      Tezos_rpc.Path.(
+        open_root / "monitor" / "certificate" /: Dac_plugin.raw_hash_rpc_arg)
 end
 
-let root_hashes dac_node_cctxt dac_plugin =
-  Tezos_rpc.Context.make_streamed_call
-    (S.root_hashes dac_plugin)
-    dac_node_cctxt
-    ()
-    ()
-    ()
+let root_hashes dac_node_cctxt =
+  Tezos_rpc.Context.make_streamed_call S.root_hashes dac_node_cctxt () () ()
 
-let certificate dac_node_cctxt dac_plugin root_hash =
+let certificate dac_node_cctxt root_hash =
   Tezos_rpc.Context.make_streamed_call
-    (S.certificate dac_plugin)
+    S.certificate
     dac_node_cctxt
     ((), root_hash)
     ()

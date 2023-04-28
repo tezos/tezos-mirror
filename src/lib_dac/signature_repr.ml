@@ -26,13 +26,13 @@
 
 (** Representation of committee member signature. *)
 type t = {
-  root_hash : Dac_plugin.hash;
+  root_hash : Dac_plugin.raw_hash;
   signature : Tezos_crypto.Aggregate_signature.t;
   signer_pkh : Tezos_crypto.Aggregate_signature.public_key_hash;
 }
 
 (** [encoding dac_plugin] returns the [t Data_encoding.t] given a [dac_plugin]. *)
-let encoding ((module P) : Dac_plugin.t) =
+let encoding =
   Data_encoding.(
     conv
       (fun {root_hash; signature; signer_pkh} ->
@@ -40,7 +40,7 @@ let encoding ((module P) : Dac_plugin.t) =
       (fun (root_hash, signature, signer_pkh) ->
         {root_hash; signature; signer_pkh})
       (obj3
-         (req "root_hash" P.encoding)
+         (req "root_hash" Dac_plugin.raw_hash_encoding)
          (req "signature" Tezos_crypto.Aggregate_signature.encoding)
          (req
             "signer_pkh"

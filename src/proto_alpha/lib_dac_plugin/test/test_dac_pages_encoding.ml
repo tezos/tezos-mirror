@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022-2023 Trili Tech  <contact@trili.tech>                  *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -46,11 +47,7 @@ let dac_plugin = Stdlib.Option.get (Dac_plugin.get Protocol.hash)
 module Hashes_map = Map.Make (struct
   type t = Dac_plugin.hash
 
-  let compare h1 h2 =
-    let (module Dac_plugin) = dac_plugin in
-    let s1 = Dac_plugin.to_hex h1 in
-    let s2 = Dac_plugin.to_hex h2 in
-    String.compare s1 s2
+  let compare h1 h2 = Dac_plugin.raw_compare h1 h2
 end)
 
 type hashes_map = bytes Hashes_map.t
@@ -203,21 +200,21 @@ module Hashes_map_backend = struct
 
   let init () = ref Hashes_map.empty
 
-  type error += Page_is_missing of Dac_plugin.hash
+  type error += Page_is_missing of Dac_plugin.raw_hash
 
-  let save (_plugin : Dac_plugin.t) t ~hash ~content =
+  let save (_plugin : Dac_plugin.t) t ~(hash : Dac_plugin.hash) ~content =
     let open Lwt_result_syntax in
     let () = t := Hashes_map.add hash content !t in
     return ()
 
-  let mem (_plugin : Dac_plugin.t) t hash =
+  let mem (_plugin : Dac_plugin.t) t (hash : Dac_plugin.hash) =
     Lwt_result_syntax.return @@ Hashes_map.mem hash !t
 
   let load (_plugin : Dac_plugin.t) t hash =
     let open Lwt_result_syntax in
     let bytes = Hashes_map.find hash !t in
     match bytes with
-    | None -> tzfail @@ Page_is_missing hash
+    | None -> tzfail @@ Page_is_missing (Dac_plugin.hash_to_raw hash)
     | Some bytes -> return bytes
 
   let number_of_pages t = List.length @@ Hashes_map.bindings !t
@@ -444,7 +441,10 @@ module Merkle_tree = struct
              ~page_store
              root_hash)
           (Page_store.Incorrect_page_hash
-             {expected = root_hash; actual = root_hash_of_corrupt_payload})
+             {
+               expected = Dac_plugin.hash_to_raw root_hash;
+               actual = Dac_plugin.hash_to_raw root_hash_of_corrupt_payload;
+             })
       in
       (* Check that pages have not been copied from the remote mock store
          to the local one. *)

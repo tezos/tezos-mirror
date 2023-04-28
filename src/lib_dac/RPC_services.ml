@@ -33,9 +33,11 @@ let store_preimage_request_encoding =
       (req "payload" Data_encoding.(bytes' Hex))
       (req "pagination_scheme" pagination_scheme_encoding))
 
-let store_preimage_response_encoding ((module P) : Dac_plugin.t) =
+let store_preimage_response_encoding =
   Data_encoding.(
-    obj2 (req "root_hash" P.encoding) (req "external_message" (bytes' Hex)))
+    obj2
+      (req "root_hash" Dac_plugin.raw_hash_encoding)
+      (req "external_message" (bytes' Hex)))
 
 let external_message_query =
   let open Tezos_rpc.Query in
@@ -43,49 +45,48 @@ let external_message_query =
   |+ opt_field "external_message" Tezos_rpc.Arg.string (fun s -> s)
   |> seal
 
-let post_store_preimage ctx =
+let post_store_preimage =
   Tezos_rpc.Service.post_service
     ~description:"Split DAC reveal data"
     ~query:Tezos_rpc.Query.empty
     ~input:store_preimage_request_encoding
-    ~output:(store_preimage_response_encoding ctx)
+    ~output:store_preimage_response_encoding
     Tezos_rpc.Path.(open_root / "store_preimage")
 
 (* DAC/FIXME: https://gitlab.com/tezos/tezos/-/issues/4263
    remove this endpoint once end-to-end tests are in place. *)
-let get_verify_signature :
-    ([`GET], unit, unit, string option, unit, bool) Tezos_rpc.Service.service =
+let get_verify_signature =
   Tezos_rpc.Service.get_service
     ~description:"Verify signature of an external message to inject in L1"
     ~query:external_message_query
     ~output:Data_encoding.bool
     Tezos_rpc.Path.(open_root / "verify_signature")
 
-let get_preimage ((module P) : Dac_plugin.t) =
+let get_preimage =
   Tezos_rpc.Service.get_service
     ~description:"Retrieves a page by its page hash and returns its contents"
     ~query:Tezos_rpc.Query.empty
     ~output:Data_encoding.bytes
-    Tezos_rpc.Path.(open_root / "preimage" /: P.hash_rpc_arg)
+    Tezos_rpc.Path.(open_root / "preimage" /: Dac_plugin.raw_hash_rpc_arg)
 
-let put_dac_member_signature dac_plugin =
+let put_dac_member_signature =
   Tezos_rpc.Service.put_service
     ~description:
       "Verifies and stores the Dac member signature of a root page hash"
     ~query:Tezos_rpc.Query.empty
-    ~input:(Signature_repr.encoding dac_plugin)
+    ~input:Signature_repr.encoding
     ~output:Data_encoding.empty
     Tezos_rpc.Path.(open_root / "dac_member_signature")
 
-let get_certificate ((module P) : Dac_plugin.t) =
+let get_certificate =
   Tezos_rpc.Service.get_service
     ~description:
       "Retrieve the Dac certificate associated with the given root page hash"
     ~query:Tezos_rpc.Query.empty
-    ~output:(Data_encoding.option (Certificate_repr.encoding (module P)))
-    Tezos_rpc.Path.(open_root / "certificates" /: P.hash_rpc_arg)
+    ~output:(Data_encoding.option Certificate_repr.encoding)
+    Tezos_rpc.Path.(open_root / "certificates" /: Dac_plugin.raw_hash_rpc_arg)
 
-let get_missing_page ((module P) : Dac_plugin.t) =
+let get_missing_page =
   Tezos_rpc.Service.get_service
     ~description:
       "Fetch a given page by forwarding the request to a Coordinator's GET \
@@ -94,7 +95,7 @@ let get_missing_page ((module P) : Dac_plugin.t) =
        Observer mode."
     ~query:Tezos_rpc.Query.empty
     ~output:Data_encoding.bytes
-    Tezos_rpc.Path.(open_root / "missing_page" /: P.hash_rpc_arg)
+    Tezos_rpc.Path.(open_root / "missing_page" /: Dac_plugin.raw_hash_rpc_arg)
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4935
    Coordinator's "POST /preimage" endpoint should in addition to root page hash
@@ -105,7 +106,7 @@ module Coordinator = struct
   (** [Coordinator]'s endpoint for serializing dac payload. In addition to
     returning a root page hash, it also pushes it to the subscribed [Observer]s
     and [Dac_member]s. *)
-  let post_preimage ((module P) : Dac_plugin.t) =
+  let post_preimage =
     Tezos_rpc.Service.post_service
       ~description:
         "Stores the preimage in a sequence of pages. Returns a root page hash \
@@ -113,6 +114,6 @@ module Coordinator = struct
          of root page hash to subscribed committee members and observers. "
       ~query:Tezos_rpc.Query.empty
       ~input:Data_encoding.bytes
-      ~output:P.encoding
+      ~output:Dac_plugin.raw_hash_encoding
       Tezos_rpc.Path.(open_root / "preimage")
 end

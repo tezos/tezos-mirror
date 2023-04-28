@@ -30,8 +30,8 @@ type error +=
   | Cannot_write_page_to_page_storage of {hash : string; content : bytes}
   | Cannot_read_page_from_page_storage of string
   | Incorrect_page_hash of {
-      expected : Dac_plugin.hash;
-      actual : Dac_plugin.hash;
+      expected : Dac_plugin.raw_hash;
+      actual : Dac_plugin.raw_hash;
     }
 
 (** [S] is the module type defining the backend required for

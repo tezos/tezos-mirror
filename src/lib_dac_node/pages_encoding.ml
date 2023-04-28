@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022-2023 Trili Tech  <contact@trili.tech>                  *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2022-2023 Marigold <contact@marigold.dev>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -220,18 +220,19 @@ module Merkle_tree = struct
 
     type page_store = S.t
 
-    let hash ((module P) : Dac_plugin.t) bytes =
-      P.hash_bytes [bytes] ~scheme:Blake2B
+    let hash ((module Plugin) : Dac_plugin.t) bytes =
+      Plugin.hash_bytes [bytes] ~scheme:Blake2B
 
-    let hashes_encoding ((module P) : Dac_plugin.t) =
-      Data_encoding.list P.encoding
+    let hashes_encoding ((module Plugin) : Dac_plugin.t) =
+      Data_encoding.list Plugin.encoding
 
     (** The preamble of a serialized page contains 1 byte denoting the version,
         and 4 bytes encoding the size of the rest of the page. In total, 5
         bytes. *)
     let page_preamble_size = 5
 
-    let hash_bytes_size ((module P) : Dac_plugin.t) = P.size ~scheme:Blake2B
+    let hash_bytes_size ((module Plugin) : Dac_plugin.t) =
+      Plugin.size ~scheme:Blake2B
 
     (** Payload pages are encoded as follows: the first byte is an integer,
         which corresponds to either [content_version_tag] (for payload pages)
@@ -571,14 +572,14 @@ module Hash_chain = struct
   module V0 = struct
     type page = {succ_hash : Dac_plugin.hash; content : string}
 
-    let hash ((module P) : Dac_plugin.t) bytes =
-      P.hash_bytes ~scheme:Blake2B [bytes]
+    let hash ((module Plugin) : Dac_plugin.t) bytes =
+      Plugin.hash_bytes ~scheme:Blake2B [bytes]
 
     let content_limit =
       (4 * 1024) - 100 (* We reserve 100 bytes for the continuation hash. *)
 
-    let serialize_page ((module P) : Dac_plugin.t) page =
-      Format.asprintf "%s hash:%s" page.content (P.to_hex page.succ_hash)
+    let serialize_page ((module Plugin) : Dac_plugin.t) page =
+      Format.asprintf "%s hash:%s" page.content (Plugin.to_hex page.succ_hash)
 
     let link_chunks dac_plugin chunks : (Dac_plugin.hash * bytes) list =
       let rec link_chunks_rev linked_pages rev_pages =

@@ -135,8 +135,8 @@ let new_head ctxt =
       {li Send the signature back to the [Coordinaotor].}
     } *)
 module Committee_member = struct
-  let push_payload_signature dac_plugin coordinator_cctxt wallet_cctxt
-      committee_member root_hash =
+  let push_payload_signature coordinator_cctxt wallet_cctxt committee_member
+      root_hash =
     let open Lwt_result_syntax in
     let signer_pkh =
       committee_member.Wallet_account.Committee_member.public_key_hash
@@ -149,10 +149,12 @@ module Committee_member = struct
         secret_key_uri
         bytes_to_sign
     in
-    let signature_repr = Signature_repr.{root_hash; signature; signer_pkh} in
+    let signature_repr =
+      Signature_repr.
+        {root_hash = Dac_plugin.hash_to_raw root_hash; signature; signer_pkh}
+    in
     let* () =
       Dac_node_client.put_dac_member_signature
-        dac_plugin
         coordinator_cctxt
         ~signature:signature_repr
     in
@@ -165,6 +167,7 @@ module Committee_member = struct
       ctxt.Node_context.Committee_member.coordinator_cctxt
     in
     let handler dac_plugin remote_store _stopper root_hash =
+      let*? root_hash = Dac_plugin.raw_to_hash dac_plugin root_hash in
       let*! () = Event.emit_new_root_hash_received dac_plugin root_hash in
       let*! payload_result =
         Pages_encoding.Merkle_tree.V0.Remote.deserialize_payload
@@ -181,7 +184,6 @@ module Committee_member = struct
             ctxt.Node_context.Committee_member.committee_member
           in
           push_payload_signature
-            dac_plugin
             coordinator_cctxt
             wallet_cctxt
             committee_member
@@ -200,7 +202,7 @@ module Committee_member = struct
     let*! () = Event.(emit subscribed_to_root_hashes_stream ()) in
     make_stream_daemon
       (handler dac_plugin remote_store)
-      (Monitor_services.root_hashes coordinator_cctxt dac_plugin)
+      (Monitor_services.root_hashes coordinator_cctxt)
 end
 
 (** Handlers specific to an [Observer]. An [Observer] is responsible for
@@ -215,6 +217,7 @@ module Observer = struct
     let open Lwt_result_syntax in
     let coordinator_cctxt = ctxt.Node_context.Observer.coordinator_cctxt in
     let handler dac_plugin remote_store _stopper root_hash =
+      let*? root_hash = Dac_plugin.raw_to_hash dac_plugin root_hash in
       let*! () = Event.emit_new_root_hash_received dac_plugin root_hash in
       let*! payload_result =
         Pages_encoding.Merkle_tree.V0.Remote.deserialize_payload
@@ -242,7 +245,7 @@ module Observer = struct
     let*! () = Event.(emit subscribed_to_root_hashes_stream ()) in
     make_stream_daemon
       (handler dac_plugin remote_store)
-      (Monitor_services.root_hashes coordinator_cctxt dac_plugin)
+      (Monitor_services.root_hashes coordinator_cctxt)
 end
 
 (** Handlers specific to a [Legacy] DAC node. If no
@@ -267,8 +270,8 @@ end
     } *)
 
 module Legacy = struct
-  let push_payload_signature dac_plugin coordinator_cctxt wallet_cctxt
-      committee_member root_hash =
+  let push_payload_signature coordinator_cctxt wallet_cctxt committee_member
+      root_hash =
     let open Lwt_result_syntax in
     let secret_key_uri_opt =
       committee_member.Wallet_account.Legacy.secret_key_uri_opt
@@ -284,11 +287,15 @@ module Legacy = struct
             bytes_to_sign
         in
         let signature_repr =
-          Signature_repr.{root_hash; signature; signer_pkh}
+          Signature_repr.
+            {
+              root_hash = Dac_plugin.hash_to_raw root_hash;
+              signature;
+              signer_pkh;
+            }
         in
         let* () =
           Dac_node_client.put_dac_member_signature
-            dac_plugin
             coordinator_cctxt
             ~signature:signature_repr
         in
@@ -306,6 +313,7 @@ module Legacy = struct
     let committee_member_opt = ctxt.Node_context.Legacy.committee_member_opt in
     let open Lwt_result_syntax in
     let handler dac_plugin remote_store _stopper root_hash =
+      let*? root_hash = Dac_plugin.raw_to_hash dac_plugin root_hash in
       let*! () = Event.emit_new_root_hash_received dac_plugin root_hash in
       let*! payload_result =
         Pages_encoding.Merkle_tree.V0.Remote.deserialize_payload
@@ -325,7 +333,6 @@ module Legacy = struct
                  If there is no [committee_member_address] provided, it means the node is run as an observer
                    then we simply [return ()] *)
               push_payload_signature
-                dac_plugin
                 coordinator_cctxt
                 wallet_cctxt
                 committee_member
@@ -347,7 +354,7 @@ module Legacy = struct
     let*! () = Event.(emit subscribed_to_root_hashes_stream ()) in
     make_stream_daemon
       (handler dac_plugin remote_store)
-      (Monitor_services.root_hashes coordinator_cctxt dac_plugin)
+      (Monitor_services.root_hashes coordinator_cctxt)
 end
 
 let handlers node_ctxt =

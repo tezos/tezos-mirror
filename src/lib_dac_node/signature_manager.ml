@@ -117,10 +117,13 @@ let compute_signatures_with_witnesses rev_indexed_signatures =
     ([], Z.zero)
     rev_indexed_signatures
 
-let sign_root_hash ((module P) : Dac_plugin.t) cctxt dac_sk_uris root_hash =
+let sign_root_hash ((module Plugin) : Dac_plugin.t) cctxt dac_sk_uris root_hash
+    =
   let open Lwt_result_syntax in
-  let bytes_to_sign = Data_encoding.Binary.to_bytes_opt P.encoding root_hash in
-  let root_hash = P.to_hex root_hash in
+  let bytes_to_sign =
+    Data_encoding.Binary.to_bytes_opt Plugin.encoding root_hash
+  in
+  let root_hash = Plugin.to_hex root_hash in
   match bytes_to_sign with
   | None -> tzfail @@ Cannot_convert_root_page_hash_to_bytes root_hash
   | Some bytes_to_sign -> (
@@ -136,15 +139,16 @@ let sign_root_hash ((module P) : Dac_plugin.t) cctxt dac_sk_uris root_hash =
       | None -> tzfail @@ Cannot_compute_aggregate_signature root_hash
       | Some signature -> return @@ (signature, witnesses))
 
-let verify ((module P) : Dac_plugin.t) ~public_keys_opt root_page_hash signature
-    witnesses =
+let verify dac_plugin ~public_keys_opt root_page_hash signature witnesses =
   let open Lwt_result_syntax in
+  let ((module Plugin) : Dac_plugin.t) = dac_plugin in
+  let*? root_hash = Dac_plugin.raw_to_hash dac_plugin root_page_hash in
   let hash_as_bytes =
-    Data_encoding.Binary.to_bytes_opt P.encoding root_page_hash
+    Data_encoding.Binary.to_bytes_opt Plugin.encoding root_hash
   in
+  let hex_root_hash = Plugin.to_hex root_hash in
   match hash_as_bytes with
-  | None ->
-      tzfail @@ Cannot_convert_root_page_hash_to_bytes (P.to_hex root_page_hash)
+  | None -> tzfail @@ Cannot_convert_root_page_hash_to_bytes hex_root_hash
   | Some bytes ->
       let* pk_msg_list =
         public_keys_opt
@@ -155,8 +159,7 @@ let verify ((module P) : Dac_plugin.t) ~public_keys_opt root_page_hash signature
                | None ->
                    if is_witness then
                      tzfail
-                     @@ Public_key_for_witness_not_available
-                          (i, P.to_hex root_page_hash)
+                     @@ Public_key_for_witness_not_available (i, hex_root_hash)
                    else return None
                | Some public_key ->
                    if is_witness then return @@ Some (public_key, None, bytes)
@@ -256,14 +259,16 @@ module Coordinator = struct
       (function Unknown_root_hash hash -> Some hash | _ -> None)
       (fun hash -> Unknown_root_hash hash)
 
-  let verify_signature ((module P) : Dac_plugin.t) pk signature root_hash =
+  let verify_signature ((module Plugin) : Dac_plugin.t) pk signature root_hash =
     let root_hash_bytes = Dac_plugin.hash_to_bytes root_hash in
     fail_unless
       (Aggregate_signature.check pk signature root_hash_bytes)
-      (Signature_verification_failed (pk, signature, P.to_hex root_hash))
+      (Signature_verification_failed (pk, signature, Plugin.to_hex root_hash))
 
-  let add_dac_member_signature ((module Plugin) : Dac_plugin.t) signature_store
+  let add_dac_member_signature dac_plugin signature_store
       Signature_repr.{root_hash; signer_pkh; signature} =
+    let open Lwt_result_syntax in
+    let*? root_hash = Dac_plugin.raw_to_hash dac_plugin root_hash in
     Store.Signature_store.add
       signature_store
       ~primary_key:root_hash
@@ -283,8 +288,7 @@ module Coordinator = struct
         Option.map (fun signature -> (index, signature)) signature_opt)
       dac_members_pk
 
-  let update_aggregate_sig_store ((module P) : Dac_plugin.t) node_store
-      dac_members_pk_opt root_hash =
+  let update_aggregate_sig_store node_store dac_members_pk_opt root_hash =
     let open Lwt_result_syntax in
     let* rev_indexed_signature =
       rev_find_indexed_signatures node_store dac_members_pk_opt root_hash
@@ -308,8 +312,7 @@ module Coordinator = struct
         in
         return @@ (aggregate_signature, witnesses)
 
-  let check_dac_member_has_signed ((module P) : Dac_plugin.t) signature_store
-      root_hash dac_member_pkh =
+  let check_dac_member_has_signed signature_store root_hash dac_member_pkh =
     let open Lwt_result_syntax in
     let* dac_member_has_signed =
       Store.Signature_store.mem
@@ -325,9 +328,10 @@ module Coordinator = struct
          (fun pkh -> Aggregate_signature.Public_key_hash.equal signer_pkh pkh)
          dac_committee
 
-  let check_coordinator_knows_root_hash ((module Plugin) : Dac_plugin.t)
-      page_store root_hash =
+  let check_coordinator_knows_root_hash dac_plugin page_store raw_root_hash =
     let open Lwt_result_syntax in
+    let ((module Plugin) : Dac_plugin.t) = dac_plugin in
+    let*? root_hash = Dac_plugin.raw_to_hash dac_plugin raw_root_hash in
     let*! has_payload =
       Page_store.Filesystem.mem (module Plugin) page_store root_hash
     in
@@ -342,7 +346,9 @@ module Coordinator = struct
 
   let should_update_certificate dac_plugin cctxt ro_node_store committee_members
       Signature_repr.{signer_pkh; root_hash; signature} =
+    let ((module Plugin) : Dac_plugin.t) = dac_plugin in
     let open Lwt_result_syntax in
+    let*? root_hash = Dac_plugin.raw_to_hash dac_plugin root_hash in
     let* () =
       fail_unless
         (check_is_dac_member committee_members signer_pkh)
@@ -357,24 +363,33 @@ module Coordinator = struct
         pub_key_opt
     in
     let* dac_member_has_signed =
-      check_dac_member_has_signed dac_plugin ro_node_store root_hash signer_pkh
+      check_dac_member_has_signed ro_node_store root_hash signer_pkh
     in
     if dac_member_has_signed then return false
     else
       let* () = verify_signature dac_plugin pub_key signature root_hash in
       return true
 
-  let stream_certificate_update committee_members
+  let stream_certificate_update dac_plugin committee_members
       (Certificate_repr.{root_hash; _} as certificate) certificate_streamers =
-    Certificate_streamers.push certificate_streamers root_hash certificate ;
+    let open Result_syntax in
+    let* () =
+      Certificate_streamers.push
+        dac_plugin
+        certificate_streamers
+        root_hash
+        certificate
+    in
     if
       Certificate_repr.all_committee_members_have_signed
         committee_members
         certificate
     then
-      let _ = Certificate_streamers.close certificate_streamers root_hash in
-      ()
-    else ()
+      let _ =
+        Certificate_streamers.close dac_plugin certificate_streamers root_hash
+      in
+      return ()
+    else return ()
 
   let handle_put_dac_member_signature ctx cctxt committee_member_signature =
     let open Lwt_result_syntax in
@@ -394,7 +409,6 @@ module Coordinator = struct
           failwith "Operation not supported for operating mode"
     in
     let*? dac_plugin = Node_context.get_dac_plugin ctx in
-    let ((module Plugin) : Dac_plugin.t) = dac_plugin in
     let page_store = Node_context.get_page_store ctx in
     let*? committee_members = Node_context.get_committee_members ctx in
     let rw_node_store = Node_context.get_node_store ctx Store_sigs.Read_write in
@@ -417,18 +431,18 @@ module Coordinator = struct
           rw_node_store
           committee_member_signature
       in
+      let*? root_hash' = Dac_plugin.raw_to_hash dac_plugin root_hash in
       let* aggregate_signature, witnesses =
-        update_aggregate_sig_store
-          dac_plugin
-          rw_node_store
-          committee_members
-          root_hash
+        update_aggregate_sig_store rw_node_store committee_members root_hash'
       in
-      return
-      @@ Option.iter
-           (stream_certificate_update
-              committee_members
-              Certificate_repr.{root_hash; aggregate_signature; witnesses})
-           certificate_streamers_opt
+      let*? () =
+        Option.iter_e
+          (stream_certificate_update
+             dac_plugin
+             committee_members
+             Certificate_repr.{root_hash; aggregate_signature; witnesses})
+          certificate_streamers_opt
+      in
+      return ()
     else return ()
 end

@@ -277,21 +277,23 @@ let emit_protocol_plugin_not_resolved current_protocol next_protocol =
     ( proto_short_hash_string current_protocol,
       proto_short_hash_string next_protocol )
 
-let emit_new_root_hash_received ((module P) : Dac_plugin.t) hash =
-  emit new_root_hash_received (P.to_hex hash)
+let emit_new_root_hash_received ((module Plugin) : Dac_plugin.t) hash =
+  emit new_root_hash_received (Plugin.to_hex hash)
 
 let emit_new_subscription_to_certificate_updates hash =
   let hex = Hex.show @@ Dac_plugin.hash_to_hex hash in
   emit new_subscription_to_certificate_updates hex
 
-let emit_root_hash_pushed_to_data_streamer ((module P) : Dac_plugin.t) hash =
-  emit new_hash_pushed_to_data_streamer (P.to_hex hash)
+let emit_root_hash_pushed_to_data_streamer ((module Plugin) : Dac_plugin.t) hash
+    =
+  emit new_hash_pushed_to_data_streamer (Plugin.to_hex hash)
 
-let emit_received_root_hash_processed ((module P) : Dac_plugin.t) hash =
-  emit received_root_hash_processed (P.to_hex hash)
+let emit_received_root_hash_processed ((module Plugin) : Dac_plugin.t) hash =
+  emit received_root_hash_processed (Plugin.to_hex hash)
 
-let emit_processing_root_hash_failed ((module P) : Dac_plugin.t) hash errors =
-  emit processing_root_hash_failed (P.to_hex hash, errors)
+let emit_processing_root_hash_failed ((module Plugin) : Dac_plugin.t) hash
+    errors =
+  emit processing_root_hash_failed (Plugin.to_hex hash, errors)
 
 let emit_signature_pushed_to_coordinator signature =
   emit new_signature_pushed_to_coordinator signature
@@ -301,10 +303,10 @@ let emit_no_committee_member_address = emit no_committee_member_address
 let emit_cannot_retrieve_keys_from_address address =
   emit cannot_retrieve_keys_from_address address
 
-let fetched_missing_page ((module P) : Dac_plugin.t) =
+let fetched_missing_page =
   declare_1
     ~section
     ~name:"missing_page_fetched"
     ~msg:"Successfully fetched missing page for hash: {hash}"
     ~level:Notice
-    ("hash", P.encoding)
+    ("hash", Dac_plugin.raw_hash_encoding)

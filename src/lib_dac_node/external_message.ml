@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022-2023 Trili Tech  <contact@trili.tech>                  *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -86,17 +87,19 @@ struct
             (fun msg -> msg);
         ])
 
-  let make ((module P) : Dac_plugin.t) root_hash signature witnesses =
+  let make ((module Plugin) : Dac_plugin.t) root_hash signature witnesses =
     let open Lwt_result_syntax in
     let message = {root_hash; signature; witnesses} in
     let res =
-      Data_encoding.Binary.to_bytes (dac_message_encoding P.encoding) message
+      Data_encoding.Binary.to_bytes
+        (dac_message_encoding Plugin.encoding)
+        message
     in
     match res with
     | Ok bytes -> return bytes
     | Error _ ->
         tzfail
-        @@ Could_not_serialize_rollup_external_message (P.to_hex root_hash)
+        @@ Could_not_serialize_rollup_external_message (Plugin.to_hex root_hash)
 
   let of_bytes dac_hash_encoding encoded_message =
     Data_encoding.Binary.of_bytes_opt

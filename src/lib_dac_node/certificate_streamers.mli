@@ -35,17 +35,25 @@ type t
 (** [init ()] returns an empty map of certificate streams. *)
 val init : unit -> t
 
-(** [handle_subscribe t root_hash] creates a new watcher for [root_hash] in
+(** [handle_subscribe dac_plugin t root_hash] creates a new watcher for [root_hash] in
     [t], and returns the corresponding [Lwt_stream] and [Lwt_watcher.stopper].
 *)
 val handle_subscribe :
-  t -> Dac_plugin.hash -> Certificate_repr.t Lwt_stream.t * Lwt_watcher.stopper
+  Dac_plugin.t ->
+  t ->
+  Dac_plugin.raw_hash ->
+  (Certificate_repr.t Lwt_stream.t * Lwt_watcher.stopper) tzresult
 
-(** [push t root_hash certificate] streams the updated certificate for
+(** [push dac_plugin t root_hash certificate] streams the updated certificate for
     [root_hash]. *)
-val push : t -> Dac_plugin.hash -> Certificate_repr.t -> unit
+val push :
+  Dac_plugin.t ->
+  t ->
+  Dac_plugin.raw_hash ->
+  Certificate_repr.t ->
+  unit tzresult
 
-(** [close t root_hash] closes the certificate [Data_streamer.t] for
+(** [close dac_plugin t root_hash] closes the certificate [Data_streamer.t] for
     [root_hash]. Returns true if the [Data_streamer.t] associated to
     [root_hash] was open before the function was invoked, false otherwise. *)
-val close : t -> Dac_plugin.hash -> bool
+val close : Dac_plugin.t -> t -> Dac_plugin.raw_hash -> bool tzresult

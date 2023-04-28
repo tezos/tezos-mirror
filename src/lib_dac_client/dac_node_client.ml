@@ -50,13 +50,12 @@ let make_unix_cctxt ~scheme ~host ~port =
    hash of the protocol that the coordinator was using when the page hash
    was computed.
 *)
-let get_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~page_hash =
-  cctxt#call_service (RPC_services.get_preimage plugin) ((), page_hash) () ()
+let get_preimage (cctxt : #cctxt) ~page_hash =
+  cctxt#call_service RPC_services.get_preimage ((), page_hash) () ()
 
-let post_store_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~payload
-    ~pagination_scheme =
+let post_store_preimage (cctxt : #cctxt) ~payload ~pagination_scheme =
   cctxt#call_service
-    (RPC_services.post_store_preimage plugin)
+    RPC_services.post_store_preimage
     ()
     ()
     (payload, pagination_scheme)
@@ -64,26 +63,13 @@ let post_store_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~payload
 let get_verify_signature (cctxt : #cctxt) ~external_message =
   cctxt#call_service RPC_services.get_verify_signature () external_message ()
 
-let put_dac_member_signature (plugin : Dac_plugin.t) (cctxt : #cctxt) ~signature
-    =
-  cctxt#call_service
-    (RPC_services.put_dac_member_signature plugin)
-    ()
-    ()
-    signature
+let put_dac_member_signature (cctxt : #cctxt) ~signature =
+  cctxt#call_service RPC_services.put_dac_member_signature () () signature
 
-let get_certificate (plugin : Dac_plugin.t) (cctxt : #cctxt) ~root_page_hash =
-  cctxt#call_service
-    (RPC_services.get_certificate plugin)
-    ((), root_page_hash)
-    ()
-    ()
+let get_certificate (cctxt : #cctxt) ~root_page_hash =
+  cctxt#call_service RPC_services.get_certificate ((), root_page_hash) () ()
 
 module Coordinator = struct
-  let post_preimage (plugin : Dac_plugin.t) (cctxt : #cctxt) ~payload =
-    cctxt#call_service
-      (RPC_services.Coordinator.post_preimage plugin)
-      ()
-      ()
-      payload
+  let post_preimage (cctxt : #cctxt) ~payload =
+    cctxt#call_service RPC_services.Coordinator.post_preimage () () payload
 end
