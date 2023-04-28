@@ -82,9 +82,9 @@ trace
       [ (Pair (Pair "abc" { 1 ; 2 ; 3 }) { 4 ; 5 ; 6 }) ]
   - DROP (entry) @ location: 46
     [ (Pair (Pair "abc" { 1 ; 2 ; 3 }) { 4 ; 5 ; 6 }) ]
-    - log/PUSH (exit) @ location: 46
+    - log/UNIT (exit) @ location: 46
       [  ]
-  - PUSH (entry) @ location: 47
+  - UNIT (entry) @ location: 47
     [  ]
     - log/NIL (exit) @ location: 47
       [ Unit ]

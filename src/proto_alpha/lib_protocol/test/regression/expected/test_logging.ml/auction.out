@@ -356,11 +356,11 @@ trace
       (Pair "[TIMESTAMP]" 100000000 "[PUBLIC_KEY_HASH]") ]
     - control: KUndip
     - control: KCons
-    - log/PUSH (exit) @ location: 55
+    - log/UNIT (exit) @ location: 55
       [ 50000000
         "[PUBLIC_KEY_HASH]"
         (Pair "[TIMESTAMP]" 100000000 "[PUBLIC_KEY_HASH]") ]
-  - PUSH (entry) @ location: 59
+  - UNIT (entry) @ location: 59
     [ 50000000
       "[PUBLIC_KEY_HASH]"
       (Pair "[TIMESTAMP]" 100000000 "[PUBLIC_KEY_HASH]") ]

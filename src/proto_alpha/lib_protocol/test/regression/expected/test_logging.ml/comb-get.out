@@ -178,10 +178,10 @@ trace
   - GET (entry) @ location: 76
     [ (Pair 1 4 2 Unit)
       (Pair 1 4 2 Unit) ]
-    - log/PUSH (exit) @ location: 76
+    - log/UNIT (exit) @ location: 76
       [ Unit
         (Pair 1 4 2 Unit) ]
-  - PUSH (entry) @ location: 78
+  - UNIT (entry) @ location: 78
     [ Unit
       (Pair 1 4 2 Unit) ]
     - log/COMPARE (exit) @ location: 78
@@ -213,9 +213,9 @@ trace
       [ (Pair 1 4 2 Unit) ]
   - DROP (entry) @ location: 89
     [ (Pair 1 4 2 Unit) ]
-    - log/PUSH (exit) @ location: 89
+    - log/UNIT (exit) @ location: 89
       [  ]
-  - PUSH (entry) @ location: 90
+  - UNIT (entry) @ location: 90
     [  ]
     - log/NIL (exit) @ location: 90
       [ Unit ]
