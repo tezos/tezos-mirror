@@ -1756,6 +1756,7 @@ let octez_stdlib_unix =
         conf_libev;
         uri;
       ]
+    ~inline_tests:ppx_expect
 
 let _octez_stdlib_unix_test =
   tezt

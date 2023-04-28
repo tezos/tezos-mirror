@@ -166,6 +166,28 @@ let make_with_pp_short pp wrapped_event =
   in
   Bytes.unsafe_to_string buf
 
+let%expect_test _ =
+  let pp_string ~all_fields:_ ~block:_ = Format.pp_print_text in
+  let make_timestamp flt =
+    match Ptime.of_float_s flt with None -> assert false | Some v -> v
+  in
+  let ts = 1682584149.77736807 in
+  let local_dependant_ts = fst @@ Unix.mktime @@ Unix.gmtime ts in
+  let time_stamp = make_timestamp local_dependant_ts in
+  let ev =
+    {
+      event = "toto";
+      time_stamp;
+      section = Internal_event.Section.make_sanitized ["my"; "section"];
+    }
+  in
+  print_endline (make_with_pp_short pp_string ev) ;
+  [%expect {| Apr 27 08:29:09.000: toto |}] ;
+  let ev = {ev with time_stamp = make_timestamp ts} in
+  print_endline (make_with_pp_rfc5424 pp_string ev "my-event") ;
+  [%expect {| 2023-04-27T08:29:09.777-00:00 [my.section.my-event] toto |}] ;
+  ()
+
 let day_of_the_year ts =
   let today =
     match Ptime.of_float_s ts with Some s -> s | None -> Ptime.min
@@ -184,10 +206,41 @@ let check_file_format_with_date base_filename s =
   let re = compile @@ re (name_no_ext ^ re_date ^ re_ext) in
   Re.execp re s
 
+let%expect_test _ =
+  print_endline (Bool.to_string (check_file_format_with_date ".out" "a.out")) ;
+  [%expect {| false |}] ;
+  print_endline
+    (Bool.to_string
+       (check_file_format_with_date "some-name.log" "some-name-19991231.log")) ;
+  [%expect {| true |}] ;
+  print_endline
+    (Bool.to_string (check_file_format_with_date "hello." "hello-19991231.")) ;
+  [%expect {| true |}] ;
+  print_endline
+    (Bool.to_string (check_file_format_with_date ".log" "19991231.log")) ;
+  [%expect {| false |}] ;
+  print_endline
+    (Bool.to_string
+       (check_file_format_with_date ".log.log" ".log-19991231.log")) ;
+  [%expect {| true |}] ;
+  print_endline
+    (Bool.to_string (check_file_format_with_date "file" "file-19991231")) ;
+  [%expect {| true |}] ;
+  ()
+
 let filename_insert_before_ext ~path s =
   let ext = Filename.extension path in
   let chopped = if ext = "" then path else Filename.chop_extension path in
   Format.asprintf "%s-%s%s" chopped s ext
+
+let%expect_test _ =
+  print_endline (filename_insert_before_ext ~path:"foo.bar" "baz") ;
+  [%expect {| foo-baz.bar |}] ;
+  print_endline (filename_insert_before_ext ~path:"/tmp/log.out" "11") ;
+  [%expect {| /tmp/log-11.out |}] ;
+  print_endline (filename_insert_before_ext ~path:"/dev/null" "XXX") ;
+  [%expect {| /dev/null-XXX |}] ;
+  ()
 
 module Make_sink (K : sig
   val kind : [`Path | `Stdout | `Stderr]

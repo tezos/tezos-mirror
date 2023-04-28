@@ -23,6 +23,8 @@
   mtime.clock.os
   lwt_log
   uri)
+ (inline_tests (flags -verbose) (modes native))
+ (preprocess (pps ppx_expect))
  (flags
   (:standard)
   -open Tezos_error_monad
