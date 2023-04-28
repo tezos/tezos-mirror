@@ -58,7 +58,7 @@ module SoruEntity = struct
 
   let to_source s = return (to_b58check s)
 
-  let name = "smart rollup"
+  let name = Smart_rollup_alias.Address.Entity.name
 end
 
 module SoruAlias = Client_aliases.Alias (SoruEntity)

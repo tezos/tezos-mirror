@@ -903,16 +903,16 @@ module Tx_rollup = struct
 end
 
 module Sc_rollup_params = struct
+  let convert_address sc_rollup_address =
+    sc_rollup_address
+    |> Data_encoding.Binary.to_bytes_exn
+         Tezos_crypto.Hashed.Smart_rollup_address.encoding
+    |> Data_encoding.Binary.of_bytes_exn Sc_rollup.Address.encoding
+
   let sc_rollup_address_parameter =
-    Tezos_clic.parameter
-      ~autocomplete:Client_proto_rollups.SoruAlias.autocomplete
-      (fun cctxt ->
-        Client_aliases.parse_alternatives
-          [
-            ( "alias",
-              fun alias -> Client_proto_rollups.SoruAlias.find cctxt alias );
-            ("text", fun text -> Client_proto_rollups.SoruAlias.of_source text);
-          ])
+    Tezos_clic.map_parameter
+      (Smart_rollup_alias.Address.parameter ())
+      ~f:convert_address
 
   let sc_rollup_address_param ?(name = "smart rollup address")
       ?(desc = "the address of the targeted smart rollup") next =
