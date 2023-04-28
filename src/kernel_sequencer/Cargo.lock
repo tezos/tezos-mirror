@@ -13,9 +13,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.70"
+version = "1.0.71"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7de8ce5e0f9f8d88245311066a578d72b7af3e7088f32783804676302df237e4"
+checksum = "9c7d0618f0e0b7e8ff11427422b64564d5fb0be1940354bfe2e0529b18a9d9b8"
 
 [[package]]
 name = "arrayref"
@@ -113,9 +113,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cpufeatures"
-version = "0.2.6"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "280a9f2d8b3a38871a3c8a46fb80db65e5e5ed97da80c4d08bf27fb63e35e181"
+checksum = "3e4c1eaa2012c47becbbad2ab175484c2a84d1185b566fb2cc5b8707343dfe58"
 dependencies = [
  "libc",
 ]
@@ -286,10 +286,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "kernel_sequencer"
+name = "itoa"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "453ad9f582a441959e5f0d088b02ce04cfe8d51a8eaf077f12ac6d3e94164ca6"
+
+[[package]]
+name = "kernel-sequencer"
 version = "0.1.0"
 dependencies = [
+ "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
+ "tezos-smart-rollup-mock",
 ]
 
 [[package]]
@@ -576,18 +584,18 @@ checksum = "f91339c0467de62360649f8d3e185ca8de4224ff281f66000de5eb2a77a79041"
 
 [[package]]
 name = "serde"
-version = "1.0.160"
+version = "1.0.162"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb2f3770c8bce3bcda7e149193a069a0f4365bda1fa5cd88e03bca26afc1216c"
+checksum = "71b2f6e1ab5c2b98c05f0f35b236b22e8df7ead6ffbf51d7808da7f8817e7ab6"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.160"
+version = "1.0.162"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "291a097c63d8497e00160b166a967a4a79c64f3facdd01cbd7502231688d77df"
+checksum = "a2a0814352fd64b58489904a44ea8d90cb1a91dcb6b4f5ebabc32c8318e93cb6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -680,6 +688,23 @@ name = "tezos-smart-rollup-core"
 version = "0.1.0"
 
 [[package]]
+name = "tezos-smart-rollup-encoding"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "nom",
+ "num-bigint",
+ "num-traits",
+ "tezos-smart-rollup-core",
+ "tezos-smart-rollup-host",
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
+ "tezos_data_encoding_derive",
+ "thiserror",
+ "time",
+]
+
+[[package]]
 name = "tezos-smart-rollup-host"
 version = "0.1.0"
 dependencies = [
@@ -687,6 +712,18 @@ dependencies = [
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "thiserror",
+]
+
+[[package]]
+name = "tezos-smart-rollup-mock"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "tezos-smart-rollup-core",
+ "tezos-smart-rollup-encoding",
+ "tezos-smart-rollup-host",
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
 ]
 
 [[package]]
@@ -773,6 +810,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d050e60b33d41c19108b32cea32164033a9013fe3b46cbd4457559bfbf77afaa"
 dependencies = [
  "num_cpus",
+]
+
+[[package]]
+name = "time"
+version = "0.3.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd0cbfecb4d19b5ea75bb31ad904eb5b9fa13f21079c3b92017ebdf4999a5890"
+dependencies = [
+ "itoa",
+ "serde",
+ "time-core",
+ "time-macros",
+]
+
+[[package]]
+name = "time-core"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e153e1f1acaef8acc537e68b44906d2db6436e2b35ac2c6b42640fff91f00fd"
+
+[[package]]
+name = "time-macros"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd80a657e71da814b8e5d60d3374fc6d35045062245d80224748ae522dd76f36"
+dependencies = [
+ "time-core",
 ]
 
 [[package]]
