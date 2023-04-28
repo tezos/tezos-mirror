@@ -495,7 +495,9 @@ let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
           | None -> Baking_configuration.default_per_block_vote_file
           | Some arg -> arg
         in
-        (* We don't let the user run the baker without providing some option (CLI, file path, or file in default location) for the toggle vote. *)
+        (* We don't let the user run the baker without providing some
+           option (CLI, file path, or file in default location) for
+           the toggle vote. *)
         Liquidity_baking_vote_file.read_liquidity_baking_toggle_vote_on_startup
           ~default:liquidity_baking_toggle_vote
           ~per_block_vote_file:per_block_vote_file_or_default
@@ -507,7 +509,7 @@ let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
         in
         may_lock_pidfile pidfile @@ fun () ->
         get_delegates cctxt sources >>=? fun delegates ->
-        let context_path = Filename.Infix.(node_data_path // "context") in
+        let context_path = Some Filename.Infix.(node_data_path // "context") in
         Client_daemon.Baker.run
           cctxt
           ~minimal_fees
@@ -518,8 +520,8 @@ let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
           ?extra_operations
           ?dal_node_endpoint
           ~force_apply
+          ?context_path
           ~chain:cctxt#chain
-          ~context_path
           ~keep_alive
           delegates);
     command
