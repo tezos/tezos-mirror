@@ -136,14 +136,13 @@ let send_dac_payload =
       let* root_hash =
         Command_handlers.send_preimage coordinator_cctxt payload
       in
-      let hex_root_hash = `Hex (Dac_plugin.raw_hash_to_hex root_hash) in
       match threshold with
       | None ->
           return
           @@ Format.printf
                "Payload stored under root hash: %a"
-               Hex.pp
-               hex_root_hash
+               Dac_plugin.pp_raw_hash
+               root_hash
       | Some threshold -> (
           let* certificate_opt =
             Command_handlers.wait_for_certificate
@@ -157,8 +156,8 @@ let send_dac_payload =
               @@ Format.printf
                    "No certificate could be obtained.\n\
                     Payload stored under root hash: %a\n"
-                   Hex.pp
-                   hex_root_hash
+                   Dac_plugin.pp_raw_hash
+                   root_hash
           | Some certificate ->
               return
               @@ Format.printf "Certificate received: %a\n" Hex.pp certificate))
@@ -180,9 +179,11 @@ let get_dac_certificate =
       in
       match certificate_opt with
       | None ->
-          let hex_root_hash = `Hex (Dac_plugin.raw_hash_to_hex root_hash) in
           return
-          @@ Format.printf "No certificate known for %a\n" Hex.pp hex_root_hash
+          @@ Format.printf
+               "No certificate known for %a\n"
+               Dac_plugin.pp_raw_hash
+               root_hash
       | Some certificate ->
           return
           @@ Format.printf "Certificate received: %a\n" Hex.pp certificate)

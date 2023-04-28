@@ -42,18 +42,16 @@ let raw_hash_encoding = Data_encoding.bytes' Hex
 
 let hash_to_raw = Fun.id
 
-let raw_hash_to_hex raw_hash =
-  let (`Hex hash) = Hex.of_bytes raw_hash in
-  hash
+let raw_hash_to_hex raw_hash = Hex.of_bytes raw_hash
 
-let raw_hash_of_hex hex = Hex.to_bytes (`Hex hex)
+let raw_hash_of_hex hex = Hex.to_bytes hex
 
 let raw_hash_of_bytes = Fun.id
 
 let raw_hash_rpc_arg =
-  let construct = raw_hash_to_hex in
+  let construct raw_hash = Hex.show @@ raw_hash_to_hex raw_hash in
   let destruct hash =
-    match raw_hash_of_hex hash with
+    match raw_hash_of_hex (`Hex hash) with
     | None -> Error "Impossible to parse raw_hash"
     | Some reveal_hash -> Ok reveal_hash
   in
@@ -71,6 +69,8 @@ type cannot_convert_raw_hash_to_hash = {
 
 type error += Cannot_convert_raw_hash_to_hash of cannot_convert_raw_hash_to_hash
 
+let pp_raw_hash fmt raw_hash = Hex.pp fmt (raw_hash_to_hex raw_hash)
+
 let () =
   register_error_kind
     `Permanent
@@ -81,9 +81,10 @@ let () =
     ~pp:(fun ppf (raw_hash, proto) ->
       Format.fprintf
         ppf
-        "Impossible to validate the provided raw_hash %s against the actual \
+        "Impossible to validate the provided raw_hash %a against the actual \
          protocol %s and transform it to a valid hash"
-        (raw_hash_to_hex raw_hash)
+        pp_raw_hash
+        raw_hash
         (Protocol_hash.to_string proto))
     Data_encoding.(
       obj2
