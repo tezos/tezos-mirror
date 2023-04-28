@@ -189,6 +189,9 @@ module Operation = struct
 
   let unsigned_encoding = unsigned_operation_encoding
 
+  let unsigned_encoding_with_legacy_attestation_name =
+    unsigned_operation_encoding_with_legacy_attestation_name
+
   include Operation_repr
 end
 
