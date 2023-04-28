@@ -858,7 +858,7 @@ let test_do_not_graft_within_backoff_period rng limits parameters =
   let state =
     List.init
       ~when_negative_length:()
-      (Milliseconds.seconds backoff + 1)
+      (Milliseconds.to_int_s backoff + 1)
       (fun i -> i + 1)
     |> WithExceptions.Result.get_ok ~loc:__LOC__
     |> List.fold_left
