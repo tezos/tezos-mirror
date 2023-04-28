@@ -1,7 +1,7 @@
 
 ./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[SMART_ROLLUP_HASH]"'
 Node is bootstrapped.
-Estimated gas: 2784.628 units (will add 100 for safety)
+Estimated gas: 2784.268 units (will add 100 for safety)
 Estimated storage: 132 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -28,7 +28,7 @@ This sequence of operations was run:
       Updated storage: Unit
       Storage size: 197 bytes
       Paid storage size diff: 132 bytes
-      Consumed gas: 2674.654
+      Consumed gas: 2674.294
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.033
         storage fees ........................... +ꜩ0.033

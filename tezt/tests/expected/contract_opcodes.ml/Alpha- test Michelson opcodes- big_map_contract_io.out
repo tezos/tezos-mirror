@@ -672,7 +672,7 @@ big_map diff
   New map(4) of type (big_map string string)
   Set map(4)["2"] to "two"
 trace
-  - location: 43 (just consumed gas: 62.128)
+  - location: 43 (just consumed gas: 61.768)
     [ (Pair (Left Unit) (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
   - location: 43 (just consumed gas: 0.010)
     [ (Left Unit)
@@ -716,7 +716,7 @@ big_map diff
   New map(4) of type (big_map string string)
   Set map(4)["3"] to "three"
 trace
-  - location: 43 (just consumed gas: 65.416)
+  - location: 43 (just consumed gas: 65.056)
     [ (Pair (Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))
             (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
   - location: 43 (just consumed gas: 0.010)
@@ -752,7 +752,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 43 (just consumed gas: 62.768)
+  - location: 43 (just consumed gas: 62.408)
     [ (Pair (Right (Left (Right Unit))) (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
   - location: 43 (just consumed gas: 0.010)
     [ (Right (Left (Right Unit)))
@@ -790,7 +790,7 @@ big_map diff
   New map(4) of type (big_map string string)
   Set map(4)["foo"] to "bar"
 trace
-  - location: 43 (just consumed gas: 60.906)
+  - location: 43 (just consumed gas: 60.546)
     [ (Pair (Right (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" })))) (Right Unit)) ]
   - location: 43 (just consumed gas: 0.010)
     [ (Right (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" }))))
@@ -926,7 +926,7 @@ big_map diff
   Set map(4)["3"] to "three"
   Set map(4)["1"] to "one"
 trace
-  - location: 43 (just consumed gas: 63.036)
+  - location: 43 (just consumed gas: 62.676)
     [ (Pair (Right (Right (Right (Left { Pair "3" "three" }))))
             (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
   - location: 43 (just consumed gas: 0.010)
@@ -1015,7 +1015,7 @@ big_map diff
   New map(4) of type (big_map string string)
   Unset map(4)["1"]
 trace
-  - location: 43 (just consumed gas: 62.772)
+  - location: 43 (just consumed gas: 62.412)
     [ (Pair (Right (Right (Right (Right { "1" }))))
             (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
   - location: 43 (just consumed gas: 0.010)

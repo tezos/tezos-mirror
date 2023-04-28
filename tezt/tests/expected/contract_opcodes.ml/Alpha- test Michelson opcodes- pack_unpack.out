@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 15 (just consumed gas: 19.769)
+  - location: 15 (just consumed gas: 19.499)
     [ (Pair (Pair (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
                   0x05070707070100000004746f746f020000000800030007000900010200000006000100020003)
             Unit) ]
@@ -70,7 +70,7 @@ At line 4 characters 14 to 26,
 script reached FAILWITH instruction
 with Unit
 trace
-  - location: 15 (just consumed gas: 19.769)
+  - location: 15 (just consumed gas: 19.499)
     [ (Pair (Pair (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
                   0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004)
             Unit) ]
