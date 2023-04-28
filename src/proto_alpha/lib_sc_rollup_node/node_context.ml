@@ -40,6 +40,7 @@ type 'a t = {
   data_dir : string;
   l1_ctxt : Layer1.t;
   rollup_address : Sc_rollup.t;
+  boot_sector_file : string option;
   mode : Configuration.mode;
   operators : Configuration.operators;
   genesis_info : Sc_rollup.Commitment.genesis_info;
@@ -184,6 +185,7 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
       {
         sc_rollup_address = rollup_address;
         sc_rollup_node_operators = operators;
+        boot_sector_file;
         mode = operating_mode;
         fee_parameters;
         loser_mode;
@@ -262,6 +264,7 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
       data_dir;
       l1_ctxt;
       rollup_address;
+      boot_sector_file;
       mode = operating_mode;
       operators;
       genesis_info;
@@ -878,6 +881,7 @@ module Internal_for_tests = struct
         data_dir;
         l1_ctxt;
         rollup_address = Sc_rollup.Address.zero;
+        boot_sector_file = None;
         mode = Observer;
         operators = Configuration.Operator_purpose_map.empty;
         genesis_info;

@@ -59,7 +59,13 @@ type error +=
   | No_refutation_coordinator
   | Could_not_acquire_lock of string
 
-type error += Lost_game of Protocol.Alpha_context.Sc_rollup.Game.game_result
+type error +=
+  | Lost_game of Protocol.Alpha_context.Sc_rollup.Game.game_result
+  | Unparsable_boot_sector of {path : string}
+  | Invalid_genesis_state of {
+      expected : Sc_rollup.Commitment.Hash.t;
+      actual : Sc_rollup.Commitment.Hash.t;
+    }
 
 let () =
   register_error_kind
@@ -295,6 +301,45 @@ let () =
            Protocol.Alpha_context.Sc_rollup.Game.game_result_encoding))
     (function Lost_game result -> Some result | _ -> None)
     (fun result -> Lost_game result) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup.node.unparsable_boot_sector"
+    ~title:"Unparsable boot sector"
+    ~description:"The boot sector provided is not parsable by the PVM."
+    ~pp:(fun ppf path ->
+      Format.fprintf ppf "The boot sector at path %S is unparsable" path)
+    Data_encoding.(obj1 (req "path" string))
+    (function Unparsable_boot_sector {path} -> Some path | _ -> None)
+    (fun path -> Unparsable_boot_sector {path}) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup.node.invalid_genesis_state"
+    ~title:"Invalid genesis state"
+    ~description:
+      "The rollup node computed an invalid genesis state, it cannot continue."
+    ~pp:(fun ppf (expected, actual) ->
+      Format.fprintf
+        ppf
+        "Genesis commitment computed (%a) is not equal to the rollup genesis \
+         (%a) commitment. The rollup node cannot continue. If you used the \
+         argument `--boot-sector-file` you probably provided the wrong boot \
+         sector. If not, please report the bug."
+        Sc_rollup.Commitment.Hash.pp
+        expected
+        Sc_rollup.Commitment.Hash.pp
+        actual)
+    Data_encoding.(
+      obj2
+        (req
+           "expected"
+           Protocol.Alpha_context.Sc_rollup.Commitment.Hash.encoding)
+        (req "actual" Protocol.Alpha_context.Sc_rollup.Commitment.Hash.encoding))
+    (function
+      | Invalid_genesis_state {expected; actual} -> Some (expected, actual)
+      | _ -> None)
+    (fun (expected, actual) -> Invalid_genesis_state {expected; actual}) ;
 
   register_error_kind
     ~id:"sc_rollup.node.no_batcher"

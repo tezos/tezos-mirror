@@ -275,6 +275,21 @@ let log_kernel_debug_file_arg =
     ~doc:""
     Client_proto_args.string_parameter
 
+let boot_sector_file_arg =
+  Tezos_clic.arg
+    ~long:"boot-sector-file"
+    ~placeholder:"file"
+    ~doc:
+      "Path to the boot sector. The argument is optional, if the rollup node \
+       was originated via the smart rollup originate operation, the rollup \
+       node will fetch the boot sector itself. This argument is required only \
+       if it's a bootstrapped smart rollup."
+    (Tezos_clic.parameter (fun _ path ->
+         let open Lwt_result_syntax in
+         let*! exists = Lwt_unix.file_exists path in
+         if exists then return path
+         else failwith "Boot sector not found at path %S" path))
+
 let group =
   {
     Tezos_clic.name = "sc_rollup.node";
@@ -301,12 +316,14 @@ let make_operators sc_rollup_node_operators =
 let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
     ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
     ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
-    ~sc_rollup_address ~sc_rollup_node_operators ~log_kernel_debug =
+    ~sc_rollup_address ~boot_sector_file ~sc_rollup_node_operators
+    ~log_kernel_debug =
   let open Configuration in
   let sc_rollup_node_operators = make_operators sc_rollup_node_operators in
   let config =
     {
       sc_rollup_address;
+      boot_sector_file;
       sc_rollup_node_operators;
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default_rpc_port rpc_port;
@@ -340,7 +357,7 @@ let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
 let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
     ~metrics_addr ~loser_mode ~reconnection_delay ~dal_node_endpoint
     ~dac_observer_endpoint ~dac_timeout ~injector_retention_period
-    ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
+    ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file
     ~sc_rollup_node_operators ~log_kernel_debug =
   let open Configuration in
   let new_sc_rollup_node_operators = make_operators sc_rollup_node_operators in
@@ -359,6 +376,8 @@ let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
           Option.value
             ~default:configuration.sc_rollup_address
             sc_rollup_address;
+        boot_sector_file =
+          Option.either boot_sector_file configuration.boot_sector_file;
         sc_rollup_node_operators;
         mode = Option.value ~default:configuration.mode mode;
         rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
@@ -395,7 +414,8 @@ let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
 let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
     ~loser_mode ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint
     ~dac_timeout ~injector_retention_period ~injector_attempts ~injection_ttl
-    ~mode ~sc_rollup_address ~sc_rollup_node_operators ~log_kernel_debug =
+    ~mode ~sc_rollup_address ~boot_sector_file ~sc_rollup_node_operators
+    ~log_kernel_debug =
   let open Lwt_result_syntax in
   let config_file = Configuration.config_filename ~data_dir in
   let*! exists_config = Lwt_unix.file_exists config_file in
@@ -419,6 +439,7 @@ let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
         ~injection_ttl
         ~mode
         ~sc_rollup_address
+        ~boot_sector_file
         ~sc_rollup_node_operators
         ~log_kernel_debug
     in
@@ -458,6 +479,7 @@ let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
         ~injection_ttl
         ~mode
         ~sc_rollup_address
+        ~boot_sector_file
         ~sc_rollup_node_operators
         ~log_kernel_debug
     in
@@ -469,7 +491,7 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart rollup node."
-    (args14
+    (args15
        force_switch
        data_dir_arg
        rpc_addr_arg
@@ -483,7 +505,8 @@ let config_init_command =
        injector_retention_period_arg
        injector_attempts_arg
        injection_ttl_arg
-       log_kernel_debug_arg)
+       log_kernel_debug_arg
+       boot_sector_file_arg)
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
@@ -502,7 +525,8 @@ let config_init_command =
            injector_retention_period,
            injector_attempts,
            injection_ttl,
-           log_kernel_debug )
+           log_kernel_debug,
+           boot_sector_file )
          mode
          sc_rollup_address
          sc_rollup_node_operators
@@ -522,6 +546,7 @@ let config_init_command =
           ~injection_ttl
           ~mode
           ~sc_rollup_address
+          ~boot_sector_file
           ~sc_rollup_node_operators
           ~log_kernel_debug
       in
@@ -539,7 +564,7 @@ let legacy_run_command =
   command
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
-    (args16
+    (args17
        data_dir_arg
        mode_arg
        sc_rollup_address_arg
@@ -555,7 +580,8 @@ let legacy_run_command =
        injector_attempts_arg
        injection_ttl_arg
        log_kernel_debug_arg
-       log_kernel_debug_file_arg)
+       log_kernel_debug_file_arg
+       boot_sector_file_arg)
     (prefixes ["run"] @@ stop)
     (fun ( data_dir,
            mode,
@@ -572,7 +598,8 @@ let legacy_run_command =
            injector_attempts,
            injection_ttl,
            log_kernel_debug,
-           log_kernel_debug_file )
+           log_kernel_debug_file,
+           boot_sector_file )
          cctxt ->
       let* configuration =
         create_or_read_config
@@ -590,6 +617,7 @@ let legacy_run_command =
           ~injection_ttl
           ~mode
           ~sc_rollup_address
+          ~boot_sector_file
           ~sc_rollup_node_operators:[]
           ~log_kernel_debug
       in
@@ -603,7 +631,7 @@ let run_command =
     ~desc:
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
-    (args14
+    (args15
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -617,7 +645,8 @@ let run_command =
        injector_attempts_arg
        injection_ttl_arg
        log_kernel_debug_arg
-       log_kernel_debug_file_arg)
+       log_kernel_debug_file_arg
+       boot_sector_file_arg)
     (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
    @@ sc_rollup_address_param
     @@ prefixes ["with"; "operators"]
@@ -635,7 +664,8 @@ let run_command =
            injector_attempts,
            injection_ttl,
            log_kernel_debug,
-           log_kernel_debug_file )
+           log_kernel_debug_file,
+           boot_sector_file )
          mode
          sc_rollup_address
          sc_rollup_node_operators
@@ -658,6 +688,7 @@ let run_command =
           ~sc_rollup_address:(Some sc_rollup_address)
           ~sc_rollup_node_operators
           ~log_kernel_debug
+          ~boot_sector_file
       in
       Daemon.run ~data_dir ?log_kernel_debug_file configuration cctxt)
 

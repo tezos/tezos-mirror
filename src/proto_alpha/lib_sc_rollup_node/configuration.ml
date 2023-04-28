@@ -54,6 +54,7 @@ type injector = {retention_period : int; attempts : int; injection_ttl : int}
 
 type t = {
   sc_rollup_address : Sc_rollup.t;
+  boot_sector_file : string option;
   sc_rollup_node_operators : operators;
   rpc_addr : string;
   rpc_port : int;
@@ -505,6 +506,7 @@ let encoding : t Data_encoding.t =
   conv
     (fun {
            sc_rollup_address;
+           boot_sector_file;
            sc_rollup_node_operators;
            rpc_addr;
            rpc_port;
@@ -522,6 +524,7 @@ let encoding : t Data_encoding.t =
            log_kernel_debug;
          } ->
       ( ( sc_rollup_address,
+          boot_sector_file,
           sc_rollup_node_operators,
           rpc_addr,
           rpc_port,
@@ -538,6 +541,7 @@ let encoding : t Data_encoding.t =
           l2_blocks_cache_size,
           log_kernel_debug ) ))
     (fun ( ( sc_rollup_address,
+             boot_sector_file,
              sc_rollup_node_operators,
              rpc_addr,
              rpc_port,
@@ -555,6 +559,7 @@ let encoding : t Data_encoding.t =
              log_kernel_debug ) ) ->
       {
         sc_rollup_address;
+        boot_sector_file;
         sc_rollup_node_operators;
         rpc_addr;
         rpc_port;
@@ -572,11 +577,12 @@ let encoding : t Data_encoding.t =
         log_kernel_debug;
       })
     (merge_objs
-       (obj9
+       (obj10
           (req
              "smart-rollup-address"
              ~description:"Smart rollup address"
              Protocol.Alpha_context.Sc_rollup.Address.encoding)
+          (opt "boot-sector" ~description:"Boot sector" string)
           (req
              "smart-rollup-node-operator"
              ~description:

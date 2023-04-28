@@ -611,7 +611,8 @@ module Make (PVM : Pvm.S) = struct
       ~genesis_hash:node_ctxt.genesis_info.commitment_hash
       ~pvm_kind:node_ctxt.kind ;
     protect start ~on_error:(function
-        | Sc_rollup_node_errors.Lost_game _ :: _ as e ->
+        | Sc_rollup_node_errors.(Lost_game _ | Invalid_genesis_state _) :: _ as
+          e ->
             Format.eprintf "%!%a@.Exiting.@." pp_print_trace e ;
             let*! _ = Lwt_exit.exit_and_wait 1 in
             return_unit

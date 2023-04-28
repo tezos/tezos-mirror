@@ -109,12 +109,51 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         | Found_boot_sector boot_sector -> return boot_sector
         | _ -> missing_boot_sector ())
 
+  let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
+    let open Lwt_result_syntax in
+    match node_ctxt.boot_sector_file with
+    | None -> get_boot_sector block_hash node_ctxt
+    | Some boot_sector_file ->
+        let*! boot_sector = Lwt_utils_unix.read_file boot_sector_file in
+        let*? boot_sector =
+          Option.value_e
+            ~error:
+              [
+                Sc_rollup_node_errors.Unparsable_boot_sector
+                  {path = boot_sector_file};
+              ]
+            (PVM.parse_boot_sector boot_sector)
+        in
+        return boot_sector
+
   let genesis_state block_hash node_ctxt ctxt =
     let open Lwt_result_syntax in
     let* boot_sector = get_boot_sector block_hash node_ctxt in
     let*! initial_state = PVM.initial_state ~empty:(PVM.State.empty ()) in
     let*! genesis_state = PVM.install_boot_sector initial_state boot_sector in
     let*! ctxt = PVM.State.set ctxt genesis_state in
+    (* Assert that the initial genesis state is equal to the rollup's genesis
+       state in the protocol. *)
+    let* () =
+      let genesis_commitment = node_ctxt.genesis_info.commitment_hash in
+      let*! compressed_state = PVM.state_hash genesis_state in
+      let our_genesis_commitment =
+        Sc_rollup.Commitment.(
+          hash_uncarbonated
+            {
+              compressed_state;
+              inbox_level = node_ctxt.genesis_info.level;
+              predecessor = Sc_rollup.Commitment.Hash.zero;
+              number_of_ticks = Sc_rollup.Number_of_ticks.zero;
+            })
+      in
+      fail_unless
+        (Sc_rollup.Commitment.Hash.equal
+           genesis_commitment
+           our_genesis_commitment)
+        (Sc_rollup_node_errors.Invalid_genesis_state
+           {expected = genesis_commitment; actual = our_genesis_commitment})
+    in
     return (ctxt, genesis_state)
 
   let state_of_head node_ctxt ctxt Layer1.{hash; level} =
