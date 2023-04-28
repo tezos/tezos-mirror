@@ -122,7 +122,7 @@ module Micheline_common = struct
       ~conv:(fun {bytes; _} -> (bytes, ()))
       ~model:
         (Model.linear
-           ~name:(ns name)
+           ~name:(ns (name ^ "_bytes"))
            ~coeff:(fv (Format.asprintf "%s_micheline_bytes" name)))
 
   let models name =
