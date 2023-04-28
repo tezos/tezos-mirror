@@ -9,6 +9,13 @@ unified_coverage:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
     - .template__coverage_report
+  rules:
+    # We do not run this job when margebot triggers the
+    # pipeline. Instead, the coverage traces are downloaded in the
+    # master pipeline and the report is computed there.
+    - if: '$GITLAB_USER_LOGIN == "nomadic-margebot"'
+      when: never
+    - when: on_success
   # This job requires all bisect_ppx artifacts from the stage test, so we override
   # the `dependencies: []` in `.default_settings` with a list of jobs.
   # Each new job in the stage test needs to be manually added to this list.
