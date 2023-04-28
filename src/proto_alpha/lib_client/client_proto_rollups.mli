@@ -29,5 +29,3 @@ open Alpha_context
 type rollup_entity = {rollup : Tx_rollup.t; origination_level : int32 option}
 
 module EpoxyAlias : Client_aliases.Alias with type t = Zk_rollup.t
-
-module SoruAlias : Client_aliases.Alias with type t = Sc_rollup.t

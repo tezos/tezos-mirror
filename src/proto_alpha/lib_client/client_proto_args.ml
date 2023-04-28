@@ -719,30 +719,6 @@ module Daemon = struct
 end
 
 module Sc_rollup_params = struct
-  let sc_rollup_address_parameter =
-    Tezos_clic.parameter
-      ~autocomplete:Client_proto_rollups.SoruAlias.autocomplete
-      (fun cctxt ->
-        Client_aliases.parse_alternatives
-          [
-            ( "alias",
-              fun alias -> Client_proto_rollups.SoruAlias.find cctxt alias );
-            ("text", fun text -> Client_proto_rollups.SoruAlias.of_source text);
-          ])
-
-  let sc_rollup_address_param ?(name = "smart rollup address")
-      ?(desc = "the address of the targeted smart rollup") next =
-    let desc =
-      String.concat
-        "\n"
-        [
-          desc;
-          "Can be an alias or a literal (autodetected in order).\n\
-           Use 'alias:name' or 'text:literal' to force.";
-        ]
-    in
-    Tezos_clic.param ~name ~desc sc_rollup_address_parameter next
-
   let rollup_kind_parameter =
     Tezos_clic.parameter (fun (cctxt : #Client_context.full) name ->
         match Sc_rollup.Kind.of_string name with
