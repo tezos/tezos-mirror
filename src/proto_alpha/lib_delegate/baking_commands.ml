@@ -526,6 +526,65 @@ let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
           delegates);
     command
       ~group
+      ~desc:"Launch the baker daemon using only RPCs."
+      (args10
+         pidfile_arg
+         minimal_fees_arg
+         minimal_nanotez_per_gas_unit_arg
+         minimal_nanotez_per_byte_arg
+         force_apply_switch_arg
+         keep_alive_arg
+         liquidity_baking_toggle_vote_arg
+         per_block_vote_file_arg
+         operations_arg
+         endpoint_arg)
+      (prefixes ["run"; "remotely"] @@ sources_param)
+      (fun ( pidfile,
+             minimal_fees,
+             minimal_nanotez_per_gas_unit,
+             minimal_nanotez_per_byte,
+             force_apply,
+             keep_alive,
+             liquidity_baking_toggle_vote,
+             per_block_vote_file,
+             extra_operations,
+             dal_node_endpoint )
+           sources
+           cctxt ->
+        let per_block_vote_file_or_default =
+          match per_block_vote_file with
+          | None -> Baking_configuration.default_per_block_vote_file
+          | Some arg -> arg
+        in
+        (* We don't let the user run the baker without providing some
+           option (CLI, file path, or file in default location) for
+           the toggle vote. *)
+        Liquidity_baking_vote_file.read_liquidity_baking_toggle_vote_on_startup
+          ~default:liquidity_baking_toggle_vote
+          ~per_block_vote_file:per_block_vote_file_or_default
+        >>=? fun (liquidity_baking_toggle_vote, vote_file_present) ->
+        let per_block_vote_file =
+          match (per_block_vote_file, vote_file_present) with
+          | Some _, _ | None, true -> Some per_block_vote_file_or_default
+          | None, false -> None
+        in
+        may_lock_pidfile pidfile @@ fun () ->
+        get_delegates cctxt sources >>=? fun delegates ->
+        Client_daemon.Baker.run
+          cctxt
+          ~minimal_fees
+          ~minimal_nanotez_per_gas_unit
+          ~minimal_nanotez_per_byte
+          ~liquidity_baking_toggle_vote
+          ?per_block_vote_file
+          ?extra_operations
+          ?dal_node_endpoint
+          ~force_apply
+          ~chain:cctxt#chain
+          ~keep_alive
+          delegates);
+    command
+      ~group
       ~desc:"Launch the VDF daemon"
       (* no_options *)
       (args1 keep_alive_arg)
