@@ -408,11 +408,6 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
   let remote_peer_id = Tezos_crypto.Crypto_box.hash msg.public_key in
   let* () =
     fail_unless
-      (remote_peer_id <> identity.P2p_identity.peer_id)
-      (P2p_errors.Myself id_point)
-  in
-  let* () =
-    fail_unless
       (Tezos_crypto.Crypto_box.check_proof_of_work
          msg.public_key
          msg.proof_of_work_stamp
@@ -443,6 +438,13 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
       metadata_config
       (P2p_io_scheduler.to_readable scheduled_conn)
       cryptobox_data
+  in
+  (* Check that this connection does not lead to the node itself after reading
+     first encrypted message. *)
+  let* () =
+    fail_unless
+      (remote_peer_id <> identity.P2p_identity.peer_id)
+      (P2p_errors.Myself id_point)
   in
   let info =
     {
