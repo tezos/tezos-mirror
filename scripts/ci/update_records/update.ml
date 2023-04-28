@@ -3,7 +3,7 @@ open Base
 
 let usage () =
   prerr_endline
-    {|Usage: PIPELINE=<PIPELINE_ID> dune exec scripts/ci/update_records/update.exe
+    {|Usage: dune exec scripts/ci/update_records/update.exe -- -a from=[<PIPELINE_ID> | last-merged-pipeline]
 
 Example: to fetch test result records from
 https://gitlab.com/tezos/tezos/-/pipelines/426773806, run
