@@ -1,0 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_base_p2p_identity_file)
+ (public_name tezos-base.p2p-identity-file)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-stdlib-unix)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib_unix))

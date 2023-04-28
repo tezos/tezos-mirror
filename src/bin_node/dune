@@ -32,6 +32,7 @@
   prometheus-app.unix
   lwt-exit
   uri
+  tezos-base.p2p-identity-file
   (select void_for_linking-tezos-embedded-protocol-genesis from
    (tezos-embedded-protocol-genesis -> void_for_linking-tezos-embedded-protocol-genesis.empty)
    (-> void_for_linking-tezos-embedded-protocol-genesis.empty))
@@ -152,7 +153,8 @@
   -open Tezos_validation
   -open Tezos_shell_context
   -open Tezos_workers
-  -open Tezos_protocol_updater))
+  -open Tezos_protocol_updater
+  -open Tezos_base_p2p_identity_file))
 
 (rule
  (action
