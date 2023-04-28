@@ -101,7 +101,7 @@ Internal
 
 - Encoding that supports ``endorsement`` kind in JSON are now suffixed with
   ``_with_legacy_attestation_name``. Non legacy encoding supports
-  ``attestation`` kind. (MR :gl:`!8563`)
+  ``attestation`` kind. (MRs :gl:`!8563`, :gl:`!8531`)
 
 - Michelson: remove legacy behaviour related to contract type. (MR :gl:`!5800`)
 
@@ -136,3 +136,7 @@ Internal
   delegate has a sufficient frozen deposit. (MR :gl:`!8722`)
 
 - Store a history of percentages of slashed deposits. (MR :gl:`!8828`)
+
+- Renaming the ``endorsement_power`` and ``preendorsement_power`` fields from
+  consensus operation receipt to ``consensus_power`` in the non legacy encoding.
+  (MR :gl:`!8531`)
