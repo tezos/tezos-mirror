@@ -109,6 +109,9 @@ module type LIB = sig
 
     val constant_uint32 : ?le:bool -> Stdint.uint32 -> bl repr t
 
+    (* length in bits *)
+    val length : bl repr -> int
+
     val add : ?ignore_carry:bool -> bl repr -> bl repr -> bl repr t
 
     val xor : bl repr -> bl repr -> bl repr t
@@ -606,6 +609,8 @@ module Lib (C : COMMON) = struct
       let b = Stdlib.Bytes.create 4 in
       Stdint.Uint32.to_bytes_big_endian u32 b 0 ;
       constant ~le b
+
+    let length b = List.length (of_list b)
 
     let add ?(ignore_carry = true) a b =
       let ha, ta = (List.hd (of_list a), List.tl (of_list a)) in
