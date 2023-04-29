@@ -65,3 +65,11 @@ val default_listen_addr : P2p_point.Id.t
 val save : t -> unit tzresult Lwt.t
 
 val load : data_dir:string -> (t, Error_monad.tztrace) result Lwt.t
+
+(** [identity_file data_dir] returns the absolute path to the "identity.json"
+    file of the DAL node, based on the given [data_dir]. *)
+val identity_file : data_dir:string -> string
+
+(** [peers_file data_dir] returns the absolute path to the "peers.json" file of
+    the DAL node, based on the given [data_dir]. *)
+val peers_file : data_dir:string -> string
