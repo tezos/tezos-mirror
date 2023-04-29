@@ -118,6 +118,7 @@ let config_init_command =
           neighbors = [];
           peers = [];
           listen_addr;
+          expected_pow = default_expected_pow;
         }
       in
       let* () = save config in

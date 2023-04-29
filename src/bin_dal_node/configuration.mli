@@ -36,6 +36,7 @@ type t = {
       (** The TCP address and port at which this instance can be reached. *)
   peers : P2p_point.Id.t list;
       (** A list of P2P peers to connect to at startup. *)
+  expected_pow : float;  (** Expected P2P identity's PoW. *)
 }
 
 (** [filename config] gets the path to config file *)
@@ -50,6 +51,8 @@ val default_data_dir : string
 val default_rpc_addr : string
 
 val default_rpc_port : int
+
+val default_expected_pow : float
 
 (** The default TCP address and port at which this instance can be reached. *)
 val default_listen_addr : P2p_point.Id.t
