@@ -1897,7 +1897,7 @@ let octez_base_unix =
         octez_event_logging |> open_;
       ]
 
-let octez_p2p_identity_file =
+let octez_base_p2p_identity_file =
   public_lib
     "tezos-base.p2p-identity-file"
     ~path:"src/lib_base/p2p_identity_file"
@@ -2256,7 +2256,7 @@ let octez_p2p =
         octez_p2p_services |> open_;
         octez_version;
         prometheus;
-        octez_p2p_identity_file |> open_;
+        octez_base_p2p_identity_file |> open_;
       ]
 
 let tezt_performance_regression =
@@ -6932,7 +6932,7 @@ let _octez_node =
          prometheus_app_unix;
          lwt_exit;
          uri;
-         octez_p2p_identity_file |> open_;
+         octez_base_p2p_identity_file |> open_;
        ]
       @ protocol_deps)
     ~linkall:true
