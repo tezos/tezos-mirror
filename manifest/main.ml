@@ -3727,6 +3727,7 @@ let _octez_benchmark_tests =
       "test";
       "test_sparse_vec";
       "test_costlang";
+      "test_model";
       "test_probe";
       "test_measure";
       "test_benchmark_helpers";
