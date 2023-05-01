@@ -281,6 +281,7 @@ type 'accounts init :=
   ?sc_rollup_arith_pvm_enable:bool ->
   ?dal_enable:bool ->
   ?zk_rollup_enable:bool ->
+  ?adaptive_inflation_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
   unit ->
