@@ -11,6 +11,10 @@ module S = Saturation_repr
 
 (* Inference model name: interpreter *)
 
+(* model builtin/timer_model *)
+(* 19.04 *)
+let cost_timer_model = let open S.Syntax in S.safe_int 20
+
 (* model interpreter/N_IHalt *)
 (* 15.2226327675 *)
 let cost_N_IHalt = let open S.Syntax in S.safe_int 15
@@ -26,4 +30,10 @@ let cost_N_ILsl_bytes size1 size2 =
     ((S.safe_int 60) +
        ((((v1 lsr 1) + (v1 lsr 4)) + (v1 lsr 5)) + (v1 lsr 6)))
       + (v0 lsr 1023)
+
+(* model interpreter/amplification_loop_model *)
+(* fun size -> (0.250107232519 * size) *)
+let cost_amplification_loop_model size =
+  let open S.Syntax in
+    let size = S.safe_int size in let v0 = size in v0 lsr 2
 
