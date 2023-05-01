@@ -1174,7 +1174,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let* () = reset_ihave_per_heartbeat in
       let* () = reset_iwant_per_heartbeat in
 
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4967
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5532
          Apply IWANT request penalties *)
       return ()
 
@@ -1245,6 +1245,11 @@ module Make (C : AUTOMATON_CONFIG) :
        [degree_out], then select an additional number of peers to graft (with
        the same conditions for grafting) to ensure that there are at least
        [degree_out] outbound peers in the mesh.
+
+       - Attempt opportunistic grafting: if the median score of the remaining
+       peers is below a given threshold, then graft a few peers at random with
+       score above the median and remove them from the peers to be pruned (if
+       they were indeed meant to be pruned).
 
        Finally, for pruned peers, back them off for [prune_backoff] time.
     *)
@@ -1683,9 +1688,6 @@ module Make (C : AUTOMATON_CONFIG) :
       let* () = set_heartbeat_ticks (Int64.succ heartbeat_ticks) in
       (* cleaning up *)
       let* () = cleanup in
-
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4967
-         Cache scores throughout the heartbeat *)
 
       (* Maintain the mesh for topics we have joined. Concretely, in case the
          number of peers per topic (in the mesh) is lower than [degree_low] or
