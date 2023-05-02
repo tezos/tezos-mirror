@@ -483,12 +483,32 @@ coverage-clean:
 	@-rm -Rf ${COVERAGE_OUTPUT}/*.coverage ${COVERAGE_REPORT}
 
 .PHONY: clean
-clean: coverage-clean clean-old-names
+clean: coverage-clean clean-old-names clean-kernels
 	@-dune clean
 	@-rm -f ${OCTEZ_BIN} ${UNRELEASED_OCTEZ_BIN}
 	@-${MAKE} -C docs clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html
 
+.PHONY: build-kernels-deps
+build-kernels-deps:
+	make -f kernels.mk build-deps
+
+.PHONY: build-kernels-dev-deps
+build-kernels-dev-deps:
+	make -f kernels.mk build-dev-deps
+
 .PHONY: build-kernels
 build-kernels:
-	make -f kernels.mk build-kernels
+	make -f kernels.mk build
+
+.PHONY: check-kernels
+check-kernels:
+	make -f kernels.mk check
+
+.PHONY: test-kernels
+test-kernels:
+	make -f kernels.mk test
+
+.PHONY: clean-kernels
+clean-kernels:
+	make -f kernels.mk clean

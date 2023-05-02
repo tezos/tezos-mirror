@@ -3,20 +3,30 @@
 #
 # SPDX-License-Identifier: MIT
 
-CC=$(which clang)
-
 .PHONY: all
-all: build test
+all: build test check
 
+.PHONY: build
 build:
-	@cargo fmt --check
-	@cargo clippy --all-targets -- --deny warnings
 	@cargo build --target wasm32-unknown-unknown --release
 
+.PHONY: build-deps
 build-deps:
 	@rustup target add wasm32-unknown-unknown
-	@rustup component add rustfmt clippy
-	@cargo install cargo-make
 
+.PHONY: build-dev-deps
+build-dev-deps: build-deps
+	@rustup component add rustfmt clippy
+
+.PHONY: test
 test:
-	@cargo make test
+	@cargo test
+
+.PHONY: check
+check:
+	@cargo fmt --check
+	@cargo clippy --all-targets -- --deny warnings
+
+.PHONY: clean
+clean:
+	@cargo clean
