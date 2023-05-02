@@ -155,8 +155,8 @@ module Make (PVM : Pvm.S) = struct
           rollup
           their_commitment
           their_commitment_hash
-    | Sc_rollup_cement {commitment; _}, Sc_rollup_cement_result {inbox_level; _}
-      ->
+    | ( Sc_rollup_cement _,
+        Sc_rollup_cement_result {inbox_level; commitment_hash; _} ) ->
         (* Cemented commitment ---------------------------------------------- *)
         let* inbox_block =
           Node_context.get_l2_block_by_level
@@ -169,20 +169,22 @@ module Make (PVM : Pvm.S) = struct
             (Option.equal
                Sc_rollup.Commitment.Hash.( = )
                inbox_block.header.commitment_hash
-               (Some commitment))
+               (Some commitment_hash))
             (Sc_rollup_node_errors.Disagree_with_cemented
                {
                  inbox_level;
                  ours = inbox_block.header.commitment_hash;
-                 on_l1 = commitment;
+                 on_l1 = commitment_hash;
                })
         in
         let lcc = Reference.get node_ctxt.lcc in
         let*! () =
           if Raw_level.(inbox_level > lcc.level) then (
-            Reference.set node_ctxt.lcc {commitment; level = inbox_level} ;
+            Reference.set
+              node_ctxt.lcc
+              {commitment = commitment_hash; level = inbox_level} ;
             Commitment_event.last_cemented_commitment_updated
-              commitment
+              commitment_hash
               inbox_level)
           else Lwt.return_unit
         in
