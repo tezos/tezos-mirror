@@ -23,7 +23,7 @@ macro_rules! sequencer_kernel_entry {
         pub extern "C" fn kernel_run() {
             use tezos_smart_rollup::core_unsafe::rollup_host::RollupHost;
             let host = unsafe { RollupHost::new() }; // Runtime from the tezos sdk
-            let mut host = $crate::sequencer_runtime::SequencerRuntime::new(host); // create a sequencer runtime that use the RollupHost runtime
+            let mut host = $crate::sequencer_runtime::SequencerRuntime::new(host, |bytes| true); // create a sequencer runtime that use the RollupHost runtime
             $kernel_run(&mut host)
         }
     };

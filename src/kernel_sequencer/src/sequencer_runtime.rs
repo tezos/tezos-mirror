@@ -10,13 +10,15 @@ use tezos_smart_rollup_host::{
     runtime::{Runtime, RuntimeError, ValueType},
 };
 
-use crate::delayed_inbox::read_input;
+use crate::{delayed_inbox::read_input, routing::FilterBehavior};
 
 pub struct SequencerRuntime<R>
 where
     R: Runtime,
 {
     host: R,
+    /// if true then the input is added to the delayed inbox
+    input_predicate: FilterBehavior,
 }
 
 /// Runtime that handles the delayed inbox and the sequencer protocol.
@@ -27,8 +29,11 @@ impl<R> SequencerRuntime<R>
 where
     R: Runtime,
 {
-    pub fn new(host: R) -> Self {
-        Self { host }
+    pub fn new(host: R, input_predicate: FilterBehavior) -> Self {
+        Self {
+            host,
+            input_predicate,
+        }
     }
 }
 
@@ -45,7 +50,7 @@ where
     }
 
     fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
-        read_input(&mut self.host)
+        read_input(&mut self.host, self.input_predicate)
     }
 
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {

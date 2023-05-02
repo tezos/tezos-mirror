@@ -20,3 +20,10 @@ version = "0.1.0"
 [dev-dependencies.tezos-smart-rollup-mock]
 path = "../kernel_sdk/mock"
 version = "0.1.0"
+
+[dev-dependencies.tezos-smart-rollup-encoding]
+path = "../kernel_sdk/encoding"
+version = "0.1.0"
+
+[dev-dependencies.tezos_crypto_rs]
+version = "0.5.0"

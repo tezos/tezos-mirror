@@ -3,5 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 mod delayed_inbox;
+pub mod routing;
 mod sequencer_macro;
 pub mod sequencer_runtime;
+
+pub use routing::FilterBehavior;
