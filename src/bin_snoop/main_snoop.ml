@@ -532,16 +532,13 @@ let codegen_all_cmd solution_fn regexp codegen_options =
 let codegen_for_a_solution solution codegen_options ~exclusions =
   let found_codegen_models =
     (* They include builtin/TIMER_LATENCY. *)
-    List.filter_map
+    List.filter
       Registration.(
-        fun (name, ({model = _; from} as model_info)) ->
-          let flag =
-            List.exists
-              (fun {bench_name = _; local_model_name} ->
-                solution.Codegen.inference_model_name = local_model_name)
-              from
-          in
-          if flag then Some (name, model_info) else None)
+        fun (_, {from; _}) ->
+          List.exists
+            (fun {local_model_name; _} ->
+              solution.Codegen.inference_model_name = local_model_name)
+            from)
       (Registration.all_models ())
   in
 
