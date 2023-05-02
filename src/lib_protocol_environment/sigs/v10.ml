@@ -12352,6 +12352,30 @@ end
 
 (** Smart rollup addresses *)
 module Address : S.HASH
+
+(** Smart rollup commitment hashes *)
+module Commitment_hash : S.HASH
+
+(** Smart rollup PVM state hashes. Refer to
+    {!Tezos_crypto.Hashed.Smart_rollup_state_hash} in
+    [src/lib_crypto/smart_rollup_state_hash.mli] for documentation. *)
+module State_hash : sig
+  include S.HASH
+
+  val context_hash_to_state_hash : Context_hash.t -> t
+
+  type unreachable__use_context_hash_to_state_hash
+
+  val hash_bytes : unreachable__use_context_hash_to_state_hash
+
+  val hash_string : unreachable__use_context_hash_to_state_hash
+end
+
+(** Smart rollup inbox hashes *)
+module Inbox_hash : S.HASH
+
+(** Smart rollup merkelized payload hashes' hash *)
+module Merkelized_payload_hashes_hash : S.HASH
 end
 # 138 "v10.in.ml"
 

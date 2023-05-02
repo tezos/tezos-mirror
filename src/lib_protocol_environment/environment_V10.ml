@@ -125,6 +125,14 @@ module type T = sig
        and type Wasm_2_0_0.info = Tezos_scoru_wasm.Wasm_pvm_state.info
        and type Smart_rollup.Address.t =
         Tezos_crypto.Hashed.Smart_rollup_address.t
+       and type Smart_rollup.Commitment_hash.t =
+        Tezos_crypto.Hashed.Smart_rollup_commitment_hash.t
+       and type Smart_rollup.State_hash.t =
+        Tezos_crypto.Hashed.Smart_rollup_state_hash.t
+       and type Smart_rollup.Inbox_hash.t =
+        Tezos_crypto.Hashed.Smart_rollup_inbox_hash.t
+       and type Smart_rollup.Merkelized_payload_hashes_hash.t =
+        Tezos_crypto.Hashed.Smart_rollup_merkelized_payload_hashes_hash.t
 
   type error += Ecoproto_error of Error_monad.error
 
@@ -1468,5 +1476,11 @@ struct
 
   module Smart_rollup = struct
     module Address = Tezos_crypto.Hashed.Smart_rollup_address
+    module Commitment_hash = Tezos_crypto.Hashed.Smart_rollup_commitment_hash
+    module State_hash = Tezos_crypto.Hashed.Smart_rollup_state_hash
+    module Inbox_hash = Tezos_crypto.Hashed.Smart_rollup_inbox_hash
+
+    module Merkelized_payload_hashes_hash =
+      Tezos_crypto.Hashed.Smart_rollup_merkelized_payload_hashes_hash
   end
 end
