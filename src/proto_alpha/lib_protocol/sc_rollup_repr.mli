@@ -56,20 +56,8 @@ module Internal_for_tests : sig
   val originated_sc_rollup : Origination_nonce.t -> Address.t
 end
 
-module State_hash : sig
-  include S.HASH
-
-  (** [context_hash_to_state_hash ch] turns an (Irmin) context hash
-      into a state hash. *)
-  val context_hash_to_state_hash : Context_hash.t -> t
-
-  (* Hackish way to disable hash_bytes and hash_string to force people to use
-     context_hash_to_state_hash (without changing content of HASH.S) *)
-  type unreachable = |
-
-  val hash_bytes : unreachable -> t
-
-  val hash_string : unreachable -> t
+module State_hash : module type of struct
+  include Smart_rollup.State_hash
 end
 
 (** Number of ticks computed by a single commitment. This represents a claim

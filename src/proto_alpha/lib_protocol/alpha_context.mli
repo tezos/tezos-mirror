@@ -3258,16 +3258,8 @@ module Sc_rollup : sig
     end
   end
 
-  module State_hash : sig
-    include S.HASH
-
-    val context_hash_to_state_hash : Context_hash.t -> t
-
-    type unreachable = |
-
-    val hash_bytes : unreachable -> t
-
-    val hash_string : unreachable -> t
+  module State_hash : module type of struct
+    include Smart_rollup.State_hash
   end
 
   (** See {!Sc_rollup_metadata_repr}. *)
