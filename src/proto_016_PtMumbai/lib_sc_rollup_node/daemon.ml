@@ -539,6 +539,7 @@ module Make (PVM : Pvm.S) = struct
       let* () = Components.Commitment.Publisher.init node_ctxt in
       let* () = Components.Refutation_coordinator.init node_ctxt in
       let* () =
+        unless (signers = []) @@ fun () ->
         Injector.init
           node_ctxt.cctxt
           (Node_context.readonly node_ctxt)
