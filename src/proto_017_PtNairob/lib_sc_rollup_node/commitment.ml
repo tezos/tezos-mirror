@@ -139,17 +139,46 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
           compressed_state;
         }
 
+  let genesis_commitment (node_ctxt : _ Node_context.t) ctxt =
+    let open Lwt_result_syntax in
+    let*! pvm_state = PVM.State.find ctxt in
+    let*? pvm_state =
+      match pvm_state with
+      | Some pvm_state -> Ok pvm_state
+      | None -> error_with "PVM state for genesis commitment is not available"
+    in
+    let*! compressed_state = PVM.state_hash pvm_state in
+    let commitment =
+      Sc_rollup.Commitment.
+        {
+          predecessor = Hash.zero;
+          inbox_level = node_ctxt.genesis_info.level;
+          number_of_ticks = Sc_rollup.Number_of_ticks.zero;
+          compressed_state;
+        }
+    in
+    (* Ensure the initial state corresponds to the one of the rollup's in the
+       protocol. A mismatch is possible if a wrong external boot sector was
+       provided. *)
+    let commitment_hash = Sc_rollup.Commitment.hash_uncarbonated commitment in
+    let+ () =
+      fail_unless
+        Sc_rollup.Commitment.Hash.(
+          commitment_hash = node_ctxt.genesis_info.commitment_hash)
+        (Sc_rollup_node_errors.Invalid_genesis_state
+           {
+             expected = node_ctxt.genesis_info.commitment_hash;
+             actual = commitment_hash;
+           })
+    in
+    commitment
+
   let create_commitment_if_necessary (node_ctxt : _ Node_context.t) ~predecessor
       current_level ctxt =
     let open Lwt_result_syntax in
     if Raw_level.(current_level = node_ctxt.genesis_info.level) then
-      let+ genesis_commitment =
-        Plugin.RPC.Sc_rollup.commitment
-          node_ctxt.cctxt
-          (node_ctxt.cctxt#chain, `Head 0)
-          node_ctxt.rollup_address
-          node_ctxt.genesis_info.commitment_hash
-      in
+      let*! () = Commitment_event.compute_commitment current_level in
+      let+ genesis_commitment = genesis_commitment node_ctxt ctxt in
       Some genesis_commitment
     else
       let* last_commitment_hash =
