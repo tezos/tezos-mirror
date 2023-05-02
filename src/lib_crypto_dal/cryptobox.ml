@@ -267,9 +267,11 @@ module Inner = struct
 
       let raw_encoding = raw_encoding
 
-      let compare = compare
+      let compare a b =
+        if Bls12_381.G1.eq a b then 0
+        else Bytes.compare (Bls12_381.G1.to_bytes a) (Bls12_381.G1.to_bytes b)
 
-      let equal = ( = )
+      let equal = Bls12_381.G1.eq
 
       let hash _ =
         (* The commitment is not hashed. This is ensured by the
