@@ -41,12 +41,8 @@ let group =
     title = "Commands for working with Sapling transactions";
   }
 
-let keys_of_implicit_account cctxt (source : Protocol.Alpha_context.Contract.t)
-    =
-  match source with
-  | Originated _ -> assert false
-  | Implicit src ->
-      Client_keys.get_key cctxt src >>=? fun (_, pk, sk) -> return (src, pk, sk)
+let keys_of_implicit_account cctxt source =
+  Client_keys.get_key cctxt source >>=? fun (_, pk, sk) -> return (pk, sk)
 
 let viewing_key_of_string s =
   let exception Unknown_sapling_address in
@@ -139,7 +135,6 @@ let memo_size_arg =
 let shield_cmd =
   let open Client_proto_args in
   let open Client_proto_context_commands in
-  let open Protocol.Alpha_context in
   let open Client_proto_contracts in
   Tezos_clic.command
     ~group
@@ -159,7 +154,7 @@ let shield_cmd =
          ~name:"qty"
          ~desc:"Amount taken from transparent wallet of source."
     @@ Tezos_clic.prefix "from"
-    @@ Contract_alias.destination_param
+    @@ Client_keys.Public_key_hash.source_param
          ~name:"src-tz"
          ~desc:"Transparent source account."
     @@ Tezos_clic.prefix "to"
@@ -183,13 +178,13 @@ let shield_cmd =
          sapling_dst
          contract_dst
          cctxt ->
-      keys_of_implicit_account cctxt source >>=? fun (pkh, src_pk, src_sk) ->
+      keys_of_implicit_account cctxt source >>=? fun (src_pk, src_sk) ->
       let open Context in
       cctxt#warning
         "Shielding %a from %a to %s@ entails a loss of privacy@."
         Tez.pp
         amount
-        Contract.pp
+        Signature.Public_key_hash.pp
         source
         sapling_dst
       >>= fun () ->
@@ -205,7 +200,7 @@ let shield_cmd =
         ~src_pk
         ~src_sk
         ~destination:(Originated contract_dst)
-        ~source:pkh
+        ~source
         ~arg
         ?confirmations:cctxt#confirmations
         ?fee
@@ -228,7 +223,6 @@ let shield_cmd =
 let unshield_cmd =
   let open Client_proto_args in
   let open Client_proto_context_commands in
-  let open Protocol.Alpha_context in
   let open Client_proto_contracts in
   Tezos_clic.command
     ~group
@@ -251,7 +245,7 @@ let unshield_cmd =
          ~name:"src-sap"
          ~desc:"Sapling account of source."
     @@ Tezos_clic.prefix "to"
-    @@ Contract_alias.destination_param
+    @@ Client_keys.Public_key_hash.source_param
          ~name:"dst-tz"
          ~desc:"Transparent destination account."
     @@ Tezos_clic.prefix "using"
@@ -269,7 +263,7 @@ let unshield_cmd =
            fee_parameter )
          amount
          (name, _sapling_uri)
-         tz_dst
+         source
          contract_dst
          cctxt ->
       let open Context in
@@ -279,10 +273,10 @@ let unshield_cmd =
         Shielded_tez.pp
         stez
         name
-        Contract.pp
-        tz_dst
+        Signature.Public_key_hash.pp
+        source
       >>= fun () ->
-      keys_of_implicit_account cctxt tz_dst >>=? fun (source, src_pk, src_sk) ->
+      keys_of_implicit_account cctxt source >>=? fun (src_pk, src_sk) ->
       do_unshield cctxt contract_dst name stez source >>=? fun sapling_input ->
       let arg = sapling_transaction_as_arg sapling_input in
       Client_proto_context.transfer
@@ -423,7 +417,7 @@ let submit_shielded_cmd =
          ~name:"file"
          ~desc:"Filename of the forged transaction."
     @@ Tezos_clic.prefix "from"
-    @@ Contract_alias.destination_param
+    @@ Client_keys.Public_key_hash.source_param
          ~name:"alias-tz"
          ~desc:"Transparent account paying the fees."
     @@ Tezos_clic.prefix "using"
@@ -467,7 +461,7 @@ let submit_shielded_cmd =
       >>=? fun transaction ->
       return (sapling_transaction_as_arg transaction) >>=? fun contract_input ->
       let chain = cctxt#chain and block = cctxt#block in
-      keys_of_implicit_account cctxt source >>=? fun (source, src_pk, src_sk) ->
+      keys_of_implicit_account cctxt source >>=? fun (src_pk, src_sk) ->
       Client_proto_context.transfer
         cctxt
         ~chain
