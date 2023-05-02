@@ -135,8 +135,11 @@ let process_messages (node_ctxt : _ Node_context.t)
       inbox
       messages
   in
-  Metrics.Inbox.Stats.head_messages_list :=
-    messages_with_protocol_internal_messages ;
+  Metrics.Inbox.Stats.set
+    messages_with_protocol_internal_messages
+    ~is_internal:(function
+      | Sc_rollup.Inbox_message.Internal _ -> true
+      | External _ -> false) ;
   let* () =
     Node_context.save_messages
       node_ctxt

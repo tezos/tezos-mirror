@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
 open Prometheus
 
 let sc_rollup_node_registry = CollectorRegistry.create ()
@@ -55,10 +53,6 @@ let metric ~help ~name collector =
     LabelSetMap.singleton [] [Prometheus.Sample_set.sample (collector ())]
   in
   (info, collect)
-
-(** Registers a pre-collector in [sc_rollup_node_registry] *)
-let register_pre_collect =
-  CollectorRegistry.register_pre_collect sc_rollup_node_registry
 
 (** Registers a metric defined with [info] associated to its [collector] *)
 let add_metric (info, collector) =
@@ -153,22 +147,15 @@ module Info = struct
     let help = "Rollup node info" in
     v_labels_counter
       ~help
-      ~label_names:
-        ["rollup_address"; "mode"; "genesis_level"; "genesis_hash"; "pvm_kind"]
+      ~label_names:["rollup_address"; "mode"; "genesis_level"; "pvm_kind"]
       "rollup_node_info"
 
-  let init_rollup_node_info ~id ~mode ~genesis_level ~genesis_hash ~pvm_kind =
-    let id = Sc_rollup_repr.Address.to_b58check id in
+  let init_rollup_node_info ~id ~mode ~genesis_level ~pvm_kind =
+    let id = Tezos_crypto.Hashed.Smart_rollup_address.to_b58check id in
     let mode = Configuration.string_of_mode mode in
-    let genesis_level = Format.asprintf "%a" Raw_level.pp genesis_level in
-    let genesis_hash =
-      Format.asprintf "%a" Sc_rollup.Commitment.Hash.pp genesis_hash
-    in
-    let pvm_kind = Sc_rollup.Kind.to_string pvm_kind in
+    let genesis_level = Int32.to_string genesis_level in
     ignore
-    @@ Counter.labels
-         rollup_node_info
-         [id; mode; genesis_level; genesis_hash; pvm_kind] ;
+    @@ Counter.labels rollup_node_info [id; mode; genesis_level; pvm_kind] ;
     ()
 
   let () =
@@ -185,8 +172,6 @@ module Inbox = struct
   type t = {head_inbox_level : Gauge.t}
 
   module Stats = struct
-    let head_messages_list = ref []
-
     let internal_messages_number = ref 0.
 
     let external_messages_number = ref 0.
@@ -194,6 +179,17 @@ module Inbox = struct
     let zero () =
       internal_messages_number := 0. ;
       external_messages_number := 0.
+
+    let set ~is_internal l =
+      zero () ;
+      List.iter
+        (fun x ->
+          let r =
+            if is_internal x then internal_messages_number
+            else external_messages_number
+          in
+          r := !r +. 1.)
+        l
   end
 
   let metrics =
@@ -212,20 +208,6 @@ module Inbox = struct
         ~name:"head_inbox_external_messages_number"
         (fun () -> !Stats.external_messages_number)
     in
-    (* Registers a pre-collector to set the stats values
-       that be will be collected by metrics *)
-    register_pre_collect (fun () ->
-        Stats.zero () ;
-        List.iter
-          (fun message ->
-            match message with
-            | Sc_rollup.Inbox_message.Internal _ ->
-                Stats.internal_messages_number :=
-                  !Stats.internal_messages_number +. 1.
-            | External _ ->
-                Stats.external_messages_number :=
-                  !Stats.external_messages_number +. 1.)
-          !Stats.head_messages_list) ;
     List.iter
       add_metric
       [head_internal_messages_number; head_external_messages_number] ;

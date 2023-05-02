@@ -39,11 +39,10 @@ module Info : sig
   (** Initializes the metric for rollup info
       with a the given arguments as label values *)
   val init_rollup_node_info :
-    id:Protocol.Alpha_context.Sc_rollup.t ->
+    id:Tezos_crypto.Hashed.Smart_rollup_address.t ->
     mode:Configuration.mode ->
-    genesis_level:Protocol.Alpha_context.Raw_level.t ->
-    genesis_hash:Protocol.Alpha_context.Sc_rollup.Commitment.Hash.t ->
-    pvm_kind:Protocol.Alpha_context.Sc_rollup.Kind.t ->
+    genesis_level:int32 ->
+    pvm_kind:string ->
     unit
 end
 
@@ -54,9 +53,8 @@ module Inbox : sig
 
   (** The stats for the inboxes *)
   module Stats : sig
-    (** The list of messages from the head *)
-    val head_messages_list :
-      Protocol.Alpha_context.Sc_rollup.Inbox_message.t list ref
+    (** Set the number of messages from the head *)
+    val set : is_internal:('a -> bool) -> 'a list -> unit
   end
 
   (** The inboxes metrics *)
