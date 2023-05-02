@@ -2763,6 +2763,42 @@ let test_consecutive_commitments _protocol _rollup_node _rollup_client sc_rollup
   in
   unit
 
+let test_cement_ignore_commitment ~kind =
+  let commitment_period = 3 in
+  let challenge_window = 3 in
+  test_commitment_scenario
+    ~commitment_period
+    ~challenge_window
+    ~kind
+    ~variant:"cement_ignore_commitment"
+  @@ fun protocol _sc_rollup_node _sc_rollup_client sc_rollup node client ->
+  let sc_rollup_node =
+    Sc_rollup_node.create
+      ~protocol
+      Custom
+      node
+      ~base_dir:(Client.base_dir client)
+      ~operators:[("publish", Constant.bootstrap1.alias)]
+    (* Don't cement commitments *)
+  in
+  let* () =
+    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
+  in
+  let* _level = Sc_rollup_node.wait_sync ~timeout:3. sc_rollup_node in
+  let* _level = bake_until_lpc_updated client sc_rollup_node in
+  let* _level = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
+  let* () = bake_levels challenge_window client in
+  let* _level = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
+  let* () =
+    let hash =
+      (* zero commitment hash *)
+      "src12UJzB8mg7yU6nWPzicH7ofJbFjyJEbHvwtZdfRXi8DQHNp1LY8"
+    in
+    cement_commitment client ~sc_rollup ~hash
+  in
+  let* _level = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
+  unit
+
 (* Refutation game scenarios
    -------------------------
 *)
@@ -5168,6 +5204,7 @@ let register ~kind ~protocols =
     test_consecutive_commitments
     protocols
     ~kind ;
+  test_cement_ignore_commitment ~kind [Nairobi; Alpha] ;
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4373
      Uncomment this test as soon as the issue done.
      test_reinject_failed_commitment protocols ~kind ; *)
