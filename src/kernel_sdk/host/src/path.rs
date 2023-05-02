@@ -89,6 +89,28 @@ pub enum PathError {
     ReadOnly,
 }
 
+// TODO: use `core:error::Error` once `error_in_core` stabilised.
+//       <https://github.com/rust-lang/rust/issues/103765>
+#[cfg(feature = "std")]
+impl std::error::Error for PathError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
+}
+
+impl core::fmt::Display for PathError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::PathEmpty => write!(f, "PathError::PathEmpty"),
+            Self::PathTooLong => write!(f, "PathError::PathTooLong"),
+            Self::InvalidStart => write!(f, "PathError::InvalidStart"),
+            Self::InvalidEmptyStep => write!(f, "PathError::InvalidEmptyStep"),
+            Self::InvalidByteInStep => write!(f, "PathError::InvalidByteInStep"),
+            Self::ReadOnly => write!(f, "PathError:ReadOnly"),
+        }
+    }
+}
+
 /// Representation of a [`Path`] which borrows its underlying byte-sequence.
 ///
 /// Useful when either:
