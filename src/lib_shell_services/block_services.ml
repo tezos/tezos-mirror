@@ -492,7 +492,9 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             (obj1 (req "protocol" (constant next_protocol_hash)))
             (merge_objs
                (dynamic_size Operation.shell_header_encoding)
-               (dynamic_size Next_proto.operation_data_encoding)))
+               (dynamic_size
+                  Next_proto
+                  .operation_data_encoding_with_legacy_attestation_name)))
 
   type operation_receipt =
     | Empty
@@ -516,7 +518,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ~title:"Operation with too large metadata"
           (Tag 0)
           (merge_objs
-             Proto.operation_data_encoding
+             Proto.operation_data_encoding_with_legacy_attestation_name
              (obj1 (req "metadata" (constant "too large"))))
           (function
             | operation_data, Too_large -> Some (operation_data, ()) | _ -> None)
@@ -524,13 +526,13 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         case
           ~title:"Operation without metadata"
           (Tag 1)
-          Proto.operation_data_encoding
+          Proto.operation_data_encoding_with_legacy_attestation_name
           (function operation_data, Empty -> Some operation_data | _ -> None)
           (fun operation_data -> (operation_data, Empty));
         case
           ~title:"Operation with metadata"
           (Tag 2)
-          Proto.operation_data_and_receipt_encoding
+          Proto.operation_data_and_receipt_encoding_with_legacy_attestation_name
           (function
             | operation_data, Receipt receipt -> Some (operation_data, receipt)
             | _ -> None)
@@ -888,7 +890,9 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             ~input:(list next_operation_encoding)
             ~output:
               (list
-                 (dynamic_size Next_proto.operation_data_and_receipt_encoding))
+                 (dynamic_size
+                    Next_proto
+                    .operation_data_and_receipt_encoding_with_legacy_attestation_name))
             Tezos_rpc.Path.(path / "operations")
       end
 
@@ -1043,7 +1047,9 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                          (merge_objs
                             (obj1 (req "hash" Operation_hash.encoding))
                             (dynamic_size Operation.shell_header_encoding))
-                         (dynamic_size Next_proto.operation_data_encoding)))))
+                         (dynamic_size
+                            Next_proto
+                            .operation_data_encoding_with_legacy_attestation_name)))))
              (req
                 "refused"
                 (Operation_hash.Map.encoding
@@ -1129,7 +1135,9 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                          (merge_objs
                             (obj1 (req "hash" Operation_hash.encoding))
                             Operation.shell_header_encoding)
-                         (dynamic_size Next_proto.operation_data_encoding)))))
+                         (dynamic_size
+                            Next_proto
+                            .operation_data_encoding_with_legacy_attestation_name)))))
              (operations_with_error_encoding "refused")
              (operations_with_error_encoding "outdated")
              (operations_with_error_encoding "branch_refused")

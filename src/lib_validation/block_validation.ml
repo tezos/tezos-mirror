@@ -434,7 +434,7 @@ module Make (Proto : Registered_protocol.T) = struct
             let op_hash = Operation.hash op in
             match
               Data_encoding.Binary.of_bytes_opt
-                Proto.operation_data_encoding
+                Proto.operation_data_encoding_with_legacy_attestation_name
                 op.Operation.proto
             with
             | None ->
@@ -494,12 +494,14 @@ module Make (Proto : Registered_protocol.T) = struct
                     serializable/deserializable *)
                  let bytes =
                    Data_encoding.Binary.to_bytes_exn
-                     Proto.operation_receipt_encoding
+                     Proto
+                     .operation_receipt_encoding_with_legacy_attestation_name
                      receipt
                  in
                  let _ =
                    Data_encoding.Binary.of_bytes_exn
-                     Proto.operation_receipt_encoding
+                     Proto
+                     .operation_receipt_encoding_with_legacy_attestation_name
                      bytes
                  in
                  let metadata =
@@ -892,8 +894,10 @@ module Make (Proto : Registered_protocol.T) = struct
           match
             Data_encoding.Binary.(
               of_bytes_exn
-                Proto.operation_receipt_encoding
-                (to_bytes_exn Proto.operation_receipt_encoding receipt))
+                Proto.operation_receipt_encoding_with_legacy_attestation_name
+                (to_bytes_exn
+                   Proto.operation_receipt_encoding_with_legacy_attestation_name
+                   receipt))
           with
           | receipt -> Applied (pv, receipt)
           | exception exn ->
@@ -916,7 +920,9 @@ module Make (Proto : Registered_protocol.T) = struct
     | Some protocol_data -> return protocol_data
 
   let parse_unsafe (proto : bytes) : Proto.operation_data tzresult =
-    safe_binary_of_bytes Proto.operation_data_encoding proto
+    safe_binary_of_bytes
+      Proto.operation_data_encoding_with_legacy_attestation_name
+      proto
 
   let parse (raw : Operation.t) =
     let open Result_syntax in
