@@ -5,9 +5,12 @@ build_kernels:
   image: "${PROD_AWS_ECR}/rust-toolchain:v1.0.3"
   needs: [trigger]
   script:
-    - make -f kernels.mk build-deps
-    - CC=clang make -f kernels.mk build-kernels
+    - make -f kernels.mk build-dev-deps
+    - make -f kernels.mk check
+    - make -f kernels.mk build
+    - make -f kernels.mk test
   variables:
+    CC: clang
     CARGO_HOME: $CI_PROJECT_DIR/cargo
     NATIVE_TARGET: x86_64-unknown-linux-musl
   cache:
