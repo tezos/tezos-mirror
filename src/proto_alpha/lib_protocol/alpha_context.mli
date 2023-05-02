@@ -3898,7 +3898,7 @@ module Sc_rollup : sig
   end
 
   module Commitment : sig
-    module Hash : S.HASH
+    module Hash : S.HASH with type t = Smart_rollup.Commitment_hash.t
 
     type t = {
       compressed_state : State_hash.t;
