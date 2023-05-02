@@ -67,8 +67,6 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     alpha : scalar_input;
     beta : scalar_input;
     gamma : scalar_input;
-    beta_rc : scalar_input;
-    gamma_rc : scalar_input;
     delta : scalar_input;
     x : scalar_input;
     r : scalar_input;
@@ -136,8 +134,6 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       alpha = dummy_input;
       beta = dummy_input;
       gamma = dummy_input;
-      beta_rc = dummy_input;
-      gamma_rc = dummy_input;
       delta = dummy_input;
       x = dummy_input;
       r = dummy_input;
@@ -346,8 +342,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
        The identities are computed from evaluations, with the functions cs of Custom_gates & Permutation_gate
     *)
     let check_identities ~switches (n, generator) x rc_wires ids_batch
-        rc_selectors (q_names, selectors)
-        (alpha, beta, gamma, beta_rc, gamma_rc, delta)
+        rc_selectors (q_names, selectors) (alpha, beta, gamma, delta)
         (wires_g, wires, zg, z, zg_rc_perm, z_rc_perm) ss_list pi_list_list =
       let nb_rc = List.length rc_wires in
       (* We don’t care about wires_g value if it’s empty so we just take wires *)
@@ -438,8 +433,8 @@ module V (Main : Aggregation.Main_protocol.S) = struct
               ~sum_alpha_i
               ~l1
               ~ss_list
-              ~beta:beta_rc
-              ~gamma:gamma_rc
+              ~beta
+              ~gamma
               ~delta
               ~x
       in
@@ -535,13 +530,12 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     List.for_all2 Scalar.( = ) given computed
 
   (* Format verification circuit public inputs *)
-  let aggreg_public_inputs pi_size
-      (alpha, beta, gamma, beta_rc, gamma_rc, delta, x, r) batch ids_batch
-      compressed_switches outer_pi =
+  let aggreg_public_inputs pi_size (alpha, beta, gamma, delta, x, r) batch
+      ids_batch compressed_switches outer_pi =
     let batch = List.concat_map SMap.values batch |> List.map fst in
     let public_input =
       Array.of_list
-        ([alpha; beta; gamma; beta_rc; gamma_rc; delta; x; r]
+        ([alpha; beta; gamma; delta; x; r]
         @ batch
         @ [ids_batch; compressed_switches]
         @ outer_pi)
@@ -581,7 +575,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     let public =
       aggreg_public_inputs
         pi_size
-        (p.alpha, p.beta, p.gamma, p.beta_rc, p.gamma_rc, p.delta, p.x, p.r)
+        (p.alpha, p.beta, p.gamma, p.delta, p.x, p.r)
         batch
         ids_batch
         compressed_switches
@@ -629,8 +623,6 @@ module V (Main : Aggregation.Main_protocol.S) = struct
         alpha;
         beta;
         gamma;
-        beta_rc;
-        gamma_rc;
         delta;
         x;
         r;
@@ -696,8 +688,6 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     let* alpha = input ~kind:`Public alpha in
     let* beta = input ~kind:`Public beta in
     let* gamma = input ~kind:`Public gamma in
-    let* beta_rc = input ~kind:`Public beta_rc in
-    let* gamma_rc = input ~kind:`Public gamma_rc in
     let* delta = input ~kind:`Public delta in
     let* x = input ~kind:`Public x in
     let* r = input ~kind:`Public r in
@@ -740,7 +730,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
            ids_batch
            rc_selectors
            (q_names, selectors)
-           (alpha, beta, gamma, beta_rc, gamma_rc, delta)
+           (alpha, beta, gamma, delta)
            (switched_wires_g, switched_wires, zg, z, zg_rc_perm, z_rc_perm)
            ss_list
            switched_inner_pi

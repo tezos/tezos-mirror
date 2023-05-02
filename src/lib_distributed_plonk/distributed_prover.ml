@@ -281,10 +281,8 @@ module Make_common (MP : Distribution.Main_protocol.S) = struct
         transcript,
         ( cmt_perm_and_plook,
           commitment_wires,
-          randomness.beta_perm,
-          randomness.gamma_perm,
-          randomness.beta_rc,
-          randomness.gamma_rc,
+          randomness.beta,
+          randomness.gamma,
           randomness.delta ) )
 
   let distributed_prover_main ~workers ~inputs
@@ -298,7 +296,7 @@ module Make_common (MP : Distribution.Main_protocol.S) = struct
         (hash_verifier_inputs (to_verifier_inputs pp inputs))
         pp
     in
-    let* pp_proof, _transcript, (perm_and_plook, wires_cm, _, _, _, _, _) =
+    let* pp_proof, _transcript, (perm_and_plook, wires_cm, _, _, _) =
       distributed_prover ~workers ~pp_prove:pp_distributed_prove_main pp ~inputs
     in
     return {perm_and_plook; wires_cm; pp_proof}
@@ -418,7 +416,7 @@ module Super_impl (PI : Aplonk.Pi_parameters.S) = struct
     let pp = update_prv_pp_transcript_with_pi pp cms_pi in
     let* ( (pp_proof, PP.{answers; batch; alpha; x; r; cms_answers; t_answers}),
            _transcript,
-           (perm_and_plook, wires_cm, beta, gamma, beta_rc, gamma_rc, delta) ) =
+           (perm_and_plook, wires_cm, beta, gamma, delta) ) =
       distributed_prover
         ~workers
         ~pp_prove:
@@ -429,20 +427,7 @@ module Super_impl (PI : Aplonk.Pi_parameters.S) = struct
         ~inputs
     in
     let ids_batch =
-      (* TODO #5551
-         Implement Plookup
-      *)
-      let rd =
-        {
-          beta_perm = beta;
-          gamma_perm = gamma;
-          beta_plook = Scalar.one;
-          gamma_plook = Scalar.one;
-          beta_rc;
-          gamma_rc;
-          delta;
-        }
-      in
+      let rd = {beta; gamma; delta} in
       compute_ids_batch pp rd alpha x public_inputs_map answers cms_answers
     in
     return
@@ -453,8 +438,6 @@ module Super_impl (PI : Aplonk.Pi_parameters.S) = struct
           alpha;
           beta;
           gamma;
-          beta_rc;
-          gamma_rc;
           delta;
           x;
           r;

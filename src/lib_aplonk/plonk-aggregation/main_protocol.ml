@@ -62,8 +62,6 @@ module type S = sig
     alpha : scalar;
     beta : scalar;
     gamma : scalar;
-    beta_rc : scalar;
-    gamma_rc : scalar;
     delta : scalar;
     x : scalar;
     r : scalar;
@@ -79,8 +77,6 @@ module type S = sig
     alpha : scalar;
     beta : scalar;
     gamma : scalar;
-    beta_rc : scalar;
-    gamma_rc : scalar;
     delta : scalar;
     x : scalar;
     r : scalar;
@@ -119,8 +115,6 @@ module Make_impl (Super_PP : Polynomial_protocol.S) = struct
     alpha : scalar;
     beta : scalar;
     gamma : scalar;
-    beta_rc : scalar;
-    gamma_rc : scalar;
     delta : scalar;
     x : scalar;
     r : scalar;
@@ -134,8 +128,6 @@ module Make_impl (Super_PP : Polynomial_protocol.S) = struct
     alpha : scalar;
     beta : scalar;
     gamma : scalar;
-    beta_rc : scalar;
-    gamma_rc : scalar;
     delta : scalar;
     x : scalar;
     r : scalar;
@@ -229,10 +221,8 @@ module Make_impl (Super_PP : Polynomial_protocol.S) = struct
         answers;
         batch;
         alpha;
-        beta = rd.beta_perm;
-        gamma = rd.gamma_perm;
-        beta_rc = rd.beta_rc;
-        gamma_rc = rd.gamma_rc;
+        beta = rd.beta;
+        gamma = rd.gamma;
         delta = rd.delta;
         x;
         r;
@@ -269,16 +259,7 @@ module Make_impl (Super_PP : Polynomial_protocol.S) = struct
         proof.pp_proof
     in
     ( kzg_verif,
-      {
-        alpha;
-        beta = rd.beta_perm;
-        gamma = rd.gamma_perm;
-        beta_rc = rd.beta_rc;
-        gamma_rc = rd.gamma_rc;
-        delta = rd.delta;
-        x;
-        r;
-      } )
+      {alpha; beta = rd.beta; gamma = rd.gamma; delta = rd.delta; x; r} )
 
   let get_gen_n_prover (prover_public_params : prover_public_parameters) =
     ( Domain.get prover_public_params.common_pp.domain 1,

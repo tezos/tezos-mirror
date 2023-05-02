@@ -41,15 +41,7 @@ module type S = sig
 
   include Plonk.Main_protocol_intf.S with type proof := proof
 
-  type gate_randomness = {
-    beta_perm : Scalar.t;
-    gamma_perm : Scalar.t;
-    beta_plook : Scalar.t;
-    gamma_plook : Scalar.t;
-    beta_rc : Scalar.t;
-    gamma_rc : Scalar.t;
-    delta : Scalar.t;
-  }
+  type gate_randomness = {beta : Scalar.t; gamma : Scalar.t; delta : Scalar.t}
 
   val build_gates_randomness : bytes -> gate_randomness * bytes
 
@@ -144,12 +136,7 @@ module type S = sig
   }
   [@@deriving repr]
 
-  type commit_to_plook_rc_remember = {
-    beta_plook : scalar;
-    gamma_plook : scalar;
-    beta_rc : scalar;
-    gamma_rc : scalar;
-  }
+  type commit_to_plook_rc_remember = {beta : scalar; gamma : scalar}
 
   val commit_to_plook_rc :
     prover_public_parameters ->
@@ -234,12 +221,7 @@ module Common (PP : Polynomial_protocol.S) = struct
   }
   [@@deriving repr]
 
-  type commit_to_plook_rc_remember = {
-    beta_plook : scalar;
-    gamma_plook : scalar;
-    beta_rc : scalar;
-    gamma_rc : scalar;
-  }
+  type commit_to_plook_rc_remember = {beta : scalar; gamma : scalar}
 
   type commit_to_wires_remember = {
     all_f_wires : Poly.t SMap.t;
@@ -287,12 +269,7 @@ module Common (PP : Polynomial_protocol.S) = struct
       PP.PC.Commitment.commit ~all_keys pp.common_pp.pp_public_parameters f_map
     in
     ( {batched_wires_map; cmt; f_map; prover_aux},
-      {
-        beta_plook = rd.beta_plook;
-        gamma_plook = rd.gamma_plook;
-        beta_rc = rd.beta_rc;
-        gamma_rc = rd.gamma_rc;
-      } )
+      {beta = rd.beta; gamma = rd.gamma} )
 
   let batch_evaluated_ids ~alpha evaluated_ids all_ids_keys =
     let powers_map =

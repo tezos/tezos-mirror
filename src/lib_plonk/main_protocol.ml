@@ -185,26 +185,15 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       verifier_inputs ;
     finish st
 
-  type gate_randomness = {
-    beta_perm : scalar;
-    gamma_perm : scalar;
-    beta_plook : scalar;
-    gamma_plook : scalar;
-    beta_rc : scalar;
-    gamma_rc : scalar;
-    delta : scalar;
-  }
+  type gate_randomness = {beta : scalar; gamma : scalar; delta : scalar}
 
   let build_gates_randomness transcript =
-    let betas_gammas, transcript = Fr_generation.random_fr_list transcript 7 in
-    let beta_perm = List.hd betas_gammas in
-    let gamma_perm = List.nth betas_gammas 1 in
-    let beta_plook = List.nth betas_gammas 2 in
-    let gamma_plook = List.nth betas_gammas 3 in
-    let beta_rc = List.nth betas_gammas 4 in
-    let gamma_rc = List.nth betas_gammas 5 in
-    let delta = List.nth betas_gammas 6 in
-    ( {beta_perm; gamma_perm; beta_plook; gamma_plook; beta_rc; gamma_rc; delta},
+    let betas_gammas, transcript = Fr_generation.random_fr_list transcript 3 in
+    ( {
+        beta = List.hd betas_gammas;
+        gamma = List.nth betas_gammas 1;
+        delta = List.nth betas_gammas 2;
+      },
       transcript )
 
   module Prover = struct
@@ -475,8 +464,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       (wires_list_map, f_wires, f_blinds, all_f_wires, cm_wires, cm_aux_wires)
 
     (* For each circuits, compute the shared Z polynomial *)
-    let build_f_map_perm pp {beta_perm = beta; gamma_perm = gamma; _}
-        batched_wires =
+    let build_f_map_perm pp {beta; gamma; _} batched_wires =
       SMap.mapi
         (fun name values ->
           let circuit_pp = SMap.find name pp.circuits_map in
@@ -506,8 +494,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       |> SMap.Aggregation.smap_of_smap_smap
 
     (* For each circuit, computes Plookup-specific polynomials *)
-    let build_f_map_plook ?shifts_map pp
-        {beta_plook = beta; gamma_plook = gamma; _} wires_list_map =
+    let build_f_map_plook ?shifts_map pp rd wires_list_map =
       SMap.mapi
         (fun name w_list ->
           let circuit_pp = SMap.find name pp.circuits_map in
@@ -521,8 +508,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                     ~gates:circuit_pp.gates
                     ~tables:circuit_pp.tables
                     ~alpha:circuit_pp.alpha
-                    ~beta
-                    ~gamma
+                    ~beta:rd.beta
+                    ~gamma:rd.gamma
                     ~domain:pp.common_pp.domain
                 in
                 if pp.common_pp.zk then
@@ -534,8 +521,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         wires_list_map
       |> SMap.Aggregation.gather_maps ?shifts_map
 
-    let build_f_map_rc_2 pp {beta_rc = beta; gamma_rc = gamma; _} batched_values
-        =
+    let build_f_map_rc_2 pp rd batched_values =
       SMap.mapi
         (fun name values ->
           let circuit_pp = SMap.find name pp.circuits_map in
@@ -544,8 +530,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
             let zs =
               RangeCheck.f_map_contribution_2
                 ~permutations:circuit_pp.rc_permutations
-                ~beta
-                ~gamma
+                ~beta:rd.beta
+                ~gamma:rd.gamma
                 ~domain:pp.common_pp.domain
                 ~values
             in
@@ -606,8 +592,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
             Perm.prover_identities
               ~circuit_prefix
               ~wires_names
-              ~beta:rd.beta_perm
-              ~gamma:rd.gamma_perm
+              ~beta:rd.beta
+              ~gamma:rd.gamma
               ~n:pp.common_pp.n
               ()
           in
@@ -618,8 +604,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
               RangeCheck.prover_identities_2
                 ~range_checks
                 ~circuit_prefix
-                ~beta:rd.beta_rc
-                ~gamma:rd.gamma_rc
+                ~beta:rd.beta
+                ~gamma:rd.gamma
                 ~domain_size:pp.common_pp.n
                 ()
             in
@@ -627,8 +613,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         pp.circuits_map
       |> SMap.values |> merge_prover_identities
 
-    let build_gates_plook_rc1_identities ?shifts_map pp
-        {beta_plook; gamma_plook; _} inputs_map =
+    let build_gates_plook_rc1_identities ?shifts_map pp rd inputs_map =
       let identities_map =
         SMap.mapi
           (fun circuit_name inputs_list ->
@@ -683,8 +668,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                       ~proof_prefix:(proof_prefix i)
                       ~wires_names
                       ~alpha:circuit_pp.alpha
-                      ~beta:beta_plook
-                      ~gamma:gamma_plook
+                      ~beta:rd.beta
+                      ~gamma:rd.gamma
                       ~n:pp.common_pp.n
                       ())
                   inputs_list
@@ -864,8 +849,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                 ~nb_proofs
                 ~generator
                 ~n
-                ~beta:rd.beta_perm
-                ~gamma:rd.gamma_perm
+                ~beta:rd.beta
+                ~gamma:rd.gamma
                 ~delta:rd.delta
                 ()
             in
@@ -893,8 +878,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                       ~generator
                       ~n
                       ~alpha:circuit_pp.alpha
-                      ~beta:rd.beta_plook
-                      ~gamma:rd.gamma_plook
+                      ~beta:rd.beta
+                      ~gamma:rd.gamma
                       ~proof_prefix:(proof_prefix i)
                       ())
             in
@@ -916,8 +901,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                   ~range_checks
                   ~circuit_prefix
                   ~nb_proofs
-                  ~beta:rd.beta_rc
-                  ~gamma:rd.gamma_rc
+                  ~beta:rd.beta
+                  ~gamma:rd.gamma
                   ~delta:rd.delta
                   ~domain_size:n
                   ~generator
