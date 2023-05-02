@@ -1260,8 +1260,8 @@ let test_handle_iwant_msg_cached_shifted rng limits parameters =
                else
                  Test.fail
                    ~__LOC__
-                   "Expected IWant to return the message in cache at heartbeat \
-                    count %d."
+                   "Expected IWant to not return the message in cache at \
+                    heartbeat count %d."
                    heartbeat_count
            | Some `Not_found ->
                if heartbeat_count >= limits.history_length then
@@ -1270,7 +1270,8 @@ let test_handle_iwant_msg_cached_shifted rng limits parameters =
                else
                  Test.fail
                    ~__LOC__
-                   "Expected IWant to return `Not_found at heartbeat count %d."
+                   "Expected IWant to not return `Not_found at heartbeat count \
+                    %d."
                    heartbeat_count)
          state
   in

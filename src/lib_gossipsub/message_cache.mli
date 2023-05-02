@@ -23,21 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A sliding window cache of published messages. The module also keeps track of
-    the number of accesses to a message by a peer, thus indirectly tracking the
-    number of IWant requests a peer makes for the same message.
+(** A sliding window cache that stores published messages and their first seen time.
+    The module also keeps track of the number of accesses to a message by a peer,
+    thus indirectly tracking the number of IWant requests a peer makes for the same message.
 
-    The module assumes that no two messages have the same message id. However,
+    The module assumes that no two different messages have the same message id. However,
     the cache stores duplicates; for instance, if [add_message id msg topic] is
     called twice, then [msg] will appear (at least) twice in
     [get_message_ids_to_gossip]'s result (assuming not more than [gossip_slots]
     shifts have been executed in the meanwhile).
 *)
-module Make (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) : sig
+module Make
+    (C : Gossipsub_intf.AUTOMATON_SUBCONFIG)
+    (Time : Gossipsub_intf.TIME) : sig
   type t
 
-  (** [create ~history_slots ~gossip_slots] creates a sliding window cache of
-      length [history_slots].
+  (** [create ~history_slots ~gossip_slots ~seen_message_slots] creates two
+      sliding window caches, one with length [history_slots] for storing message contents
+      and another with length [seen_message] for storing seen messages and their first
+      seen times.
 
       When queried for messages to advertise, the cache only returns messages in
       the last [gossip_slots]. The [gossip_slots] must be smaller or equal to
@@ -49,7 +53,8 @@ module Make (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) : sig
 
       TODO: https://gitlab.com/tezos/tezos/-/issues/5129
       Error handling. *)
-  val create : history_slots:int -> gossip_slots:int -> t
+  val create :
+    history_slots:int -> gossip_slots:int -> seen_message_slots:int -> t
 
   (** Add message to the most recent cache slot. If the message already exists
       in the cache, the message is not overridden, instead a duplicate is
@@ -67,6 +72,15 @@ module Make (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) : sig
       be duplicates in the output. There is no guarantee about the order of
       messages in the output. *)
   val get_message_ids_to_gossip : C.Topic.t -> t -> C.Message_id.t list
+
+  (** [get_first_seen_time message_id t] returns the time the message with [message_id]
+      was first seen. Returns [None] if the message was not seen during the period
+      covered by the sliding window. *)
+  val get_first_seen_time : C.Message_id.t -> t -> Time.t option
+
+  (** [seen_message message_id t] returns [true] if the message was seen during the
+      period covered by the sliding window and returns [false] if otherwise. *)
+  val seen_message : C.Message_id.t -> t -> bool
 
   (** Shift the sliding window by one slot (usually corresponding to one
       heartbeat tick). *)

@@ -312,7 +312,9 @@ module Test_message_cache = struct
       let* gossip_slots in
       let* actions in
       let left =
-        try L.create ~history_slots ~gossip_slots |> Either.left
+        try
+          L.create ~history_slots ~gossip_slots ~seen_message_slots:10
+          |> Either.left
         with exn -> Either.right exn
       in
       let right =
