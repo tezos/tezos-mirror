@@ -57,6 +57,8 @@ module Prefix : sig
 
   val smart_rollup_address : string
 
+  val smart_rollup_commitment : string
+
   val cryptobox_public_key_hash : string
 
   val ed25519_seed : string

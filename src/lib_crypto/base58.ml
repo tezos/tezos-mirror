@@ -398,6 +398,8 @@ module Prefix = struct
 
   let p256_secret_key = "\016\081\238\189" (* p2sk(54) *)
 
+  let smart_rollup_commitment = "\017\165\134\138" (* src1(54) *)
+
   (* 56 *)
   let ed25519_encrypted_seed = "\007\090\060\179\041" (* edesk(88) *)
 
