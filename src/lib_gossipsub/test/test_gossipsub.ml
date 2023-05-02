@@ -49,6 +49,7 @@ let score_parameters =
     topics = per_topic_score_parameters;
     behaviour_penalty_weight = ~-.10.0;
     behaviour_penalty_threshold = 0.0;
+    app_specific_weight = 10.;
   }
 
 (* Most of these limits are the default ones used by the Go implementation. *)

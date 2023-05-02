@@ -157,11 +157,12 @@ type ('topic, 'span) score_parameters = {
   topics : ('topic, 'span) topic_score_parameters;
       (** Per-topic score parameters. *)
   behaviour_penalty_weight : float;
-      (** The weight of the score associated to the behaviour penalty. This
+      (** P7: The weight of the score associated to the behaviour penalty. This
           parameter must be negative. *)
   behaviour_penalty_threshold : float;
       (** The threshold on the behaviour penalty
           counter above which we start penalizing the peer. *)
+  app_specific_weight : float;  (** P5: Application-specific peer scoring *)
 }
 
 type ('topic, 'peer, 'message_id, 'span) limits = {
@@ -301,6 +302,7 @@ type ('peer, 'message_id) parameters = {
     - P3b: Trigger P3 computation when the peer gets pruned or removed, so as to not forget yet unaccounted for bad message
       delivery counts.
     - P4: For each topic, penalize peers sending invalid messages on that topic.
+    - P5: The applicative layer can assign an arbitrary application-specific score to a peer.
     - P7: When a peer is pruned from the mesh for a topic, we install a backoff that
       prevents that peer from regrafting too soon. If the peer does not respect this backoff,
       it is penalized.
@@ -359,6 +361,10 @@ module type SCORE = sig
   (** [invalid_message_delivered ps topic] increments the counter related to
       invalid messages sent by the associated peer. *)
   val invalid_message_delivered : t -> topic -> t
+
+  (** [set_application_score ps score] sets the application-specific score. This score can
+      be positive or negative.  *)
+  val set_application_score : t -> float -> t
 
   (** [refresh ps] returns [Some ps'] with [ps'] a refreshed score record or [None]
       if the score expired. Refreshing a [ps] allows to update time-dependent spects
@@ -452,6 +458,8 @@ module type AUTOMATON = sig
   type subscribe = {topic : Topic.t; peer : Peer.t}
 
   type unsubscribe = {topic : Topic.t; peer : Peer.t}
+
+  type set_application_score = {peer : Peer.t; score : float}
 
   (** Output produced by one of the actions below. *)
   type _ output =
@@ -582,6 +590,8 @@ module type AUTOMATON = sig
     | Unsubscribe_from_unknown_peer : [`Unsubscribe] output
         (** The output returned when we receive an unsubscribe message from a
             peer we don't know.*)
+    | Set_application_score : [`Set_application_score] output
+        (** The output returned when we set the application score of a peer *)
 
   (** A type alias for the state monad. *)
   type 'a monad := state -> state * 'a output
@@ -648,6 +658,11 @@ module type AUTOMATON = sig
       returns the set of peers, forming the mesh, that have been pruned for that
       topic. *)
   val leave : leave -> [`Leave] monad
+
+  (** [set_application_score {peer; score}] handles setting the application score
+      of [peer]. If the peer is not known, this does nothing. *)
+  val set_application_score :
+    set_application_score -> [`Set_application_score] monad
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5352
      Handle the random state explicitly for [select_px_peers] and
