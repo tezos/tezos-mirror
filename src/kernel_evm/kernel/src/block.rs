@@ -217,6 +217,17 @@ mod tests {
         }
     }
 
+    fn get_balance(
+        host: &mut MockHost,
+        evm_account_storage: &mut EthereumAccountStorage,
+        address: &H160,
+    ) -> U256 {
+        let account = evm_account_storage
+            .get_or_create_account(host, &account_path(address).unwrap())
+            .unwrap();
+        account.balance(host).unwrap()
+    }
+
     fn dummy_eth_transaction() -> EthereumTransactionCommon {
         // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
         let nonce = U256::from(0);
@@ -312,5 +323,48 @@ mod tests {
             Ok(TransactionStatus::Success) => (),
             Err(_) => panic!("Reading the receipt failed."),
         }
+    }
+
+    #[test]
+    // Test if several valid transactions can be performed
+    fn test_several_valid_transactions() {
+        let mut host = MockHost::default();
+        let _ = genesis::init_block(&mut host);
+
+        let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
+        let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
+
+        let transactions = vec![
+            Transaction {
+                tx_hash: tx_hash_0,
+                tx: dummy_eth_transaction(),
+            },
+            Transaction {
+                tx_hash: tx_hash_1,
+                tx: dummy_eth_transaction(),
+            },
+        ];
+
+        let queue = Queue {
+            proposals: vec![Blueprint { transactions }],
+        };
+
+        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &sender,
+            U256::from(10000000000000000000u64),
+        );
+
+        produce(&mut host, queue).expect("The block production failed.");
+
+        let dest_address =
+            H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
+        let dest_balance =
+            get_balance(&mut host, &mut evm_account_storage, &dest_address);
+
+        assert_eq!(dest_balance, U256::from(10000000000000000u64))
     }
 }
