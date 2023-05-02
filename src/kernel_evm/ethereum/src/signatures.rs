@@ -23,26 +23,34 @@ use sha3::{Digest, Keccak256};
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
+pub enum ParityError {
+    #[error("Couldn't reconstruct V from chain_id: {0}")]
+    ChainId(U256),
+
+    #[error("Couldn't reconstruct parity from V: {0}")]
+    V(U256),
+}
+#[derive(Error, Debug, PartialEq)]
 pub enum TransactionError {
-    #[error("Error reading a hex string")]
+    #[error("Error reading a hex string: {0}")]
     HexError(#[from] FromHexError),
 
-    #[error("Error decoding RLP encoded byte array")]
+    #[error("Error decoding RLP encoded byte array: {0}")]
     DecoderError(#[from] DecoderError),
 
     #[error("Error extracting a slice")]
     SlicingError,
 
-    #[error("Error manipulating ECDSA key")]
-    ECDSAError,
+    #[error("Error manipulating ECDSA key: {0}")]
+    ECDSAError(libsecp256k1::Error),
 
-    #[error("Error recomputing parity of signature")]
-    Parity,
+    #[error("Error recomputing parity of signature: {0}")]
+    Parity(ParityError),
 }
 
 impl From<libsecp256k1::Error> for TransactionError {
-    fn from(_: libsecp256k1::Error) -> Self {
-        Self::ECDSAError
+    fn from(e: libsecp256k1::Error) -> Self {
+        Self::ECDSAError(e)
     }
 }
 
@@ -154,7 +162,9 @@ impl EthereumTransactionCommon {
         let mut s = Scalar([0; 8]);
         let _ = s.set_b32(&s1);
         // recompute parity from v and chain_id
-        let ri_val = self.compute_parity().ok_or(TransactionError::Parity)?;
+        let ri_val = self
+            .compute_parity()
+            .ok_or(TransactionError::Parity(ParityError::V(self.v)))?;
         let ri = RecoveryId::parse(ri_val.byte(0))?;
         Ok((Signature { r, s }, ri))
     }
@@ -198,7 +208,9 @@ impl EthereumTransactionCommon {
         let (r, s) = (H256::from(r.b32()), H256::from(s.b32()));
 
         let parity: u8 = ri.into();
-        let v = self.compute_v(parity).ok_or(TransactionError::Parity)?;
+        let v = self.compute_v(parity).ok_or(TransactionError::Parity(
+            ParityError::ChainId(self.chain_id),
+        ))?;
         Ok(EthereumTransactionCommon {
             v,
             r,
