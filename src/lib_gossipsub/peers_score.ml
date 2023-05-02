@@ -65,23 +65,24 @@ struct
     mesh_status : mesh_status;
         (** [mesh_status] tracks whether the associated peer is in the mesh or not.
             This field is updated when pruning, grafting or removing the associated peer. *)
-    first_message_deliveries : int;
+    first_message_deliveries : float;
         (** The number of messages on this topic that the associated peer was the first to deliver. *)
     mesh_message_deliveries_active : bool;
         (** A flag indicating whether we started evaluating the score associated to mesh messages deliveries. *)
-    mesh_message_deliveries : int;
+    mesh_message_deliveries : float;
         (** The number of first or near-first messages delivered on this topic by
             the associated mesh peer. *)
-    mesh_failure_penalty : int;
+    mesh_failure_penalty : float;
         (** The score penalty induced on the associated peer when pruned or removed due
             to a mesh message delivery deficit. *)
-    invalid_messages : int;
+    invalid_messages : float;
         (** The number of invalid messages sent by the associated mesh peer. *)
   }
 
   type stats = {
-    behaviour_penalty : int;  (** The score associated to a peer. *)
-    application_score : float;  (** Application-specific score. *)
+    behaviour_penalty : float;
+        (** P7: The behavioural score associated to a peer. *)
+    application_score : float;  (** P5: Application-specific score. *)
     topic_status : topic_status Topic.Map.t;
     peer_status : peer_status;
     parameters : (topic, span) score_parameters;
@@ -123,7 +124,7 @@ struct
   let p2 topic_parameters {first_message_deliveries; _} =
     let weighted_deliveries =
       topic_parameters.first_message_deliveries_weight
-      *. float_of_int first_message_deliveries
+      *. first_message_deliveries
     in
     weighted_deliveries
 
@@ -131,23 +132,25 @@ struct
       {mesh_message_deliveries; mesh_message_deliveries_active; _} =
     if
       mesh_message_deliveries_active
-      && mesh_message_deliveries < mesh_message_deliveries_threshold
+      && mesh_message_deliveries
+         < float_of_int mesh_message_deliveries_threshold
     then
       let deficit =
-        mesh_message_deliveries_threshold - mesh_message_deliveries
+        float_of_int mesh_message_deliveries_threshold
+        -. mesh_message_deliveries
       in
-      deficit * deficit
-    else 0
+      deficit *. deficit
+    else 0.
 
   let p3 params status =
     let penalty = mesh_message_delivery_penalty params status in
-    float_of_int penalty *. params.mesh_message_deliveries_weight
+    penalty *. params.mesh_message_deliveries_weight
 
   let p3b {mesh_failure_penalty_weight; _} {mesh_failure_penalty; _} =
-    float_of_int mesh_failure_penalty *. mesh_failure_penalty_weight
+    mesh_failure_penalty *. mesh_failure_penalty_weight
 
   let p4 {invalid_message_deliveries_weight; _} {invalid_messages; _} =
-    float_of_int invalid_messages *. invalid_message_deliveries_weight
+    invalid_messages *. invalid_message_deliveries_weight
 
   let topic_scores {parameters; topic_status; _} =
     Topic.Map.fold
@@ -168,7 +171,7 @@ struct
     application_score *. parameters.app_specific_weight
 
   let p7 {behaviour_penalty; parameters; _} =
-    let penalty = float_of_int behaviour_penalty in
+    let penalty = behaviour_penalty in
     if penalty > parameters.behaviour_penalty_threshold then
       let excess = penalty -. parameters.behaviour_penalty_threshold in
       excess *. excess *. parameters.behaviour_penalty_weight
@@ -180,6 +183,10 @@ struct
     let p7 = p7 ps in
     topic_scores +. p5 +. p7
 
+  let decay ~decay_zero ~decay_rate value =
+    let decayed = value *. decay_rate in
+    if decayed < decay_zero then 0.0 else decayed
+
   let make stats = {stats; score = Lazy.from_fun (fun () -> float stats)}
 
   let value ps = Lazy.force ps.score
@@ -187,7 +194,7 @@ struct
   let newly_connected parameters : t =
     make
       {
-        behaviour_penalty = 0;
+        behaviour_penalty = 0.0;
         application_score = 0.0;
         topic_status = Topic.Map.empty;
         peer_status = Connected;
@@ -195,7 +202,11 @@ struct
       }
 
   let penalty {stats; _} penalty =
-    make {stats with behaviour_penalty = stats.behaviour_penalty + penalty}
+    make
+      {
+        stats with
+        behaviour_penalty = stats.behaviour_penalty +. float_of_int penalty;
+      }
 
   let set_connected {stats; _} = make {stats with peer_status = Connected}
 
@@ -208,11 +219,11 @@ struct
     let mesh_status = fresh_mesh_status () in
     {
       mesh_status;
-      first_message_deliveries = 0;
+      first_message_deliveries = 0.0;
       mesh_message_deliveries_active = false;
-      mesh_message_deliveries = 0;
-      mesh_failure_penalty = 0;
-      invalid_messages = 0;
+      mesh_message_deliveries = 0.0;
+      mesh_failure_penalty = 0.0;
+      invalid_messages = 0.0;
     }
 
   let expires {stats; _} =
@@ -248,7 +259,7 @@ struct
                status with
                mesh_status = Inactive;
                mesh_message_deliveries_active = false;
-               mesh_failure_penalty = status.mesh_failure_penalty + penalty;
+               mesh_failure_penalty = status.mesh_failure_penalty +. penalty;
              }))
         stats.topic_status
     in
@@ -274,13 +285,13 @@ struct
                     get_topic_params stats.parameters topic
                   in
                   status.mesh_failure_penalty
-                  + mesh_message_delivery_penalty topic_parameters status
+                  +. mesh_message_delivery_penalty topic_parameters status
               | Inactive -> status.mesh_failure_penalty
             in
             {
               status with
               mesh_status = Inactive;
-              first_message_deliveries = 0;
+              first_message_deliveries = 0.0;
               mesh_message_deliveries_active = false;
               mesh_failure_penalty;
             })
@@ -295,18 +306,18 @@ struct
   let increment_first_message_deliveries parameters topic ts =
     let cap =
       let topic_parameters = get_topic_params parameters topic in
-      topic_parameters.first_message_deliveries_cap
+      topic_parameters.first_message_deliveries_cap |> float_of_int
     in
-    Int.min cap (ts.first_message_deliveries + 1)
+    Float.min cap (ts.first_message_deliveries +. 1.)
 
   let increment_mesh_message_deliveries parameters topic ts =
     match ts.mesh_status with
     | Active _ ->
         let cap =
           let topic_parameters = get_topic_params parameters topic in
-          topic_parameters.mesh_message_deliveries_cap
+          topic_parameters.mesh_message_deliveries_cap |> float_of_int
         in
-        Int.min cap (ts.mesh_message_deliveries + 1)
+        Float.min cap (ts.mesh_message_deliveries +. 1.)
     | Inactive -> ts.mesh_message_deliveries
 
   let first_message_delivered ({stats; _} : t) (topic : Topic.t) =
@@ -362,7 +373,7 @@ struct
     make {stats with topic_status}
 
   let invalid_message_delivered ({stats; _} : t) (topic : Topic.t) =
-    let increment ts = {ts with invalid_messages = ts.invalid_messages + 1} in
+    let increment ts = {ts with invalid_messages = ts.invalid_messages +. 1.} in
     let topic_status =
       Topic.Map.update
         topic
@@ -389,7 +400,9 @@ struct
     | Inactive -> Span.zero
     | Active {during; _} -> during
 
-  let refresh_topic_status_map now {stats; _} =
+  let refresh_stats now {stats; _} =
+    let parameters = stats.parameters in
+    let decay_zero = parameters.decay_zero in
     let topic_status =
       Topic.Map.mapi
         (fun topic status ->
@@ -400,14 +413,52 @@ struct
               topic_parameters.mesh_message_deliveries_activation
               <= time_active_in_mesh mesh_status)
           in
-          {status with mesh_status; mesh_message_deliveries_active})
+          (* Apply decay to counters *)
+          let first_message_deliveries =
+            decay
+              ~decay_zero
+              ~decay_rate:topic_parameters.first_message_deliveries_decay
+              status.first_message_deliveries
+          in
+          let mesh_message_deliveries =
+            decay
+              ~decay_zero
+              ~decay_rate:topic_parameters.mesh_message_deliveries_decay
+              status.mesh_message_deliveries
+          in
+          let mesh_failure_penalty =
+            decay
+              ~decay_zero
+              ~decay_rate:topic_parameters.mesh_failure_penalty_decay
+              status.mesh_failure_penalty
+          in
+          let invalid_messages =
+            decay
+              ~decay_zero
+              ~decay_rate:topic_parameters.invalid_message_deliveries_decay
+              status.invalid_messages
+          in
+          {
+            mesh_status;
+            mesh_message_deliveries_active;
+            first_message_deliveries;
+            mesh_message_deliveries;
+            mesh_failure_penalty;
+            invalid_messages;
+          })
         stats.topic_status
     in
-    make {stats with topic_status}
+    let behaviour_penalty =
+      decay
+        ~decay_zero
+        ~decay_rate:parameters.behaviour_penalty_decay
+        stats.behaviour_penalty
+    in
+    make {stats with topic_status; behaviour_penalty}
 
   let refresh ps =
     let current = Time.now () in
-    let refresh () = Some (refresh_topic_status_map current ps) in
+    let refresh () = Some (refresh_stats current ps) in
     match ps.stats.peer_status with
     | Connected -> refresh ()
     | Disconnected {expires = at} when Time.(at > current) -> refresh ()
@@ -451,7 +502,7 @@ struct
     let open Dump in
     record
       [
-        field "behaviour_penalty" (fun s -> s.behaviour_penalty) int;
+        field "behaviour_penalty" (fun s -> s.behaviour_penalty) float;
         field "topic_status" (fun s -> s.topic_status) pp_topic_status_map;
         field "peer_status" (fun s -> s.peer_status) pp_peer_status;
         (* Don't print parameters back *)

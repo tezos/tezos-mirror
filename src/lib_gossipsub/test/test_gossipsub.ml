@@ -35,13 +35,17 @@ let per_topic_score_parameters =
       time_in_mesh_quantum = 1.0;
       first_message_deliveries_weight = 1.0;
       first_message_deliveries_cap = 2000;
+      first_message_deliveries_decay = 0.5;
       mesh_message_deliveries_weight = ~-.1.0;
       mesh_message_deliveries_window = Milliseconds.of_int_ms 10;
       mesh_message_deliveries_activation = Milliseconds.of_int_s 5;
       mesh_message_deliveries_cap = 100;
       mesh_message_deliveries_threshold = 20;
+      mesh_message_deliveries_decay = 0.5;
       mesh_failure_penalty_weight = ~-.1.;
+      mesh_failure_penalty_decay = 0.5;
       invalid_message_deliveries_weight = ~-.1.;
+      invalid_message_deliveries_decay = 0.3;
     }
 
 let score_parameters =
@@ -49,7 +53,9 @@ let score_parameters =
     topics = per_topic_score_parameters;
     behaviour_penalty_weight = ~-.10.0;
     behaviour_penalty_threshold = 0.0;
+    behaviour_penalty_decay = 0.2;
     app_specific_weight = 10.;
+    decay_zero = 0.1;
   }
 
 (* Most of these limits are the default ones used by the Go implementation. *)
