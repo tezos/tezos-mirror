@@ -476,7 +476,8 @@ mod test {
         let (sk, _address) = tezos_ethereum::signatures::string_to_sk_and_address(
             "4646464646464646464646464646464646464646464646464646464646464646"
                 .to_string(),
-        );
+        )
+        .unwrap();
         let m: [u8; 32] = hex::decode(
             "daf5a779ae972f972197303d7b574746c7ef83eadac0f2791ad23db92e4c8e53",
         )
@@ -514,7 +515,8 @@ mod test {
         ];
         test_list.iter().fold((), |_, (s, ea)| {
             let (_, a) =
-                tezos_ethereum::signatures::string_to_sk_and_address(s.to_string());
+                tezos_ethereum::signatures::string_to_sk_and_address(s.to_string())
+                    .unwrap();
             let value: [u8; 20] = hex::decode(ea).unwrap().try_into().unwrap();
             let ea = EthereumAddress::from(value);
             assert_eq!(a, ea);
@@ -523,14 +525,16 @@ mod test {
 
     #[test]
     fn test_caller_classic() {
-        let (_sk, address_from_sk) = tezos_ethereum::signatures::string_to_sk_and_address(
-            "4646464646464646464646464646464646464646464646464646464646464646"
-                .to_string(),
-        );
+        let (_sk, address_from_sk) =
+            tezos_ethereum::signatures::string_to_sk_and_address(
+                "4646464646464646464646464646464646464646464646464646464646464646"
+                    .to_string(),
+            )
+            .unwrap();
         let encoded =
         "f86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83".to_string();
         let transaction = EthereumTransactionCommon::from_rlp(encoded).unwrap();
-        let address = transaction.caller();
+        let address = transaction.caller().unwrap();
         let expected_address_string: [u8; 20] =
             hex::decode("9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F")
                 .unwrap()
@@ -550,7 +554,7 @@ mod test {
         "f86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83".to_string();
         let expected_transaction = EthereumTransactionCommon::from_rlp(encoded).unwrap();
 
-        let transaction = expected_transaction.sign_transaction(string_sk);
+        let transaction = expected_transaction.sign_transaction(string_sk).unwrap();
         assert_eq!(expected_transaction, transaction)
     }
 

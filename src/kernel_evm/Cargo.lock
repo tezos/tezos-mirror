@@ -1525,6 +1525,7 @@ dependencies = [
  "sha3",
  "tezos-smart-rollup-encoding",
  "tezos_crypto_rs",
+ "thiserror",
 ]
 
 [[package]]
