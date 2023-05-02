@@ -175,9 +175,9 @@ pub fn precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
 mod tests {
     use super::*;
     use crate::account_storage::init_account_storage as init_evm_account_storage;
-    use crate::block::BlockConstants;
     use evm::Config;
     use primitive_types::{H160, U256};
+    use tezos_ethereum::block::BlockConstants;
     use tezos_smart_rollup_mock::MockHost;
 
     fn execute_precompiled(

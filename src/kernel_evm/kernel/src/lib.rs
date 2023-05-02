@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-use block::L2Block;
+use primitive_types::U256;
+use tezos_ethereum::block::L2Block;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_entrypoint::kernel_entry;
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -50,7 +51,7 @@ pub fn stage_two<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Err
             debug_msg!(
                 host,
                 "Block {} at number {} contains {} transaction(s).\n",
-                String::from_utf8(hash.to_vec()).expect("INVALID HASH"),
+                String::from_utf8(hash.as_bytes().to_vec()).expect("INVALID HASH"),
                 number,
                 transactions.len()
             )
@@ -78,7 +79,7 @@ fn retrieve_smart_rollup_address<Host: Runtime>(
 }
 
 fn genesis_initialisation<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
-    let block_path = storage::block_path(0)?;
+    let block_path = storage::block_path(U256::zero())?;
     match Runtime::store_has(host, &block_path) {
         Ok(Some(_)) => Ok(()),
         _ => genesis::init_block(host),
