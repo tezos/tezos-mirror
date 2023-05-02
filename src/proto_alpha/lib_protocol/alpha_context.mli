@@ -4466,7 +4466,7 @@ module Cache : sig
     Block_header.shell_header -> Block_header.contents -> cache_nonce
 end
 
-(** This module re-exports definitions from {!Lazy_storage_kind}. *)
+(** This module re-exports definitions from {!Operation_repr.Kind}. *)
 module Kind : sig
   type preendorsement_consensus_kind = Preendorsement_consensus_kind
 
