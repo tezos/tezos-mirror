@@ -180,28 +180,14 @@ val assoc : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> 'b option
     {!Stdlib.List}. *)
 val assoc_opt : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> 'b option
 
-(** [assq k kvs] is the same as [assoc ~equal:Stdlib.( == ) k kvs]: it uses
-    the physical equality. *)
-val assq : 'a -> ('a * 'b) list -> 'b option
-
-(** [assq_opt] is an alias for [assq] provided for compatibility with
-    {!Stdlib.List}. *)
-val assq_opt : 'a -> ('a * 'b) list -> 'b option
-
 (** [mem_assoc ~equal k l] is equivalent to
     [Option.is_some @@ assoc ~equal k l]. *)
 val mem_assoc : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> bool
-
-(** [mem_assq k l] is [mem_assoc ~equal:Stdlib.( == ) k l]. *)
-val mem_assq : 'a -> ('a * 'b) list -> bool
 
 (** [remove_assoc ~equal k l] is [l] without the first element [(k', _)] such
     that [equal k k']. *)
 val remove_assoc :
   equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> ('a * 'b) list
-
-(** [remove_assoq k l] is [remove_assoc ~equal:Stdlib.( == ) k l]. *)
-val remove_assq : 'a -> ('a * 'b) list -> ('a * 'b) list
 
 (** {3 Initialisation} *)
 
