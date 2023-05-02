@@ -72,9 +72,10 @@ let parse_block_row
 
 let select_blocks db_pool level =
   let q =
-    "SELECT b.hash, b.previous_block, d.address, d.alias, b.round, b.timestamp, r.timestamp, \
-     n.name FROM blocks b, blocks_reception r, delegates d , nodes n ON \
-     r.block = b.id AND d.id = b.baker AND n.id = r.source WHERE b.level = ?"
+    "SELECT b.hash, b.previous_block, d.address, d.alias, b.round, \
+     b.timestamp, r.timestamp, n.name FROM blocks b, blocks_reception r, \
+     delegates d , nodes n ON r.block = b.id AND d.id = b.baker AND n.id = \
+     r.source WHERE b.level = ?"
   in
   let request =
     Caqti_request.Infix.(

@@ -284,8 +284,8 @@ let add_inclusion_in_block aliases block_hash validators delegate_operations =
         updated_known
         unknown
 
-let dump_included_in_block cctxt path block_level block_hash block_predecessor block_round
-    timestamp reception_times baker consensus_ops =
+let dump_included_in_block cctxt path block_level block_hash block_predecessor
+    block_round timestamp reception_times baker consensus_ops =
   let open Lwt.Infix in
   Wallet.of_context cctxt >>= fun aliases_opt ->
   let aliases =
