@@ -2,6 +2,8 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,39 +25,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Intfs = S
+include S.HASH
 
-module Hashed = struct
-  module Block_hash = Block_hash
-  module Block_metadata_hash = Block_metadata_hash
-  module Chain_id = Chain_id
-  module Context_hash = Context_hash
-  module Operation_hash = Operation_hash
-  module Operation_list_hash = Operation_list_hash
-  module Operation_list_list_hash = Operation_list_list_hash
-  module Operation_metadata_hash = Operation_metadata_hash
-  module Operation_metadata_list_hash = Operation_metadata_list_hash
-  module Operation_metadata_list_list_hash = Operation_metadata_list_list_hash
-  module Protocol_hash = Protocol_hash
-  module Smart_rollup_address = Smart_rollup_address
-  module Smart_rollup_commitment_hash = Smart_rollup_commitment_hash
-  module Smart_rollup_state_hash = Smart_rollup_state_hash
-end
+(** [context_hash_to_state_hash ch] turns an (Irmin) context hash into a state
+    hash. *)
+val context_hash_to_state_hash : Context_hash.t -> t
 
-module Signature = struct
-  module Bls = Bls
-  module Ed25519 = Ed25519
-  module P256 = P256
-  module Secp256k1 = Secp256k1
-  include Signature
-end
+(** Hackish way to disable [hash_bytes] and [hash_string] to force people to use
+    {!context_hash_to_state_hash} (without changing content of {!S.HASH}). *)
+type unreachable__use_context_hash_to_state_hash
 
-module Aggregate_signature = Aggregate_signature
-module Base58 = Base58
-module Blake2B = Blake2B
-module Crypto_box = Crypto_box
-module Hacl = Hacl
-module Helpers = Helpers
-module Rand = Rand
-module Timelock_legacy = Timelock_legacy
-module Timelock = Timelock
+val hash_bytes : unreachable__use_context_hash_to_state_hash
+
+val hash_string : unreachable__use_context_hash_to_state_hash

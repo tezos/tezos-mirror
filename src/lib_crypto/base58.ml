@@ -400,6 +400,8 @@ module Prefix = struct
 
   let smart_rollup_commitment = "\017\165\134\138" (* src1(54) *)
 
+  let smart_rollup_state = "\017\165\235\240" (* srs1(54) *)
+
   (* 56 *)
   let ed25519_encrypted_seed = "\007\090\060\179\041" (* edesk(88) *)
 
