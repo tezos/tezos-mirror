@@ -789,32 +789,26 @@ let commands_ro () =
       ~desc:"Get the frozen deposits limit of a delegate."
       no_options
       (prefixes ["get"; "deposits"; "limit"; "for"]
-      @@ Contract_alias.destination_param ~name:"src" ~desc:"source delegate"
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"source delegate"
       @@ stop)
-      (fun () contract (cctxt : Protocol_client_context.full) ->
+      (fun () delegate (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        match contract with
-        | Originated _ ->
-            cctxt#error
-              "Cannot change deposits limit on contract %a. This operation is \
-               invalid on originated contracts."
-              Contract.pp
-              contract
-        | Implicit delegate ->
-            let* o =
-              get_frozen_deposits_limit
-                cctxt
-                ~chain:cctxt#chain
-                ~block:cctxt#block
-                delegate
-            in
-            let*! () =
-              match o with
-              | None -> cctxt#answer "unlimited"
-              | Some limit ->
-                  cctxt#answer "%a %s" Tez.pp limit Operation_result.tez_sym
-            in
-            return_unit);
+        let* o =
+          get_frozen_deposits_limit
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            delegate
+        in
+        let*! () =
+          match o with
+          | None -> cctxt#answer "unlimited"
+          | Some limit ->
+              cctxt#answer "%a %s" Tez.pp limit Operation_result.tez_sym
+        in
+        return_unit);
   ]
 
 (* ----------------------------------------------------------------------------*)
@@ -2438,44 +2432,37 @@ let commands_rw () =
          simulate_switch
          fee_parameter_args)
       (prefixes ["set"; "deposits"; "limit"; "for"]
-      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ prefix "to"
       @@ tez_param
            ~name:"deposits limit"
            ~desc:"the maximum amount of frozen deposits"
       @@ stop)
       (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
-           contract
+           mgr
            limit
            (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        match contract with
-        | Originated _ ->
-            cctxt#error
-              "Cannot change deposits limit on contract %a. This operation is \
-               invalid on originated contracts or unregistered delegate \
-               contracts."
-              Contract.pp
-              contract
-        | Implicit mgr ->
-            let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
-            let* (_ : _ Injection.result) =
-              set_deposits_limit
-                cctxt
-                ~chain:cctxt#chain
-                ~block:cctxt#block
-                ?confirmations:cctxt#confirmations
-                ~dry_run
-                ~verbose_signing
-                ~simulation
-                ~fee_parameter
-                ?fee
-                mgr
-                ~src_pk
-                ~manager_sk
-                (Some limit)
-            in
-            return_unit);
+        let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
+        let* (_ : _ Injection.result) =
+          set_deposits_limit
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ?confirmations:cctxt#confirmations
+            ~dry_run
+            ~verbose_signing
+            ~simulation
+            ~fee_parameter
+            ?fee
+            mgr
+            ~src_pk
+            ~manager_sk
+            (Some limit)
+        in
+        return_unit);
     command
       ~group
       ~desc:"Remove the deposits limit of a registered delegate."
@@ -2486,39 +2473,32 @@ let commands_rw () =
          simulate_switch
          fee_parameter_args)
       (prefixes ["unset"; "deposits"; "limit"; "for"]
-      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
       (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
-           contract
+           mgr
            (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        match contract with
-        | Originated _ ->
-            cctxt#error
-              "Cannot change deposits limit on contract %a. This operation is \
-               invalid on originated contracts or unregistered delegate \
-               contracts."
-              Contract.pp
-              contract
-        | Implicit mgr ->
-            let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
-            let* (_ : _ Injection.result) =
-              set_deposits_limit
-                cctxt
-                ~chain:cctxt#chain
-                ~block:cctxt#block
-                ?confirmations:cctxt#confirmations
-                ~dry_run
-                ~verbose_signing
-                ~simulation
-                ~fee_parameter
-                ?fee
-                mgr
-                ~src_pk
-                ~manager_sk
-                None
-            in
-            return_unit);
+        let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
+        let* (_ : _ Injection.result) =
+          set_deposits_limit
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ?confirmations:cctxt#confirmations
+            ~dry_run
+            ~verbose_signing
+            ~simulation
+            ~fee_parameter
+            ?fee
+            mgr
+            ~src_pk
+            ~manager_sk
+            None
+        in
+        return_unit);
     command
       ~group
       ~desc:"Increase the paid storage of a smart contract."
