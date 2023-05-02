@@ -34,6 +34,12 @@ Client
 Baker
 -----
 
+- Changed the baker liquidity baking vote file
+  ``per_block_votes.json`` lookup so that it also considers its client
+  data directory when searching an existing file. The previous
+  semantics, which looks for this file in the current working
+  directory, takes predecence.
+
 Accuser
 -------
 
