@@ -35,9 +35,10 @@
  (modules main))
 
 (rule
- (alias runtezt)
+ (alias runtest)
  (package tezos-crypto-dal)
  (deps srs_zcash_g1_5 srs_zcash_g2_5)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 
 (rule

@@ -28,7 +28,11 @@
   tezt)
  (modules main))
 
-(rule (alias runtezt) (package tezos-clic) (action (run %{dep:./main.exe})))
+(rule
+ (alias runtest)
+ (package tezos-clic)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
  (targets main.ml)

@@ -71,7 +71,11 @@
   (:include %{workspace_root}/macos-link-flags.sexp))
  (modules main))
 
-(rule (alias runtezt) (package tezos-store) (action (run %{dep:./main.exe})))
+(rule
+ (alias runtest)
+ (package tezos-store)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
  (targets main.ml)

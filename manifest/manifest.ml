@@ -295,7 +295,7 @@ module Dune = struct
     ]
 
   let alias_rule ?(deps = Stdlib.List.[]) ?(alias_deps = Stdlib.List.[])
-      ?deps_dune ?action ?locks ?package name =
+      ?deps_dune ?action ?locks ?package ?enabled_if name =
     let deps =
       match (deps, alias_deps, deps_dune) with
       | _ :: _, _, Some _ | _, _ :: _, Some _ ->
@@ -314,6 +314,7 @@ module Dune = struct
       (opt package @@ fun x -> [S "package"; S x]);
       (match deps with [] -> E | _ -> S "deps" :: deps);
       (opt locks @@ fun locks -> [S "locks"; S locks]);
+      (opt enabled_if @@ fun enabled_if -> [S "enabled_if"; enabled_if]);
       [
         S "action";
         (match action with None -> [S "progn"] | Some action -> action);
@@ -330,8 +331,8 @@ module Dune = struct
 
   let glob_files_rec expr = [S "glob_files_rec"; S expr]
 
-  let runtest ?(alias = "runtest") ?action ?package ?locks ~dep_files ~dep_globs
-      ~dep_globs_rec name =
+  let runtest ?(alias = "runtest") ?action ?package ?locks ?enabled_if
+      ~dep_files ~dep_globs ~dep_globs_rec name =
     let deps_dune =
       let files = List.map (fun s -> S s) dep_files in
       let globs = List.map glob_files dep_globs in
@@ -343,16 +344,17 @@ module Dune = struct
     let action =
       Option.value ~default:[S "run"; S ("%{dep:./" ^ name ^ ".exe}")] action
     in
-    alias_rule alias ?package ?deps_dune ?locks ~action
+    alias_rule alias ?package ?deps_dune ?locks ?enabled_if ~action
 
-  let runtest_js ?(alias = "runtest_js") ?package ?locks ~dep_files ~dep_globs
-      ~dep_globs_rec name =
+  let runtest_js ?(alias = "runtest_js") ?package ?locks ?enabled_if ~dep_files
+      ~dep_globs ~dep_globs_rec name =
     let action = [S "run"; S "node"; S ("%{dep:./" ^ name ^ ".bc.js}")] in
     runtest
       ~alias
       ~action
       ?package
       ?locks
+      ?enabled_if
       ~dep_files
       ~dep_globs
       ~dep_globs_rec
@@ -1008,6 +1010,7 @@ module Target = struct
         names : string Ne_list.t;
         runtest_alias : string option;
         locks : string option;
+        enabled_if : Dune.s_expr option;
       }
 
   type preprocessor_dep = File of string
@@ -1534,8 +1537,9 @@ module Target = struct
         | Some modes -> List.mem Dune.Native modes
       in
       match (kind, opam, dep_files) with
-      | Test_executable {names; runtest_alias = Some alias; locks}, package, _
-        ->
+      | ( Test_executable {names; runtest_alias = Some alias; locks; enabled_if},
+          package,
+          _ ) ->
           let runtest_js_rules =
             if run_js then
               List.map
@@ -1546,6 +1550,7 @@ module Target = struct
                     ~dep_globs
                     ~dep_globs_rec
                     ?locks
+                    ?enabled_if
                     ?package
                     name)
                 (Ne_list.to_list names)
@@ -1561,13 +1566,15 @@ module Target = struct
                     ~dep_globs
                     ~dep_globs_rec
                     ?locks
+                    ?enabled_if
                     ?package
                     name)
                 (Ne_list.to_list names)
             else []
           in
           runtest_rules @ runtest_js_rules
-      | ( Test_executable {names = name, _; runtest_alias = None; locks = _},
+      | ( Test_executable
+            {names = name, _; runtest_alias = None; locks = _; enabled_if = _},
           _,
           _ :: _ ) ->
           invalid_argf
@@ -1685,18 +1692,30 @@ module Target = struct
     | [] -> invalid_argf "Target.private_exes: at least one name must be given"
     | head :: tail -> Private_executable (head, tail)
 
-  let test ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec ?locks =
+  let test ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec ?locks
+      ?enabled_if =
+    (match (alias, enabled_if, locks) with
+    | "", Some _, _ | "", _, Some _ ->
+        invalid_arg
+          "Target.tests: cannot specify enabled_if or locks without alias"
+    | _ -> ()) ;
     let runtest_alias = if alias = "" then None else Some alias in
     internal ?dep_files ?dep_globs ?dep_globs_rec @@ fun test_name ->
-    Test_executable {names = (test_name, []); runtest_alias; locks}
+    Test_executable {names = (test_name, []); runtest_alias; locks; enabled_if}
 
-  let tests ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec ?locks =
+  let tests ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec ?locks
+      ?enabled_if =
+    (match (alias, enabled_if, locks) with
+    | "", Some _, _ | "", _, Some _ ->
+        invalid_arg
+          "Target.tests: cannot specify enabled_if or locks without alias"
+    | _ -> ()) ;
     let runtest_alias = if alias = "" then None else Some alias in
     internal ?dep_files ?dep_globs ?dep_globs_rec @@ fun test_names ->
     match test_names with
     | [] -> invalid_arg "Target.tests: at least one name must be given"
     | head :: tail ->
-        Test_executable {names = (head, tail); runtest_alias; locks}
+        Test_executable {names = (head, tail); runtest_alias; locks; enabled_if}
 
   let vendored_lib ?(released_on_opam = true) ?main_module
       ?(js_compatible = false) ?(npm_deps = []) name version =
@@ -1900,7 +1919,14 @@ let register_tezt_targets ~make_tezt_exe =
       let (_ : Target.t option) =
         Target.test
           exe_name
-          ~alias:"runtezt"
+          (* Tezts can be deselected from the runtest alias by setting
+             the environment variable [RUNTEZTALIAS] to [false]. If
+             this environment variable is unset, or set to any value
+             other than [false], then they are selected.
+
+             For more info on [%{env:VAR=VAL}] see
+             https://dune.readthedocs.io/en/stable/concepts.html#variables *)
+          ~enabled_if:Dune.[S "<>"; S "false"; S "%{env:RUNTEZTALIAS=true}"]
           ~path
           ~with_macos_security_framework
           ~opam

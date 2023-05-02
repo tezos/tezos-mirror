@@ -47,6 +47,12 @@ variables:
   # this setting cuts cache creation time.
   FF_USE_FASTZIP: "true"
 
+  # If RUNTEZTALIAS is true, then Tezt tests are included in the @runtest
+  # alias. We set it to false to deactivate these tests in the unit
+  # test jobs, as they already run in the Tezt jobs. It is set to true
+  # in the opam jobs where we want to run the tests --with-test.
+  RUNTEZTALIAS: "false"
+
 # Image templates
 .image_template__runtime_build_e2etest_dependencies_template:
   image: ${build_deps_image_name}:runtime-build-e2etest-dependencies--${build_deps_image_version}

@@ -40,7 +40,11 @@
   tezt)
  (modules main))
 
-(rule (alias runtezt) (package tezos-p2p) (action (run %{dep:./main.exe})))
+(rule
+ (alias runtest)
+ (package tezos-p2p)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
  (targets main.ml)

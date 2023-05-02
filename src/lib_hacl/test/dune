@@ -48,7 +48,11 @@
   tezt)
  (modules main))
 
-(rule (alias runtezt) (package tezos-hacl) (action (run %{dep:./main.exe})))
+(rule
+ (alias runtest)
+ (package tezos-hacl)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
  (targets main.ml)
@@ -65,8 +69,9 @@
  (modules main_js))
 
 (rule
- (alias runtezt_js)
+ (alias runtest_js)
  (package tezos-hacl)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run node %{dep:./main_js.bc.js})))
 
 (rule

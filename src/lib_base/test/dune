@@ -36,9 +36,10 @@
  (modules main))
 
 (rule
- (alias runtezt)
+ (alias runtest)
  (package tezos-base)
  (deps points.ok points.ko)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 
 (rule
@@ -56,9 +57,10 @@
  (modules main_js))
 
 (rule
- (alias runtezt_js)
+ (alias runtest_js)
  (package tezos-base)
  (deps points.ok points.ko)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run node %{dep:./main_js.bc.js})))
 
 (rule

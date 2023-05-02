@@ -38,7 +38,11 @@
   tezt)
  (modules main))
 
-(rule (alias runtezt) (package tezos-crypto) (action (run %{dep:./main.exe})))
+(rule
+ (alias runtest)
+ (package tezos-crypto)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
  (targets main.ml)

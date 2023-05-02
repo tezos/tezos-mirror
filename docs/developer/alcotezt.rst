@@ -13,12 +13,10 @@ function. This will:
 
  - Create a *test library* that registers the tests in the modules
    given as argument to ``tezt``.
- - Create a *runner executable* ``main.exe`` in the test folder. The
-   runner links with the test library and consists of a single call to
+ - Create a *test executable* ``main.exe`` in the test folder. The
+   test executable links with the test library and consists of a single call to
    Tezt's `Test.run
    <https://ocaml.org/p/tezt/latest/doc/Tezt/Test/index.html#val-run>`__.
- - Add a ``runtezt`` alias in the Dune file of the test target that
-   executes the runner.
  - Finally, link the test library with Tezt's main entrypoint at
    ``tezt/tests/main.exe`` so that it registers all Alcotezts.
 
@@ -33,15 +31,15 @@ For a given folder ``$TEST_DIR``, the Alcotezts contained therein can be invoked
     Manifest. Through ``dune``, this is done with ``dune exec
     $TEST_DIR/main.exe``.
     This will execute the tests in ``$TEST_DIR`` (but not in its subdirectories).
- 2. Through Dune, by building the ``runtezt`` alias in the test target
-    folder. That is, executing ``dune build @$TEST_DIR/runtezt``.
+ 2. Through Dune, by building the ``runtest`` alias in the test target
+    folder. That is, executing ``dune build @$TEST_DIR/runtest``.
     This will execute the tests in ``$TEST_DIR`` and its subdirectories.
  3. By executing the full Tezt test suite, via the main entrypoint at
     ``tezt/tests/main.exe``. Through Dune, this is done with ``dune
     exec tezt/tests/main.exe``.
 
-Execution through the ``main.exe`` runner
-+++++++++++++++++++++++++++++++++++++++++
+Execution through the test executable
++++++++++++++++++++++++++++++++++++++
 
 The advantage of passing through the Manifest-generated runner is that
 it only depends on the tests themselves and the tested modules (and
@@ -59,17 +57,24 @@ arguments to Tezt, append ``-- <TEZT_ARGS>`` to the above command::
 
    dune exec src/lib_clic/test/main.exe -- --list
 
-Execution through the Dune ``runtezt`` alias
+Execution through the Dune ``runtest`` alias
 ++++++++++++++++++++++++++++++++++++++++++++
 
-The Manifest-generated ``runtezt`` alias can be used to execute all
-Alcotezts in a folder and its sub-folders, recursively. For example,
-to run all Alcotezts of protocol Alpha, run::
+The ``runtest`` alias can be used to execute all tests, including
+Alcotezts, in a folder and its recursive sub-folders. For example, to
+run all tests of protocol Alpha, run::
 
-  dune build @src/proto_alpha/runtezt
+  dune build @src/proto_alpha/runtest
 
 On the other hand, there is no convenient way to pass arguments to the
-underlying Tezt binaries with this method.
+underlying tests with this method.
+
+The Alcotezts can be dynamically disabled in the ``runtest`` alias by
+setting the environment variable ``RUNTEZTALIAS`` to ``false``. For
+instance, to run all the unit tests in protocol Alpha exception the
+Alcotezts, you can run::
+
+  RUNTEZTALIAS=false dune build @src/proto_alpha/runtest
 
 Execution through the Tezt main entrypoint
 ++++++++++++++++++++++++++++++++++++++++++
@@ -157,15 +162,10 @@ There is no way to redirect the output of ``Printf``. Consequently,
 the output of Alcotezts that call this module directly cannot be
 hidden.
 
-The ``runtest``/``runtezt`` aliases
-+++++++++++++++++++++++++++++++++++
+Integration with the ``runtest`` aliases
+++++++++++++++++++++++++++++++++++++++++
 
-Alcotezts *are not* registered as a dependency on the ``runtest``
-alias. This is to avoid executing them when invoking other test
-frameworks through the ``runtest`` alias in the CI. 
-That is, ``dune runtest $TEST_DIR`` will not
-execute any Alcotezt contained in ``$TEST_DIR``. 
-
-Instead, Alcotezts registered through manifest create an alias ``runtezt``, that can be
-used with ``dune build @$TEST_DIR/runtezt``, or one of the other methods described :ref:`above
-<running-alcotezts>`.
+Alcotezts are registered as a dependency on the ``runtest``
+alias. However, they are not executed through this alias in
+the CI. Instead, they run through the Tezt main runner to enable load
+balancing.
