@@ -181,7 +181,9 @@ mod tests {
     use crate::blueprint::Blueprint;
     use crate::genesis;
     use crate::inbox::Transaction;
-    use crate::storage::read_transaction_receipt_status;
+    use crate::storage::{
+        read_transaction_receipt_cumulative_gas_used, read_transaction_receipt_status,
+    };
     use evm_execution::account_storage::{account_path, EthereumAccountStorage};
     use primitive_types::{H160, H256};
     use std::str::FromStr;
@@ -415,5 +417,56 @@ mod tests {
             get_balance(&mut host, &mut evm_account_storage, &dest_address);
 
         assert_eq!(dest_balance, U256::from(10000000000000000u64))
+    }
+
+    #[test]
+    // Test transfers gas consumption consistency
+    fn test_cumulative_transfers_gas_consumption() {
+        let mut host = MockHost::default();
+        let _ = genesis::init_block(&mut host);
+
+        let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
+        let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
+
+        let transactions = vec![
+            Transaction {
+                tx_hash: tx_hash_0,
+                tx: dummy_eth_transaction(),
+            },
+            Transaction {
+                tx_hash: tx_hash_1,
+                tx: dummy_eth_transaction(),
+            },
+        ];
+
+        let queue = Queue {
+            proposals: vec![Blueprint {
+                transactions: transactions.clone(),
+            }],
+        };
+
+        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &sender,
+            U256::from(10000000000000000000u64),
+        );
+
+        produce(&mut host, queue).expect("The block production failed.");
+
+        for transaction in transactions {
+            match read_transaction_receipt_cumulative_gas_used(
+                &mut host,
+                &transaction.tx_hash,
+            ) {
+                Ok(cumulative_gas_used) => {
+                    // NB: we do not use any gas for now, hence the following assertion
+                    assert_eq!(cumulative_gas_used, U256::zero())
+                }
+                Err(_) => panic!("Reading the receipt's cumulative gas used failed."),
+            }
+        }
     }
 }
