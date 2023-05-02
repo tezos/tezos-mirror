@@ -935,7 +935,8 @@ let genesis_protocol_data (baker_sk : Signature.secret_key)
         proof_of_work_nonce;
         seed_nonce_hash = None;
         liquidity_baking_toggle_vote =
-          Baking_configuration.default_liquidity_baking_toggle_vote;
+          Baking_configuration.default_liquidity_baking_config
+            .liquidity_baking_vote;
       }
   in
   let unsigned_header =
