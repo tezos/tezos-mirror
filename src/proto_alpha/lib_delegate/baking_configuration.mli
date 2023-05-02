@@ -51,15 +51,19 @@ type nonce_config = Deterministic | Random
 
 type state_recorder_config = Filesystem | Disabled
 
+type liquidity_baking_config = {
+  vote_file : string option;
+  liquidity_baking_vote :
+    Protocol.Alpha_context.Liquidity_baking.liquidity_baking_toggle_vote;
+}
+
 type t = {
   fees : fees_config;
   nonce : nonce_config;
   validation : validation_config;
   retries_on_failure : int;
   user_activated_upgrades : (int32 * Protocol_hash.t) list;
-  liquidity_baking_toggle_vote :
-    Protocol.Alpha_context.Liquidity_baking.liquidity_baking_toggle_vote;
-  per_block_vote_file : string option;
+  liquidity_baking : liquidity_baking_config;
   force_apply : bool;
   force : bool;
   state_recorder : state_recorder_config;
@@ -77,8 +81,7 @@ val default_retries_on_failure_config : int
 
 val default_user_activated_upgrades : (int32 * Protocol_hash.t) list
 
-val default_liquidity_baking_toggle_vote :
-  Protocol.Alpha_context.Liquidity_baking.liquidity_baking_toggle_vote
+val default_liquidity_baking_config : liquidity_baking_config
 
 val default_force_apply : bool
 
@@ -87,8 +90,6 @@ val default_force : bool
 val default_state_recorder_config : state_recorder_config
 
 val default_extra_operations : Operations_source.t option
-
-val default_per_block_vote_file : string
 
 val default_config : t
 
@@ -100,9 +101,7 @@ val make :
   ?context_path:string ->
   ?retries_on_failure:int ->
   ?user_activated_upgrades:(int32 * Protocol_hash.t) list ->
-  ?liquidity_baking_toggle_vote:
-    Protocol.Alpha_context.Liquidity_baking.liquidity_baking_toggle_vote ->
-  ?per_block_vote_file:string ->
+  ?liquidity_baking:liquidity_baking_config ->
   ?force_apply:bool ->
   ?force:bool ->
   ?state_recorder:state_recorder_config ->
