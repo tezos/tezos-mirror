@@ -11428,14 +11428,29 @@ module type PROTOCOL = sig
     protocol_data : operation_data;
   }
 
-  (** Encoding for economoic protocol-specific operation data. *)
+  (** Encoding for protocol-specific operation data. *)
   val operation_data_encoding : operation_data Data_encoding.t
 
-  (** Encoding for eonomic protocol-specific operation receipts. *)
+  (** Encoding for protocol-specific operation data. This encoding uses the
+      attestation legacy name: endorsement. *)
+  val operation_data_encoding_with_legacy_attestation_name :
+    operation_data Data_encoding.t
+
+  (** Encoding for protocol-specific operation receipts. *)
   val operation_receipt_encoding : operation_receipt Data_encoding.t
+
+  (** Encoding for protocol-specific operation receipts. This encoding uses the
+      attestation legacy name: endorsement. *)
+  val operation_receipt_encoding_with_legacy_attestation_name :
+    operation_receipt Data_encoding.t
 
   (** Encoding that mixes an operation data and its receipt. *)
   val operation_data_and_receipt_encoding :
+    (operation_data * operation_receipt) Data_encoding.t
+
+  (** Encoding that mixes an operation data and its receipt. This encoding uses
+      the attestation legacy name: endorsement. *)
+  val operation_data_and_receipt_encoding_with_legacy_attestation_name :
     (operation_data * operation_receipt) Data_encoding.t
 
   (** [acceptable_pass op] gives the validation pass in which the

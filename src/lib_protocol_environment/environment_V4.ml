@@ -1061,6 +1061,15 @@ struct
 
     include P
 
+    let operation_data_encoding_with_legacy_attestation_name =
+      operation_data_encoding
+
+    let operation_receipt_encoding_with_legacy_attestation_name =
+      operation_receipt_encoding
+
+    let operation_data_and_receipt_encoding_with_legacy_attestation_name =
+      operation_data_and_receipt_encoding
+
     let value_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
         ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =
       let open Lwt_result_syntax in

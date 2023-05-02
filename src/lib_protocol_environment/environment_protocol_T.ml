@@ -80,6 +80,15 @@ module V0toV10
      and type cache_value = Context.Cache.value = struct
   include E
 
+  let operation_data_encoding_with_legacy_attestation_name =
+    operation_data_encoding
+
+  let operation_receipt_encoding_with_legacy_attestation_name =
+    operation_receipt_encoding
+
+  let operation_data_and_receipt_encoding_with_legacy_attestation_name =
+    operation_data_and_receipt_encoding
+
   type application_state = validation_state
 
   type mode =

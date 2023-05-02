@@ -47,6 +47,9 @@ type operation_data = Alpha_context.packed_protocol_data =
 let operation_data_encoding =
   Alpha_context.Operation.protocol_data_encoding_with_legacy_attestation_name
 
+let operation_data_encoding_with_legacy_attestation_name =
+  Alpha_context.Operation.protocol_data_encoding_with_legacy_attestation_name
+
 type operation_receipt = Apply_results.packed_operation_metadata =
   | Operation_metadata :
       'kind Apply_results.operation_metadata
@@ -56,7 +59,14 @@ type operation_receipt = Apply_results.packed_operation_metadata =
 let operation_receipt_encoding =
   Apply_results.operation_metadata_encoding_with_legacy_attestation_name
 
+let operation_receipt_encoding_with_legacy_attestation_name =
+  Apply_results.operation_metadata_encoding_with_legacy_attestation_name
+
 let operation_data_and_receipt_encoding =
+  Apply_results
+  .operation_data_and_metadata_encoding_with_legacy_attestation_name
+
+let operation_data_and_receipt_encoding_with_legacy_attestation_name =
   Apply_results
   .operation_data_and_metadata_encoding_with_legacy_attestation_name
 

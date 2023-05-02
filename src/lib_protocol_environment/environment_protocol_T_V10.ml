@@ -70,9 +70,18 @@ module type T = sig
 
   val operation_data_encoding : operation_data Data_encoding.t
 
+  val operation_data_encoding_with_legacy_attestation_name :
+    operation_data Data_encoding.t
+
   val operation_receipt_encoding : operation_receipt Data_encoding.t
 
+  val operation_receipt_encoding_with_legacy_attestation_name :
+    operation_receipt Data_encoding.t
+
   val operation_data_and_receipt_encoding :
+    (operation_data * operation_receipt) Data_encoding.t
+
+  val operation_data_and_receipt_encoding_with_legacy_attestation_name :
     (operation_data * operation_receipt) Data_encoding.t
 
   val acceptable_pass : operation -> int option
