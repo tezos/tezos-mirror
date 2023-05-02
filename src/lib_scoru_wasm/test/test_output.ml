@@ -35,26 +35,26 @@ open Tezos_lazy_containers
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
 
-let test_output_buffer () =
+let test_output_buffer =
   let open Lwt_result_syntax in
   let test (level, output_buffer) =
     match Output_buffer.Internal_for_tests.level_range output_buffer with
-    | None -> true
+    | None -> return_unit
     | Some (first_level, max_level) ->
         if level <= max_level && level >= first_level then
-          Output_buffer.Internal_for_tests.is_outbox_available
-            output_buffer
-            level
-        else true
+          if
+            Output_buffer.Internal_for_tests.is_outbox_available
+              output_buffer
+              level
+          then return_unit
+          else failwith "[test_output_buffer] test failed"
+        else return_unit
   in
-  let test =
-    QCheck2.Test.make
-      QCheck2.Gen.(
-        tup2 (map Int32.of_int small_int) Ast_generators.output_buffer_gen)
-      test
-  in
-  let result = QCheck_base_runner.run_tests [test] in
-  if result = 0 then return_unit else failwith "QCheck tests failed"
+  tztest_qcheck2
+    ~name:"Output buffer"
+    QCheck2.Gen.(
+      tup2 (map Int32.of_int small_int) Ast_generators.output_buffer_gen)
+    test
 
 let test_aux_write_output () =
   let open Lwt.Syntax in
@@ -351,7 +351,7 @@ let tests =
         test_write_output_above_limit );
     ]
   @ [
-      tztest "Output buffer" `Quick test_output_buffer;
+      test_output_buffer;
       tztest "Aux_write_output" `Quick test_aux_write_output;
       tztest "Push message below the limit" `Quick test_messages_below_limit;
       tztest "Push message at the limit" `Quick test_messages_at_limit;

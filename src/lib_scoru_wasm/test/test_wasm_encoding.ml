@@ -37,19 +37,19 @@ open Encodings_util
 open Test_encodings_util
 
 (** Test serialize/deserialize instructions. *)
-let test_instr_roundtrip () =
-  let open Lwt_result_syntax in
-  qcheck Ast_generators.instr_gen (fun instr ->
-      let*! instr' = encode_decode Wasm_encoding.instruction_encoding instr in
-      assert (instr = instr') ;
-      return_unit)
+let test_instr_roundtrip =
+  make_test
+    Wasm_encoding.instruction_encoding
+    Ast_generators.instr_gen
+    ~name:"Instruction roundtrip"
+    (fun instr instr' -> Lwt_result.return (instr = instr'))
 
 let assert_string_equal s1 s2 =
   let open Lwt_result_syntax in
   if String.equal s1 s2 then return_unit else failwith "Not equal"
 
 (** Test serialize/deserialize modules. *)
-let test_module_roundtrip () =
+let test_module_roundtrip =
   let print = Format.asprintf "%a" Ast_printer.pp_module in
   let open Lwt_result_syntax in
   let dummy_module_reg =
@@ -58,8 +58,9 @@ let test_module_roundtrip () =
     Instance.ModuleMap.create ()
   in
 
-  qcheck
+  Tztest.tztest_qcheck2
     ~print
+    ~name:"Module roundtrip"
     (Ast_generators.module_gen ~module_reg:dummy_module_reg ())
     (fun module1 ->
       (* We need to print here in order to force lazy bindings to be evaluated. *)
@@ -81,7 +82,7 @@ let test_module_roundtrip () =
     More formally, test that for all values, encoding, decoding and
     re-encoding yields the same tree.
  *)
-let test_generic_tree ~pp ~gen ~encoding () =
+let test_generic_tree ~pp ~gen ~encoding name =
   let print = Format.asprintf "%a" pp in
   let open Lwt_result_syntax in
   let dummy_module_reg =
@@ -89,7 +90,7 @@ let test_generic_tree ~pp ~gen ~encoding () =
        is not important when encoding or decoding. *)
     Instance.ModuleMap.create ()
   in
-  qcheck ~print (gen ~module_reg:dummy_module_reg) (fun value1 ->
+  tztest_qcheck2 ~name ~print (gen ~module_reg:dummy_module_reg) (fun value1 ->
       let*! empty_tree = empty_tree () in
       (* We need to print here in order to force lazy bindings to be evaluated. *)
       let _ = print value1 in
@@ -107,6 +108,7 @@ let test_module_tree =
     ~pp:Ast_printer.pp_module
     ~gen:(fun ~module_reg -> Ast_generators.module_gen ~module_reg ())
     ~encoding:Wasm_encoding.module_instance_encoding
+    "Module trees"
 
 (** Test serialize/deserialize frames and compare trees. *)
 let test_frame_tree =
@@ -114,6 +116,7 @@ let test_frame_tree =
     ~pp:Ast_printer.pp_frame
     ~gen:Ast_generators.frame_gen
     ~encoding:Wasm_encoding.frame_encoding
+    "Frame trees"
 
 (** Test serialize/deserialize input and output buffers and compare trees. *)
 let test_buffers_tree =
@@ -121,6 +124,7 @@ let test_buffers_tree =
     ~pp:Ast_printer.pp_buffers
     ~gen:(fun ~module_reg:_ -> Ast_generators.buffers_gen)
     ~encoding:Wasm_encoding.buffers_encoding
+    "Input and output buffers trees"
 
 (** Test serialize/deserialize values and compare trees. *)
 let test_values_tree =
@@ -132,6 +136,7 @@ let test_values_tree =
           Tezos_lazy_containers.Lazy_vector.Int32Vector.of_list
           (list Ast_generators.value_gen)))
     ~encoding:Wasm_encoding.values_encoding
+    "Values tree"
 
 (** Test serialize/deserialize administrative instructions and compare trees. *)
 let test_admin_instr_tree =
@@ -139,23 +144,25 @@ let test_admin_instr_tree =
     ~pp:Ast_printer.pp_admin_instr
     ~gen:(fun ~module_reg -> Ast_generators.admin_instr_gen ~module_reg)
     ~encoding:Wasm_encoding.admin_instr_encoding
+    "Admin_instr trees"
 
 let test_config_tree =
   test_generic_tree
     ~pp:Ast_printer.pp_config
     ~gen:Ast_generators.config_gen
     ~encoding:Wasm_encoding.config_encoding
+    "Config trees"
 
 let tests =
   [
-    tztest "Instruction roundtrip" `Quick test_instr_roundtrip;
-    tztest "Module roundtrip" `Quick test_module_roundtrip;
-    tztest "Module trees" `Quick test_module_tree;
-    tztest "Values trees" `Quick test_values_tree;
-    tztest "Admin_instr trees" `Quick test_admin_instr_tree;
-    tztest "Input and output buffers trees" `Quick test_buffers_tree;
-    tztest "Frame trees" `Quick test_frame_tree;
-    tztest "Config trees" `Quick test_config_tree;
+    test_instr_roundtrip;
+    test_module_roundtrip;
+    test_module_tree;
+    test_values_tree;
+    test_admin_instr_tree;
+    test_buffers_tree;
+    test_frame_tree;
+    test_config_tree;
   ]
 
 let () =

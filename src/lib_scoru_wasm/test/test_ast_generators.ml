@@ -32,25 +32,21 @@
 
 open Tztest
 
-let qcheck ?print gen f =
-  let open Lwt_result_syntax in
-  let test =
-    QCheck2.Test.make ?print gen (fun x -> Result.is_ok @@ Lwt_main.run (f x))
-  in
-  let res = QCheck_base_runner.run_tests [test] in
-  if res = 0 then return_unit else failwith "QCheck tests failed"
-
 let print = Format.asprintf "%a" Ast_printer.pp_module
 
 (** A simple test that checks that generating and printing a module doesn't
     throw an exception. *)
-let test_gen_print_module () =
+let test_gen_print_module =
   let open Lwt_result_syntax in
-  qcheck ~print (Ast_generators.module_gen ()) (fun module_ ->
+  tztest_qcheck2
+    ~print
+    ~name:"gen_print_module"
+    (Ast_generators.module_gen ())
+    (fun module_ ->
       let _ = print module_ in
       return_unit)
 
-let tests = [tztest "Module" `Quick test_gen_print_module]
+let tests = [test_gen_print_module]
 
 let () =
   Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("AST Generators", tests)]
