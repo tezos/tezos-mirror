@@ -233,11 +233,13 @@ let maybe_insert_block =
         (tup4 int32 Type.time_protocol Type.block_hash Type.block_hash)
         (tup2 Type.public_key_hash int32)
       ->. unit))
-    "INSERT INTO blocks (timestamp, hash, level, round, baker) SELECT column1, \
-     column2, ?, column4, delegates.id FROM delegates JOIN (VALUES (?, ?, ?, \
-     ?)) ON delegates.address = column3 ON CONFLICT (hash) DO UPDATE SET \
-     (timestamp, level, round, baker) = (EXCLUDED.timestamp, EXCLUDED.level, \
-     EXCLUDED.round, EXCLUDED.baker) WHERE True"
+    "INSERT INTO blocks (timestamp, hash, level, round, previous_block, baker) \
+     SELECT column1, column2, ?, column5, blocks.id, delegates.id FROM (VALUES \
+     (?,?,?,?,?)) LEFT JOIN blocks ON blocks.hash = column3 JOIN delegates ON \
+     delegates.address = column4 ON CONFLICT (hash) DO UPDATE SET (timestamp, \
+     level, round, previous_block, baker) = (EXCLUDED.timestamp, \
+     EXCLUDED.level, EXCLUDED.round, EXCLUDED.previous_block, EXCLUDED.baker) \
+     WHERE True"
 
 let insert_received_operation =
   Caqti_request.Infix.(
