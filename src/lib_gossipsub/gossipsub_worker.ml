@@ -144,6 +144,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           emit_app_output full_message ;
         gstate
     | gstate, GS.Already_published -> gstate
+    | gstate, GS.Invalid_message -> gstate
+    | gstate, GS.Unknown_validity -> gstate
 
   (** From the worker's perspective, the outcome of joining a new topic from the
       application layer are:

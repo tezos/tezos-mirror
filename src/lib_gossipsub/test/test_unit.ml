@@ -473,6 +473,9 @@ let test_publish_without_flood_publishing rng limits parameters =
     match output with
     | Already_published ->
         Test.fail ~__LOC__ "Message shouldn't already be published."
+    | Invalid_message -> Test.fail ~__LOC__ "Message shouldn't be invalid."
+    | Unknown_validity ->
+        Test.fail ~__LOC__ "Message shouldn't have unknown validity."
     | Publish_message {to_publish} -> to_publish
   in
   (* Should return [degree_optimal] peers to publish to. *)
@@ -528,6 +531,9 @@ let test_fanout rng limits parameters =
     match output with
     | Already_published ->
         Test.fail ~__LOC__ "Message shouldn't already be published."
+    | Invalid_message -> Test.fail ~__LOC__ "Message shouldn't be invalid."
+    | Unknown_validity ->
+        Test.fail ~__LOC__ "Message shouldn't have unknown validity."
     | Publish_message {to_publish} -> to_publish
   in
   (* Fanout should contain [degree_optimal] peers. *)
