@@ -35,6 +35,8 @@ const TRANSACTION_RECEIPT_BLOCK_HASH: RefPath = RefPath::assert_from(b"/block_ha
 const TRANSACTION_RECEIPT_BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/block_number");
 const TRANSACTION_RECEIPT_FROM: RefPath = RefPath::assert_from(b"/from");
 const TRANSACTION_RECEIPT_TO: RefPath = RefPath::assert_from(b"/to");
+const TRANSACTION_CUMULATIVE_GAS_USED: RefPath =
+    RefPath::assert_from(b"/cumulative_gas_used");
 const TRANSACTION_RECEIPT_TYPE: RefPath = RefPath::assert_from(b"/type");
 const TRANSACTION_RECEIPT_STATUS: RefPath = RefPath::assert_from(b"/status");
 
@@ -269,6 +271,18 @@ pub fn store_transaction_receipt<Host: Runtime>(
         let to_path = concat(receipt_path, &TRANSACTION_RECEIPT_TO)?;
         host.store_write(&to_path, to.as_bytes(), 0)?;
     };
+    // Cumulative gas used
+    let cumulative_gas_used_path =
+        concat(receipt_path, &TRANSACTION_CUMULATIVE_GAS_USED)?;
+    let mut le_receipt_cumulative_gas_used: [u8; 32] = [0; 32];
+    receipt
+        .cumulative_gas_used
+        .to_little_endian(&mut le_receipt_cumulative_gas_used);
+    host.store_write(
+        &cumulative_gas_used_path,
+        &le_receipt_cumulative_gas_used,
+        0,
+    )?;
 
     Ok(())
 }
@@ -299,6 +313,16 @@ pub fn read_transaction_receipt_status<Host: Runtime>(
             value: raw_status,
         })
     })
+}
+
+pub fn read_transaction_receipt_cumulative_gas_used<Host: Runtime>(
+    host: &mut Host,
+    tx_hash: &TransactionHash,
+) -> Result<U256, Error> {
+    let receipt_path = receipt_path(tx_hash)?;
+    let cumulative_gas_used_path =
+        concat(&receipt_path, &TRANSACTION_CUMULATIVE_GAS_USED)?;
+    read_u256(host, &cumulative_gas_used_path)
 }
 
 const CHUNKED_TRANSACTIONS: RefPath = RefPath::assert_from(b"/chunked_transactions");
