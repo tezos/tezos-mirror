@@ -143,6 +143,7 @@ unsafe impl SmartRollupCore for MockHost {
             .unwrap_or_else(Error::code)
     }
 
+    #[cfg(feature = "proto-nairobi")]
     unsafe fn store_delete_value(&self, path: *const u8, len: usize) -> i32 {
         let path = from_raw_parts(path, len);
 

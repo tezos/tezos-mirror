@@ -149,6 +149,7 @@ impl Store {
         }
     }
 
+    #[cfg(feature = "proto-nairobi")]
     pub fn delete_value(&mut self, path: &str) {
         if let Some(mut node) = self.node_from_path_mut(path) {
             node.value = None;

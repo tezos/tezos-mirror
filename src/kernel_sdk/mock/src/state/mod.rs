@@ -222,6 +222,7 @@ impl HostState {
         Ok(())
     }
 
+    #[cfg(feature = "proto-nairobi")]
     pub(crate) fn handle_store_delete_value(
         &mut self,
         prefix: &[u8],

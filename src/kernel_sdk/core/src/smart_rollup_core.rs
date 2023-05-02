@@ -231,6 +231,7 @@ pub unsafe trait SmartRollupCore {
     /// # Safety
     /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
     /// - `len` must be the length of that slice.
+    #[cfg(feature = "proto-nairobi")]
     unsafe fn store_delete_value(&self, path: *const u8, len: usize) -> i32;
 
     /// See [store_list_size].

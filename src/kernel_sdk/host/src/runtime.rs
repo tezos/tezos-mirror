@@ -132,6 +132,7 @@ pub trait Runtime {
     fn store_delete<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError>;
 
     /// Delete value under `path` from storage.
+    #[cfg(feature = "proto-nairobi")]
     fn store_delete_value<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError>;
 
     /// Count the number of subkeys under `prefix`.
@@ -372,6 +373,7 @@ where
         }
     }
 
+    #[cfg(feature = "proto-nairobi")]
     fn store_delete_value<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
         let res = unsafe {
             SmartRollupCore::store_delete_value(self, path.as_ptr(), path.size())
@@ -881,6 +883,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "proto-nairobi")]
     fn store_delete_value() {
         // Arrange
         const PATH: RefPath<'static> =

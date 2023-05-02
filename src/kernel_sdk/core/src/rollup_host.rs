@@ -82,6 +82,7 @@ unsafe impl SmartRollupCore for RollupHost {
         core::store_delete(path, len)
     }
 
+    #[cfg(feature = "proto-nairobi")]
     unsafe fn store_delete_value(&self, path: *const u8, len: usize) -> i32 {
         core::store_delete_value(path, len)
     }
