@@ -10,7 +10,7 @@
 # to run in the tezt container, by setting the `NATIVE_TARGET`
 # environment variable.
 
-CC=clang
+CC?=clang
 
 .PHONY: all
 all: build test doc
