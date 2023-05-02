@@ -367,4 +367,53 @@ mod tests {
 
         assert_eq!(dest_balance, U256::from(10000000000000000u64))
     }
+
+    #[test]
+    // Test if several valid proposals can produce valid blocks
+    fn test_several_valid_proposals() {
+        let mut host = MockHost::default();
+        let _ = genesis::init_block(&mut host);
+
+        let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
+        let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
+
+        let transaction_0 = vec![Transaction {
+            tx_hash: tx_hash_0,
+            tx: dummy_eth_transaction(),
+        }];
+
+        let transaction_1 = vec![Transaction {
+            tx_hash: tx_hash_1,
+            tx: dummy_eth_transaction(),
+        }];
+
+        let queue = Queue {
+            proposals: vec![
+                Blueprint {
+                    transactions: transaction_0,
+                },
+                Blueprint {
+                    transactions: transaction_1,
+                },
+            ],
+        };
+
+        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &sender,
+            U256::from(10000000000000000000u64),
+        );
+
+        produce(&mut host, queue).expect("The block production failed.");
+
+        let dest_address =
+            H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
+        let dest_balance =
+            get_balance(&mut host, &mut evm_account_storage, &dest_address);
+
+        assert_eq!(dest_balance, U256::from(10000000000000000u64))
+    }
 }
