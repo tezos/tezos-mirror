@@ -334,7 +334,34 @@ let per_block_vote_file_arg =
     ~short:'V'
     ~long:"votefile"
     ~placeholder:"filename"
-    (Tezos_clic.parameter (fun _ s -> return s))
+    (Tezos_clic.parameter (fun (_cctxt : Protocol_client_context.full) file ->
+         let open Lwt_result_syntax in
+         let* file_exists =
+           protect
+             ~on_error:(fun _ ->
+               tzfail (Liquidity_baking_vote.Block_vote_file_not_found file))
+             (fun () ->
+               let*! b = Lwt_unix.file_exists file in
+               return b)
+         in
+         if file_exists then return file
+         else tzfail (Liquidity_baking_vote.Block_vote_file_not_found file)))
+
+let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
+  let open Lwt_syntax in
+  let default_filename = Liquidity_baking_vote.default_vote_json_filename in
+  let file_exists path =
+    Lwt.catch (fun () -> Lwt_unix.file_exists path) (fun _ -> return_false)
+  in
+  let when_s pred x g =
+    let* b = pred x in
+    if b then return_some x else g ()
+  in
+  (* Check in current working directory *)
+  when_s file_exists default_filename @@ fun () ->
+  (* Check in the baker directory *)
+  let base_dir_file = Filename.Infix.(cctxt#get_base_dir // default_filename) in
+  when_s file_exists base_dir_file @@ fun () -> return_none
 
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
@@ -362,24 +389,20 @@ let run_baker
       per_block_vote_file,
       extra_operations,
       dal_node_endpoint ) baking_mode sources cctxt =
-  let per_block_vote_file_or_default =
-    match per_block_vote_file with
-    | None -> Baking_configuration.default_per_block_vote_file
-    | Some arg -> arg
-  in
+  may_lock_pidfile pidfile @@ fun () ->
+  (if per_block_vote_file = None then
+   (* If the liquidity baking file was not explicitly given, we
+      look into default locations. *)
+   lookup_default_vote_file_path cctxt
+  else Lwt.return per_block_vote_file)
+  >>= fun per_block_vote_file ->
   (* We don't let the user run the baker without providing some
      option (CLI, file path, or file in default location) for
      the toggle vote. *)
-  Liquidity_baking_vote_file.read_liquidity_baking_toggle_vote_on_startup
-    ~default:liquidity_baking_toggle_vote
-    ~per_block_vote_file:per_block_vote_file_or_default
-  >>=? fun (liquidity_baking_toggle_vote, vote_file_present) ->
-  let per_block_vote_file =
-    match (per_block_vote_file, vote_file_present) with
-    | Some _, _ | None, true -> Some per_block_vote_file_or_default
-    | None, false -> None
-  in
-  may_lock_pidfile pidfile @@ fun () ->
+  Liquidity_baking_vote.load_liquidity_baking_config
+    ~per_block_vote_file_arg:per_block_vote_file
+    ~toggle_vote_arg:liquidity_baking_toggle_vote
+  >>=? fun liquidity_baking ->
   get_delegates cctxt sources >>=? fun delegates ->
   let context_path =
     match baking_mode with
@@ -392,8 +415,7 @@ let run_baker
     ~minimal_fees
     ~minimal_nanotez_per_gas_unit
     ~minimal_nanotez_per_byte
-    ~liquidity_baking_toggle_vote
-    ?per_block_vote_file
+    ~liquidity_baking
     ?extra_operations
     ?dal_node_endpoint
     ~force_apply
