@@ -62,3 +62,21 @@ Internal
 - Encoding that supports ``endorsement`` kind in JSON are now suffixed with
   ``_with_legacy_attestation_name``. Non legacy encoding supports
   ``attestation`` kind. (MR :gl:`!8563`)
+
+- Michelson: remove legacy behaviour related to contract type. (MR :gl:`!5800`)
+
+- Michelson: cleanup legacy annotation management. (MR :gl:`!8208`)
+
+- Michelson: refactor management of metadata in ty smart constructors. (MR :gl:`!8420`)
+
+- Michelson: remove unused deprecated tx_rollup_l2_address type. (MR :gl:`!8546`)
+
+- Rename ``source`` into ``sender``. (MR :gl:`!7373`)
+
+- Improve efficiency of solving the baker PoW challenge. (MR :gl:`!8403`)
+
+- Refactor declarations of ``make_empty_context`` and ``make_empty_tree`` for easier use.
+  (MR :gl:`!8550`)
+
+- Move notion of Smart rollup address in the shell to make it common to all protocols,
+  and expose it in the environment. (MR :gl:`!8562`)
