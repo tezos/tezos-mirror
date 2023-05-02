@@ -130,7 +130,6 @@ let commands () =
              scriptable )
            uri
            (cctxt : #Client_context.full) ->
-        let open Tezos_stdlib_unix in
         match Uri.scheme uri with
         | None | Some "unix-files" -> (
             let script_row kind date evname data () =
