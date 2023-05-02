@@ -42,8 +42,9 @@
 
 (** A smart rollup has an address starting with "sr1". *)
 module Address : sig
-  include
-    module type of Smart_rollup_address with type t = Smart_rollup_address.t
+  include module type of struct
+    include Smart_rollup.Address
+  end
 
   val of_b58data : Base58.data -> t option
 

@@ -123,7 +123,7 @@ module type T = sig
        and type Wasm_2_0_0.input_request =
         Tezos_scoru_wasm.Wasm_pvm_state.input_request
        and type Wasm_2_0_0.info = Tezos_scoru_wasm.Wasm_pvm_state.info
-       and type Smart_rollup_address.t =
+       and type Smart_rollup.Address.t =
         Tezos_crypto.Hashed.Smart_rollup_address.t
 
   (** An [Ecoproto_error e] is a shell error that carry a protocol error.

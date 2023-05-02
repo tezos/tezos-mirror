@@ -26,13 +26,13 @@
 (*****************************************************************************)
 
 module Address = struct
-  include Smart_rollup_address
+  include Smart_rollup.Address
 
   let prefix = "sr1"
 
   let () = Base58.check_encoded_prefix b58check_encoding prefix 36
 
-  let of_b58data = function Smart_rollup_address.Data h -> Some h | _ -> None
+  let of_b58data = function Smart_rollup.Address.Data h -> Some h | _ -> None
 end
 
 module Internal_for_tests = struct
@@ -88,7 +88,7 @@ module State_hash = struct
 end
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/5506
-   Remove type and module aliases for Smart_rollup_address. *)
+   Remove type and module aliases for Smart_rollup.Address. *)
 
 type t = Address.t
 

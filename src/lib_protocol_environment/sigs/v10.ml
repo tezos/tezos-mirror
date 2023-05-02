@@ -12323,8 +12323,8 @@ end
 # 136 "v10.in.ml"
 
 
-  module Smart_rollup_address : sig
-# 1 "v10/smart_rollup_address.mli"
+  module Smart_rollup : sig
+# 1 "v10/smart_rollup.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -12351,7 +12351,7 @@ end
 (*****************************************************************************)
 
 (** Smart rollup addresses *)
-include S.HASH
+module Address : S.HASH
 end
 # 138 "v10.in.ml"
 

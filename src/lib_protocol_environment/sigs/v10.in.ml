@@ -135,5 +135,5 @@ module type T = sig
 
   module Dal : [%sig "v10/dal.mli"]
 
-  module Smart_rollup_address : [%sig "v10/smart_rollup_address.mli"]
+  module Smart_rollup : [%sig "v10/smart_rollup.mli"]
 end

@@ -2353,7 +2353,7 @@ end
 module Bond_id : sig
   type t =
     | Tx_rollup_bond_id of Tx_rollup.t
-    | Sc_rollup_bond_id of Smart_rollup_address.t
+    | Sc_rollup_bond_id of Smart_rollup.Address.t
 
   val pp : Format.formatter -> t -> unit
 
@@ -3232,12 +3232,11 @@ module Sc_rollup : sig
     module Map : Map.S with type key = t
   end
 
-  module Address : sig
-    include
-      module type of Smart_rollup_address with type t = Smart_rollup_address.t
+  module Address : module type of struct
+    include Smart_rollup.Address
   end
 
-  type t = Smart_rollup_address.t
+  type t = Smart_rollup.Address.t
 
   type rollup := t
 

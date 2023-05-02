@@ -30,7 +30,7 @@ include
   Blake2B.Make
     (Base58)
     (struct
-      let name = "Smart_rollup_address"
+      let name = "smart_rollup_address"
 
       let title = "A smart rollup address"
 

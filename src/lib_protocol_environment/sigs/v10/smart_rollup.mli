@@ -24,4 +24,4 @@
 (*****************************************************************************)
 
 (** Smart rollup addresses *)
-include S.HASH
+module Address : S.HASH
