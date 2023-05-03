@@ -192,11 +192,6 @@ However, it is safe (and actually necessary) to temporarily run two bakers just 
 
    It is possible to bake and endorse using a dedicated :ref:`consensus_key` instead of the delegate's key.
 
-.. note::
-
-   In protocols before Ithaca, a separate daemon, the endorser, is responsible for emitting endorsements.
-   In these protocols, one needs to run the daemon ``octez-endorser-NNN-*`` to endorse.
-
 Accuser
 ~~~~~~~
 
