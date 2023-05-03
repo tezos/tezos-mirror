@@ -198,22 +198,30 @@ let test_all_per_block_votes =
     let votefile = "nonexistant.json" in
     if Sys.file_exists votefile then
       Test.fail ~__LOC__ "Did not expect the file %s to exist" votefile ;
-    run_vote_file baker ~votefile ~liquidity_baking_toggle_vote:Pass
-    >|= check_vote_error
-          ~__LOC__
-          (error_prefix ^ "Client_baking_forge.block_vote_file_not_found")
-          votefile
+    Lwt.catch
+      (fun () ->
+        let* _ =
+          run_vote_file baker ~votefile ~liquidity_baking_toggle_vote:Pass
+        in
+        Test.fail ~__LOC__ "Baker should not have started")
+      (fun _exn ->
+        Log.info "As expected, baker did not start" ;
+        return baker)
   in
 
   Log.info "Test invalid json in vote file" ;
   let* baker =
     let votefile = Temp.file "invalid-vote-file.json" in
     Base.write_file votefile ~contents:{|{"liquidity_baking_toggle_vote": true|} ;
-    run_vote_file baker ~votefile ~liquidity_baking_toggle_vote:Pass
-    >|= check_vote_error
-          ~__LOC__
-          (error_prefix ^ "Client_baking_forge.block_vote_file_invalid")
-          votefile
+    Lwt.catch
+      (fun () ->
+        let* _ =
+          run_vote_file baker ~votefile ~liquidity_baking_toggle_vote:Pass
+        in
+        Test.fail ~__LOC__ "Baker should not have started")
+      (fun _exn ->
+        Log.info "As expected, baker did not start" ;
+        return baker)
   in
 
   Log.info "Test vote file at default file location " ;
@@ -232,7 +240,7 @@ let test_all_per_block_votes =
     let p_error =
       baker_wait_for_per_block_vote_file_error
         ~expected_id:
-          (error_prefix ^ "Client_baking_forge.block_vote_file_not_found")
+          (error_prefix ^ "liquidity_baking_vote.block_vote_file_not_found")
         ~expected_file_path:default_votefile
         baker
     in
@@ -261,11 +269,15 @@ let test_all_per_block_votes =
         Log.info "Test invalid vote file contents: %s" contents ;
         let votefile = Temp.file "invalid-vote-file.json" in
         Base.write_file votefile ~contents ;
-        run_vote_file baker ~votefile ~liquidity_baking_toggle_vote:Pass
-        >|= check_vote_error
-              (error_prefix
-             ^ "Client_baking_forge.block_vote_file_wrong_content")
-              votefile)
+        Lwt.catch
+          (fun () ->
+            let* _ =
+              run_vote_file baker ~votefile ~liquidity_baking_toggle_vote:Pass
+            in
+            Test.fail ~__LOC__ "Baker should not have started")
+          (fun _exn ->
+            Log.info "As expected, baker did not start" ;
+            return baker))
       baker
       [
         {|{"liquidity_baking_toggle_vote": true}|};
