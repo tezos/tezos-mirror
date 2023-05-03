@@ -102,6 +102,58 @@ let nack_test () =
   | Error e ->
       Test.fail "Errors in fork processes: %a." Error_monad.pp_print_trace e
 
+module Self_identification = struct
+  (* Test where node A tries to connect to node B using the peer id of B
+     instead of its own peer id. *)
+  let self_id () =
+    Test.register
+      ~__FILE__
+      ~title:"p2p socket self peer id"
+      ~tags:["p2p"; "socket"; "self_identification"]
+    @@ fun () ->
+    let server _ch sched socket =
+      let open Lwt_result_syntax in
+      let*! r = accept ~id:id1 sched socket in
+      match r with
+      (* There are 2 acceptable ways to fail. *)
+      (* The proof of work may look correct enough to check its power. In this
+         case the error could be Not_enough_proof_of_work before a
+         Decipher_error occurs. *)
+      | Error (P2p_errors.Decipher_error :: _)
+      | Error (P2p_errors.Not_enough_proof_of_work _ :: _) ->
+          return_unit
+      | Error (P2p_errors.Myself _ :: _) ->
+          Test.fail ~__LOC__ "Unexpected detection of self connection"
+      | Ok _ -> Test.fail ~__LOC__ "Unexpected success of authentication"
+      | Error err ->
+          Test.fail
+            ~__LOC__
+            "Unexpected error %a"
+            Error_monad.pp_print_top_error_of_trace
+            err
+    in
+
+    let client _ch sched addr port =
+      let open Lwt_result_syntax in
+      let*! id_server = id1 in
+      let*! id_client = id2 in
+      (* The server's peer id is used instead of the client one. *)
+      let id_self_peer_id =
+        {id_client with public_key = id_server.public_key}
+      in
+      let*! _ = P2p_test_utils.connect sched addr port id_self_peer_id in
+      return_unit
+    in
+
+    let* r = run_nodes ~addr:Node.default_ipv6_addr client server in
+    match r with
+    | Ok () -> unit
+    | Error e ->
+        Test.fail "Errors in fork processes: %a." Error_monad.pp_print_trace e
+
+  let tests () = self_id ()
+end
+
 let () =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4882
      Use ipv4 localhost by default.
@@ -110,4 +162,5 @@ let () =
      successful using ipv6 on your machine, this will
      not work on the CI as ipv6 network interface is
      disabled on CI's executors. *)
-  nack_test ()
+  nack_test () ;
+  Self_identification.tests ()
