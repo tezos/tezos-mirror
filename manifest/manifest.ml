@@ -2319,6 +2319,7 @@ type opam_release_status =
 
 (* [height] is 1 for leaves, 1 + max dependency height for nodes. *)
 type opam_dependency_graph_node = {
+  mutable contain_executables : bool;
   mutable dependencies : String_set.t;
   mutable release_status : opam_release_status;
   mutable propagated : bool;
@@ -2336,6 +2337,13 @@ let compute_opam_release_graph () : opam_dependency_graph_node String_map.t =
     let node_of_internals package_name internals =
       let released_example = ref None in
       let unreleased_example = ref None in
+      let executable internal =
+        match internal.Target.kind with
+        | Public_executable _ -> true
+        | Public_library _ | Private_library _ | Private_executable _
+        | Test_executable _ ->
+            false
+      in
       let add_status internal =
         match internal.Target.release_status with
         | Auto_opam -> ()
@@ -2374,7 +2382,14 @@ let compute_opam_release_graph () : opam_dependency_graph_node String_map.t =
         in
         List.fold_left add_internal_dependency String_set.empty internals
       in
-      {dependencies; release_status; propagated = false; height = 0}
+      let contain_executables = List.exists executable internals in
+      {
+        dependencies;
+        release_status;
+        propagated = false;
+        height = 0;
+        contain_executables;
+      }
     in
     String_map.mapi node_of_internals !Target.by_opam
   in
@@ -3258,9 +3273,53 @@ let packages_dir, release, remove_extra_files =
   in
   (!packages_dir, release, !remove_extra_files)
 
+let print_opam_job_rules fmt batch_index pipeline_type marge_restriction =
+  Format.fprintf
+    fmt
+    {|@..rules_template__trigger_%s_opam_batch_%d:
+  rules:
+    # Run on scheduled builds.
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+      when: delayed
+      start_in: %d minutes
+    # Run when there is label on the merge request
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+      when: delayed
+      start_in: %d minutes
+    # Run on merge requests when opam changes are detected.
+    - if: '%s'
+      changes:
+        - "**/dune"
+        - "**/dune.inc"
+        - "**/*.dune.inc"
+        - "**/dune-project"
+        - "**/dune-workspace"
+        - "**/*.opam"
+        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam_package.yml
+        - manifest/manifest.ml
+        - manifest/main.ml
+        - scripts/opam-prepare-repo.sh
+        - scripts/version.sh
+      when: delayed
+      start_in: %d minutes
+    - when: never # default
+|}
+    pipeline_type
+    batch_index
+    batch_index
+    batch_index
+    marge_restriction
+    batch_index
+
 let generate_opam_ci opam_release_graph =
   (* We only need to test released packages, since those are the only one
      that will need to pass the public Opam CI. *)
+  let contain_executables package =
+    match String_map.find_opt package opam_release_graph with
+    | None -> false
+    | Some node -> node.contain_executables
+  in
   let released_packages, unreleased_packages =
     List.partition
       (fun (_, node) ->
@@ -3299,64 +3358,43 @@ let generate_opam_ci opam_release_graph =
   in
   (* Merge and sort by name for nicer diffs. *)
   let packages =
-    let by_name (_, a) (_, b) = String.compare a b in
-    List.sort by_name (released_packages @ unreleased_packages)
+    let l =
+      List.map
+        (fun (a, name) ->
+          if contain_executables name then (a, name, true) else (a, name, false))
+        (released_packages @ unreleased_packages)
+    in
+    let by_name (_, a, _) (_, b, _) = String.compare a b in
+    List.sort by_name l
   in
   (* Now [packages] is a list of [batch_index, package_name]
      where [batch_index] is 0 for packages that we do not need to test. *)
   write ".gitlab/ci/jobs/packaging/opam_package.yml" @@ fun fmt ->
   pp_do_not_edit ~comment_start:"#" fmt () ;
   (* Output one template per batch. *)
-  for i = 1 to batch_count do
-    Format.fprintf
-      fmt
-      {|@..rules_template__trigger_opam_batch_%d:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: %d minutes
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
-      when: delayed
-      start_in: %d minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '$CI_MERGE_REQUEST_ID'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: %d minutes
-    - when: never # default
-|}
-      i
-      i
-      i
-      i
+  let marge_restriction_exec = "$CI_MERGE_REQUEST_ID" in
+  let marge_restriction_all =
+    "$CI_MERGE_REQUEST_ID && $GITLAB_USER_LOGIN == \"nomadic-margebot\""
+  in
+  for batch_index = 1 to batch_count do
+    print_opam_job_rules fmt batch_index "exec" marge_restriction_exec ;
+    print_opam_job_rules fmt batch_index "all" marge_restriction_all
   done ;
+
   (* Output one job per released package. *)
-  let output_job (batch_index, package_name) =
+  let output_job (batch_index, package_name, is_executable) =
     if batch_index > 0 then
       Format.fprintf
         fmt
         {|@.opam:%s:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_%d
+    - .rules_template__trigger_%s_opam_batch_%d
   variables:
     package: %s
 |}
         package_name
+        (if is_executable then "exec" else "all")
         batch_index
         package_name
     else Format.fprintf fmt "@.# Ignoring unreleased package %s.\n" package_name
