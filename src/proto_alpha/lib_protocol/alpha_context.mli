@@ -3314,7 +3314,8 @@ module Sc_rollup : sig
   end
 
   module Inbox_merkelized_payload_hashes : sig
-    module Hash : S.HASH
+    module Hash :
+      S.HASH with type t = Smart_rollup.Merkelized_payload_hashes_hash.t
 
     type t
 

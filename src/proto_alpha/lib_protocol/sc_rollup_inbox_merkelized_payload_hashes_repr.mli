@@ -24,7 +24,7 @@
 
 type error += Merkelized_payload_hashes_proof_error of string
 
-module Hash : S.HASH
+module Hash : S.HASH with type t = Smart_rollup.Merkelized_payload_hashes_hash.t
 
 (** A type representing the head of a merkelized list of
     {!Sc_rollup_inbox_message_repr.serialized} message. It contains the hash of
