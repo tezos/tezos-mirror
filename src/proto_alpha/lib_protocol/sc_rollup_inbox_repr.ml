@@ -99,35 +99,7 @@ let () =
     (fun () -> Inbox_level_reached_messages_limit)
 
 module Int64_map = Map.Make (Int64)
-
-(* 32 *)
-let hash_prefix = "\003\255\138\145\110" (* srib1(55) *)
-
-module Hash = struct
-  let prefix = "srib1"
-
-  let encoded_size = 55
-
-  module H =
-    Blake2B.Make
-      (Base58)
-      (struct
-        let name = "Smart_rollup_inbox_hash"
-
-        let title = "The hash of an inbox of a smart rollup"
-
-        let b58check_prefix = hash_prefix
-
-        (* defaults to 32 *)
-        let size = None
-      end)
-
-  include H
-
-  let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
-
-  include Path_encoding.Make_hex (H)
-end
+module Hash = Smart_rollup.Inbox_hash
 
 module Skip_list_parameters = struct
   let basis = 4

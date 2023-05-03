@@ -3418,7 +3418,7 @@ module Sc_rollup : sig
   module Inbox : sig
     module Skip_list : Skip_list_repr.S
 
-    module Hash : S.HASH
+    module Hash : S.HASH with type t = Smart_rollup.Inbox_hash.t
 
     type level_proof = {
       hash : Inbox_merkelized_payload_hashes.Hash.t;
