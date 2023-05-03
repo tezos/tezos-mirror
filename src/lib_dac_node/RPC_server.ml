@@ -145,8 +145,7 @@ let handle_get_certificate dac_plugin node_store raw_root_hash =
   let+ value_opt = Store.Certificate_store.find node_store root_hash in
   Option.map
     (fun Store.{aggregate_signature; witnesses} ->
-      Certificate_repr.
-        {aggregate_signature; witnesses; root_hash = raw_root_hash})
+      Certificate_repr.V0.make raw_root_hash aggregate_signature witnesses)
     value_opt
 
 let handle_get_missing_page cctxt page_store dac_plugin raw_root_hash =
@@ -252,8 +251,10 @@ module Coordinator = struct
           Option.iter
             (fun Store.{aggregate_signature; witnesses} ->
               let certificate =
-                Certificate_repr.
-                  {root_hash = raw_root_hash; aggregate_signature; witnesses}
+                Certificate_repr.V0.make
+                  raw_root_hash
+                  aggregate_signature
+                  witnesses
               in
               let _ =
                 Certificate_streamers.push
@@ -263,7 +264,7 @@ module Coordinator = struct
                   certificate
               in
               if
-                Certificate_repr.all_committee_members_have_signed
+                Certificate_repr.V0.all_committee_members_have_signed
                   committee_members
                   certificate
               then

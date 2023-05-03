@@ -26,40 +26,48 @@
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/5073
    Update Certificate repr to handle a dynamic dac.
 *)
+module V0 = struct
+  let version = 0l
 
-(* Representation of a Data Availibility Committee Certificate. *)
-type t = {
-  root_hash : Dac_plugin.raw_hash;
-  aggregate_signature : Tezos_crypto.Aggregate_signature.signature;
-  witnesses : Z.t;
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4853
-         Use BitSet for witnesses field in external message
-      *)
-}
+  (* Representation of a Data Availibility Committee Certificate. *)
+  type t = {
+    version : int32;
+    root_hash : Dac_plugin.raw_hash;
+    aggregate_signature : Tezos_crypto.Aggregate_signature.signature;
+    witnesses : Z.t;
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4853
+           Use BitSet for witnesses field in external message
+        *)
+  }
 
-let encoding =
-  let obj_enc =
+  let make root_hash aggregate_signature witnesses =
+    {version; root_hash; aggregate_signature; witnesses}
+
+  let encoding =
+    let obj_enc =
+      Data_encoding.(
+        obj4
+          (req "version" Data_encoding.int32)
+          (req "root_hash" Dac_plugin.raw_hash_encoding)
+          (req "aggregate_signature" Tezos_crypto.Aggregate_signature.encoding)
+          (req "witnesses" z))
+    in
+
     Data_encoding.(
-      obj3
-        (req "root_hash" Dac_plugin.raw_hash_encoding)
-        (req "aggregate_signature" Tezos_crypto.Aggregate_signature.encoding)
-        (req "witnesses" z))
-  in
+      conv
+        (fun {version; root_hash; aggregate_signature; witnesses} ->
+          (version, root_hash, aggregate_signature, witnesses))
+        (fun (version, root_hash, aggregate_signature, witnesses) ->
+          {version; root_hash; aggregate_signature; witnesses})
+        obj_enc)
 
-  Data_encoding.(
-    conv
-      (fun {root_hash; aggregate_signature; witnesses} ->
-        (root_hash, aggregate_signature, witnesses))
-      (fun (root_hash, aggregate_signature, witnesses) ->
-        {root_hash; aggregate_signature; witnesses})
-      obj_enc)
-
-let all_committee_members_have_signed committee_members {witnesses; _} =
-  let length = List.length committee_members in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4562
-     The following is equivalent to Bitset.fill length. The Bitset module
-     should be used once it is moved from the protocol to the environment. *)
-  let expected_witnesses = Z.(pred (shift_left one length)) in
-  (* Equivalent to Bitset.diff expected_witnesses witnesses. *)
-  let missing_witnesses = Z.logand expected_witnesses (Z.lognot witnesses) in
-  Z.(equal missing_witnesses zero)
+  let all_committee_members_have_signed committee_members {witnesses; _} =
+    let length = List.length committee_members in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4562
+       The following is equivalent to Bitset.fill length. The Bitset module
+       should be used once it is moved from the protocol to the environment. *)
+    let expected_witnesses = Z.(pred (shift_left one length)) in
+    (* Equivalent to Bitset.diff expected_witnesses witnesses. *)
+    let missing_witnesses = Z.logand expected_witnesses (Z.lognot witnesses) in
+    Z.(equal missing_witnesses zero)
+end

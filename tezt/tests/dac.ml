@@ -88,7 +88,8 @@ let parse_certificate json =
   JSON.
     ( json |-> "witnesses" |> as_int,
       json |-> "aggregate_signature" |> as_string,
-      json |-> "root_hash" |> as_string )
+      json |-> "root_hash" |> as_string,
+      json |-> "version" |> as_int32 )
 
 (* Helper process that listens to certificate updates through a
    RPC request. Upon termination, the list of certificate updates
@@ -250,8 +251,8 @@ let check_downloaded_preimage coordinator observer root_hash =
   go [root_hash]
 
 let check_certificate
-    (actual_witnesses, actual_aggregate_signature, actual_root_hash)
-    (expected_witnesses, expected_aggregate_signature, expected_root_hash) =
+    (actual_witnesses, actual_aggregate_signature, actual_root_hash, _version)
+    (expected_witnesses, expected_aggregate_signature, expected_root_hash, _version) =
   (* Because encodings of aggregate signature might be different (due to the
      presence of two variants `Bls12_381` and `Unknown), the actual byte
      representation needs to be checked.*)
@@ -982,7 +983,7 @@ module Legacy = struct
           (return [])
           members
       in
-      let* witnesses, certificate, _root_hash =
+      let* witnesses, certificate, _root_hash, _version =
         RPC.call coordinator_node (Dac_rpc.get_certificate ~hex_root_hash)
       in
       assert_witnesses ~__LOC__ 3 witnesses ;
@@ -1008,7 +1009,7 @@ module Legacy = struct
       in
       let* () = call () in
       let* () = call () in
-      let* witnesses, certificate, _root_hash =
+      let* witnesses, certificate, _root_hash, _version =
         RPC.call coordinator_node (Dac_rpc.get_certificate ~hex_root_hash)
       in
       assert_witnesses ~__LOC__ 4 witnesses ;
@@ -1074,7 +1075,7 @@ module Legacy = struct
              ~dac_member_pkh:member.aggregate_public_key_hash
              ~signature)
       in
-      let* witnesses, certificate, _root_hash =
+      let* witnesses, certificate, _root_hash, _version =
         RPC.call coordinator (Dac_rpc.get_certificate ~hex_root_hash)
       in
       let expected_witnesses = Z.shift_left Z.one i in
@@ -1274,7 +1275,7 @@ module Full_infrastructure = struct
            %R = Actual)") ;
     let () =
       List.iter
-        (fun (_, _, root_hash) -> check_valid_root_hash expected_rh root_hash)
+        (fun (_, _, root_hash, _) -> check_valid_root_hash expected_rh root_hash)
         certificate_updates
     in
     let last_certificate_update =

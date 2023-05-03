@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,43 +22,21 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+module V0 : sig
+  type t = private {
+    version : int32;
+    root_hash : Dac_plugin.raw_hash;
+    aggregate_signature : Tezos_crypto.Aggregate_signature.signature;
+    witnesses : Z.t;
+  }
 
-module S : sig
-  (** Define RPC GET /monitor/root_hashes. *)
-  val root_hashes :
-    ( [`GET],
-      unit,
-      unit,
-      unit,
-      unit,
-      Dac_plugin.raw_hash )
-    Tezos_rpc.Service.service
+  val make :
+    Dac_plugin.raw_hash ->
+    Tezos_crypto.Aggregate_signature.signature ->
+    Z.t ->
+    t
 
-  (** Define RPC GET /monitor/certificate/{hex_root_hash}. *)
-  val certificate :
-    ( [`GET],
-      unit,
-      unit * Dac_plugin.raw_hash,
-      unit,
-      unit,
-      Certificate_repr.V0.t )
-    Tezos_rpc.Service.service
+  val encoding : t Data_encoding.t
+
+  val all_committee_members_have_signed : 'a trace -> t -> bool
 end
-
-(** [root_hashes streamed_cctxt dac_plugin] returns a stream of root hashes
-    and a stopper for it.
-
-    Stream is produced by calling RPC GET /monitor/root_hashes.
-*)
-val root_hashes :
-  #Tezos_rpc.Context.streamed ->
-  (Dac_plugin.raw_hash Lwt_stream.t * Tezos_rpc.Context.stopper)
-  Error_monad.tzresult
-  Lwt.t
-
-val certificate :
-  #Tezos_rpc.Context.streamed ->
-  Dac_plugin.raw_hash ->
-  (Certificate_repr.V0.t Lwt_stream.t * Tezos_rpc.Context.stopper)
-  Error_monad.tzresult
-  Lwt.t

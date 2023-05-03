@@ -56,7 +56,7 @@ val put_dac_member_signature :
 (** [get_certificate ~hex_root_hash] fetches the DAC certificate for the
     provided [hex_root_hash]. *)
 val get_certificate :
-  hex_root_hash:Hex.t -> (Dac_node.t, int * string * string) RPC_core.t
+  hex_root_hash:Hex.t -> (Dac_node.t, int * string * string * int32) RPC_core.t
 
 (** [get_missing_page ~hex_root_hash] calls GET missing_page/[page_hash] 
         endpoint. *)
