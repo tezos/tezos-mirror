@@ -40,9 +40,10 @@ type t = {
   tezos_node_cctxt : Client_context.full;
   neighbors_cctxts : Dal_node_client.cctxt list;
   committee_cache : Committee_cache.t;
+  gs_worker : Gossipsub.Worker.t;
 }
 
-let init config store cctxt =
+let init config store gs_worker cctxt =
   let neighbors_cctxts =
     List.map
       (fun Configuration.{addr; port} ->
@@ -60,6 +61,7 @@ let init config store cctxt =
     neighbors_cctxts;
     committee_cache =
       Committee_cache.create ~max_size:Constants.committee_cache_size;
+    gs_worker;
   }
 
 let set_ready ctxt plugin cryptobox proto_parameters =

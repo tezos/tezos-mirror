@@ -39,10 +39,16 @@ type status = Ready of ready_ctxt | Starting
     field are available through accessors *)
 type t
 
-(** [init config store cctx] creates a [t] with a status set to [Starting]
-    using the given dal node configuration [config], node store [store],
-    and tezos node client context [cctx]. *)
-val init : Configuration.t -> Store.node_store -> Client_context.full -> t
+(** [init config store gs_worker cctx] creates a [t] with a status set to
+    [Starting] using the given dal node configuration [config], node store
+    [store], gossipsub worker instance [gs_worker] and tezos node client context
+    [cctx]. *)
+val init :
+  Configuration.t ->
+  Store.node_store ->
+  Gossipsub.Worker.t ->
+  Client_context.full ->
+  t
 
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready

@@ -248,8 +248,19 @@ let run ~data_dir cctxt =
   let*! () = Event.(emit starting_node) () in
   let* config = Configuration.load ~data_dir in
   let config = {config with data_dir} in
+  let gs_worker =
+    let rng =
+      let seed =
+        Random.self_init () ;
+        Random.bits ()
+      in
+      Random.State.make [|seed|]
+    in
+    let open Worker_parameters in
+    Gossipsub.(Worker.make rng limits peer_filter_parameters |> Worker.start [])
+  in
   let* store = Store.init config in
-  let ctxt = Node_context.init config store cctxt in
+  let ctxt = Node_context.init config store gs_worker cctxt in
   let* rpc_server = RPC_server.(start config ctxt) in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () =
