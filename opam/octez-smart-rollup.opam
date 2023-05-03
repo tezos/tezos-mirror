@@ -13,17 +13,10 @@ depends: [
   "tezos-base"
   "tezos-stdlib-unix"
   "tezos-crypto"
-  "cohttp-lwt-unix" { >= "4.0.0" & != "5.1.0" }
-  "octez-node-config"
-  "prometheus-app" { >= "1.2" }
-  "octez-injector"
-  "tezos-version"
-  "tezos-client-base"
-  "octez-smart-rollup"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Octez: library for Smart Rollup node"
+synopsis: "Octez: library for Smart Rollups "

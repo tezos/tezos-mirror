@@ -37,6 +37,7 @@
 (package (name octez-protocol-compiler))
 (package (name octez-proxy-server))
 (package (name octez-signer))
+(package (name octez-smart-rollup))
 (package (name octez-smart-rollup-client-PtMumbai))
 (package (name octez-smart-rollup-client-PtNairob))
 (package (name octez-smart-rollup-client-alpha))
