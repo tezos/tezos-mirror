@@ -37,8 +37,8 @@ module Baker : sig
     ?per_block_vote_file:string ->
     ?extra_operations:Baking_configuration.Operations_source.t ->
     ?force_apply:bool ->
+    ?context_path:string ->
     chain:Shell_services.chain ->
-    context_path:string ->
     keep_alive:bool ->
     Baking_state.consensus_key list ->
     unit tzresult Lwt.t
