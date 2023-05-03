@@ -64,6 +64,23 @@ rules:
     category: performance
     technology:
     - ocaml
+- id: ocamllint-empty-list-compare
+  pattern-either:
+  - pattern: List.compare_length_with $X 0
+  - pattern: Compare.List_length_with.( = ) $X 0
+  - pattern: Compare.List_length_with.( == ) $X 0
+  - pattern: Compare.List_length_with.( <= ) $X 0
+  - pattern: Compare.List_length_with.( >= ) $X 0
+  - pattern: Compare.List_length_with.( < ) $X 0
+  - pattern: Compare.List_length_with.( > ) $X 0
+  - pattern: Compare.List_length_with.( <> ) $X 0
+  message: 'You probably want to test emptiness of this list using a pattern-matching of the form (match xs with [] -> ... | _ :: _ -> ...). If you are just computing the boolean value you can also use the List.is_empty function. See https://tezos.gitlab.io/developer/guidelines.html#linting-list-length-empty for details.'
+  languages: [ocaml]
+  severity: ERROR
+  metadata:
+    category: performance
+    technology:
+    - ocaml
 - id: ocamllint-concat-map
   pattern-either:
   - pattern: let $Z = List.map $X $Y in List.concat $Z

@@ -422,14 +422,23 @@ module Evaluations_impl = struct
 
   (* multiplies evaluations of all polynomials with name in poly_names,
      the resulting eval has the size of the smallest evaluation *)
-  let mul_c ?res ~evaluations
-      ?(composition_gx = (List.init (List.length evaluations) (fun _ -> 0), 1))
-      ?(powers = List.init (List.length evaluations) (fun _ -> 1)) () =
+  let mul_c ?res ~evaluations ?composition_gx ?powers () =
+    let len_evaluations = List.length evaluations in
+    let composition_gx =
+      match composition_gx with
+      | Some composition_gx -> composition_gx
+      | None -> (List.init len_evaluations (fun _ -> 0), 1)
+    in
+    let powers =
+      match powers with
+      | Some powers -> powers
+      | None -> List.init len_evaluations (fun _ -> 1)
+    in
     let domain_len = snd composition_gx in
     assert (domain_len > 0) ;
-    assert (List.compare_length_with evaluations 0 > 0) ;
-    assert (List.compare_lengths (fst composition_gx) evaluations = 0) ;
-    assert (List.compare_lengths powers evaluations = 0) ;
+    assert (len_evaluations > 0) ;
+    assert (List.compare_length_with (fst composition_gx) len_evaluations = 0) ;
+    assert (List.compare_length_with powers len_evaluations = 0) ;
     assert (List.for_all (fun power -> power > 0) powers) ;
 
     let length_result =
@@ -481,16 +490,24 @@ module Evaluations_impl = struct
   (* Adds evaluation of a1 × p1 + a2 × p2 in evaluations
      /!\ the degree may not be always accurate,
          the resulting degree may not be the max of the 2 polynomials degrees *)
-  let linear_c ?res ~evaluations
-      ?(linear_coeffs =
-        List.init (List.length evaluations) (fun _ -> Fr.(copy one)))
-      ?(composition_gx = (List.init (List.length evaluations) (fun _ -> 0), 1))
+  let linear_c ?res ~evaluations ?linear_coeffs ?composition_gx
       ?(add_constant = Fr.zero) () =
+    let len_evaluations = List.length evaluations in
+    let linear_coeffs =
+      match linear_coeffs with
+      | Some linear_coeffs -> linear_coeffs
+      | None -> List.init len_evaluations (fun _ -> Fr.(copy one))
+    in
+    let composition_gx =
+      match composition_gx with
+      | Some composition_gx -> composition_gx
+      | None -> (List.init len_evaluations (fun _ -> 0), 1)
+    in
     let domain_len = snd composition_gx in
     assert (domain_len > 0) ;
-    assert (List.compare_length_with evaluations 0 > 0) ;
-    assert (List.compare_lengths linear_coeffs evaluations = 0) ;
-    assert (List.compare_lengths (fst composition_gx) evaluations = 0) ;
+    assert (len_evaluations > 0) ;
+    assert (List.compare_length_with linear_coeffs len_evaluations = 0) ;
+    assert (List.compare_length_with (fst composition_gx) len_evaluations = 0) ;
 
     let list_eval_coeff_composition =
       List.map2
@@ -502,44 +519,45 @@ module Evaluations_impl = struct
       |> List.filter (fun (eval, _, _) -> not (is_zero eval))
     in
 
-    if List.compare_length_with list_eval_coeff_composition 0 = 0 then (
-      let length_result =
-        List.fold_left min Int.max_int @@ List.map length evaluations
-      in
-      let res = allocate_for_res res length_result in
-      constant res add_constant ;
-      let degree_result = if Fr.is_zero add_constant then -1 else 0 in
-      (degree_result, res))
-    else
-      let length_result =
-        List.fold_left min Int.max_int
-        @@ List.map
-             (fun (eval, _, _) -> length eval)
-             list_eval_coeff_composition
-      in
-      let degree_result =
-        List.fold_left max 0
-        @@ List.map
-             (fun (eval, _, _) -> degree eval)
-             list_eval_coeff_composition
-      in
-      (* TODO: check relation between length_result and degree_result? *)
-      let nb_evals = List.length list_eval_coeff_composition in
-      let array_eval_coeff_composition =
-        List.map
-          (fun (eval, linear_coeff, composition) ->
-            (snd eval, length eval, linear_coeff, composition))
-          list_eval_coeff_composition
-        |> Array.of_list
-      in
-      let res = allocate_for_res res length_result in
-      Stubs.linear_arrays
-        res
-        array_eval_coeff_composition
-        add_constant
-        length_result
-        nb_evals ;
-      (degree_result, res)
+    match list_eval_coeff_composition with
+    | [] ->
+        let length_result =
+          List.fold_left min Int.max_int @@ List.map length evaluations
+        in
+        let res = allocate_for_res res length_result in
+        constant res add_constant ;
+        let degree_result = if Fr.is_zero add_constant then -1 else 0 in
+        (degree_result, res)
+    | _ :: _ ->
+        let length_result =
+          List.fold_left min Int.max_int
+          @@ List.map
+               (fun (eval, _, _) -> length eval)
+               list_eval_coeff_composition
+        in
+        let degree_result =
+          List.fold_left max 0
+          @@ List.map
+               (fun (eval, _, _) -> degree eval)
+               list_eval_coeff_composition
+        in
+        (* TODO: check relation between length_result and degree_result? *)
+        let nb_evals = List.length list_eval_coeff_composition in
+        let array_eval_coeff_composition =
+          List.map
+            (fun (eval, linear_coeff, composition) ->
+              (snd eval, length eval, linear_coeff, composition))
+            list_eval_coeff_composition
+          |> Array.of_list
+        in
+        let res = allocate_for_res res length_result in
+        Stubs.linear_arrays
+          res
+          array_eval_coeff_composition
+          add_constant
+          length_result
+          nb_evals ;
+        (degree_result, res)
 
   (* Adds 2 evaluations *)
   let add ?res e1 e2 =
@@ -561,8 +579,8 @@ module Evaluations_impl = struct
       (deg_result, res)
 
   let linear_with_powers evals coeff =
-    assert (List.compare_length_with evals 0 > 0) ;
     let nb_evals = List.length evals in
+    assert (nb_evals > 0) ;
     let eval_lenghts = List.map length evals in
     let eval0_length = List.hd eval_lenghts in
     let is_equal_size = List.for_all (Int.equal eval0_length) eval_lenghts in
