@@ -286,6 +286,7 @@ let eval_to_result ?write_debug ?reveal_builtins tree =
   let should_compute pvm_state =
     let+ input_request_val = Wasm_vm.get_info pvm_state in
     match (input_request_val.input_request, pvm_state.tick_state) with
+    | Reveal_required _, _ when reveal_builtins <> None -> true
     | Reveal_required _, _ | Input_required, _ -> false
     | ( No_input_required,
         Eval
