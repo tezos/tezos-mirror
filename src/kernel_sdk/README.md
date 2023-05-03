@@ -31,10 +31,12 @@ with Tezos Smart Rollups, which only provide a 32bit address space.
 In order to build the Rust SDK, `clang >= 11` is required in addition to Rust. This can be installed
 through your favourite package manager.
 
-On MacOS, LLVM should be installed through homebrew:
+On MacOS, LLVM and the WebAssembly Binary Toolkit (WABT) can be installed
+through homebrew:
 
 ```shell
 brew install llvm
+brew install wabt
 LLVM_PATH=$(brew --prefix llvm)
 export AR="${LLVM_PATH}/bin/llvm-ar"
 export CC="${LLVM_PATH}/bin/clang"
