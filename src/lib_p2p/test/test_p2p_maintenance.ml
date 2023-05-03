@@ -519,13 +519,15 @@ let wrap addr n f =
       aux n f)
 
 let main () =
-  let log_cfg =
-    Lwt_log_sink_unix.create_cfg
-      ~rules:
-        "test.p2p.maintenance -> debug; p2p.maintenance -> debug; \
-         p2p.connect_handler -> debug; test.p2p.node -> debug"
-      ()
+  let rules =
+    match Tezt.Cli.options.log_level with
+    | Quiet | Error | Warn | Report | Info -> None
+    | Debug ->
+        Some
+          "test.p2p.maintenance -> debug; p2p.maintenance -> debug; \
+           p2p.connect_handler -> debug; test.p2p.node -> debug"
   in
+  let log_cfg = Lwt_log_sink_unix.create_cfg ?rules () in
   let () =
     Lwt_main.run (Tezos_base_unix.Internal_event_unix.init ~log_cfg ())
   in
