@@ -17,20 +17,21 @@
 #![cfg_attr(all(target_arch = "wasm32", not(feature = "std")), no_std)]
 #![forbid(unsafe_code)]
 
+mod instr;
+mod preimage;
+
 use core::panic::PanicInfo;
-use tezos_smart_rollup::core_unsafe::MAX_FILE_CHUNK_SIZE;
-use tezos_smart_rollup::core_unsafe::PREIMAGE_HASH_SIZE;
-use tezos_smart_rollup::dac::reveal_loop;
-use tezos_smart_rollup::dac::V0SliceContentPage;
-use tezos_smart_rollup::dac::MAX_PAGE_SIZE;
-use tezos_smart_rollup::prelude::*;
+use instr::read_config_program_size;
+use tezos_smart_rollup::host::Runtime;
 use tezos_smart_rollup::storage::path::RefPath;
+use tezos_smart_rollup_installer_config::instr::ConfigInstruction;
+use tezos_smart_rollup_installer_config::nom::{completed, read_size, NomReader};
+use tezos_smart_rollup_installer_config::size::EncodingSize;
+
+use crate::instr::{handle_instruction, read_instruction_bytes};
 
 // Path of currently running kernel.
 const KERNEL_BOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/boot.wasm");
-
-// Path that we write the kernel to, before upgrading.
-const PREPARE_KERNEL_PATH: RefPath = RefPath::assert_from(b"/installer/kernel/boot.wasm");
 
 // Support 3 levels of hashes pages, and then bottom layer of content.
 const MAX_DAC_LEVELS: usize = 4;
@@ -40,12 +41,12 @@ tezos_smart_rollup::kernel_entry!(installer);
 
 /// Installer.
 pub fn installer<Host: Runtime>(host: &mut Host) {
-    if let Some(preimage_hash) = read_reveal_hash(host) {
-        if let Err(e) = install_kernel(host, &preimage_hash) {
+    if let Ok(config_program_size) = read_config_program_size(host) {
+        if let Err(e) = install_kernel(host, config_program_size as usize) {
             Runtime::write_debug(host, e)
         }
     } else {
-        host.write_debug("Failed to read reveal hash")
+        host.write_debug("Failed to read size of config program")
     }
 }
 
@@ -59,79 +60,30 @@ fn panic(_info: &PanicInfo) -> ! {
     panic!()
 }
 
-/// Reads the final [PREIMAGE_HASH_SIZE] bytes of the installer binary.
-///
-/// The binary must have been instrumented with a custom module, containing the
-/// preimage hash of the target kernel, and this hash must be placed at the end
-/// of the binary.
-fn read_reveal_hash(host: &mut impl Runtime) -> Option<[u8; PREIMAGE_HASH_SIZE]> {
-    let kernel_size = host.store_value_size(&KERNEL_BOOT_PATH).ok()?;
-    let reveal_hash_start = kernel_size.checked_sub(PREIMAGE_HASH_SIZE)?;
-
-    let mut preimage_hash = [0; PREIMAGE_HASH_SIZE];
-
-    host.store_read_slice(&KERNEL_BOOT_PATH, reveal_hash_start, &mut preimage_hash)
-        .ok()?;
-
-    Some(preimage_hash)
-}
-
-fn install_kernel<Host: Runtime>(
-    host: &mut Host,
-    root_hash: &[u8; PREIMAGE_HASH_SIZE],
+fn install_kernel(
+    host: &mut impl Runtime,
+    config_program_size: usize,
 ) -> Result<(), &'static str> {
-    let mut buffer = [0; MAX_PAGE_SIZE * MAX_DAC_LEVELS];
+    let mut config_instruction_buffer = [0; ConfigInstruction::MAX_SIZE];
 
-    let mut write_kernel_page = write_kernel_page();
+    let kernel_size = host
+        .store_value_size(&KERNEL_BOOT_PATH)
+        .map_err(|_| "Failed to read kernel boot path size")?;
 
-    reveal_loop(
-        host,
-        0,
-        root_hash,
-        buffer.as_mut_slice(),
-        MAX_DAC_LEVELS,
-        &mut write_kernel_page,
-    )?;
-
-    Runtime::store_move(host, &PREPARE_KERNEL_PATH, &KERNEL_BOOT_PATH)
-        .map_err(|_| "FAILED to install kernel in KERNEL_PATH")?;
+    let end_offset = kernel_size - 4;
+    let mut instr_offset = end_offset - config_program_size;
+    while instr_offset < end_offset {
+        let instr_size = read_size(host, &KERNEL_BOOT_PATH, &mut instr_offset)? as usize;
+        read_instruction_bytes(
+            host,
+            &mut instr_offset,
+            &mut config_instruction_buffer[..instr_size],
+        )?;
+        let instr = ConfigInstruction::nom_read(&config_instruction_buffer[..instr_size])
+            .map_err(|_| "Couldn't decode config instruction")
+            .and_then(completed)?;
+        handle_instruction(host, instr)?;
+    }
 
     Ok(())
-}
-
-fn write_kernel_page<Host: Runtime>(
-) -> impl FnMut(&mut Host, V0SliceContentPage) -> Result<(), &'static str> {
-    let mut kernel_size = 0;
-    move |host, page| {
-        let written = append_content(host, kernel_size, page)?;
-        kernel_size += written;
-        Ok(())
-    }
-}
-
-/// Appends the content of the page path given.
-fn append_content<Host: Runtime>(
-    host: &mut Host,
-    kernel_size: usize,
-    content: V0SliceContentPage,
-) -> Result<usize, &'static str> {
-    let content = content.as_ref();
-
-    let mut size_written = 0;
-    while size_written < content.len() {
-        let num_to_write = usize::min(MAX_FILE_CHUNK_SIZE, content.len() - size_written);
-        let bytes_to_write = &content[size_written..(size_written + num_to_write)];
-
-        Runtime::store_write(
-            host,
-            &PREPARE_KERNEL_PATH,
-            bytes_to_write,
-            kernel_size + size_written,
-        )
-        .map_err(|_| "Failed to write kernel content page")?;
-
-        size_written += num_to_write;
-    }
-
-    Ok(size_written)
 }

@@ -22,6 +22,10 @@ version = "0.4"
 default-features = false
 optional = true
 
+[dependencies.tezos_data_encoding]
+version = "0.4"
+optional = true
+
 [dependencies.thiserror]
 version = "1.0"
 optional = true
@@ -37,7 +41,7 @@ features = ["testing"]
 [features]
 default = ["alloc", "crypto", "std"]
 crypto = ["tezos_crypto_rs"]
-alloc = ["thiserror"]
+alloc = ["thiserror", "tezos_data_encoding"]
 testing = ["crypto"]
 # Required for 'impl Error for RuntimeError'
 std = []

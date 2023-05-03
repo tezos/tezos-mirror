@@ -18,5 +18,6 @@ members = [
   "sdk",
   # UX
   "installer-kernel",
-  "installer-client"
+  "installer-client",
+  "installer-config",
 ]

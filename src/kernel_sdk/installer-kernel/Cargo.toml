@@ -9,7 +9,7 @@ edition = "2021"
 authors = ["TriliTech <contact@trili.tech>"]
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "lib"]
 
 [features]
 default = ["std"]
@@ -23,4 +23,8 @@ features = ["portable"]
 [dependencies.tezos-smart-rollup]
 path = "../sdk"
 version = "0.1.0"
+default-features = false
+
+[dependencies.tezos-smart-rollup-installer-config]
+path = "../installer-config"
 default-features = false
