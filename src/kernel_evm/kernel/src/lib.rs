@@ -38,29 +38,8 @@ pub fn stage_one<Host: Runtime>(
 }
 
 pub fn stage_two<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error> {
-    block::produce(host, queue)?;
-
-    match storage::read_current_block(host) {
-        Ok(L2Block {
-            number,
-            hash,
-            transactions,
-            ..
-        }) => {
-            debug_msg!(
-                host,
-                "Block {} at number {} contains {} transaction(s).\n",
-                String::from_utf8(hash.as_bytes().to_vec()).expect("INVALID HASH"),
-                number,
-                transactions.len()
-            )
-        }
-        Err(e) => {
-            debug_msg!(host, "Block reading failed: {:?}\n", e)
-        }
-    }
-
-    Ok(())
+    debug_msg!(host, "Stage two\n");
+    block::produce(host, queue)
 }
 
 fn retrieve_smart_rollup_address<Host: Runtime>(
