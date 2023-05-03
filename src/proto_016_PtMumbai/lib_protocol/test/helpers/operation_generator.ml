@@ -47,6 +47,8 @@ let manager_pass = `PManager
 
 let all_passes = [`PConsensus; `PAnonymous; `PVote; `PManager]
 
+let all_non_manager_passes = [`PConsensus; `PAnonymous; `PVote]
+
 let consensus_kinds = [`KPreendorsement; `KEndorsement; `KDal_attestation]
 
 let anonymous_kinds =
@@ -799,6 +801,24 @@ let generator_of ?source = function
         generate_sc_rollup_execute_outbox_message
   | `KSc_rollup_recover_bond ->
       generate_manager_operation ?source generate_sc_rollup_recover_bond
+
+let generate_non_manager_operation =
+  let open QCheck2.Gen in
+  let* pass = oneofl all_non_manager_passes in
+  let* kind = oneofl (pass_to_operation_kinds pass) in
+  match kind with
+  | `KPreendorsement -> generate_operation generate_preendorsement
+  | `KEndorsement -> generate_operation generate_endorsement
+  | `KDal_attestation -> generate_operation generate_dal_attestation
+  | `KSeed_nonce_revelation -> generate_operation generate_seed_nonce_revelation
+  | `KVdf_revelation -> generate_operation generate_vdf_revelation
+  | `KDouble_endorsement -> generate_operation generate_double_endorsement
+  | `KDouble_preendorsement -> generate_operation generate_double_preendorsement
+  | `KDouble_baking -> generate_operation generate_double_baking
+  | `KActivate_account -> generate_operation generate_activate_account
+  | `KProposals -> generate_operation generate_proposals
+  | `KBallot -> generate_operation generate_ballot
+  | `KManager -> assert false
 
 let generate_manager_operation batch_size =
   let open QCheck2.Gen in

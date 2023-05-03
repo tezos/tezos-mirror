@@ -37,6 +37,16 @@ let register_test ~__FILE__ ~file_title ~file_tags ~title ~additional_tags =
 (** Generator for a packed operation preceded by its hash. *)
 let oph_and_op_gen = QCheck2.Gen.map snd Operation_generator.generate_operation
 
+(** Generator for a packed non-manager operation. *)
+let non_manager_operation_gen =
+  Operation_generator.generate_non_manager_operation
+
+(** Generator for a packed manager operation. *)
+let manager_operation_gen =
+  let open QCheck2.Gen in
+  let* batch_size = int_range 1 Operation_generator.max_batch_size in
+  Operation_generator.generate_manager_operation batch_size
+
 (** Generator for a packed manager operation with the specified
     total fee and gas limit. *)
 let manager_op_with_fee_and_gas_gen ~fee_in_mutez ~gas =

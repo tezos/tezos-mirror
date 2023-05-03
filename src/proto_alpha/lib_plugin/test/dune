@@ -34,7 +34,11 @@
   -open Tezos_protocol_alpha.Protocol
   -open Tezos_protocol_alpha_parameters
   -open Tezos_alpha_test_helpers)
- (modules helpers test_conflict_handler test_consensus_filter))
+ (modules
+  helpers
+  test_conflict_handler
+  test_consensus_filter
+  test_fee_needed_to_overtake))
 
 (executable
  (name main)
