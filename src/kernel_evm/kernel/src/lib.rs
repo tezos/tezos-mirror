@@ -16,7 +16,6 @@ mod block;
 mod blueprint;
 mod error;
 mod genesis;
-mod helpers;
 mod inbox;
 mod storage;
 

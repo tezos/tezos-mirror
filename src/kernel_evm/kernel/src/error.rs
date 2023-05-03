@@ -7,9 +7,11 @@ use tezos_smart_rollup_host::runtime::RuntimeError;
 
 #[derive(Debug)]
 pub enum TransferError {
+    InvalidCallerAddress,
     InvalidSignature,
     InvalidNonce,
     NotEnoughBalance,
+    CumulativeGasUsedOverflow,
     InvalidAddressFormat(Utf8Error),
 }
 
@@ -17,6 +19,8 @@ pub enum TransferError {
 pub enum StorageError {
     Path(PathError),
     Runtime(RuntimeError),
+    AccountInitialisation,
+    GenesisAccountInitialisation,
     InvalidLoadValue { expected: usize, actual: usize },
     InvalidEncoding { path: OwnedPath, value: Vec<u8> },
 }
@@ -25,6 +29,7 @@ pub enum StorageError {
 pub enum Error {
     Transfer(TransferError),
     Storage(StorageError),
+    InvalidConversion,
 }
 
 impl From<PathError> for Error {

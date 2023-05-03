@@ -10,7 +10,6 @@ use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 use std::str::from_utf8;
 
 use crate::error::{Error, StorageError};
-use tezos_ethereum::account::*;
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::eth_gen::Hash;
 use tezos_ethereum::transaction::{
@@ -22,12 +21,6 @@ use primitive_types::{H160, H256, U256};
 
 const SMART_ROLLUP_ADDRESS: RefPath =
     RefPath::assert_from(b"/metadata/smart_rollup_address");
-
-const EVM_ACCOUNTS: RefPath = RefPath::assert_from(b"/eth_accounts");
-
-const EVM_ACCOUNT_BALANCE: RefPath = RefPath::assert_from(b"/balance");
-const EVM_ACCOUNT_NONCE: RefPath = RefPath::assert_from(b"/nonce");
-const EVM_ACCOUNT_CODE_HASH: RefPath = RefPath::assert_from(b"/code_hash");
 
 const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/evm/blocks/current");
 const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/evm/blocks");
@@ -42,6 +35,8 @@ const TRANSACTION_RECEIPT_BLOCK_HASH: RefPath = RefPath::assert_from(b"/block_ha
 const TRANSACTION_RECEIPT_BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/block_number");
 const TRANSACTION_RECEIPT_FROM: RefPath = RefPath::assert_from(b"/from");
 const TRANSACTION_RECEIPT_TO: RefPath = RefPath::assert_from(b"/to");
+const TRANSACTION_CUMULATIVE_GAS_USED: RefPath =
+    RefPath::assert_from(b"/cumulative_gas_used");
 const TRANSACTION_RECEIPT_TYPE: RefPath = RefPath::assert_from(b"/type");
 const TRANSACTION_RECEIPT_STATUS: RefPath = RefPath::assert_from(b"/status");
 
@@ -129,11 +124,6 @@ fn address_path(address: Hash) -> Result<OwnedPath, Error> {
     OwnedPath::try_from(address_path).map_err(Error::from)
 }
 
-pub fn account_path(address: Hash) -> Result<OwnedPath, Error> {
-    let address_hash = address_path(address)?;
-    concat(&EVM_ACCOUNTS, &address_hash).map_err(Error::from)
-}
-
 pub fn block_path(number: U256) -> Result<OwnedPath, Error> {
     let number: &str = &number.to_string();
     let raw_number_path: Vec<u8> = format!("/{}", &number).into();
@@ -145,94 +135,6 @@ pub fn receipt_path(receipt_hash: &TransactionHash) -> Result<OwnedPath, Error> 
     let raw_receipt_path: Vec<u8> = format!("/{}", &hash).into();
     let receipt_path = OwnedPath::try_from(raw_receipt_path)?;
     concat(&TRANSACTIONS_RECEIPTS, &receipt_path).map_err(Error::from)
-}
-
-pub fn has_account<Host: Runtime>(
-    host: &mut Host,
-    account_path: &OwnedPath,
-) -> Result<bool, Error> {
-    match host.store_has(account_path)? {
-        Some(ValueType::Subtree | ValueType::ValueWithSubtree) => Ok(true),
-        _ => Ok(false),
-    }
-}
-
-pub fn read_account_nonce<Host: Runtime>(
-    host: &mut Host,
-    account_path: &OwnedPath,
-) -> Result<U256, Error> {
-    let path = concat(account_path, &EVM_ACCOUNT_NONCE)?;
-    read_u256(host, &path)
-}
-
-pub fn read_account_balance<Host: Runtime>(
-    host: &mut Host,
-    account_path: &OwnedPath,
-) -> Result<Wei, Error> {
-    let path = concat(account_path, &EVM_ACCOUNT_BALANCE)?;
-    read_u256(host, &path)
-}
-
-pub fn read_account_code_hash<Host: Runtime>(
-    host: &mut Host,
-    account_path: &OwnedPath,
-) -> Result<Vec<u8>, Error> {
-    let path = concat(account_path, &EVM_ACCOUNT_CODE_HASH)?;
-    host.store_read(&path, 0, HASH_MAX_SIZE)
-        .map_err(Error::from)
-}
-
-pub fn read_account<Host: Runtime>(
-    host: &mut Host,
-    address: Hash,
-) -> Result<Account, Error> {
-    let account_path = account_path(address)?;
-    let nonce = read_account_nonce(host, &account_path)?;
-    let balance = read_account_balance(host, &account_path)?;
-    let code_hash = read_account_code_hash(host, &account_path)?;
-
-    Ok(Account {
-        nonce,
-        balance,
-        code_hash,
-    })
-}
-
-pub fn store_nonce<Host: Runtime>(
-    host: &mut Host,
-    account_path: &OwnedPath,
-    nonce: U256,
-) -> Result<(), Error> {
-    let path = concat(account_path, &EVM_ACCOUNT_NONCE)?;
-    write_u256(host, &path, nonce)
-}
-
-pub fn store_balance<Host: Runtime>(
-    host: &mut Host,
-    account_path: &OwnedPath,
-    balance: Wei,
-) -> Result<(), Error> {
-    let path = concat(account_path, &EVM_ACCOUNT_BALANCE)?;
-    write_u256(host, &path, balance)
-}
-
-fn store_code_hash<Host: Runtime>(
-    host: &mut Host,
-    account_path: &OwnedPath,
-    code_hash: Hash,
-) -> Result<(), Error> {
-    let path = concat(account_path, &EVM_ACCOUNT_CODE_HASH)?;
-    host.store_write(&path, code_hash, 0).map_err(Error::from)
-}
-
-pub fn store_account<Host: Runtime>(
-    host: &mut Host,
-    account: &Account,
-    account_path: &OwnedPath,
-) -> Result<(), Error> {
-    store_nonce(host, account_path, account.nonce)?;
-    store_balance(host, account_path, account.balance)?;
-    store_code_hash(host, account_path, &account.code_hash)
 }
 
 pub fn read_current_block_number<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
@@ -369,6 +271,18 @@ pub fn store_transaction_receipt<Host: Runtime>(
         let to_path = concat(receipt_path, &TRANSACTION_RECEIPT_TO)?;
         host.store_write(&to_path, to.as_bytes(), 0)?;
     };
+    // Cumulative gas used
+    let cumulative_gas_used_path =
+        concat(receipt_path, &TRANSACTION_CUMULATIVE_GAS_USED)?;
+    let mut le_receipt_cumulative_gas_used: [u8; 32] = [0; 32];
+    receipt
+        .cumulative_gas_used
+        .to_little_endian(&mut le_receipt_cumulative_gas_used);
+    host.store_write(
+        &cumulative_gas_used_path,
+        &le_receipt_cumulative_gas_used,
+        0,
+    )?;
 
     Ok(())
 }
@@ -399,6 +313,16 @@ pub fn read_transaction_receipt_status<Host: Runtime>(
             value: raw_status,
         })
     })
+}
+
+pub fn read_transaction_receipt_cumulative_gas_used<Host: Runtime>(
+    host: &mut Host,
+    tx_hash: &TransactionHash,
+) -> Result<U256, Error> {
+    let receipt_path = receipt_path(tx_hash)?;
+    let cumulative_gas_used_path =
+        concat(&receipt_path, &TRANSACTION_CUMULATIVE_GAS_USED)?;
+    read_u256(host, &cumulative_gas_used_path)
 }
 
 const CHUNKED_TRANSACTIONS: RefPath = RefPath::assert_from(b"/chunked_transactions");

@@ -3,9 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::address::EthereumAddress;
-use primitive_types::{H256, U256};
-
-use crate::eth_gen::OwnedHash;
+use primitive_types::{H160, H256, U256};
 
 pub const TRANSACTION_HASH_SIZE: usize = 32;
 pub type TransactionHash = [u8; TRANSACTION_HASH_SIZE];
@@ -74,7 +72,7 @@ pub struct TransactionReceipt {
     /// The amount of gas used by this specific transaction alone.
     pub gas_used: U256,
     /// The contract address created, if the transaction was a contract creation, otherwise null.
-    pub contract_address: Option<OwnedHash>,
+    pub contract_address: Option<H160>,
     // The two following fields can be ignored for now
     // pub logs : unit,
     // pub logs_bloom : unit,
