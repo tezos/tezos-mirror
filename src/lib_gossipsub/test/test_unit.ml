@@ -946,7 +946,7 @@ let test_do_not_graft_within_backoff_period rng limits parameters =
     |> WithExceptions.Result.get_ok ~loc:__LOC__
     |> List.fold_left
          (fun state i ->
-           Time.elapse 1 ;
+           Time.elapse @@ Milliseconds.of_int_s 1 ;
            Log.info "%d time tick(s) elapsed..." i ;
            let state, Heartbeat {to_graft; _} = GS.heartbeat state in
            let grafts = Peer.Map.bindings to_graft in
@@ -960,7 +960,7 @@ let test_do_not_graft_within_backoff_period rng limits parameters =
   in
   (* After elapsing one more second,
      the backoff should be cleared and the graft should be emitted. *)
-  Time.elapse 1 ;
+  Time.elapse @@ Milliseconds.of_int_s 1 ;
   let _state, Heartbeat {to_graft; _} = GS.heartbeat state in
   let grafts = Peer.Map.bindings to_graft in
   Check.((List.length grafts = 1) int ~error_msg:"Expected %R, got %L" ~__LOC__) ;
@@ -1009,7 +1009,7 @@ let test_unsubscribe_backoff rng limits parameters =
     |> WithExceptions.Result.get_ok ~loc:__LOC__
     |> List.fold_left
          (fun state i ->
-           Time.elapse 1 ;
+           Time.elapse @@ Milliseconds.of_int_s 1 ;
            Log.info "%d time tick(s) elapsed..." i ;
            let state, Heartbeat {to_graft; _} = GS.heartbeat state in
            let grafts = Peer.Map.bindings to_graft in
@@ -1023,7 +1023,7 @@ let test_unsubscribe_backoff rng limits parameters =
   in
   (* After elapsing one more second,
      the backoff should be cleared and the graft should be emitted. *)
-  Time.elapse 1 ;
+  Time.elapse @@ Milliseconds.of_int_s 1 ;
   let _state, Heartbeat {to_graft; _} = GS.heartbeat state in
   let grafts = Peer.Map.bindings to_graft in
   Check.((List.length grafts = 1) int ~error_msg:"Expected %R, got %L" ~__LOC__) ;

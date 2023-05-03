@@ -94,9 +94,9 @@ module Time = struct
 
   let now () = !t
 
-  let elapse s =
-    assert (s >= 0) ;
-    t := Milliseconds.add !t (Milliseconds.of_int_s s)
+  let elapse ms =
+    assert (Milliseconds.(ms >= zero)) ;
+    t := Milliseconds.add !t ms
 
   let set now = t := now
 
