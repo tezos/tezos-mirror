@@ -79,8 +79,4 @@ let tests =
   in
   ("protocol store", test_cases)
 
-let () =
-  let open Lwt_syntax in
-  Lwt_main.run
-    (let* () = Tezos_base_unix.Internal_event_unix.init () in
-     Alcotest_lwt.run ~__FILE__ "tezos-store" [tests])
+let () = Lwt_main.run (Alcotest_lwt.run ~__FILE__ "tezos-store" [tests])

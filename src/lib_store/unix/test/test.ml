@@ -34,6 +34,7 @@
 let () =
   let open Lwt_syntax in
   Lwt_main.run
+    (* we init the internal event here once and for all modules *)
     (let* () = Tezos_base_unix.Internal_event_unix.init () in
      Alcotest_lwt.run
        ~__FILE__
