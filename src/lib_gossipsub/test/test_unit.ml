@@ -978,20 +978,40 @@ let test_unsubscribe_backoff rng limits parameters =
     ~tags:["gossipsub"; "heartbeat"; "join"; "leave"]
   @@ fun () ->
   let topic = "topic" in
+  let per_topic_score_parameters =
+    GS.Score.Internal_for_tests.get_topic_params limits.score_parameters topic
+  in
+  let mesh_message_deliveries_activation =
+    per_topic_score_parameters.mesh_message_deliveries_activation
+  in
   (* Only one peer => mesh too small and will try to regraft as early as possible *)
   let peers = make_peers ~number:1 in
+  (* Number of ticks until the unsubscribe backoff expires. *)
+  let backoff_ticks = 5 in
+  (* We must set [heartbeat_interval] so that
+     number_of_heartbeats_in_the_test * [heartbeat_interval] < [mesh_message_deliveries_activation]
+     holds. This prevents surpassing [mesh_message_deliveries_activation] within the test,
+     thus avoiding the activation of p3 penalty. Since number_of_heartbeats_in_the_test
+     is [backoff_ticks + 2], we set [heartbeat_interval] as the following.*)
+  let heartbeat_interval =
+    (Milliseconds.to_int_ms mesh_message_deliveries_activation - 1)
+    / (backoff_ticks + 2)
+    |> Milliseconds.of_int_ms
+  in
+  (* Time required until unsubscribe backoff expires. *)
+  let unsubscribe_backoff =
+    Milliseconds.(of_int_ms @@ (backoff_ticks * to_int_ms heartbeat_interval))
+  in
   let state =
     init_state
       ~rng
       ~limits:
         {
           limits with
+          heartbeat_interval;
           (* Run backoff clearing on every heartbeat tick. *)
           backoff_cleanup_ticks = 1;
-          (* We will run the heartbeat tick on each time tick to simplify the test. *)
-          heartbeat_interval = Milliseconds.of_int_s 1;
-          (* Set unsubscribe backoff to 5. *)
-          unsubscribe_backoff = Milliseconds.of_int_s 5;
+          unsubscribe_backoff;
         }
       ~parameters
       ~peers
@@ -1002,14 +1022,14 @@ let test_unsubscribe_backoff rng limits parameters =
   (* Peer unsubscribes then subscribes from topic. *)
   let state, _ = GS.leave {topic} state in
   let state, _ = GS.join {topic} state in
-  (* No graft should be emitted until 7 time ticks pass.
-     The additional 2 time ticks from the backoff is due to the "backoff slack". *)
+  (* No graft should be emitted until [(backoff_ticks + 2) * heartbeat_interval] elapse.
+     The additional 2 [heartbeat_interval] is due to the "backoff slack". *)
   let state =
-    List.init ~when_negative_length:() 6 (fun i -> i + 1)
+    List.init ~when_negative_length:() (backoff_ticks + 1) (fun i -> i + 1)
     |> WithExceptions.Result.get_ok ~loc:__LOC__
     |> List.fold_left
          (fun state i ->
-           Time.elapse @@ Milliseconds.of_int_s 1 ;
+           Time.elapse @@ heartbeat_interval ;
            Log.info "%d time tick(s) elapsed..." i ;
            let state, Heartbeat {to_graft; _} = GS.heartbeat state in
            let grafts = Peer.Map.bindings to_graft in
@@ -1021,9 +1041,9 @@ let test_unsubscribe_backoff rng limits parameters =
            state)
          state
   in
-  (* After elapsing one more second,
+  (* After elapsing one more [heartbeat_interval],
      the backoff should be cleared and the graft should be emitted. *)
-  Time.elapse @@ Milliseconds.of_int_s 1 ;
+  Time.elapse @@ heartbeat_interval ;
   let _state, Heartbeat {to_graft; _} = GS.heartbeat state in
   let grafts = Peer.Map.bindings to_graft in
   Check.((List.length grafts = 1) int ~error_msg:"Expected %R, got %L" ~__LOC__) ;
