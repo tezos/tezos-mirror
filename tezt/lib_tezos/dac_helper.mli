@@ -44,7 +44,7 @@ module Scenarios : sig
 end
 
 (** [with_legacy_dac_node] creates a Legacy Dac node. DAC Committee of size
-    [committee_size] will be generated and pre-configured in the legacy node. 
+    [committee_size] will be generated and pre-configured in the legacy node.
 *)
 val with_legacy_dac_node :
   ?name:string ->
@@ -60,9 +60,9 @@ val with_legacy_dac_node :
   'a Lwt.t
 
 (** Initializes a a Coordinator Dac node. DAC Committee of size [committee_size]
-    will be generated and pre-configured in the legacy node. An additional 
+    will be generated and pre-configured in the legacy node. An additional
     [custom_committee_members] can be provided to configure fixed members of the
-    committee (useful for testing). 
+    committee (useful for testing).
 *)
 val with_coordinator_node :
   ?name:string ->
@@ -70,7 +70,6 @@ val with_coordinator_node :
   ?pvm_name:string ->
   ?wait_ready:bool ->
   ?custom_committee_members:Account.aggregate_key list ->
-  threshold:int ->
   committee_size:int ->
   Node.t ->
   Client.t ->
@@ -103,8 +102,8 @@ val with_observer :
   (Dac_node.t -> 'b Lwt.t) ->
   'b Lwt.t
 
-(** Initializes a new [Sc_rollup] with empty boot sector, attached to 
-    an [Sc_rollup_node]. 
+(** Initializes a new [Sc_rollup] with empty boot sector, attached to
+    an [Sc_rollup_node].
 *)
 val with_fresh_rollup :
   ?pvm_name:string ->
@@ -116,7 +115,7 @@ val with_fresh_rollup :
   'a Lwt.t
 
 (** Initalizes a scenario with full DAC infrastruture. See [Scenarios.full] for
-    components. 
+    components.
 *)
 val scenario_with_full_dac_infrastructure :
   ?tags:string list ->

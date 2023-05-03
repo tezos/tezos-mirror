@@ -157,8 +157,8 @@ let with_legacy_dac_node ?name ?sc_rollup_node ?(pvm_name = "arith")
   f dac_node committee_members
 
 let with_coordinator_node ?name ?sc_rollup_node ?(pvm_name = "arith")
-    ?(wait_ready = true) ?(custom_committee_members = []) ~threshold
-    ~committee_size tezos_node tezos_client f =
+    ?(wait_ready = true) ?(custom_committee_members = []) ~committee_size
+    tezos_node tezos_client f =
   let range i = List.init i Fun.id in
   let reveal_data_dir =
     Option.map
@@ -194,7 +194,6 @@ let with_coordinator_node ?name ?sc_rollup_node ?(pvm_name = "arith")
       ~node:tezos_node
       ~client:tezos_client
       ?reveal_data_dir
-      ~threshold
       ~committee_members:
         (List.map
            (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key_hash)
@@ -302,7 +301,6 @@ let scenario_with_full_dac_infrastructure ?(tags = ["dac"; "full"])
         client
         ~name:"coordinator"
         ~pvm_name
-        ~threshold:0
         ~custom_committee_members
         ~committee_size
       @@ fun coordinator_node committee_members ->

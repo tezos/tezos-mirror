@@ -48,8 +48,8 @@ val create_legacy :
   unit ->
   t
 
-(** Creates a DAC node to run in coordinator mode, using the specified
-    threshold, list of dac members and operator. *)
+(** Creates a DAC node to run in coordinator mode registered with
+    the specified committee members. *)
 val create_coordinator :
   ?path:string ->
   ?name:string ->
@@ -59,7 +59,6 @@ val create_coordinator :
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?reveal_data_dir:string ->
-  threshold:int ->
   committee_members:string list ->
   node:Node.t ->
   client:Client.t ->
