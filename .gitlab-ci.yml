@@ -11,19 +11,19 @@ workflow:
     # 'if'-rules on the pipeline includes below.
 
     # Allow 'Before merging' pipelines
-    - if: '($CI_PIPELINE_SOURCE == "merge_request_event") && ($CI_PROJECT_NAMESPACE == "tezos")'
+    - if: '($CI_PROJECT_NAMESPACE == "tezos") && ($CI_PIPELINE_SOURCE == "merge_request_event")'
     # Allow 'Latest release' pipelines
-    - if: '($CI_COMMIT_BRANCH == "latest-release") && ($CI_PROJECT_NAMESPACE == "tezos")'
+    - if: '($CI_PROJECT_NAMESPACE == "tezos") && ($CI_COMMIT_BRANCH == "latest-release")'
     # Allow 'Test latest release' pipelines
-    - if: '($CI_COMMIT_BRANCH  == "latest-release-test") && ($CI_PROJECT_NAMESPACE != "tezos")'
+    - if: '($CI_PROJECT_NAMESPACE != "tezos") && ($CI_COMMIT_BRANCH == "latest-release-test")'
     # Allow 'Master branch' pipelines
     - if: '($CI_PROJECT_NAMESPACE == "tezos") && ($CI_COMMIT_BRANCH == "master")'
     # Allow 'Release tag' pipelines
-    - if: '($CI_COMMIT_TAG =~ /^v\d+\.\d+(?:\-rc\d+)?$/) && ($CI_PROJECT_NAMESPACE == "tezos")'
+    - if: '($CI_PROJECT_NAMESPACE == "tezos") && ($CI_COMMIT_TAG =~ /^v\d+\.\d+(?:\-rc\d+)?$/)'
     # Allow 'Beta release tag' pipelines
-    - if: '($CI_COMMIT_TAG =~ /^v\d+\.\d+\-beta\d*$/) && ($CI_PROJECT_NAMESPACE == "tezos")'
+    - if: '($CI_PROJECT_NAMESPACE == "tezos") && ($CI_COMMIT_TAG =~ /^v\d+\.\d+\-beta\d*$/)'
     # Allow 'Test release tag' pipelines
-    - if: '($CI_COMMIT_TAG =~ /^v\d+\.\d+(?:\-(rc|beta)\d+)?$/) && ($CI_PROJECT_NAMESPACE != "tezos")'
+    - if: '($CI_PROJECT_NAMESPACE != "tezos") && ($CI_COMMIT_TAG =~ /^v\d+\.\d+(?:\-(rc|beta)\d+)?$/)'
     # Allow 'Scheduled pipeline for extended tests' pipelines
     - if: '($CI_PIPELINE_SOURCE == "schedule") && ($TZ_SCHEDULE_KIND == "EXTENDED_TESTS")'
     # Disallow all other pipelines
@@ -126,17 +126,17 @@ include:
   # Before merging
   - local: .gitlab/ci/pipelines/before_merging.yml
     rules:
-      - if: '($CI_PIPELINE_SOURCE == "merge_request_event") && ($CI_PROJECT_NAMESPACE == "tezos")'
+      - if: '($CI_PROJECT_NAMESPACE == "tezos") && ($CI_PIPELINE_SOURCE == "merge_request_event")'
 
   # Latest release
   - local: .gitlab/ci/pipelines/latest_release.yml
     rules:
-      - if: '($CI_COMMIT_BRANCH == "latest-release") && ($CI_PROJECT_NAMESPACE == "tezos")'
+      - if: '($CI_PROJECT_NAMESPACE == "tezos") && ($CI_COMMIT_BRANCH == "latest-release")'
 
   # Test latest release
   - local: .gitlab/ci/pipelines/latest_release_test.yml
     rules:
-      - if: '($CI_COMMIT_BRANCH  == "latest-release-test") && ($CI_PROJECT_NAMESPACE != "tezos")'
+      - if: '($CI_PROJECT_NAMESPACE != "tezos") && ($CI_COMMIT_BRANCH == "latest-release-test")'
 
   # Master branch
   - local: .gitlab/ci/pipelines/master_branch.yml
@@ -146,17 +146,17 @@ include:
   # Release tag
   - local: .gitlab/ci/pipelines/release_tag.yml
     rules:
-      - if: '($CI_COMMIT_TAG =~ /^v\d+\.\d+(?:\-rc\d+)?$/) && ($CI_PROJECT_NAMESPACE == "tezos")'
+      - if: '($CI_PROJECT_NAMESPACE == "tezos") && ($CI_COMMIT_TAG =~ /^v\d+\.\d+(?:\-rc\d+)?$/)'
 
   # Beta release tag
   - local: .gitlab/ci/pipelines/beta_release_tag.yml
     rules:
-      - if: '($CI_COMMIT_TAG =~ /^v\d+\.\d+\-beta\d*$/) && ($CI_PROJECT_NAMESPACE == "tezos")'
+      - if: '($CI_PROJECT_NAMESPACE == "tezos") && ($CI_COMMIT_TAG =~ /^v\d+\.\d+\-beta\d*$/)'
 
   # Test release tag
   - local: .gitlab/ci/pipelines/release_tag_test.yml
     rules:
-      - if: '($CI_COMMIT_TAG =~ /^v\d+\.\d+(?:\-(rc|beta)\d+)?$/) && ($CI_PROJECT_NAMESPACE != "tezos")'
+      - if: '($CI_PROJECT_NAMESPACE != "tezos") && ($CI_COMMIT_TAG =~ /^v\d+\.\d+(?:\-(rc|beta)\d+)?$/)'
 
   # Scheduled pipeline for extended tests
   - local: .gitlab/ci/pipelines/schedule_extended_test.yml
