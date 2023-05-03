@@ -52,6 +52,14 @@ let store_is_ready =
     ~level:Notice
     ()
 
+let operating_mode =
+  declare_1
+    ~section
+    ~name:"dac_node_running_mode"
+    ~msg:"The DAC node is running in mode {mode}"
+    ~level:Notice
+    ("mode", Data_encoding.string)
+
 let rpc_server_is_ready =
   declare_2
     ~section

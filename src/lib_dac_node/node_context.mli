@@ -50,6 +50,9 @@ module Coordinator : sig
       data availability committee of [t]. *)
   val public_keys_opt :
     t -> Tezos_crypto.Aggregate_signature.public_key option list
+
+  val committee_members :
+    t -> Tezos_crypto.Aggregate_signature.public_key_hash list
 end
 
 (** [Committee_member] defines a partial [Node_context.t] that is available
@@ -111,6 +114,9 @@ module Legacy : sig
   (** [secret_key_uris_opt] return the list of optional secret key URIs of the
       committee members of [t]. *)
   val secret_key_uris_opt : t -> Client_keys.aggregate_sk_uri option list
+
+  val committee_members :
+    t -> Tezos_crypto.Aggregate_signature.public_key_hash list
 end
 
 (** Operating mode specific fraction of a [Node_context.t] *)
@@ -156,9 +162,9 @@ val get_ready : t -> ready_ctxt tzresult
 (** [get_status ctxt] returns the dac node status. *)
 val get_status : t -> status
 
-(** [mode node_ctxt] returns the operating mode specific fraction of a
+(** [get_mode node_ctxt] returns the operating mode specific fraction of a
     [Node_context.t]. *)
-val mode : t -> mode
+val get_mode : t -> mode
 
 (** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context. *)
 val get_tezos_node_cctxt : t -> Client_context.full
@@ -174,13 +180,3 @@ val get_page_store : t -> Page_store.Filesystem.t
 (** [get_node_store ctxt access_mode] returns the [Store.Irmin_store.t] with
     [access_mode] used by Dac components. *)
 val get_node_store : t -> 'a Store_sigs.mode -> 'a Store.Irmin_store.t
-
-(** [get_committee_members ctxt] returns the Dac committee public key hashes from
-    [Configuration.Legacy.dac_members_addresses] or
-    [Configuration.Coordinator.dac_members_addresses] *)
-val get_committee_members :
-  t -> Tezos_crypto.Aggregate_signature.public_key_hash list tzresult
-
-(** [get_coordinator_client ctx] returns the Coordinator client if it
-    is available. *)
-val get_coordinator_client : t -> Dac_node_client.cctxt tzresult

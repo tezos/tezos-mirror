@@ -108,6 +108,10 @@ type t = private {
           DAC. *)
 }
 
+(** [mode_name t] returns a string representation of the operating mode
+    for the configuration [t]. *)
+val mode_name : t -> string
+
 (** [make_coordinator threshold dac_members_addresses] creates a new coordinator
     configuration mode using the given [threshold] and [dac_members_addresses].
 *)

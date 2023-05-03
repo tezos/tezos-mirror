@@ -63,6 +63,11 @@ module Coordinator = struct
     List.map
       (fun Wallet_account.Coordinator.{public_key_opt; _} -> public_key_opt)
       t.committee_members
+
+  let committee_members t =
+    List.map
+      (fun Wallet_account.Coordinator.{public_key_hash; _} -> public_key_hash)
+      t.committee_members
 end
 
 module Committee_member = struct
@@ -196,6 +201,11 @@ module Legacy = struct
     List.map
       (fun Wallet_account.Legacy.{secret_key_uri_opt; _} -> secret_key_uri_opt)
       t.committee_members
+
+  let committee_members t =
+    List.map
+      (fun Wallet_account.Legacy.{public_key_hash; _} -> public_key_hash)
+      t.committee_members
 end
 
 type mode =
@@ -251,7 +261,7 @@ let init config cctxt =
     mode;
   }
 
-let mode node_ctxt = node_ctxt.mode
+let get_mode node_ctxt = node_ctxt.mode
 
 let set_ready ctxt dac_plugin =
   match ctxt.status with
@@ -263,10 +273,7 @@ let set_ready ctxt dac_plugin =
       ctxt.status <- Ready {dac_plugin}
   | Ready _ -> raise Status_already_ready
 
-type error +=
-  | Node_not_ready
-  | Invalid_operation_for_mode of {mode : string; operation : string}
-  | Coordinator_client_not_defined_in_config
+type error += Node_not_ready
 
 let () =
   register_error_kind
@@ -280,39 +287,7 @@ let () =
         "DAC node is starting. It's not ready to respond to RPCs.")
     Data_encoding.(unit)
     (function Node_not_ready -> Some () | _ -> None)
-    (fun () -> Node_not_ready) ;
-  register_error_kind
-    `Permanent
-    ~id:"dac_unexpected_mode"
-    ~title:"Invalid operation for the current mode of Dac node."
-    ~description:
-      "An operation was called that it not supported by the current Dac node."
-    ~pp:(fun ppf (mode, operation) ->
-      Format.fprintf
-        ppf
-        "An operation was called that it not supported by the current Dac \
-         node. Mode: %s; Unsupported_operation: %s"
-        mode
-        operation)
-    Data_encoding.(
-      obj2 (req "mode" (string' Plain)) (req "operation" (string' Plain)))
-    (function
-      | Invalid_operation_for_mode {mode; operation} -> Some (mode, operation)
-      | _ -> None)
-    (fun (mode, operation) -> Invalid_operation_for_mode {mode; operation}) ;
-  register_error_kind
-    `Permanent
-    ~id:"dac_coordinator_client_not_defined_in_config"
-    ~title:"Coordinator client was not defined in config."
-    ~description:
-      "Coordinator client configuration was expected but not defined."
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "Coordinator client configuration was expected but not defined.")
-    Data_encoding.unit
-    (function Coordinator_client_not_defined_in_config -> Some () | _ -> None)
-    (fun () -> Coordinator_client_not_defined_in_config)
+    (fun () -> Node_not_ready)
 
 let get_ready ctxt =
   let open Result_syntax in
@@ -337,31 +312,3 @@ let get_node_store (type a) ctxt (access_mode : a Store_sigs.mode) :
   match access_mode with
   | Store_sigs.Read_only -> Store.Irmin_store.readonly ctxt.node_store
   | Store_sigs.Read_write -> ctxt.node_store
-
-let get_committee_members ctxt =
-  let open Result_syntax in
-  match ctxt.mode with
-  | Legacy legacy ->
-      Ok
-        (List.map
-           (fun Wallet_account.Legacy.{public_key_hash; _} -> public_key_hash)
-           legacy.committee_members)
-  | Coordinator coordinator ->
-      Ok
-        ((List.map (fun Wallet_account.Coordinator.{public_key_hash; _} ->
-              public_key_hash))
-           coordinator.committee_members)
-  | Observer _ ->
-      tzfail
-      @@ Invalid_operation_for_mode
-           {mode = "observer"; operation = "get_committee_members"}
-  | Committee_member _ ->
-      tzfail
-      @@ Invalid_operation_for_mode
-           {mode = "dac_member"; operation = "get_committee_members"}
-
-let get_coordinator_client ctxt =
-  match ctxt.mode with
-  | Observer observer_ctxt -> Ok observer_ctxt.coordinator_cctxt
-  | Legacy {coordinator_cctxt = Some cctxt; _} -> Ok cctxt
-  | _ -> Result_syntax.tzfail Coordinator_client_not_defined_in_config

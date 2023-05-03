@@ -53,38 +53,6 @@ let daemonize handlers =
    return_unit)
   |> lwt_map_error (List.fold_left (fun acc errs -> errs @ acc) [])
 
-let get_all_committee_members_keys pkhs ~threshold wallet_cctxt =
-  let open Lwt_result_syntax in
-  let* wallet_accounts =
-    List.map_es
-      (fun pkh ->
-        Wallet_account.Legacy.of_committee_member_address pkh wallet_cctxt)
-      pkhs
-  in
-  let*! valid_wallet_accounts =
-    List.filter_s
-      (fun Wallet_account.Legacy.{public_key_hash; secret_key_uri_opt; _} ->
-        if Option.is_some secret_key_uri_opt then Lwt.return true
-        else
-          let*! () =
-            Event.(emit committee_member_cannot_sign public_key_hash)
-          in
-          Lwt.return false)
-      wallet_accounts
-  in
-  let recovered_keys = List.length valid_wallet_accounts in
-  let*! () =
-    (* We emit a warning if the threshold of dac accounts needed to sign a
-       root page hash is not reached. We also emit a warning for each DAC
-       account whose secret key URI was not recovered.
-       We do not stop the dac node at this stage.
-    *)
-    if recovered_keys < threshold then
-      Event.(emit dac_threshold_not_reached (recovered_keys, threshold))
-    else Event.(emit dac_is_ready) ()
-  in
-  return wallet_accounts
-
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
 *)
@@ -96,6 +64,8 @@ let run ~data_dir cctxt =
        config) =
     Configuration.load ~data_dir
   in
+  let operating_mode_string = Configuration.mode_name config in
+  let*! () = Event.(emit operating_mode operating_mode_string) in
   let* () = Page_store.ensure_reveal_data_dir_exists reveal_data_dir in
   let* ctxt = Node_context.init config cctxt in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4725
