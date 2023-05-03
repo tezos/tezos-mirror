@@ -46,6 +46,9 @@ let create_if_none certificate_streamers root_hash =
   !certificate_streamers |> Map.find root_hash
   |> Option.value_f ~default:(fun _ -> assert false)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/5550
+   Close certificate streamer after timeout to avoid clients hanging
+   indefinitely. *)
 let handle_subscribe dac_plugin certificate_streamers raw_root_hash =
   let open Result_syntax in
   let* root_hash = Dac_plugin.raw_to_hash dac_plugin raw_root_hash in

@@ -77,6 +77,9 @@ let number_of_witnesses Certificate_repr.{witnesses; _} =
   in
   find_next witnesses 0
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/5550
+   Close connection after timeouts on server side to avoid the client
+   hanging forever. *)
 let wait_for_certificate cctxt root_hash threshold =
   let open Lwt_result_syntax in
   let* stream, _stopper =
