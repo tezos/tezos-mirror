@@ -819,8 +819,7 @@ restrictions:
 #. Instructions and types related to floating-point arithmetic are not
    supported. This is because IEEE floats are not deterministic, as
    the standard includes undefined behavior operations.
-#. The length of the call stack of the WASM kernel is bounded (see the WASM PVM
-   versioning section).
+#. The length of the call stack of the WASM kernel is bounded.
 
 Modulo the limitations above, a valid kernel is a WASM module that
 satisfies the following constraints:
@@ -923,7 +922,6 @@ The values and subtrees under the key ``/readonly`` are not writable
 by a kernel, but can be used by the PVM to give information to the
 kernel.
 
-
 WASM PVM Versioning
 """""""""""""""""""
 
@@ -951,6 +949,8 @@ upgrades. The WASM PVM will upgrade itself when it reads the
 +--------------+----------------+
 | Alpha        | 2.0.0-r1       |
 +--------------+----------------+
+
+The changes in each WASM PVM version can be found by searching for string "PVM" in the corresponding protocol's changelog, section ``Smart Rollups`` (e.g. `this section <../protocols/alpha.html#smart-rollups>`__ for protocol Alpha).
 
 Control Flow
 """"""""""""
