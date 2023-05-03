@@ -402,6 +402,8 @@ module Prefix = struct
 
   let smart_rollup_state = "\017\165\235\240" (* srs1(54) *)
 
+  let smart_rollup_merkelized_payload = "\003\255\138\145\140" (* srib2(55) *)
+
   (* 56 *)
   let ed25519_encrypted_seed = "\007\090\060\179\041" (* edesk(88) *)
 

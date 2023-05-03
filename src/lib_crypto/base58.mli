@@ -61,6 +61,8 @@ module Prefix : sig
 
   val smart_rollup_state : string
 
+  val smart_rollup_merkelized_payload : string
+
   val cryptobox_public_key_hash : string
 
   val ed25519_seed : string
