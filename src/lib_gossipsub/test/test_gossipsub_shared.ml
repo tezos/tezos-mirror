@@ -32,7 +32,9 @@ module Milliseconds = struct
 
   let of_int_ms ms = {ms}
 
-  let of_int_s s = {ms = s * 1000}
+  let of_float_s f = {ms = int_of_float @@ (f *. 1000.)}
+
+  let of_int_s n = {ms = n * 1000}
 
   let zero = {ms = 0}
 
@@ -40,7 +42,9 @@ module Milliseconds = struct
 
   let sub m1 m2 = of_int_ms (m1.ms - m2.ms)
 
-  let seconds {ms} = ms / 1000
+  let to_float_s {ms} = float ms /. 1000.
+
+  let to_int_s ms = to_float_s ms |> int_of_float
 
   let compare m1 m2 = Int.compare m1.ms m2.ms
 
@@ -57,11 +61,13 @@ module Milliseconds = struct
 
     let one_second = {ms = 1000}
 
-    let seconds = seconds
+    let to_int_s = to_int_s
 
-    let of_int_ms = of_int_ms
+    let to_float_s = to_float_s
 
     let of_int_s = of_int_s
+
+    let of_float_s = of_float_s
 
     let add = add
 
@@ -323,7 +329,7 @@ module Worker_config = struct
     let return = Lwt.return
 
     let sleep (span : GS.Span.t) =
-      Lwt_unix.sleep @@ float_of_int (Milliseconds.Span.seconds span)
+      Lwt_unix.sleep @@ Milliseconds.Span.to_float_s span
   end
 
   module Stream = struct

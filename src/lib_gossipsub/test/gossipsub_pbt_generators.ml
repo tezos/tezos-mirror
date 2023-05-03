@@ -315,8 +315,7 @@ struct
 
     let tick : t =
       Thread
-        ([Elapse (Milliseconds.Span.of_int_ms 1000)]
-        |> List.to_seq |> SeqM.of_seq)
+        ([Elapse (Milliseconds.Span.of_int_s 1)] |> List.to_seq |> SeqM.of_seq)
       |> M.return
 
     let repeat : int -> t -> t =

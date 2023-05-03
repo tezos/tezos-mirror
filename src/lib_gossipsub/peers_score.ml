@@ -114,7 +114,7 @@ struct
     match mesh_status with
     | Inactive -> 0.0
     | Active {since = _; during} ->
-        let seconds_in_mesh = Span.seconds during |> float_of_int in
+        let seconds_in_mesh = Span.to_float_s during in
         let weighted_time =
           topic_parameters.time_in_mesh_weight *. seconds_in_mesh
           /. topic_parameters.time_in_mesh_quantum

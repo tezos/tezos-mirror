@@ -455,8 +455,8 @@ module Test_remove_peer = struct
          2. wait until [expire=retain_duration+slack]
          3. wait until the next round of cleanup in the heartbeat *)
       let expire =
-        Milliseconds.Span.seconds limits.retain_duration
-        + (Milliseconds.Span.seconds limits.heartbeat_interval * 2)
+        Milliseconds.Span.to_int_s limits.retain_duration
+        + (Milliseconds.Span.to_int_s limits.heartbeat_interval * 2)
       in
       let heartbeat_cleanup_ticks = limits.backoff_cleanup_ticks in
       add_then_remove_peer ~gen_peer
@@ -469,8 +469,8 @@ module Test_remove_peer = struct
          After pruning, we wait for [backoff + slack] ticks then force
          triggering a cleanup of the backoffs in the heartbeat. *)
       let backoff =
-        Milliseconds.seconds Basic_fragments.prune_backoff
-        + (Milliseconds.Span.seconds limits.heartbeat_interval * 2)
+        Milliseconds.to_int_s Basic_fragments.prune_backoff
+        + (Milliseconds.Span.to_int_s limits.heartbeat_interval * 2)
       in
       let heartbeat_cleanup_ticks = limits.backoff_cleanup_ticks in
       graft_then_prune ~gen_peer ~gen_topic
@@ -546,9 +546,11 @@ module Test_remove_peer = struct
       let open M in
       let* limits =
         let+ retain_duration =
-          M.int_range 0 (Milliseconds.Span.seconds limits.retain_duration * 2)
+          M.int_range 0 (Milliseconds.Span.to_int_s limits.retain_duration * 2)
         and+ heartbeat_interval =
-          M.int_range 0 (Milliseconds.Span.seconds limits.heartbeat_interval * 2)
+          M.int_range
+            0
+            (Milliseconds.Span.to_int_s limits.heartbeat_interval * 2)
         and+ backoff_cleanup_ticks =
           M.int_range 1 (limits.backoff_cleanup_ticks * 2)
         in

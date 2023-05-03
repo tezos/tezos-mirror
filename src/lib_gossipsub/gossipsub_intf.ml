@@ -73,7 +73,11 @@ module type SPAN = sig
 
   val of_int_s : int -> t
 
-  val seconds : t -> int
+  val to_int_s : t -> int
+
+  val of_float_s : float -> t
+
+  val to_float_s : t -> float
 end
 
 module type TIME = sig

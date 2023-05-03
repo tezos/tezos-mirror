@@ -74,8 +74,7 @@ let step context input expected_outputs =
     | In_app i -> return @@ Worker.app_input context.worker i
     | Heartbeat ->
         Lwt_unix.sleep
-          (1.1
-          *. float_of_int (Milliseconds.Span.seconds context.heartbeat_span))
+          (1.1 *. Milliseconds.Span.to_float_s context.heartbeat_span)
   in
   List.iter (function
       | Out_p2p o -> Queue.push o context.expected_p2p_output
