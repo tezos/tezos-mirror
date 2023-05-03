@@ -46,23 +46,18 @@ let default_reveal_data_dir =
 
 module Coordinator = struct
   type t = {
-    threshold : int;
     committee_members_addresses :
       Tezos_crypto.Aggregate_signature.public_key_hash list;
   }
 
-  let make threshold committee_members_addresses =
-    {threshold; committee_members_addresses}
+  let make committee_members_addresses = {committee_members_addresses}
 
   let encoding =
     Data_encoding.(
       conv
-        (fun {threshold; committee_members_addresses} ->
-          (threshold, committee_members_addresses))
-        (fun (threshold, committee_members_addresses) ->
-          {threshold; committee_members_addresses})
-        (obj2
-           (req "threshold" uint8)
+        (fun {committee_members_addresses} -> committee_members_addresses)
+        (fun committee_members_addresses -> {committee_members_addresses})
+        (obj1
            (req
               "committee_members"
               (list Tezos_crypto.Aggregate_signature.Public_key_hash.encoding))))
@@ -196,8 +191,8 @@ type mode =
   | Observer of Observer.t
   | Legacy of Legacy.t
 
-let make_coordinator threshold committee_members_addresses =
-  Coordinator (Coordinator.make threshold committee_members_addresses)
+let make_coordinator committee_members_addresses =
+  Coordinator (Coordinator.make committee_members_addresses)
 
 let make_committee_member coordinator_rpc_address coordinator_rpc_port
     committee_member_address =

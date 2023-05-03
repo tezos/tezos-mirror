@@ -206,12 +206,19 @@ module Config_init = struct
       ~group
       ~desc:"Configure DAC node in coordinator mode."
       (args4 data_dir_arg rpc_address_arg rpc_port_arg reveal_data_dir_arg)
-      (prefixes ["configure"; "as"; "coordinator"; "with"; "threshold"]
-      @@ threshold_param
-      @@ prefixes ["and"; "data"; "availability"; "committee"; "members"]
+      (prefixes
+         [
+           "configure";
+           "as";
+           "coordinator";
+           "with";
+           "data";
+           "availability";
+           "committee";
+           "members";
+         ]
       @@ seq_of_param @@ tz4_address_param)
       (fun (data_dir, rpc_address, rpc_port, reveal_data_dir)
-           threshold
            committee_members_addresses
            cctxt ->
         create_configuration
@@ -219,7 +226,7 @@ module Config_init = struct
           ~reveal_data_dir
           ~rpc_address
           ~rpc_port
-          (Configuration.make_coordinator threshold committee_members_addresses)
+          (Configuration.make_coordinator committee_members_addresses)
           cctxt)
 
   let committee_member_command =
