@@ -182,6 +182,15 @@ module Stack_utils = struct
                continuation = k;
                reconstruct = (fun k -> IPush (loc, a, x, k));
              }
+    | IUnit (loc, k), s ->
+        let s = Item_t (unit_t, s) in
+        ok
+        @@ Ex_split_kinstr
+             {
+               cont_init_stack = s;
+               continuation = k;
+               reconstruct = (fun k -> IUnit (loc, k));
+             }
     | ICons_pair (loc, k), Item_t (a, Item_t (b, s)) ->
         pair_t dummy a b >|? fun (Ty_ex_c c) ->
         let s = Item_t (c, s) in

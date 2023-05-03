@@ -1,7 +1,7 @@
 
 ./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint mint
 Node is bootstrapped.
-Estimated gas: 2222.694 units (will add 100 for safety)
+Estimated gas: 2222.514 units (will add 100 for safety)
 Estimated storage: 221 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -30,7 +30,7 @@ This sequence of operations was run:
           Pair 0x017a22a4e42f88383dbb327d548e263b53f4f3b91100 (Pair "Ticket" 1) }
       Storage size: 309 bytes
       Paid storage size diff: 221 bytes
-      Consumed gas: 2222.661
+      Consumed gas: 2222.481
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.05525
         storage fees ........................... +ꜩ0.05525

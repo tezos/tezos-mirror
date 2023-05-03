@@ -294,6 +294,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IDup _ -> Interp_costs.dup
   | ISwap _ -> Interp_costs.swap
   | IPush _ -> Interp_costs.push
+  | IUnit _ -> Interp_costs.unit
   | ICons_some _ -> Interp_costs.cons_some
   | ICons_none _ -> Interp_costs.cons_none
   | IIf_none _ -> Interp_costs.if_none

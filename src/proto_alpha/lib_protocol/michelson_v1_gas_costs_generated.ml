@@ -178,6 +178,9 @@ let cost_N_ICons_some = S.safe_int 10
 (* model N_IPush *)
 let cost_N_IPush = S.safe_int 10
 
+(* model N_IUnit *)
+let cost_N_IUnit = S.safe_int 10
+
 (* model N_IDig *)
 (* Approximating 6.750442 x term *)
 let cost_N_IDig size =

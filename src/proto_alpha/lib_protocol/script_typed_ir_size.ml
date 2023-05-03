@@ -425,6 +425,7 @@ and kinstr_size :
           (accu ++ ty_size ty)
           ty
           x
+    | IUnit (loc, k) -> ret_succ_adding accu (base1 loc k)
     | ICons_pair (loc, k) -> ret_succ_adding accu (base1 loc k)
     | ICar (loc, k) -> ret_succ_adding accu (base1 loc k)
     | ICdr (loc, k) -> ret_succ_adding accu (base1 loc k)

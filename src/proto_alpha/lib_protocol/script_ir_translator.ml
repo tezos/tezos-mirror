@@ -2694,8 +2694,8 @@ and parse_instr :
       typed ctxt loc push (Item_t (t, stack))
   | Prim (loc, I_UNIT, [], annot), stack ->
       check_var_type_annot loc annot >>?= fun () ->
-      let push = {apply = (fun k -> IPush (loc, unit_t, (), k))} in
-      typed ctxt loc push (Item_t (unit_t, stack))
+      let unit = {apply = (fun k -> IUnit (loc, k))} in
+      typed ctxt loc unit (Item_t (unit_t, stack))
   (* options *)
   | Prim (loc, I_SOME, [], annot), Item_t (t, rest) ->
       check_var_type_annot loc annot >>?= fun () ->

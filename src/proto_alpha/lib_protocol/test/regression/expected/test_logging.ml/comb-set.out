@@ -34,9 +34,9 @@ trace
   - UPDATE (entry) @ location: 25
     [ 8
       (Pair 2 12 2 Unit) ]
-    - log/PUSH (exit) @ location: 25
+    - log/UNIT (exit) @ location: 25
       [ (Pair 2 12 8 Unit) ]
-  - PUSH (entry) @ location: 27
+  - UNIT (entry) @ location: 27
     [ (Pair 2 12 8 Unit) ]
     - log/UPDATE (exit) @ location: 27
       [ Unit

@@ -404,8 +404,8 @@ let ir_model instr_or_cont =
   match instr_or_cont with
   | Instr_name instr -> (
       match instr with
-      | N_IDrop | N_IDup | N_ISwap | N_IPush | N_ICons_pair | N_ICar | N_ICdr
-      | N_ICons_some | N_ICons_none | N_IIf_none | N_IOpt_map | N_ILeft
+      | N_IDrop | N_IDup | N_ISwap | N_IPush | N_IUnit | N_ICons_pair | N_ICar
+      | N_ICdr | N_ICons_some | N_ICons_none | N_IIf_none | N_IOpt_map | N_ILeft
       | N_IRight | N_IIf_left | N_ICons_list | N_INil | N_IIf_cons
       | N_IEmpty_set | N_IEmpty_map | N_IEmpty_big_map | N_IOr | N_IAnd | N_IXor
       | N_INot | N_IIf | N_ILoop | N_ILoop_left | N_IDip | N_IExec | N_IView

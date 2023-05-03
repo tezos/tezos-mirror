@@ -656,6 +656,7 @@ module Raw = struct
             (step [@ocaml.tailcall]) g gas k ks top (accu, stack)
         | IPush (_, _ty, v, k) ->
             (step [@ocaml.tailcall]) g gas k ks v (accu, stack)
+        | IUnit (_, k) -> (step [@ocaml.tailcall]) g gas k ks () (accu, stack)
         (* options *)
         | ICons_some (_, k) ->
             (step [@ocaml.tailcall]) g gas k ks (Some accu) stack
