@@ -48,7 +48,11 @@ impl<T: From<OwnedPath>> Layer<T> {
     ///
     /// Create a new transaction layer which is a copy of the layer below it. Such
     /// layers should be either discarded or consumed using respective functions below.
-    pub(crate) fn make_copy(
+    ///
+    /// There is no check regarding neither the existence of `self`, nor if the
+    /// `name` points to an already used path in the durable storage. It is the
+    /// responsability of the caller to do so.
+    pub(crate) fn force_make_copy(
         &self,
         host: &mut impl Runtime,
         name: &impl Path,
@@ -58,15 +62,9 @@ impl<T: From<OwnedPath>> Layer<T> {
             phantom: PhantomData,
         };
 
-        if let Ok(Some(_)) = host.store_has(&copy.path) {
-            Err(StorageError::StorageInUse)
-        } else if let Ok(Some(_)) = host.store_has(&self.path) {
-            host.store_copy(&self.path, &copy.path)?;
-            Ok(copy)
-        } else {
-            // Nothing to do as current layers durable storage is empty
-            // and durable storage area for copy is empty as well.
-            Ok(copy)
+        match host.store_copy(&self.path, &copy.path) {
+            Ok(()) | Err(RuntimeError::PathNotFound) => Ok(copy),
+            Err(e) => Err(e.into()),
         }
     }
 
