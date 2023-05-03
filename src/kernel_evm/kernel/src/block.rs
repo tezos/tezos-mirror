@@ -260,6 +260,50 @@ mod tests {
         }
     }
 
+    fn produce_block_with_several_valid_txs(
+        host: &mut MockHost,
+        evm_account_storage: &mut EthereumAccountStorage,
+    ) {
+        let _ = genesis::init_block(host);
+
+        let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
+        let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
+
+        let transactions = vec![
+            Transaction {
+                tx_hash: tx_hash_0,
+                tx: dummy_eth_transaction(),
+            },
+            Transaction {
+                tx_hash: tx_hash_1,
+                tx: dummy_eth_transaction(),
+            },
+        ];
+
+        let queue = Queue {
+            proposals: vec![Blueprint { transactions }],
+        };
+
+        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        set_balance(
+            host,
+            evm_account_storage,
+            &sender,
+            U256::from(10000000000000000000u64),
+        );
+
+        produce(host, queue).expect("The block production failed.")
+    }
+
+    fn assert_current_block_reading_validity(host: &mut MockHost) {
+        match storage::read_current_block(host) {
+            Ok(_) => (),
+            Err(e) => {
+                panic!("Block reading failed: {:?}\n", e)
+            }
+        }
+    }
+
     #[test]
     // Test if the invalid transactions are producing receipts with invalid status
     fn test_invalid_transactions_receipt_status() {
@@ -331,36 +375,9 @@ mod tests {
     // Test if several valid transactions can be performed
     fn test_several_valid_transactions() {
         let mut host = MockHost::default();
-        let _ = genesis::init_block(&mut host);
-
-        let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
-        let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
-
-        let transactions = vec![
-            Transaction {
-                tx_hash: tx_hash_0,
-                tx: dummy_eth_transaction(),
-            },
-            Transaction {
-                tx_hash: tx_hash_1,
-                tx: dummy_eth_transaction(),
-            },
-        ];
-
-        let queue = Queue {
-            proposals: vec![Blueprint { transactions }],
-        };
-
-        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
         let mut evm_account_storage = init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            U256::from(10000000000000000000u64),
-        );
 
-        produce(&mut host, queue).expect("The block production failed.");
+        produce_block_with_several_valid_txs(&mut host, &mut evm_account_storage);
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
@@ -468,5 +485,30 @@ mod tests {
                 Err(_) => panic!("Reading the receipt's cumulative gas used failed."),
             }
         }
+    }
+
+    #[test]
+    // Test if we're able to read current block (with an empty queue) after
+    // a block production
+    fn test_read_storage_current_block_after_block_production_with_empty_queue() {
+        let mut host = MockHost::default();
+        let _ = genesis::init_block(&mut host);
+        let queue = Queue { proposals: vec![] };
+
+        produce(&mut host, queue).expect("The block production failed.");
+
+        assert_current_block_reading_validity(&mut host);
+    }
+
+    #[test]
+    // Test if we're able to read current block (with a filled queue) after
+    // a block production
+    fn test_read_storage_current_block_after_block_production_with_filled_queue() {
+        let mut host = MockHost::default();
+        let mut evm_account_storage = init_account_storage().unwrap();
+
+        produce_block_with_several_valid_txs(&mut host, &mut evm_account_storage);
+
+        assert_current_block_reading_validity(&mut host);
     }
 }
