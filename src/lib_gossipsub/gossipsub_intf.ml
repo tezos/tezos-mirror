@@ -440,7 +440,7 @@ module type AUTOMATON = sig
   module Time : PRINTABLE
 
   (** Module for time duration *)
-  module Span : PRINTABLE
+  module Span : SPAN
 
   (** Module for peers scores *)
   module Score : SCORE with type time = Time.t
