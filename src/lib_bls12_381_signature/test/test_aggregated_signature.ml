@@ -455,9 +455,9 @@ let () =
   in
   let minsig_tests =
     [
-      MinPkTest.BasicProperties.get_tests ();
-      MinPkTest.AugProperties.get_tests ();
-      MinPkTest.PopProperties.get_tests ();
+      MinSigTest.BasicProperties.get_tests ();
+      MinSigTest.AugProperties.get_tests ();
+      MinSigTest.PopProperties.get_tests ();
     ]
   in
   let minsig_tests =
