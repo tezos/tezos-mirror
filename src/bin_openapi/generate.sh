@@ -16,7 +16,7 @@ tezos_node=./octez-node
 tezos_client=./octez-client
 
 # Protocol configuration.
-protocol_hash=PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5
+protocol_hash=PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf
 protocol_parameters=src/proto_017_PtNairob/parameters/sandbox-parameters.json
 protocol_name=nairobi
 
