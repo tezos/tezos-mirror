@@ -1,0 +1,6 @@
+instructions:
+- move:
+    from: /hello/path
+    to: /to/path
+- reveal: a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3
+  to: /path

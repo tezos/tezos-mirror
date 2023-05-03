@@ -8,13 +8,16 @@ use std::path::Path;
 use tezos_smart_rollup::core_unsafe::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup::dac::{prepare_preimages, PreimageHash};
 use tezos_smart_rollup::host::Runtime;
+use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_installer::config::create_installer_config;
 use tezos_smart_rollup_installer::installer::with_config_program;
-use tezos_smart_rollup_installer::{KERNEL_BOOT_PATH, PREPARE_KERNEL_PATH};
-use tezos_smart_rollup_installer_config::{bin::ConfigProgram, instr::ConfigInstruction};
+use tezos_smart_rollup_installer::KERNEL_BOOT_PATH;
+use tezos_smart_rollup_installer_config::binary::owned::OwnedConfigProgram;
 use tezos_smart_rollup_mock::MockHost;
 
 #[test]
-fn reveal_and_move_config() {
+fn reveal_and_move_binary_config() {
     let mut host = MockHost::default();
 
     let upgrade_to = OsString::from("tests/resources/single_page_kernel.wasm");
@@ -28,11 +31,10 @@ fn reveal_and_move_config() {
     };
     let root_hash = prepare_preimages(&original_kernel, save_preimages).unwrap();
 
-    // Prepend config to the installer.wasm
-    let kernel_with_config = with_config_program(ConfigProgram(vec![
-        ConfigInstruction::reveal_instr(root_hash.as_ref(), PREPARE_KERNEL_PATH),
-        ConfigInstruction::move_instr(PREPARE_KERNEL_PATH, KERNEL_BOOT_PATH),
-    ]));
+    // Create config consisting of reveal and following move
+    let config = create_installer_config(root_hash, None).unwrap();
+    // Append config to the installer.wasm
+    let kernel_with_config = with_config_program(config);
 
     // Write it to the boot path
     let mut i = 0;
@@ -53,10 +55,10 @@ fn reveal_and_move_config() {
 }
 
 #[test]
-fn empty_config() {
+fn empty_binary_config() {
     let mut host = MockHost::default();
 
-    let kernel = with_config_program(ConfigProgram(vec![]));
+    let kernel = with_config_program(OwnedConfigProgram(vec![]));
 
     // Write it to the boot path
     let mut i = 0;
@@ -80,4 +82,55 @@ fn empty_config() {
     }
 
     assert_eq!(kernel, boot_kernel);
+}
+
+#[test]
+fn yaml_config_execute() {
+    let mut host = MockHost::default();
+
+    let upgrade_to = OsString::from("tests/resources/single_page_kernel.wasm");
+    let upgrade_to = Path::new(&upgrade_to);
+
+    // Prepare preimages
+
+    let original_kernel = fs::read(upgrade_to).unwrap();
+    let save_preimages = |_hash: PreimageHash, preimage: Vec<u8>| {
+        host.set_preimage(preimage);
+    };
+    let root_hash = prepare_preimages(&original_kernel, save_preimages).unwrap();
+
+    // Create config consisting of reveal and following move, then move 2 more times from yaml config
+    let config = create_installer_config(
+        root_hash,
+        Some(OsString::from("tests/resources/move_config.yaml")),
+    )
+    .unwrap();
+    // Append config to the installer.wasm
+    let kernel_with_config = with_config_program(config);
+
+    // Write it to the boot path
+    let mut i = 0;
+    while i < kernel_with_config.len() {
+        let r = usize::min(kernel_with_config.len(), i + MAX_FILE_CHUNK_SIZE);
+        host.store_write(&KERNEL_BOOT_PATH, &kernel_with_config[i..r], i)
+            .unwrap();
+        i = r;
+    }
+
+    // Execute config
+    installer_kernel::installer(&mut host);
+
+    let temporary_path = RefPath::assert_from(b"/temporary/kernel/boot.wasm");
+    let boot_kernel = host
+        .store_read(&temporary_path, 0, MAX_FILE_CHUNK_SIZE)
+        .unwrap();
+    assert_eq!(original_kernel, boot_kernel);
+
+    const AUXILIARY_KERNEL_BOOT_PATH: RefPath =
+        RefPath::assert_from(b"/__installer_kernel/auxiliary/kernel/boot.wasm");
+
+    assert_eq!(
+        host.store_read(&AUXILIARY_KERNEL_BOOT_PATH, 0, MAX_FILE_CHUNK_SIZE),
+        Err(RuntimeError::PathNotFound)
+    );
 }

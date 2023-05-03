@@ -11,7 +11,7 @@ use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_host::path::{Path, RefPath, PATH_MAX_SIZE};
 use tezos_smart_rollup_host::runtime::Runtime;
 
-use crate::instr::{ConfigInstruction, MoveInstruction, RawBytes, RevealInstruction};
+use super::{ConfigInstruction, MoveInstruction, RefBytes, RevealInstruction};
 
 // Those types and helpers copy paseted from tezos_data_encoding.
 // As it's required to parse refs, lifetime 'a added to NomReader
@@ -92,20 +92,20 @@ pub fn completed<T>(x: (&[u8], T)) -> Result<T, &'static str> {
     }
 }
 
-impl<'a> NomReader<'a> for RawBytes<'a> {
+impl<'a> NomReader<'a> for RefBytes<'a> {
     fn nom_read(input: &'a [u8]) -> NomResult<Self> {
         map_res(
             complete(length_data(bounded_size(MAX_FILE_CHUNK_SIZE))),
-            |bytes| Ok::<RawBytes<'_>, NomError<'_>>(RawBytes(bytes)),
+            |bytes| Ok::<RefBytes<'_>, NomError<'_>>(RefBytes(bytes)),
         )(input)
     }
 }
 
-impl<'a> NomReader<'a> for RevealInstruction<'a> {
+impl<'a> NomReader<'a> for RevealInstruction<RefPath<'a>, RefBytes<'a>> {
     fn nom_read(bytes: &'a [u8]) -> NomResult<Self> {
         map(
             nom::sequence::tuple((
-                <RawBytes<'a> as NomReader>::nom_read,
+                <RefBytes<'a> as NomReader>::nom_read,
                 nom_read_ref_path,
             )),
             |(hash, to)| RevealInstruction { hash, to },
@@ -113,7 +113,7 @@ impl<'a> NomReader<'a> for RevealInstruction<'a> {
     }
 }
 
-impl<'a> NomReader<'a> for MoveInstruction<'a> {
+impl<'a> NomReader<'a> for MoveInstruction<RefPath<'a>> {
     fn nom_read(bytes: &'a [u8]) -> NomResult<Self> {
         map(
             tuple((nom_read_ref_path, nom_read_ref_path)),
@@ -122,16 +122,16 @@ impl<'a> NomReader<'a> for MoveInstruction<'a> {
     }
 }
 
-impl<'a> NomReader<'a> for ConfigInstruction<'a> {
+impl<'a> NomReader<'a> for ConfigInstruction<RefPath<'a>, RefBytes<'a>> {
     fn nom_read(bytes: &'a [u8]) -> NomResult<Self> {
         let (input, tag) = nom::number::complete::u8(bytes)?;
         let (input, variant) = match tag {
             0 => (map(
-                <RevealInstruction<'a> as NomReader>::nom_read,
+                <RevealInstruction<RefPath<'a>, RefBytes<'a>> as NomReader>::nom_read,
                 ConfigInstruction::Reveal,
             ))(input)?,
             1 => (map(
-                <MoveInstruction<'a> as NomReader>::nom_read,
+                <MoveInstruction<RefPath<'a>> as NomReader>::nom_read,
                 ConfigInstruction::Move,
             ))(input)?,
             _ => {

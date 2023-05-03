@@ -171,6 +171,20 @@ mod encoding {
         }
     }
 
+    impl From<PreimageHash> for Vec<u8> {
+        fn from(val: PreimageHash) -> Self {
+            val.hash
+        }
+    }
+
+    impl From<PreimageHash> for [u8; PREIMAGE_HASH_SIZE] {
+        fn from(value: PreimageHash) -> Self {
+            value.hash.try_into().unwrap_or_else(|_| {
+                unreachable!("Impossible to happen since it's been smart-constructed")
+            })
+        }
+    }
+
     /// Generates the preimages of the given content.
     pub fn prepare_preimages(
         content: &[u8],

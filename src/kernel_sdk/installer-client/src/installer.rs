@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use tezos_data_encoding::enc::BinWriter;
-use tezos_smart_rollup_installer_config::bin::ConfigProgram;
+use tezos_smart_rollup_installer_config::binary::owned::OwnedConfigProgram;
 use wasm_gen::write_custom_section;
 
 const INSTALLER_KERNEL: &[u8] = include_bytes!("../installer.wasm");
@@ -21,7 +21,7 @@ const INSTALLER_KERNEL: &[u8] = include_bytes!("../installer.wasm");
 ///
 /// For more information about which instructions config might contain,
 /// see in `installer_kernel/src/instr.rs`.
-pub fn with_config_program(config_programm: ConfigProgram) -> Vec<u8> {
+pub fn with_config_program(config_programm: OwnedConfigProgram) -> Vec<u8> {
     let mut installer = INSTALLER_KERNEL.to_vec();
 
     let mut config_programm_encoded = vec![];

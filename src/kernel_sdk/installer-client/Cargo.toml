@@ -48,6 +48,9 @@ version = "0.4"
 [dependencies.tezos-smart-rollup-host]
 path = "../host"
 
+[dependencies.serde_yaml]
+version = "0.9"
+
 # For tests
 [dev-dependencies]
 installer-kernel = { path = "../installer-kernel", default-features = false }
