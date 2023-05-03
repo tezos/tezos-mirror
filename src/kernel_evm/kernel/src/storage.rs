@@ -4,6 +4,7 @@
 #![allow(dead_code)]
 
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
+use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 
@@ -161,12 +162,31 @@ fn read_nth_block_transactions<Host: Runtime>(
         .collect::<Vec<TransactionHash>>())
 }
 
-pub fn read_current_block<Host: Runtime>(host: &mut Host) -> Result<L2Block, Error> {
+fn read_current_block_nodebug<Host: Runtime>(host: &mut Host) -> Result<L2Block, Error> {
     let number = read_current_block_number(host)?;
     let block_path = block_path(number)?;
     let transactions = read_nth_block_transactions(host, &block_path)?;
 
     Ok(L2Block::new(number, transactions))
+}
+
+pub fn read_current_block<Host: Runtime>(host: &mut Host) -> Result<L2Block, Error> {
+    match read_current_block_nodebug(host) {
+        Ok(block) => {
+            debug_msg!(
+                host,
+                "Reading block {} at number {} containing {} transaction(s).\n",
+                String::from_utf8(block.hash.as_bytes().to_vec()).expect("INVALID HASH"),
+                block.number,
+                block.transactions.len()
+            );
+            Ok(block)
+        }
+        Err(e) => {
+            debug_msg!(host, "Block reading failed: {:?}\n", e);
+            Err(e)
+        }
+    }
 }
 
 fn store_block_number<Host: Runtime>(
@@ -220,7 +240,7 @@ pub fn store_block_by_number<Host: Runtime>(
     store_block(host, block, &block_path)
 }
 
-pub fn store_current_block<Host: Runtime>(
+fn store_current_block_nodebug<Host: Runtime>(
     host: &mut Host,
     block: &L2Block,
 ) -> Result<(), Error> {
@@ -229,6 +249,28 @@ pub fn store_current_block<Host: Runtime>(
     store_block_number(host, &current_block_path, block.number)?;
     // When storing the current block's infos we need to store it under the [evm/blocks/<block_number>]
     store_block_by_number(host, block)
+}
+
+pub fn store_current_block<Host: Runtime>(
+    host: &mut Host,
+    block: &L2Block,
+) -> Result<(), Error> {
+    match store_current_block_nodebug(host, block) {
+        Ok(()) => {
+            debug_msg!(
+                host,
+                "Storing block {} at number {} containing {} transaction(s).\n",
+                String::from_utf8(block.hash.as_bytes().to_vec()).expect("INVALID HASH"),
+                block.number,
+                block.transactions.len()
+            );
+            Ok(())
+        }
+        Err(e) => {
+            debug_msg!(host, "Block storing failed: {:?}\n", e);
+            Err(e)
+        }
+    }
 }
 
 // TODO: This store a transaction receipt with multiple subkeys, it could
