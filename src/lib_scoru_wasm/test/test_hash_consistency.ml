@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Lib_scoru_wasm execution
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_hash_consistency.ml
+    Subject:      Tests execution for the tezos-scoru-wasm library
+*)
+
 open Wasm_utils
 open Tztest_helper
 module Context = Tezos_context_memory.Context_binary
@@ -81,3 +88,10 @@ let tests =
         `Quick,
         test_execution_correspondance 30_000L 5_000L );
     ]
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    "test lib scoru wasm"
+    [("Hash correspondence", tests)]
+  |> Lwt_main.run

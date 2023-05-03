@@ -27,12 +27,10 @@
 (** Testing
     -------
     Component:    Tree_encoding_decoding
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "^Parser Encodings$"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_parser_encoding.ml
     Subject:      Parser encoding tests for the tezos-scoru-wasm library
 *)
 
-open Tztest
 open Tezos_lazy_containers
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
@@ -96,12 +94,7 @@ module Byte_vector = struct
     | _, _ -> Lwt.return_ok false
 
   let tests =
-    [
-      tztest
-        "Byte_vector"
-        `Quick
-        (make_test Parser.Byte_vector.encoding gen check);
-    ]
+    [make_test ~name:"Byte_vector" Parser.Byte_vector.encoding gen check]
 end
 
 (* Lazy_vector generators *)
@@ -149,13 +142,11 @@ module Vec = struct
   let tests =
     let eq x y = Lwt.return_ok (Int32.equal x y) in
     [
-      tztest
-        "Vec"
-        `Quick
-        (make_test
-           Parser.(vector_encoding (value [] Data_encoding.int32))
-           (gen QCheck2.Gen.int32)
-           (check eq));
+      make_test
+        ~name:"Vec"
+        Parser.(vector_encoding (value [] Data_encoding.int32))
+        (gen QCheck2.Gen.int32)
+        (check eq);
     ]
 end
 
@@ -186,13 +177,11 @@ module LazyVec = struct
   let tests =
     let eq x y = Lwt.return_ok (Int32.equal x y) in
     [
-      tztest
-        "LazyVec"
-        `Quick
-        (make_test
-           Parser.Lazy_vec.(encoding (value [] Data_encoding.int32))
-           (gen QCheck2.Gen.int32)
-           (check eq));
+      make_test
+        ~name:"LazyVec"
+        Parser.Lazy_vec.(encoding (value [] Data_encoding.int32))
+        (gen QCheck2.Gen.int32)
+        (check eq);
     ]
 end
 
@@ -229,7 +218,7 @@ module Names = struct
 
   let check ns ns' = Lwt_result.return (check ns ns')
 
-  let tests = [tztest "Names" `Quick (make_test Parser.Name.encoding gen check)]
+  let tests = [make_test ~name:"Names" Parser.Name.encoding gen check]
 end
 
 module Func_type = struct
@@ -280,8 +269,7 @@ module Func_type = struct
     | FKStop ft, FKStop ft' -> func_type_check ft ft'
     | _, _ -> return false
 
-  let tests =
-    [tztest "Func_type" `Quick (make_test Parser.Func_type.encoding gen check)]
+  let tests = [make_test ~name:"Func_type" Parser.Func_type.encoding gen check]
 end
 
 module Imports = struct
@@ -328,8 +316,7 @@ module Imports = struct
     | ImpKStop imp, ImpKStop imp' -> return (import_check imp imp')
     | _, _ -> return false
 
-  let tests =
-    [tztest "Imports" `Quick (make_test Parser.Import.encoding gen check)]
+  let tests = [make_test ~name:"Imports" Parser.Import.encoding gen check]
 end
 
 module LazyStack = struct
@@ -350,13 +337,11 @@ module LazyStack = struct
   let tests =
     let eq x y = Lwt.return_ok (Int32.equal x y) in
     [
-      tztest
-        "LazyStack"
-        `Quick
-        (make_test
-           Parser.Lazy_stack.(encoding (value [] Data_encoding.int32))
-           (gen QCheck2.Gen.int32)
-           (check eq));
+      make_test
+        ~name:"LazyStack"
+        Parser.Lazy_stack.(encoding (value [] Data_encoding.int32))
+        (gen QCheck2.Gen.int32)
+        (check eq);
     ]
 end
 
@@ -393,8 +378,7 @@ module Exports = struct
     | ExpKStop exp, ExpKStop exp' -> return (export_check exp exp')
     | _, _ -> return false
 
-  let tests =
-    [tztest "Exports" `Quick (make_test Parser.Export.encoding gen check)]
+  let tests = [make_test ~name:"Exports" Parser.Export.encoding gen check]
 end
 
 module Size = struct
@@ -410,7 +394,7 @@ module Size = struct
     let open Lwt_result_syntax in
     return (s.Decode.size = s'.Decode.size && s.start = s'.start)
 
-  let tests = [tztest "Size" `Quick (make_test Parser.Size.encoding gen check)]
+  let tests = [make_test ~name:"Size" Parser.Size.encoding gen check]
 end
 
 module Instr_block = struct
@@ -462,12 +446,7 @@ module Instr_block = struct
     | _, _ -> return_false
 
   let tests =
-    [
-      tztest
-        "Instr_block"
-        `Quick
-        (make_test Parser.Instr_block.encoding gen check);
-    ]
+    [make_test ~name:"Instr_block" Parser.Instr_block.encoding gen check]
 end
 
 module Block = struct
@@ -494,8 +473,7 @@ module Block = struct
     | BlockStop l, BlockStop l' -> return (l = l')
     | _, _ -> return_false
 
-  let tests =
-    [tztest "Block" `Quick (make_test Parser.Block.encoding gen check)]
+  let tests = [make_test ~name:"Block" Parser.Block.encoding gen check]
 end
 
 module Code = struct
@@ -596,7 +574,7 @@ module Code = struct
         check_func func func'
     | _, _ -> return false
 
-  let tests = [tztest "Code" `Quick (make_test Parser.Code.encoding gen check)]
+  let tests = [make_test ~name:"Code" Parser.Code.encoding gen check]
 end
 
 module Elem = struct
@@ -704,7 +682,7 @@ module Elem = struct
     | EKStop elem, EKStop elem' -> elem_check elem elem'
     | _, _ -> return_false
 
-  let tests = [tztest "Elem" `Quick (make_test Parser.Elem.encoding gen check)]
+  let tests = [make_test ~name:"Elem" Parser.Elem.encoding gen check]
 end
 
 module Data = struct
@@ -768,7 +746,7 @@ module Data = struct
     | DKStop data, DKStop data' -> data_check data data'
     | _, _ -> return false
 
-  let tests = [tztest "Data" `Quick (make_test Parser.Data.encoding gen check)]
+  let tests = [make_test ~name:"Data" Parser.Data.encoding gen check]
 end
 
 module Field = struct
@@ -998,20 +976,16 @@ module Field = struct
 
   let tests =
     [
-      tztest
-        "Field"
-        `Quick
-        (make_test
-           Parser.Field.building_state_encoding
-           building_state_gen
-           building_state_check);
-      tztest
-        "Field.Packed"
-        `Quick
-        (make_test
-           Parser.Field.packed_field_type_encoding
-           field_type_gen
-           check_packed_field_type);
+      make_test
+        ~name:"Field"
+        Parser.Field.building_state_encoding
+        building_state_gen
+        building_state_check;
+      make_test
+        ~name:"Field.Packed"
+        Parser.Field.packed_field_type_encoding
+        field_type_gen
+        check_packed_field_type;
     ]
 end
 
@@ -1359,8 +1333,7 @@ module Module = struct
         eq_code_kont && eq_size && eq_vec_kont && pos = pos'
     | _, _ -> return_false
 
-  let tests =
-    [tztest "Module" `Quick (make_test Parser.Module.encoding gen check)]
+  let tests = [make_test ~name:"Module" Parser.Module.encoding gen check]
 end
 
 let tests =
@@ -1368,3 +1341,7 @@ let tests =
   @ Imports.tests @ LazyStack.tests @ Exports.tests @ Instr_block.tests
   @ Block.tests @ Size.tests @ Code.tests @ Elem.tests @ Data.tests
   @ Field.tests @ Module.tests
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("Parser Encodings", tests)]
+  |> Lwt_main.run

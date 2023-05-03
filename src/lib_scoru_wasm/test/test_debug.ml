@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Tree_encoding_decoding
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "^Debug$"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_debug.ml
     Subject:      Debug facilities tests for the tezos-scoru-wasm library
 *)
 
@@ -249,10 +248,10 @@ let tests =
         `Quick,
         test_write_debug_too_many_memories );
       ("debug during init", `Quick, test_write_debug_init);
-      ( "debug with inputs outside of the memory",
+      ( "debug with inputs outside of the memory (invalid length)",
         `Quick,
         test_write_debug_invalid_length );
-      ( "debug with inputs outside of the memory",
+      ( "debug with inputs outside of the memory (invalid offset)",
         `Quick,
         test_write_debug_invalid_offset );
       ( "Check reading at invalid position of the memory doesn't fail and \
@@ -260,3 +259,7 @@ let tests =
         `Quick,
         test_read_mem_outside_of_bounds );
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("Debug", tests)]
+  |> Lwt_main.run

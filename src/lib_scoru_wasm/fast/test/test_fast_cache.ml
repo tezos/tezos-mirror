@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Tezos_scoru_wasm_fast.Module_cache
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_fast_cache.exe
+    Invocation:   dune exec src/lib_scoru_wasm/fast/test/main.exe -- --file test_fast_cache.ml
     Subject:      Test the cache used for Wasmer modules
 *)
 
@@ -128,3 +128,10 @@ let tests =
     Tztest.tztest "add max number of keys" `Quick test_add_max_nb;
     Tztest.tztest "add more than max" `Quick test_add_more_than_max;
   ]
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    "test lib scoru-wasm-fast"
+    [("Fast Execution cache", tests)]
+  |> Lwt_main.run

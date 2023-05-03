@@ -1,9 +1,11 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test_scoru_wasm_fast)
+(library
+ (name src_lib_scoru_wasm_fast_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-tree-encoding
   tezos-base.unix
@@ -15,17 +17,41 @@
   tezos-scoru-wasm
   tezos-scoru-wasm-fast
   qcheck-alcotest
-  alcotest-lwt)
- (preprocess (staged_pps ppx_import ppx_deriving.show))
+  octez-alcotezt)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_base_test_helpers
   -open Tezos_scoru_wasm_helpers
   -open Tezos_scoru_wasm_test_helpers
-  -open Tezos_test_helpers))
+  -open Tezos_test_helpers
+  -open Octez_alcotezt)
+ (modules
+  gen
+  partial_memory
+  qcheck_helpers
+  test_fast_cache
+  test_fast
+  test_memory_access))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_scoru_wasm_fast_test_tezt_lib
+  tezt)
+ (preprocess (staged_pps ppx_import ppx_deriving.show))
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-scoru-wasm-fast-test)
- (action (run %{dep:./test_scoru_wasm_fast.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

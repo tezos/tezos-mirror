@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Test
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "^Host functions ticks$"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_host_functions_ticks.ml
     Subject:      Tickification of host functions tests for the \
                   tezos-scoru-wasm library
 *)
@@ -115,3 +114,10 @@ let tests =
   tztests_with_pvm
     ~versions:[V0; V1]
     [("Test tickified host function", `Quick, test_tickified_host_function)]
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    "test lib scoru wasm"
+    [("Host functions ticks", tests)]
+  |> Lwt_main.run

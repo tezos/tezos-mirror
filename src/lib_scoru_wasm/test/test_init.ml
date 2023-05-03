@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Lib_scoru_wasm
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_init.ml
+    Subject:      Init tests for the tezos-scoru-wasm library
+*)
+
 open Tezos_scoru_wasm
 open Wasm_utils
 open Tztest_helper
@@ -364,3 +371,10 @@ let tests =
       ("64 bits float types are forbidden", `Quick, test_float64_type);
       ("float values are forbidden", `Quick, test_float_value);
     ]
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    "test lib scoru wasm"
+    [("Module Initialisation", tests)]
+  |> Lwt_main.run

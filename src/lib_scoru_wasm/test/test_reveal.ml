@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Lib_scoru_wasm reveal
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "Reveal"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_reveal.ml
     Subject:      Reveal tests for the tezos-scoru-wasm library
 *)
 
@@ -364,3 +363,7 @@ let tests =
       ("Test reveal_metadata", `Quick, test_reveal_metadata);
       ("Test reveal_preimage with Fast Exec", `Quick, test_fast_exec_reveal);
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("Reveal", tests)]
+  |> Lwt_main.run

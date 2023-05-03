@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Lib_scoru_wasm input
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "Set/get"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_get_set.ml
     Subject:      Input tests for the tezos-scoru-wasm library
 *)
 
@@ -219,3 +218,7 @@ let tests =
       ("Set input", `Quick, test_set_input);
       ("Get output", `Quick, test_get_output);
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("Set/get", tests)]
+  |> Lwt_main.run
