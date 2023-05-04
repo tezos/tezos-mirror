@@ -522,4 +522,8 @@ struct
       ]
 
   let pp_value = Fmt.float
+
+  module Internal_for_tests = struct
+    let get_topic_params = get_topic_params
+  end
 end

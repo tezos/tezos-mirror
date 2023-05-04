@@ -409,6 +409,13 @@ module type SCORE = sig
   include PRINTABLE with type t := t
 
   val pp_value : Format.formatter -> value -> unit
+
+  module Internal_for_tests : sig
+    val get_topic_params :
+      ('topic, 'span) score_parameters ->
+      'topic ->
+      'span per_topic_score_parameters
+  end
 end
 
 module type AUTOMATON = sig
