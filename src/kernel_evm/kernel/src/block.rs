@@ -255,24 +255,21 @@ mod tests {
         account.balance(host).unwrap()
     }
 
-    fn dummy_eth_transaction() -> EthereumTransactionCommon {
-        // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
-        let nonce = U256::from(0);
-        let gas_price = U256::from(40000000000u64);
+    fn dummy_eth_gen_transaction(
+        nonce: U256,
+        v: U256,
+        r: H256,
+        s: H256,
+    ) -> EthereumTransactionCommon {
+        let chain_id = U256::one();
+        let gas_price = U256::from(40000000u64);
         let gas_limit = 21000u64;
         let to =
             EthereumAddress::from("423163e58aabec5daa3dd1130b759d24bef0f6ea".to_string());
-        let value = U256::from(5000000000000000u64);
-        let data: Vec<u8> = hex::decode("deace8f5000000000000000000000000000000000000000000000000000000000000a4b100000000000000000000000041bca408a6b4029b42883aeb2c25087cab76cb58000000000000000000000000000000000000000000000000002386f26fc10000000000000000000000000000000000000000000000000000002357a49c7d75f600000000000000000000000000000000000000000000000000000000640b5549000000000000000000000000710bda329b2a6224e4b44833de30f38e7f81d5640000000000000000000000000000000000000000000000000000000000000000").unwrap();
-        let v = U256::from(37);
-        let r = string_to_h256_unsafe(
-            "25dd6c973368c45ddfc17f5148e3f468a2e3f2c51920cbe9556a64942b0ab2eb",
-        );
-        let s = string_to_h256_unsafe(
-            "31da07ce40c24b0a01f46fb2abc028b5ccd70dbd1cb330725323edc49a2a9558",
-        );
+        let value = U256::from(500000000u64);
+        let data: Vec<u8> = vec![];
         EthereumTransactionCommon {
-            chain_id: U256::one(),
+            chain_id,
             nonce,
             gas_price,
             gas_limit,
@@ -283,6 +280,34 @@ mod tests {
             r,
             s,
         }
+    }
+
+    fn dummy_eth_transaction_zero() -> EthereumTransactionCommon {
+        // corresponding caller's address is 0xf95abdf6ede4c3703e0e9453771fbee8592d31e9
+        // private key 0xe922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158
+        let nonce = U256::zero();
+        let v = U256::from(37);
+        let r = string_to_h256_unsafe(
+            "451d603fc1e73bb8c7afda6d4a0ce635657c812262f8d35aa0400504cec5af03",
+        );
+        let s = string_to_h256_unsafe(
+            "562c20b430d8d137ef6ce0dc46a21f3ed4f810b7d27394af70684900be1a2e07",
+        );
+        dummy_eth_gen_transaction(nonce, v, r, s)
+    }
+
+    fn dummy_eth_transaction_one() -> EthereumTransactionCommon {
+        // corresponding caller's address is 0xf95abdf6ede4c3703e0e9453771fbee8592d31e9
+        // private key 0xe922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158
+        let nonce = U256::one();
+        let v = U256::from(37);
+        let r = string_to_h256_unsafe(
+            "624ebca1a42237859de4f0f90e4d6a6e8f73ed014656929abfe5664a039d1fc5",
+        );
+        let s = string_to_h256_unsafe(
+            "4a08c518537102edd0c3c8c2125ef9ca45d32341a5b829a94b2f2f66e4f43eb0",
+        );
+        dummy_eth_gen_transaction(nonce, v, r, s)
     }
 
     fn produce_block_with_several_valid_txs(
@@ -297,11 +322,11 @@ mod tests {
         let transactions = vec![
             Transaction {
                 tx_hash: tx_hash_0,
-                tx: dummy_eth_transaction(),
+                tx: dummy_eth_transaction_zero(),
             },
             Transaction {
                 tx_hash: tx_hash_1,
-                tx: dummy_eth_transaction(),
+                tx: dummy_eth_transaction_one(),
             },
         ];
 
@@ -309,7 +334,7 @@ mod tests {
             proposals: vec![Blueprint { transactions }],
         };
 
-        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
         set_balance(
             host,
             evm_account_storage,
@@ -339,7 +364,7 @@ mod tests {
 
         let invalid_tx = Transaction {
             tx_hash,
-            tx: dummy_eth_transaction(),
+            tx: dummy_eth_transaction_zero(),
         };
 
         let transactions: Vec<Transaction> = vec![invalid_tx];
@@ -368,7 +393,7 @@ mod tests {
 
         let valid_tx = Transaction {
             tx_hash,
-            tx: dummy_eth_transaction(),
+            tx: dummy_eth_transaction_zero(),
         };
 
         let transactions: Vec<Transaction> = vec![valid_tx];
@@ -376,7 +401,7 @@ mod tests {
             proposals: vec![Blueprint { transactions }],
         };
 
-        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
         let mut evm_account_storage = init_account_storage().unwrap();
         set_balance(
             &mut host,
@@ -409,7 +434,7 @@ mod tests {
         let dest_balance =
             get_balance(&mut host, &mut evm_account_storage, &dest_address);
 
-        assert_eq!(dest_balance, U256::from(10000000000000000u64))
+        assert_eq!(dest_balance, U256::from(1000000000u64))
     }
 
     #[test]
@@ -423,12 +448,12 @@ mod tests {
 
         let transaction_0 = vec![Transaction {
             tx_hash: tx_hash_0,
-            tx: dummy_eth_transaction(),
+            tx: dummy_eth_transaction_zero(),
         }];
 
         let transaction_1 = vec![Transaction {
             tx_hash: tx_hash_1,
-            tx: dummy_eth_transaction(),
+            tx: dummy_eth_transaction_one(),
         }];
 
         let queue = Queue {
@@ -442,7 +467,7 @@ mod tests {
             ],
         };
 
-        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
         let mut evm_account_storage = init_account_storage().unwrap();
         set_balance(
             &mut host,
@@ -458,7 +483,7 @@ mod tests {
         let dest_balance =
             get_balance(&mut host, &mut evm_account_storage, &dest_address);
 
-        assert_eq!(dest_balance, U256::from(10000000000000000u64))
+        assert_eq!(dest_balance, U256::from(1000000000u64))
     }
 
     #[test]
@@ -466,6 +491,7 @@ mod tests {
     fn test_cumulative_transfers_gas_consumption() {
         let mut host = MockHost::default();
         let _ = genesis::init_block(&mut host);
+        let base_gas = U256::from(21000);
 
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
@@ -473,11 +499,11 @@ mod tests {
         let transactions = vec![
             Transaction {
                 tx_hash: tx_hash_0,
-                tx: dummy_eth_transaction(),
+                tx: dummy_eth_transaction_zero(),
             },
             Transaction {
                 tx_hash: tx_hash_1,
-                tx: dummy_eth_transaction(),
+                tx: dummy_eth_transaction_one(),
             },
         ];
 
@@ -487,7 +513,7 @@ mod tests {
             }],
         };
 
-        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
         let mut evm_account_storage = init_account_storage().unwrap();
         set_balance(
             &mut host,
@@ -504,8 +530,7 @@ mod tests {
                 &transaction.tx_hash,
             ) {
                 Ok(cumulative_gas_used) => {
-                    // NB: we do not use any gas for now, hence the following assertion
-                    assert_eq!(cumulative_gas_used, U256::zero())
+                    assert_eq!(cumulative_gas_used, base_gas)
                 }
                 Err(_) => panic!("Reading the receipt's cumulative gas used failed."),
             }
