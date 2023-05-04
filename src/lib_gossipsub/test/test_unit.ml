@@ -545,6 +545,93 @@ let test_fanout rng limits parameters =
     state ;
   unit
 
+(** Tests that receiving a message for a subscribed topic:
+    - Returns peers to publish to.
+    - Inserts message into message cache. *)
+let test_receiving_message rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Test receiving message"
+    ~tags:["gossipsub"; "receiving_message"]
+  @@ fun () ->
+  let topic = "test" in
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_join:(fun _ -> true)
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  let sender = 99 in
+  let message = "some_data" in
+  let message_id = 0 in
+  (* Receive a message for a joined topic. *)
+  let state, output =
+    GS.handle_receive_message {sender; topic; message_id; message} state
+  in
+  let peers_to_route =
+    match output with
+    | Already_received | Not_subscribed | Invalid_message | Unknown_validity ->
+        Test.fail ~__LOC__ "Handling of received message should succeed."
+    | Route_message {to_route} -> to_route
+  in
+  (* Should return [degree_optimal] peers to route the message to. *)
+  Check.(
+    (Peer.Set.cardinal peers_to_route = limits.degree_optimal)
+      int
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__) ;
+  (* [message_id] should be added to the message cache. *)
+  assert_in_message_cache
+    ~__LOC__
+    message_id
+    ~peer:sender
+    ~expected_message:message
+    state ;
+  unit
+
+(** Tests that we do not route the message when receiving a message
+    for an unsubscribed topic. *)
+let test_receiving_message_for_unsusbcribed_topic rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Test receiving message for unsubscribed topic"
+    ~tags:["gossipsub"; "receive_message"; "fanout"]
+  @@ fun () ->
+  let topic = "topic" in
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_join:(fun _ -> false)
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  (* Leave the topic. *)
+  let state, _ = GS.leave {topic} state in
+  (* Receive message for the topic we left. *)
+  let sender = Stdlib.List.hd peers in
+  let message = "some data" in
+  let message_id = 0 in
+  let _state, output =
+    GS.handle_receive_message {sender; topic; message_id; message} state
+  in
+  match output with
+  | Already_received | Route_message _ | Invalid_message | Unknown_validity ->
+      Test.fail
+        ~__LOC__
+        "Handling of received message should fail with [Not_subscribed]."
+  | Not_subscribed -> unit
+
 (** Tests that a peer is added to our mesh on graft when we are both
     joined/subscribed to the same topic.
 
@@ -1731,6 +1818,8 @@ let register rng limits parameters =
   test_join_adds_peers_to_mesh rng limits parameters ;
   test_join_adds_fanout_to_mesh rng limits parameters ;
   test_publish_without_flood_publishing rng limits parameters ;
+  test_receiving_message_for_unsusbcribed_topic rng limits parameters ;
+  test_receiving_message rng limits parameters ;
   test_fanout rng limits parameters ;
   test_handle_graft_for_joined_topic rng limits parameters ;
   test_handle_graft_for_not_joined_topic rng limits parameters ;
