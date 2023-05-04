@@ -492,7 +492,13 @@ struct
     @@ protect
     @@ fun () ->
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    return (Header_index.mem store.index key)
+    let cached =
+      Cache.bind store.cache key @@ function
+      | None | Some (Error _) -> Lwt.return_false
+      | Some (Ok _) -> Lwt.return_true
+    in
+    let*! cached = Option.value cached ~default:Lwt.return_false in
+    return (cached || Header_index.mem store.index key)
 
   let header store key =
     let open Lwt_result_syntax in
@@ -500,10 +506,23 @@ struct
     @@ protect
     @@ fun () ->
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    try
-      let {IHeader.header; _} = Header_index.find store.index key in
-      return_some header
-    with Not_found -> return_none
+    let read_from_disk () =
+      try
+        let {IHeader.header; _} = Header_index.find store.index key in
+        return_some header
+      with Not_found -> return_none
+    in
+    let cached =
+      Cache.bind store.cache key @@ function
+      | None -> return_none
+      | Some (Ok (_value, header)) -> return_some header
+      | Some (Error _ as e) -> Lwt.return e
+    in
+    match cached with
+    | None -> read_from_disk ()
+    | Some header_opt ->
+        let* header_opt in
+        Option.fold_f header_opt ~none:read_from_disk ~some:return_some
 
   let read store key =
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
