@@ -18,6 +18,8 @@ _`Block`
     The header itself decomposes into a :ref:`shell header<shell_header>` (common to all Tezos economic protocols), and a protocol-specific header.
     The shell header contains protocol-agnostic data such as the predecessor's block hash and the block's timestamp.
 
+.. _def_context_nairobi:
+
 _`Context`
     The state of the blockchain. The context is defined by the
     `economic protocol`_ and typically includes information such as
@@ -41,6 +43,8 @@ _`Fitness` (a.k.a. score, weight)
 
 _`Height`
     See level_.
+
+.. _def_level_nairobi:
 
 _`Level` (a.k.a. block height)
     The position of a block_ in the blockchain, that is, the number of blocks

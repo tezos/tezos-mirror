@@ -93,7 +93,7 @@ Stake snapshots
 
 Before turning to the rights selection mechanism, we first introduce a new
 terminology, *stake snapshot*, to denote the stake distribution for a given block,
-as stored in the :ref:`context<context>`.
+as stored in the :ref:`context<def_context_mumbai>`.
 Stake snapshots are taken (and stored) every ``BLOCKS_PER_STAKE_SNAPSHOT`` levels.
 More precisely, a snapshot is taken at a level if and only if its cycle
 position modulo ``BLOCKS_PER_STAKE_SNAPSHOT`` is ``BLOCKS_PER_STAKE_SNAPSHOT - 1``.
