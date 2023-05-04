@@ -908,7 +908,7 @@ module type WORKER = sig
       receive from or sent to the P2P layer. *)
   type p2p_message =
     | Graft of {topic : GS.Topic.t}
-    | Prune of {topic : GS.Topic.t; px : GS.Peer.t Seq.t}
+    | Prune of {topic : GS.Topic.t; px : GS.Peer.t Seq.t; backoff : GS.Span.t}
     | IHave of {topic : GS.Topic.t; message_ids : GS.Message_id.t list}
     | IWant of {message_ids : GS.Message_id.t list}
     | Subscribe of {topic : GS.Topic.t}

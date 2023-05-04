@@ -68,7 +68,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   type p2p_message =
     | Graft of {topic : Topic.t}
-    | Prune of {topic : Topic.t; px : Peer.t Seq.t}
+    | Prune of {topic : Topic.t; px : Peer.t Seq.t; backoff : GS.Span.t}
     | IHave of {topic : Topic.t; message_ids : Message_id.t list}
     | IWant of {message_ids : Message_id.t list}
     | Subscribe of {topic : Topic.t}
@@ -194,7 +194,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let handle_leave ~emit_p2p_output topic = function
     | gstate, GS.Not_joined -> gstate
     | gstate, Leaving_topic {to_prune; noPX_peers} ->
-        let peers = View.(view gstate |> get_connected_peers) in
+        let view = View.view gstate in
+        let peers = View.get_connected_peers view in
+        let backoff = (View.limits view).unsubscribe_backoff in
         (* Sending [Prune] before [Unsubscribe] to let full-connection peers
            clean their mesh before handling [Unsubscribe] message. *)
         Peer.Set.iter
@@ -205,7 +207,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                 GS.select_px_peers gstate ~peer_to_prune topic ~noPX_peers
                 |> List.to_seq
               in
-              Prune {topic; px}
+              Prune {topic; px; backoff}
             in
             send_p2p_message ~emit_p2p_output prune (Seq.return peer_to_prune))
           to_prune ;
@@ -346,12 +348,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         (* Send Graft messages. *)
         iter to_graft (fun _peer topic -> Graft {topic}) ;
         (* Send Prune messages with adequate px. *)
+        let backoff = View.(view gstate |> limits).prune_backoff in
         iter to_prune (fun peer_to_prune topic ->
             let px =
               GS.select_px_peers gstate ~peer_to_prune topic ~noPX_peers
               |> List.to_seq
             in
-            Prune {topic; px}) ;
+            Prune {topic; px; backoff}) ;
         (* Send IHave messages. *)
         GS.select_gossip_messages gstate
         |> List.iter (fun GS.{peer; topic; message_ids} ->
@@ -404,8 +407,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let iwant : GS.iwant = {peer = from_peer; message_ids} in
         GS.handle_iwant iwant gossip_state
         |> handle_iwant ~emit_p2p_output iwant
-    | Prune {topic; px} ->
-        let backoff = View.((view gossip_state).limits.prune_backoff) in
+    | Prune {topic; px; backoff} ->
         let prune : GS.prune = {peer = from_peer; topic; px; backoff} in
         GS.handle_prune prune gossip_state |> handle_prune ~emit_p2p_output
 
@@ -563,14 +565,16 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   let pp_p2p_message fmt = function
     | Graft {topic} -> Format.fprintf fmt "Graft{topic=%a}" Topic.pp topic
-    | Prune {topic; px} ->
+    | Prune {topic; px; backoff} ->
         Format.fprintf
           fmt
-          "Prune{topic=%a, px=%a}"
+          "Prune{topic=%a, px=%a, backoff=%a}"
           Topic.pp
           topic
           (pp_list Peer.pp)
           (List.of_seq px)
+          GS.Span.pp
+          backoff
     | IHave {topic; message_ids} ->
         Format.fprintf
           fmt
