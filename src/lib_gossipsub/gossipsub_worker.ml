@@ -238,14 +238,39 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         {!GS.remove_peer}. *)
   let handle_disconnection = function gstate, GS.Removing_peer -> gstate
 
-  (** When a [Graft] request from a remote peer is received, the worker just
-      forwards it to the automaton. There is nothing else to do. *)
-  let handle_graft = function
-    | ( gstate,
-        ( GS.Peer_filtered | Unknown_topic | Peer_already_in_mesh
-        | Grafting_direct_peer | Unexpected_grafting_peer
-        | Grafting_peer_with_negative_score | Grafting_successfully
-        | Peer_backed_off | Mesh_full ) ) ->
+  (** When a [Graft] request from a remote peer is received, the worker forwards
+      it to the automaton. In certain cases the peer needs to be pruned. Other
+      than that there is nothing else to do. *)
+  let handle_graft ~emit_p2p_output peer topic (gstate, output) =
+    let backoff = View.(view gstate |> limits).prune_backoff in
+    let do_prune ~do_px =
+      let prune =
+        let px =
+          if do_px then
+            GS.select_px_peers
+              gstate
+              ~peer_to_prune:peer
+              topic
+              ~noPX_peers:Peer.Set.empty
+            |> List.to_seq
+          else Seq.empty
+        in
+        Prune {topic; px; backoff}
+      in
+      send_p2p_message ~emit_p2p_output prune (Seq.return peer)
+    in
+    (* NOTE: if the cases when we send a Prune change, be sure to also update
+       the backoffs accordingly in the automaton. *)
+    match output with
+    | GS.Peer_already_in_mesh | Unexpected_grafting_peer | Grafting_successfully
+      ->
+        gstate
+    | Peer_filtered | Unknown_topic | Grafting_direct_peer
+    | Grafting_peer_with_negative_score | Peer_backed_off ->
+        do_prune ~do_px:false ;
+        gstate
+    | Mesh_full ->
+        do_prune ~do_px:true ;
         gstate
 
   (** When a [Subscribe] request from a remote peer is received, the worker just
@@ -390,7 +415,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
              receive_message
     | Graft {topic} ->
         let graft : GS.graft = {peer = from_peer; topic} in
-        GS.handle_graft graft gossip_state |> handle_graft
+        GS.handle_graft graft gossip_state
+        |> handle_graft ~emit_p2p_output from_peer topic
     | Subscribe {topic} ->
         let subscribe : GS.subscribe = {peer = from_peer; topic} in
         GS.handle_subscribe subscribe gossip_state |> handle_subscribe
