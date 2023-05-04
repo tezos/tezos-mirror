@@ -28,6 +28,12 @@ open Plompiler.Csir
 
 let gates_equal = SMap.equal (Array.for_all2 Scalar.equal)
 
+let ql_name = Plompiler.Csir.linear_selector_name 0
+
+let qr_name = Plompiler.Csir.linear_selector_name 1
+
+let qlg_name = Plompiler.Csir.add_next_wire_suffix ql_name
+
 module Make = struct
   module Main = Plonk.Main_protocol
   module Helpers = Plonk_test.Helpers
@@ -97,7 +103,7 @@ module Make = struct
     Helpers.must_fail (fun () ->
         ignore @@ make ~wires:wrong_wires ~gates ~public_input_size:0 ()) ;
     (* gates have different sizes *)
-    let gates = SMap.of_list Scalar.[("qc", [one]); ("ql", [one; one])] in
+    let gates = SMap.of_list Scalar.[("qc", [one]); (ql_name, [one; one])] in
     Helpers.must_fail (fun () ->
         ignore @@ make ~wires ~gates ~public_input_size:0 ())
 
@@ -115,9 +121,9 @@ module Make = struct
       SMap.of_list
         Scalar.
           [
-            ("ql", [one; zero; zero]);
+            (ql_name, [one; zero; zero]);
             ("qecc_ws_add", [zero; one; zero]);
-            ("qlg", [one; zero; zero]);
+            (qlg_name, [one; zero; zero]);
             ("qc", [Scalar.(negate (of_string "4")); zero; zero]);
           ]
     in
@@ -136,9 +142,9 @@ module Make = struct
       SMap.of_list
         Scalar.
           [
-            ("ql", [one; zero; zero]);
+            (ql_name, [one; zero; zero]);
             ("dummy", [zero; one; zero]);
-            ("qlg", [one; zero; zero]);
+            (qlg_name, [one; zero; zero]);
             ("qc", [Scalar.(negate (of_string "4")); zero; zero]);
           ]
     in
@@ -161,10 +167,10 @@ module Make = struct
       [|a; b; c|]
     in
     let gates =
-      SMap.of_list Scalar.[("qc", [zero; one]); ("qr", [zero; zero])]
+      SMap.of_list Scalar.[("qc", [zero; one]); (qr_name, [zero; zero])]
     in
     let gates_expected =
-      SMap.of_list Scalar.[("qc", [|zero; one|]); ("ql", [|zero; zero|])]
+      SMap.of_list Scalar.[("qc", [|zero; one|]); (ql_name, [|zero; zero|])]
     in
     let c = make ~wires ~gates ~public_input_size:1 () in
     let wires = Array.map Array.of_list wires in
@@ -185,16 +191,14 @@ module Make = struct
           [|zero; zero; zero; zero|];
         ]
     in
-    let entry =
-      ({a = zero; b = zero; c = zero; d = zero; e = zero} : Table.entry)
-    in
-    let input =
-      Table.{a = Some zero; b = Some zero; c = None; d = None; e = None}
-    in
+    let entry = ([|zero; zero; zero; zero; zero|] : Table.entry) in
+    let input = [|Some zero; Some zero; None; None; None|] in
     assert (Table.size table_or = 4) ;
     assert (Table.mem entry table_or) ;
     Table.find input table_or |> Option.get |> fun res ->
-    assert (Scalar.(eq entry.a res.a && eq entry.b res.b && eq entry.c res.c)) ;
+    assert (
+      Scalar.(
+        eq entry.(0) res.(0) && eq entry.(1) res.(1) && eq entry.(2) res.(2))) ;
     ()
 end
 
@@ -204,33 +208,19 @@ module To_plonk = struct
     let open CS in
     let zero, one, two = Scalar.(zero, one, one + one) in
     let precomputed_advice = [] in
+    let wires = Array.init Plompiler.Csir.nb_wires_arch (Fun.const 0) in
+    wires.(0) <- 0 ;
+    wires.(1) <- 1 ;
+    wires.(2) <- 0 ;
     let g1 =
-      [|
-        {
-          a = 0;
-          b = 1;
-          c = 0;
-          d = 0;
-          e = 0;
-          sels = [("qr", one)];
-          precomputed_advice;
-          label = [];
-        };
-      |]
+      [|{wires; sels = [(qr_name, one)]; precomputed_advice; label = []}|]
     in
+    let wires = Array.init Plompiler.Csir.nb_wires_arch (Fun.const 0) in
+    wires.(0) <- 1 ;
+    wires.(1) <- 2 ;
+    wires.(2) <- 1 ;
     let g2 =
-      [|
-        {
-          a = 1;
-          b = 2;
-          c = 1;
-          d = 0;
-          e = 0;
-          sels = [("qm", two)];
-          precomputed_advice;
-          label = [];
-        };
-      |]
+      [|{wires; sels = [("qm", two)]; precomputed_advice; label = []}|]
     in
     let c = to_plonk ~public_input_size:0 [g1; g2] in
     let expected_wires =
@@ -240,7 +230,7 @@ module To_plonk = struct
       [|a; b; c|]
     in
     let expected_gates =
-      SMap.of_list [("qr", [|one; zero|]); ("qm", [|zero; two|])]
+      SMap.of_list [(qr_name, [|one; zero|]); ("qm", [|zero; two|])]
     in
     assert (Array.sub c.wires 0 (Array.length expected_wires) = expected_wires) ;
     assert (gates_equal c.gates expected_gates)

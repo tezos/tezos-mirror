@@ -28,21 +28,15 @@ module CS = Csir.CS
 module VS = Linear_algebra.Make_VectorSpace (S)
 module Tables = Csir.Tables
 
-type wire = A | B | C | D | E [@@deriving repr]
+type wire = W of int [@@deriving repr] [@@ocaml.unboxed]
+
+type row = R of int [@@deriving repr] [@@ocaml.unboxed]
 
 type 'a tagged = Input of 'a | Output of 'a [@@deriving repr]
 
 type arith_desc = {
-  a : int;
-  b : int;
-  c : int;
-  d : int;
-  e : int;
-  ql : S.t;
-  qr : S.t;
-  qo : S.t;
-  qd : S.t;
-  qe : S.t;
+  wires : row array;
+  linear : S.t array;
   qm : S.t;
   qc : S.t;
   qx5a : S.t;
@@ -53,18 +47,9 @@ type arith_desc = {
 
 type pow5_desc = {a : int; c : int} [@@deriving repr]
 
-type wires_desc = {a : int; b : int; c : int; d : int; e : int}
-[@@deriving repr]
+type wires_desc = int array [@@deriving repr]
 
-type lookup_desc = {
-  a : int tagged;
-  b : int tagged;
-  c : int tagged;
-  d : int tagged;
-  e : int tagged;
-  table : string;
-}
-[@@deriving repr]
+type lookup_desc = {wires : int tagged array; table : string} [@@deriving repr]
 
 type ws_desc = {x1 : int; y1 : int; x2 : int; y2 : int; x3 : int; y3 : int}
 [@@deriving repr]
@@ -256,70 +241,49 @@ let from_tagged = function Input i -> Some i | Output _ -> None
 let solve_one trace solver =
   (match solver with
   | Skip -> ()
-  | Arith {a; b; c; d; e; ql; qr; qo; qd; qe; qm; qc; qx5a; qx2b; to_solve; _}
-    -> (
+  | Arith {wires; linear; qm; qc; qx5a; qx2b; to_solve} -> (
       (* A gate with degree strictly greater than 1 must be used on an input wire.
          This is to avoid having several solutions for the same equation.
       *)
       match to_solve with
-      | C ->
-          let av = trace.(a) in
-          let bv = trace.(b) in
-          let dv = trace.(d) in
-          let ev = trace.(e) in
-          trace.(c) <-
+      | W i ->
+          assert (i <> 0 || S.is_zero qx5a) ;
+          assert (i <> 1 || S.is_zero qx2b) ;
+          let vs = Array.map (fun (R i) -> trace.(i)) wires in
+          let qs = Array.copy linear in
+          let qi = linear.(i) in
+          (* We ignore the i-th term, as we are solving for it *)
+          qs.(i) <- S.zero ;
+          let sum = Array.map2 S.mul qs vs |> Array.fold_left S.add qc in
+          let (R a_row) = wires.(0) in
+          let (R b_row) = wires.(1) in
+          let av = trace.(a_row) in
+          let bv = trace.(b_row) in
+          let m_pair = match i with 0 -> bv | 1 -> av | _ -> S.zero in
+          let (R i_row) = wires.(i) in
+          trace.(i_row) <-
             S.(
-              ((ql * av) + (qr * bv) + (qd * dv) + (qe * ev)
-              + (qm * av * bv)
+              (sum
+              + (if i >= 2 then qm * av * bv else S.zero)
               + (qx5a * pow av (Z.of_int 5))
-              + (qx2b * (bv * bv))
-              + qc)
-              / negate qo)
-      | A ->
-          assert (S.is_zero qx5a) ;
-          assert (S.is_zero qx2b) ;
-          let cv = trace.(c) in
-          let bv = trace.(b) in
-          let dv = trace.(d) in
-          let ev = trace.(e) in
-          trace.(a) <-
-            S.(
-              negate ((qr * bv) + (qo * cv) + (qd * dv) + (qe * ev) + qc)
-              / (ql + (bv * qm)))
-      | B ->
-          assert (S.is_zero qx5a) ;
-          assert (S.is_zero qx2b) ;
-          let cv = trace.(c) in
-          let av = trace.(a) in
-          let dv = trace.(d) in
-          let ev = trace.(e) in
-          trace.(b) <-
-            S.(
-              negate ((ql * av) + (qo * cv) + (qd * dv) + (qe * ev) + qc)
-              / (qr + (av * qm)))
-      | D | E -> raise @@ Failure "Solving for wires D or E is not allowed")
+              + (qx2b * (bv * bv)))
+              / negate (qi + (m_pair * qm))))
   | Pow5 {a; c} -> trace.(c) <- S.pow trace.(a) (Z.of_int 5)
-  | Lookup {a; b; c; d; e; table} ->
+  | Lookup {wires; table} ->
       let tbl = Tables.find table Csir.table_registry in
-      let wa, wb, wc, wd, we = Utils.map5 untag (a, b, c, d, e) in
-      let a, b, c, d, e = Utils.map5 from_tagged (a, b, c, d, e) in
-      let a, b, c, d, e =
-        Utils.map5 (Option.map (fun i -> trace.(i))) (a, b, c, d, e)
-      in
-      let entry = Option.get Csir.Table.(find {a; b; c; d; e} tbl) in
-      trace.(wa) <- entry.a ;
-      trace.(wb) <- entry.b ;
-      trace.(wc) <- entry.c ;
-      trace.(wd) <- entry.d ;
-      trace.(we) <- entry.e
-  | IsZero {a; b; c; _} ->
-      let av = trace.(a) in
-      trace.(c) <- S.(if av = zero then one else zero) ;
-      trace.(b) <- S.(if av = zero then one else S.div_exn one av)
-  | IsNotZero {a; b; c; _} ->
-      let av = trace.(a) in
-      trace.(c) <- S.(if av = zero then zero else one) ;
-      trace.(b) <- S.(if av = zero then one else S.div_exn one av)
+      let values = Array.map untag wires in
+      let wires = Array.map from_tagged wires in
+      let wires = Array.map (Option.map (fun i -> trace.(i))) wires in
+      let entry = Option.get Csir.Table.(find wires tbl) in
+      Array.iteri (fun i v -> trace.(v) <- entry.(i)) values
+  | IsZero wires ->
+      let av = trace.(wires.(0)) in
+      trace.(wires.(2)) <- S.(if av = zero then one else zero) ;
+      trace.(wires.(1)) <- S.(if av = zero then one else S.div_exn one av)
+  | IsNotZero wires ->
+      let av = trace.(wires.(0)) in
+      trace.(wires.(2)) <- S.(if av = zero then zero else one) ;
+      trace.(wires.(1)) <- S.(if av = zero then one else S.div_exn one av)
   | Ecc_Ws {x1; y1; x2; y2; x3; y3} ->
       let x1, y1 = (trace.(x1), trace.(y1)) in
       let x2, y2 = (trace.(x2), trace.(y2)) in

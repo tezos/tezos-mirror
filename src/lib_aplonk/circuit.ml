@@ -45,7 +45,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
 
   (* This type gathers all inputs of the verification circuit
      alpha, beta, gamma, delta, x, r are challenges generated from Fiat-Shamir
-     ss1, ss2, ss3, ss4, ss5 are preprocessed permutation polynomials evaluations at x
+     ss_list are preprocessed permutation polynomials evaluations at x
      selectors are the list of the selectors evaluations at x with their names
      ids_batch is the batch (with alpha) of the evaluated identities at x
      wires_g is the lists of all wires evaluations at gx for each proof
@@ -53,7 +53,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
      zg is the permutation polynomial evaluation at gx
      z is the permutation polynomial evaluation at x
      batch are the expected batched values with r of
-      · ss1, ss2, ss3, ss4, ss5 selectors
+      · ss_list selectors
       · ids_batch
       · wires_g
       · wires
@@ -71,11 +71,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     delta : scalar_input;
     x : scalar_input;
     r : scalar_input;
-    ss1 : scalar_input;
-    ss2 : scalar_input;
-    ss3 : scalar_input;
-    ss4 : scalar_input;
-    ss5 : scalar_input;
+    ss_list : scalar_input list;
     selectors : (string * scalar_input) list;
     ids_batch : scalar_input;
     wires_g : scalar_input list list;
@@ -102,6 +98,9 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     in
     let outer_pi = List.init nb_outer_pi (fun _ -> dummy_input) in
     let selectors = List.map (fun q -> (q, dummy_input)) gates in
+    let ss_list =
+      List.init Plompiler.Csir.nb_wires_arch @@ Fun.const dummy_input
+    in
     let gates = SMap.of_list (List.map (fun g -> (g, ())) gates) in
     let batch = List.init (nb_batch gates) (fun _ -> dummy_input) in
     let wires_g = if nb_batch gates = nb_batch SMap.empty then [] else wires in
@@ -114,11 +113,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       delta = dummy_input;
       x = dummy_input;
       r = dummy_input;
-      ss1 = dummy_input;
-      ss2 = dummy_input;
-      ss3 = dummy_input;
-      ss4 = dummy_input;
-      ss5 = dummy_input;
+      ss_list;
       selectors;
       ids_batch = dummy_input;
       wires_g;
@@ -309,7 +304,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     *)
     let check_identities ~switches (n, generator) x ids_batch
         (q_names, selectors) (alpha, beta, gamma, delta) (wires_g, wires, zg, z)
-        (ss1, ss2, ss3, ss4, ss5) pi_list_list =
+        ss_list pi_list_list =
       (* We don’t care about wires_g value if it’s empty so we just take wires *)
       let wires_g = match wires_g with [] -> wires | w -> w in
       (* precompute some constant *)
@@ -368,21 +363,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       in
       (* Using switched wires is enough for adapting the perm identity to the lower number of proof *)
       let* perm_a, perm_b =
-        (Perm.cs
-           ~sum_alpha_i
-           ~l1
-           ~ss1
-           ~ss2
-           ~ss3
-           ~ss4
-           ~ss5
-           ~beta
-           ~gamma
-           ~delta
-           ~x
-           ~z
-           ~zg)
-          ~wires
+        (Perm.cs ~sum_alpha_i ~l1 ~ss_list ~beta ~gamma ~delta ~x ~z ~zg) ~wires
       in
       let perm_ids = [("Perm.a", perm_a); ("Perm.b", perm_b)] in
       let identities =
@@ -579,11 +560,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
         delta;
         x;
         r;
-        ss1;
-        ss2;
-        ss3;
-        ss4;
-        ss5;
+        ss_list;
         selectors;
         ids_batch;
         wires_g;
@@ -603,19 +580,15 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       |: Input.list (List.map Input.list inner_pi)
       |> end_input_com
     in
-    let* ss1, ss2, ss3, ss4, ss5, selectors, zg, z, wires_g, wires =
-      begin_input_com (fun ss1 ss2 ss3 ss4 ss5 selectors zg z wires_g wires ->
-          ( ss1,
-            ss2,
-            ss3,
-            ss4,
-            ss5,
+    let* ss_list, selectors, zg, z, wires_g, wires =
+      begin_input_com (fun ss_list selectors zg z wires_g wires ->
+          ( of_list ss_list,
             of_list selectors,
             zg,
             z,
             List.map of_list (of_list wires_g),
             List.map of_list (of_list wires) ))
-      |: ss1 |: ss2 |: ss3 |: ss4 |: ss5 |: Input.list selectors |: zg |: z
+      |: Input.list ss_list |: Input.list selectors |: zg |: z
       |: Input.list (List.map Input.list wires_g)
       |: Input.list (List.map Input.list wires)
       |> end_input_com
@@ -663,13 +636,13 @@ module V (Main : Aggregation.Main_protocol.S) = struct
            (q_names, selectors)
            (alpha, beta, gamma, delta)
            (switched_wires_g, switched_wires, zg, z)
-           (ss1, ss2, ss3, ss4, ss5)
+           ss_list
            switched_inner_pi
     in
     let* check_batch =
       with_label ~label:"check_batch"
       @@
-      let g_list = [ss1; ss2; ss3; ss4; ss5] @ selectors in
+      let g_list = ss_list @ selectors in
       Constraints.check_batch
         r
         (g_list, switched_wires, switched_wires_g, z, zg)

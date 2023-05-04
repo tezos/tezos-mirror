@@ -59,16 +59,8 @@ module Circuit : sig
 
   val make_gates :
     ?qc:Scalar.t list ->
-    ?ql:Scalar.t list ->
-    ?qr:Scalar.t list ->
-    ?qo:Scalar.t list ->
-    ?qd:Scalar.t list ->
-    ?qe:Scalar.t list ->
-    ?qlg:Scalar.t list ->
-    ?qrg:Scalar.t list ->
-    ?qog:Scalar.t list ->
-    ?qdg:Scalar.t list ->
-    ?qeg:Scalar.t list ->
+    ?linear:(int * Scalar.t list) list ->
+    ?linear_g:(int * Scalar.t list) list ->
     ?qm:Scalar.t list ->
     ?qx2b:Scalar.t list ->
     ?qx5a:Scalar.t list ->
@@ -126,9 +118,8 @@ end = struct
 
   let get_selectors circuit = SMap.keys circuit.gates
 
-  let make_gates ?(qc = []) ?(ql = []) ?(qr = []) ?(qo = []) ?(qd = [])
-      ?(qe = []) ?(qlg = []) ?(qrg = []) ?(qog = []) ?(qdg = []) ?(qeg = [])
-      ?(qm = []) ?(qx2b = []) ?(qx5a = []) ?(qx5c = []) ?(qecc_ws_add = [])
+  let make_gates ?(qc = []) ?(linear = []) ?(linear_g = []) ?(qm = [])
+      ?(qx2b = []) ?(qx5a = []) ?(qx5c = []) ?(qecc_ws_add = [])
       ?(qecc_ed_add = []) ?(qecc_ed_cond_add = []) ?(qbool = [])
       ?(qcond_swap = []) ?(q_anemoi = []) ?(q_plookup = []) ?(q_table = [])
       ?(precomputed_advice = SMap.empty) () =
@@ -138,16 +129,8 @@ end = struct
     let gate_list =
       CS.q_list
         ~qc
-        ~ql
-        ~qr
-        ~qo
-        ~qd
-        ~qe
-        ~qlg
-        ~qrg
-        ~qog
-        ~qdg
-        ~qeg
+        ~linear
+        ~linear_g
         ~qm
         ~qx2b
         ~qx5a
@@ -280,10 +263,12 @@ end = struct
       raise (Invalid_argument "Make Circuit: table(s) given with no lookups.") ;
     let gates =
       (* Define ql if undefined as it is the gate taking the public input in. *)
+      let ql_name = Plompiler.Csir.linear_selector_name 0 in
       if
         List.fold_left ( + ) public_input_size input_com_sizes > 0
-        && (not @@ SMap.mem "ql" gates)
-      then SMap.add "ql" (Array.init circuit_size (fun _ -> Scalar.zero)) gates
+        && (not @@ SMap.mem ql_name gates)
+      then
+        SMap.add ql_name (Array.init circuit_size (fun _ -> Scalar.zero)) gates
       else gates
     in
     {
@@ -311,20 +296,8 @@ end = struct
           (* Retrieving its values as well as the next constraint's values *)
           let j = (i + 1) mod nb_cs in
           let ci, cj = (gate.(i), gate.(j)) in
-          let a, b, c, d, e =
-            ( trace.(ci.a),
-              trace.(ci.b),
-              trace.(ci.c),
-              trace.(ci.d),
-              trace.(ci.e) )
-          in
-          let ag, bg, cg, dg, eg =
-            ( trace.(cj.a),
-              trace.(cj.b),
-              trace.(cj.c),
-              trace.(cj.d),
-              trace.(cj.e) )
-          in
+          let wires = Array.map (fun w -> trace.(w)) ci.wires in
+          let wires_g = Array.map (fun w -> trace.(w)) cj.wires in
           (* Folding on selectors *)
           List.fold_left
             (fun id_map (s_name, q) ->
@@ -332,7 +305,7 @@ end = struct
               | "q_plookup" -> id_map
               | "q_table" ->
                   (* We assume there can be only one lookup per gate *)
-                  let entry : Table.entry = Table.{a; b; c; d; e} in
+                  let entry : Table.entry = wires in
                   let sub_table = List.nth tables (Scalar.to_z q |> Z.to_int) in
                   let b = Table.mem entry sub_table in
                   let id = [|(if b then Scalar.zero else Scalar.one)|] in
@@ -341,8 +314,6 @@ end = struct
                   (* Retrieving the selector's identity name and equations *)
                   let s_id_name, _ = Custom_gates.get_ids s_name in
                   let s_ids = SMap.find s_id_name id_map in
-                  let wires = [|a; b; c; d; e|] in
-                  let wires_g = [|ag; bg; cg; dg; eg|] in
                   let precomputed_advice = SMap.of_list ci.precomputed_advice in
                   (* Updating the identities with the equations' output *)
                   List.iteri
@@ -432,13 +403,13 @@ end = struct
         map
     in
     List.fold_left
-      (fun (wires, selectors_map, advice_map, pad)
-           {a; b; c; d; e; sels; precomputed_advice; label} ->
+      (fun (acc_wires, selectors_map, advice_map, pad)
+           {wires; sels; precomputed_advice; label} ->
         ignore label ;
-        let wires = add_wires [|a; b; c; d; e|] wires in
+        let acc_wires = add_wires wires acc_wires in
         let selectors_map = add_selectors sels selectors_map pad in
         let advice_map = add_selectors precomputed_advice advice_map pad in
-        (wires, selectors_map, advice_map, pad + 1))
+        (acc_wires, selectors_map, advice_map, pad + 1))
       SMap.([||], empty, empty, 0)
       cs
     |> fun (wires, selectors, advice, _) ->

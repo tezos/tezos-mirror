@@ -561,23 +561,17 @@ let place_over_block : perfectly:bool -> block -> block -> block option =
             | None -> n
           in
           let sels_prev = List.map (fun (n, q) -> (rename n, q)) b1_k_1.sels in
-          let a, b, c, d, e =
+          let wires =
             (* TODO: Revisit [type raw_constraint] and how to represent unused
                wires. Should the conversion from -1 to 0 be done here? *)
-            match List.map (max 0) combined with
-            | [a; b; c; d; e] -> (a, b, c, d, e)
-            | _ -> assert false
+            List.map (max 0) combined |> Array.of_list
           in
           let b2_0 = b2.(0) in
           let b2_rest = Array.sub b2 1 (Array.length b2 - 1) in
           assert (b1_k.precomputed_advice = []) ;
           b1.(Array.length b1 - 1) <-
             {
-              a;
-              b;
-              c;
-              d;
-              e;
+              wires;
               sels = b2_0.sels;
               precomputed_advice = b2_0.precomputed_advice;
               label = "hyb" :: b2_0.label;
@@ -628,7 +622,7 @@ let remove_boolean_gates gates =
 let add_boolean_checks ~boolean_vars gates =
   let bool_vars_map = ref @@ ISet.of_list boolean_vars in
   let shared_a constr =
-    let a_wire = CS.(constr.a) in
+    let a_wire = CS.(constr.wires.(0)) in
     if ISet.mem a_wire !bool_vars_map then (
       bool_vars_map := ISet.remove a_wire !bool_vars_map ;
       CS.{constr with sels = ("qbool", Scalar.one) :: constr.sels})
@@ -638,8 +632,10 @@ let add_boolean_checks ~boolean_vars gates =
     let wires = CS.wires_of_constr_i gate i in
     if List.hd wires < 0 && ISet.cardinal !bool_vars_map > 0 then (
       let a = ISet.choose !bool_vars_map in
+      let wires = CS.(constr.wires) in
+      wires.(0) <- a ;
       bool_vars_map := ISet.remove a !bool_vars_map ;
-      CS.{constr with a; sels = ("qbool", Scalar.one) :: constr.sels})
+      CS.{constr with wires; sels = ("qbool", Scalar.one) :: constr.sels})
     else constr
   in
   (* First try to add them on existing constraints, through the qbool selector *)

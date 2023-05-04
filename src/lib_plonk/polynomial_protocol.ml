@@ -80,8 +80,9 @@ module Make_impl (PC : Polynomial_commitment.S) = struct
       degree
    *)
   let split_t n t nb_of_t_chunks =
+    let nb_digits = String.length @@ string_of_int (nb_of_t_chunks - 1) in
     List.mapi
-      (fun i t_i -> ("T_" ^ string_of_int i, t_i))
+      (fun i t_i -> ("T_" ^ Csir.string_key_of_int ~nb_digits i, t_i))
       (Poly.split ~nb_chunks:nb_of_t_chunks n t)
     |> SMap.of_list
 

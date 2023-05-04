@@ -53,148 +53,45 @@ module Unit_tests_for_each_selector = struct
         let c = [0; 1] in
         [|a; b; c|]
       in
-      let gates = Circuit.make_gates ~qo:![0; -1] ~qc:![0; 1] () in
+      let qo = ![0; -1] in
+      let gates = Circuit.make_gates ~linear:[(2, qo)] ~qc:![0; 1] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
     in
     {name; circuit; witness; outcome = Valid}
 
-  let ql =
-    let name = "ql" in
+  let linear_selector_test i =
+    (* We don't have a test for "qo" *)
+    assert (i <> 2) ;
+    let name = Plompiler.Csir.linear_selector_name i in
     let witness = !![0; 1] in
     let circuit =
       let wires =
-        let a = [0; 1] in
-        let b = [0; 0] in
-        let c = [0; 1] in
-        [|a; b; c|]
+        Array.init Plompiler.Csir.nb_wires_arch (fun j ->
+            if j = i || j = 2 then [0; 1] else [0; 0])
       in
-      let gates = Circuit.make_gates ~ql:![1; 1] ~qo:![0; -1] () in
+      let q_linear = ![1; 1] in
+      let qo = ![0; -1] in
+      let linear = [(i, q_linear); (2, qo)] in
+      let gates = Circuit.make_gates ~linear () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
     in
     {name; circuit; witness; outcome = Valid}
 
-  let qr =
-    let name = "qr" in
-    let witness = !![0; 1] in
-    let circuit =
-      let wires =
-        let a = [0; 0] in
-        let b = [0; 1] in
-        let c = [0; 1] in
-        [|a; b; c|]
-      in
-      let gates = Circuit.make_gates ~qr:![1; 1] ~qo:![0; -1] () in
-      Circuit.make ~wires ~gates ~public_input_size:0 ()
+  let next_linear_selector_test i =
+    let name =
+      Plompiler.Csir.(linear_selector_name i |> add_next_wire_suffix)
     in
-    {name; circuit; witness; outcome = Valid}
-
-  let qd =
-    let name = "qd" in
     let witness = !![0; 1] in
     let circuit =
       let wires =
-        let a = [0; 0] in
-        let b = [0; 0] in
-        let c = [0; 1] in
-        let d = [0; 1] in
-        [|a; b; c; d|]
+        Array.init Plompiler.Csir.nb_wires_arch (fun j ->
+            if j = 2 then if i = 2 then [1; 1] else [1; 0]
+            else if j = i then [0; 1]
+            else [0; 0])
       in
-      let gates = Circuit.make_gates ~qd:![1; 1] ~qo:![0; -1] () in
-      Circuit.make ~wires ~gates ~public_input_size:0 ()
-    in
-    {name; circuit; witness; outcome = Valid}
-
-  let qe =
-    let name = "qe" in
-    let witness = !![0; 1] in
-    let circuit =
-      let wires =
-        let a = [0; 0] in
-        let b = [0; 0] in
-        let c = [0; 1] in
-        let d = [0; 0] in
-        let e = [0; 1] in
-        [|a; b; c; d; e|]
+      let gates =
+        Circuit.make_gates ~linear:[(2, ![-1; 0])] ~linear_g:[(i, ![1; 0])] ()
       in
-      let gates = Circuit.make_gates ~qe:![1; 1] ~qo:![0; -1] () in
-      Circuit.make ~wires ~gates ~public_input_size:0 ()
-    in
-    {name; circuit; witness; outcome = Valid}
-
-  let qlg =
-    let name = "qlg" in
-    let witness = !![0; 1] in
-    let circuit =
-      let wires =
-        let a = [0; 1] in
-        let b = [0; 0] in
-        let c = [1; 0] in
-        [|a; b; c|]
-      in
-      let gates = Circuit.make_gates ~qlg:![1; 0] ~qo:![-1; 0] () in
-      Circuit.make ~wires ~gates ~public_input_size:0 ()
-    in
-    {name; circuit; witness; outcome = Valid}
-
-  let qrg =
-    let name = "qrg" in
-    let witness = !![0; 1] in
-    let circuit =
-      let wires =
-        let a = [0; 0] in
-        let b = [0; 1] in
-        let c = [1; 0] in
-        [|a; b; c|]
-      in
-      let gates = Circuit.make_gates ~qrg:![1; 0] ~qo:![-1; 0] () in
-      Circuit.make ~wires ~gates ~public_input_size:0 ()
-    in
-    {name; circuit; witness; outcome = Valid}
-
-  let qog =
-    let name = "qog" in
-    let witness = !![0; 1] in
-    let circuit =
-      let wires =
-        let a = [0; 0] in
-        let b = [0; 0] in
-        let c = [1; 1] in
-        [|a; b; c|]
-      in
-      let gates = Circuit.make_gates ~qog:![1; 0] ~qo:![-1; 0] () in
-      Circuit.make ~wires ~gates ~public_input_size:0 ()
-    in
-    {name; circuit; witness; outcome = Valid}
-
-  let qdg =
-    let name = "qdg" in
-    let witness = !![0; 1] in
-    let circuit =
-      let wires =
-        let a = [0; 0] in
-        let b = [0; 0] in
-        let c = [1; 0] in
-        let d = [0; 1] in
-        [|a; b; c; d|]
-      in
-      let gates = Circuit.make_gates ~qdg:![1; 0] ~qo:![-1; 0] () in
-      Circuit.make ~wires ~gates ~public_input_size:0 ()
-    in
-    {name; circuit; witness; outcome = Valid}
-
-  let qeg =
-    let name = "qeg" in
-    let witness = !![0; 1] in
-    let circuit =
-      let wires =
-        let a = [0; 0] in
-        let b = [0; 0] in
-        let c = [1; 0] in
-        let d = [0; 0] in
-        let e = [0; 1] in
-        [|a; b; c; d; e|]
-      in
-      let gates = Circuit.make_gates ~qeg:![1; 0] ~qo:![-1; 0] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
     in
     {name; circuit; witness; outcome = Valid}
@@ -209,7 +106,7 @@ module Unit_tests_for_each_selector = struct
         let c = [0; 1] in
         [|a; b; c|]
       in
-      let gates = Circuit.make_gates ~qm:![1; 1] ~qo:![0; -1] () in
+      let gates = Circuit.make_gates ~qm:![1; 1] ~linear:[(2, ![0; -1])] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
     in
     {name; circuit; witness; outcome = Valid}
@@ -224,7 +121,9 @@ module Unit_tests_for_each_selector = struct
         let c = [0; 3; 3] in
         [|a; b; c|]
       in
-      let gates = Circuit.make_gates ~qx2b:![1; 1; 1] ~qo:![0; -1; -1] () in
+      let gates =
+        Circuit.make_gates ~qx2b:![1; 1; 1] ~linear:[(2, ![0; -1; -1])] ()
+      in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
     in
     {name; circuit; witness; outcome = Valid}
@@ -239,7 +138,7 @@ module Unit_tests_for_each_selector = struct
         let c = [0; 2] in
         [|a; b; c|]
       in
-      let gates = Circuit.make_gates ~qx5a:![1; 1] ~qo:![0; -1] () in
+      let gates = Circuit.make_gates ~qx5a:![1; 1] ~linear:[(2, ![0; -1])] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
     in
     {name; circuit; witness; outcome = Valid}
@@ -254,7 +153,7 @@ module Unit_tests_for_each_selector = struct
         let c = [0; 2] in
         [|a; b; c|]
       in
-      let gates = Circuit.make_gates ~qx5c:![1; 1] ~ql:![0; -1] () in
+      let gates = Circuit.make_gates ~qx5c:![1; 1] ~linear:[(0, ![0; -1])] () in
       Circuit.make ~wires ~gates ~public_input_size:0 ()
     in
     {name; circuit; witness; outcome = Valid}
@@ -395,8 +294,7 @@ module Unit_tests_for_each_selector = struct
       let gates =
         Circuit.make_gates
           ~q_anemoi:Scalar.[zero; zero; one; zero]
-          ~ql:Scalar.[one; one; zero; zero]
-          ~qr:Scalar.[one; zero; zero; zero]
+          ~linear:[(0, ![1; 1; 0; 0]); (1, ![1; 0; 0; 0])]
           ~precomputed_advice
           ()
       in
@@ -405,28 +303,21 @@ module Unit_tests_for_each_selector = struct
     {name; circuit; witness; outcome = Valid}
 
   let list =
-    [
-      qc;
-      ql;
-      qr;
-      qd;
-      qe;
-      qlg;
-      qrg;
-      qog;
-      qdg;
-      qeg;
-      qm;
-      qx2b;
-      qx5a;
-      qx5c;
-      qecc_ws_add;
-      qecc_ed_add;
-      qecc_ed_cond_add;
-      qbool;
-      qcond_swap;
-      q_anemoi;
-    ]
+    let wires = List.init Plompiler.Csir.nb_wires_arch Fun.id in
+    (qc :: List.map linear_selector_test (List.filter (fun i -> i <> 2) wires))
+    @ List.map next_linear_selector_test wires
+    @ [
+        qm;
+        qx2b;
+        qx5a;
+        qx5c;
+        qecc_ws_add;
+        qecc_ed_add;
+        qecc_ed_cond_add;
+        qbool;
+        qcond_swap;
+        q_anemoi;
+      ]
 end
 
 module General_circuits = struct
@@ -440,7 +331,7 @@ module General_circuits = struct
         let c = [1; 0] in
         [|a; b; c|]
       in
-      let gates = Circuit.make_gates ~qo:![-1; -1] ~qc:![1; 0] () in
+      let gates = Circuit.make_gates ~linear:[(2, ![-1; -1])] ~qc:![1; 0] () in
       Circuit.make ~wires ~gates ~public_input_size:1 ()
     in
     {name; circuit; witness; outcome = Valid}
@@ -483,9 +374,12 @@ module General = struct
 
   let gates =
     Circuit.make_gates
-      ~ql:![1; 0; 1; 0; 1; 0; 0]
-      ~qr:![1; 0; 1; 0; 1; 0; 0]
-      ~qo:![-1; -1; -1; -1; -1; 0; 0]
+      ~linear:
+        [
+          (0, ![1; 0; 1; 0; 1; 0; 0]);
+          (1, ![1; 0; 1; 0; 1; 0; 0]);
+          (2, ![-1; -1; -1; -1; -1; 0; 0]);
+        ]
       ~qm:![0; 1; 0; 1; 0; 0; 0]
       ~qecc_ws_add:![0; 0; 0; 0; 0; 1; 0]
       ()
@@ -652,11 +546,7 @@ module Big_circuit = struct
         let qe = qd in
         Circuit.Circuit.make_gates
           ~qm:!qm
-          ~ql:!ql
-          ~qr:!qr
-          ~qo:!qo
-          ~qd:!qd
-          ~qe:!qe
+          ~linear:[(0, !ql); (1, !qr); (2, !qo); (3, !qd); (4, !qe)]
           ~qc
           ()
       in
@@ -733,7 +623,7 @@ module Lookup = struct
 
   let gates =
     Circuit.make_gates
-      ~qo:![0; -1; 0; -1; 0; 0; 0]
+      ~linear:[(2, ![0; -1; 0; -1; 0; 0; 0])]
       ~qm:![0; 1; 0; 1; 0; 0; 0]
       ~qecc_ws_add:![0; 0; 0; 0; 0; 1; 0]
       ~q_plookup:![1; 0; 1; 0; 1; 0; 0]

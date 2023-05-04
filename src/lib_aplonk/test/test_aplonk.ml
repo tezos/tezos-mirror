@@ -203,12 +203,15 @@ module External = struct
       in
       let gates =
         Plonk.Circuit.make_gates
-          ~ql:S.[one; one; zero; zero; zero]
-          ~qr:S.[one; zero; zero; zero; zero]
+          ~linear:
+            [
+              (0, S.[one; one; zero; zero; zero]);
+              (1, S.[one; zero; zero; zero; zero]);
+              (2, S.[mone; mone; mone; zero; zero]);
+            ]
+          ~linear_g:[(1, S.[one; zero; zero; zero; zero])]
           ~qm:S.[zero; zero; one; zero; zero]
-          ~qo:S.[mone; mone; mone; zero; zero]
           ~qc:S.[zero; one; zero; zero; zero]
-          ~qrg:S.[one; zero; zero; zero; zero]
           ~qecc_ed_add:S.[zero; zero; zero; one; zero]
           ()
       in

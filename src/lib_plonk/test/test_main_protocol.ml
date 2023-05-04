@@ -79,6 +79,11 @@ struct
     let aggregated_cases =
       let open Cases.General in
       let open Cases.Unit_tests_for_each_selector in
+      let ql = linear_selector_test 0 in
+      let qr = linear_selector_test 1 in
+      let qlg = next_linear_selector_test 0 in
+      let qrg = next_linear_selector_test 1 in
+      let qog = next_linear_selector_test 2 in
       [
         [zero_values; non_zero_values];
         [zero_values; zero_values];
@@ -112,7 +117,7 @@ struct
   let several_circuits_one_input ~zero_knowledge () =
     let open Plonk_test.Cases in
     let qc = Unit_tests_for_each_selector.qc in
-    let ql = Unit_tests_for_each_selector.ql in
+    let ql = Unit_tests_for_each_selector.linear_selector_test 0 in
     let circuits =
       Plonk.SMap.of_list
         [(qc.name, (qc.circuit, 1)); (ql.name, (ql.circuit, 1))]

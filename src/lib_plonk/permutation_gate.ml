@@ -40,6 +40,13 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
 
   let ids_label = "Perm"
 
+  let si_name, ss_name =
+    let nb_digits =
+      string_of_int Plompiler.Csir.nb_wires_arch |> String.length
+    in
+    let name prefix i = prefix ^ Csir.string_key_of_int ~nb_digits (i + 1) in
+    (name "Si", name "Ss")
+
   (* element preprocessed and known by both prover and verifier *)
   type public_parameters = {
     g_map_perm_PP : Poly.t SMap.t;
@@ -57,11 +64,15 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
 
   let mone = Scalar.negate one
 
-  let quadratic_non_residues = Fr_generation.build_quadratic_non_residues 8
+  let quadratic_non_residues =
+    Fr_generation.build_quadratic_non_residues @@ Plompiler.Csir.nb_wires_arch
 
   let get_k k =
-    if k < 8 then quadratic_non_residues.(k)
-    else raise (Invalid_argument "Permutation.get_k : k must be lower than 8.")
+    if k < Plompiler.Csir.nb_wires_arch then quadratic_non_residues.(k)
+    else
+      raise
+        (Invalid_argument
+           "Permutation.get_k : k must be lower than nb_wires_arch.")
 
   module Partition = struct
     module IntSet = Set.Make (Int)
@@ -150,26 +161,25 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
 
     (* returns [sid_0, …, sid_k] *)
     let sid_list_non_quadratic_residues size =
-      if size > 8 then
+      if size > Plompiler.Csir.nb_wires_arch then
         raise (Failure "sid_list_non_quadratic_residues: sid list too long")
       else List.init size (fun i -> Poly.of_coefficients [(get_k i, 1)])
 
     let sid_map_non_quadratic_residues_prover size =
-      if size > 8 then
+      if size > Plompiler.Csir.nb_wires_arch then
         raise (Failure "sid_map_non_quadratic_residues: sid map too long")
       else
         SMap.of_list
           (List.init size (fun i ->
                let k = get_k i in
-               ("Si" ^ string_of_int (i + 1), Poly.of_coefficients [(k, 1)])))
+               (si_name i, Poly.of_coefficients [(k, 1)])))
 
     let evaluations_sid nb_sid evaluations =
       let domain_evals = Evaluations.find_evaluation evaluations "X" in
       SMap.of_list
         (List.init nb_sid (fun i ->
              let k = get_k i in
-             ( "Si" ^ string_of_int (i + 1),
-               Evaluations.mul_by_scalar k domain_evals )))
+             (si_name i, Evaluations.mul_by_scalar k domain_evals)))
 
     let ssigma_map_non_quadratic_residues permutation domain size =
       let n = Domain.length domain in
@@ -184,8 +194,7 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
                      let index = s_ij mod n in
                      Scalar.mul coeff (Domain.get domain index))
                in
-               ( "Ss" ^ string_of_int (i + 1),
-                 Evaluations.interpolation_fft2 domain coeff_list )))
+               (ss_name i, Evaluations.interpolation_fft2 domain coeff_list)))
       in
       ssigma_map
   end
@@ -257,9 +266,7 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
         (* changes f (resp g) array to f'(resp g') array, and multiply them together
             and with z (resp zg) *)
         let f_evaluation =
-          let sid_names =
-            List.init nb_wires (fun i -> "Si" ^ string_of_int (i + 1))
-          in
+          let sid_names = List.init nb_wires si_name in
           compute_prime
             ~prefix
             tmp_evaluation
@@ -275,8 +282,7 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
         in
         let g_evaluation =
           let ss_names =
-            List.init nb_wires (fun i ->
-                prefix @@ a_pref "Ss" ^ string_of_int (i + 1))
+            List.init nb_wires (fun i -> prefix @@ a_pref (ss_name i))
           in
           compute_prime
             ~prefix
@@ -444,8 +450,7 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
     in
     let z_name = a_pref z_name in
     let ss_names =
-      List.init (List.length wires_names) (fun i ->
-          a_pref "Ss" ^ string_of_int (i + 1))
+      List.init (List.length wires_names) (fun i -> a_pref (ss_name i))
     in
     fun x answers ->
       let get_ss i = get_answer answers X (prefix @@ List.nth ss_names i) in
@@ -484,52 +489,31 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
       z_name
       (Permutation_poly.compute_Z permutation domain beta gamma values)
 
-  let cs ~sum_alpha_i ~l1 ~ss1 ~ss2 ~ss3 ~ss4 ~ss5 ~beta ~gamma ~delta ~x ~z ~zg
-      ~wires =
+  let cs ~sum_alpha_i ~l1 ~ss_list ~beta ~gamma ~delta ~x ~z ~zg ~wires =
     let open L in
-    let a_list, b_list, c_list, d_list, e_list =
-      let rec aux (acc_a, acc_b, acc_c, acc_d, acc_e) = function
-        | [] -> List.(rev acc_a, rev acc_b, rev acc_c, rev acc_d, rev acc_e)
-        | [a; b; c; d; e] :: tl ->
-            aux (a :: acc_a, b :: acc_b, c :: acc_c, d :: acc_d, e :: acc_e) tl
-        | _ -> failwith "Unexpected wires format"
-      in
-      aux ([], [], [], [], []) wires
-    in
     let* cs_perm_a = Num.custom ~qr:Scalar.(negate one) ~qm:Scalar.(one) z l1 in
-
-    let* a = sum_alpha_i a_list delta in
-    let* b = sum_alpha_i b_list delta in
-    let* c = sum_alpha_i c_list delta in
-    let* d = sum_alpha_i d_list delta in
-    let* e = sum_alpha_i e_list delta in
-    let* betaid1 = Num.mul ~qm:(get_k 0) beta x in
-    let* betaid2 = Num.mul ~qm:(get_k 1) beta x in
-    let* betaid3 = Num.mul ~qm:(get_k 2) beta x in
-    let* betaid4 = Num.mul ~qm:(get_k 3) beta x in
-    let* betaid5 = Num.mul ~qm:(get_k 4) beta x in
-    let* betasigma1 = Num.mul beta ss1 in
-    let* betasigma2 = Num.mul beta ss2 in
-    let* betasigma3 = Num.mul beta ss3 in
-    let* betasigma4 = Num.mul beta ss4 in
-    let* betasigma5 = Num.mul beta ss5 in
-
-    let* aid = Num.add_list (to_list [a; betaid1; gamma]) in
-    let* bid = Num.add_list (to_list [b; betaid2; gamma]) in
-    let* cid = Num.add_list (to_list [c; betaid3; gamma]) in
-    let* did = Num.add_list (to_list [d; betaid4; gamma]) in
-    let* eid = Num.add_list (to_list [e; betaid5; gamma]) in
-    let* asigma = Num.add_list (to_list [a; betasigma1; gamma]) in
-    let* bsigma = Num.add_list (to_list [b; betasigma2; gamma]) in
-    let* csigma = Num.add_list (to_list [c; betasigma3; gamma]) in
-    let* dsigma = Num.add_list (to_list [d; betasigma4; gamma]) in
-    let* esigma = Num.add_list (to_list [e; betasigma5; gamma]) in
-
-    let* left_term = Num.mul_list (to_list [aid; bid; cid; did; eid; z]) in
-
-    let* right_term =
-      Num.mul_list (to_list [asigma; bsigma; csigma; dsigma; esigma; zg])
+    let wires = List.transpose wires in
+    let nb_wires = List.length wires in
+    assert (Plompiler.Csir.nb_wires_arch = nb_wires) ;
+    let* batched_wires = mapM (fun x -> sum_alpha_i x delta) wires in
+    let* beta_ids =
+      mapM (fun i -> Num.mul ~qm:(get_k i) beta x) @@ List.init nb_wires Fun.id
     in
+    let* beta_sigmas = mapM (Num.mul beta) ss_list in
+    let* w_ids =
+      map2M
+        (fun w beta_id -> Num.add_list (to_list [w; beta_id; gamma]))
+        batched_wires
+        beta_ids
+    in
+    let* w_sigmas =
+      map2M
+        (fun w beta_sigma -> Num.add_list (to_list [w; beta_sigma; gamma]))
+        batched_wires
+        beta_sigmas
+    in
+    let* left_term = Num.mul_list (to_list (z :: w_ids)) in
+    let* right_term = Num.mul_list (to_list (zg :: w_sigmas)) in
     let* cs_perm_b = Num.add ~qr:Scalar.(negate one) left_term right_term in
     ret (cs_perm_a, cs_perm_b)
 end
@@ -594,11 +578,7 @@ module type S = sig
   val cs :
     sum_alpha_i:(L.scalar L.repr list -> L.scalar L.repr -> L.scalar L.repr L.t) ->
     l1:L.scalar L.repr ->
-    ss1:L.scalar L.repr ->
-    ss2:L.scalar L.repr ->
-    ss3:L.scalar L.repr ->
-    ss4:L.scalar L.repr ->
-    ss5:L.scalar L.repr ->
+    ss_list:L.scalar L.repr list ->
     beta:L.scalar L.repr ->
     gamma:L.scalar L.repr ->
     delta:L.scalar L.repr ->

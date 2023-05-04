@@ -961,12 +961,13 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
     *)
     let preprocessing n domain (c : Circuit.t) =
       let l = List.fold_left ( + ) c.public_input_size c.input_com_sizes in
+      let ql_name = Plompiler.Csir.linear_selector_name 0 in
       (* Updating selectors for public inputs. *)
       let gates =
         (* Define ql if undefined as it is the gate taking the public input in. *)
-        if l > 0 && (not @@ SMap.mem "ql" c.gates) then
+        if l > 0 && (not @@ SMap.mem ql_name c.gates) then
           SMap.add
-            "ql"
+            ql_name
             (Array.init c.circuit_size (fun _ -> Scalar.zero))
             c.gates
         else c.gates
@@ -978,7 +979,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
           (fun label poly ->
             let length_poly = Array.length poly in
             Array.init n (fun i ->
-                if i < l && label = "ql" then Scalar.one
+                if i < l && label = ql_name then Scalar.one
                 else if l <= i && i < l + length_poly then poly.(i - l)
                 else Scalar.zero))
           gates

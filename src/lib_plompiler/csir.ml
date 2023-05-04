@@ -25,15 +25,20 @@
 
 let nb_wires_arch = 5
 
-let wire_name i = "w_" ^ string_of_int i
+let string_key_of_int ~nb_digits i =
+  let s = string_of_int i in
+  Format.sprintf "w%s" @@ String.make (nb_digits - String.length s) '0' ^ s
 
-let linear_selector_name = function
-  | 0 -> "ql"
-  | 1 -> "qr"
-  | 2 -> "qo"
-  | 3 -> "qd"
-  | 4 -> "qe"
-  | n -> "q_w" ^ string_of_int n
+let wire_name i =
+  if i < 0 || i >= nb_wires_arch then
+    raise @@ Failure "wire_name: i must be in the range [0, nb_wires_arch)" ;
+  string_key_of_int
+    ~nb_digits:(String.length @@ string_of_int (nb_wires_arch - 1))
+    i
+
+let linear_selector_name i = "q_" ^ wire_name i
+
+let add_next_wire_suffix s = s ^ "g"
 
 module Scalar = struct
   include Bls12_381.Fr
@@ -66,21 +71,9 @@ module Table : sig
 
   val size : t -> int
 
-  type entry = {
-    a : Scalar.t;
-    b : Scalar.t;
-    c : Scalar.t;
-    d : Scalar.t;
-    e : Scalar.t;
-  }
+  type entry = Scalar.t array
 
-  type partial_entry = {
-    a : Scalar.t option;
-    b : Scalar.t option;
-    c : Scalar.t option;
-    d : Scalar.t option;
-    e : Scalar.t option;
-  }
+  type partial_entry = Scalar.t option array
 
   val mem : entry -> t -> bool
 
@@ -98,24 +91,13 @@ end = struct
        [|0; 1; 0; 1|] ;
        [|0; 1; 1; 1|] ;
        [|0; 0; 0; 0|] ;
+       ...
        [|0; 0; 0; 0|] ;
      ]
   *)
-  type entry = {
-    a : Scalar.t;
-    b : Scalar.t;
-    c : Scalar.t;
-    d : Scalar.t;
-    e : Scalar.t;
-  }
+  type entry = Scalar.t array
 
-  type partial_entry = {
-    a : Scalar.t option;
-    b : Scalar.t option;
-    c : Scalar.t option;
-    d : Scalar.t option;
-    e : Scalar.t option;
-  }
+  type partial_entry = Scalar.t option array
 
   type t = Scalar.t array array [@@deriving repr]
 
@@ -132,18 +114,10 @@ end = struct
       Option.(value ~default:true @@ map (Scalar.eq s) o)
     in
     if
-      match_partial_entry pe.a table.(0).(i)
-      && match_partial_entry pe.b table.(1).(i)
-      && match_partial_entry pe.c table.(2).(i)
-    then
-      Some
-        {
-          a = table.(0).(i);
-          b = table.(1).(i);
-          c = table.(2).(i);
-          d = table.(3).(i);
-          e = table.(4).(i);
-        }
+      match_partial_entry pe.(0) table.(0).(i)
+      && match_partial_entry pe.(1) table.(1).(i)
+      && match_partial_entry pe.(2) table.(2).(i)
+    then Some (Array.map (fun x -> x.(i)) table)
     else None
 
   let find pe table =
@@ -160,17 +134,7 @@ end = struct
 
   let mem : entry -> t -> bool =
    fun entry table ->
-    match
-      find
-        {
-          a = Some entry.a;
-          b = Some entry.b;
-          c = Some entry.c;
-          d = Some entry.d;
-          e = Some entry.e;
-        }
-        table
-    with
+    match find (Array.map (fun x -> Some x) entry) table with
     | Some _ -> true
     | None -> false
 
@@ -182,37 +146,27 @@ end = struct
 end
 
 let table_or =
+  assert (nb_wires_arch >= 3) ;
   Table.of_list
-    Scalar.
-      [
-        [|zero; zero; one; one|];
-        [|zero; one; zero; one|];
-        [|zero; one; one; one|];
-        [|zero; zero; zero; zero|];
-        [|zero; zero; zero; zero|];
-      ]
+  @@ Scalar.
+       [
+         [|zero; zero; one; one|];
+         [|zero; one; zero; one|];
+         [|zero; one; one; one|];
+       ]
+  @ List.init (nb_wires_arch - 3) (Fun.const Scalar.[|zero; zero; zero; zero|])
 
 module Tables = Map.Make (String)
 
 let table_registry = Tables.add "or" table_or Tables.empty
 
 module CS = struct
-  let q_list ?q_table ~qc ~ql ~qr ~qo ~qd ~qe ~qlg ~qrg ~qog ~qdg ~qeg ~qm ~qx2b
-      ~qx5a ~qx5c ~qecc_ws_add ~qecc_ed_add ~qecc_ed_cond_add ~qbool ~qcond_swap
-      ~q_anemoi ~q_plookup () =
+  let q_list ?q_table ~qc ~linear ~linear_g ~qm ~qx2b ~qx5a ~qx5c ~qecc_ws_add
+      ~qecc_ed_add ~qecc_ed_cond_add ~qbool ~qcond_swap ~q_anemoi ~q_plookup ()
+      =
     let base =
       [
         ("qc", qc);
-        ("ql", ql);
-        ("qr", qr);
-        ("qo", qo);
-        ("qd", qd);
-        ("qe", qe);
-        ("qlg", qlg);
-        ("qrg", qrg);
-        ("qog", qog);
-        ("qdg", qdg);
-        ("qeg", qeg);
         ("qm", qm);
         ("qx2b", qx2b);
         ("qx5a", qx5a);
@@ -225,6 +179,10 @@ module CS = struct
         ("q_anemoi", q_anemoi);
         ("q_plookup", q_plookup);
       ]
+      @ List.map (fun (i, q) -> (linear_selector_name i, q)) linear
+      @ List.map
+          (fun (i, q) -> (linear_selector_name i |> add_next_wire_suffix, q))
+          linear_g
     in
     Option.(map (fun q -> ("q_table", q)) q_table |> to_list) @ base
 
@@ -233,39 +191,35 @@ module CS = struct
     | Arithmetic
     | ThisConstr
     | NextConstr
-    | WireA
-    | WireB
-    | WireC
-    | WireD
-    | WireE
+    | Wire of int
   [@@deriving repr]
 
   let all_selectors =
+    let linear =
+      List.init nb_wires_arch (fun i ->
+          (i, [ThisConstr; Linear; Arithmetic; Wire i]))
+    in
+    let linear_g =
+      List.init nb_wires_arch (fun i ->
+          (i, [NextConstr; Linear; Arithmetic; Wire i]))
+    in
     q_list
       ~qc:[ThisConstr; Arithmetic]
-      ~ql:[ThisConstr; Linear; Arithmetic; WireA]
-      ~qr:[ThisConstr; Linear; Arithmetic; WireB]
-      ~qo:[ThisConstr; Linear; Arithmetic; WireC]
-      ~qd:[ThisConstr; Linear; Arithmetic; WireD]
-      ~qe:[ThisConstr; Linear; Arithmetic; WireE]
-      ~qlg:[NextConstr; Linear; Arithmetic; WireA]
-      ~qrg:[NextConstr; Linear; Arithmetic; WireB]
-      ~qog:[NextConstr; Linear; Arithmetic; WireC]
-      ~qdg:[NextConstr; Linear; Arithmetic; WireD]
-      ~qeg:[NextConstr; Linear; Arithmetic; WireE]
-      ~qm:[ThisConstr; Arithmetic; WireA; WireB]
-      ~qx2b:[ThisConstr; Arithmetic; WireB]
-      ~qx5a:[ThisConstr; Arithmetic; WireA]
-      ~qx5c:[ThisConstr; Arithmetic; WireC]
-      ~qecc_ws_add:[ThisConstr; NextConstr; WireA; WireB; WireC]
-      ~qecc_ed_add:[ThisConstr; NextConstr; WireA; WireB; WireC]
+      ~linear
+      ~linear_g
+      ~qm:[ThisConstr; Arithmetic; Wire 0; Wire 1]
+      ~qx2b:[ThisConstr; Arithmetic; Wire 1]
+      ~qx5a:[ThisConstr; Arithmetic; Wire 0]
+      ~qx5c:[ThisConstr; Arithmetic; Wire 2]
+      ~qecc_ws_add:[ThisConstr; NextConstr; Wire 0; Wire 1; Wire 2]
+      ~qecc_ed_add:[ThisConstr; NextConstr; Wire 0; Wire 1; Wire 2]
       ~qecc_ed_cond_add:
-        [ThisConstr; NextConstr; WireA; WireB; WireC; WireD; WireE]
-      ~qbool:[ThisConstr; WireA]
-      ~qcond_swap:[ThisConstr; WireA; WireB; WireC; WireD; WireE]
-      ~q_anemoi:[ThisConstr; NextConstr; WireB; WireC; WireD; WireE]
-      ~q_plookup:[ThisConstr; WireA; WireB; WireC; WireD; WireE]
-      ~q_table:[ThisConstr; WireA; WireB; WireC; WireD; WireE]
+        [ThisConstr; NextConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
+      ~qbool:[ThisConstr; Wire 0]
+      ~qcond_swap:[ThisConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
+      ~q_anemoi:[ThisConstr; NextConstr; Wire 1; Wire 2; Wire 3; Wire 4]
+      ~q_plookup:[ThisConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
+      ~q_table:[ThisConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
       ()
 
   let selectors_with_tags tags =
@@ -285,11 +239,7 @@ module CS = struct
   let arithmetic_selectors = selectors_with_tags [Arithmetic]
 
   type raw_constraint = {
-    a : int;
-    b : int;
-    c : int;
-    d : int;
-    e : int;
+    wires : int array;
     sels : (string * Scalar.t) list;
     precomputed_advice : (string * Scalar.t) list;
     label : string list;
@@ -300,25 +250,17 @@ module CS = struct
 
   type t = gate list [@@deriving repr]
 
-  let new_constraint ~a ~b ~c ?(d = 0) ?(e = 0) ?qc ?ql ?qr ?qo ?qd ?qe ?qlg
-      ?qrg ?qog ?qdg ?qeg ?qm ?qx2b ?qx5a ?qx5c ?qecc_ws_add ?qecc_ed_add
-      ?qecc_ed_cond_add ?qbool ?qcond_swap ?q_anemoi ?q_plookup ?q_table
-      ?(precomputed_advice = []) ?(labels = []) label =
+  let new_constraint ~wires ?qc ?(linear = []) ?(linear_g = []) ?qm ?qx2b ?qx5a
+      ?qx5c ?qecc_ws_add ?qecc_ed_add ?qecc_ed_cond_add ?qbool ?qcond_swap
+      ?q_anemoi ?q_plookup ?q_table ?(precomputed_advice = []) ?(labels = [])
+      label =
     let sels =
       List.filter_map
         (fun (l, x) -> Option.bind x (fun c -> Some (l, c)))
         (q_list
            ~qc
-           ~ql
-           ~qr
-           ~qo
-           ~qd
-           ~qe
-           ~qlg
-           ~qrg
-           ~qog
-           ~qdg
-           ~qeg
+           ~linear:(List.map (fun (i, x) -> (i, Some x)) linear)
+           ~linear_g:(List.map (fun (i, x) -> (i, Some x)) linear_g)
            ~qm
            ~qx2b
            ~qx5a
@@ -333,27 +275,30 @@ module CS = struct
            ~q_table
            ())
     in
-    {a; b; c; d; e; sels; precomputed_advice; label = label :: labels}
+    let wires =
+      let pad_length = nb_wires_arch - List.length wires in
+      wires @ List.init pad_length (Fun.const 0) |> Array.of_list
+    in
+    {wires; sels; precomputed_advice; label = label :: labels}
 
   let get_sel sels s =
     match List.find_opt (fun (x, _) -> s = x) sels with
     | None -> Scalar.zero
     | Some (_, c) -> c
 
-  let to_string_raw_constraint {a; b; c; d; e; sels; precomputed_advice; label}
-      : string =
+  let to_string_raw_constraint {wires; sels; precomputed_advice; label} : string
+      =
     let pp_sel (s, c) = s ^ ":" ^ Scalar.string_of_scalar c in
     let selectors = String.concat " " (List.map pp_sel sels) in
     let precomputed_advice =
       String.concat " " (List.map pp_sel precomputed_advice)
     in
+    let wires_str =
+      Array.mapi (fun i w -> Format.sprintf "%s:%i" (wire_name i) w) wires
+    in
     Format.sprintf
-      "a:%i b:%i c:%i d:%i e:%i %s | %s [%s]"
-      a
-      b
-      c
-      d
-      e
+      "%s %s | %s [%s]"
+      (String.concat " " @@ Array.to_list wires_str)
       selectors
       precomputed_advice
       (String.concat " ; " label)
@@ -372,14 +317,7 @@ module CS = struct
     List.for_all is_linear_sel constr.sels
 
   let rename_wires_constr ~rename constr =
-    {
-      constr with
-      a = rename constr.a;
-      b = rename constr.b;
-      c = rename constr.c;
-      d = rename constr.d;
-      e = rename constr.e;
-    }
+    {constr with wires = Array.map rename constr.wires}
 
   let rename_wires ~rename gate = Array.map (rename_wires_constr ~rename) gate
 
@@ -388,10 +326,16 @@ module CS = struct
     List.for_all is_arithmetic_sel constr.sels
 
   let boolean_raw_constr constr =
+    let module SMap = Map.Make (String) in
+    let ql_name = linear_selector_name 0 in
     if
-      constr.sels = [("ql", Scalar.mone); ("qm", Scalar.one)]
-      && constr.a = constr.b
-    then Some constr.a
+      (* We do equality through maps as a way to sort the list *)
+      SMap.equal
+        Scalar.equal
+        (SMap.of_seq @@ List.to_seq constr.sels)
+        (SMap.of_seq @@ List.to_seq [("qm", Scalar.one); (ql_name, Scalar.mone)])
+      && constr.wires.(0) = constr.wires.(1)
+    then Some constr.wires.(0)
     else None
 
   let used_selectors gate i =
@@ -401,11 +345,9 @@ module CS = struct
     @ List.filter (fun (s, _) -> List.mem s next_constr_selectors) prev_sels
 
   let wires_of_constr_i gate i =
-    let a_selectors = selectors_with_tags [WireA] in
-    let b_selectors = selectors_with_tags [WireB] in
-    let c_selectors = selectors_with_tags [WireC] in
-    let d_selectors = selectors_with_tags [WireD] in
-    let e_selectors = selectors_with_tags [WireE] in
+    let selectors =
+      Array.init nb_wires_arch (fun i -> selectors_with_tags [Wire i])
+    in
     let intersect names = List.exists (fun (s, _q) -> List.mem s names) in
     let sels = used_selectors gate i in
     (* We treat qecc_ed_cond_add exceptionally until we have a better interface
@@ -413,19 +355,21 @@ module CS = struct
     let relax =
       List.map fst sels = ["qecc_ed_cond_add"] && gate.(i).sels = []
     in
-    let a_selectors = if relax then [] else a_selectors in
-    let b_selectors = if relax then [] else b_selectors in
-    let c_selectors = if relax then [] else c_selectors in
+    if relax then (
+      selectors.(0) <- [] ;
+      selectors.(1) <- [] ;
+      selectors.(2) <- []) ;
     (* We treat q_anemoi exceptionally until we have a better interface
        on unused wires *)
     let relax = List.map fst sels = ["q_anemoi"] && gate.(i).sels = [] in
-    let a_selectors = if relax then [] else a_selectors in
-    let b_selectors = if relax then [] else b_selectors in
-    let c_selectors = if relax then [] else c_selectors in
+    if relax then (
+      selectors.(0) <- [] ;
+      selectors.(1) <- [] ;
+      selectors.(2) <- []) ;
     List.map2
       (fun wsels w -> if intersect wsels sels then w else -1)
-      [a_selectors; b_selectors; c_selectors; d_selectors; e_selectors]
-      [gate.(i).a; gate.(i).b; gate.(i).c; gate.(i).d; gate.(i).e]
+      (Array.to_list selectors)
+      (gate.(i).wires |> Array.to_list)
 
   let gate_wires gate =
     List.init (Array.length gate) (wires_of_constr_i gate)
@@ -437,39 +381,38 @@ module CS = struct
     if not @@ is_linear_raw_constr constr then
       raise @@ Invalid_argument "constraint is non-linear"
     else
+      let module SMap = Map.Make (String) in
+      let linear_terms_map =
+        ("qc", -1)
+        :: List.init nb_wires_arch (fun i ->
+               (linear_selector_name i, constr.wires.(i)))
+        |> List.to_seq |> SMap.of_seq
+      in
       List.map
-        (fun (sel_name, coeff) ->
-          match sel_name with
-          | "qc" -> (coeff, -1)
-          | "ql" -> (coeff, constr.a)
-          | "qr" -> (coeff, constr.b)
-          | "qo" -> (coeff, constr.c)
-          | "qd" -> (coeff, constr.d)
-          | "qe" -> (coeff, constr.e)
-          | _ -> assert false)
+        (fun (sel_name, coeff) -> (coeff, SMap.find sel_name linear_terms_map))
         constr.sels
       |> List.filter (fun (q, _) -> not @@ Scalar.is_zero q)
 
   let mk_linear_constr (wires, sels) =
-    match wires with
-    | [a; b; c; d; e] ->
-        {a; b; c; d; e; sels; precomputed_advice = []; label = ["linear"]}
-    | _ -> assert false
+    {
+      wires = Array.of_list wires;
+      sels;
+      precomputed_advice = [];
+      label = ["linear"];
+    }
 
   let mk_bool_constr wire =
+    let wires = Array.init nb_wires_arch (Fun.const 0) in
+    wires.(0) <- wire ;
     {
-      a = wire;
-      b = 0;
-      c = 0;
-      d = 0;
-      e = 0;
+      wires;
       sels = [("qbool", Scalar.one)];
       precomputed_advice = [];
       label = ["bool"];
     }
 
   let raw_constraint_equal c1 c2 =
-    c1.a = c2.a && c1.b = c2.b && c1.c = c2.c && c1.d = c2.d && c1.e = c2.e
+    Array.for_all2 ( = ) c1.wires c2.wires
     && c1.label = c2.label
     && List.for_all2
          (fun (name, coeff) (name', coeff') ->

@@ -25,8 +25,6 @@
 
 module S = Csir.Scalar
 
-let map5 f (a, b, c, d, e) = (f a, f b, f c, f d, f e)
-
 (* Difference between the scalar order and the succeeding power of 2 *)
 let alpha = Z.(shift_left one (Z.numbits S.order) - S.order)
 
