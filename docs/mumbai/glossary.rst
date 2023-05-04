@@ -8,11 +8,9 @@ section may be different for other protocol versions.
 Tezos
 -----
 
-.. _blocks:
-
 _`Block`
     The Tezos blockchain is a linked list of blocks (or actually, a tree when several competing branches exist).
-    Blocks conceptually contain a header and a list of operations_,
+    Blocks conceptually contain a header and a list of operation_\ s,
     which are specific to the `economic protocol`_.
 
     The header itself decomposes into a :ref:`shell header<shell_header>` (common to all Tezos economic protocols), and a protocol-specific header.
@@ -26,12 +24,12 @@ _`Context`
     “this account_ is credited with this many tez” and “this is the
     code for that `smart contract`_.”
 
-    The context is modified by operations_. For example, an
+    The context is modified by operation_\ s. For example, an
     operation_ can transfer tez from one account_ to another, which modifies the
     part of the context that tracks account_ credit.
 
 _`Economic protocol`
-    The economic protocol is the set of rules defining valid operations_ and blocks_, how the network agrees on the next block to build (the consensus algorithm),
+    The economic protocol is the set of rules defining valid operation_\ s and block_\ s, how the network agrees on the next block to build (the consensus algorithm),
     and how operations update the blockchain state, also called context_.
 
     In Tezos, the economic protocol can be upgraded without interruption or
@@ -63,14 +61,12 @@ _`Mempool`
     the prefix ``../<block_id>/metadata``.
 
 _`Node`
-    A peer in the P2P network. It maintains a local state and propagates blocks_
-    and operations_.
-
-.. _operations:
+    A peer in the P2P network. It maintains a local state and propagates block_\ s
+    and operation_\ s.
 
 _`Operation`
     An operation transforms the context_; this is what makes the state of the chain
-    change. Operations are grouped into blocks_; thus, the chain progresses in
+    change. Operations are grouped into block_\ s; thus, the chain progresses in
     batches.
     For the different kinds of operations defined by the protocol, see `operation kinds`_.
 
@@ -132,7 +128,7 @@ _`Baking`/_`endorsing rights`
     When a block_ is created and propagated on the network, delegates that have
     `endorsing rights`_ for the matching block_ level can emit an endorsement
     operation_.
-    Endorsement operations_ are included in the next block_.
+    Endorsement operation_\ s are included in the next block_.
 
 _`Burn`
     To ensure responsible use of the storage space on the public blockchain,
@@ -218,7 +214,7 @@ _`Fee`
 .. _def_gas_mumbai:
 
 _`Gas`
-    A measure of the number of elementary operations_ performed during
+    A measure of the number of elementary operation_\ s performed during
     the execution of a `smart contract`_. Gas is used to measure how
     much computing power is used to execute a `smart contract`_.
 

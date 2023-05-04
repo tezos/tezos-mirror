@@ -8,11 +8,9 @@ section may be different for other protocol versions.
 Tezos
 -----
 
-.. _blocks:
-
 _`Block`
     The Tezos blockchain is a linked list of blocks (or actually, a tree when several competing branches exist).
-    Blocks conceptually contain a header and a list of operations_,
+    Blocks conceptually contain a header and a list of operation_\ s,
     which are specific to the `economic protocol`_.
 
     The header itself decomposes into a :ref:`shell header<shell_header>` (common to all Tezos economic protocols), and a protocol-specific header.
@@ -26,12 +24,12 @@ _`Context`
     “this account_ is credited with this many tez” and “this is the
     code for that `smart contract`_.”
 
-    The context is modified by operations_. For example, an
+    The context is modified by operation_\ s. For example, an
     operation_ can transfer tez from one account_ to another, which modifies the
     part of the context that tracks account_ credit.
 
 _`Economic protocol`
-    The economic protocol is the set of rules defining valid operations_ and blocks_, how the network agrees on the next block to build (the consensus algorithm),
+    The economic protocol is the set of rules defining valid operation_\ s and block_\ s, how the network agrees on the next block to build (the consensus algorithm),
     and how operations update the blockchain state, also called context_.
 
     In Tezos, the economic protocol can be upgraded without interruption or
@@ -63,14 +61,12 @@ _`Mempool`
     the prefix ``../<block_id>/metadata``.
 
 _`Node`
-    A peer in the P2P network. It maintains a local state and propagates blocks_
-    and operations_.
-
-.. _operations:
+    A peer in the P2P network. It maintains a local state and propagates block_\ s
+    and operation_\ s.
 
 _`Operation`
     An operation transforms the context_; this is what makes the state of the chain
-    change. Operations are grouped into blocks_; thus, the chain progresses in
+    change. Operations are grouped into block_\ s; thus, the chain progresses in
     batches.
     For the different kinds of operations defined by the protocol, see `operation kinds`_.
 
@@ -109,8 +105,6 @@ _`Account`
     tez available).
 
     An account can be either an `originated account`_ or an `implicit account`_.
-
-.. _bakers:
 
 _`Baker`
     When a delegate_ creates a new block_, it is called the baker of this block.
@@ -155,7 +149,7 @@ _`Contract`
 .. _def_cycle_nairobi:
 
 _`Cycle`
-    A cycle is a sequence of consecutive blocks_ of fixed length (given by a protocol constant_). E.g., cycle 12 started at block
+    A cycle is a sequence of consecutive block_\ s of fixed length (given by a protocol constant_). E.g., cycle 12 started at block
     level 49152 and ended at block_ level 53248.
 
     Cycles are used as a unit of “time” in the block_ chain. For example, the
@@ -185,7 +179,7 @@ _`Delegation`
 .. _def_double_signing_nairobi:
 
 _`Double signing`
-    The situation when a baker_ signs two different blocks_ at the same level and same round,
+    The situation when a baker_ signs two different block_\ s at the same level and same round,
     is called double baking. Double baking is detrimental to the network and might be
     indicative of an attempt to double spend.
     The same goes for signing two different endorsements at the same level and the same round.
@@ -215,7 +209,7 @@ _`Endorsing rights`
 
 _`Fee`
     To ensure responsible use of computation resources of other nodes, and also to encourage active participation in the consensus protocol,
-    users pay fees to bakers for including their operations_ in blocks_.
+    users pay fees to bakers for including their operation_\ s in block_\ s.
     For example, fees are paid to a baker for operations such as a transaction_ or a revelation of a public key.
 
    See also `burn`_.
