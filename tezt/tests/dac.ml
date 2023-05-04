@@ -84,38 +84,13 @@ let assert_witnesses ~__LOC__ expected witnesses =
       int
       ~error_msg:"Expected witnesses bitset to be %L. Found: %R")
 
-let parse_certificate json =
-  JSON.
-    ( json |-> "witnesses" |> as_int,
-      json |-> "aggregate_signature" |> as_string,
-      json |-> "root_hash" |> as_string,
-      json |-> "version" |> as_int32 )
-
-(* Helper process that listens to certificate updates through a
-   RPC request. Upon termination, the list of certificate updates
-   is returned *)
-let streamed_certificates_client coordinator_node root_hash =
-  let endpoint =
-    Format.sprintf
-      "http://%s:%d/monitor/certificate/%s"
-      (Dac_node.rpc_host coordinator_node)
-      (Dac_node.rpc_port coordinator_node)
-      root_hash
-  in
-  RPC.Curl.get_raw endpoint
-  |> Runnable.map (fun output ->
-         let as_list = String.split_on_char '\n' output in
-         (* Each JSON item in the response of the curl request is
-            suffixed with the '\n' character, which will cause an
-            empty item to be inserted at the end of the list. *)
-         let rev_as_list_no_empty_element =
-           match List.rev as_list with
-           | [] -> assert false
-           | _ :: rev_list -> rev_list
-         in
-         List.rev_map
-           (fun raw -> parse_certificate @@ JSON.parse ~origin:endpoint raw)
-           rev_as_list_no_empty_element)
+module Certificate_V0 = struct
+  let parse_certificate json =
+    JSON.
+      ( json |-> "witnesses" |> as_int,
+        json |-> "aggregate_signature" |> as_string,
+        json |-> "root_hash" |> as_string,
+        json |-> "version" |> as_int )
 
 let wait_for_layer1_block_processing dac_node level =
   Dac_node.wait_for dac_node "dac_node_layer_1_new_head.v0" (fun e ->
@@ -252,7 +227,10 @@ let check_downloaded_preimage coordinator observer root_hash =
 
 let check_certificate
     (actual_witnesses, actual_aggregate_signature, actual_root_hash, _version)
-    (expected_witnesses, expected_aggregate_signature, expected_root_hash, _version) =
+    ( expected_witnesses,
+      expected_aggregate_signature,
+      expected_root_hash,
+      _version ) =
   (* Because encodings of aggregate signature might be different (due to the
      presence of two variants `Bls12_381` and `Unknown), the actual byte
      representation needs to be checked.*)
@@ -984,7 +962,9 @@ module Legacy = struct
           members
       in
       let* witnesses, certificate, _root_hash, _version =
-        RPC.call coordinator_node (Dac_rpc.get_certificate ~hex_root_hash)
+        RPC.call
+          coordinator_node
+          (Dac_rpc.Certificate_V0.get_certificate ~hex_root_hash)
       in
       assert_witnesses ~__LOC__ 3 witnesses ;
       assert_verify_aggregate_signature members_keys hex_root_hash certificate ;
@@ -1010,7 +990,9 @@ module Legacy = struct
       let* () = call () in
       let* () = call () in
       let* witnesses, certificate, _root_hash, _version =
-        RPC.call coordinator_node (Dac_rpc.get_certificate ~hex_root_hash)
+        RPC.call
+          coordinator_node
+          (Dac_rpc.Certificate_V0.get_certificate ~hex_root_hash)
       in
       assert_witnesses ~__LOC__ 4 witnesses ;
       assert_verify_aggregate_signature [member] hex_root_hash certificate ;
@@ -1076,7 +1058,9 @@ module Legacy = struct
              ~signature)
       in
       let* witnesses, certificate, _root_hash, _version =
-        RPC.call coordinator (Dac_rpc.get_certificate ~hex_root_hash)
+        RPC.call
+          coordinator
+          (Dac_rpc.Certificate_V0.get_certificate ~hex_root_hash)
       in
       let expected_witnesses = Z.shift_left Z.one i in
       assert_witnesses ~__LOC__ (Z.to_int expected_witnesses) witnesses ;
@@ -1217,7 +1201,10 @@ module Full_infrastructure = struct
     assert (List.length committee_members > 0) ;
     let payload, expected_rh = sample_payload "preimage" in
     let certificate_stream_client =
-      Runnable.run @@ streamed_certificates_client coordinator_node expected_rh
+      Runnable.run
+      @@ Certificate_V0.streamed_certificates_client
+           coordinator_node
+           expected_rh
     in
     let push_promise =
       wait_for_root_hash_pushed_to_data_streamer coordinator_node expected_rh
@@ -1275,7 +1262,8 @@ module Full_infrastructure = struct
            %R = Actual)") ;
     let () =
       List.iter
-        (fun (_, _, root_hash, _) -> check_valid_root_hash expected_rh root_hash)
+        (fun (_, _, root_hash, _) ->
+          check_valid_root_hash expected_rh root_hash)
         certificate_updates
     in
     let last_certificate_update =
@@ -1286,14 +1274,18 @@ module Full_infrastructure = struct
     let* get_certificate =
       RPC.call
         coordinator_node
-        (Dac_rpc.get_certificate ~hex_root_hash:(`Hex expected_rh))
+        (Dac_rpc.Certificate_V0.get_certificate
+           ~hex_root_hash:(`Hex expected_rh))
     in
     check_certificate get_certificate last_certificate_update ;
     (* 6. Request certificate via streamed endpoints again, check that one
        item is returned with the same certificate returned by the GET
        endpoint. *)
     let* second_certificates_stream =
-      Runnable.run @@ streamed_certificates_client coordinator_node expected_rh
+      Runnable.run
+      @@ Certificate_V0.streamed_certificates_client
+           coordinator_node
+           expected_rh
     in
     Check.(
       (1 = List.length second_certificates_stream)

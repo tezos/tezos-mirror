@@ -333,26 +333,29 @@ let should_update_certificate dac_plugin cctxt ro_node_store committee_members
     let* () = verify_signature dac_plugin pub_key signature root_hash in
     return true
 
-let stream_certificate_update dac_plugin committee_members
-    (Certificate_repr.{root_hash; _} as certificate) certificate_streamers =
-  let open Result_syntax in
-  let* () =
-    Certificate_streamers.push
-      dac_plugin
-      certificate_streamers
-      root_hash
-      certificate
-  in
-  if
-    Certificate_repr.all_committee_members_have_signed
-      committee_members
-      certificate
-  then
-    let _ =
-      Certificate_streamers.close dac_plugin certificate_streamers root_hash
+module Certificate_V0 = struct
+  let stream_certificate_update dac_plugin committee_members
+      (Certificate_repr.V0.{root_hash; _} as certificate) certificate_streamers
+      =
+    let open Result_syntax in
+    let* () =
+      Certificate_streamers.push
+        dac_plugin
+        certificate_streamers
+        root_hash
+        certificate
     in
-    return ()
-  else return ()
+    if
+      Certificate_repr.V0.all_committee_members_have_signed
+        committee_members
+        certificate
+    then
+      let _ =
+        Certificate_streamers.close dac_plugin certificate_streamers root_hash
+      in
+      return ()
+    else return ()
+end
 
 let handle_put_dac_member_signature dac_plugin certificate_streamers_opt
     rw_node_store page_store cctxt committee_members committee_member_signature
@@ -384,11 +387,13 @@ let handle_put_dac_member_signature dac_plugin certificate_streamers_opt
     in
     let*? () =
       Option.iter_e
-        (stream_certificate_update
+        (Certificate_V0.stream_certificate_update
            dac_plugin
            committee_members
-           Certificate_repr.
-             {root_hash = raw_root_hash; aggregate_signature; witnesses})
+           (Certificate_repr.V0.make
+              raw_root_hash
+              aggregate_signature
+              witnesses))
         certificate_streamers_opt
     in
     return ()

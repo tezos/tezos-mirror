@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,11 +28,15 @@
    Update Certificate repr to handle a dynamic dac.
 *)
 module V0 = struct
-  let version = 0l
+  (** Current version of the [Certificate]
+      must be equal to the version of the module, 0 in this case. *)
+  let version = 0
 
-  (* Representation of a Data Availibility Committee Certificate. *)
+  (** Representation of a Data Availibility Committee Certificate.
+     Type is private to make sure correct [version] is used.
+     Use [make] function to create a [Certificate_repr.V0.t] *)
   type t = {
-    version : int32;
+    version : int;
     root_hash : Dac_plugin.raw_hash;
     aggregate_signature : Tezos_crypto.Aggregate_signature.signature;
     witnesses : Z.t;
@@ -47,12 +52,11 @@ module V0 = struct
     let obj_enc =
       Data_encoding.(
         obj4
-          (req "version" Data_encoding.int32)
+          (req "version" Data_encoding.uint8)
           (req "root_hash" Dac_plugin.raw_hash_encoding)
           (req "aggregate_signature" Tezos_crypto.Aggregate_signature.encoding)
           (req "witnesses" z))
     in
-
     Data_encoding.(
       conv
         (fun {version; root_hash; aggregate_signature; witnesses} ->

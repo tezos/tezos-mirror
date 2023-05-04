@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,14 +23,25 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(** This is the first version of the [Certificate_repr.t]. In the future
+    if it is needed to add a field of modify type of an existing field,
+      one must simply create a [V1] module with the new definition 
+    of [type t]. *)
 module V0 : sig
+  (** Representation of a Data Availibility Committee Certificate.
+     Type is private to make sure correct [version] is used.
+     Use [make] function to create a [Certificate_repr.V0.t]. *)
   type t = private {
-    version : int32;
+    version : int;
     root_hash : Dac_plugin.raw_hash;
     aggregate_signature : Tezos_crypto.Aggregate_signature.signature;
     witnesses : Z.t;
   }
 
+  (** Create a [Certificate_repr.V0.t] from given [Dac_plugin.raw_hash],
+     [Tezos_crypto.Aggregate_signature.signature] and [Z.t].
+     This function is in charge to add the correct [version]. *)
   val make :
     Dac_plugin.raw_hash ->
     Tezos_crypto.Aggregate_signature.signature ->
@@ -38,5 +50,7 @@ module V0 : sig
 
   val encoding : t Data_encoding.t
 
+  (** [Certificate_repr.V0.all_committee_members_have_signed committee_members certificate] 
+     will return [true] if all members have signed, otherwise it will return [false]. *)
   val all_committee_members_have_signed : 'a trace -> t -> bool
 end

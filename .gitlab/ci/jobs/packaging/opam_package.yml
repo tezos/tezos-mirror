@@ -736,6 +736,8 @@ opam:tezos-crypto-dal:
 
 # Ignoring unreleased package tezos-dac-lib.
 
+# Ignoring unreleased package tezos-dac-lib-test.
+
 # Ignoring unreleased package tezos-dac-node-lib.
 
 # Ignoring unreleased package tezos-dac-node-lib-test.
