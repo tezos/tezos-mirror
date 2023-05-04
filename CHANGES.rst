@@ -95,6 +95,9 @@ Client
 
     ./octez-client list smart rollups
 
+- Add an ``operation_v2`` and ``operation_v2.unsigned`` registered encoding that
+  supports ``attestation`` kind instead of ``endorsement``. (MR :gl:`!8563`)
+
 Baker
 -----
 

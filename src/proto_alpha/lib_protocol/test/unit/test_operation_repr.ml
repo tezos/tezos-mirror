@@ -105,7 +105,7 @@ module Test_operation_repr = struct
   let test_split_signatures error assemble =
     let op_bytes =
       Data_encoding.Binary.to_bytes_exn
-        Operation_repr.contents_encoding
+        Operation_repr.contents_encoding_with_legacy_attestation_name
         (Contents (Failing_noop ""))
     in
     let prefix, suffix = zero_bls in
@@ -114,7 +114,7 @@ module Test_operation_repr = struct
     in
     match
       Data_encoding.Binary.of_bytes
-        Operation_repr.protocol_data_encoding
+        Operation_repr.protocol_data_encoding_with_legacy_attestation_name
         protocol_data_bytes
     with
     | Ok _ -> failwith "Should have failed with %s" error

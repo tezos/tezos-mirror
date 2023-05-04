@@ -157,7 +157,9 @@ let prequorum_encoding =
        (req "level" int32)
        (req "round" Round.encoding)
        (req "block_payload_hash" Block_payload_hash.encoding)
-       (req "preendorsements" (list (dynamic_size Operation.encoding))))
+       (req
+          "preendorsements"
+          (list (dynamic_size Operation.encoding_with_legacy_attestation_name))))
 
 let block_info_encoding =
   let open Data_encoding in
@@ -210,8 +212,12 @@ let block_info_encoding =
        (req "payload_round" Round.encoding)
        (req "round" Round.encoding)
        (req "prequorum" (option prequorum_encoding))
-       (req "quorum" (list (dynamic_size Operation.encoding)))
-       (req "dal_attestations" (list (dynamic_size Operation.encoding)))
+       (req
+          "quorum"
+          (list (dynamic_size Operation.encoding_with_legacy_attestation_name)))
+       (req
+          "dal_attestations"
+          (list (dynamic_size Operation.encoding_with_legacy_attestation_name)))
        (req "payload" Operation_pool.payload_encoding))
 
 let round_of_shell_header shell_header =
@@ -415,7 +421,8 @@ let event_encoding =
         (tup3
            (constant "Prequorum_reached")
            Operation_worker.candidate_encoding
-           (Data_encoding.list (dynamic_size Operation.encoding)))
+           (Data_encoding.list
+              (dynamic_size Operation.encoding_with_legacy_attestation_name)))
         (function
           | Prequorum_reached (candidate, ops) ->
               Some ((), candidate, List.map Operation.pack ops)
@@ -429,7 +436,8 @@ let event_encoding =
         (tup3
            (constant "Quorum_reached")
            Operation_worker.candidate_encoding
-           (Data_encoding.list (dynamic_size Operation.encoding)))
+           (Data_encoding.list
+              (dynamic_size Operation.encoding_with_legacy_attestation_name)))
         (function
           | Quorum_reached (candidate, ops) ->
               Some ((), candidate, List.map Operation.pack ops)

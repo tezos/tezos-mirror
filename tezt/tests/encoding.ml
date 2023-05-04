@@ -44,6 +44,8 @@
             the list of encodings.
 *)
 
+let sample_as_tags sample = String.split_on_char '.' sample
+
 let check_dump_encodings () =
   Test.register
     ~__FILE__
@@ -80,7 +82,7 @@ let check_protocol_sample_encoding ?supports sample =
   Protocol.register_regression_test
     ~__FILE__
     ~title:(sf "protocol encoding regression test: %s" sample)
-    ~tags:["encoding"; "protocol"]
+    ~tags:(["encoding"; "protocol"] @ sample_as_tags sample)
     ?supports
   @@ fun protocol ->
   let base_path =
@@ -95,7 +97,7 @@ let check_shell_sample_encoding sample =
   Regression.register
     ~__FILE__
     ~title:(sf "shell encoding regression test: %s" sample)
-    ~tags:["encoding"; "shell"]
+    ~tags:(["encoding"; "shell"] @ sample_as_tags sample)
   @@ fun () ->
   let base_path =
     "tezt" // "tests" // "encoding_samples" // "shell" // sample
@@ -119,8 +121,14 @@ let check_samples protocols =
   protocol_sample "nonce" ;
   protocol_sample "operation.internal" ;
   protocol_sample "operation" ;
+  protocol_sample
+    ~supports:Protocol.(From_protocol 18)
+    "operation_with_attestation" ;
   protocol_sample "operation.raw" ;
   protocol_sample "operation.unsigned" ;
+  protocol_sample
+    ~supports:Protocol.(From_protocol 18)
+    "operation_with_attestation.unsigned" ;
   protocol_sample "period" ;
   protocol_sample "raw_level" ;
   protocol_sample "seed" ;

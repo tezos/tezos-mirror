@@ -2471,7 +2471,11 @@ let operation_data_and_metadata_encoding =
            (Tag 1)
            ~title:"Operation_without_metadata"
            (obj2
-              (req "contents" (dynamic_size Operation.contents_list_encoding))
+              (req
+                 "contents"
+                 (dynamic_size
+                    Operation
+                    .contents_list_encoding_with_legacy_attestation_name))
               (opt "signature" Signature.encoding))
            (function
              | Operation_data op, No_operation_metadata ->

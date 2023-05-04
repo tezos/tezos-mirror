@@ -37,7 +37,8 @@ module Operations_source = struct
       }
 
   let operations_encoding =
-    Data_encoding.(list (dynamic_size Operation.encoding))
+    Data_encoding.(
+      list (dynamic_size Operation.encoding_with_legacy_attestation_name))
 
   let retrieve = function
     | None -> Lwt.return_none
@@ -410,7 +411,7 @@ let inject_preendorsements state ~preendorsements =
        let watermark = Operation.(to_watermark (Preendorsement chain_id)) in
        let unsigned_operation_bytes =
          Data_encoding.Binary.to_bytes_exn
-           Operation.unsigned_encoding
+           Operation.unsigned_encoding_with_legacy_attestation_name
            unsigned_operation
        in
        Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
@@ -491,7 +492,7 @@ let sign_endorsements state endorsements =
        let unsigned_operation = (shell, Contents_list contents) in
        let unsigned_operation_bytes =
          Data_encoding.Binary.to_bytes_exn
-           Operation.unsigned_encoding
+           Operation.unsigned_encoding_with_legacy_attestation_name
            unsigned_operation
        in
        Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
@@ -527,7 +528,7 @@ let sign_dal_attestations state attestations =
       let unsigned_operation = (shell, Contents_list contents) in
       let unsigned_operation_bytes =
         Data_encoding.Binary.to_bytes_exn
-          Operation.unsigned_encoding
+          Operation.unsigned_encoding_with_legacy_attestation_name
           unsigned_operation
       in
       Client_keys.sign
@@ -573,7 +574,9 @@ let inject_dal_attestations state attestations =
   List.iter_ep
     (fun (delegate, signed_operation, (attestation : Dal.Attestation.t)) ->
       let encoded_op =
-        Data_encoding.Binary.to_bytes_exn Operation.encoding signed_operation
+        Data_encoding.Binary.to_bytes_exn
+          Operation.encoding_with_legacy_attestation_name
+          signed_operation
       in
       Shell_services.Injection.operation
         cctxt
