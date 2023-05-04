@@ -47,6 +47,8 @@ module type COMMITMENT = sig
 
   val equal : t -> t -> bool
 
+  val compare : t -> t -> int
+
   val zero : t
 end
 
