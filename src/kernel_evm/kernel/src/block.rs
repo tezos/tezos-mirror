@@ -561,4 +561,41 @@ mod tests {
 
         assert_current_block_reading_validity(&mut host);
     }
+
+    #[test]
+    // Test that the same transaction can not be replayed twice
+    fn test_replay_attack() {
+        let mut host = MockHost::default();
+        let _ = genesis::init_block(&mut host);
+
+        let tx = Transaction {
+            tx_hash: [0; TRANSACTION_HASH_SIZE],
+            tx: dummy_eth_transaction_zero(),
+        };
+
+        let transactions = vec![tx.clone(), tx];
+
+        let queue = Queue {
+            proposals: vec![
+                Blueprint {
+                    transactions: transactions.clone(),
+                },
+                Blueprint { transactions },
+            ],
+        };
+
+        let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &sender,
+            U256::from(10000000000000000000u64),
+        );
+
+        match produce(&mut host, queue) {
+            Err(Error::Transfer(InvalidNonce { .. })) => (),
+            _ => panic!("An error should be thrown because of a replay attack attempt."),
+        }
+    }
 }
