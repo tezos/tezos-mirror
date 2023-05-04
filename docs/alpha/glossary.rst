@@ -117,18 +117,16 @@ _`Baker`
     daemon, on behalf of one or more delegate_ accounts.
     By extension, a baker designates the owner of such a delegate account, typically running the baker daemon on its behalf.
 
-.. _bake:
-
 _`Baking`
     The act of creating a new block_ by a baker_.
 
 _`Baking rights`
-    A delegate_ is allowed to bake_/endorse_ a block_ if it holds the
+    Baking_/endorsing_ a block_ can only be done by a delegate_ who holds the
     baking/endorsing right for that block level_ and round_. At the start of a cycle_,
     baking and endorsing rights are computed for all the block_ levels and rounds in the
     cycle_, based on the proportion of the stake_ of each delegate_.
 
-    For each block_ level and round_, there is exactly one account that is allowed to bake, but several accounts are allowed to endorse_.
+    For each block_ level and round_, there is exactly one account that is allowed to bake, but several accounts are allowed to endorse.
 
 _`Burn`
     To ensure responsible use of the storage space on the public blockchain,
@@ -194,8 +192,6 @@ _`Failing Noop`
     blocks<full_application_alpha>`. This operation allows end-users to
     :ref:`sign arbitrary messages<failing_noop>` which have no
     computational semantics.
-
-.. _endorse:
 
 _`Endorsing`
     When a block_ is created and propagated on the network, delegates that have
