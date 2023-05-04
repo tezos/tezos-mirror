@@ -389,7 +389,7 @@ of the frozen deposit. The payload producer that includes the misbehavior
 evidence is rewarded half of the slashed amount.
 
 The evidence for double signing at a given level can be collected by any
-:ref:`accuser<Accuser>` and included as an *accusation* operation in a block
+:ref:`accuser<def_accuser_nairobi>` and included as an *accusation* operation in a block
 for a period of ``MAX_SLASHING_PERIOD``.
 
 If a delegates' deposit is smaller than the slashed amount, the deposit is

@@ -224,7 +224,7 @@ is *well-formed*, that is, that it has the expected "shape" of a valid
 block under the current Tezos economic protocol. Given a block
 candidate, the block validation process will then verify that the
 candidate block declares consistent :ref:`level<Level>`,
-:ref:`round<Round>`, and timestamp values; that it carries a valid
+:ref:`round<def_round_alpha>`, and timestamp values; that it carries a valid
 signature, etc. At this step, the block validation process will also
 initialize the data-structures required for subsequent steps.
 

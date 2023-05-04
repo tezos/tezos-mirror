@@ -393,7 +393,7 @@ of the frozen deposit. The payload producer that includes the misbehavior
 evidence is rewarded half of the slashed amount.
 
 The evidence for double signing at a given level can be collected by any
-:ref:`accuser<Accuser>` and included as an *accusation* operation in a block
+:ref:`accuser<def_accuser_mumbai>` and included as an *accusation* operation in a block
 for a period of ``MAX_SLASHING_PERIOD``.
 
 We note that selfish baking is not an issue in Tenderbake: say we are at round

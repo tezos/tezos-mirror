@@ -13,6 +13,8 @@ Tezos
 Protocol
 --------
 
+.. _def_accuser_mumbai:
+
 _`Accuser`
     When a delegate_ attempts to inject several incompatible blocks (or when it tries
     to abuse the network in another similar way), another delegate_ can make an
@@ -23,6 +25,8 @@ _`Accuser`
 
     When using :ref:`Octez <octez>`, accusations are handled by the
     accuser binary.
+
+.. _def_account_mumbai:
 
 _`Account`
     An account is a unique identifier within the protocol. There are different
@@ -70,6 +74,8 @@ _`Constants`
 _`Contract`
     See account_.
 
+.. _def_cycle_mumbai:
+
 _`Cycle`
     A cycle is a set of consecutive blocks. E.g., cycle 12 started at block_
     level 49152 and ended at block_ level 53248.
@@ -81,6 +87,8 @@ _`Cycle`
     The length of a cycle is a (parametric) protocol
     :ref:`constant<Constants>`, and thus might change across different
     Tezos protocols.
+
+.. _def_delegate_mumbai:
 
 _`Delegate`
     An `implicit account`_ to which an account_ has delegated their
@@ -94,6 +102,8 @@ _`Delegation`
     delegate_. This increases the delegate_'s stake and consequently
     its baking_ rights. The delegate_ does not control the funds from
     the account_.
+
+.. _def_double_signing_mumbai:
 
 _`Double signing`
     The action of a baker_ signing two different blocks at the same
@@ -115,6 +125,8 @@ _`Failing Noop`
    :ref:`sign arbitrary messages<failing_noop>` which have no
    computational semantics.
 
+.. _def_fee_mumbai:
+
 _`Fee`
    To ensure responsible use of computation resources of other
    nodes, and also to encourage active participation in the consensus
@@ -127,10 +139,14 @@ _`Fee`
 
    See also `burn`_.
 
+.. _def_gas_mumbai:
+
 _`Gas`
     A measure of the number of elementary operations_ performed during
     the execution of a `smart contract`_. Gas is used to measure how
     much computing power is used to execute a `smart contract`_.
+
+.. _def_implicit_account_mumbai:
 
 _`Implicit account`
     An account_ that is linked to a public key. Contrary to a `smart
@@ -164,8 +180,8 @@ _`Layer 2`
 _`Michelson`
     The built-in language used by a `smart contract`_.
 
-.. _glossary_minimal_stake:
-.. _glossary_minimal_stake_mumbai:
+.. _def_minimal_stake:
+.. _def_minimal_stake_mumbai:
 
 _`Minimal stake`
     An amount of tez (e.g., 6000ꜩ) serving as a minimal amount for a
@@ -179,9 +195,13 @@ _`Operation kinds`
 _`Originated account`
     See `smart contract`_.
 
+.. _def_origination_mumbai:
+
 _`Origination`
     A manager operation_ whose purpose is to create -- that
     is, to deploy -- a `smart contract`_ on the Tezos blockchain.
+
+.. _def_round_mumbai:
 
 _`Round`
     An attempt to reach consensus on a block at a given level.

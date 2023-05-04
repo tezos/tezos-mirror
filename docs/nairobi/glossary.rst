@@ -13,6 +13,8 @@ Tezos
 Protocol
 --------
 
+.. _def_accuser_nairobi:
+
 _`Accuser`
     When a delegate_ attempts `double signing`_ (or when it tries
     to abuse the network in another similar way), another delegate_ can make an
@@ -22,6 +24,8 @@ _`Accuser`
 
     When using :ref:`Octez <octez>`, accusation operations are emitted by the
     accuser daemon. Note that this daemon is not associated to a delegate: accusation operations are anonymous, and any delegate can include them in a block.
+
+.. _def_account_nairobi:
 
 _`Account`
     An account is an address managed by the protocol.
@@ -72,6 +76,8 @@ _`Constant`
 _`Contract`
     See account_.
 
+.. _def_cycle_nairobi:
+
 _`Cycle`
     A cycle is a sequence of consecutive blocks_ of fixed length (given by a protocol constant_). E.g., cycle 12 started at block
     level 49152 and ended at block_ level 53248.
@@ -83,6 +89,8 @@ _`Cycle`
     The length of a cycle is a (parametric) protocol
     :ref:`constant<Constants>`, and thus might change across different
     Tezos protocols.
+
+.. _def_delegate_nairobi:
 
 _`Delegate`
     An `implicit account`_ that can participate in consensus and in governance.
@@ -97,6 +105,8 @@ _`Delegation`
     delegate_. The delegating account's balance increases the delegate_'s stake_ and consequently
     its `baking rights`_ and `endorsing rights`_. However, the delegate_ does not control the funds of
     the delegating account_, e.g., it can not spend them.
+
+.. _def_double_signing_nairobi:
 
 _`Double signing`
     The situation when a baker_ signs two different blocks_ at the same level and same round,
@@ -125,6 +135,8 @@ _`Endorsing`
 _`Endorsing rights`
     See `baking rights`_.
 
+.. _def_fee_nairobi:
+
 _`Fee`
     To ensure responsible use of computation resources of other nodes, and also to encourage active participation in the consensus protocol,
     users pay fees to bakers for including their operations_ in blocks_.
@@ -132,10 +144,14 @@ _`Fee`
 
    See also `burn`_.
 
+.. _def_gas_nairobi:
+
 _`Gas`
     A measure of the number of elementary steps performed during
     the execution of a `smart contract`_. Gas is used to measure how
     much computing power is used to execute a `smart contract`_.
+
+.. _def_implicit_account_nairobi:
 
 _`Implicit account`
     An account_ that is linked to a public key. Contrary to a `smart
@@ -168,7 +184,7 @@ _`Layer 2`
 _`Michelson`
     The built-in language used by a `smart contract`_.
 
-.. _glossary_minimal_stake_nairobi:
+.. _def_minimal_stake_nairobi:
 
 _`Minimal stake`
     An amount of tez (e.g., 6000ꜩ) serving as a minimal amount for a
@@ -183,9 +199,13 @@ _`Operation kinds`
 _`Originated account`
     See `smart contract`_.
 
+.. _def_origination_nairobi:
+
 _`Origination`
     A manager operation_ whose purpose is to create -- that
     is, to deploy -- a `smart contract`_ on the Tezos blockchain.
+
+.. _def_round_nairobi:
 
 _`Round`
     An attempt to reach consensus on a block at a given level.
