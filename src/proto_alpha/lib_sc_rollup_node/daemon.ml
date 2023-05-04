@@ -349,7 +349,7 @@ let rec process_head (node_ctxt : _ Node_context.t) ~catching_up
         Node_context.save_level
           node_ctxt
           {Layer1.hash = head.hash; level = head.level}
-      in
+      and* () = Node_context.save_protocol_info node_ctxt head ~predecessor in
       let* inbox_hash, inbox, inbox_witness, messages =
         Inbox.process_head node_ctxt ~predecessor head
       in
