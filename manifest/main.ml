@@ -7264,6 +7264,7 @@ let _octez_dal_node =
          octez_crypto_dal |> open_;
          octez_store_unix |> open_;
          octez_store_shared |> open_;
+         octez_gossipsub |> open_;
          octez_dal_node_gossipsub_lib |> open_;
          irmin_pack;
          irmin_pack_unix;
