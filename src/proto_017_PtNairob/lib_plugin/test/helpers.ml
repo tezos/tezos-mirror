@@ -23,6 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** One-element list containing the Tezt tag of the local protocol,
+    e.g. "alpha", "nairobi", "mumbai", etc. *)
+let proto_tags = Alcotezt_utils.is_proto_test __FILE__
+
+(** Register a plugin test, with file-specific tags and prefix in title. *)
+let register_test ~__FILE__ ~file_title ~file_tags ~title ~additional_tags =
+  Test.register
+    ~__FILE__
+    ~title:(sf "%s/plugin: %s: %s" Protocol.name file_title title)
+    ~tags:(proto_tags @ ("plugin" :: (file_tags @ additional_tags)))
+
 (** Generator for a packed operation preceded by its hash. *)
 let oph_and_op_gen = QCheck2.Gen.map snd Operation_generator.generate_operation
 

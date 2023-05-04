@@ -31,6 +31,12 @@
     Subject:      Unit tests the Mempool.conflict_handler function of the plugin
 *)
 
+let register_test =
+  Helpers.register_test
+    ~__FILE__
+    ~file_title:"conflict_handler"
+    ~file_tags:["mempool"; "conflict_handler"]
+
 let pp_answer fmt = function
   | `Keep -> Format.fprintf fmt "Keep"
   | `Replace -> Format.fprintf fmt "Replace"
@@ -53,7 +59,11 @@ let is_manager_op ((_ : Operation_hash.t), op) =
 (** Test that when the operations are not both manager operations, the
     conflict handler picks the higher operation according to
     [Operation.compare]. *)
-let test_random_ops () =
+let () =
+  register_test
+    ~title:"non-manager operations"
+    ~additional_tags:["nonmanager"; "random"]
+  @@ fun () ->
   let ops =
     QCheck2.Gen.(
       generate ~n:100 (pair Helpers.oph_and_op_gen Helpers.oph_and_op_gen))
@@ -70,8 +80,8 @@ let test_random_ops () =
         (* When both operations are manager operations, the result is
            complicated and depends on the [config]. Testing it here
            would mean basically reimplementing
-           [conflict_handler]. Instead, we test this case in
-           [test_manager_ops] below. *)
+           [conflict_handler]. Instead, we test this case in the
+           "manager operations" test below. *)
         ()
       else if
         (* When there is at least one non-manager operation, the
@@ -81,7 +91,7 @@ let test_random_ops () =
       then check_answer ~__LOC__ `Keep answer
       else check_answer ~__LOC__ `Replace answer)
     ops ;
-  return_unit
+  unit
 
 let check_conflict_handler ~__LOC__ config ~old ~nw expected =
   let answer =
@@ -94,7 +104,11 @@ let check_conflict_handler ~__LOC__ config ~old ~nw expected =
 
 (** Test the semantics of the conflict handler on manager operations,
     with either hand-picked or carefully generated fee and gas. *)
-let test_manager_ops () =
+let () =
+  register_test
+    ~title:"manager operations"
+    ~additional_tags:["manager"; "random"]
+  @@ fun () ->
   let make_op = Helpers.generate_manager_op_with_fee_and_gas in
 
   (* Test operations with specific fee and gas, using the default
@@ -209,20 +223,4 @@ let test_manager_ops () =
   List.iter
     (fun nw -> check_conflict_handler ~__LOC__ default ~old ~nw `Replace)
     ops_both_5more ;
-  return_unit
-
-let () =
-  Alcotest_lwt.run
-    ~__FILE__
-    Protocol.name
-    [
-      ( "conflict_handler",
-        [
-          Tztest.tztest
-            "Random operations (not both manager)"
-            `Quick
-            test_random_ops;
-          Tztest.tztest "Manager operations" `Quick test_manager_ops;
-        ] );
-    ]
-  |> Lwt_main.run
+  Lwt.return_unit
