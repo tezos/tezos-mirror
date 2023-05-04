@@ -55,11 +55,11 @@ let is_manager_op ((_ : Operation_hash.t), op) =
     [Operation.compare]. *)
 let test_random_ops () =
   let ops =
-    let open Operation_generator in
-    QCheck2.Gen.(generate ~n:100 (pair generate_operation generate_operation))
+    QCheck2.Gen.(
+      generate ~n:100 (pair Helpers.oph_and_op_gen Helpers.oph_and_op_gen))
   in
   List.iter
-    (fun ((_, op1), (_, op2)) ->
+    (fun (op1, op2) ->
       let answer =
         Plugin.Mempool.conflict_handler
           Plugin.Mempool.default_config
@@ -83,50 +83,6 @@ let test_random_ops () =
     ops ;
   return_unit
 
-(** Generator for a manager batch with the specified total fee and gas. *)
-let generate_manager_op_with_fee_and_gas ~fee_in_mutez ~gas =
-  let open Alpha_context in
-  let open QCheck2.Gen in
-  let rec set_fee_and_gas :
-      type kind. _ -> _ -> kind contents_list -> kind contents_list t =
-   fun desired_total_fee desired_total_gas -> function
-    | Single (Manager_operation data) ->
-        let fee = Tez.of_mutez_exn (Int64.of_int desired_total_fee) in
-        let gas_limit = Gas.Arith.integral_of_int_exn desired_total_gas in
-        return (Single (Manager_operation {data with fee; gas_limit}))
-    | Cons (Manager_operation data, tail) ->
-        let* local_fee =
-          (* We generate some corner cases where some individual
-             operations in the batch have zero fees. *)
-          let* r = frequencyl [(7, `Random); (2, `Zero); (1, `All)] in
-          match r with
-          | `Random -> int_range 0 desired_total_fee
-          | `Zero -> return 0
-          | `All -> return desired_total_fee
-        in
-        let* local_gas = int_range 0 desired_total_gas in
-        let fee = Tez.of_mutez_exn (Int64.of_int local_fee) in
-        let gas_limit = Gas.Arith.integral_of_int_exn local_gas in
-        let* tail =
-          set_fee_and_gas
-            (desired_total_fee - local_fee)
-            (desired_total_gas - local_gas)
-            tail
-        in
-        return (Cons (Manager_operation {data with fee; gas_limit}, tail))
-    | Single _ ->
-        (* This function is only called on a manager operation. *) assert false
-  in
-  (* Generate a random manager operation. *)
-  let* batch_size = int_range 1 Operation_generator.max_batch_size in
-  let* op = Operation_generator.generate_manager_operation batch_size in
-  (* Modify its fee and gas to match the [fee_in_mutez] and [gas] inputs. *)
-  let {shell = _; protocol_data = Operation_data protocol_data} = op in
-  let* contents = set_fee_and_gas fee_in_mutez gas protocol_data.contents in
-  let protocol_data = {protocol_data with contents} in
-  let op = {op with protocol_data = Operation_data protocol_data} in
-  return (Operation.hash_packed op, op)
-
 let check_conflict_handler ~__LOC__ config ~old ~nw expected =
   let answer =
     Plugin.Mempool.conflict_handler
@@ -139,10 +95,7 @@ let check_conflict_handler ~__LOC__ config ~old ~nw expected =
 (** Test the semantics of the conflict handler on manager operations,
     with either hand-picked or carefully generated fee and gas. *)
 let test_manager_ops () =
-  let make_op ~fee_in_mutez ~gas =
-    QCheck2.Gen.generate1
-      (generate_manager_op_with_fee_and_gas ~fee_in_mutez ~gas)
-  in
+  let make_op = Helpers.generate_manager_op_with_fee_and_gas in
 
   (* Test operations with specific fee and gas, using the default
      configuration. This configuration replaces the old operation when
@@ -209,7 +162,7 @@ let test_manager_ops () =
     let* fee_in_mutez = int_range 0 (fee_more5 - 1) in
     let* gas = int_range 0 max_gas in
     Format.eprintf "op_not_fee5: fee = %d; gas = %d@." fee_in_mutez gas ;
-    generate_manager_op_with_fee_and_gas ~fee_in_mutez ~gas
+    Helpers.manager_op_with_fee_and_gas_gen ~fee_in_mutez ~gas
   in
   let ops_not_5more_fee = generate ~n:repeat generator_not_5more_fee in
   List.iter
@@ -227,7 +180,7 @@ let test_manager_ops () =
     let fee_upper_bound = Q.to_int fee_for_5more_ratio - 1 in
     let* fee_in_mutez = int_range 0 (max 0 fee_upper_bound) in
     Format.eprintf "op_not_ratio5: fee = %d; gas = %d@." fee_in_mutez gas ;
-    generate_manager_op_with_fee_and_gas ~fee_in_mutez ~gas
+    Helpers.manager_op_with_fee_and_gas_gen ~fee_in_mutez ~gas
   in
   let ops_not_5more_ratio = generate ~n:repeat generator_not_5more_ratio in
   List.iter
@@ -250,7 +203,7 @@ let test_manager_ops () =
     let fee_lower_bound = max fee_more5 (Q.to_int fee_for_5more_ratio + 1) in
     let* fee_in_mutez = int_range fee_lower_bound max_fee in
     Format.eprintf "op_both_better: fee = %d; gas = %d@." fee_in_mutez gas ;
-    generate_manager_op_with_fee_and_gas ~fee_in_mutez ~gas
+    Helpers.manager_op_with_fee_and_gas_gen ~fee_in_mutez ~gas
   in
   let ops_both_5more = generate ~n:repeat generator_both_5more in
   List.iter
