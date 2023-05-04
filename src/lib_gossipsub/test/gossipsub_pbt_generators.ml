@@ -57,12 +57,17 @@ struct
     | Iwant : GS.iwant -> [`IWant] input (* case 3 *)
     | Graft : GS.graft -> [`Graft] input (* case 4 *)
     | Prune : GS.prune -> [`Prune] input (* case 5 *)
-    | Publish : GS.publish -> [`Publish] input (* case 6 *)
-    | Heartbeat : [`Heartbeat] input (* case 7 *)
-    | Join : GS.join -> [`Join] input (* case 8 *)
-    | Leave : GS.leave -> [`Leave] input (* case 9 *)
-    | Subscribe : GS.subscribe -> [`Subscribe] input (* case 10 *)
-    | Unsubscribe : GS.unsubscribe -> [`Unsubscribe] input (* case 11 *)
+    | Publish_message :
+        GS.publish_message
+        -> [`Publish_message] input (* case 6 *)
+    | Receive_message :
+        GS.receive_message
+        -> [`Receive_message] input (* case 7 *)
+    | Heartbeat : [`Heartbeat] input (* case 8 *)
+    | Join : GS.join -> [`Join] input (* case 9 *)
+    | Leave : GS.leave -> [`Leave] input (* case 10 *)
+    | Subscribe : GS.subscribe -> [`Subscribe] input (* case 11 *)
+    | Unsubscribe : GS.unsubscribe -> [`Unsubscribe] input (* case 12 *)
 
   type ex_input = I : _ input -> ex_input
 
@@ -92,7 +97,14 @@ struct
     | Iwant handle_iwant -> fprintf fmtr "Iwant %a" GS.pp_iwant handle_iwant
     | Graft handle_graft -> fprintf fmtr "Graft %a" GS.pp_graft handle_graft
     | Prune handle_prune -> fprintf fmtr "Prune %a" GS.pp_prune handle_prune
-    | Publish publish -> fprintf fmtr "Publish %a" GS.pp_publish publish
+    | Receive_message handle_receive_message ->
+        fprintf
+          fmtr
+          "Receive_message %a"
+          GS.pp_receive_message
+          handle_receive_message
+    | Publish_message publish_message ->
+        fprintf fmtr "Publish %a" GS.pp_publish_message publish_message
     | Heartbeat -> fprintf fmtr "Heartbeat"
     | Join join -> fprintf fmtr "Join %a" GS.pp_join join
     | Leave leave -> fprintf fmtr "Leave %a" GS.pp_leave leave
@@ -150,12 +162,18 @@ struct
     and+ backoff = gen_span in
     ({peer; topic; px; backoff} : GS.prune)
 
-  let publish ~gen_peer ~gen_topic ~gen_message_id ~gen_message =
-    let+ sender = option gen_peer
+  let receive_message ~gen_peer ~gen_topic ~gen_message_id ~gen_message =
+    let+ sender = gen_peer
     and+ topic = gen_topic
     and+ message_id = gen_message_id
     and+ message = gen_message in
-    ({sender; topic; message_id; message} : GS.publish)
+    ({sender; topic; message_id; message} : GS.receive_message)
+
+  let publish_message ~gen_topic ~gen_message_id ~gen_message =
+    let+ topic = gen_topic
+    and+ message_id = gen_message_id
+    and+ message = gen_message in
+    ({topic; message_id; message} : GS.publish_message)
 
   let join ~gen_topic =
     let+ topic = gen_topic in
@@ -190,7 +208,9 @@ struct
 
     let prune x = Prune x |> i
 
-    let publish x = Publish x |> i
+    let receive_message x = Receive_message x |> i
+
+    let publish_message x = Publish_message x |> i
 
     let join x = Join x |> i
 
@@ -212,7 +232,8 @@ struct
     | Iwant m -> GS.handle_iwant m state
     | Graft m -> GS.handle_graft m state
     | Prune m -> GS.handle_prune m state
-    | Publish m -> GS.publish m state
+    | Receive_message m -> GS.handle_receive_message m state
+    | Publish_message m -> GS.publish_message m state
     | Heartbeat -> GS.heartbeat state
     | Join m -> GS.join m state
     | Leave m -> GS.leave m state

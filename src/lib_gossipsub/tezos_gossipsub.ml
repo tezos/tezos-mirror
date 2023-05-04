@@ -76,8 +76,14 @@ module Make (C : AUTOMATON_CONFIG) :
     backoff : span;
   }
 
-  type publish = {
-    sender : Peer.t option;
+  type publish_message = {
+    topic : Topic.t;
+    message_id : Message_id.t;
+    message : message;
+  }
+
+  type receive_message = {
+    sender : Peer.t;
     topic : Topic.t;
     message_id : Message_id.t;
     message : message;
@@ -129,10 +135,13 @@ module Make (C : AUTOMATON_CONFIG) :
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
     | No_PX : [`Prune] output
     | PX : Peer.Set.t -> [`Prune] output
-    | Publish_message : {to_publish : Peer.Set.t} -> [`Publish] output
-    | Already_published : [`Publish] output
-    | Invalid_message : [`Publish] output
-    | Unknown_validity : [`Publish] output
+    | Publish_message : {to_publish : Peer.Set.t} -> [`Publish_message] output
+    | Already_published : [`Publish_message] output
+    | Route_message : {to_route : Peer.Set.t} -> [`Receive_message] output
+    | Already_received : [`Receive_message] output
+    | Not_subscribed : [`Receive_message] output
+    | Invalid_message : [`Receive_message] output
+    | Unknown_validity : [`Receive_message] output
     | Already_joined : [`Join] output
     | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
     | Not_joined : [`Leave] output
@@ -478,6 +487,13 @@ module Make (C : AUTOMATON_CONFIG) :
       let*! rng in
       select_connections_peers connections scores rng topic ~filter ~max
       |> Peer.Set.of_list |> return
+
+    let get_direct_peers topic =
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5010
+
+         Have a dedicated structure for direct peers? *)
+      let filter _peer {direct; _} _score = direct in
+      select_peers topic ~filter ~max:max_int
 
     let set_mesh_topic topic peers state =
       let state = {state with mesh = Topic.Map.add topic peers state.mesh} in
@@ -921,7 +937,7 @@ module Make (C : AUTOMATON_CONFIG) :
   let handle_prune : prune -> [`Prune] output Monad.t =
    fun {peer; topic; px; backoff} -> Prune.handle peer topic ~px ~backoff
 
-  module Publish = struct
+  module Receive_message = struct
     let check_valid sender topic message =
       let open Monad.Syntax in
       match Message.valid message with
@@ -930,33 +946,60 @@ module Make (C : AUTOMATON_CONFIG) :
           (* FIXME https://gitlab.com/tezos/tezos/-/issues/5486
              It is not clear yet what we should do here. *)
           fail Unknown_validity
-      | `Invalid -> (
-          match sender with
-          | None ->
-              (* We don't let ourselves send an invalid message, but
-                 we don't punish ourselves. *)
-              fail Invalid_message
-          | Some sender ->
-              let* () =
-                update_score sender (fun stats ->
-                    Score.invalid_message_delivered stats topic)
-              in
-              fail Invalid_message)
+      | `Invalid ->
+          let* () =
+            update_score sender (fun stats ->
+                Score.invalid_message_delivered stats topic)
+          in
+          fail Invalid_message
 
-    let check_seen sender topic message_id =
+    let handle sender topic message_id message =
+      let open Monad.Syntax in
+      let*? () =
+        let*! message_cache in
+        match Message_cache.get_first_seen_time message_id message_cache with
+        | None -> unit
+        | Some validated ->
+            let* () =
+              update_score sender (fun stats ->
+                  Score.duplicate_message_delivered stats topic validated)
+            in
+            fail Already_received
+      in
+      let*? () = check_valid sender topic message in
+      let*! mesh_opt = find_mesh topic in
+      let*? peers_in_mesh =
+        match mesh_opt with
+        | Some peers -> pass peers
+        | None -> fail Not_subscribed
+      in
+      let peers = Peer.Set.remove sender peers_in_mesh in
+      let* () = put_message_in_cache message_id message topic in
+      let* () =
+        update_score sender (fun stats ->
+            Score.first_message_delivered stats topic)
+      in
+      let* direct_peers = get_direct_peers topic in
+      let to_route = Peer.Set.union peers direct_peers in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5272
+
+         Filter out peers from which we already received the message, or an
+         IHave message? *)
+      Route_message {to_route} |> return
+  end
+
+  let handle_receive_message :
+      receive_message -> [`Receive_message] output Monad.t =
+   fun {sender; topic; message_id; message} ->
+    Receive_message.handle sender topic message_id message
+
+  module Publish_message = struct
+    let check_not_seen message_id =
       let open Monad.Syntax in
       let*! message_cache in
       match Message_cache.get_first_seen_time message_id message_cache with
       | None -> unit
-      | Some validated -> (
-          match sender with
-          | None -> unit
-          | Some sender ->
-              let* () =
-                update_score sender (fun stats ->
-                    Score.duplicate_message_delivered stats topic validated)
-              in
-              fail Already_published)
+      | Some _validated -> fail Already_published
 
     let get_peers_for_unsubscribed_topic topic =
       let open Monad.Syntax in
@@ -981,10 +1024,9 @@ module Make (C : AUTOMATON_CONFIG) :
           let* () = set_fanout_topic topic now fanout.peers in
           return fanout.peers
 
-    let handle ~sender topic message_id message : [`Publish] output Monad.t =
+    let handle topic message_id message : [`Publish_message] output Monad.t =
       let open Monad.Syntax in
-      let*? () = check_seen sender topic message_id in
-      let*? () = check_valid sender topic message in
+      let*? () = check_not_seen message_id in
       let* () = put_message_in_cache message_id message topic in
       let*! mesh_opt = find_mesh topic in
       let* peers =
@@ -992,41 +1034,14 @@ module Make (C : AUTOMATON_CONFIG) :
         | Some peers -> return peers
         | None -> get_peers_for_unsubscribed_topic topic
       in
-      let peers =
-        Option.fold
-          ~none:peers
-          ~some:(fun peer -> Peer.Set.remove peer peers)
-          sender
-      in
-
-      let* () =
-        match sender with
-        | None ->
-            (* Message is not from network. *)
-            return ()
-        | Some sender ->
-            update_score sender (fun stats ->
-                Score.first_message_delivered stats topic)
-      in
-
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5272
-
-         Filter out peers from which we already received the message, or an
-         IHave message? *)
-      let* direct_peers =
-        let filter _peer {direct; _} _score = direct in
-        select_peers topic ~filter ~max:max_int
-      in
+      let* direct_peers = get_direct_peers topic in
       let to_publish = Peer.Set.union peers direct_peers in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5010
-
-         Have a dedicated structure for direct peers? *)
       Publish_message {to_publish} |> return
   end
 
-  let publish : publish -> [`Publish] output Monad.t =
-   fun {sender; topic; message_id; message} ->
-    Publish.handle ~sender topic message_id message
+  let publish_message : publish_message -> [`Publish_message] output Monad.t =
+   fun {topic; message_id; message} ->
+    Publish_message.handle topic message_id message
 
   module Join = struct
     let check_is_not_subscribed topic : (unit, [`Join] output) Monad.check =
@@ -1936,15 +1951,26 @@ module Make (C : AUTOMATON_CONFIG) :
       Span.pp
       backoff
 
-  let pp_publish fmtr ({sender; topic; message_id; message} : publish) =
+  let pp_receive_message fmtr
+      ({sender; topic; message_id; message} : receive_message) =
     let open Format in
     fprintf
       fmtr
       "{ sender=%a; topic=%a; message_id=%a; message=%a }"
-      (pp_print_option
-         ~none:(fun fmtr () -> pp_print_string fmtr "None")
-         Peer.pp)
+      Peer.pp
       sender
+      Topic.pp
+      topic
+      Message_id.pp
+      message_id
+      Message.pp
+      message
+
+  let pp_publish_message fmtr ({topic; message_id; message} : publish_message) =
+    let open Format in
+    fprintf
+      fmtr
+      "{ topic=%a; message_id=%a; message=%a }"
       Topic.pp
       topic
       Message_id.pp
@@ -2056,6 +2082,14 @@ module Make (C : AUTOMATON_CONFIG) :
     | Already_published -> fprintf fmtr "Already_published"
     | Invalid_message -> fprintf fmtr "Invalid_message"
     | Unknown_validity -> fprintf fmtr "Unknown_validity"
+    | Route_message {to_route} ->
+        fprintf
+          fmtr
+          "Route_message %a"
+          Fmt.Dump.(record [field "to_route" Fun.id pp_peer_set])
+          to_route
+    | Already_received -> fprintf fmtr "Already_received"
+    | Not_subscribed -> fprintf fmtr "Not_subscribed"
     | Already_joined -> fprintf fmtr "Already_joined"
     | Joining_topic {to_graft} ->
         fprintf fmtr "Joining_topic %a" pp_peer_set to_graft

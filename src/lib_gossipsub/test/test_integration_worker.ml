@@ -323,7 +323,9 @@ let test_worker_filter_messages_for_app rng limits parameters =
   let* () =
     Worker.(
       step
-        (In_p2p (In_message {from_peer; p2p_message = Publish full_message}))
+        (In_p2p
+           (In_message
+              {from_peer; p2p_message = Message_with_header full_message}))
         [Out_app full_message])
   in
 
@@ -336,7 +338,9 @@ let test_worker_filter_messages_for_app rng limits parameters =
   let* () =
     Worker.(
       step
-        (In_p2p (In_message {from_peer; p2p_message = Publish full_message'}))
+        (In_p2p
+           (In_message
+              {from_peer; p2p_message = Message_with_header full_message'}))
         [])
   in
 
