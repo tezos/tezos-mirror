@@ -66,6 +66,7 @@ let nack_test () =
     ~title:"p2p socket nack"
     ~tags:["p2p"; "socket"; "nack"]
   @@ fun () ->
+  let open Lwt_result_syntax in
   let encoding = Data_encoding.bytes in
 
   let is_rejected = function
@@ -77,7 +78,6 @@ let nack_test () =
   in
 
   let server ch sched socket =
-    let open Lwt_result_syntax in
     let* info, auth_fd = accept sched socket in
     Check.is_true info.incoming ~error_msg:"Message should be incomming." ;
     let*! id2 in
@@ -89,7 +89,6 @@ let nack_test () =
   in
 
   let client ch sched addr port =
-    let open Lwt_result_syntax in
     let*! id2 in
     let* auth_fd = connect sched addr port id2 in
     let*! conn = P2p_socket.accept ~canceler auth_fd encoding in
@@ -97,8 +96,11 @@ let nack_test () =
     sync ch
   in
 
-  let* _ = run_nodes ~addr:Node.default_ipv6_addr client server in
-  unit
+  let*! r = run_nodes ~addr:Node.default_ipv6_addr client server in
+  match r with
+  | Ok () -> unit
+  | Error e ->
+      Test.fail "Errors in fork processes: %a." Error_monad.pp_print_trace e
 
 let () =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4882
