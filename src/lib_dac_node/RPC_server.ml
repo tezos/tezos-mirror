@@ -31,6 +31,7 @@ open Tezos_rpc_http_server
 type error +=
   | Cannot_construct_external_message
   | Cannot_deserialize_external_message
+  | DAC_node_not_ready
 
 let () =
   register_error_kind
@@ -52,10 +53,29 @@ let () =
       Format.fprintf ppf "External rollup message could not be deserialized")
     Data_encoding.unit
     (function Cannot_deserialize_external_message -> Some () | _ -> None)
-    (fun () -> Cannot_deserialize_external_message)
+    (fun () -> Cannot_deserialize_external_message) ;
+  register_error_kind
+    `Permanent
+    ~id:"dac_node_not_ready"
+    ~title:"DAC Node is not ready"
+    ~description:
+      "RPC server of DAC node is not started and plugin is not resolved."
+    ~pp:(fun ppf () -> Format.fprintf ppf "DAC Node is not ready")
+    Data_encoding.unit
+    (function DAC_node_not_ready -> Some () | _ -> None)
+    (fun () -> DAC_node_not_ready)
 
 let add_service registerer service handler directory =
   registerer directory service handler
+
+let handle_get_health_live cctxt =
+  match Node_context.get_status cctxt with
+  | Ready _ | Starting -> Lwt_result_syntax.return "DAC Node is alive"
+
+let handle_get_health_ready cctxt =
+  match Node_context.get_status cctxt with
+  | Ready _ -> Lwt_result_syntax.return "DAC Node is ready"
+  | Starting -> Lwt_result_syntax.tzfail DAC_node_not_ready
 
 let handle_post_store_preimage dac_plugin cctxt dac_sk_uris page_store
     hash_streamer (data, pagination_scheme) =
@@ -160,6 +180,20 @@ let handle_get_missing_page cctxt page_store dac_plugin raw_root_hash =
   in
   let*! () = Event.(emit fetched_missing_page raw_root_hash) in
   return preimage
+
+let register_get_health_live cctxt directory =
+  directory
+  |> add_service
+       Tezos_rpc.Directory.register0
+       RPC_services.get_health_live
+       (fun () () -> handle_get_health_live cctxt)
+
+let register_get_health_ready cctxt directory =
+  directory
+  |> add_service
+       Tezos_rpc.Directory.register0
+       RPC_services.get_health_ready
+       (fun () () -> handle_get_health_ready cctxt)
 
 let register_post_store_preimage ctx cctxt dac_sk_uris page_store hash_streamer
     directory =
@@ -434,7 +468,10 @@ let start ~rpc_address ~rpc_port node_ctxt =
       (fun () ->
         match Node_context.get_status node_ctxt with
         | Ready {dac_plugin = (module Dac_plugin)} ->
-            Lwt.return (register_dynamic_rpc (module Dac_plugin))
+            Lwt.return
+              (register_dynamic_rpc (module Dac_plugin)
+              |> register_get_health_ready node_ctxt
+              |> register_get_health_live node_ctxt)
         | Starting -> Lwt.return Tezos_rpc.Directory.empty)
   in
   let rpc_address = P2p_addr.of_string_exn rpc_address in

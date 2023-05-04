@@ -122,3 +122,17 @@ module V0 = struct
         Tezos_rpc.Path.(v0_prefix / "preimage")
   end
 end
+
+let get_health_live =
+  Tezos_rpc.Service.get_service
+    ~description:"Check that DAC node is alive"
+    ~query:Tezos_rpc.Query.empty
+    ~output:Data_encoding.string
+    Tezos_rpc.Path.(open_root / "health" / "live")
+
+let get_health_ready =
+  Tezos_rpc.Service.get_service
+    ~description:"Check that DAC node is ready"
+    ~query:Tezos_rpc.Query.empty
+    ~output:Data_encoding.string
+    Tezos_rpc.Path.(open_root / "health" / "ready")

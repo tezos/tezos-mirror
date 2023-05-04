@@ -76,3 +76,12 @@ module V0 : sig
     val post_preimage : payload:string -> (Dac_node.t, string) RPC_core.t
   end
 end
+
+(** [get_health_live] returns ["DAC Node is alive"] if 
+    [Node_context.get_status cctxt] is [Starting] or [Ready]. *)
+val get_health_live : (Dac_node.t, string) RPC_core.t
+
+(** [get_health_ready] returns ["DAC Node is ready"] if 
+    [Node_context.get_status cctxt] is [Ready]
+    and fail with [tzfail Dac_node_not_ready] otherwise. *)
+val get_health_ready : (Dac_node.t, string) RPC_core.t

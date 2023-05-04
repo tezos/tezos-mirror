@@ -106,3 +106,14 @@ module V0 : sig
       Tezos_rpc.Service.service
   end
 end
+
+(** GET dac/health/live returns ["DAC Node is alive"] if 
+    [Node_context.get_status cctxt] is [Starting] or [Ready]. *)
+val get_health_live :
+  ([`GET], unit, unit, unit, unit, string) Tezos_rpc.Service.service
+
+(** GET dac/health/ready returns ["DAC Node is ready"] if 
+    [Node_context.get_status cctxt] is [Ready]
+    and fail with [tzfail Dac_node_not_ready] otherwise. *)
+val get_health_ready :
+  ([`GET], unit, unit, unit, unit, string) Tezos_rpc.Service.service

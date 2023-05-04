@@ -431,6 +431,31 @@ module Legacy = struct
     let* () = Dac_node.terminate dac_node in
     return ()
 
+  let test_dac_not_ready_without_protocol =
+    Test.register
+      ~__FILE__
+      ~title:"dac node startup not ready without protocol"
+      ~tags:["dac"; "dac_node"]
+    @@ fun () ->
+    let run_dac = Dac_node.run ~wait_ready:false in
+    let nodes_args = Node.[Synchronisation_threshold 0] in
+    let* node = Node.init nodes_args in
+    let* client = Client.init () in
+    let dac_node =
+      Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
+    in
+    let* _dir = Dac_node.init_config dac_node in
+    let* () = run_dac dac_node in
+    (* this call must fail as node is not ready *)
+    let* () =
+      assert_lwt_failure
+        ~__LOC__
+        "Expected DAC node not alive"
+        (RPC.call dac_node Dac_rpc.get_health_live)
+    in
+    let* () = Dac_node.terminate dac_node in
+    return ()
+
   let test_dac_node_handles_dac_store_preimage_merkle_V0 _protocol dac_node
       sc_rollup_node _sc_rollup_address _node _client pvm_name _threshold
       _committee_members =
@@ -1092,6 +1117,233 @@ module Legacy = struct
       assert_verify_aggregate_signature [member] hex_root_hash certificate ;
       unit
   end
+end
+
+module Coordinator = struct
+  let test_dac_not_ready =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"dac coordiantor startup not ready"
+      ~tags:["dac"; "dac_node"]
+    @@ fun protocol ->
+    let run_dac = Dac_node.run ~wait_ready:false in
+    let nodes_args = Node.[Synchronisation_threshold 0] in
+    let previous_protocol =
+      match Protocol.previous_protocol protocol with
+      | Some p -> p
+      | None -> assert false
+    in
+    let* node, client =
+      Client.init_with_protocol
+        `Client
+        ~protocol:previous_protocol
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args
+        ()
+    in
+    let dac_node =
+      Dac_node.create_coordinator ~node ~client ~committee_members:[] ()
+    in
+    let* _dir = Dac_node.init_config dac_node in
+    let* () = run_dac dac_node in
+    (* this call must fail as node is not ready *)
+    let* () =
+      assert_lwt_failure
+        ~__LOC__
+        "Expected DAC node not alive"
+        (RPC.call dac_node Dac_rpc.get_health_live)
+    in
+    (* must wait for node to be ready before terminating it *)
+    let* () =
+      Lwt.join
+        [
+          Dac_node.wait_for dac_node "dac_node_plugin_resolved.v0" (fun _ ->
+              Some ());
+          Client.bake_for_and_wait client;
+        ]
+    in
+    let* () = Dac_node.terminate dac_node in
+    return ()
+
+  let test_dac_not_ready_without_protocol =
+    Test.register
+      ~__FILE__
+      ~title:"dac coordinator startup not ready without protocol"
+      ~tags:["dac"; "dac_node"]
+    @@ fun () ->
+    let run_dac = Dac_node.run ~wait_ready:false in
+    let nodes_args = Node.[Synchronisation_threshold 0] in
+    let* node = Node.init nodes_args in
+    let* client = Client.init () in
+    let dac_node =
+      Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
+    in
+    let* _dir = Dac_node.init_config dac_node in
+    let* () = run_dac dac_node in
+    (* this call must fail as node is not ready *)
+    let* () =
+      assert_lwt_failure
+        ~__LOC__
+        "Expected DAC node not alive"
+        (RPC.call dac_node Dac_rpc.get_health_live)
+    in
+    let* () = Dac_node.terminate dac_node in
+    return ()
+end
+
+module Observer = struct
+  let test_dac_not_ready =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"dac observer startup not ready"
+      ~tags:["dac"; "dac_node"]
+    @@ fun protocol ->
+    let run_dac = Dac_node.run ~wait_ready:false in
+    let nodes_args = Node.[Synchronisation_threshold 0] in
+    let previous_protocol =
+      match Protocol.previous_protocol protocol with
+      | Some p -> p
+      | None -> assert false
+    in
+    let* node, client =
+      Client.init_with_protocol
+        `Client
+        ~protocol:previous_protocol
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args
+        ()
+    in
+    let dac_node = Dac_node.create_observer ~node ~client () in
+    let* _dir = Dac_node.init_config dac_node in
+    let* () = run_dac dac_node in
+    (* this call must fail as node is not ready *)
+    let* () =
+      assert_lwt_failure
+        ~__LOC__
+        "Expected DAC observer not alive"
+        (RPC.call dac_node Dac_rpc.get_health_live)
+    in
+    (* must wait for node to be ready before terminating it *)
+    let* () =
+      Lwt.join
+        [
+          Dac_node.wait_for dac_node "dac_node_plugin_resolved.v0" (fun _ ->
+              Some ());
+          Client.bake_for_and_wait client;
+        ]
+    in
+    let* () = Dac_node.terminate dac_node in
+    return ()
+
+  let test_dac_not_ready_without_protocol =
+    Test.register
+      ~__FILE__
+      ~title:"dac observer startup not ready without protocol"
+      ~tags:["dac"; "dac_node"]
+    @@ fun () ->
+    let run_dac = Dac_node.run ~wait_ready:false in
+    let nodes_args = Node.[Synchronisation_threshold 0] in
+    let* node = Node.init nodes_args in
+    let* client = Client.init () in
+    let dac_node =
+      Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
+    in
+    let* _dir = Dac_node.init_config dac_node in
+    let* () = run_dac dac_node in
+    (* this call must fail as node is not ready *)
+    let* () =
+      assert_lwt_failure
+        ~__LOC__
+        "Expected DAC node not alive"
+        (RPC.call dac_node Dac_rpc.get_health_live)
+    in
+    let* () = Dac_node.terminate dac_node in
+    return ()
+end
+
+module Member = struct
+  let test_dac_not_ready =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"dac member startup not ready"
+      ~tags:["dac"; "dac_node"]
+    @@ fun protocol ->
+    let run_dac = Dac_node.run ~wait_ready:false in
+    let nodes_args = Node.[Synchronisation_threshold 0] in
+    let previous_protocol =
+      match Protocol.previous_protocol protocol with
+      | Some p -> p
+      | None -> assert false
+    in
+    let* node, client =
+      Client.init_with_protocol
+        `Client
+        ~protocol:previous_protocol
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args
+        ()
+    in
+    let* committee_member =
+      Client.bls_gen_keys ~alias:"committee_member" client
+    in
+    let* committee_member_info =
+      Client.bls_show_address ~alias:committee_member client
+    in
+    let committee_member_address =
+      committee_member_info.aggregate_public_key_hash
+    in
+    let dac_node =
+      Dac_node.create_committee_member
+        ~address:committee_member_address
+        ~node
+        ~client
+        ()
+    in
+    let* _dir = Dac_node.init_config dac_node in
+    let* () = run_dac dac_node in
+    (* this call must fail as node is not ready *)
+    let* () =
+      assert_lwt_failure
+        ~__LOC__
+        "Expected DAC observer not alive"
+        (RPC.call dac_node Dac_rpc.get_health_live)
+    in
+    (* must wait for node to be ready before terminating it *)
+    let* () =
+      Lwt.join
+        [
+          Dac_node.wait_for dac_node "dac_node_plugin_resolved.v0" (fun _ ->
+              Some ());
+          Client.bake_for_and_wait client;
+        ]
+    in
+    let* () = Dac_node.terminate dac_node in
+    return ()
+
+  let test_dac_not_ready_without_protocol =
+    Test.register
+      ~__FILE__
+      ~title:"dac member startup not ready without protocol"
+      ~tags:["dac"; "dac_node"]
+    @@ fun () ->
+    let run_dac = Dac_node.run ~wait_ready:false in
+    let nodes_args = Node.[Synchronisation_threshold 0] in
+    let* node = Node.init nodes_args in
+    let* client = Client.init () in
+    let dac_node =
+      Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
+    in
+    let* _dir = Dac_node.init_config dac_node in
+    let* () = run_dac dac_node in
+    (* this call must fail as node is not ready *)
+    let* () =
+      assert_lwt_failure
+        ~__LOC__
+        "Expected DAC node not alive"
+        (RPC.call dac_node Dac_rpc.get_health_live)
+    in
+    let* () = Dac_node.terminate dac_node in
+    return ()
 end
 
 (** [Full_infrastructure] is a test suite consisting only of tests with the DAC
@@ -2469,6 +2721,13 @@ end
 let register ~protocols =
   (* Tests with layer1 and dac nodes *)
   Legacy.test_dac_node_startup protocols ;
+  Legacy.test_dac_not_ready_without_protocol ;
+  Coordinator.test_dac_not_ready_without_protocol ;
+  Observer.test_dac_not_ready_without_protocol ;
+  Member.test_dac_not_ready_without_protocol ;
+  Coordinator.test_dac_not_ready protocols ;
+  Observer.test_dac_not_ready protocols ;
+  Member.test_dac_not_ready protocols ;
   Legacy.test_dac_node_imports_committee_members protocols ;
   Legacy.test_dac_node_dac_threshold_not_reached protocols ;
   scenario_with_layer1_legacy_and_rollup_nodes
