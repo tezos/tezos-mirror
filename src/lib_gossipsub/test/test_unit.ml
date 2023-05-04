@@ -375,8 +375,8 @@ let test_join_adds_fanout_to_mesh rng limits parameters =
   (* Publish to topic0.
      We did not join the topic so the peers should be added to the fanout map.*)
   let state, _ =
-    GS.publish
-      {sender = None; topic = "topic0"; message_id = 0; message = "message"}
+    GS.publish_message
+      {topic = "topic0"; message_id = 0; message = "message"}
       state
   in
   (* Check that all [init_peers] have been added to the fanout.  *)
@@ -467,15 +467,11 @@ let test_publish_without_flood_publishing rng limits parameters =
   let message_id = 0 in
   (* Publish to a joined topic. *)
   let state, output =
-    GS.publish {sender = None; topic; message_id; message = publish_data} state
+    GS.publish_message {topic; message_id; message = publish_data} state
   in
   let peers_to_publish =
     match output with
-    | Already_published ->
-        Test.fail ~__LOC__ "Message shouldn't already be published."
-    | Invalid_message -> Test.fail ~__LOC__ "Message shouldn't be invalid."
-    | Unknown_validity ->
-        Test.fail ~__LOC__ "Message shouldn't have unknown validity."
+    | Already_published -> Test.fail ~__LOC__ "Publish should succeed."
     | Publish_message {to_publish} -> to_publish
   in
   (* Should return [degree_optimal] peers to publish to. *)
@@ -525,15 +521,11 @@ let test_fanout rng limits parameters =
   let publish_data = "some data" in
   let message_id = 0 in
   let state, output =
-    GS.publish {sender = None; topic; message_id; message = publish_data} state
+    GS.publish_message {topic; message_id; message = publish_data} state
   in
   let peers_to_publish =
     match output with
-    | Already_published ->
-        Test.fail ~__LOC__ "Message shouldn't already be published."
-    | Invalid_message -> Test.fail ~__LOC__ "Message shouldn't be invalid."
-    | Unknown_validity ->
-        Test.fail ~__LOC__ "Message shouldn't have unknown validity."
+    | Already_published -> Test.fail ~__LOC__ "Publish should succeed."
     | Publish_message {to_publish} -> to_publish
   in
   (* Fanout should contain [degree_optimal] peers. *)
@@ -552,6 +544,93 @@ let test_fanout rng limits parameters =
     ~expected_message:publish_data
     state ;
   unit
+
+(** Tests that receiving a message for a subscribed topic:
+    - Returns peers to publish to.
+    - Inserts message into message cache. *)
+let test_receiving_message rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Test receiving message"
+    ~tags:["gossipsub"; "receiving_message"]
+  @@ fun () ->
+  let topic = "test" in
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_join:(fun _ -> true)
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  let sender = 99 in
+  let message = "some_data" in
+  let message_id = 0 in
+  (* Receive a message for a joined topic. *)
+  let state, output =
+    GS.handle_receive_message {sender; topic; message_id; message} state
+  in
+  let peers_to_route =
+    match output with
+    | Already_received | Not_subscribed | Invalid_message | Unknown_validity ->
+        Test.fail ~__LOC__ "Handling of received message should succeed."
+    | Route_message {to_route} -> to_route
+  in
+  (* Should return [degree_optimal] peers to route the message to. *)
+  Check.(
+    (Peer.Set.cardinal peers_to_route = limits.degree_optimal)
+      int
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__) ;
+  (* [message_id] should be added to the message cache. *)
+  assert_in_message_cache
+    ~__LOC__
+    message_id
+    ~peer:sender
+    ~expected_message:message
+    state ;
+  unit
+
+(** Tests that we do not route the message when receiving a message
+    for an unsubscribed topic. *)
+let test_receiving_message_for_unsusbcribed_topic rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Test receiving message for unsubscribed topic"
+    ~tags:["gossipsub"; "receive_message"; "fanout"]
+  @@ fun () ->
+  let topic = "topic" in
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_join:(fun _ -> false)
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  (* Leave the topic. *)
+  let state, _ = GS.leave {topic} state in
+  (* Receive message for the topic we left. *)
+  let sender = Stdlib.List.hd peers in
+  let message = "some data" in
+  let message_id = 0 in
+  let _state, output =
+    GS.handle_receive_message {sender; topic; message_id; message} state
+  in
+  match output with
+  | Already_received | Route_message _ | Invalid_message | Unknown_validity ->
+      Test.fail
+        ~__LOC__
+        "Handling of received message should fail with [Not_subscribed]."
+  | Not_subscribed -> unit
 
 (** Tests that a peer is added to our mesh on graft when we are both
     joined/subscribed to the same topic.
@@ -1196,7 +1275,7 @@ let test_handle_iwant_msg_cached rng limits parameters =
   let message = "some message" in
   let message_id = 3 in
   (* Place message in cache by publishing. *)
-  let state, _ = GS.publish {sender = None; topic; message; message_id} state in
+  let state, _ = GS.publish_message {topic; message; message_id} state in
   (* Send IWant. *)
   let _state, output =
     GS.handle_iwant {peer; message_ids = [message_id]} state
@@ -1238,7 +1317,7 @@ let test_handle_iwant_msg_cached_shifted rng limits parameters =
   let message = "some message" in
   let message_id = 3 in
   (* Place message in cache by publishing. *)
-  let state, _ = GS.publish {sender = None; topic; message; message_id} state in
+  let state, _ = GS.publish_message {topic; message; message_id} state in
   (* Loop [2 * limits.history_length] times and check that IWant starts returning
      `Not_found after [history_length] heartbeat ticks. *)
   let _state =
@@ -1352,7 +1431,7 @@ let test_ignore_too_many_iwants_from_same_peer_for_same_message rng limits
   (* Add message to cache by publishing. *)
   let message = "some message" in
   let message_id = 0 in
-  let state, _ = GS.publish {sender = None; topic; message; message_id} state in
+  let state, _ = GS.publish_message {topic; message; message_id} state in
   (* Send IWant from same peer for same message [(2 * limits.max_gossip_retransmission) + 10] times.
      Only the first [max_gossip_retransmission] IWant requests should be accepted. *)
   let _state =
@@ -1468,7 +1547,7 @@ let test_handle_ihave_subscribed_and_msg_seen rng limits parameters =
   (* Publish to mark message as seen. *)
   let message = "some message" in
   let message_id = 0 in
-  let state, _ = GS.publish {sender = None; topic; message_id; message} state in
+  let state, _ = GS.publish_message {topic; message_id; message} state in
   (* Handle IHave for the seen message. *)
   let _state, output =
     GS.handle_ihave {peer; topic; message_ids = [message_id]} state
@@ -1739,6 +1818,8 @@ let register rng limits parameters =
   test_join_adds_peers_to_mesh rng limits parameters ;
   test_join_adds_fanout_to_mesh rng limits parameters ;
   test_publish_without_flood_publishing rng limits parameters ;
+  test_receiving_message_for_unsusbcribed_topic rng limits parameters ;
+  test_receiving_message rng limits parameters ;
   test_fanout rng limits parameters ;
   test_handle_graft_for_joined_topic rng limits parameters ;
   test_handle_graft_for_not_joined_topic rng limits parameters ;

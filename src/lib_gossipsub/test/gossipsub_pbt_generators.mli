@@ -39,12 +39,17 @@ type _ input =
   | Iwant : GS.iwant -> [`IWant] input (* case 3 *)
   | Graft : GS.graft -> [`Graft] input (* case 4 *)
   | Prune : GS.prune -> [`Prune] input (* case 5 *)
-  | Publish : GS.publish -> [`Publish] input (* case 6 *)
-  | Heartbeat : [`Heartbeat] input (* case 7 *)
-  | Join : GS.join -> [`Join] input (* case 8 *)
-  | Leave : GS.leave -> [`Leave] input (* case 9 *)
-  | Subscribe : GS.subscribe -> [`Subscribe] input (* case 10 *)
-  | Unsubscribe : GS.unsubscribe -> [`Unsubscribe] input (* case 11 *)
+  | Publish_message :
+      GS.publish_message
+      -> [`Publish_message] input (* case 6 *)
+  | Receive_message :
+      GS.receive_message
+      -> [`Receive_message] input (* case 7 *)
+  | Heartbeat : [`Heartbeat] input (* case 8 *)
+  | Join : GS.join -> [`Join] input (* case 9 *)
+  | Leave : GS.leave -> [`Leave] input (* case 10 *)
+  | Subscribe : GS.subscribe -> [`Subscribe] input (* case 11 *)
+  | Unsubscribe : GS.unsubscribe -> [`Unsubscribe] input (* case 12 *)
 
 (** Existentially packed input. *)
 type ex_input = I : _ input -> ex_input
@@ -112,12 +117,18 @@ val prune :
   int ->
   GS.prune t
 
-val publish :
+val receive_message :
   gen_peer:Peer.t t ->
   gen_topic:Topic.t t ->
   gen_message_id:Message_id.t t ->
   gen_message:message t ->
-  GS.publish t
+  GS.receive_message t
+
+val publish_message :
+  gen_topic:Topic.t t ->
+  gen_message_id:Message_id.t t ->
+  gen_message:message t ->
+  GS.publish_message t
 
 val join : gen_topic:Topic.t t -> GS.join t
 
@@ -141,7 +152,9 @@ module I : sig
 
   val prune : prune -> ex_input
 
-  val publish : publish -> ex_input
+  val receive_message : receive_message -> ex_input
+
+  val publish_message : publish_message -> ex_input
 
   val join : join -> ex_input
 

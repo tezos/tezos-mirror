@@ -471,8 +471,14 @@ module type AUTOMATON = sig
     backoff : span;
   }
 
-  type publish = {
-    sender : Peer.t option;
+  type publish_message = {
+    topic : Topic.t;
+    message_id : Message_id.t;
+    message : message;
+  }
+
+  type receive_message = {
+    sender : Peer.t;
     topic : Topic.t;
     message_id : Message_id.t;
     message : message;
@@ -562,15 +568,24 @@ module type AUTOMATON = sig
     | PX : Peer.Set.t -> [`Prune] output
         (** The given peer has been pruned for the given topic. The given set of
             peers alternatives in {!prune} for that topic is returned. *)
-    | Publish_message : {to_publish : Peer.Set.t} -> [`Publish] output
+    | Publish_message : {to_publish : Peer.Set.t} -> [`Publish_message] output
         (** [to_publish] contains:
             - Direct peers for the message's topic;
             - The peers in the topic's mesh, if the peer is subscribed to the
               topic. Otherwise, the peers in the topic's fanout. *)
-    | Already_published : [`Publish] output
+    | Already_published : [`Publish_message] output
         (** Attempting to publish a message that has already been published. *)
-    | Invalid_message : [`Publish] output
-    | Unknown_validity : [`Publish] output
+    | Route_message : {to_route : Peer.Set.t} -> [`Receive_message] output
+        (** [to_route] contains:
+            - Direct peers for the message's topic;
+            - The peers in the topic's mesh minus the original sender of the message. *)
+    | Already_received : [`Receive_message] output
+        (** Received a message that has already been recevied before. *)
+    | Not_subscribed : [`Receive_message] output
+        (** Received a message from a remote peer for a topic we are not
+            subscribed to. *)
+    | Invalid_message : [`Receive_message] output
+    | Unknown_validity : [`Receive_message] output
         (** Attempting to publish a message that is invalid. *)
     | Already_joined : [`Join] output
         (** Attempting to join a topic we already joined. *)
@@ -667,11 +682,15 @@ module type AUTOMATON = sig
       on this topic. *)
   val handle_prune : prune -> [`Prune] monad
 
-  (** [publish { sender; topic; message_id; message }] allows to route a message
-      on the gossip network. If [sender=None], the message comes from the
-      application layer and the local node is the sender. The function returns a
-      set of peers to which the (full) message will be directly forwarded.  *)
-  val publish : publish -> [`Publish] monad
+  (** [handle_receive_message { sender; topic; message_id; message }] handles
+      a message received from [sender] on the gossip network. The function returns
+      a set of peers to which the (full) message will be directly forwarded.  *)
+  val handle_receive_message : receive_message -> [`Receive_message] monad
+
+  (** [publish { topic; message_id; message }] allows to publish a message
+      on the gossip network from the local node. The function returns a set of peers
+      to which the (full) message will be directly forwarded.  *)
+  val publish_message : publish_message -> [`Publish_message] monad
 
   (** [heartbeat] executes the heartbeat routine of the algorithm. *)
   val heartbeat : [`Heartbeat] monad
@@ -732,7 +751,9 @@ module type AUTOMATON = sig
 
   val pp_prune : Format.formatter -> prune -> unit
 
-  val pp_publish : Format.formatter -> publish -> unit
+  val pp_receive_message : Format.formatter -> receive_message -> unit
+
+  val pp_publish_message : Format.formatter -> publish_message -> unit
 
   val pp_join : Format.formatter -> join -> unit
 
@@ -875,8 +896,9 @@ module type WORKER = sig
   (** We (re-)export the GS, Monad and Stream modules. *)
   include WORKER_CONFIGURATION
 
-  (** A full message is defined by its content, topic and id. *)
-  type full_message = {
+  (** A message together with a header, that is, a topic and an id.
+     This corresponds to what the spec calls a "full message". *)
+  type message_with_header = {
     message : GS.Message.t;
     topic : GS.Topic.t;
     message_id : GS.Message_id.t;
@@ -891,7 +913,7 @@ module type WORKER = sig
     | IWant of {message_ids : GS.Message_id.t list}
     | Subscribe of {topic : GS.Topic.t}
     | Unsubscribe of {topic : GS.Topic.t}
-    | Publish of full_message
+    | Message_with_header of message_with_header
 
   (** The different kinds of input events that could be received from the P2P
       layer. *)
@@ -903,7 +925,7 @@ module type WORKER = sig
   (** The different kinds of input events that could be received from the
       application layer. *)
   type app_input =
-    | Inject_message of full_message
+    | Publish_message of message_with_header
     | Join of GS.Topic.t
     | Leave of GS.Topic.t
 
@@ -917,7 +939,7 @@ module type WORKER = sig
 
   (** The application layer will be advertised about full messages it's
       interested in. *)
-  type app_output = full_message
+  type app_output = message_with_header
 
   (** [make rng limits parameters] initializes a new Gossipsub automaton with
       the given arguments. Then, it initializes and returns a worker for it. *)
