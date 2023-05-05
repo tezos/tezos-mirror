@@ -47,7 +47,7 @@ type batcher = {
   min_batch_elements : int;
   min_batch_size : int;
   max_batch_elements : int;
-  max_batch_size : int;
+  max_batch_size : int option;
 }
 
 type injector = {retention_period : int; attempts : int; injection_ttl : int}
@@ -184,45 +184,13 @@ let default_batcher_min_batch_size = 10
 
 let default_batcher_max_batch_elements = max_int
 
-let protocol_max_batch_size =
-  let empty_message_op : _ Operation.t =
-    let open Protocol in
-    let open Alpha_context in
-    let open Operation in
-    {
-      shell = {branch = Block_hash.zero};
-      protocol_data =
-        {
-          signature = Some Signature.zero;
-          contents =
-            Single
-              (Manager_operation
-                 {
-                   source = Signature.Public_key_hash.zero;
-                   fee = Tez.of_mutez_exn Int64.max_int;
-                   counter = Manager_counter.Internal_for_tests.of_int max_int;
-                   gas_limit =
-                     Gas.Arith.integral_of_int_exn ((max_int - 1) / 1000);
-                   storage_limit = Z.of_int max_int;
-                   operation = Sc_rollup_add_messages {messages = [""]};
-                 });
-        };
-    }
-  in
-  Protocol.Constants_repr.max_operation_data_length
-  - Data_encoding.Binary.length
-      Operation.encoding_with_legacy_attestation_name
-      (Operation.pack empty_message_op)
-
-let default_batcher_max_batch_size = protocol_max_batch_size
-
 let default_batcher =
   {
     simulate = default_batcher_simulate;
     min_batch_elements = default_batcher_min_batch_elements;
     min_batch_size = default_batcher_min_batch_size;
     max_batch_elements = default_batcher_max_batch_elements;
-    max_batch_size = default_batcher_max_batch_size;
+    max_batch_size = None;
   }
 
 let default_injector =
@@ -482,33 +450,38 @@ let batcher_encoding =
            min_batch_size,
            max_batch_elements,
            max_batch_size ) ->
-      if max_batch_size > protocol_max_batch_size then
-        Error
-          (Format.sprintf
-             "max_batch_size must be smaller than %d"
-             protocol_max_batch_size)
-      else if min_batch_size <= 0 then Error "min_batch_size must be positive"
-      else if max_batch_size < min_batch_size then
-        Error "max_batch_size must be greater than min_batch_size"
-      else if min_batch_elements <= 0 then
-        Error "min_batch_elements must be positive"
-      else if max_batch_elements < min_batch_elements then
-        Error "max_batch_elements must be greater than min_batch_elements"
-      else
-        Ok
-          {
-            simulate;
-            min_batch_elements;
-            min_batch_size;
-            max_batch_elements;
-            max_batch_size;
-          })
+      let open Result_syntax in
+      let error_when c s = if c then Error s else return_unit in
+      let* () =
+        error_when (min_batch_size <= 0) "min_batch_size must be positive"
+      in
+      let* () =
+        match max_batch_size with
+        | Some m when m < min_batch_size ->
+            Error "max_batch_size must be greater than min_batch_size"
+        | _ -> return_unit
+      in
+      let* () =
+        error_when (min_batch_elements <= 0) "min_batch_size must be positive"
+      in
+      let+ () =
+        error_when
+          (max_batch_elements < min_batch_elements)
+          "max_batch_elements must be greater than min_batch_elements"
+      in
+      {
+        simulate;
+        min_batch_elements;
+        min_batch_size;
+        max_batch_elements;
+        max_batch_size;
+      })
   @@ obj5
        (dft "simulate" bool default_batcher_simulate)
        (dft "min_batch_elements" int31 default_batcher_min_batch_elements)
        (dft "min_batch_size" int31 default_batcher_min_batch_size)
        (dft "max_batch_elements" int31 default_batcher_max_batch_elements)
-       (dft "max_batch_size" int31 default_batcher_max_batch_size)
+       (opt "max_batch_size" int31)
 
 let injector_encoding : injector Data_encoding.t =
   let open Data_encoding in

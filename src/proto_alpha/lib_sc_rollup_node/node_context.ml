@@ -229,6 +229,49 @@ let check_fee_parameters Configuration.{fee_parameters; _} =
   in
   Configuration.Operator_purpose_map.iter_e check fee_parameters
 
+let protocol_max_batch_size =
+  let empty_message_op : _ Operation.t =
+    let open Protocol in
+    let open Alpha_context in
+    let open Operation in
+    {
+      shell = {branch = Block_hash.zero};
+      protocol_data =
+        {
+          signature = Some Signature.zero;
+          contents =
+            Single
+              (Manager_operation
+                 {
+                   source = Signature.Public_key_hash.zero;
+                   fee = Tez.of_mutez_exn Int64.max_int;
+                   counter = Manager_counter.Internal_for_tests.of_int max_int;
+                   gas_limit =
+                     Gas.Arith.integral_of_int_exn ((max_int - 1) / 1000);
+                   storage_limit = Z.of_int max_int;
+                   operation = Sc_rollup_add_messages {messages = [""]};
+                 });
+        };
+    }
+  in
+  Protocol.Constants_repr.max_operation_data_length
+  - Data_encoding.Binary.length
+      Operation.encoding_with_legacy_attestation_name
+      (Operation.pack empty_message_op)
+
+let check_batcher_config Configuration.{batcher = {max_batch_size; _}; _} =
+  match max_batch_size with
+  | Some m when m > protocol_max_batch_size ->
+      error_with
+        "batcher.max_batch_size must be smaller than %d"
+        protocol_max_batch_size
+  | _ -> Ok ()
+
+let check_config config =
+  let open Result_syntax in
+  let+ () = check_fee_parameters config and+ () = check_batcher_config config in
+  ()
+
 let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
     mode
     Configuration.(
@@ -245,7 +288,7 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
         _;
       } as configuration) =
   let open Lwt_result_syntax in
-  let*? () = check_fee_parameters configuration in
+  let*? () = check_config configuration in
   let* lockfile = lock ~data_dir in
   let dal_cctxt =
     Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
