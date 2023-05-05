@@ -3,4 +3,5 @@
 // SPDX-License-Identifier: MIT
 
 mod delayed_inbox;
+mod sequencer_macro;
 pub mod sequencer_runtime;
