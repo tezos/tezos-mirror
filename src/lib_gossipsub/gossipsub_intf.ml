@@ -559,12 +559,8 @@ module type AUTOMATON = sig
             alternative peers are returned because the peer's score is too low.
             The score of the peer is included in the return value. *)
     | No_PX : [`Prune] output
-        (** The given peer has been pruned for the given topic. But the given
-            set of peers alternatives in {!prune} is empty. *)
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5251
-
-       Some fixes might be needed for the prune case. Once done, update the
-       docstring. *)
+        (** The given peer has been pruned for the given topic. No
+            alternatives peers was provided in {!prune}. *)
     | PX : Peer.Set.t -> [`Prune] output
         (** The given peer has been pruned for the given topic. The given set of
             peers alternatives in {!prune} for that topic is returned. *)
