@@ -8,7 +8,7 @@
 // Outputs:
 // - the signed transaction,
 // - the message hash,
-// - and the "r" and "s" part of the signature.
+// - and the "r", "s" and "v" parts of the signature.
 //
 // usage: node sign_tx.js ./relative/path/to/tx.json "privateKey"
 // dependency: npm install--save '@warren-bank/ethereumjs-tx-sign'
@@ -29,8 +29,9 @@ let privateKey = process.argv[3]
 
 // create json object from tx.json
 let json = require(jsonFile);
-let rawTx2 = sign(json, privateKey);
-console.log(`tx = 0x${rawTx2.rawTx}`);
-console.log("msgHash = " + rawTx2.msgHash);
-console.log("r = " + rawTx2.signature.slice(0, 32).toString('hex'));
-console.log("s = " + rawTx2.signature.slice(32, 64).toString('hex'));
+let signedTx = sign(json, privateKey);
+console.log(`tx = 0x${signedTx.rawTx}`);
+console.log("msgHash = " + signedTx.msgHash);
+console.log("r = " + signedTx.r);
+console.log("s = " + signedTx.s);
+console.log("v = " + signedTx.v);
