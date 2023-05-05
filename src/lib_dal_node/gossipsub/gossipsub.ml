@@ -31,3 +31,24 @@ module Worker = struct
   module Default_parameters = Gs_default_parameters
   include Tezos_gossipsub.Worker (Config)
 end
+
+module Transport_layer = struct
+  module Interface = Transport_layer_interface
+  module Default_parameters = Transport_layer_default_parameters
+
+  type t =
+    ( Interface.p2p_message,
+      Interface.peer_metadata,
+      Interface.connection_metadata )
+    P2p.t
+
+  let create ~network_name config limits =
+    P2p.create
+      ~config
+      ~limits
+      Interface.peer_meta_config
+      Interface.conn_meta_config
+    @@ Interface.message_config ~network_name
+
+  let activate = P2p.activate
+end

@@ -24,6 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module exposes the instantiations of the Gossipsub and Octez-p2p
+    libraries to be used by the DAL node to connect to and exchange data with
+    peers. *)
+
+(** Below, we expose the main types needed for the integration with the existing
+    DAL node alongside their encodings. *)
+
 type topic = Gs_interface.topic
 
 type message_id = Gs_interface.message_id
@@ -38,6 +45,9 @@ val message_id_encoding : message_id Data_encoding.t
 
 val message_encoding : message Data_encoding.t
 
+(** The worker module exposes instantiation of the Gossipsub worker functor,
+    alongside the config used to instantiate the functor and the default values
+    of the GS parameters. *)
 module Worker : sig
   module Config :
     module type of Gs_interface.Worker
@@ -55,4 +65,19 @@ module Worker : sig
        and type GS.Message.t = message
        and type GS.Peer.t = peer
        and module GS.Span = Config.GS.Span
+end
+
+(** The transport layer module exposes the needed primitives, interface and
+    default parameters for the instantiation of the Octez-p2p library. *)
+module Transport_layer : sig
+  module Interface : module type of Transport_layer_interface
+
+  module Default_parameters : module type of Transport_layer_default_parameters
+
+  type t
+
+  val create :
+    network_name:string -> P2p.config -> P2p_limits.t -> t tzresult Lwt.t
+
+  val activate : t -> unit
 end
