@@ -564,7 +564,7 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
   let* resulting_context_hash =
     Store.Block.resulting_context_hash chain_store root_b
   in
-  let*! ctxt =
+  let*! root_ctxt =
     Context_ops.checkout_exn
       (Store.context_index (Store.Chain.global_store chain_store))
       resulting_context_hash
@@ -579,21 +579,21 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
   in
   let* _, _, blocks =
     List.fold_left_es
-      (fun (ctxt, pred, blocks) b ->
+      (fun (pred_ctxt, pred, blocks) b ->
+        let* pred_resulting_context =
+          Store.Block.resulting_context_hash chain_store pred
+        in
         let* ctxt, resulting_context, b =
-          let*! ctxt =
+          let*! new_ctxt =
             Context_ops.add
-              ctxt
+              pred_ctxt
               ["level"]
               (Bytes.of_string (Format.asprintf "%ld" (Block_repr.level b)))
           in
-          let*! ctxt =
+          let*! new_ctxt =
             match set_protocol with
-            | None -> Lwt.return ctxt
-            | Some proto -> Context_ops.add_protocol ctxt proto
-          in
-          let* pred_resulting_context =
-            Store.Block.resulting_context_hash chain_store pred
+            | None -> Lwt.return new_ctxt
+            | Some proto -> Context_ops.add_protocol new_ctxt proto
           in
           let shell =
             {
@@ -612,10 +612,10 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
           in
           let hash = Block_header.hash header in
           let*! resulting_context =
-            Context_ops.commit ~time:Time.Protocol.epoch ctxt
+            Context_ops.commit ~time:Time.Protocol.epoch new_ctxt
           in
           return
-            ( ctxt,
+            ( new_ctxt,
               resulting_context,
               {
                 Block_repr.hash;
@@ -648,7 +648,7 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
           else return_unit
         in
         return (ctxt, b, b :: blocks))
-      (ctxt, root_b, [])
+      (root_ctxt, root_b, [])
       blocks
   in
   let head = List.hd blocks |> WithExceptions.Option.get ~loc:__LOC__ in
