@@ -2668,7 +2668,7 @@ let commands_rw () =
          counter_arg
          (Client_keys.force_switch ()))
       (prefixes ["originate"; "smart"; "rollup"]
-      @@ SoruAlias.fresh_alias_param
+      @@ Smart_rollup_alias.Address.fresh_alias_param
            ~name:"alias"
            ~desc:"name of the new smart rollup"
       @@ prefix "from"
@@ -2743,8 +2743,12 @@ let commands_rw () =
                     {address = rollup_address; _});
               _;
             } ->
-            let* alias = SoruAlias.of_fresh cctxt force alias in
-            let* () = SoruAlias.add ~force cctxt alias rollup_address in
+            let* alias =
+              Smart_rollup_alias.Address.of_fresh cctxt force alias
+            in
+            let* () =
+              Smart_rollup_alias.Address.add ~force cctxt alias rollup_address
+            in
             let*! () =
               cctxt#message
                 {|Smart rollup %a memorized as "%s"|}
@@ -2855,7 +2859,7 @@ let commands_rw () =
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["for"; "smart"; "rollup"]
-      @@ Sc_rollup_params.sc_rollup_address_param
+      @@ Smart_rollup_alias.Address.param
            ~desc:
              "The address of the smart rollup where the commitment will be \
               published."
@@ -2941,7 +2945,7 @@ let commands_rw () =
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["for"; "smart"; "rollup"]
-      @@ Sc_rollup_params.sc_rollup_address_param
+      @@ Smart_rollup_alias.Address.param
            ~desc:
              "The address of the smart rollup of which the commitment will be \
               cemented."
@@ -2992,7 +2996,7 @@ let commands_rw () =
          counter_arg
          fee_parameter_args)
       (prefixes ["timeout"; "dispute"; "on"; "smart"; "rollup"]
-      @@ Sc_rollup_params.sc_rollup_address_param
+      @@ Smart_rollup_alias.Address.param
            ~desc:
              "The address of the smart rollup where the staker of the dispute \
               has timed-out."
@@ -3100,7 +3104,7 @@ let commands_rw () =
          storage_limit_arg
          counter_arg)
       (prefixes ["execute"; "outbox"; "message"; "of"; "smart"; "rollup"]
-      @@ Sc_rollup_params.sc_rollup_address_param
+      @@ Smart_rollup_alias.Address.param
            ~desc:"The address of the smart rollup where the message resides."
       @@ prefix "from"
       @@ Client_keys.Public_key_hash.source_param
@@ -3170,7 +3174,7 @@ let commands_rw () =
            ~name:"staker"
            ~desc:"The implicit account that owns the frozen bond."
       @@ prefixes ["for"; "smart"; "rollup"]
-      @@ Sc_rollup_params.sc_rollup_address_param
+      @@ Smart_rollup_alias.Address.param
            ~desc:"The address of the smart rollup of the bond."
       @@ prefixes ["from"]
       @@ Client_keys.Public_key_hash.source_param

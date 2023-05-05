@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,4 +24,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val commands : unit -> Protocol_client_context.full Tezos_clic.command list
+val commands : unit -> Client_context.full Tezos_clic.command list

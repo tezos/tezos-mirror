@@ -213,14 +213,6 @@ val level_arg : (Script_int.n Script_int.num option, full) Tezos_clic.arg
 val now_arg : (Script_timestamp.t option, full) Tezos_clic.arg
 
 module Sc_rollup_params : sig
-  val sc_rollup_address_parameter : (Sc_rollup.t, full) Tezos_clic.parameter
-
-  val sc_rollup_address_param :
-    ?name:string ->
-    ?desc:string ->
-    ('a, full) Tezos_clic.params ->
-    (Sc_rollup.t -> 'a, full) Tezos_clic.params
-
   val rollup_kind_parameter : (Sc_rollup.Kind.t, full) Tezos_clic.parameter
 
   val boot_sector_parameter :

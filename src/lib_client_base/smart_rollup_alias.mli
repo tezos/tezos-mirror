@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,4 +24,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val commands : unit -> Protocol_client_context.full Tezos_clic.command list
+module Address : sig
+  include
+    Client_aliases.Alias
+      with type t = Tezos_crypto.Hashed.Smart_rollup_address.t
+
+  module Entity :
+    Client_aliases.Entity
+      with type t = Tezos_crypto.Hashed.Smart_rollup_address.t
+
+  (** Argument parser for rollup address literals or aliases. *)
+  val parameter : unit -> (t, #Client_context.wallet) Tezos_clic.parameter
+
+  (** Command line parameter for rollup address literals or aliases. *)
+  val param :
+    ?name:string ->
+    ?desc:string ->
+    ('a, (#Client_context.wallet as 'obj)) Tezos_clic.params ->
+    (t -> 'a, 'obj) Tezos_clic.params
+end

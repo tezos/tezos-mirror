@@ -31,7 +31,7 @@ let force_switch =
     ()
 
 let sc_rollup_address_param =
-  Client_proto_args.Sc_rollup_params.sc_rollup_address_param
+  Smart_rollup_alias.Address.param
     ~name:"smart-rollup-address"
     ~desc:"The smart rollup address"
 
@@ -40,7 +40,7 @@ let sc_rollup_address_arg =
     ~long:"rollup"
     ~placeholder:"smart-rollup-address"
     ~doc:"The smart rollup address (required when no configuration file exists)"
-    Client_proto_args.Sc_rollup_params.sc_rollup_address_parameter
+    (Smart_rollup_alias.Address.parameter ())
 
 let sc_rollup_node_operator_param =
   let open Lwt_result_syntax in
