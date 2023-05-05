@@ -4098,6 +4098,20 @@ let octez_injector =
         octez_crawler |> open_;
       ]
 
+let octez_smart_rollup_node_lib =
+  public_lib
+    "octez-smart-rollup-node"
+    ~path:"src/lib_smart_rollup_node"
+    ~synopsis:"Octez: library for Smart Rollup node"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_stdlib_unix |> open_;
+        octez_crypto |> open_;
+        octez_injector |> open_;
+      ]
+
 let octez_scoru_wasm_helpers =
   public_lib
     "tezos-scoru-wasm-helpers"
@@ -6066,6 +6080,7 @@ let hash = Protocol.hash
             aches;
             aches_lwt;
             octez_injector |> open_;
+            octez_smart_rollup_node_lib |> open_;
             octez_scoru_wasm;
             octez_scoru_wasm_fast;
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
@@ -6172,6 +6187,7 @@ let hash = Protocol.hash
             octez_client_base_unix |> open_;
             octez_client_commands |> open_;
             client |> if_some |> open_;
+            octez_smart_rollup_node_lib |> open_;
             octez_sc_rollup_node |> if_some |> open_;
           ]
     in

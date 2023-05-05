@@ -37,6 +37,7 @@
 (package (name octez-smart-rollup-client-PtMumbai))
 (package (name octez-smart-rollup-client-PtNairob))
 (package (name octez-smart-rollup-client-alpha))
+(package (name octez-smart-rollup-node))
 (package (name octez-smart-rollup-node-PtMumbai))
 (package (name octez-smart-rollup-node-PtNairob))
 (package (name octez-smart-rollup-node-alpha))

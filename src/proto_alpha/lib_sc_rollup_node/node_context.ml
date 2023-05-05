@@ -179,6 +179,99 @@ let make_kernel_logger ?log_kernel_debug_file data_dir =
   in
   Lwt_io.of_fd ~close:(fun () -> Lwt_unix.close fd) ~mode:Lwt_io.Output fd
 
+let check_fee_parameters Configuration.{fee_parameters; _} =
+  let check_value purpose name compare to_string mempool_default value =
+    if compare mempool_default value > 0 then
+      error_with
+        "Bad configuration fee_parameter.%s for %s. It must be at least %s for \
+         operations of the injector to be propagated."
+        name
+        (Configuration.string_of_purpose purpose)
+        (to_string mempool_default)
+    else Ok ()
+  in
+  let check purpose
+      {
+        Injector_sigs.minimal_fees;
+        minimal_nanotez_per_byte;
+        minimal_nanotez_per_gas_unit;
+        force_low_fee = _;
+        fee_cap = _;
+        burn_cap = _;
+      } =
+    let open Result_syntax in
+    let+ () =
+      check_value
+        purpose
+        "minimal_fees"
+        Int64.compare
+        Int64.to_string
+        (Tez.to_mutez Plugin.Mempool.default_minimal_fees)
+        minimal_fees.mutez
+    and+ () =
+      check_value
+        purpose
+        "minimal_nanotez_per_byte"
+        Q.compare
+        Q.to_string
+        Plugin.Mempool.default_minimal_nanotez_per_byte
+        minimal_nanotez_per_byte
+    and+ () =
+      check_value
+        purpose
+        "minimal_nanotez_per_gas_unit"
+        Q.compare
+        Q.to_string
+        Plugin.Mempool.default_minimal_nanotez_per_gas_unit
+        minimal_nanotez_per_gas_unit
+    in
+    ()
+  in
+  Configuration.Operator_purpose_map.iter_e check fee_parameters
+
+let protocol_max_batch_size =
+  let empty_message_op : _ Operation.t =
+    let open Protocol in
+    let open Alpha_context in
+    let open Operation in
+    {
+      shell = {branch = Block_hash.zero};
+      protocol_data =
+        {
+          signature = Some Signature.zero;
+          contents =
+            Single
+              (Manager_operation
+                 {
+                   source = Signature.Public_key_hash.zero;
+                   fee = Tez.of_mutez_exn Int64.max_int;
+                   counter = Manager_counter.Internal_for_tests.of_int max_int;
+                   gas_limit =
+                     Gas.Arith.integral_of_int_exn ((max_int - 1) / 1000);
+                   storage_limit = Z.of_int max_int;
+                   operation = Sc_rollup_add_messages {messages = [""]};
+                 });
+        };
+    }
+  in
+  Protocol.Constants_repr.max_operation_data_length
+  - Data_encoding.Binary.length
+      Operation.encoding_with_legacy_attestation_name
+      (Operation.pack empty_message_op)
+
+let check_batcher_config Configuration.{batcher = {max_batch_size; _}; _} =
+  match max_batch_size with
+  | Some m when m > protocol_max_batch_size ->
+      error_with
+        "batcher.max_batch_size must be smaller than %d"
+        protocol_max_batch_size
+  | _ -> Ok ()
+
+let check_config config =
+  let open Result_syntax in
+  let+ () = check_fee_parameters config and+ () = check_batcher_config config in
+  ()
+
 let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
     mode
     Configuration.(
@@ -195,6 +288,7 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
         _;
       } as configuration) =
   let open Lwt_result_syntax in
+  let*? () = check_config configuration in
   let* lockfile = lock ~data_dir in
   let dal_cctxt =
     Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
@@ -224,7 +318,7 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
   and* genesis_info =
     RPC.Sc_rollup.genesis_info cctxt (cctxt#chain, cctxt#block) rollup_address
   in
-  let*! () = Event.rollup_exists ~addr:configuration.sc_rollup_address ~kind in
+  let*! () = Event.rollup_exists ~addr:rollup_address ~kind in
   let*! () =
     if dal_cctxt = None && protocol_constants.parametric.dal.feature_enable then
       Event.warn_dal_enabled_no_node ()
