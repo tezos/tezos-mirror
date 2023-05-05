@@ -396,17 +396,13 @@ let is_processed {store; _} head = Store.L2_blocks.mem store.l2_blocks head
 
 let last_processed_head_opt {store; _} = Store.L2_head.read store.l2_head
 
-let mark_finalized_head {store; _} head_hash =
-  let open Lwt_result_syntax in
-  let* block = Store.L2_blocks.read store.l2_blocks head_hash in
-  match block with
-  | None -> return_unit
-  | Some (block_info, header) ->
-      let block = {block_info with header} in
-      Store.Last_finalized_head.write store.last_finalized_head block
+let mark_finalized_level {store; _} level =
+  Store.Last_finalized_level.write store.last_finalized_level level
 
-let get_finalized_head_opt {store; _} =
-  Store.Last_finalized_head.read store.last_finalized_head
+let get_finalized_level {store; _} =
+  let open Lwt_result_syntax in
+  let+ level = Store.Last_finalized_level.read store.last_finalized_level in
+  Option.value level ~default:0l
 
 let get_l2_block {store; _} block_hash =
   let open Lwt_result_syntax in
@@ -433,6 +429,15 @@ let find_l2_block_by_level node_ctxt level =
   match block_hash with
   | None -> return_none
   | Some block_hash -> find_l2_block node_ctxt block_hash
+
+let get_finalized_head_opt node_ctxt =
+  let open Lwt_result_syntax in
+  let* level =
+    Store.Last_finalized_level.read node_ctxt.store.last_finalized_level
+  in
+  match level with
+  | None -> return_none
+  | Some level -> find_l2_block_by_level node_ctxt level
 
 let head_of_block_level (hash, level) = {Layer1.hash; level}
 
@@ -464,27 +469,10 @@ let get_predecessor node_ctxt (hash, level) =
       (* [head] is not already known in the L2 chain *)
       Layer1.get_predecessor node_ctxt.l1_ctxt (hash, level)
 
-let nth_predecessor node_ctxt n block =
-  let open Lwt_result_syntax in
-  let+ res, preds =
-    Layer1.nth_predecessor
-      ~get_predecessor:(get_predecessor node_ctxt)
-      n
-      (block_level_of_head block)
-  in
-  (head_of_block_level res, List.map head_of_block_level preds)
-
 let header_of_head node_ctxt Layer1.{hash; level} =
   let open Lwt_result_syntax in
   let+ header = Layer1.fetch_tezos_shell_header node_ctxt.cctxt hash in
   {Layer1.hash; level; header}
-
-let nth_predecessor_header node_ctxt n block =
-  let open Lwt_result_syntax in
-  let* res, preds = nth_predecessor node_ctxt n (Layer1.head_of_header block) in
-  let* res = header_of_head node_ctxt res
-  and* preds = List.map_ep (header_of_head node_ctxt) preds in
-  return (res, preds)
 
 let get_tezos_reorg_for_new_head node_ctxt old_head new_head =
   let open Lwt_result_syntax in

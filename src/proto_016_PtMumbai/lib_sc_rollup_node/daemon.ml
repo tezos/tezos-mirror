@@ -220,15 +220,8 @@ module Make (PVM : Pvm.S) = struct
         (* Other manager operations *)
         return_unit
 
-  (** Process an L1 SCORU operation (for the node's rollup) which is finalized
-      for the first time. *)
-  let process_finalized_l1_operation (type kind) _node_ctxt _head ~source:_
-      (_operation : kind manager_operation)
-      (_result : kind successful_manager_operation_result) =
-    return_unit
-
-  let process_l1_operation (type kind) ~finalized node_ctxt
-      (head : Layer1.header) ~source (operation : kind manager_operation)
+  let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
+      (operation : kind manager_operation)
       (result : kind Apply_results.manager_operation_result) =
     let open Lwt_result_syntax in
     let is_for_my_rollup : type kind. kind manager_operation -> bool = function
@@ -254,19 +247,20 @@ module Make (PVM : Pvm.S) = struct
     if not (is_for_my_rollup operation) then return_unit
     else
       (* Only look at operations that are for the node's rollup *)
-      let*! () = Daemon_event.included_operation ~finalized operation result in
+      let*! () = Daemon_event.included_operation operation result in
       match result with
       | Applied success_result ->
-          let process =
-            if finalized then process_finalized_l1_operation
-            else process_included_l1_operation
-          in
-          process node_ctxt head ~source operation success_result
+          process_included_l1_operation
+            node_ctxt
+            head
+            ~source
+            operation
+            success_result
       | _ ->
           (* No action for non successful operations  *)
           return_unit
 
-  let process_l1_block_operations ~finalized node_ctxt (head : Layer1.header) =
+  let process_l1_block_operations node_ctxt (head : Layer1.header) =
     let open Lwt_result_syntax in
     let* block =
       Layer1.fetch_tezos_block node_ctxt.Node_context.cctxt head.hash
@@ -275,7 +269,7 @@ module Make (PVM : Pvm.S) = struct
         result =
       let open Lwt_result_syntax in
       let* () = accu in
-      process_l1_operation ~finalized node_ctxt head ~source operation result
+      process_l1_operation node_ctxt head ~source operation result
     in
     let apply_internal (type kind) accu ~source:_
         (_operation : kind Apply_internal_results.internal_operation)
@@ -295,31 +289,6 @@ module Make (PVM : Pvm.S) = struct
     let origination_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
     header.level < origination_level
 
-  let rec processed_finalized_block (node_ctxt : _ Node_context.t)
-      (block : Layer1.header) =
-    let open Lwt_result_syntax in
-    let* last_finalized = Node_context.get_finalized_head_opt node_ctxt in
-    let already_finalized =
-      match last_finalized with
-      | Some finalized ->
-          block.level <= Raw_level.to_int32 finalized.header.level
-      | None -> false
-    in
-    unless (already_finalized || before_origination node_ctxt block)
-    @@ fun () ->
-    let* predecessor =
-      Node_context.get_predecessor_header_opt node_ctxt block
-    in
-    let* () =
-      Option.iter_es (processed_finalized_block node_ctxt) predecessor
-    in
-    let*! () =
-      Daemon_event.head_processing block.hash block.level ~finalized:true
-    in
-    let* () = process_l1_block_operations ~finalized:true node_ctxt block in
-    let* () = Node_context.mark_finalized_head node_ctxt block.hash in
-    return_unit
-
   let previous_context (node_ctxt : _ Node_context.t)
       ~(predecessor : Layer1.header) =
     let open Lwt_result_syntax in
@@ -333,9 +302,7 @@ module Make (PVM : Pvm.S) = struct
     let open Lwt_result_syntax in
     let* already_processed = Node_context.is_processed node_ctxt head.hash in
     unless (already_processed || before_origination node_ctxt head) @@ fun () ->
-    let*! () =
-      Daemon_event.head_processing head.hash head.level ~finalized:false
-    in
+    let*! () = Daemon_event.head_processing head.hash head.level in
     let* predecessor = Node_context.get_predecessor_header_opt node_ctxt head in
     match predecessor with
     | None ->
@@ -357,7 +324,7 @@ module Make (PVM : Pvm.S) = struct
           when_ (Node_context.dal_supported node_ctxt) @@ fun () ->
           Dal_slots_tracker.process_head node_ctxt (Layer1.head_of_header head)
         in
-        let* () = process_l1_block_operations ~finalized:false node_ctxt head in
+        let* () = process_l1_block_operations node_ctxt head in
         (* Avoid storing and publishing commitments if the head is not final. *)
         (* Avoid triggering the pvm execution if this has been done before for
            this head. *)
@@ -402,23 +369,17 @@ module Make (PVM : Pvm.S) = struct
         let l2_block =
           Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
         in
-        let* finalized_block, _ =
-          Node_context.nth_predecessor_header
+        let* () =
+          Node_context.mark_finalized_level
             node_ctxt
-            node_ctxt.block_finality_time
-            head
+            Int32.(sub head.level (of_int node_ctxt.block_finality_time))
         in
-        let* () = processed_finalized_block node_ctxt finalized_block in
         let* () = Node_context.save_l2_head node_ctxt l2_block in
-        let*! () =
-          Daemon_event.new_head_processed head.hash (Raw_level.to_int32 level)
-        in
+        let*! () = Daemon_event.new_head_processed head.hash head.level in
         return_unit
 
   (* [on_layer_1_head node_ctxt head] processes a new head from the L1. It
-     also processes any missing blocks that were not processed. Every time a
-     head is processed we also process head~2 as finalized (which may recursively
-     imply the processing of head~3, etc). *)
+     also processes any missing blocks that were not processed. *)
   let on_layer_1_head node_ctxt (head : Layer1.header) =
     let open Lwt_result_syntax in
     let* old_head = Node_context.last_processed_head_opt node_ctxt in

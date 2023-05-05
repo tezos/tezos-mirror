@@ -196,12 +196,12 @@ module L2_head = Indexed_store.Make_singleton (struct
   let encoding = Sc_rollup_block.encoding
 end)
 
-module Last_finalized_head = Indexed_store.Make_singleton (struct
-  type t = Sc_rollup_block.t
+module Last_finalized_level = Indexed_store.Make_singleton (struct
+  type t = int32
 
-  let name = "finalized_head"
+  let name = "finalized_level"
 
-  let encoding = Sc_rollup_block.encoding
+  let encoding = Data_encoding.int32
 end)
 
 (** Table from L1 levels to blocks hashes. *)
@@ -384,7 +384,7 @@ type 'a store = {
   commitments : 'a Commitments.t;
   commitments_published_at_level : 'a Commitments_published_at_level.t;
   l2_head : 'a L2_head.t;
-  last_finalized_head : 'a Last_finalized_head.t;
+  last_finalized_level : 'a Last_finalized_level.t;
   levels_to_hashes : 'a Levels_to_hashes.t;
   irmin_store : 'a Irmin_store.t;
 }
@@ -403,7 +403,7 @@ let readonly
        commitments;
        commitments_published_at_level;
        l2_head;
-       last_finalized_head;
+       last_finalized_level;
        levels_to_hashes;
        irmin_store;
      } :
@@ -416,7 +416,7 @@ let readonly
     commitments_published_at_level =
       Commitments_published_at_level.readonly commitments_published_at_level;
     l2_head = L2_head.readonly l2_head;
-    last_finalized_head = Last_finalized_head.readonly last_finalized_head;
+    last_finalized_level = Last_finalized_level.readonly last_finalized_level;
     levels_to_hashes = Levels_to_hashes.readonly levels_to_hashes;
     irmin_store = Irmin_store.readonly irmin_store;
   }
@@ -429,7 +429,7 @@ let close
        commitments;
        commitments_published_at_level;
        l2_head = _;
-       last_finalized_head = _;
+       last_finalized_level = _;
        levels_to_hashes;
        irmin_store;
      } :
@@ -459,8 +459,8 @@ let load (type a) (mode : a mode) ~l2_blocks_cache_size data_dir :
       ~path:(path "commitments_published_at_level")
   in
   let* l2_head = L2_head.load mode ~path:(path "l2_head") in
-  let* last_finalized_head =
-    Last_finalized_head.load mode ~path:(path "last_finalized_head")
+  let* last_finalized_level =
+    Last_finalized_level.load mode ~path:(path "last_finalized_level")
   in
   let* levels_to_hashes =
     Levels_to_hashes.load mode ~path:(path "levels_to_hashes")
@@ -473,7 +473,7 @@ let load (type a) (mode : a mode) ~l2_blocks_cache_size data_dir :
     commitments;
     commitments_published_at_level;
     l2_head;
-    last_finalized_head;
+    last_finalized_level;
     levels_to_hashes;
     irmin_store;
   }

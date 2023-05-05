@@ -75,10 +75,8 @@ module Block_directory_helpers = struct
 
   let get_finalized node_ctxt =
     let open Lwt_result_syntax in
-    let* head = Node_context.get_finalized_head_opt node_ctxt in
-    match head with
-    | None -> failwith "No finalized head"
-    | Some {header = {block_hash; _}; _} -> return block_hash
+    let* level = Node_context.get_finalized_level node_ctxt in
+    Node_context.hash_of_level node_ctxt level
 
   let get_last_cemented (node_ctxt : _ Node_context.t) =
     protect @@ fun () ->

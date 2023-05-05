@@ -26,10 +26,9 @@
 (** This module defines functions that emit the events used by the smart
     rollup node daemon (see {!Daemon}). *)
 
-(** [head_processing hash level ~finalized] emits the event that the
-    block of the given [hash] and at the given [level] is being processed, and
-    whether it is [finalized]. *)
-val head_processing : Block_hash.t -> int32 -> finalized:bool -> unit Lwt.t
+(** [head_processing hash level] emits the event that the
+    block of the given [hash] and at the given [level] is being processed. *)
+val head_processing : Block_hash.t -> int32 -> unit Lwt.t
 
 (** [new_head_processed hash level] emits the event that the daemon has finished
     processing the head of the given [hash] and at the given [level]. *)
@@ -43,10 +42,9 @@ val processing_heads_iteration : Layer1.head list -> unit Lwt.t
     processed. *)
 val new_heads_processed : Layer1.head list -> unit Lwt.t
 
-(** [included_operation ~finalized op result] emits an event that an operation
-    for the rollup was included in a block (or finalized). *)
+(** [included_operation op result] emits an event that an operation
+    for the rollup was included in a block. *)
 val included_operation :
-  finalized:bool ->
   'kind Protocol.Alpha_context.manager_operation ->
   'kind Protocol.Apply_results.manager_operation_result ->
   unit Lwt.t

@@ -423,13 +423,8 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
   let inbox_info_of_level (node_ctxt : _ Node_context.t) inbox_level =
     let open Alpha_context in
     let open Lwt_result_syntax in
-    let+ finalized_head = Node_context.get_finalized_head_opt node_ctxt in
-    let finalized =
-      match finalized_head with
-      | None -> false
-      | Some {header = {level = finalized_level; _}; _} ->
-          Compare.Int32.(inbox_level <= Raw_level.to_int32 finalized_level)
-    in
+    let+ finalized_level = Node_context.get_finalized_level node_ctxt in
+    let finalized = Compare.Int32.(inbox_level <= finalized_level) in
     let lcc = Reference.get node_ctxt.lcc in
     let cemented =
       Compare.Int32.(inbox_level <= Raw_level.to_int32 lcc.level)

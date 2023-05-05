@@ -29,16 +29,13 @@ module Simple = struct
   let section = [Protocol.name; "sc_rollup_node"; "daemon"]
 
   let head_processing =
-    declare_3
+    declare_2
       ~section
       ~name:"sc_rollup_daemon_process_head"
-      ~msg:"Processing {finalized} head {hash} at level {level}"
+      ~msg:"Processing head {hash} at level {level}"
       ~level:Notice
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
-      ("finalized", Data_encoding.bool)
-      ~pp3:(fun fmt finalized ->
-        Format.pp_print_string fmt @@ if finalized then "finalized" else "new")
 
   let new_head_processed =
     declare_2
@@ -103,15 +100,6 @@ module Simple = struct
           | None -> Format.pp_print_string ppf "none"
           | Some e -> Environment.Error_monad.pp_trace ppf e)
 
-  let finalized_successful_operation =
-    declare_1
-      ~section
-      ~name:"sc_rollup_daemon_finalized_successful_operation"
-      ~msg:"Operation {operation} was finalized"
-      ~level:Debug
-      ("operation", L1_operation.encoding)
-      ~pp1:L1_operation.pp
-
   let error =
     declare_1
       ~section
@@ -132,8 +120,7 @@ module Simple = struct
       ()
 end
 
-let head_processing hash level ~finalized =
-  Simple.(emit head_processing (hash, level, finalized))
+let head_processing hash level = Simple.(emit head_processing (hash, level))
 
 let new_head_processed hash level =
   Simple.(emit new_head_processed (hash, level))
@@ -155,18 +142,13 @@ let processing_heads_iteration =
 
 let new_heads_processed = new_heads_iteration Simple.new_heads_processed
 
-let included_operation (type kind) ~finalized
+let included_operation (type kind)
     (operation : kind Protocol.Alpha_context.manager_operation)
     (result : kind Protocol.Apply_results.manager_operation_result) =
   match L1_operation.of_manager_operation operation with
   | None -> Lwt.return_unit
   | Some operation -> (
       match result with
-      | Applied _ when finalized ->
-          Simple.(emit finalized_successful_operation) operation
-      | _ when finalized ->
-          (* No events for finalized non successful operations  *)
-          Lwt.return_unit
       | Applied _ -> Simple.(emit included_successful_operation) operation
       | result ->
           let status, errors =
