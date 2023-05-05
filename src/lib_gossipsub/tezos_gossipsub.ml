@@ -123,7 +123,7 @@ module Make (C : AUTOMATON_CONFIG) :
       }
         -> [`IWant] output
     | Peer_filtered : [`Graft] output
-    | Unknown_topic : [`Graft] output
+    | Unsubscribed_topic : [`Graft] output
     | Peer_already_in_mesh : [`Graft] output
     | Grafting_direct_peer : [`Graft] output
     | Unexpected_grafting_peer : [`Graft] output
@@ -806,16 +806,23 @@ module Make (C : AUTOMATON_CONFIG) :
    fun {peer; message_ids} -> IWant.handle peer message_ids
 
   module Graft = struct
-    let check_filter peer =
+    let check_filter peer topic =
       let open Monad.Syntax in
       let*! peer_filter in
-      fail_if_not (peer_filter peer `Graft) Peer_filtered
+      if peer_filter peer `Graft then pass ()
+      else
+        let*! prune_backoff in
+        let* () = set_backoff_for_peer prune_backoff topic peer in
+        Peer_filtered |> fail
 
-    let check_topic_known topic =
+    let check_subscribed peer topic =
       let open Monad.Syntax in
       let*! mesh_opt = find_mesh topic in
       match mesh_opt with
-      | None -> Unknown_topic |> fail
+      | None ->
+          let*! prune_backoff in
+          let* () = set_backoff_for_peer prune_backoff topic peer in
+          Unsubscribed_topic |> fail
       | Some mesh -> pass mesh
 
     let check_not_in_mesh mesh peer =
@@ -828,28 +835,34 @@ module Make (C : AUTOMATON_CONFIG) :
       | None -> Unexpected_grafting_peer |> fail
       | Some connection -> pass connection
 
-    let check_not_direct connection =
+    let check_not_direct connection peer topic =
       let open Monad.Syntax in
-      if connection.direct then Grafting_direct_peer |> fail else pass ()
+      if connection.direct then
+        let*! prune_backoff in
+        let* () = set_backoff_for_peer prune_backoff topic peer in
+        Grafting_direct_peer |> fail
+      else pass ()
 
     let check_score peer topic score =
       let open Monad.Syntax in
-      let*! prune_backoff in
       if Score.(value score >= zero) then unit
       else
+        let*! prune_backoff in
         let* () = set_backoff_for_peer prune_backoff topic peer in
         Grafting_peer_with_negative_score |> fail
 
-    let check_mesh_size mesh connection =
+    let check_mesh_size mesh connection peer topic =
       let open Monad.Syntax in
       let*! degree_high in
       (* Check the number of mesh peers; if it is at (or over) [degree_high], we
          only accept grafts from peers with outbound connections; this is a
          defensive check to restrict potential mesh takeover attacks combined
          with love bombing *)
-      fail_if
-        ((not connection.outbound) && Peer.Set.cardinal mesh >= degree_high)
-        Mesh_full
+      if (not connection.outbound) && Peer.Set.cardinal mesh >= degree_high then
+        let*! prune_backoff in
+        let* () = set_backoff_for_peer prune_backoff topic peer in
+        Mesh_full |> fail
+      else pass ()
 
     let check_backoff peer topic score =
       let open Monad.Syntax in
@@ -872,20 +885,22 @@ module Make (C : AUTOMATON_CONFIG) :
             let* () = add_score peer score in
             fail Peer_backed_off
 
+    (* NOTE: It is the worker who builds the Prune message in (some of the)
+       cases of failed/rejected graft requests. The cases should be the same as
+       those for which we set a backoff, which is done here; be sure the two
+       modules match! *)
     let handle peer topic =
-      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5264
-         Be sure that the peers that requested failed/rejected graft are properly pruned. *)
       let open Monad.Syntax in
-      let*? () = check_filter peer in
-      let*? mesh = check_topic_known topic in
+      let*? () = check_filter peer topic in
+      let*? mesh = check_subscribed peer topic in
       let*? () = check_not_in_mesh mesh peer in
       let*? connection = check_active peer in
-      let*? () = check_not_direct connection in
+      let*? () = check_not_direct connection peer topic in
       let*! score_opt = get_score peer in
       (* Global invariant: peer in mesh implies that score exists *)
       let*? () = with_score score_opt @@ check_backoff peer topic in
       let*? () = with_score score_opt @@ check_score peer topic in
-      let*? () = check_mesh_size mesh connection in
+      let*? () = check_mesh_size mesh connection peer topic in
       let* () = update_score peer (fun s -> Score.graft s topic) in
       let* () = set_mesh_topic topic (Peer.Set.add peer mesh) in
       (* Call [handle_subscribe] to ensure the invariant where all grafted peers subscribed. *)
@@ -1941,7 +1956,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let open Format in
     fprintf
       fmtr
-      "{ peer=%a; topic=%a; px=%a; backoff=%a }"
+      "{ peer=%a; topic=%a; px=[%a]; backoff=%a }"
       Peer.pp
       peer
       Topic.pp
@@ -2059,7 +2074,7 @@ module Make (C : AUTOMATON_CONFIG) :
           (pp_message_id_map pp_elt)
           routed_message_ids
     | Peer_filtered -> fprintf fmtr "Peer_filtered"
-    | Unknown_topic -> fprintf fmtr "Unknown_topic"
+    | Unsubscribed_topic -> fprintf fmtr "Unsubscribed_topic"
     | Peer_already_in_mesh -> fprintf fmtr "Peer_already_in_mesh"
     | Grafting_direct_peer -> fprintf fmtr "Grafting_direct_peer"
     | Unexpected_grafting_peer -> fprintf fmtr "Unexpected_grafting_peer"

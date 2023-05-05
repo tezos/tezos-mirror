@@ -534,7 +534,7 @@ module type AUTOMATON = sig
     | Peer_filtered : [`Graft] output
         (** The peer we attempt to graft has not been selected by
             [peer_filter]. *)
-    | Unknown_topic : [`Graft] output
+    | Unsubscribed_topic : [`Graft] output
         (** We didn't join the topic for which we are attempting to graft a
             peer. *)
     | Peer_already_in_mesh : [`Graft] output
@@ -559,12 +559,8 @@ module type AUTOMATON = sig
             alternative peers are returned because the peer's score is too low.
             The score of the peer is included in the return value. *)
     | No_PX : [`Prune] output
-        (** The given peer has been pruned for the given topic. But the given
-            set of peers alternatives in {!prune} is empty. *)
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5251
-
-       Some fixes might be needed for the prune case. Once done, update the
-       docstring. *)
+        (** The given peer has been pruned for the given topic. No
+            alternatives peers was provided in {!prune}. *)
     | PX : Peer.Set.t -> [`Prune] output
         (** The given peer has been pruned for the given topic. The given set of
             peers alternatives in {!prune} for that topic is returned. *)
@@ -583,7 +579,7 @@ module type AUTOMATON = sig
         (** Received a message that has already been recevied before. *)
     | Not_subscribed : [`Receive_message] output
         (** Received a message from a remote peer for a topic we are not
-            subscribed to. *)
+            subscribed to (called "unknown topic" in the Go implementation). *)
     | Invalid_message : [`Receive_message] output
     | Unknown_validity : [`Receive_message] output
         (** Attempting to publish a message that is invalid. *)
@@ -908,7 +904,7 @@ module type WORKER = sig
       receive from or sent to the P2P layer. *)
   type p2p_message =
     | Graft of {topic : GS.Topic.t}
-    | Prune of {topic : GS.Topic.t; px : GS.Peer.t Seq.t}
+    | Prune of {topic : GS.Topic.t; px : GS.Peer.t Seq.t; backoff : GS.Span.t}
     | IHave of {topic : GS.Topic.t; message_ids : GS.Message_id.t list}
     | IWant of {message_ids : GS.Message_id.t list}
     | Subscribe of {topic : GS.Topic.t}

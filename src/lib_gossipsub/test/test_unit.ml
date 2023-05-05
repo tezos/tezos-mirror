@@ -200,8 +200,12 @@ let test_ignore_graft_from_unknown_topic rng limits parameters =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5079
      Use Tezt.Check to assert output *)
   match output with
-  | Unknown_topic -> unit
-  | _ -> Tezt.Test.fail "Expected output [Unknown_topic]"
+  | Unsubscribed_topic -> unit
+  | _ ->
+      Tezt.Test.fail
+        "Expected output [Unsubscribed_topic]; got [%a]"
+        GS.pp_output
+        output
 
 (** Test that:
     - Subscribing a known peer to a topic adds the topic to their subscriptions.
@@ -708,7 +712,7 @@ let test_handle_graft_for_not_joined_topic rng limits parameters =
   in
   (* Check that the graft did not take effect. *)
   assert_mesh_inclusion ~__LOC__ ~peer:new_peer ~topic state ~is_included:false ;
-  assert_output ~__LOC__ output Unknown_topic ;
+  assert_output ~__LOC__ output Unsubscribed_topic ;
   unit
 
 (** Tests sending a graft without subscribing to the topic results in susbcribing to the topic. *)
