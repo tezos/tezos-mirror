@@ -71,10 +71,19 @@ module Make (Simulation : Simulation.S) : S = struct
 
   type status = Pending_batch | Batched of Injector.Inj_operation.hash
 
+  (* Same as {!Configuration.batcher} with max_batch_size non optional. *)
+  type conf = {
+    simulate : bool;
+    min_batch_elements : int;
+    min_batch_size : int;
+    max_batch_elements : int;
+    max_batch_size : int;
+  }
+
   type state = {
     node_ctxt : Node_context.ro;
     signer : Tezos_crypto.Signature.public_key_hash;
-    conf : Configuration.batcher;
+    conf : conf;
     messages : Message_queue.t;
     batched : Batched_messages.t;
     mutable simulation_ctxt : Simulation.t option;
@@ -249,8 +258,20 @@ module Make (Simulation : Simulation.S) : S = struct
     (* Forget failing messages *)
     List.iter (Message_queue.remove state.messages) failing
 
-  let init_batcher_state node_ctxt ~signer conf =
+  let init_batcher_state node_ctxt ~signer (conf : Configuration.batcher) =
     let open Lwt_syntax in
+    let conf =
+      {
+        simulate = conf.simulate;
+        min_batch_elements = conf.min_batch_elements;
+        min_batch_size = conf.min_batch_size;
+        max_batch_elements = conf.max_batch_elements;
+        max_batch_size =
+          Option.value
+            conf.max_batch_size
+            ~default:Node_context.protocol_max_batch_size;
+      }
+    in
     return
       {
         node_ctxt;

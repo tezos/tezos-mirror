@@ -279,15 +279,24 @@ let make_operators sc_rollup_node_operators =
   in
   make_purpose_map purposed_operators ~default:default_operator
 
+let convert_address sc_rollup_address =
+  sc_rollup_address
+  |> Data_encoding.Binary.to_bytes_exn
+       Protocol.Alpha_context.Sc_rollup.Address.encoding
+  |> Data_encoding.Binary.of_bytes_exn
+       Tezos_crypto.Hashed.Smart_rollup_address.encoding
+
 let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
     ~reconnection_delay ~dal_node_endpoint ~injector_attempts
     ~injector_retention_period ~injection_ttl ~mode ~sc_rollup_address
     ~sc_rollup_node_operators ~log_kernel_debug =
   let open Configuration in
   let sc_rollup_node_operators = make_operators sc_rollup_node_operators in
+  let sc_rollup_address = convert_address sc_rollup_address in
   let config =
     {
       sc_rollup_address;
+      boot_sector_file = None;
       sc_rollup_node_operators;
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default_rpc_port rpc_port;
@@ -329,6 +338,7 @@ let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
       new_sc_rollup_node_operators
       configuration.sc_rollup_node_operators
   in
+  let sc_rollup_address = Option.map convert_address sc_rollup_address in
   let configuration =
     Configuration.
       {

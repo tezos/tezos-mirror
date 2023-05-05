@@ -43,7 +43,7 @@ module Operator_purpose_map : Map.S with type key = purpose
 
 type operators = Tezos_crypto.Signature.Public_key_hash.t Operator_purpose_map.t
 
-type fee_parameters = Injection.fee_parameter Operator_purpose_map.t
+type fee_parameters = Injector_sigs.fee_parameter Operator_purpose_map.t
 
 (** Configuration for the batcher.
 
@@ -54,7 +54,7 @@ type fee_parameters = Injection.fee_parameter Operator_purpose_map.t
 type batcher = {
   simulate : bool;
       (** If [true], the batcher will simulate the messages it receives, in an
-      incremental context, before queuing them. *)
+          incremental context, before queuing them. *)
   min_batch_elements : int;
       (** The minimum number elements in a batch for it to be produced when the
           batcher receives new messages. *)
@@ -63,7 +63,7 @@ type batcher = {
           batcher receives new messages. *)
   max_batch_elements : int;
       (** The maximum number of elements that we can put in a batch. *)
-  max_batch_size : int;  (** The maximum size in bytes of a batch. *)
+  max_batch_size : int option;  (** The maximum size in bytes of a batch. *)
 }
 
 type injector = {
@@ -78,7 +78,7 @@ type injector = {
 }
 
 type t = {
-  sc_rollup_address : Protocol.Alpha_context.Sc_rollup.t;
+  sc_rollup_address : Sc_rollup_address.t;
   sc_rollup_node_operators : operators;
   rpc_addr : string;
   rpc_port : int;
@@ -138,7 +138,8 @@ val default_reconnection_delay : float
 (** [default_fee_parameter ?purpose ()] is the default fee parameter to inject
     operation on L1. If [purpose] is provided, it returns the default fee
     parameter for the specific purpose. *)
-val default_fee_parameter : ?purpose:purpose -> unit -> Injection.fee_parameter
+val default_fee_parameter :
+  ?purpose:purpose -> unit -> Injector_sigs.fee_parameter
 
 (** [default_fee_parameters] is the default fee parameters configuration build
     with {!default_fee_parameter} for all purposes. *)
