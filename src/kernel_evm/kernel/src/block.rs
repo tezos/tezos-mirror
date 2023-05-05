@@ -5,10 +5,12 @@
 use crate::blueprint::Queue;
 use crate::error::Error;
 use crate::error::StorageError::AccountInitialisation;
-use crate::error::TransferError::CumulativeGasUsedOverflow;
-use crate::error::TransferError::InvalidCallerAddress;
+use crate::error::TransferError::{
+    CumulativeGasUsedOverflow, InvalidCallerAddress, InvalidNonce,
+};
 use crate::storage;
 use evm_execution::account_storage::init_account_storage;
+use evm_execution::account_storage::EthereumAccountStorage;
 use evm_execution::handler::ExecutionOutcome;
 use evm_execution::{precompiles, run_transaction};
 
@@ -110,6 +112,34 @@ fn make_receipts(
         .collect()
 }
 
+fn check_nonce<Host: Runtime>(
+    host: &mut Host,
+    tx_nonce: U256,
+    caller: EthereumAddress,
+    evm_account_storage: &mut EthereumAccountStorage,
+) -> Result<(), Error> {
+    let caller_account_path =
+        evm_execution::account_storage::account_path(&caller.into())
+            .map_err(|_| Error::Storage(AccountInitialisation))?;
+    let caller_account = evm_account_storage
+        .get_account(host, &caller_account_path)
+        .map_err(|_| Error::Storage(AccountInitialisation))?;
+    let caller_nonce = match caller_account {
+        Some(account) => account
+            .nonce(host)
+            .map_err(|_| Error::Storage(AccountInitialisation))?,
+        None => U256::zero(),
+    };
+    if tx_nonce != caller_nonce {
+        Err(Error::Transfer(InvalidNonce {
+            expected: tx_nonce,
+            actual: caller_nonce,
+        }))
+    } else {
+        Ok(())
+    }
+}
+
 pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error> {
     let mut current_block = storage::read_current_block(host)?;
     let mut evm_account_storage =
@@ -126,6 +156,7 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
                 .tx
                 .caller()
                 .map_err(|_| Error::Transfer(InvalidCallerAddress))?;
+            check_nonce(host, transaction.tx.nonce, caller, &mut evm_account_storage)?;
             let receipt_info = match run_transaction(
                 host,
                 &current_block.constants(),

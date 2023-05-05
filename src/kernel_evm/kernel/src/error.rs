@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 use core::str::Utf8Error;
+use primitive_types::U256;
 use tezos_smart_rollup_host::path::{OwnedPath, PathError};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 
@@ -9,7 +10,7 @@ use tezos_smart_rollup_host::runtime::RuntimeError;
 pub enum TransferError {
     InvalidCallerAddress,
     InvalidSignature,
-    InvalidNonce,
+    InvalidNonce { expected: U256, actual: U256 },
     NotEnoughBalance,
     CumulativeGasUsedOverflow,
     InvalidAddressFormat(Utf8Error),
