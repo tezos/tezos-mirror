@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
-
 type mode = Observer | Accuser | Batcher | Maintenance | Operator | Custom
 
 type purpose = Publish | Add_messages | Cement | Timeout | Refute
@@ -40,20 +38,20 @@ end)
 
 type operators = Signature.Public_key_hash.t Operator_purpose_map.t
 
-type fee_parameters = Injection.fee_parameter Operator_purpose_map.t
+type fee_parameters = Injector_sigs.fee_parameter Operator_purpose_map.t
 
 type batcher = {
   simulate : bool;
   min_batch_elements : int;
   min_batch_size : int;
   max_batch_elements : int;
-  max_batch_size : int;
+  max_batch_size : int option;
 }
 
 type injector = {retention_period : int; attempts : int; injection_ttl : int}
 
 type t = {
-  sc_rollup_address : Sc_rollup.t;
+  sc_rollup_address : Sc_rollup_address.t;
   sc_rollup_node_operators : operators;
   rpc_addr : string;
   rpc_port : int;
@@ -90,20 +88,23 @@ let default_metrics_port = 9933
 
 let default_reconnection_delay = 2.0 (* seconds *)
 
-let tez t = Tez.of_mutez_exn Int64.(mul (of_int t) 1_000_000L)
+let mutez mutez = {Injector_sigs.mutez}
 
-let default_minimal_fees = Mempool.default_minimal_fees
+let tez t = mutez Int64.(mul (of_int t) 1_000_000L)
 
-let default_minimal_nanotez_per_gas_unit =
-  Mempool.default_minimal_nanotez_per_gas_unit
+(* Copied from src/proto_017_PtNairob/lib_plugin/mempool.ml *)
 
-let default_minimal_nanotez_per_byte = Mempool.default_minimal_nanotez_per_byte
+let default_minimal_fees = mutez 100L
+
+let default_minimal_nanotez_per_gas_unit = Q.of_int 100
+
+let default_minimal_nanotez_per_byte = Q.of_int 1000
 
 let default_force_low_fee = false
 
 let default_fee_cap = tez 1
 
-let default_burn_cap = Tez.zero
+let default_burn_cap = mutez 0L
 
 (* The below default fee and burn limits are computed by taking into account
    the worst fee found in the tests for the rollup node.
@@ -155,7 +156,7 @@ let default_fee_parameter ?purpose () =
     | Some purpose -> (default_fee purpose, default_burn purpose)
   in
   {
-    Injection.minimal_fees = default_minimal_fees;
+    Injector_sigs.minimal_fees = default_minimal_fees;
     minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
     minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
     force_low_fee = default_force_low_fee;
@@ -178,45 +179,13 @@ let default_batcher_min_batch_size = 10
 
 let default_batcher_max_batch_elements = max_int
 
-let protocol_max_batch_size =
-  let empty_message_op : _ Operation.t =
-    let open Protocol in
-    let open Alpha_context in
-    let open Operation in
-    {
-      shell = {branch = Block_hash.zero};
-      protocol_data =
-        {
-          signature = Some Signature.zero;
-          contents =
-            Single
-              (Manager_operation
-                 {
-                   source = Signature.Public_key_hash.zero;
-                   fee = Tez.of_mutez_exn Int64.max_int;
-                   counter = Manager_counter.Internal_for_tests.of_int max_int;
-                   gas_limit =
-                     Gas.Arith.integral_of_int_exn ((max_int - 1) / 1000);
-                   storage_limit = Z.of_int max_int;
-                   operation = Sc_rollup_add_messages {messages = [""]};
-                 });
-        };
-    }
-  in
-  Protocol.Constants_repr.max_operation_data_length
-  - Data_encoding.Binary.length
-      Operation.encoding
-      (Operation.pack empty_message_op)
-
-let default_batcher_max_batch_size = protocol_max_batch_size
-
 let default_batcher =
   {
     simulate = default_batcher_simulate;
     min_batch_elements = default_batcher_min_batch_elements;
     min_batch_size = default_batcher_min_batch_size;
     max_batch_elements = default_batcher_max_batch_elements;
-    max_batch_size = default_batcher_max_batch_size;
+    max_batch_size = None;
   }
 
 let default_injector =
@@ -326,7 +295,7 @@ let fee_parameter_encoding purpose =
   let open Data_encoding in
   conv
     (fun {
-           Injection.minimal_fees;
+           Injector_sigs.minimal_fees;
            minimal_nanotez_per_byte;
            minimal_nanotez_per_gas_unit;
            force_low_fee;
@@ -357,17 +326,17 @@ let fee_parameter_encoding purpose =
        (dft
           "minimal-fees"
           ~description:"Exclude operations with lower fees"
-          Tez.encoding
+          tez_encoding
           default_minimal_fees)
        (dft
           "minimal-nanotez-per-byte"
           ~description:"Exclude operations with lower fees per byte"
-          Plugin.Mempool.nanotez_enc
+          nanotez_encoding
           default_minimal_nanotez_per_byte)
        (dft
           "minimal-nanotez-per-gas-unit"
           ~description:"Exclude operations with lower gas fees"
-          Plugin.Mempool.nanotez_enc
+          nanotez_encoding
           default_minimal_nanotez_per_gas_unit)
        (dft
           "force-low-fee"
@@ -378,12 +347,12 @@ let fee_parameter_encoding purpose =
        (dft
           "fee-cap"
           ~description:"The fee cap"
-          Tez.encoding
+          tez_encoding
           (default_fee purpose))
        (dft
           "burn-cap"
           ~description:"The burn cap"
-          Tez.encoding
+          tez_encoding
           (default_burn purpose)))
 
 let fee_parameters_encoding =
@@ -451,33 +420,38 @@ let batcher_encoding =
            min_batch_size,
            max_batch_elements,
            max_batch_size ) ->
-      if max_batch_size > protocol_max_batch_size then
-        Error
-          (Format.sprintf
-             "max_batch_size must be smaller than %d"
-             protocol_max_batch_size)
-      else if min_batch_size <= 0 then Error "min_batch_size must be positive"
-      else if max_batch_size < min_batch_size then
-        Error "max_batch_size must be greater than min_batch_size"
-      else if min_batch_elements <= 0 then
-        Error "min_batch_elements must be positive"
-      else if max_batch_elements < min_batch_elements then
-        Error "max_batch_elements must be greater than min_batch_elements"
-      else
-        Ok
-          {
-            simulate;
-            min_batch_elements;
-            min_batch_size;
-            max_batch_elements;
-            max_batch_size;
-          })
+      let open Result_syntax in
+      let error_when c s = if c then Error s else return_unit in
+      let* () =
+        error_when (min_batch_size <= 0) "min_batch_size must be positive"
+      in
+      let* () =
+        match max_batch_size with
+        | Some m when m < min_batch_size ->
+            Error "max_batch_size must be greater than min_batch_size"
+        | _ -> return_unit
+      in
+      let* () =
+        error_when (min_batch_elements <= 0) "min_batch_size must be positive"
+      in
+      let+ () =
+        error_when
+          (max_batch_elements < min_batch_elements)
+          "max_batch_elements must be greater than min_batch_elements"
+      in
+      {
+        simulate;
+        min_batch_elements;
+        min_batch_size;
+        max_batch_elements;
+        max_batch_size;
+      })
   @@ obj5
        (dft "simulate" bool default_batcher_simulate)
        (dft "min_batch_elements" int31 default_batcher_min_batch_elements)
        (dft "min_batch_size" int31 default_batcher_min_batch_size)
        (dft "max_batch_elements" int31 default_batcher_max_batch_elements)
-       (dft "max_batch_size" int31 default_batcher_max_batch_size)
+       (opt "max_batch_size" int31)
 
 let injector_encoding : injector Data_encoding.t =
   let open Data_encoding in
@@ -566,7 +540,7 @@ let encoding : t Data_encoding.t =
           (req
              "smart-rollup-address"
              ~description:"Smart rollup address"
-             Protocol.Alpha_context.Sc_rollup.Address.encoding)
+             Sc_rollup_address.encoding)
           (req
              "smart-rollup-node-operator"
              ~description:
