@@ -8,9 +8,13 @@
  (libraries
   tezos-base
   tezos-crypto-dal
-  tezos-gossipsub)
+  tezos-gossipsub
+  tezos-p2p-services
+  tezos-crypto)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_crypto_dal
-  -open Tezos_gossipsub))
+  -open Tezos_gossipsub
+  -open Tezos_p2p_services
+  -open Tezos_crypto))

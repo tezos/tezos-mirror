@@ -3993,6 +3993,9 @@ let octez_dal_node_gossipsub_lib =
         octez_base |> open_ ~m:"TzPervasives";
         octez_crypto_dal |> open_;
         octez_gossipsub |> open_;
+        octez_p2p |> open_;
+        octez_p2p_services |> open_;
+        octez_crypto |> open_;
       ]
 
 let octez_dac_lib =
