@@ -300,4 +300,14 @@ module Worker :
   end
 end
 
-(* Most of these limits are the default ones used by the Go implementation. *)
+let span_encoding : Span.t Data_encoding.t =
+  let open Data_encoding in
+  (* We limit the size of a {!Span.t} value to 2 bytes. It is sufficient for the
+     spans sent via the network by Gossipsub, while avoiding overflows when
+     adding them to values of type {!Time.t}. *)
+  let span_size = 2 in
+  check_size span_size
+  @@ conv
+       (fun span -> Span.to_int_s span)
+       (fun span -> Span.of_int_s span)
+       (obj1 (req "span" int16))
