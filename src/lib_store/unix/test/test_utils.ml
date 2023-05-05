@@ -181,6 +181,8 @@ let dummy_patch_context ctxt =
   let*? {context; _} = Environment.wrap_tzresult res in
   return context
 
+(* Registers a context prunning callback. See
+   `lib_context/sigs/context.ml` for further details. *)
 let register_gc store =
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
@@ -195,6 +197,19 @@ let register_gc store =
     return_unit
   in
   Store.Chain.register_gc_callback chain_store (Some gc)
+
+(* Registers a context split callback. See
+   `lib_context/sigs/context.ml` for further details. *)
+let register_split store =
+  let open Lwt_result_syntax in
+  let chain_store = Store.main_chain_store store in
+  let split =
+    Some
+      (fun () ->
+        let*! () = Context_ops.split (Store.context_index store) in
+        return_unit)
+  in
+  Store.Chain.register_split_callback chain_store split
 
 let wrap_store_init ?(patch_context = dummy_patch_context)
     ?(history_mode = History_mode.Archive) ?(allow_testchains = true)
@@ -225,7 +240,9 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
             ~allow_testchains
             genesis
         in
-        if with_gc then register_gc store ;
+        if with_gc then (
+          register_gc store ;
+          register_split store) ;
         protect
           ~on_error:(fun err ->
             let*! pp_store = Store.make_pp_store store in
@@ -308,7 +325,9 @@ let wrap_simple_store_init ?(patch_context = dummy_patch_context)
             ~allow_testchains
             genesis
         in
-        if with_gc then register_gc store ;
+        if with_gc then (
+          register_gc store ;
+          register_split store) ;
         protect
           ~on_error:(fun err ->
             let*! () = Store.close_store store in
