@@ -565,6 +565,7 @@ module Test_remove_peer = struct
           heartbeat_interval;
           backoff_cleanup_ticks;
           score_cleanup_ticks;
+          prune_backoff = Basic_fragments.prune_backoff;
         }
       in
       let state = GS.make rng limits parameters in

@@ -201,7 +201,11 @@ let test_ignore_graft_from_unknown_topic rng limits parameters =
      Use Tezt.Check to assert output *)
   match output with
   | Unsubscribed_topic -> unit
-  | _ -> Tezt.Test.fail "Expected output [Unsubscribed_topic]"
+  | _ ->
+      Tezt.Test.fail
+        "Expected output [Unsubscribed_topic]; got [%a]"
+        GS.pp_output
+        output
 
 (** Test that:
     - Subscribing a known peer to a topic adds the topic to their subscriptions.
