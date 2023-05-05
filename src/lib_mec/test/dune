@@ -1,8 +1,27 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names
+(library
+ (name src_lib_mec_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  octez-alcotezt
+  octez-mec)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Octez_alcotezt
+  -open Mec)
+ (modules
+  ark_poseidon128
+  ark_pobls
+  mds_pobls
+  mds_poseidon128
+  poseidon128_linear_trick_expected_output
+  test_vector_pedersen_hash
   test_neptunus
   test_orchard
   test_pedersen_hash
@@ -51,255 +70,22 @@
   test_marvellous
   test_redjubjub
   test_find_group_hash
-  test_iterator)
+  test_iterator))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  alcotest
-  octez-mec)
- (flags
-  (:standard)
-  -open Mec))
+  src_lib_mec_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package octez-mec)
- (action (run %{dep:./test_neptunus.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_orchard.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_pedersen_hash.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_poseidon128.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_poseidon252.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_sinsemilla.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_babyjubjub.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_babyjubjub_reduced.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_bandersnatch_affine_montgomery.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_bandersnatch_affine_weierstrass.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_bandersnatch_affine_edwards.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_bls12_381_affine.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_bls12_381_projective.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_bn254_affine.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_bn254_jacobian.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_bn254_projective.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_curve25519_affine_edwards.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_curve25519_conversions_between_forms.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_curve25519_montgomery.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_curve448.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_ec_functor.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_iso_pallas_affine.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_jubjub.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_jubjub_conversions_between_forms.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_jubjub_weierstrass.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_pallas_affine.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_pallas_jacobian.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_pallas_projective.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_secp256k1_affine.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_secp256k1_jacobian.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_secp256k1_projective.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_secp256r1_affine.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_secp256r1_jacobian.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_secp256r1_projective.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_tweedledee_affine.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_tweedledee_jacobian.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_tweedledee_projective.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_tweedledum_affine.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_tweedledum_jacobian.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_tweedledum_projective.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_vesta_affine.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_vesta_jacobian.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_vesta_projective.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_digestif.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_linear_trick.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_marvellous.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_redjubjub.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_find_group_hash.exe})))
-
-(rule
- (alias runtest)
- (package octez-mec)
- (action (run %{dep:./test_iterator.exe})))
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

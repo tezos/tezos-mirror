@@ -1029,8 +1029,14 @@ let octez_mec =
     ~deps:[alcotest; bls12_381; bigarray_compat; eqaf]
 
 let _octez_mec_tests =
-  tests
+  tezt
     [
+      "ark_poseidon128";
+      "ark_pobls";
+      "mds_pobls";
+      "mds_poseidon128";
+      "poseidon128_linear_trick_expected_output";
+      "test_vector_pedersen_hash";
       "test_neptunus";
       "test_orchard";
       "test_pedersen_hash";
@@ -1085,7 +1091,7 @@ let _octez_mec_tests =
     ]
     ~path:"src/lib_mec/test"
     ~opam:"octez-mec"
-    ~deps:[alcotest; octez_mec |> open_]
+    ~deps:[alcotezt; octez_mec |> open_]
 
 let octez_polynomial =
   public_lib
