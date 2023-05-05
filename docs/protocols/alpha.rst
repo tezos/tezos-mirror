@@ -87,8 +87,9 @@ Internal
 - Refactor declarations of ``make_empty_context`` and ``make_empty_tree`` for easier use.
   (MR :gl:`!8550`)
 
-- Move notion of Smart rollup address in the shell to make it common to all protocols,
-  and expose it in the environment. (MR :gl:`!8562`)
+- Move notions of Smart rollup address and various smart rollup hashes types to
+  the shell to make them common to all protocols though the environment. (MR
+  :gl:`!8562`, MR :gl:`!8625`)
 
 - Refactoring : stake splitted between a frozen part and a delegated part. (MR :gl:`!8051`)
 
