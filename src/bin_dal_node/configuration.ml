@@ -50,8 +50,9 @@ let default_rpc_addr = "127.0.0.1"
 let default_rpc_port = 10732
 
 let default_listen_addr =
-  let default_net_host = "[::]" in
-  let default_net_port = 11732 in
+  let open Gossipsub.Transport_layer.Default_parameters.P2p_config in
+  let default_net_host = P2p_addr.to_string listening_addr in
+  let default_net_port = listening_port in
   P2p_point.Id.of_string_exn ~default_port:default_net_port default_net_host
 
 let default_neighbors = []
@@ -60,7 +61,8 @@ let default_peers = []
 
 let default_use_unsafe_srs = false
 
-let default_expected_pow = 26.
+let default_expected_pow =
+  Gossipsub.Transport_layer.Default_parameters.P2p_config.expected_pow
 
 let default_network_name = "dal-sandbox"
 
