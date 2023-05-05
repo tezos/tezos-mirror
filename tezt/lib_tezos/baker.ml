@@ -47,6 +47,7 @@ module Parameters = struct
     votefile : string option;
     liquidity_baking_toggle_vote : liquidity_baking_vote option;
     force_apply : bool;
+    remote_mode : bool;
     operations_pool : string option;
     dal_node : Dal_node.t option;
   }
@@ -92,7 +93,7 @@ let liquidity_baking_votefile ?path vote =
 
 let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = [])
     ?votefile ?(liquidity_baking_toggle_vote = Some Pass) ?(force_apply = false)
-    ?operations_pool ?dal_node node client =
+    ?(remote_mode = false) ?operations_pool ?dal_node node client =
   let baker =
     create
       ~path:(Protocol.baker protocol)
@@ -109,6 +110,7 @@ let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = [])
         pending_ready = [];
         votefile;
         liquidity_baking_toggle_vote;
+        remote_mode;
         force_apply;
         operations_pool;
         dal_node;
@@ -156,20 +158,14 @@ let run ?event_level ?event_sections_levels (baker : t) =
           (Dal_node.rpc_port node))
       baker.persistent_state.dal_node
   in
+  let run_args =
+    if baker.persistent_state.remote_mode then ["remotely"]
+    else ["with"; "local"; "node"; Node.data_dir node]
+  in
   let arguments =
-    [
-      "--endpoint";
-      node_addr;
-      "--base-dir";
-      Client.base_dir client;
-      "run";
-      "with";
-      "local";
-      "node";
-      Node.data_dir node;
-    ]
-    @ liquidity_baking_toggle_vote @ votefile @ force_apply @ operations_pool
-    @ dal_node_endpoint @ delegates
+    ["--endpoint"; node_addr; "--base-dir"; Client.base_dir client; "run"]
+    @ run_args @ liquidity_baking_toggle_vote @ votefile @ force_apply
+    @ operations_pool @ dal_node_endpoint @ delegates
   in
   let on_terminate _ =
     (* Cancel all [Ready] event listeners. *)
@@ -203,7 +199,7 @@ let wait_for_ready baker =
 
 let init ~protocol ?name ?color ?event_pipe ?runner ?event_sections_levels
     ?(delegates = []) ?votefile ?liquidity_baking_toggle_vote ?force_apply
-    ?operations_pool ?dal_node node client =
+    ?remote_mode ?operations_pool ?dal_node node client =
   let* () = Node.wait_for_ready node in
   let baker =
     create
@@ -215,6 +211,7 @@ let init ~protocol ?name ?color ?event_pipe ?runner ?event_sections_levels
       ?votefile
       ?liquidity_baking_toggle_vote
       ?force_apply
+      ?remote_mode
       ?operations_pool
       ?dal_node
       ~delegates

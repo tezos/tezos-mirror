@@ -64,8 +64,8 @@ val on_event : t -> (event -> unit) -> unit
 
 (** Spawn [octez-baker run].
 
-    The resulting promise is fulfilled as soon as the baker has been spawned.  It
-    continues running in the background.*)
+    The resulting promise is fulfilled as soon as the baker has been
+    spawned. It continues running in the background. *)
 val run :
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
@@ -128,6 +128,8 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
     [operations_pool] and [force_apply] are passed to the baker daemon through
     the flag [--operations-pool] and [--force_apply].
 
+    If [remote_mode] is specified, the baker will run in RPC-only mode.
+
     If [dal_node] is specified, then it is the DAL node that the baker queries
     in order to determine the attestations it sends to the L1 node. A
     [--dal_node] argument is passed to specify the DAL node's endpoint. *)
@@ -141,6 +143,7 @@ val create :
   ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?force_apply:bool ->
+  ?remote_mode:bool ->
   ?operations_pool:string ->
   ?dal_node:Dal_node.t ->
   Node.t ->
@@ -182,6 +185,8 @@ val create :
     [--votefile], [--liquidity-baking-toggle-vote], [--should-apply]
     respectively [--operations-pool].
 
+    If [remote_mode] is specified, the baker will run in RPC-only mode.
+
     If [dal_node] is specified, then it is the DAL node that the baker queries
     in order to determine the attestations it sends to the L1 node. A
     [--dal_node] argument is passed to specify the DAL node's endpoint. *)
@@ -196,6 +201,7 @@ val init :
   ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?force_apply:bool ->
+  ?remote_mode:bool ->
   ?operations_pool:string ->
   ?dal_node:Dal_node.t ->
   Node.t ->

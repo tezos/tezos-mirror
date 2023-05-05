@@ -109,6 +109,13 @@ Baker
 
 - Improved efficiency to solve the anti spam proof of work challenge.
 
+- Made the baker capable of running in a RPC-only mode through a newly
+  introduced command: ``octez-baker-<protocol> run remotely
+  [delegates] [options]``. This mode does not require the octez node's
+  storage to be directly accessible by the baker and will reduce
+  memory consumption. However, this mode is less performant and may
+  result in noticable slower baking times. (MR :gl:`!8607`)
+
 Accuser
 -------
 
