@@ -561,14 +561,6 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
         Lwt.return (Store.Block.descriptor block)
   in
   let* root_b = Store.Block.read_block chain_store (fst root) in
-  let* resulting_context_hash =
-    Store.Block.resulting_context_hash chain_store root_b
-  in
-  let*! root_ctxt =
-    Context_ops.checkout_exn
-      (Store.context_index (Store.Chain.global_store chain_store))
-      resulting_context_hash
-  in
   let*! blocks, _last =
     make_raw_block_list ?min_lafl ?constants ?max_operations_ttl ~kind root n
   in
@@ -577,13 +569,22 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
     | None -> Store.Block.proto_level root_b
     | Some proto_level -> proto_level
   in
-  let* _, _, blocks =
+  let context_index =
+    Store.context_index (Store.Chain.global_store chain_store)
+  in
+  let* _, blocks =
     List.fold_left_es
-      (fun (pred_ctxt, pred, blocks) b ->
+      (fun (pred, blocks) b ->
         let* pred_resulting_context =
           Store.Block.resulting_context_hash chain_store pred
         in
-        let* ctxt, resulting_context, b =
+        let* resulting_context, b =
+          (* It is required to checkout the actual context to update
+             some context internal values (such as the parent
+             commits). *)
+          let*! pred_ctxt =
+            Context_ops.checkout_exn context_index pred_resulting_context
+          in
           let*! new_ctxt =
             Context_ops.add
               pred_ctxt
@@ -615,8 +616,7 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
             Context_ops.commit ~time:Time.Protocol.epoch new_ctxt
           in
           return
-            ( new_ctxt,
-              resulting_context,
+            ( resulting_context,
               {
                 Block_repr.hash;
                 contents =
@@ -644,11 +644,16 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
         let* () =
           if should_set_head then
             let* _ = Store.Chain.set_head chain_store b in
+            let*! () =
+              Block_store.await_merging
+                (Store.Unsafe.get_block_store chain_store)
+            in
+            let*! () = Context_ops.wait_gc_completion context_index in
             return_unit
           else return_unit
         in
-        return (ctxt, b, b :: blocks))
-      (root_ctxt, root_b, [])
+        return (b, b :: blocks))
+      (root_b, [])
       blocks
   in
   let head = List.hd blocks |> WithExceptions.Option.get ~loc:__LOC__ in
