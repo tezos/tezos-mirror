@@ -265,7 +265,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | GS.Peer_already_in_mesh | Unexpected_grafting_peer | Grafting_successfully
       ->
         gstate
-    | Peer_filtered | Unknown_topic | Grafting_direct_peer
+    | Peer_filtered | Unsubscribed_topic | Grafting_direct_peer
     | Grafting_peer_with_negative_score | Peer_backed_off ->
         do_prune ~do_px:false ;
         gstate

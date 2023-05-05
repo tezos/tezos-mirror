@@ -637,7 +637,7 @@ module Test_peers_below_degree_high = struct
     match input with
     | Graft _ -> (
         match output with
-        | Peer_filtered | Unknown_topic | Unexpected_grafting_peer
+        | Peer_filtered | Unsubscribed_topic | Unexpected_grafting_peer
         | Grafting_peer_with_negative_score | Peer_backed_off ->
             fail (`unexpected_output (O output))
         | Grafting_direct_peer | Peer_already_in_mesh | Grafting_successfully

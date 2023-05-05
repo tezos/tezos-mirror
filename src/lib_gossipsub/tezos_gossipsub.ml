@@ -123,7 +123,7 @@ module Make (C : AUTOMATON_CONFIG) :
       }
         -> [`IWant] output
     | Peer_filtered : [`Graft] output
-    | Unknown_topic : [`Graft] output
+    | Unsubscribed_topic : [`Graft] output
     | Peer_already_in_mesh : [`Graft] output
     | Grafting_direct_peer : [`Graft] output
     | Unexpected_grafting_peer : [`Graft] output
@@ -815,14 +815,14 @@ module Make (C : AUTOMATON_CONFIG) :
         let* () = set_backoff_for_peer prune_backoff topic peer in
         Peer_filtered |> fail
 
-    let check_topic_known peer topic =
+    let check_subscribed peer topic =
       let open Monad.Syntax in
       let*! mesh_opt = find_mesh topic in
       match mesh_opt with
       | None ->
           let*! prune_backoff in
           let* () = set_backoff_for_peer prune_backoff topic peer in
-          Unknown_topic |> fail
+          Unsubscribed_topic |> fail
       | Some mesh -> pass mesh
 
     let check_not_in_mesh mesh peer =
@@ -892,7 +892,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let handle peer topic =
       let open Monad.Syntax in
       let*? () = check_filter peer topic in
-      let*? mesh = check_topic_known peer topic in
+      let*? mesh = check_subscribed peer topic in
       let*? () = check_not_in_mesh mesh peer in
       let*? connection = check_active peer in
       let*? () = check_not_direct connection peer topic in
@@ -2074,7 +2074,7 @@ module Make (C : AUTOMATON_CONFIG) :
           (pp_message_id_map pp_elt)
           routed_message_ids
     | Peer_filtered -> fprintf fmtr "Peer_filtered"
-    | Unknown_topic -> fprintf fmtr "Unknown_topic"
+    | Unsubscribed_topic -> fprintf fmtr "Unsubscribed_topic"
     | Peer_already_in_mesh -> fprintf fmtr "Peer_already_in_mesh"
     | Grafting_direct_peer -> fprintf fmtr "Grafting_direct_peer"
     | Unexpected_grafting_peer -> fprintf fmtr "Unexpected_grafting_peer"
