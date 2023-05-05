@@ -1956,7 +1956,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let open Format in
     fprintf
       fmtr
-      "{ peer=%a; topic=%a; px=%a; backoff=%a }"
+      "{ peer=%a; topic=%a; px=[%a]; backoff=%a }"
       Peer.pp
       peer
       Topic.pp

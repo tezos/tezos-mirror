@@ -500,11 +500,11 @@ module Test_remove_peer = struct
   let pp_backoff fmtr backoff =
     let list = backoff |> GS.Peer.Map.bindings in
     Format.pp_print_list
-      ~pp_sep:(fun fmtr () -> Format.fprintf fmtr ",")
+      ~pp_sep:(fun fmtr () -> Format.fprintf fmtr ", ")
       (fun fmtr (topic, backoff) ->
         Format.fprintf
           fmtr
-          "peer %a -> %a,"
+          "peer %a -> %a"
           GS.Peer.pp
           topic
           Milliseconds.pp
@@ -518,10 +518,10 @@ module Test_remove_peer = struct
     let cleanup =
       Int64.(rem v.heartbeat_ticks (of_int v.limits.backoff_cleanup_ticks)) = 0L
     in
-    if cleanup then fprintf fmtr "heartbeat.clean;" ;
+    if cleanup then fprintf fmtr "heartbeat.clean; " ;
     Topic.Map.iter
       (fun topic backoff ->
-        fprintf fmtr "%a:[%a]" Topic.pp topic pp_backoff backoff)
+        fprintf fmtr "%a: [%a]" Topic.pp topic pp_backoff backoff)
       v.backoff ;
     Peer.Map.iter
       (fun peer score ->
