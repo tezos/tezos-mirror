@@ -26,8 +26,9 @@
 (** Testing
     _______
 
-    Invocation: dune exec src/lib_store/unix/test/bench.exe --file bench.ml
-    Subject: Store locator bench. These tests are not run in the CI
+    Invocation: dune exec src/lib_store/unix/test/bench/bench.exe --
+                --file bench.ml
+    Subject: Store locator bench. These tests are not run in the CI.
 *)
 
 module Store = Tezos_store_unix.Store
@@ -96,9 +97,7 @@ let bench_locator base_dir =
 let bench = [Test_locator.wrap "bench locator" bench_locator]
 
 let () =
-  let open Lwt_syntax in
   Lwt_main.run
-    (let* () = Tezos_base_unix.Internal_event_unix.init () in
-     Alcotest_lwt.run ~__FILE__ "tezos-store-bench" [("locator bench", bench)])
+    (Alcotest_lwt.run ~__FILE__ "tezos-store-bench" [("locator bench", bench)])
 
 let () = Tezt.Test.run ()
