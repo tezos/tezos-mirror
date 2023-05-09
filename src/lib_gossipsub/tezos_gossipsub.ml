@@ -721,7 +721,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! rng in
       let iwant_message_ids_len = List.length message_ids in
-      (* Do not send more messages than [max_sent_iwant_per_heartbeat] *)
+      (* Do not send more than [max_sent_iwant_per_heartbeat] message ids. *)
       let iwant_ids_to_send_n = min iwant_message_ids_len limit in
       let shuffle_iwant_ids = List.shuffle ~rng message_ids in
       let requested_message_ids =
