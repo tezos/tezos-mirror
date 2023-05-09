@@ -260,7 +260,9 @@ let run ~data_dir cctxt =
       Random.State.make [|seed|]
     in
     let open Worker_parameters in
-    Gossipsub.(Worker.make rng limits peer_filter_parameters |> Worker.start [])
+    Gossipsub.Worker.(
+      make ~events_logging:Logging.event rng limits peer_filter_parameters
+      |> start [])
   in
   (* Create and activate a transport (P2P) layer instance. *)
   let* transport_layer =
