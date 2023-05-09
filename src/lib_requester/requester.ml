@@ -323,11 +323,12 @@ end = struct
          simultaneously.
 
          Note: using `Lwt.pause` or `Lwt.yield` might not be
-         sufficient, e.g., when the scheduler does not  timeout cancelers are not given a
-         chance to be executed.
+         sufficient, e.g., when the scheduler does not timeout
+         cancelers are not given a chance to be executed.
 
          Note: This constant was selected using the sophisticated
          "damp digit" method. *)
+      let* () = Lwt_unix.sleep 0.001 in
       let timeout = compute_timeout state in
       let* () =
         Lwt.choose
