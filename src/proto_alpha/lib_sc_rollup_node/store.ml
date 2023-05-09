@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -450,3 +451,23 @@ let load (type a) (mode : a mode) ~l2_blocks_cache_size data_dir :
     levels_to_hashes;
     irmin_store;
   }
+
+let iter_l2_blocks ({l2_blocks; l2_head; _} : _ t) f =
+  let open Lwt_result_syntax in
+  let* head = L2_head.read l2_head in
+  match head with
+  | None ->
+      (* No reachable head, nothing to do *)
+      return_unit
+  | Some head ->
+      let rec loop hash =
+        let* block = L2_blocks.read l2_blocks hash in
+        match block with
+        | None ->
+            (* The block does not exist, the known chain stops here, so do we. *)
+            return_unit
+        | Some (block, header) ->
+            let* () = f {block with header} in
+            loop header.predecessor
+      in
+      loop head.header.block_hash

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -161,3 +162,8 @@ val load :
 
 (** [readonly store] returns a read-only version of [store]. *)
 val readonly : _ t -> ro
+
+(** [iter_l2_blocks store f] iterates [f] on all L2 blocks reachable from the
+    head, from newest to oldest.  *)
+val iter_l2_blocks :
+  _ t -> (Sc_rollup_block.t -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
