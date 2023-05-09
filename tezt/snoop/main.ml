@@ -30,7 +30,8 @@ let run proto =
   Lwt_main.run
     (let* () = Prepare_data.main proto in
      let* () = Perform_benchmarks.main proto in
-     Perform_inference.main ())
+     let* () = Perform_inference.main () in
+     Perform_codegen.main ())
 
 let () =
   Background.start (fun x -> raise x) ;
