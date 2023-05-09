@@ -795,7 +795,7 @@ let commands_ro () =
       @@ stop)
       (fun () delegate (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        let* o =
+        let* deposit =
           get_frozen_deposits_limit
             cctxt
             ~chain:cctxt#chain
@@ -803,7 +803,7 @@ let commands_ro () =
             delegate
         in
         let*! () =
-          match o with
+          match deposit with
           | None -> cctxt#answer "unlimited"
           | Some limit ->
               cctxt#answer "%a %s" Tez.pp limit Operation_result.tez_sym
