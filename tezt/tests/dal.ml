@@ -289,6 +289,17 @@ let update_neighbors dal_node neighbors =
     dal_node
     (JSON.put ("neighbors", JSON.annotate ~origin:"dal_node_config" neighbors))
 
+let update_known_peers dal_node known_peers =
+  let peers =
+    `A
+      (List.map
+         (fun dal_node -> `String (Dal_node.listen_addr dal_node))
+         known_peers)
+  in
+  Dal_node.Config_file.update
+    dal_node
+    (JSON.put ("peers", JSON.annotate ~origin:"dal_node_config" peers))
+
 let wait_for_stored_slot dal_node slot_header =
   Dal_node.wait_for dal_node "stored_slot_shards.v0" (fun e ->
       if JSON.(e |-> "commitment" |> as_string) = slot_header then Some ()
@@ -2473,6 +2484,43 @@ let register_end_to_end_tests ~protocols =
         protocols)
     e2e_tests
 
+let wait_for_gossipsub_worker_event ~name dal_node lambda =
+  Dal_node.wait_for dal_node (sf "gossipsub_worker_event-%s.v0" name) lambda
+
+let check_expected expected found = if expected <> found then None else Some ()
+
+let ( let*?? ) a b = Option.bind a b
+
+let check_new_connection_event ~main_node ~other_node ~is_outbound =
+  wait_for_gossipsub_worker_event ~name:"new_connection" main_node (fun event ->
+      let*?? () =
+        check_expected
+          JSON.(Dal_node.read_identity other_node |-> "peer_id" |> as_string)
+          JSON.(event |-> "peer" |> as_string)
+      in
+      check_expected is_outbound JSON.(event |-> "outbound" |> as_bool))
+
+let test_dal_node_p2p_connection _protocol _parameters _cryptobox node client
+    dal_node1 =
+  let dal_node2 = Dal_node.create ~node ~client () in
+  let* _config_file = Dal_node.init_config dal_node2 in
+  update_known_peers dal_node2 [dal_node1] ;
+  let conn_ev_in_node1 =
+    check_new_connection_event
+      ~main_node:dal_node1
+      ~other_node:dal_node2
+      ~is_outbound:false
+  in
+  let conn_ev_in_node2 =
+    check_new_connection_event
+      ~main_node:dal_node2
+      ~other_node:dal_node1
+      ~is_outbound:true
+  in
+  let* () = Dal_node.run dal_node2 in
+  let* () = conn_ev_in_node1 and* () = conn_ev_in_node2 in
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -2560,6 +2608,12 @@ let register ~protocols =
     ~activation_timestamp:Now
     "dal attestor with baker daemon"
     (test_attestor ~with_baker_daemon:true)
+    protocols ;
+
+  (* Tests with layer1 and dal nodes (with p2p/GS) *)
+  scenario_with_layer1_and_dal_nodes
+    "GS/P2P connection"
+    test_dal_node_p2p_connection
     protocols ;
 
   (* Tests with all nodes *)
