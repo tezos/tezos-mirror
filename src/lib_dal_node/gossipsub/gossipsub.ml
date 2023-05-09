@@ -53,3 +53,5 @@ module Transport_layer = struct
 
   let activate = P2p.activate
 end
+
+module Transport_layer_hooks = Gs_transport_connection
