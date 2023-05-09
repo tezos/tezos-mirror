@@ -13,7 +13,9 @@
   tezos-protocol-updater
   tezos-client-base-unix
   tezos-stdlib-unix
-  tezos-crypto-dal)
+  tezos-crypto-dal
+  tezos-p2p
+  tezos-p2p-services)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -21,4 +23,6 @@
   -open Tezos_protocol_updater
   -open Tezos_client_base_unix
   -open Tezos_stdlib_unix
-  -open Tezos_crypto_dal))
+  -open Tezos_crypto_dal
+  -open Tezos_p2p
+  -open Tezos_p2p_services))

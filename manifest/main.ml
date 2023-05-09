@@ -3878,6 +3878,8 @@ let octez_dal_node_lib =
         octez_client_base_unix |> open_;
         octez_stdlib_unix |> open_;
         octez_crypto_dal |> open_;
+        octez_p2p |> open_;
+        octez_p2p_services |> open_;
       ]
 
 let octez_dal_node_gossipsub_lib =
