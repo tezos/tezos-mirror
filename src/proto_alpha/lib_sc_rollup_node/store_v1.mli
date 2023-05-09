@@ -24,17 +24,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This version of the store is used for the rollup nodes for protocols for and
+    after Nairobi, i.e. >= 17. *)
+
 open Protocol
 open Alpha_context
 open Indexed_store
 
-module Irmin_store : Store_sigs.Store
-
-module L2_blocks :
-  INDEXED_FILE
-    with type key := Block_hash.t
-     and type value := (unit, unit) Sc_rollup_block.block
-     and type header := Sc_rollup_block.header
+include module type of struct
+  include Store_v0
+end
 
 (** Storage for persisting messages downloaded from the L1 node. *)
 module Messages :
@@ -43,70 +42,13 @@ module Messages :
      and type value := Sc_rollup.Inbox_message.t list
      and type header := bool * Block_hash.t * Timestamp.t * int
 
-(** Aggregated collection of messages from the L1 inbox *)
-module Inboxes :
-  SIMPLE_INDEXED_FILE
-    with type key := Sc_rollup.Inbox.Hash.t
-     and type value := Sc_rollup.Inbox.t
-     and type header := unit
-
-(** Storage containing commitments and corresponding commitment hashes that the
-    rollup node has knowledge of. *)
-module Commitments :
-  INDEXABLE_STORE
-    with type key := Sc_rollup.Commitment.Hash.t
-     and type value := Sc_rollup.Commitment.t
-
-(** Storage mapping commitment hashes to the level when they were published by
-    the rollup node. It only contains hashes of commitments published by this
-    rollup node. *)
-module Commitments_published_at_level : sig
-  type element = {
-    first_published_at_level : Raw_level.t;
-        (** The level at which this commitment was first published. *)
-    published_at_level : Raw_level.t option;
-        (** The level at which we published this commitment. If
-            [first_published_at_level <> published_at_level] it means that the
-            commitment is republished. *)
-  }
-
-  include
-    INDEXABLE_STORE
-      with type key := Sc_rollup.Commitment.Hash.t
-       and type value := element
+module Dal_pages : sig
+  type removed_in_v1
 end
 
-module L2_head : SINGLETON_STORE with type value := Sc_rollup_block.t
-
-module Last_finalized_level : SINGLETON_STORE with type value := int32
-
-module Levels_to_hashes :
-  INDEXABLE_STORE with type key := int32 and type value := Block_hash.t
-
-(** Published slot headers per block hash,
-    stored as a list of bindings from [Dal_slot_index.t]
-    to [Dal.Slot.t]. The encoding function converts this
-    list into a [Dal.Slot_index.t]-indexed map. *)
-module Dal_slots_headers :
-  Store_sigs.Nested_map
-    with type primary_key := Block_hash.t
-     and type secondary_key := Dal.Slot_index.t
-     and type value := Dal.Slot.Header.t
-     and type 'a store := 'a Irmin_store.t
-
-module Dal_confirmed_slots_history :
-  Store_sigs.Append_only_map
-    with type key := Block_hash.t
-     and type value := Dal.Slots_history.t
-     and type 'a store := 'a Irmin_store.t
-
-(** Confirmed DAL slots histories cache. See documentation of
-    {!Dal_slot_repr.Slots_history} for more details. *)
-module Dal_confirmed_slots_histories :
-  Store_sigs.Append_only_map
-    with type key := Block_hash.t
-     and type value := Dal.Slots_history.History_cache.t
-     and type 'a store := 'a Irmin_store.t
+module Dal_processed_slots : sig
+  type removed_in_v1
+end
 
 (** [Dal_slots_statuses] is a [Store_utils.Nested_map] used to store the
     attestation status of DAL slots. The values of this storage module have type
