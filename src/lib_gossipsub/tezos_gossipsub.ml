@@ -753,7 +753,7 @@ module Make (C : AUTOMATON_CONFIG) :
         shuffle_and_trunc iwant_message_ids ~limit
       in
       let* () = update_iwant_per_heartbeat ~delta:length peer in
-      (* FIXME https://gitlab.com/tezos/tezos/-/issues/4966
+      (* FIXME https://gitlab.com/tezos/tezos/-/issues/5532
 
          The go implementation traces some of the messages
          requested. *)
