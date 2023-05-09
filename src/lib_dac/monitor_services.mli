@@ -45,8 +45,8 @@ module S : sig
     Tezos_rpc.Service.service
 end
 
-(** [root_hashes streamed_cctxt dac_plugin] returns a stream of root hashes
-    and a stopper for it.
+(** [root_hashes streamed_cctxt raw_hash api_version] returns a stream
+    of root hashes and a stopper for it.
 
     Stream is produced by calling RPC "GET [api_version]/monitor/root_hashes".
 *)
@@ -57,6 +57,11 @@ val root_hashes :
   Error_monad.tzresult
   Lwt.t
 
+(** [certificate streamed_cctxt raw_hash api_version] returns a stream and a
+    stopper for monitoring certificate updates for a given root hash.
+    
+    Stream is produced by calling RPC "GET [api_version]/monitor/certificate".
+*)
 val certificate :
   #Tezos_rpc.Context.streamed ->
   Dac_plugin.raw_hash ->

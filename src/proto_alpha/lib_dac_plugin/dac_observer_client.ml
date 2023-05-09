@@ -151,7 +151,11 @@ module Client = struct
       Dac_plugin.hash_to_raw @@ proto_hash_to_dac_hash dac_plugin hash
     in
     let+ preimage =
-      Dac_node_client.Observer.get_missing_page observer_cctxt dac_hash
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5627
+         Currently we have only one major DAC API version ([V0]). For this reason,
+         clients can always default to [Dac_node_client.V0]. This should be
+         revisited once we add another major version. *)
+      Dac_node_client.V0.Observer.get_missing_page observer_cctxt dac_hash
     in
     String.of_bytes preimage
 end

@@ -68,7 +68,11 @@ let serialize_certificate certificate =
    rename PUT v1/preimage into v1/payload, and change name
    of function accordingly. *)
 let send_preimage cctxt payload =
-  Dac_node_client.Coordinator.post_preimage cctxt ~payload
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5627
+     Currently we have only one major DAC API version ([V0]). For this reason,
+     client binary can always default to it. This should be revisited once we
+     add another major version. *)
+  Dac_node_client.V0.Coordinator.post_preimage cctxt ~payload
 
 let number_of_witnesses certificate =
   let witnesses = Certificate_repr.get_witnesses certificate in
@@ -86,7 +90,11 @@ let number_of_witnesses certificate =
 let wait_for_certificate cctxt root_hash threshold =
   let open Lwt_result_syntax in
   let* stream, _stopper =
-    Dac_node_client.monitor_certificate cctxt ~root_hash
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5627
+       Currently we have only one major DAC API version ([V0]). For this reason,
+       client binary can always default to it. This should be revisited once we
+       add another major version. *)
+    Dac_node_client.V0.monitor_certificate cctxt ~root_hash
   in
   let rec go best_certificate_opt best_witnesses =
     let*! certificate_opt = Lwt_stream.get stream in
@@ -105,6 +113,10 @@ let wait_for_certificate cctxt root_hash threshold =
 let get_certificate cctxt root_page_hash =
   let open Lwt_result_syntax in
   let* certificate_opt =
-    Dac_node_client.get_certificate cctxt ~root_page_hash
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5627
+       Currently we have only one major DAC API version ([V0]). For this reason,
+       client binary can always default to it. This should be revisited once we
+       add another major version. *)
+    Dac_node_client.V0.get_certificate cctxt ~root_page_hash
   in
   Option.map_es serialize_certificate certificate_opt
