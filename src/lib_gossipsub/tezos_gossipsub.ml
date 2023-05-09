@@ -1110,6 +1110,15 @@ module Make (C : AUTOMATON_CONFIG) :
           in
           return (Peer.Set.union more_peers valid_fanout_peers)
       in
+      (* Notify scoring about the graft. *)
+      let scores =
+        Peer.Set.fold
+          (fun peer scores ->
+            update_scores_score peer (fun s -> Score.graft s topic) scores)
+          peers
+          scores
+      in
+      let* () = set_scores scores in
       let* () = set_mesh_topic topic peers in
       let* () = delete_fanout topic in
       Joining_topic {to_graft = peers} |> return
@@ -1608,6 +1617,16 @@ module Make (C : AUTOMATON_CONFIG) :
           backoff
         |> set_backoff
       in
+      (* Notify scoring about the grafts. *)
+      let scores =
+        Peer.Map.fold
+          (fun peer ->
+            Topic.Set.fold (fun topic ->
+                update_scores_score peer (fun s -> Score.graft s topic)))
+          to_graft
+          scores
+      in
+      let* () = set_scores scores in
       (* Update mesh for grafted and pruned peers *)
       let* () = update_mesh mesh ~to_graft ~to_prune in
       return (to_graft, to_prune, noPX_peers)

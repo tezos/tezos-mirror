@@ -36,6 +36,8 @@ module Milliseconds = struct
 
   let of_int_s n = {ms = n * 1000}
 
+  let to_int_ms {ms} = ms
+
   let zero = {ms = 0}
 
   let add m1 m2 = of_int_ms (m1.ms + m2.ms)
@@ -62,6 +64,8 @@ module Milliseconds = struct
     let one_second = {ms = 1000}
 
     let to_int_s = to_int_s
+
+    let to_int_ms = to_int_ms
 
     let to_float_s = to_float_s
 
@@ -94,9 +98,9 @@ module Time = struct
 
   let now () = !t
 
-  let elapse s =
-    assert (s >= 0) ;
-    t := Milliseconds.add !t (Milliseconds.of_int_s s)
+  let elapse ms =
+    assert (Milliseconds.(ms >= zero)) ;
+    t := Milliseconds.add !t ms
 
   let set now = t := now
 
