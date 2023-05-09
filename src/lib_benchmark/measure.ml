@@ -35,9 +35,9 @@ type options = {
 }
 
 type 'workload timed_workload = {
-  workload : 'workload;  (** Workload associated to the measurement *)
-  measures : Maths.vector;  (** Collected measurements *)
-  allocated_words : int option;  (** Measured allocation in words *)
+  workload : 'workload;
+  measures : Maths.vector;
+  allocated_words : int option;
 }
 
 type 'workload workload_data = 'workload timed_workload list
