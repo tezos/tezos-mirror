@@ -160,16 +160,17 @@ let make_with_pp_short pp wrapped_event =
   in
   let buf = Bytes.create lines_size in
   let prev_pos = ref 0 in
+  let blit s len =
+    Bytes.blit_string s 0 buf !prev_pos len ;
+    prev_pos := !prev_pos + len
+  in
   let () =
     List.iter
       (fun s ->
-        Bytes.blit_string timestamp 0 buf !prev_pos timestamp_size ;
-        prev_pos := !prev_pos + timestamp_size ;
         let s_len = String.length s in
-        Bytes.blit_string s 0 buf !prev_pos s_len ;
-        prev_pos := !prev_pos + s_len ;
-        Bytes.set buf !prev_pos '\n' ;
-        prev_pos := !prev_pos + 1)
+        blit timestamp timestamp_size ;
+        blit s s_len ;
+        blit "\n" 1)
       lines
   in
   Bytes.unsafe_to_string buf
