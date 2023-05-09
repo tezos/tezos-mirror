@@ -181,7 +181,8 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
              let k = get_k i in
              (si_name i, Evaluations.mul_by_scalar k domain_evals)))
 
-    let ssigma_map_non_quadratic_residues permutation domain size =
+    let ssigma_map_non_quadratic_residues external_prefix permutation domain
+        size =
       let n = Domain.length domain in
       let ssigma_map =
         SMap.of_list
@@ -194,7 +195,8 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
                      let index = s_ij mod n in
                      Scalar.mul coeff (Domain.get domain index))
                in
-               (ss_name i, Evaluations.interpolation_fft2 domain coeff_list)))
+               ( external_prefix ^ ss_name i,
+                 Evaluations.interpolation_fft2 domain coeff_list )))
       in
       ssigma_map
   end
@@ -244,9 +246,9 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
       res_evaluation
 
     (* evaluations must contain z’s evaluation *)
-    let prover_identities ~additionnal_prefix:a_pref ~prefix wires_names beta
-        gamma n evaluations =
-      let z_name = a_pref z_name in
+    let prover_identities ~external_prefix:e_pref ~prefix wires_names beta gamma
+        n evaluations =
+      let z_name = e_pref z_name in
       let raw_z_name = z_name in
       let zg_name = zg_name z_name in
       let z_evaluation =
@@ -282,7 +284,7 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
         in
         let g_evaluation =
           let ss_names =
-            List.init nb_wires (fun i -> prefix @@ a_pref (ss_name i))
+            List.init nb_wires (fun i -> prefix @@ e_pref (ss_name i))
           in
           compute_prime
             ~prefix
@@ -320,8 +322,8 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
       in
       SMap.of_list
         [
-          (prefix (a_pref "Perm.a"), identity_l1_z);
-          (prefix (a_pref "Perm.b"), identity_zfg);
+          (prefix (e_pref "Perm.a"), identity_l1_z);
+          (prefix (e_pref "Perm.b"), identity_zfg);
         ]
 
     (* compute_Z performs the following steps in the two loops.
@@ -391,6 +393,100 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
       Evaluations.interpolation_fft2 domain scalar_array_Z
   end
 
+  (* The shared permutation argument consists of leveraging the fact that
+     all proofs of the same circuit type share the same permutation
+     for ensuring the copy-satisfiability.
+     This allows us to run a single permutation argument on a linear
+     combination of the wire polynomials of all same-circuit proofs.
+     Namely, let a_i(X), b_i(X), c_i(X) be the wire polynomials of the
+     i-th proof. Let delta be some scalar sampled after (and based on)
+     a commitment to all a_i, b_i, c_i and consider batched polynomials:
+     A(X) := \sum_i delta^{i-1} a_i(X)
+     B(X) := \sum_i delta^{i-1} b_i(X)
+     C(X) := \sum_i delta^{i-1} c_i(X)
+     We will perform a single permutation argument for A, B and C. *)
+  module Shared_argument = struct
+    let build_batched_wires_values ~delta ~wires:wires_list_map =
+      (* agg_map = {a -> [] ; b -> [] ; …} *)
+      let agg_map =
+        SMap.(map (Fun.const []) (List.hd (choose wires_list_map |> snd)))
+      in
+      (* builds {a -> linear(a in l) ; b -> linear(b in l) ; …} *)
+      let aggreg_wires_list l =
+        List.fold_left
+          (fun acc wires -> (SMap.mapi (fun k v -> SMap.find k wires :: v)) acc)
+          agg_map
+          (List.rev l)
+        |> SMap.map (fun ws_list ->
+               Evaluations.linear_with_powers ws_list delta)
+      in
+      SMap.map aggreg_wires_list wires_list_map
+      |> SMap.(map (update_keys String.capitalize_ascii))
+
+    (* For each circuit, interpolates the batched wires A, B, C from the
+       batched witness *)
+    let batched_wires_poly_of_batched_wires (zk, n, domain) batched_wires
+        (delta, f_blinds) =
+      let batched_polys =
+        SMap.map (fun w -> Evaluations.interpolation_fft domain w) batched_wires
+      in
+      if not zk then batched_polys
+      else
+        (* delta is only used to batched the blinds, the polys are computed
+           from a witness batched with delta already *)
+        let batched_blinds =
+          let f_blinds = List.map (fun b -> Option.get b) f_blinds in
+          SMap.map_list_to_list_map f_blinds
+          |> SMap.map (fun p -> Poly.linear_with_powers p delta)
+        in
+        SMap.mapi
+          (fun name f ->
+            let b = SMap.find name batched_blinds in
+            Poly.(f + mul_xn b n Scalar.(negate one)))
+          batched_polys
+
+    (* compute the batched polynomials A, B, C for the shared-permutation
+       argument; polynomial A (analogously B and C) can be computed by
+       batching polynomials a_i with powers of delta; or alternatively, by
+       applying an IFFT interpolation on the batched witness; we expect
+       the latter to be more efficient if the number of batched proofs
+       is over the threshold of [log2(n)] proofs, where [n] is the domain
+       size: this is because polynomial batching would require about
+       [n * nb_proofs] scalar operations (per polynomial) whereas the IFFT
+       would need [n * log2(n)]; such theoretical threshold has also been
+       empirically sustained with benchmarks *)
+    let build_batched_witness_polys ?(use_batched_wires = false) ~zero_knowledge
+        ~domain ~delta ~batched_wires ~f:(f_wires, f_blinds) () =
+      let n = Domain.length domain in
+      let logn = Z.log2 @@ Z.of_int n in
+      let batched_witness_polys =
+        SMap.mapi
+          (fun name wires_list ->
+            let batched_wires = SMap.find name batched_wires in
+            let f_blinds = SMap.find name f_blinds in
+            if List.compare_length_with wires_list logn > 0 || use_batched_wires
+            then
+              (* we apply an IFFT on the batched witness *)
+              batched_wires_poly_of_batched_wires
+                (zero_knowledge, n, domain)
+                batched_wires
+                (delta, f_blinds)
+            else
+              (* Use capital for the batched wires *)
+              let wires_list =
+                List.map (SMap.update_keys String.capitalize_ascii) wires_list
+              in
+              (* we batched the a_i polynomials (analogously for b_i and c_i) *)
+              SMap.map (fun p -> Poly.linear_with_powers p delta)
+              @@ SMap.map_list_to_list_map wires_list)
+          f_wires
+      in
+      batched_witness_polys |> SMap.Aggregation.smap_of_smap_smap
+
+    let merge_batched_values m1 m2 =
+      SMap.mapi (fun k v -> SMap.union_disjoint v (SMap.find k m1)) m2
+  end
+
   (* max degree needed is the degree of Perm.b, which is sum of wire’s degree plus z degree *)
   let polynomials_degree ~nb_wires = nb_wires + 1
 
@@ -414,8 +510,12 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
        As a consequence, deg(T)-deg(Zs) = (n+2)+3(n+1) - n = 3n+5
        (for gates’ identity verification, max degree is degree of qM×fL×fR which
        is (n-1)+(n+1)+(n+1) < 3n+5) *)
-  let preprocessing ~domain ~permutation ~nb_wires () =
-    Preprocessing.ssigma_map_non_quadratic_residues permutation domain nb_wires
+  let preprocessing ?(external_prefix = "") ~domain ~permutation ~nb_wires () =
+    Preprocessing.ssigma_map_non_quadratic_residues
+      external_prefix
+      permutation
+      domain
+      nb_wires
 
   let common_preprocessing ~nb_wires ~domain ~evaluations =
     let sid_evals = Preprocessing.evaluations_sid nb_wires evaluations in
@@ -423,37 +523,43 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
     let l1_map = SMap.singleton l1 @@ Preprocessing.compute_l1 domain in
     Evaluations.compute_evaluations_update_map ~evaluations l1_map
 
-  let prover_identities ?(prefix = "") ?(circuit_name = "") ~wires_names ~beta
-      ~gamma ~n () =
-    let additionnal_prefix s =
-      if s = z_name && prefix <> "" then prefix ^ "Perm_" ^ s else prefix ^ s
-    in
-    let prefix = SMap.Aggregation.add_prefix circuit_name in
+  let external_prefix_fun ext s =
+    (* This is used to differenciate the case where the permutation gate is
+       called by PlonK & the case where it’s used by an other gate (ie RC)
+       Depending on that, we want to change Z, Ss & identities names *)
+    if s = z_name && ext <> "" then ext ^ "Perm_" ^ s else ext ^ s
+
+  let prover_identities ?(external_prefix = "") ?(circuit_prefix = Fun.id)
+      ~wires_names ~beta ~gamma ~n () =
+    let external_prefix = external_prefix_fun external_prefix in
     fun evaluations ->
       Permutation_poly.prover_identities
-        ~additionnal_prefix
-        ~prefix
+        ~external_prefix
+        ~prefix:circuit_prefix
         wires_names
         beta
         gamma
         n
         evaluations
 
-  let verifier_identities ?(prefix = "") ?(circuit_name = "") ~nb_proofs
-      ~generator ~n ~wires_names ~beta ~gamma ~delta () =
-    let a_pref s =
-      if s = z_name && prefix <> "" then prefix ^ "Perm_" ^ s else prefix ^ s
+  let verifier_identities ?(external_prefix = "") ?(circuit_prefix = Fun.id)
+      ~nb_proofs ~generator ~n ~wires_names ~beta ~gamma ~delta () =
+    let e_pref = external_prefix_fun external_prefix in
+    let prefix_j i =
+      SMap.Aggregation.add_prefix
+        ~no_sep:true
+        ~n:nb_proofs
+        ~i
+        (circuit_prefix "")
     in
-    let prefix = SMap.Aggregation.add_prefix circuit_name in
-    let prefix_j j =
-      SMap.Aggregation.add_prefix ~n:nb_proofs ~i:j circuit_name
-    in
-    let z_name = a_pref z_name in
+    let z_name = e_pref z_name in
     let ss_names =
-      List.init (List.length wires_names) (fun i -> a_pref (ss_name i))
+      List.init (List.length wires_names) (fun i -> e_pref (ss_name i))
     in
     fun x answers ->
-      let get_ss i = get_answer answers X (prefix @@ List.nth ss_names i) in
+      let get_ss i =
+        get_answer answers X (circuit_prefix @@ List.nth ss_names i)
+      in
       (* compute the delta-aggregated wire evaluations at x for each wire name *)
       let batched =
         let wire_j w j = get_answer answers X @@ prefix_j j w in
@@ -461,8 +567,8 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
           (fun w -> Fr_generation.batch delta (List.init nb_proofs (wire_j w)))
           wires_names
       in
-      let z = get_answer answers X (prefix z_name) in
-      let zg = get_answer answers GX (prefix z_name) in
+      let z = get_answer answers X (circuit_prefix z_name) in
+      let zg = get_answer answers GX (circuit_prefix z_name) in
       (* compute the first identity: (Z(x) - 1) * L1(x) *)
       let res1 =
         Scalar.(
@@ -482,11 +588,15 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
           (multiply @@ (zg :: zg_factors))
       in
       SMap.of_list
-        [(prefix (a_pref "Perm.a"), res1); (prefix (a_pref "Perm.b"), res2)]
+        [
+          (circuit_prefix (e_pref "Perm.a"), res1);
+          (circuit_prefix (e_pref "Perm.b"), res2);
+        ]
 
-  let f_map_contribution ~permutation ~values ~beta ~gamma ~domain =
+  let f_map_contribution ?(external_prefix = "") ~permutation ~values ~beta
+      ~gamma ~domain () =
     SMap.singleton
-      z_name
+      (external_prefix_fun external_prefix z_name)
       (Permutation_poly.compute_Z permutation domain beta gamma values)
 
   let cs ~sum_alpha_i ~l1 ~ss_list ~beta ~gamma ~delta ~x ~z ~zg ~wires =
@@ -527,7 +637,9 @@ module type S = sig
 
   val build_permutation : int array array -> int array
 
+  (* external_prefix is an additionnal prefix for Ss, Z and identities names ; it is used by Range check gate *)
   val preprocessing :
+    ?external_prefix:string ->
     domain:Domain.t ->
     permutation:int array ->
     nb_wires:int ->
@@ -540,11 +652,9 @@ module type S = sig
     evaluations:Evaluations.t SMap.t ->
     Evaluations.t SMap.t
 
-  (* prefix is an additionnal prefix for Ss, Z and identities names ; it is
-     used by Range check gate *)
   val prover_identities :
-    ?prefix:string ->
-    ?circuit_name:string ->
+    ?external_prefix:string ->
+    ?circuit_prefix:(string -> string) ->
     wires_names:string list ->
     beta:Scalar.t ->
     gamma:Scalar.t ->
@@ -552,11 +662,9 @@ module type S = sig
     unit ->
     prover_identities
 
-  (* prefix is an additionnal prefix for Ss, Z and identities names ; it is
-     used by Range check gate *)
   val verifier_identities :
-    ?prefix:string ->
-    ?circuit_name:string ->
+    ?external_prefix:string ->
+    ?circuit_prefix:(string -> string) ->
     nb_proofs:int ->
     generator:Scalar.t ->
     n:int ->
@@ -568,11 +676,13 @@ module type S = sig
     verifier_identities
 
   val f_map_contribution :
+    ?external_prefix:string ->
     permutation:int array ->
     values:Evaluations.t SMap.t ->
-    beta:Poly.scalar ->
-    gamma:Poly.scalar ->
+    beta:Scalar.t ->
+    gamma:Scalar.t ->
     domain:Domain.t ->
+    unit ->
     Poly.t SMap.t
 
   val cs :
@@ -587,6 +697,32 @@ module type S = sig
     zg:L.scalar L.repr ->
     wires:L.scalar L.repr list list ->
     (L.scalar L.repr * L.scalar L.repr) L.t
+
+  module Shared_argument : sig
+    val build_batched_wires_values :
+      delta:Scalar.t ->
+      wires:Evaluations.t SMap.t list SMap.t ->
+      Evaluations.t SMap.t SMap.t
+
+    val batched_wires_poly_of_batched_wires :
+      bool * int * Domain.t ->
+      Evaluations.t SMap.t ->
+      Scalar.t * Poly.t SMap.t option list ->
+      Poly.t SMap.t
+
+    val build_batched_witness_polys :
+      ?use_batched_wires:bool ->
+      zero_knowledge:bool ->
+      domain:Domain.t ->
+      delta:Scalar.t ->
+      batched_wires:Evaluations.t SMap.t SMap.t ->
+      f:Poly.t SMap.t list SMap.t * Poly.t SMap.t option list SMap.t ->
+      unit ->
+      Poly.t SMap.t
+
+    val merge_batched_values :
+      'a SMap.t SMap.t -> 'a SMap.t SMap.t -> 'a SMap.t SMap.t
+  end
 end
 
 module Permutation_gate (PP : Polynomial_protocol.S) : S with module PP = PP =

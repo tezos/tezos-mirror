@@ -1,10 +1,4 @@
-module Scalar = struct
-  include Bls12_381.Fr
-
-  let t : t Repr.t =
-    Repr.(map (bytes_of (`Fixed size_in_bytes)) of_bytes_exn to_bytes)
-end
-
+module Scalar = Plompiler.Csir.Scalar
 module Scalar_map = Map.Make (Scalar)
 module Poly = Bls12_381_polynomial.Polynomial
 module Domain = Bls12_381_polynomial.Domain

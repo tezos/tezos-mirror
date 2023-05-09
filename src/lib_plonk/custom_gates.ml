@@ -63,10 +63,9 @@ module type S = sig
   val aggregate_blinds : gates:'a SMap.t -> int SMap.t
 
   val aggregate_prover_identities :
-    ?circuit_name:string ->
+    ?circuit_prefix:(string -> string) ->
     input_coms_size:int ->
-    proof_idx:int ->
-    nb_proofs:int ->
+    proof_prefix:(string -> string) ->
     gates:'a SMap.t ->
     public_inputs:Scalar.t array ->
     domain:Domain.t ->
@@ -74,10 +73,9 @@ module type S = sig
     prover_identities
 
   val aggregate_verifier_identities :
-    ?circuit_name:string ->
+    ?circuit_prefix:(string -> string) ->
     input_com_sizes:int list ->
-    proof_idx:int ->
-    nb_proofs:int ->
+    proof_prefix:(string -> string) ->
     gates:'a SMap.t ->
     public_inputs:Scalar.t array ->
     generator:Scalar.t ->
@@ -220,7 +218,7 @@ module Aggregator = struct
     let sum_array a = Array.fold_left ( + ) 0 a in
     SMap.map sum_array blinds_array
 
-  let filter_evaluations ~evaluations ~prefix ~prefix_common gates =
+  let filter_evaluations ~evaluations ~prefix ~circuit_prefix gates =
     let get_eval = Evaluations.find_evaluation evaluations in
     let base =
       List.fold_left
@@ -256,19 +254,19 @@ module Aggregator = struct
         (* Adding advice *)
         let acc =
           List.init (get_nb_advs gate) (fun i ->
-              prefix_common qadv_label ^ string_of_int i)
+              circuit_prefix qadv_label ^ string_of_int i)
           |> List.fold_left
                (fun acc2 adv_i -> SMap.add adv_i (get_eval adv_i) acc2)
                acc
         in
         (* Adding selector *)
-        let gate = prefix_common gate in
-        if String.starts_with ~prefix:(prefix_common "qpub") gate then acc
+        let gate = circuit_prefix gate in
+        if String.starts_with ~prefix:(circuit_prefix "qpub") gate then acc
         else SMap.add gate (get_eval gate) acc)
       base
       gates
 
-  let filter_answers ~answers ~prefix ~prefix_common gates =
+  let filter_answers ~answers ~prefix ~circuit_prefix gates =
     let x, gx = (string_of_eval_point X, string_of_eval_point GX) in
     let get_x, get_gx = (get_answer answers X, get_answer answers GX) in
     let add_mapmap k' k v mm =
@@ -307,107 +305,96 @@ module Aggregator = struct
         (* Adding advice *)
         let acc =
           List.init (get_nb_advs gate) (fun i ->
-              prefix_common qadv_label ^ string_of_int i)
+              circuit_prefix qadv_label ^ string_of_int i)
           |> List.fold_left
                (fun acc2 adv_i -> add_x adv_i (get_x adv_i) acc2)
                acc
         in
         (* Adding selector *)
-        let gate = prefix_common gate in
-        if String.starts_with ~prefix:(prefix_common "qpub") gate then acc
+        let gate = circuit_prefix gate in
+        if String.starts_with ~prefix:(circuit_prefix "qpub") gate then acc
         else add_x gate (get_x gate) acc)
       base
       gates
 
-  let aggregate_prover_identities ?(circuit_name = "") ~input_coms_size
-      ~proof_idx ~nb_proofs ~gates ~public_inputs ~domain () : prover_identities
+  let aggregate_prover_identities ?(circuit_prefix = Fun.id) ~input_coms_size
+      ~proof_prefix:prefix ~gates ~public_inputs ~domain () : prover_identities
       =
-    let prefix_common = SMap.Aggregation.add_prefix circuit_name in
-    let prefix =
-      SMap.Aggregation.add_prefix ~n:nb_proofs ~i:proof_idx circuit_name
+   fun evaluations ->
+    let size_eval = Evaluations.size_evaluations evaluations in
+    (* Sort and filter gates according to nb of tmp buffers *)
+    let gates =
+      List.sort
+        (fun gate1 gate2 ->
+          Int.compare (get_nb_buffers gate1) (get_nb_buffers gate2))
+        (filter_gates gates |> SMap.keys)
     in
-    fun evaluations ->
-      let size_eval = Evaluations.size_evaluations evaluations in
-      (* Sort and filter gates according to nb of tmp buffers *)
-      let gates =
-        List.sort
-          (fun gate1 gate2 ->
-            Int.compare (get_nb_buffers gate1) (get_nb_buffers gate2))
-          (filter_gates gates |> SMap.keys)
-      in
-      (* Creating tmp buffers for prover identities *)
-      let nb_min_buffers =
-        match gates with
-        | [] -> 0
-        | hd_gates :: _ -> max 1 (get_nb_buffers hd_gates)
-      in
-      tmp_buffers :=
-        Array.init nb_min_buffers (fun _ -> Evaluations.create size_eval) ;
-      (* Filter evaluations *)
-      let evaluations =
-        filter_evaluations ~evaluations ~prefix ~prefix_common gates
-      in
-      (* Except for the arithmetic gates,
-         all gates correspond to distinct identities. *)
-      let init_ids =
-        let arith_acc_evaluation = Evaluations.create size_eval in
-        SMap.singleton (prefix @@ arith ^ ".0") arith_acc_evaluation
-      in
-      let union key e1 e2 =
-        assert (key = prefix @@ arith ^ ".0") ;
-        Some (Evaluations.add ~res:e1 e1 e2)
-      in
-      let public = {public_inputs; input_coms_size} in
-      List.fold_left
-        (fun accumulated_ids gate ->
-          SMap.union
-            union
-            accumulated_ids
-            (get_prover_identities
-               gate
-               ~prefix_common
-               ~prefix
-               ~public
-               ~domain
-               evaluations))
-        init_ids
-        gates
+    (* Creating tmp buffers for prover identities *)
+    let nb_min_buffers =
+      match gates with
+      | [] -> 0
+      | hd_gates :: _ -> max 1 (get_nb_buffers hd_gates)
+    in
+    tmp_buffers :=
+      Array.init nb_min_buffers (fun _ -> Evaluations.create size_eval) ;
+    (* Filter evaluations *)
+    let evaluations =
+      filter_evaluations ~evaluations ~prefix ~circuit_prefix gates
+    in
+    (* Except for the arithmetic gates,
+       all gates correspond to distinct identities. *)
+    let init_ids =
+      let arith_acc_evaluation = Evaluations.create size_eval in
+      SMap.singleton (prefix @@ arith ^ ".0") arith_acc_evaluation
+    in
+    let union key e1 e2 =
+      assert (key = prefix @@ arith ^ ".0") ;
+      Some (Evaluations.add ~res:e1 e1 e2)
+    in
+    let public = {public_inputs; input_coms_size} in
+    List.fold_left
+      (fun accumulated_ids gate ->
+        SMap.union
+          union
+          accumulated_ids
+          (get_prover_identities
+             gate
+             ~prefix_common:circuit_prefix
+             ~prefix
+             ~public
+             ~domain
+             evaluations))
+      init_ids
+      gates
 
-  let aggregate_verifier_identities ?(circuit_name = "") ~input_com_sizes
-      ~proof_idx ~nb_proofs ~gates ~public_inputs ~generator ~size_domain () :
+  let aggregate_verifier_identities ?(circuit_prefix = Fun.id) ~input_com_sizes
+      ~proof_prefix:prefix ~gates ~public_inputs ~generator ~size_domain () :
       verifier_identities =
-    let prefix_common = SMap.Aggregation.add_prefix circuit_name in
-    let prefix =
-      SMap.Aggregation.add_prefix ~n:nb_proofs ~i:proof_idx circuit_name
+   fun x answers ->
+    let gates = filter_gates gates |> SMap.keys in
+    let answers = filter_answers ~answers ~prefix ~circuit_prefix gates in
+    let arith_id = SMap.singleton (prefix @@ arith ^ ".0") Scalar.zero in
+    let union key s1 s2 =
+      assert (key = prefix @@ arith ^ ".0") ;
+      Some (Scalar.add s1 s2)
     in
-    fun x answers ->
-      let gates = filter_gates gates |> SMap.keys in
-      let answers = filter_answers ~answers ~prefix ~prefix_common gates in
-      let arith_id = SMap.singleton (prefix @@ arith ^ ".0") Scalar.zero in
-      let union key s1 s2 =
-        assert (key = prefix @@ arith ^ ".0") ;
-        Some (Scalar.add s1 s2)
-      in
-      let public =
-        {
-          public_inputs;
-          input_coms_size = List.fold_left ( + ) 0 input_com_sizes;
-        }
-      in
-      List.fold_left
-        (fun accumulated_ids gate ->
-          let gate_ids =
-            get_verifier_identities
-              gate
-              ~prefix_common
-              ~prefix
-              ~public
-              ~generator
-              ~size_domain
-          in
-          SMap.union union accumulated_ids (gate_ids x answers))
-        arith_id
-        gates
+    let public =
+      {public_inputs; input_coms_size = List.fold_left ( + ) 0 input_com_sizes}
+    in
+    List.fold_left
+      (fun accumulated_ids gate ->
+        let gate_ids =
+          get_verifier_identities
+            gate
+            ~prefix_common:circuit_prefix
+            ~prefix
+            ~public
+            ~generator
+            ~size_domain
+        in
+        SMap.union union accumulated_ids (gate_ids x answers))
+      arith_id
+      gates
 
   let aggregate_polynomials_degree ~gates =
     SMap.fold

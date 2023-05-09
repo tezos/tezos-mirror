@@ -83,27 +83,32 @@ module type S = sig
       Evaluations.t SMap.t list SMap.t ->
       Poly.t SMap.t
 
-    val batched_wires_poly_of_batched_wires :
-      prover_public_parameters ->
-      Evaluations.t SMap.t ->
-      Scalar.t * Poly.t SMap.t option list ->
-      Poly.t SMap.t
-
-    val build_batched_wires_values :
-      gate_randomness ->
-      Evaluations.t SMap.t list SMap.t ->
-      Evaluations.t SMap.t SMap.t
-
     val build_f_map_perm :
       prover_public_parameters ->
       gate_randomness ->
       Evaluations.t SMap.t SMap.t ->
       Poly.t SMap.t
 
-    val build_perm_identities :
+    (* builds the range check proof polynomials *)
+    val build_f_map_rc_1 :
+      ?shifts_map:(int * int) SMap.t ->
+      prover_public_parameters ->
+      gate_randomness ->
+      Evaluations.t SMap.t list SMap.t ->
+      Evaluations.t SMap.t SMap.t ->
+      Poly.t SMap.t * Evaluations.t SMap.t SMap.t
+
+    (* builds the range check’s permutation proof polynomials *)
+    val build_f_map_rc_2 :
+      prover_public_parameters ->
+      gate_randomness ->
+      Evaluations.t SMap.t SMap.t ->
+      Poly.t SMap.t
+
+    val build_perm_rc2_identities :
       prover_public_parameters -> gate_randomness -> prover_identities
 
-    val build_gates_plook_rc_identities :
+    val build_gates_plook_rc1_identities :
       ?shifts_map:(int * int) SMap.t ->
       prover_public_parameters ->
       gate_randomness ->
@@ -287,13 +292,22 @@ module Common (PP : Polynomial_protocol.S) = struct
 
   let commit_to_plook_rc pp shifts_map transcript f_wires_list_map =
     let rd, _transcript = build_gates_randomness transcript in
-    let batched_wires_map = build_batched_wires_values rd f_wires_list_map in
+    let batched_wires_map =
+      Perm.Shared_argument.build_batched_wires_values
+        ~delta:rd.delta
+        ~wires:f_wires_list_map
+    in
     (* ******************************************* *)
     let f_map_plook = build_f_map_plook ~shifts_map pp rd f_wires_list_map in
-    let f_map_rc =
-      Prover.build_f_map_range_checks ~shifts_map pp rd f_wires_list_map
-    in
-    let f_map = SMap.union_disjoint f_map_plook f_map_rc in
+    (* FIXME https://gitlab.com/nomadic-labs/cryptography/privacy-team/-/issues/222
+       Handle multiproofs
+    *)
+    (* let f_map_rc, batched_wires_map =
+         Prover.build_f_map_range_checks ~shifts_map pp rd f_wires_list_map
+           batched_wires_map
+       in
+       let f_map = SMap.union_disjoint f_map_plook f_map_rc in *)
+    let f_map = f_map_plook in
     (* commit to the plookup polynomials *)
     let cmt, prover_aux =
       (* FIXME: implement Plookup *)
@@ -339,7 +353,7 @@ module Common (PP : Polynomial_protocol.S) = struct
       SMap.map
         (fun batched_witness ->
           (* we apply an IFFT on the batched witness *)
-          batched_wires_poly_of_batched_wires
+          Perm.Shared_argument.batched_wires_poly_of_batched_wires
             pp
             batched_witness
             (Scalar.zero, []))
@@ -380,13 +394,15 @@ module Common (PP : Polynomial_protocol.S) = struct
     let evaluated_perm_ids =
       let evaluations =
         let batched_wires_polys =
-          build_batched_witness_polys_bis pp batched_wires_map
+          build_batched_witness_polys_bis
+            (pp.common_pp.zk, pp.common_pp.n, pp.common_pp.domain)
+            batched_wires_map
         in
         build_evaluations
           pp
           (SMap.union_disjoint f_map_perm batched_wires_polys)
       in
-      (build_perm_identities pp randomness) evaluations
+      (build_perm_rc2_identities pp randomness) evaluations
     in
     let cmt = Commitment.commit pp.common_pp.pp_public_parameters f_map_perm in
 
