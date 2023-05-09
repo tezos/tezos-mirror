@@ -98,6 +98,10 @@ Signer
 Proxy Server
 ------------
 
+- Redirected not found replies (HTTP 404 answers) to the underlying
+  octez-node itself. Public visibility of the node is not required
+  anymore.
+
 Protocol Compiler And Environment
 ---------------------------------
 
