@@ -323,6 +323,9 @@ end) : Internal_event.SINK with type t = t = struct
     Format.kasprintf (failwith "Parsing URI: %s: %s" (Uri.to_string uri)) fmt
 
   let configure uri =
+    let flag name =
+      match Uri.get_query_param uri name with Some "true" -> true | _ -> false
+    in
     let open Lwt_result_syntax in
     let section_prefixes =
       let all =
@@ -414,11 +417,6 @@ end) : Internal_event.SINK with type t = t = struct
                 | None ->
                     fail_parsing uri "daily-logs should be an integer : %S" n)
             | None -> return_none
-          in
-          let flag name =
-            match Uri.get_query_param uri name with
-            | Some "true" -> true
-            | _ -> false
           in
           let with_pid = flag "with-pid" in
           let fresh = flag "fresh" in
