@@ -47,6 +47,7 @@ type t = {
     | (* See https://tools.ietf.org/html/rfc5424#section-6 *)
       `Pp_RFC5424
     | `Pp_short ];
+  colors : bool;
   (* Hopefully temporary hack to handle event which are emitted with
      the non-cooperative log functions in `Legacy_logging`: *)
   lwt_bad_citizen_hack :
@@ -71,6 +72,24 @@ type 'event wrapped = {
 let wrap time_stamp section event = {time_stamp; section; event}
 
 let is_syslog o = match o with Syslog _ -> true | _ -> false
+
+module Color = struct
+  let reset = "\027[0m"
+
+  let reset_len = 4
+
+  let color_len = 5
+
+  let bold = "\027[1m"
+
+  let bold_len = 4
+
+  module FG = struct
+    let red = "\027[31m"
+
+    let yellow = "\027[33m"
+  end
+end
 
 let wrapped_encoding event_encoding =
   let open Data_encoding in
@@ -108,7 +127,9 @@ let make_with_pp_rfc5424 pp wrapped_event name =
     (pp ~all_fields:false ~block:false)
     wrapped_event.event
 
-let make_with_pp_short pp wrapped_event =
+type color_setting = Enabled of string option | Disabled
+
+let make_with_pp_short ~color pp wrapped_event =
   let pp_date fmt time =
     let time = Ptime.to_float_s time in
     let tm = Unix.localtime time in
@@ -148,13 +169,27 @@ let make_with_pp_short pp wrapped_event =
          (pp ~all_fields:false ~block:true)
          wrapped_event.event)
   in
+  let color_total_size, bold_total_size =
+    match color with
+    | Enabled color_opt ->
+        let color_total_size =
+          if Option.is_some color_opt then Color.(color_len + reset_len) else 0
+        in
+        let bold_total_size i =
+          if i = 0 then Color.(bold_len + reset_len) else 0
+        in
+        (color_total_size, bold_total_size)
+    | Disabled -> (0, fun _i -> 0)
+  in
+
   let timestamp = Format.asprintf "%a: " pp_date wrapped_event.time_stamp in
   let timestamp_size = String.length timestamp in
   let lines_size =
-    List.fold_left
-      (fun acc s ->
-        (* total length of a line is (timestamp + message + \n *)
-        acc + timestamp_size + String.length s + 1)
+    List.fold_left_i
+      (fun i acc s ->
+        (* computing the total length of a line *)
+        acc + timestamp_size + String.length s + 1 + color_total_size
+        + bold_total_size i)
       0
       lines
   in
@@ -164,12 +199,22 @@ let make_with_pp_short pp wrapped_event =
     Bytes.blit_string s 0 buf !prev_pos len ;
     prev_pos := !prev_pos + len
   in
+  let enable_color, color_tag_opt =
+    match color with
+    | Enabled color_tag -> (true, color_tag)
+    | Disabled -> (false, None)
+  in
   let () =
-    List.iter
-      (fun s ->
+    List.iteri
+      (fun i s ->
+        let bold_first_header = enable_color && i = 0 in
         let s_len = String.length s in
+        if bold_first_header then blit Color.bold Color.bold_len ;
         blit timestamp timestamp_size ;
+        if bold_first_header then blit Color.reset Color.reset_len ;
+        Option.iter (fun tag -> blit tag Color.color_len) color_tag_opt ;
         blit s s_len ;
+        if Option.is_some color_tag_opt then blit Color.reset Color.reset_len ;
         blit "\n" 1)
       lines
   in
@@ -190,7 +235,7 @@ let%expect_test _ =
       section = Internal_event.Section.make_sanitized ["my"; "section"];
     }
   in
-  print_endline (make_with_pp_short pp_string ev) ;
+  print_endline (make_with_pp_short ~color:Disabled pp_string ev) ;
   [%expect {| Apr 27 08:29:09.000: toto |}] ;
   let ev = {ev with time_stamp = make_timestamp ts} in
   print_endline (make_with_pp_rfc5424 pp_string ev "my-event") ;
@@ -357,6 +402,7 @@ end) : Internal_event.SINK with type t = t = struct
       | None | Some "one-per-line" -> return `One_per_line
       | Some other -> fail_parsing uri "Unknown format: %S" other
     in
+    let colors = flag "colors" in
     let* output =
       match K.kind with
       | `Path ->
@@ -454,7 +500,7 @@ end) : Internal_event.SINK with type t = t = struct
       | `Stdout -> return (Static Lwt_unix.stdout)
       | `Stderr -> return (Static Lwt_unix.stderr)
     in
-    let t = {output; lwt_bad_citizen_hack = ref []; filter; format} in
+    let t = {output; lwt_bad_citizen_hack = ref []; filter; format; colors} in
     return t
 
   let write_mutex = Lwt_mutex.create ()
@@ -559,14 +605,27 @@ end) : Internal_event.SINK with type t = t = struct
         | Some (_, None) -> (* exclude list *) false
         | Some (_, Some lvl) -> Internal_event.Level.compare M.level lvl >= 0)
 
-  let handle (type a) {output; lwt_bad_citizen_hack; format; _} m
+  let level_color = function
+    | Internal_event.Warning -> Some Color.FG.yellow
+    | Error | Fatal -> Some Color.FG.red
+    | Info | Notice | Debug -> None
+
+  let output_color_compatible out =
+    let open Lwt_syntax in
+    match out with
+    | Static fd ->
+        let* is_a_tty = Lwt_unix.isatty fd in
+        return (is_a_tty && Sys.getenv_opt "TERM" <> Some "dumb")
+    | Syslog _ | Rotating _ -> return_false
+
+  let handle (type a) {output; lwt_bad_citizen_hack; format; colors; _} m
       ?(section = Internal_event.Section.empty) (event : a) =
     let open Lwt_result_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     let now = Ptime_clock.now () in
     let wrapped_event = wrap now section event in
-    let to_write =
-      if is_syslog output then make_for_syslog M.pp wrapped_event
+    let*! to_write =
+      if is_syslog output then Lwt.return @@ make_for_syslog M.pp wrapped_event
       else
         let json () =
           Data_encoding.Json.construct
@@ -574,12 +633,23 @@ end) : Internal_event.SINK with type t = t = struct
             wrapped_event
         in
         match format with
-        | `Pp_RFC5424 -> make_with_pp_rfc5424 M.pp wrapped_event M.name
-        | `Pp_short -> make_with_pp_short M.pp wrapped_event
-        | `One_per_line -> Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
+        | `Pp_RFC5424 ->
+            Lwt.return @@ make_with_pp_rfc5424 M.pp wrapped_event M.name
+        | `Pp_short ->
+            let*! color =
+              if colors then
+                let*! color_compatible = output_color_compatible output in
+                if color_compatible then
+                  Lwt.return (Enabled (level_color M.level))
+                else Lwt.return Disabled
+              else Lwt.return Disabled
+            in
+            Lwt.return @@ make_with_pp_short ~color M.pp wrapped_event
+        | `One_per_line ->
+            Lwt.return @@ Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
         | `Netstring ->
             let bytes = Ezjsonm.value_to_string ~minify:true (json ()) in
-            Format.asprintf "%d:%s," (String.length bytes) bytes
+            Lwt.return @@ Format.asprintf "%d:%s," (String.length bytes) bytes
     in
     lwt_bad_citizen_hack :=
       (to_write, M.level, section) :: !lwt_bad_citizen_hack ;
