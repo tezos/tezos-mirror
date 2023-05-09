@@ -24,7 +24,7 @@ pub struct BlockConstants {
     /// the value to an arbitrary value.
     pub difficulty: U256,
     /// Gas limit for the current block.
-    pub gas_limit: U256,
+    pub gas_limit: u64,
     /// The base fee per gas for doing a transaction.
     pub base_fee_per_gas: U256,
     /// Identifier for the chain. Normally this would identify the chain (Ethereum
@@ -43,7 +43,7 @@ impl BlockConstants {
             coinbase: H160::zero(),
             timestamp: U256::zero(),
             difficulty: U256::zero(),
-            gas_limit: U256::one(),
+            gas_limit: 1u64,
             base_fee_per_gas: U256::one(),
             chain_id: U256::zero(),
         }
@@ -68,7 +68,7 @@ pub struct L2Block {
     pub total_difficulty: U256,
     pub extra_data: OwnedHash,
     pub size: U256,
-    pub gas_limit: U256,
+    pub gas_limit: u64,
     pub gas_used: U256,
     pub timestamp: U256,
     pub transactions: Vec<TransactionHash>,
@@ -103,7 +103,7 @@ impl L2Block {
             total_difficulty: U256::zero(),
             extra_data: L2Block::dummy_hash(),
             size: U256::zero(),
-            gas_limit: U256::one(),
+            gas_limit: 1u64,
             gas_used: U256::zero(),
             timestamp: U256::zero(),
             transactions,

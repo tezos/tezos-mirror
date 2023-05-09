@@ -804,7 +804,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn block_gas_limit(&self) -> U256 {
-        self.block.gas_limit
+        self.block.gas_limit.into()
     }
 
     fn block_base_fee_per_gas(&self) -> U256 {

@@ -112,7 +112,7 @@ where
         e.to.into(),
         e.caller()?.into(),
         e.data,
-        Some(e.gas_limit.as_u64()),
+        Some(e.gas_limit),
         Some(e.value),
     )?;
 

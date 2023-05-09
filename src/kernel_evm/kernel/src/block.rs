@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::panic::catch_unwind;
-
 use crate::blueprint::Queue;
 use crate::error::Error;
 use crate::error::StorageError::AccountInitialisation;
@@ -124,10 +122,6 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
         let transactions = proposal.transactions;
 
         for (transaction, index) in transactions.into_iter().zip(0u32..) {
-            // TODO: https://gitlab.com/tezos/tezos/-/issues/5487
-            // gas_limit representation should be the same through all modules to avoid
-            // odd conversions
-            let gas_limit = catch_unwind(|| transaction.tx.gas_limit.as_u64()).ok();
             let caller = transaction
                 .tx
                 .caller()
@@ -140,7 +134,7 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
                 transaction.tx.to.into(),
                 caller.into(),
                 transaction.tx.data,
-                gas_limit,
+                Some(transaction.tx.gas_limit),
                 Some(transaction.tx.value),
             ) {
                 Ok(outcome) => {
@@ -234,7 +228,7 @@ mod tests {
         // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
         let nonce = U256::from(0);
         let gas_price = U256::from(40000000000u64);
-        let gas_limit = U256::from(21000);
+        let gas_limit = 21000u64;
         let to =
             EthereumAddress::from("423163e58aabec5daa3dd1130b759d24bef0f6ea".to_string());
         let value = U256::from(5000000000000000u64);
