@@ -51,7 +51,13 @@ module Transport_layer = struct
       Interface.conn_meta_config
     @@ Interface.message_config ~network_name
 
-  let activate = P2p.activate
+  let activate ?(additional_points = []) p2p =
+    let () = P2p.activate p2p in
+    P2p.pool p2p
+    |> Option.iter (fun pool ->
+           List.iter
+             (fun point -> P2p_pool.register_point pool point |> ignore)
+             additional_points)
 end
 
 module Transport_layer_hooks = Gs_transport_connection

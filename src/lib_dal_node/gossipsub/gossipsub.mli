@@ -82,10 +82,15 @@ module Transport_layer : sig
 
   type t
 
+  (** [create ~network_name config limits] create a new instance of type
+      {!t}. It is a wrapper on top of {!P2p.activate}. *)
   val create :
     network_name:string -> P2p.config -> P2p_limits.t -> t tzresult Lwt.t
 
-  val activate : t -> unit
+  (** [activate ?additional_points t] activates the given transport layer [t]. It
+      is a wrapper on top of {!P2p.activate}. If some [additional_points] are
+      given, they are added to [t]'s known points. *)
+  val activate : ?additional_points:P2p_point.Id.t list -> t -> unit
 end
 
 (** This module implements the list of hooks that allow interconnecting the
