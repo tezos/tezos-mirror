@@ -51,6 +51,7 @@ val make_config_uri :
   ?format:string ->
   ?chmod:int ->
   ?with_pid:bool ->
+  ?colors:bool ->
   ?fresh:bool ->
   ?section_prefixes:(string * Internal_event.level) list ->
   [`Stdout | `Stderr | `Path of string | `Null | `Syslog of string] ->

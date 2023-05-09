@@ -138,6 +138,7 @@ let make_default_internal_events ~rules ~verbosity
     Internal_event_config.make_config_uri
       ~level:verbosity
       ~section_prefixes
+      ~colors:true
       ~format:"pp-short"
       kind
   in
