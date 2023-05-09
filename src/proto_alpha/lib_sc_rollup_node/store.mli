@@ -134,36 +134,4 @@ type +'a store = {
   irmin_store : 'a Irmin_store.t;
 }
 
-(** Type of store. The parameter indicates if the store can be written or only
-    read. *)
-type 'a t = ([< `Read | `Write > `Read] as 'a) store
-
-(** Read/write store {!t}. *)
-type rw = Store_sigs.rw t
-
-(** Read only store {!t}. *)
-type ro = Store_sigs.ro t
-
-(** [close store] closes the store. *)
-val close : _ t -> unit tzresult Lwt.t
-
-(** [load mode ~l2_blocks_cache_size directory] loads a store from the data
-    persisted in [directory]. If [mode] is {!Store_sigs.Read_only}, then the
-    indexes and irmin store will be opened in readonly mode and only read
-    operations will be permitted. This allows to open a store for read access
-    that is already opened in {!Store_sigs.Read_write} mode in another
-    process. [l2_blocks_cache_size] is the number of L2 blocks the rollup node
-    will keep in memory. *)
-val load :
-  'a Store_sigs.mode ->
-  l2_blocks_cache_size:int ->
-  string ->
-  'a store tzresult Lwt.t
-
-(** [readonly store] returns a read-only version of [store]. *)
-val readonly : _ t -> ro
-
-(** [iter_l2_blocks store f] iterates [f] on all L2 blocks reachable from the
-    head, from newest to oldest.  *)
-val iter_l2_blocks :
-  _ t -> (Sc_rollup_block.t -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
+include Store_sig.S with type 'a store := 'a store
