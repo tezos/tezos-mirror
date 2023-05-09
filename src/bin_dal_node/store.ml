@@ -95,6 +95,7 @@ type node_store = {
   store : t;
   shard_store : Shards.t;
   shards_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
+  gs_worker : Gossipsub.Worker.t;
 }
 
 (** [open_shards_stream node_store] opens a stream that should be notified when
@@ -102,8 +103,9 @@ type node_store = {
 let open_shards_stream {shards_watcher; _} =
   Lwt_watcher.create_stream shards_watcher
 
-(** [init config] inits the store on the filesystem using the given [config]. *)
-let init config =
+(** [init gs_worker config] inits the store on the filesystem using the
+    given [config] and [gs_worker]. *)
+let init gs_worker config =
   let open Lwt_result_syntax in
   let base_dir = Configuration.data_dir_path config path in
   let shards_watcher = Lwt_watcher.create_input () in
@@ -111,7 +113,7 @@ let init config =
   let*! store = main repo in
   let shard_store = Shards.init base_dir shard_store_dir in
   let*! () = Event.(emit store_is_ready ()) in
-  return {shard_store; store; shards_watcher}
+  return {shard_store; store; shards_watcher; gs_worker}
 
 let trace_decoding_error ~data_kind ~tztrace_of_error r =
   let open Result_syntax in
