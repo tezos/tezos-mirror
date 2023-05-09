@@ -119,7 +119,9 @@ let make_with_pp_short pp wrapped_event =
       | 8 -> "Sep"
       | 9 -> "Oct"
       | 10 -> "Nov"
-      | 11 | _ -> "Dec"
+      | 11 -> "Dec"
+      | _ -> assert false
+      (* `tm` is built locally, so it should contain invalid month code *)
     in
     let ms = mod_float (time *. 1000.) 1000. in
     Format.fprintf
