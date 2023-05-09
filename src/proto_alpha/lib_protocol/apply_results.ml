@@ -868,14 +868,14 @@ type 'kind contents_result =
       balance_updates : Receipt.balance_updates;
       delegate : Signature.public_key_hash;
       consensus_key : Signature.public_key_hash;
-      preendorsement_power : int;
+      consensus_power : int;
     }
       -> Kind.preendorsement contents_result
   | Endorsement_result : {
       balance_updates : Receipt.balance_updates;
       delegate : Signature.public_key_hash;
       consensus_key : Signature.public_key_hash;
-      endorsement_power : int;
+      consensus_power : int;
     }
       -> Kind.endorsement contents_result
   | Dal_attestation_result : {
@@ -1001,6 +1001,14 @@ let equal_manager_kind :
   | Kind.Zk_rollup_update_manager_kind, _ -> None
 
 module Encoding = struct
+  let consensus_result_encoding power_name =
+    let open Data_encoding in
+    obj4
+      (dft "balance_updates" Receipt.balance_updates_encoding [])
+      (req "delegate" Signature.Public_key_hash.encoding)
+      (req (Format.asprintf "%s_power" power_name) int31)
+      (req "consensus_key" Signature.Public_key_hash.encoding)
+
   type 'kind case =
     | Case : {
         op_case : 'kind Operation.Encoding.case;
@@ -1027,12 +1035,7 @@ module Encoding = struct
     Case
       {
         op_case = Operation.Encoding.preendorsement_case;
-        encoding =
-          obj4
-            (dft "balance_updates" Receipt.balance_updates_encoding [])
-            (req "delegate" Signature.Public_key_hash.encoding)
-            (req "preendorsement_power" int31)
-            (req "consensus_key" Signature.Public_key_hash.encoding);
+        encoding = consensus_result_encoding "preendorsement";
         select =
           (function
           | Contents_result (Preendorsement_result _ as op) -> Some op
@@ -1044,25 +1047,19 @@ module Encoding = struct
         proj =
           (function
           | Preendorsement_result
-              {balance_updates; delegate; consensus_key; preendorsement_power}
-            ->
-              (balance_updates, delegate, preendorsement_power, consensus_key));
+              {balance_updates; delegate; consensus_key; consensus_power} ->
+              (balance_updates, delegate, consensus_power, consensus_key));
         inj =
-          (fun (balance_updates, delegate, preendorsement_power, consensus_key) ->
+          (fun (balance_updates, delegate, consensus_power, consensus_key) ->
             Preendorsement_result
-              {balance_updates; delegate; consensus_key; preendorsement_power});
+              {balance_updates; delegate; consensus_key; consensus_power});
       }
 
   let endorsement_case =
     Case
       {
         op_case = Operation.Encoding.endorsement_case;
-        encoding =
-          obj4
-            (dft "balance_updates" Receipt.balance_updates_encoding [])
-            (req "delegate" Signature.Public_key_hash.encoding)
-            (req "endorsement_power" int31)
-            (req "consensus_key" Signature.Public_key_hash.encoding);
+        encoding = consensus_result_encoding "endorsement";
         select =
           (function
           | Contents_result (Endorsement_result _ as op) -> Some op | _ -> None);
@@ -1073,12 +1070,12 @@ module Encoding = struct
         proj =
           (function
           | Endorsement_result
-              {balance_updates; delegate; consensus_key; endorsement_power} ->
-              (balance_updates, delegate, endorsement_power, consensus_key));
+              {balance_updates; delegate; consensus_key; consensus_power} ->
+              (balance_updates, delegate, consensus_power, consensus_key));
         inj =
-          (fun (balance_updates, delegate, endorsement_power, consensus_key) ->
+          (fun (balance_updates, delegate, consensus_power, consensus_key) ->
             Endorsement_result
-              {balance_updates; delegate; consensus_key; endorsement_power});
+              {balance_updates; delegate; consensus_key; consensus_power});
       }
 
   let dal_attestation_case =

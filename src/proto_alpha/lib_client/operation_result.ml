@@ -876,38 +876,38 @@ let pp_contents_and_result :
         bus
   | ( Preendorsement {level; _},
       Preendorsement_result
-        {balance_updates; delegate; consensus_key; preendorsement_power} ) ->
+        {balance_updates; delegate; consensus_key; consensus_power} ) ->
       Format.fprintf
         ppf
         "@[<v 2>Preendorsement:@,\
          Level: %a@,\
          Balance updates:%a@,\
          Delegate: %a@,\
-         Preendorsement Power: %d@]"
+         Consensus Power: %d@]"
         Raw_level.pp
         level
         pp_balance_updates
         balance_updates
         Consensus_key.pp
         {delegate; consensus_pkh = consensus_key}
-        preendorsement_power
+        consensus_power
   | ( Endorsement {level; _},
       Endorsement_result
-        {balance_updates; delegate; consensus_key; endorsement_power} ) ->
+        {balance_updates; delegate; consensus_key; consensus_power} ) ->
       Format.fprintf
         ppf
         "@[<v 2>Endorsement:@,\
          Level: %a@,\
          Balance updates:%a@,\
          Delegate: %a@,\
-         Endorsement power: %d@]"
+         Consensus Power: %d@]"
         Raw_level.pp
         level
         pp_balance_updates
         balance_updates
         Consensus_key.pp
         {delegate; consensus_pkh = consensus_key}
-        endorsement_power
+        consensus_power
   | Dal_attestation _, Dal_attestation_result {delegate} ->
       Format.fprintf
         ppf
