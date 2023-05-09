@@ -191,6 +191,9 @@ Smart Rollup WASM Debugger
 - Added a command ``show function symbols`` to inspect the custom section
   ``name`` of unstripped kernels (MR :gl:`!8522`)
 
+- Added a command ``profile`` that runs a full ``kernel_run`` and produces a
+  flamegraph of the execution (MR :gl:`!8510`).
+
 Miscellaneous
 -------------
 
