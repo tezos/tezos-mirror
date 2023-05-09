@@ -69,7 +69,7 @@ let post_store_preimage =
     ~query:Tezos_rpc.Query.empty
     ~input:store_preimage_request_encoding
     ~output:store_preimage_response_encoding
-    Tezos_rpc.Path.(open_root / "store_preimage")
+    Tezos_rpc.Path.(open_root /: Api.version_rpc_arg / "store_preimage")
 
 (* DAC/FIXME: https://gitlab.com/tezos/tezos/-/issues/4263
    remove this endpoint once end-to-end tests are in place. *)
@@ -78,14 +78,16 @@ let get_verify_signature =
     ~description:"Verify signature of an external message to inject in L1"
     ~query:external_message_query
     ~output:Data_encoding.bool
-    Tezos_rpc.Path.(open_root / "verify_signature")
+    Tezos_rpc.Path.(open_root /: Api.version_rpc_arg / "verify_signature")
 
 let get_preimage =
   Tezos_rpc.Service.get_service
     ~description:"Retrieves a page by its page hash and returns its contents"
     ~query:Tezos_rpc.Query.empty
     ~output:Data_encoding.bytes
-    Tezos_rpc.Path.(open_root / "preimage" /: Dac_plugin.raw_hash_rpc_arg)
+    Tezos_rpc.Path.(
+      open_root /: Api.version_rpc_arg / "preimage"
+      /: Dac_plugin.raw_hash_rpc_arg)
 
 let put_dac_member_signature =
   Tezos_rpc.Service.put_service
@@ -94,7 +96,7 @@ let put_dac_member_signature =
     ~query:Tezos_rpc.Query.empty
     ~input:Signature_repr.encoding
     ~output:Data_encoding.empty
-    Tezos_rpc.Path.(open_root / "dac_member_signature")
+    Tezos_rpc.Path.(open_root /: Api.version_rpc_arg / "dac_member_signature")
 
 let get_certificate =
   Tezos_rpc.Service.get_service
@@ -102,7 +104,9 @@ let get_certificate =
       "Retrieve the Dac certificate associated with the given root page hash"
     ~query:Tezos_rpc.Query.empty
     ~output:(Data_encoding.option Certificate_repr.encoding)
-    Tezos_rpc.Path.(open_root / "certificates" /: Dac_plugin.raw_hash_rpc_arg)
+    Tezos_rpc.Path.(
+      open_root /: Api.version_rpc_arg / "certificates"
+      /: Dac_plugin.raw_hash_rpc_arg)
 
 let get_missing_page =
   Tezos_rpc.Service.get_service
@@ -113,7 +117,9 @@ let get_missing_page =
        Observer mode."
     ~query:Tezos_rpc.Query.empty
     ~output:Data_encoding.bytes
-    Tezos_rpc.Path.(open_root / "missing_page" /: Dac_plugin.raw_hash_rpc_arg)
+    Tezos_rpc.Path.(
+      open_root /: Api.version_rpc_arg / "missing_page"
+      /: Dac_plugin.raw_hash_rpc_arg)
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4935
    Coordinator's "POST /preimage" endpoint should in addition to root page hash
@@ -133,5 +139,5 @@ module Coordinator = struct
       ~query:Tezos_rpc.Query.empty
       ~input:Data_encoding.bytes
       ~output:Dac_plugin.raw_hash_encoding
-      Tezos_rpc.Path.(open_root / "preimage")
+      Tezos_rpc.Path.(open_root /: Api.version_rpc_arg / "preimage")
 end
