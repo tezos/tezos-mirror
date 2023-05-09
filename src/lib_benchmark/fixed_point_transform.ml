@@ -366,7 +366,7 @@ end = struct
       incr x ;
       "v" ^ string_of_int v
 
-  let false_ = Term X.true_
+  let false_ = Term X.false_
 
   let true_ = Term X.true_
 
