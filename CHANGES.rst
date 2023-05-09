@@ -188,6 +188,9 @@ Smart Rollup WASM Debugger
 
 - Automatically ``load inputs`` when ``step inbox`` is called. (MR :gl:`!8444`)
 
+- Added a command ``show function symbols`` to inspect the custom section
+  ``name`` of unstripped kernels (MR :gl:`!8522`)
+
 Miscellaneous
 -------------
 

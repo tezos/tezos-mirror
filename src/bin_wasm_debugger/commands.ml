@@ -45,6 +45,7 @@ type commands =
   | Show_subkeys of string
   | Show_key of string * printable_value_kind
   | Show_memory of int32 * int * printable_value_kind
+  | Dump_function_symbols
   | Step of eval_step
   | Load_inputs
   | Reveal_preimage of string option
@@ -98,6 +99,7 @@ let parse_commands s =
         | Some kind -> Show_key (key, kind)
         | None -> Unknown s)
     | "show" :: "memory" :: rest -> parse_memory_commands s rest
+    | ["dump"; "function"; "symbols"] -> Dump_function_symbols
     | ["step"; step] -> (
         match parse_eval_step step with Some s -> Step s | None -> Unknown s)
     | ["load"; "inputs"] -> Load_inputs
@@ -508,6 +510,14 @@ let show_memory tree address length kind =
             state
       | exn -> Lwt_io.printf "Error: %s\n%!" (Printexc.to_string exn))
 
+type extra = {functions : string Custom_section.FuncMap.t}
+
+let dump_function_symbols extra =
+  let functions =
+    Format.asprintf "%a" Custom_section.pp_function_subsection extra.functions
+  in
+  Lwt_io.printf "Functions:\n%s\n" functions
+
 (* [reveal_preimage config hex tree] checks the current state is waiting for a
    preimage, parses [hex] as an hexadecimal representation of the data or use
    the builtin if none is given, and does a reveal step. *)
@@ -544,7 +554,7 @@ let reveal_metadata config tree =
 
 (* [handle_command command tree inboxes level] dispatches the commands to their
    actual implementation. *)
-let handle_command c config tree inboxes level =
+let handle_command c config extra tree inboxes level =
   let open Lwt_result_syntax in
   let command = parse_commands c in
   let return ?(tree = tree) ?(inboxes = inboxes) () =
@@ -588,6 +598,9 @@ let handle_command c config tree inboxes level =
         return ()
     | Show_memory (address, length, kind) ->
         let*! () = show_memory tree address length kind in
+        return ()
+    | Dump_function_symbols ->
+        let*! () = dump_function_symbols extra in
         return ()
     | Reveal_preimage bytes ->
         let*! tree = reveal_preimage config bytes tree in
