@@ -98,8 +98,11 @@ val wait : t -> Unix.process_status Lwt.t
     If [use_unsafe_srs] is [true], the dal node runs with unsafe computed SRS
     allowing tests to run faster, without the need of large file. Default is
     [true] in tezt.
+
+    [expected_pow] allows to change the PoW difficulty. Default value is 0.
 *)
-val init_config : ?use_unsafe_srs:bool -> t -> string Lwt.t
+val init_config :
+  ?use_unsafe_srs:bool -> ?expected_pow:float -> t -> string Lwt.t
 
 module Config_file : sig
   (** DAL node configuration files. *)
