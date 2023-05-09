@@ -151,7 +151,115 @@ module Self_identification = struct
     | Error e ->
         Test.fail "Errors in fork processes: %a." Error_monad.pp_print_trace e
 
-  let tests () = self_id ()
+  (* Test where node A tries to connect to node B reusing Connection_message of
+     B. *)
+  let self_connection_message () =
+    Test.register
+      ~__FILE__
+      ~title:"p2p socket self connection message"
+      ~tags:["p2p"; "socket"; "self_identification"]
+    @@ fun () ->
+    let server _ch sched socket =
+      let open Lwt_result_syntax in
+      (* The first connection permits the client to get the connection message
+         of the server. *)
+      let*! _r = accept sched socket in
+      (* During second connection handshake, the client will send back the
+         server connection message. *)
+      let*! r = accept sched socket in
+      match r with
+      (* The handshake should fail because the Metadata message is not ciphered
+         correctly. *)
+      | Error (P2p_errors.Decipher_error :: _) -> return_unit
+      | Error (P2p_errors.Myself _ :: _) ->
+          Test.fail ~__LOC__ "Unexpected detection of self connection"
+      | Ok _ -> Test.fail ~__LOC__ "Unexpected success of authentication"
+      | Error err ->
+          Test.fail
+            ~__LOC__
+            "Unexpected error %a"
+            Error_monad.pp_print_top_error_of_trace
+            err
+    in
+
+    let client _ch sched addr port =
+      let open Lwt_result_syntax in
+      let*! id_client = id2 in
+      let pp_connect_error ppf e =
+        match e with
+        | `Connection_refused ->
+            Format.pp_print_string ppf "Connection Connection_refused"
+        | `Unexpected_error e ->
+            Format.pp_print_string ppf (Printexc.to_string e)
+      in
+      let*! conn = P2p_test_utils.raw_connect sched addr port in
+      match conn with
+      | Error e -> Test.fail "First connection failed: %a" pp_connect_error e
+      | Ok conn -> (
+          let canceler = Lwt_canceler.create () in
+          (* During the first connection, the client get the connection message
+             from the server. *)
+          let* server_connection_msg, _ =
+            P2p_socket.Internal_for_tests.Connection_message.read
+              ~canceler
+              (P2p_io_scheduler.to_readable conn)
+          in
+          let* () = P2p_io_scheduler.close conn in
+          (* During the second connection, the client will send the server's
+             connection message instead of its own. *)
+          let*! conn = P2p_test_utils.raw_connect sched addr port in
+          match conn with
+          | Error e ->
+              Test.fail "Second connection failed: %a" pp_connect_error e
+          | Ok conn ->
+              let canceler = Lwt_canceler.create () in
+              let* sent_msg =
+                P2p_socket.Internal_for_tests.Connection_message.write
+                  ~canceler
+                  conn
+                  server_connection_msg
+              in
+              let* _, recv_msg =
+                P2p_socket.Internal_for_tests.Connection_message.read
+                  ~canceler
+                  (P2p_io_scheduler.to_readable conn)
+              in
+              (* The client does not have the private key of the server. He
+                 tries with its own private key. *)
+              let cryptobox_data =
+                P2p_socket.Internal_for_tests.Crypto.create_data
+                  ~incoming:false
+                  ~recv_msg
+                  ~sent_msg
+                  ~sk:id_client.secret_key
+                  ~pk:
+                    (P2p_socket.Internal_for_tests.Connection_message
+                     .get_public_key
+                       server_connection_msg)
+              in
+              let metadata =
+                P2p_test_utils.conn_meta_config.conn_meta_value ()
+              in
+              (* By sending a message without having the private key
+                 corresponding to the connection message the client sent, it
+                 will no longer be able to progress in the handshake. *)
+              P2p_socket.Internal_for_tests.Metadata.write
+                ~canceler
+                P2p_test_utils.conn_meta_config
+                conn
+                cryptobox_data
+                metadata)
+    in
+
+    let* r = run_nodes ~addr:Node.default_ipv6_addr client server in
+    match r with
+    | Ok () -> unit
+    | Error e ->
+        Test.fail "Errors in fork processes: %a." Error_monad.pp_print_trace e
+
+  let tests () =
+    self_id () ;
+    self_connection_message ()
 end
 
 let () =
