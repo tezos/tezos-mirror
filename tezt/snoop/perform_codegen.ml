@@ -25,8 +25,6 @@
 
 let models = Perform_inference.models
 
-(* ./octez-snoop generate code for solutions inferred_XXX.sol *)
-
 let cost_function_ml fp model_name =
   (if fp then Printf.sprintf "inferred_%s.ml"
   else Printf.sprintf "inferred_%s_no_fp.ml")
