@@ -668,6 +668,7 @@ let all_instructions =
     N_IAnd_bytes;
     N_IXor_bytes;
     N_INot_bytes;
+    N_IUnit;
   ]
 
 let all_continuations =
