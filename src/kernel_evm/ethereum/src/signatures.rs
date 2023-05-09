@@ -161,12 +161,20 @@ impl EthereumTransactionCommon {
         let s1: [u8; 32] = s.into();
         let mut s = Scalar([0; 8]);
         let _ = s.set_b32(&s1);
-        // recompute parity from v and chain_id
-        let ri_val = self
-            .compute_parity()
-            .ok_or(TransactionError::Parity(ParityError::V(self.v)))?;
-        let ri = RecoveryId::parse(ri_val.byte(0))?;
-        Ok((Signature { r, s }, ri))
+        if s.is_high() {
+            // if s > secp256k1n / 2 the signature is invalid
+            // cf EIP2 (part 2) https://eips.ethereum.org/EIPS/eip-2
+            Err(TransactionError::ECDSAError(
+                libsecp256k1::Error::InvalidSignature,
+            ))
+        } else {
+            // recompute parity from v and chain_id
+            let ri_val = self
+                .compute_parity()
+                .ok_or(TransactionError::Parity(ParityError::V(self.v)))?;
+            let ri = RecoveryId::parse(ri_val.byte(0))?;
+            Ok((Signature { r, s }, ri))
+        }
     }
     /// Find the caller address from r and s of the common data
     /// for an Ethereum transaction, ie, what address is associated
@@ -378,6 +386,8 @@ impl Into<Vec<u8>> for EthereumTransactionCommon {
 // cargo test ethereum::signatures::test --features testing
 #[cfg(test)]
 mod test {
+    use std::ops::Neg;
+
     use super::*;
 
     // utility function to just build a standard correct transaction
@@ -927,6 +937,47 @@ mod test {
         assert_eq!(
             EthereumAddress::from("9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f".to_string()),
             transaction.caller().unwrap()
+        )
+    }
+
+    #[test]
+    fn test_caller_eip155_example_fail_eip2() {
+        // this test checks that EIP2 part (2) is implemented
+        // https://eips.ethereum.org/EIPS/eip-2
+        // ie, All transaction signatures whose s-value is greater
+        // than secp256k1n/2 are now considered invalid
+
+        let transaction = basic_eip155_transaction();
+
+        // flip s
+        let s: H256 = transaction.s;
+        let s1: [u8; 32] = s.into();
+        let mut scalar = Scalar([0; 8]);
+        let _ = scalar.set_b32(&s1);
+        let flipped_scalar = scalar.neg();
+        let flipped_s = H256::from_slice(&flipped_scalar.b32());
+
+        // flip v
+        let flipped_v = if transaction.v == U256::from(37) {
+            U256::from(38)
+        } else {
+            U256::from(37)
+        };
+
+        let flipped_transaction = EthereumTransactionCommon {
+            s: flipped_s,
+            v: flipped_v,
+            ..transaction
+        };
+
+        // as v and s are flipped, the signature is a correct ECDSA signature
+        // and the caller should be the same, if EIP2 is not implemented
+        // but with EIP2 s should be too big, and the transaction should be rejected
+        assert_eq!(
+            Err(TransactionError::ECDSAError(
+                libsecp256k1::Error::InvalidSignature
+            )),
+            flipped_transaction.caller()
         )
     }
 
