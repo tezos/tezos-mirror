@@ -120,3 +120,6 @@ module Config_file : sig
         [Node.Config_file.update node (JSON.put ("use_unsafe_srs", "true"))] *)
   val update : t -> (JSON.t -> JSON.t) -> unit
 end
+
+(** Read the content of the node's identity file. *)
+val read_identity : t -> JSON.t
