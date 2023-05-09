@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,42 +24,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The collector registry for the rollup node metrics. *)
-val sc_rollup_node_registry : Prometheus.CollectorRegistry.t
+module Simple = struct
+  include Internal_event.Simple
 
-(** [metrics_server metrics_addr] runs a server for the rollup metrics on [metrics_addr].
-    The metrics are accessible thanks to a [/metrics] request. *)
-val metrics_serve : string option -> (unit, tztrace) result Lwt.t
+  let section = ["smart_rollup_node"]
 
-(** [print_csv_metrics ppf metrics] prints the [metrics] as CSV. *)
-val print_csv_metrics :
-  Format.formatter -> 'a Prometheus.MetricFamilyMap.t -> unit
+  let starting_metrics_server =
+    declare_2
+      ~section
+      ~name:"starting_metrics_server"
+      ~msg:"starting metrics server on {host}:{port}"
+      ~level:Notice
+      ("host", Data_encoding.string)
+      ("port", Data_encoding.uint16)
 
-(** The node info metrics *)
-module Info : sig
-  (** Initializes the metric for rollup info
-      with a the given arguments as label values *)
-  val init_rollup_node_info :
-    id:Protocol.Alpha_context.Sc_rollup.t ->
-    mode:Configuration.mode ->
-    genesis_level:Protocol.Alpha_context.Raw_level.t ->
-    genesis_hash:Protocol.Alpha_context.Sc_rollup.Commitment.Hash.t ->
-    pvm_kind:Protocol.Alpha_context.Sc_rollup.Kind.t ->
-    unit
+  let metrics_ended =
+    declare_1
+      ~section
+      ~name:"metrics_ended"
+      ~level:Error
+      ~msg:"metrics server ended with error {stacktrace}"
+      ("stacktrace", Data_encoding.string)
 end
 
-(** The metrics related to Inboxes *)
-module Inbox : sig
-  (** The type of an inbox metrics *)
-  type t = {head_inbox_level : Prometheus.Gauge.t}
+let starting_metrics_server ~host ~port =
+  Simple.(emit starting_metrics_server) (host, port)
 
-  (** The stats for the inboxes *)
-  module Stats : sig
-    (** The list of messages from the head *)
-    val head_messages_list :
-      Protocol.Alpha_context.Sc_rollup.Inbox_message.t list ref
-  end
+let metrics_ended error = Simple.(emit metrics_ended) error
 
-  (** The inboxes metrics *)
-  val metrics : t
-end
+let metrics_ended_dont_wait error =
+  Simple.(emit__dont_wait__use_with_care metrics_ended) error

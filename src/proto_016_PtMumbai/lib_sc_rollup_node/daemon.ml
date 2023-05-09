@@ -574,11 +574,10 @@ module Make (PVM : Pvm.S) = struct
       daemonize node_ctxt
     in
     Metrics.Info.init_rollup_node_info
-      ~id:node_ctxt.rollup_address
+      ~id:configuration.sc_rollup_address
       ~mode:configuration.mode
-      ~genesis_level:node_ctxt.genesis_info.level
-      ~genesis_hash:node_ctxt.genesis_info.commitment_hash
-      ~pvm_kind:node_ctxt.kind ;
+      ~genesis_level:(Raw_level.to_int32 node_ctxt.genesis_info.level)
+      ~pvm_kind:(Sc_rollup.Kind.to_string node_ctxt.kind) ;
     protect start ~on_error:(function
         | Sc_rollup_node_errors.(Lost_game _ | Invalid_genesis_state _) :: _ as
           e ->

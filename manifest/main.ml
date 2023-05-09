@@ -4109,6 +4109,9 @@ let octez_smart_rollup_node_lib =
         octez_base_unix;
         octez_stdlib_unix |> open_;
         octez_crypto |> open_;
+        cohttp_lwt_unix;
+        octez_node_config;
+        prometheus_app;
         octez_injector |> open_;
       ]
 
@@ -6084,8 +6087,6 @@ let hash = Protocol.hash
             octez_scoru_wasm;
             octez_scoru_wasm_fast;
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
-            prometheus_app |> if_ N.(number >= 016);
-            octez_node_config |> if_ N.(number >= 016);
           ]
         ~conflicts:[Conflicts.checkseum]
     in
