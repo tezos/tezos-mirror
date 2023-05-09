@@ -78,6 +78,16 @@ val message_encoding : message Data_encoding.t
 
 val span_encoding : Span.t Data_encoding.t
 
+module Monad : sig
+  type 'a t = 'a Lwt.t
+
+  val return : 'a -> 'a t
+
+  val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+
+  val sleep : Span.t -> unit t
+end
+
 module Worker_config :
   Gossipsub_intf.WORKER_CONFIGURATION
     with type GS.Topic.t = topic
@@ -85,6 +95,7 @@ module Worker_config :
      and type GS.Message.t = message
      and type GS.Peer.t = peer
      and module GS.Span = Span
+     and module Monad = Monad
 
 module Worker_instance :
   Gossipsub_intf.WORKER
@@ -93,3 +104,4 @@ module Worker_instance :
      and type GS.Message.t = message
      and type GS.Peer.t = peer
      and module GS.Span = Span
+     and module Monad = Monad

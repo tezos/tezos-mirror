@@ -56,6 +56,7 @@ module Worker : sig
        and type GS.Message.t = message
        and type GS.Peer.t = peer
        and module GS.Span = Gs_interface.Span
+       and module Monad = Gs_interface.Monad
 
   module Default_parameters : module type of Gs_default_parameters
 
@@ -66,6 +67,7 @@ module Worker : sig
        and type GS.Message.t = message
        and type GS.Peer.t = peer
        and module GS.Span = Config.GS.Span
+       and module Monad = Gs_interface.Monad
 end
 
 (** The transport layer module exposes the needed primitives, interface and
