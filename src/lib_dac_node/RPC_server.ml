@@ -325,14 +325,10 @@ module Coordinator = struct
     let hash_streamer =
       coordinator_node_ctxt.Node_context.Coordinator.hash_streamer
     in
-    let public_keys_opt =
-      Node_context.Coordinator.public_keys_opt coordinator_node_ctxt
-    in
     let certificate_streamers = coordinator_node_ctxt.certificate_streamers in
     let committee_members = coordinator_node_ctxt.committee_members in
     Tezos_rpc.Directory.empty
     |> register_post_preimage dac_plugin hash_streamer page_store
-    |> register_get_verify_signature dac_plugin public_keys_opt
     |> register_get_preimage dac_plugin page_store
     |> register_monitor_root_hashes hash_streamer
     |> register_monitor_certificate
