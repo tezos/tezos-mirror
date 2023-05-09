@@ -16,15 +16,18 @@
 /// ```
 #[macro_export]
 macro_rules! sequencer_kernel_entry {
-    ($kernel_run: expr) => {
+    ($kernel_run: expr, $filter_behavior: expr) => {
         /// The `kernel_run` function is called by the wasm host at regular intervals.
         #[cfg(target_arch = "wasm32")]
         #[no_mangle]
         pub extern "C" fn kernel_run() {
             use tezos_smart_rollup::core_unsafe::rollup_host::RollupHost;
             let host = unsafe { RollupHost::new() }; // Runtime from the tezos sdk
-            let mut host = $crate::sequencer_runtime::SequencerRuntime::new(host, |bytes| true); // create a sequencer runtime that use the RollupHost runtime
+            let mut host = $crate::sequencer_runtime::SequencerRuntime::new(host, $filter_behavior); // create a sequencer runtime that use the RollupHost runtime
             $kernel_run(&mut host)
         }
+    };
+    ($kernel_run: expr) => {
+        sequencer_kernel_entry!($kernel_run, $crate::routing::FilterBehavior::AllowAll);
     };
 }
