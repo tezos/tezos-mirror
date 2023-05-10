@@ -316,6 +316,11 @@ module type CONSENSUS = sig
      level. *)
   val allowed_preendorsements : t -> (consensus_pk * int) slot_map option
 
+  (** Returns the set of delegates that are not allowed to bake or
+      endorse blocks; i.e., delegates which have zero frozen deposit
+      due to a previous slashing. *)
+  val forbidden_delegates : t -> Signature.Public_key_hash.Set.t
+
   (** Missing pre-computed map by first slot. This error should not happen. *)
   type error += Slot_map_not_found of {loc : string}
 
@@ -349,6 +354,15 @@ module type CONSENSUS = sig
      (pkh, power)].  *)
   val record_preendorsement :
     t -> initial_slot:slot -> power:int -> round -> t tzresult
+
+  (** [forbid_delegate ctx delegate] adds [delegate] to the set of
+      forbidden delegates, which prevents this delegate from baking or
+      endorsing. *)
+  val forbid_delegate : t -> Signature.Public_key_hash.t -> t
+
+  (** [set_forbidden_delegate ctx delegates] sets [delegates] as the
+      current forbidden delegates. *)
+  val set_forbidden_delegates : t -> Signature.Public_key_hash.Set.t -> t
 
   val endorsements_seen : t -> slot_set
 
