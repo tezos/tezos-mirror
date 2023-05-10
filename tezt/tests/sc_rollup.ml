@@ -362,6 +362,79 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
   in
   scenario protocol rollup_node rollup_client sc_rollup tezos_node tezos_client
 
+let test_l2_migration_scenario ?parameters_ty ?(mode = Sc_rollup_node.Operator)
+    ?(operator = Constant.bootstrap1.alias) ?boot_sector ?commitment_period
+    ?challenge_window ?timeout ?variant ?(tags = []) ~kind ~migrate_from
+    ~migrate_to ~scenario_prior ~scenario_after ~description () =
+  let tags =
+    Protocol.tag migrate_from :: Protocol.tag migrate_to :: kind :: "migration"
+    :: tags
+  in
+  Test.register
+    ~__FILE__
+    ~tags
+    ~title:
+      (sf
+         "%s->%s: %s"
+         (Protocol.name migrate_from)
+         (Protocol.name migrate_to)
+         (format_title_scenario kind {variant; tags; description}))
+  @@ fun () ->
+  let* tezos_node, tezos_client =
+    setup_l1 ?commitment_period ?challenge_window ?timeout migrate_from
+  in
+  let* rollup_node, rollup_client, sc_rollup =
+    setup_rollup
+      ~protocol:migrate_from
+      ?parameters_ty
+      ~kind
+      ~mode
+      ?boot_sector
+      ~operator
+      tezos_node
+      tezos_client
+  in
+  let* prior_res =
+    scenario_prior ~sc_rollup rollup_node rollup_client tezos_node tezos_client
+  in
+  let migration_level = Node.get_level tezos_node + 1 in
+  let patch_config =
+    Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+      [(migration_level, migrate_to)]
+  in
+  Log.info
+    "Migrating L1 from %s to %s"
+    (Protocol.name migrate_from)
+    (Protocol.name migrate_to) ;
+  let* () = Node.terminate tezos_node in
+  let nodes_args =
+    Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
+  in
+  let* () = Node.run ~patch_config tezos_node nodes_args in
+  let* () = Node.wait_for_ready tezos_node in
+  let* () = Client.bake_for_and_wait tezos_client in
+  (* Rollup node and client for other protocol *)
+  let data_dir = Sc_rollup_node.data_dir rollup_node in
+  let rollup_node =
+    Sc_rollup_node.create
+      ~protocol:migrate_to
+      ~data_dir
+      ~base_dir:(Client.base_dir tezos_client)
+      ~default_operator:operator
+      mode
+      tezos_node
+  in
+  let rollup_client =
+    Sc_rollup_client.create ~protocol:migrate_to rollup_node
+  in
+  scenario_after
+    ~sc_rollup
+    rollup_node
+    rollup_client
+    tezos_node
+    tezos_client
+    prior_res
+
 let commitment_info_inbox_level
     (commitment_info : Sc_rollup_client.commitment_info) =
   commitment_info.commitment_and_hash.commitment.inbox_level
@@ -1380,6 +1453,47 @@ let test_rollup_node_run_with_kernel ~kind ~kernel_name ~internal =
     ~boot_sector:(read_kernel kernel_name)
     ~internal
     ~kind
+
+let test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to =
+  let tags = ["store"] in
+  let description = "node can read data after store migration" in
+  let commitment_period = 10 in
+  let challenge_window = 10 in
+  let scenario_prior ~sc_rollup rollup_node _rollup_client _tezos_node
+      tezos_client =
+    let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
+    let* () = send_messages commitment_period tezos_client in
+    let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+    let* () = Sc_rollup_node.terminate rollup_node in
+    unit
+  in
+  let scenario_after ~sc_rollup rollup_node rollup_client tezos_node
+      tezos_client () =
+    let migration_level = Node.get_level tezos_node in
+    let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
+    let*! _l2_block =
+      Sc_rollup_client.rpc_get
+        rollup_client
+        ["global"; "block"; string_of_int (migration_level - 1)]
+    in
+    let* () = send_messages 1 tezos_client in
+    let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+    let*! _l2_block =
+      Sc_rollup_client.rpc_get rollup_client ["global"; "block"; "head"]
+    in
+    unit
+  in
+  test_l2_migration_scenario
+    ~tags
+    ~kind
+    ~commitment_period
+    ~challenge_window
+    ~migrate_from
+    ~migrate_to
+    ~scenario_prior
+    ~scenario_after
+    ~description
+    ()
 
 (* Ensure the PVM is transitioning upon incoming messages.
       -------------------------------------------------------
@@ -5278,7 +5392,8 @@ let register_migration ~kind ~migrate_from ~migrate_to =
   test_migration_cement ~kind ~migrate_from ~migrate_to ;
   test_migration_recover ~kind ~migrate_from ~migrate_to ;
   test_migration_refute ~kind ~migrate_from ~migrate_to ;
-  test_cont_refute_pre_migration ~kind ~migrate_from ~migrate_to
+  test_cont_refute_pre_migration ~kind ~migrate_from ~migrate_to ;
+  test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to
 
 let register_migration ~migrate_from ~migrate_to =
   register_migration ~kind:"arith" ~migrate_from ~migrate_to ;
