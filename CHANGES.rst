@@ -62,11 +62,12 @@ Node
   ``plugin.removed_fees_too_low_for_mempool`` have been replaced with
   ``node.mempool.rejected_by_full_mempool`` and
   ``node.mempool.removed_from_full_mempool`` with different
-  descriptions and messages. In particular, the
-  ``rejected_by_full_mempool`` error no longer indicates the minimal
-  fee needed by the rejected operation to be accepted by the full
-  mempool (however, we are working on providing this information
-  again). (MR :gl:`!6787`)
+  descriptions and messages. The ``rejected_by_full_mempool`` error
+  still indicates the minimal fee that the operation would need to be
+  accepted by the full mempool, provided that such a fee exists. If
+  not, the error now states that the operation cannot be included no
+  matter its fee (e.g. if it is a non-manager operation). (MRs
+  :gl:`!6787`, :gl:`!8640`)
 
 - RPC ``/helpers/forge/operations`` can now take JSON formatted operations with
   ``attestation``, ``preattestation``, ``double_attestation_evidence`` and
