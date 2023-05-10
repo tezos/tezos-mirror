@@ -122,7 +122,7 @@ type 'span per_topic_score_parameters = {
       (** P2: The maximum value considered during score computation for the number of
           first message deliveries. *)
   first_message_deliveries_decay : float;
-      (** [P2] score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
+      (** P2: The score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
           This parameter must be in the unit interval. *)
   mesh_message_deliveries_weight : float;
       (** P3: The weight of the score associated to the number of first/near-first
@@ -139,17 +139,17 @@ type 'span per_topic_score_parameters = {
       (** P3: The number of messages received from a peer in the mesh in the
           associated topic above which the peer won't be penalized  *)
   mesh_message_deliveries_decay : float;
-      (** [P3] score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
+      (** P3: The score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
           This parameter must be in the unit interval. *)
   mesh_failure_penalty_weight : float;
       (** P3b: Penalty induced when a peer gets pruned with a non-zero mesh message delivery deficit. *)
   mesh_failure_penalty_decay : float;
-      (** [P3b] score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
+      (** P3b: The score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
           This parameter must be in the unit interval. *)
   invalid_message_deliveries_weight : float;
       (** P4: Penalty induced when a peer sends an invalid message. *)
   invalid_message_deliveries_decay : float;
-      (** [P4] score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
+      (** P4: The score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
           This parameter must be in the unit interval. *)
 }
 
@@ -184,7 +184,7 @@ type ('topic, 'span) score_parameters = {
       (** The threshold on the behaviour penalty
           counter above which we start penalizing the peer. *)
   behaviour_penalty_decay : float;
-      (** [P7] score is multiplied by a factor of [behaviour_penalty_decay] every [score_cleanup_ticks] heartbeat.
+      (** P7: The score is multiplied by a factor of [behaviour_penalty_decay] every [score_cleanup_ticks] heartbeat.
           This parameter must be in the unit interval. *)
   app_specific_weight : float;  (** P5: Application-specific peer scoring *)
   decay_zero : float;
