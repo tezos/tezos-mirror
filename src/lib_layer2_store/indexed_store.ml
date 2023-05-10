@@ -555,14 +555,12 @@ struct
     @@ fun () ->
     let*! () = Lwt_utils_unix.create_dir path in
     let readonly = match mode with Read_only -> true | Read_write -> false in
-    let flag, perms =
-      if readonly then (Unix.O_RDONLY, 0o444) else (Unix.O_RDWR, 0o644)
-    in
+    let flag = if readonly then Unix.O_RDONLY else Unix.O_RDWR in
     let*! fd =
       Lwt_unix.openfile
         (Filename.concat path "data")
         [Unix.O_CREAT; O_CLOEXEC; flag]
-        perms
+        0o644
     in
     let index =
       Header_index.v
