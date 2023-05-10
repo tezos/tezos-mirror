@@ -350,7 +350,7 @@ let pp_input_request ppf = function
   | Input_required -> Format.fprintf ppf "Waiting for input"
   | Reveal_required Reveal_metadata -> Format.fprintf ppf "Waiting for metadata"
   | Reveal_required (Reveal_raw_data hash) ->
-      Format.fprintf ppf "Waiting for reveal: %s" hash
+      Format.fprintf ppf "Waiting for reveal: %a" Hex.pp @@ Hex.of_string hash
 
 (* [show_status tree] show the state of the PVM. *)
 let show_status tree =
