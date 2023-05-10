@@ -111,7 +111,7 @@ type config = {
       (** If set to [true], the p2p layer will not participate to the peer
           discovery mechanism. The p2p layer will not be able to find new peers
           to connect with. For more details, refers to field
-          {disable_peer_discovery} of {!type:P2p_connect_handler.config}.  *)
+          [disable_peer_discovery] of {!type:P2p_connect_handler.config}.  *)
 }
 
 (** Type of a P2P layer instance *)

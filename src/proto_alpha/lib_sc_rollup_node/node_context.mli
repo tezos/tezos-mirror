@@ -140,7 +140,7 @@ val close : _ t -> unit tzresult Lwt.t
     [block_hash]. *)
 val checkout_context : 'a t -> Block_hash.t -> 'a Context.t tzresult Lwt.t
 
-(** [metadata node_ctxt] creates a {Sc_rollup.Metadata.t} using the information
+(** [metadata node_ctxt] creates a {!Sc_rollup.Metadata.t} using the information
     stored in [node_ctxt]. *)
 val metadata : _ t -> Sc_rollup.Metadata.t
 

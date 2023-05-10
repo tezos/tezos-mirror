@@ -29,10 +29,10 @@ open Store_sigs
     index can be written or only read. *)
 type 'a index constraint 'a = [< `Read | `Write > `Read]
 
-(** Read/write {!index}. *)
+(** Read/write {!type:index}. *)
 type rw_index = [`Read | `Write] index
 
-(** Read only {!index}. *)
+(** Read only {!type:index}. *)
 type ro_index = [`Read] index
 
 (** The type of trees stored in the context, i.e. the actual data. *)
@@ -48,7 +48,7 @@ type rw = [`Read | `Write] t
 type ro = [`Read] t
 
 (** A context hash is the hash produced when the data of the context is
-    committed to disk, i.e. the {!commit} hash. *)
+    committed to disk, i.e. the {!type:commit} hash. *)
 type hash = Sc_rollup_context_hash.t
 
 (** The type of commits for the context. *)
@@ -156,7 +156,7 @@ module PVMState : sig
 
   (** [set context state] saves the PVM state [state] in the context and returns
       the updated context. Note: [set] does not perform any write on disk, this
-      information must be committed using {!commit}. *)
+      information must be committed using {!val:commit}. *)
   val set : 'a t -> value -> 'a t Lwt.t
 end
 

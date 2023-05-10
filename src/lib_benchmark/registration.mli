@@ -58,7 +58,7 @@ type parameter_info = Namespace.t list
     included in it. *)
 val register : Benchmark.t -> unit
 
-(** Register a {!Tezos_clic.command} for the command line *)
+(** Register a {!type:Tezos_clic.command} for the command line *)
 val add_command : unit Tezos_clic.command -> unit
 
 (* -------------------------------------------------------------------------- *)

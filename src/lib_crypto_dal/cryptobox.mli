@@ -25,7 +25,7 @@
 
 open Cryptobox_intf
 
-(** {0 Cryptography for the Data Availability Layer}
+(** {1 Cryptography for the Data Availability Layer}
 
     The Data Availability Layer (DAL) reduces the storage strain on the
     blockchain by only storing on-chain constant-size cryptographic
@@ -35,12 +35,12 @@ open Cryptobox_intf
     A slot is encoded with some redundancy using a so-called MDS (Maximum
     Distance Separable) code. The resulting encoded slot is partitioned into
     {!type:shard}s, allowing retrieval of the slot with any subset of
-    [{!recfield:parameters.number_of_shards}/{!recfield:parameters.redundancy_factor}]
-    out of [{!recfield:parameters.number_of_shards}] shards. By doing so,
+    [{!field:parameters.number_of_shards}/{!field:parameters.redundancy_factor}]
+    out of [{!field:parameters.number_of_shards}] shards. By doing so,
     we can guarantee high data availability provided a certain fraction of
     the DAL nodes is storing and supplying the data. This fraction can be
     made as small as desired at the expense of a higher data redundancy
-    {!recfield:parameters.redundancy_factor}. MDS codes have no unnecessary
+    {!field:parameters.redundancy_factor}. MDS codes have no unnecessary
     redundancy.
 
     One can verify in constant time that the correct shard was retrieved
@@ -50,8 +50,8 @@ open Cryptobox_intf
     slot commitment.
 
     A {!type:slot} is partioned into
-    [{!recfield:parameters.slot_size}/{!recfield:parameters.page_size}] segments
-    called {!type:Verifier.page}s of size {!recfield:parameters.page_size}.
+    [{!field:parameters.slot_size}/{!field:parameters.page_size}] segments
+    called {!type:Verifier.page}s of size {!field:parameters.page_size}.
     One can also verify in constant time that the correct page
     was retrieved using a KZG proof {!type:page_proof} and the slot commitment.
 
@@ -395,7 +395,7 @@ val load_precompute_shards_proofs :
 val hash_precomputation : shards_proofs_precomputation -> Tezos_crypto.Blake2B.t
 
 (** [prove_shards t ~precomputation ~polynomial] produces
-   [number_of_shards] proofs (π_0, ..., π_{number_of_shards - 1}) for the elements
+   [number_of_shards] proofs [(π_0, ..., π_{number_of_shards - 1})] for the elements
    of [polynomial_from_shards polynomial] (where [number_of_shards]
    is declared in [t]) using the [precomputation].
 
@@ -484,7 +484,10 @@ module Internal_for_tests : sig
      Return [(size, power_of_two, remainder)] such that:
      * If [domain_size > 1], then [size] is the smallest integer greater or
      equal to [domain_size] and is of the form 2^a * 3^b * 11^c * 19^d,
-     where a ∈ ⟦0, 32⟧, b ∈ {0, 1}, c ∈ {0, 1}, d ∈ {0, 1}.
+     where:
+     {v
+     a ∈ ⟦0, 32⟧, b ∈ {0, 1}, c ∈ {0, 1}, d ∈ {0, 1}
+     v}
      * If [domain_size = 1], then [size = 2].
      * [size = power_of_two * remainder], [power_of_two] is a power of two,
      and [remainder] is not divisible by 2. *)

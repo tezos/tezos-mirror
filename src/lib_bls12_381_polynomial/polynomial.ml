@@ -604,12 +604,12 @@ end
 module type Polynomial_unsafe_sig = sig
   include Polynomial_sig
 
-  (** [to_carray p] converts [p] from type {!t} to type {!Fr_carray.t}
+  (** [to_carray p] converts [p] from type {!type:t} to type {!type:Fr_carray.t}
 
       Note: [to_carray p] doesn't create a copy of [p] *)
   val to_carray : t -> Fr_carray.t
 
-  (** [of_carray p] converts [p] from type {!Fr_carray.t} to type {!t}
+  (** [of_carray p] converts [p] from type {!type:Fr_carray.t} to type {!type:t}
 
       Note: [of_carray p] doesn't create a copy of [p] *)
   val of_carray : Fr_carray.t -> t
@@ -623,7 +623,7 @@ module type Polynomial_unsafe_sig = sig
       [(length p - 1)]. *)
   val copy_carray : ?offset:int -> ?len:int -> t -> t
 
-  (** [length p] returns the length of the underlying {!Fr_carray.t}. *)
+  (** [length p] returns the length of the underlying {!type:Fr_carray.t}. *)
   val length : t -> int
 end
 

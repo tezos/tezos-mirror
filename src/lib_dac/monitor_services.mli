@@ -34,7 +34,7 @@ module S : sig
       Dac_plugin.raw_hash )
     Tezos_rpc.Service.service
 
-  (** Define RPC GET /monitor/certificate/{hex_root_hash}. *)
+  (** Define RPC GET /monitor/certificate/hex_root_hash. *)
   val certificate :
     ( [`GET],
       unit,

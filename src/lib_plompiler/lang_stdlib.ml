@@ -85,7 +85,7 @@ module type LIB = sig
 
     (** [geq (a, bound_a) (b, bound_b)] returns the boolean wire representing
         a >= b.
-        Pre-condition: a ∈ [0, bound_a) ∧ b ∈ [0, bound_b) *)
+        Pre-condition: [a ∈ \[0, bound_a) ∧ b ∈ \[0, bound_b)] *)
     val geq : scalar repr * Z.t -> scalar repr * Z.t -> bool repr t
   end
   with type scalar = scalar
