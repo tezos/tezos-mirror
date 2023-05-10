@@ -175,8 +175,13 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
         head.level
         (List.length collected_messages)
     in
-    let is_migration_block =
-      head.header.proto_level <> predecessor.header.proto_level
+    let* grandparent =
+      Node_context.get_predecessor_header node_ctxt predecessor
+    in
+    let is_first_block =
+      (* head is the first block of the protocol if its predecessor is a
+         migration block. *)
+      grandparent.header.proto_level <> predecessor.header.proto_level
     in
     let* (( _inbox_hash,
             inbox,
@@ -184,7 +189,7 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
             _messages_with_protocol_internal_messages ) as res) =
       process_messages
         node_ctxt
-        ~is_migration_block
+        ~is_migration_block:is_first_block
         ~predecessor
         ~level:head.level
         collected_messages
