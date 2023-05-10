@@ -559,8 +559,8 @@ module type AUTOMATON = sig
     | Mesh_full : [`Graft] output
         (** Grafting a peer for a topic whose mesh has already sufficiently many
             peers. *)
-    | No_peer_in_mesh : [`Prune] output
-        (** Attempting to prune a peer which is not in the mesh. *)
+    | Prune_topic_not_tracked : [`Prune] output
+        (** Attempting to prune a peer for a non-tracked topic. *)
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
         (** The given peer has been pruned for the given topic, but no
             alternative peers are returned because the peer's score is too low.

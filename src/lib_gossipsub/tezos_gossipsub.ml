@@ -131,7 +131,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | Grafting_successfully : [`Graft] output
     | Peer_backed_off : [`Graft] output
     | Mesh_full : [`Graft] output
-    | No_peer_in_mesh : [`Prune] output
+    | Prune_topic_not_tracked : [`Prune] output
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
     | No_PX : [`Prune] output
     | PX : Peer.Set.t -> [`Prune] output
@@ -928,16 +928,16 @@ module Make (C : AUTOMATON_CONFIG) :
       fail_if Score.(value score < of_float accept_px_threshold)
       @@ Ignore_PX_score_too_low score
 
-    let check_topic_known topic =
+    let check_topic_tracked topic =
       let open Monad.Syntax in
       let*! mesh_opt = find_mesh topic in
       match mesh_opt with
-      | None -> No_peer_in_mesh |> fail
+      | None -> Prune_topic_not_tracked |> fail
       | Some mesh -> pass mesh
 
     let handle peer topic ~px ~backoff =
       let open Monad.Syntax in
-      let*? mesh = check_topic_known topic in
+      let*? mesh = check_topic_tracked topic in
       let mesh = Peer.Set.remove peer mesh in
       let* () = set_mesh_topic topic mesh in
       let* () = set_backoff_for_peer backoff topic peer in
@@ -2102,7 +2102,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | Grafting_successfully -> fprintf fmtr "Grafting_successfully"
     | Peer_backed_off -> fprintf fmtr "Peer_backed_off"
     | Mesh_full -> fprintf fmtr "Mesh_full"
-    | No_peer_in_mesh -> fprintf fmtr "No_peer_in_mesh"
+    | Prune_topic_not_tracked -> fprintf fmtr "Prune_topic_not_tracked"
     | Ignore_PX_score_too_low score ->
         fprintf fmtr "Ignore_PX_score_too_low %a" Score.pp score
     | No_PX -> fprintf fmtr "No_PX"

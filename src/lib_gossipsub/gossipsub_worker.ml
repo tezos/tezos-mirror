@@ -337,7 +337,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       the given collection of alternative peers to connect to. The worker then
       asks the P2P part to connect to those peeers. *)
   let handle_prune ~emit_p2p_output = function
-    | gstate, (GS.No_peer_in_mesh | Ignore_PX_score_too_low _ | No_PX) -> gstate
+    | gstate, (GS.Prune_topic_not_tracked | Ignore_PX_score_too_low _ | No_PX)
+      ->
+        gstate
     | gstate, GS.PX peers ->
         send_p2p_output
           ~emit_p2p_output
