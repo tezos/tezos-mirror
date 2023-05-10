@@ -31,6 +31,7 @@
 (package (name octez-node-config))
 (package (name octez-protocol-compiler))
 (package (name octez-proxy-server))
+(package (name octez-rpc-process))
 (package (name octez-signer))
 (package (name octez-smart-rollup))
 (package (name octez-smart-rollup-client-Proxford))
