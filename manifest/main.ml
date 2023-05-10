@@ -1187,11 +1187,11 @@ let _octez_srs_extraction_main =
       ]
 
 let _octez_srs_extraction_tests =
-  tests
-    ["main"]
+  tezt
+    ["test_main"]
     ~path:"src/lib_srs_extraction/test"
     ~opam:"octez-srs-extraction"
-    ~deps:[octez_srs_extraction |> open_; alcotest]
+    ~deps:[octez_srs_extraction |> open_; alcotezt]
     ~dep_files:["phase1radix2m5"]
     ~dune:
       Dune.(

@@ -69,6 +69,7 @@
   src_lib_stdlib_unix_test__tezt_lib
   src_lib_stdlib_test_unix_tezt_lib
   src_lib_stdlib_test_tezt_lib
+  src_lib_srs_extraction_test_tezt_lib
   src_lib_signer_backends_unix_test_tezt_lib
   src_lib_signer_backends_test_tezt_lib
   src_lib_shell_services_test_tezt_lib
