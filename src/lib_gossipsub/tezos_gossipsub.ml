@@ -740,8 +740,8 @@ module Make (C : AUTOMATON_CONFIG) :
             Ihave_from_peer_with_low_score {score; threshold = gossip_threshold})
       in
       let* count_ihave_received = update_and_get_ihave_per_heartbeat peer in
-      let*! count_iwant_sent = find_iwant_per_heartbeat peer in
       let*? () = check_too_many_recv_ihave_message count_ihave_received in
+      let*! count_iwant_sent = find_iwant_per_heartbeat peer in
       let*? () = check_too_many_sent_iwant_message count_iwant_sent in
       let*? () = check_topic_tracked topic in
       let* iwant_message_ids = filter peer message_ids in
