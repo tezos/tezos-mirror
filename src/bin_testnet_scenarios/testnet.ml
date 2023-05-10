@@ -23,12 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {network : string; snapshot : string option; protocol : Protocol.t}
+type t = {
+  network : string;
+  snapshot : string option;
+  protocol : Protocol.t;
+  data_dir : string option;
+}
 
 let get_testnet_config path =
   let conf = JSON.parse_file path in
   let snapshot = JSON.(conf |-> "snapshot" |> as_string_opt) in
   let network = JSON.(conf |-> "network" |> as_string) in
+  let data_dir = JSON.(conf |-> "data-dir" |> as_string_opt) in
   let protocol =
     let tags =
       List.map (fun proto -> (proto, Protocol.tag proto)) Protocol.all
@@ -38,4 +44,4 @@ let get_testnet_config path =
     | Some (proto, _tag) -> proto
     | None -> failwith (protocol_tag ^ " is not a valid protocol name")
   in
-  {snapshot; network; protocol}
+  {snapshot; network; protocol; data_dir}
