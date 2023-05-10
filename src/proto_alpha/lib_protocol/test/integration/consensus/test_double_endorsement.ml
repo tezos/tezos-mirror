@@ -441,7 +441,7 @@ let test_freeze_more_with_low_balance =
     >>=? fun () ->
     (* We now bake until end of cycle only with [account2]:
        block of the new cycle are called cX below. *)
-    Block.bake_until_cycle_end b3 >>=? fun c1 ->
+    Block.bake_until_cycle_end ~policy:(By_account account2) b3 >>=? fun c1 ->
     double_endorse_and_punish c1 account1 >>=? fun c2 ->
     (* Second denunciation has happened: we check that the full balance of
        [account1] reflects the slashing of 50% of the original deposit. Its

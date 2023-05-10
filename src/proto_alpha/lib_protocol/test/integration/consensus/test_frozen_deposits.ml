@@ -239,7 +239,7 @@ let test_unset_limit () =
     frozen_deposits_at_genesis
   >>=? fun () -> return_unit
 
-let test_cannot_bake_with_zero_deposits () =
+let test_cannot_bake_with_zero_deposits_limit () =
   Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
   let (contract1, account1), (_contract2, account2) =
     get_first_2_accounts_contracts contracts
@@ -265,6 +265,8 @@ let test_cannot_bake_with_zero_deposits () =
      get_next_baker_by_account fails with "No slots found" *)
   Assert.error ~loc:__LOC__ b1 (fun _ -> true) >>=? fun () ->
   Block.bake_until_cycle_end ~policy:(By_account account2) b >>=? fun b ->
+  (* after one cycle is passed, the frozen deposit window has passed
+     and the frozen deposits should now be effectively 0. *)
   Context.Delegate.current_frozen_deposits (B b) account1 >>=? fun fd ->
   Assert.equal_tez ~loc:__LOC__ fd Tez.zero >>=? fun () ->
   Block.bake ~policy:(By_account account1) b >>= fun b1 ->
@@ -659,9 +661,9 @@ let tests =
       tztest "set deposits limit to 5%" `Quick (test_set_limit 5);
       tztest "unset deposits limit" `Quick test_unset_limit;
       tztest
-        "cannot bake with zero deposits"
+        "cannot bake with zero deposits limit"
         `Quick
-        test_cannot_bake_with_zero_deposits;
+        test_cannot_bake_with_zero_deposits_limit;
       tztest
         "deposits after stake removal"
         `Quick
