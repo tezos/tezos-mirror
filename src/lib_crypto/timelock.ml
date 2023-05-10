@@ -367,6 +367,22 @@ let open_chest chest chest_key ~time =
         | None -> Correct Bytes.empty
         | Some plaintext -> Correct plaintext)
 
+module Internal_for_tests = struct
+  let rsa_public_to_z x = x
+
+  let locked_value_to_z x = x
+
+  let unlocked_value_to_z x = x
+
+  let vdf_proof_to_z x = x
+
+  let hash_to_prime = hash_to_prime
+
+  let prove_wesolowski = prove_wesolowski
+
+  let verify_wesolowski = verify_wesolowski
+end
+
 (* -------- Sampling functions for gas benchmarks -------- *)
 (* Those function are unsafe for wallet usage as they use the OCaml
    random generator. This is used to easily reproduce benchmarks. *)
