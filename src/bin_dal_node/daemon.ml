@@ -275,6 +275,7 @@ let run ~data_dir cctxt =
   let* rpc_server = RPC_server.(start config ctxt) in
   (* activate the p2p instance. *)
   Gossipsub.Transport_layer.activate ~additional_points:peers transport_layer ;
+  let () = Gossipsub.Transport_layer_hooks.activate gs_worker transport_layer in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () = Event.(emit rpc_server_is_ready (rpc_addr, rpc_port)) in
   (* Start daemon to resolve current protocol plugin *)
