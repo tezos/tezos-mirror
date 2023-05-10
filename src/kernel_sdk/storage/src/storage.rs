@@ -105,7 +105,7 @@ impl<T: From<OwnedPath>> Storage<T> {
         if let Some(top) = self.layers.last() {
             let new_layer_name = alloc::format!("{}.{}", self.prefix, new_layer_index);
             let new_layer_path = OwnedPath::try_from(new_layer_name.as_bytes().to_vec())?;
-            let new_top = top.make_copy(host, &new_layer_path)?;
+            let new_top = top.force_make_copy(host, &new_layer_path)?;
             self.layers.push(new_top);
             Ok(())
         } else {
