@@ -195,7 +195,7 @@ let delegate_has_revealed_nonces delegate unrevelead_nonces_set =
 
 let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
   let endorsing_reward_per_slot =
-    Constants_storage.endorsing_reward_per_slot ctxt
+    Delegate_rewards.endorsing_reward_per_slot ctxt
   in
   let unrevealed_nonces_set =
     List.fold_left
