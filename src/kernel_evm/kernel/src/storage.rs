@@ -34,6 +34,8 @@ const TRANSACTION_RECEIPT_BLOCK_HASH: RefPath = RefPath::assert_from(b"/block_ha
 const TRANSACTION_RECEIPT_BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/block_number");
 const TRANSACTION_RECEIPT_FROM: RefPath = RefPath::assert_from(b"/from");
 const TRANSACTION_RECEIPT_TO: RefPath = RefPath::assert_from(b"/to");
+const TRANSACTION_RECEIPT_CONTRACT_ADDRESS: RefPath =
+    RefPath::assert_from(b"/contract_address");
 const TRANSACTION_CUMULATIVE_GAS_USED: RefPath =
     RefPath::assert_from(b"/cumulative_gas_used");
 const TRANSACTION_RECEIPT_TYPE: RefPath = RefPath::assert_from(b"/type");
@@ -303,6 +305,13 @@ pub fn store_transaction_receipt<Host: Runtime>(
         let to_path = concat(receipt_path, &TRANSACTION_RECEIPT_TO)?;
         host.store_write(&to_path, to.as_bytes(), 0)?;
     };
+    // Contract address
+    if let Some(contract_address) = receipt.contract_address {
+        let contract_address_path =
+            concat(receipt_path, &TRANSACTION_RECEIPT_CONTRACT_ADDRESS)?;
+        host.store_write(&contract_address_path, contract_address.as_bytes(), 0)?;
+    };
+
     // Cumulative gas used
     let cumulative_gas_used_path =
         concat(receipt_path, &TRANSACTION_CUMULATIVE_GAS_USED)?;

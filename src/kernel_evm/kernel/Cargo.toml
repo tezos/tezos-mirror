@@ -41,6 +41,7 @@ primitive-types = { version = "0.11.1", default-features = false }
 hex = "0.4"
 num-traits = "0.2.8"
 evm-execution = { path = "../evm_execution" }
+rlp = "0.5.2"
 
 [features]
 default = ["panic-hook"]

@@ -95,6 +95,8 @@ module Durable_storage_path = struct
     let status tx_hash = receipt_field tx_hash "status"
 
     let type_ tx_hash = receipt_field tx_hash "type"
+
+    let contract_address tx_hash = receipt_field tx_hash "contract_address"
   end
 end
 
@@ -361,12 +363,12 @@ module RPC = struct
     let inspect_durable_and_decode_opt key decode =
       let* bytes = call_service ~base durable_state_value () {key} () in
       match bytes with
-      | Some bytes -> return (Some (decode bytes))
-      | None -> return None
+      | Some bytes -> return_some (decode bytes)
+      | None -> return_none
     in
     let inspect_durable_and_decode key decode =
-      let* opt = inspect_durable_and_decode_opt key decode in
-      match opt with Some bytes -> return bytes | None -> failwith "null"
+      let* res_opt = inspect_durable_and_decode_opt key decode in
+      match res_opt with Some res -> return res | None -> failwith "null"
     in
     let decode_block_hash bytes =
       Block_hash (Bytes.to_string bytes |> Hex.of_string |> Hex.show)
@@ -408,6 +410,11 @@ module RPC = struct
         (Durable_storage_path.Transaction_receipt.status tx_hash)
         decode_number
     in
+    let* contract_address =
+      inspect_durable_and_decode_opt
+        (Durable_storage_path.Transaction_receipt.contract_address tx_hash)
+        decode_address
+    in
     let+ type_ =
       inspect_durable_and_decode
         (Durable_storage_path.Transaction_receipt.type_ tx_hash)
@@ -427,8 +434,7 @@ module RPC = struct
       logsBloom = Hash (String.make 256 'a');
       type_;
       status;
-      contractAddress =
-        Some (address_of_string "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c");
+      contractAddress = contract_address;
     }
 end
 
