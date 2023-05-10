@@ -597,6 +597,13 @@ opam:octez-proxy-server:
   variables:
     package: octez-proxy-server
 
+opam:octez-rpc-process:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_1
+  variables:
+    package: octez-rpc-process
+
 opam:octez-signer:
   extends:
     - .opam_template
@@ -729,7 +736,7 @@ opam:tezos-baking-017-PtNairob-commands:
 opam:tezos-baking-alpha:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_1
+    - .rules_template__trigger_all_opam_batch_2
   variables:
     package: tezos-baking-alpha
 
@@ -743,7 +750,7 @@ opam:tezos-baking-alpha-commands:
 opam:tezos-base:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+    - .rules_template__trigger_all_opam_batch_7
   variables:
     package: tezos-base
 
@@ -935,7 +942,7 @@ opam:tezos-client-base-unix:
 opam:tezos-client-commands:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+    - .rules_template__trigger_all_opam_batch_6
   variables:
     package: tezos-client-commands
 
@@ -1204,7 +1211,7 @@ opam:tezos-embedded-protocol-demo-noops:
 opam:tezos-embedded-protocol-genesis:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+    - .rules_template__trigger_all_opam_batch_4
   variables:
     package: tezos-embedded-protocol-genesis
 
@@ -1672,7 +1679,7 @@ opam:tezos-protocol-plugin-017-PtNairob:
 opam:tezos-protocol-plugin-017-PtNairob-registerer:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+    - .rules_template__trigger_all_opam_batch_3
   variables:
     package: tezos-protocol-plugin-017-PtNairob-registerer
 
@@ -1853,7 +1860,7 @@ opam:tezos-smart-rollup-017-PtNairob:
 opam:tezos-smart-rollup-alpha:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+    - .rules_template__trigger_all_opam_batch_5
   variables:
     package: tezos-smart-rollup-alpha
 
