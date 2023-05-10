@@ -43,7 +43,7 @@ null
   { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "yay" } ]
 
 ./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/ballots
-{ "yay": "4000001978209", "nay": "4000000000000", "pass": "4000000000000" }
+{ "yay": "4000001679643", "nay": "4000000000000", "pass": "4000000000000" }
 
 ./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/current_period
 { "voting_period": { "index": 1, "kind": "exploration", "start_position": 4 },
@@ -65,7 +65,7 @@ null
   { "pkh": "[PUBLIC_KEY_HASH]",
     "voting_power": "4000000000000" },
   { "pkh": "[PUBLIC_KEY_HASH]",
-    "voting_power": "4000001978209" } ]
+    "voting_power": "4000001679643" } ]
 
 ./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/proposals
 []
@@ -75,4 +75,4 @@ null
   "position": 1, "remaining": 2 }
 
 ./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/total_voting_power
-"20000001978209"
+"20000001679643"
