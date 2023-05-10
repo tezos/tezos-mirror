@@ -167,6 +167,41 @@ let test_sampler_and_get_plaintext_size () =
   | Correct _ -> ()
   | _ -> assert false
 
+(* Unit test checking that the memory efficient Wesolowski proof generation is
+   correct *)
+let test_wesolowski () =
+  let open Timelock in
+  let open Internal_for_tests in
+  let payload = Bytes.of_string "fdgfnhfd" and time = 10 in
+  let chest, chest_key = create_chest_and_chest_key ~payload ~time () in
+  let rsa, g, c, pi =
+    ( rsa_public_to_z chest.rsa_public,
+      locked_value_to_z chest_key.vdf_tuple.locked_value,
+      unlocked_value_to_z chest_key.vdf_tuple.unlocked_value,
+      vdf_proof_to_z chest_key.vdf_tuple.vdf_proof )
+  in
+  (* Memory intensive proof generation *)
+  let pi_high_memory =
+    let l =
+      hash_to_prime
+        chest.rsa_public
+        ~time
+        chest.locked_value
+        chest_key.vdf_tuple.unlocked_value
+    in
+    let exponent = Z.(pow (of_int 2) time / l) in
+    Z.powm g exponent rsa
+  in
+  let tuple_high_memory =
+    to_vdf_tuple_unsafe
+      (Z.to_string g)
+      (Z.to_string c)
+      (Z.to_string pi_high_memory)
+  in
+  assert (Z.(equal pi pi_high_memory)) ;
+  assert (verify_wesolowski chest.rsa_public ~time tuple_high_memory) ;
+  ()
+
 let tests =
   [
     ( "timelock",
@@ -181,5 +216,6 @@ let tests =
         ("negative test - high level", `Quick, test_high_level_negative);
         ("negative test - low level", `Quick, test_low_level_negative);
         ("sampler test", `Quick, test_sampler_and_get_plaintext_size);
+        ("test wesolowski", `Quick, test_wesolowski);
       ] );
   ]
