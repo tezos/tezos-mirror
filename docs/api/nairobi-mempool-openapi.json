@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "17.0~beta1"
+    "version": "17.0~rc1"
   },
   "paths": {
     "/ban_operation": {
@@ -187,7 +187,7 @@
                       "protocol": {
                         "type": "string",
                         "enum": [
-                          "PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5"
+                          "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
                         ]
                       },
                       "branch": {
@@ -349,7 +349,7 @@
                               "protocol": {
                                 "type": "string",
                                 "enum": [
-                                  "PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5"
+                                  "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
                                 ]
                               },
                               "branch": {
@@ -389,7 +389,7 @@
                               "protocol": {
                                 "type": "string",
                                 "enum": [
-                                  "PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5"
+                                  "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
                                 ]
                               },
                               "branch": {
@@ -429,7 +429,7 @@
                               "protocol": {
                                 "type": "string",
                                 "enum": [
-                                  "PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5"
+                                  "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
                                 ]
                               },
                               "branch": {
@@ -469,7 +469,7 @@
                               "protocol": {
                                 "type": "string",
                                 "enum": [
-                                  "PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5"
+                                  "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
                                 ]
                               },
                               "branch": {
@@ -509,7 +509,7 @@
                               "protocol": {
                                 "type": "string",
                                 "enum": [
-                                  "PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5"
+                                  "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
                                 ]
                               },
                               "branch": {
@@ -592,7 +592,7 @@
                                     "protocol": {
                                       "type": "string",
                                       "enum": [
-                                        "PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5"
+                                        "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
                                       ]
                                     },
                                     "branch": {
@@ -638,7 +638,7 @@
                                     "protocol": {
                                       "type": "string",
                                       "enum": [
-                                        "PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5"
+                                        "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
                                       ]
                                     },
                                     "branch": {
@@ -684,7 +684,7 @@
                                     "protocol": {
                                       "type": "string",
                                       "enum": [
-                                        "PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5"
+                                        "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
                                       ]
                                     },
                                     "branch": {
@@ -730,7 +730,7 @@
                                     "protocol": {
                                       "type": "string",
                                       "enum": [
-                                        "PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5"
+                                        "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
                                       ]
                                     },
                                     "branch": {
@@ -3429,7 +3429,7 @@
           "protocol": {
             "type": "string",
             "enum": [
-              "PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5"
+              "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
             ]
           },
           "branch": {

@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "17.0~beta1"
+    "version": "17.0~rc1"
   },
   "paths": {
     "/": {
@@ -6339,6 +6339,118 @@
         }
       }
     },
+    "/helpers/attestation_rights": {
+      "get": {
+        "description": "Retrieves the delegates allowed to attest a block.\nBy default, it gives the attestation power for delegates that have at least one attestation slot for the next block.\nParameters `level` and `cycle` can be used to specify the (valid) level(s) in the past or future at which the attestation rights have to be returned. Parameter `delegate` can be used to restrict the results to the given delegates.\nParameter `consensus_key` can be used to restrict the results to the given consensus_keys. \nReturns the smallest attestation slots and the attestation power. Also returns the minimal timestamp that corresponds to attestation at the given level. The timestamps are omitted for levels in the past, and are only estimates for levels higher that the next block's, based on the hypothesis that all predecessor blocks were baked at the first round.",
+        "parameters": [
+          {
+            "name": "level",
+            "in": "query",
+            "description": "A level integer",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cycle",
+            "in": "query",
+            "description": "A cycle integer",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "delegate",
+            "in": "query",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "consensus_key",
+            "in": "query",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "level": {
+                        "type": "integer",
+                        "minimum": -2147483648,
+                        "maximum": 2147483647
+                      },
+                      "delegates": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "delegate": {
+                              "$ref": "#/components/schemas/Signature.Public_key_hash"
+                            },
+                            "first_slot": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            },
+                            "attestation_power": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            },
+                            "consensus_key": {
+                              "$ref": "#/components/schemas/Signature.Public_key_hash"
+                            }
+                          },
+                          "required": [
+                            "delegate",
+                            "first_slot",
+                            "attestation_power",
+                            "consensus_key"
+                          ]
+                        }
+                      },
+                      "estimated_time": {
+                        "$ref": "#/components/schemas/timestamp.protocol"
+                      }
+                    },
+                    "required": [
+                      "level",
+                      "delegates"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/helpers/baking_rights": {
       "get": {
         "description": "Retrieves the list of delegates allowed to bake a block.\nBy default, it gives the best baking opportunities (in terms of rounds) for bakers that have at least one opportunity below the 64th round for the next block.\nParameters `level` and `cycle` can be used to specify the (valid) level(s) in the past or future at which the baking rights have to be returned.\nParameter `delegate` can be used to restrict the results to the given delegates. Parameter `consensus_key` can be used to restrict the results to the given consensus_keys. If parameter `all` is set, all the baking opportunities for each baker at each level are returned, instead of just the first one.\nReturns the list of baking opportunities up to round 64. Also returns the minimal timestamps that correspond to these opportunities. The timestamps are omitted for levels in the past, and are only estimates for levels higher that the next block's, based on the hypothesis that all predecessor blocks were baked at the first round.",
@@ -6566,7 +6678,7 @@
     },
     "/helpers/endorsing_rights": {
       "get": {
-        "description": "Retrieves the delegates allowed to endorse a block.\nBy default, it gives the endorsing power for delegates that have at least one endorsing slot for the next block.\nParameters `level` and `cycle` can be used to specify the (valid) level(s) in the past or future at which the endorsing rights have to be returned. Parameter `delegate` can be used to restrict the results to the given delegates.\nParameter `consensus_key` can be used to restrict the results to the given consensus_keys. \nReturns the smallest endorsing slots and the endorsing power. Also returns the minimal timestamp that corresponds to endorsing at the given level. The timestamps are omitted for levels in the past, and are only estimates for levels higher that the next block's, based on the hypothesis that all predecessor blocks were baked at the first round.",
+        "description": "Deprecated: use `attestation_rights` instead.\nRetrieves the delegates allowed to endorse a block.\nBy default, it gives the endorsing power for delegates that have at least one endorsing slot for the next block.\nParameters `level` and `cycle` can be used to specify the (valid) level(s) in the past or future at which the endorsing rights have to be returned. Parameter `delegate` can be used to restrict the results to the given delegates.\nParameter `consensus_key` can be used to restrict the results to the given consensus_keys. \nReturns the smallest endorsing slots and the endorsing power. Also returns the minimal timestamp that corresponds to endorsing at the given level. The timestamps are omitted for levels in the past, and are only estimates for levels higher that the next block's, based on the hypothesis that all predecessor blocks were baked at the first round.",
         "parameters": [
           {
             "name": "level",
@@ -7629,7 +7741,7 @@
                       "protocol": {
                         "type": "string",
                         "enum": [
-                          "PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5"
+                          "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
                         ]
                       },
                       "payload_hash": {
@@ -9554,7 +9666,7 @@
                     "next_protocol": {
                       "type": "string",
                       "enum": [
-                        "PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5"
+                        "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
                       ]
                     },
                     "test_chain_status": {
@@ -21450,7 +21562,7 @@
           "next_protocol": {
             "type": "string",
             "enum": [
-              "PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5"
+              "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
             ]
           },
           "test_chain_status": {
@@ -21845,7 +21957,7 @@
           "protocol": {
             "type": "string",
             "enum": [
-              "PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5"
+              "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
             ]
           },
           "branch": {

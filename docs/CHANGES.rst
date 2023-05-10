@@ -3,8 +3,8 @@
 Changelog
 '''''''''
 
-Version 17.0-beta1`
-===================
+Version 17.0-rc1
+================
 
 Node
 ----
@@ -37,6 +37,49 @@ Node
 - Fixed a issue that may trigger unknown keys errors while reading the
   context on a read-only instance.
 
+- Added query parameter ``protocol`` to RPC ``/monitor/heads/<chain_id>`` (which can be
+  repeated) in order to monitor new heads of one or several given protocols only.
+
+- **Breaking Change** Reworked some node logs. While bootstrapping,
+  the node will log one message every 50 validated blocks to indicate
+  the current head's level and how old it is, giving an indication on
+  how long it will take to be synchronized. Also, gracefully indicates
+  peer disconnection instead of spurious "worker crashed" messages.
+
+- Fixed an issue where a node lagging behind would end up freezing and
+  never be able to catch up.
+
+Client
+------
+
+- **Breaking Changes**: an alias must be provided when originating a
+  smart rollup. That alias can be used in other smart rollup commands
+  instead of the address. This is similar to what is done for smart
+  contracts.
+
+  Smart rollup origination command::
+
+    ./octez-client originate smart rollup <alias> from <source contract> of kind <smart rollup kind> of type <michelson type> with kernel <kernel>
+
+  Other example command::
+
+    ./octez-client recover bond of <implicit contrat> for smart rollup <alias or address> from <source contract>
+
+- Similarly to smart contract, the client now has functions to manage the set of known smart rollups::
+
+    ./octez-client remember smart rollup <alias> <smart rollup address>
+
+    ./octez-client forget smart rollup <alias>
+
+    ./octez-client forget all smart rollups
+
+    ./octez-client show known smart rollup <alias>
+
+    ./octez-client list smart rollups
+
+- Add an ``operation_v2`` and ``operation_v2.unsigned`` registered encoding that
+  supports ``attestation`` kind instead of ``endorsement``. (MR :gl:`!8563`)
+
 Baker
 -----
 
@@ -47,6 +90,16 @@ Baker
   ``branch`` fields are counted only once in the (pre)quorums. (MR :gl:`!8175`)
 
 - Improved efficiency to solve the anti-spam Proof-of-Work challenge.
+
+- Made the baker capable of running in a RPC-only mode through a newly
+  introduced command: ``octez-baker-<protocol> run remotely
+  [delegates] [options]``. This mode does not require the octez node's
+  storage to be directly accessible by the baker and will reduce
+  memory consumption. However, this mode is less performant and may
+  result in noticable slower baking times. (MR :gl:`!8607`)
+
+- Added a default configuration for that enables disk logs as a
+  file-descriptor-sink in the base directory with a 7 days rotation.
 
 Accuser
 -------
@@ -91,6 +144,14 @@ Smart Rollup node
   for the rollup. This is an optional argument that is required *only* if the
   smart rollup was bootstrapped and not originated (MR :gl:`!8556`).
 
+- Fixed legacy run command (MR :gl:`!8547`).
+
+- Fixed missing commitment for genesis by using local computation instead of
+  RPC (MR :gl:`!8617`).
+
+- Fixed issue where rollup node believed it disagreed with L1 regarding cemented
+  commitments (MR :gl:`!8615`).
+
 Smart Rollup client
 -------------------
 
@@ -110,6 +171,13 @@ Smart Rollup WASM Debugger
 - Added commands to inspect the structure of the durable storage (MRs
   :gl:`!7707`, :gl:`!8304`).
 
+- Automatically ``load inputs`` when ``step inbox`` is called. (MR :gl:`!8444`)
+
+- Added a command ``show function symbols`` to inspect the custom section
+  ``name`` of unstripped kernels (MR :gl:`!8522`)
+
+- Added a command ``profile`` that runs a full ``kernel_run`` and produces a
+  flamegraph of the execution (MR :gl:`!8510`).
 
 Miscellaneous
 -------------

@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "17.0~beta1"
+    "version": "17.0~rc1"
   },
   "paths": {
     "/chains/{chain_id}": {
@@ -850,7 +850,17 @@
                               "maximum": 1073741823
                             },
                             "swap-linger": {
-                              "$ref": "#/components/schemas/timespan.system"
+                              "nullable": true,
+                              "oneOf": [
+                                {
+                                  "title": "Some",
+                                  "oneOf": [
+                                    {
+                                      "$ref": "#/components/schemas/timespan.system"
+                                    }
+                                  ]
+                                }
+                              ]
                             },
                             "binary-chunks-size": {
                               "type": "integer",
@@ -2094,6 +2104,15 @@
             "in": "path",
             "description": "A chain identifier. This is either a chain hash in Base58Check notation or a one the predefined aliases: 'main', 'test'.",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "protocol",
+            "in": "query",
+            "description": "Protocol_hash (Base58Check-encoded)",
+            "required": false,
             "schema": {
               "type": "string"
             }
