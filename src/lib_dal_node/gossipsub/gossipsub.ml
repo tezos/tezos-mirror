@@ -29,6 +29,7 @@ include Gs_interface
 module Worker = struct
   module Config = Gs_interface.Worker_config
   module Default_parameters = Gs_default_parameters
+  module Logging = Gs_logging
   include Gs_interface.Worker_instance
 end
 

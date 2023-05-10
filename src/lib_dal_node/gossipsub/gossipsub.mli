@@ -67,7 +67,10 @@ module Worker : sig
        and type GS.Message.t = message
        and type GS.Peer.t = peer
        and module GS.Span = Config.GS.Span
-       and module Monad = Gs_interface.Monad
+
+  module Logging : sig
+    val event : event -> unit Monad.t
+  end
 end
 
 (** The transport layer module exposes the needed primitives, interface and
