@@ -40,6 +40,25 @@ val transaction_send :
   unit ->
   string Lwt.t
 
+(** [add_abi ~label ~abi ()] register an ABI (Application Binary Interface) in
+    the client. [abi] should be a path to the json file. [label] is a string
+    used by the client to register the ABI in memory so it can be refered to
+    later.*)
+val add_abi : label:string -> abi:string -> unit -> unit Lwt.t
+
+(** [deploy ~source_private_key ~endpoint ~abi ~bin] crafts and sign a
+    transaction deploying [bin] whose interface [abi] is registered in the
+    client, and sends the raw transaction to the JSON-API server listening at
+    [endpoint]. [bin] is a path to the binary file, and [abi] is the label used
+    while registering the ABI in the client. *)
+val deploy :
+  source_private_key:string ->
+  endpoint:string ->
+  abi:string ->
+  bin:string ->
+  unit ->
+  string Lwt.t
+
 (** [get_block ~block_id ~endpoint] asks the block [block_id] (it can be a
     hash or a number) to the JSON-RPC API server listening at [endpoint]. *)
 val get_block : block_id:string -> endpoint:string -> Block.t Lwt.t

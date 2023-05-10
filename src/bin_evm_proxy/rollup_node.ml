@@ -423,7 +423,8 @@ module RPC = struct
       logsBloom = Hash (String.make 256 'a');
       type_;
       status;
-      contractAddress = None;
+      contractAddress =
+        Some (address_of_string "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c");
     }
 end
 
