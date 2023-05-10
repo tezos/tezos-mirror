@@ -38,7 +38,7 @@ let create_nodes =
 let create_blocks =
   "   CREATE TABLE IF NOT EXISTS blocks(\n\
   \     id INTEGER PRIMARY KEY,\n\
-  \     previous_block INTEGER,\n\
+  \     predecessor INTEGER,\n\
   \     timestamp INTEGER NOT NULL, -- Unix time\n\
   \     hash BLOB UNIQUE NOT NULL,\n\
   \     level INTEGER NOT NULL,\n\
@@ -132,7 +132,7 @@ let create_tables =
     create_operations_inclusion_operation_idx;
   ]
 
-let alter_blocks = "   ALTER TABLE blocks ADD COLUMN previous_block INTEGER"
+let alter_blocks = "   ALTER TABLE blocks ADD COLUMN predecessor INTEGER"
 
 let alter_tables = [alter_blocks]
 
@@ -233,13 +233,12 @@ let maybe_insert_block =
         (tup4 int32 Type.time_protocol Type.block_hash Type.block_hash)
         (tup2 Type.public_key_hash int32)
       ->. unit))
-    "INSERT INTO blocks (timestamp, hash, level, round, previous_block, baker) \
+    "INSERT INTO blocks (timestamp, hash, level, round, predecessor, baker) \
      SELECT column1, column2, ?, column5, blocks.id, delegates.id FROM (VALUES \
      (?,?,?,?,?)) LEFT JOIN blocks ON blocks.hash = column3 JOIN delegates ON \
      delegates.address = column4 ON CONFLICT (hash) DO UPDATE SET (timestamp, \
-     level, round, previous_block, baker) = (EXCLUDED.timestamp, \
-     EXCLUDED.level, EXCLUDED.round, EXCLUDED.previous_block, EXCLUDED.baker) \
-     WHERE True"
+     level, round, predecessor, baker) = (EXCLUDED.timestamp, EXCLUDED.level, \
+     EXCLUDED.round, EXCLUDED.predecessor, EXCLUDED.baker) WHERE True"
 
 let insert_received_operation =
   Caqti_request.Infix.(
