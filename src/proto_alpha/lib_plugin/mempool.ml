@@ -618,6 +618,18 @@ let conflict_handler config : Mempool.conflict_handler =
   else if Operation.compare existing_operation new_operation < 0 then `Replace
   else `Keep
 
+let find_manager {shell = _; protocol_data = Operation_data {contents; _}} =
+  match contents with
+  | Single (Manager_operation {source; _}) -> Some source
+  | Cons (Manager_operation {source; _}, _) -> Some source
+  | Single
+      ( Preendorsement _ | Endorsement _ | Dal_attestation _ | Proposals _
+      | Ballot _ | Seed_nonce_revelation _ | Vdf_revelation _
+      | Double_baking_evidence _ | Double_preendorsement_evidence _
+      | Double_endorsement_evidence _ | Activate_account _ | Drain_delegate _
+      | Failing_noop _ ) ->
+      None
+
 let fee_needed_to_overtake ~op_to_overtake ~candidate_op =
   if is_manager_operation candidate_op && is_manager_operation op_to_overtake
   then
