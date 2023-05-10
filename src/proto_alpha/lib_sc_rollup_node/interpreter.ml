@@ -218,7 +218,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         Layer1.{hash = block.header.predecessor; level = pred_level}
     in
     let* inbox = Node_context.get_inbox node_ctxt block.header.inbox_hash in
-    let* {is_migration_block; predecessor; predecessor_timestamp; messages} =
+    let* {is_first_block; predecessor; predecessor_timestamp; messages} =
       Node_context.get_messages node_ctxt block.header.inbox_witness
     in
     let inbox_level = Sc_rollup.Inbox.inbox_level inbox in
@@ -228,7 +228,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       let open Sc_rollup.Inbox_message in
       Internal Start_of_level
       ::
-      (if is_migration_block then
+      (if is_first_block then
        [Internal Sc_rollup.Inbox_message.protocol_migration_internal_message]
       else [])
       @ Internal (Info_per_level {predecessor; predecessor_timestamp})

@@ -53,7 +53,7 @@ module type S = sig
 
   val append_l2_block :
     [`Read | `Write] Node_context.t ->
-    ?is_migration_block:bool ->
+    ?is_first_block:bool ->
     Sc_rollup.Inbox_message.t trace ->
     ((Sc_rollup_block.header, unit) Sc_rollup_block.block, tztrace) result Lwt.t
 end
@@ -198,8 +198,8 @@ module Make (PVM : Pvm.S) = struct
     in
     {Layer1.hash; level; header}
 
-  let append_l2_block (node_ctxt : _ Node_context.t)
-      ?(is_migration_block = false) messages =
+  let append_l2_block (node_ctxt : _ Node_context.t) ?(is_first_block = false)
+      messages =
     let open Lwt_result_syntax in
     let* predecessor_l2_block =
       Node_context.last_processed_head_opt node_ctxt
@@ -221,7 +221,7 @@ module Make (PVM : Pvm.S) = struct
     in
     Daemon.Internal_for_tests.process_messages
       node_ctxt
-      ~is_migration_block
+      ~is_first_block
       ~predecessor
       head
       messages

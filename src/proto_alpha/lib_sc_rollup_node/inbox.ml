@@ -91,7 +91,7 @@ let same_inbox_as_layer_1 node_ctxt head_hash inbox =
     (Sc_rollup.Inbox.equal layer1_inbox inbox)
     (Sc_rollup_node_errors.Inconsistent_inbox {layer1_inbox; inbox})
 
-let add_messages ~is_migration_block ~predecessor_timestamp ~predecessor inbox
+let add_messages ~is_first_block ~predecessor_timestamp ~predecessor inbox
     messages =
   let open Lwt_result_syntax in
   let no_history = Sc_rollup.Inbox.History.empty ~capacity:0L in
@@ -102,7 +102,7 @@ let add_messages ~is_migration_block ~predecessor_timestamp ~predecessor inbox
              witness,
              messages_with_protocol_internal_messages ) =
        Sc_rollup.Inbox.add_all_messages
-         ~first_block:is_migration_block
+         ~first_block:is_first_block
          ~predecessor_timestamp
          ~predecessor
          no_history
@@ -118,7 +118,7 @@ let add_messages ~is_migration_block ~predecessor_timestamp ~predecessor inbox
          inbox,
          messages_with_protocol_internal_messages )
 
-let process_messages (node_ctxt : _ Node_context.t) ~is_migration_block
+let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
     ~(predecessor : Layer1.header) ~level messages =
   let open Lwt_result_syntax in
   let* inbox =
@@ -132,7 +132,7 @@ let process_messages (node_ctxt : _ Node_context.t) ~is_migration_block
          inbox,
          messages_with_protocol_internal_messages ) =
     add_messages
-      ~is_migration_block
+      ~is_first_block
       ~predecessor_timestamp
       ~predecessor:predecessor.hash
       inbox
@@ -148,7 +148,7 @@ let process_messages (node_ctxt : _ Node_context.t) ~is_migration_block
       node_ctxt
       witness_hash
       {
-        is_migration_block;
+        is_first_block;
         predecessor = predecessor.hash;
         predecessor_timestamp;
         messages;
@@ -189,7 +189,7 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
             _messages_with_protocol_internal_messages ) as res) =
       process_messages
         node_ctxt
-        ~is_migration_block:is_first_block
+        ~is_first_block
         ~predecessor
         ~level:head.level
         collected_messages
@@ -206,7 +206,7 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
 
 let start () = Inbox_event.starting ()
 
-let payloads_history_of_messages ~is_migration_block ~predecessor
+let payloads_history_of_messages ~is_first_block ~predecessor
     ~predecessor_timestamp messages =
   let open Result_syntax in
   let dummy_inbox =
@@ -223,7 +223,7 @@ let payloads_history_of_messages ~is_migration_block ~predecessor
        (N after next snapshot). *)
     Environment.wrap_tzresult
     @@ Sc_rollup.Inbox.add_all_messages
-         ~first_block:is_migration_block
+         ~first_block:is_first_block
          ~predecessor_timestamp
          ~predecessor
          (Sc_rollup.Inbox.History.empty ~capacity:0L)
