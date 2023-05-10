@@ -162,13 +162,13 @@ let shield_cmd =
          ~name:"qty"
          ~desc:"Amount taken from transparent wallet of source."
     @@ Tezos_clic.prefix "from"
-    @@ ContractAlias.destination_param
+    @@ Contract_alias.destination_param
          ~name:"src-tz"
          ~desc:"Transparent source account."
     @@ Tezos_clic.prefix "to"
     @@ Tezos_clic.string ~name:"dst-sap" ~desc:"Sapling address of destination."
     @@ Tezos_clic.prefix "using"
-    @@ OriginatedContractAlias.destination_param
+    @@ Originated_contract_alias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
     @@ Tezos_clic.stop)
@@ -254,11 +254,11 @@ let unshield_cmd =
          ~name:"src-sap"
          ~desc:"Sapling account of source."
     @@ Tezos_clic.prefix "to"
-    @@ ContractAlias.destination_param
+    @@ Contract_alias.destination_param
          ~name:"dst-tz"
          ~desc:"Transparent destination account."
     @@ Tezos_clic.prefix "using"
-    @@ OriginatedContractAlias.destination_param
+    @@ Originated_contract_alias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
     @@ Tezos_clic.stop)
@@ -360,7 +360,7 @@ let forge_shielded_cmd =
     @@ Tezos_clic.prefix "to"
     @@ Tezos_clic.string ~name:"dst-sap" ~desc:"Sapling address of destination."
     @@ Tezos_clic.prefix "using"
-    @@ OriginatedContractAlias.destination_param
+    @@ Originated_contract_alias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
     @@ Tezos_clic.stop)
@@ -426,11 +426,11 @@ let submit_shielded_cmd =
          ~name:"file"
          ~desc:"Filename of the forged transaction."
     @@ Tezos_clic.prefix "from"
-    @@ ContractAlias.destination_param
+    @@ Contract_alias.destination_param
          ~name:"alias-tz"
          ~desc:"Transparent account paying the fees."
     @@ Tezos_clic.prefix "using"
-    @@ OriginatedContractAlias.destination_param
+    @@ Originated_contract_alias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
     @@ Tezos_clic.stop)
@@ -501,7 +501,7 @@ let submit_shielded_cmd =
       | Some (_res, _contracts) -> return_unit)
 
 let for_contract_arg =
-  Client_proto_contracts.OriginatedContractAlias.destination_arg
+  Client_proto_contracts.Originated_contract_alias.destination_arg
     ~name:"for-contract"
     ~doc:"name of the contract to associate new key with"
     ()
@@ -544,7 +544,7 @@ let use_key_for_contract_cmd =
          ~name:"sapling-key"
          ~desc:"Sapling key to use for the contract."
     @@ Tezos_clic.prefixes ["for"; "contract"]
-    @@ Client_proto_contracts.OriginatedContractAlias.destination_param
+    @@ Client_proto_contracts.Originated_contract_alias.destination_param
          ~name:"contract"
          ~desc:"Contract the key will be used on."
     @@ Tezos_clic.stop)
@@ -704,7 +704,7 @@ let commands () =
            ~name:"sapling-key"
            ~desc:"Sapling key we get balance for."
       @@ Tezos_clic.prefixes ["in"; "contract"]
-      @@ Client_proto_contracts.OriginatedContractAlias.destination_param
+      @@ Client_proto_contracts.Originated_contract_alias.destination_param
            ~name:"contract"
            ~desc:"Contract we get balance from."
       @@ Tezos_clic.stop)

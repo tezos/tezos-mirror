@@ -33,7 +33,7 @@ let group =
     title = "Commands for managing FA1.2-compatible smart contracts";
   }
 
-let alias_param = Client_proto_contracts.ContractAlias.destination_param
+let alias_param = Client_proto_contracts.Contract_alias.destination_param
 
 let token_contract_param () =
   alias_param
@@ -60,13 +60,13 @@ let tez_amount_arg =
   tez_arg ~default:"0" ~parameter:"tez-amount" ~doc:"amount in \xEA\x9C\xA9"
 
 let as_arg =
-  Client_proto_contracts.ContractAlias.destination_arg
+  Client_proto_contracts.Contract_alias.destination_arg
     ~name:"as"
     ~doc:"name or address of the caller of the contract"
     ()
 
 let payer_arg =
-  Client_proto_contracts.ContractAlias.destination_arg
+  Client_proto_contracts.Contract_alias.destination_arg
     ~name:"payer"
     ~doc:"name of the payer (i.e. SOURCE) contract for the transaction"
     ()

@@ -86,7 +86,7 @@ let commands () =
       ~desc:"Get the balance of a contract."
       no_options
       (prefixes ["get"; "balance"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         get_balance cctxt ~chain:`Main ~block:cctxt#block contract
@@ -98,7 +98,7 @@ let commands () =
       ~desc:"Get the storage of a contract."
       no_options
       (prefixes ["get"; "script"; "storage"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         get_storage cctxt ~chain:`Main ~block:cctxt#block contract >>=? function
@@ -111,7 +111,7 @@ let commands () =
       ~desc:"Get the code of a contract."
       no_options
       (prefixes ["get"; "script"; "code"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         get_script cctxt ~chain:`Main ~block:cctxt#block contract >>=? function
@@ -133,7 +133,7 @@ let commands () =
       ~desc:"Get the manager of a contract."
       no_options
       (prefixes ["get"; "manager"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         Client_proto_contracts.get_manager
@@ -154,7 +154,7 @@ let commands () =
       ~desc:"Get the delegate of a contract."
       no_options
       (prefixes ["get"; "delegate"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         Client_proto_contracts.get_delegate
