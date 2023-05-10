@@ -25,6 +25,16 @@
 
 (* Client module for interacting with a Dac Node in Observer mode. This client
    should only used by components that are compiled with a protocol. *)
+
+module Reveal_hash = Protocol.Sc_rollup_reveal_hash
+
+type error +=
+  | Failed_to_initialize_dac_plugin
+  | Failed_to_fetch_missing_page_from_observer of Reveal_hash.t
+  | Failed_to_verify_raw_data_with_hash of (Reveal_hash.t * Protocol_hash.t)
+  | Timeout of Z.t
+  | Wrong_hash of {found : Reveal_hash.t; expected : Reveal_hash.t}
+
 type t
 
 module Configuration : sig

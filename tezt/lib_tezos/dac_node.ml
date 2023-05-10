@@ -188,6 +188,17 @@ let spawn_config_init dac_node =
   in
   spawn_command dac_node (mode_command @ arg_command)
 
+let ls = "ls"
+
+let ls_reveal_data_dir dac_node =
+  let reveal_data_dir = dac_node.persistent_state.reveal_data_dir in
+  let commands = [reveal_data_dir] in
+  let process =
+    Process.spawn ~name:dac_node.name ~color:dac_node.color ls commands
+  in
+  let* filenames = Process.check_and_read_stdout process in
+  return @@ String.split_on_char '\n' filenames
+
 let init_config dac_node =
   let process = spawn_config_init dac_node in
   let* output = Process.check_and_read_stdout process in

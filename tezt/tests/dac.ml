@@ -28,46 +28,13 @@
 (* Testing
    -------
    Component:    Data-availability layer
+   Requirements: make -f kernels.mk build
    Invocation:   dune exec tezt/tests/main.exe -- --file dac.ml
    Subject: Integration tests related to the data-availability layer
 *)
+open Dac_helper
 
 let hooks = Tezos_regression.hooks
-
-module Scenarios = struct
-  type full = {
-    protocol : Protocol.t;
-    node : Node.t;
-    client : Client.t;
-    key : string;
-    sc_rollup_address : string;
-    sc_rollup_node : Sc_rollup_node.t;
-    coordinator_node : Dac_node.t;
-    committee_members : Account.aggregate_key list;
-    committee_members_nodes : Dac_node.t list;
-    observer_nodes : Dac_node.t list;
-    rollup_nodes : Sc_rollup_node.t list;
-  }
-end
-
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3173
-   The functions below are duplicated from sc_rollup.ml.
-   They should be moved to a common submodule. *)
-let make_int_parameter name = function
-  | None -> []
-  | Some value -> [(name, `Int value)]
-
-let make_bool_parameter name = function
-  | None -> []
-  | Some value -> [(name, `Bool value)]
-
-let test ~__FILE__ ?(tags = []) ?supports title f =
-  let tags = "dac" :: tags in
-  Protocol.register_test ~__FILE__ ~title ~tags ?supports f
-
-let regression_test ~__FILE__ ?(tags = []) title f =
-  let tags = "dac" :: tags in
-  Protocol.register_regression_test ~__FILE__ ~title ~tags f
 
 let assert_lwt_failure ?__LOC__ msg lwt_under_inspection =
   let* passed =
@@ -148,376 +115,6 @@ let streamed_certificates_client coordinator_node root_hash =
          List.rev_map
            (fun raw -> parse_certificate @@ JSON.parse ~origin:endpoint raw)
            rev_as_list_no_empty_element)
-
-(* Some initialization functions to start needed nodes. *)
-
-let setup_node ?(additional_bootstrap_accounts = 5) ~parameters ~protocol
-    ?(event_sections_levels = []) ?(node_arguments = []) () =
-  (* Temporary setup to initialise the node. *)
-  let base = Either.right (protocol, None) in
-  let* parameter_file = Protocol.write_parameter_file ~base parameters in
-  let* _client = Client.init_mockup ~parameter_file ~protocol () in
-  let nodes_args =
-    Node.
-      [
-        Synchronisation_threshold 0; History_mode (Full None); No_bootstrap_peers;
-      ]
-  in
-  let node = Node.create nodes_args in
-  let* () = Node.config_init node [] in
-  let* () = Node.run node ~event_sections_levels node_arguments in
-  let* () = Node.wait_for_ready node in
-  let* client = Client.init ~endpoint:(Node node) () in
-  let* additional_account_keys =
-    Client.stresstest_gen_keys additional_bootstrap_accounts client
-  in
-  let additional_bootstrap_accounts =
-    List.map (fun x -> (x, None, false)) additional_account_keys
-  in
-  let* parameter_file =
-    Protocol.write_parameter_file
-      ~additional_bootstrap_accounts
-      ~base
-      parameters
-  in
-  let* () =
-    Client.activate_protocol_and_wait ~parameter_file ~protocol client
-  in
-  return (node, client)
-
-let with_layer1 ?additional_bootstrap_accounts ?commitment_period
-    ?challenge_window ?event_sections_levels ?node_arguments f ~protocol =
-  let parameters =
-    make_int_parameter
-      ["smart_rollup_commitment_period_in_blocks"]
-      commitment_period
-    @ make_int_parameter
-        ["smart_rollup_challenge_window_in_blocks"]
-        challenge_window
-    @ [(["smart_rollup_arith_pvm_enable"], `Bool true)]
-  in
-  let* node, client =
-    setup_node
-      ?additional_bootstrap_accounts
-      ?event_sections_levels
-      ?node_arguments
-      ~parameters
-      ~protocol
-      ()
-  in
-  let bootstrap1_key = Constant.bootstrap1.public_key_hash in
-  f node client bootstrap1_key
-
-let with_legacy_dac_node tezos_node ?name ?sc_rollup_node ?(pvm_name = "arith")
-    ?(wait_ready = true) ~threshold ?committee_member_address ~committee_members
-    tezos_client f =
-  let range i = List.init i Fun.id in
-  let reveal_data_dir =
-    Option.map
-      (fun sc_rollup_node ->
-        Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
-      sc_rollup_node
-  in
-  let* committee_members =
-    List.fold_left
-      (fun keys i ->
-        let* keys in
-        let* key =
-          Client.bls_gen_and_show_keys
-            ~alias:(Format.sprintf "dac-member-%d" i)
-            tezos_client
-        in
-        return (key :: keys))
-      (return [])
-      (range committee_members)
-  in
-  let dac_node =
-    Dac_node.create_legacy
-      ?name
-      ~node:tezos_node
-      ~client:tezos_client
-      ?reveal_data_dir
-      ~threshold
-      ?committee_member_address
-      ~committee_members:
-        (List.map
-           (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key_hash)
-           committee_members)
-      ()
-  in
-  let* _dir = Dac_node.init_config dac_node in
-  let* () = Dac_node.run dac_node ~wait_ready in
-  f dac_node committee_members
-
-let with_coordinator_node tezos_node ?name ?sc_rollup_node ?(pvm_name = "arith")
-    ?(wait_ready = true) ~threshold ~committee_members tezos_client f =
-  let range i = List.init i Fun.id in
-  let reveal_data_dir =
-    Option.map
-      (fun sc_rollup_node ->
-        Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
-      sc_rollup_node
-  in
-  let* committee_members =
-    List.fold_left
-      (fun keys i ->
-        let* keys in
-        let* key =
-          Client.bls_gen_and_show_keys
-            ~alias:(Format.sprintf "committee-member-%d" i)
-            tezos_client
-        in
-        return (key :: keys))
-      (return [])
-      (range committee_members)
-  in
-  let dac_node =
-    Dac_node.create_coordinator
-      ?name
-      ~node:tezos_node
-      ~client:tezos_client
-      ?reveal_data_dir
-      ~threshold
-      ~committee_members:
-        (List.map
-           (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key_hash)
-           committee_members)
-      ()
-  in
-  let* _dir = Dac_node.init_config dac_node in
-  let* () = Dac_node.run dac_node ~wait_ready in
-  f dac_node committee_members
-
-let with_committee_member tezos_node coordinator_node ?name ?sc_rollup_node
-    ?(pvm_name = "arith") ?(wait_ready = true) ~committee_member tezos_client f
-    =
-  let reveal_data_dir =
-    Option.map
-      (fun sc_rollup_node ->
-        Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
-      sc_rollup_node
-  in
-  let Account.{public_key_hash; _} = committee_member in
-  let dac_node =
-    Dac_node.create_committee_member
-      ?name
-      ~node:tezos_node
-      ~client:tezos_client
-      ?reveal_data_dir
-      ~coordinator_rpc_host:(Dac_node.rpc_host coordinator_node)
-      ~coordinator_rpc_port:(Dac_node.rpc_port coordinator_node)
-      ~address:public_key_hash
-      ()
-  in
-  let* _dir = Dac_node.init_config dac_node in
-  let* () = Dac_node.run dac_node ~wait_ready in
-  f dac_node committee_member
-
-let with_observer tezos_node coordinator_node ?name ?sc_rollup_node
-    ?(pvm_name = "arith") ?(wait_ready = true) ~committee_member tezos_client f
-    =
-  let reveal_data_dir =
-    Option.map
-      (fun sc_rollup_node ->
-        Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
-      sc_rollup_node
-  in
-  let dac_node =
-    Dac_node.create_observer
-      ?name
-      ~node:tezos_node
-      ~client:tezos_client
-      ?reveal_data_dir
-      ~coordinator_rpc_host:(Dac_node.rpc_host coordinator_node)
-      ~coordinator_rpc_port:(Dac_node.rpc_port coordinator_node)
-      ()
-  in
-  let* _dir = Dac_node.init_config dac_node in
-  let* () = Dac_node.run dac_node ~wait_ready in
-  f dac_node committee_member
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4706
-   Keep pvm name value in Sc_rollup.t. *)
-let with_fresh_rollup ~protocol ?(pvm_name = "arith") tezos_node tezos_client
-    bootstrap1_key f =
-  let* rollup_address =
-    Client.Sc_rollup.originate
-      ~hooks
-      ~burn_cap:Tez.(of_int 9999999)
-      ~alias:"rollup"
-      ~src:bootstrap1_key
-      ~kind:pvm_name
-      ~boot_sector:""
-      ~parameters_ty:"string"
-      tezos_client
-  in
-  let sc_rollup_node =
-    Sc_rollup_node.create
-      ~protocol
-      Operator
-      tezos_node
-      ~base_dir:(Client.base_dir tezos_client)
-      ~default_operator:bootstrap1_key
-  in
-  let* () = Client.bake_for_and_wait tezos_client in
-  f rollup_address sc_rollup_node
-
-let scenario_with_full_dac_infrastructure ?(tags = ["dac"; "full"])
-    ?(pvm_name = "arith") ~committee_members ~observers ?commitment_period
-    ?challenge_window ?event_sections_levels ?node_arguments variant scenario =
-  let description = "Testing Full DAC infrastructure" in
-  test
-    ~__FILE__
-    ~tags
-    (Printf.sprintf "%s (%s)" description variant)
-    (fun protocol ->
-      with_layer1
-        ?commitment_period
-        ?challenge_window
-        ?event_sections_levels
-        ?node_arguments
-        ~protocol
-      @@ fun node client key ->
-      with_fresh_rollup ~protocol ~pvm_name node client key
-      @@ fun sc_rollup_address sc_rollup_node ->
-      with_coordinator_node
-        node
-        client
-        ~name:"coordinator"
-        ~pvm_name
-        ~threshold:0
-        ~committee_members
-      @@ fun coordinator_node committee_members ->
-      let committee_members_nodes =
-        List.mapi
-          (fun i Account.{aggregate_public_key_hash; _} ->
-            Dac_node.create_committee_member
-              ~name:("committee-member-" ^ Int.to_string i)
-              ~node
-              ~client
-              ~coordinator_rpc_host:(Dac_node.rpc_host coordinator_node)
-              ~coordinator_rpc_port:(Dac_node.rpc_port coordinator_node)
-              ~address:aggregate_public_key_hash
-              ())
-          committee_members
-      in
-      let rollup_nodes, observer_nodes =
-        List.init observers Fun.id
-        |> List.map (fun i ->
-               let rollup_node_i =
-                 Sc_rollup_node.create
-                   ~name:("observer-" ^ Int.to_string i ^ "-rollup-node")
-                   ~protocol
-                   Operator
-                   node
-                   ~base_dir:(Client.base_dir client)
-                   ~default_operator:key
-               in
-               let reveal_data_dir =
-                 Filename.concat
-                   (Sc_rollup_node.data_dir rollup_node_i)
-                   pvm_name
-               in
-               let dac_node_i =
-                 Dac_node.create_observer
-                   ~name:("observer-" ^ Int.to_string i)
-                   ~node
-                   ~client
-                   ~reveal_data_dir
-                   ~coordinator_rpc_host:(Dac_node.rpc_host coordinator_node)
-                   ~coordinator_rpc_port:(Dac_node.rpc_port coordinator_node)
-                   ()
-               in
-               (rollup_node_i, dac_node_i))
-        |> List.split
-      in
-      scenario
-        Scenarios.
-          {
-            protocol;
-            node;
-            client;
-            key;
-            sc_rollup_address;
-            sc_rollup_node;
-            coordinator_node;
-            committee_members;
-            committee_members_nodes;
-            observer_nodes;
-            rollup_nodes;
-          })
-
-(* Wrapper scenario functions that should be re-used as much as possible when
-   writing tests. *)
-let scenario_with_layer1_node ?(tags = ["dac"; "layer1"]) ?commitment_period
-    ?challenge_window ?event_sections_levels ?node_arguments variant scenario =
-  let description = "Testing DAC L1 integration" in
-  test
-    ~__FILE__
-    ~tags
-    (Printf.sprintf "%s (%s)" description variant)
-    (fun protocol ->
-      with_layer1
-        ?commitment_period
-        ?challenge_window
-        ?event_sections_levels
-        ?node_arguments
-        ~protocol
-      @@ fun node client key -> scenario protocol node client key)
-
-let scenario_with_layer1_and_legacy_dac_nodes
-    ?(tags = ["dac"; "layer1"; "legacy"]) ?commitment_period ?challenge_window
-    ~threshold ~committee_members variant scenario =
-  let description = "Testing DAC node" in
-  test
-    ~__FILE__
-    ~tags
-    (Printf.sprintf "%s (%s)" description variant)
-    (fun protocol ->
-      with_layer1 ?commitment_period ?challenge_window ~protocol
-      @@ fun node client _key ->
-      with_legacy_dac_node ~threshold ~committee_members node client
-      @@ fun dac_node committee_members ->
-      scenario protocol node client dac_node threshold committee_members)
-
-let scenario_with_layer1_legacy_and_rollup_nodes
-    ?(tags = ["dac"; "dac_node"; "legacy"]) ?(pvm_name = "arith")
-    ?commitment_period ?challenge_window ~threshold ?committee_member_address
-    ~committee_members variant scenario =
-  let description = "Testing DAC rollup and node with L1" in
-  regression_test
-    ~__FILE__
-    ~tags
-    (Printf.sprintf "%s (%s)" description variant)
-    (fun protocol ->
-      with_layer1 ?commitment_period ?challenge_window ~protocol
-      @@ fun node client key ->
-      with_fresh_rollup
-        node
-        client
-        key
-        ~protocol
-        ~pvm_name
-        (fun sc_rollup_address sc_rollup_node ->
-          with_legacy_dac_node
-            node
-            ~sc_rollup_node
-            ~pvm_name
-            ~threshold
-            ~committee_members
-            ?committee_member_address
-            client
-          @@ fun dac_node committee_members ->
-          scenario
-            protocol
-            dac_node
-            sc_rollup_node
-            sc_rollup_address
-            node
-            client
-            pvm_name
-            threshold
-            committee_members))
 
 let wait_for_layer1_block_processing dac_node level =
   Dac_node.wait_for dac_node "dac_node_layer_1_new_head.v0" (fun e ->
@@ -1270,10 +867,10 @@ module Legacy = struct
   (* 1. Observer should fetch missing page from Coordinator when GET /missing_page/{hash}
         is called.
      2. As a side effect, Observer should save fetched page into its page store before
-        returning it in the response. This can be observer by checking the result of
+        returning it in the response. This can be observed by checking the result of
         retrieving preimage before and after the GET /missing_page/{hash} call.*)
   let test_observer_get_missing_page _protocol node client coordinator threshold
-      dac_members =
+      _committee_members =
     let root_hash =
       "00649d431e829f4adc68edecb8d8d8071154b57086cc124b465f6f6600a4bc91c7"
     in
@@ -1286,15 +883,7 @@ module Legacy = struct
     assert (root_hash = Hex.show hex_root_hash) ;
     let* () = root_hash_stream_promise in
     let observer =
-      Dac_node.create_legacy
-        ~threshold
-        ~committee_members:
-          (List.map
-             (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key_hash)
-             dac_members)
-        ~node
-        ~client
-        ()
+      Dac_node.create_legacy ~threshold ~committee_members:[] ~node ~client ()
     in
     let* _ = Dac_node.init_config observer in
     let () = set_coordinator observer coordinator in
@@ -1902,113 +1491,1076 @@ module Full_infrastructure = struct
     return ()
 end
 
+(* Modified from tezt/tests/tx_sc_rollup.ml *)
+module Tx_kernel_e2e = struct
+  open Sc_rollup_helpers
+  module Bls = Tezos_crypto.Signature.Bls
+
+  let send_message ?(src = Constant.bootstrap2.alias) client msg =
+    let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
+    Client.bake_for_and_wait client
+
+  (* TX Kernel external messages and their encodings *)
+  module Tx_kernel = struct
+    open Tezos_protocol_alpha.Protocol
+    open Tezos_crypto.Signature
+
+    type ticket = {
+      ticketer : Alpha_context.Contract.t;
+      content : string;
+      amount : int;
+    }
+
+    let ticket_of ~ticketer ~content amount =
+      {
+        ticketer = Result.get_ok (Alpha_context.Contract.of_b58check ticketer);
+        content;
+        amount;
+      }
+
+    (* Primitive operation of tx kernel.
+       Several primitive operations might be outgoing from the same account.
+       Corresponds to kernel_core::inbox::external::v1::OperationContent
+       type in the tx kernel. *)
+    type operation =
+      | Withdrawal of {
+          receiver_contract : Contract_hash.t;
+          ticket : ticket;
+          entrypoint : string;
+        }
+      | Transfer of {
+          (* tz4 address *)
+          destination : Tezos_crypto.Signature.Bls.Public_key_hash.t;
+          ticket : ticket;
+        }
+
+    (* List of elemtary operations which are outgoing from the same account.
+       Corresponds to a pair of
+         * kernel_core::bls::BlsKey and
+         * kernel_core::inbox::external::v1::verifiable::VerifiableOperation
+       in the tx kernel.
+       VerifiableOperation::signer is replaced by its private key
+       in order to be able to sign outer [multiaccount_tx].
+       In terms of the tx kernel it is rather *sending* type not *verifiable*.
+    *)
+    type account_operations = {
+      signer : Bls.Secret_key.t;
+      counter : int64;
+      operations : operation list;
+    }
+
+    let account_operations_of ~sk ~counter operations =
+      {signer = sk; counter; operations}
+
+    (* Several account operations.
+       Content of this tx signed by each account,
+       and stored in the aggregated signature.
+       Corresponds to
+          kernel_core::inbox::external::v1::verifiable::VerifiableTransaction type
+       in the tx kernel
+    *)
+    type multiaccount_tx = {
+      accounts_operations : account_operations list;
+      encoded_accounts_ops : string; (* just encoded concatenated list above *)
+      aggregated_signature : Bls.t;
+    }
+
+    (* Batch of multiaccount transactions.
+       Corresponds to
+         kernel_core::inbox::external::v1::ParsedBatch type
+       in the tx kernel
+    *)
+    type transactions_batch = {
+      transactions : multiaccount_tx list;
+      encoded_transactions : string; (* just encoded concatenated list above *)
+      aggregated_signature : Bls.t;
+    }
+
+    module Encodings = struct
+      let list_encode xs =
+        Data_encoding.(Binary.to_string_exn string @@ String.concat "" xs)
+
+      (* String ticket encoding for tx kernel.
+         Corresponds to kernel_core::encoding::string_ticket::StringTicketRepr *)
+      let ticket_repr {ticketer; content; amount} : string =
+        let open Tezos_protocol_alpha.Protocol.Alpha_context in
+        Printf.sprintf
+          "\007\007\n\000\000\000\022%s\007\007\001%s\000%s"
+          Data_encoding.(Binary.to_string_exn Contract.encoding ticketer)
+          Data_encoding.(Binary.to_string_exn bytes @@ Bytes.of_string content)
+          Data_encoding.(Binary.to_string_exn z @@ Z.of_int amount)
+
+      (* Encoding of kernel_core::inbox::external::v1::OperationContent from tx_kernel *)
+      let operation_repr = function
+        | Withdrawal {receiver_contract; ticket; entrypoint} ->
+            let open Alpha_context in
+            let withdrawal_prefix = "\000" in
+            let contract_bytes =
+              Data_encoding.(
+                Binary.to_string_exn Contract_hash.encoding receiver_contract)
+            in
+            let entrypoint_bytes =
+              Data_encoding.(
+                Entrypoint.of_string_strict_exn entrypoint
+                |> Binary.to_string_exn Entrypoint.simple_encoding)
+            in
+            withdrawal_prefix ^ contract_bytes ^ ticket_repr ticket
+            ^ entrypoint_bytes
+        | Transfer {destination; ticket} ->
+            let transfer_prefix = "\001" in
+            let tz4address =
+              Data_encoding.(
+                Binary.to_string_exn
+                  Tezos_crypto.Signature.Bls.Public_key_hash.encoding
+                  destination)
+            in
+            transfer_prefix ^ tz4address ^ ticket_repr ticket
+
+      let account_operations_repr {signer; counter; operations} : string =
+        let signer_bytes =
+          if Int64.equal counter 0L then
+            "\000" (* PK signer tag *)
+            ^ Data_encoding.(
+                Bls.Secret_key.to_public_key signer
+                |> Binary.to_string_exn Bls.Public_key.encoding)
+          else
+            "\001" (* tz4address signer tag *)
+            ^ Data_encoding.(
+                Bls.Secret_key.to_public_key signer
+                |> Bls.Public_key.hash
+                |> Binary.to_string_exn Bls.Public_key_hash.encoding)
+        in
+        let counter = Data_encoding.(Binary.to_string_exn int64 counter) in
+        let contents = list_encode @@ List.map operation_repr operations in
+        signer_bytes ^ counter ^ contents
+
+      let list_of_account_operations_repr
+          (accounts_operations : account_operations list) : string =
+        let account_ops_encoded =
+          List.map account_operations_repr accounts_operations
+        in
+        list_encode account_ops_encoded
+
+      let list_of_multiaccount_tx_encoding (transactions : multiaccount_tx list)
+          =
+        let txs_encodings =
+          List.map (fun x -> x.encoded_accounts_ops) transactions
+        in
+        list_encode txs_encodings
+    end
+
+    let multiaccount_tx_of (accounts_operations : account_operations list) =
+      let encoded_accounts_ops =
+        Encodings.list_of_account_operations_repr accounts_operations
+      in
+      let accounts_sks = List.map (fun x -> x.signer) accounts_operations in
+      (* List consisting of single transaction, that is fine *)
+      let aggregated_signature =
+        Option.get
+        @@ Bls.(
+             aggregate_signature_opt
+             @@ List.map
+                  (fun sk -> sign sk @@ Bytes.of_string encoded_accounts_ops)
+                  accounts_sks)
+      in
+      assert (
+        Bls.aggregate_check
+          (List.map
+             (fun sk ->
+               ( Bls.Secret_key.to_public_key sk,
+                 None,
+                 Bytes.of_string encoded_accounts_ops ))
+             accounts_sks)
+          aggregated_signature) ;
+      {accounts_operations; encoded_accounts_ops; aggregated_signature}
+
+    let transactions_batch_of (transactions : multiaccount_tx list) =
+      let encoded_transactions =
+        Encodings.list_of_multiaccount_tx_encoding transactions
+      in
+      let signatures =
+        List.map
+          (fun (x : multiaccount_tx) -> x.aggregated_signature)
+          transactions
+      in
+      let aggregated_signature =
+        Option.get @@ Bls.aggregate_signature_opt signatures
+      in
+      {transactions; encoded_transactions; aggregated_signature}
+
+    let external_message_of_batch ?(should_hex_encode = true)
+        (batch : transactions_batch) =
+      let v1_batch_prefix = "\000" in
+      let signature =
+        batch.aggregated_signature |> Tezos_crypto.Signature.Bls.to_bytes
+        |> Bytes.to_string
+      in
+      let raw = v1_batch_prefix ^ batch.encoded_transactions ^ signature in
+      if should_hex_encode then hex_encode raw else raw
+
+    (* External message consisting of single transaction. *)
+    let external_message_of_account_ops (accounts_ops : account_operations list)
+        =
+      external_message_of_batch @@ transactions_batch_of
+      @@ [multiaccount_tx_of accounts_ops]
+  end
+
+  let assert_state_changed ?block sc_rollup_client prev_state_hash =
+    let*! state_hash =
+      Sc_rollup_client.state_hash ?block ~hooks sc_rollup_client
+    in
+    Check.(state_hash <> prev_state_hash)
+      Check.string
+      ~error_msg:"State hash has not changed (%L <> %R)" ;
+    Lwt.return_unit
+
+  let assert_ticks_advanced ?block sc_rollup_client prev_ticks =
+    let*! ticks = Sc_rollup_client.total_ticks ?block ~hooks sc_rollup_client in
+    Check.(ticks > prev_ticks)
+      Check.int
+      ~error_msg:"Tick counter did not advance (%L > %R)" ;
+    Lwt.return_unit
+
+  (* Send a deposit into the rollup. *)
+  let test_deposit ~client ~sc_rollup_node ~sc_rollup_client ~sc_rollup_address
+      ~mint_and_deposit_contract level tz4_address =
+    let*! prev_state_hash =
+      Sc_rollup_client.state_hash ~hooks sc_rollup_client
+    in
+    let* () =
+      (* Internal message through forwarder *)
+      let arg =
+        sf
+          {|Pair (Pair %S "%s") (Pair 450 "Hello, Ticket!")|}
+          sc_rollup_address
+          tz4_address
+      in
+      Client.transfer
+        client
+        ~hooks
+        ~amount:Tez.zero
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:mint_and_deposit_contract
+        ~arg
+        ~burn_cap:(Tez.of_int 1000)
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* _ =
+      Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node (level + 1)
+    in
+    let* () = assert_state_changed sc_rollup_client prev_state_hash in
+    Lwt.return @@ (level + 1)
+
+  let rec bake_until cond client sc_rollup_node =
+    let* stop = cond client in
+    if stop then unit
+    else
+      let* () = Client.bake_for_and_wait client in
+      let* current_level = Client.level client in
+      let* _ =
+        Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node current_level
+      in
+      bake_until cond client sc_rollup_node
+
+  let ticket mint_and_deposit_contract amount =
+    Tx_kernel.ticket_of
+      ~ticketer:mint_and_deposit_contract
+      ~content:"Hello, Ticket!"
+      amount
+
+  type prepare_message_setup = {
+    sk1 : Bls.Secret_key.t;
+    sk2 : Bls.Secret_key.t;
+    pkh1 : Bls.Public_key_hash.t;
+    pkh2 : Bls.Public_key_hash.t;
+    transfer_message : string;
+    withdraw_message : string;
+    mint_and_deposit_contract : string;
+    receive_tickets_contract : string;
+    level : int;
+  }
+
+  type send_message_and_wait_setup = {
+    prev_state_hash : string;
+    prev_ticks : int;
+    level : int;
+  }
+
+  let prepare_contracts_and_messages
+      ?(transfer_message_should_hex_encode = true) ~client ~level protocol =
+    let pkh1, _pk, sk1 = Tezos_crypto.Signature.Bls.generate_key () in
+    let pkh2, _pk2, sk2 = Tezos_crypto.Signature.Bls.generate_key () in
+
+    (* Originate a contract that will mint and transfer tickets to the tx kernel. *)
+    (* Originate forwarder contract to send internal messages to rollup. *)
+    let* _, mint_and_deposit_contract =
+      Client.originate_contract_at (* ~alias:"rollup_deposit" *)
+        ~amount:Tez.zero
+        ~src:Constant.bootstrap1.alias
+        ~init:"Unit"
+        ~burn_cap:Tez.(of_int 1)
+        client
+        ["mini_scenarios"; "smart_rollup_mint_and_deposit_ticket"]
+        protocol
+    in
+    let* () = Client.bake_for_and_wait client in
+    Log.info
+      "The mint and deposit contract %s was successfully originated"
+      mint_and_deposit_contract ;
+    let level = level + 1 in
+
+    (* originate ticket receiver contract that will receive withdrawls..*)
+    let* _, receive_tickets_contract =
+      Client.originate_contract_at
+        ~amount:Tez.zero
+        ~src:Constant.bootstrap1.alias
+        ~init:"{}"
+        ~burn_cap:Tez.(of_int 1)
+        client
+        ["mini_scenarios"; "smart_rollup_receive_tickets"]
+        protocol
+    in
+    let* () = Client.bake_for_and_wait client in
+    Log.info
+      "The receiver contract %s was successfully originated"
+      receive_tickets_contract ;
+    let level = level + 1 in
+
+    (* Construct transfer message to send to rollup. *)
+    let transfer_message =
+      Tx_kernel.(
+        [
+          multiaccount_tx_of
+            [
+              (* Transfer 50 tickets *)
+              account_operations_of
+                ~sk:sk1
+                ~counter:0L
+                [
+                  Transfer
+                    {
+                      destination = pkh2;
+                      ticket = ticket mint_and_deposit_contract 60;
+                    };
+                ];
+              (* Transfer 10 tickets back *)
+              account_operations_of
+                ~sk:sk2
+                ~counter:0L
+                [
+                  Transfer
+                    {
+                      destination = pkh1;
+                      ticket = ticket mint_and_deposit_contract 10;
+                    };
+                ];
+            ];
+          multiaccount_tx_of
+            [
+              (* Transfer another 10 tickets back but in a separate tx *)
+              account_operations_of
+                ~sk:sk2
+                ~counter:1L
+                [
+                  Transfer
+                    {
+                      destination = pkh1;
+                      ticket = ticket mint_and_deposit_contract 10;
+                    };
+                ];
+            ];
+        ]
+        |> transactions_batch_of
+        |> external_message_of_batch
+             ~should_hex_encode:transfer_message_should_hex_encode)
+    in
+    (* Construct withdrawal *)
+    let withdrawal_op amount =
+      Tx_kernel.Withdrawal
+        {
+          receiver_contract =
+            Tezos_protocol_alpha.Protocol.Contract_hash.of_b58check_exn
+              receive_tickets_contract;
+          ticket = ticket mint_and_deposit_contract amount;
+          entrypoint = "receive_tickets";
+        }
+    in
+
+    (* Construct withdrawal mesage to send to rollup. *)
+    (* pk withdraws part of his tickets, pk2 withdraws all of his tickets *)
+    let withdraw_message =
+      Tx_kernel.(
+        [
+          account_operations_of
+            ~sk:sk1
+            ~counter:1L
+            [withdrawal_op 220; withdrawal_op 100];
+          account_operations_of ~sk:sk2 ~counter:2L [withdrawal_op 40];
+        ]
+        |> external_message_of_account_ops)
+    in
+    return
+      {
+        sk1;
+        sk2;
+        pkh1;
+        pkh2;
+        transfer_message;
+        withdraw_message;
+        mint_and_deposit_contract;
+        receive_tickets_contract;
+        level;
+      }
+
+  let send_message_and_wait_for_level ~level ~sc_rollup_client ~sc_rollup_node
+      ~client ~hooks hex_encoded_message =
+    let*! prev_state_hash =
+      Sc_rollup_client.state_hash ~hooks sc_rollup_client
+    in
+    let*! prev_ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
+    let* () = send_message client (sf "hex:[%S]" hex_encoded_message) in
+    let level = level + 1 in
+    let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
+    let* () = assert_state_changed sc_rollup_client prev_state_hash in
+    return {prev_state_hash; prev_ticks; level}
+
+  let verify_outbox_answer ~withdrawal_level ~sc_rollup_client
+      ~sc_rollup_address ~client ~receive_tickets_contract
+      ~mint_and_deposit_contract =
+    let*! outbox =
+      Sc_rollup_client.outbox ~outbox_level:withdrawal_level sc_rollup_client
+    in
+    Log.info "Outbox is %s" @@ JSON.encode outbox ;
+    let* answer =
+      let message_index = 0 in
+      let outbox_level = withdrawal_level in
+      let destination = receive_tickets_contract in
+      let open Tezos_protocol_alpha.Protocol.Alpha_context in
+      let ticketer =
+        mint_and_deposit_contract |> Contract.of_b58check |> Result.get_ok
+        |> Data_encoding.(Binary.to_string_exn Contract.encoding)
+        |> hex_encode
+      in
+      let parameters d =
+        Printf.sprintf
+          {|Pair 0x%s (Pair "%s" %s)|}
+          ticketer
+          "Hello, Ticket!"
+          (Int.to_string d)
+      in
+      let outbox_transaction param =
+        Sc_rollup_client.
+          {
+            destination;
+            entrypoint = Some "receive_tickets";
+            parameters = parameters param;
+            parameters_ty = None;
+          }
+      in
+      Sc_rollup_client.outbox_proof_batch
+        sc_rollup_client
+        ~message_index
+        ~outbox_level
+        (List.map outbox_transaction [220; 100; 40])
+    in
+    match answer with
+    | Some {commitment_hash; proof} ->
+        let*! () =
+          Client.Sc_rollup.execute_outbox_message
+            ~hooks
+            ~burn_cap:(Tez.of_int 10)
+            ~rollup:sc_rollup_address
+            ~src:Constant.bootstrap1.alias
+            ~commitment_hash
+            ~proof
+            client
+        in
+        Client.bake_for_and_wait client
+    | _ -> failwith "Unexpected error during proof generation"
+
+  (* [prepare_dac_external_message ~coordinator_node ~committee_members_nodes payload] registers a
+     [payload] with [coordinator_node] then waits for all [committee_member_nodes] to sign the resultant
+     root hash. The associated DAC certificate is retrieved, the l1 external message is constructed,
+     hex encoded and returned.
+  *)
+  let prepare_dac_external_message ~coordinator_node ~committee_members_nodes
+      ?(should_run_committee_member_nodes = true) payload =
+    (* monitor event emission on dac member*)
+    let wait_for_signature_pushed_event dac_member =
+      Dac_node.wait_for
+        dac_member
+        "new_signature_pushed_to_coordinator.v0"
+        (fun _ -> Some ())
+    in
+    let wait_for_member_signature_pushed_to_coordinator =
+      List.map wait_for_signature_pushed_event committee_members_nodes
+    in
+    let* () =
+      if should_run_committee_member_nodes then
+        Lwt_list.iter_s
+          (fun dac_member ->
+            let* _dir = Dac_node.init_config dac_member in
+            let ev =
+              wait_for_handle_new_subscription_to_hash_streamer coordinator_node
+            in
+            let* () = Dac_node.run dac_member in
+            ev)
+          committee_members_nodes
+      else unit
+    in
+    let* preimage_hash =
+      RPC.call coordinator_node (Dac_rpc.Coordinator.post_preimage ~payload)
+    in
+    let* () = Lwt.join wait_for_member_signature_pushed_to_coordinator in
+    let* witnesses, signature, root_hash =
+      RPC.call
+        coordinator_node
+        (Dac_rpc.get_certificate ~hex_root_hash:(`Hex preimage_hash))
+    in
+    let root_hash = `Hex root_hash |> Hex.to_string |> String.to_bytes in
+    let signature =
+      Data_encoding.Binary.to_bytes_exn
+        Tezos_crypto.Aggregate_signature.encoding
+      @@ Tezos_crypto.Aggregate_signature.of_b58check_exn signature
+    in
+    let witnesses =
+      Data_encoding.Binary.to_bytes_exn Data_encoding.z (Z.of_int witnesses)
+    in
+    let dac_certificate_bin =
+      Bytes.to_string
+      @@ Bytes.concat Bytes.empty [root_hash; signature; witnesses]
+    in
+    let l1_external_message = hex_encode ("\042" ^ dac_certificate_bin) in
+    return @@ (`Hex l1_external_message, `Hex preimage_hash)
+
+  (* Test scenario where DAC Observer is in sync with the Data Availability Committee - Ideal case.
+     When a DAC ceritifcate is created, the Observer should download pages from the Coordinator and
+     persist them to the rollup node's data directory. On reveal_hash, the pages should already be
+     present.
+
+     The Tx-kernel outbox is verified to test the correctness of DAC infrastructure.
+     This test has 1 cordinator, 1 committee member, 1 rollup node with 1 observer running.
+  *)
+  let test_tx_kernel_e2e_with_dac_observer_synced_with_dac commitment_period
+      scenario =
+    let Dac_helper.Scenarios.
+          {
+            protocol;
+            client;
+            key;
+            coordinator_node;
+            committee_members_nodes;
+            observer_nodes;
+            rollup_nodes;
+            _;
+          } =
+      scenario
+    in
+    let sc_rollup_node = List.nth rollup_nodes 0 in
+    let observer_node = List.nth observer_nodes 0 in
+    let* _ = Dac_node.init_config observer_node in
+    let* () = Dac_node.run observer_node in
+    let* boot_sector =
+      prepare_installer_kernel
+        ~preimages_dir:
+          (Filename.concat
+             (Sc_rollup_node.data_dir sc_rollup_node)
+             "wasm_2_0_0")
+        "tx-kernel-fixed-dac"
+    in
+    let* sc_rollup_address =
+      Client.Sc_rollup.originate
+        ~burn_cap:Tez.(of_int 9999999)
+        ~alias:"tx_kernel_fixed_dac_rollup"
+        ~src:key
+        ~kind:"wasm_2_0_0"
+        ~boot_sector
+        ~parameters_ty:"pair string (ticket string)"
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    (* Run the rollup node, ensure origination succeeds. *)
+    let* genesis_info =
+      RPC.Client.call ~hooks client
+      @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+           sc_rollup_address
+    in
+    let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+    let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
+    let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
+    let* level =
+      Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level
+    in
+    Check.(level = init_level)
+      Check.int
+      ~error_msg:"Current level has moved past origination level (%L = %R)" ;
+    let* {
+           pkh1;
+           transfer_message;
+           withdraw_message;
+           mint_and_deposit_contract;
+           receive_tickets_contract;
+           level;
+           _;
+         } =
+      prepare_contracts_and_messages
+        ~client
+        ~level
+        ~transfer_message_should_hex_encode:false
+        protocol
+    in
+
+    (* Deposit *)
+    let* level =
+      test_deposit
+        ~client
+        ~sc_rollup_node
+        ~sc_rollup_client
+        ~sc_rollup_address
+        ~mint_and_deposit_contract
+        level
+      @@ Tezos_crypto.Signature.Bls.Public_key_hash.to_b58check pkh1
+    in
+
+    let payload = transfer_message in
+
+    (* Register root hash with coordinator.
+       Retrieve certificate after committee members have signed.
+       Prepare L1 Dac message hex encoded.
+    *)
+    (* Tx kernel dac messages expects the root hash page to be a content page containing
+       a list of hashes that references the actually payload's merkle tree root hash.
+       Rollup id in tx kernel is hard-coded to `0` to select the list head. *)
+    let* _, hexed_preimage_hash =
+      prepare_dac_external_message
+        ~coordinator_node
+        ~committee_members_nodes
+        payload
+    in
+    let* `Hex l1_external_message, _ =
+      prepare_dac_external_message
+        ~coordinator_node
+        ~committee_members_nodes
+        ~should_run_committee_member_nodes:false
+        (Hex.to_string hexed_preimage_hash)
+    in
+
+    (* Send DAC certificate as an External Message to L1 *)
+    let* {level; _} =
+      send_message_and_wait_for_level
+        ~level
+        ~sc_rollup_client
+        ~sc_rollup_node
+        ~client
+        ~hooks
+        l1_external_message
+    in
+
+    (* After that pkh1 has 410 tickets, pkh2 has 40 tickets *)
+    (* Send withdrawal *)
+    let* {prev_state_hash; prev_ticks; level = withdrawal_level} =
+      send_message_and_wait_for_level
+        ~level
+        ~sc_rollup_client
+        ~sc_rollup_node
+        ~client
+        ~hooks
+        withdraw_message
+    in
+    let* _, last_lcc_level =
+      Sc_rollup_helpers.last_cemented_commitment_hash_with_level
+        ~sc_rollup:sc_rollup_address
+        client
+    in
+    let next_lcc_level = last_lcc_level + commitment_period in
+
+    (* Bake until the next commitment is cemented, this commitment
+       will include the withdrawal. *)
+    let* () =
+      bake_until
+        (fun client ->
+          let* _, lcc_level =
+            Sc_rollup_helpers.last_cemented_commitment_hash_with_level
+              ~sc_rollup:sc_rollup_address
+              client
+          in
+          return (lcc_level = next_lcc_level))
+        client
+        sc_rollup_node
+    in
+
+    let block = string_of_int next_lcc_level in
+    let* () = assert_state_changed ~block sc_rollup_client prev_state_hash in
+    let* () = assert_ticks_advanced ~block sc_rollup_client prev_ticks in
+
+    (* EXECUTE withdrawal *)
+    let* () =
+      verify_outbox_answer
+        ~client
+        ~sc_rollup_client
+        ~sc_rollup_address
+        ~receive_tickets_contract
+        ~mint_and_deposit_contract
+        ~withdrawal_level
+    in
+    unit
+
+  (* Test scenario where DAC Observer joins halfway and hence is cold/has missing pages. In this scenario,
+     rollup node makes an RPC call to Observer via GET /missing_page/{hash}. The Observer should retrieve
+     the missing page then store it to the rollup node's data directory. Since the rollup node starts cold,
+     this should happen for every page in the root hash's Merkle tree.
+
+     The Tx-kernel outbox is verified to test the correctness of DAC infrastructure.
+     This test has 1 cordinator, 1 committee member, 1 rollup node with 1 observer running.
+  *)
+  let test_tx_kernel_e2e_with_dac_observer_missing_pages commitment_period
+      scenario =
+    let Dac_helper.Scenarios.
+          {
+            protocol;
+            client;
+            key;
+            coordinator_node;
+            committee_members_nodes;
+            observer_nodes;
+            rollup_nodes;
+            _;
+          } =
+      scenario
+    in
+    let sc_rollup_node = List.nth rollup_nodes 0 in
+    let* boot_sector =
+      prepare_installer_kernel
+        ~preimages_dir:
+          (Filename.concat
+             (Sc_rollup_node.data_dir sc_rollup_node)
+             "wasm_2_0_0")
+        "tx-kernel-fixed-dac"
+    in
+    let* sc_rollup_address =
+      Client.Sc_rollup.originate
+        ~burn_cap:Tez.(of_int 9999999)
+        ~alias:"tx_kernel_fixed_dac_rollup"
+        ~src:key
+        ~kind:"wasm_2_0_0"
+        ~boot_sector
+        ~parameters_ty:"pair string (ticket string)"
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+
+    (* Run the rollup node, ensure origination succeeds. *)
+    let* genesis_info =
+      RPC.Client.call ~hooks client
+      @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+           sc_rollup_address
+    in
+    let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+    let observer_node = List.nth observer_nodes 0 in
+    let* _ = Dac_node.init_config observer_node in
+    let* () =
+      Sc_rollup_node.run
+        sc_rollup_node
+        sc_rollup_address
+        ["--dac-observer"; Dac_node.endpoint observer_node]
+    in
+    let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
+    let* level =
+      Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level
+    in
+    Check.(level = init_level)
+      Check.int
+      ~error_msg:"Current level has moved past origination level (%L = %R)" ;
+    let* {
+           pkh1;
+           transfer_message;
+           withdraw_message;
+           mint_and_deposit_contract;
+           receive_tickets_contract;
+           level;
+           _;
+         } =
+      prepare_contracts_and_messages
+        ~client
+        ~level
+        ~transfer_message_should_hex_encode:false
+        protocol
+    in
+
+    (* Deposit *)
+    let* level =
+      test_deposit
+        ~client
+        ~sc_rollup_node
+        ~sc_rollup_client
+        ~sc_rollup_address
+        ~mint_and_deposit_contract
+        level
+      @@ Tezos_crypto.Signature.Bls.Public_key_hash.to_b58check pkh1
+    in
+    let payload = transfer_message in
+
+    (* Register root hash with coordinator.
+       Retrieve certificate after committee members have signed.
+       Prepare L1 Dac message hex encoded.
+    *)
+    (* Tx kernel dac messages expects the root hash page to be a content page containing
+       a list of hashes that references the actually payload's merkle tree root hash.
+       Rollup id in tx kernel is hard-coded to `0` to select the list head. *)
+    let* _, transfer_messages_preimage_hash =
+      prepare_dac_external_message
+        ~coordinator_node
+        ~committee_members_nodes
+        payload
+    in
+    let* `Hex l1_external_message, hexed_perimage_hash =
+      prepare_dac_external_message
+        ~coordinator_node
+        ~committee_members_nodes
+        ~should_run_committee_member_nodes:false
+        (Hex.to_string transfer_messages_preimage_hash)
+    in
+
+    (* Delay Observer start up to simulate it missing coordinator's streamed
+       root hash. *)
+    let* filenames = Dac_node.ls_reveal_data_dir observer_node in
+    Check.(
+      (false
+      = List.exists
+          (String.equal (Hex.show transfer_messages_preimage_hash))
+          filenames)
+        ~__LOC__
+        bool
+        ~error_msg:
+          "Observer node is in invalid state: Unexpected preimage hash found \
+           in reveal data dir.") ;
+
+    Check.(
+      (false
+      = List.exists (String.equal (Hex.show hexed_perimage_hash)) filenames)
+        ~__LOC__
+        bool
+        ~error_msg:
+          "Observer node is in invalid state: Unexpected preimage hash found \
+           in reveal data dir.") ;
+    let* () = Dac_node.run ~wait_ready:true observer_node in
+
+    (* Send DAC certificate as an External Message to L1 *)
+    let* {level; _} =
+      send_message_and_wait_for_level
+        ~level
+        ~sc_rollup_client
+        ~sc_rollup_node
+        ~client
+        ~hooks
+        l1_external_message
+    in
+
+    (* After that pkh1 has 410 tickets, pkh2 has 40 tickets *)
+    (* Send withdrawal *)
+    let* {prev_state_hash; prev_ticks; level = withdrawal_level} =
+      send_message_and_wait_for_level
+        ~level
+        ~sc_rollup_client
+        ~sc_rollup_node
+        ~client
+        ~hooks
+        withdraw_message
+    in
+    let* _, last_lcc_level =
+      Sc_rollup_helpers.last_cemented_commitment_hash_with_level
+        ~sc_rollup:sc_rollup_address
+        client
+    in
+    let next_lcc_level = last_lcc_level + commitment_period in
+
+    (* Bake until the next commitment is cemented, this commitment
+       will include the withdrawal. *)
+    let* () =
+      bake_until
+        (fun client ->
+          let* _, lcc_level =
+            Sc_rollup_helpers.last_cemented_commitment_hash_with_level
+              ~sc_rollup:sc_rollup_address
+              client
+          in
+          return (lcc_level = next_lcc_level))
+        client
+        sc_rollup_node
+    in
+    let block = string_of_int next_lcc_level in
+    let* () = assert_state_changed ~block sc_rollup_client prev_state_hash in
+    let* () = assert_ticks_advanced ~block sc_rollup_client prev_ticks in
+
+    (* EXECUTE withdrawal *)
+    let* () =
+      verify_outbox_answer
+        ~client
+        ~sc_rollup_client
+        ~sc_rollup_address
+        ~receive_tickets_contract
+        ~mint_and_deposit_contract
+        ~withdrawal_level
+    in
+    unit
+
+  let test_tx_kernel_e2e_with_dac_observer_synced_with_dac =
+    let commitment_period = 10 in
+    let challenge_window = 10 in
+    let custom_committee_members = [Constant.aggregate_tz4_account] in
+    Dac_helper.scenario_with_full_dac_infrastructure
+      ~__FILE__
+      ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"; "dac"; "full"]
+      ~pvm_name:"wasm_2_0_0"
+      ~committee_size:0
+      ~observers:1
+      ~custom_committee_members
+      ~commitment_period
+      ~challenge_window
+      "kernel_e2e.dac_observer_synced_with_dac"
+      (test_tx_kernel_e2e_with_dac_observer_synced_with_dac commitment_period)
+
+  let test_tx_kernel_e2e_with_dac_observer_missing_pages =
+    let commitment_period = 10 in
+    let challenge_window = 10 in
+    let custom_committee_members = [Constant.aggregate_tz4_account] in
+    Dac_helper.scenario_with_full_dac_infrastructure
+      ~__FILE__
+      ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"; "dac"; "full"]
+      ~pvm_name:"wasm_2_0_0"
+      ~committee_size:0
+      ~observers:1
+      ~custom_committee_members
+      ~commitment_period
+      ~challenge_window
+      "kernel_e2e.dac_observer_missing_pages"
+      (test_tx_kernel_e2e_with_dac_observer_missing_pages commitment_period)
+end
+
 let register ~protocols =
   (* Tests with layer1 and dac nodes *)
   Legacy.test_dac_node_startup protocols ;
   Legacy.test_dac_node_imports_committee_members protocols ;
   Legacy.test_dac_node_dac_threshold_not_reached protocols ;
   scenario_with_layer1_legacy_and_rollup_nodes
+    ~__FILE__
     ~tags:["dac"; "dac_node"]
     "dac_reveals_data_merkle_tree_v0"
     Legacy.test_dac_node_handles_dac_store_preimage_merkle_V0
     protocols
     ~threshold:1
-    ~committee_members:1 ;
+    ~committee_size:1 ;
   scenario_with_layer1_legacy_and_rollup_nodes
+    ~__FILE__
     ~tags:["dac"; "dac_node"]
     "dac_reveals_data_hash_chain_v0"
     Legacy.test_dac_node_handles_dac_store_preimage_hash_chain_V0
     protocols
     ~threshold:1
-    ~committee_members:1 ;
+    ~committee_size:1 ;
   scenario_with_layer1_legacy_and_rollup_nodes
+    ~__FILE__
     ~tags:["dac"; "dac_node"]
     ~threshold:0
-    ~committee_members:0
+    ~committee_size:0
     "dac_retrieve_preimage"
     Legacy.test_dac_node_handles_dac_retrieve_preimage_merkle_V0
     protocols ;
   scenario_with_layer1_legacy_and_rollup_nodes
+    ~__FILE__
     ~tags:["dac"; "dac_node"]
     "dac_rollup_arith_uses_reveals"
     Legacy.test_rollup_arith_uses_reveals
     protocols
     ~threshold:1
-    ~committee_members:1 ;
+    ~committee_size:1 ;
   scenario_with_layer1_legacy_and_rollup_nodes
+    ~__FILE__
     ~tags:["dac"; "dac_node"]
     "dac_rollup_arith_wrong_hash"
     Legacy.test_reveals_fails_on_wrong_hash
     ~threshold:1
-    ~committee_members:1
+    ~committee_size:1
     protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
+    ~__FILE__
     ~threshold:0
-    ~committee_members:0
+    ~committee_size:0
     ~tags:["dac"; "dac_node"]
     "dac_streaming_of_root_hashes_in_legacy_mode"
     Legacy.test_streaming_of_root_hashes_as_observer
     protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
+    ~__FILE__
     ~threshold:0
-    ~committee_members:1
+    ~committee_size:1
     ~tags:["dac"; "dac_node"]
     "dac_push_signature_in_legacy_mode_as_member"
     Legacy.test_streaming_of_root_hashes_as_member
     protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
+    ~__FILE__
     ~threshold:0
-    ~committee_members:0
+    ~committee_size:0
     ~tags:["dac"; "dac_node"]
     "committee member downloads pages from coordinator"
     Legacy.test_observer_downloads_pages
     protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
+    ~__FILE__
     ~threshold:0
-    ~committee_members:2
+    ~committee_size:2
     ~tags:["dac"; "dac_node"]
     "dac_get_certificate"
     Legacy.Signature_manager.test_get_certificate
     protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
+    ~__FILE__
     ~threshold:0
-    ~committee_members:3
+    ~committee_size:3
     ~tags:["dac"; "dac_node"]
     "dac_store_member_signature"
     Legacy.Signature_manager.test_handle_store_signature
     protocols ;
   scenario_with_full_dac_infrastructure
+    ~__FILE__
     ~observers:0
-    ~committee_members:0
+    ~committee_size:0
     ~tags:["dac"; "dac_node"]
     "dac_coordinator_post_preimage_endpoint"
     Full_infrastructure.test_coordinator_post_preimage_endpoint
     protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
+    ~__FILE__
     ~threshold:0
-    ~committee_members:1
+    ~committee_size:1
     ~tags:["dac"; "dac_node"]
     "dac_observer_get_missing_page"
     Legacy.test_observer_get_missing_page
     protocols ;
   scenario_with_full_dac_infrastructure
+    ~__FILE__
     ~observers:1
-    ~committee_members:1
+    ~committee_size:1
     ~tags:["dac"; "dac_node"]
     "committee members and observers download pages from coordinator"
     Full_infrastructure.test_download_and_retrieval_of_pages
     protocols ;
   scenario_with_full_dac_infrastructure
+    ~__FILE__
     ~observers:0
-    ~committee_members:2
+    ~committee_size:2
     ~tags:["dac"; "dac_node"]
     "certificates are updated in streaming endpoint"
     Full_infrastructure.test_streaming_certificates
     protocols ;
   scenario_with_full_dac_infrastructure
+    ~__FILE__
     ~observers:0
-    ~committee_members:2
+    ~committee_size:2
     ~tags:["dac"; "dac_node"]
     "test client commands"
     Full_infrastructure.test_client
-    protocols
+    protocols ;
+  Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_synced_with_dac protocols ;
+  Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_missing_pages protocols

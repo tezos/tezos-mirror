@@ -125,6 +125,9 @@ val data_dir : t -> string
 (** Get the reveal-data-dir of an dac node. *)
 val reveal_data_dir : t -> string
 
+(** Calls [ls] on reveal data dir. *)
+val ls_reveal_data_dir : t -> string list Lwt.t
+
 (** [run ?wait_ready ?env node] launches the given dac
     node where env is a map of environment variable.
 
