@@ -33,6 +33,9 @@ type t
 
 type mode = Batcher | Custom | Maintenance | Observer | Operator | Accuser
 
+(** Returns the associated {!mode}, fails if the mode is not valid. *)
+val mode_of_string : string -> mode
+
 (** Create a smart contract rollup node.
 
     A smart contract rollup node is associated to a tezos node

@@ -61,6 +61,16 @@ let string_of_mode = function
   | Custom -> "custom"
   | Accuser -> "accuser"
 
+let mode_of_string s =
+  match String.lowercase_ascii s with
+  | "observer" -> Observer
+  | "batcher" -> Batcher
+  | "maintenance" -> Maintenance
+  | "operator" -> Operator
+  | "custom" -> Custom
+  | "accuser" -> Accuser
+  | _ -> invalid_arg (Format.sprintf "%S is not an existing mode" s)
+
 let check_error ?exit_code ?msg sc_node =
   match sc_node.status with
   | Not_running ->
