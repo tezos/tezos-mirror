@@ -274,7 +274,7 @@ let eval_and_profile ?write_debug ?reveal_builtins symbols tree =
 
     let* input_request_val = Wasm_vm.get_info pvm_state in
     match (input_request_val.input_request, pvm_state.tick_state) with
-    | Reveal_required _, _ when reveal_builtins = None -> return_false
+    | Reveal_required _, _ when reveal_builtins <> None -> return_true
     | Input_required, _ | Reveal_required _, _ -> return_false
     | _ -> return_true
   in
@@ -285,19 +285,22 @@ let eval_and_profile ?write_debug ?reveal_builtins symbols tree =
         tree
     in
     let* info = Wasm_utils.Wasm.get_info tree in
-    match info.Wasm_pvm_state.input_request with
-    | No_input_required ->
-        let* tree, ticks =
-          Wasm_utils.Wasm.Internal_for_tests.compute_step_many_until
-            ?write_debug
-            ?reveal_builtins
-            ~max_steps:(Z.to_int64 pvm_state.max_nb_ticks)
-            compute_and_snapshot
-            tree
-        in
-        eval_until_input_requested
-          (Z.add accumulated_ticks @@ Z.of_int64 ticks)
+    let run () =
+      let* tree, ticks =
+        Wasm_utils.Wasm.Internal_for_tests.compute_step_many_until
+          ?write_debug
+          ?reveal_builtins
+          ~max_steps:(Z.to_int64 pvm_state.max_nb_ticks)
+          compute_and_snapshot
           tree
+      in
+      eval_until_input_requested
+        (Z.add accumulated_ticks @@ Z.of_int64 ticks)
+        tree
+    in
+    match info.Wasm_pvm_state.input_request with
+    | No_input_required -> run ()
+    | Reveal_required _ when reveal_builtins <> None -> run ()
     | Input_required | Reveal_required _ -> return (tree, accumulated_ticks)
   in
   let+ tree, ticks = eval_until_input_requested Z.zero tree in
