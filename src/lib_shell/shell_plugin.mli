@@ -88,6 +88,10 @@ module type FILTER = sig
         implementation of this function relies). *)
     val conflict_handler : config -> Proto.Mempool.conflict_handler
 
+    (** If the operation is a manager operation, return its source,
+        otherwise return [None]. *)
+    val find_manager : Proto.operation -> Signature.Public_key_hash.t option
+
     (** Compute the minimal fee (expressed in mutez) that [candidate_op]
         would need to have in order to be strictly greater than
         [op_to_overtake] according to {!Proto.compare_operations}.
