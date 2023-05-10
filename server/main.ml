@@ -217,10 +217,10 @@ let maybe_alter_tables db_pool =
             Sql_requests.alter_tables))
     db_pool
 
-let maybe_create_and_alter_tables db_pool =
-  Lwt.bind (maybe_create_tables db_pool) (function
+let maybe_alter_and_create_tables db_pool =
+  Lwt.bind (maybe_alter_tables db_pool) (function
       | Error e -> Lwt.return_error e
-      | Ok () -> maybe_alter_tables db_pool)
+      | Ok () -> maybe_create_tables db_pool)
 
 let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) level
     block_hash operations =
@@ -543,7 +543,7 @@ let () =
     (match Caqti_lwt.connect_pool uri with
     | Error e -> Lwt_io.eprintl (Caqti_error.show e)
     | Ok pool ->
-        Lwt.bind (maybe_create_and_alter_tables pool) (function
+        Lwt.bind (maybe_alter_and_create_tables pool) (function
             | Error e -> Lwt_io.eprintl (Caqti_error.show e)
             | Ok () ->
                 let stop, paf = Lwt.task () in
