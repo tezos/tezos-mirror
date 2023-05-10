@@ -1,3 +1,36 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(* Testing
+   -------
+   Component:    Lib Bls12_381_hash
+   Invocation:   dune exec src/lib_bls12_381_hash/test/main.exe \
+                  -- --file test_anemoi.ml
+   Subject:      Test Bls12_381_hash
+*)
+
 (* Generated using
    https://github.com/vesselinux/anemoi-hash/commit/9d9fc2a52e31c5e9379be2856414233e4e780f58
    with:
@@ -374,7 +407,10 @@ let test_state_functions () =
   let state_size = 2 * l in
   let state = Array.init state_size (fun _ -> Bls12_381.Fr.random ()) in
   let parameters =
-    Bls12_381_hash.Permutation.Anemoi.Parameters.create 128 state_size mds
+    (Bls12_381_hash.Permutation.Anemoi.Parameters.create
+       128
+       state_size
+       mds [@warning "-3"])
   in
   let ctxt = Bls12_381_hash.Permutation.Anemoi.allocate_ctxt parameters in
   let () = Bls12_381_hash.Permutation.Anemoi.set_state ctxt state in
@@ -521,6 +557,7 @@ let test_anemoi_generate_constants () =
 let () =
   let open Alcotest in
   run
+    ~__FILE__
     "The permutation Anemoi and the mode of operation Jive"
     [
       ( "From reference implementation",

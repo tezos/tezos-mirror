@@ -103,6 +103,7 @@
   src_lib_client_base_test_tezt_lib
   src_lib_clic_test_tezt_lib
   src_lib_bls12_381_polynomial_test_tezt_lib
+  src_lib_bls12_381_hash_test_tezt_lib
   src_lib_benchmark_test_tezt_lib
   src_lib_benchmark_lib_micheline_rewriting_test_tezt_lib
   src_lib_base_unix_test_tezt_lib
