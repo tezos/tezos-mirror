@@ -13,13 +13,13 @@ kernel_sdk:
 	@cp src/kernel_sdk/target/$(NATIVE_TARGET)/release/smart-rollup-installer .
 
 evm_kernel.wasm::
-	@make -C src/kernel_evm
+	@make -C src/kernel_evm build
 	@cp src/kernel_evm/target/wasm32-unknown-unknown/release/evm_kernel.wasm $@
 	@wasm-strip $@
 
 .PHONY: kernel_sequencer
 kernel_sequencer:
-	@make -C src/kernel_sequencer
+	@make -C src/kernel_sequencer build
 
 .PHONY: build
 build: ${KERNELS} kernel_sdk kernel_sequencer
