@@ -587,7 +587,7 @@ module Make (PVM : Pvm.S) = struct
     (** Same as {!process_head} but only builds and stores the L2 block
         corresponding to [messages]. It is used by the unit tests to build an L2
         chain. *)
-    let process_messages (node_ctxt : _ Node_context.t) ~is_migration_block
+    let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
         ~predecessor head messages =
       let open Lwt_result_syntax in
       let* ctxt = previous_context node_ctxt ~predecessor in
@@ -597,7 +597,7 @@ module Make (PVM : Pvm.S) = struct
       let* inbox_hash, inbox, inbox_witness, messages =
         Inbox.Internal_for_tests.process_messages
           node_ctxt
-          ~is_migration_block
+          ~is_first_block
           ~predecessor
           ~level:head.level
           messages
