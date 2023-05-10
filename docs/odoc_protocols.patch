@@ -1,0 +1,481 @@
+commit cdf9c9c25cab3824806ab10d1759f9b017705984
+Author: Nic Volanschi <nic.volanschi@nomadic-labs.com>
+Date:   Wed May 10 12:14:15 2023 +0200
+
+    REMOVEME: doc patchs for old protocols
+
+diff --git a/src/proto_016_PtMumbai/lib_benchmarks_proto/storage_benchmarks.ml b/src/proto_016_PtMumbai/lib_benchmarks_proto/storage_benchmarks.ml
+index 8b0531848c..e2fe075109 100644
+--- a/src/proto_016_PtMumbai/lib_benchmarks_proto/storage_benchmarks.ml
++++ b/src/proto_016_PtMumbai/lib_benchmarks_proto/storage_benchmarks.ml
+@@ -23,7 +23,7 @@
+ (*                                                                           *)
+ (*****************************************************************************)
+ 
+-(** {2 [Storage_functors] benchmarks}.
++(** {2 [Storage_functors] benchmarks}
+ 
+     This module registers a benchmark [List_key_values_benchmark].  Its result
+     is used to fill in the corresponding value, [list_key_values_step]
+diff --git a/src/proto_016_PtMumbai/lib_benchmarks_proto/tx_rollup_benchmarks.ml b/src/proto_016_PtMumbai/lib_benchmarks_proto/tx_rollup_benchmarks.ml
+index db0e4f6beb..3154b2e600 100644
+--- a/src/proto_016_PtMumbai/lib_benchmarks_proto/tx_rollup_benchmarks.ml
++++ b/src/proto_016_PtMumbai/lib_benchmarks_proto/tx_rollup_benchmarks.ml
+@@ -298,8 +298,8 @@ let gen_ticket () =
+   make_ticket ticket
+ 
+ (** [input ~rng_state nb_of_couple_addr nb_of_ticket_per_couple] creates
+-    [nb_of_couple_addr] of {!couple} where each couple owns
+-    [nb_of_ticket_per_couple] of {!ticket} in common. It can later on be used
++    [nb_of_couple_addr] of {!type:couple} where each couple owns
++    [nb_of_ticket_per_couple] of {!type:ticket} in common. It can later on be used
+     to create transfers between addresses in the same couple of a ticket they
+     both own (that helps to create larger proofs). *)
+ let input ~rng_state nb_of_couple_addr nb_of_ticket_per_couple =
+diff --git a/src/proto_016_PtMumbai/lib_protocol/dal_slot_repr.mli b/src/proto_016_PtMumbai/lib_protocol/dal_slot_repr.mli
+index a7f9970c46..189d55ba4a 100644
+--- a/src/proto_016_PtMumbai/lib_protocol/dal_slot_repr.mli
++++ b/src/proto_016_PtMumbai/lib_protocol/dal_slot_repr.mli
+@@ -112,7 +112,7 @@ module Header : sig
+       and the slot's index. *)
+   type id = {published_level : Raw_level_repr.t; index : Index.t}
+ 
+-  (** For Layer-1, a slot is described by its slot {!id} and the
++  (** For Layer-1, a slot is described by its slot {!type-id} and the
+      slot's commitment. *)
+   type t = {id : id; commitment : Commitment.t}
+ 
+@@ -121,7 +121,7 @@ module Header : sig
+      [slot_size]. *)
+   type operation = {header : t; proof : Commitment_proof.t}
+ 
+-  (** encoding for values of type {!id}. *)
++  (** encoding for values of type {!type:id}. *)
+   val id_encoding : id Data_encoding.t
+ 
+   (** encoding for values of type {!t}. *)
+@@ -130,7 +130,7 @@ module Header : sig
+   (** encoding for values of type {!operation}. *)
+   val operation_encoding : operation Data_encoding.t
+ 
+-  (** pretty-printer for values of type {!id}. *)
++  (** pretty-printer for values of type {!type:id}. *)
+   val pp_id : Format.formatter -> id -> unit
+ 
+   (** pretty-printer for values of type {!t}. *)
+@@ -226,7 +226,7 @@ end
+     slot per cell in the skip list. The slots are sorted in increasing order by
+     level, and by slot index, for the slots of the same level.
+ 
+-    This module also defines a bounded history cache (type {History_cache.t})
++    This module also defines a bounded history cache (type {!History_cache.t})
+     that allows to remember recent values of a skip list of type {!t}
+     (indexed by the skip lists' hashes). This structure is meant to be
+     maintained and used by the rollup node to produce refutation proofs
+diff --git a/src/proto_016_PtMumbai/lib_protocol/indexable.mli b/src/proto_016_PtMumbai/lib_protocol/indexable.mli
+index cc921e802f..9cfefa967e 100644
+--- a/src/proto_016_PtMumbai/lib_protocol/indexable.mli
++++ b/src/proto_016_PtMumbai/lib_protocol/indexable.mli
+@@ -102,7 +102,7 @@ val pp :
+     contained in [x].
+ 
+     {b Note:} If you want to manipulate a value of type ['a value],
+-    you can use {!value}. *)
++    you can use {!val:value}. *)
+ val destruct : ('state, 'a) t -> ('a index, 'a) Either.t
+ 
+ (** [forget x] returns an indexable value whose kind of contents has
+diff --git a/src/proto_016_PtMumbai/lib_protocol/sc_rollup_costs.mli b/src/proto_016_PtMumbai/lib_protocol/sc_rollup_costs.mli
+index 0fea2940b0..432e5de038 100644
+--- a/src/proto_016_PtMumbai/lib_protocol/sc_rollup_costs.mli
++++ b/src/proto_016_PtMumbai/lib_protocol/sc_rollup_costs.mli
+@@ -81,5 +81,5 @@ val cost_verify_output_proof : bytes_len:int -> Gas_limit_repr.cost
+ (** [cost_add_message ~new_cell_index ~msg_len] returns the cost of adding a
+     message of length [msg_len] to a sc-rollup inbox. This function is used
+     internally in the [Sc_rollup_storage] module and covers the function
+-    {!Sc_rollup_inbox_merkelized_payload_hashes_repr.add_payload *)
++    {!Sc_rollup_inbox_merkelized_payload_hashes_repr.add_payload} *)
+ val cost_add_message : current_index:Z.t -> msg_len:int -> Gas_limit_repr.cost
+diff --git a/src/proto_016_PtMumbai/lib_protocol/sc_rollup_game_repr.mli b/src/proto_016_PtMumbai/lib_protocol/sc_rollup_game_repr.mli
+index 5145218b45..bc43a11e2f 100644
+--- a/src/proto_016_PtMumbai/lib_protocol/sc_rollup_game_repr.mli
++++ b/src/proto_016_PtMumbai/lib_protocol/sc_rollup_game_repr.mli
+@@ -216,7 +216,7 @@ module V1 : sig
+       will show that the next message available in [inbox_snapshot] is
+       at [level], so shouldn't be included in this commitment.
+ 
+-    - [game_state], the current state of the game, see {!game_state}
++    - [game_state], the current state of the game, see {!type:game_state}
+       for more information.
+ 
+     Invariants:
+diff --git a/src/proto_016_PtMumbai/lib_protocol/sc_rollup_inbox_repr.mli b/src/proto_016_PtMumbai/lib_protocol/sc_rollup_inbox_repr.mli
+index 121aa88867..05d071663c 100644
+--- a/src/proto_016_PtMumbai/lib_protocol/sc_rollup_inbox_repr.mli
++++ b/src/proto_016_PtMumbai/lib_protocol/sc_rollup_inbox_repr.mli
+@@ -357,7 +357,7 @@ val finalize_inbox_level_no_history :
+   t -> Sc_rollup_inbox_merkelized_payload_hashes_repr.t -> t tzresult
+ 
+ (** [genesis ~timestamp ~predecessor level] initializes the inbox at some
+-    given [level] with: SOL, Info_per_level {timestamp; predecessor} and EOL
++    given [level] with: SOL, [Info_per_level {timestamp; predecessor}] and EOL
+     inside. *)
+ val genesis :
+   predecessor_timestamp:Time.t ->
+diff --git a/src/proto_016_PtMumbai/lib_protocol/sc_rollup_repr.mli b/src/proto_016_PtMumbai/lib_protocol/sc_rollup_repr.mli
+index e8e36e46e4..44cb437774 100644
+--- a/src/proto_016_PtMumbai/lib_protocol/sc_rollup_repr.mli
++++ b/src/proto_016_PtMumbai/lib_protocol/sc_rollup_repr.mli
+@@ -77,7 +77,7 @@ end
+     about the state of the PVM, which can be disputed as part of a commitment
+     dispute.
+ 
+-    See also {!Commitment_repr.}. *)
++    See also {!Commitment_repr}. *)
+ module Number_of_ticks : sig
+   include Bounded.S with type ocaml_type := int64
+ 
+diff --git a/src/proto_016_PtMumbai/lib_protocol/script_repr.mli b/src/proto_016_PtMumbai/lib_protocol/script_repr.mli
+index 54f707dcac..0f23b3e53c 100644
+--- a/src/proto_016_PtMumbai/lib_protocol/script_repr.mli
++++ b/src/proto_016_PtMumbai/lib_protocol/script_repr.mli
+@@ -76,7 +76,7 @@ val deserialized_cost : expr -> Gas_limit_repr.cost
+ val bytes_node_cost : bytes -> Gas_limit_repr.cost
+ 
+ (** Returns (a lower bound on) the cost to deserialize a
+-    {!lazy_expr}. If the expression has already been deserialized
++    {!type:lazy_expr}. If the expression has already been deserialized
+     (i.e. the lazy expression contains the deserialized value or both
+     the bytes representation and the deserialized value) then the cost
+     is {b free}. *)
+@@ -89,7 +89,7 @@ val stable_force_decode_cost : lazy_expr -> Gas_limit_repr.cost
+ 
+ val force_decode : lazy_expr -> expr tzresult
+ 
+-(** Returns the cost to serialize a {!lazy_expr}. If the expression
++(** Returns the cost to serialize a {!type:lazy_expr}. If the expression
+     has already been deserialized (i.e. le lazy expression contains the
+     bytes representation or both the bytes representation and the
+     deserialized value) then the cost is {b free}. *)
+diff --git a/src/proto_016_PtMumbai/lib_protocol/test/helpers/dummy_zk_rollup.ml b/src/proto_016_PtMumbai/lib_protocol/test/helpers/dummy_zk_rollup.ml
+index 5176108be3..a5aaf042aa 100644
+--- a/src/proto_016_PtMumbai/lib_protocol/test/helpers/dummy_zk_rollup.ml
++++ b/src/proto_016_PtMumbai/lib_protocol/test/helpers/dummy_zk_rollup.ml
+@@ -54,7 +54,7 @@
+     - ["fee"]: the trivial fees circuit, since this RU has no concept of fees.
+ 
+     NB: the "op" circuit does not add any constraints over the operation's
+-    [exit_validity] other than it being in {0, 1}. This means that the dummy
++    [exit_validity] other than it being in [{0, 1}]. This means that the dummy
+     rollup can be used to test deposits/withdrawals, but the rollup will not
+     perform any monetary bookkeeping.
+ *)
+diff --git a/src/proto_016_PtMumbai/lib_protocol/test/helpers/incremental.mli b/src/proto_016_PtMumbai/lib_protocol/test/helpers/incremental.mli
+index 1be5fc3dff..bee46135c5 100644
+--- a/src/proto_016_PtMumbai/lib_protocol/test/helpers/incremental.mli
++++ b/src/proto_016_PtMumbai/lib_protocol/test/helpers/incremental.mli
+@@ -101,11 +101,11 @@ val validate_operation :
+     provided, [add_operation] fails.}}
+ 
+     {ul {li [?allow_manager_failure] marks that manager operation
+-    failures after fee taken are ignored.}}
++    failures after fee taken are ignored.}
+ 
+     {li [?check_size:bool]: enable the check that an operation size
+     should not exceed [Constants_repr.max_operation_data_length].
+-    Enabled (set to [true]) by default. } *)
++    Enabled (set to [true]) by default. }} *)
+ val add_operation :
+   ?expect_failure:(error list -> unit tzresult Lwt.t) ->
+   ?expect_apply_failure:(error list -> unit tzresult Lwt.t) ->
+diff --git a/src/proto_016_PtMumbai/lib_protocol/test/helpers/op.mli b/src/proto_016_PtMumbai/lib_protocol/test/helpers/op.mli
+index 24a03b9eb4..e57798f3ff 100644
+--- a/src/proto_016_PtMumbai/lib_protocol/test/helpers/op.mli
++++ b/src/proto_016_PtMumbai/lib_protocol/test/helpers/op.mli
+@@ -212,7 +212,7 @@ val increase_paid_storage :
+     hashing [pkh]. Useful for forging non-honest reveal operations}
+ 
+     {li [?storage_limit:Z.t]: forces a storage limit, otherwise
+-    set to [Z.zero]}
++    set to [Z.zero]}}
+ *)
+ val revelation :
+   ?fee:Tez.t ->
+diff --git a/src/proto_016_PtMumbai/lib_protocol/test/helpers/operation_generator.ml b/src/proto_016_PtMumbai/lib_protocol/test/helpers/operation_generator.ml
+index 06f477c7a1..747736aa80 100644
+--- a/src/proto_016_PtMumbai/lib_protocol/test/helpers/operation_generator.ml
++++ b/src/proto_016_PtMumbai/lib_protocol/test/helpers/operation_generator.ml
+@@ -748,7 +748,7 @@ let generate_sc_rollup_recover_bond =
+   let+ sc_rollup = random_sc_rollup in
+   Sc_rollup_recover_bond {sc_rollup; staker}
+ 
+-(** {By Kind Operation Generator} *)
++(** {3 By Kind Operation Generator} *)
+ 
+ let generator_of ?source = function
+   | `KReveal -> generate_manager_operation ?source generate_reveal
+diff --git a/src/proto_016_PtMumbai/lib_protocol/test/helpers/sc_rollup_helpers.ml b/src/proto_016_PtMumbai/lib_protocol/test/helpers/sc_rollup_helpers.ml
+index 5ce360934f..5eb347d595 100644
+--- a/src/proto_016_PtMumbai/lib_protocol/test/helpers/sc_rollup_helpers.ml
++++ b/src/proto_016_PtMumbai/lib_protocol/test/helpers/sc_rollup_helpers.ml
+@@ -229,9 +229,9 @@ let genesis_commitment_raw ~boot_sector ~origination_level kind =
+   in
+   return res
+ 
+-(** {2. Inbox message helpers.} *)
++(** {1 Inbox message helpers.} *)
+ 
+-(** {1. Above [Alpha_context].} *)
++(** {2 Above [Alpha_context].} *)
+ 
+ let message_serialize msg =
+   WithExceptions.Result.get_ok
+@@ -406,7 +406,7 @@ let gen_payloads_for_levels ~start_level ~max_level gen_message =
+   in
+   aux [] (max_level - start_level)
+ 
+-(** {1. Below [Alpha_context].} *)
++(** {2 Below [Alpha_context].} *)
+ 
+ let message_serialize_repr msg =
+   WithExceptions.Result.get_ok
+diff --git a/src/proto_016_PtMumbai/lib_protocol/validate.mli b/src/proto_016_PtMumbai/lib_protocol/validate.mli
+index ccfaaeac95..b9ad8dab13 100644
+--- a/src/proto_016_PtMumbai/lib_protocol/validate.mli
++++ b/src/proto_016_PtMumbai/lib_protocol/validate.mli
+@@ -296,7 +296,7 @@ val finalize_block : validation_state -> unit tzresult Lwt.t
+     However, this function does not check for conflicts with
+     previously validated operations, nor global block properties such
+     as the respect of the block gas limit. This allows the function to
+-    only take an {!info} as input rather than a full {!validation_state}.
++    only take an {!type:info} as input rather than a full {!validation_state}.
+ 
+     This function is intended for {!Mempool_validation} exclusively. *)
+ val check_operation :
+diff --git a/src/proto_016_PtMumbai/lib_protocol/zk_rollup_apply.mli b/src/proto_016_PtMumbai/lib_protocol/zk_rollup_apply.mli
+index 7e01854acc..caf342d8c6 100644
+--- a/src/proto_016_PtMumbai/lib_protocol/zk_rollup_apply.mli
++++ b/src/proto_016_PtMumbai/lib_protocol/zk_rollup_apply.mli
+@@ -109,7 +109,7 @@ val assert_feature_enabled : t -> unit tzresult
+ (** [originate ~ctxt_before_op ~ctxt ~public_parameters ~transcript
+                ~circuits_info ~init_state ~nb_ops]
+     applies the origination operation for a ZK rollup.
+-    See {!Zk_rollup_storage:originate}.
++    See {!Zk_rollup_storage.originate}.
+ 
+     May fail with:
+     {ul
+@@ -199,7 +199,7 @@ val publish :
+       {li [Zk_rollup.Errors.Ticket_payload_size_limit_exceeded] if the ticket
+         found in the [parameters] exceeds the maximum ticket size.
+       }
+-u      {li [Script_tc_errors.Forbidden_zero_ticket_quantity] if the ticket
++      {li [Script_tc_errors.Forbidden_zero_ticket_quantity] if the ticket
+         amount is zero.
+       }
+       {li [Zk_rollup.Errors.Invalid_deposit_amount] if the amount of the ticket
+diff --git a/src/proto_016_PtMumbai/lib_sc_rollup_node/context.mli b/src/proto_016_PtMumbai/lib_sc_rollup_node/context.mli
+index 636bb700d1..1a54302fd8 100644
+--- a/src/proto_016_PtMumbai/lib_sc_rollup_node/context.mli
++++ b/src/proto_016_PtMumbai/lib_sc_rollup_node/context.mli
+@@ -29,10 +29,10 @@ open Store_sigs
+     index can be written or only read. *)
+ type 'a index constraint 'a = [< `Read | `Write > `Read]
+ 
+-(** Read/write {!index}. *)
++(** Read/write {!type:index}. *)
+ type rw_index = [`Read | `Write] index
+ 
+-(** Read only {!index}. *)
++(** Read only {!type:index}. *)
+ type ro_index = [`Read] index
+ 
+ (** The type of trees stored in the context, i.e. the actual data. *)
+@@ -48,7 +48,7 @@ type rw = [`Read | `Write] t
+ type ro = [`Read] t
+ 
+ (** A context hash is the hash produced when the data of the context is
+-    committed to disk, i.e. the {!commit} hash. *)
++    committed to disk, i.e. the {!type:commit} hash. *)
+ type hash = Sc_rollup_context_hash.t
+ 
+ (** The type of commits for the context. *)
+@@ -156,7 +156,7 @@ module PVMState : sig
+ 
+   (** [set context state] saves the PVM state [state] in the context and returns
+       the updated context. Note: [set] does not perform any write on disk, this
+-      information must be committed using {!commit}. *)
++      information must be committed using {!val:commit}. *)
+   val set : 'a t -> value -> 'a t Lwt.t
+ end
+ 
+diff --git a/src/proto_016_PtMumbai/lib_sc_rollup_node/dal_pages_request.mli b/src/proto_016_PtMumbai/lib_sc_rollup_node/dal_pages_request.mli
+index 2a9a69a71b..f7247a51e3 100644
+--- a/src/proto_016_PtMumbai/lib_sc_rollup_node/dal_pages_request.mli
++++ b/src/proto_016_PtMumbai/lib_sc_rollup_node/dal_pages_request.mli
+@@ -42,7 +42,7 @@ type error += Dal_slot_not_found_in_store of Dal.Slot.Header.id
+     The function returns [Dal_slot_not_found_in_store] if no entry is found in
+     the store for the given ID (i.e. no page is registered with or without content).
+ 
+-    If the returned value is [Some pages]], the slot whose ID is given is
++    If the returned value is [Some pages], the slot whose ID is given is
+     supposed to be confirmed and [pages] correspond to the pages of the slot.
+     Otherwise [None] is returned.
+ 
+diff --git a/src/proto_016_PtMumbai/lib_sc_rollup_node/node_context.mli b/src/proto_016_PtMumbai/lib_sc_rollup_node/node_context.mli
+index 411710c5b7..a62117b545 100644
+--- a/src/proto_016_PtMumbai/lib_sc_rollup_node/node_context.mli
++++ b/src/proto_016_PtMumbai/lib_sc_rollup_node/node_context.mli
+@@ -137,7 +137,7 @@ val close : _ t -> unit tzresult Lwt.t
+     [block_hash]. *)
+ val checkout_context : 'a t -> Block_hash.t -> 'a Context.t tzresult Lwt.t
+ 
+-(** [metadata node_ctxt] creates a {Sc_rollup.Metadata.t} using the information
++(** [metadata node_ctxt] creates a {!Sc_rollup.Metadata.t} using the information
+     stored in [node_ctxt]. *)
+ val metadata : _ t -> Sc_rollup.Metadata.t
+ 
+diff --git a/src/proto_016_PtMumbai/lib_sc_rollup_node/pvm.ml b/src/proto_016_PtMumbai/lib_sc_rollup_node/pvm.ml
+index ca8e5769b9..90a3c81f2f 100644
+--- a/src/proto_016_PtMumbai/lib_sc_rollup_node/pvm.ml
++++ b/src/proto_016_PtMumbai/lib_sc_rollup_node/pvm.ml
+@@ -34,7 +34,7 @@ module type S = sig
+       with type context = Context.rw_index
+        and type hash = Sc_rollup.State_hash.t
+ 
+-  (** Kind of the PVM (same as {!name}).  *)
++  (** Kind of the PVM. *)
+   val kind : Sc_rollup.Kind.t
+ 
+   (** [get_tick state] gets the total tick counter for the given PVM state. *)
+@@ -88,7 +88,7 @@ module type S = sig
+ 
+     (** [set context state] saves the PVM state [state] in the context and
+         returns the updated context. Note: [set] does not perform any write on
+-        disk, this information must be committed using {!Context.commit}. *)
++        disk, this information must be committed using {!val:Context.commit}. *)
+     val set : 'a Context.t -> state -> 'a Context.t Lwt.t
+   end
+ end
+diff --git a/src/proto_016_PtMumbai/lib_sc_rollup_node/store.mli b/src/proto_016_PtMumbai/lib_sc_rollup_node/store.mli
+index 598836d8f1..1fd2fb535f 100644
+--- a/src/proto_016_PtMumbai/lib_sc_rollup_node/store.mli
++++ b/src/proto_016_PtMumbai/lib_sc_rollup_node/store.mli
+@@ -100,7 +100,7 @@ module Dal_confirmed_slots_history :
+      and type 'a store := 'a Irmin_store.t
+ 
+ (** Confirmed DAL slots histories cache. See documentation of
+-    {Dal_slot_repr.Slots_history} for more details. *)
++    {!Dal_slot_repr.Slots_history} for more details. *)
+ module Dal_confirmed_slots_histories :
+   Store_sigs.Append_only_map
+     with type key := Block_hash.t
+diff --git a/src/proto_017_PtNairob/lib_sc_rollup_node/context.mli b/src/proto_017_PtNairob/lib_sc_rollup_node/context.mli
+index 636bb700d1..1a54302fd8 100644
+--- a/src/proto_017_PtNairob/lib_sc_rollup_node/context.mli
++++ b/src/proto_017_PtNairob/lib_sc_rollup_node/context.mli
+@@ -29,10 +29,10 @@ open Store_sigs
+     index can be written or only read. *)
+ type 'a index constraint 'a = [< `Read | `Write > `Read]
+ 
+-(** Read/write {!index}. *)
++(** Read/write {!type:index}. *)
+ type rw_index = [`Read | `Write] index
+ 
+-(** Read only {!index}. *)
++(** Read only {!type:index}. *)
+ type ro_index = [`Read] index
+ 
+ (** The type of trees stored in the context, i.e. the actual data. *)
+@@ -48,7 +48,7 @@ type rw = [`Read | `Write] t
+ type ro = [`Read] t
+ 
+ (** A context hash is the hash produced when the data of the context is
+-    committed to disk, i.e. the {!commit} hash. *)
++    committed to disk, i.e. the {!type:commit} hash. *)
+ type hash = Sc_rollup_context_hash.t
+ 
+ (** The type of commits for the context. *)
+@@ -156,7 +156,7 @@ module PVMState : sig
+ 
+   (** [set context state] saves the PVM state [state] in the context and returns
+       the updated context. Note: [set] does not perform any write on disk, this
+-      information must be committed using {!commit}. *)
++      information must be committed using {!val:commit}. *)
+   val set : 'a t -> value -> 'a t Lwt.t
+ end
+ 
+diff --git a/src/proto_017_PtNairob/lib_sc_rollup_node/dal_pages_request.mli b/src/proto_017_PtNairob/lib_sc_rollup_node/dal_pages_request.mli
+index 3be2cdb1f5..f27d737fbc 100644
+--- a/src/proto_017_PtNairob/lib_sc_rollup_node/dal_pages_request.mli
++++ b/src/proto_017_PtNairob/lib_sc_rollup_node/dal_pages_request.mli
+@@ -42,7 +42,7 @@ type error += Dal_slot_not_found_in_store of Dal.Slot.Header.id
+     The function returns [Dal_slot_not_found_in_store] if no entry is found in
+     the store for the given ID (i.e. no page is registered with or without content).
+ 
+-    If the returned value is [Some pages]], the slot whose ID is given is
++    If the returned value is [Some pages], the slot whose ID is given is
+     supposed to be confirmed and [pages] correspond to the pages of the slot.
+     Otherwise [None] is returned.
+ 
+diff --git a/src/proto_017_PtNairob/lib_sc_rollup_node/inbox.mli b/src/proto_017_PtNairob/lib_sc_rollup_node/inbox.mli
+index a723ad47e5..29caafad18 100644
+--- a/src/proto_017_PtNairob/lib_sc_rollup_node/inbox.mli
++++ b/src/proto_017_PtNairob/lib_sc_rollup_node/inbox.mli
+@@ -56,7 +56,7 @@ val start : unit -> unit Lwt.t
+ 
+ (** [add_messages ~is_migration_block ~predecessor_timestamp
+     ~predecessor inbox messages] adds [messages] to the [inbox] using
+-    {!Inbox.add_all_messages}. *)
++    {!Sc_rollup.Inbox.add_all_messages}. *)
+ val add_messages :
+   is_migration_block:bool ->
+   predecessor_timestamp:Timestamp.time ->
+diff --git a/src/proto_017_PtNairob/lib_sc_rollup_node/node_context.mli b/src/proto_017_PtNairob/lib_sc_rollup_node/node_context.mli
+index 713cf00c65..2e1b6d51d9 100644
+--- a/src/proto_017_PtNairob/lib_sc_rollup_node/node_context.mli
++++ b/src/proto_017_PtNairob/lib_sc_rollup_node/node_context.mli
+@@ -135,7 +135,7 @@ val close : _ t -> unit tzresult Lwt.t
+     [block_hash]. *)
+ val checkout_context : 'a t -> Block_hash.t -> 'a Context.t tzresult Lwt.t
+ 
+-(** [metadata node_ctxt] creates a {Sc_rollup.Metadata.t} using the information
++(** [metadata node_ctxt] creates a {!Sc_rollup.Metadata.t} using the information
+     stored in [node_ctxt]. *)
+ val metadata : _ t -> Sc_rollup.Metadata.t
+ 
+diff --git a/src/proto_017_PtNairob/lib_sc_rollup_node/pvm.ml b/src/proto_017_PtNairob/lib_sc_rollup_node/pvm.ml
+index ca8e5769b9..90a3c81f2f 100644
+--- a/src/proto_017_PtNairob/lib_sc_rollup_node/pvm.ml
++++ b/src/proto_017_PtNairob/lib_sc_rollup_node/pvm.ml
+@@ -34,7 +34,7 @@ module type S = sig
+       with type context = Context.rw_index
+        and type hash = Sc_rollup.State_hash.t
+ 
+-  (** Kind of the PVM (same as {!name}).  *)
++  (** Kind of the PVM. *)
+   val kind : Sc_rollup.Kind.t
+ 
+   (** [get_tick state] gets the total tick counter for the given PVM state. *)
+@@ -88,7 +88,7 @@ module type S = sig
+ 
+     (** [set context state] saves the PVM state [state] in the context and
+         returns the updated context. Note: [set] does not perform any write on
+-        disk, this information must be committed using {!Context.commit}. *)
++        disk, this information must be committed using {!val:Context.commit}. *)
+     val set : 'a Context.t -> state -> 'a Context.t Lwt.t
+   end
+ end
+diff --git a/src/proto_017_PtNairob/lib_sc_rollup_node/store.mli b/src/proto_017_PtNairob/lib_sc_rollup_node/store.mli
+index 2bf1bd361a..b43b800956 100644
+--- a/src/proto_017_PtNairob/lib_sc_rollup_node/store.mli
++++ b/src/proto_017_PtNairob/lib_sc_rollup_node/store.mli
+@@ -100,7 +100,7 @@ module Dal_confirmed_slots_history :
+      and type 'a store := 'a Irmin_store.t
+ 
+ (** Confirmed DAL slots histories cache. See documentation of
+-    {Dal_slot_repr.Slots_history} for more details. *)
++    {!Dal_slot_repr.Slots_history} for more details. *)
+ module Dal_confirmed_slots_histories :
+   Store_sigs.Append_only_map
+     with type key := Block_hash.t

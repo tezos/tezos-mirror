@@ -85,6 +85,7 @@ odoc-lite: docexes
 	  --include="src/proto_017*" \
 	  --exclude="src/proto_0*" \
 		../src ../tezt ../vendors ../dune ../dune-project $(TMPDOCDIR)/
+	patch -d $(TMPDOCDIR) -p1 <odoc_protocols.patch
 	@echo "Running odoc, outputs messages to $(TMPDOCDIR)/odoc.log"
 	cd $(TMPDOCDIR); ODOC_WARN_ERROR=true dune build @doc >odoc.log 2>&1; \
 	  RESULT=$$?; (grep '^Error:' odoc.log || true); exit $$RESULT
