@@ -84,22 +84,36 @@ module No_public_input_PIs = struct
     : Aplonk.Pi_parameters.CircuitPI)
 end
 
-module DP_Kzg = DP_PlonK (Distributed_prover.Main_Kzg)
-module DP_Pack = DP_PlonK (Distributed_prover.Main_Pack)
-module DP_Meta = DP_aPlonk (No_public_input_PIs)
+module Rollup_example_PIs = struct
+  let get_pi_module _ =
+    (module Aplonk.Pi_parameters.Rollup_example : Aplonk.Pi_parameters.CircuitPI)
+end
+
+module DP_Kzg () = DP_PlonK (Distributed_prover.Main_Kzg)
+module DP_Pack () = DP_PlonK (Distributed_prover.Main_Pack)
+module DP_Meta () = DP_aPlonk (Rollup_example_PIs)
 
 let srs = srs
 
-let circuits_inputs nb_proofs k =
-  let open Cases in
-  let _, circuit_map, witness, _ =
-    Big_circuit.make ~nb_proofs ~public_input_size:2 ~k |> aggregate_cases
-  in
-  (* FIXME Multicircuit with Meta-PlonK doesn’t work *)
-  (* let circuit_map =
-       Plonk.SMap.(union_disjoint circuit_map (update_keys (fun i -> i ^ "2") circuit_map))
-     in *)
-  (circuit_map, witness)
+module Circuit_Builder = struct
+  let base nb_proofs k =
+    let open Cases in
+    let _, circuit_map, witness, _ =
+      Big_circuit.make ~nb_proofs ~public_input_size:2 ~k |> aggregate_cases
+    in
+    (* FIXME Multicircuit with Meta-PlonK doesn’t work *)
+    (* let circuit_map =
+         Plonk.SMap.(union_disjoint circuit_map (update_keys (fun i -> i ^ "2") circuit_map))
+       in *)
+    (circuit_map, witness)
+
+  let range_checks nb_proofs _ =
+    let open Cases in
+    let _, circuit_map, witness, _ =
+      List.init nb_proofs (Fun.const Range_Checks.valid) |> aggregate_cases
+    in
+    (circuit_map, witness)
+end
 
 module Helpers (DP : DP_for_tests) = struct
   module MP = DP.MP
@@ -119,11 +133,12 @@ module Helpers (DP : DP_for_tests) = struct
           })
       node_strings
 
-  let run_master ?nb_proofs ?(k = circuit_size) ~self_node ~nodes () =
+  let run_master ?nb_proofs ?(circuit_size = circuit_size) ~self_node ~nodes ()
+      =
     let nb_proofs =
       match nb_proofs with None -> List.length nodes | Some n -> n
     in
-    let circuit_map, x_map = circuits_inputs nb_proofs k in
+    let circuit_map, x_map = Circuit_Builder.base nb_proofs circuit_size in
     let pp_prover, pp_verifier =
       MP.setup ~zero_knowledge:false circuit_map ~srs
     in
@@ -148,8 +163,5 @@ module Helpers (DP : DP_for_tests) = struct
     in
     let t2 = Unix.gettimeofday () in
     Printf.printf "Prover time: %4.2f\n" (t2 -. t1) ;
-    let b =
-      try MP.verify pp_verifier ~inputs:verifier_inputs proof with _e -> false
-    in
-    Printf.printf "Verified: %b\n" b
+    assert (MP.verify pp_verifier ~inputs:verifier_inputs proof)
 end

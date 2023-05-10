@@ -18,81 +18,18 @@ module Internal = struct
 end
 
 module External (PC : Polynomial_commitment.S) = struct
-  module PP = Polynomial_protocol.Make (PC)
-  module H = Plonk_test.Helpers.Make (Main_protocol)
+  module MP = Main_protocol.Make (Polynomial_protocol.Make (PC))
+  module H = Plonk_test.Helpers.Make (MP)
   open Plonk_test.Cases
 
-  let test_range_checks_single ~zero_knowledge () =
-    let wires = Array.map Array.to_list General.circuit.wires in
-    let gates = SMap.map Array.to_list General.circuit.gates in
-    let circuit =
-      Plonk.Circuit.make
-        ~wires
-        ~gates
-        ~public_input_size:General.circuit.public_input_size
-        ~range_checks:([4; 6], 4)
-        ()
-    in
-    let inputs = General.witness in
-    H.test_circuit ~name:"RC_single" ~zero_knowledge circuit inputs ;
-    let circuit =
-      Plonk.Circuit.make
-        ~wires
-        ~gates
-        ~public_input_size:General.circuit.public_input_size
-        ~range_checks:([1; 3; 4; 6], 2)
-        ()
-    in
-    try H.test_circuit ~name:"RC_single_wrong" ~zero_knowledge circuit inputs
-    with Plonk.Main_protocol.Rest_not_null _ -> ()
-
-  let test_range_checks_multi ~zero_knowledge () =
-    let wires = Array.map Array.to_list General.circuit.wires in
-    let gates = SMap.map Array.to_list General.circuit.gates in
-    let circuit1 =
-      Plonk.Circuit.make
-        ~wires
-        ~gates
-        ~public_input_size:General.circuit.public_input_size
-        ~range_checks:([4; 6], 4)
-        ()
-    in
-    let witness = General.witness in
-    let circuit2 =
-      Plonk.Circuit.make
-        ~wires
-        ~gates
-        ~public_input_size:General.circuit.public_input_size
-        ~range_checks:([1; 2], 2)
-        ()
-    in
-    let circuits =
-      SMap.of_list [("circuit1", (circuit1, 2)); ("circuit2", (circuit2, 1))]
-    in
-    let inputs =
-      SMap.of_list [("circuit1", [witness; witness]); ("circuit2", [witness])]
-    in
-
-    H.test_circuits ~name:"RC_multi" ~zero_knowledge circuits inputs ;
-
-    let circuit3 =
-      Plonk.Circuit.make
-        ~wires
-        ~gates
-        ~public_input_size:General.circuit.public_input_size
-        ~range_checks:([1; 3; 4; 6], 2)
-        ()
-    in
-    let circuits = SMap.add_unique "circuit3" (circuit3, 1) circuits in
-    let inputs = SMap.add_unique "circuit3" [witness] inputs in
-    try H.test_circuits ~name:"RC_multi_wrong" ~zero_knowledge circuits inputs
-    with Plonk.Main_protocol.Rest_not_null _ -> ()
-
   let tests_quick pc_name =
-    [
-      (pc_name ^ ".RC_single", test_range_checks_single);
-      (pc_name ^ ".RC_multi", test_range_checks_multi);
-    ]
+    List.map
+      (fun case ->
+        (case.name, H.run_test_case {case with name = pc_name ^ "." ^ case.name}))
+      Range_Checks.list
+    @ List.map
+        (H.test_aggregated_cases ~prefix:pc_name)
+        Range_Checks.[[valid; valid; valid_bis]]
 end
 
 module External_Kzg = External (Polynomial_commitment)

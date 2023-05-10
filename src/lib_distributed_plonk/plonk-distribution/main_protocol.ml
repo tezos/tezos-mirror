@@ -59,6 +59,8 @@ module type S = sig
   val hash_verifier_inputs : verifier_inputs -> bytes
 
   module Prover : sig
+    val build_all_keys : prover_public_parameters -> int SMap.t -> string list
+
     val commit_to_wires :
       ?all_keys:string list ->
       ?shifts_map:(int * int) SMap.t ->
@@ -175,7 +177,7 @@ module type S = sig
     scalar ->
     PP.PC.answer list
 
-  val shared_perm_argument :
+  val shared_perm_rc_argument :
     prover_public_parameters ->
     int ->
     gate_randomness ->
@@ -206,22 +208,6 @@ module type S = sig
   val check_no_zk : prover_public_parameters -> unit
 end
 
-(* [build_all_keys strs shifts_map] returns a list of prefixed [strs],
-   deduced from the [shifts_map] (that contains circuits names binded with,
-   among others, the number of proofs) that corresponds to all the
-   names of the [strs] polynomials that will be committed for the proof
-*)
-let build_all_keys names shifts_map =
-  let build_all_names prefix n name =
-    List.init n (fun i -> SMap.Aggregation.add_prefix ~n ~i prefix name)
-  in
-  SMap.mapi
-    (fun prefix (_i, n) ->
-      List.concat_map (build_all_names prefix n) names
-      |> List.sort String.compare)
-    shifts_map
-  |> SMap.values |> List.concat
-
 module Common (PP : Polynomial_protocol.S) = struct
   open Plonk.Main_protocol.Make_impl (PP)
 
@@ -232,6 +218,13 @@ module Common (PP : Polynomial_protocol.S) = struct
 
   type worker_inputs = {inputs : circuit_prover_input list; shift : int * int}
   [@@deriving repr]
+
+  (* [build_all_keys nb_proofs nb_wires] returns a list of prefixed wires_name *)
+  let build_all_wires_keys nb_proofs_map nb_wires =
+    let names = wire_names nb_wires in
+    List.concat_map (fun (circuit_name, n) ->
+        List.concat_map (SMap.Aggregation.build_all_names circuit_name n) names)
+    @@ SMap.bindings nb_proofs_map
 
   let split_inputs_map ~nb_workers inputs_map =
     let list_range i1 i2 = List.filteri (fun i _ -> i1 <= i && i < i2) in
@@ -276,7 +269,7 @@ module Common (PP : Polynomial_protocol.S) = struct
   let worker_commit_to_wires pp worker_inputs_map =
     let inputs_map = SMap.map (fun wi -> wi.inputs) worker_inputs_map in
     let shifts_map = SMap.map (fun wi -> wi.shift) worker_inputs_map in
-    let all_keys = build_all_keys (wire_names nb_wires) shifts_map in
+    let all_keys = build_all_wires_keys (SMap.map snd shifts_map) nb_wires in
     let wires_list_map, f_wires, _, all_f_wires, cm_wires, cm_aux_wires =
       commit_to_wires ~all_keys ~shifts_map pp inputs_map
     in
@@ -299,19 +292,21 @@ module Common (PP : Polynomial_protocol.S) = struct
     in
     (* ******************************************* *)
     let f_map_plook = build_f_map_plook ~shifts_map pp rd f_wires_list_map in
-    (* FIXME https://gitlab.com/nomadic-labs/cryptography/privacy-team/-/issues/222
-       Handle multiproofs
-    *)
-    (* let f_map_rc, batched_wires_map =
-         Prover.build_f_map_range_checks ~shifts_map pp rd f_wires_list_map
-           batched_wires_map
-       in
-       let f_map = SMap.union_disjoint f_map_plook f_map_rc in *)
-    let f_map = f_map_plook in
+    let f_map_rc, batched_wires_map =
+      Prover.build_f_map_rc_1
+        ~shifts_map
+        pp
+        rd
+        f_wires_list_map
+        batched_wires_map
+    in
+    let f_map = SMap.union_disjoint f_map_plook f_map_rc in
     (* commit to the plookup polynomials *)
     let cmt, prover_aux =
-      (* FIXME: implement Plookup *)
-      let all_keys = build_all_keys ["plook"; "RC"] shifts_map in
+      (* TODO #5551
+         Implement Plookup
+      *)
+      let all_keys = build_all_keys pp (SMap.map snd shifts_map) in
       PP.PC.Commitment.commit ~all_keys pp.common_pp.pp_public_parameters f_map
     in
     ( {batched_wires_map; cmt; f_map; prover_aux},
@@ -361,7 +356,7 @@ module Common (PP : Polynomial_protocol.S) = struct
     in
     batched_witness_polys |> SMap.Aggregation.smap_of_smap_smap
 
-  let shared_perm_argument pp nb_workers randomness inputs_map replies =
+  let shared_perm_rc_argument pp nb_workers randomness inputs_map replies =
     let recombine_batched_wires pieces =
       (* we want the last worker to be first to apply Horner's method *)
       let pieces = List.rev pieces in
@@ -390,6 +385,8 @@ module Common (PP : Polynomial_protocol.S) = struct
     in
     let open Prover in
     let f_map_perm = build_f_map_perm pp randomness batched_wires_map in
+    let f_map_rc = build_f_map_rc_2 pp randomness batched_wires_map in
+    let f_map_perm_rc = SMap.union_disjoint f_map_perm f_map_rc in
 
     let evaluated_perm_ids =
       let evaluations =
@@ -400,13 +397,20 @@ module Common (PP : Polynomial_protocol.S) = struct
         in
         build_evaluations
           pp
-          (SMap.union_disjoint f_map_perm batched_wires_polys)
+          (SMap.union_disjoint f_map_perm_rc batched_wires_polys)
       in
       (build_perm_rc2_identities pp randomness) evaluations
     in
-    let cmt = Commitment.commit pp.common_pp.pp_public_parameters f_map_perm in
+    let cmt =
+      let all_keys = build_all_keys pp (SMap.map List.length inputs_map) in
+      Commitment.commit
+        ~all_keys
+        pp.common_pp.pp_public_parameters
+        f_map_perm_rc
+    in
+    (f_map_perm_rc, evaluated_perm_ids, cmt)
 
-    (f_map_perm, evaluated_perm_ids, cmt)
+  let build_f_map_rc_2 = Prover.build_f_map_rc_2
 
   let make_secret pp (f_map, f_prv_aux) =
     [(pp.common_pp.g_map, pp.common_pp.g_prover_aux); (f_map, f_prv_aux)]

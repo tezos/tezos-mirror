@@ -424,6 +424,50 @@ module General = struct
   let list_one_public_input = [zero_values; non_zero_values; wrong_values]
 end
 
+module Range_Checks = struct
+  open General
+
+  let public_input_size = General.circuit.public_input_size
+
+  let valid =
+    let name = "RC_single_valid" in
+    let circuit =
+      Plonk.Circuit.make
+        ~wires
+        ~gates
+        ~public_input_size
+        ~range_checks:([4; 6], 4)
+        ()
+    in
+    {name; circuit; witness; outcome = Valid}
+
+  let valid_bis =
+    let name = "RC_single_valid_bis" in
+    let circuit =
+      Plonk.Circuit.make
+        ~wires
+        ~gates
+        ~public_input_size
+        ~range_checks:([1; 2], 2)
+        ()
+    in
+    {name; circuit; witness; outcome = Valid}
+
+  let wrong =
+    let name = "RC_single_wrong" in
+    let circuit =
+      Plonk.Circuit.make
+        ~wires
+        ~gates
+        ~public_input_size
+        ~range_checks:([1; 3; 4; 6], 2)
+        ()
+    in
+    {name; circuit; witness; outcome = Proof_error}
+
+  let list = [valid; valid_bis; wrong]
+end
+
 module Big_circuit = struct
   (* generates circuit with 2^k - 1 constraints that adds 2^(k + 1) inputs 4 by 4,
      then adds 2^(k-1) inputs 2 by 2, then multiplies 2^(k-2) inputs 2 by 2, and

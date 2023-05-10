@@ -123,6 +123,13 @@ module StringMap = struct
     (* separator between prefixes & name ; must be only one character *)
     let sep = "~"
 
+    let update_key_name f str =
+      match String.rindex_from_opt str (String.length str - 1) sep.[0] with
+      | None -> f str
+      | Some i ->
+          String.sub str 0 (i + 1)
+          ^ f (String.sub str (i + 1) (String.length str - i - 1))
+
     let padded ~n i =
       let str = string_of_int i in
       let len = String.length (string_of_int (n - 1)) in
@@ -131,6 +138,9 @@ module StringMap = struct
     let add_prefix ?(no_sep = false) ?(n = 1) ?(i = 0) ?(shift = 0) prefix str =
       let prefix = if prefix = "" || no_sep then prefix else prefix ^ sep in
       if n = 1 then prefix ^ str else prefix ^ padded ~n (i + shift) ^ sep ^ str
+
+    let build_all_names prefix n name =
+      List.init n (fun i -> add_prefix ~n ~i prefix name)
 
     let prefix_map ?n ?i ?shift prefix str_map =
       fold (fun k -> add (add_prefix ?n ?i ?shift prefix k)) str_map empty
@@ -221,6 +231,13 @@ module type S = sig
     (* Separator for prefixing *)
     val sep : string
 
+    (* applies the input function on the last part of the input string (parts
+       are delimited by sep).
+       [update_key_name f ("hello" ^ sep ^ "world" ^ sep ^ "!!")]
+       returns ["hello" ^ sep ^ "world" ^ sep ^ (f "!!")]
+    *)
+    val update_key_name : (key -> key) -> key -> key
+
     (* [add_prefix ~n ~i ~shift prefix str] return idx^prefix^sep^str
        idx = [i] + [shift] as a string, eventually padded with '0' before to
        allow a numbering until [n] with the same number of caracters
@@ -239,6 +256,11 @@ module type S = sig
       string ->
       string ->
       string
+
+    (* [build_all_names prefix n k] build the list of all prefixed [k] with
+       n proofs : [build_all_names "hello" 11 "world"] will return
+       ["hello~00~world" ; "hello~01~world" ; … ; "hello~10~world"] *)
+    val build_all_names : key -> int -> key -> key list
 
     (* adds prefix to each key of str_map ; [i] will be added as a string
        before the prefix

@@ -299,6 +299,30 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
     }
     [@@deriving repr]
 
+    (* TODO #5551
+       Handle Plookup
+    *)
+    (* For the distributed_prover *)
+    let build_all_keys pp nb_proofs_map =
+      List.concat_map
+        (fun (c_name, c) ->
+          if fst c.range_checks = [] then
+            List.map (SMap.Aggregation.add_prefix c_name) Perm.shared_z_names
+          else
+            let shared =
+              List.map
+                (SMap.Aggregation.add_prefix c_name)
+                (Perm.shared_z_names @ RangeCheck.shared_z_names)
+            in
+            let keys =
+              let n = SMap.find c_name nb_proofs_map in
+              List.concat_map
+                (SMap.Aggregation.build_all_names c_name n)
+                RangeCheck.z_names
+            in
+            shared @ keys)
+        (SMap.bindings pp.circuits_map)
+
     let enforce_wire_values wire_indices wire_values =
       try
         Array.map
@@ -376,6 +400,14 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       SMap.mapi
         (fun name values ->
           let circuit_pp = SMap.find name pp.circuits_map in
+          (* Removing everything that is not wires *)
+          let values =
+            let wires_names =
+              wire_names Plompiler.Csir.nb_wires_arch
+              |> List.map String.capitalize_ascii
+            in
+            SMap.filter (fun k _ -> List.mem k wires_names) values
+          in
           let zs =
             Perm.f_map_contribution
               ~permutation:circuit_pp.permutation
@@ -602,10 +634,15 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                     ())
                 inputs_list
             in
+            (* for plookup and rc, we do a mapi on the input_list & ignore the
+               input (instead of doing a List.init nb_proofs) because for the
+               distributed prover, the number of inputs given will differ from
+               nb_proofs *)
             let plookup_identities =
               if not circuit_pp.ultra then []
               else
-                List.init nb_proofs (fun i ->
+                List.mapi
+                  (fun i _ ->
                     Plook.prover_identities
                       ~circuit_prefix
                       ~proof_prefix:(proof_prefix i)
@@ -615,16 +652,19 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                       ~gamma:gamma_plook
                       ~n:pp.common_pp.n
                       ())
+                  inputs_list
             in
             let rc1_identities =
               if fst circuit_pp.range_checks = [] then []
               else
-                List.init nb_proofs (fun i ->
+                List.mapi
+                  (fun i _ ->
                     RangeCheck.prover_identities_1
                       ~circuit_prefix
                       ~proof_prefix:(proof_prefix i)
                       ~domain_size:pp.common_pp.n
                       ())
+                  inputs_list
             in
             merge_prover_identities
               (rc1_identities @ plookup_identities @ gates_identities))
@@ -1210,8 +1250,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       let cm_g, g_prover_aux = Commitment.commit pp_prover g_map in
       (* Generating transcript *)
       let transcript =
-        let tmp = PP.PC.Public_parameters.to_bytes n pp_prover in
-        Transcript.expand Commitment.t cm_g tmp
+        PP.PC.Public_parameters.to_bytes n pp_prover
+        |> Transcript.expand Commitment.t cm_g
       in
       let eval_points = eval_points pp_prv in
       let common_prv =

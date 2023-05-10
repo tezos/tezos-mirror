@@ -48,6 +48,10 @@ module type S = sig
 
   val batched_z_name : string
 
+  val z_names : string list
+
+  val shared_z_names : string list
+
   val build_permutation :
     range_checks:int list * int -> size_domain:int -> int array
 
@@ -133,6 +137,11 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
 
   let batched_z_name = "RC_Z_BATCHED"
 
+  (* Used for distribution *)
+  let z_names = [z_name]
+
+  let shared_z_names = [rc_prefix ^ "Perm_Z"]
+
   type public_parameters = Poly.t SMap.t
 
   let zero, one, two = Scalar.(zero, one, one + one)
@@ -150,7 +159,10 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
 
   (* Build the permutation such that nj <-> N + i_j for n = [up_bound],
      j < len([rc]), N = [size_domain], i_j = index of the j-th range check in
-     [rc] *)
+     [rc]
+     Note that identities and Z building must consider the polynomials in the
+     order imposed by this permutation, which stands for the order Z_RC — Wire.
+  *)
   let build_permutation ~range_checks:(rc, up_bound) ~size_domain =
     let get_safe l i =
       try size_domain + List.nth l (i / up_bound) with _ -> i
@@ -175,6 +187,15 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
       in
       Array.append fst snd
 
+  (* We have to make sure we consider the values we give to Perm functions
+     in the same order as the permutation we build ; the current permutation
+     stands for the order Z_RC — Wire. *)
+  let prefix_for_perm =
+    SMap.Aggregation.update_key_name (fun k ->
+        if k = batched_wire then "2." ^ batched_wire
+        else if k = batched_z_name then "1." ^ k
+        else k)
+
   (* TODO we should be able to aggregate permutation for different range checks
      proofs as we do for wires ; for now & simplicity, we don’t handle several
      proofs in one circuit *)
@@ -191,8 +212,9 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
       let values =
         SMap.of_list
           [
-            (batched_wire, SMap.find batched_wire batched_values);
-            (batched_z_name, SMap.find batched_z_name batched_values);
+            (prefix_for_perm batched_wire, SMap.find batched_wire batched_values);
+            ( prefix_for_perm batched_z_name,
+              SMap.find batched_z_name batched_values );
           ]
       in
       Perm.f_map_contribution
@@ -205,29 +227,37 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
         ()
 
     let prover_identities ?(circuit_prefix = Fun.id) ~beta ~gamma ~domain_size
-        () =
+        () evaluations =
+      let evaluations = SMap.update_keys prefix_for_perm evaluations in
       Perm.prover_identities
         ~external_prefix
         ~circuit_prefix
-        ~wires_names:[batched_z_name; batched_wire]
+        ~wires_names:(List.map prefix_for_perm [batched_wire; batched_z_name])
         ~beta
         ~gamma
         ~n:domain_size
         ()
+        evaluations
 
     let verifier_identities ?(circuit_prefix = Fun.id) ~nb_proofs ~beta ~gamma
-        ~delta ~domain_size ~generator () =
+        ~delta ~domain_size ~generator () x answers =
+      let answers = SMap.(map (update_keys prefix_for_perm)) answers in
+
       Perm.verifier_identities
         ~external_prefix
         ~circuit_prefix
         ~nb_proofs
         ~generator
         ~n:domain_size
-        ~wires_names:[z_name; wire]
+        ~wires_names:(List.map prefix_for_perm [wire; z_name])
         ~beta
         ~gamma
         ~delta
         ()
+        x
+        answers
+
+    let cs = Perm.cs
   end
 
   module RangeChecks = struct
@@ -377,6 +407,17 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
       in
       SMap.of_list
         [(prefix "RC.a", identity_rca); (prefix "RC.b", identity_rcb)]
+
+    let cs ~lnin1 ~pnin1 ~z ~zg =
+      let open Plompiler.LibCircuit in
+      let* one_m_z = Num.custom ~ql:mone ~qc:one z z in
+      let* id_a = Num.mul_list (to_list [z; one_m_z; lnin1]) in
+      let* id_b =
+        let* z_m_2zg = Num.add z ~qr:mtwo zg in
+        let* one_m_z_p_2zg = Num.add one_m_z ~qr:two zg in
+        Num.mul_list (to_list [z_m_2zg; one_m_z_p_2zg; pnin1])
+      in
+      ret (id_a, id_b)
   end
 
   let preprocessing ~permutation ~range_checks ~domain =
@@ -397,6 +438,10 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
   let verifier_identities_1 = RangeChecks.verifier_identities
 
   let verifier_identities_2 = Permutation.verifier_identities
+
+  let cs_1 = RangeChecks.cs
+
+  let cs_2 = Permutation.cs
 end
 
 module Range_check_gate (PP : Polynomial_protocol.S) : S with module PP = PP =

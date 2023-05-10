@@ -47,6 +47,8 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
     let name prefix i = prefix ^ Csir.string_key_of_int ~nb_digits (i + 1) in
     (name "Si", name "Ss")
 
+  let shared_z_names = [z_name]
+
   (* element preprocessed and known by both prover and verifier *)
   type public_parameters = {
     g_map_perm_PP : Poly.t SMap.t;
@@ -246,8 +248,8 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
       res_evaluation
 
     (* evaluations must contain z’s evaluation *)
-    let prover_identities ~external_prefix:e_pref ~prefix wires_names beta gamma
-        n evaluations =
+    let prover_identities ~external_prefix:e_pref ~prefix sorted_wires_names
+        beta gamma n evaluations =
       let z_name = e_pref z_name in
       let raw_z_name = z_name in
       let zg_name = zg_name z_name in
@@ -260,7 +262,7 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
       let id1_evaluation = Evaluations.create z_evaluation_len in
       let id2_evaluation = Evaluations.create z_evaluation_len in
 
-      let wires_names = List.map prefix wires_names in
+      let wires_names = List.map prefix sorted_wires_names in
 
       let identity_zfg =
         let nb_wires = List.length wires_names in
@@ -529,6 +531,9 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
        Depending on that, we want to change Z, Ss & identities names *)
     if s = z_name && ext <> "" then ext ^ "Perm_" ^ s else ext ^ s
 
+  (* Note that this function uses a sorted version of wires_names list ; having
+     a sorted list avoids errors when the list is not sorted as the map used to
+     create Z *)
   let prover_identities ?(external_prefix = "") ?(circuit_prefix = Fun.id)
       ~wires_names ~beta ~gamma ~n () =
     let external_prefix = external_prefix_fun external_prefix in
@@ -536,7 +541,7 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
       Permutation_poly.prover_identities
         ~external_prefix
         ~prefix:circuit_prefix
-        wires_names
+        (List.sort String.compare wires_names)
         beta
         gamma
         n
@@ -544,6 +549,7 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
 
   let verifier_identities ?(external_prefix = "") ?(circuit_prefix = Fun.id)
       ~nb_proofs ~generator ~n ~wires_names ~beta ~gamma ~delta () =
+    let wires_names = List.sort String.compare wires_names in
     let e_pref = external_prefix_fun external_prefix in
     let prefix_j i =
       SMap.Aggregation.add_prefix
@@ -630,6 +636,8 @@ end
 
 module type S = sig
   module PP : Polynomial_protocol.S
+
+  val shared_z_names : string list
 
   val srs_size : zero_knowledge:bool -> n:int -> int
 
