@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 use core::str::Utf8Error;
 use primitive_types::U256;
+use rlp::DecoderError;
 use tezos_smart_rollup_host::path::{OwnedPath, PathError};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 
@@ -47,5 +48,11 @@ impl From<RuntimeError> for Error {
 impl From<TransferError> for Error {
     fn from(e: TransferError) -> Self {
         Self::Transfer(e)
+    }
+}
+
+impl From<DecoderError> for Error {
+    fn from(_: DecoderError) -> Self {
+        Self::InvalidConversion
     }
 }

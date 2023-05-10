@@ -13,19 +13,19 @@ pub enum TransactionType {
     Eip1559,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum TransactionStatus {
     Success,
     Failure,
 }
 
-pub enum TransactionStatusDecodingError {
+pub enum TransactionDecodingError {
     InvalidEncoding,
     InvalidVectorLength,
 }
 
 impl TryFrom<&u8> for TransactionStatus {
-    type Error = TransactionStatusDecodingError;
+    type Error = TransactionDecodingError;
 
     fn try_from(v: &u8) -> Result<Self, Self::Error> {
         if *v == 0 {
@@ -33,19 +33,19 @@ impl TryFrom<&u8> for TransactionStatus {
         } else if *v == 1 {
             Ok(Self::Success)
         } else {
-            Err(TransactionStatusDecodingError::InvalidEncoding)
+            Err(TransactionDecodingError::InvalidEncoding)
         }
     }
 }
 
 impl TryFrom<&Vec<u8>> for TransactionStatus {
-    type Error = TransactionStatusDecodingError;
+    type Error = TransactionDecodingError;
 
     fn try_from(v: &Vec<u8>) -> Result<Self, Self::Error> {
         if v.len() == 1 {
             TransactionStatus::try_from(&v[0])
         } else {
-            Err(TransactionStatusDecodingError::InvalidVectorLength)
+            Err(TransactionDecodingError::InvalidVectorLength)
         }
     }
 }
@@ -87,6 +87,33 @@ impl Into<&'static [u8]> for &TransactionType {
             TransactionType::Legacy => [0u8].as_slice(),
             TransactionType::Eip2930 => [1u8].as_slice(),
             TransactionType::Eip1559 => [2u8].as_slice(),
+        }
+    }
+}
+
+impl TryFrom<&u8> for TransactionType {
+    type Error = TransactionDecodingError;
+
+    fn try_from(v: &u8) -> Result<Self, Self::Error> {
+        if *v == 0 {
+            Ok(Self::Legacy)
+        } else if *v == 1 {
+            Ok(Self::Eip2930)
+        } else if *v == 2 {
+            Ok(Self::Eip1559)
+        } else {
+            Err(TransactionDecodingError::InvalidEncoding)
+        }
+    }
+}
+impl TryFrom<&Vec<u8>> for TransactionType {
+    type Error = TransactionDecodingError;
+
+    fn try_from(v: &Vec<u8>) -> Result<Self, Self::Error> {
+        if v.len() == 1 {
+            TransactionType::try_from(&v[0])
+        } else {
+            Err(TransactionDecodingError::InvalidVectorLength)
         }
     }
 }
