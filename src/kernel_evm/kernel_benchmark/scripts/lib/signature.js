@@ -2,24 +2,23 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Use this module in a nodeJs program to sign transaction an ethereum transaction provided as a json, using a given private key.
+// Use this module in a nodeJs program to sign an ethereum transaction
+// provided as a json, using a given private key.
 // See transactions_example/*.json for examples of format.
-// Note that a deployement transaction must not include a "to" field.
-// Returns a raw transaction:
-// let rawTx2 = {
-// rawData: any[];
-// msgHash: any;
-// DER: number[];
-// signature: Buffer;
-// rawTx: string; // signed transaction
+// Note that a contract creation transaction must not include a "to" field.
+// Returns a struct with the signed transaction and other useful values:
+// {
+//   rawTx: string,       // signed rlp encoded transaction, no 0x
+//   msgHash: any,        // msgHash used for signature
+//   txData: transaction, // cleaned up transaction data (no signature)
+//   r: any,              // signature : r
+//   s: any,              // signature : s
+//   v: number,           // signature : v (eip-155, include chain_id encoding)
 // }
-// rlp encoded signed transaction is rawTx2.rawTx
-// r is rawTx2.signature.slice(0, 32)
-// s is rawTx2.signature.slice(32, 64)
 
 // see sign_tx.js script
 
-const { sign: enthereumjs_sign } = require('@warren-bank/ethereumjs-tx-sign')
+const { sign: enthereumjs_sign, unsign: ethereumjs_unsign } = require('@warren-bank/ethereumjs-tx-sign')
 
 const BN = require('bn.js')
 
@@ -34,6 +33,20 @@ const clean_input = function (str) {
     if (str.length % 2 === 1) str = `0${str}`
     // return in hex format lead by 0x
     return `0x${str}`
+}
+
+// sign and compile all usefull info in a struct
+const sign_info = function (txData2, privateKey) {
+    let signed = enthereumjs_sign(txData2, privateKey);
+    let unsigned = ethereumjs_unsign(signed.rawTx);
+    return {
+        msgHash: signed.msgHash,
+        rawTx: signed.rawTx,
+        txData: txData2,
+        r: unsigned.signature.r,
+        s: unsigned.signature.s,
+        v: parseInt(unsigned.signature.v, 16)
+    }
 }
 
 const sign = function (json, privateKey) {
@@ -52,7 +65,7 @@ const sign = function (json, privateKey) {
             chainId: json.chainId
         }
         // sign transaction
-        return enthereumjs_sign(txData2, privateKey);
+        return sign_info(txData2, privateKey);
     } else {
         // clean input
         const txData2 = {
@@ -65,7 +78,8 @@ const sign = function (json, privateKey) {
             chainId: json.chainId
         }
         // sign transaction
-        return enthereumjs_sign(txData2, privateKey);
+        return sign_info(txData2, privateKey);
     }
 }
+
 module.exports = { sign, clean_input }
