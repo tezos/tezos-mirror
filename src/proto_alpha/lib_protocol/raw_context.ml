@@ -972,7 +972,17 @@ let prepare_first_block ~level ~timestamp ctxt =
             min_pending_to_process = c.zk_rollup.min_pending_to_process;
           }
       in
+
       let adaptive_inflation = Constants_parametric_repr.{enable = false} in
+
+      let reward_weights =
+        let c_gen =
+          Constants_repr.Generated.generate
+            ~consensus_committee_size:c.consensus_committee_size
+        in
+        c_gen.reward_weights
+      in
+
       let constants =
         Constants_parametric_repr.
           {
@@ -987,19 +997,15 @@ let prepare_first_block ~level ~timestamp ctxt =
             proof_of_work_threshold = c.proof_of_work_threshold;
             minimal_stake = c.minimal_stake;
             vdf_difficulty = c.vdf_difficulty;
-            seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
             origination_size = c.origination_size;
             max_operations_time_to_live = c.max_operations_time_to_live;
-            baking_reward_fixed_portion = c.baking_reward_fixed_portion;
-            baking_reward_bonus_per_slot = c.baking_reward_bonus_per_slot;
-            endorsing_reward_per_slot = c.endorsing_reward_per_slot;
+            reward_weights;
             cost_per_byte = c.cost_per_byte;
             hard_storage_limit_per_operation =
               c.hard_storage_limit_per_operation;
             quorum_min = c.quorum_min;
             quorum_max = c.quorum_max;
             min_proposal_quorum = c.min_proposal_quorum;
-            liquidity_baking_subsidy = c.liquidity_baking_subsidy;
             liquidity_baking_toggle_ema_threshold =
               c.liquidity_baking_toggle_ema_threshold;
             minimal_block_delay = c.minimal_block_delay;

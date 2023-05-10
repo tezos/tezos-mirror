@@ -104,14 +104,18 @@ let constants_mainnet =
   let Constants.Generated.
         {
           consensus_threshold;
-          baking_reward_fixed_portion;
-          baking_reward_bonus_per_slot;
-          endorsing_reward_per_slot;
-          liquidity_baking_subsidy;
+          reward_weights =
+            {
+              base_total_rewards_per_minute;
+              baking_reward_fixed_portion_weight;
+              baking_reward_bonus_weight;
+              endorsing_reward_weight;
+              liquidity_baking_subsidy_weight;
+              seed_nonce_revelation_tip_weight;
+              vdf_revelation_tip_weight;
+            };
         } =
-    Constants.Generated.generate
-      ~consensus_committee_size
-      ~blocks_per_minute:{numerator = 60; denominator = block_time}
+    Constants.Generated.generate ~consensus_committee_size
   in
   {
     Constants.Parametric.preserved_cycles = 5;
@@ -134,19 +138,29 @@ let constants_mainnet =
           - 5: security factor (strictly higher than the ratio between highest CPU
          clock rate and benchmark machine that is 8.43/2.8 ~= 3 *)
     vdf_difficulty = 8_000_000_000L;
-    seed_nonce_revelation_tip =
-      (match Tez.(one /? 8L) with Ok c -> c | Error _ -> assert false);
     origination_size = 257;
-    baking_reward_fixed_portion (* 5_000_000 mutez *);
-    baking_reward_bonus_per_slot (* 2_143 mutez *);
-    endorsing_reward_per_slot (* 1_428 mutez *);
+    reward_weights =
+      {
+        base_total_rewards_per_minute;
+        (* 85.007812 tez/minute *)
+        baking_reward_fixed_portion_weight;
+        (* 1/4th of total block rewards *)
+        baking_reward_bonus_weight;
+        (* all bonus rewards = fixed rewards *)
+        endorsing_reward_weight;
+        (* all baking rewards = all endorsing rewards *)
+        liquidity_baking_subsidy_weight;
+        (* 1/16th of block rewards *)
+        seed_nonce_revelation_tip_weight;
+        (* 1/20480 of block rewards *)
+        vdf_revelation_tip_weight;
+        (* 1/20480 of block rewards *)
+      };
     hard_storage_limit_per_operation = Z.of_int 60_000;
     cost_per_byte = Tez.of_mutez_exn 250L;
     quorum_min = 20_00l;
     quorum_max = 70_00l;
     min_proposal_quorum = 5_00l;
-    (* liquidity_baking_subsidy is 1/16th of maximum total rewards for a block *)
-    liquidity_baking_subsidy (* 1_250_000 mutez *);
     (* 1/2 window size of 2000 blocks with precision of 1_000_000
        for integer computation *)
     liquidity_baking_toggle_ema_threshold = 1_000_000_000l;
@@ -293,17 +307,8 @@ let derive_cryptobox_parameters ~redundancy_factor ~mainnet_constants_divider =
 let constants_sandbox =
   let consensus_committee_size = 256 in
   let block_time = 1 in
-  let Constants.Generated.
-        {
-          consensus_threshold = _;
-          baking_reward_fixed_portion;
-          baking_reward_bonus_per_slot;
-          endorsing_reward_per_slot;
-          liquidity_baking_subsidy;
-        } =
-    Constants.Generated.generate
-      ~consensus_committee_size
-      ~blocks_per_minute:{numerator = 60; denominator = block_time}
+  let Constants.Generated.{consensus_threshold = _; reward_weights} =
+    Constants.Generated.generate ~consensus_committee_size
   in
   {
     constants_mainnet with
@@ -318,6 +323,7 @@ let constants_sandbox =
               ~redundancy_factor:8
               ~mainnet_constants_divider:32;
         };
+    reward_weights;
     Constants.Parametric.preserved_cycles = 2;
     blocks_per_cycle = 8l;
     blocks_per_commitment = 4l;
@@ -326,31 +332,18 @@ let constants_sandbox =
     cycles_per_voting_period = 8l;
     proof_of_work_threshold = Int64.(sub (shift_left 1L 62) 1L);
     vdf_difficulty = 50_000L;
-    liquidity_baking_subsidy;
     minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
     delay_increment_per_round = Period.one_second;
     consensus_committee_size = 256;
     consensus_threshold = 0;
-    baking_reward_fixed_portion (* 333_333 mutez *);
-    baking_reward_bonus_per_slot (* 3_921 mutez *);
-    endorsing_reward_per_slot (* 2_604 mutez *);
     max_slashing_period = 2;
     frozen_deposits_percentage = 5;
   }
 
 let constants_test =
   let consensus_committee_size = 25 in
-  let Constants.Generated.
-        {
-          consensus_threshold;
-          baking_reward_fixed_portion;
-          baking_reward_bonus_per_slot;
-          endorsing_reward_per_slot;
-          liquidity_baking_subsidy;
-        } =
-    Constants.Generated.generate
-      ~consensus_committee_size
-      ~blocks_per_minute:{numerator = 2; denominator = 1}
+  let Constants.Generated.{consensus_threshold; reward_weights} =
+    Constants.Generated.generate ~consensus_committee_size
   in
   {
     constants_mainnet with
@@ -365,6 +358,7 @@ let constants_test =
               ~redundancy_factor:4
               ~mainnet_constants_divider:64;
         };
+    reward_weights;
     Constants.Parametric.preserved_cycles = 3;
     blocks_per_cycle = 12l;
     blocks_per_commitment = 4l;
@@ -374,13 +368,9 @@ let constants_test =
     proof_of_work_threshold =
       Int64.(sub (shift_left 1L 62) 1L) (* 1/4 of nonces are accepted *);
     vdf_difficulty = 50_000L;
-    liquidity_baking_subsidy;
     consensus_committee_size;
     consensus_threshold (* 17 slots *);
     max_slashing_period = 2;
-    baking_reward_fixed_portion (* 10 tez *);
-    baking_reward_bonus_per_slot (* 1.25 tez *);
-    endorsing_reward_per_slot (* 0.8 tez *);
     frozen_deposits_percentage =
       5
       (* not 10 so that multiplication and

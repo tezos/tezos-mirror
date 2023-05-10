@@ -56,23 +56,15 @@ val minimal_stake : Raw_context.t -> Tez_repr.t
 
 val vdf_difficulty : Raw_context.t -> int64
 
-val seed_nonce_revelation_tip : Raw_context.t -> Tez_repr.t
-
 val origination_size : Raw_context.t -> int
 
-val baking_reward_fixed_portion : Raw_context.t -> Tez_repr.t
-
-val baking_reward_bonus_per_slot : Raw_context.t -> Tez_repr.t
-
-val endorsing_reward_per_slot : Raw_context.t -> Tez_repr.t
+val reward_weights : Raw_context.t -> Constants_parametric_repr.reward_weights
 
 val quorum_min : Raw_context.t -> int32
 
 val quorum_max : Raw_context.t -> int32
 
 val min_proposal_quorum : Raw_context.t -> int32
-
-val liquidity_baking_subsidy : Raw_context.t -> Tez_repr.t
 
 val liquidity_baking_toggle_ema_threshold : Raw_context.t -> int32
 

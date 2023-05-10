@@ -23,15 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let baking_reward_fixed_portion = Constants_storage.baking_reward_fixed_portion
+(* Temp assert false, see next commit for correct values *)
+let baking_reward_fixed_portion _ = assert false
 
-let baking_reward_bonus_per_slot =
-  Constants_storage.baking_reward_bonus_per_slot
+let baking_reward_bonus_per_slot _ = assert false
 
-let endorsing_reward_per_slot = Constants_storage.endorsing_reward_per_slot
+let endorsing_reward_per_slot _ = assert false
 
-let liquidity_baking_subsidy = Constants_storage.liquidity_baking_subsidy
+let liquidity_baking_subsidy _ = assert false
 
-let seed_nonce_revelation_tip = Constants_storage.seed_nonce_revelation_tip
+let seed_nonce_revelation_tip _ = assert false
 
-let vdf_revelation_tip = Constants_storage.seed_nonce_revelation_tip
+let vdf_revelation_tip _ = assert false
