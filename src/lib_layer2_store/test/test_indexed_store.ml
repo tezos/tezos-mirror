@@ -444,28 +444,29 @@ let () =
     (test_gen `Sequential)
     R.check_run
 
+module Indexable_for_test = struct
+  module S =
+    Make_indexable
+      (struct
+        let name = "indexable_test"
+      end)
+      (SKey)
+      (Make_index_value (Make_fixed_encodable (FixedValue)))
+
+  type t = rw S.t
+
+  let load = S.load Read_write
+
+  let read s k = S.find s k
+
+  let write s k v = S.add s k v
+
+  let delete _ _ = assert false
+
+  let close = S.close
+end
+
 let () =
-  let module Indexable_for_test = struct
-    module S =
-      Make_indexable
-        (struct
-          let name = "indexable_test"
-        end)
-        (SKey)
-        (Make_index_value (Make_fixed_encodable (FixedValue)))
-
-    type t = rw S.t
-
-    let load = S.load Read_write
-
-    let read s k = S.find s k
-
-    let write s k v = S.add s k v
-
-    let delete _ _ = assert false
-
-    let close = S.close
-  end in
   let module R = Runner (SKey) (FixedValue) (Indexable_for_test) in
   let test_gen kind =
     let open QCheck2.Gen in
@@ -488,29 +489,30 @@ let () =
     (test_gen `Parallel)
     R.check_run
 
+module Indexable_removable_for_test = struct
+  module S =
+    Make_indexable_removable
+      (struct
+        let name = "indexable_removable_test"
+      end)
+      (SKey)
+      (Make_index_value (Make_fixed_encodable (FixedValue)))
+
+  type t = rw S.t
+
+  let load = S.load Read_write
+
+  let read s k = S.find s k
+
+  let write s k v = S.add s k v
+
+  let delete s k = S.remove s k
+
+  let close = S.close
+end
+
 let () =
-  let module Indexable_for_test = struct
-    module S =
-      Make_indexable_removable
-        (struct
-          let name = "indexable_removable_test"
-        end)
-        (SKey)
-        (Make_index_value (Make_fixed_encodable (FixedValue)))
-
-    type t = rw S.t
-
-    let load = S.load Read_write
-
-    let read s k = S.find s k
-
-    let write s k v = S.add s k v
-
-    let delete s k = S.remove s k
-
-    let close = S.close
-  end in
-  let module R = Runner (SKey) (FixedValue) (Indexable_for_test) in
+  let module R = Runner (SKey) (FixedValue) (Indexable_removable_for_test) in
   let test_gen kind =
     let open QCheck2.Gen in
     let* n = int_range 2 10 in
@@ -532,52 +534,53 @@ let () =
     (test_gen `Parallel)
     R.check_run
 
+module Indexed_file_for_test = struct
+  module S =
+    Make_simple_indexed_file
+      (struct
+        let name = "indexed_file"
+      end)
+      (Make_index_key (struct
+        include Make_fixed_encodable (SKey)
+
+        let equal = String.equal
+      end))
+      (struct
+        include Value
+
+        module Header = struct
+          type t = int32
+
+          let name = "sum_chars"
+
+          let encoding = Data_encoding.int32
+
+          let fixed_size = 4
+        end
+
+        (* Header contains sum of byte codes as an example *)
+        let header b =
+          Bytes.fold_left (fun n c -> n + Char.code c) 0 b |> Int32.of_int
+      end)
+
+  type t = rw S.t
+
+  let load ~path = S.load ~path ~cache_size:10 Read_write
+
+  open Lwt_result_syntax
+
+  let read s k =
+    let+ v = S.read s k in
+    Option.map fst v
+
+  let write s k v = S.append s ~key:k ~value:v
+
+  let delete _ _ = assert false
+
+  let close = S.close
+end
+
 let () =
-  let module Indexed_file_for_test = struct
-    module S =
-      Make_simple_indexed_file
-        (struct
-          let name = "indexed_file"
-        end)
-        (Make_index_key (struct
-          include Make_fixed_encodable (SKey)
-
-          let equal = String.equal
-        end))
-        (struct
-          include Value
-
-          module Header = struct
-            type t = int32
-
-            let name = "sum_chars"
-
-            let encoding = Data_encoding.int32
-
-            let fixed_size = 4
-          end
-
-          (* Header contains sum of byte codes as an example *)
-          let header b =
-            Bytes.fold_left (fun n c -> n + Char.code c) 0 b |> Int32.of_int
-        end)
-
-    type t = rw S.t
-
-    let load ~path = S.load ~path ~cache_size:10 Read_write
-
-    open Lwt_result_syntax
-
-    let read s k =
-      let+ v = S.read s k in
-      Option.map fst v
-
-    let write s k v = S.append s ~key:k ~value:v
-
-    let delete _ _ = assert false
-
-    let close = S.close
-  end in
   let module R = Runner (SKey) (Value) (Indexed_file_for_test) in
   let test_gen kind =
     let open QCheck2.Gen in
@@ -600,8 +603,35 @@ let () =
     (test_gen `Parallel)
     R.check_run
 
+let test_load () =
+  incr uid ;
+  let pid = Unix.getpid () in
+  let path =
+    Filename.(concat @@ get_temp_dir_name ())
+      (Format.sprintf "tezos-layer2-indexed-store-test-load-%d-%d" pid !uid)
+  in
+  let open Lwt_result_syntax in
+  let* store = Indexed_file_for_test.S.load ~path ~cache_size:1 Read_only in
+  let* () = Indexed_file_for_test.S.close store in
+  let* store = Indexed_file_for_test.S.load ~path ~cache_size:1 Read_write in
+  Indexed_file_for_test.S.close store
+
+let unit_tests =
+  let wrap (name, t) =
+    let f () =
+      match Lwt_main.run (t ()) with
+      | Ok () -> ()
+      | Error e -> Alcotest.failf "%a" pp_print_trace e
+    in
+    (name, `Quick, f)
+  in
+  List.map wrap [("load", test_load)]
+
 let () =
   Alcotest.run
     ~__FILE__
     "tezos-layer2-store"
-    [("indexed-store", List.map QCheck_alcotest.to_alcotest !tests)]
+    [
+      ("indexed-store-pbt", List.map QCheck_alcotest.to_alcotest !tests);
+      ("indexed-store-unit", unit_tests);
+    ]
