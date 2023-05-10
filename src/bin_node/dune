@@ -16,6 +16,7 @@
   octez-shell-libs.shell-services
   octez-libs.rpc-http
   octez-libs.rpc-http-server
+  octez-rpc-process
   octez-shell-libs.p2p
   octez-shell-libs.shell
   octez-shell-libs.store
@@ -147,11 +148,13 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base
+  -open Tezos_base_unix
   -open Octez_node_config
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
   -open Tezos_rpc_http
   -open Tezos_rpc_http_server
+  -open Octez_rpc_process
   -open Tezos_p2p
   -open Tezos_shell
   -open Tezos_store
