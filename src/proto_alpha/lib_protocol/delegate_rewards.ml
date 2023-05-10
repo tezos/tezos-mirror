@@ -33,3 +33,5 @@ let endorsing_reward_per_slot = Constants_storage.endorsing_reward_per_slot
 let liquidity_baking_subsidy = Constants_storage.liquidity_baking_subsidy
 
 let seed_nonce_revelation_tip = Constants_storage.seed_nonce_revelation_tip
+
+let vdf_revelation_tip = Constants_storage.seed_nonce_revelation_tip

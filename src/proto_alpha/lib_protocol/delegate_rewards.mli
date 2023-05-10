@@ -34,3 +34,6 @@ val endorsing_reward_per_slot : Raw_context.t -> Tez_repr.t
 val liquidity_baking_subsidy : Raw_context.t -> Tez_repr.t
 
 val seed_nonce_revelation_tip : Raw_context.t -> Tez_repr.t
+
+val vdf_revelation_tip : Raw_context.t -> Tez_repr.t
+

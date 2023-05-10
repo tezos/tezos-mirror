@@ -2751,6 +2751,9 @@ module Delegate : sig
     val liquidity_baking_subsidy : t -> Tez.t
 
     val seed_nonce_revelation_tip : t -> Tez.t
+
+    val vdf_revelation_tip : t -> Tez.t
+
   end
 end
 

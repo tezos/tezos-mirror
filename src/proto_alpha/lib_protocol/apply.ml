@@ -1926,7 +1926,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       (ctxt, Single_result (Seed_nonce_revelation_result balance_updates))
   | Single (Vdf_revelation {solution}) ->
       Seed.update_seed ctxt solution >>=? fun ctxt ->
-      let tip = Delegate.Rewards.seed_nonce_revelation_tip ctxt in
+      let tip = Delegate.Rewards.vdf_revelation_tip ctxt in
       let contract =
         Contract.Implicit payload_producer.Consensus_key.delegate
       in
