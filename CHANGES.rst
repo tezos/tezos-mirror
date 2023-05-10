@@ -116,6 +116,9 @@ Baker
   memory consumption. However, this mode is less performant and may
   result in noticable slower baking times. (MR :gl:`!8607`)
 
+- Added a default configuration for that enables disk logs as a
+  file-descriptor-sink in the base directory with a 7 days rotation.
+
 Accuser
 -------
 
