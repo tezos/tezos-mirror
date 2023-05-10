@@ -69,6 +69,9 @@ let put_dac_member_signature (cctxt : #cctxt) ~signature =
 let get_certificate (cctxt : #cctxt) ~root_page_hash =
   cctxt#call_service RPC_services.get_certificate ((), root_page_hash) () ()
 
+let monitor_certificate (cctxt : #cctxt) ~root_hash =
+  Monitor_services.certificate cctxt root_hash
+
 module Coordinator = struct
   let post_preimage (cctxt : #cctxt) ~payload =
     cctxt#call_service RPC_services.Coordinator.post_preimage () () payload

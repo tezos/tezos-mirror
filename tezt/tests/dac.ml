@@ -1652,7 +1652,7 @@ module Full_infrastructure = struct
     in
     (* 1. Run committee member and observer nodes.
        Because the event resolution loop in the Daemon always resolves
-       all promises matching an event filter, when a new even is received,
+       all promises matching an event filter, when a new event is received,
        we cannot wait for multiple subscription to the hash streamer, as
        events of this kind are indistinguishable one from the other.
        Instead, we wait for the subscription of one observer/committe_member
@@ -1717,6 +1717,188 @@ module Full_infrastructure = struct
       | _ -> assert false
     in
     check_certificate get_certificate certificate_update_from_second_stream ;
+    return ()
+
+  let certificate_encoding =
+    let untagged =
+      Data_encoding.(
+        obj3
+          (req "root_hash" (Fixed.bytes 33))
+          (req "aggregate_signature" Tezos_crypto.Aggregate_signature.encoding)
+          (req "witnesses" z))
+    in
+    Data_encoding.(
+      union
+        ~tag_size:`Uint8
+        [
+          case
+            ~title:"certificate_V0"
+            (Tag 0)
+            untagged
+            (fun certificate -> Some certificate)
+            (fun certificate -> certificate);
+        ])
+
+  (* Builds a certificate for `root_hash`. `committee_members_opt` is a list
+     of optional `aggregate_key` pairs. If it the i-th value of this list is
+     set to `None`, then the i-th committee member won't sign the root hash in
+     the certificate. Otherwise, the i-th committee member will sign the
+     certificate using the secret key at the i-th position in the list.
+     Only unencrypted aggregate secret keys are supported. *)
+  let build_raw_certificate committee_members_opt root_hash =
+    let rev_signatures, witnesses =
+      List.fold_left
+        (fun (rev_signatures, witnesses) committee_member_opt ->
+          let witnesses = Z.(shift_left witnesses 1) in
+          match committee_member_opt with
+          | None -> (rev_signatures, witnesses)
+          | Some committee_member -> (
+              match committee_member.Account.aggregate_secret_key with
+              | Encrypted _ ->
+                  (* Encrypted aggregate keys are not used in dac tests. *)
+                  Stdlib.failwith
+                    "Unexpected encrypted aggregate key. Only unencrypted \
+                     aggregate keys are supported in DAC tests"
+              | Unencrypted b58_secret_key ->
+                  let secret_key =
+                    Tezos_crypto.Aggregate_signature.Secret_key.of_b58check_exn
+                      b58_secret_key
+                  in
+                  let signature =
+                    Tezos_crypto.Aggregate_signature.sign secret_key root_hash
+                  in
+                  (signature :: rev_signatures, Z.succ witnesses)))
+        ([], Z.zero)
+        committee_members_opt
+    in
+    let signatures = List.rev rev_signatures in
+    let aggregate_signature =
+      Tezos_crypto.Aggregate_signature.aggregate_signature_opt signatures
+    in
+    match aggregate_signature with
+    | None ->
+        Stdlib.failwith
+          Format.(
+            asprintf
+              "Could not compute aggregate signature for %a"
+              pp_print_bytes
+              root_hash)
+    | Some aggregate_signature ->
+        Hex.of_bytes
+        @@ Data_encoding.Binary.to_bytes_exn
+             certificate_encoding
+             (root_hash, aggregate_signature, witnesses)
+
+  let check_raw_certificate (`Hex actual_raw_certificate)
+      (`Hex expected_raw_certificate) =
+    Check.(
+      (actual_raw_certificate = expected_raw_certificate)
+        string
+        ~error_msg:
+          "Raw certificate does not match the expected one: Actual = %L <> %R \
+           = Expected")
+
+  let test_client
+      Scenarios.
+        {
+          coordinator_node;
+          committee_members_nodes;
+          observer_nodes;
+          committee_members;
+          _;
+        } =
+    (* 0. Coordinator node is already running when the this function is
+          executed by the test
+       1. Run committee members and observers
+       2. Dac client posts a preimage to coordinator, and waits for all
+          committee members to sign
+       3. The signature is checked against one constructed manually
+       4. The signature of the root hash is requested again via the
+          client `get certificate` command,
+       5. The returned signature is checked to be equvalent to the
+          one previously output by the client.
+    *)
+    (* The test requires at least one committee member *)
+    assert (List.length committee_members > 0) ;
+    let coordinator_client = Dac_client.create coordinator_node in
+    let payload, expected_rh = sample_payload "preimage" in
+    let committee_members_opt =
+      List.map (fun committee_member -> Some committee_member) committee_members
+    in
+    let expected_certificate =
+      build_raw_certificate
+        committee_members_opt
+        (Hex.to_bytes (`Hex expected_rh))
+    in
+    let wait_for_node_subscribed_to_data_streamer () =
+      wait_for_handle_new_subscription_to_hash_streamer coordinator_node
+    in
+    (* Initialize configuration of all nodes. *)
+    let* _ =
+      Lwt_list.iter_s
+        (fun committee_member_node ->
+          let* _ = Dac_node.init_config committee_member_node in
+          return ())
+        committee_members_nodes
+    in
+    let* _ =
+      Lwt_list.iter_s
+        (fun observer_node ->
+          let* _ = Dac_node.init_config observer_node in
+          return ())
+        observer_nodes
+    in
+    (* 1. Run committee member and observer nodes.
+       Because the event resolution loop in the Daemon always resolves
+       all promises matching an event filter, when a new event is received,
+       we cannot wait for multiple subscription to the hash streamer, as
+       events of this kind are indistinguishable one from the other.
+       Instead, we wait for the subscription of one observer/committe_member
+       node to be notified before running the next node. *)
+    let* () =
+      Lwt_list.iter_s
+        (fun node ->
+          let node_is_subscribed =
+            wait_for_node_subscribed_to_data_streamer ()
+          in
+          let* () = Dac_node.run ~wait_ready:true node in
+          node_is_subscribed)
+        (committee_members_nodes @ observer_nodes)
+    in
+    (* 2. Dac client posts a preimage to coordinator, and waits for all
+          committee members to sign. *)
+    let* client_sends_payload_output =
+      Dac_client.send_payload
+        coordinator_client
+        (Hex.of_string payload)
+        ~threshold:(List.length committee_members)
+    in
+    let last_certificate_update =
+      match client_sends_payload_output with
+      | Root_hash rh ->
+          Stdlib.failwith @@ "Expected certificate, found root hash"
+          ^ Hex.show rh
+      | Certificate c -> c
+    in
+    (* 3. The signature is checked against one constructed manually. *)
+    check_raw_certificate last_certificate_update expected_certificate ;
+    (* 4. The signature of the root hash is requested again via the
+          client `get certificate` command.v*)
+    let* get_certificate_output =
+      Dac_client.get_certificate coordinator_client (`Hex expected_rh)
+    in
+    let get_certificate =
+      match get_certificate_output with
+      | None -> Stdlib.failwith @@ "Expected certificate, found none"
+      | Some (Certificate c) -> c
+      | _ ->
+          (* This case cannot happen as get_certificate_output can never have
+             value `Some (Root_hash _ )`. *)
+          assert false
+    in
+    (* 5. The returned signature is checked to be equvalent to the
+          one previously output by the client. *)
+    check_raw_certificate get_certificate last_certificate_update ;
     return ()
 end
 
@@ -1822,4 +2004,11 @@ let register ~protocols =
     ~tags:["dac"; "dac_node"]
     "certificates are updated in streaming endpoint"
     Full_infrastructure.test_streaming_certificates
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~observers:0
+    ~committee_members:2
+    ~tags:["dac"; "dac_node"]
+    "test client commands"
+    Full_infrastructure.test_client
     protocols

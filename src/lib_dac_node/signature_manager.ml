@@ -182,6 +182,9 @@ let rev_collect_indexed_signatures cctxt dac_sk_uris bytes_to_sign =
         sk_uri_opt)
     dac_sk_uris
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/5578
+     Check that computed witness field is correct with respect to signatures.
+*)
 let compute_signatures_with_witnesses rev_indexed_signatures =
   let open Lwt_result_syntax in
   List.fold_left_es

@@ -282,6 +282,8 @@ opam:octez-crawler:
   variables:
     package: octez-crawler
 
+# Ignoring unreleased package octez-dac-client.
+
 # Ignoring unreleased package octez-dac-node.
 
 # Ignoring unreleased package octez-dal-node.

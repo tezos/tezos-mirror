@@ -54,7 +54,7 @@ __pycache__
 /octez-evm-proxy-server
 /tezos-dal-node
 /octez-dal-node
-/octez-dac-node
+/octez-dac-*
 /octez-binaries
 
 /src/proto_*/parameters/*-parameters.json
