@@ -2624,7 +2624,8 @@ end
 
 (** This module re-exports definitions from {!Delegate_storage},
    {!Delegate_consensus_key}, {!Delegate_missed_endorsements_storage},
-   {!Delegate_slashed_deposits_storage}, {!Delegate_cycles}. *)
+   {!Delegate_slashed_deposits_storage}, {!Delegate_cycles},
+   {!Delegate_rewards}. *)
 module Delegate : sig
   val check_not_tz4 : Signature.public_key_hash -> unit tzresult
 
@@ -2739,6 +2740,18 @@ module Delegate : sig
 
   (** See {!Stake_storage.prepare_stake_distribution}. *)
   val prepare_stake_distribution : context -> context tzresult Lwt.t
+
+  module Rewards : sig
+    val baking_reward_fixed_portion : t -> Tez.t
+
+    val baking_reward_bonus_per_slot : t -> Tez.t
+
+    val endorsing_reward_per_slot : t -> Tez.t
+
+    val liquidity_baking_subsidy : t -> Tez.t
+
+    val seed_nonce_revelation_tip : t -> Tez.t
+  end
 end
 
 (** This module re-exports definitions from {!Voting_period_repr} and
