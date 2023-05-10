@@ -379,7 +379,11 @@ end
 
 let default_subsidy =
   let open Tezos_protocol_alpha_parameters in
-  Tez.to_mutez @@ Default_parameters.constants_test.liquidity_baking_subsidy
+  let c = Default_parameters.constants_test in
+  Tez.to_mutez
+  @@ Delegate.Rewards.Internal_for_tests.reward_from_constants
+       ~csts:c
+       ~reward_kind:Liquidity_baking_subsidy
 
 let security_deposit = 640_000_000L
 
@@ -853,20 +857,35 @@ module ConcreteBaseMachine :
     bake ~invariant ~baker:env.holder [op2] env state
 
   let init ~invariant ?subsidy accounts_balances =
-    let liquidity_baking_subsidy = Option.map Tez.of_mutez_exn subsidy in
+    let liquidity_baking_subsidy =
+      Option.value ~default:default_subsidy subsidy |> Tez.of_mutez_exn
+    in
+    let block_delay =
+      Period.to_seconds
+        Tezos_protocol_alpha_parameters.Default_parameters.constants_test
+          .minimal_block_delay
+      |> Int64.to_int
+    in
     let n, bootstrap_balances = initial_xtz_repartition accounts_balances in
     Context.init_n
       n
       ~consensus_threshold:0
       ~bootstrap_balances
       ~cost_per_byte:Tez.zero
-      ~endorsing_reward_per_slot:Tez.zero
-      ~baking_reward_bonus_per_slot:Tez.zero
-      ~baking_reward_fixed_portion:Tez.zero
+      ~reward_weights:
+        {
+          base_total_rewards_per_minute =
+            Tez.(div_exn (mul_exn liquidity_baking_subsidy 60) block_delay);
+          endorsing_reward_weight = 0;
+          baking_reward_fixed_portion_weight = 0;
+          baking_reward_bonus_weight = 0;
+          seed_nonce_revelation_tip_weight = 0;
+          vdf_revelation_tip_weight = 0;
+          liquidity_baking_subsidy_weight = 1;
+        }
       ~origination_size:0
       ~blocks_per_cycle:10_000l
       ~cycles_per_voting_period:1l
-      ?liquidity_baking_subsidy
       ()
     >>= function
     | blk, holder :: accounts ->

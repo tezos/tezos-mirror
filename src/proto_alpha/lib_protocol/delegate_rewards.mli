@@ -37,3 +37,16 @@ val seed_nonce_revelation_tip : Raw_context.t -> Tez_repr.t
 
 val vdf_revelation_tip : Raw_context.t -> Tez_repr.t
 
+(* For testing purposes *)
+module Internal_for_tests : sig
+  type reward_kind =
+    | Baking_reward_fixed_portion
+    | Baking_reward_bonus_per_slot
+    | Endorsing_reward_per_slot
+    | Liquidity_baking_subsidy
+    | Seed_nonce_revelation_tip
+    | Vdf_revelation_tip
+
+  val reward_from_constants :
+    csts:Constants_parametric_repr.t -> reward_kind:reward_kind -> Tez_repr.t
+end

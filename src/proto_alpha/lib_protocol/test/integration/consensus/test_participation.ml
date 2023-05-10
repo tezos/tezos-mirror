@@ -137,10 +137,13 @@ let test_participation_rpc () =
     expected_cycle_activity * numerator / denominator
   in
   let allowed_missed_slots = expected_cycle_activity - minimal_cycle_activity in
+  let endorsing_reward_per_slot =
+    Alpha_context.Delegate.Rewards.Internal_for_tests.reward_from_constants
+      ~csts:csts.parametric
+      ~reward_kind:Endorsing_reward_per_slot
+  in
   let expected_endorsing_rewards =
-    Tez.mul_exn
-      csts.parametric.endorsing_reward_per_slot
-      expected_cycle_activity
+    Tez.mul_exn endorsing_reward_per_slot expected_cycle_activity
   in
   Block.bake ~policy:(By_account del1) b0 >>=? fun b1 ->
   List.fold_left_es

@@ -311,8 +311,8 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
     ()
   >>=? fun (b0, (account1, _account2)) ->
   let pkh1 = Context.Contract.pkh account1 in
-  Context.get_constants (B b0)
-  >>=? fun Constants.{parametric = {baking_reward_fixed_portion; _}; _} ->
+  Context.get_baking_reward_fixed_portion (B b0)
+  >>=? fun baking_reward_fixed_portion ->
   Block.bake ~policy:(By_account pkh1) b0 >>= fun b1 ->
   if has_active_stake then
     b1 >>?= fun b1 ->

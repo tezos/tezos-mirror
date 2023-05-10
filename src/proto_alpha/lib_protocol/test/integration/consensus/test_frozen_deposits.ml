@@ -38,9 +38,11 @@ open Test_tez
 let constants =
   {
     Default_parameters.constants_test with
-    endorsing_reward_per_slot = Tez.zero;
-    baking_reward_bonus_per_slot = Tez.zero;
-    baking_reward_fixed_portion = Tez.zero;
+    reward_weights =
+      {
+        Default_parameters.constants_test.reward_weights with
+        base_total_rewards_per_minute = Tez.zero;
+      };
     consensus_threshold = 0;
     origination_size = 0;
   }

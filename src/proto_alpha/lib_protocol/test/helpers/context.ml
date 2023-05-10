@@ -203,34 +203,57 @@ let default_test_constants =
   Tezos_protocol_alpha_parameters.Default_parameters.constants_test
 
 let get_baking_reward_fixed_portion ctxt =
-  get_constants ctxt
-  >>=? fun {Constants.parametric = {baking_reward_fixed_portion; _}; _} ->
-  return baking_reward_fixed_portion
+  get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
+  return
+    (Delegate.Rewards.Internal_for_tests.reward_from_constants
+       ~csts
+       ~reward_kind:Baking_reward_fixed_portion)
 
 let get_bonus_reward ctxt ~endorsing_power =
   get_constants ctxt
-  >>=? fun {
-             Constants.parametric =
-               {baking_reward_bonus_per_slot; consensus_threshold; _};
-             _;
-           } ->
+  >>=? fun {Constants.parametric = {consensus_threshold; _} as csts; _} ->
+  let baking_reward_bonus_per_slot =
+    Delegate.Rewards.Internal_for_tests.reward_from_constants
+      ~csts
+      ~reward_kind:Baking_reward_bonus_per_slot
+  in
   let multiplier = max 0 (endorsing_power - consensus_threshold) in
   return Test_tez.(baking_reward_bonus_per_slot *! Int64.of_int multiplier)
 
 let get_endorsing_reward ctxt ~expected_endorsing_power =
-  get_constants ctxt
-  >>=? fun {Constants.parametric = {endorsing_reward_per_slot; _}; _} ->
+  get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
+  let endorsing_reward_per_slot =
+    Delegate.Rewards.Internal_for_tests.reward_from_constants
+      ~csts
+      ~reward_kind:Endorsing_reward_per_slot
+  in
   Lwt.return
     (Environment.wrap_tzresult
        Tez.(endorsing_reward_per_slot *? Int64.of_int expected_endorsing_power))
 
 let get_liquidity_baking_subsidy ctxt =
-  get_constants ctxt
-  >>=? fun {Constants.parametric = {liquidity_baking_subsidy; _}; _} ->
-  return liquidity_baking_subsidy
+  get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
+  return
+    (Delegate.Rewards.Internal_for_tests.reward_from_constants
+       ~csts
+       ~reward_kind:Liquidity_baking_subsidy)
 
 let get_liquidity_baking_cpmm_address ctxt =
   Alpha_services.Liquidity_baking.get_cpmm_address rpc_ctxt ctxt
+
+let get_seed_nonce_revelation_tip ctxt =
+  get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
+  return
+    (Delegate.Rewards.Internal_for_tests.reward_from_constants
+       ~csts
+       ~reward_kind:Seed_nonce_revelation_tip)
+
+let get_vdf_revelation_tip ctxt =
+  get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
+  return
+    (Delegate.Rewards.Internal_for_tests.reward_from_constants
+       ~csts
+       ~reward_kind:Vdf_revelation_tip)
 
 (* Voting *)
 
@@ -459,12 +482,10 @@ let tup_get : type a r. (a, r) tup -> a list -> r =
 let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?bootstrap_delegations ?bootstrap_consensus_keys ?consensus_threshold
     ?min_proposal_quorum ?bootstrap_contracts ?level ?cost_per_byte
-    ?liquidity_baking_subsidy ?endorsing_reward_per_slot
-    ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
-    ?blocks_per_cycle ?cycles_per_voting_period ?sc_rollup_enable
-    ?sc_rollup_arith_pvm_enable ?dal_enable ?zk_rollup_enable
-    ?adaptive_inflation_enable ?hard_gas_limit_per_block
-    ?nonce_revelation_threshold () =
+    ?reward_weights ?origination_size ?blocks_per_cycle
+    ?cycles_per_voting_period ?sc_rollup_enable ?sc_rollup_arith_pvm_enable
+    ?dal_enable ?zk_rollup_enable ?adaptive_inflation_enable
+    ?hard_gas_limit_per_block ?nonce_revelation_threshold () =
   let n = tup_n tup in
   Account.generate_accounts ?rng_state n >>?= fun accounts ->
   let contracts =
@@ -484,10 +505,7 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?bootstrap_contracts
     ?level
     ?cost_per_byte
-    ?liquidity_baking_subsidy
-    ?endorsing_reward_per_slot
-    ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion
+    ?reward_weights
     ?origination_size
     ?blocks_per_cycle
     ?cycles_per_voting_period

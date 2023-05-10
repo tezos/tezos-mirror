@@ -205,12 +205,9 @@ let test_valid_double_endorsing_followed_by_double_baking () =
 let test_payload_producer_gets_evidence_rewards () =
   Context.init_n ~consensus_threshold:0 10 () >>=? fun (genesis, contracts) ->
   Context.get_constants (B genesis)
-  >>=? fun Constants.
-             {
-               parametric =
-                 {double_baking_punishment; baking_reward_fixed_portion; _};
-               _;
-             } ->
+  >>=? fun Constants.{parametric = {double_baking_punishment; _}; _} ->
+  Context.get_baking_reward_fixed_portion (B genesis)
+  >>=? fun baking_reward_fixed_portion ->
   Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
   let c1_c2 =
     match contracts with c1 :: c2 :: _ -> (c1, c2) | _ -> assert false

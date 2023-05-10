@@ -126,12 +126,12 @@ let test_revelation_early_wrong_right_twice () =
   let open Assert in
   let* b, _contracts = Context.init_n ~consensus_threshold:0 5 () in
   let* csts = Context.get_constants (B b) in
-  let tip = csts.parametric.seed_nonce_revelation_tip in
+  let* tip = Context.get_seed_nonce_revelation_tip (B b) in
   let blocks_per_commitment =
     Int32.to_int csts.parametric.blocks_per_commitment
   in
-  let baking_reward_fixed_portion =
-    csts.parametric.baking_reward_fixed_portion
+  let* baking_reward_fixed_portion =
+    Context.get_baking_reward_fixed_portion (B b)
   in
   (* get the pkh of a baker *)
   let* pkh, _, _, _ = Block.get_next_baker b in
@@ -287,10 +287,16 @@ let test_unrevealed () =
   let constants =
     {
       Default_parameters.constants_test with
-      endorsing_reward_per_slot = Tez.one_mutez;
-      baking_reward_bonus_per_slot = Tez.zero;
-      baking_reward_fixed_portion = Tez.zero;
-      seed_nonce_revelation_tip = Tez.zero;
+      reward_weights =
+        {
+          base_total_rewards_per_minute = Tez.one;
+          endorsing_reward_weight = 1;
+          baking_reward_bonus_weight = 0;
+          baking_reward_fixed_portion_weight = 0;
+          seed_nonce_revelation_tip_weight = 0;
+          vdf_revelation_tip_weight = 0;
+          liquidity_baking_subsidy_weight = 0;
+        };
       consensus_threshold = 0;
       minimal_participation_ratio = Ratio.{numerator = 0; denominator = 1};
     }
@@ -372,11 +378,13 @@ let test_early_incorrect_unverified_correct_already_vdf () =
   let nonce_revelation_threshold =
     Int32.to_int csts.parametric.nonce_revelation_threshold
   in
-  let baking_reward_fixed_portion =
-    csts.parametric.baking_reward_fixed_portion
+  let* baking_reward_fixed_portion =
+    Context.get_baking_reward_fixed_portion (B b)
   in
-  let seed_nonce_revelation_tip = csts.parametric.seed_nonce_revelation_tip in
-  let vdf_nonce_revelation_tip = csts.parametric.seed_nonce_revelation_tip in
+  let* seed_nonce_revelation_tip =
+    Context.get_seed_nonce_revelation_tip (B b)
+  in
+  let* vdf_nonce_revelation_tip = Context.get_vdf_revelation_tip (B b) in
   (* get the pkh of a baker *)
   let* pkh, _, _, _ = Block.get_next_baker b in
   let id = Alpha_context.Contract.Implicit pkh in

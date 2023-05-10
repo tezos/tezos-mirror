@@ -259,9 +259,16 @@ let context_init_tup tup ?(blocks_per_cycle = 4l) =
     ~blocks_per_cycle
     ~cycles_per_voting_period:1l
     ~consensus_threshold:0
-    ~endorsing_reward_per_slot:Tez.zero
-    ~baking_reward_bonus_per_slot:Tez.zero
-    ~baking_reward_fixed_portion:Tez.zero
+    ~reward_weights:
+      {
+        base_total_rewards_per_minute = Tez.zero;
+        endorsing_reward_weight = 1;
+        baking_reward_bonus_weight = 1;
+        baking_reward_fixed_portion_weight = 1;
+        seed_nonce_revelation_tip_weight = 1;
+        vdf_revelation_tip_weight = 1;
+        liquidity_baking_subsidy_weight = 1;
+      }
     ~nonce_revelation_threshold:2l
 
 (** [context_init n ()] returns [(block, contracts)] where [block] is

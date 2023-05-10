@@ -485,12 +485,10 @@ let validate_bootstrap_accounts
     (function Exit -> return_unit | exc -> raise exc)
 
 let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
-    ?level ?cost_per_byte ?liquidity_baking_subsidy ?endorsing_reward_per_slot
-    ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
-    ?blocks_per_cycle ?cycles_per_voting_period ?sc_rollup_enable
-    ?sc_rollup_arith_pvm_enable ?dal_enable ?zk_rollup_enable
-    ?adaptive_inflation_enable ?hard_gas_limit_per_block
-    ?nonce_revelation_threshold () =
+    ?level ?cost_per_byte ?reward_weights ?origination_size ?blocks_per_cycle
+    ?cycles_per_voting_period ?sc_rollup_enable ?sc_rollup_arith_pvm_enable
+    ?dal_enable ?zk_rollup_enable ?adaptive_inflation_enable
+    ?hard_gas_limit_per_block ?nonce_revelation_threshold () =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
   let min_proposal_quorum =
@@ -499,25 +497,8 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
   let cost_per_byte =
     Option.value ~default:constants.cost_per_byte cost_per_byte
   in
-  let liquidity_baking_subsidy =
-    Option.value
-      ~default:constants.liquidity_baking_subsidy
-      liquidity_baking_subsidy
-  in
-  let endorsing_reward_per_slot =
-    Option.value
-      ~default:constants.endorsing_reward_per_slot
-      endorsing_reward_per_slot
-  in
-  let baking_reward_bonus_per_slot =
-    Option.value
-      ~default:constants.baking_reward_bonus_per_slot
-      baking_reward_bonus_per_slot
-  in
-  let baking_reward_fixed_portion =
-    Option.value
-      ~default:constants.baking_reward_fixed_portion
-      baking_reward_fixed_portion
+  let reward_weights =
+    Option.value ~default:constants.reward_weights reward_weights
   in
   let origination_size =
     Option.value ~default:constants.origination_size origination_size
@@ -563,15 +544,12 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
   let constants =
     {
       constants with
-      endorsing_reward_per_slot;
-      baking_reward_bonus_per_slot;
-      baking_reward_fixed_portion;
+      reward_weights;
       origination_size;
       blocks_per_cycle;
       cycles_per_voting_period;
       min_proposal_quorum;
       cost_per_byte;
-      liquidity_baking_subsidy;
       consensus_threshold;
       tx_rollup = constants.tx_rollup;
       sc_rollup =
@@ -613,22 +591,18 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
 (* if no parameter file is passed we check in the current directory
    where the test is run *)
 let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
-    ?bootstrap_contracts ?level ?cost_per_byte ?liquidity_baking_subsidy
-    ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
-    ?cycles_per_voting_period ?sc_rollup_enable ?sc_rollup_arith_pvm_enable
-    ?dal_enable ?zk_rollup_enable ?hard_gas_limit_per_block
-    ?adaptive_inflation_enable ?nonce_revelation_threshold
+    ?bootstrap_contracts ?level ?cost_per_byte ?reward_weights ?origination_size
+    ?blocks_per_cycle ?cycles_per_voting_period ?sc_rollup_enable
+    ?sc_rollup_arith_pvm_enable ?dal_enable ?zk_rollup_enable
+    ?hard_gas_limit_per_block ?adaptive_inflation_enable
+    ?nonce_revelation_threshold
     (bootstrap_accounts : Parameters.bootstrap_account list) =
   prepare_initial_context_params
     ?consensus_threshold
     ?min_proposal_quorum
     ?level
     ?cost_per_byte
-    ?liquidity_baking_subsidy
-    ?endorsing_reward_per_slot
-    ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion
+    ?reward_weights
     ?origination_size
     ?blocks_per_cycle
     ?cycles_per_voting_period

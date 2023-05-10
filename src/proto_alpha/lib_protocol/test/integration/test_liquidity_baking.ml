@@ -293,8 +293,7 @@ let liquidity_baking_storage n () =
 let liquidity_baking_balance_update () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
-  Context.get_constants (B blk) >>=? fun csts ->
-  let subsidy = csts.parametric.liquidity_baking_subsidy in
+  Context.get_liquidity_baking_subsidy (B blk) >>=? fun subsidy ->
   Block.bake_n_with_all_balance_updates 128 blk
   >>=? fun (_blk, balance_updates) ->
   let liquidity_baking_updates =
