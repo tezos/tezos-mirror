@@ -46,7 +46,7 @@ val get_preimage :
   #cctxt -> page_hash:Dac_plugin.raw_hash -> bytes tzresult Lwt.t
 
 (** [post_store_preimage cctxt ~payload ~pagination_scheme] posts a [payload] to dac/store_preimage
-    using a given [pagination_scheme]. It returns the base58 encoded root page hash
+    using a given [pagination_scheme]. It returns the hex encoded root page hash
     and the raw bytes. *)
 val post_store_preimage :
   #cctxt ->
@@ -90,4 +90,11 @@ module Coordinator : sig
   the subscribed DAC Members and Observers. *)
   val post_preimage :
     #cctxt -> payload:bytes -> Dac_plugin.raw_hash tzresult Lwt.t
+end
+
+module Observer : sig
+  (** [get_missing_page plugin cctxt page_hash] notifies an [Observer] that a
+      page hash must be downloaded. This function returns the preimage of the
+      requested [page_hash]. *)
+  val get_missing_page : #cctxt -> Dac_plugin.raw_hash -> bytes tzresult Lwt.t
 end

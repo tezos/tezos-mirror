@@ -76,3 +76,8 @@ module Coordinator = struct
   let post_preimage (cctxt : #cctxt) ~payload =
     cctxt#call_service RPC_services.Coordinator.post_preimage () () payload
 end
+
+module Observer = struct
+  let get_missing_page (cctxt : #cctxt) page_hash =
+    cctxt#call_service RPC_services.get_missing_page ((), page_hash) () ()
+end

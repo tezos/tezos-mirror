@@ -29,7 +29,7 @@
 val get_preimage : string -> (Dac_node.t, string) RPC_core.t
 
 (** [post_store_preimage cctxt ~payload ~pagination_scheme] posts a [payload] to dac/store_preimage 
-    using a given [pagination_scheme]. It returns the base58 encoded root page hash 
+    using a given [pagination_scheme]. It returns the hex encoded root page hash 
     and the raw bytes that can be used as contents of a rollup message to trigger the request of
     the payload in a WASM rollup. *)
 val post_store_preimage :
