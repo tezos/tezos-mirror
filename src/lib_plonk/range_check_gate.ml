@@ -42,6 +42,9 @@
 open Bls
 open Utils
 open Identities
+module L = Plompiler.LibCircuit
+
+type s_repr = L.scalar L.repr
 
 module type S = sig
   module PP : Polynomial_protocol.S
@@ -116,6 +119,23 @@ module type S = sig
     generator:Scalar.t ->
     unit ->
     verifier_identities
+
+  val cs :
+    lnin1:s_repr ->
+    pnin1:s_repr ->
+    z_list:s_repr list ->
+    zg_list:s_repr list ->
+    wire_list:s_repr list ->
+    sum_alpha_i:(s_repr list -> s_repr -> s_repr L.t) ->
+    l1:s_repr ->
+    ss_list:s_repr list ->
+    beta:s_repr ->
+    gamma:s_repr ->
+    delta:s_repr ->
+    x:s_repr ->
+    z_perm:s_repr ->
+    zg_perm:s_repr ->
+    (string * s_repr) list L.t
 end
 
 module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
@@ -123,9 +143,9 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
 
   exception Too_many_checks of string
 
-  let lnin1 = "Lni_plus_n_minus_1"
+  let lnin1 = "Lnin1"
 
-  let pnin1 = "Pni_plus_n_minus_1"
+  let pnin1 = "Pnin1"
 
   let z_name = "RC_Z"
 
@@ -257,7 +277,20 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
         x
         answers
 
-    let cs = Perm.cs
+    let cs ~sum_alpha_i ~l1 ~ss_list ~beta ~gamma ~delta ~x ~z ~zg ~wires () =
+      Perm.cs
+        ~external_prefix
+        ~sum_alpha_i
+        ~l1
+        ~ss_list
+        ~beta
+        ~gamma
+        ~delta
+        ~x
+        ~z
+        ~zg
+        ~wires
+        ()
   end
 
   module RangeChecks = struct
@@ -408,8 +441,8 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
       SMap.of_list
         [(prefix "RC.a", identity_rca); (prefix "RC.b", identity_rcb)]
 
-    let cs ~lnin1 ~pnin1 ~z ~zg =
-      let open Plompiler.LibCircuit in
+    let cs ~prefix ~lnin1 ~pnin1 ~z ~zg =
+      let open L in
       let* one_m_z = Num.custom ~ql:mone ~qc:one z z in
       let* id_a = Num.mul_list (to_list [z; one_m_z; lnin1]) in
       let* id_b =
@@ -417,7 +450,7 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
         let* one_m_z_p_2zg = Num.add one_m_z ~qr:two zg in
         Num.mul_list (to_list [z_m_2zg; one_m_z_p_2zg; pnin1])
       in
-      ret (id_a, id_b)
+      ret [(prefix "RC.a", id_a); (prefix "RC.b", id_b)]
   end
 
   let preprocessing ~permutation ~range_checks ~domain =
@@ -439,9 +472,44 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
 
   let verifier_identities_2 = Permutation.verifier_identities
 
-  let cs_1 = RangeChecks.cs
-
-  let cs_2 = Permutation.cs
+  let cs ~lnin1 ~pnin1 ~z_list ~zg_list ~wire_list ~sum_alpha_i ~l1 ~ss_list
+      ~beta ~gamma ~delta ~x ~z_perm ~zg_perm =
+    let open L in
+    let* rc =
+      let n = List.length z_list in
+      let i = ref (-1) in
+      (* RC’s cs for all proofs *)
+      let* rc =
+        map2M
+          (fun z zg ->
+            incr i ;
+            RangeChecks.cs
+              ~prefix:(SMap.Aggregation.add_prefix ~n ~i:!i "")
+              ~lnin1
+              ~pnin1
+              ~z
+              ~zg)
+          z_list
+          zg_list
+      in
+      ret (List.concat rc)
+    in
+    let wires = List.map2 (fun z w -> [z; w]) z_list wire_list in
+    let* perm =
+      Permutation.cs
+        ~sum_alpha_i
+        ~l1
+        ~ss_list
+        ~beta
+        ~gamma
+        ~delta
+        ~x
+        ~z:z_perm
+        ~zg:zg_perm
+        ~wires
+        ()
+    in
+    ret (rc @ perm)
 end
 
 module Range_check_gate (PP : Polynomial_protocol.S) : S with module PP = PP =

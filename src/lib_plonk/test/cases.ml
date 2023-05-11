@@ -427,7 +427,7 @@ end
 module Range_Checks = struct
   open General
 
-  let public_input_size = General.circuit.public_input_size
+  let public_input_size = 0
 
   let valid =
     let name = "RC_single_valid" in

@@ -29,7 +29,9 @@ module External = struct
   open Aplonk.Pi_parameters
 
   let no_pi_cases =
-    Cases.Unit_tests_for_each_selector.list @ [Cases.General.no_public_inputs]
+    Cases.Unit_tests_for_each_selector.list
+    @ [Cases.General.no_public_inputs]
+    @ Cases.Range_Checks.list
 
   let one_pi_cases =
     Cases.General_circuits.list @ Cases.General.list_one_public_input

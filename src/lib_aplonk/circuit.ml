@@ -38,6 +38,7 @@ let map_end f l =
 module V (Main : Aggregation.Main_protocol.S) = struct
   module Gates = Main.Gates
   module Perm = Main.Perm
+  module RC = Main.RangeCheck
   module S = Plompiler.S
   open Plompiler.LibCircuit
 
@@ -61,6 +62,9 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       · z_list
      outer_pi is the list of public inputs that are public to aPlonK’s verifier
      inner_pi is the list of hidden public inputs that are not known from aPlonK’s verifier
+     rc_selectors are range checks dedicated selectors lnin1, pnin1, RC_ss1 & RC_ss2
+     z_rc is the list of Range checks’ Z proof polynomials evaluations for each proof
+     z_rc_perm & z_rc_perm are Range checks’ permutation polynomial evaluation for X and gX. Note that the list must be at most of size 1 (1 permutation polynomial per circuit). We use lists here in order make handling in plompiler easier.
   *)
   type circuit_inputs = {
     switches : bool Input.input list;
@@ -68,6 +72,8 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     alpha : scalar_input;
     beta : scalar_input;
     gamma : scalar_input;
+    beta_rc : scalar_input;
+    gamma_rc : scalar_input;
     delta : scalar_input;
     x : scalar_input;
     r : scalar_input;
@@ -81,12 +87,17 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     batch : scalar_input list;
     inner_pi : scalar_input list list;
     outer_pi : scalar_input list;
+    rc_selectors : scalar_input list;
+    zg_rc : scalar_input list;
+    z_rc : scalar_input list;
+    zg_rc_perm : scalar_input list;
+    z_rc_perm : scalar_input list;
   }
 
   let nb_batch gates = if Gates.exists_gx_composition ~gates then 5 else 4
 
   (* This inputs is given to the verification circuit when it’s created. The value of the dummy inputs is irrelevant, only their structures & sizes matter *)
-  let dummy_input gates nb_proofs nb_inner_pi nb_outer_pi =
+  let dummy_input range_checks gates nb_proofs nb_inner_pi nb_outer_pi =
     let switches = List.init nb_proofs (fun _ -> Input.bool true) in
     let dummy_input = Input.scalar S.one in
     let wires =
@@ -104,12 +115,23 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     let gates = SMap.of_list (List.map (fun g -> (g, ())) gates) in
     let batch = List.init (nb_batch gates) (fun _ -> dummy_input) in
     let wires_g = if nb_batch gates = nb_batch SMap.empty then [] else wires in
+    let z_rc, zg_rc, z_rc_perm, zg_rc_perm, rc_selectors =
+      if fst range_checks = [] then ([], [], [], [], [])
+      else
+        ( List.init nb_proofs (Fun.const dummy_input),
+          List.init nb_proofs (Fun.const dummy_input),
+          [dummy_input],
+          [dummy_input],
+          List.init 4 (Fun.const dummy_input) )
+    in
     {
       switches;
       compressed_switches = dummy_input;
       alpha = dummy_input;
       beta = dummy_input;
       gamma = dummy_input;
+      beta_rc = dummy_input;
+      gamma_rc = dummy_input;
       delta = dummy_input;
       x = dummy_input;
       r = dummy_input;
@@ -123,6 +145,11 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       batch;
       inner_pi;
       outer_pi;
+      rc_selectors;
+      zg_rc;
+      z_rc;
+      zg_rc_perm;
+      z_rc_perm;
     }
 
   module Constraints = struct
@@ -245,17 +272,19 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       >* equal compressed_switches sum
 
     (* Recomputes batches & compare them to claimed batches *)
-    let check_batch r (g_list, wires, wiresg, z, zg) batch =
+    let check_batch r (g_list, wires, wiresg, z_list, zg_list) batch =
       let wires = List.flatten wires in
       let wiresg = List.flatten wiresg in
       let* batch_g = sum_alpha_i g_list r in
       let* batch_wires = sum_alpha_i wires r in
+      let* batch_z = sum_alpha_i z_list r in
+      let* batch_zg = sum_alpha_i zg_list r in
       let g_exp = List.nth batch 0 in
       let zg_exp = List.nth batch 1 in
       let z_exp = List.nth batch 2 in
       let* g = equal batch_g g_exp in
-      let* z = equal z z_exp in
-      let* zg = equal zg zg_exp in
+      let* zg = equal batch_zg zg_exp in
+      let* z = equal batch_z z_exp in
       match wiresg with
       | [] ->
           let wires_exp = List.nth batch 3 in
@@ -302,9 +331,10 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     (* Verifies that the linear combination of identities with alpha is equal to T×Zs
        The identities are computed from evaluations, with the functions cs of Custom_gates & Permutation_gate
     *)
-    let check_identities ~switches (n, generator) x ids_batch
-        (q_names, selectors) (alpha, beta, gamma, delta) (wires_g, wires, zg, z)
-        ss_list pi_list_list =
+    let check_identities ~switches (n, generator) x ids_batch rc_selectors
+        (q_names, selectors) (alpha, beta, gamma, beta_rc, gamma_rc, delta)
+        (wires_g, wires, zg, z, zg_rc, z_rc, zg_rc_perm, z_rc_perm) ss_list
+        pi_list_list =
       (* We don’t care about wires_g value if it’s empty so we just take wires *)
       let wires_g = match wires_g with [] -> wires | w -> w in
       (* precompute some constant *)
@@ -362,37 +392,76 @@ module V (Main : Aggregation.Main_protocol.S) = struct
         Plonk.List.mapn add_circuits (pi_list :: monomials) |> mapM Fun.id
       in
       (* Using switched wires is enough for adapting the perm identity to the lower number of proof *)
-      let* perm_a, perm_b =
-        (Perm.cs ~sum_alpha_i ~l1 ~ss_list ~beta ~gamma ~delta ~x ~z ~zg) ~wires
+      let* perm_ids =
+        (Perm.cs ~sum_alpha_i ~l1 ~ss_list ~beta ~gamma ~delta ~x ~z ~zg)
+          ~wires
+          ()
       in
-      let perm_ids = [("Perm.a", perm_a); ("Perm.b", perm_b)] in
+      let* rc_ids =
+        match z_rc with
+        | [] -> ret []
+        | _ ->
+            let lnin1 = List.nth rc_selectors 0 in
+            let pnin1 = List.nth rc_selectors 1 in
+            let ss1 = List.nth rc_selectors 2 in
+            let ss2 = List.nth rc_selectors 3 in
+            (* todo compute batched wires outside of the permutation to unify a with the a of the perm *)
+            let wire_list = List.map List.hd wires in
+            RC.cs
+              ~lnin1
+              ~pnin1
+              ~z_list:z_rc
+              ~zg_list:zg_rc
+              ~wire_list
+              ~sum_alpha_i
+              ~l1
+              ~ss_list:[ss1; ss2]
+              ~beta:beta_rc
+              ~gamma:gamma_rc
+              ~delta
+              ~x
+              ~z_perm:(List.hd z_rc_perm)
+              ~zg_perm:(List.hd zg_rc_perm)
+      in
       let identities =
-        format_arith_ids arith_list @ format_custom_ids custom_ids @ perm_ids
+        format_arith_ids arith_list
+        @ format_custom_ids custom_ids
+        @ perm_ids @ rc_ids
         |> List.sort (fun (s, _) (s', _) -> String.compare s s')
         |> List.map snd
       in
-      (* Adapt the switches to match the identities *)
+      (* Adapt the switches to match the identities. Note that the way we
+         handle shifts here only works because the switches are of form [11…00] *)
       let id_switches =
-        let nb_ids_per_proof =
-          let nb_custom_ids =
-            List.(
-              hd custom_ids |> fold_left (fun acc l -> acc + length (snd l)) 0)
+        let for_each_proof =
+          let nb_ids_per_proof =
+            let nb_custom_ids =
+              List.(
+                hd custom_ids |> fold_left (fun acc l -> acc + length (snd l)) 0)
+            in
+            (* +1 for the arithmetic identity & + 2 for the range check id *)
+            match rc_ids with [] -> nb_custom_ids + 1 | _ -> nb_custom_ids + 3
           in
-          (* +1 for the arithmetic identity *)
-          nb_custom_ids + 1
+          List.concat_map
+            (fun b -> List.init nb_ids_per_proof (Fun.const b))
+            switches
         in
-        (* [true ; true] is added for the permutation identities *)
-        (List.map (fun b -> List.init nb_ids_per_proof (Fun.const b)) switches
-        |> List.flatten)
-        @ [t; t]
+        (* [true ; true] is added for the permutation identities, &
+           [true ; true] is added for the RC permutation identities *)
+        let for_whole_circuit =
+          match rc_ids with [] -> [t; t] | _ -> [t; t; t; t]
+        in
+        for_each_proof @ for_whole_circuit
       in
       let* sum_id = sum_alpha_i_switched id_switches identities alpha in
       equal sum_id ids_batch
   end
 
   (* number of public inputs in the verification circuit added by meta; circuit
-     public inputs will be considered later (when their amount is known) *)
-  let meta_public_input_size gates = 8 + nb_batch gates
+        public inputs will be considered later (when their amount is known)
+        The 10 public_inputs are : fiat shamir randomness (alpha, beta, gamma,
+     beta_rc, gamma_rc, delta, x, r), ids_batch & compressed_switch *)
+  let meta_public_input_size gates = 10 + nb_batch gates
 
   let nb_answers nb_proofs gates =
     (* Sσ₁ + Sσ₂ + Sσ₃ + Sσ₄ + Sσ₅ + selectors *)
@@ -457,12 +526,13 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     List.for_all2 Scalar.( = ) given computed
 
   (* Format verification circuit public inputs *)
-  let aggreg_public_inputs pi_size (alpha, beta, gamma, delta, x, r) batch
-      ids_batch compressed_switches outer_pi =
+  let aggreg_public_inputs pi_size
+      (alpha, beta, gamma, beta_rc, gamma_rc, delta, x, r) batch ids_batch
+      compressed_switches outer_pi =
     let batch = List.concat_map SMap.values batch |> List.map fst in
     let public_input =
       Array.of_list
-        ([alpha; beta; gamma; delta; x; r]
+        ([alpha; beta; gamma; beta_rc; gamma_rc; delta; x; r]
         @ batch
         @ [ids_batch; compressed_switches]
         @ outer_pi)
@@ -510,7 +580,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     let public =
       aggreg_public_inputs
         pi_size
-        (p.alpha, p.beta, p.gamma, p.delta, p.x, p.r)
+        (p.alpha, p.beta, p.gamma, p.beta_rc, p.gamma_rc, p.delta, p.x, p.r)
         batch
         ids_batch
         compressed_switches
@@ -557,6 +627,8 @@ module V (Main : Aggregation.Main_protocol.S) = struct
         alpha;
         beta;
         gamma;
+        beta_rc;
+        gamma_rc;
         delta;
         x;
         r;
@@ -570,6 +642,11 @@ module V (Main : Aggregation.Main_protocol.S) = struct
         batch;
         outer_pi;
         inner_pi;
+        rc_selectors;
+        zg_rc;
+        z_rc;
+        zg_rc_perm;
+        z_rc_perm;
       } =
     let n = S.of_int n in
     (* input selectors in the same order they are given *)
@@ -580,15 +657,45 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       |: Input.list (List.map Input.list inner_pi)
       |> end_input_com
     in
-    let* ss_list, selectors, zg, z, wires_g, wires =
-      begin_input_com (fun ss_list selectors zg z wires_g wires ->
-          ( of_list ss_list,
+    let* ( rc_selectors,
+           ss_list,
+           selectors,
+           zg_rc_perm,
+           zg_rc,
+           zg,
+           z_rc_perm,
+           z_rc,
+           z,
+           wires_g,
+           wires ) =
+      begin_input_com
+        (fun
+          rc_selectors
+          ss_list
+          selectors
+          zg_rc_perm
+          zg_rc
+          zg
+          z_rc_perm
+          z_rc
+          z
+          wires_g
+          wires
+        ->
+          ( of_list rc_selectors,
+            ss_list,
             of_list selectors,
+            of_list zg_rc_perm,
+            of_list zg_rc,
             zg,
+            of_list z_rc_perm,
+            of_list z_rc,
             z,
             List.map of_list (of_list wires_g),
             List.map of_list (of_list wires) ))
-      |: Input.list ss_list |: Input.list selectors |: zg |: z
+      |: Input.list rc_selectors |: Input.list ss_list |: Input.list selectors
+      |: Input.list zg_rc_perm |: Input.list zg_rc |: zg |: Input.list z_rc_perm
+      |: Input.list z_rc |: z
       |: Input.list (List.map Input.list wires_g)
       |: Input.list (List.map Input.list wires)
       |> end_input_com
@@ -596,6 +703,8 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     let* alpha = input ~kind:`Public alpha in
     let* beta = input ~kind:`Public beta in
     let* gamma = input ~kind:`Public gamma in
+    let* beta_rc = input ~kind:`Public beta_rc in
+    let* gamma_rc = input ~kind:`Public gamma_rc in
     let* delta = input ~kind:`Public delta in
     let* x = input ~kind:`Public x in
     let* r = input ~kind:`Public r in
@@ -616,6 +725,8 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       Constraints.switch switches ~wires ~wires_g ~inner_pi
     in
 
+    let ss_list = of_list ss_list in
+
     let* check_switches =
       with_label ~label:"check_switches"
       @@ Constraints.check_switches compressed_switches switches
@@ -633,19 +744,29 @@ module V (Main : Aggregation.Main_protocol.S) = struct
            (n, generator)
            x
            ids_batch
+           rc_selectors
            (q_names, selectors)
-           (alpha, beta, gamma, delta)
-           (switched_wires_g, switched_wires, zg, z)
+           (alpha, beta, gamma, beta_rc, gamma_rc, delta)
+           ( switched_wires_g,
+             switched_wires,
+             zg,
+             z,
+             zg_rc,
+             z_rc,
+             zg_rc_perm,
+             z_rc_perm )
            ss_list
            switched_inner_pi
     in
     let* check_batch =
       with_label ~label:"check_batch"
       @@
-      let g_list = ss_list @ selectors in
+      let g_list = rc_selectors @ ss_list @ selectors in
+      let z_list = z_rc_perm @ z_rc @ [z] in
+      let zg_list = zg_rc_perm @ zg_rc @ [zg] in
       Constraints.check_batch
         r
-        (g_list, switched_wires, switched_wires_g, z, zg)
+        (g_list, switched_wires, switched_wires_g, z_list, zg_list)
         batch
     in
 
@@ -661,7 +782,9 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       check_pi =
     let gen, n = Main.get_gen_n_prover pp in
     let gates = Plonk.Circuit.get_selectors circuit in
-    let dummy_input = dummy_input gates nb_proofs nb_inner_pi nb_outer_pi in
+    let dummy_input =
+      dummy_input circuit.range_checks gates nb_proofs nb_inner_pi nb_outer_pi
+    in
     Plompiler.LibCircuit.get_cs
       (verification_circuit (gen, n) check_pi dummy_input)
 end
