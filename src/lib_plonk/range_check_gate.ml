@@ -56,17 +56,17 @@ module type S = sig
   val shared_z_names : string list
 
   val build_permutation :
-    range_checks:int list * int -> size_domain:int -> int array
+    range_checks:(int * int) list -> size_domain:int -> int array
 
   val preprocessing :
     permutation:int array ->
-    range_checks:'a list * int ->
+    range_checks:(int * int) list ->
     domain:Domain.t ->
     Poly.t SMap.t
 
   (* Builds the pure range check proof polynomials *)
   val f_map_contribution_1 :
-    range_checks:int list * int ->
+    range_checks:(int * int) list ->
     domain:Domain.t ->
     values:Evaluations.t SMap.t ->
     Evaluations.t * Poly.t SMap.t
@@ -168,44 +168,49 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
 
   let mone, mtwo = Scalar.(negate one, negate two)
 
-  (* This function returns the index of the first occurence of [x] in [l].
-     If [l] does not contain [x], -1 is returned. *)
-  let find l x =
-    let rec aux i = function
-      | [] -> -1
-      | h :: t -> if x = h then i else aux (i + 1) t
-    in
-    aux 0 l
-
-  (* Build the permutation such that nj <-> N + i_j for n = [up_bound],
+  (* Build the permutation such that (n₀ + … + n_{j - 1}) <-> N + i_j for ni = upperbounds,
      j < len([rc]), N = [size_domain], i_j = index of the j-th range check in
-     [rc]
+     [range_checks]
      Note that identities and Z building must consider the polynomials in the
      order imposed by this permutation, which stands for the order Z_RC — Wire.
   *)
-  let build_permutation ~range_checks:(rc, up_bound) ~size_domain =
-    let get_safe l i =
-      try size_domain + List.nth l (i / up_bound) with _ -> i
-    in
-    if rc = [] then [||]
+  let build_permutation ~range_checks ~size_domain =
+    if range_checks = [] then [||]
     else
-      let fst =
-        Array.init size_domain (fun i ->
+      let fst_part =
+        (* the first element is the sum of upperbounds until an index represented
+           by the second element *)
+        let sum_n = ref (0, 0) in
+        let get_safe l j =
+          try
+            let i, n = List.nth l (snd !sum_n) in
+            sum_n := (fst !sum_n + n, snd !sum_n + 1) ;
+            size_domain + i
+          with _ -> j
+        in
+        Array.init size_domain (fun j ->
             (* if we are at a range check index i then the permutation goes on
                the corresponding index in the range check list ; if there is no
                more index in the range check list, or if we are not at a range
                check index, i is a fix point of the permutation
             *)
-            if i mod up_bound = 0 then get_safe rc i else i)
+            if j = fst !sum_n then get_safe range_checks j else j)
       in
-      let snd =
-        Array.init size_domain (fun i ->
+      let snd_part =
+        (* we just keep the first argument of sum_n, the second one is now useless *)
+        let sum_n = ref 0 in
+        Array.init size_domain (fun j ->
             (* if i is not a index of the range check list then it’s a fix point,
                else it goes on on index of the corresponding range check ;
                this piece is the mirror of the preceeding one *)
-            match find rc i with -1 -> size_domain + i | j -> j * up_bound)
+            match List.assoc_opt j range_checks with
+            | None -> size_domain + j
+            | Some n ->
+                let res = !sum_n in
+                sum_n := res + n ;
+                res)
       in
-      Array.append fst snd
+      Array.append fst_part snd_part
 
   (* We have to make sure we consider the values we give to Perm functions
      in the same order as the permutation we build ; the current permutation
@@ -294,45 +299,35 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
   end
 
   module RangeChecks = struct
-    let assert_not_too_many_checks k nb =
-      if k < nb then
-        raise
-          (Too_many_checks
-             (Printf.sprintf "%d checks asked, %d checks expected" nb k))
-
-    let compute_pnin1 upper_bound domain domain_size =
-      let x_w i =
-        Poly.of_coefficients
-          [(one, 1); (Scalar.negate (Domain.get domain i), 0)]
-      in
-      let k = domain_size / upper_bound in
-      (* Computes product of (X-ω^(ni + n - 1)) from i = 1 to k *)
-      let rec aux res = function
-        | 0 -> res
-        | i -> aux (Poly.mul res (x_w ((upper_bound * i) - 1))) (i - 1)
-      in
-      aux Poly.one k
-
-    let preprocessing ~range_checks:(idx, upper_bound) ~domain =
-      if Z.(log2up (of_int upper_bound)) <> Z.(log2 (of_int upper_bound)) then
-        failwith "upper_bound must be a power of two." ;
-      if idx = [] then SMap.empty
+    let preprocessing ~range_checks ~domain =
+      if range_checks = [] then SMap.empty
       else
         let domain_size = Domain.length domain in
-        let lnin1_poly =
-          Array.init domain_size (fun i ->
-              if i mod upper_bound = upper_bound - 1 then one else zero)
+        let build_poly ~at_n ~default =
+          let a =
+            List.concat_map
+              (fun (_, n) ->
+                List.init n (fun i -> if i = n - 1 then at_n else default))
+              range_checks
+            |> Array.of_list
+          in
+          if domain_size < Array.length a then
+            raise
+              (Too_many_checks
+                 (Printf.sprintf
+                    "Range checks : sum of bounds (=%d) must be less than \
+                     domain size (=%d)"
+                    (Array.length a)
+                    domain_size)) ;
+          Array.(append a (init (domain_size - length a) (Fun.const zero)))
           |> Evaluations.interpolation_fft2 domain
         in
-        let pnin1_poly = compute_pnin1 upper_bound domain domain_size in
+        let lnin1_poly = build_poly ~at_n:one ~default:zero in
+        let pnin1_poly = build_poly ~at_n:zero ~default:one in
         SMap.of_list [(lnin1, lnin1_poly); (pnin1, pnin1_poly)]
 
-    let get_checks_from_wire k check_indices wire =
-      let checks = List.map (Evaluations.get wire) check_indices in
-      checks @ List.(init (k - length checks) (Fun.const Scalar.zero))
-
     (* compute the evaluations of the Z polynomial for a scalar [x] with the bound [up] *)
-    let partial_z up x =
+    let partial_z (x, up) =
       let x = Scalar.to_z x in
       let rec aux gwi = function
         | 1 -> gwi
@@ -343,30 +338,22 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
       let res = aux [x] up in
       res |> List.rev_map Scalar.of_z
 
-    let build_z_evals domain up k check_indices values =
-      let checks = get_checks_from_wire k check_indices values in
-      let all_evals = List.concat_map (partial_z up) checks |> Array.of_list in
-      let evals =
-        Array.(
-          append
-            all_evals
-            (init
-               (Domain.length domain - length all_evals)
-               (Fun.const Scalar.zero)))
-      in
-      Evaluations.of_array (Array.length evals - 1, evals)
-
-    let compute_Z domain up k check_indices values =
-      let evals = build_z_evals domain up k check_indices values in
-      (evals, Evaluations.interpolation_fft domain evals)
-
-    let f_map_contribution ~range_checks:(check_indices, upper_bound) ~domain
-        ~values =
+    let f_map_contribution ~range_checks ~domain ~values =
       let wire = SMap.find wire values in
-      let nb_range_checks = List.length check_indices in
-      let k = Domain.length domain / upper_bound in
-      assert_not_too_many_checks k nb_range_checks ;
-      let evals, z = compute_Z domain upper_bound k check_indices wire in
+      let evals =
+        let to_checks =
+          List.map (fun (i, n) -> (Evaluations.get wire i, n)) range_checks
+        in
+        let all_evals = List.concat_map partial_z to_checks |> Array.of_list in
+        let evals =
+          Array.(
+            append
+              all_evals
+              (init (Domain.length domain - length all_evals) (Fun.const zero)))
+        in
+        Evaluations.of_array (Array.length evals - 1, evals)
+      in
+      let z = Evaluations.interpolation_fft domain evals in
       (evals, SMap.of_list [(z_name, z)])
 
     let prover_identities ?(circuit_prefix = Fun.id) ~proof_prefix:prefix
@@ -379,7 +366,6 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
       let tmp2_evaluation = Evaluations.create z_evaluation_len in
       let idrca_evaluation = Evaluations.create z_evaluation_len in
       let idrcb_evaluation = Evaluations.create z_evaluation_len in
-
       (* Z × (1-Z) × Lnin1 *)
       let identity_rca =
         let lnin1_evaluation =
@@ -454,7 +440,7 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
   end
 
   let preprocessing ~permutation ~range_checks ~domain =
-    if fst range_checks = [] then SMap.empty
+    if range_checks = [] then SMap.empty
     else
       let rc = RangeChecks.preprocessing ~range_checks ~domain in
       let perm = Permutation.preprocessing ~permutation ~domain in

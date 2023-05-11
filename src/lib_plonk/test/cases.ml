@@ -436,7 +436,7 @@ module Range_Checks = struct
         ~wires
         ~gates
         ~public_input_size
-        ~range_checks:([4; 6], 4)
+        ~range_checks:[(4, 4); (6, 4)]
         ()
     in
     {name; circuit; witness; outcome = Valid}
@@ -448,7 +448,7 @@ module Range_Checks = struct
         ~wires
         ~gates
         ~public_input_size
-        ~range_checks:([1; 2], 2)
+        ~range_checks:[(1, 2); (2, 2); (6, 4)]
         ()
     in
     {name; circuit; witness; outcome = Valid}
@@ -460,12 +460,55 @@ module Range_Checks = struct
         ~wires
         ~gates
         ~public_input_size
-        ~range_checks:([1; 3; 4; 6], 2)
+        ~range_checks:[(1, 2); (3, 2); (4, 2); (6, 2)]
         ()
     in
     {name; circuit; witness; outcome = Proof_error}
 
-  let list = [valid; valid_bis; wrong]
+  let basic =
+    let circuit =
+      (* This circuit takes x₁ & x₂ (given as first elements of d & e) as inputs and
+         rangechecks the outputs x₁ + x₂ & 3×x₁ + x₂ given in a
+         in order to have enough constraints for the range check poly, we pad until
+         8 constraints
+      *)
+      let gates =
+        Circuit.make_gates
+          ~linear:
+            [
+              (0, ![-1; -1; 0; 0; 0; 0; 0; 0]);
+              (3, ![1; 3; 0; 0; 0; 0; 0; 0]);
+              (4, ![1; 1; 0; 0; 0; 0; 0; 0]);
+            ]
+          ()
+      in
+      let wires =
+        [|
+          [2; 3; 0; 0; 0; 0; 0; 0];
+          [0; 0; 0; 0; 0; 0; 0; 0];
+          [0; 0; 0; 0; 0; 0; 0; 0];
+          [0; 0; 0; 0; 0; 0; 0; 0];
+          [1; 1; 0; 0; 0; 0; 0; 0];
+        |]
+      in
+      Circuit.make
+        ~wires
+        ~gates
+        ~public_input_size:0
+        ~range_checks:[(0, 3); (1, 4)]
+        ()
+    in
+    let get_witness x1 x2 =
+      let x1 = Scalar.of_int x1 in
+      let x2 = Scalar.of_int x2 in
+      let x3 = Scalar.(x1 + x2) in
+      let x4 = Scalar.((of_int 3 * x1) + x2) in
+      [|x1; x2; x3; x4|]
+    in
+    let witness = get_witness 4 3 in
+    {name = "basic"; circuit; witness; outcome = Valid}
+
+  let list = [valid; valid_bis; wrong; basic]
 end
 
 module Big_circuit = struct

@@ -54,7 +54,7 @@ module Circuit : sig
     table_size : int;
     nb_lookups : int;
     ultra : bool;
-    range_checks : int list * int;
+    range_checks : (int * int) list;
   }
 
   val make_gates :
@@ -83,7 +83,7 @@ module Circuit : sig
     ?tables:Scalar.t array list list ->
     public_input_size:int ->
     ?input_com_sizes:int list ->
-    ?range_checks:int list * int ->
+    ?range_checks:(int * int) list ->
     unit ->
     t
 
@@ -99,7 +99,7 @@ module Circuit : sig
     public_input_size:int ->
     ?input_com_sizes:int list ->
     ?tables:Table.t list ->
-    ?range_checks:int list * int ->
+    ?range_checks:(int * int) list ->
     CS.t ->
     t
 end = struct
@@ -113,7 +113,7 @@ end = struct
     table_size : int;
     nb_lookups : int;
     ultra : bool;
-    range_checks : int list * int;
+    range_checks : (int * int) list;
   }
 
   let get_selectors circuit = SMap.keys circuit.gates
@@ -159,7 +159,7 @@ end = struct
      Wires and gates cannot be empty and must all have the same length.
   *)
   let make ~wires ~gates ?(tables = []) ~public_input_size
-      ?(input_com_sizes = []) ?(range_checks = ([], -1)) () =
+      ?(input_com_sizes = []) ?(range_checks = []) () =
     if Array.length wires = 0 then
       raise @@ Invalid_argument "Make Circuit: empty wires." ;
     if SMap.is_empty gates then
@@ -229,7 +229,7 @@ end = struct
     (* Check all range indexes are contained in the array *)
     let () =
       List.iter
-        (fun i ->
+        (fun (i, _) ->
           if
             List.exists
               (fun l -> i >= circuit_size + l + public_input_size)
@@ -238,7 +238,7 @@ end = struct
             raise
               (Invalid_argument
                  "Make Circuit: inconsistent range checks indices."))
-        (fst range_checks)
+        range_checks
     in
     let table_size =
       if tables = [] then 0
@@ -367,7 +367,7 @@ end = struct
     with Constraint_not_satisfied _ -> false
 
   let to_plonk ~public_input_size ?(input_com_sizes = []) ?(tables = [])
-      ?(range_checks = ([], -1)) cs =
+      ?(range_checks = []) cs =
     let open CS in
     let cs = List.rev Array.(to_list @@ concat cs) in
     assert (cs <> []) ;

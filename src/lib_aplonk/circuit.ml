@@ -116,7 +116,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     let batch = List.init (nb_batch gates) (fun _ -> dummy_input) in
     let wires_g = if nb_batch gates = nb_batch SMap.empty then [] else wires in
     let z_rc, zg_rc, z_rc_perm, zg_rc_perm, rc_selectors =
-      if fst range_checks = [] then ([], [], [], [], [])
+      if range_checks = [] then ([], [], [], [], [])
       else
         ( List.init nb_proofs (Fun.const dummy_input),
           List.init nb_proofs (Fun.const dummy_input),
