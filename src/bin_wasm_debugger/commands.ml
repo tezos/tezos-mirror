@@ -327,7 +327,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     let open Lwt_result_syntax in
     let return' ?(inboxes = inboxes) f =
       let* tree, count = f in
-      return (tree, count, inboxes)
+      return (tree, count, inboxes, level)
     in
     match step with
     | Tick -> return' (compute_step tree)
@@ -337,9 +337,9 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         let*! status = check_input_request tree in
         match status with
         | Ok () ->
-            let* tree, inboxes, count1 = load_inputs inboxes level tree in
-            let* tree, count2 = eval_until_input_requested config tree in
-            return (tree, Int64.(add (of_int32 count1) count2), inboxes)
+            let* tree, inboxes, level = load_inputs inboxes level tree in
+            let* tree, ticks = eval_until_input_requested config tree in
+            return (tree, ticks, inboxes, level)
         | Error _ -> return' (eval_until_input_requested config tree))
 
   let profile ~collapse level inboxes config extra tree =
@@ -380,10 +380,10 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
      prints the number of ticks elapsed and the new status. *)
   let step level inboxes config kind tree =
     let open Lwt_result_syntax in
-    let* tree, ticks, inboxes = eval level inboxes config kind tree in
+    let* tree, ticks, inboxes, level = eval level inboxes config kind tree in
     let*! () = Lwt_io.printf "Evaluation took %Ld ticks so far\n" ticks in
     let*! () = show_status tree in
-    return (tree, inboxes)
+    return (tree, inboxes, level)
 
   let bench config tree =
     let open Lwt_syntax in
@@ -698,9 +698,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
       | Show_status ->
           let*! () = show_status tree in
           return ()
-      | Step kind ->
-          let* tree, inboxes = step level inboxes config kind tree in
-          return ~tree ~inboxes ()
+      | Step kind -> step level inboxes config kind tree
       | Show_inbox ->
           let*! () = show_inbox tree in
           return ()
