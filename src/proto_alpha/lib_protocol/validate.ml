@@ -429,10 +429,8 @@ module Consensus = struct
   open Validate_errors.Consensus
 
   let check_frozen_deposits_are_positive ctxt delegate_pkh =
-    let open Lwt_result_syntax in
-    let* frozen_deposits = Delegate.frozen_deposits ctxt delegate_pkh in
-    fail_unless
-      Tez.(frozen_deposits.current_amount > zero)
+    fail_when
+      (Delegate.is_forbidden_delegate ctxt delegate_pkh)
       (Zero_frozen_deposits delegate_pkh)
 
   let get_delegate_details slot_map kind slot =
