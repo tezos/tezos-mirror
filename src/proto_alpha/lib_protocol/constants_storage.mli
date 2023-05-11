@@ -70,8 +70,6 @@ val liquidity_baking_toggle_ema_threshold : Raw_context.t -> int32
 
 val parametric : Raw_context.t -> Constants_parametric_repr.t
 
-val tx_rollup : Raw_context.t -> Constants_parametric_repr.tx_rollup
-
 val sc_rollup : Raw_context.t -> Constants_parametric_repr.sc_rollup
 
 val consensus_committee_size : Raw_context.t -> int
@@ -86,36 +84,6 @@ val delegation_over_baking_limit : Raw_context.t -> int
 
 val percentage_of_frozen_deposits_slashed_per_double_baking :
   Raw_context.t -> int
-
-val tx_rollup_enable : Raw_context.t -> bool
-
-val tx_rollup_origination_size : Raw_context.t -> int
-
-val tx_rollup_hard_size_limit_per_inbox : Raw_context.t -> int
-
-val tx_rollup_hard_size_limit_per_message : Raw_context.t -> int
-
-val tx_rollup_max_withdrawals_per_batch : Raw_context.t -> int
-
-val tx_rollup_commitment_bond : Raw_context.t -> Tez_repr.t
-
-val tx_rollup_finality_period : Raw_context.t -> int
-
-val tx_rollup_withdraw_period : Raw_context.t -> int
-
-val tx_rollup_max_inboxes_count : Raw_context.t -> int
-
-val tx_rollup_max_messages_per_inbox : Raw_context.t -> int
-
-val tx_rollup_max_commitments_count : Raw_context.t -> int
-
-val tx_rollup_cost_per_byte_ema_factor : Raw_context.t -> int
-
-val tx_rollup_max_ticket_payload_size : Raw_context.t -> int
-
-val tx_rollup_rejection_max_proof_size : Raw_context.t -> int
-
-val tx_rollup_sunset_level : Raw_context.t -> int32
 
 val percentage_of_frozen_deposits_slashed_per_double_endorsement :
   Raw_context.t -> int

@@ -558,7 +558,6 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       min_proposal_quorum;
       cost_per_byte;
       consensus_threshold;
-      tx_rollup = constants.tx_rollup;
       sc_rollup =
         {
           constants.sc_rollup with

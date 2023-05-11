@@ -36,55 +36,6 @@ type dal = {
 
 val dal_encoding : dal Data_encoding.t
 
-type tx_rollup = {
-  enable : bool;
-  origination_size : int;
-  (* the maximum amount of bytes messages can allocate in an inbox *)
-  hard_size_limit_per_inbox : int;
-  (* the maximum amount of bytes one batch can allocate in an inbox *)
-  hard_size_limit_per_message : int;
-  (* the amount of tez to bond a tx rollup commitment *)
-  commitment_bond : Tez_repr.t;
-  (* the number of blocks before a tx rollup block is final *)
-  finality_period : int;
-  (* the maximum number of levels that can be left unfinalized
-     before we stop accepting new inboxes for a tx rollup *)
-  (* the minimum number of blocks to wait before removing a finalised
-     commitment from the context. *)
-  withdraw_period : int;
-  max_inboxes_count : int;
-  (* the maximum number of messages in an inbox.  This bounds the
-     size of a commitment. *)
-  max_messages_per_inbox : int;
-  (* the maximum number of finalized commitments, to ensure that
-     remove_commitment is ever called *)
-  max_commitments_count : int;
-  (* The number of blocks used to compute the ema factor determining
-     the cost per byte for new messages in the inbox. *)
-  cost_per_byte_ema_factor : int;
-  (* Tickets are transmitted in batches in the
-     [Tx_rollup_dispatch_tickets] operation.
-
-     The semantics is that this operation is used to
-     concretize the withdraw orders emitted by the layer-2,
-     one layer-1 operation per messages of an
-     inbox. Therefore, it is of significant importance that
-     a valid batch does not produce a list of withdraw
-     orders which could not fit in a layer-1 operation.
-
-     With these values, at least 2048 bytes remain available
-     to store the rest of the operands of
-     [Tx_rollup_dispatch_tickets] (in practice, even more,
-     because we overapproximate the size of tickets). So we
-     are safe. *)
-  max_ticket_payload_size : int;
-  max_withdrawals_per_batch : int;
-  (* The maximum size, in bytes, of a Merkle proof.  Operations which would
-     require proofs larger than this should be no-ops. *)
-  rejection_max_proof_size : int;
-  sunset_level : int32;
-}
-
 type sc_rollup = {
   enable : bool;
   arith_pvm_enable : bool;
@@ -206,7 +157,6 @@ type t = {
   (* in cycles *)
   cache_sampler_state_cycles : int;
   (* in cycles *)
-  tx_rollup : tx_rollup;
   dal : dal;
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;

@@ -27,8 +27,6 @@
 
 open Protocol.Alpha_context
 
-let tx_rollup_finality_period = 40_000
-
 (** The challenge window is about two weeks with 15s block-time,
     (4 * 60 * 24 * 14).
     WARNING: changing this value also impacts
@@ -193,56 +191,6 @@ let constants_mainnet =
     cache_stake_distribution_cycles = 8;
     (* One for the sampler state for all cycles stored at any moment (as above). *)
     cache_sampler_state_cycles = 8;
-    tx_rollup =
-      {
-        enable = false;
-        (* Based on how storage burn is implemented for
-           transaction rollups, this means that a rollup operator
-           can create 100 inboxes (40 bytes per inbox) before
-           having to pay storage burn. *)
-        origination_size = 4_000;
-        (* Considering an average size of layer-2 operations of
-           20, this gives a TPS per rollup higher than 400, and
-           the capability to have two rollups at full speed on
-           mainnet (as long as they do not reach scalability
-           issues related to proof size). *)
-        hard_size_limit_per_inbox = 500_000;
-        hard_size_limit_per_message = 5_000;
-        commitment_bond = Tez.of_mutez_exn 10_000_000_000L;
-        finality_period = tx_rollup_finality_period;
-        max_inboxes_count = tx_rollup_finality_period + 100;
-        (* [60_000] blocks is about two weeks. *)
-        withdraw_period = tx_rollup_finality_period;
-        max_messages_per_inbox = 1_010;
-        (* Must be greater than the withdraw period. *)
-        max_commitments_count = (2 * tx_rollup_finality_period) + 100;
-        cost_per_byte_ema_factor = 120;
-        (* Tickets are transmitted in batches in the
-           [Tx_rollup_dispatch_tickets] operation.
-
-           The semantics is that this operation is used to
-           concretize the withdraw orders emitted by the layer-2,
-           one layer-1 operation per messages of an
-           inbox. Therefore, it is of significant importance that
-           a valid batch does not produce a list of withdraw
-           orders which could not fit in a layer-1 operation.
-
-           With these values, at least 2048 bytes remain available
-           to store the rest of the operands of
-           [Tx_rollup_dispatch_tickets] (in practice, even more,
-           because we overapproximate the size of tickets). So we
-           are safe. *)
-        max_withdrawals_per_batch = 15;
-        max_ticket_payload_size = 2_048;
-        (* Must be smaller than maximum limit of a manager operation
-           (minus overhead), since we need to limit our proofs to those
-           that can fit in an operation. *)
-        rejection_max_proof_size = 30000;
-        (* This is the first block of cycle 618, which is expected to
-           be about one year after the activation of protocol J.  See
-           https://tzstats.com/cycle/618 *)
-        sunset_level = 3_473_409l;
-      };
     dal = default_dal;
     sc_rollup =
       {

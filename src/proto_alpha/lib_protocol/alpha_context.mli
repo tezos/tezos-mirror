@@ -804,24 +804,6 @@ module Constants : sig
 
     val dal_encoding : dal Data_encoding.t
 
-    type tx_rollup = {
-      enable : bool;
-      origination_size : int;
-      hard_size_limit_per_inbox : int;
-      hard_size_limit_per_message : int;
-      commitment_bond : Tez.t;
-      finality_period : int;
-      withdraw_period : int;
-      max_inboxes_count : int;
-      max_messages_per_inbox : int;
-      max_commitments_count : int;
-      cost_per_byte_ema_factor : int;
-      max_ticket_payload_size : int;
-      max_withdrawals_per_batch : int;
-      rejection_max_proof_size : int;
-      sunset_level : int32;
-    }
-
     type sc_rollup = {
       enable : bool;
       arith_pvm_enable : bool;
@@ -896,7 +878,6 @@ module Constants : sig
       cache_script_size : int;
       cache_stake_distribution_cycles : int;
       cache_sampler_state_cycles : int;
-      tx_rollup : tx_rollup;
       dal : dal;
       sc_rollup : sc_rollup;
       zk_rollup : zk_rollup;
@@ -916,8 +897,6 @@ module Constants : sig
   end
 
   val parametric : context -> Parametric.t
-
-  val tx_rollup : context -> Parametric.tx_rollup
 
   val sc_rollup : context -> Parametric.sc_rollup
 
@@ -982,32 +961,6 @@ module Constants : sig
     context -> int
 
   val testnet_dictator : context -> public_key_hash option
-
-  val tx_rollup_enable : context -> bool
-
-  val tx_rollup_origination_size : context -> int
-
-  val tx_rollup_hard_size_limit_per_inbox : context -> int
-
-  val tx_rollup_hard_size_limit_per_message : context -> int
-
-  val tx_rollup_max_withdrawals_per_batch : context -> int
-
-  val tx_rollup_commitment_bond : context -> Tez.t
-
-  val tx_rollup_finality_period : context -> int
-
-  val tx_rollup_max_inboxes_count : context -> int
-
-  val tx_rollup_max_messages_per_inbox : context -> int
-
-  val tx_rollup_max_commitments_count : context -> int
-
-  val tx_rollup_max_ticket_payload_size : context -> int
-
-  val tx_rollup_rejection_max_proof_size : context -> int
-
-  val tx_rollup_sunset_level : context -> int32
 
   val sc_rollup_enable : context -> bool
 
