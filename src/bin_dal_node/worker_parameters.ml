@@ -1,10 +1,9 @@
 open Gossipsub_intf
 module Span = Gossipsub.Worker.GS.Span
 
-let per_topic_score_parameters :
-    (Gossipsub.topic, Span.t) topic_score_parameters =
+let per_topic_score_limits : (Gossipsub.topic, Span.t) topic_score_limits =
   let open Gossipsub.Worker.Default_parameters.Topic_score in
-  Topic_score_parameters_single
+  Topic_score_limits_single
     {
       time_in_mesh_weight;
       time_in_mesh_cap;
@@ -24,10 +23,10 @@ let per_topic_score_parameters :
       invalid_message_deliveries_decay;
     }
 
-let score_parameters =
+let score_limits =
   let open Gossipsub.Worker.Default_parameters.Score in
   {
-    topics = per_topic_score_parameters;
+    topics = per_topic_score_limits;
     topic_score_cap;
     behaviour_penalty_weight;
     behaviour_penalty_threshold;
@@ -68,7 +67,7 @@ let limits =
     opportunistic_graft_peers;
     opportunistic_graft_threshold;
     seen_history_length;
-    score_parameters;
+    score_limits;
   }
 
 let peer_filter_parameters =

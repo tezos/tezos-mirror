@@ -252,7 +252,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
   let assert_in_unit_interval v = assert (v >= 0.0 && v <= 1.0)
 
-  let check_per_topic_score_parameters tsp =
+  let check_per_topic_score_limits tsp =
     assert (tsp.time_in_mesh_weight >= 0.0) ;
     assert (tsp.time_in_mesh_cap >= 0.0) ;
     assert (tsp.time_in_mesh_quantum > 0.0) ;
@@ -269,12 +269,11 @@ module Make (C : AUTOMATON_CONFIG) :
     assert (tsp.invalid_message_deliveries_weight <= 0.0) ;
     assert_in_unit_interval tsp.invalid_message_deliveries_decay
 
-  let check_score_parameters (sp : _ score_parameters) =
+  let check_score_limits (sp : _ score_limits) =
     (match sp.topics with
-    | Topic_score_parameters_single tp -> check_per_topic_score_parameters tp
-    | Topic_score_parameters_family {all_topics; parameters; weights = _} ->
-        Seq.map parameters all_topics
-        |> Seq.iter check_per_topic_score_parameters) ;
+    | Topic_score_limits_single tp -> check_per_topic_score_limits tp
+    | Topic_score_limits_family {all_topics; parameters; weights = _} ->
+        Seq.map parameters all_topics |> Seq.iter check_per_topic_score_limits) ;
     Option.iter (fun cap -> assert (cap >= 0.0)) sp.topic_score_cap ;
     assert (sp.behaviour_penalty_weight <= 0.0) ;
     assert (sp.behaviour_penalty_threshold >= 0.0) ;
@@ -299,7 +298,7 @@ module Make (C : AUTOMATON_CONFIG) :
     assert (l.degree_out <= l.degree_optimal / 2) ;
     assert (l.history_gossip_length > 0) ;
     assert (l.history_gossip_length <= l.history_length) ;
-    check_score_parameters l.score_parameters
+    check_score_limits l.score_limits
 
   let make : Random.State.t -> limits -> parameters -> state =
    fun rng limits parameters ->
@@ -398,7 +397,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let rng state = state.rng
 
-    let score_parameters state = state.limits.score_parameters
+    let score_limits state = state.limits.score_limits
 
     let update ?(delta = 1) key map =
       Peer.Map.update
@@ -1797,7 +1796,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! connections in
       let*! scores in
-      let*! score_parameters in
+      let*! score_limits in
       match Peer.Map.find peer connections with
       | None ->
           let connection = {direct; topics = Topic.Set.empty; outbound} in
@@ -1806,7 +1805,7 @@ module Make (C : AUTOMATON_CONFIG) :
             Peer.Map.update
               peer
               (function
-                | None -> Some (Score.newly_connected score_parameters)
+                | None -> Some (Score.newly_connected score_limits)
                 | Some score -> Some (Score.set_connected score))
               scores
           in

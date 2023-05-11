@@ -85,7 +85,7 @@ struct
     application_score : float;  (** P5: Application-specific score. *)
     topic_status : topic_status Topic.Map.t;
     peer_status : peer_status;
-    parameters : (topic, span) score_parameters;
+    parameters : (topic, span) score_limits;
   }
 
   type t = {
@@ -99,13 +99,13 @@ struct
 
   let get_topic_params parameters topic =
     match parameters.topics with
-    | Topic_score_parameters_single tp -> tp
-    | Topic_score_parameters_family {parameters; _} -> parameters topic
+    | Topic_score_limits_single tp -> tp
+    | Topic_score_limits_family {parameters; _} -> parameters topic
 
   let get_topic_weight parameters topic =
     match parameters.topics with
-    | Topic_score_parameters_single _ -> 1.0
-    | Topic_score_parameters_family {weights; _} -> weights topic
+    | Topic_score_limits_single _ -> 1.0
+    | Topic_score_limits_family {weights; _} -> weights topic
 
   (* Please refer to the `SCORE` module type documentation for the meaning of each
      score function. *)

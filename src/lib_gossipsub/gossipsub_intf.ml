@@ -107,7 +107,7 @@ module type AUTOMATON_CONFIG = sig
   module Time : TIME with type span = Span.t
 end
 
-type 'span per_topic_score_parameters = {
+type 'span per_topic_score_limits = {
   time_in_mesh_weight : float;
       (** P1: The weight of the score associated to the time spent in the mesh. *)
   time_in_mesh_cap : float;
@@ -153,13 +153,13 @@ type 'span per_topic_score_parameters = {
           This parameter must be in the unit interval. *)
 }
 
-type ('topic, 'span) topic_score_parameters =
-  | Topic_score_parameters_single of 'span per_topic_score_parameters
+type ('topic, 'span) topic_score_limits =
+  | Topic_score_limits_single of 'span per_topic_score_limits
       (** Use this constructor when the topic score parameters do not
           depend on the topic. *)
-  | Topic_score_parameters_family of {
+  | Topic_score_limits_family of {
       all_topics : 'topic Seq.t;
-      parameters : 'topic -> 'span per_topic_score_parameters;
+      parameters : 'topic -> 'span per_topic_score_limits;
       weights : 'topic -> float;
     }
       (** Use this constructor when the topic score parameters may depend
@@ -171,8 +171,8 @@ type ('topic, 'span) topic_score_parameters =
 
    TODO: https://gitlab.com/tezos/tezos/-/issues/5545
    We did not implement P6, aka IP colocation factor *)
-type ('topic, 'span) score_parameters = {
-  topics : ('topic, 'span) topic_score_parameters;
+type ('topic, 'span) score_limits = {
+  topics : ('topic, 'span) topic_score_limits;
       (** Per-topic score parameters. *)
   topic_score_cap : float option;
       (** An optional cap on the total positive contribution of topics to the score of the peer.
@@ -300,7 +300,7 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
   opportunistic_graft_threshold : float;
       (** The median mesh score threshold before triggering opportunistic
           grafting; this should have a small positive value. *)
-  score_parameters : ('topic, 'span) score_parameters;
+  score_limits : ('topic, 'span) score_limits;
       (** score-specific parameters. *)
   seen_history_length : int;
       (** [seen_history_length] controls the size of the message cache used for
@@ -347,7 +347,7 @@ module type SCORE = sig
   type topic
 
   (** [newly_connected params] creates a fresh statistics record. *)
-  val newly_connected : (topic, span) score_parameters -> t
+  val newly_connected : (topic, span) score_limits -> t
 
   (** [value ps] evaluates the score of [ps]. *)
   val value : t -> value
@@ -412,9 +412,7 @@ module type SCORE = sig
 
   module Internal_for_tests : sig
     val get_topic_params :
-      ('topic, 'span) score_parameters ->
-      'topic ->
-      'span per_topic_score_parameters
+      ('topic, 'span) score_limits -> 'topic -> 'span per_topic_score_limits
   end
 end
 

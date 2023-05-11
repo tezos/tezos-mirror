@@ -978,11 +978,11 @@ let test_unsubscribe_backoff rng limits parameters =
     ~tags:["gossipsub"; "heartbeat"; "join"; "leave"]
   @@ fun () ->
   let topic = "topic" in
-  let per_topic_score_parameters =
-    GS.Score.Internal_for_tests.get_topic_params limits.score_parameters topic
+  let per_topic_score_limits =
+    GS.Score.Internal_for_tests.get_topic_params limits.score_limits topic
   in
   let mesh_message_deliveries_activation =
-    per_topic_score_parameters.mesh_message_deliveries_activation
+    per_topic_score_limits.mesh_message_deliveries_activation
   in
   (* Only one peer => mesh too small and will try to regraft as early as possible *)
   let peers = make_peers ~number:1 in
