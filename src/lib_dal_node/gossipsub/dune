@@ -1,0 +1,16 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_dal_node_lib_gossipsub)
+ (public_name tezos-dal-node-lib.gossipsub)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-crypto-dal
+  tezos-gossipsub)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_crypto_dal
+  -open Tezos_gossipsub))

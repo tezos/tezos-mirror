@@ -3,7 +3,7 @@
 
 (library
  (name tezos_dal_node_lib)
- (package tezos-dal-node-lib)
+ (public_name tezos-dal-node-lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

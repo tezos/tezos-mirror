@@ -19,12 +19,14 @@
   tezos-rpc-http-client-unix
   tezos-stdlib-unix
   tezos-stdlib
-  tezos_dal_node_lib
+  tezos-dal-node-lib
   tezos-dal-node-services
   tezos_layer2_store
   tezos-crypto-dal
   tezos-store.unix
   tezos-store.shared
+  tezos-gossipsub
+  tezos-dal-node-lib.gossipsub
   irmin-pack
   irmin-pack.unix
   irmin
@@ -51,6 +53,8 @@
   -open Tezos_layer2_store
   -open Tezos_crypto_dal
   -open Tezos_store_unix
-  -open Tezos_store_shared))
+  -open Tezos_store_shared
+  -open Tezos_gossipsub
+  -open Tezos_dal_node_lib_gossipsub))
 
 (rule (action (progn (write-file void_for_linking-tezos-dal-alpha.empty ""))))

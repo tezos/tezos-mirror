@@ -276,6 +276,9 @@ val shards_from_polynomial : t -> polynomial -> shard Seq.t
 (** A proof that a shard belongs to some commitment. *)
 type shard_proof
 
+(** An encoding of a shard proof. *)
+val shard_proof_encoding : shard_proof Data_encoding.t
+
 (** [verify_shard t commitment shard proof] returns [Ok ()]
     if [shard] is an element of [shards_from_polynomial p] where
     [commitment = commit t p] for some polynomial [p].

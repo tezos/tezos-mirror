@@ -26,6 +26,7 @@ depends: [
   "tezos-layer2-store"
   "tezos-crypto-dal"
   "tezos-store"
+  "tezos-gossipsub"
   "irmin-pack" { >= "3.6.1" & < "3.7.0" }
   "irmin" { >= "3.6.1" & < "3.7.0" }
   "tezos-dal-016-PtMumbai"

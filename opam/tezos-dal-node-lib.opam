@@ -17,6 +17,7 @@ depends: [
   "tezos-client-base-unix"
   "tezos-stdlib-unix"
   "tezos-crypto-dal"
+  "tezos-gossipsub"
 ]
 build: [
   ["rm" "-r" "vendors"]

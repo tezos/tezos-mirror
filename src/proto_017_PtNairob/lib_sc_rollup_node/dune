@@ -21,7 +21,7 @@
   tezos-rpc-http-server
   tezos-workers
   tezos-dal-node-services
-  tezos_dal_node_lib
+  tezos-dal-node-lib
   tezos-shell-services
   tezos-smart-rollup-017-PtNairob
   tezos-smart-rollup-layer2-017-PtNairob

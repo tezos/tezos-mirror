@@ -190,6 +190,8 @@ module Inner = struct
 
     let share_encoding = array fr_encoding
 
+    let shard_proof_encoding = g1_encoding
+
     let shard_encoding =
       conv
         (fun {index; share} -> (index, share))
@@ -256,6 +258,19 @@ module Inner = struct
         (Fixed.bytes commitment_size)
       [@@coverage off]
 
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5593
+
+       We could have a smarter compare eg. using lazy Data_encoding.compare that
+       encodes the two values to bytes lazily and stops as soon as the values
+       are detected to be not equal. *)
+    let compare_commitments a b =
+      (* We are obliged to compare commitments by casting to bytes because
+         {!Bls12_381.G1} doesn't provide a compare function. *)
+      if Bls12_381.G1.eq a b then 0
+      else Bytes.compare (Bls12_381.G1.to_bytes a) (Bls12_381.G1.to_bytes b)
+
+    let compare = compare_commitments
+
     include Tezos_crypto.Helpers.Make (struct
       type t = commitment
 
@@ -267,9 +282,7 @@ module Inner = struct
 
       let raw_encoding = raw_encoding
 
-      let compare a b =
-        if Bls12_381.G1.eq a b then 0
-        else Bytes.compare (Bls12_381.G1.to_bytes a) (Bls12_381.G1.to_bytes b)
+      let compare = compare_commitments
 
       let equal = Bls12_381.G1.eq
 
