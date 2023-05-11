@@ -450,7 +450,9 @@ let start ~rpc_address ~rpc_port node_ctxt =
   let rpc_address = P2p_addr.of_string_exn rpc_address in
   let host = Ipaddr.V6.to_string rpc_address in
   let node = `TCP (`Port rpc_port) in
-  let acl = RPC_server.Acl.default rpc_address in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5613
+     Check if proper ACL handling is needed. *)
+  let acl = RPC_server.Acl.allow_all in
   let server =
     RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
   in
