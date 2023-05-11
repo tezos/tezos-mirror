@@ -23,13 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A sliding window cache that stores published messages and their first seen time.
-    The module also keeps track of the number of accesses to a message by a peer,
-    thus indirectly tracking the number of IWant requests a peer makes for the same message.
+(** A sliding window cache that stores published messages and their first seen
+    time.  The module also keeps track of the number of accesses to a message by
+    a peer, thus indirectly tracking the number of IWant requests a peer makes
+    for the same message between two heartbeats.
 
-    The module assumes that no two different messages have the same message id. However,
-    the cache stores duplicates; for instance, if [add_message id msg topic] is
-    called twice, then [msg] will appear (at least) twice in
+    The module assumes that no two different messages have the same message
+    id. However, the cache stores duplicates; for instance, if [add_message id
+    msg topic] is called exactly twice, then [msg] will appear twice in
     [get_message_ids_to_gossip]'s result (assuming not more than [gossip_slots]
     shifts have been executed in the meanwhile).
 *)
@@ -45,9 +46,16 @@ module Make
 
       When queried for messages to advertise, the cache only returns messages in
       the last [gossip_slots]. The [gossip_slots] must be smaller or equal to
-      [history_slots]. The slack between [gossip_slots] and [history_slots]
-      accounts for the reaction time between when a message is advertised via
-      IHave gossip, and when the peer pulls it via an IWant command.
+      [history_slots].
+
+      The slack between [gossip_slots] and [history_slots] accounts for the
+      reaction time between when a message is advertised via IHave gossip, and
+      when the peer pulls it via an IWant command. To see this, if say
+      [gossip_slot = history_slots] then the messages inserted in cache
+      [history_slots] heartbeat ticks ago and advertised now will not be
+      available after the next tick, because they are removed from the
+      cache. This means IWant requests from the remote peer for such messages
+      would be unfulfilled and potentially penalizing.
 
       @raise Assert_failure when [gossip_slots <= 0 || gossip_slots > history_slots]
 
@@ -57,12 +65,12 @@ module Make
     history_slots:int -> gossip_slots:int -> seen_message_slots:int -> t
 
   (** Add message to the most recent cache slot. If the message already exists
-      in the cache, the message is not overridden, instead a duplicate is
-      stored. *)
+      in the cache, the message is not overridden, instead a duplicate message
+      id is stored (the message itself is only stored once). *)
   val add_message : C.Message_id.t -> C.Message.t -> C.Topic.t -> t -> t
 
   (** Get the message associated to the given message id, increase the access
-      counter for the peer requesting the message, and also return the updated
+      counter for the peer requesting the message, and also returns the updated
       counter. *)
   val get_message_for_peer :
     C.Peer.t -> C.Message_id.t -> t -> (t * C.Message.t * int) option
