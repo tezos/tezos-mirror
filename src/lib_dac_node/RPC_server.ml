@@ -31,7 +31,7 @@ open Tezos_rpc_http_server
 type error +=
   | Cannot_construct_external_message
   | Cannot_deserialize_external_message
-  | DAC_node_not_ready
+  | DAC_node_not_ready of string
 
 let () =
   register_error_kind
@@ -60,22 +60,23 @@ let () =
     ~title:"DAC Node is not ready"
     ~description:
       "RPC server of DAC node is not started and plugin is not resolved."
-    ~pp:(fun ppf () -> Format.fprintf ppf "DAC Node is not ready")
-    Data_encoding.unit
-    (function DAC_node_not_ready -> Some () | _ -> None)
-    (fun () -> DAC_node_not_ready)
+    ~pp:(fun ppf message ->
+      Format.fprintf ppf "DAC Node is not ready %s" message)
+    Data_encoding.(obj1 (req "value" string))
+    (function DAC_node_not_ready message -> Some message | _ -> None)
+    (fun message -> DAC_node_not_ready message)
 
 let add_service registerer service handler directory =
   registerer directory service handler
 
 let handle_get_health_live cctxt =
   match Node_context.get_status cctxt with
-  | Ready _ | Starting -> Lwt_result_syntax.return "DAC Node is alive"
+  | Ready _ | Starting -> Lwt_result_syntax.return true
 
 let handle_get_health_ready cctxt =
   match Node_context.get_status cctxt with
-  | Ready _ -> Lwt_result_syntax.return "DAC Node is ready"
-  | Starting -> Lwt_result_syntax.tzfail DAC_node_not_ready
+  | Ready _ -> Lwt_result_syntax.return true
+  | Starting -> Lwt_result_syntax.tzfail @@ DAC_node_not_ready "starting"
 
 let handle_post_store_preimage dac_plugin cctxt dac_sk_uris page_store
     hash_streamer (data, pagination_scheme) =

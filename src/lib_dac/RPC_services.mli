@@ -110,7 +110,7 @@ end
 (** GET dac/health/live returns ["DAC Node is alive"] if 
     [Node_context.get_status cctxt] is [Starting] or [Ready]. *)
 val get_health_live :
-  ([`GET], unit, unit, unit, unit, string) Tezos_rpc.Service.service
+  ([`GET], unit, unit, unit, unit, bool) Tezos_rpc.Service.service
 
 (** GET dac/health/ready returns ["DAC Node is ready"] if 
     [Node_context.get_status cctxt] is [Ready]

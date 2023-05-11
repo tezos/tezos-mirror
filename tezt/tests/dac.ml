@@ -194,6 +194,23 @@ let check_preimage expected_preimage actual_preimage =
       ~error_msg:
         "Preimage does not match expected value (Current: %L <> Expected: %R)")
 
+let check_not_ready dac_node =
+  assert_lwt_failure
+    ~__LOC__
+    "Expected DAC node not ready"
+    (RPC.call dac_node Dac_rpc.get_health_ready)
+
+let check_not_alive dac_node =
+  assert_lwt_failure
+    ~__LOC__
+    "Expected DAC node not alive"
+    (RPC.call dac_node Dac_rpc.get_health_live)
+
+let check_liveness_and_readiness dac_node =
+  let* liveness = RPC.call dac_node Dac_rpc.get_health_live in
+  let* readiness = RPC.call dac_node Dac_rpc.get_health_ready in
+  return @@ assert (liveness && readiness)
+
 (** [check_downloaded_page coordinator observer page_hash] checks that the
      [observer] has downloaded a page with [page_hash] from the [coordinator],
      that the contents of the page corresponds to the ones of the
@@ -356,6 +373,7 @@ module Legacy = struct
     in
     let* () = run_dac dac_node in
     let* () = ready_promise in
+    let* () = check_liveness_and_readiness dac_node in
     let* () = Dac_node.terminate dac_node in
     unit
 
@@ -447,12 +465,9 @@ module Legacy = struct
     let* _dir = Dac_node.init_config dac_node in
     let* () = run_dac dac_node in
     (* this call must fail as node is not ready *)
-    let* () =
-      assert_lwt_failure
-        ~__LOC__
-        "Expected DAC node not alive"
-        (RPC.call dac_node Dac_rpc.get_health_live)
-    in
+    let* () = check_not_alive dac_node in
+    let* () = check_not_ready dac_node in
+
     let* () = Dac_node.terminate dac_node in
     return ()
 
@@ -1147,12 +1162,8 @@ module Coordinator = struct
     let* _dir = Dac_node.init_config dac_node in
     let* () = run_dac dac_node in
     (* this call must fail as node is not ready *)
-    let* () =
-      assert_lwt_failure
-        ~__LOC__
-        "Expected DAC node not alive"
-        (RPC.call dac_node Dac_rpc.get_health_live)
-    in
+    let* () = check_not_alive dac_node in
+    let* () = check_not_ready dac_node in
     (* must wait for node to be ready before terminating it *)
     let* () =
       Lwt.join
@@ -1181,12 +1192,8 @@ module Coordinator = struct
     let* _dir = Dac_node.init_config dac_node in
     let* () = run_dac dac_node in
     (* this call must fail as node is not ready *)
-    let* () =
-      assert_lwt_failure
-        ~__LOC__
-        "Expected DAC node not alive"
-        (RPC.call dac_node Dac_rpc.get_health_live)
-    in
+    let* () = check_not_alive dac_node in
+    let* () = check_not_ready dac_node in
     let* () = Dac_node.terminate dac_node in
     return ()
 end
@@ -1217,12 +1224,8 @@ module Observer = struct
     let* _dir = Dac_node.init_config dac_node in
     let* () = run_dac dac_node in
     (* this call must fail as node is not ready *)
-    let* () =
-      assert_lwt_failure
-        ~__LOC__
-        "Expected DAC observer not alive"
-        (RPC.call dac_node Dac_rpc.get_health_live)
-    in
+    let* () = check_not_alive dac_node in
+    let* () = check_not_ready dac_node in
     (* must wait for node to be ready before terminating it *)
     let* () =
       Lwt.join
@@ -1251,12 +1254,8 @@ module Observer = struct
     let* _dir = Dac_node.init_config dac_node in
     let* () = run_dac dac_node in
     (* this call must fail as node is not ready *)
-    let* () =
-      assert_lwt_failure
-        ~__LOC__
-        "Expected DAC node not alive"
-        (RPC.call dac_node Dac_rpc.get_health_live)
-    in
+    let* () = check_not_alive dac_node in
+    let* () = check_not_ready dac_node in
     let* () = Dac_node.terminate dac_node in
     return ()
 end
@@ -1302,12 +1301,8 @@ module Member = struct
     let* _dir = Dac_node.init_config dac_node in
     let* () = run_dac dac_node in
     (* this call must fail as node is not ready *)
-    let* () =
-      assert_lwt_failure
-        ~__LOC__
-        "Expected DAC observer not alive"
-        (RPC.call dac_node Dac_rpc.get_health_live)
-    in
+    let* () = check_not_alive dac_node in
+    let* () = check_not_ready dac_node in
     (* must wait for node to be ready before terminating it *)
     let* () =
       Lwt.join
@@ -1336,12 +1331,8 @@ module Member = struct
     let* _dir = Dac_node.init_config dac_node in
     let* () = run_dac dac_node in
     (* this call must fail as node is not ready *)
-    let* () =
-      assert_lwt_failure
-        ~__LOC__
-        "Expected DAC node not alive"
-        (RPC.call dac_node Dac_rpc.get_health_live)
-    in
+    let* () = check_not_alive dac_node in
+    let* () = check_not_ready dac_node in
     let* () = Dac_node.terminate dac_node in
     return ()
 end
@@ -1429,6 +1420,7 @@ module Full_infrastructure = struct
             wait_for_node_subscribed_to_data_streamer ()
           in
           let* () = Dac_node.run ~wait_ready:true node in
+          let* () = check_liveness_and_readiness node in
           node_is_subscribed)
         (committee_members_nodes @ observer_nodes)
     in
@@ -1521,6 +1513,7 @@ module Full_infrastructure = struct
             wait_for_node_subscribed_to_data_streamer ()
           in
           let* () = Dac_node.run ~wait_ready:true node in
+          let* () = check_liveness_and_readiness node in
           node_is_subscribed)
         (committee_members_nodes @ observer_nodes)
     in
@@ -1720,6 +1713,7 @@ module Full_infrastructure = struct
             wait_for_node_subscribed_to_data_streamer ()
           in
           let* () = Dac_node.run ~wait_ready:true node in
+          let* () = check_liveness_and_readiness node in
           node_is_subscribed)
         (committee_members_nodes @ observer_nodes)
     in
@@ -2285,6 +2279,7 @@ module Tx_kernel_e2e = struct
               wait_for_handle_new_subscription_to_hash_streamer coordinator_node
             in
             let* () = Dac_node.run dac_member in
+            let* () = check_liveness_and_readiness dac_member in
             ev)
           committee_members_nodes
       else unit
@@ -2341,6 +2336,7 @@ module Tx_kernel_e2e = struct
     let observer_node = List.nth observer_nodes 0 in
     let* _ = Dac_node.init_config observer_node in
     let* () = Dac_node.run observer_node in
+    let* () = check_liveness_and_readiness observer_node in
     let* boot_sector =
       prepare_installer_kernel
         ~preimages_dir:
@@ -2625,6 +2621,7 @@ module Tx_kernel_e2e = struct
           "Observer node is in invalid state: Unexpected preimage hash found \
            in reveal data dir.") ;
     let* () = Dac_node.run ~wait_ready:true observer_node in
+    let* () = check_liveness_and_readiness observer_node in
 
     (* Send DAC certificate as an External Message to L1 *)
     let* {level; _} =

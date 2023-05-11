@@ -127,12 +127,12 @@ let get_health_live =
   Tezos_rpc.Service.get_service
     ~description:"Check that DAC node is alive"
     ~query:Tezos_rpc.Query.empty
-    ~output:Data_encoding.string
+    ~output:Data_encoding.bool
     Tezos_rpc.Path.(open_root / "health" / "live")
 
 let get_health_ready =
   Tezos_rpc.Service.get_service
     ~description:"Check that DAC node is ready"
     ~query:Tezos_rpc.Query.empty
-    ~output:Data_encoding.string
+    ~output:Data_encoding.bool
     Tezos_rpc.Path.(open_root / "health" / "ready")

@@ -79,7 +79,7 @@ end
 
 (** [get_health_live] returns ["DAC Node is alive"] if 
     [Node_context.get_status cctxt] is [Starting] or [Ready]. *)
-val get_health_live : (Dac_node.t, string) RPC_core.t
+val get_health_live : (Dac_node.t, bool) RPC_core.t
 
 (** [get_health_ready] returns ["DAC Node is ready"] if 
     [Node_context.get_status cctxt] is [Ready]
