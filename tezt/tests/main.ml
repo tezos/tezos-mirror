@@ -84,6 +84,16 @@ let register_protocol_migration_tests () =
     ~loser_protocols:[migrate_from] ;
   Sc_rollup.register_migration ~migrate_from ~migrate_to
 
+let register_old_protocol_migration_tests () =
+  List.iter
+    (fun p ->
+      match (Protocol.previous_protocol p, p) with
+      | _, Alpha -> () (* Already in register_protocol_migration_tests *)
+      | None, _ -> ()
+      | Some migrate_from, migrate_to ->
+          Sc_rollup.register_migration ~migrate_from ~migrate_to)
+    Protocol.all
+
 (* Register tests that use [Protocol.register_test] and for which we rely on
    [?supports] to decide which protocols the tests should run on.
    As a consequence, all those tests should be registered with [Protocol.all]
@@ -218,6 +228,7 @@ let register_protocol_specific_because_regression_tests () =
 let () =
   register_protocol_independent_tests () ;
   register_protocol_migration_tests () ;
+  register_old_protocol_migration_tests () ;
   register_protocol_tests_that_use_supports_correctly () ;
   register_protocol_specific_because_regression_tests () ;
   Tezos_scoru_wasm_regressions.register () ;
