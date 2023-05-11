@@ -25,8 +25,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let expected_slots_for_given_active_stake ctxt ~total_active_stake ~active_stake
-    =
+let expected_slots_for_given_active_stake ctxt ~total_active_stake_weight
+    ~active_stake_weight =
   let blocks_per_cycle =
     Int32.to_int (Constants_storage.blocks_per_cycle ctxt)
   in
@@ -39,9 +39,9 @@ let expected_slots_for_given_active_stake ctxt ~total_active_stake ~active_stake
   Z.to_int
     (Z.div
        (Z.mul
-          (Z.of_int64 (Tez_repr.to_mutez active_stake))
+          (Z.of_int64 active_stake_weight)
           (Z.of_int number_of_endorsements_per_cycle))
-       (Z.of_int64 (Tez_repr.to_mutez total_active_stake)))
+       (Z.of_int64 total_active_stake_weight))
 
 type level_participation = Participated | Didn't_participate
 
@@ -79,10 +79,16 @@ let record_endorsing_participation ctxt ~delegate ~participation
               Stake_storage.get_total_active_stake ctxt level.cycle
               >>=? fun total_active_stake ->
               let expected_slots =
+                let active_stake_weight =
+                  Stake_repr.staking_weight active_stake
+                in
+                let total_active_stake_weight =
+                  Stake_repr.staking_weight total_active_stake
+                in
                 expected_slots_for_given_active_stake
                   ctxt
-                  ~total_active_stake
-                  ~active_stake
+                  ~total_active_stake_weight
+                  ~active_stake_weight
               in
               let Ratio_repr.{numerator; denominator} =
                 Constants_storage.minimal_participation_ratio ctxt
@@ -167,10 +173,14 @@ let participation_info ctxt delegate =
       Stake_storage.get_total_active_stake ctxt level.cycle
       >>=? fun total_active_stake ->
       let expected_cycle_activity =
+        let active_stake_weight = Stake_repr.staking_weight active_stake in
+        let total_active_stake_weight =
+          Stake_repr.staking_weight total_active_stake
+        in
         expected_slots_for_given_active_stake
           ctxt
-          ~total_active_stake
-          ~active_stake
+          ~total_active_stake_weight
+          ~active_stake_weight
       in
       let Ratio_repr.{numerator; denominator} =
         Constants_storage.minimal_participation_ratio ctxt

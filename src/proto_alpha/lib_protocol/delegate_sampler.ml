@@ -175,26 +175,35 @@ let get_stakes_for_selected_index ctxt index =
       let*? total_balance =
         balance_and_frozen_bonds +? frozen_deposits.current_amount
       in
-      let* stake_for_cycle =
-        let frozen_deposits_limit =
-          match frozen_deposits_limit with Some fdp -> fdp | None -> max_mutez
-        in
-        let aux = min total_balance frozen_deposits_limit in
-        if aux <= overflow_bound then
-          let*? aux = aux *? 100L in
-          let*? v = aux /? frozen_deposits_percentage in
+      let frozen_deposits_limit =
+        match frozen_deposits_limit with Some fdp -> fdp | None -> max_mutez
+      in
+      let frozen = min total_balance frozen_deposits_limit in
+      let* total_stake_for_cycle =
+        if frozen <= overflow_bound then
+          let*? frozen = frozen *? 100L in
+          let*? v = frozen /? frozen_deposits_percentage in
           return (min v staking_balance)
         else
           let*? sbal = staking_balance /? 100L in
-          let*? a = aux /? frozen_deposits_percentage in
+          let*? a = frozen /? frozen_deposits_percentage in
           if sbal <= a then return staking_balance
           else
             let*? r = max_mutez /? frozen_deposits_percentage in
             return r
       in
-      let*? total_stake = Tez_repr.(total_stake +? stake_for_cycle) in
+      let delegated =
+        (* This subtraction should not result in a negative value because the
+           staking balance includes the total balance.
+           But since the staking balance is taken from the snapshot and the
+           frozen balance is taken at the end of the cycle we have no strong
+           guarantees. *)
+        sub_opt total_stake_for_cycle frozen |> Option.value ~default:zero
+      in
+      let stake_for_cycle = Stake_repr.make ~frozen ~delegated in
+      let*? total_stake = Stake_repr.(total_stake +? stake_for_cycle) in
       return ((delegate, stake_for_cycle) :: acc, total_stake))
-    ~init:([], Tez_repr.zero)
+    ~init:([], Stake_repr.zero)
 
 let compute_snapshot_index_for_seed ~max_snapshot_index seed =
   let rd = Seed_repr.initialize_new seed [Bytes.of_string "stake_snapshot"] in
@@ -222,7 +231,7 @@ let select_distribution_for_cycle ctxt cycle =
   List.fold_left_es
     (fun acc (pkh, stake) ->
       Delegate_consensus_key.active_pubkey_for_cycle ctxt pkh cycle
-      >|=? fun pk -> (pk, Tez_repr.to_mutez stake) :: acc)
+      >|=? fun pk -> (pk, Stake_repr.staking_weight stake) :: acc)
     []
     stakes
   >>=? fun stakes_pk ->

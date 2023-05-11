@@ -103,6 +103,48 @@ let patch_script ctxt (address, hash, patched_code) =
         address ;
       return ctxt
 
+(** Converts {Storage.Stake.Total_active_stake} and
+    {Storage.Stake.Selected_distribution_for_cycle} from {Tez_repr} to
+    {Stake_repr}.
+    Remove me in P. *)
+let migrate_stake_distribution_for_o ctxt =
+  let open Lwt_result_syntax in
+  let convert =
+    let max_delegated_percentage =
+      let frozen_deposits_percentage =
+        Constants_storage.frozen_deposits_percentage ctxt
+      in
+      Int64.of_int (100 - frozen_deposits_percentage)
+    in
+    fun old_stake ->
+      let delegated =
+        match Tez_repr.(old_stake *? max_delegated_percentage) with
+        | Error _unexpected_overflow -> Tez_repr.zero
+        | Ok delegated_times_100 -> Tez_repr.div_exn delegated_times_100 100
+      in
+      match Tez_repr.sub_opt old_stake delegated with
+      | None -> Stake_repr.make ~frozen:old_stake ~delegated:Tez_repr.zero
+      | Some frozen -> Stake_repr.make ~frozen ~delegated
+  in
+  let* ctxt =
+    Storage.Stake.Total_active_stake_up_to_Nairobi.fold
+      ctxt
+      ~order:`Undefined
+      ~init:(ok ctxt)
+      ~f:(fun cycle stake ctxt ->
+        let*? ctxt in
+        let stake = convert stake in
+        Storage.Stake.Total_active_stake.update ctxt cycle stake)
+  in
+  Storage.Stake.Selected_distribution_for_cycle_up_to_Nairobi.fold
+    ctxt
+    ~order:`Undefined
+    ~init:(ok ctxt)
+    ~f:(fun cycle distr ctxt ->
+      let*? ctxt in
+      let distr = List.map (fun (pkh, stake) -> (pkh, convert stake)) distr in
+      Storage.Stake.Selected_distribution_for_cycle.update ctxt cycle distr)
+
 let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
     =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
@@ -169,7 +211,8 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
              inbox migration message. see `sc_rollup_inbox_storage`. *)
       Raw_level_repr.of_int32 level >>?= fun level ->
       Storage.Tenderbake.First_level_of_protocol.update ctxt level
-      >>=? fun ctxt -> return (ctxt, []))
+      >>=? fun ctxt ->
+      migrate_stake_distribution_for_o ctxt >>=? fun ctxt -> return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   List.fold_left_es patch_script ctxt Legacy_script_patches.addresses_to_patch
   >>=? fun ctxt ->

@@ -119,6 +119,7 @@
         "Lazy_storage_kind",
         "Receipt_repr",
         "Migration_repr",
+        "Stake_repr",
         "Carbonated_map_costs",
         "Carbonated_map",
 
