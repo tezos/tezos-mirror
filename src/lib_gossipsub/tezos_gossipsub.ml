@@ -1853,6 +1853,74 @@ module Make (C : AUTOMATON_CONFIG) :
   let remove_peer : remove_peer -> [`Remove_peer] output Monad.t =
    fun {peer} -> Remove_peer.handle peer
 
+  (* On spam protection
+     ==================
+
+     We make the assumption that the bandwidth per peer can be limited. This
+     means that if the automaton allows a peer to send us an unbounded number of
+     messages, this is not a case of concern by itself. There is a case of
+     concern if this results in wasting space or CPU time.
+
+     Another assumption we make is that messages are of bounded size, because
+     the message encoding should ensure this.
+
+     We detail next for each p2p message type what checks are (or are not) in
+     place concerning the receipt of "spam" and what are the concerns.
+
+     IHave messages:
+     - There is a maximum number, given by [max_recv_ihave_per_heartbeat], of
+       IHave messages that a peer accepts from another peer between two
+       heartbeat ticks; receiving more than this limit is not punished, the
+       automaton simply returns [Too_many_recv_ihave_messages].
+     - The number of message ids included is not checked, even though the remote
+       peer should include at most [max_sent_iwant_per_heartbeat] ids.
+
+     IWant messages:
+     - There is a maximum number, given by [max_gossip_retransmission], of times
+       that a peer can request the *same* message (during the time the message is
+       in the message cache).
+     - There is no imposed bound on the number of IWant messages received from a peer.
+     - The number of message ids included is not checked, though the remote peer
+       should include at most [max_sent_iwant_per_heartbeat] ids between two
+       heartbeat ticks.
+
+     Note on IHave/IWant messages: heartbeats of different peers need not be in
+     sync. Therefore we cannot use the limits supposedly used by the sender on
+     the receiver side to punish the sender; we could multiply these limits by 2
+     though.
+
+     Graft messages:
+     - Receiving a Graft message within the backoff period (given by
+       [prune_backoff] or [unsubscribed_backoff]) is punished. Receiving such a
+       Graft very soon (before [prune_backoff + graft_flood_backoff]) is punished
+       further.
+     - Receiving a duplicate of an accepted Graft request is not punished, the
+       automaton simply returns [Peer_already_in_mesh]. In all other failure cases
+       (except for unconnected peers) a backoff is set.
+
+     Prune messages:
+     - In case of a duplicate Prune the automaton simply returns
+       [Peer_not_in_mesh] because the peer has already been removed from the mesh
+       following the first Prune message.
+     - The number of PX peers is not bounded. However, the remote peer should
+       advertise at most [peers_to_px].
+
+     Subscribe/Unsubscribe messages:
+     - Duplicates are not checked for, a duplicate Subscribe/Unsubscribed (for a
+       connected peer) is always successful.
+
+     Full messages:
+     - We check for duplicates with the message cache. A duplicate is not re-routed.
+     - A peer sending duplicates within a small window (given by
+       [mesh_message_deliveries_window] of a few ms) is rewarded because they
+       count as near-first deliveries. Duplicates received outside of this window
+       are not counted.
+     - Potential problems:
+       - receiving a large number of duplicates, as all duplicate message ids
+         are stored in the cache *)
+
+  (* "Getters" *)
+
   let select_px_peers state ~peer_to_prune topic ~noPX_peers =
     let do_px = do_px state in
     let peers_to_px = peers_to_px state in
