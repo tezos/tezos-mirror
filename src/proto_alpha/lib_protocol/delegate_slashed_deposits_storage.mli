@@ -50,8 +50,10 @@ val already_slashed_for_double_endorsing :
 type punishing_amounts = {reward : Tez_repr.t; amount_to_burn : Tez_repr.t}
 
 (** Record in the context that the given delegate has now been slashed
-    for double endorsing for the given level and return the amounts to burn
-    and to reward.
+    for double endorsing for the given level and return the amounts to
+    burn and to reward. If the delegate has no remaining frozen
+    deposits, this will also forbid it to bake or endorse until a new
+    deposit is frozen.
 
     Fails with [Unrequired_denunciation] if the given delegate has
     already been slashed for double endorsing for the given level.  *)
@@ -62,8 +64,10 @@ val punish_double_endorsing :
   (Raw_context.t * punishing_amounts) tzresult Lwt.t
 
 (** Record in the context that the given delegate has now been slashed
-    for double baking for the given level and returns the amounts to burn
-    and to reward.
+    for double baking for the given level and returns the amounts to
+    burn and to reward. If the delegate has no remaining frozen
+    deposits, this will also forbid it to bake or endorse until a new
+    deposit is frozen.
 
     Fails with [Unrequired_denunciation] if the given delegate has
     already been slashed for double baking for the given level.  *)

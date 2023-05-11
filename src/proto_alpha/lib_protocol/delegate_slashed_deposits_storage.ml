@@ -71,6 +71,13 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
     Tez_repr.(min frozen_deposits.current_amount punish_value)
   in
   let reward, amount_to_burn = Tez_repr.div2_sub punishing_amount in
+  let should_forbid =
+    Tez_repr.(punishing_amount = frozen_deposits.current_amount)
+  in
+  let*! ctxt =
+    if should_forbid then Delegate_storage.forbid_delegate ctxt delegate
+    else Lwt.return ctxt
+  in
   let*! ctxt =
     Storage.Slashed_deposits.add
       (ctxt, level.cycle)

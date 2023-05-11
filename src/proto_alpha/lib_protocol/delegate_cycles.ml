@@ -92,6 +92,7 @@ let max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle =
 
 let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
     ~balance_updates =
+  Delegate_storage.reset_forbidden_delegates ctxt >>= fun ctxt ->
   let max_slashable_period = Constants_storage.max_slashing_period ctxt in
   (* We want to be able to slash for at most [max_slashable_period] *)
   (match Cycle_repr.(sub new_cycle (max_slashable_period - 1)) with
@@ -152,13 +153,28 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
            above doesn't necessarily hold. In this case, we freeze the max
            we can for the delegate. *)
         let to_freeze = Tez_repr.(min balance desired_to_freeze) in
-        Token.transfer
-          ~origin
-          ctxt
-          (`Contract delegate_contract)
-          (`Frozen_deposits delegate)
-          to_freeze
-        >|=? fun (ctxt, bupds) -> (ctxt, bupds @ balance_updates)
+        if Tez_repr.(to_freeze > zero) then
+          Token.transfer
+            ~origin
+            ctxt
+            (`Contract delegate_contract)
+            (`Frozen_deposits delegate)
+            to_freeze
+          >>=? fun (ctxt, bupds) -> return (ctxt, bupds @ balance_updates)
+        else
+          (* If the delegate cannot freeze any deposit and its current
+             deposit will remain at zero then we add the delegate to
+             the forbidden set. *)
+          (if Tez_repr.(current_amount = zero) then
+           Delegate_storage.forbid_delegate ctxt delegate
+          else Lwt.return ctxt)
+          >>= fun ctxt -> return (ctxt, balance_updates)
+      else if
+        (* => (current_amount = maximum_stake_to_be_deposited) *)
+        Tez_repr.(current_amount = zero)
+      then
+        Delegate_storage.forbid_delegate ctxt delegate >>= fun ctxt ->
+        return (ctxt, balance_updates)
       else return (ctxt, balance_updates))
     maxima
     (ctxt, balance_updates)
