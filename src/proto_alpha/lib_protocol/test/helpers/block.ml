@@ -489,7 +489,8 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
     ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
     ?blocks_per_cycle ?cycles_per_voting_period ?sc_rollup_enable
     ?sc_rollup_arith_pvm_enable ?dal_enable ?zk_rollup_enable
-    ?hard_gas_limit_per_block ?nonce_revelation_threshold () =
+    ?adaptive_inflation_enable ?hard_gas_limit_per_block
+    ?nonce_revelation_threshold () =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
   let min_proposal_quorum =
@@ -544,6 +545,11 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
   let zk_rollup_enable =
     Option.value ~default:constants.zk_rollup.enable zk_rollup_enable
   in
+  let adaptive_inflation_enable =
+    Option.value
+      ~default:constants.adaptive_inflation.enable
+      adaptive_inflation_enable
+  in
   let hard_gas_limit_per_block =
     Option.value
       ~default:constants.hard_gas_limit_per_block
@@ -576,6 +582,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
         };
       dal = {constants.dal with feature_enable = dal_enable};
       zk_rollup = {constants.zk_rollup with enable = zk_rollup_enable};
+      adaptive_inflation = {enable = adaptive_inflation_enable};
       hard_gas_limit_per_block;
       nonce_revelation_threshold;
     }
@@ -611,7 +618,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?sc_rollup_enable ?sc_rollup_arith_pvm_enable
     ?dal_enable ?zk_rollup_enable ?hard_gas_limit_per_block
-    ?nonce_revelation_threshold
+    ?adaptive_inflation_enable ?nonce_revelation_threshold
     (bootstrap_accounts : Parameters.bootstrap_account list) =
   prepare_initial_context_params
     ?consensus_threshold
@@ -630,6 +637,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?dal_enable
     ?zk_rollup_enable
     ?hard_gas_limit_per_block
+    ?adaptive_inflation_enable
     ?nonce_revelation_threshold
     ()
   >>=? fun (constants, shell, hash) ->
