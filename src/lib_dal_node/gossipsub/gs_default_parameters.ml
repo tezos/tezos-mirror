@@ -28,7 +28,7 @@
     limits. These values are used or re-defined in the DAL node before
     instantiating the Gossipsub worker. *)
 
-module Span = Gs_interface.Worker.GS.Span
+module Span = Gs_interface.Span
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5559
 

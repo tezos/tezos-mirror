@@ -256,7 +256,7 @@ module Automaton_config :
 end
 
 (** Instantiate the worker functor *)
-module Worker :
+module Worker_config :
   Gossipsub_intf.WORKER_CONFIGURATION
     with type GS.Topic.t = topic
      and type GS.Message_id.t = message_id
@@ -311,3 +311,5 @@ let span_encoding : Span.t Data_encoding.t =
        (fun span -> Span.to_int_s span)
        (fun span -> Span.of_int_s span)
        (obj1 (req "span" int16))
+
+module Worker_instance = Tezos_gossipsub.Worker (Worker_config)

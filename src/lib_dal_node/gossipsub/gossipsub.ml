@@ -27,9 +27,9 @@
 include Gs_interface
 
 module Worker = struct
-  module Config = Gs_interface.Worker
+  module Config = Gs_interface.Worker_config
   module Default_parameters = Gs_default_parameters
-  include Tezos_gossipsub.Worker (Config)
+  include Gs_interface.Worker_instance
 end
 
 module Transport_layer = struct

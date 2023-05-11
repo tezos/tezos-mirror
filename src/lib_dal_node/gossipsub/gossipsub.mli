@@ -50,11 +50,12 @@ val message_encoding : message Data_encoding.t
     of the GS parameters. *)
 module Worker : sig
   module Config :
-    module type of Gs_interface.Worker
+    module type of Gs_interface.Worker_config
       with type GS.Topic.t = topic
        and type GS.Message_id.t = message_id
        and type GS.Message.t = message
        and type GS.Peer.t = peer
+       and module GS.Span = Gs_interface.Span
 
   module Default_parameters : module type of Gs_default_parameters
 

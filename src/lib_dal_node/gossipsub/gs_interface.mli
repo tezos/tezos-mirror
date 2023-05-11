@@ -78,8 +78,16 @@ val message_encoding : message Data_encoding.t
 
 val span_encoding : Span.t Data_encoding.t
 
-module Worker :
+module Worker_config :
   Gossipsub_intf.WORKER_CONFIGURATION
+    with type GS.Topic.t = topic
+     and type GS.Message_id.t = message_id
+     and type GS.Message.t = message
+     and type GS.Peer.t = peer
+     and module GS.Span = Span
+
+module Worker_instance :
+  Gossipsub_intf.WORKER
     with type GS.Topic.t = topic
      and type GS.Message_id.t = message_id
      and type GS.Message.t = message
