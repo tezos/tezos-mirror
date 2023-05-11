@@ -67,7 +67,7 @@ val get_certificate :
     unit * Dac_plugin.raw_hash,
     unit,
     unit,
-    Certificate_repr.V0.t option )
+    Certificate_repr.t option )
   Tezos_rpc.Service.service
 
 (**  GET dac/missing_page/[page_hash] Observer fetches the missing page 

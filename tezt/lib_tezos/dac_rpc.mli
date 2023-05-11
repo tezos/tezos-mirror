@@ -57,14 +57,10 @@ val put_dac_member_signature :
         endpoint. *)
 val get_missing_page : hex_root_hash:Hex.t -> (Dac_node.t, string) RPC_core.t
 
-(** Since [Certificate_repr.t] is now versioned, we should define one
-    module per version. *)
-module Certificate_V0 : sig
-  (** [get_certificate ~hex_root_hash] fetches the DAC certificate for the
+(** [get_certificate ~hex_root_hash] fetches the DAC certificate for the
     provided [hex_root_hash]. *)
-  val get_certificate :
-    hex_root_hash:Hex.t -> (Dac_node.t, int * string * string * int) RPC_core.t
-end
+val get_certificate :
+  hex_root_hash:Hex.t -> (Dac_node.t, int * string * string * int) RPC_core.t
 
 module Coordinator : sig
   (** [post_preimage ~payload] sends a [payload] to the DAC

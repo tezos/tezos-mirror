@@ -75,3 +75,30 @@ module V0 = struct
     let missing_witnesses = Z.logand expected_witnesses (Z.lognot witnesses) in
     Z.(equal missing_witnesses zero)
 end
+
+type t = V0 of V0.t
+
+let encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"certificate_repr_V0"
+        Json_only
+        V0.encoding
+        (function V0 s -> Some s)
+        (fun s -> V0 s);
+    ]
+
+let get_root_hash t = match t with V0 t -> t.root_hash
+
+let get_aggregate_signature t = match t with V0 t -> t.aggregate_signature
+
+let get_witnesses t = match t with V0 t -> t.witnesses
+
+let get_version t = match t with V0 _t -> V0.version
+
+let all_committee_members_have_signed committee_members certificate =
+  match certificate with
+  | V0 certificate ->
+      V0.all_committee_members_have_signed committee_members certificate

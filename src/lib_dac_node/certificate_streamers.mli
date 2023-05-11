@@ -30,7 +30,7 @@
 
 (** The type of [Certificate_streamers]. Values of type
     [Certificate_streamers.t] map root hashes to
-    [Certificate_repr.V0.t Data_streamer.t]. *)
+    [Certificate_repr.t Data_streamer.t]. *)
 type t
 
 (** [init ()] returns an empty map of certificate streams. *)
@@ -43,7 +43,7 @@ val handle_subscribe :
   Dac_plugin.t ->
   t ->
   Dac_plugin.raw_hash ->
-  (Certificate_repr.V0.t Lwt_stream.t * Lwt_watcher.stopper) tzresult
+  (Certificate_repr.t Lwt_stream.t * Lwt_watcher.stopper) tzresult
 
 (** [push dac_plugin t root_hash certificate] streams the updated certificate for
     [root_hash]. *)
@@ -51,7 +51,7 @@ val push :
   Dac_plugin.t ->
   t ->
   Dac_plugin.raw_hash ->
-  Certificate_repr.V0.t ->
+  Certificate_repr.t ->
   unit tzresult
 
 (** [close dac_plugin t root_hash] closes the certificate [Data_streamer.t] for

@@ -32,12 +32,7 @@ module V0 : sig
   (** Representation of a Data Availibility Committee Certificate.
      Type is private to make sure correct [version] is used.
      Use [make] function to create a [Certificate_repr.V0.t]. *)
-  type t = private {
-    version : int;
-    root_hash : Dac_plugin.raw_hash;
-    aggregate_signature : Tezos_crypto.Aggregate_signature.signature;
-    witnesses : Z.t;
-  }
+  type t
 
   (** Create a [Certificate_repr.V0.t] from given [Dac_plugin.raw_hash],
      [Tezos_crypto.Aggregate_signature.signature] and [Z.t].
@@ -47,10 +42,26 @@ module V0 : sig
     Tezos_crypto.Aggregate_signature.signature ->
     Z.t ->
     t
-
-  val encoding : t Data_encoding.t
-
-  (** [Certificate_repr.V0.all_committee_members_have_signed committee_members certificate] 
-     will return [true] if all members have signed, otherwise it will return [false]. *)
-  val all_committee_members_have_signed : 'a trace -> t -> bool
 end
+
+type t = V0 of V0.t
+
+(** Used to return any version of [Certificate_repr] on 
+     DAC RPC endpoints. *)
+val encoding : t Data_encoding.t
+
+(** Helper to get [root_hash] from any given version of [Certificate_repr]. *)
+val get_root_hash : t -> Dac_plugin.raw_hash
+
+(** Helper to get [aggregate_signature] from any given version of [Certificate_repr]. *)
+val get_aggregate_signature : t -> Tezos_crypto.Aggregate_signature.signature
+
+(** Helper to get [witnesses] from any given version of [Certificate_repr]. *)
+val get_witnesses : t -> Z.t
+
+(** Helper to get [version] from any given version of [Certificate_repr]. *)
+val get_version : t -> int
+
+(** [Certificate_repr.all_committee_members_have_signed committee_members certificate] 
+     will return [true] if all members have signed, otherwise it will return [false]. *)
+val all_committee_members_have_signed : 'a list -> t -> bool

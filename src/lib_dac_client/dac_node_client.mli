@@ -73,7 +73,7 @@ val put_dac_member_signature :
 val get_certificate :
   #cctxt ->
   root_page_hash:Dac_plugin.raw_hash ->
-  Certificate_repr.V0.t option tzresult Lwt.t
+  Certificate_repr.t option tzresult Lwt.t
 
 (** [monitor_certificate cctxt ~root_hash] returns a stream and a
     stopper for monitoring certificate updates for [root_hash]. *)

@@ -80,16 +80,14 @@ let put_dac_member_signature ~hex_root_hash ~dac_member_pkh ~signature =
 let get_missing_page ~hex_root_hash =
   make GET ["missing_page"; Hex.show hex_root_hash] JSON.as_string
 
-module Certificate_V0 = struct
-  let get_certificate ~hex_root_hash =
-    let (`Hex page_hash) = hex_root_hash in
-    make GET ["certificates"; page_hash] @@ fun json ->
-    JSON.
-      ( json |-> "witnesses" |> as_int,
-        json |-> "aggregate_signature" |> as_string,
-        json |-> "root_hash" |> as_string,
-        json |-> "version" |> as_int )
-end
+let get_certificate ~hex_root_hash =
+  let (`Hex page_hash) = hex_root_hash in
+  make GET ["certificates"; page_hash] @@ fun json ->
+  JSON.
+    ( json |-> "witnesses" |> as_int,
+      json |-> "aggregate_signature" |> as_string,
+      json |-> "root_hash" |> as_string,
+      json |-> "version" |> as_int )
 
 module Coordinator = struct
   let post_preimage ~payload =

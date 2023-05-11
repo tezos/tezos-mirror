@@ -27,16 +27,18 @@ let certificate_client_encoding =
   let untagged =
     Data_encoding.(
       conv
-        (fun Certificate_repr.{root_hash; aggregate_signature; witnesses} ->
-          ( Dac_plugin.raw_hash_to_bytes root_hash,
-            aggregate_signature,
-            witnesses ))
+        (fun certificate ->
+          ( Dac_plugin.raw_hash_to_bytes
+            @@ Certificate_repr.get_root_hash certificate,
+            Certificate_repr.get_aggregate_signature certificate,
+            Certificate_repr.get_witnesses certificate ))
         (fun (root_hash, aggregate_signature, witnesses) ->
-          {
-            root_hash = Dac_plugin.raw_hash_of_bytes root_hash;
-            aggregate_signature;
-            witnesses;
-          })
+          Certificate_repr.(
+            V0
+              (V0.make
+                 (Dac_plugin.raw_hash_of_bytes root_hash)
+                 aggregate_signature
+                 witnesses)))
         (obj3
            (req "root_hash" (Fixed.bytes 33))
            (req "aggregate_signature" Tezos_crypto.Aggregate_signature.encoding)
@@ -68,7 +70,8 @@ let serialize_certificate certificate =
 let send_preimage cctxt payload =
   Dac_node_client.Coordinator.post_preimage cctxt ~payload
 
-let number_of_witnesses Certificate_repr.{witnesses; _} =
+let number_of_witnesses certificate =
+  let witnesses = Certificate_repr.get_witnesses certificate in
   let rec find_next witnesses num_witnesses =
     if Z.(equal witnesses zero) then num_witnesses
     else

@@ -41,7 +41,7 @@ module S : sig
       unit * Dac_plugin.raw_hash,
       unit,
       unit,
-      Certificate_repr.V0.t )
+      Certificate_repr.t )
     Tezos_rpc.Service.service
 end
 
@@ -59,6 +59,6 @@ val root_hashes :
 val certificate :
   #Tezos_rpc.Context.streamed ->
   Dac_plugin.raw_hash ->
-  (Certificate_repr.V0.t Lwt_stream.t * Tezos_rpc.Context.stopper)
+  (Certificate_repr.t Lwt_stream.t * Tezos_rpc.Context.stopper)
   Error_monad.tzresult
   Lwt.t

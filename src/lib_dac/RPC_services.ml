@@ -83,7 +83,7 @@ let get_certificate =
     ~description:
       "Retrieve the Dac certificate associated with the given root page hash"
     ~query:Tezos_rpc.Query.empty
-    ~output:(Data_encoding.option Certificate_repr.V0.encoding)
+    ~output:(Data_encoding.option Certificate_repr.encoding)
     Tezos_rpc.Path.(open_root / "certificates" /: Dac_plugin.raw_hash_rpc_arg)
 
 let get_missing_page =

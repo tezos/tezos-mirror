@@ -43,7 +43,7 @@ module S = struct
          once delivery, i.e. a certificate update could be streamed multiple \
          times."
       ~query:Tezos_rpc.Query.empty
-      ~output:Certificate_repr.V0.encoding
+      ~output:Certificate_repr.encoding
       Tezos_rpc.Path.(
         open_root / "monitor" / "certificate" /: Dac_plugin.raw_hash_rpc_arg)
 end

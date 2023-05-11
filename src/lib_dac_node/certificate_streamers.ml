@@ -33,7 +33,7 @@ end)
 (* A [Certificate_streamer.t] is a mutable map that associates to root hashes
    values of type [Certificate_repr.V0.t Data_streamer.t]. Such data streamers are
    used to notify clients of updates of DAC certificates. *)
-type t = Certificate_repr.V0.t Data_streamer.t Map.t ref
+type t = Certificate_repr.t Data_streamer.t Map.t ref
 
 let init () = ref Map.empty
 

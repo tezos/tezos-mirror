@@ -49,7 +49,7 @@ type certificate_store_value = {
 }
 
 (** Key-value store for Dac certificates where keys are hexified [Dac_hash.t]
-    and values are [Certificate_repr.V0.t]. *)
+    and values are [Certificate_repr.t]. *)
 module Certificate_store :
   Store_sigs.Map
     with type 'a store = 'a Irmin_store.t

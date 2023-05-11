@@ -26,27 +26,30 @@
 (** Testing
     -------
     Component:  Lib_dac Certificate_repr
-    Invocation: dune exec src/lib_dac_node/test/main.exe -- --file test_certificate.ml
+    Invocation: dune exec src/lib_dac/test/main.exe -- --file test_certificate.ml
     Subject:    Tests for the Certificate_repr.
 *)
 
-let assert_equal_certificate (c1 : Certificate_repr.V0.t)
-    (c2 : Certificate_repr.V0.t) =
-  c1.witnesses = c2.witnesses
-  && c1.aggregate_signature = c2.aggregate_signature
-  && c1.root_hash = c2.root_hash
-  && c1.version = c2.version && c1.version = 0 && c2.version = 0
+let assert_equal_certificate (c1 : Certificate_repr.t) (c2 : Certificate_repr.t)
+    =
+  Certificate_repr.get_witnesses c1 = Certificate_repr.get_witnesses c2
+  && Certificate_repr.get_aggregate_signature c1
+     = Certificate_repr.get_aggregate_signature c2
+  && Certificate_repr.get_root_hash c1 = Certificate_repr.get_root_hash c2
+  && Certificate_repr.get_version c1 = Certificate_repr.get_version c2
+
+let raw_hash_of_hex hex = Hex.to_bytes (`Hex hex)
 
 let create_certificate root_hash signature witnesses =
-  let root_hash = Dac_plugin.raw_hash_of_hex root_hash in
+  let root_hash = raw_hash_of_hex root_hash in
   let signature = Tezos_crypto.Aggregate_signature.of_b58check_opt signature in
   let witnesses = Z.of_int witnesses in
   match (root_hash, signature, witnesses) with
   | Some root_hash, Some signature, witnesses ->
-      Certificate_repr.V0.make root_hash signature witnesses
-  | _ ->
-      Stdlib.failwith
-        "Impossible to create Certificate_repr.t from given values"
+      Certificate_repr.(
+        V0
+          (V0.make (Dac_plugin.raw_hash_of_bytes root_hash) signature witnesses))
+  | _ -> assert false
 
 (** When creating a [Certificate.V0.t] with [make] function
     Version field in created certificate must be equal to 0. *)
@@ -58,10 +61,10 @@ let test_version_is_0 () =
       "asigHmGKUsRdN53gbjZoZ36akZEhJn6Cp2dsDzbypqMeaAxoHebs8xLkUpi4xtWpaLaxRkXSsyUeN7ZJsQ8no7B2nP75Kd9D5XKLQmfTE3qRYomyaAX9rRjSMk9hFEK4HJRnizgHA36zc"
       1
   in
-  return @@ assert (certificate.version = 0)
+  return @@ assert (Certificate_repr.get_version certificate = 0)
 
-(** Encode and decode a certificate, leads to the same certificate. *)
-let binary_encode_decode () =
+(** Encode to binary a certificate fails. *)
+let binary_encode () =
   let open Lwt_result_syntax in
   let certificate =
     create_certificate
@@ -70,14 +73,12 @@ let binary_encode_decode () =
       1
   in
   let encoded_certificate =
-    Data_encoding.Binary.to_bytes_exn Certificate_repr.V0.encoding certificate
+    Data_encoding.Binary.to_bytes Certificate_repr.encoding certificate
   in
-  let decoded_certificate =
-    Data_encoding.Binary.of_bytes_exn
-      Certificate_repr.V0.encoding
-      encoded_certificate
-  in
-  return @@ assert (assert_equal_certificate certificate decoded_certificate)
+
+  match encoded_certificate with
+  | Ok _ -> return @@ assert false
+  | Error _ -> return @@ assert true
 
 let json_encode_decode () =
   let open Lwt_result_syntax in
@@ -88,10 +89,10 @@ let json_encode_decode () =
       1
   in
   let encoded_certificate =
-    Data_encoding.Json.construct Certificate_repr.V0.encoding certificate
+    Data_encoding.Json.construct Certificate_repr.encoding certificate
   in
   let decoded_certificate =
-    Data_encoding.Json.destruct Certificate_repr.V0.encoding encoded_certificate
+    Data_encoding.Json.destruct Certificate_repr.encoding encoded_certificate
   in
   return @@ assert (assert_equal_certificate certificate decoded_certificate)
 
@@ -104,7 +105,7 @@ let json_decode () =
       1
   in
   let encoded_certificate =
-    Data_encoding.Json.construct Certificate_repr.V0.encoding certificate
+    Data_encoding.Json.construct Certificate_repr.encoding certificate
   in
   let expected_json =
     Data_encoding.Json.from_string
@@ -119,7 +120,7 @@ let json_decode () =
   in
   match expected_json with
   | Ok expected_json -> return @@ assert (encoded_certificate = expected_json)
-  | _ -> Stdlib.failwith "unreachable"
+  | _ -> assert false
 
 let json_encode () =
   let open Lwt_result_syntax in
@@ -143,10 +144,10 @@ let json_encode () =
   match json with
   | Ok expected_json ->
       let decoded_certificate =
-        Data_encoding.Json.destruct Certificate_repr.V0.encoding expected_json
+        Data_encoding.Json.destruct Certificate_repr.encoding expected_json
       in
       return @@ assert (certificate = decoded_certificate)
-  | _ -> Stdlib.failwith "unreachable"
+  | _ -> assert false
 
 let tests =
   [
@@ -154,7 +155,7 @@ let tests =
       "Verify Certificate_repr.version is equal to 0"
       `Quick
       test_version_is_0;
-    Tztest.tztest "Simple Binary encode decode" `Quick binary_encode_decode;
+    Tztest.tztest "Simple Binary encode" `Quick binary_encode;
     Tztest.tztest "Simple JSON encode decode" `Quick json_encode_decode;
     Tztest.tztest "Simple JSON decode" `Quick json_decode;
     Tztest.tztest "Simple JSON encode" `Quick json_encode;
