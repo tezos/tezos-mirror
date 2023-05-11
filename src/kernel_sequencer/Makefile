@@ -24,3 +24,7 @@ build-dev-deps:
 .PHONY: test
 test:
 	@cargo test
+
+.PHONY: clean
+clean:
+	@cargo clean
