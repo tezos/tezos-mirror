@@ -132,6 +132,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | Peer_backed_off : [`Graft] output
     | Mesh_full : [`Graft] output
     | Prune_topic_not_tracked : [`Prune] output
+    | Peer_not_in_mesh : [`Prune] output
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
     | No_PX : [`Prune] output
     | PX : Peer.Set.t -> [`Prune] output
@@ -943,6 +944,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let handle peer topic ~px ~backoff =
       let open Monad.Syntax in
       let*? mesh = check_topic_tracked topic in
+      let*? () = fail_if_not (Peer.Set.mem peer mesh) Peer_not_in_mesh in
       let mesh = Peer.Set.remove peer mesh in
       let* () = set_mesh_topic topic mesh in
       let* () = set_backoff_for_peer backoff topic peer in
@@ -2108,6 +2110,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | Peer_backed_off -> fprintf fmtr "Peer_backed_off"
     | Mesh_full -> fprintf fmtr "Mesh_full"
     | Prune_topic_not_tracked -> fprintf fmtr "Prune_topic_not_tracked"
+    | Peer_not_in_mesh -> fprintf fmtr "Peer_not_in_mesh"
     | Ignore_PX_score_too_low score ->
         fprintf fmtr "Ignore_PX_score_too_low %a" Score.pp score
     | No_PX -> fprintf fmtr "No_PX"

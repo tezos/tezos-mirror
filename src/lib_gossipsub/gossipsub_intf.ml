@@ -644,6 +644,8 @@ module type AUTOMATON = sig
             peers. *)
     | Prune_topic_not_tracked : [`Prune] output
         (** Attempting to prune a peer for a non-tracked topic. *)
+    | Peer_not_in_mesh : [`Prune] output
+        (** Attempting to prune a peer which is not in the mesh. *)
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
         (** The given peer has been pruned for the given topic, but no
             alternative peers are returned because the peer's score is too low.
