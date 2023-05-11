@@ -724,15 +724,30 @@ let fix_checkpoint chain_dir block_store ~head ~savepoint =
   in
   return inferred_checkpoint
 
-let check_block_protocol_hash context_index ~expected block =
+let check_block_protocol_hash block_store context_index ~expected block =
   let open Lwt_result_syntax in
-  protect @@ fun () ->
-  let*! ctxt = Context.checkout_exn context_index (Block_repr.context block) in
-  let*! got = Context.get_protocol ctxt in
-  return Protocol_hash.(got = expected)
+  protect (fun () ->
+      let* resulting_context_hash_opt =
+        Block_store.resulting_context_hash
+          ~fetch_expect_predecessor_context:(fun () ->
+            let* (module Protocol) = Registered_protocol.get_result expected in
+            return
+              (Protocol.expected_context_hash = Predecessor_resulting_context))
+          block_store
+          (Block (Block_repr.hash block, 0))
+      in
+      match resulting_context_hash_opt with
+      | Some ctxt_hash -> (
+          let*! ctxt = Context.checkout context_index ctxt_hash in
+          match ctxt with
+          | Some ctxt ->
+              let*! got = Context.get_protocol ctxt in
+              return Protocol_hash.(got = expected)
+          | None -> return_false)
+      | None -> return_false)
 
 (** Look into the cemented store for the lowest block with an
-    associated proto level that is above the savepoint. *)
+    associated proto level that is below the savepoint. *)
 let find_activation_blocks_in_cemented block_store ~savepoint_level ~proto_level
     =
   let open Lwt_result_syntax in
@@ -800,16 +815,19 @@ let find_activation_blocks_in_cemented block_store ~savepoint_level ~proto_level
           let min_proto_level = Block_repr.proto_level min_b in
           let max_proto_level = Block_repr.proto_level max_b in
           if Compare.Int.(min_proto_level > proto_level) then
-            (* Too recent *)
+            (* The proto_level was activated below the lower bound of
+               this cycle (in an older cycle), continuing the
+               search. *)
             find_activation_cycle cycle (pred n)
           else if Compare.Int.(max_proto_level < proto_level) then
-            (* Too high, it must be in the previous cycle *)
+            (* The proto_level was activated above the upper bound of
+               this cycle (in a more recent cycle), it must be in the
+               previously searched cycle. *)
             return previous_cycle
           else if
             min_proto_level <= proto_level && proto_level <= max_proto_level
-          then
-            (* Activation may have occured in a previous cycle *)
-            find_activation_cycle cycle (pred n)
+          then (* Activation have occurred in this cycle. *)
+            return cycle
           else
             (* All cases are covered:
                (proto_level < min) v (max < proto_level) v
@@ -964,6 +982,7 @@ let fix_protocol_levels chain_dir block_store context_index genesis
             | Some b ->
                 let* protocol_matches =
                   check_block_protocol_hash
+                    block_store
                     context_index
                     ~expected:proto_info.protocol
                     b
