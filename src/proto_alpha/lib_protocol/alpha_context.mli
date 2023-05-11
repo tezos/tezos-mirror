@@ -4831,13 +4831,6 @@ module Fees : sig
     payer:Token.giver ->
     (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
 
-  val burn_tx_rollup_origination_fees :
-    ?origin:Receipt.update_origin ->
-    context ->
-    storage_limit:Z.t ->
-    payer:Token.giver ->
-    (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
-
   val burn_sc_rollup_origination_fees :
     ?origin:Receipt.update_origin ->
     context ->
