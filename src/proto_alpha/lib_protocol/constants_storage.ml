@@ -76,25 +76,13 @@ let vdf_difficulty c =
   let constants = Raw_context.constants c in
   constants.vdf_difficulty
 
-let seed_nonce_revelation_tip c =
-  let constants = Raw_context.constants c in
-  constants.seed_nonce_revelation_tip
-
 let origination_size c =
   let constants = Raw_context.constants c in
   constants.origination_size
 
-let baking_reward_fixed_portion c =
+let reward_weights c =
   let constants = Raw_context.constants c in
-  constants.baking_reward_fixed_portion
-
-let baking_reward_bonus_per_slot c =
-  let constants = Raw_context.constants c in
-  constants.baking_reward_bonus_per_slot
-
-let endorsing_reward_per_slot c =
-  let constants = Raw_context.constants c in
-  constants.endorsing_reward_per_slot
+  constants.reward_weights
 
 let quorum_min c =
   let constants = Raw_context.constants c in
@@ -107,10 +95,6 @@ let quorum_max c =
 let min_proposal_quorum c =
   let constants = Raw_context.constants c in
   constants.min_proposal_quorum
-
-let liquidity_baking_subsidy c =
-  let constants = Raw_context.constants c in
-  constants.liquidity_baking_subsidy
 
 let liquidity_baking_toggle_ema_threshold c =
   let constants = Raw_context.constants c in

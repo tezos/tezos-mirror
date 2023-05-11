@@ -44,23 +44,23 @@ This sequence of operations was run:
     [ { "cycle": 2, "pkh": "[PUBLIC_KEY_HASH]" } ] }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
-{ "full_balance": "4000003836623", "current_frozen_deposits": "200000191831",
-  "frozen_deposits": "200000191831", "staking_balance": "4000003836623",
+{ "full_balance": "4000002964496", "current_frozen_deposits": "200000148224",
+  "frozen_deposits": "200000148224", "staking_balance": "4000002964496",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0", "deactivated": false, "grace_period": 3,
   "voting_power": "4000000000000", "remaining_proposals": 20,
   "active_consensus_key": "[PUBLIC_KEY_HASH]" }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
-{ "full_balance": "4000003836623", "current_frozen_deposits": "200000191831",
-  "frozen_deposits": "200000191831", "staking_balance": "4000003836623",
+{ "full_balance": "4000002964496", "current_frozen_deposits": "200000148224",
+  "frozen_deposits": "200000148224", "staking_balance": "4000002964496",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0", "deactivated": false, "grace_period": 3,
   "voting_power": "4000000000000", "remaining_proposals": 20,
   "active_consensus_key": "[PUBLIC_KEY_HASH]" }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
-"3800003644792"
+"3800002816272"
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "0"
@@ -84,25 +84,25 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.06425
       storage fees ........................... +ꜩ0.06425
-      [PUBLIC_KEY_HASH] ... -ꜩ3762003.544737
-      [PUBLIC_KEY_HASH] ... +ꜩ3762003.544737
-      [PUBLIC_KEY_HASH] ... -ꜩ38000.035805
-      [PUBLIC_KEY_HASH] ... +ꜩ38000.035805
+      [PUBLIC_KEY_HASH] ... -ꜩ3762002.724502
+      [PUBLIC_KEY_HASH] ... +ꜩ3762002.724502
+      [PUBLIC_KEY_HASH] ... -ꜩ38000.02752
+      [PUBLIC_KEY_HASH] ... +ꜩ38000.02752
 
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
-{ "full_balance": "238000560969", "current_frozen_deposits": "200000191831",
-  "frozen_deposits": "200000191831", "staking_balance": "238000560969",
+{ "full_balance": "238000509077", "current_frozen_deposits": "200000148224",
+  "frozen_deposits": "200000148224", "staking_balance": "238000509077",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0", "deactivated": false, "grace_period": 4,
   "voting_power": "4000000000000", "remaining_proposals": 20,
   "active_consensus_key": "[PUBLIC_KEY_HASH]" }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
-"38000369138"
+"38000360853"
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "0"
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
-"3762003544737"
+"3762002724502"

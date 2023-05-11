@@ -125,6 +125,16 @@ type zk_rollup = {
 
 type adaptive_inflation = {enable : bool}
 
+type reward_weights = {
+  base_total_rewards_per_minute : Tez_repr.t;
+  baking_reward_fixed_portion_weight : int;
+  baking_reward_bonus_weight : int;
+  endorsing_reward_weight : int;
+  liquidity_baking_subsidy_weight : int;
+  seed_nonce_revelation_tip_weight : int;
+  vdf_revelation_tip_weight : int;
+}
+
 type t = {
   preserved_cycles : int;
   blocks_per_cycle : int32;
@@ -137,17 +147,13 @@ type t = {
   proof_of_work_threshold : int64;
   minimal_stake : Tez_repr.t;
   vdf_difficulty : int64;
-  seed_nonce_revelation_tip : Tez_repr.t;
   origination_size : int;
-  baking_reward_fixed_portion : Tez_repr.t;
-  baking_reward_bonus_per_slot : Tez_repr.t;
-  endorsing_reward_per_slot : Tez_repr.t;
+  reward_weights : reward_weights;
   cost_per_byte : Tez_repr.t;
   hard_storage_limit_per_operation : Z.t;
   quorum_min : int32;
   quorum_max : int32;
   min_proposal_quorum : int32;
-  liquidity_baking_subsidy : Tez_repr.t;
   liquidity_baking_toggle_ema_threshold : int32;
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
@@ -332,6 +338,51 @@ let adaptive_inflation_encoding =
     (fun adaptive_inflation_enable -> {enable = adaptive_inflation_enable})
     (obj1 (req "adaptive_inflation_enable" bool))
 
+let reward_weights_encoding =
+  let open Data_encoding in
+  conv
+    (fun ({
+            base_total_rewards_per_minute;
+            baking_reward_fixed_portion_weight;
+            baking_reward_bonus_weight;
+            endorsing_reward_weight;
+            liquidity_baking_subsidy_weight;
+            seed_nonce_revelation_tip_weight;
+            vdf_revelation_tip_weight;
+          } :
+           reward_weights) ->
+      ( base_total_rewards_per_minute,
+        baking_reward_fixed_portion_weight,
+        baking_reward_bonus_weight,
+        endorsing_reward_weight,
+        liquidity_baking_subsidy_weight,
+        seed_nonce_revelation_tip_weight,
+        vdf_revelation_tip_weight ))
+    (fun ( base_total_rewards_per_minute,
+           baking_reward_fixed_portion_weight,
+           baking_reward_bonus_weight,
+           endorsing_reward_weight,
+           liquidity_baking_subsidy_weight,
+           seed_nonce_revelation_tip_weight,
+           vdf_revelation_tip_weight ) ->
+      {
+        base_total_rewards_per_minute;
+        baking_reward_fixed_portion_weight;
+        baking_reward_bonus_weight;
+        endorsing_reward_weight;
+        liquidity_baking_subsidy_weight;
+        seed_nonce_revelation_tip_weight;
+        vdf_revelation_tip_weight;
+      })
+    (obj7
+       (req "base_index_of_total_rewards_per_minute" Tez_repr.encoding)
+       (req "baking_reward_fixed_weight" int31)
+       (req "baking_reward_bonus_weight" int31)
+       (req "endorsing_reward_weight" int31)
+       (req "liquidity_baking_subsidy_weight" int31)
+       (req "nonce_revelation_tip_weight" int31)
+       (req "vdf_revelation_tip_weight" int31))
+
 let encoding =
   let open Data_encoding in
   conv
@@ -347,17 +398,13 @@ let encoding =
           c.proof_of_work_threshold,
           c.minimal_stake ),
         ( ( c.vdf_difficulty,
-            c.seed_nonce_revelation_tip,
             c.origination_size,
-            c.baking_reward_fixed_portion,
-            c.baking_reward_bonus_per_slot,
-            c.endorsing_reward_per_slot,
+            c.reward_weights,
             c.cost_per_byte,
             c.hard_storage_limit_per_operation,
             c.quorum_min ),
           ( ( c.quorum_max,
               c.min_proposal_quorum,
-              c.liquidity_baking_subsidy,
               c.liquidity_baking_toggle_ema_threshold,
               c.max_operations_time_to_live,
               c.minimal_block_delay,
@@ -388,17 +435,13 @@ let encoding =
              proof_of_work_threshold,
              minimal_stake ),
            ( ( vdf_difficulty,
-               seed_nonce_revelation_tip,
                origination_size,
-               baking_reward_fixed_portion,
-               baking_reward_bonus_per_slot,
-               endorsing_reward_per_slot,
+               reward_weights,
                cost_per_byte,
                hard_storage_limit_per_operation,
                quorum_min ),
              ( ( quorum_max,
                  min_proposal_quorum,
-                 liquidity_baking_subsidy,
                  liquidity_baking_toggle_ema_threshold,
                  max_operations_time_to_live,
                  minimal_block_delay,
@@ -430,17 +473,13 @@ let encoding =
         proof_of_work_threshold;
         minimal_stake;
         vdf_difficulty;
-        seed_nonce_revelation_tip;
         origination_size;
-        baking_reward_fixed_portion;
-        baking_reward_bonus_per_slot;
-        endorsing_reward_per_slot;
+        reward_weights;
         cost_per_byte;
         hard_storage_limit_per_operation;
         quorum_min;
         quorum_max;
         min_proposal_quorum;
-        liquidity_baking_subsidy;
         liquidity_baking_toggle_ema_threshold;
         max_operations_time_to_live;
         minimal_block_delay;
@@ -480,21 +519,17 @@ let encoding =
           (req "proof_of_work_threshold" int64)
           (req "minimal_stake" Tez_repr.encoding))
        (merge_objs
-          (obj9
+          (obj6
              (req "vdf_difficulty" int64)
-             (req "seed_nonce_revelation_tip" Tez_repr.encoding)
              (req "origination_size" int31)
-             (req "baking_reward_fixed_portion" Tez_repr.encoding)
-             (req "baking_reward_bonus_per_slot" Tez_repr.encoding)
-             (req "endorsing_reward_per_slot" Tez_repr.encoding)
+             (req "reward_weights" reward_weights_encoding)
              (req "cost_per_byte" Tez_repr.encoding)
              (req "hard_storage_limit_per_operation" z)
              (req "quorum_min" int32))
           (merge_objs
-             (obj9
+             (obj8
                 (req "quorum_max" int32)
                 (req "min_proposal_quorum" int32)
-                (req "liquidity_baking_subsidy" Tez_repr.encoding)
                 (req "liquidity_baking_toggle_ema_threshold" int32)
                 (req "max_operations_time_to_live" int16)
                 (req "minimal_block_delay" Period_repr.encoding)

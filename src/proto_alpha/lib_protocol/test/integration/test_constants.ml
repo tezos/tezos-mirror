@@ -178,17 +178,32 @@ let test_sc_rollup_max_commitment_storage_size () =
    1/16th of the maximum reward. *)
 let liquidity_baking_subsidy_param () =
   let constants = Default_parameters.constants_mainnet in
-  constants.baking_reward_bonus_per_slot
+  let get_reward =
+    Protocol.Alpha_context.Delegate.Rewards.Internal_for_tests
+    .reward_from_constants
+      ~csts:constants
+  in
+  let baking_reward_bonus_per_slot =
+    get_reward ~reward_kind:Baking_reward_bonus_per_slot
+  in
+  baking_reward_bonus_per_slot
   *? Int64.of_int (constants.consensus_committee_size / 3)
   >>?= fun baking_reward_bonus ->
-  constants.baking_reward_fixed_portion +? baking_reward_bonus
-  >>?= fun baking_rewards ->
-  constants.endorsing_reward_per_slot
-  *? Int64.of_int constants.consensus_committee_size
+  let baking_reward_fixed_portion =
+    get_reward ~reward_kind:Baking_reward_fixed_portion
+  in
+  baking_reward_fixed_portion +? baking_reward_bonus >>?= fun baking_rewards ->
+  let endorsing_reward_per_slot =
+    get_reward ~reward_kind:Endorsing_reward_per_slot
+  in
+  endorsing_reward_per_slot *? Int64.of_int constants.consensus_committee_size
   >>?= fun validators_rewards ->
   baking_rewards +? validators_rewards >>?= fun total_rewards ->
   total_rewards /? 16L >>?= fun expected_subsidy ->
-  constants.liquidity_baking_subsidy -? expected_subsidy >>?= fun diff ->
+  let liquidity_baking_subsidy =
+    get_reward ~reward_kind:Liquidity_baking_subsidy
+  in
+  liquidity_baking_subsidy -? expected_subsidy >>?= fun diff ->
   let max_diff = 1000 (* mutez *) in
   Assert.leq_int ~loc:__LOC__ (Int64.to_int (to_mutez diff)) max_diff
 

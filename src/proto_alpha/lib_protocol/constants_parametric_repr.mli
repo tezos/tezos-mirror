@@ -140,6 +140,22 @@ type zk_rollup = {
 
 type adaptive_inflation = {enable : bool}
 
+type reward_weights = {
+  (* [base_total_rewards_per_minute] is the total amount of rewards expected to
+     be distributed every minute *)
+  base_total_rewards_per_minute : Tez_repr.t;
+  (* The following fields represent the "weights" of the respective reward kinds.
+     The actual reward values are computed proportionally from the other weights
+     as a portion of the [base_total_rewards_per_minute]. See the module
+     {!Delegate_rewards} for more details *)
+  baking_reward_fixed_portion_weight : int;
+  baking_reward_bonus_weight : int;
+  endorsing_reward_weight : int;
+  liquidity_baking_subsidy_weight : int;
+  seed_nonce_revelation_tip_weight : int;
+  vdf_revelation_tip_weight : int;
+}
+
 type t = {
   preserved_cycles : int;
   blocks_per_cycle : int32;
@@ -152,18 +168,14 @@ type t = {
   proof_of_work_threshold : int64;
   minimal_stake : Tez_repr.t;
   vdf_difficulty : int64;
-  seed_nonce_revelation_tip : Tez_repr.t;
   origination_size : int;
-  baking_reward_fixed_portion : Tez_repr.t;
-  baking_reward_bonus_per_slot : Tez_repr.t;
-  endorsing_reward_per_slot : Tez_repr.t;
+  reward_weights : reward_weights;
   cost_per_byte : Tez_repr.t;
   hard_storage_limit_per_operation : Z.t;
   quorum_min : int32;
   (* in centile of a percentage *)
   quorum_max : int32;
   min_proposal_quorum : int32;
-  liquidity_baking_subsidy : Tez_repr.t;
   liquidity_baking_toggle_ema_threshold : int32;
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;

@@ -59,7 +59,7 @@ let () =
 let bonus_baking_reward ctxt ~endorsing_power =
   let consensus_threshold = Constants.consensus_threshold ctxt in
   let baking_reward_bonus_per_slot =
-    Constants.baking_reward_bonus_per_slot ctxt
+    Delegate.Rewards.baking_reward_bonus_per_slot ctxt
   in
   let extra_endorsing_power = endorsing_power - consensus_threshold in
   error_when

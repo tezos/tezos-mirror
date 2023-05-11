@@ -175,6 +175,7 @@
   Delegate_consensus_key
   Delegate_storage
   Delegate_sampler
+  Delegate_rewards
   Delegate_missed_endorsements_storage
   Delegate_slashed_deposits_storage
   Delegate_cycles
@@ -454,6 +455,7 @@
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
+  delegate_rewards.ml delegate_rewards.mli
   delegate_missed_endorsements_storage.ml
   delegate_missed_endorsements_storage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
@@ -735,6 +737,7 @@
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
+  delegate_rewards.ml delegate_rewards.mli
   delegate_missed_endorsements_storage.ml
   delegate_missed_endorsements_storage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
@@ -1000,6 +1003,7 @@
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
+  delegate_rewards.ml delegate_rewards.mli
   delegate_missed_endorsements_storage.ml
   delegate_missed_endorsements_storage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli

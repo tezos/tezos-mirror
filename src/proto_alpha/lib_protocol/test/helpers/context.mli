@@ -108,6 +108,10 @@ val get_liquidity_baking_subsidy : t -> Tez.t tzresult Lwt.t
 
 val get_liquidity_baking_cpmm_address : t -> Contract_hash.t tzresult Lwt.t
 
+val get_seed_nonce_revelation_tip : t -> Tez.t tzresult Lwt.t
+
+val get_vdf_revelation_tip : t -> Tez.t tzresult Lwt.t
+
 module Vote : sig
   val get_ballots : t -> Vote.ballots tzresult Lwt.t
 
@@ -270,10 +274,7 @@ type 'accounts init :=
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->
-  ?liquidity_baking_subsidy:Tez.t ->
-  ?endorsing_reward_per_slot:Tez.t ->
-  ?baking_reward_bonus_per_slot:Tez.t ->
-  ?baking_reward_fixed_portion:Tez.t ->
+  ?reward_weights:Constants.Parametric.reward_weights ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->

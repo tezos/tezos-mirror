@@ -126,10 +126,7 @@ val genesis :
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->
-  ?liquidity_baking_subsidy:Tez.t ->
-  ?endorsing_reward_per_slot:Tez.t ->
-  ?baking_reward_bonus_per_slot:Tez.t ->
-  ?baking_reward_fixed_portion:Tez.t ->
+  ?reward_weights:Constants.Parametric.reward_weights ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->
@@ -286,10 +283,7 @@ val prepare_initial_context_params :
   ?min_proposal_quorum:int32 ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->
-  ?liquidity_baking_subsidy:Tez.t ->
-  ?endorsing_reward_per_slot:Tez.t ->
-  ?baking_reward_bonus_per_slot:Tez.t ->
-  ?baking_reward_fixed_portion:Tez.t ->
+  ?reward_weights:Constants.Parametric.reward_weights ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->

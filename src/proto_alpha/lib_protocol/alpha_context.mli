@@ -842,6 +842,16 @@ module Constants : sig
 
     type adaptive_inflation = {enable : bool}
 
+    type reward_weights = {
+      base_total_rewards_per_minute : Tez.t;
+      baking_reward_fixed_portion_weight : int;
+      baking_reward_bonus_weight : int;
+      endorsing_reward_weight : int;
+      liquidity_baking_subsidy_weight : int;
+      seed_nonce_revelation_tip_weight : int;
+      vdf_revelation_tip_weight : int;
+    }
+
     type t = {
       preserved_cycles : int;
       blocks_per_cycle : int32;
@@ -854,17 +864,13 @@ module Constants : sig
       proof_of_work_threshold : int64;
       minimal_stake : Tez.t;
       vdf_difficulty : int64;
-      seed_nonce_revelation_tip : Tez.t;
       origination_size : int;
-      baking_reward_fixed_portion : Tez.t;
-      baking_reward_bonus_per_slot : Tez.t;
-      endorsing_reward_per_slot : Tez.t;
+      reward_weights : reward_weights;
       cost_per_byte : Tez.t;
       hard_storage_limit_per_operation : Z.t;
       quorum_min : int32;
       quorum_max : int32;
       min_proposal_quorum : int32;
-      liquidity_baking_subsidy : Tez.t;
       liquidity_baking_toggle_ema_threshold : int32;
       max_operations_time_to_live : int;
       minimal_block_delay : Period.t;
@@ -894,14 +900,10 @@ module Constants : sig
   module Generated : sig
     type t = {
       consensus_threshold : int;
-      baking_reward_fixed_portion : Tez.t;
-      baking_reward_bonus_per_slot : Tez.t;
-      endorsing_reward_per_slot : Tez.t;
-      liquidity_baking_subsidy : Tez.t;
+      reward_weights : Parametric.reward_weights;
     }
 
-    val generate :
-      consensus_committee_size:int -> blocks_per_minute:Ratio.t -> t
+    val generate : consensus_committee_size:int -> t
   end
 
   val parametric : context -> Parametric.t
@@ -936,23 +938,15 @@ module Constants : sig
 
   val vdf_difficulty : context -> int64
 
-  val seed_nonce_revelation_tip : context -> Tez.t
-
   val origination_size : context -> int
 
-  val baking_reward_fixed_portion : context -> Tez.t
-
-  val baking_reward_bonus_per_slot : context -> Tez.t
-
-  val endorsing_reward_per_slot : context -> Tez.t
+  val reward_weights : context -> Parametric.reward_weights
 
   val quorum_min : context -> int32
 
   val quorum_max : context -> int32
 
   val min_proposal_quorum : context -> int32
-
-  val liquidity_baking_subsidy : context -> Tez.t
 
   val liquidity_baking_toggle_ema_threshold : context -> int32
 
@@ -2624,7 +2618,8 @@ end
 
 (** This module re-exports definitions from {!Delegate_storage},
    {!Delegate_consensus_key}, {!Delegate_missed_endorsements_storage},
-   {!Delegate_slashed_deposits_storage}, {!Delegate_cycles}. *)
+   {!Delegate_slashed_deposits_storage}, {!Delegate_cycles},
+   {!Delegate_rewards}. *)
 module Delegate : sig
   val check_not_tz4 : Signature.public_key_hash -> unit tzresult
 
@@ -2739,6 +2734,33 @@ module Delegate : sig
 
   (** See {!Stake_storage.prepare_stake_distribution}. *)
   val prepare_stake_distribution : context -> context tzresult Lwt.t
+
+  module Rewards : sig
+    val baking_reward_fixed_portion : t -> Tez.t
+
+    val baking_reward_bonus_per_slot : t -> Tez.t
+
+    val endorsing_reward_per_slot : t -> Tez.t
+
+    val liquidity_baking_subsidy : t -> Tez.t
+
+    val seed_nonce_revelation_tip : t -> Tez.t
+
+    val vdf_revelation_tip : t -> Tez.t
+
+    module Internal_for_tests : sig
+      type reward_kind =
+        | Baking_reward_fixed_portion
+        | Baking_reward_bonus_per_slot
+        | Endorsing_reward_per_slot
+        | Liquidity_baking_subsidy
+        | Seed_nonce_revelation_tip
+        | Vdf_revelation_tip
+
+      val reward_from_constants :
+        csts:Constants.Parametric.t -> reward_kind:reward_kind -> Tez.t
+    end
+  end
 end
 
 (** This module re-exports definitions from {!Voting_period_repr} and

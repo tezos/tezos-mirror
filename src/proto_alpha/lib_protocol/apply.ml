@@ -1917,7 +1917,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->
-      let tip = Constants.seed_nonce_revelation_tip ctxt in
+      let tip = Delegate.Rewards.seed_nonce_revelation_tip ctxt in
       let contract =
         Contract.Implicit payload_producer.Consensus_key.delegate
       in
@@ -1926,7 +1926,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       (ctxt, Single_result (Seed_nonce_revelation_result balance_updates))
   | Single (Vdf_revelation {solution}) ->
       Seed.update_seed ctxt solution >>=? fun ctxt ->
-      let tip = Constants.seed_nonce_revelation_tip ctxt in
+      let tip = Delegate.Rewards.vdf_revelation_tip ctxt in
       let contract =
         Contract.Implicit payload_producer.Consensus_key.delegate
       in
@@ -2063,7 +2063,9 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                 (Z.of_int 20)))
       in
       let backtracking_ctxt = ctxt in
-      (let liquidity_baking_subsidy = Constants.liquidity_baking_subsidy ctxt in
+      (let liquidity_baking_subsidy =
+         Delegate.Rewards.liquidity_baking_subsidy ctxt
+       in
        (* credit liquidity baking subsidy to CPMM contract *)
        Token.transfer
          ~origin:Subsidy
@@ -2416,7 +2418,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
       return (ctxt, Some rewards_bonus)
     else return (ctxt, None)
   in
-  let baking_reward = Constants.baking_reward_fixed_portion ctxt in
+  let baking_reward = Delegate.Rewards.baking_reward_fixed_portion ctxt in
   let* ctxt, baking_receipts =
     Delegate.record_baking_activity_and_pay_rewards_and_fees
       ctxt

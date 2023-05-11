@@ -551,6 +551,7 @@ module Delegate = struct
   let deactivated = Delegate_activation_storage.is_inactive
 
   module Consensus_key = Delegate_consensus_key
+  module Rewards = Delegate_rewards
 end
 
 module Stake_distribution = struct
