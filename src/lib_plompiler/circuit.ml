@@ -1515,8 +1515,7 @@ let get_cs ?(optimize = false) f : cs_result =
   let ts = List.map (fun t_id -> Tables.find t_id tables) s.tables in
   let cs, solver, free_wires =
     if optimize then
-      let circuit_id = Utils.get_circuit_id s.cs in
-      let path = Utils.circuit_path circuit_id in
+      let path = Utils.circuit_path (Utils.get_circuit_id s.cs) in
       let cs, ti =
         if Sys.file_exists path then (
           (* If defined, load it up *)
@@ -1528,7 +1527,9 @@ let get_cs ?(optimize = false) f : cs_result =
           Utils.of_bytes cs_ti_t buffer)
         else
           let nb_inputs = Array.length s.inputs in
-          let o = Optimizer.optimize ~nb_inputs s.cs in
+          let o =
+            Optimizer.optimize ~nb_inputs ~range_checks:s.range_checks s.cs
+          in
           let serialized = Utils.to_bytes cs_ti_t o in
           let outc = open_out_bin path in
           output_bytes outc serialized ;
