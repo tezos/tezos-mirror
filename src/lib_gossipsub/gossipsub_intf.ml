@@ -418,6 +418,89 @@ module type SCORE = sig
   end
 end
 
+module type MESSAGE_CACHE = sig
+  module Peer : ITERABLE
+
+  module Topic : ITERABLE
+
+  module Message_id : ITERABLE
+
+  module Message : PRINTABLE
+
+  module Time : TIME
+
+  (** A sliding window cache that stores published messages and their first seen
+    time. The module also keeps track of the number of accesses to a message by
+    a peer, thus indirectly tracking the number of IWant requests a peer makes
+    for the same message between two heartbeats.
+
+    The module assumes that no two different messages have the same message
+    id. However, the cache stores duplicates; for instance, if [add_message id
+    msg topic] is called exactly twice, then [msg] will appear twice in
+    [get_message_ids_to_gossip]'s result (assuming not more than [gossip_slots]
+    shifts have been executed in the meanwhile). *)
+  type t
+
+  (** [create ~history_slots ~gossip_slots ~seen_message_slots] creates two
+      sliding window caches, one with length [history_slots] for storing message contents
+      and another with length [seen_message] for storing seen messages and their first
+      seen times.
+
+      When queried for messages to advertise, the cache only returns messages in
+      the last [gossip_slots]. The [gossip_slots] must be smaller or equal to
+      [history_slots].
+
+      The slack between [gossip_slots] and [history_slots] accounts for the
+      reaction time between when a message is advertised via IHave gossip, and
+      when the peer pulls it via an IWant command. To see this, if say
+      [gossip_slot = history_slots] then the messages inserted in cache
+      [history_slots] heartbeat ticks ago and advertised now will not be
+      available after the next tick, because they are removed from the
+      cache. This means IWant requests from the remote peer for such messages
+      would be unfulfilled and potentially penalizing.
+
+      @raise Assert_failure when [gossip_slots <= 0 || gossip_slots > history_slots]
+
+      TODO: https://gitlab.com/tezos/tezos/-/issues/5129
+      Error handling. *)
+  val create :
+    history_slots:int -> gossip_slots:int -> seen_message_slots:int -> t
+
+  (** Add message to the most recent cache slot. If the message already exists
+      in the cache, the message is not overridden, instead a duplicate message
+      id is stored (the message itself is only stored once). *)
+  val add_message : Message_id.t -> Message.t -> Topic.t -> t -> t
+
+  (** Get the message associated to the given message id, increase the access
+      counter for the peer requesting the message, and also returns the updated
+      counter. *)
+  val get_message_for_peer :
+    Peer.t -> Message_id.t -> t -> (t * Message.t * int) option
+
+  (** Get the message ids for the given topic in the last [gossip_slots] slots
+      of the cache. If there were duplicates added in the cache, then there will
+      be duplicates in the output. There is no guarantee about the order of
+      messages in the output. *)
+  val get_message_ids_to_gossip : Topic.t -> t -> Message_id.t list
+
+  (** [get_first_seen_time message_id t] returns the time the message with [message_id]
+      was first seen. Returns [None] if the message was not seen during the period
+      covered by the sliding window. *)
+  val get_first_seen_time : Message_id.t -> t -> Time.t option
+
+  (** [seen_message message_id t] returns [true] if the message was seen during the
+      period covered by the sliding window and returns [false] if otherwise. *)
+  val seen_message : Message_id.t -> t -> bool
+
+  (** Shift the sliding window by one slot (usually corresponding to one
+      heartbeat tick). *)
+  val shift : t -> t
+
+  module Internal_for_tests : sig
+    val get_access_counters : t -> (Message_id.t * int Peer.Map.t) Seq.t
+  end
+end
+
 module type AUTOMATON = sig
   (** Module for peer *)
   module Peer : ITERABLE

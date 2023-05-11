@@ -214,12 +214,18 @@ end
 
 module Make
     (C : Gossipsub_intf.AUTOMATON_SUBCONFIG)
-    (Time : Gossipsub_intf.TIME) =
-struct
+    (Time : Gossipsub_intf.TIME) :
+  Gossipsub_intf.MESSAGE_CACHE
+    with module Peer = C.Peer
+     and module Topic = C.Topic
+     and module Message_id = C.Message_id
+     and module Message = C.Message
+     and module Time = Time = struct
   module Peer = C.Peer
   module Topic = C.Topic
   module Message_id = C.Message_id
   module Message = C.Message
+  module Time = Time
   module Sliding_message_id_map = Sliding_message_id_map (C)
 
   type message_with_access_counter = {
