@@ -1749,12 +1749,14 @@ let octez_stdlib_unix =
         re;
         ezjsonm;
         ptime;
+        ptime_clock_os;
         mtime;
         mtime_clock_os;
         lwt_log;
         conf_libev;
         uri;
       ]
+    ~inline_tests:ppx_expect
 
 let _octez_stdlib_unix_test =
   tezt

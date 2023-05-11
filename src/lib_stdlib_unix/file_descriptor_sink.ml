@@ -38,7 +38,12 @@ type output = Static of Lwt_unix.file_descr | Rotating of rotating
 
 type t = {
   output : output;
-  format : [`One_per_line | `Netstring | `Pp];
+  format :
+    [ `One_per_line
+    | `Netstring
+    | (* See https://tools.ietf.org/html/rfc5424#section-6 *)
+      `Pp_RFC5424
+    | `Pp_short ];
   (* Hopefully temporary hack to handle event which are emitted with
      the non-cooperative log functions in `Legacy_logging`: *)
   lwt_bad_citizen_hack : string list ref;
@@ -54,7 +59,7 @@ let hostname =
     ~default:Unix.gethostname
 
 type 'event wrapped = {
-  time_stamp : float;
+  time_stamp : Ptime.t;
   section : Internal_event.Section.t;
   event : 'event;
 }
@@ -63,6 +68,15 @@ let wrap time_stamp section event = {time_stamp; section; event}
 
 let wrapped_encoding event_encoding =
   let open Data_encoding in
+  let ptime_encoding =
+    conv
+      Ptime.to_float_s
+      (fun f ->
+        match Ptime.of_float_s f with
+        | None -> invalid_arg "File-descriptor-sink: invalid timestamp"
+        | Some s -> s)
+      float
+  in
   let v0 =
     conv
       (fun {time_stamp; section; event} ->
@@ -70,11 +84,165 @@ let wrapped_encoding event_encoding =
       (fun (_, time_stamp, section, event) -> {time_stamp; section; event})
       (obj4
          (req "hostname" string)
-         (req "time_stamp" float)
+         (req "time_stamp" ptime_encoding)
          (req "section" Internal_event.Section.encoding)
          (req "event" event_encoding))
   in
   With_version.(encoding ~name:"fd-sink-item" (first_version v0))
+
+let make_with_pp_rfc5424 pp wrapped_event name =
+  (* See https://tools.ietf.org/html/rfc5424#section-6 *)
+  Format.asprintf
+    "%a [%s.%s] %a\n"
+    (Ptime.pp_rfc3339 ~frac_s:3 ())
+    wrapped_event.time_stamp
+    (Internal_event.Section.to_string_list wrapped_event.section
+    |> String.concat ".")
+    name
+    (pp ~all_fields:false ~block:false)
+    wrapped_event.event
+
+let make_with_pp_short pp wrapped_event =
+  let pp_date fmt time =
+    let time = Ptime.to_float_s time in
+    let tm = Unix.localtime time in
+    let month_string =
+      match tm.Unix.tm_mon with
+      | 0 -> "Jan"
+      | 1 -> "Feb"
+      | 2 -> "Mar"
+      | 3 -> "Apr"
+      | 4 -> "May"
+      | 5 -> "Jun"
+      | 6 -> "Jul"
+      | 7 -> "Aug"
+      | 8 -> "Sep"
+      | 9 -> "Oct"
+      | 10 -> "Nov"
+      | 11 -> "Dec"
+      | _ -> assert false
+      (* `tm` is built locally, so it should contain invalid month code *)
+    in
+    let ms = mod_float (time *. 1000.) 1000. in
+    Format.fprintf
+      fmt
+      "%s %2d %02d:%02d:%02d.%03.0f"
+      month_string
+      tm.Unix.tm_mday
+      tm.Unix.tm_hour
+      tm.Unix.tm_min
+      tm.Unix.tm_sec
+      ms
+  in
+  let lines =
+    String.split_on_char
+      '\n'
+      (Format.asprintf
+         "%a"
+         (pp ~all_fields:false ~block:true)
+         wrapped_event.event)
+  in
+  let timestamp = Format.asprintf "%a: " pp_date wrapped_event.time_stamp in
+  let timestamp_size = String.length timestamp in
+  let lines_size =
+    List.fold_left
+      (fun acc s ->
+        (* total length of a line is (timestamp + message + \n *)
+        acc + timestamp_size + String.length s + 1)
+      0
+      lines
+  in
+  let buf = Bytes.create lines_size in
+  let prev_pos = ref 0 in
+  let () =
+    List.iter
+      (fun s ->
+        Bytes.blit_string timestamp 0 buf !prev_pos timestamp_size ;
+        prev_pos := !prev_pos + timestamp_size ;
+        let s_len = String.length s in
+        Bytes.blit_string s 0 buf !prev_pos s_len ;
+        prev_pos := !prev_pos + s_len ;
+        Bytes.set buf !prev_pos '\n' ;
+        prev_pos := !prev_pos + 1)
+      lines
+  in
+  Bytes.unsafe_to_string buf
+
+let%expect_test _ =
+  let pp_string ~all_fields:_ ~block:_ = Format.pp_print_text in
+  let make_timestamp flt =
+    match Ptime.of_float_s flt with None -> assert false | Some v -> v
+  in
+  let ts = 1682584149.77736807 in
+  let local_dependant_ts = fst @@ Unix.mktime @@ Unix.gmtime ts in
+  let time_stamp = make_timestamp local_dependant_ts in
+  let ev =
+    {
+      event = "toto";
+      time_stamp;
+      section = Internal_event.Section.make_sanitized ["my"; "section"];
+    }
+  in
+  print_endline (make_with_pp_short pp_string ev) ;
+  [%expect {| Apr 27 08:29:09.000: toto |}] ;
+  let ev = {ev with time_stamp = make_timestamp ts} in
+  print_endline (make_with_pp_rfc5424 pp_string ev "my-event") ;
+  [%expect {| 2023-04-27T08:29:09.777-00:00 [my.section.my-event] toto |}] ;
+  ()
+
+let day_of_the_year ts =
+  let today =
+    match Ptime.of_float_s ts with Some s -> s | None -> Ptime.min
+  in
+  let (y, m, d), _ = Ptime.to_date_time today in
+  (y, m, d)
+
+let string_of_day_of_the_year (y, m, d) = Format.sprintf "%d%02d%02d" y m d
+
+let check_file_format_with_date base_filename s =
+  let name_no_ext = Filename.remove_extension base_filename in
+  let ext = Filename.extension base_filename in
+  let open Re.Perl in
+  let re_ext = "(." ^ ext ^ ")?" in
+  let re_date = "-\\d{4}\\d{2}\\d{2}" in
+  let re = compile @@ re (name_no_ext ^ re_date ^ re_ext) in
+  Re.execp re s
+
+let%expect_test _ =
+  print_endline (Bool.to_string (check_file_format_with_date ".out" "a.out")) ;
+  [%expect {| false |}] ;
+  print_endline
+    (Bool.to_string
+       (check_file_format_with_date "some-name.log" "some-name-19991231.log")) ;
+  [%expect {| true |}] ;
+  print_endline
+    (Bool.to_string (check_file_format_with_date "hello." "hello-19991231.")) ;
+  [%expect {| true |}] ;
+  print_endline
+    (Bool.to_string (check_file_format_with_date ".log" "19991231.log")) ;
+  [%expect {| false |}] ;
+  print_endline
+    (Bool.to_string
+       (check_file_format_with_date ".log.log" ".log-19991231.log")) ;
+  [%expect {| true |}] ;
+  print_endline
+    (Bool.to_string (check_file_format_with_date "file" "file-19991231")) ;
+  [%expect {| true |}] ;
+  ()
+
+let filename_insert_before_ext ~path s =
+  let ext = Filename.extension path in
+  let chopped = if ext = "" then path else Filename.chop_extension path in
+  Format.asprintf "%s-%s%s" chopped s ext
+
+let%expect_test _ =
+  print_endline (filename_insert_before_ext ~path:"foo.bar" "baz") ;
+  [%expect {| foo-baz.bar |}] ;
+  print_endline (filename_insert_before_ext ~path:"/tmp/log.out" "11") ;
+  [%expect {| /tmp/log-11.out |}] ;
+  print_endline (filename_insert_before_ext ~path:"/dev/null" "XXX") ;
+  [%expect {| /dev/null-XXX |}] ;
+  ()
 
 module Make_sink (K : sig
   val kind : [`Path | `Stdout | `Stderr]
@@ -89,29 +257,6 @@ end) : Internal_event.SINK with type t = t = struct
 
   let fail_parsing uri fmt =
     Format.kasprintf (failwith "Parsing URI: %s: %s" (Uri.to_string uri)) fmt
-
-  let day_of_the_year ts =
-    let today =
-      match Ptime.of_float_s ts with Some s -> s | None -> Ptime.min
-    in
-    let (y, m, d), _ = Ptime.to_date_time today in
-    (y, m, d)
-
-  let string_of_day_of_the_year (y, m, d) = Format.sprintf "%d%02d%02d" y m d
-
-  let check_file_format_with_date base_filename s =
-    let name_no_ext = Filename.remove_extension base_filename in
-    let ext = Filename.extension base_filename in
-    let open Re.Perl in
-    let re_ext = "(." ^ ext ^ ")?" in
-    let re_date = "-\\d{4}\\d{2}\\d{2}" in
-    let re = compile @@ re (name_no_ext ^ re_date ^ re_ext) in
-    Re.execp re s
-
-  let filename_insert_before_ext ~path s =
-    let ext = Filename.extension path in
-    let chopped = if ext = "" then path else Filename.chop_extension path in
-    Format.asprintf "%s-%s%s" chopped s ext
 
   let configure uri =
     let open Lwt_result_syntax in
@@ -187,7 +332,9 @@ end) : Internal_event.SINK with type t = t = struct
     let* format =
       match Uri.get_query_param uri "format" with
       | Some "netstring" -> return `Netstring
-      | Some "pp" -> return `Pp
+      | Some "pp-short" -> return `Pp_short
+      | Some "pp-rfc5424" -> return `Pp_RFC5424
+      | Some "pp" -> return `Pp_RFC5424
       | None | Some "one-per-line" -> return `One_per_line
       | Some other -> fail_parsing uri "Unknown format: %S" other
     in
@@ -307,7 +454,7 @@ end) : Internal_event.SINK with type t = t = struct
       to_write =
     let open Lwt_result_syntax in
     let {day; fd} = !current in
-    let today = day_of_the_year now in
+    let today = Ptime.to_date now in
     let should_rotate_output = day <> today in
     let* () =
       Lwt_mutex.with_lock write_mutex (fun () ->
@@ -372,26 +519,15 @@ end) : Internal_event.SINK with type t = t = struct
       ?(section = Internal_event.Section.empty) (event : a) =
     let open Lwt_result_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
-    let now = Unix.gettimeofday () in
+    let now = Ptime_clock.now () in
     let wrapped_event = wrap now section event in
     let to_write =
       let json () =
         Data_encoding.Json.construct (wrapped_encoding M.encoding) wrapped_event
       in
       match format with
-      | `Pp ->
-          (* See https://tools.ietf.org/html/rfc5424#section-6 *)
-          Format.asprintf
-            "%a [%s.%s] %a\n"
-            (Ptime.pp_rfc3339 ~frac_s:3 ())
-            (match Ptime.of_float_s wrapped_event.time_stamp with
-            | Some s -> s
-            | None -> Ptime.min)
-            (Internal_event.Section.to_string_list wrapped_event.section
-            |> String.concat ".")
-            M.name
-            (M.pp ~all_fields:true ~block:false)
-            event
+      | `Pp_RFC5424 -> make_with_pp_rfc5424 M.pp wrapped_event M.name
+      | `Pp_short -> make_with_pp_short M.pp wrapped_event
       | `One_per_line -> Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
       | `Netstring ->
           let bytes = Ezjsonm.value_to_string ~minify:true (json ()) in
@@ -415,7 +551,7 @@ end) : Internal_event.SINK with type t = t = struct
     let* () =
       List.iter_es
         (fun event_string ->
-          let now = Unix.gettimeofday () in
+          let now = Ptime_clock.now () in
           output_one now output event_string)
         !lwt_bad_citizen_hack
     in
