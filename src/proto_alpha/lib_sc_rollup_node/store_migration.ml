@@ -213,3 +213,48 @@ let maybe_run_migration ~storage_dir =
               migrations
           in
           Format.printf "Store migration completed@.")
+
+module V0_to_V1 = struct
+  let convert_store_messages
+      (messages, (block_hash, timestamp, number_of_messages)) =
+    ( messages,
+      (false (* is migration block *), block_hash, timestamp, number_of_messages)
+    )
+
+  let migrate_messages (v0_store : _ Store_v0.t) (v1_store : _ Store_v1.t)
+      (l2_block : Sc_rollup_block.t) =
+    let open Lwt_result_syntax in
+    let* v0_messages =
+      Store_v0.Messages.read v0_store.messages l2_block.header.inbox_witness
+    in
+    match v0_messages with
+    | None -> return_unit
+    | Some v0_messages ->
+        let value, header = convert_store_messages v0_messages in
+        Store_v1.Messages.append
+          v1_store.messages
+          ~key:l2_block.header.inbox_witness
+          ~header
+          ~value
+
+  let final_actions ~storage_dir ~tmp_dir (_v0_store : _ Store_v0.t)
+      (_v1_store : _ Store_v1.t) =
+    let open Lwt_result_syntax in
+    let*! () =
+      Lwt_utils_unix.remove_dir (messages_store_location ~storage_dir)
+    in
+    let*! () =
+      Lwt_unix.rename
+        (messages_store_location ~storage_dir:tmp_dir)
+        (messages_store_location ~storage_dir)
+    in
+    return_unit
+
+  include
+    Make (Store_v0) (Store_v1)
+      (struct
+        let migrate_block_action = migrate_messages
+
+        let final_actions = final_actions
+      end)
+end
