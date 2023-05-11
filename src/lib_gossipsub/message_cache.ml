@@ -69,6 +69,8 @@ end = struct
   module Topic = C.Topic
   module Message_id = C.Message_id
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5536
+     Transform the list into a set? *)
   type slot_entry = Message_id.t list Topic.Map.t
 
   (* A slot is just an index, normally a heartbeat tick, and this is why the
@@ -83,6 +85,8 @@ end = struct
            the map. Normally the caller ensures that the same messages (that is,
            with the same id) is not inserted twice; however, this module does not make
            this assumption. *)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5536
+           Make the above assumption and remove this field? *)
   }
 
   type 'a t = {
