@@ -70,6 +70,7 @@ actually a *family* of three URI-schemes:
 -  ``file-descriptor-path://`` to output to a file,
 -  ``file-descriptor-stdout://`` to output to ``stdout`` / ``1``, or
 -  ``file-descriptor-stderr://`` to output to ``stderr`` / ``2``.
+- ``file-descriptor-syslog://`` ouputs to a ``syslog`` facility
 
 *Note:* ``-stdout`` and ``-stderr`` schemes are there for convenience
 and for making the API consistent; most Unix-ish systems nowadays have
@@ -92,16 +93,18 @@ Common options:
    sections. To exclude a specific section use the ``none`` filter, for
    example ``section-prefix=p2p:none``. To define a filter only for
    one specific section ``section-prefix=p2p:debug&section-prefix=:none``
--  ``format=<value>`` the output format used; acceptable values are:
+- ``format=<value>`` the output format used. Note that syslog output will ignore
+   this option and use the syslog formatting. Possible values are:
 
    -  ``one-per-line`` (the default): output JSON objects, one per line,
    -  ``netstring``: use the Netstring format
       (cf. `Wikipedia <https://en.wikipedia.org/wiki/Netstring>`__) to
       separate JSON records,
-   -  ``pp`` to output the events pretty-printed, one per line, using a
-      format compatible with
-      `RFC-5424 <https://www.rfc-editor.org/rfc/rfc5424#section-6>`__ (or
-      Syslog).
+   - ``pp`` or ``pp-rfc5424`` to output the events pretty-printed, one per line,
+      using a format compatible with `RFC-5424
+      <https://www.rfc-editor.org/rfc/rfc5424#section-6>`__ (or Syslog).
+   - ``pp-short`` to output the events pretty-printed in a shorter and more
+     user-friendly fashion.
 
 Options available only for the ``file-descriptor-path://`` case:
 
@@ -123,7 +126,17 @@ Options available only for the ``file-descriptor-path://`` case:
   the log files are stored and all its parents recursively if they don't
   exist.
 
-Examples:
+Option available only for ``file-descriptor-syslog://`` case:
+
+- ["facility=<facility>"] is the targeted syslog output. ``user`` is the default
+  value if no value is provided. See `RFC-3164
+  <https://www.rfc-editor.org/rfc/rfc3164#section-6>`__ for more information.
+  The possible values are: ``auth``, ``authpriv``, ``cron``, ``daemon``,
+  ``ftp``, ``kernel``, ``local0``, ``local1``, ``local2``, ``local3``,
+  ``local4``, ``local5``, ``local6``, ``local7``, ``lpr``, ``mail``, ``news``,
+  ``syslog``, ``user``, ``uucp``, ``ntp``, ``security``, ``console``
+
+  Examples:
 
 -  ``file-descriptor-path:///the/path/to/write.log?format=one-per-line&level-at-least=notice&with-pid=true&chmod=0o640``
    → Executables will write all log events of level at least ``Notice``
