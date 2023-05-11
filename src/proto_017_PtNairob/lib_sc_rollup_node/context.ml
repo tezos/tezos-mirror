@@ -204,7 +204,7 @@ end
 module Rollup = struct
   let path = ["rollup_address"]
 
-  let set_address (index : _ index) addr =
+  let set_address (index : rw_index) addr =
     let open Lwt_result_syntax in
     protect @@ fun () ->
     let info () =
@@ -220,7 +220,7 @@ module Rollup = struct
     let*! () = IStore.set_exn ~info store path value in
     return_unit
 
-  let get_address (index : _ index) =
+  let get_address (index : _ raw_index) =
     let open Lwt_result_syntax in
     protect @@ fun () ->
     let*! store = IStore.main index.repo in
@@ -229,4 +229,80 @@ module Rollup = struct
     @@ Option.map
          (Data_encoding.Binary.of_bytes_exn Sc_rollup.Address.encoding)
          value
+
+  let check_or_set_address (type a) (mode : a mode) (index : a raw_index)
+      rollup_address =
+    let open Lwt_result_syntax in
+    let* saved_address = get_address index in
+    match saved_address with
+    | Some saved_address ->
+        fail_unless Sc_rollup.Address.(rollup_address = saved_address)
+        @@ Sc_rollup_node_errors.Unexpected_rollup
+             {rollup_address; saved_address}
+    | None -> (
+        (* Address was never saved, we set it permanently if not in read-only
+           mode. *)
+        match mode with
+        | Store_sigs.Read_only -> return_unit
+        | Read_write -> set_address index rollup_address)
 end
+
+module Version = struct
+  type t = V0
+
+  let version = V0
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun V0 -> 0)
+      (function
+        | 0 -> V0
+        | v ->
+            Format.ksprintf Stdlib.failwith "Unsupported context version %d" v)
+      int31
+
+  let path = ["context_version"]
+
+  let set (index : rw_index) =
+    let open Lwt_result_syntax in
+    protect @@ fun () ->
+    let info () =
+      let date =
+        Time.(System.now () |> System.to_protocol |> Protocol.to_seconds)
+      in
+      IStore.Info.v date
+    in
+    let value = Data_encoding.Binary.to_bytes_exn encoding version in
+    let*! store = IStore.main index.repo in
+    let*! () = IStore.set_exn ~info store path value in
+    return_unit
+
+  let get (index : _ index) =
+    let open Lwt_result_syntax in
+    protect @@ fun () ->
+    let*! store = IStore.main index.repo in
+    let*! value = IStore.find store path in
+    return @@ Option.map (Data_encoding.Binary.of_bytes_exn encoding) value
+
+  let check (index : _ index) =
+    let open Lwt_result_syntax in
+    let* context_version = get index in
+    match context_version with None | Some V0 -> return_unit
+
+  let check_and_set (index : _ index) =
+    let open Lwt_result_syntax in
+    let* context_version = get index in
+    match context_version with None -> set index | Some V0 -> return_unit
+end
+
+let load : type a. a mode -> string -> a raw_index tzresult Lwt.t =
+ fun mode path ->
+  let open Lwt_result_syntax in
+  let*! index = load mode path in
+  let+ () =
+    match mode with
+    | Read_only -> Version.check index
+    | Read_write -> Version.check_and_set index
+  in
+  index

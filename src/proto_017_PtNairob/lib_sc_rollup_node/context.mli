@@ -55,7 +55,7 @@ type hash = Sc_rollup_context_hash.t
 type commit
 
 (** [load path] initializes from disk a context from [path]. *)
-val load : 'a mode -> string -> 'a index Lwt.t
+val load : 'a mode -> string -> 'a index tzresult Lwt.t
 
 (** [index context] is the repository of the context [context]. *)
 val index : 'a t -> 'a index
@@ -162,9 +162,12 @@ end
 
 (** Static information about the rollup. *)
 module Rollup : sig
-  val set_address :
-    _ index -> Protocol.Alpha_context.Sc_rollup.Address.t -> unit tzresult Lwt.t
-
   val get_address :
     _ index -> Protocol.Alpha_context.Sc_rollup.Address.t option tzresult Lwt.t
+
+  val check_or_set_address :
+    'a mode ->
+    'a index ->
+    Protocol.Alpha_context.Sc_rollup.Address.t ->
+    unit tzresult Lwt.t
 end
