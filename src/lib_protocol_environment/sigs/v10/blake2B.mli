@@ -57,3 +57,18 @@ module type Register = sig
 end
 
 module Make (Register : Register) (Name : PrefixedName) : S.HASH
+
+module Make_merkle_tree (R : sig
+  val register_encoding :
+    prefix:string ->
+    length:int ->
+    to_raw:('a -> string) ->
+    of_raw:(string -> 'a option) ->
+    wrap:('a -> Base58.data) ->
+    'a Base58.encoding
+end)
+(K : PrefixedName) (Contents : sig
+  type t
+
+  val to_bytes : t -> Bytes.t
+end) : S.MERKLE_TREE with type elt = Contents.t
