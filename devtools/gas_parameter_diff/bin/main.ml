@@ -114,7 +114,11 @@ let () =
             else 100. *. diff /. divisor
           in
           Printf.printf ",%f,%f,%f,%f\n" final_min final_max diff change ;
-          if change > 20. then
+          let is_const =
+            String.ends_with ~suffix:"const" name
+            || String.ends_with ~suffix:"intercept" name
+          in
+          if change > 20. && ((not is_const) || diff > 2.) then
             Printf.eprintf "%f%% regression for %s.\n" change name
       | _, _ -> Printf.printf ",,,,\n")
     all_param_names ;
