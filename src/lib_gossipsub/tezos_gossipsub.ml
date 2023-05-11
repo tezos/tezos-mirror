@@ -168,7 +168,8 @@ module Make (C : AUTOMATON_CONFIG) :
   type connection = {
     topics : Topic.Set.t;  (** The set of topics the peer subscribed to. *)
     direct : bool;
-        (** A direct (aka explicit) connection is a connection to which we forward all the messages. *)
+        (** A direct (aka explicit) connection is a connection to which we
+            forward all the messages. *)
     outbound : bool;  (** An outbound connection is a connection we initiated. *)
   }
 
@@ -176,12 +177,9 @@ module Make (C : AUTOMATON_CONFIG) :
 
   module Message_cache = Message_cache.Make (C.Subconfig) (Time)
 
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/4983
-
-      This data-structure should be documented. *)
   type state = {
-    limits : limits;
-    parameters : parameters;
+    limits : limits;  (** Statically known parameters of the algorithm. *)
+    parameters : parameters;  (** Other parameters of the algorithm. *)
     connections : connection Peer.Map.t;
         (** [connections] is the set of active connections. A connection is added
             through the `Add_peer` message and removed through the `Remove_peer`
@@ -192,7 +190,11 @@ module Make (C : AUTOMATON_CONFIG) :
             can't be stored in {!connections}. Any peer having an active connection
             is associated to a score. *)
     ihave_per_heartbeat : int Peer.Map.t;
+        (** Mapping tracking for each peer the number of IHave messages received from
+            that peer between two heartbeats. *)
     iwant_per_heartbeat : int Peer.Map.t;
+        (** Mapping tracking for each peer the number of messages ids sent in
+            IWant messages to that peer between two heartbeats. *)
     mesh : Peer.Set.t Topic.Map.t;
         (** The mesh for a topic is a random subset of the connected peers
             subscribed to that topic and that have non-negative score, are not
@@ -212,8 +214,11 @@ module Make (C : AUTOMATON_CONFIG) :
              backoff is set for a peer and a topic, this peer is not expected
              to be in the mesh of the given topic.  *)
     message_cache : Message_cache.t;
-    rng : Random.State.t;
+        (** A sliding window cache that stores published messages and their first
+        seen time. *)
+    rng : Random.State.t;  (** The state of the PRNG algorithm. *)
     heartbeat_ticks : int64;
+        (** A counter of the number of elapsed heartbeat ticks.  *)
   }
   (* Invariants:
 
