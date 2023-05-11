@@ -40,6 +40,9 @@ const MAXIMUM_TRANSACTION_DEPTH: usize = 1024_usize;
 /// Be it contract -call, -create or simple transfer, the handler will update the world
 /// state in durable storage _and_ produce a summary of the outcome that will be needed
 /// for creating a transaction receipt.
+///
+/// A failed transaction will not refund gas. SputnikVM even treats some kinds of failure,
+/// eg, logging during static call, as out-of-gas.
 #[derive(Debug, Eq, PartialEq)]
 pub struct ExecutionOutcome {
     /// How much gas was used for processing an entire transaction.
@@ -86,6 +89,13 @@ fn ethereum_error_to_exit_reason(exit_reason: EthereumError) -> ExitReason {
     }
 }
 
+/// Data related to the current transaction layer
+struct TransactionLayerData {
+    /// Whether the current transaction is static or not, ie, if the
+    /// transaction is allowed to update durable storage.
+    pub is_static: bool,
+}
+
 /// The implementation of the SputnikVM [Handler] trait
 pub struct EvmHandler<'a, Host: Runtime> {
     /// The host
@@ -102,6 +112,9 @@ pub struct EvmHandler<'a, Host: Runtime> {
     gasometer: Gasometer<'a>,
     /// The configuration, eg, London or Frontier for execution
     config: &'a Config,
+    /// The contexts associated with transaction(s) currently in
+    /// progress
+    transaction_data: Vec<TransactionLayerData>,
 }
 
 #[allow(unused_variables)]
@@ -124,6 +137,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             config,
             precompiles,
             gasometer: Gasometer::<'a>::new(gas_limit, config),
+            transaction_data: vec![],
         }
     }
 
@@ -131,6 +145,15 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// lifetime.
     pub fn gas_used(&self) -> u64 {
         self.gasometer.total_used_gas()
+    }
+
+    /// Returns true if there is a static transaction in progress, otherwise
+    /// return false.
+    fn is_static(&self) -> bool {
+        self.transaction_data
+            .last()
+            .map(|data| data.is_static)
+            .unwrap_or(false)
     }
 
     /// Execute a SputnikVM runtime with this handler
@@ -295,7 +318,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         transfer: Option<Transfer>,
         input: Vec<u8>,
         gas_limit: Option<u64>,
-        is_static: bool,
         transaction_context: TransactionContext,
     ) -> Result<CreateOutcome, EthereumError> {
         debug_msg!(
@@ -335,7 +357,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             &input,
             gas_limit,
             &transaction_context.context,
-            is_static,
+            self.is_static(),
         ) {
             match precompile_result {
                 Ok(precompile_output) => Ok((
@@ -388,7 +410,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             }),
             input,
             gas_limit,
-            is_static,
             TransactionContext::new(caller, callee, value.unwrap_or(U256::zero())),
         );
 
@@ -541,7 +562,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// this.
     fn begin_initial_transaction(
         &mut self,
-        _is_static: bool,
+        is_static: bool,
     ) -> Result<(), EthereumError> {
         let current_depth = self.evm_account_storage.stack_depth();
 
@@ -564,6 +585,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 true,
             ));
         }
+
+        self.transaction_data
+            .push(TransactionLayerData { is_static });
 
         self.evm_account_storage
             .begin_transaction(self.host)
@@ -601,9 +625,18 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             ));
         }
 
+        if current_depth != self.transaction_data.len() {
+            return Err(EthereumError::InconsistentTransactionData(
+                current_depth,
+                self.transaction_data.len(),
+            ));
+        }
+
         self.evm_account_storage
             .commit_transaction(self.host)
             .map_err(EthereumError::from)?;
+
+        let _ = self.transaction_data.pop();
 
         Ok(ExecutionOutcome {
             gas_used: self.gas_used(),
@@ -643,11 +676,20 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             ));
         }
 
+        if current_depth != self.transaction_data.len() {
+            return Err(EthereumError::InconsistentTransactionData(
+                current_depth,
+                self.transaction_data.len(),
+            ));
+        }
+
         let gas_used = self.gas_used();
 
         self.evm_account_storage
             .rollback_transaction(self.host)
             .map_err(EthereumError::from)?;
+
+        let _ = self.transaction_data.pop();
 
         Ok(ExecutionOutcome {
             gas_used,
@@ -706,6 +748,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
                 self.rollback_initial_transaction()
             }
+            Err(EthereumError::FatalMachineError(ExitFatal::CallErrorAsFatal(
+                ExitError::OutOfGas,
+            ))) => self.rollback_initial_transaction(),
             Err(err) => {
                 debug_msg!(
                     self.host,
@@ -720,7 +765,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     }
 
     /// Begin an intermediate transaction
-    fn begin_inter_transaction(&mut self, _is_static: bool) -> Result<(), EthereumError> {
+    fn begin_inter_transaction(&mut self, is_static: bool) -> Result<(), EthereumError> {
         let current_depth = self.evm_account_storage.stack_depth();
 
         debug_msg!(
@@ -732,6 +777,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         if current_depth == 0 {
             return Err(EthereumError::InconsistentTransactionStack(0, false, true));
         }
+
+        self.transaction_data.push(TransactionLayerData {
+            is_static: self.is_static() || is_static,
+        });
 
         self.evm_account_storage
             .begin_transaction(self.host)
@@ -756,6 +805,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             current_depth
         );
 
+        let _ = self.transaction_data.pop();
+
         self.evm_account_storage
             .commit_transaction(self.host)
             .map_err(EthereumError::from)
@@ -778,6 +829,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             "Rollback transaction at transaction depth: {}",
             current_depth
         );
+
+        let _ = self.transaction_data.pop();
 
         self.evm_account_storage
             .rollback_transaction(self.host)
@@ -1008,7 +1061,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             }
         }
 
-        if let Err(err) = self.begin_inter_transaction(false) {
+        if let Err(err) = self.begin_inter_transaction(is_static) {
             // Beware that we may not be able to recover from this error.
             return Capture::Exit((ethereum_error_to_exit_reason(err), vec![]));
         }
@@ -1018,7 +1071,6 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             transfer,
             input,
             target_gas,
-            is_static,
             TransactionContext::from_context(context),
         );
 
@@ -1038,7 +1090,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                 context.address,
                 opcode,
                 stack,
-                false,
+                self.is_static(),
                 self.config,
                 &self,
             )?;
@@ -1246,7 +1298,6 @@ mod test {
         let address = H160::from_low_u64_be(213_u64);
         let input = vec![0_u8];
         let gas_limit: Option<u64> = None;
-        let is_static = false;
         let transaction_context = TransactionContext::new(caller, address, U256::zero());
         let transfer: Option<Transfer> = None;
         let code: Vec<u8> = vec![
@@ -1268,7 +1319,6 @@ mod test {
             transfer,
             input,
             gas_limit,
-            is_static,
             transaction_context,
         );
 
@@ -1311,7 +1361,6 @@ mod test {
         let address = H160::from_low_u64_be(213_u64);
         let input = vec![0_u8];
         let gas_limit: Option<u64> = None;
-        let is_static = false;
         let transaction_context = TransactionContext::new(caller, address, U256::zero());
         let transfer: Option<Transfer> = None;
         let code: Vec<u8> = vec![
@@ -1365,7 +1414,6 @@ mod test {
             transfer,
             input,
             gas_limit,
-            is_static,
             transaction_context,
         );
 
@@ -1417,7 +1465,6 @@ mod test {
 
         let address = H160::from_low_u64_be(118);
         let gas_limit: Option<u64> = None;
-        let is_static = false;
         let transaction_context = TransactionContext::new(caller, address, U256::zero());
         let transfer: Option<Transfer> = None;
         let code: Vec<u8> = vec![
@@ -1469,7 +1516,6 @@ mod test {
             transfer,
             input.to_vec(),
             gas_limit,
-            is_static,
             transaction_context,
         );
 
@@ -1520,7 +1566,6 @@ mod test {
 
         let address = H160::from_low_u64_be(12389);
         let gas_limit: Option<u64> = None;
-        let is_static = false;
         let transaction_context = TransactionContext::new(caller, address, U256::zero());
         let transfer: Option<Transfer> = None;
         let code: Vec<u8> = vec![
@@ -1572,7 +1617,6 @@ mod test {
             transfer,
             input.to_vec(),
             gas_limit,
-            is_static,
             transaction_context,
         );
 
@@ -1612,7 +1656,6 @@ mod test {
         let address = H160::from_low_u64_be(312);
         let input: Vec<u8> = vec![0_u8];
         let gas_limit: Option<u64> = None;
-        let is_static = false;
         let transaction_context = TransactionContext::new(caller, address, U256::zero());
         let transfer: Option<Transfer> = None;
         let code: Vec<u8> = vec![
@@ -1639,7 +1682,6 @@ mod test {
             transfer,
             input,
             gas_limit,
-            is_static,
             transaction_context,
         );
 
@@ -1734,7 +1776,6 @@ mod test {
         let address = H160::from_low_u64_be(117);
         let input = vec![0_u8];
         let gas_limit: Option<u64> = None;
-        let is_static = false;
         let transaction_context =
             TransactionContext::new(caller, address, U256::from(50_u32));
         let transfer: Option<Transfer> = Some(Transfer {
@@ -1758,7 +1799,6 @@ mod test {
             transfer,
             input,
             gas_limit,
-            is_static,
             transaction_context,
         );
 
@@ -1800,7 +1840,6 @@ mod test {
         let address = H160::from_low_u64_be(210_u64);
         let input = vec![0_u8];
         let gas_limit: Option<u64> = None;
-        let is_static = false;
         let transaction_context = TransactionContext::new(caller, address, U256::zero());
         let transfer: Option<Transfer> = Some(Transfer {
             source: caller,
@@ -1823,7 +1862,6 @@ mod test {
             transfer,
             input,
             gas_limit,
-            is_static,
             transaction_context,
         );
 
