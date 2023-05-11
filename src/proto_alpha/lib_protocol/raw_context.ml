@@ -998,6 +998,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             enable = c.zk_rollup.enable;
             origination_size = c.zk_rollup.origination_size;
             min_pending_to_process = c.zk_rollup.min_pending_to_process;
+            max_ticket_payload_size = c.tx_rollup.max_ticket_payload_size;
           }
       in
 

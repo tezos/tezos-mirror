@@ -121,6 +121,7 @@ type zk_rollup = {
   enable : bool;
   origination_size : int;
   min_pending_to_process : int;
+  max_ticket_payload_size : int;
 }
 
 type adaptive_inflation = {
@@ -320,20 +321,29 @@ let sc_rollup_encoding =
 let zk_rollup_encoding =
   let open Data_encoding in
   conv
-    (fun ({enable; origination_size; min_pending_to_process} : zk_rollup) ->
-      (enable, origination_size, min_pending_to_process))
+    (fun ({
+            enable;
+            origination_size;
+            min_pending_to_process;
+            max_ticket_payload_size;
+          } :
+           zk_rollup) ->
+      (enable, origination_size, min_pending_to_process, max_ticket_payload_size))
     (fun ( zk_rollup_enable,
            zk_rollup_origination_size,
-           zk_rollup_min_pending_to_process ) ->
+           zk_rollup_min_pending_to_process,
+           zk_rollup_max_ticket_payload_size ) ->
       {
         enable = zk_rollup_enable;
         origination_size = zk_rollup_origination_size;
         min_pending_to_process = zk_rollup_min_pending_to_process;
+        max_ticket_payload_size = zk_rollup_max_ticket_payload_size;
       })
-    (obj3
+    (obj4
        (req "zk_rollup_enable" bool)
        (req "zk_rollup_origination_size" int31)
-       (req "zk_rollup_min_pending_to_process" int31))
+       (req "zk_rollup_min_pending_to_process" int31)
+       (req "zk_rollup_max_ticket_payload_size" int31))
 
 let adaptive_inflation_encoding =
   let open Data_encoding in

@@ -136,6 +136,7 @@ type zk_rollup = {
      That is, every update must process at least
      [min(length pending_list, min_pending_to_process)] pending operations. *)
   min_pending_to_process : int;
+  max_ticket_payload_size : int;
 }
 
 type adaptive_inflation = {

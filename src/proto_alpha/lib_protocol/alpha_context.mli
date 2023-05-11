@@ -842,6 +842,7 @@ module Constants : sig
       enable : bool;
       origination_size : int;
       min_pending_to_process : int;
+      max_ticket_payload_size : int;
     }
 
     type adaptive_inflation = {
@@ -1037,6 +1038,8 @@ module Constants : sig
   val adaptive_inflation_enable : context -> bool
 
   val freeze_rewards : context -> bool
+
+  val zk_rollup_max_ticket_payload_size : context -> int
 
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : Parametric.t}

@@ -179,7 +179,7 @@ let transaction_to_zk_rollup ~ctxt ~parameters_ty ~parameters ~dst_rollup ~since
     Zk_rollup_parameters.get_deposit_parameters parameters_ty parameters
   in
   let* ticket_size, ctxt = Ticket_scanner.ex_ticket_size ctxt ex_ticket in
-  let limit = Constants.tx_rollup_max_ticket_payload_size ctxt in
+  let limit = Constants.zk_rollup_max_ticket_payload_size ctxt in
   let*? () =
     error_when
       Saturation_repr.(ticket_size >! limit)

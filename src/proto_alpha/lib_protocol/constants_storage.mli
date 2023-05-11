@@ -162,6 +162,8 @@ val zk_rollup_min_pending_to_process : Raw_context.t -> int
 
 val zk_rollup_origination_size : Raw_context.t -> int
 
+val zk_rollup_max_ticket_payload_size : Raw_context.t -> int
+
 val adaptive_inflation_enable : Raw_context.t -> bool
 
 val adaptive_inflation_staking_over_baking_limit : Raw_context.t -> int

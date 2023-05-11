@@ -286,6 +286,7 @@ let constants_mainnet =
            The following constants need to be refined. *)
         origination_size = 4_000;
         min_pending_to_process = 10;
+        max_ticket_payload_size = 2_048;
       };
     adaptive_inflation =
       {

@@ -124,8 +124,7 @@ let test_origination_fees () =
   let contract = Stdlib.List.hd contracts in
   let _prover_pp, public_parameters = Lazy.force Operator.lazy_pp in
   let expected_size =
-    (* TODO: create ZK constant *)
-    let origination_size = constants.parametric.tx_rollup.origination_size in
+    let origination_size = constants.parametric.zk_rollup.origination_size in
     let init_account =
       Zk_rollup.Account.
         {
@@ -735,7 +734,7 @@ let test_invalid_deposit () =
   in
   let* limit =
     let* constants = Context.get_constants (I i) in
-    constants.parametric.tx_rollup.max_ticket_payload_size |> return
+    constants.parametric.zk_rollup.max_ticket_payload_size |> return
   in
   let* (_i : Incremental.t) =
     let payload_size = Saturation_repr.safe_int (contents_size + 216) in
