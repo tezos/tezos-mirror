@@ -78,6 +78,9 @@ module type SPAN = sig
   val of_float_s : float -> t
 
   val to_float_s : t -> float
+
+  (** [mul s n] returns [n * s]. *)
+  val mul : t -> int -> t
 end
 
 module type TIME = sig
@@ -92,9 +95,6 @@ module type TIME = sig
   val add : t -> span -> t
 
   val sub : t -> span -> t
-
-  (** [mul_span s n] returns [n * s]. *)
-  val mul_span : span -> int -> span
 
   val to_span : t -> span
 end

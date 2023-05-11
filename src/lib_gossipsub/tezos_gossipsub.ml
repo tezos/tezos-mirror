@@ -1201,7 +1201,7 @@ module Make (C : AUTOMATON_CONFIG) :
           (* Subtract some slack time to the current time to account for
              the message latency; for details, see
              https://github.com/libp2p/go-libp2p-pubsub/issues/368 *)
-          Time.sub current (Time.mul_span heartbeat_interval 2)
+          Time.sub current (Span.mul heartbeat_interval 2)
         in
         let*! backoff in
         Topic.Map.filter_map
