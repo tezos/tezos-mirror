@@ -45,4 +45,4 @@ module EpoxyEntity = struct
   let name = "epoxy"
 end
 
-module EpoxyAlias = Client_aliases.Alias (EpoxyEntity)
+module Epoxy_alias = Client_aliases.Alias (EpoxyEntity)

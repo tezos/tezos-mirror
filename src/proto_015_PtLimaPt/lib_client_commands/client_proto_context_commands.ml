@@ -176,7 +176,9 @@ let commands_ro () =
       ~desc:"Get the key rank of a cache key."
       no_options
       (prefixes ["get"; "cached"; "contract"; "rank"; "for"]
-      @@ OriginatedContractAlias.destination_param ~name:"src" ~desc:"contract"
+      @@ Originated_contract_alias.destination_param
+           ~name:"src"
+           ~desc:"contract"
       @@ stop)
       (fun () contract (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
@@ -218,7 +220,7 @@ let commands_ro () =
       ~desc:"Get the balance of a contract."
       no_options
       (prefixes ["get"; "balance"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () contract (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
@@ -234,7 +236,7 @@ let commands_ro () =
       ~desc:"Get the storage of a contract."
       (args1 (unparsing_mode_arg ~default:"Readable"))
       (prefixes ["get"; "contract"; "storage"; "for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -258,7 +260,7 @@ let commands_ro () =
       ~desc:"Get the used storage space of a contract."
       no_options
       (prefixes ["get"; "contract"; "used"; "storage"; "space"; "for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -279,7 +281,7 @@ let commands_ro () =
       ~desc:"Get the paid storage space of a contract."
       no_options
       (prefixes ["get"; "contract"; "paid"; "storage"; "space"; "for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -306,7 +308,7 @@ let commands_ro () =
       @@ prefixes ["of"; "type"]
       @@ Tezos_clic.param ~name:"type" ~desc:"type of the key" data_parameter
       @@ prefix "in"
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -363,7 +365,7 @@ let commands_ro () =
       ~desc:"Get the code of a contract."
       (args2 (unparsing_mode_arg ~default:"Readable") normalize_types_switch)
       (prefixes ["get"; "contract"; "code"; "for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -394,7 +396,7 @@ let commands_ro () =
       ~desc:"Get the `BLAKE2B` script hash of a contract."
       no_options
       (prefixes ["get"; "contract"; "script"; "hash"; "for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -419,7 +421,7 @@ let commands_ro () =
            ~desc:"the entrypoint to describe"
            entrypoint_parameter
       @@ prefixes ["for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -448,7 +450,7 @@ let commands_ro () =
       ~desc:"Get the entrypoint list of a contract."
       (args1 normalize_types_switch)
       (prefixes ["get"; "contract"; "entrypoints"; "for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -472,7 +474,7 @@ let commands_ro () =
       ~desc:"Get the list of unreachable paths in a contract's parameter type."
       no_options
       (prefixes ["get"; "contract"; "unreachable"; "paths"; "for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -495,7 +497,7 @@ let commands_ro () =
       ~desc:"Get the delegate of a contract."
       no_options
       (prefixes ["get"; "delegate"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () contract (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
@@ -691,7 +693,7 @@ let commands_ro () =
       ~desc:"Get the frozen deposits limit of a delegate."
       no_options
       (prefixes ["get"; "deposits"; "limit"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source delegate"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source delegate"
       @@ stop)
       (fun () contract (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in

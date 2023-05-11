@@ -64,7 +64,7 @@ class mock_wallet (entities : string) : Tezos_client_base.Client_context.wallet
 (**
    Test.
    Tests different lookups of
-   [Client_proto_contracts.ContractAlias.find_destination].
+   [Client_proto_contracts.Contract_alias.find_destination].
 *)
 let test_find_destination _ =
   let bootstrap1 = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" in
@@ -73,9 +73,9 @@ let test_find_destination _ =
   in
   let w = new mock_wallet wallet_json in
   let test msg key exp_source =
-    Client_proto_contracts.ContractAlias.find_destination w key
+    Client_proto_contracts.Contract_alias.find_destination w key
     >>=? fun contract ->
-    Client_proto_contracts.RawContractAlias.to_source contract
+    Client_proto_contracts.Raw_contract_alias.to_source contract
     >>=? fun source ->
     (* Alcotest equality assertion *)
     Alcotest.(check string msg source exp_source) ;
