@@ -54,7 +54,7 @@ val verify :
     [Configuration.Coordinator] mode.*)
 module Coordinator : sig
   (** [handle_put_dac_member_signature ctx dac_plugin ro_store rw_store page_store
-      cctxt dac_member_signature] does the following procedure:
+      dac_member_signature] does the following procedure:
       1. Checks that the [root_hash] provided inside [Signature_repr.t] is known. Fails if unknown
       2. Checks that the [dac_member_signature.signer_pkh] is currently a Dac member.
       3. Checks that the dac member has not yet signed. If already signed, then noop
@@ -69,7 +69,6 @@ module Coordinator : sig
     Dac_plugin.t ->
     Store_sigs.rw Store.Irmin_store.t ->
     Page_store.Filesystem.t ->
-    #Client_context.wallet ->
     Signature_repr.t ->
     unit tzresult Lwt.t
 end
@@ -86,7 +85,7 @@ module Legacy : sig
     (Tezos_crypto.Aggregate_signature.signature * Z.t, tztrace) result Lwt.t
 
   (** [handle_put_dac_member_signature ctx dac_plugin ro_store rw_store page_store
-      cctxt dac_member_signature] does the following procedure:
+      dac_member_signature] does the following procedure:
       1. Checks that the [root_hash] provided inside [Signature_repr.t] is known. Fails if unknown
       2. Checks that the [dac_member_signature.signer_pkh] is currently a Dac member.
       3. Checks that the dac member has not yet signed. If already signed, then noop
@@ -101,7 +100,6 @@ module Legacy : sig
     Dac_plugin.t ->
     Store_sigs.rw Store.Irmin_store.t ->
     Page_store.Filesystem.t ->
-    #Client_context.wallet ->
     Signature_repr.t ->
     unit tzresult Lwt.t
 end
