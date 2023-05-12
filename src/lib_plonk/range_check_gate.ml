@@ -49,33 +49,31 @@ type s_repr = L.scalar L.repr
 module type S = sig
   module PP : Polynomial_protocol.S
 
-  val batched_z_name : string
+  val z_names : string -> string list
 
-  val z_names : string list
+  val shared_z_names : string -> string list
 
-  val shared_z_names : string list
-
-  val build_permutation :
-    range_checks:(int * int) list -> size_domain:int -> int array
+  val build_permutations :
+    size_domain:int -> range_checks:(int * int) list SMap.t -> int array SMap.t
 
   val preprocessing :
-    permutation:int array ->
-    range_checks:(int * int) list ->
+    range_checks:(int * int) list SMap.t ->
+    permutations:int array SMap.t ->
     domain:Domain.t ->
     Poly.t SMap.t
 
   (* Builds the pure range check proof polynomials *)
   val f_map_contribution_1 :
-    range_checks:(int * int) list ->
+    range_checks:(int * int) list SMap.t ->
     domain:Domain.t ->
     values:Evaluations.t SMap.t ->
-    Evaluations.t * Poly.t SMap.t
+    Evaluations.t SMap.t * Poly.t SMap.t
 
   (* Builds the shared permutation proof polynomials for the range check proof polynomials built with f_map_contribution_1
      [values] must contain the wire polynomial that is being range checked and its range check proof polynomial, each in aggregated version
   *)
   val f_map_contribution_2 :
-    permutation:int array ->
+    permutations:int array SMap.t ->
     beta:Poly.scalar ->
     gamma:Poly.scalar ->
     domain:Domain.t ->
@@ -87,6 +85,7 @@ module type S = sig
     ?circuit_prefix:(string -> string) ->
     proof_prefix:(string -> string) ->
     domain_size:int ->
+    range_checks:'a SMap.t ->
     unit ->
     prover_identities
 
@@ -96,6 +95,7 @@ module type S = sig
     beta:Scalar.t ->
     gamma:Scalar.t ->
     domain_size:int ->
+    range_checks:'a SMap.t ->
     unit ->
     prover_identities
 
@@ -103,6 +103,7 @@ module type S = sig
   val verifier_identities_1 :
     ?circuit_prefix:(string -> string) ->
     proof_prefix:(string -> string) ->
+    range_checks:bool SMap.t ->
     unit ->
     Scalar.t ->
     Scalar.t SMap.t SMap.t ->
@@ -117,24 +118,25 @@ module type S = sig
     delta:Scalar.t ->
     domain_size:int ->
     generator:Scalar.t ->
+    range_checks:bool SMap.t ->
     unit ->
     verifier_identities
 
   val cs :
-    lnin1:s_repr ->
-    pnin1:s_repr ->
+    rc_index:int list ->
+    nb_proofs:int ->
+    lnin1:s_repr list ->
+    pnin1:s_repr list ->
     z_list:s_repr list ->
     zg_list:s_repr list ->
-    wire_list:s_repr list ->
+    aggregated_wires:s_repr list ->
     sum_alpha_i:(s_repr list -> s_repr -> s_repr L.t) ->
     l1:s_repr ->
-    ss_list:s_repr list ->
+    ss_list:s_repr list list ->
     beta:s_repr ->
     gamma:s_repr ->
     delta:s_repr ->
     x:s_repr ->
-    z_perm:s_repr ->
-    zg_perm:s_repr ->
     (string * s_repr) list L.t
 end
 
@@ -147,20 +149,20 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
 
   let pnin1 = "Pnin1"
 
-  let z_name = "RC_Z"
-
   let rc_prefix = "RC_"
 
-  let wire = Plompiler.Csir.wire_name 0
+  let z_name wire = rc_prefix ^ wire ^ "_Z"
 
-  let batched_wire = String.capitalize_ascii wire
+  let batched_wire = String.capitalize_ascii
 
-  let batched_z_name = "RC_Z_BATCHED"
+  let batched_z_name wire = rc_prefix ^ batched_wire wire ^ "_Z"
+
+  let suffix str wire = str ^ "_" ^ wire
 
   (* Used for distribution *)
-  let z_names = [z_name]
+  let z_names wire = [z_name wire]
 
-  let shared_z_names = [rc_prefix ^ "Perm_Z"]
+  let shared_z_names wire = [rc_prefix ^ wire ^ "_Perm_Z"]
 
   type public_parameters = Poly.t SMap.t
 
@@ -168,82 +170,98 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
 
   let mone, mtwo = Scalar.(negate one, negate two)
 
-  (* Build the permutation such that (n₀ + … + n_{j - 1}) <-> N + i_j for ni = upperbounds,
-     j < len([rc]), N = [size_domain], i_j = index of the j-th range check in
-     [range_checks]
-     Note that identities and Z building must consider the polynomials in the
-     order imposed by this permutation, which stands for the order Z_RC — Wire.
-  *)
-  let build_permutation ~range_checks ~size_domain =
-    if range_checks = [] then [||]
-    else
-      let fst_part =
-        (* the first element is the sum of upperbounds until an index represented
-           by the second element *)
-        let sum_n = ref (0, 0) in
-        let get_safe l j =
-          try
-            let i, n = List.nth l (snd !sum_n) in
-            sum_n := (fst !sum_n + n, snd !sum_n + 1) ;
-            size_domain + i
-          with _ -> j
-        in
-        Array.init size_domain (fun j ->
-            (* if we are at a range check index i then the permutation goes on
-               the corresponding index in the range check list ; if there is no
-               more index in the range check list, or if we are not at a range
-               check index, i is a fix point of the permutation
-            *)
-            if j = fst !sum_n then get_safe range_checks j else j)
-      in
-      let snd_part =
-        (* we just keep the first argument of sum_n, the second one is now useless *)
-        let sum_n = ref 0 in
-        Array.init size_domain (fun j ->
-            (* if i is not a index of the range check list then it’s a fix point,
-               else it goes on on index of the corresponding range check ;
-               this piece is the mirror of the preceeding one *)
-            match List.assoc_opt j range_checks with
-            | None -> size_domain + j
-            | Some n ->
-                let res = !sum_n in
-                sum_n := res + n ;
-                res)
-      in
-      Array.append fst_part snd_part
-
-  (* We have to make sure we consider the values we give to Perm functions
-     in the same order as the permutation we build ; the current permutation
-     stands for the order Z_RC — Wire. *)
-  let prefix_for_perm =
-    SMap.Aggregation.update_key_name (fun k ->
-        if k = batched_wire then "2." ^ batched_wire
-        else if k = batched_z_name then "1." ^ k
-        else k)
-
-  (* TODO we should be able to aggregate permutation for different range checks
-     proofs as we do for wires ; for now & simplicity, we don’t handle several
-     proofs in one circuit *)
   module Permutation = struct
+    (* Build the permutation such that (n₀ + … + n_{j - 1}) <-> N + i_j for ni = upperbounds,
+       j < len([rc]), N = [size_domain], i_j = index of the j-th range check in
+       [range_checks]
+       Note that identities and Z building must consider the polynomials in the
+       order imposed by this permutation, which stands for the order Z_RC — Wire.
+    *)
+    let build_permutation_wire ~size_domain range_checks =
+      if range_checks = [] then [||]
+      else
+        let fst_part =
+          (* the first element is the sum of upperbounds until an index represented
+             by the second element *)
+          let sum_n = ref (0, 0) in
+          let get_safe l j =
+            try
+              let i, n = List.nth l (snd !sum_n) in
+              sum_n := (fst !sum_n + n, snd !sum_n + 1) ;
+              size_domain + i
+            with _ -> j
+          in
+          Array.init size_domain (fun j ->
+              (* if we are at a range check index i then the permutation goes on
+                 the corresponding index in the range check list ; if there is no
+                 more index in the range check list, or if we are not at a range
+                 check index, i is a fix point of the permutation
+              *)
+              if j = fst !sum_n then get_safe range_checks j else j)
+        in
+        let snd_part =
+          (* we just keep the first argument of sum_n, the second one is now useless *)
+          let sum_n = ref 0 in
+          Array.init size_domain (fun j ->
+              (* if i is not a index of the range check list then it’s a fix point,
+                 else it goes on on index of the corresponding range check ;
+                 this piece is the mirror of the preceeding one *)
+              match List.assoc_opt j range_checks with
+              | None -> size_domain + j
+              | Some n ->
+                  let res = !sum_n in
+                  sum_n := res + n ;
+                  res)
+        in
+        Array.append fst_part snd_part
+
     module Perm = Permutation_gate.Permutation_gate (PP)
 
-    let external_prefix = rc_prefix
+    let external_prefix wire = rc_prefix ^ wire ^ "_"
 
-    let preprocessing ~permutation ~domain =
-      Perm.preprocessing ~external_prefix ~domain ~permutation ~nb_wires:2 ()
+    let prefix_for_perm =
+      let batched_wire_prefix =
+        String.capitalize_ascii Plompiler.Csir.wire_prefix
+      in
+      SMap.Aggregation.update_key_name (fun k ->
+          if
+            Str.(
+              string_match (regexp (batched_wire_prefix ^ "\\([0-9]+\\)")) k 0)
+          then "2." ^ k
+          else if
+            Str.(
+              string_match
+                (regexp (rc_prefix ^ batched_wire_prefix ^ "\\([0-9]+\\)_Z"))
+                k
+                0)
+          then "1." ^ k
+          else k)
 
-    let f_map_contribution ~permutation ~beta ~gamma ~domain
-        ~values:batched_values =
+    (* We have to make sure we consider the values we give to Perm functions
+       in the same order as the permutation we build ; the current permutation
+       stands for the order Z_RC — Wire. *)
+    let prefix_for_perm_map = SMap.update_keys prefix_for_perm
+
+    let preprocessing ~domain wire permutation =
+      Perm.preprocessing
+        ~external_prefix:(external_prefix wire)
+        ~domain
+        ~permutation
+        ~nb_wires:2
+        ()
+
+    let f_map_contribution ~beta ~gamma ~domain ~values:batched_values wire
+        permutation =
       let values =
         SMap.of_list
           [
-            (prefix_for_perm batched_wire, SMap.find batched_wire batched_values);
-            ( prefix_for_perm batched_z_name,
-              SMap.find batched_z_name batched_values );
+            (batched_wire wire, SMap.find (batched_wire wire) batched_values);
+            (batched_z_name wire, SMap.find (batched_z_name wire) batched_values);
           ]
+        |> prefix_for_perm_map
       in
       Perm.f_map_contribution
-        ~external_prefix
+        ~external_prefix:(external_prefix wire)
         ~permutation
         ~values
         ~beta
@@ -252,12 +270,13 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
         ()
 
     let prover_identities ?(circuit_prefix = Fun.id) ~beta ~gamma ~domain_size
-        () evaluations =
-      let evaluations = SMap.update_keys prefix_for_perm evaluations in
+        wire _ evaluations =
+      let evaluations = prefix_for_perm_map evaluations in
       Perm.prover_identities
-        ~external_prefix
+        ~external_prefix:(external_prefix wire)
         ~circuit_prefix
-        ~wires_names:(List.map prefix_for_perm [batched_wire; batched_z_name])
+        ~wires_names:
+          (List.map prefix_for_perm [batched_wire wire; batched_z_name wire])
         ~beta
         ~gamma
         ~n:domain_size
@@ -265,41 +284,54 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
         evaluations
 
     let verifier_identities ?(circuit_prefix = Fun.id) ~nb_proofs ~beta ~gamma
-        ~delta ~domain_size ~generator () x answers =
-      let answers = SMap.(map (update_keys prefix_for_perm)) answers in
+        ~delta ~domain_size ~generator wire rc x answers =
+      if not rc then SMap.empty
+      else
+        let answers = SMap.map (SMap.update_keys prefix_for_perm) answers in
+        Perm.verifier_identities
+          ~external_prefix:(external_prefix wire)
+          ~circuit_prefix
+          ~nb_proofs
+          ~generator
+          ~n:domain_size
+          ~wires_names:(List.map prefix_for_perm [wire; z_name wire])
+          ~beta
+          ~gamma
+          ~delta
+          ()
+          x
+          answers
 
-      Perm.verifier_identities
-        ~external_prefix
-        ~circuit_prefix
-        ~nb_proofs
-        ~generator
-        ~n:domain_size
-        ~wires_names:(List.map prefix_for_perm [wire; z_name])
-        ~beta
-        ~gamma
-        ~delta
-        ()
-        x
-        answers
-
-    let cs ~sum_alpha_i ~l1 ~ss_list ~beta ~gamma ~delta ~x ~z ~zg ~wires () =
-      Perm.cs
-        ~external_prefix
-        ~sum_alpha_i
-        ~l1
-        ~ss_list
-        ~beta
-        ~gamma
-        ~delta
-        ~x
-        ~z
-        ~zg
-        ~wires
-        ()
+    (*
+        [[SS1_a ; SS2_a] ; [SS1_b ; SS2_b]]
+        [RC_perm_a ; RC_perm_b]
+        [0~RC_a_Z ; 0~RC_b_Z]
+       [[0~RC_a_Z ; 0~a] ; [0~RC_b_Z ; 0~b]]
+    *)
+    let cs_for_all_wires ~l1 ~ss_list ~beta ~gamma ~x ~z_perm ~zg_perm
+        ~aggregated_wires w_list =
+      let zzgwss =
+        List.(combine (combine (combine z_perm zg_perm) w_list) ss_list)
+      in
+      L.map2M
+        (fun (((z, zg), w), ss_list) aggregated_wires ->
+          Perm.cs
+            ~external_prefix:(rc_prefix ^ "w" ^ string_of_int w ^ "_")
+            ~l1
+            ~ss_list
+            ~beta
+            ~gamma
+            ~x
+            ~z
+            ~zg
+            ~aggregated_wires
+            ())
+        zzgwss
+        aggregated_wires
   end
 
   module RangeChecks = struct
-    let preprocessing ~range_checks ~domain =
+    let preprocessing ~domain wire range_checks =
       if range_checks = [] then SMap.empty
       else
         let domain_size = Domain.length domain in
@@ -324,7 +356,8 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
         in
         let lnin1_poly = build_poly ~at_n:one ~default:zero in
         let pnin1_poly = build_poly ~at_n:zero ~default:one in
-        SMap.of_list [(lnin1, lnin1_poly); (pnin1, pnin1_poly)]
+        SMap.of_list
+          [(suffix lnin1 wire, lnin1_poly); (suffix pnin1 wire, pnin1_poly)]
 
     (* compute the evaluations of the Z polynomial for a scalar [x] with the bound [up] *)
     let partial_z (x, up) =
@@ -338,28 +371,37 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
       let res = aux [x] up in
       res |> List.rev_map Scalar.of_z
 
-    let f_map_contribution ~range_checks ~domain ~values =
-      let wire = SMap.find wire values in
-      let evals =
-        let to_checks =
-          List.map (fun (i, n) -> (Evaluations.get wire i, n)) range_checks
-        in
-        let all_evals = List.concat_map partial_z to_checks |> Array.of_list in
+    let f_map_contribution ~domain ~values wire_name range_checks =
+      if range_checks = [] then (SMap.empty, SMap.empty)
+      else
+        let wire = SMap.find wire_name values in
         let evals =
-          Array.(
-            append
-              all_evals
-              (init (Domain.length domain - length all_evals) (Fun.const zero)))
+          let to_checks =
+            List.map
+              (fun (idx, bound) -> (Evaluations.get wire idx, bound))
+              range_checks
+          in
+          let all_evals =
+            List.concat_map partial_z to_checks |> Array.of_list
+          in
+          let evals =
+            Array.(
+              append
+                all_evals
+                (init
+                   (Domain.length domain - length all_evals)
+                   (Fun.const zero)))
+          in
+          Evaluations.of_array (Array.length evals - 1, evals)
         in
-        Evaluations.of_array (Array.length evals - 1, evals)
-      in
-      let z = Evaluations.interpolation_fft domain evals in
-      (evals, SMap.of_list [(z_name, z)])
+        let z = Evaluations.interpolation_fft domain evals in
+        ( SMap.of_list [(batched_z_name wire_name, evals)],
+          SMap.of_list [(z_name wire_name, z)] )
 
     let prover_identities ?(circuit_prefix = Fun.id) ~proof_prefix:prefix
-        ~domain_size:n () evaluations =
+        ~domain_size:n wire _ evaluations =
       let z_evaluation =
-        Evaluations.find_evaluation evaluations (prefix z_name)
+        Evaluations.find_evaluation evaluations (prefix (z_name wire))
       in
       let z_evaluation_len = Evaluations.length z_evaluation in
       let tmp_evaluation = Evaluations.create z_evaluation_len in
@@ -369,7 +411,9 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
       (* Z × (1-Z) × Lnin1 *)
       let identity_rca =
         let lnin1_evaluation =
-          Evaluations.find_evaluation evaluations (circuit_prefix lnin1)
+          Evaluations.find_evaluation
+            evaluations
+            (circuit_prefix (suffix lnin1 wire))
         in
         let one_m_z_evaluation =
           Evaluations.linear_c
@@ -387,7 +431,9 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
       (* (Z - 2Zg) × (1 - Z + 2Zg) × Pnin1 *)
       let identity_rcb =
         let pnin1_evaluation =
-          Evaluations.find_evaluation evaluations (circuit_prefix pnin1)
+          Evaluations.find_evaluation
+            evaluations
+            (circuit_prefix (suffix pnin1 wire))
         in
         let z_min_2Zg_evaluation =
           Evaluations.linear_c
@@ -412,22 +458,30 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
           ()
       in
       SMap.of_list
-        [(prefix "RC.a", identity_rca); (prefix "RC.b", identity_rcb)]
+        [
+          (prefix (rc_prefix ^ wire) ^ ".a", identity_rca);
+          (prefix (rc_prefix ^ wire) ^ ".b", identity_rcb);
+        ]
 
-    let verifier_identities ?(circuit_prefix = Fun.id) ~proof_prefix:prefix ()
-        _x answers =
-      let z = get_answer answers X (prefix z_name) in
-      let zg = get_answer answers GX (prefix z_name) in
-      let lnin1 = get_answer answers X (circuit_prefix lnin1) in
-      let pnin1 = get_answer answers X (circuit_prefix pnin1) in
-      let identity_rca = Scalar.(z * (one + negate z) * lnin1) in
-      let identity_rcb =
-        Scalar.((z + (mtwo * zg)) * (one + negate z + (two * zg)) * pnin1)
-      in
-      SMap.of_list
-        [(prefix "RC.a", identity_rca); (prefix "RC.b", identity_rcb)]
+    let verifier_identities ?(circuit_prefix = Fun.id) ~proof_prefix:prefix wire
+        rc _x answers =
+      if not rc then SMap.empty
+      else
+        let z = get_answer answers X (prefix (z_name wire)) in
+        let zg = get_answer answers GX (prefix (z_name wire)) in
+        let lnin1 = get_answer answers X (circuit_prefix (suffix lnin1 wire)) in
+        let pnin1 = get_answer answers X (circuit_prefix (suffix pnin1 wire)) in
+        let identity_rca = Scalar.(z * (one + negate z) * lnin1) in
+        let identity_rcb =
+          Scalar.((z + (mtwo * zg)) * (one + negate z + (two * zg)) * pnin1)
+        in
+        SMap.of_list
+          [
+            (prefix (rc_prefix ^ wire) ^ ".a", identity_rca);
+            (prefix (rc_prefix ^ wire) ^ ".b", identity_rcb);
+          ]
 
-    let cs ~prefix ~lnin1 ~pnin1 ~z ~zg =
+    let cs_unitary ~prefix ~lnin1 ~pnin1 ~z ~zg w =
       let open L in
       let* one_m_z = Num.custom ~ql:mone ~qc:one z z in
       let* id_a = Num.mul_list (to_list [z; one_m_z; lnin1]) in
@@ -436,66 +490,157 @@ module Range_check_gate_impl (PP : Polynomial_protocol.S) = struct
         let* one_m_z_p_2zg = Num.add one_m_z ~qr:two zg in
         Num.mul_list (to_list [z_m_2zg; one_m_z_p_2zg; pnin1])
       in
-      ret [(prefix "RC.a", id_a); (prefix "RC.b", id_b)]
+      let wire = "w" ^ string_of_int w in
+      ret
+        [(prefix "RC_" ^ wire ^ ".a", id_a); (prefix "RC_" ^ wire ^ ".b", id_b)]
+
+    let cs_for_all_wires ~prefix ~lnin1 ~pnin1 ~z_list ~zg_list w_list =
+      let open L in
+      let lp = List.combine lnin1 pnin1 in
+      let zzgw = List.(combine (combine z_list zg_list) w_list) in
+      let* ids =
+        map2M
+          (fun (lnin1, pnin1) ((z, zg), w) ->
+            cs_unitary ~prefix ~lnin1 ~pnin1 ~z ~zg w)
+          lp
+          zzgw
+      in
+      ret (List.concat ids)
   end
 
-  let preprocessing ~permutation ~range_checks ~domain =
-    if range_checks = [] then SMap.empty
-    else
-      let rc = RangeChecks.preprocessing ~range_checks ~domain in
-      let perm = Permutation.preprocessing ~permutation ~domain in
-      SMap.union_disjoint rc perm
+  let build_permutations ~size_domain ~range_checks =
+    SMap.map (Permutation.build_permutation_wire ~size_domain) range_checks
 
-  let f_map_contribution_1 = RangeChecks.f_map_contribution
+  let preprocessing ~range_checks ~permutations ~domain =
+    let rc = SMap.mapi (RangeChecks.preprocessing ~domain) range_checks in
+    let perm = SMap.mapi (Permutation.preprocessing ~domain) permutations in
+    SMap.values rc @ SMap.values perm |> SMap.union_disjoint_list
 
-  let f_map_contribution_2 = Permutation.f_map_contribution
-
-  let prover_identities_1 = RangeChecks.prover_identities
-
-  let prover_identities_2 = Permutation.prover_identities
-
-  let verifier_identities_1 = RangeChecks.verifier_identities
-
-  let verifier_identities_2 = Permutation.verifier_identities
-
-  let cs ~lnin1 ~pnin1 ~z_list ~zg_list ~wire_list ~sum_alpha_i ~l1 ~ss_list
-      ~beta ~gamma ~delta ~x ~z_perm ~zg_perm =
-    let open L in
-    let* rc =
-      let n = List.length z_list in
-      let i = ref (-1) in
-      (* RC’s cs for all proofs *)
-      let* rc =
-        map2M
-          (fun z zg ->
-            incr i ;
-            RangeChecks.cs
-              ~prefix:(SMap.Aggregation.add_prefix ~n ~i:!i "")
-              ~lnin1
-              ~pnin1
-              ~z
-              ~zg)
-          z_list
-          zg_list
-      in
-      ret (List.concat rc)
+  let f_map_contribution_1 ~range_checks ~domain ~values =
+    let z_evals, f_map =
+      SMap.mapi (RangeChecks.f_map_contribution ~domain ~values) range_checks
+      |> SMap.to_pair
     in
-    let wires = List.map2 (fun z w -> [z; w]) z_list wire_list in
+    ( SMap.(union_disjoint_list (values z_evals)),
+      SMap.(union_disjoint_list (values f_map)) )
+
+  let f_map_contribution_2 ~permutations ~beta ~gamma ~domain ~values =
+    SMap.mapi
+      (Permutation.f_map_contribution ~beta ~gamma ~domain ~values)
+      permutations
+    |> SMap.values |> SMap.union_disjoint_list
+
+  let prover_identities_1 ?(circuit_prefix = Fun.id) ~proof_prefix ~domain_size
+      ~range_checks () =
+    SMap.mapi
+      (RangeChecks.prover_identities ~circuit_prefix ~proof_prefix ~domain_size)
+      range_checks
+    |> SMap.values |> Identities.merge_prover_identities
+
+  let prover_identities_2 ?(circuit_prefix = Fun.id) ~beta ~gamma ~domain_size
+      ~range_checks () =
+    SMap.mapi
+      (Permutation.prover_identities ~circuit_prefix ~beta ~gamma ~domain_size)
+      range_checks
+    |> SMap.values |> Identities.merge_prover_identities
+
+  let verifier_identities_1 ?(circuit_prefix = Fun.id) ~proof_prefix
+      ~range_checks () =
+    SMap.mapi
+      (RangeChecks.verifier_identities ~circuit_prefix ~proof_prefix)
+      range_checks
+    |> SMap.values |> Identities.merge_verifier_identities
+
+  let verifier_identities_2 ?(circuit_prefix = Fun.id) ~nb_proofs ~beta ~gamma
+      ~delta ~domain_size ~generator ~range_checks () =
+    SMap.mapi
+      (Permutation.verifier_identities
+         ~circuit_prefix
+         ~nb_proofs
+         ~beta
+         ~gamma
+         ~delta
+         ~domain_size
+         ~generator)
+      range_checks
+    |> SMap.values |> Identities.merge_verifier_identities
+
+  (* converts [0~RC_a_Z ; 0~RC_b_Z ; 1~RC_a_Z ; 1~RC_b_Z ; RC_perm_a ; RC_perm_b]
+     into [RC_perm_a ; RC_perm_b], [[0~RC_a_Z ; 0~RC_b_Z] ; [1~RC_a_Z ; 1~RC_b_Z]]
+      Note that the way answers are ordered may differ if proof are not numbered (-> if there is just one proof)
+  *)
+  let format_z_list rc_wires nb_proofs z_list =
+    let z_rev = List.rev z_list in
+    let z = Array.of_list z_list in
+    let n = List.length rc_wires in
+    if nb_proofs = 1 then
+      let z_perm, z_rc =
+        List.mapi (fun i _ -> (z.(2 * i), z.((2 * i) + 1))) rc_wires
+        |> List.split
+      in
+      (z_perm, [z_rc])
+    else
+      let z_perm = List.(rev (init n (nth z_rev))) in
+      let z_rc =
+        List.init nb_proofs (fun i -> List.init n (fun w -> z.((n * i) + w)))
+      in
+      (z_perm, z_rc)
+
+  (*
+      [lni1]
+      [pni1]
+      z_list = [0~RC_a_Z ; 0~RC_b_Z ; 1~RC_a_Z ; 1~RC_b_Z ; RC_perm_a ; RC_perm_b]
+      aggregated_wires = [A, B, C, D, E]
+  *)
+  let cs ~rc_index ~nb_proofs:n ~lnin1 ~pnin1 ~z_list ~zg_list ~aggregated_wires
+      ~sum_alpha_i ~l1 ~ss_list ~beta ~gamma ~delta ~x =
+    let open L in
+    let z_perm, z_rc = format_z_list rc_index n z_list in
+    let zg_perm, zg_rc = format_z_list rc_index n zg_list in
+    let* rc =
+      let proof_idx = ref (-1) in
+      map2M
+        (fun z_list zg_list ->
+          incr proof_idx ;
+          RangeChecks.cs_for_all_wires
+            ~prefix:(SMap.Aggregation.add_prefix ~n ~i:!proof_idx "")
+            ~lnin1
+            ~pnin1
+            ~z_list
+            ~zg_list
+            rc_index)
+        z_rc
+        zg_rc
+    in
+    let* aggregated_z_rc =
+      List.mapn (fun i -> sum_alpha_i i delta) z_rc |> mapM Fun.id
+    in
+
+    let aggregated_rc_wires =
+      List.filteri (fun i _ -> List.mem i rc_index) aggregated_wires
+    in
+
+    let aggregated_wires =
+      List.fold_left2
+        (fun acc r w -> [r; w] :: acc)
+        []
+        aggregated_z_rc
+        aggregated_rc_wires
+      |> List.rev
+    in
     let* perm =
-      Permutation.cs
-        ~sum_alpha_i
+      Permutation.cs_for_all_wires
         ~l1
         ~ss_list
         ~beta
         ~gamma
-        ~delta
         ~x
-        ~z:z_perm
-        ~zg:zg_perm
-        ~wires
-        ()
+        ~z_perm
+        ~zg_perm
+        ~aggregated_wires
+        rc_index
     in
-    ret (rc @ perm)
+    ret (List.flatten (rc @ perm))
 end
 
 module Range_check_gate (PP : Polynomial_protocol.S) : S with module PP = PP =

@@ -29,7 +29,7 @@ module External (PC : Polynomial_commitment.S) = struct
       Range_Checks.list
     @ List.map
         (H.test_aggregated_cases ~prefix:pc_name)
-        Range_Checks.[[valid; valid; valid_bis]]
+        Range_Checks.[[valid; valid; basic; basic]]
 end
 
 module External_Kzg = External (Polynomial_commitment)

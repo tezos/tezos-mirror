@@ -121,6 +121,10 @@ module External = struct
               (qe.name, (module No_public_input : CircuitPI));
               (qlg.name, (module No_public_input : CircuitPI));
               (qrg.name, (module No_public_input : CircuitPI));
+              ( Cases.Range_Checks.basic.name,
+                (module No_public_input : CircuitPI) );
+              ( Cases.Range_Checks.valid.name,
+                (module No_public_input : CircuitPI) );
               (zero_values.name, (module One_public_input : CircuitPI));
               (non_zero_values.name, (module One_public_input : CircuitPI));
             ]
@@ -146,6 +150,9 @@ module External = struct
           ])
         [
           [qc; ql; qr; qd; qe];
+          (* FIXME: aPlonk doesn’t work when used with two circuits with different evaluation points for wires *)
+          (* [ql; qlg; Cases.Range_Checks.valid; Cases.Range_Checks.basic]; *)
+          [qc; Cases.Range_Checks.basic];
           [non_zero_values; non_zero_values; zero_values];
           [qlg; qrg; non_zero_values; zero_values];
         ]

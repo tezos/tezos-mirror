@@ -289,6 +289,7 @@ module Common (PP : Polynomial_protocol.S) = struct
       Perm.Shared_argument.build_batched_wires_values
         ~delta:rd.delta
         ~wires:f_wires_list_map
+        ()
     in
     (* ******************************************* *)
     let f_map_plook = build_f_map_plook ~shifts_map pp rd f_wires_list_map in

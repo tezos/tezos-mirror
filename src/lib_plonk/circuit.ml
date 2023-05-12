@@ -54,7 +54,7 @@ module Circuit : sig
     table_size : int;
     nb_lookups : int;
     ultra : bool;
-    range_checks : (int * int) list;
+    range_checks : (int * int) list SMap.t;
   }
 
   val make_gates :
@@ -83,7 +83,7 @@ module Circuit : sig
     ?tables:Scalar.t array list list ->
     public_input_size:int ->
     ?input_com_sizes:int list ->
-    ?range_checks:(int * int) list ->
+    ?range_checks:(int * int) list SMap.t ->
     unit ->
     t
 
@@ -99,7 +99,7 @@ module Circuit : sig
     public_input_size:int ->
     ?input_com_sizes:int list ->
     ?tables:Table.t list ->
-    ?range_checks:(int * int) list ->
+    ?range_checks:(int * int) list SMap.t ->
     CS.t ->
     t
 end = struct
@@ -113,7 +113,7 @@ end = struct
     table_size : int;
     nb_lookups : int;
     ultra : bool;
-    range_checks : (int * int) list;
+    range_checks : (int * int) list SMap.t;
   }
 
   let get_selectors circuit = SMap.keys circuit.gates
@@ -159,7 +159,7 @@ end = struct
      Wires and gates cannot be empty and must all have the same length.
   *)
   let make ~wires ~gates ?(tables = []) ~public_input_size
-      ?(input_com_sizes = []) ?(range_checks = []) () =
+      ?(input_com_sizes = []) ?(range_checks = SMap.empty) () =
     if Array.length wires = 0 then
       raise @@ Invalid_argument "Make Circuit: empty wires." ;
     if SMap.is_empty gates then
@@ -226,20 +226,30 @@ end = struct
             l)
         tables
     in
-    (* Check all range indexes are contained in the array *)
+    (* Check all range indexes are contained in the array & all range check’s wires are in wires *)
     let () =
-      List.iter
-        (fun (i, _) ->
+      SMap.iter
+        (fun wire_name r ->
           if
-            List.exists
-              (fun l -> i >= circuit_size + l + public_input_size)
-              input_com_sizes
+            Plompiler.Csir.int_of_wire_name wire_name
+            >= Plompiler.Csir.nb_wires_arch
           then
             raise
-              (Invalid_argument
-                 "Make Circuit: inconsistent range checks indices."))
+              (Invalid_argument "Make Circuit: inconsistent range checks keys.") ;
+          (List.iter (fun (i, _) ->
+               if
+                 List.exists
+                   (fun l -> i >= circuit_size + l + public_input_size)
+                   input_com_sizes
+               then
+                 raise
+                   (Invalid_argument
+                      "Make Circuit: inconsistent range checks indices.")))
+            r)
         range_checks
     in
+    (* Remove empty ranges checks lists from range checks map *)
+    let range_checks = SMap.filter (fun _ l -> l <> []) range_checks in
     let table_size =
       if tables = [] then 0
       else List.fold_left (fun acc t -> acc + Array.length (List.hd t)) 0 tables
@@ -367,7 +377,7 @@ end = struct
     with Constraint_not_satisfied _ -> false
 
   let to_plonk ~public_input_size ?(input_com_sizes = []) ?(tables = [])
-      ?(range_checks = []) cs =
+      ?(range_checks = SMap.empty) cs =
     let open CS in
     let cs = List.rev Array.(to_list @@ concat cs) in
     assert (cs <> []) ;

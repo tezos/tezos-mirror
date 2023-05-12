@@ -327,22 +327,24 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
      C(X) := \sum_i delta^{i-1} c_i(X)
      We will perform a single permutation argument for A, B and C. *)
   module Shared_argument = struct
-    let build_batched_wires_values ~delta ~wires:wires_list_map =
-      (* agg_map = {a -> [] ; b -> [] ; …} *)
-      let agg_map =
-        SMap.(map (Fun.const []) (List.hd (choose wires_list_map |> snd)))
-      in
-      (* builds {a -> linear(a in l) ; b -> linear(b in l) ; …} *)
-      let aggreg_wires_list l =
-        List.fold_left
-          (fun acc wires -> (SMap.mapi (fun k v -> SMap.find k wires :: v)) acc)
-          agg_map
-          (List.rev l)
-        |> SMap.map (fun ws_list ->
-               Evaluations.linear_with_powers ws_list delta)
-      in
-      SMap.map aggreg_wires_list wires_list_map
-      |> SMap.(map (update_keys String.capitalize_ascii))
+    let build_batched_wires_values ?(batched_keys = String.capitalize_ascii)
+        ~delta ~wires:wires_list_map () =
+      if SMap.is_empty wires_list_map then SMap.empty
+      else
+        (* builds {a -> linear(a in l) ; b -> linear(b in l) ; …} *)
+        let aggreg_wires_list l =
+          (* agg_map = {a -> [] ; b -> [] ; …} *)
+          let agg_map = SMap.(map (Fun.const []) (List.hd l)) in
+          List.fold_left
+            (fun acc wires ->
+              (SMap.mapi (fun k v -> SMap.find k wires :: v)) acc)
+            agg_map
+            (List.rev l)
+          |> SMap.map (fun ws_list ->
+                 Evaluations.linear_with_powers ws_list delta)
+        in
+        SMap.map aggreg_wires_list wires_list_map
+        |> SMap.(map (update_keys batched_keys))
 
     (* For each circuit, interpolates the batched wires A, B, C from the
        batched witness *)
@@ -405,7 +407,15 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
       batched_witness_polys |> SMap.Aggregation.smap_of_smap_smap
 
     let merge_batched_values m1 m2 =
-      SMap.mapi (fun k v -> SMap.union_disjoint v (SMap.find k m1)) m2
+      if SMap.is_empty m1 then m2
+      else if SMap.is_empty m2 then m1
+      else
+        SMap.mapi
+          (fun k v1 ->
+            match SMap.find_opt k m2 with
+            | Some v2 -> SMap.union_disjoint v1 v2
+            | None -> v1)
+          m1
   end
 
   (* max degree needed is the degree of Perm.b, which is sum of wire’s degree plus z degree *)
@@ -595,14 +605,11 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
       (external_prefix_fun external_prefix z_name)
       (Permutation_poly.compute_Z permutation domain beta gamma values)
 
-  let cs ?(external_prefix = "") ~sum_alpha_i ~l1 ~ss_list ~beta ~gamma ~delta
-      ~x ~z ~zg ~wires () =
+  let cs ?(external_prefix = "") ~l1 ~ss_list ~beta ~gamma ~x ~z ~zg
+      ~aggregated_wires () =
     let open L in
     let* perm_a = Num.custom ~qr:Scalar.(negate one) ~qm:Scalar.(one) z l1 in
     let* perm_b =
-      let* delta_wires =
-        List.mapn (fun i -> sum_alpha_i i delta) wires |> mapM Fun.id
-      in
       let i = ref 0 in
       let* left, right =
         fold2M
@@ -617,7 +624,7 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
             ret (left, right))
           (z, zg)
           ss_list
-          delta_wires
+          aggregated_wires
       in
       Num.add ~qr:Scalar.(negate one) left right
     in
@@ -689,23 +696,23 @@ module type S = sig
 
   val cs :
     ?external_prefix:string ->
-    sum_alpha_i:(L.scalar L.repr list -> L.scalar L.repr -> L.scalar L.repr L.t) ->
     l1:L.scalar L.repr ->
     ss_list:L.scalar L.repr list ->
     beta:L.scalar L.repr ->
     gamma:L.scalar L.repr ->
-    delta:L.scalar L.repr ->
     x:L.scalar L.repr ->
     z:L.scalar L.repr ->
     zg:L.scalar L.repr ->
-    wires:L.scalar L.repr list list ->
+    aggregated_wires:L.scalar L.repr list ->
     unit ->
     (string * L.scalar L.repr) list L.t
 
   module Shared_argument : sig
     val build_batched_wires_values :
-      delta:Scalar.t ->
+      ?batched_keys:(string -> string) ->
+      delta:Poly.scalar ->
       wires:Evaluations.t SMap.t list SMap.t ->
+      unit ->
       Evaluations.t SMap.t SMap.t
 
     val batched_wires_poly_of_batched_wires :

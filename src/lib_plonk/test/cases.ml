@@ -436,19 +436,7 @@ module Range_Checks = struct
         ~wires
         ~gates
         ~public_input_size
-        ~range_checks:[(4, 4); (6, 4)]
-        ()
-    in
-    {name; circuit; witness; outcome = Valid}
-
-  let valid_bis =
-    let name = "RC_single_valid_bis" in
-    let circuit =
-      Plonk.Circuit.make
-        ~wires
-        ~gates
-        ~public_input_size
-        ~range_checks:[(1, 2); (2, 2); (6, 4)]
+        ~range_checks:(SMap.of_list [("w0", [(4, 4); (6, 4)])])
         ()
     in
     {name; circuit; witness; outcome = Valid}
@@ -460,7 +448,7 @@ module Range_Checks = struct
         ~wires
         ~gates
         ~public_input_size
-        ~range_checks:[(1, 2); (3, 2); (4, 2); (6, 2)]
+        ~range_checks:(SMap.of_list [("w0", [(1, 2); (3, 4); (4, 2)])])
         ()
     in
     {name; circuit; witness; outcome = Proof_error}
@@ -469,6 +457,7 @@ module Range_Checks = struct
     let circuit =
       (* This circuit takes x₁ & x₂ (given as first elements of d & e) as inputs and
          rangechecks the outputs x₁ + x₂ & 3×x₁ + x₂ given in a
+         We also bound x₂ as the first value of e (in order to check bounds on other wires)
          in order to have enough constraints for the range check poly, we pad until
          8 constraints
       *)
@@ -495,7 +484,8 @@ module Range_Checks = struct
         ~wires
         ~gates
         ~public_input_size:0
-        ~range_checks:[(0, 3); (1, 4)]
+        ~range_checks:
+          (SMap.of_list [("w0", [(0, 3); (1, 4)]); ("w4", [(0, 2)])])
         ()
     in
     let get_witness x1 x2 =
@@ -508,7 +498,7 @@ module Range_Checks = struct
     let witness = get_witness 4 3 in
     {name = "basic"; circuit; witness; outcome = Valid}
 
-  let list = [valid; valid_bis; wrong; basic]
+  let list = [valid; wrong; basic]
 end
 
 module Big_circuit = struct

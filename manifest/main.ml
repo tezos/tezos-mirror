@@ -1282,6 +1282,7 @@ let octez_plonk =
         data_encoding;
         octez_bls12_381_polynomial |> open_;
         octez_plompiler |> open_;
+        str;
       ]
     ~preprocess:[pps ppx_repr]
 

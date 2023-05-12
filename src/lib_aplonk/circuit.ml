@@ -90,8 +90,6 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     rc_selectors : scalar_input list;
     zg_rc : scalar_input list;
     z_rc : scalar_input list;
-    zg_rc_perm : scalar_input list;
-    z_rc_perm : scalar_input list;
   }
 
   let nb_batch gates = if Gates.exists_gx_composition ~gates then 5 else 4
@@ -115,14 +113,13 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     let gates = SMap.of_list (List.map (fun g -> (g, ())) gates) in
     let batch = List.init (nb_batch gates) (fun _ -> dummy_input) in
     let wires_g = if nb_batch gates = nb_batch SMap.empty then [] else wires in
-    let z_rc, zg_rc, z_rc_perm, zg_rc_perm, rc_selectors =
-      if range_checks = [] then ([], [], [], [], [])
+    let z_rc, rc_selectors =
+      if SMap.is_empty range_checks then ([], [])
       else
-        ( List.init nb_proofs (Fun.const dummy_input),
-          List.init nb_proofs (Fun.const dummy_input),
-          [dummy_input],
-          [dummy_input],
-          List.init 4 (Fun.const dummy_input) )
+        let nb_wires = SMap.cardinal range_checks in
+        (* here the +nb_wires stands for RC_perm_Z *)
+        ( List.init ((nb_proofs * nb_wires) + nb_wires) (Fun.const dummy_input),
+          List.init (4 * nb_wires) (Fun.const dummy_input) )
     in
     {
       switches;
@@ -146,10 +143,8 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       inner_pi;
       outer_pi;
       rc_selectors;
-      zg_rc;
+      zg_rc = z_rc;
       z_rc;
-      zg_rc_perm;
-      z_rc_perm;
     }
 
   module Constraints = struct
@@ -331,10 +326,10 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     (* Verifies that the linear combination of identities with alpha is equal to T×Zs
        The identities are computed from evaluations, with the functions cs of Custom_gates & Permutation_gate
     *)
-    let check_identities ~switches (n, generator) x ids_batch rc_selectors
-        (q_names, selectors) (alpha, beta, gamma, beta_rc, gamma_rc, delta)
-        (wires_g, wires, zg, z, zg_rc, z_rc, zg_rc_perm, z_rc_perm) ss_list
-        pi_list_list =
+    let check_identities ~switches (n, generator) x rc_wires ids_batch
+        rc_selectors (q_names, selectors)
+        (alpha, beta, gamma, beta_rc, gamma_rc, delta)
+        (wires_g, wires, zg, z, zg_rc, z_rc) ss_list pi_list_list =
       (* We don’t care about wires_g value if it’s empty so we just take wires *)
       let wires_g = match wires_g with [] -> wires | w -> w in
       (* precompute some constant *)
@@ -392,36 +387,39 @@ module V (Main : Aggregation.Main_protocol.S) = struct
         Plonk.List.mapn add_circuits (pi_list :: monomials) |> mapM Fun.id
       in
       (* Using switched wires is enough for adapting the perm identity to the lower number of proof *)
-      let* perm_ids =
-        (Perm.cs ~sum_alpha_i ~l1 ~ss_list ~beta ~gamma ~delta ~x ~z ~zg)
-          ~wires
-          ()
+      let* aggregated_wires =
+        Plonk.List.mapn (fun i -> sum_alpha_i i delta) wires |> mapM Fun.id
       in
+      let* perm_ids =
+        (Perm.cs ~l1 ~ss_list ~beta ~gamma ~x ~z ~zg) ~aggregated_wires ()
+      in
+      let nb_rc = List.length rc_wires in
       let* rc_ids =
-        match z_rc with
+        match rc_wires with
         | [] -> ret []
         | _ ->
-            let lnin1 = List.nth rc_selectors 0 in
-            let pnin1 = List.nth rc_selectors 1 in
-            let ss1 = List.nth rc_selectors 2 in
-            let ss2 = List.nth rc_selectors 3 in
-            (* todo compute batched wires outside of the permutation to unify a with the a of the perm *)
-            let wire_list = List.map List.hd wires in
+            let nb_proofs = List.length wires in
+            let lnin1 = Plonk.List.sub rc_selectors 0 nb_rc in
+            let pnin1 = Plonk.List.sub rc_selectors nb_rc nb_rc in
+            let ss_list =
+              List.init nb_rc (fun i ->
+                  Plonk.List.sub rc_selectors (nb_rc * (2 + i)) 2)
+            in
             RC.cs
+              ~rc_index:rc_wires
+              ~nb_proofs
               ~lnin1
               ~pnin1
               ~z_list:z_rc
               ~zg_list:zg_rc
-              ~wire_list
+              ~aggregated_wires
               ~sum_alpha_i
               ~l1
-              ~ss_list:[ss1; ss2]
+              ~ss_list
               ~beta:beta_rc
               ~gamma:gamma_rc
               ~delta
               ~x
-              ~z_perm:(List.hd z_rc_perm)
-              ~zg_perm:(List.hd zg_rc_perm)
       in
       let identities =
         format_arith_ids arith_list
@@ -439,17 +437,21 @@ module V (Main : Aggregation.Main_protocol.S) = struct
               List.(
                 hd custom_ids |> fold_left (fun acc l -> acc + length (snd l)) 0)
             in
-            (* +1 for the arithmetic identity & + 2 for the range check id *)
-            match rc_ids with [] -> nb_custom_ids + 1 | _ -> nb_custom_ids + 3
+            (* +1 for the arithmetic identity & + 2×nb_rc for the range check ids *)
+            match rc_ids with
+            | [] -> nb_custom_ids + 1
+            | _ -> nb_custom_ids + 1 + (2 * nb_rc)
           in
           List.concat_map
             (fun b -> List.init nb_ids_per_proof (Fun.const b))
             switches
         in
         (* [true ; true] is added for the permutation identities, &
-           [true ; true] is added for the RC permutation identities *)
+           nb_rc × [true ; true] is added for the RC permutation identities *)
         let for_whole_circuit =
-          match rc_ids with [] -> [t; t] | _ -> [t; t; t; t]
+          match rc_ids with
+          | [] -> [t; t]
+          | _ -> [t; t] @ List.init (2 * nb_rc) (Fun.const t)
         in
         for_each_proof @ for_whole_circuit
       in
@@ -462,15 +464,6 @@ module V (Main : Aggregation.Main_protocol.S) = struct
         The 10 public_inputs are : fiat shamir randomness (alpha, beta, gamma,
      beta_rc, gamma_rc, delta, x, r), ids_batch & compressed_switch *)
   let meta_public_input_size gates = 10 + nb_batch gates
-
-  let nb_answers nb_proofs gates =
-    (* Sσ₁ + Sσ₂ + Sσ₃ + Sσ₄ + Sσ₅ + selectors *)
-    let nb_g = nb_wires + SMap.cardinal gates in
-    let nb_w = nb_proofs * nb_wires in
-    let nb_wg = if Gates.exists_gx_composition ~gates then nb_w else 0 in
-    let nb_z = 1 in
-    let nb_zg = 1 in
-    nb_g + nb_w + nb_wg + nb_z + nb_zg
 
   let verify_batch r batch batches t_answers =
     let init_sum =
@@ -620,7 +613,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
   (* generator & n are the subgroup generator & size of the subgroup of identities verification
      check_pi is a function related to PI, given here as argument in order to allow several PI handling forms
   *)
-  let verification_circuit (generator, n) check_pi
+  let verification_circuit (generator, n) rc_wires check_pi
       {
         switches;
         compressed_switches;
@@ -645,8 +638,6 @@ module V (Main : Aggregation.Main_protocol.S) = struct
         rc_selectors;
         zg_rc;
         z_rc;
-        zg_rc_perm;
-        z_rc_perm;
       } =
     let n = S.of_int n in
     (* input selectors in the same order they are given *)
@@ -657,45 +648,20 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       |: Input.list (List.map Input.list inner_pi)
       |> end_input_com
     in
-    let* ( rc_selectors,
-           ss_list,
-           selectors,
-           zg_rc_perm,
-           zg_rc,
-           zg,
-           z_rc_perm,
-           z_rc,
-           z,
-           wires_g,
-           wires ) =
+    let* rc_selectors, ss_list, selectors, zg_rc, zg, z_rc, z, wires_g, wires =
       begin_input_com
-        (fun
-          rc_selectors
-          ss_list
-          selectors
-          zg_rc_perm
-          zg_rc
-          zg
-          z_rc_perm
-          z_rc
-          z
-          wires_g
-          wires
-        ->
+        (fun rc_selectors ss_list selectors zg_rc zg z_rc z wires_g wires ->
           ( of_list rc_selectors,
             ss_list,
             of_list selectors,
-            of_list zg_rc_perm,
             of_list zg_rc,
             zg,
-            of_list z_rc_perm,
             of_list z_rc,
             z,
             List.map of_list (of_list wires_g),
             List.map of_list (of_list wires) ))
       |: Input.list rc_selectors |: Input.list ss_list |: Input.list selectors
-      |: Input.list zg_rc_perm |: Input.list zg_rc |: zg |: Input.list z_rc_perm
-      |: Input.list z_rc |: z
+      |: Input.list zg_rc |: zg |: Input.list z_rc |: z
       |: Input.list (List.map Input.list wires_g)
       |: Input.list (List.map Input.list wires)
       |> end_input_com
@@ -743,18 +709,12 @@ module V (Main : Aggregation.Main_protocol.S) = struct
            ~switches
            (n, generator)
            x
+           rc_wires
            ids_batch
            rc_selectors
            (q_names, selectors)
            (alpha, beta, gamma, beta_rc, gamma_rc, delta)
-           ( switched_wires_g,
-             switched_wires,
-             zg,
-             z,
-             zg_rc,
-             z_rc,
-             zg_rc_perm,
-             z_rc_perm )
+           (switched_wires_g, switched_wires, zg, z, zg_rc, z_rc)
            ss_list
            switched_inner_pi
     in
@@ -762,8 +722,8 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       with_label ~label:"check_batch"
       @@
       let g_list = rc_selectors @ ss_list @ selectors in
-      let z_list = z_rc_perm @ z_rc @ [z] in
-      let zg_list = zg_rc_perm @ zg_rc @ [zg] in
+      let z_list = z_rc @ [z] in
+      let zg_list = zg_rc @ [zg] in
       Constraints.check_batch
         r
         (g_list, switched_wires, switched_wires_g, z_list, zg_list)
@@ -785,6 +745,10 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     let dummy_input =
       dummy_input circuit.range_checks gates nb_proofs nb_inner_pi nb_outer_pi
     in
+    let rc_wires =
+      SMap.(keys circuit.range_checks)
+      |> List.map Plompiler.Csir.int_of_wire_name
+    in
     Plompiler.LibCircuit.get_cs
-      (verification_circuit (gen, n) check_pi dummy_input)
+      (verification_circuit (gen, n) rc_wires check_pi dummy_input)
 end
