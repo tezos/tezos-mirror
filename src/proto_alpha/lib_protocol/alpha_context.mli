@@ -5127,10 +5127,11 @@ end
 val prepare_first_block :
   Chain_id.t ->
   Context.t ->
-  typecheck:
+  typecheck_smart_contract:
     (context ->
     Script.t ->
     ((Script.t * Lazy_storage.diffs option) * context) tzresult Lwt.t) ->
+  typecheck_smart_rollup:(context -> Script.expr -> context tzresult) ->
   level:Int32.t ->
   timestamp:Time.t ->
   predecessor:Block_hash.t ->

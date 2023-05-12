@@ -75,11 +75,11 @@ let init_account (ctxt, balance_updates)
       >>=? fun () -> return ctxt)
   >|=? fun ctxt -> (ctxt, new_balance_updates @ balance_updates)
 
-let init_contract ~typecheck (ctxt, balance_updates)
+let init_contract ~typecheck_smart_contract (ctxt, balance_updates)
     ({delegate; amount; script} : Parameters_repr.bootstrap_contract) =
   Contract_storage.fresh_contract_from_current_nonce ctxt
   >>?= fun (ctxt, contract_hash) ->
-  typecheck ctxt script >>=? fun (script, ctxt) ->
+  typecheck_smart_contract ctxt script >>=? fun (script, ctxt) ->
   Contract_storage.raw_originate
     ctxt
     ~prepaid_bootstrap_storage:true
@@ -105,10 +105,15 @@ let genesis_hash ~boot_sector kind =
   let*! genesis_hash = Machine.state_hash state in
   return genesis_hash
 
-let init_smart_rollup ctxt
+let init_smart_rollup ~typecheck_smart_rollup ctxt
     ({address; boot_sector; pvm_kind; parameters_ty} :
       Parameters_repr.bootstrap_smart_rollup) =
   let open Lwt_result_syntax in
+  let*? ctxt =
+    let open Result_syntax in
+    let* parameters_ty = Script_repr.force_decode parameters_ty in
+    typecheck_smart_rollup ctxt parameters_ty
+  in
   let* genesis_hash = genesis_hash ~boot_sector pvm_kind in
   let genesis_commitment : Sc_rollup_commitment_repr.t =
     {
@@ -135,14 +140,22 @@ let init_smart_rollup ctxt
   in
   return ctxt
 
-let init ctxt ~typecheck ?no_reward_cycles accounts contracts smart_rollups =
+let init ctxt ~typecheck_smart_contract ~typecheck_smart_rollup
+    ?no_reward_cycles accounts contracts smart_rollups =
   let nonce = Operation_hash.hash_string ["Un festival de GADT."] in
   let ctxt = Raw_context.init_origination_nonce ctxt nonce in
   List.fold_left_es init_account (ctxt, []) accounts
   >>=? fun (ctxt, balance_updates) ->
-  List.fold_left_es (init_contract ~typecheck) (ctxt, balance_updates) contracts
+  List.fold_left_es
+    (init_contract ~typecheck_smart_contract)
+    (ctxt, balance_updates)
+    contracts
   >>=? fun (ctxt, balance_updates) ->
-  List.fold_left_es init_smart_rollup ctxt smart_rollups >>=? fun ctxt ->
+  List.fold_left_es
+    (init_smart_rollup ~typecheck_smart_rollup)
+    ctxt
+    smart_rollups
+  >>=? fun ctxt ->
   (match no_reward_cycles with
   | None -> return ctxt
   | Some cycles ->

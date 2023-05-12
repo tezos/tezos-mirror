@@ -49,11 +49,6 @@ type bootstrap_smart_rollup = {
   pvm_kind : Sc_rollups.Kind.t;
   boot_sector : string;
   parameters_ty : Script_repr.lazy_expr;
-      (** Note that the parameters are neither parsed or validated.
-          The chain's bootstrap module is an alpha context's dependency, which
-          is used by modules such as {!Script_ir_translator}. So, because
-          of cyclic dependencies, we cannot use them when we bootstrap a smart
-          rollup, and therefore we perform no checks on the parameters validity. *)
 }
 
 (** Protocol parameters define some constants regulating behaviour of the
