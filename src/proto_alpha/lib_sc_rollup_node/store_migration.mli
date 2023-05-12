@@ -23,43 +23,45 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type S = sig
-  type +'a store
+(** Type of parameter for migration functor {!Make}. *)
+module type MIGRATION_ACTIONS = sig
+  (** Type of store from which data is migrated. *)
+  type from_store
 
-  (** Type of store. The parameter indicates if the store can be written or only
-      read. *)
-  type 'a t = ([< `Read | `Write > `Read] as 'a) store
+  (** Type of store to which the data is migrated. *)
+  type dest_store
 
-  (** Read/write store {!t}. *)
-  type rw = Store_sigs.rw t
+  (** Action or actions to migrate data associated to a block. NOTE:
+      [dest_store] is an empty R/W store initialized in a temporary location. *)
+  val migrate_block_action :
+    from_store -> dest_store -> Sc_rollup_block.t -> unit tzresult Lwt.t
 
-  (** Read only store {!t}. *)
-  type ro = Store_sigs.ro t
-
-  (** Version supported by this code.  *)
-  val version : Store_version.t
-
-  (** [close store] closes the store. *)
-  val close : _ t -> unit tzresult Lwt.t
-
-  (** [load mode ~l2_blocks_cache_size directory] loads a store from the data
-      persisted in [directory]. If [mode] is {!Store_sigs.Read_only}, then the
-      indexes and irmin store will be opened in readonly mode and only read
-      operations will be permitted. This allows to open a store for read access
-      that is already opened in {!Store_sigs.Read_write} mode in another
-      process. [l2_blocks_cache_size] is the number of L2 blocks the rollup node
-      will keep in memory. *)
-  val load :
-    'a Store_sigs.mode ->
-    l2_blocks_cache_size:int ->
-    string ->
-    'a store tzresult Lwt.t
-
-  (** [readonly store] returns a read-only version of [store]. *)
-  val readonly : _ t -> ro
-
-  (** [iter_l2_blocks store f] iterates [f] on all L2 blocks reachable from the
-      head, from newest to oldest.  *)
-  val iter_l2_blocks :
-    _ t -> (Sc_rollup_block.t -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
+  (** The final actions to be performed in the migration. In particular, this is
+      where data from the temporary store in [dest_store] in [tmp_dir] should be
+      reported in the actual [storage_dir]. *)
+  val final_actions :
+    storage_dir:string ->
+    tmp_dir:string ->
+    from_store ->
+    dest_store ->
+    unit tzresult Lwt.t
 end
+
+module type S = sig
+  (** Migration function for the store located in [storage_dir]. *)
+  val migrate : storage_dir:string -> unit tzresult Lwt.t
+end
+
+(** Functor to create and {e register} a migration. *)
+module Make
+    (S_from : Store_sig.S)
+    (S_dest : Store_sig.S)
+    (Actions : MIGRATION_ACTIONS
+                 with type from_store := Store_sigs.ro S_from.t
+                  and type dest_store := Store_sigs.rw S_dest.t) : S
+
+(** Migrate store located in rollup node {e store} directory [storage_dir] if
+    needed. If there is no possible migration path registered to go from the
+    current version to the last {!Store.version}, this function resolves with an
+    error. *)
+val maybe_run_migration : storage_dir:string -> unit tzresult Lwt.t

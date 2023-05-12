@@ -30,6 +30,8 @@ include Store_sigs
 include Store_utils
 include Store_v0
 
+let version = Store_version.V1
+
 module Make_hash_index_key (H : Environment.S.HASH) =
 Indexed_store.Make_index_key (struct
   include Indexed_store.Make_fixed_encodable (H)

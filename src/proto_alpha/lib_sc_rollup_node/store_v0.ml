@@ -35,6 +35,8 @@ include Store_utils
 (** Aggregated collection of messages from the L1 inbox *)
 open Alpha_context
 
+let version = Store_version.V0
+
 module Irmin_store = struct
   module IStore = Irmin_store.Make (struct
     let name = "Tezos smart rollup node"
