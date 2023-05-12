@@ -560,6 +560,7 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
   Init_storage.prepare ctxt ~level ~predecessor_timestamp ~timestamp
   >>=? fun (ctxt, balance_updates, origination_results) ->
   Consensus.load_endorsement_branch ctxt >>=? fun ctxt ->
+  Delegate.load_forbidden_delegates ctxt >>=? fun ctxt ->
   return (ctxt, balance_updates, origination_results)
 
 let finalize ?commit_message:message c fitness =
