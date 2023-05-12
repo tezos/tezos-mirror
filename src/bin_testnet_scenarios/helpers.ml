@@ -46,24 +46,32 @@ let rec wait_for_funded_key node client expected_amount key =
   else unit
 
 let setup_octez_node ~(testnet : Testnet.t) ?runner () =
-  (* By default, Tezt set the difficulty to generate the identity file
-     of the Octez node to 0 (`--expected-pow 0`). The default value
-     used in network like mainnet, Mondaynet etc. is 26 (see
-     `lib_node_config/config_file.ml`). *)
   let l1_node_args =
     Node.[Expected_pow 26; Synchronisation_threshold 1; Network testnet.network]
   in
-  let node = Node.create ?runner l1_node_args in
-  let* () = Node.config_init node [] in
-  let* () =
-    match testnet.snapshot with
-    | Some snapshot ->
-        Log.info "Import snapshot" ;
-        let* snapshot = download ?runner snapshot "snapshot" in
-        let* () = Node.snapshot_import node snapshot in
-        Log.info "Snapshot imported" ;
-        unit
-    | None -> unit
+  let* node =
+    match testnet.data_dir with
+    | Some data_dir ->
+        (* Runs a node using the existing data-dir. *)
+        return (Node.create ~data_dir l1_node_args)
+    | None ->
+        (* By default, Tezt set the difficulty to generate the identity file
+           of the Octez node to 0 (`--expected-pow 0`). The default value
+           used in network like mainnet, Mondaynet etc. is 26 (see
+           `lib_node_config/config_file.ml`). *)
+        let node = Node.create ?runner l1_node_args in
+        let* () = Node.config_init node [] in
+        let* () =
+          match testnet.snapshot with
+          | Some snapshot ->
+              Log.info "Import snapshot" ;
+              let* snapshot = download ?runner snapshot "snapshot" in
+              let* () = Node.snapshot_import node snapshot in
+              Log.info "Snapshot imported" ;
+              unit
+          | None -> unit
+        in
+        return node
   in
   let* () = Node.run node [] in
   let* () = Node.wait_for_ready node in

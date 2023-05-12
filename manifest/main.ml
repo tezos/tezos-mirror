@@ -3865,6 +3865,7 @@ let _tezt_testnet_scenarios =
       [
         tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_ethereum |> open_;
       ]
 
 let octez_openapi =

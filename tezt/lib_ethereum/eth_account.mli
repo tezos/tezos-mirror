@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  let path = Cli.get_string ~default:"scenarios.json" "configuration" in
-  let testnet = Testnet.get_testnet_config path in
+type t = {address : string; private_key : string; genesis_mint_tx : string}
 
-  Sc_rollup.register ~testnet ;
-  Evm_rollup.register ~testnet ;
-
-  Test.run ()
+(** Bootstrap accounts in the EVM Kernel *)
+val bootstrap_accounts : t array
