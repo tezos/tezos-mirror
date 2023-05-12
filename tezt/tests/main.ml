@@ -82,7 +82,7 @@ let register_protocol_migration_tests () =
     ~from_protocol:migrate_to
     ~to_protocol:Demo
     ~loser_protocols:[migrate_from] ;
-  Sc_rollup.register_migration ~migrate_from:Protocol.Nairobi ~migrate_to
+  Sc_rollup.register_migration ~migrate_from ~migrate_to
 
 (* Register tests that use [Protocol.register_test] and for which we rely on
    [?supports] to decide which protocols the tests should run on.

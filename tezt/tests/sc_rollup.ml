@@ -298,11 +298,19 @@ let test_l1_scenario ?regression ?hooks ~kind ?boot_sector ?commitment_period
 let test_l1_migration_scenario ?parameters_ty ?(src = Constant.bootstrap1.alias)
     ?variant ?(tags = []) ~kind ~migrate_from ~migrate_to ~scenario_prior
     ~scenario_after ~description () =
-  let tags = kind :: "migration" :: tags in
+  let tags =
+    Protocol.tag migrate_from :: Protocol.tag migrate_to :: kind :: "migration"
+    :: tags
+  in
   Test.register
     ~__FILE__
     ~tags
-    ~title:(format_title_scenario kind {variant; tags; description})
+    ~title:
+      (sf
+         "%s->%s: %s"
+         (Protocol.name migrate_from)
+         (Protocol.name migrate_to)
+         (format_title_scenario kind {variant; tags; description}))
   @@ fun () ->
   let* tezos_node, tezos_client =
     setup_l1 ~commitment_period:10 ~challenge_window:10 ~timeout:10 migrate_from
