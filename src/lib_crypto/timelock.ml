@@ -421,6 +421,10 @@ let proof_of_vdf_tuple_unsafe rsa_public ~time vdf_tuple =
 let chest_sampler ~rng_state ~plaintext_size ~time =
   Random.set_state rng_state ;
   let plaintext = gen_random_bytes_bench_unsafe plaintext_size in
+  (* As we only benchmark the type encodings and the verification function,
+     it is safe to sample chests on known precomputed tuples in order to
+     generate them quickly. As such, we assert here that the time input is a
+     power of 2 lower than 30 (we only precomputed tuples up to that value). *)
   let locked_value, proof =
     let log_time = Float.(of_int time |> log2 |> to_int) in
     let vdf_tuple =
