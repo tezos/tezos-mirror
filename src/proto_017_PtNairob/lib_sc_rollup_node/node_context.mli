@@ -353,19 +353,19 @@ val find_messages :
   Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t ->
   messages_info option tzresult Lwt.t
 
-(** [get_num_messages t witness_hash] retrieves (without reading all the messages
-    from disk) the number of messages for the inbox witness [witness_hash]
-    stored by the rollup node. *)
+(** [get_num_messages t witness_hash] retrieves the number of messages for the
+    inbox witness [witness_hash] stored by the rollup node. *)
 val get_num_messages :
   _ t -> Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t -> int tzresult Lwt.t
 
-(** [save_messages t payloads_hash messages] associates the list of [messages]
-    to the [payloads_hash]. The payload hash must be computed by calling,
-    e.g. {!Sc_rollup.Inbox.add_all_messages}. *)
+(** [save_messages t payloads_hash ~block_hash messages] associates the list of
+    [messages] to the [payloads_hash]. The payload hash must be computed by
+    calling, e.g. {!Sc_rollup.Inbox.add_all_messages}. *)
 val save_messages :
   rw ->
   Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t ->
-  messages_info ->
+  block_hash:Block_hash.t ->
+  Sc_rollup.Inbox_message.t list ->
   unit tzresult Lwt.t
 
 (** {3 DAL} *)
