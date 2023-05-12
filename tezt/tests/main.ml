@@ -129,6 +129,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Create_contract.register ~protocols ;
   Deposits_limit.register ~protocols ;
   Double_bake.register ~protocols ;
+  Double_consensus.register ~protocols ;
   Encoding.register ~protocols ;
   Events.register ~protocols ;
   External_validation.register ~protocols ;

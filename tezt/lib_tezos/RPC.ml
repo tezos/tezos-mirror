@@ -655,6 +655,18 @@ let get_chain_block_helper_endorsing_rights ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "helpers"; "endorsing_rights"]
     Fun.id
 
+let get_chain_block_helper_validators ?(chain = "main") ?(block = "head")
+    ?delegate ?level () =
+  let query_string =
+    Query_arg.opt "delegate" Fun.id delegate
+    @ Query_arg.opt "level" Int.to_string level
+  in
+  make
+    ~query_string
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "validators"]
+    Fun.id
+
 let get_chain_block_helper_levels_in_current_cycle ?(chain = "main")
     ?(block = "head") () =
   make

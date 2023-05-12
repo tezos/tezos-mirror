@@ -638,6 +638,19 @@ val get_chain_block_helper_attestation_rights :
 val get_chain_block_helper_endorsing_rights :
   ?chain:string -> ?block:string -> ?delegate:string -> unit -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/validators]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_helper_validators :
+  ?chain:string ->
+  ?block:string ->
+  ?delegate:string ->
+  ?level:int ->
+  unit ->
+  JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/helpers/levels_in_current_cycle]
 
     [chain] defaults to ["main"].

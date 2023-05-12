@@ -61,11 +61,16 @@ type t
 
 type operation := t
 
+type consensus_kind = Endorsement | Preendorsement
+
 (** The kind is necessary because it determines the watermark of an
    operation which is necessary for signing an operation. This type
    aims to be extended when other kinds of operations are added into
    this module. *)
-type kind = Consensus of {chain_id : string} | Voting | Manager
+type kind =
+  | Consensus of {kind : consensus_kind; chain_id : string}
+  | Voting
+  | Manager
 
 (** [make ~branch ~signer ~kind json client] builds the representation
    of an unsigned operation. *)
@@ -182,6 +187,18 @@ module Consensus : sig
      [level - attestation_lag].  For each slot, the value of the
      booleans indicates whether the data is deemed available. *)
   val dal_attestation : attestation:bool array -> level:int -> t
+
+  (* [preendorsement ~level ~round ~slot ~block_payload_hash] craft a
+     preendorsement operation at [level] on the [round] with the [slot] and
+     [block_payload_hash]. *)
+  val preendorsement :
+    slot:int -> level:int -> round:int -> block_payload_hash:string -> t
+
+  (* [endorsement ~level ~round ~slot ~block_payload_hash] craft an
+     endorsement operation at [level] on the [round] with the [slot] and
+     [block_payload_hash]. *)
+  val endorsement :
+    slot:int -> level:int -> round:int -> block_payload_hash:string -> t
 
   (** [operation] constructs an operation from a consensus
      operation. the [client] is used to fetch the branch and the

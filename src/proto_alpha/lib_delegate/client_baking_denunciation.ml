@@ -58,7 +58,10 @@ type ops_stream =
 
 type 'kind recorded_consensus =
   | No_operation_seen
-  | Operation_seen of 'kind operation
+  | Operation_seen of {
+      operation : 'kind operation;
+      previously_denounced_oph : Operation_hash.t option;
+    }
 
 type recorded_consensus_operations = {
   endorsement : Kind.endorsement recorded_consensus;
@@ -213,10 +216,19 @@ let process_consensus_op (type kind) state cctxt
     chain_id level round slot =
   let open Lwt_result_syntax in
   let diff = Raw_level.diff state.highest_level_encountered level in
-  if Int32.(diff > of_int state.preserved_levels) then return_unit
+  if Int32.(diff > of_int state.preserved_levels) then
     (* We do not handle operations older than [preserved_levels] *)
-  else if diff < -2l then return_unit
+    let*! () =
+      Events.(emit consensus_operation_too_old) (Operation.hash new_op)
+    in
+    return_unit
+  else if diff < -2l then
     (* We do not handle operations too far in the future *)
+    let*! () =
+      Events.(emit consensus_operation_too_far_in_future)
+        (Operation.hash new_op)
+    in
+    return_unit
   else
     let* endorsing_rights = get_validator_rights state cctxt level in
     match Slot.Map.find slot endorsing_rights with
@@ -239,9 +251,10 @@ let process_consensus_op (type kind) state cctxt
                  (add_consensus_operation
                     consensus_key
                     op_kind
-                    (Operation_seen new_op)
+                    (Operation_seen
+                       {operation = new_op; previously_denounced_oph = None})
                     round_map)
-        | Operation_seen existing_op
+        | Operation_seen {operation = existing_op; previously_denounced_oph}
           when Block_payload_hash.(
                  get_payload_hash op_kind existing_op
                  <> get_payload_hash op_kind new_op)
@@ -286,17 +299,26 @@ let process_consensus_op (type kind) state cctxt
             let*! () =
               Events.(emit double_op_detected) (new_op_hash, existing_op_hash)
             in
+            let* op_hash =
+              Shell_services.Injection.private_operation cctxt ~chain bytes
+            in
+            let*! () =
+              match previously_denounced_oph with
+              | Some oph -> Events.(emit double_consensus_already_denounced) oph
+              | None -> Lwt.return_unit
+            in
             HLevel.replace
               state.consensus_operations_table
               (chain_id, level, round)
               (add_consensus_operation
                  consensus_key
                  op_kind
-                 (Operation_seen new_op)
+                 (Operation_seen
+                    {
+                      operation = new_op;
+                      previously_denounced_oph = Some op_hash;
+                    })
                  round_map) ;
-            let* op_hash =
-              Shell_services.Injection.private_operation cctxt ~chain bytes
-            in
             let*! () = Events.(emit double_op_denounced) (op_hash, bytes) in
             return_unit
         | _ -> return_unit)
