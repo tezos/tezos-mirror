@@ -80,6 +80,39 @@ pub struct TransactionReceipt {
     pub status: TransactionStatus,
 }
 
+/// Transaction receipt, https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionbyhash
+/// There a lot of redundancy between a transaction object and a transaction
+/// receipt. In fact, transaction objects should not be stored in the kernel
+/// but rather in the EVM node. Duplicating the code instead of sharing fields
+/// is intentional to facilitate the associated code to the EVM node.
+/// TODO: https://gitlab.com/tezos/tezos/-/issues/5695
+pub struct TransactionObject {
+    /// Address of the sender.
+    pub from: H160,
+    /// The amount of gas used by this specific transaction alone.
+    pub gas_used: U256,
+    /// The amount of gas price provided by the sender in Wei.
+    pub gas_price: U256,
+    /// Hash of the transaction.
+    pub hash: TransactionHash,
+    /// The data send along with the transaction.
+    pub input: Vec<u8>,
+    /// The number of transactions made by the sender prior to this one.
+    pub nonce: U256,
+    /// Address of the receiver. null when its a contract creation transaction.
+    pub to: Option<H160>,
+    /// Integer of the transactions index position in the block.
+    pub index: u32,
+    /// Value transferred in Wei.
+    pub value: U256,
+    /// ECDSA recovery id
+    pub v: U256,
+    /// ECDSA signature r
+    pub r: H256,
+    /// ECDSA signature s
+    pub s: H256,
+}
+
 #[allow(clippy::from_over_into)]
 impl Into<&'static [u8]> for &TransactionType {
     fn into(self) -> &'static [u8] {
