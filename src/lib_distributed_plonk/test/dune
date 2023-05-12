@@ -9,9 +9,7 @@
   octez-plonk
   octez-plonk.aggregation
   octez-plonk.distribution
-  octez-plonk.plonk-test
-  octez-aplonk)
- (modules distribution_helpers))
+  octez-aplonk))
 
 (executable
  (name main)
