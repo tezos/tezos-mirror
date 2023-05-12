@@ -96,6 +96,7 @@ val with_observer :
   ?sc_rollup_node:Sc_rollup_node.t ->
   ?pvm_name:string ->
   ?wait_ready:bool ->
+  committee_member_rpcs:(string * int) list ->
   Node.t ->
   Dac_node.t ->
   Client.t ->

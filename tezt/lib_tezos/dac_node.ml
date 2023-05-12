@@ -42,6 +42,7 @@ module Parameters = struct
   type observer_mode_settings = {
     coordinator_rpc_host : string;
     coordinator_rpc_port : int;
+    committee_member_rpcs : (string * int) list;
   }
 
   type mode_settings =
@@ -111,6 +112,8 @@ let reveal_data_dir dac_node = dac_node.persistent_state.reveal_data_dir
 let spawn_command dac_node =
   Process.spawn ~name:dac_node.name ~color:dac_node.color dac_node.path
 
+let raw_rpc (host, port) = Printf.sprintf "%s:%d" host port
+
 let spawn_config_init dac_node =
   let arg_command =
     [
@@ -173,12 +176,26 @@ let spawn_config_init dac_node =
           "signer";
           committee_member_params.address;
         ]
-    | Observer observer_params ->
+    | Observer
+        {coordinator_rpc_host; coordinator_rpc_port; committee_member_rpcs} ->
         let coordinator_host =
-          observer_params.coordinator_rpc_host ^ ":"
-          ^ Int.to_string observer_params.coordinator_rpc_port
+          coordinator_rpc_host ^ ":" ^ Int.to_string coordinator_rpc_port
         in
-        ["configure"; "as"; "observer"; "with"; "coordinator"; coordinator_host]
+        let committee_member_rpcs = List.map raw_rpc committee_member_rpcs in
+        [
+          "configure";
+          "as";
+          "observer";
+          "with";
+          "coordinator";
+          coordinator_host;
+          "and";
+          "committee";
+          "member";
+          "rpc";
+          "addresses";
+        ]
+        @ committee_member_rpcs
   in
   spawn_command dac_node (mode_command @ arg_command)
 
@@ -355,12 +372,14 @@ let create_committee_member ?(path = Constant.dac_node) ?name ?color ?data_dir
 
 let create_observer ?(path = Constant.dac_node) ?name ?color ?data_dir
     ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir
-    ?(coordinator_rpc_host = "127.0.0.1") ?coordinator_rpc_port ~node ~client ()
-    =
+    ?(coordinator_rpc_host = "127.0.0.1") ?coordinator_rpc_port
+    ~committee_member_rpcs ~node ~client () =
   let coordinator_rpc_port =
     match coordinator_rpc_port with None -> Port.fresh () | Some port -> port
   in
-  let mode = Observer {coordinator_rpc_host; coordinator_rpc_port} in
+  let mode =
+    Observer {coordinator_rpc_host; coordinator_rpc_port; committee_member_rpcs}
+  in
   create
     ~path
     ?name

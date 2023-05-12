@@ -101,11 +101,19 @@ module Committee_member = struct
 end
 
 module Observer = struct
-  type t = {coordinator_cctxt : Dac_node_client.cctxt}
+  type t = {
+    coordinator_cctxt : Dac_node_client.cctxt;
+    committee_cctxts : Dac_node_client.cctxt list;
+  }
 
   let init observer_config =
     let open Lwt_result_syntax in
-    let Configuration.Observer.{coordinator_rpc_address; coordinator_rpc_port} =
+    let Configuration.Observer.
+          {
+            coordinator_rpc_address;
+            coordinator_rpc_port;
+            committee_rpc_addresses;
+          } =
       observer_config
     in
     let coordinator_cctxt =
@@ -114,7 +122,13 @@ module Observer = struct
         ~host:coordinator_rpc_address
         ~port:coordinator_rpc_port
     in
-    return {coordinator_cctxt}
+    let committee_cctxts =
+      List.map
+        (fun (host, port) ->
+          Dac_node_client.make_unix_cctxt ~scheme:"http" ~host ~port)
+        committee_rpc_addresses
+    in
+    return {coordinator_cctxt; committee_cctxts}
 end
 
 module Legacy = struct
