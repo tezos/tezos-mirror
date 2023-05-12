@@ -544,7 +544,7 @@ let transaction_encoding =
 
 type call = {
   from : address option;
-  to_ : address;
+  to_ : address option;
   gas : quantity option;
   gasPrice : quantity option;
   value : quantity option;
@@ -560,7 +560,7 @@ let call_encoding =
       {from; to_; gas; gasPrice; value; data})
     (obj6
        (opt "from" address_encoding)
-       (req "to" address_encoding)
+       (opt "to" address_encoding)
        (opt "gas" quantity_encoding)
        (opt "gasPrice" quantity_encoding)
        (opt "value" quantity_encoding)

@@ -36,6 +36,8 @@ open Sc_rollup_helpers
 
 let pvm_kind = "wasm_2_0_0"
 
+let kernel_inputs_path = "tezt/tests/evm_kernel_inputs"
+
 type full_evm_setup = {
   node : Node.t;
   client : Client.t;
@@ -74,20 +76,14 @@ let next_evm_level ~sc_rollup_node ~node ~client =
     sc_rollup_node
     (Node.get_level node)
 
-let send_and_wait_until_tx_mined ~sc_rollup_node ~node ~client
-    ~source_private_key ~to_public_key ~value ~evm_proxy_server_endpoint ?data
-    () =
+(** [wait_for_application ~sc_rollup_node ~node ~client apply ()] tries to
+[apply] an operation and in parallel moves [sc_rollup_node] to the [node]'s next
+level until either the operation succeeded (in which case it stops) or a given
+number of level has passed (in which case it fails). *)
+let wait_for_application ~sc_rollup_node ~node ~client apply () =
   let* start_level = Client.level client in
   let max_iteration = 10 in
-  let tx_hash =
-    Eth_cli.transaction_send
-      ~source_private_key
-      ~to_public_key
-      ~value
-      ~endpoint:evm_proxy_server_endpoint
-      ?data
-      ()
-  in
+  let tx_hash = apply () in
   let next_level =
     let rec go () =
       (* Sleep few seconds to give a better chance to [tx_hash] of being
@@ -96,7 +92,7 @@ let send_and_wait_until_tx_mined ~sc_rollup_node ~node ~client
       let* new_level = next_evm_level ~sc_rollup_node ~node ~client in
       if start_level + max_iteration < new_level then
         Test.fail
-          "Baked more than %d blocks and [eth transaction:send] is still \
+          "Baked more than %d blocks and the operation's application is still \
            pending"
           max_iteration
       else go ()
@@ -104,6 +100,19 @@ let send_and_wait_until_tx_mined ~sc_rollup_node ~node ~client
     go ()
   in
   Lwt.choose [tx_hash; next_level]
+
+let send_and_wait_until_tx_mined ~sc_rollup_node ~node ~client
+    ~source_private_key ~to_public_key ~value ~evm_proxy_server_endpoint ?data
+    () =
+  let send =
+    Eth_cli.transaction_send
+      ~source_private_key
+      ~to_public_key
+      ~value
+      ~endpoint:evm_proxy_server_endpoint
+      ?data
+  in
+  wait_for_application ~sc_rollup_node ~node ~client send ()
 
 let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash) protocol =
@@ -327,6 +336,33 @@ let test_l2_blocks_progression =
   let* () = check_block_progression ~expected_block_level:2 in
   unit
 
+let test_l2_deploy =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "l2_deploy"]
+    ~title:"Check L2 contract deployment"
+  @@ fun protocol ->
+  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
+  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
+  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* () =
+    Eth_cli.add_abi
+      ~label:"simpleStorage"
+      ~abi:(kernel_inputs_path ^ "/storage_abi.json")
+      ()
+  in
+  let send_deploy =
+    Eth_cli.deploy
+      ~source_private_key:sender.private_key
+      ~endpoint:evm_proxy_server_endpoint
+      ~abi:"simpleStorage"
+      ~bin:(kernel_inputs_path ^ "/storage.bin")
+  in
+  let* _ = wait_for_application ~sc_rollup_node ~node ~client send_deploy () in
+  unit
+
 let transfer ?data protocol =
   let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
   let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
@@ -393,6 +429,7 @@ let register_evm_proxy_server ~protocols =
   test_rpc_getTransactionCount protocols ;
   test_l2_blocks_progression protocols ;
   test_l2_transfer protocols ;
-  test_chunked_transaction protocols
+  test_chunked_transaction protocols ;
+  test_l2_deploy protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols

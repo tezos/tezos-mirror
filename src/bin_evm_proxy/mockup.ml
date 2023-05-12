@@ -52,7 +52,9 @@ let block_height () = block_height_of_z @@ Z.of_int !block_height_counter
 
 let balance = qty_f @@ Conv.to_wei 1000
 
-let code = hash_f "0x"
+let code =
+  hash_f
+    "0x608060405234801561001057600080fd5b5061017f806100206000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80634e70b1dc1461004657806360fe47b1146100645780636d4ce63c14610080575b600080fd5b61004e61009e565b60405161005b91906100d0565b60405180910390f35b61007e6004803603810190610079919061011c565b6100a4565b005b6100886100ae565b60405161009591906100d0565b60405180910390f35b60005481565b8060008190555050565b60008054905090565b6000819050919050565b6100ca816100b7565b82525050565b60006020820190506100e560008301846100c1565b92915050565b600080fd5b6100f9816100b7565b811461010457600080fd5b50565b600081359050610116816100f0565b92915050565b600060208284031215610132576101316100eb565b5b600061014084828501610107565b9150509291505056fea2646970667358221220ec57e49a647342208a1f5c9b1f2049bf1a27f02e19940819f38929bf67670a5964736f6c63430008120033"
 
 (* Gas limit must be at least 21000 *)
 let gas_price = qty_f @@ Z.of_int 21000
@@ -98,9 +100,10 @@ let transaction_receipt () =
     transactionIndex = qty_f Z.zero;
     blockHash = block_hash;
     blockNumber = qty_f @@ Z.of_int !block_height_counter;
-    from = address_of_string "6F4d14B90C48bEFb49CA3fe6663dEC70731A8bC7";
-    to_ = address_of_string "A5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E";
-    contractAddress = None;
+    from = address_of_string "0x6F4d14B90C48bEFb49CA3fe6663dEC70731A8bC7";
+    to_ = address_of_string "0xA5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E";
+    contractAddress =
+      Some (address_of_string "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c");
     cumulativeGasUsed = gas_price;
     effectiveGasPrice = gas_price;
     gasUsed = gas_price;
@@ -114,13 +117,13 @@ let transaction_object =
   {
     blockHash = block_hash;
     blockNumber = qty_f @@ Z.of_int 42;
-    from = Address "0x6F4d14B90C48bEFb49CA3fe6663dEC70731A8bC7";
+    from = address_of_string "0x6F4d14B90C48bEFb49CA3fe6663dEC70731A8bC7";
     gas = qty_f Z.zero;
     gasPrice = qty_f Z.zero;
     hash = transaction_hash;
     input = None;
     nonce = qty_f Z.zero;
-    to_ = Address "0xA5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E";
+    to_ = address_of_string "0xA5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E";
     transactionIndex = qty_f Z.zero;
     value = qty_f Z.zero;
     v = qty_f Z.zero;

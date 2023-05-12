@@ -25,14 +25,19 @@
 
 let path = "eth"
 
-let spawn_command command decode =
+let spawn_command_and_read command decode =
   let process = Process.spawn path command in
   let* output = Process.check_and_read_stdout process in
   return (JSON.parse ~origin:"eth_spawn_command" output |> decode)
 
+let spawn_command command =
+  let process = Process.spawn path command in
+  let* output = Process.check process in
+  return output
+
 let balance ~account ~endpoint =
   let* balance =
-    spawn_command
+    spawn_command_and_read
       ["address:balance"; account; "--network"; endpoint]
       JSON.as_int
   in
@@ -40,7 +45,7 @@ let balance ~account ~endpoint =
 
 let transaction_send ~source_private_key ~to_public_key ~value ~endpoint ?data
     () =
-  spawn_command
+  spawn_command_and_read
     ([
        "transaction:send";
        "--pk";
@@ -56,7 +61,29 @@ let transaction_send ~source_private_key ~to_public_key ~value ~endpoint ?data
     JSON.as_string
 
 let get_block ~block_id ~endpoint =
-  spawn_command ["block:get"; block_id; "--network"; endpoint] Block.of_json
+  spawn_command_and_read
+    ["block:get"; block_id; "--network"; endpoint]
+    Block.of_json
 
 let block_number ~endpoint =
-  spawn_command ["block:number"; "--network"; endpoint] JSON.as_int
+  spawn_command_and_read ["block:number"; "--network"; endpoint] JSON.as_int
+
+let add_abi ~label ~abi () = spawn_command ["abi:add"; label; abi]
+
+let deploy ~source_private_key ~endpoint ~abi ~bin () =
+  let decode json =
+    let open JSON in
+    json |-> "address" |> as_string
+  in
+  spawn_command_and_read
+    [
+      "contract:deploy";
+      "--pk";
+      source_private_key;
+      "--abi";
+      abi;
+      "--network";
+      endpoint;
+      bin;
+    ]
+    decode
