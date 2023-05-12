@@ -556,10 +556,13 @@ let get_predecessor node_ctxt (hash, level) =
       (* [head] is not already known in the L2 chain *)
       Layer1.get_predecessor node_ctxt.l1_ctxt (hash, level)
 
-let header_of_head node_ctxt Layer1.{hash; level} =
+let header_of_hash node_ctxt hash =
   let open Lwt_result_syntax in
   let+ header = Layer1.fetch_tezos_shell_header node_ctxt.cctxt hash in
-  {Layer1.hash; level; header}
+  {Layer1.hash; level = header.level; header}
+
+let header_of_head node_ctxt Layer1.{hash; level = _} =
+  header_of_hash node_ctxt hash
 
 let get_tezos_reorg_for_new_head node_ctxt old_head new_head =
   let open Lwt_result_syntax in
@@ -795,55 +798,71 @@ type messages_info = {
   messages : Sc_rollup.Inbox_message.t list;
 }
 
-let get_messages {store; _} messages_hash =
+let find_messages node_ctxt messages_hash =
   let open Lwt_result_syntax in
-  let* msg = Store.Messages.read store.messages messages_hash in
+  let* msg = Store.Messages.read node_ctxt.store.messages messages_hash in
   match msg with
+  | None -> return_none
+  | Some (messages, block_hash) ->
+      let* header = header_of_hash node_ctxt block_hash in
+      let* pred_header = header_of_hash node_ctxt header.header.predecessor in
+      let* grand_parent_header =
+        header_of_hash node_ctxt pred_header.header.predecessor
+      in
+      let is_first_block =
+        pred_header.header.proto_level <> grand_parent_header.header.proto_level
+      in
+      return_some
+        {
+          is_first_block;
+          predecessor = pred_header.hash;
+          predecessor_timestamp = pred_header.header.timestamp;
+          messages;
+        }
+
+let get_messages_aux find node_ctxt hash =
+  let open Lwt_result_syntax in
+  let* res = find node_ctxt hash in
+  match res with
   | None ->
       failwith
         "Could not retrieve messages with payloads merkelized hash %a"
         Sc_rollup.Inbox_merkelized_payload_hashes.Hash.pp
-        messages_hash
-  | Some
-      ( messages,
-        (is_first_block, predecessor, predecessor_timestamp, _num_messages) ) ->
-      return {is_first_block; predecessor; predecessor_timestamp; messages}
+        hash
+  | Some res -> return res
 
-let find_messages {store; _} hash =
-  let open Lwt_result_syntax in
-  let+ msgs = Store.Messages.read store.messages hash in
-  Option.map
-    (fun ( messages,
-           (is_first_block, predecessor, predecessor_timestamp, _num_messages)
-         ) -> {is_first_block; predecessor; predecessor_timestamp; messages})
-    msgs
+let get_messages node_ctxt = get_messages_aux find_messages node_ctxt
+
+let get_messages_without_proto_messages node_ctxt =
+  get_messages_aux
+    (fun node_ctxt messages_hash ->
+      let open Lwt_result_syntax in
+      let* msg = Store.Messages.read node_ctxt.store.messages messages_hash in
+      match msg with
+      | None -> return_none
+      | Some (messages, _block_hash) -> return_some messages)
+    node_ctxt
 
 let get_num_messages {store; _} hash =
   let open Lwt_result_syntax in
-  let* header = Store.Messages.header store.messages hash in
-  match header with
+  let* msg = Store.Messages.read store.messages hash in
+  match msg with
   | None ->
       failwith
         "Could not retrieve number of messages for inbox witness %a"
         Sc_rollup.Inbox_merkelized_payload_hashes.Hash.pp
         hash
-  | Some (_first_block, _predecessor, _predecessor_timestamp, num_messages) ->
-      return num_messages
+  | Some (messages, _block_hash) -> return (List.length messages)
 
-let save_messages {store; _} key
-    {is_first_block; predecessor; predecessor_timestamp; messages} =
-  Store.Messages.append
-    store.messages
-    ~key
-    ~header:
-      (is_first_block, predecessor, predecessor_timestamp, List.length messages)
-    ~value:messages
+let save_messages {store; _} key ~block_hash messages =
+  Store.Messages.append store.messages ~key ~header:block_hash ~value:messages
 
 let get_full_l2_block node_ctxt block_hash =
   let open Lwt_result_syntax in
   let* block = get_l2_block node_ctxt block_hash in
   let* inbox = get_inbox node_ctxt block.header.inbox_hash
-  and* {messages; _} = get_messages node_ctxt block.header.inbox_witness
+  and* messages =
+    get_messages_without_proto_messages node_ctxt block.header.inbox_witness
   and* commitment =
     Option.map_es (get_commitment node_ctxt) block.header.commitment_hash
   in
