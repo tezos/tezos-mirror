@@ -284,14 +284,16 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
     state.global_state.config.user_activated_upgrades
   in
   (* Set liquidity_baking_toggle_vote for this block *)
-  let default = state.global_state.config.liquidity_baking_toggle_vote in
-  let per_block_vote_file = state.global_state.config.per_block_vote_file in
-  (match per_block_vote_file with
-  | None -> Lwt.return default
+  let {Baking_configuration.vote_file; liquidity_baking_vote} =
+    state.global_state.config.liquidity_baking
+  in
+  (* Prioritize reading from the [vote_file] if it exists. *)
+  (match vote_file with
   | Some per_block_vote_file ->
-      Liquidity_baking_vote_file.read_liquidity_baking_toggle_vote_no_fail
-        ~default
-        ~per_block_vote_file)
+      Liquidity_baking_vote.read_liquidity_baking_toggle_vote_no_fail
+        ~default_liquidity_baking_vote:liquidity_baking_vote
+        ~per_block_vote_file
+  | None -> Lwt.return liquidity_baking_vote)
   >>= fun liquidity_baking_toggle_vote ->
   (* Cache last toggle vote to use in case of vote file errors *)
   let updated_state =
@@ -303,7 +305,11 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
           config =
             {
               updated_state.global_state.config with
-              liquidity_baking_toggle_vote;
+              liquidity_baking =
+                {
+                  updated_state.global_state.config.liquidity_baking with
+                  liquidity_baking_vote = liquidity_baking_toggle_vote;
+                };
             };
         };
     }
