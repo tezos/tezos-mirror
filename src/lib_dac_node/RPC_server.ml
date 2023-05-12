@@ -61,7 +61,7 @@ let () =
     ~description:
       "RPC server of DAC node is not started and plugin is not resolved."
     ~pp:(fun ppf message ->
-      Format.fprintf ppf "DAC Node is not ready %s" message)
+      Format.fprintf ppf "DAC Node is not ready, current status is: %s" message)
     Data_encoding.(obj1 (req "value" string))
     (function DAC_node_not_ready message -> Some message | _ -> None)
     (fun message -> DAC_node_not_ready message)
