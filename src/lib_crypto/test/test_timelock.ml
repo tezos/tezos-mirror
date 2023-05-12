@@ -123,30 +123,27 @@ let test_low_level_negative () =
   let payload = Bytes.of_string "fdgfnhfd" and time = 10 in
   let chest, chest_key = create_chest_and_chest_key ~payload ~time () in
   let proof = unlock_and_prove chest.rsa_public ~time chest.locked_value in
-  let encoding = Data_encoding.(tup2 (tup3 n n n) n) in
-  let of_proof x =
-    Data_encoding.Binary.to_bytes_exn proof_encoding x
-    |> Data_encoding.Binary.of_bytes_exn encoding
-  in
-  let to_proof x =
-    Data_encoding.Binary.to_bytes_exn encoding x
-    |> Data_encoding.Binary.of_bytes_exn proof_encoding
-  in
-  (* Creator proof *)
-  let tuple, secret = of_proof chest_key in
-  let gen, challenge, w_proof = tuple in
-  (* Openener proof *)
-  let _vdf_tuple, nonce = of_proof proof in
   let incorrect_proofs =
-    List.map
-      to_proof
-      [
-        (Z.(gen + one, challenge, w_proof), secret);
-        (Z.(gen, challenge + one, w_proof), secret);
-        (Z.(gen, challenge, w_proof + one), secret);
-        (tuple, Z.(secret + one));
-        (tuple, nonce);
-      ]
+    let open Internal_for_tests in
+    let g, g' =
+      let locked = locked_value_to_z chest_key.vdf_tuple.locked_value in
+      (locked |> Z.to_string, Z.(locked + one |> to_string))
+    in
+    let c, c' =
+      let challenge = unlocked_value_to_z chest_key.vdf_tuple.unlocked_value in
+      (challenge |> Z.to_string, Z.(challenge + one |> to_string))
+    in
+    let pi, pi' =
+      let proof = vdf_proof_to_z chest_key.vdf_tuple.vdf_proof in
+      (proof |> Z.to_string, Z.(proof + one |> to_string))
+    in
+    [
+      {vdf_tuple = to_vdf_tuple_unsafe g' c pi; nonce = chest_key.nonce};
+      {vdf_tuple = to_vdf_tuple_unsafe g c' pi; nonce = chest_key.nonce};
+      {vdf_tuple = to_vdf_tuple_unsafe g c pi'; nonce = chest_key.nonce};
+      {vdf_tuple = chest_key.vdf_tuple; nonce = Z.(chest_key.nonce + one)};
+      {vdf_tuple = chest_key.vdf_tuple; nonce = proof.nonce};
+    ]
   in
   assert (
     List.for_all
@@ -170,6 +167,43 @@ let test_sampler_and_get_plaintext_size () =
   | Correct _ -> ()
   | _ -> assert false
 
+(* Unit test checking that the memory efficient Wesolowski proof generation is
+   correct *)
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/5629
+   Turn this test into a PBT. *)
+let test_wesolowski () =
+  let open Timelock in
+  let open Internal_for_tests in
+  let payload = Bytes.of_string "fdgfnhfd" and time = 10 in
+  let chest, chest_key = create_chest_and_chest_key ~payload ~time () in
+  let rsa, g, c, pi =
+    ( rsa_public_to_z chest.rsa_public,
+      locked_value_to_z chest_key.vdf_tuple.locked_value,
+      unlocked_value_to_z chest_key.vdf_tuple.unlocked_value,
+      vdf_proof_to_z chest_key.vdf_tuple.vdf_proof )
+  in
+  (* Memory intensive proof generation *)
+  let pi_high_memory =
+    let l =
+      hash_to_prime
+        chest.rsa_public
+        ~time
+        chest.locked_value
+        chest_key.vdf_tuple.unlocked_value
+    in
+    let exponent = Z.(pow (of_int 2) time / l) in
+    Z.powm g exponent rsa
+  in
+  let tuple_high_memory =
+    to_vdf_tuple_unsafe
+      (Z.to_string g)
+      (Z.to_string c)
+      (Z.to_string pi_high_memory)
+  in
+  assert (Z.(equal pi pi_high_memory)) ;
+  assert (verify_wesolowski chest.rsa_public ~time tuple_high_memory) ;
+  ()
+
 let tests =
   [
     ( "timelock",
@@ -184,5 +218,6 @@ let tests =
         ("negative test - high level", `Quick, test_high_level_negative);
         ("negative test - low level", `Quick, test_low_level_negative);
         ("sampler test", `Quick, test_sampler_and_get_plaintext_size);
+        ("test wesolowski", `Quick, test_wesolowski);
       ] );
   ]
