@@ -169,6 +169,8 @@ let test_sampler_and_get_plaintext_size () =
 
 (* Unit test checking that the memory efficient Wesolowski proof generation is
    correct *)
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/5629
+   Turn this test into a PBT. *)
 let test_wesolowski () =
   let open Timelock in
   let open Internal_for_tests in
