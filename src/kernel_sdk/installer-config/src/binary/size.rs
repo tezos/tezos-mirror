@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
+use tezos_smart_rollup_core::{MAX_FILE_CHUNK_SIZE, PREIMAGE_HASH_SIZE};
 use tezos_smart_rollup_host::path::PATH_MAX_SIZE;
 
-use crate::instr::{ConfigInstruction, MoveInstruction, RawBytes, RevealInstruction};
+use super::{ConfigInstruction, MoveInstruction, RefBytes, RevealInstruction};
 
 // https://stackoverflow.com/questions/53619695/calculating-maximum-value-of-a-set-of-constant-expressions-at-compile-time
 const fn max(a: usize, b: usize) -> usize {
@@ -22,19 +22,22 @@ pub trait EncodingSize {
 
 const MAX_SIZE_REF_PATH: usize = 1 + PATH_MAX_SIZE;
 
-impl<'a> EncodingSize for RawBytes<'a> {
+impl<'a> EncodingSize for RefBytes<'a> {
     const MAX_SIZE: usize = 4 + MAX_FILE_CHUNK_SIZE;
 }
 
-impl<'a> EncodingSize for MoveInstruction<'a> {
+impl<Path> EncodingSize for MoveInstruction<Path> {
     const MAX_SIZE: usize = MAX_SIZE_REF_PATH * 2;
 }
 
-impl<'a> EncodingSize for RevealInstruction<'a> {
-    const MAX_SIZE: usize = RawBytes::MAX_SIZE + MAX_SIZE_REF_PATH;
+impl<Path, Bytes> EncodingSize for RevealInstruction<Path, Bytes> {
+    // Hash size + path size
+    const MAX_SIZE: usize = PREIMAGE_HASH_SIZE + MAX_SIZE_REF_PATH;
 }
 
-impl<'a> EncodingSize for ConfigInstruction<'a> {
-    const MAX_SIZE: usize =
-        1 + max(MoveInstruction::MAX_SIZE, RevealInstruction::MAX_SIZE);
+impl<Path, Bytes> EncodingSize for ConfigInstruction<Path, Bytes> {
+    const MAX_SIZE: usize = 1 + max(
+        MoveInstruction::<Path>::MAX_SIZE,
+        RevealInstruction::<Path, Bytes>::MAX_SIZE,
+    );
 }

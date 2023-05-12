@@ -24,14 +24,19 @@ use core::panic::PanicInfo;
 use instr::read_config_program_size;
 use tezos_smart_rollup::host::Runtime;
 use tezos_smart_rollup::storage::path::RefPath;
-use tezos_smart_rollup_installer_config::instr::ConfigInstruction;
-use tezos_smart_rollup_installer_config::nom::{completed, read_size, NomReader};
-use tezos_smart_rollup_installer_config::size::EncodingSize;
+use tezos_smart_rollup_installer_config::binary::{
+    completed, read_size, EncodingSize, NomReader, RefConfigInstruction,
+};
 
 use crate::instr::{handle_instruction, read_instruction_bytes};
 
 // Path of currently running kernel.
 const KERNEL_BOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/boot.wasm");
+
+// Installer kernel will copy to this path before execution of config.
+// This is done in order avoid rewriting kernel during config execution.
+const AUXILIARY_KERNEL_BOOT_PATH: RefPath =
+    RefPath::assert_from(b"/__installer_kernel/auxiliary/kernel/boot.wasm");
 
 // Support 3 levels of hashes pages, and then bottom layer of content.
 const MAX_DAC_LEVELS: usize = 4;
@@ -64,26 +69,35 @@ fn install_kernel(
     host: &mut impl Runtime,
     config_program_size: usize,
 ) -> Result<(), &'static str> {
-    let mut config_instruction_buffer = [0; ConfigInstruction::MAX_SIZE];
+    let mut config_instruction_buffer = [0; RefConfigInstruction::MAX_SIZE];
 
     let kernel_size = host
         .store_value_size(&KERNEL_BOOT_PATH)
         .map_err(|_| "Failed to read kernel boot path size")?;
 
+    host.store_copy(&KERNEL_BOOT_PATH, &AUXILIARY_KERNEL_BOOT_PATH)
+        .map_err(|_| "Failed to copy kernel boot before config execution")?;
+
     let end_offset = kernel_size - 4;
     let mut instr_offset = end_offset - config_program_size;
     while instr_offset < end_offset {
-        let instr_size = read_size(host, &KERNEL_BOOT_PATH, &mut instr_offset)? as usize;
+        let instr_size =
+            read_size(host, &AUXILIARY_KERNEL_BOOT_PATH, &mut instr_offset)? as usize;
         read_instruction_bytes(
             host,
+            &AUXILIARY_KERNEL_BOOT_PATH,
             &mut instr_offset,
             &mut config_instruction_buffer[..instr_size],
         )?;
-        let instr = ConfigInstruction::nom_read(&config_instruction_buffer[..instr_size])
-            .map_err(|_| "Couldn't decode config instruction")
-            .and_then(completed)?;
+        let instr =
+            RefConfigInstruction::nom_read(&config_instruction_buffer[..instr_size])
+                .map_err(|_| "Couldn't decode config instruction")
+                .and_then(completed)?;
         handle_instruction(host, instr)?;
     }
+
+    host.store_delete(&AUXILIARY_KERNEL_BOOT_PATH)
+        .map_err(|_| "Failed to delete auxiliary kernel boot after config execution")?;
 
     Ok(())
 }

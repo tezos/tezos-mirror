@@ -5,9 +5,12 @@
 use tezos_data_encoding::enc::{
     field, put_byte, put_bytes, BinError, BinResult, BinWriter,
 };
-use tezos_smart_rollup_host::path::{Path, RefPath};
+use tezos_smart_rollup_host::path::Path;
 
-use super::instr::{ConfigInstruction, MoveInstruction, RawBytes, RevealInstruction};
+use super::{
+    instr::{ConfigInstruction, MoveInstruction, RefBytes, RevealInstruction},
+    owned::OwnedConfigProgram,
+};
 
 fn put_le_size(size: usize, out: &mut Vec<u8>) -> BinResult {
     let size = u32::try_from(size).map_err(|_| {
@@ -22,7 +25,7 @@ fn put_le_size(size: usize, out: &mut Vec<u8>) -> BinResult {
 }
 
 /// Encode RefPath as a bytes with prepended path size
-fn ref_path_dynamic(p: &RefPath, output: &mut Vec<u8>) -> BinResult {
+fn path_dynamic(p: &impl Path, output: &mut Vec<u8>) -> BinResult {
     let data = p.as_bytes();
     // We can cast it to u8 as path length doesn't exceed 250
     let size = data.len() as u8;
@@ -31,21 +34,25 @@ fn ref_path_dynamic(p: &RefPath, output: &mut Vec<u8>) -> BinResult {
     Ok(())
 }
 
-impl<'a> BinWriter for RawBytes<'a> {
+fn bytes_dynamic(b: &impl AsRef<[u8]>, output: &mut Vec<u8>) -> BinResult {
+    put_le_size(b.as_ref().len(), output)?;
+    put_bytes(b.as_ref(), output);
+    Ok(())
+}
+
+impl<'a> BinWriter for RefBytes<'a> {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        put_le_size(self.0.len(), output)?;
-        put_bytes(self.0, output);
-        Ok(())
+        bytes_dynamic(self, output)
     }
 }
 
-impl<'a> BinWriter for MoveInstruction<'a> {
+impl<P: Path> BinWriter for MoveInstruction<P> {
     fn bin_write(&self, out: &mut Vec<u8>) -> tezos_data_encoding::enc::BinResult {
         (|data: &Self, out: &mut Vec<u8>| {
-            tezos_data_encoding::enc::field("MoveInstruction::from", ref_path_dynamic)(
+            tezos_data_encoding::enc::field("MoveInstruction::from", path_dynamic)(
                 &data.from, out,
             )?;
-            tezos_data_encoding::enc::field("MoveInstruction::to", ref_path_dynamic)(
+            tezos_data_encoding::enc::field("MoveInstruction::to", path_dynamic)(
                 &data.to, out,
             )?;
             Ok(())
@@ -53,46 +60,40 @@ impl<'a> BinWriter for MoveInstruction<'a> {
     }
 }
 
-impl<'a> BinWriter for RevealInstruction<'a> {
+impl<P: Path, B: AsRef<[u8]>> BinWriter for RevealInstruction<P, B> {
     fn bin_write(&self, out: &mut Vec<u8>) -> tezos_data_encoding::enc::BinResult {
         (|data: &Self, out: &mut Vec<u8>| {
-            field(
-                "RevealInstruction::hash",
-                <RawBytes as BinWriter>::bin_write,
-            )(&data.hash, out)?;
-            field("RevealInstruction::to", ref_path_dynamic)(&data.to, out)?;
+            field("RevealInstruction::hash", bytes_dynamic)(&data.hash, out)?;
+            field("RevealInstruction::to", path_dynamic)(&data.to, out)?;
             Ok(())
         })(self, out)
     }
 }
 
-impl<'a> BinWriter for ConfigInstruction<'a> {
+impl<P: Path, B: AsRef<[u8]>> BinWriter for ConfigInstruction<P, B> {
     fn bin_write(&self, out: &mut Vec<u8>) -> tezos_data_encoding::enc::BinResult {
         use tezos_data_encoding::enc::{u8, variant_with_field};
         match self {
             ConfigInstruction::Reveal(inner) => variant_with_field(
                 "ConfigInstruction::Reveal",
                 u8,
-                <RevealInstruction<'a> as BinWriter>::bin_write,
+                <RevealInstruction<P, B> as BinWriter>::bin_write,
             )(&0, inner, out),
             ConfigInstruction::Move(inner) => {
                 tezos_data_encoding::enc::variant_with_field(
                     "ConfigInstruction::Move",
                     u8,
-                    <MoveInstruction<'a> as BinWriter>::bin_write,
+                    <MoveInstruction<P> as BinWriter>::bin_write,
                 )(&1, inner, out)
             }
         }
     }
 }
 
-#[derive(Debug)]
-pub struct ConfigProgram<'a>(pub Vec<ConfigInstruction<'a>>);
-
 // Encode all commands with appended number of commands at the end.
 // It makes possible for the installer_kernel to
 // parse commands at the end of the kernel binary.
-impl<'a> BinWriter for ConfigProgram<'a> {
+impl BinWriter for OwnedConfigProgram {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
         let initial_size = output.len();
         for i in 0..self.0.len() {
@@ -115,7 +116,7 @@ mod test {
 
     use tezos_data_encoding::enc::BinWriter;
 
-    use crate::nom::NomReader;
+    use crate::binary::NomReader;
 
     // I have to pass `out` here because for some reason
     // borrow checker complaines about this line:
@@ -137,10 +138,10 @@ mod test {
     fn roundtrip_encdec() {
         use tezos_smart_rollup_host::path::RefPath;
 
-        use crate::instr::{
-            ConfigInstruction, MoveInstruction, RawBytes, RevealInstruction,
+        use crate::binary::instr::{
+            ConfigInstruction, MoveInstruction, RefBytes, RevealInstruction,
         };
-        roundtrip(&RawBytes("hello".as_bytes()), &mut vec![]);
+        roundtrip(&RefBytes("hello".as_bytes()), &mut vec![]);
 
         roundtrip(
             &MoveInstruction {
@@ -153,7 +154,7 @@ mod test {
         roundtrip(
             &RevealInstruction {
                 to: RefPath::assert_from("/fldl/sfjisfkj".as_bytes()),
-                hash: RawBytes("some hash should be 33 bytes".as_bytes()),
+                hash: RefBytes("some hash should be 33 bytes".as_bytes()),
             },
             &mut vec![],
         );
@@ -161,7 +162,7 @@ mod test {
         roundtrip(
             &ConfigInstruction::Reveal(RevealInstruction {
                 to: RefPath::assert_from("/fldl/sfjisfkj".as_bytes()),
-                hash: RawBytes("some hash should be 33 bytes".as_bytes()),
+                hash: RefBytes("some hash should be 33 bytes".as_bytes()),
             }),
             &mut vec![],
         );

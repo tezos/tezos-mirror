@@ -11,9 +11,7 @@ use clap::Parser;
 use commands::Cli;
 use commands::Commands;
 use std::path::Path;
-use tezos_smart_rollup_installer::{KERNEL_BOOT_PATH, PREPARE_KERNEL_PATH};
-use tezos_smart_rollup_installer_config::bin::ConfigProgram;
-use tezos_smart_rollup_installer_config::instr::ConfigInstruction;
+use tezos_smart_rollup_installer::config::{create_installer_config, ConfigurationError};
 use thiserror::Error;
 
 fn main() -> Result<(), ClientError> {
@@ -22,6 +20,7 @@ fn main() -> Result<(), ClientError> {
             upgrade_to,
             output,
             preimages_dir,
+            setup_file,
         } => {
             let upgrade_to = Path::new(&upgrade_to);
             let output = Path::new(&output);
@@ -29,10 +28,8 @@ fn main() -> Result<(), ClientError> {
 
             let root_hash = preimages::content_to_preimages(upgrade_to, preimages_dir)?;
 
-            let kernel = installer::with_config_program(ConfigProgram(vec![
-                ConfigInstruction::reveal_instr(root_hash.as_ref(), PREPARE_KERNEL_PATH),
-                ConfigInstruction::move_instr(PREPARE_KERNEL_PATH, KERNEL_BOOT_PATH),
-            ]));
+            let config = create_installer_config(root_hash, setup_file)?;
+            let kernel = installer::with_config_program(config);
 
             output::save_kernel(output, &kernel).map_err(ClientError::SaveInstaller)?;
         }
@@ -45,6 +42,8 @@ fn main() -> Result<(), ClientError> {
 enum ClientError {
     #[error("Error preimaging kernel: {0}")]
     KernelPreimageError(#[from] preimages::Error),
+    #[error("Error configuring kernel: {0}")]
+    ConfigError(#[from] ConfigurationError),
     #[error("Unable to save installer kernel: {0}")]
     SaveInstaller(std::io::Error),
 }
