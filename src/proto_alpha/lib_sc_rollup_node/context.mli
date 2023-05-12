@@ -55,7 +55,7 @@ type hash = Sc_rollup_context_hash.t
 type commit
 
 (** [load path] initializes from disk a context from [path]. *)
-val load : 'a mode -> string -> 'a index Lwt.t
+val load : 'a mode -> string -> 'a index tzresult Lwt.t
 
 (** [index context] is the repository of the context [context]. *)
 val index : 'a t -> 'a index

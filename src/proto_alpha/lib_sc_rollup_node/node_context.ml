@@ -292,7 +292,7 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
       ~l2_blocks_cache_size
       Configuration.(default_storage_dir data_dir)
   in
-  let*! context =
+  let* context =
     Context.load mode (Configuration.default_context_dir data_dir)
   in
   let* () = Context.Rollup.check_or_set_address mode context rollup_address in
@@ -929,7 +929,7 @@ module Internal_for_tests = struct
         ~l2_blocks_cache_size
         Configuration.(default_storage_dir data_dir)
     in
-    let*! context =
+    let* context =
       Context.load Read_write (Configuration.default_context_dir data_dir)
     in
     let genesis_info =
