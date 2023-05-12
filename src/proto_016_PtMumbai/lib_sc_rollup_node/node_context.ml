@@ -303,6 +303,10 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
     |> Protocol.Alpha_context.Sc_rollup.Address.of_bytes_exn
   in
   let* lockfile = lock ~data_dir in
+  let* () =
+    Store_migration.maybe_run_migration
+      ~storage_dir:(Configuration.default_storage_dir data_dir)
+  in
   let dal_cctxt =
     Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
   in
