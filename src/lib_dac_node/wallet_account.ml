@@ -31,15 +31,10 @@ module Coordinator = struct
     public_key_opt : Aggregate_signature.public_key option;
   }
 
-  let of_committee_member_address pkh cctxt =
+  let of_committee_member_public_key public_key =
     let open Lwt_result_syntax in
-    let* ((public_key_hash, public_key_opt, _) as account_wallet) =
-      Wallet_cctxt_helpers.get_keys cctxt pkh
-    in
-    let*! () =
-      if Wallet_cctxt_helpers.can_verify account_wallet then Lwt.return ()
-      else Event.(emit commit_member_no_public_key pkh)
-    in
+    let public_key_hash = Aggregate_signature.Public_key.hash public_key in
+    let public_key_opt = Some public_key in
     return {public_key_hash; public_key_opt}
 end
 

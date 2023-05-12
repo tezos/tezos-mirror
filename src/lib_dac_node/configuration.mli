@@ -33,8 +33,7 @@ type host_and_port = {host : string; port : int}
 module Coordinator : sig
   (** The type of a coordinator specific configuration mode. *)
   type t = {
-    committee_members_addresses :
-      Tezos_crypto.Aggregate_signature.public_key_hash list;
+    committee_members : Tezos_crypto.Aggregate_signature.public_key list;
   }
 
   (** [committee_members_addresses t] retrieves the addresses of the committee
@@ -115,11 +114,10 @@ type t = private {
     for the configuration [t]. *)
 val mode_name : t -> string
 
-(** [make_coordinator committee_members_addresses] creates a new coordinator
-    configuration mode using the given [committee_members_addresses].
+(** [make_coordinator committee_members] creates a new coordinator
+    configuration mode using the given [committee_members] public keys.
 *)
-val make_coordinator :
-  Tezos_crypto.Aggregate_signature.public_key_hash list -> mode
+val make_coordinator : Tezos_crypto.Aggregate_signature.public_key list -> mode
 
 (** [make_committee_member coordinator_rpc_address coordinator_rpc_port
     committee_member_address] creates a new committee-member configuration

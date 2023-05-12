@@ -80,6 +80,21 @@ let tz4_address_param ?(name = "public key hash")
   let desc = String.concat "\n" [desc; "A tz4 address"] in
   Tezos_clic.param ~name ~desc tz4_address_parameter
 
+let tz4_public_key_parameter =
+  Tezos_clic.parameter (fun _cctxt s ->
+      let open Lwt_result_syntax in
+      let*? pk = Tezos_crypto.Aggregate_signature.Public_key.of_b58check s in
+      return pk)
+
+let tz4_public_key_param ?(name = "public key")
+    ?(desc = "BLS public key of committee member") =
+  let desc =
+    String.concat
+      "\n"
+      [desc; "A BLS12-381 public key which belongs to a tz4 account"]
+  in
+  Tezos_clic.param ~name ~desc tz4_public_key_parameter
+
 let committee_member_address_arg =
   Tezos_clic.arg
     ~long:"committee-member-address"
@@ -222,16 +237,16 @@ module Config_init = struct
            "committee";
            "members";
          ]
-      @@ seq_of_param @@ tz4_address_param)
+      @@ seq_of_param @@ tz4_public_key_param)
       (fun (data_dir, rpc_address, rpc_port, reveal_data_dir)
-           committee_members_addresses
+           committee_members
            cctxt ->
         create_configuration
           ~data_dir
           ~reveal_data_dir
           ~rpc_address
           ~rpc_port
-          (Configuration.make_coordinator committee_members_addresses)
+          (Configuration.make_coordinator committee_members)
           cctxt)
 
   let committee_member_command =

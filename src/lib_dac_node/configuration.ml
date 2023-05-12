@@ -46,23 +46,25 @@ let default_reveal_data_dir =
 
 module Coordinator = struct
   type t = {
-    committee_members_addresses :
-      Tezos_crypto.Aggregate_signature.public_key_hash list;
+    committee_members : Tezos_crypto.Aggregate_signature.public_key list;
   }
 
-  let make committee_members_addresses = {committee_members_addresses}
+  let make committee_members = {committee_members}
 
   let encoding =
     Data_encoding.(
       conv
-        (fun {committee_members_addresses} -> committee_members_addresses)
-        (fun committee_members_addresses -> {committee_members_addresses})
+        (fun {committee_members} -> committee_members)
+        (fun committee_members -> {committee_members})
         (obj1
            (req
               "committee_members"
-              (list Tezos_crypto.Aggregate_signature.Public_key_hash.encoding))))
+              (list Tezos_crypto.Aggregate_signature.Public_key.encoding))))
 
-  let committee_members_addresses t = t.committee_members_addresses
+  let committee_members_addresses t =
+    List.map
+      Tezos_crypto.Aggregate_signature.Public_key.hash
+      t.committee_members
 
   let name = "Coordinator"
 end
@@ -212,8 +214,8 @@ type mode =
   | Observer of Observer.t
   | Legacy of Legacy.t
 
-let make_coordinator committee_members_addresses =
-  Coordinator (Coordinator.make committee_members_addresses)
+let make_coordinator committee_members =
+  Coordinator (Coordinator.make committee_members)
 
 let make_committee_member coordinator_rpc_address coordinator_rpc_port
     committee_member_address =

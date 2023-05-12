@@ -39,21 +39,16 @@ module Coordinator = struct
     certificate_streamers : Certificate_streamers.t;
   }
 
-  let get_all_committee_members_public_keys committee_members_addresses cctxt =
+  let get_all_committee_members_public_keys committee_members_public_keys =
     List.map_es
-      (fun public_key_hash ->
-        Wallet_account.Coordinator.of_committee_member_address
-          public_key_hash
-          cctxt)
-      committee_members_addresses
+      Wallet_account.Coordinator.of_committee_member_public_key
+      committee_members_public_keys
 
-  let init coordinator_config cctxt =
+  let init coordinator_config =
     let open Lwt_result_syntax in
-    let Configuration.Coordinator.{committee_members_addresses; _} =
-      coordinator_config
-    in
+    let Configuration.Coordinator.{committee_members; _} = coordinator_config in
     let+ committee_members =
-      get_all_committee_members_public_keys committee_members_addresses cctxt
+      get_all_committee_members_public_keys committee_members
     in
     let hash_streamer = Data_streamer.init () in
     let certificate_streamers = Certificate_streamers.init () in
@@ -245,7 +240,7 @@ let init_mode Configuration.{mode; _} cctxt =
   let open Lwt_result_syntax in
   match mode with
   | Coordinator config ->
-      let+ mode_node_ctxt = Coordinator.init config cctxt in
+      let+ mode_node_ctxt = Coordinator.init config in
       Coordinator mode_node_ctxt
   | Committee_member config ->
       let+ mode_node_ctxt = Committee_member.init config cctxt in
