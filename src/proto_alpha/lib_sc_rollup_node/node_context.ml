@@ -124,17 +124,6 @@ let get_last_published_commitment (cctxt : Protocol_client_context.full)
   | Ok None -> return_none
   | Ok (Some (_staked_hash, staked_commitment)) -> return_some staked_commitment
 
-let check_and_set_rollup_address context rollup_address =
-  let open Lwt_result_syntax in
-  let* saved_address = Context.Rollup.get_address context in
-  match saved_address with
-  | None ->
-      (* Address was never saved, we set it permanently. *)
-      Context.Rollup.set_address context rollup_address
-  | Some saved_address ->
-      fail_unless Sc_rollup.Address.(rollup_address = saved_address)
-      @@ Sc_rollup_node_errors.Unexpected_rollup {rollup_address; saved_address}
-
 let lock ~data_dir =
   let lockfile_path = Filename.concat data_dir "lock" in
   let lock_aux ~data_dir =
@@ -306,7 +295,7 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
   let*! context =
     Context.load mode (Configuration.default_context_dir data_dir)
   in
-  let* () = check_and_set_rollup_address context rollup_address in
+  let* () = Context.Rollup.check_or_set_address mode context rollup_address in
   let* l1_ctxt =
     Layer1.start ~name:"sc_rollup_node" ~reconnection_delay cctxt
   in

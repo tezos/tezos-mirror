@@ -162,9 +162,12 @@ end
 
 (** Static information about the rollup. *)
 module Rollup : sig
-  val set_address :
-    _ index -> Protocol.Alpha_context.Sc_rollup.Address.t -> unit tzresult Lwt.t
-
   val get_address :
     _ index -> Protocol.Alpha_context.Sc_rollup.Address.t option tzresult Lwt.t
+
+  val check_or_set_address :
+    'a mode ->
+    'a index ->
+    Protocol.Alpha_context.Sc_rollup.Address.t ->
+    unit tzresult Lwt.t
 end
