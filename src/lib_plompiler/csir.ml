@@ -25,9 +25,11 @@
 
 let nb_wires_arch = 5
 
+let wire_prefix = "w"
+
 let string_key_of_int ~nb_digits i =
   let s = string_of_int i in
-  Format.sprintf "w%s" @@ String.make (nb_digits - String.length s) '0' ^ s
+  wire_prefix ^ String.make (nb_digits - String.length s) '0' ^ s
 
 let wire_name i =
   if i < 0 || i >= nb_wires_arch then
@@ -35,6 +37,14 @@ let wire_name i =
   string_key_of_int
     ~nb_digits:(String.length @@ string_of_int (nb_wires_arch - 1))
     i
+
+let int_of_wire_name s =
+  let n = String.length wire_prefix in
+  try
+    if String.sub s 0 n <> wire_prefix then
+      failwith "int_of_wire_name : invalid wire name." ;
+    int_of_string (String.sub s n (String.length s - n))
+  with _ -> failwith "int_of_wire_name : invalid wire name."
 
 let linear_selector_name i = "q_" ^ wire_name i
 

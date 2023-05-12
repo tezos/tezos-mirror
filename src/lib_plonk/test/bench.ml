@@ -101,10 +101,12 @@ let () =
   (* Note that range checks are not the same as the ones in the previous
      circuit ; it is just indexes I took to make it work *)
   let range_checks =
-    List.(
-      rev
-        (init nb_range_checks (fun i ->
-             ((1 lsl (nb_constraints + 1)) - i - 1, nb_bits))))
+    Plonk.SMap.singleton
+      "w0"
+      List.(
+        rev
+          (init nb_range_checks (fun i ->
+               ((1 lsl (nb_constraints + 1)) - i - 1, nb_bits))))
   in
   let cs_no_rc = Plompiler.LibCircuit.get_cs no_rc in
   let witness_no_rc = Plompiler.Solver.solve cs_no_rc.solver base_witness in
