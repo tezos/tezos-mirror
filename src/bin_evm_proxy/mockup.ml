@@ -101,7 +101,7 @@ let transaction_receipt () =
     blockHash = block_hash;
     blockNumber = qty_f @@ Z.of_int !block_height_counter;
     from = address_of_string "0x6F4d14B90C48bEFb49CA3fe6663dEC70731A8bC7";
-    to_ = address_of_string "0xA5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E";
+    to_ = Some (address_of_string "0xA5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E");
     contractAddress =
       Some (address_of_string "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c");
     cumulativeGasUsed = gas_price;

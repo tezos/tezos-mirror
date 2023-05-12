@@ -73,6 +73,11 @@ impl Into<H160> for EthereumAddress {
     }
 }
 
+impl From<H160> for EthereumAddress {
+    fn from(addr: H160) -> Self {
+        Self(addr)
+    }
+}
 impl From<EthereumAddress> for String {
     fn from(e: EthereumAddress) -> Self {
         format!("{:x}", e.0)

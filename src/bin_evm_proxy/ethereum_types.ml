@@ -337,7 +337,7 @@ type transaction_receipt = {
   blockHash : block_hash;
   blockNumber : quantity;
   from : address;
-  to_ : address;
+  to_ : address option;
   cumulativeGasUsed : quantity;
   effectiveGasPrice : quantity;
   gasUsed : quantity;
@@ -412,7 +412,7 @@ let transaction_receipt_encoding =
           (req "blockHash" block_hash_encoding)
           (req "blockNumber" quantity_encoding)
           (req "from" address_encoding)
-          (req "to" address_encoding)
+          (req "to" (option address_encoding))
           (req "cumulativeGasUsed" quantity_encoding)
           (req "effectiveGasPrice" quantity_encoding)
           (req "gasUsed" quantity_encoding)

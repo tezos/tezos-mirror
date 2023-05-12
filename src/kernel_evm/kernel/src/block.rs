@@ -30,7 +30,7 @@ struct TransactionReceiptInfo {
     index: u32,
     execution_outcome: Option<ExecutionOutcome>,
     caller: EthereumAddress,
-    to: EthereumAddress,
+    to: Option<EthereumAddress>,
 }
 
 fn make_receipt_info(
@@ -38,7 +38,7 @@ fn make_receipt_info(
     index: u32,
     execution_outcome: Option<ExecutionOutcome>,
     caller: EthereumAddress,
-    to: EthereumAddress,
+    to: Option<EthereumAddress>,
 ) -> TransactionReceiptInfo {
     TransactionReceiptInfo {
         tx_hash,
@@ -59,7 +59,7 @@ fn make_receipt(
     let block_hash = block.hash;
     let block_number = block.number;
     let from = receipt_info.caller;
-    let to = Some(receipt_info.to);
+    let to = receipt_info.to;
     let effective_gas_price = block.constants().gas_price;
 
     let tx_receipt = match receipt_info.execution_outcome {
@@ -163,7 +163,7 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
                 &current_block.constants(),
                 &mut evm_account_storage,
                 &precompiles,
-                transaction.tx.to.into(),
+                transaction.tx.to.map(|a| a.into()),
                 caller.into(),
                 transaction.tx.data,
                 Some(transaction.tx.gas_limit),
@@ -218,6 +218,9 @@ mod tests {
     use tezos_ethereum::transaction::{TransactionStatus, TRANSACTION_HASH_SIZE};
     use tezos_smart_rollup_mock::MockHost;
 
+    fn address_from_str(s: &str) -> Option<EthereumAddress> {
+        Some(EthereumAddress::from(s.to_string()))
+    }
     fn string_to_h256_unsafe(s: &str) -> H256 {
         let mut v: [u8; 32] = [0; 32];
         hex::decode_to_slice(s, &mut v).expect("Could not parse to 256 hex value.");
@@ -265,8 +268,7 @@ mod tests {
         let chain_id = U256::one();
         let gas_price = U256::from(40000000u64);
         let gas_limit = 21000u64;
-        let to =
-            EthereumAddress::from("423163e58aabec5daa3dd1130b759d24bef0f6ea".to_string());
+        let to = address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea");
         let value = U256::from(500000000u64);
         let data: Vec<u8> = vec![];
         EthereumTransactionCommon {
