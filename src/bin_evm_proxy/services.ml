@@ -114,8 +114,9 @@ let dispatch_input
           match res with Ok x -> return_some x | Error _ -> return_none
         in
         return (Get_transaction_receipt.Output (Ok receipt))
-    | Get_transaction_by_hash.Input _ ->
-        return (Get_transaction_by_hash.Output (Ok Mockup.transaction_object))
+    | Get_transaction_by_hash.Input (Some tx_hash) ->
+        let* transaction_object = Rollup_node_rpc.transaction_object tx_hash in
+        return (Get_transaction_by_hash.Output (Ok transaction_object))
     | Send_raw_transaction.Input (Some tx_raw) ->
         let* tx_hash =
           Rollup_node_rpc.inject_raw_transaction ~smart_rollup_address tx_raw

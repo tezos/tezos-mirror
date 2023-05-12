@@ -102,6 +102,39 @@ module Durable_storage_path = struct
 
     let contract_address tx_hash = receipt_field tx_hash "contract_address"
   end
+
+  module Transaction_object = struct
+    let objects = "/transactions_objects"
+
+    let object_field tx_hash field =
+      Format.sprintf "%s/%s/%s" objects tx_hash field
+
+    let block_hash tx_hash = object_field tx_hash "block_hash"
+
+    let block_number tx_hash = object_field tx_hash "block_number"
+
+    let from tx_hash = object_field tx_hash "from"
+
+    let gas_used tx_hash = object_field tx_hash "gas_used"
+
+    let gas_price tx_hash = object_field tx_hash "gas_price"
+
+    let input tx_hash = object_field tx_hash "input"
+
+    let nonce tx_hash = object_field tx_hash "nonce"
+
+    let to_ tx_hash = object_field tx_hash "to"
+
+    let index tx_hash = object_field tx_hash "index"
+
+    let value tx_hash = object_field tx_hash "value"
+
+    let v tx_hash = object_field tx_hash "v"
+
+    let r tx_hash = object_field tx_hash "r"
+
+    let s tx_hash = object_field tx_hash "r"
+  end
 end
 
 module RPC = struct
@@ -371,65 +404,78 @@ module RPC = struct
       ~number:Durable_storage_path.Block.(Nth n)
       base
 
+  let inspect_durable_and_decode_opt base key decode =
+    let open Lwt_result_syntax in
+    let* bytes = call_service ~base durable_state_value () {key} () in
+    match bytes with
+    | Some bytes -> return_some (decode bytes)
+    | None -> return_none
+
+  let inspect_durable_and_decode base key decode =
+    let open Lwt_result_syntax in
+    let* res_opt = inspect_durable_and_decode_opt base key decode in
+    match res_opt with Some res -> return res | None -> failwith "null"
+
+  let decode_block_hash bytes =
+    Block_hash (Bytes.to_string bytes |> Hex.of_string |> Hex.show)
+
+  let decode_address bytes =
+    Address (Bytes.to_string bytes |> Hex.of_string |> Hex.show)
+
+  let decode_number bytes =
+    Bytes.to_string bytes |> Z.of_bits |> Ethereum_types.quantity_of_z
+
+  let decode_hash bytes =
+    Hash (Bytes.to_string bytes |> Hex.of_string |> Hex.show)
+
   let transaction_receipt base (Hash tx_hash) =
     let open Lwt_result_syntax in
-    let inspect_durable_and_decode_opt key decode =
-      let* bytes = call_service ~base durable_state_value () {key} () in
-      match bytes with
-      | Some bytes -> return_some (decode bytes)
-      | None -> return_none
-    in
-    let inspect_durable_and_decode key decode =
-      let* res_opt = inspect_durable_and_decode_opt key decode in
-      match res_opt with Some res -> return res | None -> failwith "null"
-    in
-    let decode_block_hash bytes =
-      Block_hash (Bytes.to_string bytes |> Hex.of_string |> Hex.show)
-    in
-    let decode_address bytes =
-      Address (Bytes.to_string bytes |> Hex.of_string |> Hex.show)
-    in
-    let decode_number bytes =
-      Bytes.to_string bytes |> Z.of_bits |> Ethereum_types.quantity_of_z
-    in
     let* block_hash =
       inspect_durable_and_decode
+        base
         (Durable_storage_path.Transaction_receipt.block_hash tx_hash)
         decode_block_hash
     in
     let* block_number =
       inspect_durable_and_decode
+        base
         (Durable_storage_path.Transaction_receipt.block_number tx_hash)
         decode_number
     in
     let* from =
       inspect_durable_and_decode
+        base
         (Durable_storage_path.Transaction_receipt.from tx_hash)
         decode_address
     in
     (* This can be none *)
     let* to_ =
       inspect_durable_and_decode_opt
+        base
         (Durable_storage_path.Transaction_receipt.to_ tx_hash)
         decode_address
     in
     let* index =
       inspect_durable_and_decode
+        base
         (Durable_storage_path.Transaction_receipt.index tx_hash)
         decode_number
     in
     let* status =
       inspect_durable_and_decode
+        base
         (Durable_storage_path.Transaction_receipt.status tx_hash)
         decode_number
     in
     let* contract_address =
       inspect_durable_and_decode_opt
+        base
         (Durable_storage_path.Transaction_receipt.contract_address tx_hash)
         decode_address
     in
     let+ type_ =
       inspect_durable_and_decode
+        base
         (Durable_storage_path.Transaction_receipt.type_ tx_hash)
         decode_number
     in
@@ -449,6 +495,109 @@ module RPC = struct
       status;
       contractAddress = contract_address;
     }
+
+  let transaction_object base (Hash tx_hash as hash) =
+    let open Lwt_result_syntax in
+    let* block_hash_opt =
+      inspect_durable_and_decode_opt
+        base
+        (Durable_storage_path.Transaction_object.block_hash tx_hash)
+        decode_block_hash
+    in
+    match block_hash_opt with
+    | None ->
+        (* If the transaction has no block hash, it was not mined. *)
+        return_none
+    | Some block_hash ->
+        let* block_number =
+          inspect_durable_and_decode
+            base
+            (Durable_storage_path.Transaction_object.block_number tx_hash)
+            decode_number
+        in
+        let* from =
+          inspect_durable_and_decode
+            base
+            (Durable_storage_path.Transaction_object.from tx_hash)
+            decode_address
+        in
+        let* gas_used =
+          inspect_durable_and_decode
+            base
+            (Durable_storage_path.Transaction_object.gas_used tx_hash)
+            decode_number
+        in
+        let* gas_price =
+          inspect_durable_and_decode
+            base
+            (Durable_storage_path.Transaction_object.gas_price tx_hash)
+            decode_number
+        in
+        let* input =
+          inspect_durable_and_decode_opt
+            base
+            (Durable_storage_path.Transaction_object.input tx_hash)
+            decode_hash
+        in
+        let* nonce =
+          inspect_durable_and_decode
+            base
+            (Durable_storage_path.Transaction_object.nonce tx_hash)
+            decode_number
+        in
+        let* to_ =
+          inspect_durable_and_decode_opt
+            base
+            (Durable_storage_path.Transaction_object.to_ tx_hash)
+            decode_address
+        in
+        let* index =
+          inspect_durable_and_decode
+            base
+            (Durable_storage_path.Transaction_object.index tx_hash)
+            decode_number
+        in
+        let* value =
+          inspect_durable_and_decode
+            base
+            (Durable_storage_path.Transaction_object.value tx_hash)
+            decode_number
+        in
+        let* v =
+          inspect_durable_and_decode
+            base
+            (Durable_storage_path.Transaction_object.v tx_hash)
+            decode_number
+        in
+        let* r =
+          inspect_durable_and_decode
+            base
+            (Durable_storage_path.Transaction_object.r tx_hash)
+            decode_hash
+        in
+        let* s =
+          inspect_durable_and_decode
+            base
+            (Durable_storage_path.Transaction_object.s tx_hash)
+            decode_hash
+        in
+        return_some
+          {
+            blockHash = block_hash;
+            blockNumber = block_number;
+            from;
+            gas = gas_used;
+            gasPrice = gas_price;
+            hash;
+            input;
+            nonce;
+            to_;
+            transactionIndex = index;
+            value;
+            v;
+            r;
+            s;
+          }
 end
 
 module type S = sig
@@ -473,6 +622,10 @@ module type S = sig
 
   val transaction_receipt :
     Ethereum_types.hash -> Ethereum_types.transaction_receipt tzresult Lwt.t
+
+  val transaction_object :
+    Ethereum_types.hash ->
+    Ethereum_types.transaction_object option tzresult Lwt.t
 end
 
 module Make (Base : sig
@@ -495,4 +648,6 @@ end) : S = struct
   let nth_block = RPC.nth_block Base.base
 
   let transaction_receipt = RPC.transaction_receipt Base.base
+
+  let transaction_object = RPC.transaction_object Base.base
 end

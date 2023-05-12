@@ -341,11 +341,11 @@ module Get_transaction_by_hash = MethodMaker (struct
 
   type input = hash
 
-  type output = transaction_object
+  type output = transaction_object option
 
   let input_encoding = Data_encoding.tup1 hash_encoding
 
-  let output_encoding = transaction_object_encoding
+  let output_encoding = Data_encoding.option transaction_object_encoding
 
   let method_ = "eth_getTransactionByHash"
 end)
