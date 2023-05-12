@@ -1,6 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -23,13 +24,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = V0 | V1 | V2
+(** This version of the store is used for the rollup nodes for protocols for and
+    after Nairobi, i.e. >= 17. *)
 
-(** Pretty-printer for store versions *)
-val pp : Format.formatter -> t -> unit
+open Protocol
+open Alpha_context
+open Indexed_store
 
-(** Read the version file from [dir]. *)
-val read_version_file : dir:string -> t option tzresult Lwt.t
+include module type of struct
+  include Store_v1
+end
 
-(** Write a version to the version file in [dir]. *)
-val write_version_file : dir:string -> t -> unit tzresult Lwt.t
+(** Storage for persisting messages downloaded from the L1 node. *)
+module Messages :
+  INDEXED_FILE
+    with type key := Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+     and type value := Sc_rollup.Inbox_message.t list
+     and type header := Block_hash.t
+
+type +'a store = {
+  l2_blocks : 'a L2_blocks.t;
+  messages : 'a Messages.t;
+  inboxes : 'a Inboxes.t;
+  commitments : 'a Commitments.t;
+  commitments_published_at_level : 'a Commitments_published_at_level.t;
+  l2_head : 'a L2_head.t;
+  last_finalized_level : 'a Last_finalized_level.t;
+  levels_to_hashes : 'a Levels_to_hashes.t;
+  irmin_store : 'a Irmin_store.t;
+}
+
+include Store_sig.S with type 'a store := 'a store

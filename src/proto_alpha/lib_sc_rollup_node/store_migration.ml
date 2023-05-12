@@ -224,7 +224,7 @@ let maybe_run_migration ~storage_dir =
           in
           Format.printf "Store migration completed@.")
 
-module V0_to_V1 = struct
+module V1_migrations = struct
   let convert_store_messages
       (messages, (block_hash, timestamp, number_of_messages)) =
     ( messages,
@@ -293,10 +293,60 @@ module V0_to_V1 = struct
     let*! () = migrate_dal_processed_slots_irmin v1_store in
     return_unit
 
-  include
+  module From_v0 =
     Make (Store_v0) (Store_v1)
       (struct
         let migrate_block_action = migrate_messages
+
+        let final_actions = final_actions
+      end)
+end
+
+module V2_migrations = struct
+  let messages_store_location ~storage_dir =
+    let open Filename.Infix in
+    storage_dir // "messages"
+
+  let migrate_messages read_messages (v2_store : _ Store_v2.t)
+      (l2_block : Sc_rollup_block.t) =
+    let open Lwt_result_syntax in
+    let* v1_messages = read_messages l2_block.header.inbox_witness in
+    match v1_messages with
+    | None -> return_unit
+    | Some (messages, _v1_header) ->
+        let header = l2_block.header.block_hash in
+        Store_v2.Messages.append
+          v2_store.messages
+          ~key:l2_block.header.inbox_witness
+          ~header
+          ~value:messages
+
+  let final_actions ~storage_dir ~tmp_dir _ _ =
+    let open Lwt_result_syntax in
+    let*! () =
+      Lwt_utils_unix.remove_dir (messages_store_location ~storage_dir)
+    in
+    let*! () =
+      Lwt_unix.rename
+        (messages_store_location ~storage_dir:tmp_dir)
+        (messages_store_location ~storage_dir)
+    in
+    return_unit
+
+  module From_v1 =
+    Make (Store_v1) (Store_v2)
+      (struct
+        let migrate_block_action v1_store =
+          migrate_messages Store_v1.(Messages.read v1_store.messages)
+
+        let final_actions = final_actions
+      end)
+
+  module From_v0 =
+    Make (Store_v0) (Store_v2)
+      (struct
+        let migrate_block_action v0_store =
+          migrate_messages Store_v0.(Messages.read v0_store.messages)
 
         let final_actions = final_actions
       end)
