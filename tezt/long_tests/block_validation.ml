@@ -508,13 +508,16 @@ let grafana_panels =
       ();
   ]
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/5621
+   The tests [shell_validation.block.*] have disabled by adding the
+   tag [ci_disabled] due to consistent failures. *)
 let register ~executors () =
   let datadir = lazy (Fixture.datadir ()) in
 
   Long_test.register
     ~__FILE__
     ~title:Benchmark.chunk_title
-    ~tags:["shell"; "validation"; "block"; "chunk"]
+    ~tags:["shell"; "validation"; "block"; "chunk"; "ci_disabled"]
     ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir
@@ -523,7 +526,7 @@ let register ~executors () =
   Long_test.register
     ~__FILE__
     ~title:Benchmark.specific_title
-    ~tags:["shell"; "validation"; "block"; "specific"]
+    ~tags:["shell"; "validation"; "block"; "specific"; "ci_disabled"]
     ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir
@@ -535,7 +538,7 @@ let register ~executors () =
   Long_test.register
     ~__FILE__
     ~title:Benchmark.subparts_title
-    ~tags:["shell"; "validation"; "block"; "subpart"]
+    ~tags:["shell"; "validation"; "block"; "subpart"; "ci_disabled"]
     ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir
