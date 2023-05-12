@@ -84,7 +84,7 @@ module Internal_for_tests : sig
   val process_messages :
     Node_context.rw ->
     predecessor:Layer1.header ->
-    level:int32 ->
+    Layer1.header ->
     Sc_rollup.Inbox_message.t list ->
     (Sc_rollup.Inbox.Hash.t
     * Sc_rollup.Inbox.t
