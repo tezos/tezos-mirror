@@ -20,7 +20,7 @@ hex = "0.4"
 rlp = "0.5.2"
 sha3 = { version = "0.10.6", default-features = false }
 
-tezos_data_encoding = "0.4"
+tezos_data_encoding = "0.5"
 
 primitive-types = { version = "0.11.1", default-features = false }
 

@@ -45,10 +45,10 @@ const NEW_CHUNKED_TRANSACTION_TAG: u8 = 1;
 const TRANSACTION_CHUNK_TAG: u8 = 2;
 
 const MAX_SIZE_PER_CHUNK: usize = 4095 // Max input size minus external tag
-	    - 20 // Smart rollup address size
-	    - 1  // Transaction chunk tag
-	    - 2  // Number of chunks (u16)
-	    - 32; // Transaction hash size
+            - 20 // Smart rollup address size
+            - 1  // Transaction chunk tag
+            - 2  // Number of chunks (u16)
+            - 32; // Transaction hash size
 
 macro_rules! parsable {
     ($expr : expr) => {
@@ -269,7 +269,7 @@ mod tests {
         let mut host = MockHost::default();
 
         let tx =
-	    EthereumTransactionCommon::from_rlp_bytes(&hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap()).unwrap();
+            EthereumTransactionCommon::from_rlp_bytes(&hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap()).unwrap();
         let input = Input::SimpleTransaction(Box::new(Transaction {
             tx_hash: ZERO_TX_HASH,
             tx: tx.clone(),

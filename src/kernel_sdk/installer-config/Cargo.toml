@@ -35,7 +35,7 @@ version = "6.1"
 default-features = false
 
 [dependencies.tezos_data_encoding]
-version = "0.4"
+version = "0.5"
 optional = true
 
 [dependencies.serde]

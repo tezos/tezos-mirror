@@ -70,9 +70,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 tezos-smart-rollup = { git = "https://gitlab.com/tezos/tezos.git" }
-tezos_data_encoding = "0.4"
-tezos_crypto_rs = { version = "0.4", default-features = false }
-nom = "6"
+tezos_data_encoding = "0.5"
+tezos_crypto_rs = { version = "0.5", default-features = false }
+nom = "7.1"
 
 [dev-dependencies]
 tezos-smart-rollup = { git = "https://gitlab.com/tezos/tezos.git", features = ["testing"] }

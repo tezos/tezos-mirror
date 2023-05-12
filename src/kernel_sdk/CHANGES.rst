@@ -45,6 +45,9 @@ SDK
 ---
 
 - Implements trait ``Error`` and ``Display`` for ``PathError`` in ``tezos-smart-rollup-host``.
+- Upgrade dependencies:
+  - ``tezos_crypto_rs``, ``tezos_data_encoding`` to ``v0.5.0``.
+  - ``nom`` to ``7.1``.
 
 Installer client
 ----------------
