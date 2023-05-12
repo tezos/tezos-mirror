@@ -934,8 +934,10 @@ upgrades. The WASM PVM will upgrade itself when it reads the
 | Protocol     | Version        |
 +==============+================+
 | Mumbai       | 2.0.0          |
++--------------+----------------+
 | Nairobi      | 2.0.0-r1       |
-| proto_alpha  | 2.0.0-r1       |
++--------------+----------------+
+| Alpha        | 2.0.0-r1       |
 +--------------+----------------+
 
 Control Flow
