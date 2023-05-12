@@ -401,12 +401,12 @@ module Coordinator = struct
     let committee_members = Node_context.Coordinator.committee_members ctx in
     let get_public_key_opt committee_member_address =
       List.find_map
-        (fun Wallet_account.Coordinator.{public_key_hash; public_key_opt} ->
+        (fun Wallet_account.Coordinator.{public_key_hash; public_key} ->
           if
             Tezos_crypto.Aggregate_signature.Public_key_hash.(
               committee_member_address <> public_key_hash)
           then None
-          else public_key_opt)
+          else Some public_key)
         ctx.committee_members
     in
     handle_put_dac_member_signature

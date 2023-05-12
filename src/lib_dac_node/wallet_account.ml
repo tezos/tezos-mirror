@@ -28,14 +28,13 @@ module Aggregate_signature = Tezos_crypto.Aggregate_signature
 module Coordinator = struct
   type t = {
     public_key_hash : Aggregate_signature.public_key_hash;
-    public_key_opt : Aggregate_signature.public_key option;
+    public_key : Aggregate_signature.public_key;
   }
 
   let of_committee_member_public_key public_key =
     let open Lwt_result_syntax in
     let public_key_hash = Aggregate_signature.Public_key.hash public_key in
-    let public_key_opt = Some public_key in
-    return {public_key_hash; public_key_opt}
+    return {public_key_hash; public_key}
 end
 
 module Committee_member = struct

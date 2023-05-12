@@ -56,7 +56,7 @@ module Coordinator = struct
 
   let public_keys_opt t =
     List.map
-      (fun Wallet_account.Coordinator.{public_key_opt; _} -> public_key_opt)
+      (fun Wallet_account.Coordinator.{public_key; _} -> Some public_key)
       t.committee_members
 
   let committee_members t =
