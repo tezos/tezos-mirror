@@ -462,17 +462,17 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
      -----
   *)
   | ICons_pair :
-      Script.location * ('a * 'b, 'c * 'S, 'r, 'F) kinstr
+      Script.location * (('a, 'b) pair, 'c * 'S, 'r, 'F) kinstr
       -> ('a, 'b * ('c * 'S), 'r, 'F) kinstr
   | ICar :
       Script.location * ('a, 'S, 'r, 'F) kinstr
-      -> ('a * 'b, 'S, 'r, 'F) kinstr
+      -> (('a, 'b) pair, 'S, 'r, 'F) kinstr
   | ICdr :
       Script.location * ('b, 'S, 'r, 'F) kinstr
-      -> ('a * 'b, 'S, 'r, 'F) kinstr
+      -> (('a, 'b) pair, 'S, 'r, 'F) kinstr
   | IUnpair :
       Script.location * ('a, 'b * 'S, 'r, 'F) kinstr
-      -> ('a * 'b, 'S, 'r, 'F) kinstr
+      -> (('a, 'b) pair, 'S, 'r, 'F) kinstr
   (*
      Options
      -------
@@ -580,13 +580,13 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IMap_map :
       Script.location
       * (('a, 'c) map, _) ty option
-      * ('a * 'b, 'd * 'S, 'c, 'd * 'S) kinstr
+      * (('a, 'b) pair, 'd * 'S, 'c, 'd * 'S) kinstr
       * (('a, 'c) map, 'd * 'S, 'r, 'F) kinstr
       -> (('a, 'b) map, 'd * 'S, 'r, 'F) kinstr
   | IMap_iter :
       Script.location
-      * ('a * 'b, _) ty option
-      * ('a * 'b, 'c * 'S, 'c, 'S) kinstr
+      * (('a, 'b) pair, _) ty option
+      * (('a, 'b) pair, 'c * 'S, 'c, 'S) kinstr
       * ('c, 'S, 'r, 'F) kinstr
       -> (('a, 'b) map, 'c * 'S, 'r, 'F) kinstr
   | IMap_mem :
@@ -837,7 +837,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, ('a, 'b) lambda * 'S, 'r, 'F) kinstr
   | IApply :
       Script.location * ('a, _) ty * (('b, 'c) lambda, 'S, 'r, 'F) kinstr
-      -> ('a, ('a * 'b, 'c) lambda * 'S, 'r, 'F) kinstr
+      -> ('a, (('a, 'b) pair, 'c) lambda * 'S, 'r, 'F) kinstr
   | ILambda :
       Script.location
       * ('b, 'c) lambda
@@ -1096,14 +1096,14 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IRead_ticket :
       Script.location
       * 'a comparable_ty option
-      * (address * ('a * n num), 'a ticket * 'S, 'r, 'F) kinstr
+      * ((address, ('a, n num) pair) pair, 'a ticket * 'S, 'r, 'F) kinstr
       -> ('a ticket, 'S, 'r, 'F) kinstr
   | ISplit_ticket :
-      Script.location * (('a ticket * 'a ticket) option, 'S, 'r, 'F) kinstr
-      -> ('a ticket, (n num * n num) * 'S, 'r, 'F) kinstr
+      Script.location * (('a ticket, 'a ticket) pair option, 'S, 'r, 'F) kinstr
+      -> ('a ticket, (n num, n num) pair * 'S, 'r, 'F) kinstr
   | IJoin_tickets :
       Script.location * 'a comparable_ty * ('a ticket option, 'S, 'r, 'F) kinstr
-      -> ('a ticket * 'a ticket, 'S, 'r, 'F) kinstr
+      -> (('a ticket, 'a ticket) pair, 'S, 'r, 'F) kinstr
   | IOpen_chest :
       Script.location * ((bytes, bool) or_, 'S, 'r, 'F) kinstr
       -> ( Script_timelock.chest_key,
@@ -1209,15 +1209,15 @@ and (_, _, _, _) continuation =
       * ('b Script_list.t, 'c * 'S, 'r, 'F) continuation
       -> ('b, 'c * 'S, 'r, 'F) continuation
   | KMap_enter_body :
-      ('a * 'b, 'd * 'S, 'c, 'd * 'S) kinstr
-      * ('a * 'b) list
+      (('a, 'b) pair, 'd * 'S, 'c, 'd * 'S) kinstr
+      * ('a, 'b) pair list
       * ('a, 'c) map
       * (('a, 'c) map, _) ty option
       * (('a, 'c) map, 'd * 'S, 'r, 'F) continuation
       -> ('d, 'S, 'r, 'F) continuation
   | KMap_exit_body :
-      ('a * 'b, 'd * 'S, 'c, 'd * 'S) kinstr
-      * ('a * 'b) list
+      (('a, 'b) pair, 'd * 'S, 'c, 'd * 'S) kinstr
+      * ('a, 'b) pair list
       * ('a, 'c) map
       * 'a
       * (('a, 'c) map, _) ty option
@@ -1400,21 +1400,22 @@ and (_, _, _, _, _, _) uncomb_gadt_witness =
   | Uncomb_one : ('a, 'x, 'before, 'a, 'x, 'before) uncomb_gadt_witness
   | Uncomb_succ :
       ('b, 'c, 'S, 'd, 'e, 'T) uncomb_gadt_witness
-      -> ('a * 'b, 'c, 'S, 'a, 'd, 'e * 'T) uncomb_gadt_witness
+      -> (('a, 'b) pair, 'c, 'S, 'a, 'd, 'e * 'T) uncomb_gadt_witness
 
 and ('before, 'after) comb_get_gadt_witness =
   | Comb_get_zero : ('b, 'b) comb_get_gadt_witness
-  | Comb_get_one : ('a * 'b, 'a) comb_get_gadt_witness
+  | Comb_get_one : (('a, 'b) pair, 'a) comb_get_gadt_witness
   | Comb_get_plus_two :
       ('before, 'after) comb_get_gadt_witness
-      -> ('a * 'before, 'after) comb_get_gadt_witness
+      -> (('a, 'before) pair, 'after) comb_get_gadt_witness
 
 and ('value, 'before, 'after) comb_set_gadt_witness =
   | Comb_set_zero : ('value, _, 'value) comb_set_gadt_witness
-  | Comb_set_one : ('value, 'hd * 'tl, 'value * 'tl) comb_set_gadt_witness
+  | Comb_set_one
+      : ('value, ('hd, 'tl) pair, ('value, 'tl) pair) comb_set_gadt_witness
   | Comb_set_plus_two :
       ('value, 'before, 'after) comb_set_gadt_witness
-      -> ('value, 'a * 'before, 'a * 'after) comb_set_gadt_witness
+      -> ('value, ('a, 'before) pair, ('a, 'after) pair) comb_set_gadt_witness
 
 and (_, _, _, _) dup_n_gadt_witness =
   | Dup_n_zero : ('a, _, _, 'a) dup_n_gadt_witness
