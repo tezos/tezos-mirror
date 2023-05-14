@@ -824,7 +824,14 @@ module Codegen_check_definitions_cmd = struct
 end
 
 module Auto_build_cmd = struct
-  let auto_build_handler destination_directory bench_names () =
+  let auto_build_handler
+      ( destination_directory,
+        print_problem,
+        plot,
+        override_files,
+        full_plot_verbosity,
+        plot_raw_workload,
+        empirical_plot ) bench_names () =
     let bench_names =
       let all_benchmarks = Registration.all_benchmarks () in
       List.map
@@ -836,7 +843,17 @@ module Auto_build_cmd = struct
           n)
         bench_names
     in
-    let auto_build_options = {destination_directory} in
+    let infer_parameters =
+      let open Infer_cmd in
+      default_infer_parameters_options
+      |> set_print_problem print_problem
+      |> set_plot plot
+      |> set_override_files override_files
+      |> set_full_plot_verbosity full_plot_verbosity
+      |> set_plot_raw_workload plot_raw_workload
+      |> lift_opt set_empirical_plot empirical_plot
+    in
+    let auto_build_options = {destination_directory; infer_parameters} in
     commandline_outcome_ref :=
       Some (Auto_build {bench_names; auto_build_options}) ;
     Lwt.return_ok ()
@@ -854,7 +871,15 @@ module Auto_build_cmd = struct
       ~placeholder:"directory"
       (Tezos_clic.parameter (fun () filename -> Lwt.return_ok filename))
 
-  let options = Tezos_clic.args1 destination_directory_arg
+  let options =
+    Tezos_clic.args7
+      destination_directory_arg
+      Infer_cmd.Options.print_problem
+      Infer_cmd.Options.plot_arg
+      Infer_cmd.Options.override_arg
+      Infer_cmd.Options.full_plot_verbosity_arg
+      Infer_cmd.Options.plot_raw_workload_arg
+      Infer_cmd.Options.empirical_plot_arg
 
   let command =
     Tezos_clic.command

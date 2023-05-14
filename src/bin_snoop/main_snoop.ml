@@ -272,6 +272,9 @@ and infer_for_measurements ~model_name measurements
         let problem =
           Inference.make_problem ~data:m.Measure.workload_data ~model ~overrides
         in
+        if infer_opts.print_problem then (
+          Format.eprintf "Dumping problem to stdout as requested by user@." ;
+          Csv.export_stdout (Inference.problem_to_csv problem)) ;
         let is_constant_input =
           is_constant_input (module Bench) m.Measure.workload_data
         in
@@ -809,7 +812,7 @@ module Auto_build = struct
         in
         (providers, providers_map))
 
-  let infer mkfilename local_model_name measurements solution =
+  let infer mkfilename local_model_name measurements solution infer_opts =
     let solver = "lasso" in
     let csv_export = mkfilename ".sol.csv" in
     (* If [csv_export] already exists, it must be removed first,
@@ -818,15 +821,15 @@ module Auto_build = struct
     if Sys.file_exists csv_export then Unix.unlink csv_export ;
     let solution_fn = mkfilename ".sol" in
     let dot_file = mkfilename ".dot" in
+    let report_file = mkfilename ".tex" in
     let infer_opts =
       {
-        Commands.Infer_cmd.default_infer_parameters_options with
-        (* print_problem= false; *)
-        plot = false;
-        lasso_positive = true;
-        csv_export = Some csv_export;
+        infer_opts with
+        Cmdline.csv_export = Some csv_export;
         save_solution = Some solution_fn;
         dot_file = Some dot_file;
+        lasso_positive = true;
+        report = ReportToFile report_file;
       }
     in
     let solution =
@@ -867,7 +870,7 @@ module Auto_build = struct
       codegen_options
       ~exclusions:String.Set.empty
 
-  let cmd bench_names Cmdline.{destination_directory} =
+  let cmd bench_names Cmdline.{destination_directory; infer_parameters} =
     let exitf status fmt =
       Format.kasprintf
         (fun s ->
@@ -955,7 +958,12 @@ module Auto_build = struct
             in
             (* Infernece *)
             let solution =
-              infer mkfilename local_model_name measurements providers
+              infer
+                mkfilename
+                local_model_name
+                measurements
+                providers
+                infer_parameters
             in
             (* Codegen *)
             codegen mkfilename solution)

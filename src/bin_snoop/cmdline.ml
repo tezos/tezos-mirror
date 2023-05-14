@@ -77,7 +77,11 @@ type infer_parameters_options = {
   display : Display.options;
 }
 
-type auto_build_options = {destination_directory : string option}
+type auto_build_options = {
+  destination_directory : string option;
+  (* Where to load/save files *)
+  infer_parameters : infer_parameters_options;
+}
 
 (* Outcome of command-line parsing. *)
 
