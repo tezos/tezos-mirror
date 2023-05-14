@@ -270,9 +270,14 @@ module Graph : sig
 
   val build : Solver.Solved.t list -> result
 
+  (** Topological ordered fold *)
   val fold : (Solver.Solved.t -> 'a -> 'a) -> t -> 'a -> 'a
 
+  (** Topological ordered iter *)
   val iter : (Solver.Solved.t -> unit) -> t -> unit
+
+  (** Returns the topological ordered list of [Solver.Sovled.t] *)
+  val to_sorted_list : t -> Solver.Solved.t list
 
   val save_graphviz : t -> string -> unit
 end = struct
@@ -435,6 +440,8 @@ end = struct
   let fold = G.fold
 
   let iter = G.iter
+
+  let to_sorted_list t = List.rev @@ fold List.cons t []
 
   let save_graphviz g fn =
     Graphviz.save fn @@ G.fold_vertex (fun s acc -> s :: acc) g []

@@ -237,7 +237,7 @@ let save :
   in
   Measurement (bench, measurement)
 
-let packed_measurement_print_json measurement_packed output_path =
+let packed_measurement_save_json measurement_packed output_path =
   let (Measurement (bench, measurement)) = measurement_packed in
   let module Bench = (val bench) in
   let encoding_measurement = measurement_encoding Bench.workload_encoding in

@@ -109,6 +109,9 @@ module Graph : sig
   (** Dependency topological iteration *)
   val iter : (Solver.Solved.t -> unit) -> t -> unit
 
+  (** Returns the topological ordered list of [Solver.Sovled.t] *)
+  val to_sorted_list : t -> Solver.Solved.t list
+
   (** Visualize the graph using Graphviz *)
   val save_graphviz : t -> string -> unit
 end

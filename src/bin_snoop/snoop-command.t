@@ -1,13 +1,13 @@
 Missing config file prints
   $ ./main_snoop.exe benchmark interpreter/N_IBlake2b and save to output.json -c __nosuchdir --bench-num 1 2>&1 | sed s'/stats over all benchmarks:.*/stats <hidden>/'
-  Benchmarking with the following options:
-  { options = { seed=self-init;
-                bench #=1;
-                nsamples/bench=500;
-                minor_heap_size=262144 words;
-                config directory=__nosuchdir };
-     save_file = output.json;
-     storage = Mem }
+  Benchmarking interpreter/N_IBlake2b with the following options:
+    { options = { seed=self-init;
+                  bench #=1;
+                  nsamples/bench=500;
+                  minor_heap_size=262144 words;
+                  config directory=__nosuchdir };
+      save_file = output.json;
+      storage = Mem }
   Failed loading json __nosuchdir: No such file or directory (Ignoring)
   Using default configuration for benchmark interpreter/N_IBlake2b
   Loaded configuration from __nosuchdir for benchmark interpreter/N_IBlake2b
