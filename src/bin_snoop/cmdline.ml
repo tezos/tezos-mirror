@@ -81,6 +81,7 @@ type auto_build_options = {
   destination_directory : string option;
   (* Where to load/save files *)
   infer_parameters : infer_parameters_options;
+  measure_options : Measure.options;
 }
 
 (* Outcome of command-line parsing. *)

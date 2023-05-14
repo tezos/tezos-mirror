@@ -826,6 +826,8 @@ end
 module Auto_build_cmd = struct
   let auto_build_handler
       ( destination_directory,
+        nsamples,
+        bench_number,
         print_problem,
         plot,
         override_files,
@@ -853,7 +855,17 @@ module Auto_build_cmd = struct
       |> set_plot_raw_workload plot_raw_workload
       |> lift_opt set_empirical_plot empirical_plot
     in
-    let auto_build_options = {destination_directory; infer_parameters} in
+    let measure_options =
+      let opts = Benchmark_cmd.default_benchmark_options.options in
+      {
+        opts with
+        nsamples = Option.value nsamples ~default:opts.nsamples;
+        bench_number = Option.value bench_number ~default:opts.bench_number;
+      }
+    in
+    let auto_build_options =
+      {destination_directory; infer_parameters; measure_options}
+    in
     commandline_outcome_ref :=
       Some (Auto_build {bench_names; auto_build_options}) ;
     Lwt.return_ok ()
@@ -872,8 +884,10 @@ module Auto_build_cmd = struct
       (Tezos_clic.parameter (fun () filename -> Lwt.return_ok filename))
 
   let options =
-    Tezos_clic.args7
+    Tezos_clic.args9
       destination_directory_arg
+      Benchmark_cmd.Options.nsamples_arg
+      Benchmark_cmd.Options.bench_number_arg
       Infer_cmd.Options.print_problem
       Infer_cmd.Options.plot_arg
       Infer_cmd.Options.override_arg
