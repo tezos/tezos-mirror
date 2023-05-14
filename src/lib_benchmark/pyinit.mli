@@ -24,16 +24,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Initializes Python *)
 val pyinit : unit -> unit
 
+(** Import [numpy] and returns its Python object.
+    It also initialize Python runtime if not yet.
+*)
 val numpy : unit -> Pytypes.pyobject
 
+(** Import [sklearn.linear_model] and returns its Python object.
+    It also initialize Python runtime if not yet.
+*)
 val linear_model : unit -> Pytypes.pyobject
 
+(** Import [scipy.optimize] and returns its Python object.
+    It also initialize Python runtime if not yet.
+*)
 val scipy_optimize : unit -> Pytypes.pyobject
 
+(** Import [sklearn.metrics] and returns its Python object.
+    It also initialize Python runtime if not yet.
+*)
 val sklearn_metrics : unit -> Pytypes.pyobject
 
+(** Import [statsmodels.api] and returns its Python object.
+    It also initialize Python runtime if not yet.
+*)
 val statsmodels_api : unit -> Pytypes.pyobject
 
+(** Import [statsmodels.stats] and returns its Python object.
+    It also initialize Python runtime if not yet.
+*)
 val statsmodels_stats : unit -> Pytypes.pyobject
