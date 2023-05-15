@@ -43,4 +43,4 @@ let activate gs_worker p2p_layer =
     new_connection_handler gs_worker p2p_layer
     |> P2p.on_new_connection p2p_layer
   in
-  ()
+  Lwt.return_unit

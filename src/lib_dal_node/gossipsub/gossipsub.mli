@@ -110,5 +110,5 @@ end
     {!Transport_layer_hooks.activate} function below. *)
 module Transport_layer_hooks : sig
   (** See {!Gs_transport_connection.activate}. *)
-  val activate : Worker.t -> Transport_layer.t -> unit
+  val activate : Worker.t -> Transport_layer.t -> unit Lwt.t
 end
