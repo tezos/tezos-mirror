@@ -840,7 +840,7 @@ module Constants : sig
       min_pending_to_process : int;
     }
 
-    type adaptive_inflation = {enable : bool}
+    type adaptive_inflation = {enable : bool; staking_over_baking_limit : int}
 
     type reward_weights = {
       base_total_rewards_per_minute : Tez.t;

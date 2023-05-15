@@ -560,7 +560,8 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
         };
       dal = {constants.dal with feature_enable = dal_enable};
       zk_rollup = {constants.zk_rollup with enable = zk_rollup_enable};
-      adaptive_inflation = {enable = adaptive_inflation_enable};
+      adaptive_inflation =
+        {constants.adaptive_inflation with enable = adaptive_inflation_enable};
       hard_gas_limit_per_block;
       nonce_revelation_threshold;
     }
