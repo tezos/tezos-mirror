@@ -290,7 +290,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   (* Prioritize reading from the [vote_file] if it exists. *)
   (match vote_file with
   | Some per_block_vote_file ->
-      Liquidity_baking_vote.read_liquidity_baking_toggle_vote_no_fail
+      Per_block_vote_file.read_liquidity_baking_toggle_vote_no_fail
         ~default_liquidity_baking_vote:liquidity_baking_vote
         ~per_block_vote_file
   | None -> Lwt.return liquidity_baking_vote)

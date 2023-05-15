@@ -31,7 +31,7 @@ type contents = {
   seed_nonce_hash : Nonce_hash.t option;
   proof_of_work_nonce : bytes;
   liquidity_baking_toggle_vote :
-    Liquidity_baking_repr.liquidity_baking_toggle_vote;
+    Toggle_votes_repr.liquidity_baking_toggle_vote;
 }
 
 type protocol_data = {contents : contents; signature : Signature.t}
@@ -105,7 +105,7 @@ let contents_encoding =
           (opt "seed_nonce_hash" Nonce_hash.encoding)
           (req
              "liquidity_baking_toggle_vote"
-             Liquidity_baking_repr.liquidity_baking_toggle_vote_encoding))
+             Toggle_votes_repr.liquidity_baking_toggle_vote_encoding))
 
 let protocol_data_encoding =
   let open Data_encoding in

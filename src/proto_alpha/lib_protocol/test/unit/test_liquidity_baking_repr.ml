@@ -25,27 +25,27 @@
 
 (** Testing
     -------
-    Component:  Protocol Liquidity_baking_repr module
+    Component:  Protocol Toggle_votes_repr module
     Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
                   -- --file test_liquidity_baking_repr.ml
-    Subject:    Tests for the Liquidity_baking_repr module
+    Subject:    Tests for the Toggle_votes_repr module
 *)
 
 open Protocol
 
 let ema_of_int32 ema =
-  Liquidity_baking_repr.Toggle_EMA.of_int32 ema >|= Environment.wrap_tzresult
+  Toggle_votes_repr.Toggle_EMA.of_int32 ema >|= Environment.wrap_tzresult
 
-let ema_to_int32 = Liquidity_baking_repr.Toggle_EMA.to_int32
+let ema_to_int32 = Toggle_votes_repr.Toggle_EMA.to_int32
 
 let compute_new_ema ~toggle_vote ema =
-  Liquidity_baking_repr.compute_new_ema ~toggle_vote ema |> ema_to_int32
+  Toggle_votes_repr.compute_new_ema ~toggle_vote ema |> ema_to_int32
 
 (* Folds compute_new_ema on a list of votes *)
 let compute_new_ema_n toggle_votes initial_ema =
   List.fold_left
     (fun ema toggle_vote ->
-      Liquidity_baking_repr.compute_new_ema ~toggle_vote ema)
+      Toggle_votes_repr.compute_new_ema ~toggle_vote ema)
     initial_ema
     toggle_votes
   |> ema_to_int32
@@ -170,7 +170,7 @@ let test_ema_decreases_on_bound () =
 
 (* Test that 1385 Off votes are needed to reach the threshold from 0. *)
 let test_ema_many_off () =
-  let open Liquidity_baking_repr in
+  let open Toggle_votes_repr in
   ema_of_int32 0l >>=? fun initial_ema ->
   Assert.leq_int32
     ~loc:__LOC__
@@ -184,7 +184,7 @@ let test_ema_many_off () =
 
 (* Test that 1385 On votes are needed to reach the threshold from the max value of the EMA (2,000,000,000). *)
 let test_ema_many_on () =
-  let open Liquidity_baking_repr in
+  let open Toggle_votes_repr in
   ema_of_int32 2_000_000_000l >>=? fun initial_ema ->
   Assert.leq_int32
     ~loc:__LOC__

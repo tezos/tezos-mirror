@@ -451,17 +451,17 @@ let per_block_vote_file_arg =
          let* file_exists =
            protect
              ~on_error:(fun _ ->
-               tzfail (Liquidity_baking_vote.Block_vote_file_not_found file))
+               tzfail (Per_block_vote_file.Block_vote_file_not_found file))
              (fun () ->
                let*! b = Lwt_unix.file_exists file in
                return b)
          in
          if file_exists then return file
-         else tzfail (Liquidity_baking_vote.Block_vote_file_not_found file)))
+         else tzfail (Per_block_vote_file.Block_vote_file_not_found file)))
 
 let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
   let open Lwt_syntax in
-  let default_filename = Liquidity_baking_vote.default_vote_json_filename in
+  let default_filename = Per_block_vote_file.default_vote_json_filename in
   let file_exists path =
     Lwt.catch (fun () -> Lwt_unix.file_exists path) (fun _ -> return_false)
   in
@@ -511,7 +511,7 @@ let run_baker
   (* We don't let the user run the baker without providing some
      option (CLI, file path, or file in default location) for
      the toggle vote. *)
-  Liquidity_baking_vote.load_liquidity_baking_config
+  Per_block_vote_file.load_liquidity_baking_config
     ~per_block_vote_file_arg:per_block_vote_file
     ~toggle_vote_arg:liquidity_baking_toggle_vote
   >>=? fun liquidity_baking ->

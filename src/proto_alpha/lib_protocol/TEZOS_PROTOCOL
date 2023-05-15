@@ -90,7 +90,7 @@
 
         "Bond_id_repr",
         "Vote_repr",
-        "Liquidity_baking_repr",
+        "Toggle_votes_repr",
         "Block_header_repr",
         "Destination_repr",
         "Script_int",

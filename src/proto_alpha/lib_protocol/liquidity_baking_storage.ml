@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Liquidity_baking_repr
+open Toggle_votes_repr
 
 let get_cpmm_address = Storage.Liquidity_baking.Cpmm_address.get
 

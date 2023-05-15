@@ -3812,7 +3812,7 @@ module Block_header : sig
     seed_nonce_hash : Nonce_hash.t option;
     proof_of_work_nonce : bytes;
     liquidity_baking_toggle_vote :
-      Liquidity_baking_repr.liquidity_baking_toggle_vote;
+      Toggle_votes_repr.liquidity_baking_toggle_vote;
   }
 
   type protocol_data = {contents : contents; signature : signature}
@@ -4684,11 +4684,11 @@ module Parameters : sig
   val encoding : t Data_encoding.t
 end
 
-(** This module re-exports definitions from {!Liquidity_baking_repr} and
+(** This module re-exports definitions from {!Toggle_votes_repr} and
     {!Liquidity_baking_storage}. *)
 module Liquidity_baking : sig
   type liquidity_baking_toggle_vote =
-        Liquidity_baking_repr.liquidity_baking_toggle_vote =
+        Toggle_votes_repr.liquidity_baking_toggle_vote =
     | LB_on
     | LB_off
     | LB_pass
