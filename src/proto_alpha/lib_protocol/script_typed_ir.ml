@@ -1070,9 +1070,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IComb_get :
       Script.location
       * int
-      * ('T, 'v) comb_get_gadt_witness
+      * ('t, 'v) comb_get_gadt_witness
       * ('v, 'a * 'S, 'r, 'F) kinstr
-      -> ('T, 'a * 'S, 'r, 'F) kinstr
+      -> ('t, 'a * 'S, 'r, 'F) kinstr
   | IComb_set :
       Script.location
       * int
@@ -1082,8 +1082,8 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IDup_n :
       Script.location
       * int
-      * ('a, 'b, 'S, 'T) dup_n_gadt_witness
-      * ('T, 'a * ('b * 'S), 'r, 'F) kinstr
+      * ('a, 'b, 'S, 't) dup_n_gadt_witness
+      * ('t, 'a * ('b * 'S), 'r, 'F) kinstr
       -> ('a, 'b * 'S, 'r, 'F) kinstr
   | ITicket :
       Script.location
