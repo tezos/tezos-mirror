@@ -69,12 +69,12 @@ let () =
 let add_service registerer service handler directory =
   registerer directory service handler
 
-let handle_get_health_live cctxt =
-  match Node_context.get_status cctxt with
+let handle_get_health_live node_ctxt =
+  match Node_context.get_status node_ctxt with
   | Ready _ | Starting -> Lwt_result_syntax.return true
 
-let handle_get_health_ready cctxt =
-  match Node_context.get_status cctxt with
+let handle_get_health_ready node_ctxt =
+  match Node_context.get_status node_ctxt with
   | Ready _ -> Lwt_result_syntax.return true
   | Starting -> Lwt_result_syntax.tzfail @@ DAC_node_not_ready "starting"
 
@@ -462,6 +462,11 @@ let start ~rpc_address ~rpc_port node_ctxt =
           cctxt
           legacy_node_ctxt
   in
+  let register_health_endpoints dir =
+    dir
+    |> register_get_health_ready node_ctxt
+    |> register_get_health_live node_ctxt
+  in
   let dir =
     Tezos_rpc.Directory.register_dynamic_directory
       Tezos_rpc.Directory.empty
@@ -471,9 +476,9 @@ let start ~rpc_address ~rpc_port node_ctxt =
         | Ready {dac_plugin = (module Dac_plugin)} ->
             Lwt.return
               (register_dynamic_rpc (module Dac_plugin)
-              |> register_get_health_ready node_ctxt
-              |> register_get_health_live node_ctxt)
-        | Starting -> Lwt.return Tezos_rpc.Directory.empty)
+              |> register_health_endpoints)
+        | Starting ->
+            Lwt.return (Tezos_rpc.Directory.empty |> register_health_endpoints))
   in
   let rpc_address = P2p_addr.of_string_exn rpc_address in
   let host = Ipaddr.V6.to_string rpc_address in
@@ -493,6 +498,7 @@ let start ~rpc_address ~rpc_port node_ctxt =
           ~callback:(RPC_server.resto_callback server)
           node
       in
+      let* () = Event.emit_rpc_started () in
       return_ok server)
     fail_with_exn
 

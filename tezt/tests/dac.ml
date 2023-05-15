@@ -200,11 +200,12 @@ let check_not_ready dac_node =
     "Expected DAC node not ready"
     (RPC.call dac_node Dac_rpc.get_health_ready)
 
-let check_not_alive dac_node =
-  assert_lwt_failure
-    ~__LOC__
-    "Expected DAC node not alive"
-    (RPC.call dac_node Dac_rpc.get_health_live)
+let check_alive dac_node =
+  let* () =
+    Dac_node.wait_for dac_node "rpc_server_started.v0" (fun _ -> Some ())
+  in
+  let* liveness = RPC.call dac_node Dac_rpc.get_health_live in
+  return @@ assert liveness
 
 let check_liveness_and_readiness dac_node =
   let* liveness = RPC.call dac_node Dac_rpc.get_health_live in
@@ -470,10 +471,10 @@ module Legacy = struct
     in
     let* _dir = Dac_node.init_config dac_node in
     let* () = run_dac dac_node in
-    (* this call must fail as node is not ready *)
-    let* () = check_not_alive dac_node in
+    (* GET /health/live must succeed *)
+    let* () = check_alive dac_node in
+    (* GET /health/ready must fail *)
     let* () = check_not_ready dac_node in
-
     let* () = Dac_node.terminate dac_node in
     return ()
 
@@ -1141,47 +1142,6 @@ module Legacy = struct
 end
 
 module Coordinator = struct
-  let test_dac_not_ready =
-    Protocol.register_test
-      ~__FILE__
-      ~title:"dac coordinator startup not ready"
-      ~tags:["dac"; "dac_node"]
-    @@ fun protocol ->
-    let run_dac = Dac_node.run ~wait_ready:false in
-    let nodes_args = Node.[Synchronisation_threshold 0] in
-    let previous_protocol =
-      match Protocol.previous_protocol protocol with
-      | Some p -> p
-      | None -> assert false
-    in
-    let* node, client =
-      Client.init_with_protocol
-        `Client
-        ~protocol:previous_protocol
-        ~event_sections_levels:[("prevalidator", `Debug)]
-        ~nodes_args
-        ()
-    in
-    let dac_node =
-      Dac_node.create_coordinator ~node ~client ~committee_members:[] ()
-    in
-    let* _dir = Dac_node.init_config dac_node in
-    let* () = run_dac dac_node in
-    (* this call must fail as node is not ready *)
-    let* () = check_not_alive dac_node in
-    let* () = check_not_ready dac_node in
-    (* must wait for node to be ready before terminating it *)
-    let* () =
-      Lwt.join
-        [
-          Dac_node.wait_for dac_node "dac_node_plugin_resolved.v0" (fun _ ->
-              Some ());
-          Client.bake_for_and_wait client;
-        ]
-    in
-    let* () = Dac_node.terminate dac_node in
-    return ()
-
   let test_dac_not_ready_without_protocol =
     Protocol.register_test
       ~__FILE__
@@ -1203,53 +1163,15 @@ module Coordinator = struct
     in
     let* _dir = Dac_node.init_config dac_node in
     let* () = run_dac dac_node in
-    (* this call must fail as node is not ready *)
-    let* () = check_not_alive dac_node in
+    (* GET /health/live must succeed *)
+    let* () = check_alive dac_node in
+    (* GET /health/ready must fail *)
     let* () = check_not_ready dac_node in
     let* () = Dac_node.terminate dac_node in
     return ()
 end
 
 module Observer = struct
-  let test_dac_not_ready =
-    Protocol.register_test
-      ~__FILE__
-      ~title:"dac observer startup not ready"
-      ~tags:["dac"; "dac_node"]
-    @@ fun protocol ->
-    let run_dac = Dac_node.run ~wait_ready:false in
-    let nodes_args = Node.[Synchronisation_threshold 0] in
-    let previous_protocol =
-      match Protocol.previous_protocol protocol with
-      | Some p -> p
-      | None -> assert false
-    in
-    let* node, client =
-      Client.init_with_protocol
-        `Client
-        ~protocol:previous_protocol
-        ~event_sections_levels:[("prevalidator", `Debug)]
-        ~nodes_args
-        ()
-    in
-    let dac_node = Dac_node.create_observer ~node ~client () in
-    let* _dir = Dac_node.init_config dac_node in
-    let* () = run_dac dac_node in
-    (* this call must fail as node is not ready *)
-    let* () = check_not_alive dac_node in
-    let* () = check_not_ready dac_node in
-    (* must wait for node to be ready before terminating it *)
-    let* () =
-      Lwt.join
-        [
-          Dac_node.wait_for dac_node "dac_node_plugin_resolved.v0" (fun _ ->
-              Some ());
-          Client.bake_for_and_wait client;
-        ]
-    in
-    let* () = Dac_node.terminate dac_node in
-    return ()
-
   let test_dac_not_ready_without_protocol =
     Protocol.register_test
       ~__FILE__
@@ -1271,68 +1193,15 @@ module Observer = struct
     in
     let* _dir = Dac_node.init_config dac_node in
     let* () = run_dac dac_node in
-    (* this call must fail as node is not ready *)
-    let* () = check_not_alive dac_node in
+    (* GET /health/live must succeed *)
+    let* () = check_alive dac_node in
+    (* GET /health/ready must fail *)
     let* () = check_not_ready dac_node in
     let* () = Dac_node.terminate dac_node in
     return ()
 end
 
 module Member = struct
-  let test_dac_not_ready =
-    Protocol.register_test
-      ~__FILE__
-      ~title:"dac member startup not ready with"
-      ~tags:["dac"; "dac_node"]
-    @@ fun protocol ->
-    let run_dac = Dac_node.run ~wait_ready:false in
-    let nodes_args = Node.[Synchronisation_threshold 0] in
-    let previous_protocol =
-      match Protocol.previous_protocol protocol with
-      | Some p -> p
-      | None -> assert false
-    in
-    let* node, client =
-      Client.init_with_protocol
-        `Client
-        ~protocol:previous_protocol
-        ~event_sections_levels:[("prevalidator", `Debug)]
-        ~nodes_args
-        ()
-    in
-    let* committee_member =
-      Client.bls_gen_keys ~alias:"committee_member" client
-    in
-    let* committee_member_info =
-      Client.bls_show_address ~alias:committee_member client
-    in
-    let committee_member_address =
-      committee_member_info.aggregate_public_key_hash
-    in
-    let dac_node =
-      Dac_node.create_committee_member
-        ~address:committee_member_address
-        ~node
-        ~client
-        ()
-    in
-    let* _dir = Dac_node.init_config dac_node in
-    let* () = run_dac dac_node in
-    (* this call must fail as node is not ready *)
-    let* () = check_not_alive dac_node in
-    let* () = check_not_ready dac_node in
-    (* must wait for node to be ready before terminating it *)
-    let* () =
-      Lwt.join
-        [
-          Dac_node.wait_for dac_node "dac_node_plugin_resolved.v0" (fun _ ->
-              Some ());
-          Client.bake_for_and_wait client;
-        ]
-    in
-    let* () = Dac_node.terminate dac_node in
-    return ()
-
   let test_dac_not_ready_without_protocol =
     Protocol.register_test
       ~__FILE__
@@ -1354,8 +1223,9 @@ module Member = struct
     in
     let* _dir = Dac_node.init_config dac_node in
     let* () = run_dac dac_node in
-    (* this call must fail as node is not ready *)
-    let* () = check_not_alive dac_node in
+    (* GET /health/live must succeed *)
+    let* () = check_alive dac_node in
+    (* GET /health/ready must fail *)
     let* () = check_not_ready dac_node in
     let* () = Dac_node.terminate dac_node in
     return ()
@@ -2748,9 +2618,6 @@ let register_with_unsupported_protocol ~protocols =
 let register ~protocols =
   (* Tests with layer1 and dac nodes *)
   Legacy.test_dac_node_startup protocols ;
-  Coordinator.test_dac_not_ready protocols ;
-  Observer.test_dac_not_ready protocols ;
-  Member.test_dac_not_ready protocols ;
   Legacy.test_dac_node_imports_committee_members protocols ;
   Legacy.test_dac_node_dac_threshold_not_reached protocols ;
   scenario_with_layer1_legacy_and_rollup_nodes

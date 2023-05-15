@@ -36,6 +36,14 @@ let starting_node =
     ~level:Notice
     ()
 
+let rpc_server_started =
+  declare_0
+    ~section
+    ~name:"rpc_server_started"
+    ~msg:"DAC Node RPC server is started"
+    ~level:Notice
+    ()
+
 let shutdown_node =
   declare_1
     ~section
@@ -307,6 +315,8 @@ let emit_signature_pushed_to_coordinator signature =
   emit new_signature_pushed_to_coordinator signature
 
 let emit_no_committee_member_address = emit no_committee_member_address
+
+let emit_rpc_started = emit rpc_server_started
 
 let emit_cannot_retrieve_keys_from_address address =
   emit cannot_retrieve_keys_from_address address
