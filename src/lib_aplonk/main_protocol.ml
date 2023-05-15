@@ -341,15 +341,12 @@ struct
     in
     let meta_proofs =
       SMap.mapi
-        (fun circuit_name circuit_inputs ->
-          meta_prove
-            ~main_prover_aux:prover_aux
-            ~meta_pps:pp.meta_pps
-            ~inner_pi_map
-            ~transcript
-            batches
-            circuit_name
-            circuit_inputs)
+        (meta_prove
+           ~main_prover_aux:prover_aux
+           ~meta_pps:pp.meta_pps
+           ~inner_pi_map
+           ~transcript
+           batches)
         inputs
     in
     let cms_answers =
