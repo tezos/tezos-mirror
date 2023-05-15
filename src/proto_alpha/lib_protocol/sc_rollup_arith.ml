@@ -1474,7 +1474,7 @@ module Make (Context : P) :
     | Some (IStore x) -> (
         (* When evaluating an instruction [IStore x], we start by checking if [x]
            is a reserved directive:
-           - "hash:<HASH>", to import a DAC data;
+           - "hash:<HASH>", to import a reveal data;
            - "dal:<LVL>:<SID>:<PID>", to request a Dal page;
            - "out" or "<DESTINATION>%<ENTRYPOINT>", to add a message in the outbox.
            Otherwise, the instruction is interpreted as a directive to store the

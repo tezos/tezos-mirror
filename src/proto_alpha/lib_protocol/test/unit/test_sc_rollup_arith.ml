@@ -311,6 +311,42 @@ let test_evaluation_messages () =
   >>=? fun () ->
   List.iter_es (test_evaluation_message ~valid:false) invalid_messages
 
+let boot_then_reveal_metadata sc_rollup_address origination_level =
+  let open Sc_rollup_PVM_sig in
+  let open Lwt_result_syntax in
+  boot "" @@ fun _ctxt state ->
+  let metadata =
+    Sc_rollup_metadata_repr.{address = sc_rollup_address; origination_level}
+  in
+  let input = Reveal (Metadata metadata) in
+  let*! state = set_input input state in
+  let*! input_state = is_input_state state in
+  match input_state with
+  | Initial -> return state
+  | No_input_required | Needs_reveal _ | First_after _ ->
+      failwith
+        "After booting, the machine should be waiting for the initial input."
+
+let test_reveal () =
+  let open Lwt_result_syntax in
+  let* state =
+    boot_then_reveal_metadata Sc_rollup_repr.Address.zero Raw_level_repr.root
+  in
+  let* state = go ~max_steps:10_000 Waiting_for_input_message state in
+  let raw_data = "1 1 +" in
+  let raw_data_hash =
+    Sc_rollup_reveal_hash.(hash_string ~scheme:Blake2B [raw_data])
+  in
+  let source = "hash:" ^ Sc_rollup_reveal_hash.to_hex raw_data_hash in
+  let input = Sc_rollup_helpers.make_external_input_repr source in
+  let*! state = set_input input state in
+  let* state = go ~max_steps:10_000 Waiting_for_reveal state in
+  let*! state = set_input (Reveal (Raw_data raw_data)) state in
+  let* state = go ~max_steps:10_000 Waiting_for_input_message state in
+  get_stack state >>= function
+  | [2] -> return_unit
+  | _ -> failwith "invalid stack"
+
 let test_output_messages_proofs ~valid ~inbox_level (source, expected_outputs) =
   let open Lwt_result_syntax in
   boot "" @@ fun ctxt state ->
@@ -545,6 +581,7 @@ let tests =
       `Quick
       test_initial_state_hash_arith_pvm;
     Tztest.tztest "Filter internal message" `Quick test_filter_internal_message;
+    Tztest.tztest "Reveal" `Quick test_reveal;
   ]
 
 let () =
