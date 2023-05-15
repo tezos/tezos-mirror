@@ -3811,8 +3811,7 @@ module Block_header : sig
     payload_round : Round.t;
     seed_nonce_hash : Nonce_hash.t option;
     proof_of_work_nonce : bytes;
-    liquidity_baking_toggle_vote :
-      Toggle_votes_repr.liquidity_baking_toggle_vote;
+    toggle_votes : Toggle_votes_repr.toggle_votes;
   }
 
   type protocol_data = {contents : contents; signature : signature}
@@ -4684,33 +4683,45 @@ module Parameters : sig
   val encoding : t Data_encoding.t
 end
 
-(** This module re-exports definitions from {!Toggle_votes_repr} and
-    {!Liquidity_baking_storage}. *)
+(** This module re-exports definitions from {!Toggle_EMA} *)
+module Toggle_EMA : sig
+  type t
+
+  val zero : t
+
+  val to_int32 : t -> Int32.t
+
+  val encoding : t Data_encoding.t
+end
+
+(** This module re-exports definitions from {!Toggle_votes_repr}. *)
+module Toggle_votes : sig
+  type toggle_vote = Toggle_votes_repr.toggle_vote =
+    | Toggle_vote_on
+    | Toggle_vote_off
+    | Toggle_vote_pass
+
+  type toggle_votes = Toggle_votes_repr.toggle_votes = {
+    liquidity_baking_vote : toggle_vote;
+    adaptive_inflation_vote : toggle_vote;
+  }
+
+  val liquidity_baking_vote_encoding : toggle_vote Data_encoding.encoding
+
+  val adaptive_inflation_vote_encoding : toggle_vote Data_encoding.encoding
+
+  val toggle_votes_encoding : toggle_votes Data_encoding.encoding
+
+  val compute_new_ema : toggle_vote:toggle_vote -> Toggle_EMA.t -> Toggle_EMA.t
+end
+
+(** This module re-exports definitions from {!Liquidity_baking_storage}. *)
 module Liquidity_baking : sig
-  type liquidity_baking_toggle_vote =
-        Toggle_votes_repr.liquidity_baking_toggle_vote =
-    | LB_on
-    | LB_off
-    | LB_pass
-
-  val liquidity_baking_toggle_vote_encoding :
-    liquidity_baking_toggle_vote Data_encoding.encoding
-
   val get_cpmm_address : context -> Contract_hash.t tzresult Lwt.t
-
-  module Toggle_EMA : sig
-    type t
-
-    val zero : t
-
-    val to_int32 : t -> Int32.t
-
-    val encoding : t Data_encoding.t
-  end
 
   val on_subsidy_allowed :
     context ->
-    toggle_vote:liquidity_baking_toggle_vote ->
+    toggle_vote:Toggle_votes.toggle_vote ->
     (context -> Contract_hash.t -> (context * 'a list) tzresult Lwt.t) ->
     (context * 'a list * Toggle_EMA.t) tzresult Lwt.t
 end

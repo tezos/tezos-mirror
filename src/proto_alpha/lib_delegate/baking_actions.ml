@@ -284,17 +284,25 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
     state.global_state.config.user_activated_upgrades
   in
   (* Set liquidity_baking_toggle_vote for this block *)
-  let {Baking_configuration.vote_file; liquidity_baking_vote} =
-    state.global_state.config.liquidity_baking
+  let {
+    Baking_configuration.vote_file;
+    liquidity_baking_vote;
+    adaptive_inflation_vote;
+  } =
+    state.global_state.config.toggle_votes
   in
   (* Prioritize reading from the [vote_file] if it exists. *)
-  (match vote_file with
-  | Some per_block_vote_file ->
-      Per_block_vote_file.read_liquidity_baking_toggle_vote_no_fail
-        ~default_liquidity_baking_vote:liquidity_baking_vote
-        ~per_block_vote_file
-  | None -> Lwt.return liquidity_baking_vote)
-  >>= fun liquidity_baking_toggle_vote ->
+  (let default =
+     Protocol.Alpha_context.Toggle_votes.
+       {liquidity_baking_vote; adaptive_inflation_vote}
+   in
+   match vote_file with
+   | Some per_block_vote_file ->
+       Per_block_vote_file.read_toggle_votes_no_fail
+         ~default
+         ~per_block_vote_file
+   | None -> Lwt.return default)
+  >>= fun {liquidity_baking_vote; adaptive_inflation_vote} ->
   (* Cache last toggle vote to use in case of vote file errors *)
   let updated_state =
     {
@@ -305,16 +313,19 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
           config =
             {
               updated_state.global_state.config with
-              liquidity_baking =
+              toggle_votes =
                 {
-                  updated_state.global_state.config.liquidity_baking with
-                  liquidity_baking_vote = liquidity_baking_toggle_vote;
+                  updated_state.global_state.config.toggle_votes with
+                  liquidity_baking_vote;
+                  adaptive_inflation_vote;
                 };
             };
         };
     }
   in
-  Events.(emit vote_for_liquidity_baking_toggle) liquidity_baking_toggle_vote
+  Events.(emit vote_for_liquidity_baking_toggle) liquidity_baking_vote
+  >>= fun () ->
+  Events.(emit vote_for_adaptive_inflation) adaptive_inflation_vote
   >>= fun () ->
   let chain = `Hash state.global_state.chain_id in
   let pred_block = `Hash (predecessor.hash, 0) in
@@ -338,7 +349,8 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
     ~round
     ~seed_nonce_hash
     ~payload_round
-    ~liquidity_baking_toggle_vote
+    ~liquidity_baking_toggle_vote:liquidity_baking_vote
+    ~adaptive_inflation_vote
     ~user_activated_upgrades
     ~force_apply
     state.global_state.config.fees

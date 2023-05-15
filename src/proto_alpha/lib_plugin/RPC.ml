@@ -973,7 +973,8 @@ module Scripts = struct
           mode = application_mode;
           op_count = 0;
           migration_balance_updates = [];
-          liquidity_baking_toggle_ema = Liquidity_baking.Toggle_EMA.zero;
+          liquidity_baking_toggle_ema = Toggle_EMA.zero;
+          adaptive_inflation_toggle_ema = Toggle_EMA.zero;
           implicit_operations_results = [];
         }
     in
@@ -2666,11 +2667,14 @@ module Forge = struct
                    Hex
                    Alpha_context.Constants.proof_of_work_nonce_size)
                 empty_proof_of_work_nonce)
-             Liquidity_baking.(
+             Toggle_votes.(
                dft
-                 "liquidity_baking_toggle_vote"
-                 liquidity_baking_toggle_vote_encoding
-                 LB_pass))
+                 "toggle_votes"
+                 toggle_votes_encoding
+                 {
+                   liquidity_baking_vote = Toggle_vote_pass;
+                   adaptive_inflation_vote = Toggle_vote_pass;
+                 }))
         ~output:(obj1 (req "protocol_data" (bytes Hex)))
         RPC_path.(path / "protocol_data")
   end
@@ -2693,7 +2697,7 @@ module Forge = struct
           payload_round,
           seed_nonce_hash,
           proof_of_work_nonce,
-          liquidity_baking_toggle_vote )
+          toggle_votes )
       ->
         return
           (Data_encoding.Binary.to_bytes_exn
@@ -2703,7 +2707,7 @@ module Forge = struct
                payload_round;
                seed_nonce_hash;
                proof_of_work_nonce;
-               liquidity_baking_toggle_vote;
+               toggle_votes;
              }))
 
   module Manager = struct
@@ -2840,7 +2844,7 @@ module Forge = struct
   let protocol_data ctxt block ?(payload_hash = Block_payload_hash.zero)
       ?(payload_round = Round.zero) ?seed_nonce_hash
       ?(proof_of_work_nonce = empty_proof_of_work_nonce)
-      ~liquidity_baking_toggle_vote () =
+      ~liquidity_baking_toggle_vote ~adaptive_inflation_vote () =
     RPC_context.make_call0
       S.protocol_data
       ctxt
@@ -2850,7 +2854,10 @@ module Forge = struct
         payload_round,
         seed_nonce_hash,
         proof_of_work_nonce,
-        liquidity_baking_toggle_vote )
+        {
+          liquidity_baking_vote = liquidity_baking_toggle_vote;
+          adaptive_inflation_vote;
+        } )
 end
 
 module Parse = struct

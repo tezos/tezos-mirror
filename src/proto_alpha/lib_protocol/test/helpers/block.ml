@@ -168,7 +168,8 @@ module Forge = struct
       ?(proof_of_work_threshold =
         Tezos_protocol_alpha_parameters.Default_parameters.constants_test
           .proof_of_work_threshold) ~payload_hash ~payload_round
-      ?(liquidity_baking_toggle_vote = Liquidity_baking.LB_pass)
+      ?(liquidity_baking_toggle_vote = Toggle_votes.Toggle_vote_pass)
+      ?(adaptive_inflation_vote = Toggle_votes.Toggle_vote_pass)
       ~seed_nonce_hash shell =
     naive_pow_miner
       ~proof_of_work_threshold
@@ -179,7 +180,11 @@ module Forge = struct
           payload_round;
           proof_of_work_nonce = default_proof_of_work_nonce;
           seed_nonce_hash;
-          liquidity_baking_toggle_vote;
+          toggle_votes =
+            {
+              liquidity_baking_vote = liquidity_baking_toggle_vote;
+              adaptive_inflation_vote;
+            };
         }
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash =
@@ -239,7 +244,7 @@ module Forge = struct
 
   let forge_header ?(locked_round = None) ?(payload_round = None)
       ?(policy = By_round 0) ?timestamp ?(operations = [])
-      ?liquidity_baking_toggle_vote pred =
+      ?liquidity_baking_toggle_vote ?adaptive_inflation_vote pred =
     let pred_fitness =
       match Fitness.from_raw pred.header.shell.fitness with
       | Ok pred_fitness -> pred_fitness
@@ -288,6 +293,7 @@ module Forge = struct
     make_contents
       ~seed_nonce_hash
       ?liquidity_baking_toggle_vote
+      ?adaptive_inflation_vote
       ~payload_hash
       ~payload_round
       shell
@@ -298,7 +304,8 @@ module Forge = struct
       ?(proof_of_work_threshold =
         Tezos_protocol_alpha_parameters.Default_parameters.constants_test
           .proof_of_work_threshold) ?seed_nonce_hash
-      ?(liquidity_baking_toggle_vote = Liquidity_baking.LB_pass) ~payload_hash
+      ?(liquidity_baking_toggle_vote = Toggle_votes.Toggle_vote_pass)
+      ?(adaptive_inflation_vote = Toggle_votes.Toggle_vote_pass) ~payload_hash
       ~payload_round shell_header =
     naive_pow_miner
       ~proof_of_work_threshold
@@ -306,7 +313,11 @@ module Forge = struct
       {
         Block_header.proof_of_work_nonce = default_proof_of_work_nonce;
         seed_nonce_hash;
-        liquidity_baking_toggle_vote;
+        toggle_votes =
+          {
+            liquidity_baking_vote = liquidity_baking_toggle_vote;
+            adaptive_inflation_vote;
+          };
         payload_hash;
         payload_round;
       }
@@ -801,7 +812,7 @@ let apply header ?(operations = []) ?(allow_manager_failures = false) pred =
 
 let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
     ?payload_round ?check_size ~baking_mode ?(allow_manager_failures = false)
-    ?liquidity_baking_toggle_vote pred =
+    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote pred =
   let operations =
     match (operation, operations) with
     | Some op, Some ops -> Some (op :: ops)
@@ -816,6 +827,7 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
     ?policy
     ?operations
     ?liquidity_baking_toggle_vote
+    ?adaptive_inflation_vote
     pred
   >>=? fun header ->
   Forge.sign_header header >>=? fun header ->
@@ -830,7 +842,7 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
 
 let bake ?(baking_mode = Application) ?(allow_manager_failures = false)
     ?payload_round ?locked_round ?policy ?timestamp ?operation ?operations
-    ?liquidity_baking_toggle_vote ?check_size pred =
+    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote ?check_size pred =
   bake_with_metadata
     ?payload_round
     ~baking_mode
@@ -841,6 +853,7 @@ let bake ?(baking_mode = Application) ?(allow_manager_failures = false)
     ?operation
     ?operations
     ?liquidity_baking_toggle_vote
+    ?adaptive_inflation_vote
     ?check_size
     pred
   >>=? fun (t, (_metadata : block_header_metadata)) -> return t
@@ -850,40 +863,60 @@ let bake ?(baking_mode = Application) ?(allow_manager_failures = false)
 (* This function is duplicated from Context to avoid a cyclic dependency *)
 let get_constants b = Alpha_services.Constants.all rpc_ctxt b
 
-let bake_n ?(baking_mode = Application) ?policy ?liquidity_baking_toggle_vote n
-    b =
+let bake_n ?(baking_mode = Application) ?policy ?liquidity_baking_toggle_vote
+    ?adaptive_inflation_vote n b =
   List.fold_left_es
-    (fun b _ -> bake ~baking_mode ?policy ?liquidity_baking_toggle_vote b)
+    (fun b _ ->
+      bake
+        ~baking_mode
+        ?policy
+        ?liquidity_baking_toggle_vote
+        ?adaptive_inflation_vote
+        b)
     b
     (1 -- n)
 
 let rec bake_while ?(baking_mode = Application) ?policy
-    ?liquidity_baking_toggle_vote predicate b =
+    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote predicate b =
   let open Lwt_result_syntax in
-  let* new_block = bake ~baking_mode ?policy ?liquidity_baking_toggle_vote b in
+  let* new_block =
+    bake
+      ~baking_mode
+      ?policy
+      ?liquidity_baking_toggle_vote
+      ?adaptive_inflation_vote
+      b
+  in
   if predicate new_block then
     (bake_while [@ocaml.tailcall])
       ~baking_mode
       ?policy
       ?liquidity_baking_toggle_vote
+      ?adaptive_inflation_vote
       predicate
       new_block
   else return b
 
 let bake_until_level ?(baking_mode = Application) ?policy
-    ?liquidity_baking_toggle_vote level b =
+    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote level b =
   bake_while
     ~baking_mode
     ?policy
     ?liquidity_baking_toggle_vote
+    ?adaptive_inflation_vote
     (fun b -> b.header.shell.level <= Raw_level.to_int32 level)
     b
 
 let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
-    ?liquidity_baking_toggle_vote n b =
+    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote n b =
   List.fold_left_es
     (fun (b, balance_updates_rev) _ ->
-      bake_with_metadata ~baking_mode ?policy ?liquidity_baking_toggle_vote b
+      bake_with_metadata
+        ~baking_mode
+        ?policy
+        ?liquidity_baking_toggle_vote
+        ?adaptive_inflation_vote
+        b
       >>=? fun (b, metadata) ->
       let balance_updates_rev =
         List.rev_append metadata.balance_updates balance_updates_rev
@@ -962,11 +995,16 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
   >|=? fun (b, origination_results_rev) -> (b, List.rev origination_results_rev)
 
 let bake_n_with_liquidity_baking_toggle_ema ?(baking_mode = Application) ?policy
-    ?liquidity_baking_toggle_vote n b =
-  let initial_ema = Liquidity_baking.Toggle_EMA.zero in
+    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote n b =
+  let initial_ema = Toggle_EMA.zero in
   List.fold_left_es
     (fun (b, _toggle_ema) _ ->
-      bake_with_metadata ~baking_mode ?policy ?liquidity_baking_toggle_vote b
+      bake_with_metadata
+        ~baking_mode
+        ?policy
+        ?liquidity_baking_toggle_vote
+        ?adaptive_inflation_vote
+        b
       >|=? fun (b, metadata) -> (b, metadata.liquidity_baking_toggle_ema))
     (b, initial_ema)
     (1 -- n)

@@ -147,14 +147,14 @@ let keep_alive_arg =
     ~long:"keep-alive"
     ()
 
-let liquidity_baking_toggle_vote_parameter =
+let toggle_vote_parameter =
   Tezos_clic.parameter
     ~autocomplete:(fun _ctxt -> return ["on"; "off"; "pass"])
-    (let open Protocol.Alpha_context.Liquidity_baking in
+    (let open Protocol.Alpha_context.Toggle_votes in
     fun _ctxt -> function
-      | "on" -> return LB_on
-      | "off" -> return LB_off
-      | "pass" -> return LB_pass
+      | "on" -> return Toggle_vote_on
+      | "off" -> return Toggle_vote_off
+      | "pass" -> return Toggle_vote_pass
       | s ->
           failwith
             "unexpected vote: %s, expected either \"on\", \"off\", or \"pass\"."
@@ -169,7 +169,18 @@ let liquidity_baking_toggle_vote_arg =
        abstain. Note that this \"option\" is mandatory!"
     ~long:"liquidity-baking-toggle-vote"
     ~placeholder:"vote"
-    liquidity_baking_toggle_vote_parameter
+    toggle_vote_parameter
+
+let adaptive_inflation_vote_arg =
+  Tezos_clic.arg
+    ~doc:
+      "Vote to adopt or not the adaptive inflation feature. The possible \
+       values for this option are: \"off\" to request not activating it, \
+       \"on\" to request activating it, and \"pass\" to abstain. If you do not \
+       vote, default value is \"pass\"."
+    ~long:"adaptive-inflation-vote"
+    ~placeholder:"vote"
+    toggle_vote_parameter
 
 let get_delegates (cctxt : Protocol_client_context.full)
     (pkhs : Signature.public_key_hash list) =
@@ -304,7 +315,11 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
                         payload_round = Round.zero;
                         seed_nonce_hash = None;
                         proof_of_work_nonce;
-                        liquidity_baking_toggle_vote = LB_pass;
+                        toggle_votes =
+                          {
+                            liquidity_baking_vote = Toggle_vote_pass;
+                            adaptive_inflation_vote = Toggle_vote_pass;
+                          };
                       })
               in
               let _then = Time.System.now () in
@@ -478,7 +493,7 @@ let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 let baker_args =
-  Tezos_clic.args10
+  Tezos_clic.args11
     pidfile_arg
     minimal_fees_arg
     minimal_nanotez_per_gas_unit_arg
@@ -486,6 +501,7 @@ let baker_args =
     force_apply_switch_arg
     keep_alive_arg
     liquidity_baking_toggle_vote_arg
+    adaptive_inflation_vote_arg
     per_block_vote_file_arg
     operations_arg
     endpoint_arg
@@ -497,24 +513,26 @@ let run_baker
       minimal_nanotez_per_byte,
       force_apply,
       keep_alive,
-      liquidity_baking_toggle_vote,
+      liquidity_baking_vote,
+      adaptive_inflation_vote,
       per_block_vote_file,
       extra_operations,
       dal_node_endpoint ) baking_mode sources cctxt =
   may_lock_pidfile pidfile @@ fun () ->
   (if per_block_vote_file = None then
-   (* If the liquidity baking file was not explicitly given, we
+   (* If the votes file was not explicitly given, we
       look into default locations. *)
    lookup_default_vote_file_path cctxt
   else Lwt.return per_block_vote_file)
   >>= fun per_block_vote_file ->
   (* We don't let the user run the baker without providing some
      option (CLI, file path, or file in default location) for
-     the toggle vote. *)
-  Per_block_vote_file.load_liquidity_baking_config
-    ~per_block_vote_file_arg:per_block_vote_file
-    ~toggle_vote_arg:liquidity_baking_toggle_vote
-  >>=? fun liquidity_baking ->
+     the toggle votes. *)
+  Per_block_vote_file.load_toggle_votes_config
+    ~default_liquidity_baking_vote:liquidity_baking_vote
+    ~default_adaptive_inflation_vote:adaptive_inflation_vote
+    ~per_block_vote_file
+  >>=? fun votes ->
   get_delegates cctxt sources >>=? fun delegates ->
   let context_path =
     match baking_mode with
@@ -527,7 +545,7 @@ let run_baker
     ~minimal_fees
     ~minimal_nanotez_per_gas_unit
     ~minimal_nanotez_per_byte
-    ~liquidity_baking
+    ~votes
     ?extra_operations
     ?dal_node_endpoint
     ~force_apply

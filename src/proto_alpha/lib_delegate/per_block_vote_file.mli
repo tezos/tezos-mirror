@@ -23,12 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module is used to load the baker's liquidity baking vote
+(** This module is used to load the baker's per block votes
     configurations. When a file is given as configuration, its content
     is expected to be a valid JSON matching the following examples:
     - {v {"liquidity_baking_toggle_vote": "on"} v}
     - {v {"liquidity_baking_toggle_vote": "off"} v}
     - {v {"liquidity_baking_toggle_vote": "pass"} v}
+    - {v {"adaptive_inflation_vote": "on"} v}
+    - {v {"adaptive_inflation_vote": "off"} v}
+    - {v {"adaptive_inflation_vote": "pass"} v}
+    - {v {"liquidity_baking_toggle_vote": "on","adaptive_inflation_vote": "on"} v}
+    - {v {"liquidity_baking_toggle_vote": "on","adaptive_inflation_vote": "off"} v}
+    - {v {"liquidity_baking_toggle_vote": "on","adaptive_inflation_vote": "pass"} v}
+    - {v {"liquidity_baking_toggle_vote": "off","adaptive_inflation_vote": "on"} v}
+    - {v {"liquidity_baking_toggle_vote": "off","adaptive_inflation_vote": "off"} v}
+    - {v {"liquidity_baking_toggle_vote": "off","adaptive_inflation_vote": "pass"} v}
+    - {v {"liquidity_baking_toggle_vote": "pass","adaptive_inflation_vote": "on"} v}
+    - {v {"liquidity_baking_toggle_vote": "pass","adaptive_inflation_vote": "off"} v}
+    - {v {"liquidity_baking_toggle_vote": "pass","adaptive_inflation_vote": "pass"} v}
 
     Moreover, in order to handle dynamic voting (i.e. change the
     baker's vote without having to restart it), each time a block is
@@ -52,20 +64,21 @@ type error += Missing_vote_on_startup
     starts. *)
 val default_vote_json_filename : string
 
-(** Reads the content of [per_block_vote_file] and returns a vote. If
+(** Reads the content of [per_block_vote_file] and returns the votes. If
     any error occurs (e.g. Non-existing file, unparsable content,
-    etc.), [default_liquidity_baking_vote] will be returned. *)
-val read_liquidity_baking_toggle_vote_no_fail :
-  default_liquidity_baking_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
+    etc.), given default values will be used to fill the gaps. *)
+val read_toggle_votes_no_fail :
+  default:Toggle_votes.toggle_votes ->
   per_block_vote_file:string ->
-  Liquidity_baking.liquidity_baking_toggle_vote Lwt.t
+  Toggle_votes.toggle_votes Lwt.t
 
 (** Load a liquidity baking configuration given two possible
     arguments. If neither are provided, it fails. Otherwise, it tries,
     in priority, to read the [per_block_vote_file_arg] file if it is
     given and loads a config using its content. Otherwise, the
     [toggle_vote_arg] is used. *)
-val load_liquidity_baking_config :
-  per_block_vote_file_arg:string option ->
-  toggle_vote_arg:Liquidity_baking.liquidity_baking_toggle_vote option ->
-  Baking_configuration.liquidity_baking_config tzresult Lwt.t
+val load_toggle_votes_config :
+  default_liquidity_baking_vote:Toggle_votes.toggle_vote option ->
+  default_adaptive_inflation_vote:Toggle_votes.toggle_vote option ->
+  per_block_vote_file:string option ->
+  Baking_configuration.toggle_votes_config tzresult Lwt.t

@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Tocqueville Group, Inc. <contact@tezos.com>            *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,39 +24,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+(** Exponential moving average of toggle votes. Represented as an int32 between
+    0 and 2,000,000,000. It is an exponential moving average of the "off" votes
+    over a window of the most recent 2000 blocks that did not vote "pass". *)
 
-type unsigned_block = {
-  unsigned_block_header : Block_header.t;
-  operations : Tezos_base.Operation.t list list;
-}
+type t
 
-type simulation_kind =
-  | Filter of Operation_pool.Prioritized.t
-  | Apply of {
-      ordered_pool : Operation_pool.ordered_pool;
-      payload_hash : Block_payload_hash.t;
-    }
+val of_int32 : Int32.t -> t tzresult Lwt.t
 
-type simulation_mode = Local of Context.index | Node
+val zero : t
 
-val forge :
-  #Protocol_client_context.full ->
-  chain_id:Chain_id.t ->
-  pred_info:Baking_state.block_info ->
-  pred_resulting_context_hash:Context_hash.t ->
-  pred_live_blocks:Block_hash.Set.t ->
-  timestamp:Time.Protocol.t ->
-  round:Round.t ->
-  liquidity_baking_toggle_vote:Toggle_votes.toggle_vote ->
-  adaptive_inflation_vote:Toggle_votes.toggle_vote ->
-  user_activated_upgrades:User_activated.upgrades ->
-  Baking_configuration.fees_config ->
-  force_apply:bool ->
-  seed_nonce_hash:Nonce_hash.t option ->
-  payload_round:Round.t ->
-  Baking_state.validation_mode ->
-  simulation_kind ->
-  Constants.Parametric.t ->
-  unsigned_block tzresult Lwt.t
+val to_int32 : t -> Int32.t
+
+val encoding : t Data_encoding.t
+
+val ( < ) : t -> Int32.t -> bool
+
+val update_ema_off : t -> t
+
+val update_ema_on : t -> t
