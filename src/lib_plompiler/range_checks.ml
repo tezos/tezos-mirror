@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* MIT License                                                               *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,64 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Lang_core
-include Lang_stdlib
+module IMap = Map.Make (Int)
 
-module LibResult : sig
-  include LIB
+(* (variable index -> bound) *)
+type t = int IMap.t
 
-  val get_result : 'a repr t -> 'a Input.t
-end = struct
-  include Result
-  include Lib (Result)
-end
+let empty = IMap.empty
 
-module LibCircuit : sig
-  include LIB
+let is_empty = IMap.is_empty
 
-  val deserialize : S.t array -> 'a Input.t -> 'a Input.t
+let mem = IMap.mem
 
-  val get_inputs : 'a repr t -> S.t array * int
+let find_opt = IMap.find_opt
 
-  type cs_result = {
-    nvars : int;
-    free_wires : int list;
-    cs : Csir.CS.t;
-    public_input_size : int;
-    input_com_sizes : int list;
-    tables : Csir.Table.t list;
-    range_checks : (string * (int * int) list) list;
-    solver : Solver.t;
-  }
-  [@@deriving repr]
+let remove = IMap.remove
 
-  val get_cs : ?optimize:bool -> 'a repr t -> cs_result
-end = struct
-  include Circuit
-  include Lib (Circuit)
-end
-
-module Gadget = struct
-  module type HASH = Hash_sig.HASH
-
-  module Anemoi128 = Gadget_anemoi.Anemoi128
-  module AnemoiJive_128_1 = Gadget_anemoi.Make
-  module Poseidon128 = Gadget_poseidon.Poseidon128
-  module Poseidon252 = Gadget_poseidon.Poseidon252
-  module PoseidonFull = Gadget_poseidon.PoseidonFull
-  module Merkle = Gadget_merkle.Make
-  module Merkle_narity = Gadget_merkle_narity
-  module JubjubEdwards = Gadget_edwards.Jubjub
-  module JubjubWeierstrass = Gadget_weierstrass.Jubjub
-  module Schnorr = Gadget_schnorr.Make
-  module Blake2s = Gadget_blake2s.Blake2s
-end
-
-include Gadget
-module Utils = Utils
-module Linear_algebra = Linear_algebra
-module Optimizer = Optimizer
-module Solver = Solver
-module Encodings = Encoding.Encodings
-module Bounded = Bounded
-module Csir = Csir
+let add ~nb_bits i =
+  IMap.update i (function
+      | None -> Some nb_bits
+      | _ ->
+          raise
+            (Invalid_argument
+               (Printf.sprintf
+                  "Range_check : index %d is already range-checked."
+                  i)))

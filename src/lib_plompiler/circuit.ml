@@ -84,6 +84,7 @@ type state = {
   delayed : state -> state * unit repr;
   tables : string list;
   solver : Solver.t;
+  range_checks : Range_checks.t;
   (* label trace *)
   labels : string list;
 }
@@ -505,6 +506,11 @@ module Num = struct
   type nonrec 'a repr = 'a repr
 
   type nonrec 'a t = 'a t
+
+  (* checks that 0 <= (Scalar l) < 2^nb_bits *)
+  let range_check ~nb_bits (Scalar l) s =
+    assert (nb_bits > 0) ;
+    ({s with range_checks = Range_checks.add ~nb_bits l s.range_checks}, Unit)
 
   (* l ≠ 0  <=>  ∃ r ≠ 0 : l * r - 1 = 0 *)
   let assert_nonzero (Scalar l) =
@@ -1417,6 +1423,7 @@ let get f =
         solver = Solver.empty_solver;
         delayed = ret Unit;
         check_wires = [];
+        range_checks = Range_checks.empty;
         labels = [];
       }
   in
@@ -1446,11 +1453,62 @@ type cs_result = {
   public_input_size : int;
   input_com_sizes : int list;
   tables : Csir.Table.t list;
+  (* wire name * (plonk index * bound) *)
+  range_checks : (string * (int * int) list) list;
   solver : Solver.t;
 }
 [@@deriving repr]
 
 let cs_ti_t = Repr.pair Csir.CS.t Optimizer.trace_info_t
+
+(* Converting range-checks (given as a list of (plompiler index * bound)) to
+    something that PlonK can understand : (wire name * (wire index * bound)).
+    We go through each wire & each constraint, we take the plompiler index of
+    this wire at this constraint, and look for it in the plompiler
+    range-checks ; if this index is range-checked, it will be formatted as
+   (wire name * (plonk gate index * bound))
+*)
+let to_plonk_range_checks plomp_range_checks cs =
+  let pending_rc, range_checks =
+    let cs = Array.concat cs in
+    (* This function puts all the range-checks that can be written with the
+       given [wire] in their PlonK form in [all_found_rc], and removes them
+       from [pending_rc] *)
+    let get_wire_range_check (pending_rc, all_found_rc) wire =
+      let pending_rc, found_rc =
+        (* Go through all constraints of the CS *)
+        Array.fold_left
+          (fun (pending_rc, found_rc) (i, (constr : CS.raw_constraint)) ->
+            (* idx is the plompiler index corresponding to [wire] in the [i]-th
+               constraint [constr] *)
+            let idx = constr.wires.(Csir.int_of_wire_name wire) in
+            match Range_checks.find_opt idx pending_rc with
+            | None ->
+                (* [idx] is not range-checked, everything is returned unchanged *)
+                (pending_rc, found_rc)
+            | Some bound ->
+                (* [idx] is range-checked, it’s removed from [pending_rc]
+                   & ([wire] * (index of the gate [idx] * [bound]) is added to
+                   [found_rc] *)
+                let pending_rc = Range_checks.remove idx pending_rc in
+                let found_rc = (i, bound) :: found_rc in
+                (pending_rc, found_rc))
+          (pending_rc, [])
+          (Array.mapi (fun i c -> (i, c)) cs)
+      in
+      (pending_rc, (wire, found_rc) :: all_found_rc)
+    in
+    (* Apply get_wire_range_check for each wire *)
+    List.fold_left
+      get_wire_range_check
+      (plomp_range_checks, [])
+      (List.init Csir.nb_wires_arch Csir.wire_name)
+  in
+  (* We assert that all pending range-checks have been processed *)
+  assert (Range_checks.is_empty pending_rc) ;
+  (* Remove empty lists from range checks, in order to avoid useless iterations
+     in PlonK & make the number of wires range-checked more easily computable *)
+  List.filter (fun (_, r) -> r <> []) range_checks
 
 let get_cs ?(optimize = false) f : cs_result =
   let s, _ = get f in
@@ -1480,6 +1538,7 @@ let get_cs ?(optimize = false) f : cs_result =
       (cs, Solver.append_solver (Updater ti) s.solver, ti.free_wires)
     else (s.cs, s.solver, [])
   in
+  let range_checks = to_plonk_range_checks s.range_checks cs in
   {
     nvars = s.nvars;
     free_wires;
@@ -1488,4 +1547,5 @@ let get_cs ?(optimize = false) f : cs_result =
     public_input_size = s.pi_size;
     input_com_sizes = List.rev s.input_com_sizes;
     solver;
+    range_checks;
   }

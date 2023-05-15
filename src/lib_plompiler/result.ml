@@ -185,6 +185,10 @@ module Num = struct
 
   type nonrec 'a t = 'a t
 
+  let range_check ~nb_bits (S (X x)) s =
+    assert (Z.compare (S.to_z x) Z.(one lsl nb_bits) < 0) ;
+    (s, U)
+
   let assert_nonzero sx =
     let x = of_s sx in
     assert (not S.(x = zero)) ;

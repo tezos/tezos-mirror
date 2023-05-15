@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* MIT License                                                               *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,64 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Lang_core
-include Lang_stdlib
+(* Representation of range-checks in Plompiler
 
-module LibResult : sig
-  include LIB
+   Range checks represent a set of constraints applied to the wires, defining
+   an upper bound that is a power of 2. There is at most one constraint per
+   wire index.
+*)
 
-  val get_result : 'a repr t -> 'a Input.t
-end = struct
-  include Result
-  include Lib (Result)
-end
+type t
 
-module LibCircuit : sig
-  include LIB
+val empty : t
 
-  val deserialize : S.t array -> 'a Input.t -> 'a Input.t
+(* [is_empty rc] returns true if there is no range-checks in [rc], false
+   otherwise *)
+val is_empty : t -> bool
 
-  val get_inputs : 'a repr t -> S.t array * int
+(* [mem i rc] returns true if [i] is range-checked in [rc], false otherwise *)
+val mem : int -> t -> bool
 
-  type cs_result = {
-    nvars : int;
-    free_wires : int list;
-    cs : Csir.CS.t;
-    public_input_size : int;
-    input_com_sizes : int list;
-    tables : Csir.Table.t list;
-    range_checks : (string * (int * int) list) list;
-    solver : Solver.t;
-  }
-  [@@deriving repr]
+(* [find_opt i rc] returns None if [i] is not range-checked in [rc], and
+   [Some nb_bits] otherwise, where [nb_bits] is the logarithm in base 2 of the
+   bound for the value at index [i] *)
+val find_opt : int -> t -> int option
 
-  val get_cs : ?optimize:bool -> 'a repr t -> cs_result
-end = struct
-  include Circuit
-  include Lib (Circuit)
-end
+(* [remove i rc] removes [i] from the indices to range-check given by [rc] *)
+val remove : int -> t -> t
 
-module Gadget = struct
-  module type HASH = Hash_sig.HASH
-
-  module Anemoi128 = Gadget_anemoi.Anemoi128
-  module AnemoiJive_128_1 = Gadget_anemoi.Make
-  module Poseidon128 = Gadget_poseidon.Poseidon128
-  module Poseidon252 = Gadget_poseidon.Poseidon252
-  module PoseidonFull = Gadget_poseidon.PoseidonFull
-  module Merkle = Gadget_merkle.Make
-  module Merkle_narity = Gadget_merkle_narity
-  module JubjubEdwards = Gadget_edwards.Jubjub
-  module JubjubWeierstrass = Gadget_weierstrass.Jubjub
-  module Schnorr = Gadget_schnorr.Make
-  module Blake2s = Gadget_blake2s.Blake2s
-end
-
-include Gadget
-module Utils = Utils
-module Linear_algebra = Linear_algebra
-module Optimizer = Optimizer
-module Solver = Solver
-module Encodings = Encoding.Encodings
-module Bounded = Bounded
-module Csir = Csir
+(* [add ~nb_bits i rc] adds [i] with the bound [2^nb_bits] to [rc].
+   This function raises [Invalid_argument] if the index to add is
+   already range-checked. *)
+val add : nb_bits:int -> int -> t -> t

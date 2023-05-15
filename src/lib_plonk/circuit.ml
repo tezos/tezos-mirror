@@ -95,8 +95,7 @@ module Circuit : sig
 
   val sat : CS.t -> Table.t list -> Scalar.t array -> bool
 
-  val to_plonk :
-    ?range_checks:(int * int) list SMap.t -> Plompiler.LibCircuit.cs_result -> t
+  val to_plonk : Plompiler.LibCircuit.cs_result -> t
 end = struct
   type t = {
     wires : int array array;
@@ -373,8 +372,7 @@ end = struct
       true
     with Constraint_not_satisfied _ -> false
 
-  let to_plonk ?(range_checks = SMap.empty)
-      (cs : Plompiler.LibCircuit.cs_result) =
+  let to_plonk (cs : Plompiler.LibCircuit.cs_result) =
     let open CS in
     let constraints = List.rev Array.(to_list @@ concat cs.cs) in
     assert (constraints <> []) ;
@@ -422,6 +420,7 @@ end = struct
     |> fun (wires, selectors, advice, _) ->
     let gates = SMap.union_disjoint selectors advice in
     let tables = List.map Table.to_list cs.tables in
+    let range_checks = SMap.of_list cs.range_checks in
     make
       ~wires
       ~gates

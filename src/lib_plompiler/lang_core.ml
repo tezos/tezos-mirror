@@ -32,6 +32,8 @@ module type NUM = sig
 
   type 'a t
 
+  val range_check : nb_bits:int -> scalar repr -> unit repr t
+
   val custom :
     ?qc:S.t ->
     ?ql:S.t ->
