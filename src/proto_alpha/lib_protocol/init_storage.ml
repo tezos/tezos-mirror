@@ -145,6 +145,17 @@ let migrate_stake_distribution_for_o ctxt =
       let distr = List.map (fun (pkh, stake) -> (pkh, convert stake)) distr in
       Storage.Stake.Selected_distribution_for_cycle.update ctxt cycle distr)
 
+(** Initializes the total supply at the beginning of O
+    Uses an estimation of the total supply at the activation of O.
+    This value can be refined at the beginning of P to have a
+    perfectly accurate ammount.
+
+    Remove me in P. *)
+let initialize_total_supply_for_o ctxt =
+  Storage.Contract.Total_supply.add
+    ctxt
+    (Tez_repr.of_mutez_exn 940_000_000_000_000L)
+
 let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
     =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
@@ -212,7 +223,8 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
       Raw_level_repr.of_int32 level >>?= fun level ->
       Storage.Tenderbake.First_level_of_protocol.update ctxt level
       >>=? fun ctxt ->
-      migrate_stake_distribution_for_o ctxt >>=? fun ctxt -> return (ctxt, []))
+      migrate_stake_distribution_for_o ctxt >>=? fun ctxt ->
+      initialize_total_supply_for_o ctxt >>= fun ctxt -> return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   List.fold_left_es patch_script ctxt Legacy_script_patches.addresses_to_patch
   >>=? fun ctxt ->
