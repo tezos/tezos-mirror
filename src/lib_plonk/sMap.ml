@@ -172,6 +172,14 @@ module StringMap = struct
 
     let select_answers_by_circuit circuit_name =
       map (filter_by_circuit_name circuit_name)
+
+    let add_map_list_map m1 m2 =
+      mapi
+        (fun k l1 ->
+          match find_opt k m2 with
+          | Some l2 -> List.map2 union_disjoint l1 l2
+          | None -> l1)
+        m1
   end
 end
 
@@ -301,6 +309,9 @@ module type S = sig
        and filters the keys of the inner map, keeping the elements whose key
        corresponds to the given circuit name. *)
     val select_answers_by_circuit : string -> 'a t t -> 'a t t
+
+    (* [add_map_list_map m1 m2] will merge [m1] & [m2] ; the resulting map will contain the same keys as [m1] ; [m1] & [m2] can be disjoint, if a key is not found in [m2], the resulting map contains the same binding as [m1] for this key  *)
+    val add_map_list_map : 'a t list t -> 'a t list t -> 'a t list t
   end
 end
 

@@ -165,9 +165,11 @@ module External = struct
           ])
         [
           [qc; ql; qr; qd; qe];
-          (* FIXME: aPlonk doesn’t work when used with two circuits with different evaluation points for wires *)
-          (* [ql; qlg; Cases.Range_Checks.valid; Cases.Range_Checks.basic]; *)
-          [qc; Cases.Range_Checks.basic];
+          (* FIXME: #5458
+             aPlonk doesn’t work when used with two circuits with different evaluation points for wires
+             I (Anne-Laure) thought the problem was solved when I fixed the number of batches to the max of the circuits but it still fails in verification *)
+          (* [ql; qlg]; *)
+          [qc; Cases.Range_Checks.basic; Cases.Range_Checks.basic];
           [non_zero_values; non_zero_values; zero_values];
           [qlg; qrg; non_zero_values; zero_values];
         ]
