@@ -60,13 +60,15 @@ struct
       - input_com_sizes   : number of input commitment sizes expected by this
                             base circuit
       - nb_proofs         : maximum number of proofs that will be created on
-                            this base circuit *)
+                            this base circuit
+      - nb_rc_wires       : number of range-checked wires *)
   type prover_meta_pp = {
     meta_pp : Main_KZG.prover_public_parameters;
     meta_solver : Plompiler.Solver.t;
     public_input_size : int;
     input_com_sizes : int list;
     nb_proofs : int;
+    nb_rc_wires : int;
   }
   [@@deriving repr]
 
@@ -258,6 +260,7 @@ struct
         public_input_size;
         input_com_sizes;
         nb_proofs;
+        nb_rc_wires = SMap.cardinal circuit.range_checks;
       }
     in
     let verifier_meta_pp =
