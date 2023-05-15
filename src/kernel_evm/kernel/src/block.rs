@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -122,7 +123,7 @@ fn check_nonce<Host: Runtime>(
         evm_execution::account_storage::account_path(&caller.into())
             .map_err(|_| Error::Storage(AccountInitialisation))?;
     let caller_account = evm_account_storage
-        .get_account(host, &caller_account_path)
+        .get(host, &caller_account_path)
         .map_err(|_| Error::Storage(AccountInitialisation))?;
     let caller_nonce = match caller_account {
         Some(account) => account
@@ -230,7 +231,7 @@ mod tests {
         balance: U256,
     ) {
         let mut account = evm_account_storage
-            .get_or_create_account(host, &account_path(address).unwrap())
+            .get_or_create(host, &account_path(address).unwrap())
             .unwrap();
         let current_balance = account.balance(host).unwrap();
         if current_balance > balance {
@@ -250,7 +251,7 @@ mod tests {
         address: &H160,
     ) -> U256 {
         let account = evm_account_storage
-            .get_or_create_account(host, &account_path(address).unwrap())
+            .get_or_create(host, &account_path(address).unwrap())
             .unwrap();
         account.balance(host).unwrap()
     }

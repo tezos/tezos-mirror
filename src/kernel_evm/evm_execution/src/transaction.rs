@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2022 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -63,7 +64,7 @@ pub fn commit_transaction(
 ) -> Result<(), EthereumError> {
     debug_msg!(host, "Commit transaction");
     evm_account_storage
-        .commit(host)
+        .commit_transaction(host)
         .map_err(EthereumError::from)
 }
 
@@ -74,6 +75,6 @@ pub fn rollback_transaction(
 ) -> Result<(), EthereumError> {
     debug_msg!(host, "Rollback transaction");
     evm_account_storage
-        .rollback(host)
+        .rollback_transaction(host)
         .map_err(EthereumError::from)
 }

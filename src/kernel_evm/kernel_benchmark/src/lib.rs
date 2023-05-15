@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -43,7 +44,7 @@ fn setup_faucet<Host: Runtime>(
     let faucet_addr: H160 = H160::from_slice(&hex::decode(FAUCET_ADDR).unwrap());
     let faucet_path = account_path(&faucet_addr).unwrap();
     let mut faucet = evm_account_storage
-        .get_or_create_account(host, &faucet_path)
+        .get_or_create(host, &faucet_path)
         .unwrap();
     if let Ok(b) = faucet.balance(host) {
         if b == primitive_types::U256::zero() {

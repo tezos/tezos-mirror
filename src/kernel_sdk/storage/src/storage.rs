@@ -221,11 +221,11 @@ mod test {
         let a2_name = RefPath::assert_from(b"/beta");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_name)
+            .create_new(&mut host, &a1_name)
             .expect("Unable to get first account")
             .expect("No account in storage");
         let mut a2 = storage
-            .new_account(&mut host, &a2_name)
+            .create_new(&mut host, &a2_name)
             .expect("Unable to get second account")
             .expect("No account in storage");
 
@@ -240,7 +240,7 @@ mod test {
             .expect("Cannot begin transaction");
 
         let mut a = storage
-            .get_account(&host, &a1_name)
+            .get(&host, &a1_name)
             .expect("Cannot get account a1")
             .expect("No account a1 in storage during transaction");
 
@@ -248,19 +248,19 @@ mod test {
         a.set_b(&mut host, "b11");
 
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Cannot commit transaction");
 
         // Assert
         let a11 = storage
-            .get_account(&host, &a1_name)
+            .get(&host, &a1_name)
             .expect("Cannot get account a1")
             .expect("No account a1 in storage after commit");
         assert_eq!(a11.get_a(&host), b"a11");
         assert_eq!(a11.get_b(&host), b"b11");
 
         let a21 = storage
-            .get_account(&host, &a2_name)
+            .get(&host, &a2_name)
             .expect("Cannot get account a1")
             .expect("No account a2 in storage after commit");
         assert_eq!(a21.get_a(&host), b"a2");
@@ -279,11 +279,11 @@ mod test {
         let a2_name = RefPath::assert_from(b"/beta");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_name)
+            .create_new(&mut host, &a1_name)
             .expect("Unable to get first account")
             .expect("No account in storage");
         let mut a2 = storage
-            .new_account(&mut host, &a2_name)
+            .create_new(&mut host, &a2_name)
             .expect("Unable to get second account")
             .expect("No account in storage");
 
@@ -298,7 +298,7 @@ mod test {
             .expect("Cannot begin transaction");
 
         let mut a = storage
-            .get_account(&host, &a1_name)
+            .get(&host, &a1_name)
             .expect("Cannot get account a1")
             .expect("No account a1 in storage during transaction");
 
@@ -306,19 +306,19 @@ mod test {
         a.set_b(&mut host, "b11");
 
         storage
-            .rollback(&mut host)
+            .rollback_transaction(&mut host)
             .expect("Cannot rollback transaction");
 
         // Assert
         let a11 = storage
-            .get_account(&host, &a1_name)
+            .get(&host, &a1_name)
             .expect("Cannot get account a1")
             .expect("No account a1 in storage after commit");
         assert_eq!(a11.get_a(&host), b"a1");
         assert_eq!(a11.get_b(&host), b"b1");
 
         let a21 = storage
-            .get_account(&host, &a2_name)
+            .get(&host, &a2_name)
             .expect("Cannot get account a1")
             .expect("No account a2 in storage after commit");
         assert_eq!(a21.get_a(&host), b"a2");
@@ -337,11 +337,11 @@ mod test {
         let a2_name = RefPath::assert_from(b"/beta");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_name)
+            .create_new(&mut host, &a1_name)
             .expect("Unable to get first account")
             .expect("No account in storage");
         let mut a2 = storage
-            .new_account(&mut host, &a2_name)
+            .create_new(&mut host, &a2_name)
             .expect("Unable to get second account")
             .expect("No account in storage");
 
@@ -356,7 +356,7 @@ mod test {
             .expect("Cannot begin transaction");
 
         let mut a = storage
-            .get_account(&host, &a1_name)
+            .get(&host, &a1_name)
             .expect("Cannot get account a1")
             .expect("No account a1 in storage during transaction");
         a.set_a(&mut host, "a11");
@@ -364,7 +364,7 @@ mod test {
 
         // Test original account content while inside transaction
         let oa = storage
-            .get_original_account(&host, &a1_name)
+            .get_original(&host, &a1_name)
             .expect("Cannot get original account a1")
             .expect("No original account a1 in storage during transaction");
         assert_eq!(oa.get_a(&host), b"a1");
@@ -372,19 +372,19 @@ mod test {
 
         // Commit
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Cannot commit transaction");
 
         // Assert
         let a11 = storage
-            .get_account(&host, &a1_name)
+            .get(&host, &a1_name)
             .expect("Cannot get account a1")
             .expect("No account a1 in storage after commit");
         assert_eq!(a11.get_a(&host), b"a11");
         assert_eq!(a11.get_b(&host), b"b11");
 
         let a21 = storage
-            .get_account(&host, &a2_name)
+            .get(&host, &a2_name)
             .expect("Cannot get account a1")
             .expect("No account a2 in storage after commit");
         assert_eq!(a21.get_a(&host), b"a2");
@@ -409,26 +409,26 @@ mod test {
             .expect("Cannot begin transaction");
 
         let mut a = storage
-            .new_account(&mut host, &a1_name)
+            .create_new(&mut host, &a1_name)
             .expect("Cannot get account a1")
             .expect("No account a1 in storage during transaction");
         a.set_a(&mut host, "a1");
         a.set_b(&mut host, "b1");
 
         let oa = storage
-            .get_original_account(&host, &a1_name)
+            .get_original(&host, &a1_name)
             .expect("Cannot get original account a1");
 
         assert_eq!(oa, None);
 
         // Commit
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Cannot commit transaction");
 
         // Assert
         let a11 = storage
-            .get_account(&host, &a1_name)
+            .get(&host, &a1_name)
             .expect("Cannot get account a1")
             .expect("No account a1 in storage after commit");
         assert_eq!(a11.get_a(&host), b"a1");
@@ -452,7 +452,7 @@ mod test {
 
         // Commit
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Cannot commit transaction");
 
         // Assert
@@ -471,11 +471,11 @@ mod test {
         let a2_name = RefPath::assert_from(b"/beta");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_name)
+            .create_new(&mut host, &a1_name)
             .expect("Unable to get first account")
             .expect("No account in storage");
         let mut a2 = storage
-            .new_account(&mut host, &a2_name)
+            .create_new(&mut host, &a2_name)
             .expect("Unable to get second account")
             .expect("No account in storage");
 
@@ -490,21 +490,19 @@ mod test {
             .expect("Cannot begin transaction");
 
         storage
-            .delete_account(&mut host, &a1_name)
+            .delete(&mut host, &a1_name)
             .expect("Cannot delete account");
 
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Cannot commit transaction");
 
         // Assert
-        let a11 = storage
-            .get_account(&host, &a1_name)
-            .expect("Cannot get account a1");
+        let a11 = storage.get(&host, &a1_name).expect("Cannot get account a1");
         assert_eq!(a11, None);
 
         let a21 = storage
-            .get_account(&host, &a2_name)
+            .get(&host, &a2_name)
             .expect("Cannot get account a1")
             .expect("No account a2 in storage after commit");
         assert_eq!(a21.get_a(&host), b"a2");
@@ -523,11 +521,11 @@ mod test {
         let a2_name = RefPath::assert_from(b"/beta");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_name)
+            .create_new(&mut host, &a1_name)
             .expect("Unable to get first account")
             .expect("No account in storage");
         let mut a2 = storage
-            .new_account(&mut host, &a2_name)
+            .create_new(&mut host, &a2_name)
             .expect("Unable to get second account")
             .expect("No account in storage");
 
@@ -542,25 +540,21 @@ mod test {
             .expect("Cannot begin transaction");
 
         storage
-            .delete_account(&mut host, &a1_name)
+            .delete(&mut host, &a1_name)
             .expect("Cannot delete account a1");
         storage
-            .delete_account(&mut host, &a2_name)
+            .delete(&mut host, &a2_name)
             .expect("Cannot delete account a2");
 
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Cannot commit transaction");
 
         // Assert
-        let a11 = storage
-            .get_account(&host, &a1_name)
-            .expect("Cannot get account a1");
+        let a11 = storage.get(&host, &a1_name).expect("Cannot get account a1");
         assert_eq!(a11, None);
 
-        let a21 = storage
-            .get_account(&host, &a2_name)
-            .expect("Cannot get account a1");
+        let a21 = storage.get(&host, &a2_name).expect("Cannot get account a1");
         assert_eq!(a21, None);
     }
 
@@ -576,11 +570,11 @@ mod test {
         let a2_name = RefPath::assert_from(b"/beta");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_name)
+            .create_new(&mut host, &a1_name)
             .expect("Unable to get first account")
             .expect("No account in storage");
         let mut a2 = storage
-            .new_account(&mut host, &a2_name)
+            .create_new(&mut host, &a2_name)
             .expect("Unable to get second account")
             .expect("No account in storage");
 
@@ -595,26 +589,26 @@ mod test {
             .expect("Cannot begin transaction");
 
         storage
-            .delete_account(&mut host, &a1_name)
+            .delete(&mut host, &a1_name)
             .expect("Cannot delete account a1");
         storage
-            .delete_account(&mut host, &a2_name)
+            .delete(&mut host, &a2_name)
             .expect("Cannot delete account a2");
 
         storage
-            .rollback(&mut host)
+            .rollback_transaction(&mut host)
             .expect("Cannot rollback transaction");
 
         // Assert
         let a11 = storage
-            .get_account(&host, &a1_name)
+            .get(&host, &a1_name)
             .expect("Cannot get account a1")
             .expect("No account a1 in storage after commit");
         assert_eq!(a11.get_a(&host), b"a1");
         assert_eq!(a11.get_b(&host), b"b1");
 
         let a21 = storage
-            .get_account(&host, &a2_name)
+            .get(&host, &a2_name)
             .expect("Cannot get account a1")
             .expect("No account a2 in storage after commit");
         assert_eq!(a21.get_a(&host), b"a2");

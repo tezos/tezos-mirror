@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -62,7 +63,7 @@ fn forge_genesis_mint_account<Host: Runtime>(
     evm_account_storage: &mut EthereumAccountStorage,
 ) -> Result<(), AccountStorageError> {
     let mut account =
-        evm_account_storage.get_or_create_account(host, &account_path(mint_address)?)?;
+        evm_account_storage.get_or_create(host, &account_path(mint_address)?)?;
     account.balance_add(host, balance)
 }
 
@@ -170,7 +171,7 @@ mod tests {
         address: &H160,
     ) -> U256 {
         let account = evm_account_storage
-            .get_or_create_account(host, &account_path(address).unwrap())
+            .get_or_create(host, &account_path(address).unwrap())
             .unwrap();
         account.balance(host).unwrap()
     }
