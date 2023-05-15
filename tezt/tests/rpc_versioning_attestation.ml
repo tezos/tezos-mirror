@@ -107,6 +107,91 @@ let test_forge_preconsensus =
     ~additionnal_tags:["forge"; "operations"; "consensus"; "pre"]
   @@ fun protocol -> test_consensus Operation.Preattestation protocol
 
+let mk_double_consensus_evidence kind use_legacy_name op1 op2 client =
+  let* op1_sign = Operation.sign op1 client in
+  let* op2_sign = Operation.sign op2 client in
+  return
+    (Operation.Anonymous.double_consensus_evidence
+       ~kind
+       ~use_legacy_name
+       (op1, op1_sign)
+       (op2, op2_sign))
+
+let test_double_consensus_evidence double_evidence_kind protocol =
+  let* _node, client = Client.init_with_protocol ~protocol `Client () in
+
+  let create_double_consensus_evidence ~use_legacy_name =
+    let consensus_kind =
+      match double_evidence_kind with
+      | Operation.Anonymous.Double_attestation_evidence -> Operation.Attestation
+      | Operation.Anonymous.Double_preattestation_evidence ->
+          Operation.Preattestation
+    in
+    let consensus_name =
+      Operation.Anonymous.kind_to_string double_evidence_kind use_legacy_name
+    in
+    Log.info "Create an %s operation" consensus_name ;
+
+    let signer = Constant.bootstrap1 in
+    let consensus1 = mk_consensus consensus_kind use_legacy_name in
+    let* op1 = Operation.Consensus.operation ~signer consensus1 client in
+    let consensus2 = mk_consensus ~slot:2 consensus_kind use_legacy_name in
+    let* op2 = Operation.Consensus.operation ~signer consensus2 client in
+    let* double_consensus_evidence =
+      mk_double_consensus_evidence
+        double_evidence_kind
+        use_legacy_name
+        op1
+        op2
+        client
+    in
+    let* double_consensus_evidence_op =
+      Operation.Anonymous.operation double_consensus_evidence client
+    in
+
+    Log.info
+      "Ensures that the generated JSON contains the %s kind"
+      consensus_name ;
+    let consensus_json =
+      JSON.annotate ~origin:__LOC__
+      @@ Operation.json double_consensus_evidence_op
+    in
+    check_kind consensus_json consensus_name ;
+    Lwt.return double_consensus_evidence_op
+  in
+
+  let* legacy_double_consensus_evidence_op =
+    create_double_consensus_evidence ~use_legacy_name:true
+  in
+  let* double_consensus_evidence_op =
+    create_double_consensus_evidence ~use_legacy_name:false
+  in
+  check_hex_from_ops
+    legacy_double_consensus_evidence_op
+    double_consensus_evidence_op
+    client
+
+let test_forge_double_consensus_evidence =
+  register_test
+    ~title:"Forge double consensus evidence operations"
+    ~additionnal_tags:["forge"; "operations"; "consensus"; "double"; "evidence"]
+  @@ fun protocol ->
+  test_double_consensus_evidence
+    Operation.Anonymous.Double_attestation_evidence
+    protocol
+
+let test_forge_double_preconsensus_evidence =
+  register_test
+    ~title:"Forge double pre-consensus evidence operations"
+    ~additionnal_tags:
+      ["forge"; "operations"; "consensus"; "pre"; "double"; "evidence"]
+  @@ fun protocol ->
+  test_double_consensus_evidence
+    Operation.Anonymous.Double_preattestation_evidence
+    protocol
+
 let register ~protocols =
   test_forge_consensus protocols ;
-  test_forge_preconsensus protocols
+  test_forge_preconsensus protocols ;
+  test_forge_double_consensus_evidence protocols ;
+  test_forge_double_preconsensus_evidence protocols
