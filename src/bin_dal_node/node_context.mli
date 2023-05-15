@@ -88,10 +88,17 @@ val get_tezos_node_cctxt : t -> Client_context.full
 (** [get_neighbors_cctxts ctxt] returns the dal node neighbors client contexts *)
 val get_neighbors_cctxts : t -> Dal_node_client.cctxt list
 
-(** [fetch_assigned_shard_indices ctxt ~level ~pkh] fetches from L1 the shard indices assigned to [pkh] at [level].
-    It internally caches the DAL committee with [level] as the key with FIFO strategy. *)
+(** [fetch_assigned_shard_indices ctxt ~level ~pkh] fetches from L1 the shard
+    indices assigned to [pkh] at [level].  It internally caches the DAL
+    committee with [level] as the key with FIFO strategy. *)
 val fetch_assigned_shard_indices :
   t ->
   level:int32 ->
   pkh:Tezos_crypto.Signature.Public_key_hash.t ->
   int list tzresult Lwt.t
+
+(** [fetch_committee ctxt ~level] fetches from L1 the shard indices assigned
+    to all attestors at [level].  It internally caches the DAL committee with
+    [level] as the key with FIFO strategy. *)
+val fetch_committee :
+  t -> level:int32 -> Committee_cache.committee tzresult Lwt.t
