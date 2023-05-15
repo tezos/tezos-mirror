@@ -138,6 +138,8 @@ module Module : sig
 end
 
 module Memory : sig
+  exception Out_of_bounds
+
   module Array : module type of Ctypes.CArray
 
   (** WebAssembly memory *)

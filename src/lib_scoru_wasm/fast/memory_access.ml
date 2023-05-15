@@ -30,21 +30,14 @@ module I32 = Tezos_webassembly_interpreter.I32
 module Wasmer : Host_funcs.Memory_access with type t = Memory.t = struct
   type t = Memory.t
 
-  exception Out_of_bounds
-
-  let translate_array_exception (body : unit -> 'a) : 'a =
-    try body ()
-    with Invalid_argument msg when msg = "index out of bounds" ->
-      raise Out_of_bounds
+  exception Out_of_bounds = Memory.Out_of_bounds
 
   let load_bytes memory address length =
     let address = I32.to_int_u address in
-    translate_array_exception @@ fun () ->
     Lwt.return (Memory.get_string memory ~address ~length)
 
   let store_bytes memory address data =
     let address = I32.to_int_u address in
-    translate_array_exception @@ fun () ->
     Memory.set_string memory ~address ~data ;
     Lwt.return ()
 
@@ -73,7 +66,7 @@ module Wasmer : Host_funcs.Memory_access with type t = Memory.t = struct
         loop (steps - 1) (addr + 1) bits)
     in
 
-    translate_array_exception (fun () -> loop num_bytes abs_addr bits) ;
+    loop num_bytes abs_addr bits ;
 
     Lwt.return ()
 
