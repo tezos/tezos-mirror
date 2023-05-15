@@ -68,6 +68,12 @@ Node
   mempool (however, we are working on providing this information
   again). (MR :gl:`!6787`)
 
+- RPC ``/helpers/forge/operations`` can now take JSON formatted operations with
+  ``attestation``, ``preattestation``, ``double_attestation_evidence`` and
+  ``double_preattestation_evidence`` kinds. Note that the existing kinds
+  ``endorsement``, ``preendorsement``, ``double_endorsement_evidence``, and
+  ``double_preendorsement_evidence`` are still accepted. (MR :gl:`!8746`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
