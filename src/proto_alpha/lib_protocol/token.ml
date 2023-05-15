@@ -98,7 +98,10 @@ let credit ctxt receiver amount origin =
         | `Sc_rollup_refutation_punishments -> Sc_rollup_refutation_punishments
         | `Burned -> Burned
       in
-      return (ctxt, sink)
+      Storage.Contract.Total_supply.get ctxt >>=? fun old_total_supply ->
+      Tez_repr.(old_total_supply -? amount) >>?= fun new_total_supply ->
+      Storage.Contract.Total_supply.update ctxt new_total_supply
+      >|=? fun ctxt -> (ctxt, sink)
   | #container as container -> (
       match container with
       | `Contract receiver ->
@@ -146,7 +149,10 @@ let spend ctxt giver amount origin =
         | `Tx_rollup_rejection_rewards -> Tx_rollup_rejection_rewards
         | `Sc_rollup_refutation_rewards -> Sc_rollup_refutation_rewards
       in
-      return (ctxt, src)
+      Storage.Contract.Total_supply.get ctxt >>=? fun old_total_supply ->
+      Tez_repr.(old_total_supply +? amount) >>?= fun new_total_supply ->
+      Storage.Contract.Total_supply.update ctxt new_total_supply
+      >|=? fun ctxt -> (ctxt, src)
   | #container as container -> (
       match container with
       | `Contract giver ->
