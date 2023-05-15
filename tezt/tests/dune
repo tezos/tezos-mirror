@@ -78,6 +78,7 @@
   src_proto_016_PtMumbai_lib_client_test_tezt_lib
   src_lib_workers_test_tezt_lib
   src_lib_webassembly_tests_tezt_lib
+  src_lib_wasmer_test_tezt_lib
   src_lib_version_test_tezt_lib
   src_lib_tree_encoding_test_tezt_lib
   src_lib_store_unix_test_tezt_lib

@@ -702,6 +702,8 @@ opam:octez-smart-rollup-wasm-debugger:
 
 # Ignoring unreleased package octez-testnet-scenarios.
 
+# Ignoring unreleased package octez-wasmer-test.
+
 # Ignoring unreleased package tezos-016-PtMumbai-test-helpers.
 
 opam:tezos-017-PtNairob-test-helpers:
