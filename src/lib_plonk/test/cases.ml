@@ -458,28 +458,13 @@ module Range_Checks = struct
       (* This circuit takes x₁ & x₂ (given as first elements of d & e) as inputs and
          rangechecks the outputs x₁ + x₂ & 3×x₁ + x₂ given in a
          We also bound x₂ as the first value of e (in order to check bounds on other wires)
-         in order to have enough constraints for the range check poly, we pad until
-         8 constraints
       *)
       let gates =
         Circuit.make_gates
-          ~linear:
-            [
-              (0, ![-1; -1; 0; 0; 0; 0; 0; 0]);
-              (3, ![1; 3; 0; 0; 0; 0; 0; 0]);
-              (4, ![1; 1; 0; 0; 0; 0; 0; 0]);
-            ]
+          ~linear:[(0, ![-1; -1]); (3, ![1; 3]); (4, ![1; 1])]
           ()
       in
-      let wires =
-        [|
-          [2; 3; 0; 0; 0; 0; 0; 0];
-          [0; 0; 0; 0; 0; 0; 0; 0];
-          [0; 0; 0; 0; 0; 0; 0; 0];
-          [0; 0; 0; 0; 0; 0; 0; 0];
-          [1; 1; 0; 0; 0; 0; 0; 0];
-        |]
-      in
+      let wires = [|[2; 3]; [0; 0]; [0; 0]; [0; 0]; [1; 1]|] in
       Circuit.make
         ~wires
         ~gates

@@ -1162,22 +1162,31 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
             nb_lookups;
             ultra;
             gates;
+            range_checks;
             _;
           } nb_proofs =
       (* Computing domain *)
       (* For TurboPlonk, we want a domain of size a power of two
          higher than or equal to the number of constraints plus public inputs.
          As for UltraPlonk, a domain of size stricly higher than the number of constraints
-         (to be sure we pad the last lookup). *)
-      let nb_cs_pi =
-        circuit_size
-        + List.fold_left ( + ) public_input_size input_com_sizes
-        + if ultra then 1 else 0
+         (to be sure we pad the last lookup).
+         For range-checks, we want to ensure that the domain size is greater than the "size" of the "biggest" range-checks
+      *)
+      let nb_max_constraints =
+        let l = List.fold_left ( + ) public_input_size input_com_sizes in
+        SMap.fold
+          (fun _ r acc ->
+            let sum_bounds =
+              (List.fold_left (fun sum (_, bound) -> sum + bound)) 0 r
+            in
+            max acc sum_bounds)
+          range_checks
+          (circuit_size + l + if ultra then 1 else 0)
       in
       (* For UltraPlonk, we want a domain of size a power of two
          higher than the number of records and strictly higher than the number of lookups *)
       let nb_rec_look = if ultra then max (nb_lookups + 1) table_size else 0 in
-      let max_nb = max nb_cs_pi nb_rec_look in
+      let max_nb = max nb_max_constraints nb_rec_look in
       let log = Z.(log2up (of_int max_nb)) in
       let n = Int.shift_left 1 log in
       let pack_size =

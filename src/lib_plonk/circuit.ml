@@ -237,11 +237,7 @@ end = struct
             raise
               (Invalid_argument "Make Circuit: inconsistent range checks keys.") ;
           (List.iter (fun (i, _) ->
-               if
-                 List.exists
-                   (fun l -> i >= circuit_size + l + public_input_size)
-                   input_com_sizes
-               then
+               if i >= circuit_size then
                  raise
                    (Invalid_argument
                       "Make Circuit: inconsistent range checks indices.")))
