@@ -3239,7 +3239,7 @@ module Registration_section = struct
               ~range:{min = 0; max = 29}
               rng_state
           in
-          let time = Random.State.int rng_state (Int.shift_left 1 log_time) in
+          let time = Int.shift_left 1 log_time in
           let plaintext_size =
             Base_samplers.sample_in_interval
               ~range:{min = 1; max = 10000}

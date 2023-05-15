@@ -55,7 +55,7 @@ let read_encoding path enc =
 
 let path = "/tmp"
 
-let time = "1000"
+let time = "1024"
 
 let dummy_chest =
   let rng_state = Random.get_state () in

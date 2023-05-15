@@ -83,9 +83,6 @@ let rsa2048 =
   Z.of_string
     "25195908475657893494027183240048398571429282126204032027777137836043662020707595556264018525880784406918290641249515082189298559149176184502808489120072844992687392807287776735971418347270261896375014971824691165077613379859095700097330459748808428401797429100642458691817195118746121515172654632282216869987549182422433637259085141865462043576798423387184774447920739934236584823824281198163815010674810451660377306056201619676256133844143603833904414952634432190114657544454178424020924616515723350778707749817125772467962926386356373289912154831438167899885040445364023527381951378636564391212010397122822120720357"
 
-(* RSA2048 rsa2048 size. *)
-let size_rsa2048 = 2048
-
 let rsa_public_encoding =
   let open Data_encoding in
   def "timelock.rsa2048"
@@ -386,14 +383,17 @@ end
 (* -------- Sampling functions for gas benchmarks -------- *)
 (* Those function are unsafe for wallet usage as they use the OCaml
    random generator. This is used to easily reproduce benchmarks. *)
+
+let vdf_tuples =
+  Array.map
+    (Data_encoding.Binary.of_string_exn vdf_tuple_encoding)
+    Timelock_precompute.vdf_tuples
+
 let gen_random_bytes_bench_unsafe size =
   Bytes.init size (fun _ -> Char.chr (Random.int 256))
 
-let gen_locked_value_bench_unsafe rsa_public =
-  let gen_random_z_unsafe size =
-    gen_random_bytes_bench_unsafe size |> Bytes.to_string |> Z.of_bits
-  in
-  Z.erem (gen_random_z_unsafe (size_rsa2048 / 8)) rsa_public
+let gen_random_z_unsafe size =
+  gen_random_bytes_bench_unsafe size |> Bytes.to_string |> Z.of_bits
 
 let encrypt_unsafe symmetric_key plaintext =
   let nonce =
@@ -406,11 +406,33 @@ let encrypt_unsafe symmetric_key plaintext =
     payload = Crypto_box.Secretbox.secretbox symmetric_key plaintext nonce;
   }
 
+let proof_of_vdf_tuple_unsafe rsa_public ~time vdf_tuple =
+  if verify_wesolowski rsa_public ~time vdf_tuple then
+    let nonce =
+      gen_random_z_unsafe (128 + (Z.to_bits rsa_public |> String.length))
+    in
+    let randomized_locked_value =
+      Z.powm vdf_tuple.locked_value nonce rsa_public
+    in
+    let proof = {vdf_tuple; nonce} in
+    (randomized_locked_value, proof)
+  else raise (Invalid_argument "Timelock tuple verification failed.")
+
 let chest_sampler ~rng_state ~plaintext_size ~time =
   Random.set_state rng_state ;
   let plaintext = gen_random_bytes_bench_unsafe plaintext_size in
-  let locked_value = gen_locked_value_bench_unsafe rsa2048 in
-  let proof = unlock_and_prove rsa2048 ~time locked_value in
+  (* As we only benchmark the type encodings and the verification function,
+     it is safe to sample chests on known precomputed tuples in order to
+     generate them quickly. As such, we assert here that the time input is a
+     power of 2 lower than 30 (we only precomputed tuples up to that value). *)
+  let locked_value, proof =
+    let log_time = Float.(of_int time |> log2 |> to_int) in
+    let vdf_tuple =
+      if log_time < 30 then vdf_tuples.(log_time)
+      else failwith "Timelock: trying to sample chest with too high time."
+    in
+    proof_of_vdf_tuple_unsafe rsa2048 ~time vdf_tuple
+  in
   let sym_key = timelock_proof_to_symmetric_key rsa2048 proof in
   let ciphertext = encrypt_unsafe sym_key plaintext in
   ({locked_value; rsa_public = rsa2048; ciphertext}, proof)
