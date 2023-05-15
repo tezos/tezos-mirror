@@ -11,10 +11,9 @@
 //   - inputs is an array of array of transactions (as strings)
 //   - see bench1.js
 
-const { sign, clean_input } = require('../lib/signature');
+const { sign } = require('../lib/signature');
+const { legacy_contract_address } = require('../lib/contract');
 
-const rlp = require("rlp");
-const keccak = require("keccak");
 
 const transfer_prototype_json = require('./transfer_prototype.json');
 const create_prototype_json = require('./create_prototype.json');
@@ -37,20 +36,10 @@ exports.transfer = function (playera, playerb, amount) {
     return rawTx.rawTx;
 }
 
-// nonce must be a number !
-const legacy_contract_adress = function (player_address, nonce) {
-    let hex_addr = clean_input(player_address)
-    let rlp_encoded = rlp.encode([hex_addr, nonce]);
-    var contract_address_long = keccak("keccak256")
-        .update(rlp_encoded)
-        .digest("hex");
-    return contract_address_long.substring(24);
-}
-
 exports.create = function (player, amount, data) {
     let tx = { ...create_prototype_json };
     tx.nonce = player.nonce;
-    let address = legacy_contract_adress(player.addr, player.nonce);
+    let address = legacy_contract_address(player.addr, player.nonce);
     player.nonce += 1;
     tx.value = amount;
     tx.data = data;
@@ -99,4 +88,3 @@ exports.encode_number = function (n) {
     var zeroFilled = (s + n.toString(16)).slice(-32)
     return zeroFilled
 }
-
