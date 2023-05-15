@@ -604,6 +604,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
 
   (* generator & n are the subgroup generator & size of the subgroup of identities verification
      check_pi is a function related to PI, given here as argument in order to allow several PI handling forms
+     note that wires & wires_g may also contain RC_Z polynomials
   *)
   let verification_circuit (generator, n) rc_wires check_pi
       {
