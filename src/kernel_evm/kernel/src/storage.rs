@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 #![allow(dead_code)]
 
+use hex::ToHex;
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::path::*;
@@ -176,7 +177,7 @@ pub fn read_current_block<Host: Runtime>(host: &mut Host) -> Result<L2Block, Err
             debug_msg!(
                 host,
                 "Reading block {} at number {} containing {} transaction(s).\n",
-                String::from_utf8(block.hash.as_bytes().to_vec()).expect("INVALID HASH"),
+                block.hash.as_bytes().encode_hex::<String>(),
                 block.number,
                 block.transactions.len()
             );
@@ -260,7 +261,7 @@ pub fn store_current_block<Host: Runtime>(
             debug_msg!(
                 host,
                 "Storing block {} at number {} containing {} transaction(s).\n",
-                String::from_utf8(block.hash.as_bytes().to_vec()).expect("INVALID HASH"),
+                block.hash.as_bytes().encode_hex::<String>(),
                 block.number,
                 block.transactions.len()
             );
