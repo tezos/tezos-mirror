@@ -43,9 +43,11 @@ module type T = sig
 
   type validation_state
 
-  type filter_state
+  type config
 
-  type filter_config
+  val default_config : config
+
+  val config_encoding : config Data_encoding.t
 
   type chain_store
 
@@ -66,7 +68,7 @@ module type T = sig
 
   val pre_filter :
     t ->
-    filter_config ->
+    config ->
     protocol_operation Shell_operation.operation ->
     [ `Passed_prefilter of Prevalidator_pending_operations.priority
     | Prevalidator_classification.error_classification ]
@@ -82,51 +84,64 @@ module type T = sig
     * replacements
 
   val add_operation :
-    t -> filter_config -> protocol_operation operation -> add_result Lwt.t
+    t -> config -> protocol_operation operation -> add_result Lwt.t
 
   val remove_operation : t -> Operation_hash.t -> t
 
   module Internal_for_tests : sig
     val get_mempool_operations : t -> protocol_operation Operation_hash.Map.t
 
-    val get_filter_state : t -> filter_state
-
     type mempool
 
     val set_mempool : t -> mempool -> t
+
+    type bounding_state
+
+    val get_bounding_state : t -> bounding_state
+
+    val set_bounding_state : t -> bounding_state -> t
   end
 end
 
-module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
+module MakeAbstract
+    (Chain_store : CHAIN_STORE)
+    (Filter : Shell_plugin.FILTER)
+    (Bounding : Prevalidator_bounding.T
+                  with type protocol_operation = Filter.Proto.operation) :
   T
     with type protocol_operation = Filter.Proto.operation
      and type validation_state = Filter.Proto.validation_state
-     and type filter_state = Filter.Mempool.state
-     and type filter_config = Filter.Mempool.config
      and type chain_store = Chain_store.chain_store
-     and type Internal_for_tests.mempool = Filter.Proto.Mempool.t = struct
+     and type Internal_for_tests.mempool = Filter.Proto.Mempool.t
+     and type Internal_for_tests.bounding_state = Bounding.state = struct
   module Proto = Filter.Proto
 
   type protocol_operation = Proto.operation
 
   type validation_state = Proto.validation_state
 
-  type filter_state = Filter.Mempool.state
+  type config = Filter.Mempool.config * Prevalidator_bounding.config
 
-  type filter_config = Filter.Mempool.config
+  let default_config =
+    (Filter.Mempool.default_config, Prevalidator_bounding.default_config)
+
+  let config_encoding =
+    Data_encoding.merge_objs
+      Filter.Mempool.config_encoding
+      Prevalidator_bounding.config_encoding
 
   type chain_store = Chain_store.chain_store
 
   type operation = protocol_operation Shell_operation.operation
 
-  type create_aux_t = {
+  type t = {
     validation_info : Proto.Mempool.validation_info;
     mempool : Proto.Mempool.t;
-    head : Block_header.shell_header;
-    context : Tezos_protocol_environment.Context.t;
+    bounding_state : Bounding.state;
+    filter_info : Filter.Mempool.filter_info;
   }
 
-  let create_aux chain_store head timestamp =
+  let create_aux ?old_state chain_store head timestamp =
     let open Lwt_result_syntax in
     let* context = Chain_store.context chain_store head in
     let head_hash = Store.Block.hash head in
@@ -141,35 +156,22 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
     let* validation_info, mempool =
       Proto.Mempool.init context chain_id ~head_hash ~head ~cache:`Lazy
     in
-    return {validation_info; mempool; head; context}
-
-  type t = {
-    validation_info : Proto.Mempool.validation_info;
-    mempool : Proto.Mempool.t;
-    filter_state : Filter.Mempool.state;
-  }
+    let* filter_info =
+      match old_state with
+      | None -> Filter.Mempool.init context ~head
+      | Some old_state -> Filter.Mempool.flush old_state.filter_info ~head
+    in
+    return
+      {validation_info; mempool; bounding_state = Bounding.empty; filter_info}
 
   let create chain_store ~head ~timestamp =
-    let open Lwt_result_syntax in
-    let* {validation_info; mempool; head; context} =
-      create_aux chain_store head timestamp
-    in
-    let* filter_state = Filter.Mempool.init context ~head in
-    return {validation_info; mempool; filter_state}
+    create_aux chain_store head timestamp
 
   let flush chain_store ~head ~timestamp old_state =
-    let open Lwt_result_syntax in
-    let* {validation_info; mempool; head; context = _} =
-      create_aux chain_store head timestamp
-    in
-    let* filter_state = Filter.Mempool.flush old_state.filter_state ~head in
-    return {validation_info; mempool; filter_state}
+    create_aux ~old_state chain_store head timestamp
 
-  let pre_filter state filter_config op =
-    Filter.Mempool.pre_filter
-      ~filter_state:state.filter_state
-      filter_config
-      op.protocol
+  let pre_filter state (filter_config, (_ : Prevalidator_bounding.config)) op =
+    Filter.Mempool.pre_filter state.filter_info filter_config op.protocol
 
   type error_classification = Prevalidator_classification.error_classification
 
@@ -206,7 +208,7 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
                assert false)
 
   let translate_proto_add_result (proto_add_result : Proto.Mempool.add_result)
-      op : (replacement, error_classification) result =
+      op : replacement tzresult =
     let open Result in
     let open Validation_errors in
     match proto_add_result with
@@ -216,61 +218,50 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
           [Operation_replacement {old_hash = removed; new_hash = op.hash}]
         in
         return_some (removed, `Outdated trace)
-    | Unchanged ->
-        error
-          (classification_of_trace [Operation_conflict {new_hash = op.hash}])
+    | Unchanged -> error [Operation_conflict {new_hash = op.hash}]
 
-  (** Call [Filter.Mempool.add_operation_and_enforce_mempool_bound],
-      which ensures that the number of manager operations in the
-      mempool is bounded as specified in [filter_config].
+  (* Analyze the output of [Proto.Mempool.add_operation] to handle a
+     potential operation conflict. Then use the [Bounding] module to
+     ensure that the mempool remains bounded.
 
-      The [state] argument is the prevalidation state (which has not
-      been modified yet). The [mempool] and [proto_add_result] are the
-      results of the protocol's [add_operation].
+     If successful, return the updated [mempool] and [bounding_state],
+     as well as any operation [replacements] caused by either the
+     protocol mempool or the [Bounding] module.
 
-      Maintaining this bound may require the removal of an operation
-      when the mempool was already full. In this case, this operation,
-      called [full_mempool_replacement], must also be removed from the
-      protocol's abstract [mempool].
-
-      Return the updated [state] (containing the updated protocol
-      [mempool]) and [filter_state], and the final [replacements], which
-      may have been mandated either by the protocol's [add_operation]
-      or by [Filter.Mempool.add_operation_and_enforce_mempool_bound]
-      (but not both: if the protocol already causes a replacement, then
-      the mempool is no longer full so there cannot be a
-      [full_mempool_replacement]. *)
-  let enforce_mempool_bound_and_update_states state filter_config
-      (mempool, proto_add_result) op :
-      (t * replacements, error_classification) result Lwt.t =
-    let open Lwt_result_syntax in
-    let*? proto_replacement = translate_proto_add_result proto_add_result op in
-    let* filter_state, full_mempool_replacement =
-      Filter.Mempool.add_operation_and_enforce_mempool_bound
-        ?replace:(Option.map fst proto_replacement)
-        filter_config
-        state.filter_state
-        (op.hash, op.protocol)
+     Note that the [mempool] argument, as part of the output of
+     [Proto.Mempool.add_operation], already contains the new operation
+     (if it has been accepted). So the only update it may need is the
+     removal of any operations replaced during [Bounding.add]. *)
+  let check_conflict_and_bound (mempool, proto_add_result) bounding_state
+      bounding_config op :
+      (Proto.Mempool.t * Bounding.state * replacements) tzresult =
+    let open Result_syntax in
+    let* proto_replacement = translate_proto_add_result proto_add_result op in
+    let bounding_state =
+      match proto_replacement with
+      | None -> bounding_state
+      | Some (replaced, _) -> Bounding.remove_operation bounding_state replaced
+    in
+    let* bounding_state, removed_by_bounding =
+      Option.to_result
+        ~none:[Validation_errors.Rejected_by_full_mempool op.hash]
+        (Bounding.add_operation bounding_state bounding_config op)
     in
     let mempool =
-      match full_mempool_replacement with
-      | `No_replace -> mempool
-      | `Replace (replace_oph, _) ->
-          Proto.Mempool.remove_operation mempool replace_oph
+      List.fold_left Proto.Mempool.remove_operation mempool removed_by_bounding
     in
     let replacements =
-      match (proto_replacement, full_mempool_replacement) with
-      | _, `No_replace -> Option.to_list proto_replacement
-      | None, `Replace repl -> [repl]
-      | Some _, `Replace _ ->
-          (* If there is a [proto_replacement], it gets removed from the
-             mempool before adding [op] so the mempool cannot be full. *)
-          assert false
+      Option.to_list proto_replacement
+      @ List.map
+          (fun removed ->
+            let err = [Validation_errors.Removed_from_full_mempool removed] in
+            (removed, classification_of_trace err))
+          removed_by_bounding
     in
-    return ({state with mempool; filter_state}, replacements)
+    return (mempool, bounding_state, replacements)
 
-  let add_operation_result state filter_config op :
-      (t * operation * classification * replacements) tzresult Lwt.t =
+  let add_operation_result state (filter_config, bounding_config) op :
+      add_result tzresult Lwt.t =
     let open Lwt_result_syntax in
     let conflict_handler = Filter.Mempool.conflict_handler filter_config in
     let* proto_output = proto_add_operation ~conflict_handler state op in
@@ -281,42 +272,49 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
        that the operation is individually valid, in particular its
        signature is correct. We record this so that any future
        signature check can be skipped. *)
-    let op = record_successful_signature_check op in
-    let*! res =
-      enforce_mempool_bound_and_update_states
-        state
-        filter_config
+    let valid_op = record_successful_signature_check op in
+    let res =
+      catch_e @@ fun () ->
+      check_conflict_and_bound
         proto_output
-        op
+        state.bounding_state
+        bounding_config
+        valid_op
     in
     match res with
-    | Ok (state, replacement) -> return (state, op, `Prechecked, replacement)
-    | Error err_class -> return (state, op, (err_class :> classification), [])
+    | Ok (mempool, bounding_state, replacement) ->
+        let state = {state with mempool; bounding_state} in
+        return (state, valid_op, `Prechecked, replacement)
+    | Error trace ->
+        (* We convert any error from [check_conflict_and_bound] into an
+           [add_result] here, rather than let [add_operation] below do
+           the same, so that we can return the updated [valid_op]. *)
+        return (state, valid_op, classification_of_trace trace, [])
 
-  let add_operation state filter_config op : add_result Lwt.t =
+  let add_operation state config op : add_result Lwt.t =
     let open Lwt_syntax in
-    let* res =
-      protect (fun () -> add_operation_result state filter_config op)
-    in
+    let* res = protect (fun () -> add_operation_result state config op) in
     match res with
     | Ok add_result -> return add_result
     | Error trace -> return (state, op, classification_of_trace trace, [])
 
   let remove_operation state oph =
     let mempool = Proto.Mempool.remove_operation state.mempool oph in
-    let filter_state =
-      Filter.Mempool.remove ~filter_state:state.filter_state oph
-    in
-    {state with mempool; filter_state}
+    let bounding_state = Bounding.remove_operation state.bounding_state oph in
+    {state with mempool; bounding_state}
 
   module Internal_for_tests = struct
     let get_mempool_operations {mempool; _} = Proto.Mempool.operations mempool
 
-    let get_filter_state {filter_state; _} = filter_state
-
     type mempool = Proto.Mempool.t
 
     let set_mempool state mempool = {state with mempool}
+
+    type bounding_state = Bounding.state
+
+    let get_bounding_state {bounding_state; _} = bounding_state
+
+    let set_bounding_state state bounding_state = {state with bounding_state}
   end
 end
 
@@ -333,10 +331,9 @@ module Make (Filter : Shell_plugin.FILTER) :
   T
     with type protocol_operation = Filter.Proto.operation
      and type validation_state = Filter.Proto.validation_state
-     and type filter_state = Filter.Mempool.state
-     and type filter_config = Filter.Mempool.config
      and type chain_store = Store.chain_store =
   MakeAbstract (Production_chain_store) (Filter)
+    (Prevalidator_bounding.Make (Filter.Proto))
 
 module Internal_for_tests = struct
   module type CHAIN_STORE = CHAIN_STORE

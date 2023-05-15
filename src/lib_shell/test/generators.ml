@@ -113,8 +113,9 @@ let priority_gen () : Prevalidator_pending_operations.priority QCheck2.Gen.t =
 let operation_with_hash_gen ?proto_gen ?block_hash_t () :
     unit operation QCheck2.Gen.t =
   let open QCheck2.Gen in
+  let* signature_checked = bool in
   let+ oph, op = raw_operation_with_hash_gen ?proto_gen ?block_hash_t () in
-  Internal_for_tests.make_operation op oph ()
+  Internal_for_tests.make_operation ~signature_checked oph op ()
 
 let operation_with_hash_and_priority_gen ?proto_gen ?block_hash_t () :
     (unit operation * Prevalidator_pending_operations.priority) QCheck2.Gen.t =
