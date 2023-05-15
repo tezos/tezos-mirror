@@ -30,11 +30,6 @@ open Plonk.Bls
 
 let nb_wires = Plompiler.Csir.nb_wires_arch
 
-(* Applies the function [f] to the last element of the list [l] *)
-let map_end f l =
-  let n = List.length l in
-  List.mapi (fun i x -> if i = n - 1 then f x else x) l
-
 module V (Main : Aggregation.Main_protocol.S) = struct
   module Gates = Main.Gates
   module Perm = Main.Perm
@@ -559,7 +554,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
             w_list @ List.init (to_pad * nb_wires) (Fun.const S.zero))
           wires_list
       in
-      map_end pad_wires answers |> List.flatten |> List.flatten
+      Plonk.List.map_end pad_wires answers |> List.flatten |> List.flatten
     in
     (padded_inner_pi, padded_answers)
 
