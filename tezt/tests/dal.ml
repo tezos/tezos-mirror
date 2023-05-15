@@ -496,8 +496,11 @@ let dal_attestation ?level ?(force = false) ~signer ~nb_slots availability
         let* level = Client.level client in
         return @@ (level + 1)
   in
-  Operation.Consensus.(
-    inject ~force ~signer (dal_attestation ~level ~attestation) client)
+  Operation.Consensus.inject
+    ~force
+    ~signer
+    (Operation.Consensus.dal_attestation ~level ~attestation)
+    client
 
 let dal_attestations ?level ?force
     ?(signers = Array.to_list Account.Bootstrap.keys) ~nb_slots availability
