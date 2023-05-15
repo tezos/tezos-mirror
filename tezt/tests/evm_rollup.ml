@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,11 +28,10 @@
 (* Testing
    -------
    Component:    Smart Optimistic Rollups: EVM Kernel
-   Requirement:  make -f kernels.mk build-kernels
+   Requirement:  make -f kernels.mk build
                  npm install eth-cli
    Invocation:   dune exec tezt/tests/main.exe -- --file evm_rollup.ml
 *)
-
 open Sc_rollup_helpers
 
 let pvm_kind = "wasm_2_0_0"
@@ -49,13 +49,76 @@ type full_evm_setup = {
   evm_proxy_server : Evm_proxy_server.t;
 }
 
-let hex_encode (input : string) : string =
-  match Hex.of_string input with `Hex s -> s
+let hex_256_of n = Printf.sprintf "%064x" n
+
+let no_0x s =
+  if String.starts_with ~prefix:"0x" s then String.sub s 2 (String.length s - 2)
+  else s
 
 let evm_proxy_server_version proxy_server =
   let endpoint = Evm_proxy_server.endpoint proxy_server in
   let get_version_url = endpoint ^ "/version" in
   RPC.Curl.get get_version_url
+
+let get_transaction_status ~endpoint ~tx =
+  let* receipt = Eth_cli.get_receipt ~endpoint ~tx in
+  match receipt with
+  | None -> failwith "no transaction receipt, it probably isn't mined yet."
+  | Some r -> return r.status
+
+let check_tx_succeeded ~endpoint ~tx =
+  let* status = get_transaction_status ~endpoint ~tx in
+  Check.(is_true status) ~error_msg:"Expected transaction to succeed." ;
+  unit
+
+let check_tx_failed ~endpoint ~tx =
+  let* status = get_transaction_status ~endpoint ~tx in
+  Check.(is_false status) ~error_msg:"Expected transaction to fail." ;
+  unit
+
+(** [get_value_in_storage client addr nth] fetch the [nth] value in the storage
+    of account [addr]  *)
+let get_value_in_storage sc_rollup_client address nth =
+  Sc_rollup_client.inspect_durable_state_value
+    ~hooks
+    sc_rollup_client
+    ~pvm_kind
+    ~operation:Sc_rollup_client.Value
+    ~key:
+      (Printf.sprintf
+         "/evm/eth_accounts/%s/storage/%064x"
+         (String.lowercase_ascii @@ no_0x address)
+         nth)
+
+let check_str_in_storage ~evm_setup ~address ~nth ~expected =
+  let*! value = get_value_in_storage evm_setup.sc_rollup_client address nth in
+  Check.((value = Some expected) (option string))
+    ~error_msg:"Unexpected value in storage, should be %R, but got %L" ;
+  unit
+
+let check_nb_in_storage ~evm_setup ~address ~nth ~expected =
+  check_str_in_storage ~evm_setup ~address ~nth ~expected:(hex_256_of expected)
+
+let get_storage_size sc_rollup_client ~address =
+  let*! storage =
+    Sc_rollup_client.inspect_durable_state_value
+      ~hooks
+      sc_rollup_client
+      ~pvm_kind
+      ~operation:Sc_rollup_client.Subkeys
+      ~key:
+        (Printf.sprintf
+           "/evm/eth_accounts/%s/storage"
+           (String.lowercase_ascii @@ no_0x address))
+  in
+  return (List.length storage)
+
+let check_storage_size sc_rollup_client ~address size =
+  (* check storage size *)
+  let* storage_size = get_storage_size sc_rollup_client ~address in
+  Check.((storage_size = size) int)
+    ~error_msg:"Unexpected storage size, should be %R, but is %L" ;
+  unit
 
 (** [next_evm_level ~sc_rollup_node ~node ~client] moves [sc_rollup_node] to
     the [node]'s next level. *)
@@ -66,10 +129,6 @@ let next_evm_level ~sc_rollup_node ~node ~client =
     sc_rollup_node
     (Node.get_level node)
 
-(** [wait_for_application ~sc_rollup_node ~node ~client apply ()] tries to
-[apply] an operation and in parallel moves [sc_rollup_node] to the [node]'s next
-level until either the operation succeeded (in which case it stops) or a given
-number of level has passed (in which case it fails). *)
 let wait_for_application ~sc_rollup_node ~node ~client apply () =
   let* start_level = Client.level client in
   let max_iteration = 10 in
@@ -164,6 +223,34 @@ let setup_mockup () =
   let evm_proxy_server = Evm_proxy_server.mockup () in
   let* () = Evm_proxy_server.run evm_proxy_server in
   return evm_proxy_server
+
+type contract = {label : string; abi : string; bin : string}
+
+let deploy ~contract ~sender full_evm_setup =
+  let {node; client; sc_rollup_node; evm_proxy_server; _} = full_evm_setup in
+  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* () = Eth_cli.add_abi ~label:contract.label ~abi:contract.abi () in
+  let send_deploy () =
+    Eth_cli.deploy
+      ~source_private_key:sender.Eth_account.private_key
+      ~endpoint:evm_proxy_server_endpoint
+      ~abi:contract.label
+      ~bin:contract.bin
+  in
+  wait_for_application ~sc_rollup_node ~node ~client send_deploy ()
+
+let send ~sender ~receiver ~value ?data full_evm_setup =
+  let {node; client; sc_rollup_node; evm_proxy_server; _} = full_evm_setup in
+  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let send =
+    Eth_cli.transaction_send
+      ~source_private_key:sender.Eth_account.private_key
+      ~to_public_key:receiver.Eth_account.address
+      ~value
+      ~endpoint:evm_proxy_server_endpoint
+      ?data
+  in
+  wait_for_application ~sc_rollup_node ~node ~client send ()
 
 let test_evm_proxy_server_connection =
   Protocol.register_test
@@ -404,33 +491,45 @@ let test_l2_blocks_progression =
   let* () = check_block_progression ~expected_block_level:3 in
   unit
 
-let test_l2_deploy =
+(** The info for the "storage.sol" contract.
+    See [src\kernel_evm\solidity_examples] *)
+let simple_storage =
+  {
+    label = "simpleStorage";
+    abi = kernel_inputs_path ^ "/storage_abi.json";
+    bin = kernel_inputs_path ^ "/storage.bin";
+  }
+
+(** The info for the "erc20tok.sol" contract.
+    See [src\kernel_evm\solidity_examples] *)
+let erc20 =
+  {
+    label = "erc20tok";
+    abi = kernel_inputs_path ^ "/erc20tok_abi.json";
+    bin = kernel_inputs_path ^ "/erc20tok.bin";
+  }
+
+(** Test that the contract creation works.  *)
+let test_l2_deploy_simple_storage =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "l2_deploy"]
     ~title:"Check L2 contract deployment"
   @@ fun protocol ->
-  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
-  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
-  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* ({sc_rollup_client; evm_proxy_server; _} as full_evm_setup) =
+    setup_past_genesis protocol
+  in
+  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* () =
-    Eth_cli.add_abi
-      ~label:"simpleStorage"
-      ~abi:(kernel_inputs_path ^ "/storage_abi.json")
-      ()
+  let* contract_address, tx =
+    deploy ~contract:simple_storage ~sender full_evm_setup
   in
-  let contract_compiled_file = kernel_inputs_path ^ "/storage.bin" in
-  let send_deploy () =
-    Eth_cli.deploy
-      ~source_private_key:sender.private_key
-      ~endpoint:evm_proxy_server_endpoint
-      ~abi:"simpleStorage"
-      ~bin:contract_compiled_file
-  in
-  let* contract_address, tx_hash =
-    wait_for_application ~sc_rollup_node ~node ~client send_deploy ()
-  in
+  let address = String.lowercase_ascii contract_address in
+  Check.(
+    (address = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344")
+      string
+      ~error_msg:"Expected address to be %R but was %L.") ;
+
   let* code_in_kernel =
     Evm_proxy_server.fetch_contract_code evm_proxy_server contract_address
   in
@@ -443,26 +542,211 @@ let test_l2_deploy =
     ~error_msg:"Unexpected code %L, it should be %R" ;
   (* The transaction was a contract creation, the transaction object
      must not contain the [to] field. *)
-  let* tx_object =
-    Eth_cli.transaction_get ~endpoint:evm_proxy_server_endpoint ~tx_hash
-  in
+  let* tx_object = Eth_cli.transaction_get ~endpoint ~tx_hash:tx in
   (match tx_object with
   | Some tx_object ->
       Check.((tx_object.to_ = None) (option string))
         ~error_msg:
           "The transaction object of a contract creation should not have the \
            [to] field present"
-  | None -> Test.fail "The transaction object of %s should be available" tx_hash) ;
+  | None -> Test.fail "The transaction object of %s should be available" tx) ;
+
+  let*! accounts =
+    Sc_rollup_client.inspect_durable_state_value
+      ~hooks
+      sc_rollup_client
+      ~pvm_kind
+      ~operation:Sc_rollup_client.Subkeys
+      ~key:"/evm/eth_accounts"
+  in
+  (* check tx status*)
+  let* () = check_tx_succeeded ~endpoint ~tx in
+
+  (* check contract account was created *)
+  Check.(
+    list_mem
+      string
+      (String.lowercase_ascii @@ no_0x contract_address)
+      (List.map String.lowercase_ascii accounts)
+      ~error_msg:"Expected %L account to be initialized by contract creation.") ;
+  unit
+
+(** Test that a contract can be called,
+    and that the call can modify the storage.  *)
+let test_l2_call_simple_storage =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "l2_deploy"; "l2_call"]
+    ~title:"Check L2 contract call"
+  @@ fun protocol ->
+  (* setup *)
+  let* ({sc_rollup_node; node; client; evm_proxy_server; sc_rollup_client; _} as
+       evm_setup) =
+    setup_past_genesis protocol
+  in
+  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+
+  (* deploy contract *)
+  let* address, _tx = deploy ~contract:simple_storage ~sender evm_setup in
+
+  (* calls the set method *)
+  let call_set (sender : Eth_account.t) n =
+    Eth_cli.call
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:simple_storage.label
+      ~address
+      ~method_call:(Printf.sprintf "set(%d)" n)
+  in
+
+  (* set 42 *)
+  let* tx =
+    wait_for_application ~sc_rollup_node ~node ~client (call_set sender 42) ()
+  in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+
+  let* () = check_storage_size sc_rollup_client ~address 1 in
+  let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:42 in
+
+  (* set 24 by another user *)
+  let* tx =
+    wait_for_application
+      ~sc_rollup_node
+      ~node
+      ~client
+      (call_set Eth_account.bootstrap_accounts.(1) 24)
+      ()
+  in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+
+  let* () = check_storage_size sc_rollup_client ~address 1 in
+  (* value stored has changed *)
+  let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:24 in
+
+  (* set -1 *)
+  (* some environments prevent sending a negative value, as the value is
+     unsigned (eg remix) but it is actually the expected result *)
+  let* tx =
+    wait_for_application ~sc_rollup_node ~node ~client (call_set sender (-1)) ()
+  in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+
+  let* () = check_storage_size sc_rollup_client ~address 1 in
+  (* value stored has changed *)
+  let* () =
+    check_str_in_storage
+      ~evm_setup
+      ~address
+      ~nth:0
+      ~expected:
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  in
+  unit
+
+let test_l2_deploy_erc20 =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "l2_deploy"; "erc20"; "l2_call"]
+    ~title:"Check L2 erc20 contract deployment"
+  @@ fun protocol ->
+  (* setup *)
+  let* ({sc_rollup_client; evm_proxy_server; node; client; sc_rollup_node; _} as
+       evm_setup) =
+    setup_past_genesis protocol
+  in
+  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let player = Eth_account.bootstrap_accounts.(1) in
+
+  (* deploy the contract *)
+  let* address, tx = deploy ~contract:erc20 ~sender evm_setup in
+  Check.(
+    (String.lowercase_ascii address
+    = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344")
+      string
+      ~error_msg:"Expected address to be %R but was %L.") ;
+
+  (* check tx status *)
+  let* () = check_tx_succeeded ~endpoint ~tx in
+
+  (* check account was created *)
+  let*! accounts =
+    Sc_rollup_client.inspect_durable_state_value
+      ~hooks
+      sc_rollup_client
+      ~pvm_kind
+      ~operation:Sc_rollup_client.Subkeys
+      ~key:"/evm/eth_accounts"
+  in
+  Check.(
+    list_mem
+      string
+      (no_0x @@ String.lowercase_ascii address)
+      (List.map String.lowercase_ascii accounts)
+      ~error_msg:"Expected %L account to be initialized by contract creation.") ;
+
+  (* minting / burning *)
+  let call_mint (sender : Eth_account.t) n =
+    Eth_cli.call
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:erc20.label
+      ~address
+      ~method_call:(Printf.sprintf "mint(%d)" n)
+  in
+  let call_burn ?(expect_failure = false) (sender : Eth_account.t) n =
+    Eth_cli.call
+      ~expect_failure
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:erc20.label
+      ~address
+      ~method_call:(Printf.sprintf "burn(%d)" n)
+  in
+
+  (* sender mints 42 *)
+  let* tx =
+    wait_for_application ~sc_rollup_node ~node ~client (call_mint sender 42) ()
+  in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+
+  (* totalSupply is the first value in storage *)
+  let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:42 in
+
+  (* player mints 100 *)
+  let* tx =
+    wait_for_application ~sc_rollup_node ~node ~client (call_mint player 100) ()
+  in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+  (* totalSupply is the first value in storage *)
+  let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:142 in
+
+  (* sender tries to burn 100, should fail *)
+  let* _tx =
+    wait_for_application
+      ~sc_rollup_node
+      ~node
+      ~client
+      (call_burn ~expect_failure:true sender 100)
+      ()
+  in
+  let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:142 in
+
+  (* sender tries to burn 42, should succeed *)
+  let* tx =
+    wait_for_application ~sc_rollup_node ~node ~client (call_burn sender 42) ()
+  in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+  let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:100 in
   unit
 
 let transfer ?data protocol =
-  let* {node; client; sc_rollup_node; evm_proxy_server; _} =
+  let* ({evm_proxy_server; _} as full_evm_setup) =
     setup_past_genesis protocol
   in
-  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
-  let balance account =
-    Eth_cli.balance ~account ~endpoint:evm_proxy_server_endpoint
-  in
+  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let balance account = Eth_cli.balance ~account ~endpoint in
   let sender, receiver =
     (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
   in
@@ -471,18 +755,8 @@ let transfer ?data protocol =
   let* sender_nonce = get_transaction_count evm_proxy_server sender.address in
   (* We always send less than the balance, to ensure it always works. *)
   let value = Wei.(sender_balance - one) in
-  let* tx_hash =
-    send_and_wait_until_tx_mined
-      ~sc_rollup_node
-      ~node
-      ~client
-      ~source_private_key:sender.private_key
-      ~to_public_key:receiver.address
-      ~value
-      ?data
-      ~evm_proxy_server_endpoint
-      ()
-  in
+  let* tx = send ~sender ~receiver ~value ?data full_evm_setup in
+  let* () = check_tx_succeeded ~endpoint ~tx in
   let* new_sender_balance = balance sender.address in
   let* new_receiver_balance = balance receiver.address in
   let* new_sender_nonce =
@@ -499,14 +773,11 @@ let transfer ?data protocol =
       "Unexpected sender nonce after transfer, should be %R, but got %L" ;
   (* Perform some sanity checks on the transaction object produced by the
      kernel. *)
-  let* tx_object =
-    Eth_cli.transaction_get ~endpoint:evm_proxy_server_endpoint ~tx_hash
-  in
+  let* tx_object = Eth_cli.transaction_get ~endpoint ~tx_hash:tx in
   let tx_object =
     match tx_object with
     | Some tx_object -> tx_object
-    | None ->
-        Test.fail "The transaction object of %s should be available" tx_hash
+    | None -> Test.fail "The transaction object of %s should be available" tx
   in
   Check.((tx_object.from = sender.address) string)
     ~error_msg:"Unexpected transaction's sender" ;
@@ -631,7 +902,7 @@ let test_full_blocks =
     | Full txs -> txs
   in
   List.iter
-    (fun tx ->
+    (fun (tx : Transaction.transaction_object) ->
       let index = tx.Transaction.transactionIndex |> Int32.to_int in
       Check.(
         (tx.Transaction.hash
@@ -700,12 +971,14 @@ let register_evm_proxy_server ~protocols =
   test_l2_blocks_progression protocols ;
   test_l2_transfer protocols ;
   test_chunked_transaction protocols ;
-  test_l2_deploy protocols ;
   test_rpc_txpool_content protocols ;
   test_rpc_web3_clientVersion protocols ;
   test_simulate protocols ;
   test_full_blocks protocols ;
   test_latest_block protocols ;
-  test_eth_call_nullable_recipient protocols
+  test_eth_call_nullable_recipient protocols ;
+  test_l2_deploy_simple_storage protocols ;
+  test_l2_call_simple_storage protocols ;
+  test_l2_deploy_erc20 protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols

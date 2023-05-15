@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,18 +26,23 @@
 
 let path = "eth"
 
+let spawn_command_and_read_string ?expect_failure command =
+  let process = Process.spawn path command in
+  Process.check_and_read_stdout ?expect_failure process
+
+let spawn_command ?expect_failure command =
+  let process = Process.spawn path command in
+  let* output = Process.check ?expect_failure process in
+  return output
+
+let spawn_command_and_read_json_opt command decode =
+  let* output = spawn_command_and_read_string command in
+  let json = JSON.parse ~origin:"eth-cli RPC" output in
+  if JSON.is_null json then return None else json |> decode |> some
+
 let spawn_command_and_read_json command decode =
-  let process = Process.spawn path command in
-  let* output = Process.check_and_read_stdout process in
-  return (JSON.parse ~origin:"eth_spawn_command" output |> decode)
-
-let spawn_command_and_read_string command =
-  let process = Process.spawn path command in
-  Process.check_and_read_stdout process
-
-let spawn_command command =
-  let process = Process.spawn path command in
-  Process.check process
+  let* opt = spawn_command_and_read_json_opt command decode in
+  match opt with Some v -> return v | None -> failwith "No value to decode"
 
 let balance ~account ~endpoint =
   let* balance =
@@ -64,17 +70,9 @@ let transaction_send ~source_private_key ~to_public_key ~value ~endpoint ?data
     JSON.as_string
 
 let transaction_get ~endpoint ~tx_hash =
-  let* output =
-    spawn_command_and_read_string
-      ["transaction:get"; tx_hash; "--network"; endpoint]
-  in
-  let output = String.trim output in
-  if output = "null" then return None
-  else
-    return
-      (Some
-         (JSON.parse ~origin:"transaction_get" output
-         |> Transaction.transaction_object_of_json))
+  spawn_command_and_read_json_opt
+    ["transaction:get"; tx_hash; "--network"; endpoint]
+    Transaction.transaction_object_of_json
 
 let get_block ~block_id ~endpoint =
   spawn_command_and_read_json
@@ -109,3 +107,24 @@ let deploy ~source_private_key ~endpoint ~abi ~bin =
       bin;
     ]
     decode
+
+let call ?(expect_failure = false) ~source_private_key ~endpoint ~abi_label
+    ~address ~method_call () =
+  let command =
+    [
+      "contract:send";
+      "--pk";
+      source_private_key;
+      "--network";
+      endpoint;
+      Format.sprintf "%s@%s" abi_label address;
+      method_call;
+    ]
+  in
+  if expect_failure then spawn_command_and_read_string ~expect_failure command
+  else spawn_command_and_read_json command JSON.as_string
+
+let get_receipt ~endpoint ~tx =
+  spawn_command_and_read_json_opt
+    ["transaction:get"; tx; "--network"; endpoint]
+    (fun j -> JSON.(j |-> "receipt") |> Transaction.transaction_receipt_of_json)
