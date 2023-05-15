@@ -1,15 +1,17 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
 //! Transaction layers
 //!
-//! Account storage is kept in layers - one on top of another. The bottom layer
+//! Transactional storage is kept in layers - one on top of another. The bottom layer
 //! holds the "original" values for each account.
 //!
 //! Each time a transaction is created with `begin_transaction`, a new layer
-//! is added to the top of the layer stack. `rollback` will delete the top layer,
-//! and `commit` moves the top layer back into the previous one (overwriting it).
+//! is added to the top of the layer stack. `rollback_transaction` will delete
+//! the top layer, and `commit_transaction` moves the top layer back into the
+//! previous one (overwriting it).
 //!
 //! This allows transactions to be arbitrarily nested.
 
@@ -92,11 +94,11 @@ impl<T: From<OwnedPath>> Layer<T> {
         }
     }
 
-    /// Create new, empty account
+    /// Create new, empty stored object
     ///
-    /// Create a new account in the current layer. Note that the data for the new
-    /// account will only be written when the account object does so.
-    pub(crate) fn new_account(
+    /// Create a new object in the current layer. Note that the data will only be written
+    /// when the object does so.
+    pub(crate) fn create_new(
         &mut self,
         host: &impl Runtime,
         id: &impl Path,
@@ -110,12 +112,11 @@ impl<T: From<OwnedPath>> Layer<T> {
         }
     }
 
-    /// Get existing account
+    /// Get existing object
     ///
-    /// Get an account from the current layer. This checks that the account data
-    /// actually exists, ie, that there is some data in durable storage for the account
-    /// in this layer.
-    pub(crate) fn get_account(
+    /// Get an object from the current layer. This checks that the data actually exists, ie,
+    /// that there is some data in durable storage for the object in this layer.
+    pub(crate) fn get(
         &self,
         host: &impl Runtime,
         id: &impl Path,
@@ -129,26 +130,26 @@ impl<T: From<OwnedPath>> Layer<T> {
         }
     }
 
-    /// Get or create a new account
+    /// Get or create a new object
     ///
-    /// If no account exists at the path given, then create a new account and return that
+    /// If no object exists at the path given, then create a new object and return that
     /// instead. (Use case).
-    pub(crate) fn get_or_create_account(
+    pub(crate) fn get_or_create(
         &self,
         _host: &impl Runtime,
         id: &impl Path,
     ) -> Result<T, StorageError> {
         // We could get rid of the host parameter, but in the future, it would be nice
-        // if we had the option of interacting with storage when creating an account.
+        // if we had the option of interacting with storage when creating an object.
         let account_path = concat(&self.path, id)?;
         Ok(T::from(account_path))
     }
 
-    /// Delete existing account
+    /// Delete existing object
     ///
-    /// Delete an account in the current layer. This updates the current layer in
+    /// Delete an object in the current layer. This updates the current layer in
     /// storage.
-    pub(crate) fn delete_account(
+    pub(crate) fn delete(
         &mut self,
         host: &mut impl Runtime,
         id: &impl Path,
