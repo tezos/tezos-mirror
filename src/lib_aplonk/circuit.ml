@@ -531,30 +531,22 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     in
     (switches, S.of_int nb_proofs)
 
-  let pad_inputs nb_max_proofs inner_pi answers =
-    let to_pad = nb_max_proofs - List.length inner_pi in
+  let pad_inputs nb_max_proofs nb_rc_wires inner_pi answers =
+    let nb_proofs = List.length inner_pi in
     let padded_inner_pi =
+      let to_pad = nb_max_proofs - nb_proofs in
       let nb_inner_pi = List.(length (hd inner_pi)) in
       List.flatten inner_pi
       @ List.(init (to_pad * nb_inner_pi) (Fun.const S.zero))
     in
     let padded_answers =
-      let answers =
-        answers |> List.map (fun a -> SMap.values a |> List.map SMap.values)
-      in
-      let pad_wires wires_list =
-        List.map
-          (fun w_list ->
-            w_list @ List.init (to_pad * nb_wires) (Fun.const S.zero))
-          wires_list
-      in
-      Plonk.List.map_end pad_wires answers |> List.flatten |> List.flatten
+      Plonk.Utils.pad_answers nb_max_proofs nb_rc_wires nb_proofs answers
     in
     (padded_inner_pi, padded_answers)
 
   (* Returns witness of verification circuit *)
-  let get_witness max_nb_proofs (p : Main.prover_aux) circuit_name pi_size
-      solver (inner_pi, outer_pi) switches compressed_switches batch =
+  let get_witness max_nb_proofs nb_rc_wires (p : Main.prover_aux) circuit_name
+      pi_size solver (inner_pi, outer_pi) switches compressed_switches batch =
     let ids_batch = SMap.find circuit_name p.ids_batch |> fst in
     let public =
       aggreg_public_inputs
@@ -574,7 +566,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     in
     let inputs =
       let inner_pi, answers =
-        pad_inputs max_nb_proofs inner_pi circuit_answers
+        pad_inputs max_nb_proofs nb_rc_wires inner_pi circuit_answers
       in
       Array.(concat [of_list (inner_pi @ answers); public; switches])
     in

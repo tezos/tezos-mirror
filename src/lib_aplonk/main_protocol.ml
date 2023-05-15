@@ -301,6 +301,7 @@ struct
       let outer_pi = PI.outer_of_inner inner_pi in
       Aggreg_circuit.get_witness
         prover_meta_pp.nb_proofs
+        prover_meta_pp.nb_rc_wires
         main_prover_aux
         circuit_name
         prover_meta_pp.public_input_size
