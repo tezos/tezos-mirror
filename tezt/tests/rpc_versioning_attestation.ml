@@ -884,8 +884,65 @@ module Run_Simulate = struct
     test_simulate_operation_double_preconsensus_evidence protocols
 end
 
+module Preapply = struct
+  let test_consensus kind protocol =
+    let* node, client = Client.init_with_protocol ~protocol `Client () in
+    let* () = Client.bake_for_and_wait ~node client in
+    let signer = Constant.bootstrap1 in
+    let* level, slots, block_payload_hash =
+      get_consensus_info signer.public_key_hash client
+    in
+
+    let preapply_op ~use_legacy_name =
+      let* consensus_op =
+        create_consensus_op
+          ~level
+          ~slot:(List.hd slots)
+          ~block_payload_hash
+          ~use_legacy_name
+          ~signer
+          ~kind
+          client
+      in
+      let* signature = Operation.sign consensus_op client in
+      let consensus_json =
+        Operation.make_preapply_operation_input
+          ~protocol
+          ~signature
+          consensus_op
+      in
+      let* _ =
+        RPC.Client.call client
+        @@ RPC.post_chain_block_helpers_preapply_operations
+             ~data:(Data (`A [consensus_json]))
+             ()
+      in
+      unit
+    in
+
+    let* () = preapply_op ~use_legacy_name:true in
+    preapply_op ~use_legacy_name:false
+
+  let test_preapply_consensus =
+    register_test
+      ~title:"Preapply operation with consensus operations"
+      ~additionnal_tags:["preapply"; "operations"; "consensus"]
+    @@ fun protocol -> test_consensus Operation.Attestation protocol
+
+  let test_preapply_preconsensus =
+    register_test
+      ~title:"Preapply operation with preconsensus operations"
+      ~additionnal_tags:["preapply"; "operations"; "pre"; "consensus"]
+    @@ fun protocol -> test_consensus Operation.Preattestation protocol
+
+  let register ~protocols =
+    test_preapply_consensus protocols ;
+    test_preapply_preconsensus protocols
+end
+
 let register ~protocols =
   Forge.register ~protocols ;
   Parse.register ~protocols ;
   Mempool.register ~protocols ;
-  Run_Simulate.register ~protocols
+  Run_Simulate.register ~protocols ;
+  Preapply.register ~protocols
