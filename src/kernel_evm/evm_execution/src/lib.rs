@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -147,7 +148,7 @@ mod test {
         balance: U256,
     ) {
         let mut account = evm_account_storage
-            .get_or_create_account(host, &account_path(address).unwrap())
+            .get_or_create(host, &account_path(address).unwrap())
             .unwrap();
         let current_balance = account.balance(host).unwrap();
         if current_balance > balance {
@@ -167,7 +168,7 @@ mod test {
         address: &H160,
     ) -> U256 {
         let account = evm_account_storage
-            .get_or_create_account(host, &account_path(address).unwrap())
+            .get_or_create(host, &account_path(address).unwrap())
             .unwrap();
         account.balance(host).unwrap()
     }
@@ -180,9 +181,7 @@ mod test {
         code: &[u8],
     ) {
         let path = account_path(address).unwrap();
-        let mut account = evm_account_storage
-            .get_or_create_account(host, &path)
-            .unwrap();
+        let mut account = evm_account_storage.get_or_create(host, &path).unwrap();
         account.set_code(host, code).unwrap();
     }
 

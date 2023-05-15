@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -492,7 +493,7 @@ mod test {
             .expect("Could not begin transaction");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_path)
+            .create_new(&mut host, &a1_path)
             .expect("Could not create new account")
             .expect("Account already exists in storage");
 
@@ -505,12 +506,12 @@ mod test {
             .expect("Could not increment nonce");
 
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Could not commit transaction");
 
         // Assert
         let a1 = storage
-            .get_account(&host, &a1_path)
+            .get(&host, &a1_path)
             .expect("Could not get account")
             .expect("Account does not exist");
 
@@ -534,7 +535,7 @@ mod test {
             .expect("Could not begin transaction");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_path)
+            .create_new(&mut host, &a1_path)
             .expect("Could not create new account")
             .expect("Account already exists");
 
@@ -542,12 +543,12 @@ mod test {
             .expect("Could not increment nonce");
 
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Could not commit transaction");
 
         // Assert
         let a1 = storage
-            .get_account(&host, &a1_path)
+            .get(&host, &a1_path)
             .expect("Could not get account from storage")
             .expect("Account does not exist");
 
@@ -576,7 +577,7 @@ mod test {
             .expect("Could not begin transaction");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_path)
+            .create_new(&mut host, &a1_path)
             .expect("Could not create new account")
             .expect("Account already exists");
 
@@ -586,12 +587,12 @@ mod test {
             .expect("Could not add second value to balance");
 
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Could not commit transaction");
 
         // Assert
         let a1 = storage
-            .get_account(&host, &a1_path)
+            .get(&host, &a1_path)
             .expect("Could not get account from storage")
             .expect("Account does not exist");
 
@@ -620,7 +621,7 @@ mod test {
             .expect("Could not begin transaction");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_path)
+            .create_new(&mut host, &a1_path)
             .expect("Could not create new account")
             .expect("Account already exists");
 
@@ -630,12 +631,12 @@ mod test {
             .expect("Could not add second value to balance");
 
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Could not commit transaction");
 
         // Assert
         let a1 = storage
-            .get_account(&host, &a1_path)
+            .get(&host, &a1_path)
             .expect("Could not get account from storage")
             .expect("Account does not exist");
 
@@ -663,7 +664,7 @@ mod test {
             .expect("Could not begin transaction");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_path)
+            .create_new(&mut host, &a1_path)
             .expect("Could not create new account")
             .expect("Account already exists");
 
@@ -675,12 +676,12 @@ mod test {
         );
 
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Could not commit transaction");
 
         // Assert
         let a1 = storage
-            .get_account(&host, &a1_path)
+            .get(&host, &a1_path)
             .expect("Could not get account from storage")
             .expect("Account does not exist");
 
@@ -707,7 +708,7 @@ mod test {
             .expect("Could not begin transaction");
 
         let a1 = storage
-            .new_account(&mut host, &a1_path)
+            .create_new(&mut host, &a1_path)
             .expect("Could not create new account")
             .expect("Account already exists");
 
@@ -735,7 +736,7 @@ mod test {
             .expect("Could not begin transaction");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_path)
+            .create_new(&mut host, &a1_path)
             .expect("Could not create new account")
             .expect("Account already exists");
 
@@ -743,12 +744,12 @@ mod test {
             .expect("Could not update account storage");
 
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Could not commit transaction");
 
         // Assert
         let a1 = storage
-            .get_account(&host, &a1_path)
+            .get(&host, &a1_path)
             .expect("Could not get account from storage")
             .expect("Account does not exist");
 
@@ -778,7 +779,7 @@ mod test {
             .expect("Could not begin transaction");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_path)
+            .create_new(&mut host, &a1_path)
             .expect("Could not create new account")
             .expect("Account already exists");
 
@@ -824,12 +825,12 @@ mod test {
         );
 
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Could not commit transaction");
 
         // Assert
         let a1 = storage
-            .get_account(&host, &a1_path)
+            .get(&host, &a1_path)
             .expect("Could not get account from storage")
             .expect("Account does not exist");
 
@@ -854,7 +855,7 @@ mod test {
             .expect("Could not begin transaction");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_path)
+            .create_new(&mut host, &a1_path)
             .expect("Could not create new account")
             .expect("Account already exists in storage");
 
@@ -867,12 +868,12 @@ mod test {
             .expect("Could not increment nonce");
 
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Could not commit transaction");
 
         // Assert
         let a1 = storage
-            .get_account(&host, &a1_path)
+            .get(&host, &a1_path)
             .expect("Could not get account")
             .expect("Account does not exist");
 
@@ -908,7 +909,7 @@ mod test {
             .expect("Could not begin transaction");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_path)
+            .create_new(&mut host, &a1_path)
             .expect("Could not create new account")
             .expect("Account already exists in storage");
 
@@ -916,12 +917,12 @@ mod test {
             .expect("Could not write code to account");
 
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Could not commit transaction");
 
         // Assert
         let a1 = storage
-            .get_account(&host, &a1_path)
+            .get(&host, &a1_path)
             .expect("Could not get account")
             .expect("Account does not exist");
 
@@ -958,7 +959,7 @@ mod test {
             .expect("Could not begin transaction");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_path)
+            .create_new(&mut host, &a1_path)
             .expect("Could not create new account")
             .expect("Account already exists in storage");
 
@@ -968,12 +969,12 @@ mod test {
             .expect("Could not write code to account");
 
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Could not commit transaction");
 
         // Assert
         let a1 = storage
-            .get_account(&host, &a1_path)
+            .get(&host, &a1_path)
             .expect("Could not get account")
             .expect("Account does not exist");
 
@@ -1008,7 +1009,7 @@ mod test {
             .expect("Could not begin transaction");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_path)
+            .create_new(&mut host, &a1_path)
             .expect("Could not create new account")
             .expect("Account already exists in storage");
 
@@ -1022,12 +1023,12 @@ mod test {
             .expect("Could not delete code for contract");
 
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Could not commit transaction");
 
         // Assert
         let a1 = storage
-            .get_account(&host, &a1_path)
+            .get(&host, &a1_path)
             .expect("Could not get account")
             .expect("Account does not exist");
 
@@ -1063,7 +1064,7 @@ mod test {
             .expect("Could not begin transaction");
 
         let mut a1 = storage
-            .new_account(&mut host, &a1_path)
+            .create_new(&mut host, &a1_path)
             .expect("Could not create new account")
             .expect("Account already exists in storage");
 
@@ -1071,12 +1072,12 @@ mod test {
             .expect("Could not write code to account");
 
         storage
-            .commit(&mut host)
+            .commit_transaction(&mut host)
             .expect("Could not commit transaction");
 
         // Assert
         let a1 = storage
-            .get_account(&host, &a1_path)
+            .get(&host, &a1_path)
             .expect("Could not get account")
             .expect("Account does not exist");
 

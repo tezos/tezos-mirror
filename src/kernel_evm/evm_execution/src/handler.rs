@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -290,7 +291,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         // TODO: mark `caller` and `address` as hot for gas calculation
         // issue: https://gitlab.com/tezos/tezos/-/issues/4866
 
-        if self.evm_account_storage.transaction_depth() >= MAXIMUM_TRANSACTION_DEPTH {
+        if self.evm_account_storage.stack_depth() >= MAXIMUM_TRANSACTION_DEPTH {
             return Err(EthereumError::MachineExitError(ExitError::CallTooDeep));
         }
 
@@ -421,10 +422,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         debug_msg!(
             self.host,
             "Executing contract call at depth: {}",
-            self.evm_account_storage.transaction_depth()
+            self.evm_account_storage.stack_depth()
         );
 
-        if self.evm_account_storage.transaction_depth() > MAXIMUM_TRANSACTION_DEPTH {
+        if self.evm_account_storage.stack_depth() > MAXIMUM_TRANSACTION_DEPTH {
             debug_msg!(self.host, "Execution beyond the call limit of 1024");
             return Err(EthereumError::MachineExitError(ExitError::CallTooDeep));
         }
@@ -638,7 +639,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         address: H160,
     ) -> Result<EthereumAccount, EthereumError> {
         self.evm_account_storage
-            .get_or_create_account(self.host, &account_path(&address)?)
+            .get_or_create(self.host, &account_path(&address)?)
             .map_err(EthereumError::from)
     }
 
@@ -649,7 +650,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         // do the error handling here.
         if let Ok(path) = account_path(&address) {
             self.evm_account_storage
-                .get_account(self.host, &path)
+                .get(self.host, &path)
                 .ok()
                 .flatten()
         } else {
@@ -667,7 +668,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         // it does not allow for this to fail, so we just return None.
         if let Ok(path) = account_path(&address) {
             self.evm_account_storage
-                .get_original_account(self.host, &path)
+                .get_original(self.host, &path)
                 .ok()
                 .flatten()
         } else {
@@ -682,9 +683,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     fn increment_nonce(&mut self, address: H160) -> Result<(), EthereumError> {
         match account_path(&address) {
             Ok(path) => {
-                let mut account = self
-                    .evm_account_storage
-                    .get_or_create_account(self.host, &path)?;
+                let mut account =
+                    self.evm_account_storage.get_or_create(self.host, &path)?;
                 account
                     .increment_nonce(self.host)
                     .map_err(EthereumError::from)
