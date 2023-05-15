@@ -137,7 +137,7 @@ When introducing cross-references between documentation pages as well as referen
 
 - When referring to a whole documentation page, you should use a ``:doc:`` role rather than introducing a label at the start of the page.
   Indeed, labels incur an overhead, especially when pages get duplicated for different protocol versions.
-  In particular, when referring to a page of the currently active protocol, consider using ``active/`` as the directory of that page, instead of a hardcoded protocol number ``NNN/``.
+  In particular, when referring to a page of the currently active protocol, consider using ``active/`` as the directory of that page, instead of a hardcoded protocol name.
 - When referring to an artifact in the code repository (source file, commit, etc.), you may use an appropriate custom or GitLab role (see `Sphinx extensions`_) instead of a plain HTML link.
   Indeed, specific roles are checked for correctness more effectively and more efficiently than HTML links.
 
@@ -182,7 +182,7 @@ Writing protocol documentation
 ------------------------------
 
 Writing protocol documentation is a special case because protocol-related
-documentation pages are duplicated for several protocol versions (under directories named ``NNN/``, where *NNN* is either a protocol number or "alpha"), and possibly
+documentation pages are duplicated for several protocol versions (under directories named as the protocols, e.g.,  "alpha/"), and possibly
 also in a protocol-independent part (typically under directory
 ``shell/``).
 
@@ -200,7 +200,7 @@ Definitions
 First let us introduce the following definitions:
 
 - A *label* is an identifier defining a specific position in a documentation page (typically, before a section name). A *reference* is a link to a label, in the same or another page. In Sphinx, labels are written ``.. _label:`` and references are written ``:ref: `textual description <label>```, or ``:ref: `label```. Labels and references are case-insensitive.
-- A *versioned* label bears a protocol version in it (e.g. ``label_NNN``); an  *unversioned* label doesn't (i.e. just ``label``)
+- A *versioned* label is suffixed by  protocol name (e.g. ``label_alpha``); an  *unversioned* label doesn't (i.e. just ``label``)
 - A *local* reference is a link from a protocol-specific page to the same page or to another protocol-specific page. An *external* reference is a reference from a protocol-independent page to a label in a protocol-specific page.
 
 Rules
@@ -210,14 +210,14 @@ The following simple rules are proposed for safely managing cross-references:
 
 1. In all but the **current** protocol, any defined label must be versioned::
 
-    .. _<label>_NNN:
+    .. _<label>_<proto>:
 
 2. In the **current** protocol, labels may be versioned (as targets of local references), unversioned (as targets of external references), or both. The last case is done by defining *two* labels for such location::
 
     ..  _<label>:
-    ..  _<label>_NNN:
+    ..  _<label>_<proto>:
 
-3. Any local reference in protocol NNN must be versioned NNN. This includes references appearing in the currently active protocol.
+3. Any local reference in protocol ``<proto>`` must be versioned ``<proto>``. This includes references appearing in the currently active protocol.
 
 4. External references must be unversioned.
 
@@ -225,7 +225,7 @@ The rationale of the above rules:
 
 - Any label defined in a protocol-specific page must be versioned to avoid name conflicts (as by definition the containing page is duplicated).
 - External references must be unversioned to avoid modifying protocol-independent pages when the current protocol is changed.
-- Local references in the current protocol could also work if unversioned, but when the protocol is changed, they should be rewritten as versioned. It is much simpler to enforce the rule that all local references in a page for any protocol NNN must be versioned NNN.
+- Local references in the current protocol could also work if unversioned, but when the protocol is changed, they should be rewritten as versioned. It is much simpler to enforce the rule that all local references in a page for any protocol ``<proto>`` must be versioned ``<proto>``.
 
 Protocol changes
 ~~~~~~~~~~~~~~~~
@@ -237,9 +237,9 @@ When a new protocol is adopted, its pages must be "linked" with the protocol-ind
 
 **NB** no rewriting of any reference is needed on protocol changes.
 
-On creating a new protocol proposal version NNN out of alpha:
+On creating a new protocol proposal version ``<proto>`` out of alpha:
 
-- rename all versioned labels AND references _alpha in its pages to version _NNN
+- rename all versioned labels AND references _alpha in its pages to version _<proto>
 
 Rules automation
 ~~~~~~~~~~~~~~~~
@@ -256,7 +256,7 @@ To help enforcing the above cross-referencing rules in protocol-specific pages, 
 
   + can be used when a new protocol is adopted for "unlinking" the pages of the old protocol, only if those pages are not removed altogether
 
-Moreover, the script ``scripts/snapshot_alpha.sh``, used to create a new protocol proposal version NNN out of alpha is planned to integrate renaming of labels and references.
+Moreover, the script ``scripts/snapshot_alpha.sh``, used to create a new protocol proposal version ``<proto>`` out of alpha integrates renaming of labels and references.
 
 Documenting protocols
 ~~~~~~~~~~~~~~~~~~~~~
