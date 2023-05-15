@@ -88,10 +88,10 @@ module V (Main : Aggregation.Main_protocol.S) = struct
   }
 
   (* by default, there is one batch for the preprocessed polynomials, two for the permutation polynomials (also evaluated at gX), and one for the wires. *)
-  let nb_batch_default = 4
+  let nb_batches_default = 4
 
   (* The number of batches increases by one if there is a gX evaluation for wires (using RC protocol induces a gX evaluations for wires) *)
-  let nb_batch circuit =
+  let nb_batches circuit =
     let gates =
       Plonk.Circuit.get_selectors circuit
       |> List.map (fun g -> (g, ()))
@@ -99,12 +99,12 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     in
     let nb_rc = SMap.cardinal circuit.range_checks in
     if Gates.exists_gx_composition ~gates || nb_rc <> 0 then
-      nb_batch_default + 1
-    else nb_batch_default
+      nb_batches_default + 1
+    else nb_batches_default
 
   (* This inputs is given to the verification circuit when it’s created. The value of the dummy inputs is irrelevant, only their structures & sizes matter *)
-  let dummy_input range_checks gates nb_batch nb_proofs nb_inner_pi nb_outer_pi
-      =
+  let dummy_input range_checks gates nb_batches nb_proofs nb_inner_pi
+      nb_outer_pi =
     let nb_rc = SMap.cardinal range_checks in
     let switches = List.init nb_proofs (fun _ -> Input.bool true) in
     let dummy_input = Input.scalar S.one in
@@ -122,8 +122,8 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     let ss_list =
       List.init Plompiler.Csir.nb_wires_arch @@ Fun.const dummy_input
     in
-    let batch = List.init nb_batch (fun _ -> dummy_input) in
-    let wires_g = if nb_batch = nb_batch_default then [] else wires in
+    let batch = List.init nb_batches (fun _ -> dummy_input) in
+    let wires_g = if nb_batches = nb_batches_default then [] else wires in
     let z_rc_perm, rc_selectors =
       if SMap.is_empty range_checks then ([], [])
       else
@@ -765,7 +765,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     Bool.assert_true res
 
   (* Function that creates the verification circuit as cs *)
-  let get_cs_verification pp circuit nb_batch nb_proofs
+  let get_cs_verification pp circuit nb_batches nb_proofs
       (nb_outer_pi, nb_inner_pi) check_pi =
     let gen, n = Main.get_gen_n_prover pp in
     let gates = Plonk.Circuit.get_selectors circuit in
@@ -773,7 +773,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       dummy_input
         circuit.range_checks
         gates
-        nb_batch
+        nb_batches
         nb_proofs
         nb_inner_pi
         nb_outer_pi
