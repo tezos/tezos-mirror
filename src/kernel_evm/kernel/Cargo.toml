@@ -33,7 +33,7 @@ path = "../../kernel_sdk/encoding"
 path = "../../kernel_sdk/mock"
 
 [dev-dependencies.tezos_data_encoding]
-tezos_data_encoding = "0.4"
+version = "0.5"
 
 [dependencies]
 tezos_ethereum = { path = "../ethereum" }

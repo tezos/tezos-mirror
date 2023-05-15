@@ -2,7 +2,6 @@ use evm_execution::storage::blocks::EvmBlockStorageError;
 use evm_execution::EthereumError;
 use host::runtime::RuntimeError;
 use rlp::DecoderError;
-use tezos_data_encoding::nom::error::DecodeError;
 use tezos_ethereum::signatures::TransactionError;
 use thiserror::Error;
 // TODO:  https://gitlab.com/tezos/tezos/-/issues/5557
@@ -10,10 +9,10 @@ use thiserror::Error;
 
 /// Anything that can go wrong on the application level
 #[derive(Error, Debug)]
-pub enum ApplicationError<'a> {
+pub enum ApplicationError {
     /// Error parsing inbox message
     #[error("unable to parse header inbox message {0}")]
-    MalformedInboxMessage(nom::Err<DecodeError<&'a [u8]>>),
+    MalformedInboxMessage(String),
     /// Error happened during interaction with the storage
     #[error("EVM storage failed: {0}")]
     EvmStorage(#[from] EvmBlockStorageError),

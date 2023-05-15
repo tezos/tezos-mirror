@@ -32,14 +32,14 @@ pub fn process_inbox_message<'a, Host: Runtime>(
     evm_account_storage: &mut EthereumAccountStorage,
     level: u32,
     message: &'a [u8],
-) -> Result<(), ApplicationError<'a>> {
+) -> Result<(), ApplicationError> {
     debug_msg!(host, "Processing an inbox message at level {}", level);
 
     let precompiles = evm_execution::precompiles::precompile_set();
 
     let (_remaining, message) =
         InboxMessage::<MichelsonPair<MichelsonString, StringTicket>>::parse(message)
-            .map_err(ApplicationError::MalformedInboxMessage)?;
+            .map_err(|e| ApplicationError::MalformedInboxMessage(format!("{e:?}")))?;
 
     match message {
         InboxMessage::Internal(InternalInboxMessage::Transfer(Transfer { .. })) => Ok(()),
@@ -72,11 +72,11 @@ pub fn process_inbox_message<'a, Host: Runtime>(
     }
 }
 
-fn process_info<'a, Host: Runtime>(
+fn process_info<Host: Runtime>(
     host: &mut Host,
     level: u32,
     info: InfoPerLevel,
-) -> Result<(), ApplicationError<'a>> {
+) -> Result<(), ApplicationError> {
     Runtime::reveal_metadata(host)
         .map_err(ApplicationError::FailedToFetchRollupMetadata)
         .and_then(|metadata| {
@@ -94,13 +94,13 @@ fn process_info<'a, Host: Runtime>(
         })
 }
 /// Process one Ethereum transaction
-fn process_ethereum_transaction<'a, Host>(
+fn process_ethereum_transaction<Host>(
     host: &mut Host,
     evm_account_storage: &mut EthereumAccountStorage,
     block: &BlockConstants,
     precompiles: &PrecompileBTreeMap<Host>,
     e: EthereumTransactionCommon,
-) -> Result<(), ApplicationError<'a>>
+) -> Result<(), ApplicationError>
 where
     Host: Runtime,
 {
