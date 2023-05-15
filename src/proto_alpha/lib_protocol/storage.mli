@@ -229,6 +229,10 @@ module Contract : sig
       with type key = Contract_repr.t
        and type value = Tez_repr.t
        and type t := Raw_context.t
+
+  (** Stores the amount of tokens currently present on chain *)
+  module Total_supply :
+    Single_data_storage with type value = Tez_repr.t and type t := Raw_context.t
 end
 
 module Big_map : sig

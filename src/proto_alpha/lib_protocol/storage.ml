@@ -407,6 +407,13 @@ module Contract = struct
         let name = ["total_frozen_bonds"]
       end)
       (Tez_repr)
+
+  module Total_supply =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["total_supply"]
+      end)
+      (Tez_repr)
 end
 
 module type NEXT = sig
