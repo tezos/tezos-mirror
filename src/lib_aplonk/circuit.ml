@@ -87,7 +87,13 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     z_rc : scalar_input list;
   }
 
-  let nb_batch gates = if Gates.exists_gx_composition ~gates then 5 else 4
+  (* by default, there is one batch for the preprocessed polynomials, two for the permutation polynomials (also evaluated at gX), and one for the wires. *)
+  let nb_batch_default = 4
+
+  (* The number of batches increases by one if there is a gX evaluation for wires *)
+  let nb_batch gates =
+    if Gates.exists_gx_composition ~gates then nb_batch_default + 1
+    else nb_batch_default
 
   (* This inputs is given to the verification circuit when it’s created. The value of the dummy inputs is irrelevant, only their structures & sizes matter *)
   let dummy_input range_checks gates nb_proofs nb_inner_pi nb_outer_pi =
@@ -107,7 +113,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     in
     let gates = SMap.of_list (List.map (fun g -> (g, ())) gates) in
     let batch = List.init (nb_batch gates) (fun _ -> dummy_input) in
-    let wires_g = if nb_batch gates = nb_batch SMap.empty then [] else wires in
+    let wires_g = if nb_batch gates = nb_batch_default then [] else wires in
     let z_rc, rc_selectors =
       if SMap.is_empty range_checks then ([], [])
       else
