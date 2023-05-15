@@ -77,11 +77,11 @@ let node_is_ready =
     ~level:Notice
     ()
 
-let dac_is_ready =
+let committee_keys_imported =
   declare_0
     ~section
-    ~name:"dac_is_ready"
-    ~msg:"The Data Availability Committee is ready"
+    ~name:"committee_keys_imported"
+    ~msg:"The Data Availability Committee keys had been successfully imported"
     ~level:Notice
     ()
 

@@ -349,7 +349,7 @@ module Legacy = struct
       ~supports:Protocol.(From_protocol (Protocol.number Alpha))
     @@ fun protocol ->
     let* node, client = Client.init_with_protocol `Client ~protocol () in
-    let run_dac = Dac_node.run ~wait_ready:false in
+    let run_dac = Dac_node.run ~wait_ready:true in
     let* committee_member =
       Client.bls_gen_keys ~alias:"committee_member" client
     in
@@ -369,7 +369,7 @@ module Legacy = struct
     in
     let* _dir = Dac_node.init_config dac_node in
     let ready_promise =
-      Dac_node.wait_for dac_node "dac_is_ready.v0" (fun _ -> Some ())
+      Dac_node.wait_for dac_node "committee_keys_imported.v0" (fun _ -> Some ())
     in
     let* () = run_dac dac_node in
     let* () = ready_promise in
@@ -450,15 +450,21 @@ module Legacy = struct
     return ()
 
   let test_dac_not_ready_without_protocol =
-    Test.register
+    Protocol.register_test
       ~__FILE__
-      ~title:"dac node startup not ready without protocol"
+      ~title:"dac Legacy startup not ready with unsupported protocol"
       ~tags:["dac"; "dac_node"]
-    @@ fun () ->
+    @@ fun protocol ->
     let run_dac = Dac_node.run ~wait_ready:false in
     let nodes_args = Node.[Synchronisation_threshold 0] in
-    let* node = Node.init nodes_args in
-    let* client = Client.init () in
+    let* node, client =
+      Client.init_with_protocol
+        `Client
+        ~protocol
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args
+        ()
+    in
     let dac_node =
       Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
     in
@@ -1138,7 +1144,7 @@ module Coordinator = struct
   let test_dac_not_ready =
     Protocol.register_test
       ~__FILE__
-      ~title:"dac coordiantor startup not ready"
+      ~title:"dac coordinator startup not ready"
       ~tags:["dac"; "dac_node"]
     @@ fun protocol ->
     let run_dac = Dac_node.run ~wait_ready:false in
@@ -1177,15 +1183,21 @@ module Coordinator = struct
     return ()
 
   let test_dac_not_ready_without_protocol =
-    Test.register
+    Protocol.register_test
       ~__FILE__
-      ~title:"dac coordinator startup not ready without protocol"
+      ~title:"dac coordinator startup not ready with unsupported protocol"
       ~tags:["dac"; "dac_node"]
-    @@ fun () ->
+    @@ fun protocol ->
     let run_dac = Dac_node.run ~wait_ready:false in
     let nodes_args = Node.[Synchronisation_threshold 0] in
-    let* node = Node.init nodes_args in
-    let* client = Client.init () in
+    let* node, client =
+      Client.init_with_protocol
+        `Client
+        ~protocol
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args
+        ()
+    in
     let dac_node =
       Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
     in
@@ -1239,15 +1251,21 @@ module Observer = struct
     return ()
 
   let test_dac_not_ready_without_protocol =
-    Test.register
+    Protocol.register_test
       ~__FILE__
-      ~title:"dac observer startup not ready without protocol"
+      ~title:"dac Observer startup not ready with unsupported protocol"
       ~tags:["dac"; "dac_node"]
-    @@ fun () ->
+    @@ fun protocol ->
     let run_dac = Dac_node.run ~wait_ready:false in
     let nodes_args = Node.[Synchronisation_threshold 0] in
-    let* node = Node.init nodes_args in
-    let* client = Client.init () in
+    let* node, client =
+      Client.init_with_protocol
+        `Client
+        ~protocol
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args
+        ()
+    in
     let dac_node =
       Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
     in
@@ -1264,7 +1282,7 @@ module Member = struct
   let test_dac_not_ready =
     Protocol.register_test
       ~__FILE__
-      ~title:"dac member startup not ready"
+      ~title:"dac member startup not ready with"
       ~tags:["dac"; "dac_node"]
     @@ fun protocol ->
     let run_dac = Dac_node.run ~wait_ready:false in
@@ -1316,15 +1334,21 @@ module Member = struct
     return ()
 
   let test_dac_not_ready_without_protocol =
-    Test.register
+    Protocol.register_test
       ~__FILE__
-      ~title:"dac member startup not ready without protocol"
+      ~title:"dac Member startup not ready with unsupported protocol"
       ~tags:["dac"; "dac_node"]
-    @@ fun () ->
+    @@ fun protocol ->
     let run_dac = Dac_node.run ~wait_ready:false in
     let nodes_args = Node.[Synchronisation_threshold 0] in
-    let* node = Node.init nodes_args in
-    let* client = Client.init () in
+    let* node, client =
+      Client.init_with_protocol
+        `Client
+        ~protocol
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args
+        ()
+    in
     let dac_node =
       Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
     in
@@ -2715,13 +2739,15 @@ module Tx_kernel_e2e = struct
       (test_tx_kernel_e2e_with_dac_observer_missing_pages commitment_period)
 end
 
+let register_with_unsupported_protocol ~protocols =
+  Legacy.test_dac_not_ready_without_protocol protocols ;
+  Coordinator.test_dac_not_ready_without_protocol protocols ;
+  Observer.test_dac_not_ready_without_protocol protocols ;
+  Member.test_dac_not_ready_without_protocol protocols
+
 let register ~protocols =
   (* Tests with layer1 and dac nodes *)
   Legacy.test_dac_node_startup protocols ;
-  Legacy.test_dac_not_ready_without_protocol ;
-  Coordinator.test_dac_not_ready_without_protocol ;
-  Observer.test_dac_not_ready_without_protocol ;
-  Member.test_dac_not_ready_without_protocol ;
   Coordinator.test_dac_not_ready protocols ;
   Observer.test_dac_not_ready protocols ;
   Member.test_dac_not_ready protocols ;
