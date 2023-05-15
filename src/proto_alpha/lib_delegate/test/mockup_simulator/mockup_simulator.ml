@@ -928,6 +928,16 @@ let genesis_protocol_data (baker_sk : Signature.secret_key)
       ~payload_round:Alpha_context.Round.zero
       []
   in
+  let toggle_votes =
+    {
+      Protocol.Toggle_votes_repr.liquidity_baking_vote =
+        Baking_configuration.default_votes_config
+          .Baking_configuration.liquidity_baking_vote;
+      adaptive_inflation_vote =
+        Baking_configuration.default_votes_config
+          .Baking_configuration.adaptive_inflation_vote;
+    }
+  in
   let contents =
     Protocol.Alpha_context.Block_header.
       {
@@ -935,9 +945,7 @@ let genesis_protocol_data (baker_sk : Signature.secret_key)
         payload_round = Alpha_context.Round.zero;
         proof_of_work_nonce;
         seed_nonce_hash = None;
-        liquidity_baking_toggle_vote =
-          Baking_configuration.default_liquidity_baking_config
-            .liquidity_baking_vote;
+        toggle_votes;
       }
   in
   let unsigned_header =

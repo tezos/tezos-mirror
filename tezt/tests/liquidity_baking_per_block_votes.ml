@@ -240,7 +240,7 @@ let test_all_per_block_votes =
     let p_error =
       baker_wait_for_per_block_vote_file_error
         ~expected_id:
-          (error_prefix ^ "liquidity_baking_vote.block_vote_file_not_found")
+          (error_prefix ^ "per_block_vote_file.block_vote_file_not_found")
         ~expected_file_path:default_votefile
         baker
     in
