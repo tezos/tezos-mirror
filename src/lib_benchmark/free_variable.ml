@@ -57,7 +57,7 @@ module Set = struct
   let pp fmtr set =
     let open Format in
     let elts = elements set in
-    fprintf fmtr "{ @[<hv>%a@] }" (pp_print_list ~pp_sep:(pp_sep "; ") pp) elts
+    fprintf fmtr "{ @[<hv>%a@] }" (pp_print_list ~pp_sep:(pp_sep ";") pp) elts
 end
 
 module Sparse_vec = Sparse_vec.Make (Map)

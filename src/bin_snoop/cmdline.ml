@@ -45,9 +45,10 @@ type benchmark_options = {
   csv_export : string option;
 }
 
-type codegen_options =
-  | No_transform
-  | Fixed_point_transform of Fixed_point_transform.options
+type codegen_options = {
+  transform : Fixed_point_transform.options option;
+  save_to : string option;
+}
 
 (* Infer command related types *)
 
@@ -74,6 +75,13 @@ type infer_parameters_options = {
   (* Serialise solution to given file *)
   dot_file : string option; (* Export dependency graph to graphviz format *)
   display : Display.options;
+}
+
+type auto_build_options = {
+  destination_directory : string option;
+  (* Where to load/save files *)
+  infer_parameters : infer_parameters_options;
+  measure_options : Measure.options;
 }
 
 (* Outcome of command-line parsing. *)
@@ -108,6 +116,10 @@ type command =
     }
   | Codegen_check_definitions of {files : string list}
   | Solution_print of string list
+  | Auto_build of {
+      bench_names : Namespace.t list;
+      auto_build_options : auto_build_options;
+    }
   | No_command
 
 (* -------------------------------------------------------------------------- *)

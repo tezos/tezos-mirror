@@ -67,7 +67,7 @@ val save :
   workload_data:'t workload_data ->
   packed_measurement
 
-val packed_measurement_print_json : packed_measurement -> string option -> unit
+val packed_measurement_save_json : packed_measurement -> string option -> unit
 
 val load : filename:string -> packed_measurement
 

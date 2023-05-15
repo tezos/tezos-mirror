@@ -26,3 +26,4 @@ let cost_N_ILsl_bytes size1 size2 =
     ((S.safe_int 60) +
        ((((v1 lsr 1) + (v1 lsr 4)) + (v1 lsr 5)) + (v1 lsr 6)))
       + (v0 lsr 1023)
+
