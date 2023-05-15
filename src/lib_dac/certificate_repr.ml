@@ -36,7 +36,6 @@ module V0 = struct
      Type is private to make sure correct [version] is used.
      Use [make] function to create a [Certificate_repr.V0.t] *)
   type t = {
-    version : int;
     root_hash : Dac_plugin.raw_hash;
     aggregate_signature : Tezos_crypto.Aggregate_signature.signature;
     witnesses : Z.t;
@@ -46,7 +45,7 @@ module V0 = struct
   }
 
   let make root_hash aggregate_signature witnesses =
-    {version; root_hash; aggregate_signature; witnesses}
+    {root_hash; aggregate_signature; witnesses}
 
   let encoding =
     let obj_enc =
@@ -58,11 +57,12 @@ module V0 = struct
           (req "witnesses" z))
     in
     Data_encoding.(
-      conv
-        (fun {version; root_hash; aggregate_signature; witnesses} ->
-          (version, root_hash, aggregate_signature, witnesses))
+      conv_with_guard
+        (fun {root_hash; aggregate_signature; witnesses} ->
+          (0, root_hash, aggregate_signature, witnesses))
         (fun (version, root_hash, aggregate_signature, witnesses) ->
-          {version; root_hash; aggregate_signature; witnesses})
+          if version == 0 then Ok {root_hash; aggregate_signature; witnesses}
+          else Error "invalid version of certificate.")
         obj_enc)
 
   let all_committee_members_have_signed committee_members {witnesses; _} =

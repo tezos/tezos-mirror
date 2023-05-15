@@ -103,7 +103,7 @@
 (package (name tezos-dac-017-PtNairob))
 (package (name tezos-dac-alpha))
 (package (name tezos-dac-client-lib))
-(package (name tezos-dac-lib)(allow_empty))
+(package (name tezos-dac-lib))
 (package (name tezos-dac-lib-test)(allow_empty))
 (package (name tezos-dac-node-lib)(allow_empty))
 (package (name tezos-dac-node-lib-test)(allow_empty))

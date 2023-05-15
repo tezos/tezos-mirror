@@ -5,14 +5,24 @@
  (name src_lib_dac_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
+  tezos-stdlib
+  tezos-stdlib-unix
+  tezos-base
   tezos-test-helpers
   tezos-base-test-helpers
-  tezos_dac_lib
+  tezos-dac-lib
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_stdlib
+  -open Tezos_stdlib_unix
+  -open Tezos_base
   -open Tezos_base.TzPervasives
+  -open Tezos_test_helpers
   -open Tezos_base_test_helpers
   -open Tezos_dac_lib
   -open Octez_alcotezt)
