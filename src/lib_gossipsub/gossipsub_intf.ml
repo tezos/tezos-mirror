@@ -107,7 +107,7 @@ module type AUTOMATON_CONFIG = sig
   module Time : TIME with type span = Span.t
 end
 
-type 'span per_topic_score_parameters = {
+type 'span per_topic_score_limits = {
   time_in_mesh_weight : float;
       (** P1: The weight of the score associated to the time spent in the mesh. *)
   time_in_mesh_cap : float;
@@ -122,7 +122,7 @@ type 'span per_topic_score_parameters = {
       (** P2: The maximum value considered during score computation for the number of
           first message deliveries. *)
   first_message_deliveries_decay : float;
-      (** [P2] score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
+      (** P2: The score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
           This parameter must be in the unit interval. *)
   mesh_message_deliveries_weight : float;
       (** P3: The weight of the score associated to the number of first/near-first
@@ -139,27 +139,27 @@ type 'span per_topic_score_parameters = {
       (** P3: The number of messages received from a peer in the mesh in the
           associated topic above which the peer won't be penalized  *)
   mesh_message_deliveries_decay : float;
-      (** [P3] score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
+      (** P3: The score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
           This parameter must be in the unit interval. *)
   mesh_failure_penalty_weight : float;
       (** P3b: Penalty induced when a peer gets pruned with a non-zero mesh message delivery deficit. *)
   mesh_failure_penalty_decay : float;
-      (** [P3b] score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
+      (** P3b: The score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
           This parameter must be in the unit interval. *)
   invalid_message_deliveries_weight : float;
       (** P4: Penalty induced when a peer sends an invalid message. *)
   invalid_message_deliveries_decay : float;
-      (** [P4] score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
+      (** P4: The score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
           This parameter must be in the unit interval. *)
 }
 
-type ('topic, 'span) topic_score_parameters =
-  | Topic_score_parameters_single of 'span per_topic_score_parameters
+type ('topic, 'span) topic_score_limits =
+  | Topic_score_limits_single of 'span per_topic_score_limits
       (** Use this constructor when the topic score parameters do not
           depend on the topic. *)
-  | Topic_score_parameters_family of {
+  | Topic_score_limits_family of {
       all_topics : 'topic Seq.t;
-      parameters : 'topic -> 'span per_topic_score_parameters;
+      parameters : 'topic -> 'span per_topic_score_limits;
       weights : 'topic -> float;
     }
       (** Use this constructor when the topic score parameters may depend
@@ -171,8 +171,8 @@ type ('topic, 'span) topic_score_parameters =
 
    TODO: https://gitlab.com/tezos/tezos/-/issues/5545
    We did not implement P6, aka IP colocation factor *)
-type ('topic, 'span) score_parameters = {
-  topics : ('topic, 'span) topic_score_parameters;
+type ('topic, 'span) score_limits = {
+  topics : ('topic, 'span) topic_score_limits;
       (** Per-topic score parameters. *)
   topic_score_cap : float option;
       (** An optional cap on the total positive contribution of topics to the score of the peer.
@@ -184,7 +184,7 @@ type ('topic, 'span) score_parameters = {
       (** The threshold on the behaviour penalty
           counter above which we start penalizing the peer. *)
   behaviour_penalty_decay : float;
-      (** [P7] score is multiplied by a factor of [behaviour_penalty_decay] every [score_cleanup_ticks] heartbeat.
+      (** P7: The score is multiplied by a factor of [behaviour_penalty_decay] every [score_cleanup_ticks] heartbeat.
           This parameter must be in the unit interval. *)
   app_specific_weight : float;  (** P5: Application-specific peer scoring *)
   decay_zero : float;
@@ -300,7 +300,7 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
   opportunistic_graft_threshold : float;
       (** The median mesh score threshold before triggering opportunistic
           grafting; this should have a small positive value. *)
-  score_parameters : ('topic, 'span) score_parameters;
+  score_limits : ('topic, 'span) score_limits;
       (** score-specific parameters. *)
   seen_history_length : int;
       (** [seen_history_length] controls the size of the message cache used for
@@ -347,7 +347,7 @@ module type SCORE = sig
   type topic
 
   (** [newly_connected params] creates a fresh statistics record. *)
-  val newly_connected : (topic, span) score_parameters -> t
+  val newly_connected : (topic, span) score_limits -> t
 
   (** [value ps] evaluates the score of [ps]. *)
   val value : t -> value
@@ -412,9 +412,90 @@ module type SCORE = sig
 
   module Internal_for_tests : sig
     val get_topic_params :
-      ('topic, 'span) score_parameters ->
-      'topic ->
-      'span per_topic_score_parameters
+      ('topic, 'span) score_limits -> 'topic -> 'span per_topic_score_limits
+  end
+end
+
+module type MESSAGE_CACHE = sig
+  module Peer : ITERABLE
+
+  module Topic : ITERABLE
+
+  module Message_id : ITERABLE
+
+  module Message : PRINTABLE
+
+  module Time : TIME
+
+  (** A sliding window cache that stores published messages and their first seen
+    time. The module also keeps track of the number of accesses to a message by
+    a peer, thus indirectly tracking the number of IWant requests a peer makes
+    for the same message between two heartbeats.
+
+    The module assumes that no two different messages have the same message
+    id. However, the cache stores duplicates; for instance, if [add_message id
+    msg topic] is called exactly twice, then [msg] will appear twice in
+    [get_message_ids_to_gossip]'s result (assuming not more than [gossip_slots]
+    shifts have been executed in the meanwhile). *)
+  type t
+
+  (** [create ~history_slots ~gossip_slots ~seen_message_slots] creates two
+      sliding window caches, one with length [history_slots] for storing message contents
+      and another with length [seen_message] for storing seen messages and their first
+      seen times.
+
+      When queried for messages to advertise, the cache only returns messages in
+      the last [gossip_slots]. The [gossip_slots] must be smaller or equal to
+      [history_slots].
+
+      The slack between [gossip_slots] and [history_slots] accounts for the
+      reaction time between when a message is advertised via IHave gossip, and
+      when the peer pulls it via an IWant command. To see this, if say
+      [gossip_slot = history_slots] then the messages inserted in cache
+      [history_slots] heartbeat ticks ago and advertised now will not be
+      available after the next tick, because they are removed from the
+      cache. This means IWant requests from the remote peer for such messages
+      would be unfulfilled and potentially penalizing.
+
+      @raise Assert_failure when [gossip_slots <= 0 || gossip_slots > history_slots]
+
+      TODO: https://gitlab.com/tezos/tezos/-/issues/5129
+      Error handling. *)
+  val create :
+    history_slots:int -> gossip_slots:int -> seen_message_slots:int -> t
+
+  (** Add message to the most recent cache slot. If the message already exists
+      in the cache, the message is not overridden, instead a duplicate message
+      id is stored (the message itself is only stored once). *)
+  val add_message : Message_id.t -> Message.t -> Topic.t -> t -> t
+
+  (** Get the message associated to the given message id, increase the access
+      counter for the peer requesting the message, and also returns the updated
+      counter. *)
+  val get_message_for_peer :
+    Peer.t -> Message_id.t -> t -> (t * Message.t * int) option
+
+  (** Get the message ids for the given topic in the last [gossip_slots] slots
+      of the cache. If there were duplicates added in the cache, then there will
+      be duplicates in the output. There is no guarantee about the order of
+      messages in the output. *)
+  val get_message_ids_to_gossip : Topic.t -> t -> Message_id.t list
+
+  (** [get_first_seen_time message_id t] returns the time the message with [message_id]
+      was first seen. Returns [None] if the message was not seen during the period
+      covered by the sliding window. *)
+  val get_first_seen_time : Message_id.t -> t -> Time.t option
+
+  (** [seen_message message_id t] returns [true] if the message was seen during the
+      period covered by the sliding window and returns [false] if otherwise. *)
+  val seen_message : Message_id.t -> t -> bool
+
+  (** Shift the sliding window by one slot (usually corresponding to one
+      heartbeat tick). *)
+  val shift : t -> t
+
+  module Internal_for_tests : sig
+    val get_access_counters : t -> (Message_id.t * int Peer.Map.t) Seq.t
   end
 end
 
@@ -559,7 +640,9 @@ module type AUTOMATON = sig
     | Mesh_full : [`Graft] output
         (** Grafting a peer for a topic whose mesh has already sufficiently many
             peers. *)
-    | No_peer_in_mesh : [`Prune] output
+    | Prune_topic_not_tracked : [`Prune] output
+        (** Attempting to prune a peer for a non-tracked topic. *)
+    | Peer_not_in_mesh : [`Prune] output
         (** Attempting to prune a peer which is not in the mesh. *)
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
         (** The given peer has been pruned for the given topic, but no

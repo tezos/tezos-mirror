@@ -131,7 +131,8 @@ module Make (C : AUTOMATON_CONFIG) :
     | Grafting_successfully : [`Graft] output
     | Peer_backed_off : [`Graft] output
     | Mesh_full : [`Graft] output
-    | No_peer_in_mesh : [`Prune] output
+    | Prune_topic_not_tracked : [`Prune] output
+    | Peer_not_in_mesh : [`Prune] output
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
     | No_PX : [`Prune] output
     | PX : Peer.Set.t -> [`Prune] output
@@ -168,7 +169,8 @@ module Make (C : AUTOMATON_CONFIG) :
   type connection = {
     topics : Topic.Set.t;  (** The set of topics the peer subscribed to. *)
     direct : bool;
-        (** A direct (aka explicit) connection is a connection to which we forward all the messages. *)
+        (** A direct (aka explicit) connection is a connection to which we
+            forward all the messages. *)
     outbound : bool;  (** An outbound connection is a connection we initiated. *)
   }
 
@@ -176,12 +178,9 @@ module Make (C : AUTOMATON_CONFIG) :
 
   module Message_cache = Message_cache.Make (C.Subconfig) (Time)
 
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/4983
-
-      This data-structure should be documented. *)
   type state = {
-    limits : limits;
-    parameters : parameters;
+    limits : limits;  (** Statically known parameters of the algorithm. *)
+    parameters : parameters;  (** Other parameters of the algorithm. *)
     connections : connection Peer.Map.t;
         (** [connections] is the set of active connections. A connection is added
             through the `Add_peer` message and removed through the `Remove_peer`
@@ -192,7 +191,11 @@ module Make (C : AUTOMATON_CONFIG) :
             can't be stored in {!connections}. Any peer having an active connection
             is associated to a score. *)
     ihave_per_heartbeat : int Peer.Map.t;
+        (** Mapping tracking for each peer the number of IHave messages received from
+            that peer between two heartbeats. *)
     iwant_per_heartbeat : int Peer.Map.t;
+        (** Mapping tracking for each peer the number of messages ids sent in
+            IWant messages to that peer between two heartbeats. *)
     mesh : Peer.Set.t Topic.Map.t;
         (** The mesh for a topic is a random subset of the connected peers
             subscribed to that topic and that have non-negative score, are not
@@ -212,8 +215,11 @@ module Make (C : AUTOMATON_CONFIG) :
              backoff is set for a peer and a topic, this peer is not expected
              to be in the mesh of the given topic.  *)
     message_cache : Message_cache.t;
-    rng : Random.State.t;
+        (** A sliding window cache that stores published messages and their first
+        seen time. *)
+    rng : Random.State.t;  (** The state of the PRNG algorithm. *)
     heartbeat_ticks : int64;
+        (** A counter of the number of elapsed heartbeat ticks.  *)
   }
   (* Invariants:
 
@@ -246,7 +252,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
   let assert_in_unit_interval v = assert (v >= 0.0 && v <= 1.0)
 
-  let check_per_topic_score_parameters tsp =
+  let check_per_topic_score_limits tsp =
     assert (tsp.time_in_mesh_weight >= 0.0) ;
     assert (tsp.time_in_mesh_cap >= 0.0) ;
     assert (tsp.time_in_mesh_quantum > 0.0) ;
@@ -263,12 +269,11 @@ module Make (C : AUTOMATON_CONFIG) :
     assert (tsp.invalid_message_deliveries_weight <= 0.0) ;
     assert_in_unit_interval tsp.invalid_message_deliveries_decay
 
-  let check_score_parameters (sp : _ score_parameters) =
+  let check_score_limits (sp : _ score_limits) =
     (match sp.topics with
-    | Topic_score_parameters_single tp -> check_per_topic_score_parameters tp
-    | Topic_score_parameters_family {all_topics; parameters; weights = _} ->
-        Seq.map parameters all_topics
-        |> Seq.iter check_per_topic_score_parameters) ;
+    | Topic_score_limits_single tp -> check_per_topic_score_limits tp
+    | Topic_score_limits_family {all_topics; parameters; weights = _} ->
+        Seq.map parameters all_topics |> Seq.iter check_per_topic_score_limits) ;
     Option.iter (fun cap -> assert (cap >= 0.0)) sp.topic_score_cap ;
     assert (sp.behaviour_penalty_weight <= 0.0) ;
     assert (sp.behaviour_penalty_threshold >= 0.0) ;
@@ -293,7 +298,7 @@ module Make (C : AUTOMATON_CONFIG) :
     assert (l.degree_out <= l.degree_optimal / 2) ;
     assert (l.history_gossip_length > 0) ;
     assert (l.history_gossip_length <= l.history_length) ;
-    check_score_parameters l.score_parameters
+    check_score_limits l.score_limits
 
   let make : Random.State.t -> limits -> parameters -> state =
    fun rng limits parameters ->
@@ -392,7 +397,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let rng state = state.rng
 
-    let score_parameters state = state.limits.score_parameters
+    let score_limits state = state.limits.score_limits
 
     let update ?(delta = 1) key map =
       Peer.Map.update
@@ -721,7 +726,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! rng in
       let iwant_message_ids_len = List.length message_ids in
-      (* Do not send more messages than [max_sent_iwant_per_heartbeat] *)
+      (* Do not send more than [max_sent_iwant_per_heartbeat] message ids. *)
       let iwant_ids_to_send_n = min iwant_message_ids_len limit in
       let shuffle_iwant_ids = List.shuffle ~rng message_ids in
       let requested_message_ids =
@@ -740,8 +745,8 @@ module Make (C : AUTOMATON_CONFIG) :
             Ihave_from_peer_with_low_score {score; threshold = gossip_threshold})
       in
       let* count_ihave_received = update_and_get_ihave_per_heartbeat peer in
-      let*! count_iwant_sent = find_iwant_per_heartbeat peer in
       let*? () = check_too_many_recv_ihave_message count_ihave_received in
+      let*! count_iwant_sent = find_iwant_per_heartbeat peer in
       let*? () = check_too_many_sent_iwant_message count_iwant_sent in
       let*? () = check_topic_tracked topic in
       let* iwant_message_ids = filter peer message_ids in
@@ -753,7 +758,7 @@ module Make (C : AUTOMATON_CONFIG) :
         shuffle_and_trunc iwant_message_ids ~limit
       in
       let* () = update_iwant_per_heartbeat ~delta:length peer in
-      (* FIXME https://gitlab.com/tezos/tezos/-/issues/4966
+      (* FIXME https://gitlab.com/tezos/tezos/-/issues/5532
 
          The go implementation traces some of the messages
          requested. *)
@@ -928,16 +933,17 @@ module Make (C : AUTOMATON_CONFIG) :
       fail_if Score.(value score < of_float accept_px_threshold)
       @@ Ignore_PX_score_too_low score
 
-    let check_topic_known topic =
+    let check_topic_tracked topic =
       let open Monad.Syntax in
       let*! mesh_opt = find_mesh topic in
       match mesh_opt with
-      | None -> No_peer_in_mesh |> fail
+      | None -> Prune_topic_not_tracked |> fail
       | Some mesh -> pass mesh
 
     let handle peer topic ~px ~backoff =
       let open Monad.Syntax in
-      let*? mesh = check_topic_known topic in
+      let*? mesh = check_topic_tracked topic in
+      let*? () = fail_if_not (Peer.Set.mem peer mesh) Peer_not_in_mesh in
       let mesh = Peer.Set.remove peer mesh in
       let* () = set_mesh_topic topic mesh in
       let* () = set_backoff_for_peer backoff topic peer in
@@ -1790,7 +1796,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! connections in
       let*! scores in
-      let*! score_parameters in
+      let*! score_limits in
       match Peer.Map.find peer connections with
       | None ->
           let connection = {direct; topics = Topic.Set.empty; outbound} in
@@ -1799,7 +1805,7 @@ module Make (C : AUTOMATON_CONFIG) :
             Peer.Map.update
               peer
               (function
-                | None -> Some (Score.newly_connected score_parameters)
+                | None -> Some (Score.newly_connected score_limits)
                 | Some score -> Some (Score.set_connected score))
               scores
           in
@@ -2102,7 +2108,8 @@ module Make (C : AUTOMATON_CONFIG) :
     | Grafting_successfully -> fprintf fmtr "Grafting_successfully"
     | Peer_backed_off -> fprintf fmtr "Peer_backed_off"
     | Mesh_full -> fprintf fmtr "Mesh_full"
-    | No_peer_in_mesh -> fprintf fmtr "No_peer_in_mesh"
+    | Prune_topic_not_tracked -> fprintf fmtr "Prune_topic_not_tracked"
+    | Peer_not_in_mesh -> fprintf fmtr "Peer_not_in_mesh"
     | Ignore_PX_score_too_low score ->
         fprintf fmtr "Ignore_PX_score_too_low %a" Score.pp score
     | No_PX -> fprintf fmtr "No_PX"

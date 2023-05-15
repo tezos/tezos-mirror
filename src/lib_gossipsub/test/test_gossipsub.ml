@@ -27,8 +27,8 @@ open Tezos_gossipsub
 open Gossipsub_intf
 module Milliseconds = Test_gossipsub_shared.Milliseconds
 
-let per_topic_score_parameters =
-  Topic_score_parameters_single
+let per_topic_score_limits =
+  Topic_score_limits_single
     {
       time_in_mesh_weight = 1.0;
       time_in_mesh_cap = 3600.0;
@@ -48,9 +48,9 @@ let per_topic_score_parameters =
       invalid_message_deliveries_decay = 0.3;
     }
 
-let score_parameters =
+let score_limits =
   {
-    topics = per_topic_score_parameters;
+    topics = per_topic_score_limits;
     topic_score_cap = Some 3600.;
     behaviour_penalty_weight = ~-.10.0;
     behaviour_penalty_threshold = 0.0;
@@ -91,7 +91,7 @@ let default_limits =
     opportunistic_graft_peers = 2;
     opportunistic_graft_threshold = 1.;
     seen_history_length = 120;
-    score_parameters;
+    score_limits;
   }
 
 let parameters = {peer_filter = (fun _peer _action -> true)}

@@ -172,7 +172,7 @@ end
 module C = Automaton_config
 module GS = Tezos_gossipsub.Make (C)
 
-let pp_per_topic_score_parameters =
+let pp_per_topic_score_limits =
   Fmt.Dump.record
     [
       Fmt.Dump.field
@@ -194,16 +194,16 @@ let pp_per_topic_score_parameters =
         Fmt.int;
     ]
 
-let pp_topic_score_parameters fmtr tsp =
+let pp_topic_score_limits fmtr tsp =
   match tsp with
-  | Topic_score_parameters_single p -> pp_per_topic_score_parameters fmtr p
-  | Topic_score_parameters_family _ -> Format.fprintf fmtr "<...>"
+  | Topic_score_limits_single p -> pp_per_topic_score_limits fmtr p
+  | Topic_score_limits_family _ -> Format.fprintf fmtr "<...>"
 
-let pp_score_parameters =
+let pp_score_limits =
   Fmt.Dump.(
     record
       [
-        field "topics" (fun sp -> sp.topics) pp_topic_score_parameters;
+        field "topics" (fun sp -> sp.topics) pp_topic_score_limits;
         field
           "behaviour_penalty_weight"
           (fun sp -> sp.behaviour_penalty_weight)
@@ -246,7 +246,7 @@ let pp_limits fmtr
     opportunistic_graft_peers;
     opportunistic_graft_threshold;
     seen_history_length;
-    score_parameters;
+    score_limits;
   } =
     l
   in
@@ -282,7 +282,7 @@ let pp_limits fmtr
      opportunistic_graft_peers = %d;@;\
      opportunistic_graft_threshold = %f;@;\
      seen_history_length = %d;@;\
-     score_parameters= %a }@]"
+     score_limits= %a }@]"
     max_recv_ihave_per_heartbeat
     max_sent_iwant_per_heartbeat
     max_gossip_retransmission
@@ -318,8 +318,8 @@ let pp_limits fmtr
     opportunistic_graft_peers
     opportunistic_graft_threshold
     seen_history_length
-    pp_score_parameters
-    score_parameters
+    pp_score_limits
+    score_limits
 
 (** Instantiate the worker functor *)
 module Worker_config = struct
