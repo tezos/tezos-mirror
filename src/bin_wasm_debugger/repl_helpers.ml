@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_scoru_wasm_helpers
-
 (* [error loc category msg] fails with the location of an error and a message,
    returned by either the parser of the typechecker of the WASM reference
    interpreter. *)
@@ -66,46 +64,6 @@ let read_file file =
         let buffer = Bytes.make (Int64.to_int len) '\000' in
         let+ () = read_into_exactly ic buffer 0 (Int64.to_int len) in
         Bytes.to_string buffer))
-
-(* [find_key_in_durable] retrieves the given [key] from the durable storage in
-   the tree. Returns `None` if the key does not exists. *)
-let find_key_in_durable tree key =
-  let open Lwt_syntax in
-  let* durable = Wasm_utils.wrap_as_durable_storage tree in
-  let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
-  Tezos_scoru_wasm.Durable.find_value durable key
-
-(* [print_durable ~depth ~show_values ~path tree] prints the keys in the durable
-   storage from the given path and their values in their hexadecimal
-   representation. By default, it prints from the root of the durable
-   storage. *)
-let print_durable ?(depth = 10) ?(show_values = true) ?(path = []) tree =
-  let open Lwt_syntax in
-  let durable_path = "durable" :: path in
-  let* path_exists = Encodings_util.Tree.mem_tree tree durable_path in
-  if path_exists then
-    Encodings_util.Tree.fold
-      ~depth:(`Le depth)
-      tree
-      ("durable" :: path)
-      ~order:`Sorted
-      ~init:()
-      ~f:(fun key tree () ->
-        let full_key = String.concat "/" key in
-        (* If we need to show the values, we show every keys, even the root and
-           '@'. *)
-        if show_values then
-          let+ value = Encodings_util.Tree.find tree [] in
-          let value = Option.value ~default:(Bytes.create 0) value in
-          Format.printf "/%s\n  %a\n%!" full_key Hex.pp (Hex.of_bytes value)
-        else if key <> [] && key <> ["@"] then
-          return (Format.printf "/%s\n%!" full_key)
-        else return_unit)
-  else
-    Lwt.return
-    @@ Format.printf
-         "The path /%s is not available in the durable storage\n%!"
-         (String.concat "/" path)
 
 type integer_value_kind = [`U16 | `I32 | `I64 | `U128 | `U256]
 
