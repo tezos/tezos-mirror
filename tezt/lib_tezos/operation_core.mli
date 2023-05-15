@@ -69,6 +69,7 @@ type consensus_kind = Attestation | Preattestation
    this module. *)
 type kind =
   | Consensus of {kind : consensus_kind; chain_id : string}
+  | Anonymous
   | Voting
   | Manager
 
@@ -255,6 +256,69 @@ module Consensus : sig
     ?chain_id:string ->
     ?error:rex ->
     signer:Account.key ->
+    t ->
+    Client.t ->
+    [`OpHash of string] Lwt.t
+end
+
+module Anonymous : sig
+  (** A representation of an anonymous operation. *)
+  type t
+
+  type double_consensus_evidence_kind =
+    | Double_attestation_evidence
+    | Double_preattestation_evidence
+
+  (** [double_consensus_evidence ~kind ~use_legacy_name op1 op2] crafts a double
+      consensus evidence operation with the [kind], [op1] and [op2]. Both
+      operations should be of the same kind and the same as the one expected by
+      [kind]. If [use_legacy_name] is set, the [kind] field in the crafted JSON
+      will be "(pre)endorsement" instead of "(pre)attestation". *)
+  val double_consensus_evidence :
+    kind:double_consensus_evidence_kind ->
+    use_legacy_name:bool ->
+    operation * Tezos_crypto.Signature.t ->
+    operation * Tezos_crypto.Signature.t ->
+    t
+
+  (** [double_attestation_evidence ~use_legacy_name op1 op2] crafts a double
+      attestation evidence operation with op1 and op2. Both operations should be
+      attestations. If [use_legacy_name] is set, the [kind] field in the crafted
+      JSON will be "endorsement" instead of "attestation". *)
+  val double_attestation_evidence :
+    use_legacy_name:bool ->
+    operation * Tezos_crypto.Signature.t ->
+    operation * Tezos_crypto.Signature.t ->
+    t
+
+  (** [double_preattestation_evidence ~use_legacy_name op1 op2] crafts a double
+      attestation evidence operation with op1 and op2. Both operations should be
+      preattestations. If [use_legacy_name] is set, the [kind] field in the
+      crafted JSON will be "preendorsement" instead of "preattestation". *)
+  val double_preattestation_evidence :
+    use_legacy_name:bool ->
+    operation * Tezos_crypto.Signature.t ->
+    operation * Tezos_crypto.Signature.t ->
+    t
+
+  (** [kind_to_string kind use_legacy_name] return the name of the [kind]. If
+      [use_legacy_name] is set, the name corresponding to the [kind] will be
+      "double_(pre)endorsement_evidence" instead of
+      "double_(pre)attestation_evidence". *)
+  val kind_to_string : double_consensus_evidence_kind -> bool -> string
+
+  (** [operation] constructs an operation from an anonymous operation. the
+      [client] is used to fetch the branch and the [chain_id]. *)
+  val operation : ?branch:string -> t -> Client.t -> operation Lwt.t
+
+  (** A wrapper for {!val:inject} with anonymous operations. The client is used
+      to get all the data that was not provided if it can be recovered via RPCs.
+      Mainly those are the [branch] and the [chain_id]. *)
+  val inject :
+    ?request:[`Inject | `Notify] ->
+    ?force:bool ->
+    ?branch:string ->
+    ?error:rex ->
     t ->
     Client.t ->
     [`OpHash of string] Lwt.t
