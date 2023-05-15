@@ -355,7 +355,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
             (* 1 more blind is added for the commitment evaluation *)
               (fun f -> Poly.blind ~nb_blinds:(1 + nb_extra_blinds) n f)
             unblinded_res
-          |> SMap.two_maps_of_pair_map
+          |> SMap.to_pair
         in
         (polys, Some blinds)
       else (unblinded_res, None)
@@ -389,7 +389,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
               w_list
             |> List.split)
           wires_list_map
-        |> SMap.two_maps_of_pair_map
+        |> SMap.to_pair
       in
       (* all wire-polynomials gathered in a map *)
       let all_f_wires = SMap.Aggregation.gather_maps ?shifts_map f_wires in

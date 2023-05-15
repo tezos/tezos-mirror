@@ -111,12 +111,6 @@ module StringMap = struct
       failwith "sub_map : first argument is not contained in the second." ;
     res
 
-  let two_maps_of_pair_map m =
-    fold
-      (fun k (v1, v2) (acc1, acc2) -> (add k v1 acc1, add k v2 acc2))
-      m
-      (empty, empty)
-
   let update_keys f map = fold (fun k v acc -> add (f k) v acc) map empty
 
   module Aggregation = struct
@@ -192,6 +186,7 @@ module type S = sig
 
   val values : 'a t -> 'a list
 
+  (* Splits a map of pairs into a pair of maps *)
   val to_pair : ('a * 'b) t -> 'a t * 'b t
 
   (* [add_unique k v map] adds [k -> v] to [map] & throw an error if [k] is
@@ -214,9 +209,6 @@ module type S = sig
      Raises failure if some key of m1 is not in m2
   *)
   val sub_map : 'a t -> 'b t -> 'b t
-
-  (* Splits a map of couple into a couple of maps *)
-  val two_maps_of_pair_map : ('a * 'b) t -> 'a t * 'b t
 
   (* USE WITH CAUTION : be sure your update function won’t create duplications *)
   val update_keys : (key -> key) -> 'a t -> 'a t
