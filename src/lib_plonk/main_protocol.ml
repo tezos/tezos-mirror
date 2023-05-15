@@ -997,16 +997,14 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
           Inputs:
           - n: the number of constraints in the circuits + the number of public inputs
        -   domain: the interpolation domain for polynomials of size n
-       - s elector_polys: the selector polynomials,
-       e.g. [ql, qr, qo, qm, qc] for an arithmetic circuit.
-       We assume ql is the first polynomial in the list.
-       - wire_indices: the list corresponding to the wires indices,
-       e.g. [a, b, c] for an arithmetic circuit
        - l, the number of public inputs + the number of elements committed in input_commitments
        Outputs:
-       - interpolated_polys: selector polynomials, prepended with 0/1s for the public inputs,
+       - interpolated_gates: selector polynomials, prepended with 0/1s for the public inputs,
        interpolated on the domain
+       - extended_gates: gates with "q_pub" selector if there is public_inputs
        - extended_wires: circuits wires prepended with wires corresponding to the public inputs
+       - extended_tables: formatted tables
+       - adapted_range_checks: range check with indexes shifted regarding public_inputs
     *)
     let preprocessing n domain (c : Circuit.t) =
       let l = List.fold_left ( + ) c.public_input_size c.input_com_sizes in
@@ -1025,11 +1023,11 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       let extended_gates =
         (* Adding 0s/1s for public inputs & input_commitments *)
         SMap.mapi
-          (fun label poly ->
-            let length_poly = Array.length poly in
+          (fun label gate ->
+            let length_poly = Array.length gate in
             Array.init n (fun i ->
                 if i < l && label = ql_name then Scalar.one
-                else if l <= i && i < l + length_poly then poly.(i - l)
+                else if l <= i && i < l + length_poly then gate.(i - l)
                 else Scalar.zero))
           gates
       in
@@ -1053,7 +1051,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       in
       let extended_gates =
         if c.public_input_size = 0 then extended_gates
-        else SMap.add "qpub" [||] extended_gates
+        else SMap.add_unique "qpub" [||] extended_gates
       in
       let extended_wires =
         let li_array = Array.init l (fun i -> i) in
