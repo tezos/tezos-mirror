@@ -90,12 +90,23 @@ module Shards = struct
         Stored_data.make_file ~filepath Cryptobox.share_encoding Stdlib.( = ))
 end
 
+module Shard_proofs_cache =
+  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
+    (struct
+      type t = Cryptobox.Commitment.t
+
+      let equal = Cryptobox.Commitment.equal
+
+      let hash = Hashtbl.hash
+    end)
+
 (** Store context *)
 type node_store = {
   store : t;
   shard_store : Shards.t;
   shards_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
   gs_worker : Gossipsub.Worker.t;
+  in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;
 }
 
 (** [open_shards_stream node_store] opens a stream that should be notified when
@@ -113,7 +124,26 @@ let init gs_worker config =
   let*! store = main repo in
   let shard_store = Shards.init base_dir shard_store_dir in
   let*! () = Event.(emit store_is_ready ()) in
-  return {shard_store; store; shards_watcher; gs_worker}
+
+  (* The size of the cache of 1024 entries is chosen such that: if a DAL node
+     stores the shard proofs of 128 slots per level, the cache will be able to
+     store the proofs for 8 levels, which should be quite sufficient
+     with the current attestation lag.
+
+     A shard proof takes 52 bytes with the current encoding (could be improved
+     to 48), so the maximum memory footprint of the cache is dominated by (keys
+     size is negligible):
+
+     1024 (cache size) * 2048 (shards per slot) * 52 bytes = 109 mb *)
+  let cache_size = 1024 in
+  return
+    {
+      shard_store;
+      store;
+      shards_watcher;
+      gs_worker;
+      in_memory_shard_proofs = Shard_proofs_cache.create cache_size;
+    }
 
 let trace_decoding_error ~data_kind ~tztrace_of_error r =
   let open Result_syntax in
@@ -649,4 +679,13 @@ module Legacy = struct
           (fun header ->
             if header.Services.Types.status = hs then Some header else None)
           accu
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
+
+     handle with_proof flag -> store proofs on disk? *)
+  let save_shard_proofs node_store commitment shard_proofs =
+    Shard_proofs_cache.replace
+      node_store.in_memory_shard_proofs
+      commitment
+      shard_proofs
 end

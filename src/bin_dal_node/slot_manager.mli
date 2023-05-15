@@ -70,12 +70,18 @@ val get_commitment_slot :
   Cryptobox.commitment ->
   (slot, [Errors.decoding | Errors.not_found]) result Lwt.t
 
-(** [add_commitment_shards node_store cryptobox commitment ~with_proof]
-    registers the shards of the slot whose commitment is given.
+(** [add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
+    commitment shard_proofs] registers the shards of the slot whose commitment is
+    given.
+
+    If [shard_proofs.with_proof] is true, proofs are generated for the computed
+    shards using [shards_proofs_precomputation] and stored in a bounded
+    structure in memory.
 
     In addition to decoding errors, the function returns [`Not_found]
     if there is no slot content for [commitment] in [node_store]. *)
 val add_commitment_shards :
+  shards_proofs_precomputation:Cryptobox.shards_proofs_precomputation ->
   Store.node_store ->
   Cryptobox.t ->
   Cryptobox.commitment ->
