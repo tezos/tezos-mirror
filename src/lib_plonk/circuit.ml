@@ -248,8 +248,14 @@ end = struct
             r)
         range_checks
     in
-    (* Remove empty ranges checks lists from range checks map *)
-    let range_checks = SMap.filter (fun _ l -> l <> []) range_checks in
+    (* Remove empty range-check lists from the range-check map & sort lists by index in ascending order *)
+    let range_checks =
+      SMap.filter_map
+        (fun _ -> function
+          | [] -> None
+          | l -> Some (List.sort (fun (a, _) (b, _) -> Int.compare a b) l))
+        range_checks
+    in
     let table_size =
       if tables = [] then 0
       else List.fold_left (fun acc t -> acc + Array.length (List.hd t)) 0 tables
