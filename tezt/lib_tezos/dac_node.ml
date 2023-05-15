@@ -31,10 +31,7 @@ module Parameters = struct
     committee_member_address_opt : string option;
   }
 
-  type coordinator_mode_settings = {
-    threshold : int;
-    committee_members : string list;
-  }
+  type coordinator_mode_settings = {committee_members : string list}
 
   type committee_member_mode_settings = {
     address : string;
@@ -153,9 +150,6 @@ let spawn_config_init dac_node =
           "as";
           "coordinator";
           "with";
-          "threshold";
-          Int.to_string coordinator_params.threshold;
-          "and";
           "data";
           "availability";
           "committee";
@@ -318,9 +312,9 @@ let create_legacy ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
     ()
 
 let create_coordinator ?(path = Constant.dac_node) ?name ?color ?data_dir
-    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir ~threshold
+    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir
     ~committee_members ~node ~client () =
-  let mode = Coordinator {threshold; committee_members} in
+  let mode = Coordinator {committee_members} in
   create
     ~path
     ?name
