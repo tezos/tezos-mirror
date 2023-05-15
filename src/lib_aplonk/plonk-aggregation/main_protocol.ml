@@ -86,15 +86,14 @@ module type S = sig
     r : scalar;
   }
 
-  type input_commit_info = {
-    nb_max_answers : int;
-    nb_max_pi : int;
-    func : ?size:int -> ?shift:int -> scalar array -> PP.Answers_commitment.t;
+  type input_commit_funcs = {
+    pi : scalar array -> PP.Answers_commitment.t;
+    answers : Scalar.t SMap.t SMap.t list -> PP.Answers_commitment.t;
   }
 
   val prove_list :
     prover_public_parameters ->
-    input_commit_infos:input_commit_info SMap.t ->
+    input_commit_funcs:input_commit_funcs SMap.t ->
     inputs:prover_inputs ->
     proof * prover_aux
 
@@ -142,19 +141,17 @@ module Make_impl (Super_PP : Polynomial_protocol.S) = struct
     r : scalar;
   }
 
-  type input_commit_info = {
-    nb_max_answers : int;
-    nb_max_pi : int;
-    func :
-      ?size:int -> ?shift:int -> scalar array -> Super_PP.Answers_commitment.t;
+  type input_commit_funcs = {
+    pi : scalar array -> PP.Answers_commitment.t;
+    answers : Scalar.t SMap.t SMap.t list -> PP.Answers_commitment.t;
   }
 
-  let hash_pi (pp : prover_public_parameters) ic_infos inputs =
+  let hash_pi (pp : prover_public_parameters) ic_funcs inputs =
     (* TODO: can we commit only to the hidden pi?*)
     let pi_infos =
       SMap.mapi
         (fun circuit_name inputs_list ->
-          let ic_info = SMap.find circuit_name ic_infos in
+          let commit = (SMap.find circuit_name ic_funcs).pi in
           let c = SMap.find circuit_name pp.circuits_map in
           let ic_size = List.fold_left ( + ) 0 c.input_com_sizes in
           let pi =
@@ -162,7 +159,7 @@ module Make_impl (Super_PP : Polynomial_protocol.S) = struct
               (fun s -> Array.sub s.witness ic_size c.public_input_size)
               inputs_list
           in
-          (pi, ic_info.func ~size:ic_info.nb_max_pi @@ Array.concat pi))
+          (pi, commit @@ Array.concat pi))
         inputs
     in
     (SMap.map fst pi_infos, SMap.map snd pi_infos)
@@ -209,20 +206,18 @@ module Make_impl (Super_PP : Polynomial_protocol.S) = struct
           (SMap.map PP.Answers_commitment.(fun a -> a.public) cms_pi);
     }
 
-  let commit_to_answers_map =
-    SMap.map (fun ic_info ->
-        ic_info.func ~shift:ic_info.nb_max_pi ~size:ic_info.nb_max_answers)
-
-  let prove_list (pp : prover_public_parameters) ~input_commit_infos ~inputs =
-    let public_inputs_map, cms_pi = hash_pi pp input_commit_infos inputs in
+  let prove_list (pp : prover_public_parameters) ~input_commit_funcs ~inputs =
+    let public_inputs_map, cms_pi = hash_pi pp input_commit_funcs inputs in
     (* add the PI in the transcript *)
     let pp = update_prv_pp_transcript_with_pi pp cms_pi in
-    let commit_to_answers_map = commit_to_answers_map input_commit_infos in
     let ( ( pp_proof,
             Super_PP.{answers; batch; alpha; x; r; cms_answers; t_answers} ),
           (perm_and_plook, wires_cm, rd) ) =
       Prover.prove_parameters
-        ~pp_prove:(Super_PP.prove_super_aggregation ~commit_to_answers_map)
+        ~pp_prove:
+          (Super_PP.prove_super_aggregation
+             ~commit_to_answers_map:
+               (SMap.map (fun f -> f.answers) input_commit_funcs))
         pp
         ~inputs_map:inputs
     in

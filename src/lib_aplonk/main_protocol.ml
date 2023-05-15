@@ -207,18 +207,29 @@ struct
 
   (* ////////////////////////////////////////////////////// *)
 
-  let input_commit_infos (pp : prover_public_parameters) =
-    SMap.map
-      (fun prover_meta_pp ->
+  let input_commit_funcs (pp : prover_public_parameters) inputs =
+    SMap.mapi
+      (fun name pp ->
+        let nb_proofs = List.length (SMap.find name inputs) in
+        (* meta-verification circuits have exactly 2 input commitments:
+           one for the PI and one for the answers (in that order) *)
+        let nb_max_pi = List.hd pp.input_com_sizes in
         Main_Pack.
           {
-            (* meta-verification circuits have exactly 2 input commitments:
-               one for the PI and one for the answers (in that order) *)
-            nb_max_pi = List.hd prover_meta_pp.input_com_sizes;
-            nb_max_answers = List.nth prover_meta_pp.input_com_sizes 1;
-            func =
-              (fun ?size ?shift s ->
-                Main_KZG.input_commit ?size ?shift prover_meta_pp.meta_pp s);
+            pi = (fun pi -> Main_KZG.input_commit ~size:nb_max_pi pp.meta_pp pi);
+            answers =
+              (fun answers ->
+                let answers =
+                  Plonk.Utils.pad_answers
+                    pp.nb_proofs
+                    pp.nb_rc_wires
+                    nb_proofs
+                    answers
+                in
+                Main_KZG.input_commit
+                  ~shift:nb_max_pi
+                  pp.meta_pp
+                  (Array.of_list answers));
           })
       pp.meta_pps
 
@@ -327,8 +338,8 @@ struct
            "Main_Kzg.prove could not create a proof for the verification \
             circuit.")
 
-  let meta_proof (pp : prover_public_parameters) inputs (main_proof, prover_aux)
-      =
+  let meta_proof (pp : prover_public_parameters) inputs
+      (main_proof, (prover_aux : Main_Pack.prover_aux)) =
     let open Main_Pack in
     let transcript =
       Data_encoding.Binary.to_bytes_exn proof_encoding main_proof
@@ -370,9 +381,9 @@ struct
 
   let prove (pp : prover_public_parameters) ~(inputs : prover_inputs) =
     let pp = filter_prv_pp_circuits pp inputs in
-    let input_commit_infos = input_commit_infos pp in
+    let input_commit_funcs = input_commit_funcs pp inputs in
     let proof_base_circuits =
-      try Main_Pack.prove_list pp.main_pp ~input_commit_infos ~inputs
+      try Main_Pack.prove_list pp.main_pp ~input_commit_funcs ~inputs
       with Main_Pack.Rest_not_null _ ->
         raise
           (Rest_not_null

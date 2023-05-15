@@ -408,22 +408,23 @@ module Super_impl (PI : Aplonk.Pi_parameters.S) = struct
         transcript )
 
   let distributed_prove_super_aggregation ~workers
-      (pp : Main_Pack.prover_public_parameters) ~input_commit_infos ~inputs =
+      (pp : Main_Pack.prover_public_parameters) ~input_commit_funcs ~inputs =
     let open Common in
     let open Main_Pack in
     let open D in
     (* TODO: can we commit only to the hidden pi?*)
-    let public_inputs_map, cms_pi = hash_pi pp input_commit_infos inputs in
+    let public_inputs_map, cms_pi = hash_pi pp input_commit_funcs inputs in
     (* add the PI in the transcript *)
     let pp = update_prv_pp_transcript_with_pi pp cms_pi in
-    let commit_to_answers_map = commit_to_answers_map input_commit_infos in
     let* ( (pp_proof, PP.{answers; batch; alpha; x; r; cms_answers; t_answers}),
            _transcript,
            (perm_and_plook, wires_cm, beta, gamma, beta_rc, gamma_rc, delta) ) =
       distributed_prover
         ~workers
         ~pp_prove:
-          (pp_distributed_prove_super_aggregation_main ~commit_to_answers_map)
+          (pp_distributed_prove_super_aggregation_main
+             ~commit_to_answers_map:
+               (SMap.map (fun f -> f.answers) input_commit_funcs))
         pp
         ~inputs
     in
@@ -471,7 +472,7 @@ module Super_impl (PI : Aplonk.Pi_parameters.S) = struct
       distributed_prove_super_aggregation
         ~workers
         pp.main_pp
-        ~input_commit_infos:(input_commit_infos pp)
+        ~input_commit_funcs:(input_commit_funcs pp inputs)
         ~inputs
     in
     return (meta_proof pp inputs distributed_proof)
