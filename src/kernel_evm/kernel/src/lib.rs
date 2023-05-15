@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -48,7 +49,7 @@ fn retrieve_smart_rollup_address<Host: Runtime>(
     match read_smart_rollup_address(host) {
         Ok(smart_rollup_address) => Ok(smart_rollup_address),
         Err(_) => {
-            let rollup_metadata = Runtime::reveal_metadata(host)?;
+            let rollup_metadata = Runtime::reveal_metadata(host);
             let address = rollup_metadata.raw_rollup_address;
             store_smart_rollup_address(host, &address)?;
             Ok(address)

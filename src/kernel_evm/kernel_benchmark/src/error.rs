@@ -1,6 +1,5 @@
 use evm_execution::storage::blocks::EvmBlockStorageError;
 use evm_execution::EthereumError;
-use host::runtime::RuntimeError;
 use rlp::DecoderError;
 use tezos_ethereum::signatures::TransactionError;
 use thiserror::Error;
@@ -16,9 +15,6 @@ pub enum ApplicationError {
     /// Error happened during interaction with the storage
     #[error("EVM storage failed: {0}")]
     EvmStorage(#[from] EvmBlockStorageError),
-    /// Error fetching rollup metadata from host
-    #[error("Failed to fetch rollup metadata: {0:?}")]
-    FailedToFetchRollupMetadata(RuntimeError),
     /// Error executing ethereum transaction
     #[error("Failed to execute ethereum transaction: {0:?}")]
     EthereumError(#[from] EthereumError),

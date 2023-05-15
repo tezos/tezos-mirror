@@ -77,21 +77,18 @@ fn process_info<Host: Runtime>(
     level: u32,
     info: InfoPerLevel,
 ) -> Result<(), ApplicationError> {
-    Runtime::reveal_metadata(host)
-        .map_err(ApplicationError::FailedToFetchRollupMetadata)
-        .and_then(|metadata| {
-            // Origination level considered to be block level with number 0
-            // Next one is with number 1
-            let block_level: u64 = u64::from(level - metadata.origination_level);
-            let block_number = U256::from(block_level);
-            evm_execution::storage::blocks::add_new_block(
-                host,
-                block_number,
-                H256::from_slice(&Keccak256::digest(info.predecessor.0.as_slice())),
-                info.predecessor_timestamp.as_u64().into(),
-            )
-            .map_err(ApplicationError::EvmStorage)
-        })
+    let metadata = Runtime::reveal_metadata(host);
+    // Origination level considered to be block level with number 0
+    // Next one is with number 1
+    let block_level: u64 = u64::from(level - metadata.origination_level);
+    let block_number = U256::from(block_level);
+    evm_execution::storage::blocks::add_new_block(
+        host,
+        block_number,
+        H256::from_slice(&Keccak256::digest(info.predecessor.0.as_slice())),
+        info.predecessor_timestamp.as_u64().into(),
+    )
+    .map_err(ApplicationError::EvmStorage)
 }
 /// Process one Ethereum transaction
 fn process_ethereum_transaction<Host>(
