@@ -64,16 +64,40 @@ let init_account (ctxt, balance_updates)
         contract
         (Some (Option.value ~default:public_key_hash delegate_to))
       >>=? fun ctxt ->
-      match consensus_key with
+      (match consensus_key with
       | None -> return ctxt
       | Some consensus_key ->
           Delegate_consensus_key.init ctxt public_key_hash consensus_key)
+      >>=? fun ctxt ->
+      match delegate_to with
+      | Some delegate
+        when Signature.Public_key_hash.(delegate <> public_key_hash) ->
+          return (ctxt, [])
+      | _ ->
+          (* Self-delegated => contract is a delegate.
+             Freeze the largest amount of tokens to avoid over-delegation
+             according to the [delegation_over_baking_limit].
+             This is necessary so that the network (in tests too) starts with
+             accounts with baking rights. *)
+          let delegation_over_baking_limit =
+            Constants_storage.delegation_over_baking_limit ctxt
+          in
+          let amount_to_freeze =
+            Tez_repr.div_exn amount (delegation_over_baking_limit + 1)
+          in
+          Token.transfer
+            ~origin:Protocol_migration
+            ctxt
+            (`Contract contract)
+            (`Frozen_deposits public_key_hash)
+            amount_to_freeze)
   | None ->
       fail_when
         (Option.is_some delegate_to)
         (Unrevealed_public_key public_key_hash)
-      >>=? fun () -> return ctxt)
-  >|=? fun ctxt -> (ctxt, new_balance_updates @ balance_updates)
+      >>=? fun () -> return (ctxt, []))
+  >|=? fun (ctxt, freeze_balance_updates) ->
+  (ctxt, freeze_balance_updates @ new_balance_updates @ balance_updates)
 
 let init_contract ~typecheck_smart_contract (ctxt, balance_updates)
     ({delegate; amount; script} : Parameters_repr.bootstrap_contract) =
