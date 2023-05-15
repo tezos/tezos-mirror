@@ -2038,6 +2038,18 @@ Constraints: 7
 Bool.test_bor_lookup_optimized:
 Constraints: 4
 
+RC.vanilla:
+Proof size: 3.08 KB
+Proof hash: 438bd14017d002b53c021f62518b9ec5ed94cf37c973c168daa22d7bf833604a
+Prover_pp hash: 86fb56ee097c93330209bf54d4e164bc456b461ea567d2e555941c2d73aad369
+Verifier_pp hash: 0c13388ce0d417029b16d73377e2e13bd7f8b9b49780d15c35a58c2f03bfa734
+
+RC.optimizer:
+Proof size: 3.22 KB
+Proof hash: cdf97e9e75fa7096e238742cdae802698cc0e3f5d9f381cc73a3491698912dc4
+Prover_pp hash: 0e94ed863703b185f62d244fb35788e920d0a85b2731686ac7d9d2e41538e4de
+Verifier_pp hash: 0f5c8379fe5ca4ffa27a5e45080b9c59adfc63a16f6e366a0dd3386c57da3eb3
+
 Optimizer.test_long_sum:
 Constraints: 100
 
