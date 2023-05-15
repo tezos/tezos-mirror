@@ -950,8 +950,8 @@ let () =
            e)
   | _ -> None
 
-let publish_and_store_slot ?counter ?force ?level ?(fee = 1_200) node client
-    dal_node source index content ~slot_size =
+let publish_and_store_slot ?with_proof ?counter ?force ?level ?(fee = 1_200)
+    node client dal_node source index content ~slot_size =
   let slot_level =
     match level with Some level -> level | None -> 1 + Node.get_level node
   in
@@ -959,7 +959,8 @@ let publish_and_store_slot ?counter ?force ?level ?(fee = 1_200) node client
     let slot = Rollup.Dal.make_slot ~slot_size content in
     let* commit = RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot) in
     let* () =
-      RPC.call dal_node @@ Rollup.Dal.RPC.put_commitment_shards commit
+      RPC.call dal_node
+      @@ Rollup.Dal.RPC.put_commitment_shards ?with_proof commit
     in
     let* () =
       RPC.call
@@ -2563,6 +2564,65 @@ let check_events_with_topic ~event_with_topic dal_node ~num_slots expected_pkh =
       if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
       else None)
 
+type event_with_message = Publish_message | Message_with_header of peer_id
+
+let event_with_message_to_string = function
+  | Publish_message -> "publish_message"
+  | Message_with_header _ -> "message_with_header"
+
+(** This function monitors the Gossipsub worker events whose name is given by
+    [event_with_message]. It's somehow similar to function
+    {!check_events_with_topic}, except that what varies here is the shard index
+    instead of slot index. Moreover, shards do not necessiraly start from 0 or
+    end at number_of_shards - 1. *)
+let check_events_with_message ~event_with_message dal_node ~from_shard ~to_shard
+    ~expected_commitment ~expected_level ~expected_pkh ~expected_slot =
+  let remaining = ref (to_shard - from_shard + 1) in
+  let seen = Array.make !remaining false in
+  let get_shard_index_opt event =
+    let topic_slot_index =
+      JSON.(event |-> "topic" |-> "slot_index" |> as_int)
+    in
+    let topic_pkh = JSON.(event |-> "topic" |-> "pkh" |> as_string) in
+    let level = JSON.(event |-> "message_id" |-> "level" |> as_int) in
+    let slot_index = JSON.(event |-> "message_id" |-> "slot_index" |> as_int) in
+    let shard_index =
+      JSON.(event |-> "message_id" |-> "shard_index" |> as_int)
+    in
+    let pkh = JSON.(event |-> "message_id" |-> "pkh" |> as_string) in
+    let commitment =
+      JSON.(event |-> "message_id" |-> "commitment" |> as_string)
+    in
+    let*?? () = check_expected expected_pkh topic_pkh in
+    let*?? () = check_expected expected_pkh pkh in
+    let*?? () = check_expected expected_level level in
+    let*?? () = check_expected expected_slot slot_index in
+    let*?? () = check_expected expected_slot topic_slot_index in
+    let*?? () = check_expected expected_commitment commitment in
+    let*?? () =
+      match event_with_message with
+      | Publish_message -> Some ()
+      | Message_with_header expected_peer_id ->
+          check_expected expected_peer_id JSON.(event |-> "peer" |> as_string)
+    in
+    Some shard_index
+  in
+  wait_for_gossipsub_worker_event
+    dal_node
+    ~name:(event_with_message_to_string event_with_message)
+    (fun event ->
+      let*?? shard_index = get_shard_index_opt event in
+      let index = shard_index - from_shard in
+      Check.(
+        (seen.(index) = false)
+          bool
+          ~error_msg:
+            (sf "Shard_index %d already seen. Invariant broken" shard_index)) ;
+      seen.(index) <- true ;
+      let () = remaining := !remaining - 1 in
+      if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
+      else None)
+
 let test_dal_node_p2p_connection _protocol _parameters _cryptobox node client
     dal_node1 =
   let dal_node2 = Dal_node.create ~node ~client () in
@@ -2596,8 +2656,8 @@ let test_dal_node_join_topic _protocol _parameters _cryptobox _node client
   let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profile profile1) in
   event_waiter
 
-let test_dal_node_gs_topic_subscribe_and_graft _protocol _parameters _cryptobox
-    node client dal_node1 =
+let test_dal_node_gs_topic_subscribe_and_graft_and_publication _protocol
+    parameters _cryptobox node client dal_node1 =
   (* connect *)
   let dal_node2 = Dal_node.create ~node ~client () in
   let* _config_file = Dal_node.init_config dal_node2 in
@@ -2656,7 +2716,74 @@ let test_dal_node_gs_topic_subscribe_and_graft _protocol _parameters _cryptobox
       pkh1
   in
   let* () = RPC.call dal_node2 (Rollup.Dal.RPC.patch_profile profile1) in
-  Lwt.join [event_waiter_subscribe; event_waiter_graft]
+  let* () = Lwt.join [event_waiter_subscribe; event_waiter_graft] in
+
+  (* Posting a DAL message to DAL node and to L1 *)
+  let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
+  let* slot_index, slot_commitment =
+    let slot_size = crypto_params.slot_size in
+    let slot_content = generate_dummy_slot slot_size in
+    publish_and_store_slot
+      ~with_proof:true
+      node
+      client
+      dal_node1
+      ~slot_size
+      Constant.bootstrap1
+      0
+      slot_content
+  in
+
+  (* Preparing event waiters for different shards that will be published by
+     dal_node1 once the slot header is included in an L1 block.
+
+     We also prepare an event waiter for the shards that will be received by
+     dal_node2 on its topics. *)
+  let published_level = Node.get_level node + 1 in
+  let attested_level = published_level + parameters.attestation_lag in
+  let* waiter_publish_list, waiter_direct_forward =
+    let open Rollup.Dal.Committee in
+    (* Get the committee from L1 *)
+    let* committee_from_l1 = at_level node ~level:attested_level in
+    (* For messages publication, we'll have one waiter promise per attestor. *)
+    let waiter_publish_list =
+      List.map
+        (fun {attestor; first_shard_index; power} ->
+          check_events_with_message
+            ~event_with_message:Publish_message
+            dal_node1
+            ~from_shard:first_shard_index
+            ~to_shard:(first_shard_index + power - 1)
+            ~expected_commitment:slot_commitment
+            ~expected_level:published_level
+            ~expected_pkh:attestor
+            ~expected_slot:slot_index)
+        committee_from_l1
+    in
+    (* For messages reception, we'll have one promise for attestor [pkh1]. *)
+    let waiter_direct_forward =
+      match
+        List.find (fun {attestor; _} -> attestor = pkh1) committee_from_l1
+      with
+      | {attestor; first_shard_index; power} ->
+          check_events_with_message
+            ~event_with_message:(Message_with_header peer_id1)
+            dal_node2
+            ~from_shard:first_shard_index
+            ~to_shard:(first_shard_index + power - 1)
+            ~expected_commitment:slot_commitment
+            ~expected_level:published_level
+            ~expected_pkh:attestor
+            ~expected_slot:slot_index
+      | exception Not_found ->
+          Test.fail "Should not happen as %s is part of the committee" pkh1
+    in
+    return (waiter_publish_list, waiter_direct_forward)
+  in
+  (* We bake a block that includes [slot_header] operation. *)
+  let* () = Client.bake_for_and_wait client in
+  let* () = Lwt.join waiter_publish_list and* () = waiter_direct_forward in
+  unit
 
 let register ~protocols =
   (* Tests with Layer1 node only *)
@@ -2757,8 +2884,8 @@ let register ~protocols =
     test_dal_node_join_topic
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    "GS topic subscribe and graft"
-    test_dal_node_gs_topic_subscribe_and_graft
+    "GS topic subscribe and graft and publication"
+    test_dal_node_gs_topic_subscribe_and_graft_and_publication
     protocols ;
 
   (* Tests with all nodes *)
