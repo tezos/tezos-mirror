@@ -18,6 +18,9 @@ depends: [
   "tezos-stdlib-unix"
   "tezos-crypto-dal"
   "tezos-gossipsub"
+  "tezos-p2p"
+  "tezos-p2p-services"
+  "tezos-crypto"
 ]
 build: [
   ["rm" "-r" "vendors"]

@@ -27,6 +27,10 @@
   tezos-store.shared
   tezos-gossipsub
   tezos-dal-node-lib.gossipsub
+  tezos-p2p
+  tezos-p2p-services
+  tezos-crypto
+  tezos-base.p2p-identity-file
   irmin-pack
   irmin-pack.unix
   irmin
@@ -55,6 +59,10 @@
   -open Tezos_store_unix
   -open Tezos_store_shared
   -open Tezos_gossipsub
-  -open Tezos_dal_node_lib_gossipsub))
+  -open Tezos_dal_node_lib_gossipsub
+  -open Tezos_p2p
+  -open Tezos_p2p_services
+  -open Tezos_crypto
+  -open Tezos_base_p2p_identity_file))
 
 (rule (action (progn (write-file void_for_linking-tezos-dal-alpha.empty ""))))

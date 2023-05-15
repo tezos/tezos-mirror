@@ -33,6 +33,8 @@ type t = {
   neighbors : neighbor list;
   listen_addr : P2p_point.Id.t;
   peers : P2p_point.Id.t list;
+  expected_pow : float;
+  network_name : string;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -48,8 +50,9 @@ let default_rpc_addr = "127.0.0.1"
 let default_rpc_port = 10732
 
 let default_listen_addr =
-  let default_net_host = "[::]" in
-  let default_net_port = 11732 in
+  let open Gossipsub.Transport_layer.Default_parameters.P2p_config in
+  let default_net_host = P2p_addr.to_string listening_addr in
+  let default_net_port = listening_port in
   P2p_point.Id.of_string_exn ~default_port:default_net_port default_net_host
 
 let default_neighbors = []
@@ -57,6 +60,11 @@ let default_neighbors = []
 let default_peers = []
 
 let default_use_unsafe_srs = false
+
+let default_expected_pow =
+  Gossipsub.Transport_layer.Default_parameters.P2p_config.expected_pow
+
+let default_network_name = "dal-sandbox"
 
 let neighbor_encoding : neighbor Data_encoding.t =
   let open Data_encoding in
@@ -76,6 +84,8 @@ let encoding : t Data_encoding.t =
            listen_addr;
            neighbors;
            peers;
+           expected_pow;
+           network_name;
          } ->
       ( use_unsafe_srs,
         data_dir,
@@ -83,14 +93,18 @@ let encoding : t Data_encoding.t =
         rpc_port,
         listen_addr,
         neighbors,
-        peers ))
+        peers,
+        expected_pow,
+        network_name ))
     (fun ( use_unsafe_srs,
            data_dir,
            rpc_addr,
            rpc_port,
            listen_addr,
            neighbors,
-           peers ) ->
+           peers,
+           expected_pow,
+           network_name ) ->
       {
         use_unsafe_srs;
         data_dir;
@@ -99,8 +113,10 @@ let encoding : t Data_encoding.t =
         listen_addr;
         neighbors;
         peers;
+        expected_pow;
+        network_name;
       })
-    (obj7
+    (obj9
        (dft
           "use_unsafe_srs"
           ~description:"use unsafe srs for tests"
@@ -127,7 +143,17 @@ let encoding : t Data_encoding.t =
           "peers"
           ~description:"P2P addresses of remote peers"
           (list P2p_point.Id.encoding)
-          default_peers))
+          default_peers)
+       (dft
+          "expected-pow"
+          ~description:"Expected P2P identity's PoW"
+          float
+          default_expected_pow)
+       (dft
+          "network-name"
+          ~description:"The name that identifies the network"
+          string
+          default_network_name))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 
@@ -174,3 +200,7 @@ let load ~data_dir =
   in
   let config = Data_encoding.Json.destruct encoding json in
   {config with data_dir}
+
+let identity_file ~data_dir = Filename.concat data_dir "identity.json"
+
+let peers_file ~data_dir = Filename.concat data_dir "peers.json"

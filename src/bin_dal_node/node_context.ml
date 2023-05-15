@@ -41,9 +41,10 @@ type t = {
   neighbors_cctxts : Dal_node_client.cctxt list;
   committee_cache : Committee_cache.t;
   gs_worker : Gossipsub.Worker.t;
+  transport_layer : Gossipsub.Transport_layer.t;
 }
 
-let init config store gs_worker cctxt =
+let init config store gs_worker transport_layer cctxt =
   let neighbors_cctxts =
     List.map
       (fun Configuration.{addr; port} ->
@@ -62,6 +63,7 @@ let init config store gs_worker cctxt =
     committee_cache =
       Committee_cache.create ~max_size:Constants.committee_cache_size;
     gs_worker;
+    transport_layer;
   }
 
 let set_ready ctxt plugin cryptobox proto_parameters =

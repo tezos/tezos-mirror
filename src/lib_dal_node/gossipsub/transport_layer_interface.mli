@@ -24,60 +24,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module exposes the instantiations of the Gossipsub and Octez-p2p
-    libraries to be used by the DAL node to connect to and exchange data with
-    peers. *)
+(** This module defines the data structures used to instantiate the Octez P2P
+    library. More exactly, it exposes:
 
-(** Below, we expose the main types needed for the integration with the existing
-    DAL node alongside their encodings. *)
+    - the types {!p2p_message}, {!peer_metadata} and {!connection_metadata},
+    used to instantiate type variables of {!P2p.t};
 
-type topic = Gs_interface.topic
+    - the values {!peer_metadata_cfg} of type {!P2p_params.peer_meta_config},
+    {!conn_metadata_cfg} of type {!P2p_params.conn_meta_config} and
+    {!message_cfg} of type {!P2p_params.message_config} that are used when
+    calling {!P2p.create}.
+*)
 
-type message_id = Gs_interface.message_id
+(** Without piggybacking, {!p2p_message} is almost identical to
+    {!Gs_interface.p2p_message}, except that for the [Prune] case,
+    {!P2p_peer.Id.t} elements in [px] are replaced by their {!P2p_point.Id.t}
+    counterpart. *)
+type p2p_message =
+  | Graft of {topic : Gs_interface.topic}
+  | Prune of {
+      topic : Gs_interface.topic;
+      px : P2p_point.Id.t Seq.t;
+      backoff : Gs_interface.Span.t;
+    }
+  | IHave of {
+      topic : Gs_interface.topic;
+      message_ids : Gs_interface.message_id list;
+    }
+  | IWant of {message_ids : Gs_interface.message_id list}
+  | Subscribe of {topic : Gs_interface.topic}
+  | Unsubscribe of {topic : Gs_interface.topic}
+  | Message_with_header of {
+      message : Gs_interface.message;
+      topic : Gs_interface.topic;
+      message_id : Gs_interface.message_id;
+    }
 
-type message = Gs_interface.message
+(** {!peer_metadata} is not used. So, its value is [unit]. *)
+type peer_metadata = unit
 
-type peer = Gs_interface.peer
+(** {!connection_metadata} is not used currently. So, its value is [unit]. *)
+type connection_metadata = unit
 
-val topic_encoding : topic Data_encoding.t
+(** A P2P message config is parameterized by the network's name. *)
+val message_config :
+  network_name:string -> p2p_message P2p_params.message_config
 
-val message_id_encoding : message_id Data_encoding.t
+val peer_meta_config : peer_metadata P2p_params.peer_meta_config
 
-val message_encoding : message Data_encoding.t
-
-(** The worker module exposes instantiation of the Gossipsub worker functor,
-    alongside the config used to instantiate the functor and the default values
-    of the GS parameters. *)
-module Worker : sig
-  module Config :
-    module type of Gs_interface.Worker
-      with type GS.Topic.t = topic
-       and type GS.Message_id.t = message_id
-       and type GS.Message.t = message
-       and type GS.Peer.t = peer
-
-  module Default_parameters : module type of Gs_default_parameters
-
-  include
-    Gossipsub_intf.WORKER
-      with type GS.Topic.t = topic
-       and type GS.Message_id.t = message_id
-       and type GS.Message.t = message
-       and type GS.Peer.t = peer
-       and module GS.Span = Config.GS.Span
-end
-
-(** The transport layer module exposes the needed primitives, interface and
-    default parameters for the instantiation of the Octez-p2p library. *)
-module Transport_layer : sig
-  module Interface : module type of Transport_layer_interface
-
-  module Default_parameters : module type of Transport_layer_default_parameters
-
-  type t
-
-  val create :
-    network_name:string -> P2p.config -> P2p_limits.t -> t tzresult Lwt.t
-
-  val activate : t -> unit
-end
+val conn_meta_config : connection_metadata P2p_params.conn_meta_config

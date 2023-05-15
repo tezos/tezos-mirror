@@ -36,6 +36,9 @@ type t = {
       (** The TCP address and port at which this instance can be reached. *)
   peers : P2p_point.Id.t list;
       (** A list of P2P peers to connect to at startup. *)
+  expected_pow : float;  (** Expected P2P identity's PoW. *)
+  network_name : string;
+      (** A string that identifies the network's name. E.g. dal-sandbox. *)
 }
 
 (** [filename config] gets the path to config file *)
@@ -51,6 +54,10 @@ val default_rpc_addr : string
 
 val default_rpc_port : int
 
+val default_expected_pow : float
+
+val default_network_name : string
+
 (** The default TCP address and port at which this instance can be reached. *)
 val default_listen_addr : P2p_point.Id.t
 
@@ -58,3 +65,11 @@ val default_listen_addr : P2p_point.Id.t
 val save : t -> unit tzresult Lwt.t
 
 val load : data_dir:string -> (t, Error_monad.tztrace) result Lwt.t
+
+(** [identity_file data_dir] returns the absolute path to the "identity.json"
+    file of the DAL node, based on the given [data_dir]. *)
+val identity_file : data_dir:string -> string
+
+(** [peers_file data_dir] returns the absolute path to the "peers.json" file of
+    the DAL node, based on the given [data_dir]. *)
+val peers_file : data_dir:string -> string

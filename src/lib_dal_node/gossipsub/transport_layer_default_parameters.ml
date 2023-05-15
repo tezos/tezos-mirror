@@ -24,60 +24,94 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module exposes the instantiations of the Gossipsub and Octez-p2p
-    libraries to be used by the DAL node to connect to and exchange data with
-    peers. *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/5565
 
-(** Below, we expose the main types needed for the integration with the existing
-    DAL node alongside their encodings. *)
+   Document these values (taken from octez-node), and chage them if needed.
+*)
+module P2p_limits = struct
+  let connection_timeout = Time.System.Span.of_seconds_exn 10.
 
-type topic = Gs_interface.topic
+  let authentication_timeout = Time.System.Span.of_seconds_exn 5.
 
-type message_id = Gs_interface.message_id
+  let greylist_timeout = Time.System.Span.of_seconds_exn 86400. (* one day *)
 
-type message = Gs_interface.message
+  let maintenance_idle_time = Some (Time.System.Span.of_seconds_exn 120.)
+  (* two minutes *)
 
-type peer = Gs_interface.peer
+  let min_connections = 10
 
-val topic_encoding : topic Data_encoding.t
+  let expected_connections = 50
 
-val message_id_encoding : message_id Data_encoding.t
+  let max_connections = 100
 
-val message_encoding : message Data_encoding.t
+  let backlog = 20
 
-(** The worker module exposes instantiation of the Gossipsub worker functor,
-    alongside the config used to instantiate the functor and the default values
-    of the GS parameters. *)
-module Worker : sig
-  module Config :
-    module type of Gs_interface.Worker
-      with type GS.Topic.t = topic
-       and type GS.Message_id.t = message_id
-       and type GS.Message.t = message
-       and type GS.Peer.t = peer
+  let max_incoming_connections = 20
 
-  module Default_parameters : module type of Gs_default_parameters
+  let max_download_speed = None
 
-  include
-    Gossipsub_intf.WORKER
-      with type GS.Topic.t = topic
-       and type GS.Message_id.t = message_id
-       and type GS.Message.t = message
-       and type GS.Peer.t = peer
-       and module GS.Span = Config.GS.Span
+  let max_upload_speed = None
+
+  let read_buffer_size = 1 lsl 14
+
+  let read_queue_size = None
+
+  let write_queue_size = None
+
+  let incoming_app_message_queue_size = None
+
+  let incoming_message_queue_size = None
+
+  let outgoing_message_queue_size = None
+
+  let max_known_points = Some (400, 300)
+
+  let max_known_peer_ids = Some (400, 300)
+
+  let peer_greylist_size = 1023 (* historical value *)
+
+  let ip_greylist_size_in_kilobytes =
+    2 * 1024 (* two megabytes has shown good properties in simulation *)
+
+  let ip_greylist_cleanup_delay =
+    Time.System.Span.of_seconds_exn 86400. (* one day *)
+
+  let binary_chunks_size = None
+
+  (** Contraty to octez-node, [swap_linger] is disabled for Gossipsub. *)
+  let swap_linger = None
 end
 
-(** The transport layer module exposes the needed primitives, interface and
-    default parameters for the instantiation of the Octez-p2p library. *)
-module Transport_layer : sig
-  module Interface : module type of Transport_layer_interface
+module P2p_reconnection_config = struct
+  let factor = 1.05
 
-  module Default_parameters : module type of Transport_layer_default_parameters
+  let initial_delay = Ptime.Span.of_int_s 1
 
-  type t
+  let disconnection_delay = Ptime.Span.of_int_s 5
 
-  val create :
-    network_name:string -> P2p.config -> P2p_limits.t -> t tzresult Lwt.t
+  let increase_cap = Ptime.Span.of_int_s 60
+end
 
-  val activate : t -> unit
+module P2p_config = struct
+  let expected_pow = 26.
+
+  let listening_port = 11732
+
+  let listening_addr = P2p_addr.of_string_exn "127.0.0.1"
+
+  let discovery_port = None
+
+  let discovery_addr = None
+
+  let advertised_port = Some listening_port
+
+  let trusted_points = []
+
+  let private_mode = false
+
+  let proof_of_work_target = Crypto_box.make_pow_target expected_pow
+
+  let trust_discovered_peers = false
+
+  let disable_peer_discovery = true
 end

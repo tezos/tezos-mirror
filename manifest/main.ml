@@ -1897,7 +1897,7 @@ let octez_base_unix =
         octez_event_logging |> open_;
       ]
 
-let octez_p2p_identity_file =
+let octez_base_p2p_identity_file =
   public_lib
     "tezos-base.p2p-identity-file"
     ~path:"src/lib_base/p2p_identity_file"
@@ -2256,7 +2256,7 @@ let octez_p2p =
         octez_p2p_services |> open_;
         octez_version;
         prometheus;
-        octez_p2p_identity_file |> open_;
+        octez_base_p2p_identity_file |> open_;
       ]
 
 let tezt_performance_regression =
@@ -3993,6 +3993,9 @@ let octez_dal_node_gossipsub_lib =
         octez_base |> open_ ~m:"TzPervasives";
         octez_crypto_dal |> open_;
         octez_gossipsub |> open_;
+        octez_p2p |> open_;
+        octez_p2p_services |> open_;
+        octez_crypto |> open_;
       ]
 
 let octez_dac_lib =
@@ -6932,7 +6935,7 @@ let _octez_node =
          prometheus_app_unix;
          lwt_exit;
          uri;
-         octez_p2p_identity_file |> open_;
+         octez_base_p2p_identity_file |> open_;
        ]
       @ protocol_deps)
     ~linkall:true
@@ -7268,6 +7271,10 @@ let _octez_dal_node =
          octez_store_shared |> open_;
          octez_gossipsub |> open_;
          octez_dal_node_gossipsub_lib |> open_;
+         octez_p2p |> open_;
+         octez_p2p_services |> open_;
+         octez_crypto |> open_;
+         octez_base_p2p_identity_file |> open_;
          irmin_pack;
          irmin_pack_unix;
          irmin;
