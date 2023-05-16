@@ -144,7 +144,6 @@ mod test {
     use host::runtime::Runtime;
     use primitive_types::H160;
     use std::str::FromStr;
-    use tezos_ethereum::address::EthereumAddress;
     use tezos_ethereum::signatures::EthereumTransactionCommon;
     use tezos_smart_rollup_mock::MockHost;
 
@@ -573,7 +572,7 @@ mod test {
                 tezos_ethereum::signatures::string_to_sk_and_address(s.to_string())
                     .unwrap();
             let value: [u8; 20] = hex::decode(ea).unwrap().try_into().unwrap();
-            let ea = EthereumAddress::from(value);
+            let ea = value.into();
             assert_eq!(a, ea);
         })
     }
@@ -595,7 +594,7 @@ mod test {
                 .unwrap()
                 .try_into()
                 .unwrap();
-        let expected_address = EthereumAddress::from(expected_address_string);
+        let expected_address: H160 = expected_address_string.into();
         assert_eq!(expected_address, address);
         assert_eq!(expected_address, address_from_sk)
     }

@@ -11,13 +11,12 @@
 
 use std::array::TryFromSliceError;
 
-use crate::address::EthereumAddress;
 use hex::FromHexError;
 use libsecp256k1::{
     curve::Scalar, recover, sign, verify, Message, PublicKey, RecoveryId, SecretKey,
     Signature,
 };
-use primitive_types::{H256, U256};
+use primitive_types::{H160, H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
 use sha3::{Digest, Keccak256};
 use thiserror::Error;
@@ -62,7 +61,7 @@ impl From<TryFromSliceError> for TransactionError {
 /// produces address from a secret key
 pub fn string_to_sk_and_address(
     s: String,
-) -> Result<(SecretKey, EthereumAddress), TransactionError> {
+) -> Result<(SecretKey, H160), TransactionError> {
     let mut data: [u8; 32] = [0u8; 32];
     hex::decode_to_slice(s, &mut data)?;
     let sk = SecretKey::parse(&data)?;
@@ -71,7 +70,7 @@ pub fn string_to_sk_and_address(
     let kec = Keccak256::digest(serialised);
     let mut value: [u8; 20] = [0u8; 20];
     value.copy_from_slice(&kec[12..]);
-    Ok((sk, EthereumAddress::from(value)))
+    Ok((sk, value.into()))
 }
 
 /// the type of a transaction
@@ -108,7 +107,7 @@ pub struct EthereumTransactionCommon {
     pub gas_limit: u64,
     /// The 160-bit address of the message call’s recipient
     /// or, for a contract creation transaction
-    pub to: Option<EthereumAddress>,
+    pub to: Option<H160>,
     /// A scalar value equal to the number of Wei to
     /// be transferred to the message call’s recipient or,
     /// in the case of contract creation, as an endowment
@@ -180,7 +179,7 @@ impl EthereumTransactionCommon {
     /// for an Ethereum transaction, ie, what address is associated
     /// with the signature of the message.
     /// TODO <https://gitlab.com/tezos/tezos/-/milestones/115>
-    pub fn caller(&self) -> Result<EthereumAddress, TransactionError> {
+    pub fn caller(&self) -> Result<H160, TransactionError> {
         let mes = self.message();
         let (sig, ri) = self.signature()?;
         let pk = recover(&mes, &sig, &ri)?;
@@ -188,7 +187,7 @@ impl EthereumTransactionCommon {
         let kec = Keccak256::digest(serialised);
         let value: [u8; 20] = kec.as_slice()[12..].try_into()?;
 
-        Ok(EthereumAddress::from(value))
+        Ok(value.into())
     }
 
     /// compute v from parity and chain_id
@@ -317,11 +316,11 @@ fn decode_field_h256(
     decode_h256(decoder).map_err(custom_err)
 }
 
-fn decode_field_to(decoder: &Rlp<'_>) -> Result<Option<EthereumAddress>, DecoderError> {
+fn decode_field_to(decoder: &Rlp<'_>) -> Result<Option<H160>, DecoderError> {
     if decoder.is_empty() {
         Ok(None)
     } else {
-        let addr: EthereumAddress = decode_field(decoder, "to")?;
+        let addr: H160 = decode_field(decoder, "to")?;
         Ok(Some(addr))
     }
 }
@@ -333,7 +332,7 @@ impl Decodable for EthereumTransactionCommon {
                 let nonce: U256 = decode_field(&next(&mut it)?, "nonce")?;
                 let gas_price: U256 = decode_field(&next(&mut it)?, "gas_price")?;
                 let gas_limit: u64 = decode_field(&next(&mut it)?, "gas_limit")?;
-                let to: Option<EthereumAddress> = decode_field_to(&next(&mut it)?)?;
+                let to: Option<H160> = decode_field_to(&next(&mut it)?)?;
                 let value: U256 = decode_field(&next(&mut it)?, "value")?;
                 let data: Vec<u8> = decode_field(&next(&mut it)?, "data")?;
                 let v: U256 = decode_field(&next(&mut it)?, "v")?;
@@ -374,7 +373,7 @@ impl Encodable for EthereumTransactionCommon {
         stream.append(&self.gas_price);
         stream.append(&self.gas_limit);
         if let Some(addr) = self.to {
-            stream.append_internal(&addr);
+            stream.append(&addr);
         } else {
             stream.append_empty_data();
         }
@@ -405,8 +404,9 @@ mod test {
     use std::ops::Neg;
 
     use super::*;
-    fn address_from_str(s: &str) -> Option<EthereumAddress> {
-        Some(EthereumAddress::from(s.to_string()))
+    fn address_from_str(s: &str) -> Option<H160> {
+        let data = &hex::decode(s).unwrap();
+        Some(H160::from_slice(data))
     }
 
     // utility function to just build a standard correct transaction
@@ -508,12 +508,8 @@ mod test {
         let encoded =
         "f86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83".to_string();
 
-        let expected_address_string: [u8; 20] =
-            hex::decode("9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F")
-                .unwrap()
-                .try_into()
-                .unwrap();
-        let expected_address = EthereumAddress::from(expected_address_string);
+        let expected_address =
+            address_from_str("9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F").unwrap();
 
         // act
         let transaction = EthereumTransactionCommon::from_rlp(encoded).unwrap();
@@ -873,9 +869,7 @@ mod test {
 
         // assert
         assert_eq!(
-            Ok(EthereumAddress::from(
-                "d9e5c94a12f78a96640757ac97ba0c257e8aa262".to_string()
-            )),
+            Ok(address_from_str("d9e5c94a12f78a96640757ac97ba0c257e8aa262").unwrap()),
             transaction.caller(),
             "test field from"
         )
@@ -938,12 +932,8 @@ mod test {
             .to_string();
         let (_sk, address) = string_to_sk_and_address(sk.clone()).unwrap();
         // Check that the derived address is the expected one.
-        let expected_address_string: [u8; 20] =
-            hex::decode(b"6471A723296395CF1Dcc568941AFFd7A390f94CE")
-                .unwrap()
-                .try_into()
-                .unwrap();
-        let expected_address = EthereumAddress::from(expected_address_string);
+        let expected_address =
+            address_from_str("6471A723296395CF1Dcc568941AFFd7A390f94CE").unwrap();
         assert_eq!(expected_address, address);
 
         // Check that the derived sender address is the expected one.
@@ -961,7 +951,7 @@ mod test {
     fn test_caller_eip155_example() {
         let transaction = basic_eip155_transaction();
         assert_eq!(
-            EthereumAddress::from("9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f".to_string()),
+            address_from_str("9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f").unwrap(),
             transaction.caller().unwrap()
         )
     }
@@ -1033,9 +1023,7 @@ mod test {
 
         // check
         assert_eq!(
-            Ok(EthereumAddress::from(
-                "af1276cbb260bb13deddb4209ae99ae6e497f446".to_string()
-            )),
+            Ok(address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap()),
             transaction.caller(),
             "checking caller"
         )

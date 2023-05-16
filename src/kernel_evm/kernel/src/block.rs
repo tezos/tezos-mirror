@@ -15,11 +15,10 @@ use evm_execution::account_storage::EthereumAccountStorage;
 use evm_execution::handler::ExecutionOutcome;
 use evm_execution::{precompiles, run_transaction};
 
-use tezos_ethereum::address::EthereumAddress;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_smart_rollup_host::runtime::Runtime;
 
-use primitive_types::U256;
+use primitive_types::{H160, U256};
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::transaction::{
     TransactionReceipt, TransactionStatus, TransactionType,
@@ -29,16 +28,16 @@ struct TransactionReceiptInfo {
     tx_hash: TransactionHash,
     index: u32,
     execution_outcome: Option<ExecutionOutcome>,
-    caller: EthereumAddress,
-    to: Option<EthereumAddress>,
+    caller: H160,
+    to: Option<H160>,
 }
 
 fn make_receipt_info(
     tx_hash: TransactionHash,
     index: u32,
     execution_outcome: Option<ExecutionOutcome>,
-    caller: EthereumAddress,
-    to: Option<EthereumAddress>,
+    caller: H160,
+    to: Option<H160>,
 ) -> TransactionReceiptInfo {
     TransactionReceiptInfo {
         tx_hash,
@@ -116,12 +115,11 @@ fn make_receipts(
 fn check_nonce<Host: Runtime>(
     host: &mut Host,
     tx_nonce: U256,
-    caller: EthereumAddress,
+    caller: H160,
     evm_account_storage: &mut EthereumAccountStorage,
 ) -> Result<(), Error> {
-    let caller_account_path =
-        evm_execution::account_storage::account_path(&caller.into())
-            .map_err(|_| Error::Storage(AccountInitialisation))?;
+    let caller_account_path = evm_execution::account_storage::account_path(&caller)
+        .map_err(|_| Error::Storage(AccountInitialisation))?;
     let caller_account = evm_account_storage
         .get(host, &caller_account_path)
         .map_err(|_| Error::Storage(AccountInitialisation))?;
@@ -163,8 +161,8 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
                 &current_block.constants(),
                 &mut evm_account_storage,
                 &precompiles,
-                transaction.tx.to.map(|a| a.into()),
-                caller.into(),
+                transaction.tx.to,
+                caller,
                 transaction.tx.data,
                 Some(transaction.tx.gas_limit),
                 Some(transaction.tx.value),
@@ -213,13 +211,13 @@ mod tests {
     use evm_execution::account_storage::{account_path, EthereumAccountStorage};
     use primitive_types::{H160, H256};
     use std::str::FromStr;
-    use tezos_ethereum::address::EthereumAddress;
     use tezos_ethereum::signatures::EthereumTransactionCommon;
     use tezos_ethereum::transaction::{TransactionStatus, TRANSACTION_HASH_SIZE};
     use tezos_smart_rollup_mock::MockHost;
 
-    fn address_from_str(s: &str) -> Option<EthereumAddress> {
-        Some(EthereumAddress::from(s.to_string()))
+    fn address_from_str(s: &str) -> Option<H160> {
+        let data = &hex::decode(s).unwrap();
+        Some(H160::from_slice(data))
     }
     fn string_to_h256_unsafe(s: &str) -> H256 {
         let mut v: [u8; 32] = [0; 32];

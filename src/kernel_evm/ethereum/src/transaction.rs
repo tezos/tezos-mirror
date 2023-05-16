@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::address::EthereumAddress;
 use primitive_types::{H160, H256, U256};
 
 pub const TRANSACTION_HASH_SIZE: usize = 32;
@@ -62,9 +61,9 @@ pub struct TransactionReceipt {
     /// Block number where this transaction was in.
     pub block_number: U256,
     /// Address of the sender.
-    pub from: EthereumAddress,
+    pub from: H160,
     /// Address of the receiver. null when its a contract creation transaction.
-    pub to: Option<EthereumAddress>,
+    pub to: Option<H160>,
     /// The total amount of gas used when this transaction was executed in the block
     pub cumulative_gas_used: U256,
     /// The sum of the base fee and tip paid per unit of gas.
