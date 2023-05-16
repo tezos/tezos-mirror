@@ -34,8 +34,6 @@ type error +=
       old_hash : Operation_hash.t;
       new_hash : Operation_hash.t;
     }
-  | Rejected_by_full_mempool of Operation_hash.t
-  | Removed_from_full_mempool of Operation_hash.t
 
 type error += Too_many_operations
 

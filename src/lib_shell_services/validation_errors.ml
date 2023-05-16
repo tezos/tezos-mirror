@@ -34,8 +34,6 @@ type error +=
       old_hash : Operation_hash.t;
       new_hash : Operation_hash.t;
     }
-  | Rejected_by_full_mempool of Operation_hash.t
-  | Removed_from_full_mempool of Operation_hash.t
 
 type error += Too_many_operations
 
@@ -104,39 +102,6 @@ let () =
       | Operation_replacement {old_hash; new_hash} -> Some (old_hash, new_hash)
       | _ -> None)
     (fun (old_hash, new_hash) -> Operation_replacement {old_hash; new_hash}) ;
-  (* Rejected_by_full_mempool *)
-  register_error_kind
-    `Temporary
-    ~id:"node.mempool.rejected_by_full_mempool"
-    ~title:"Operation fees are too low to be considered in full mempool"
-    ~description:"Operation fees are too low to be considered in full mempool"
-    ~pp:(fun ppf oph ->
-      Format.fprintf
-        ppf
-        "The mempool is full and operation %a does not have enough fees to \
-         replace existing operations."
-        Operation_hash.pp
-        oph)
-    Data_encoding.(obj1 (req "operation_hash" Operation_hash.encoding))
-    (function Rejected_by_full_mempool oph -> Some oph | _ -> None)
-    (fun oph -> Rejected_by_full_mempool oph) ;
-  (* Removed_from_full_mempool *)
-  register_error_kind
-    `Temporary
-    ~id:"node.mempool.removed_from_full_mempool"
-    ~title:"Operation removed from full mempool because its fees are too low"
-    ~description:
-      "Operation removed from full mempool because its fees are too low"
-    ~pp:(fun ppf oph ->
-      Format.fprintf
-        ppf
-        "Operation %a has been removed from a full mempool because it had the \
-         lowest fee/gas ratio."
-        Operation_hash.pp
-        oph)
-    Data_encoding.(obj1 (req "operation_hash" Operation_hash.encoding))
-    (function Removed_from_full_mempool oph -> Some oph | _ -> None)
-    (fun oph -> Removed_from_full_mempool oph) ;
   (* Too many operations *)
   register_error_kind
     `Temporary

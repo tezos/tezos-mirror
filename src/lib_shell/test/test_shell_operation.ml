@@ -90,7 +90,7 @@ let init_full_requester_disk ?global_input () :
 let init_full_requester ?global_input () : Test_Requester.t =
   fst (init_full_requester_disk ?global_input ())
 
-let mk_operation n =
+let mk_operation n : Operation.t =
   let base = "BLuxtLkkNKWgV8xTzBuGcHJRPukgk4nY" in
   let base_len = String.length base in
   let n_string = Int.to_string n in
@@ -101,10 +101,7 @@ let mk_operation n =
   assert (String.length hash_string = base_len) ;
   let branch = Block_hash.of_string_exn hash_string in
   let proto = Bytes.of_string n_string in
-  let op : Operation.t = {shell = {branch}; proto} in
-  let oph = Operation.hash op in
-  let shell_op = Shell_operation.Internal_for_tests.make_operation oph op () in
-  (oph, shell_op)
+  {shell = {branch}; proto}
 
 (** Check that when doing a succession of inject/classify operations,
  *  the memory table of the requester stays small. In the past, this
@@ -124,7 +121,9 @@ let test_db_leak f (nb_ops : int) (_ : unit) =
   in
   let classes = Classification.create parameters in
   let handle i =
-    let oph, op = mk_operation i in
+    let op = mk_operation i in
+    let oph = Operation.hash op in
+    let op = Shell_operation.Internal_for_tests.make_operation op oph () in
     let injected = Lwt_main.run @@ Test_Requester.inject requester oph i in
     assert injected ;
     f [] op classes
@@ -159,7 +158,9 @@ let test_in_mempool_leak f (nb_ops : int) (_ : unit) =
   in
   let classes = Classification.create parameters in
   let handle i =
-    let oph, op = mk_operation i in
+    let op = mk_operation i in
+    let oph = Operation.hash op in
+    let op = Shell_operation.Internal_for_tests.make_operation op oph () in
     let injected = Lwt_main.run @@ Test_Requester.inject requester oph i in
     assert injected ;
     f [] op classes
@@ -193,7 +194,9 @@ let test_db_do_not_clear_right_away f (nb_ops : int) (_ : unit) =
   in
   let classes = Classification.create parameters in
   let handle i =
-    let oph, op = mk_operation i in
+    let op = mk_operation i in
+    let oph = Operation.hash op in
+    let op = Shell_operation.Internal_for_tests.make_operation op oph () in
     Format.printf "Injecting op: %a\n" Operation_hash.pp oph ;
     let injected = Lwt_main.run @@ Test_Requester.inject requester oph i in
     assert injected ;

@@ -972,28 +972,16 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
     in
     get_filter_variations ()
   in
-  let* () = get_filter_variations () in
-  let* () =
-    (* valid configuration *)
+  let* _ = get_filter_variations () in
+  let* _ =
     post_and_get_filter
-      {|{ "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
-          "minimal_nanotez_per_byte": [ "56", "3" ],
-          "replace_by_fee_factor": ["21", "20"], "max_operations": 0,
-          "max_total_bytes": 100_000_000 }|}
+      {|{ "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ], "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false }|}
   in
-  let* () =
-    (* valid configuration with omitted fields *)
+  let* _ =
     post_and_get_filter
-      {|{ "minimal_fees": "200", "replace_by_fee_factor": ["1", "1"] }|}
+      {|{ "minimal_fees": "200", "allow_script_failure": true }|}
   in
-  let* () =
-    (* invalid field name *)
-    post_and_get_filter {|{ "max_operations": 100, "invalid_field_name": 100 }|}
-  in
-  let* () =
-    (* ill-typed data *) post_and_get_filter {|{ "minimal_fees": "toto" }|}
-  in
-  let* () = (* back to default config *) post_and_get_filter "{}" in
+  let* _ = post_and_get_filter "{}" in
   unit
 
 let start_with_acl address acl =

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,57 +23,62 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The mempool type description. *)
-type t = {
-  applied : string list;
-  branch_delayed : string list;
-  branch_refused : string list;
-  refused : string list;
-  outdated : string list;
-  unprocessed : string list;
-}
+(** Testing
+    -------
+    Component:    Shell (Plugin)
+    Invocation:   dune exec src/proto_alpha/lib_plugin/test/main.exe \
+                  -- --file test_plugin.ml
+    Subject:      Unit tests the plugin
+*)
 
-(** A comparable type for mempool where classification and ordering
-   does not matter. *)
-val typ : t Check.typ
+open Plugin.Mempool
+open Test_utils
 
-(** A comparable type for mempool where ordering does not matter. *)
-val classified_typ : t Check.typ
+let count = Some 1000
 
-val empty : t
+(** This test checks that [flush] empties the filter state. *)
+let test_flush () =
+  let l =
+    QCheck2.Gen.generate
+      ~n:(Option.value ~default:1 count)
+      Generators.filter_state_with_operation_gen
+  in
+  List.iter_es
+    (fun (ops_state, (oph, (op_info : manager_op_info))) ->
+      let ops_state = add_manager_op ops_state oph op_info `No_replace in
+      let open Lwt_result_syntax in
+      let* block, _contract = Context.init1 () in
+      let* incremental = Incremental.begin_construction block in
+      let ctxt = Incremental.alpha_ctxt incremental in
+      let head = block.header.shell in
+      let round_durations = Alpha_context.Constants.round_durations ctxt in
+      let hard_gas_limit_per_block =
+        Alpha_context.Constants.hard_gas_limit_per_block ctxt
+      in
+      let* filter_state =
+        init_state ~head round_durations hard_gas_limit_per_block
+      in
+      let filter_state = {filter_state with ops_state} in
+      let* flushed_state = flush filter_state ~head in
+      if eq_state flushed_state.ops_state empty_ops_state then return_unit
+      else
+        failwith
+          "Flushed state is not empty : %a"
+          pp_state
+          flushed_state.ops_state)
+    l
 
-(** Symetric difference (union(a, b) - intersection(a, b)) *)
-val symmetric_diff : t -> t -> t
-
-(** Build a value of type {!t} from a json returned by
-   {!RPC.get_mempool_pending_operations}. *)
-val of_json : JSON.t -> t
-
-(** Call [RPC.get_mempool_pending_operations] and wrap the result in a
-    value of type [Mempool.t] *)
-val get_mempool :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?applied:bool ->
-  ?branch_delayed:bool ->
-  ?branch_refused:bool ->
-  ?refused:bool ->
-  ?outdated:bool ->
-  ?validation_passes:int list ->
-  Client.t ->
-  t Lwt.t
-
-(** Check that each field of [t] contains the same elements as the
-    argument of the same name. Ordening does not matter. Omitted
-    arguments default to the empty list. This is useful when we expect a
-    sparse mempool. *)
-val check_mempool :
-  ?applied:string list ->
-  ?branch_delayed:string list ->
-  ?branch_refused:string list ->
-  ?refused:string list ->
-  ?outdated:string list ->
-  ?unprocessed:string list ->
-  t ->
-  unit
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    Protocol.name
+    [
+      ( "on_flush",
+        [
+          Tztest.tztest
+            "[on_flush ~validation_state ...] yields an empty state "
+            `Quick
+            test_flush;
+        ] );
+    ]
+  |> Lwt_main.run

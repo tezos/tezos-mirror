@@ -165,8 +165,11 @@ let mk_chain_tools (chain_db : Distributed_db.chain_db) :
 
 (** Module type used both in production and in tests. *)
 module type S = sig
-  (** Type instantiated by {!Prevalidation.T.config}. *)
-  type config
+  (** Type instantiated by {!Filter.Mempool.state}. *)
+  type filter_state
+
+  (** Type instantiated by {!Filter.Mempool.config}. *)
+  type filter_config
 
   (** Similar to the type [operation] from the protocol,
       see {!Tezos_protocol_environment.PROTOCOL} *)
@@ -185,7 +188,7 @@ module type S = sig
       (Classification.classification * protocol_operation operation)
       Lwt_watcher.input;
     mutable rpc_directory : types_state Tezos_rpc.Directory.t lazy_t;
-    mutable config : config;
+    mutable filter_config : filter_config;
     lock : Lwt_mutex.t;
   }
 
@@ -251,12 +254,17 @@ module Make_s
     (Prevalidation_t : Prevalidation.T
                          with type validation_state =
                            Filter.Proto.validation_state
+                          and type filter_state = Filter.Mempool.state
+                          and type filter_config = Filter.Mempool.config
                           and type protocol_operation = Filter.Proto.operation) :
   S
-    with type config = Prevalidation_t.config
+    with type filter_state = Filter.Mempool.state
+     and type filter_config = Filter.Mempool.config
      and type protocol_operation = Filter.Proto.operation
      and type prevalidation_t = Prevalidation_t.t = struct
-  type config = Prevalidation_t.config
+  type filter_state = Filter.Mempool.state
+
+  type filter_config = Filter.Mempool.config
 
   type protocol_operation = Filter.Proto.operation
 
@@ -269,7 +277,7 @@ module Make_s
       (Classification.classification * protocol_operation operation)
       Lwt_watcher.input;
     mutable rpc_directory : types_state Tezos_rpc.Directory.t lazy_t;
-    mutable config : config;
+    mutable filter_config : filter_config;
     lock : Lwt_mutex.t;
   }
 
@@ -324,7 +332,7 @@ module Make_s
   let pre_filter pv ~notifier parsed_op : [Pending_ops.priority | `Drop] Lwt.t =
     let open Lwt_syntax in
     let+ v =
-      Prevalidation_t.pre_filter pv.validation_state pv.config parsed_op
+      Prevalidation_t.pre_filter pv.validation_state pv.filter_config parsed_op
     in
     match v with
     | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as errs
@@ -377,14 +385,14 @@ module Make_s
        operations whose classes are changed/impacted by this classification
        (eg. in case of operation replacement).
   *)
-  let classify_operation shell ~config ~validation_state mempool op :
+  let classify_operation shell ~filter_config ~validation_state mempool op :
       (prevalidation_t
       * Mempool.t
       * (protocol_operation operation * Classification.classification) trace)
       Lwt.t =
     let open Lwt_syntax in
     let* v_state, op, classification, replacements =
-      Prevalidation_t.add_operation validation_state config op
+      Prevalidation_t.add_operation validation_state filter_config op
     in
     let to_replace =
       List.filter_map
@@ -420,7 +428,7 @@ module Make_s
      operations are advertised to the remote peers. However, if a peer
      requests our mempool, we advertise all our classified operations and
      all our pending operations. *)
-  let classify_pending_operations ~notifier shell config state =
+  let classify_pending_operations ~notifier shell filter_config state =
     let open Lwt_syntax in
     let* r =
       Pending_ops.fold_es
@@ -433,7 +441,7 @@ module Make_s
             let* new_validation_state, new_mempool, to_handle =
               classify_operation
                 shell
-                ~config
+                ~filter_config
                 ~validation_state:acc_validation_state
                 acc_mempool
                 op
@@ -495,7 +503,7 @@ module Make_s
         classify_pending_operations
           ~notifier
           pv.shell
-          pv.config
+          pv.filter_config
           pv.validation_state
       in
       pv.validation_state <- validation_state ;
@@ -649,7 +657,7 @@ module Make_s
               let*! validation_state, delta_mempool, to_handle =
                 classify_operation
                   pv.shell
-                  ~config:pv.config
+                  ~filter_config:pv.filter_config
                   ~validation_state:pv.validation_state
                   Mempool.empty
                   parsed_op
@@ -861,6 +869,8 @@ module Make
     (Prevalidation_t : Prevalidation.T
                          with type validation_state =
                            Filter.Proto.validation_state
+                          and type filter_state = Filter.Mempool.state
+                          and type filter_config = Filter.Mempool.config
                           and type protocol_operation = Filter.Proto.operation
                           and type chain_store = Store.chain_store) : T = struct
   module S = Make_s (Filter) (Prevalidation_t)
@@ -891,16 +901,16 @@ module Make
 
   type worker = Worker.infinite Worker.queue Worker.t
 
-  (** Return a json describing the prevalidator's [config].
+  (** Returns a json describing the prevalidator's [filter_config].
       The boolean [include_default] ([true] by default) indicates
       whether the json should include the fields which have a value
       equal to their default value. *)
-  let get_config_json ?(include_default = true) pv =
+  let get_filter_config_json ?(include_default = true) pv =
     let include_default_fields = if include_default then `Always else `Never in
     Data_encoding.Json.construct
       ~include_default_fields
-      Prevalidation_t.config_encoding
-      pv.config
+      Filter.Mempool.config_encoding
+      pv.filter_config
 
   let filter_validation_passes allowed_validation_passes
       (op : protocol_operation) =
@@ -926,7 +936,10 @@ module Make
           !dir
           (Proto_services.S.Mempool.get_filter Tezos_rpc.Path.open_root)
           (fun pv params () ->
-            return (get_config_json ~include_default:params#include_default pv)) ;
+            return
+              (get_filter_config_json
+                 ~include_default:params#include_default
+                 pv)) ;
       dir :=
         Tezos_rpc.Directory.register
           !dir
@@ -936,18 +949,13 @@ module Make
             let* () =
               try
                 let config =
-                  Data_encoding.Json.destruct
-                    Prevalidation_t.config_encoding
-                    obj
+                  Data_encoding.Json.destruct Filter.Mempool.config_encoding obj
                 in
-                pv.config <- config ;
+                pv.filter_config <- config ;
                 Lwt.return_unit
               with _ -> Events.(emit invalid_mempool_filter_configuration) ()
             in
-            (* We return [get_config_json pv] rather than [obj] in
-               order to show omitted fields (which have been reset to
-               their default values), and also in case [obj] is invalid. *)
-            return_ok (get_config_json pv)) ;
+            return_ok (get_filter_config_json pv)) ;
       (* Ban an operation (from its given hash): remove it from the
          mempool if present. Add it to the set pv.banned_operations
          to prevent it from being fetched/processed/injected in the
@@ -1362,10 +1370,10 @@ module Make
           validation_state;
           operation_stream = Lwt_watcher.create_input ();
           rpc_directory = build_rpc_directory w;
-          config =
+          filter_config =
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/1725
                initialize from config file *)
-            Prevalidation_t.default_config;
+            Filter.Mempool.default_config;
           lock = Lwt_mutex.create ();
         }
       in
