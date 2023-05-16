@@ -80,7 +80,7 @@ let get_messages Node_context.{l1_ctxt; _} head =
   in
   return (List.rev rev_messages)
 
-let same_inbox_as_layer_1 node_ctxt head_hash inbox =
+let same_as_layer_1 node_ctxt head_hash inbox =
   let open Lwt_result_syntax in
   let head_block = `Hash (head_hash, 0) in
   let Node_context.{cctxt; _} = node_ctxt in
@@ -169,14 +169,7 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
         head.level
         (List.length collected_messages)
     in
-    let* (( _inbox_hash,
-            inbox,
-            _witness_hash,
-            _messages_with_protocol_internal_messages ) as res) =
-      process_messages node_ctxt ~predecessor head collected_messages
-    in
-    let* () = same_inbox_as_layer_1 node_ctxt head.hash inbox in
-    return res
+    process_messages node_ctxt ~predecessor head collected_messages
   else
     let* inbox = Node_context.genesis_inbox node_ctxt in
     return

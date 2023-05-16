@@ -330,7 +330,8 @@ let exit_after_proto_migration node_ctxt ?predecessor head =
       let*! _ = Lwt_exit.exit_and_wait 0 in
       return_unit
 
-let rec process_head (node_ctxt : _ Node_context.t) (head : Layer1.header) =
+let rec process_head (node_ctxt : _ Node_context.t) ~catching_up
+    (head : Layer1.header) =
   let open Lwt_result_syntax in
   let start_timestamp = Time.System.now () in
   let* already_processed = Node_context.is_processed node_ctxt head.hash in
@@ -344,7 +345,7 @@ let rec process_head (node_ctxt : _ Node_context.t) (head : Layer1.header) =
       return_unit
   | Some predecessor ->
       let* () = exit_on_other_proto node_ctxt ~predecessor head in
-      let* () = process_head node_ctxt predecessor in
+      let* () = process_head node_ctxt ~catching_up:true predecessor in
       let* ctxt = previous_context node_ctxt ~predecessor in
       let* () =
         Node_context.save_level
@@ -373,6 +374,10 @@ let rec process_head (node_ctxt : _ Node_context.t) (head : Layer1.header) =
       let*! context_hash = Context.commit ctxt in
       let* commitment_hash =
         Publisher.process_head node_ctxt ~predecessor:predecessor.hash head ctxt
+      in
+      let* () =
+        unless (catching_up && Option.is_none commitment_hash) @@ fun () ->
+        Inbox.same_as_layer_1 node_ctxt head.hash inbox
       in
       let level = Raw_level.of_int32_exn head.level in
       let* previous_commitment_hash =
@@ -473,7 +478,8 @@ let on_layer_1_head node_ctxt (head : Layer1.header) =
       (fun (block, to_prefetch) ->
         Layer1.prefetch_tezos_blocks node_ctxt.l1_ctxt to_prefetch ;
         let* header = get_header block in
-        process_head node_ctxt header)
+        let catching_up = block.level < head.level in
+        process_head node_ctxt ~catching_up header)
       new_chain_prefetching
   in
   let* () = Publisher.publish_commitments () in
