@@ -161,6 +161,8 @@ let pair l r = P (l, r)
 
 let unit = U
 
+let to_s s = S (X s)
+
 let of_s (S (X s)) = s
 
 let map2 f x y = X (f x y)

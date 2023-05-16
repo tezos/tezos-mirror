@@ -98,10 +98,12 @@ let ( let* ) : 'a t -> ('a -> 'b t) -> 'b t =
   let s, o = m s in
   f o s
 
+let unscalar (Scalar s) = s
+
 let ( let*& ) : scalar repr t -> (int -> 'b repr t) -> 'b repr t =
- fun m f s ->
-  let s, Scalar o = m s in
-  f o s
+ fun m f ->
+  let* m in
+  f (unscalar m)
 
 let ( >* ) m f =
   let* Unit = m in
