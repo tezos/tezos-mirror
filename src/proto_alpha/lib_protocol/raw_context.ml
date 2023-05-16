@@ -995,6 +995,17 @@ let prepare_first_block ~level ~timestamp ctxt =
         * c.ratio_of_frozen_deposits_slashed_per_double_endorsement.numerator
         / c.ratio_of_frozen_deposits_slashed_per_double_endorsement.denominator
       in
+      let percentage_of_frozen_deposits_slashed_per_double_baking =
+        let double_baking_punishment_times_100 =
+          Int64.mul 100L (Tez_repr.to_mutez c.double_baking_punishment)
+        in
+        let percentage_rounded_down =
+          Int64.div
+            double_baking_punishment_times_100
+            (Tez_repr.to_mutez c.minimal_stake)
+        in
+        1 + Int64.to_int percentage_rounded_down
+      in
       let constants =
         Constants_parametric_repr.
           {
@@ -1027,7 +1038,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             minimal_participation_ratio = c.minimal_participation_ratio;
             max_slashing_period = c.max_slashing_period;
             frozen_deposits_percentage = c.frozen_deposits_percentage;
-            double_baking_punishment = c.double_baking_punishment;
+            percentage_of_frozen_deposits_slashed_per_double_baking;
             percentage_of_frozen_deposits_slashed_per_double_endorsement;
             (* The `testnet_dictator` should absolutely be None on mainnet *)
             testnet_dictator = c.testnet_dictator;

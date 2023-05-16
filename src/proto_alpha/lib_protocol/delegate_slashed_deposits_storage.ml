@@ -98,11 +98,16 @@ let punish_double_baking ctxt delegate (level : Level_repr.t) =
   in
   let delegate_contract = Contract_repr.Implicit delegate in
   let* frozen_deposits = Frozen_deposits_storage.get ctxt delegate_contract in
-  let slashing_for_one_block =
-    Constants_storage.double_baking_punishment ctxt
+  let slashing_percentage =
+    Constants_storage.percentage_of_frozen_deposits_slashed_per_double_baking
+      ctxt
+  in
+  let punish_value =
+    Tez_repr.(
+      div_exn (mul_exn frozen_deposits.initial_amount slashing_percentage) 100)
   in
   let punishing_amount =
-    Tez_repr.(min frozen_deposits.current_amount slashing_for_one_block)
+    Tez_repr.(min frozen_deposits.current_amount punish_value)
   in
   finish_punish
     ctxt

@@ -134,9 +134,9 @@ let frozen_deposits_percentage c =
   let constants = Raw_context.constants c in
   constants.frozen_deposits_percentage
 
-let double_baking_punishment c =
+let percentage_of_frozen_deposits_slashed_per_double_baking c =
   let constants = Raw_context.constants c in
-  constants.double_baking_punishment
+  constants.percentage_of_frozen_deposits_slashed_per_double_baking
 
 let tx_rollup_enable c =
   let tx_rollup = Raw_context.tx_rollup c in
