@@ -172,6 +172,7 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
       Raw_level_repr.of_int32 level >>?= fun level ->
       Storage.Tenderbake.First_level_of_protocol.init ctxt level
       >>=? fun ctxt ->
+      Storage.Contract.Total_supply.add ctxt Tez_repr.zero >>= fun ctxt ->
       Storage.Block_round.init ctxt Round_repr.zero >>=? fun ctxt ->
       let init_commitment (ctxt, balance_updates)
           Commitment_repr.{blinded_public_key_hash; amount} =
