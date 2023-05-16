@@ -1,0 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_version_value)
+ (public_name tezos-version.value)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-version
+  tezos-version.parser)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))

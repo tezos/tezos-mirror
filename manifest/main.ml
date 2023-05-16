@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022-2023 Trili Tech <contact@trili.tech>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -2004,6 +2004,17 @@ let octez_version =
             ~deps:[[S "universe"]]
             ~action:[S "run"; S "./exe/get_git_info.exe"];
         ]
+
+let _octez_version_value =
+  public_lib
+    "tezos-version.value"
+    ~path:"src/lib_version/value/"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_version;
+        octez_version_parser;
+      ]
 
 let _octez_version_get_git_info =
   private_exe
