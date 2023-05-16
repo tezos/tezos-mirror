@@ -306,6 +306,8 @@ let sample_payload example_filename =
   let root_hash = JSON.(json |-> "root_hash" |> as_string) in
   (payload, root_hash)
 
+let decode_hex_string_to_bytes s = Hex.to_string (`Hex s)
+
 (** This modules encapsulate tests for DAC nodes when running in legacy node.
     It includes tests where we have two dac nodes running in
     the legacy mode interacting with each other. As such one node normally tries
@@ -2615,6 +2617,36 @@ let register_with_unsupported_protocol ~protocols =
   Observer.test_dac_not_ready_without_protocol protocols ;
   Member.test_dac_not_ready_without_protocol protocols
 
+(** [V1_API] is a test suite for [V1] API. *)
+module V1_API = struct
+  (** Test "v1/page" endpoint. *)
+  let test_get_pages Scenarios.{coordinator_node; _} =
+    (* 1. Post [payload] to [Coordinator] and receive [root_hash].
+       2. Asumming that [payload] fits into one [Contents] page
+          retrieving it via [GET v1/pages/[root_hash]] should result
+          in initial payload. *)
+    let payload = "test" in
+    (* Assert that [expected] payload fits onto one [Contents] page.
+       Since [init_hex_root_hash] calls "POST v0/preimage" that uses
+       [Merkle_tree.V0] serialization, [max_page_size] is 4096 bytes,
+       out of which 5 bytes are for preamble, meaning inital payload
+       can be at max 4091 bytes in size for the above to hold. *)
+    let () = assert (Bytes.length (String.to_bytes payload) < 4091) in
+    let* root_hash =
+      (* TODO https://gitlab.com/tezos/tezos/-/issues/5671
+         Once we have "PUT v1/preimage" we should use a call to [V1] api here
+         instead. *)
+      RPC.call coordinator_node (Dac_rpc.V0.Coordinator.post_preimage ~payload)
+    in
+    let* raw = RPC.call coordinator_node (Dac_rpc.V1.get_pages @@ root_hash) in
+    let remove_preamble s =
+      let preamle_size = 5 in
+      String.(sub s preamle_size (length s - preamle_size))
+    in
+    let actual = remove_preamble (decode_hex_string_to_bytes raw) in
+    return @@ check_preimage payload actual
+end
+
 let register ~protocols =
   (* Tests with layer1 and dac nodes *)
   Legacy.test_dac_node_startup protocols ;
@@ -2749,4 +2781,12 @@ let register ~protocols =
     (Full_infrastructure.test_client ~send_payload_from_file:true)
     protocols ;
   Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_synced_with_dac protocols ;
-  Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_missing_pages protocols
+  Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_missing_pages protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:0
+    ~committee_size:0
+    ~tags:["dac"; "dac_node"]
+    "test v1/get_pages"
+    V1_API.test_get_pages
+    protocols
