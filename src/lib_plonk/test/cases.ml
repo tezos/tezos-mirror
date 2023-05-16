@@ -486,6 +486,56 @@ module Range_Checks = struct
   let list = [valid; wrong; basic]
 end
 
+module Mod_Arith = struct
+  let add_mod_25519 ?(valid = true) case_name ~x ~y ~z ~qm ~tj =
+    let name = "add_mod_2^255-19." ^ case_name in
+    (* addition mod 2^255-19, we have;
+        |moduli| = [base] = [2^85]
+        qm_shift := -1
+        tj_shift := -32767
+    *)
+    (* if there is no wrap-around, we will have qm = 1 and tj = 32767 *)
+    (* if there is wrap-around 2^255 - 19, qm = 2 (so that qm + qm_shift = 1)
+       and tj = 32767 . *)
+    let base = Z.(shift_left one 85) in
+    let xs = Plompiler.Utils.z_to_limbs ~len:3 ~base x in
+    let ys = Plompiler.Utils.z_to_limbs ~len:3 ~base y in
+    let zs = Plompiler.Utils.z_to_limbs ~len:3 ~base z in
+    let witness =
+      (Z.zero :: xs) @ ys @ [qm; tj] @ zs
+      |> List.map Scalar.of_z |> Array.of_list
+    in
+    let circuit =
+      let wires =
+        let a = [1; 9] in
+        let b = [2; 10] in
+        let c = [3; 11] in
+        let d = [4; 7] in
+        let e = [5; 8] in
+        let f = [6; 0] in
+        [|a; b; c; d; e; f|]
+      in
+      let gates = Circuit.make_gates ~q_mod_add:[("25519", ![1; 0])] () in
+      Circuit.make ~wires ~gates ~public_input_size:0 ()
+    in
+    {name; circuit; witness; outcome = (if valid then Valid else Proof_error)}
+
+  let mod_add_tests =
+    let ( ! ) = Z.of_int in
+    let m = Z.(shift_left one 255 - of_int 19) in
+    let tj = !32767 in
+    [
+      add_mod_25519 "no_wrap_around" ~x:!5 ~y:!6 ~z:!11 ~qm:!1 ~tj;
+      add_mod_25519 "wrap_around" ~x:Z.(m - !1) ~y:!2 ~z:!1 ~qm:!2 ~tj;
+      add_mod_25519 "non-std out" ~x:Z.(m - !1) ~y:!4 ~z:Z.(m + !3) ~qm:!1 ~tj;
+      add_mod_25519 ~valid:false "invalid" ~x:!0 ~y:!1 ~z:!2 ~qm:!1 ~tj;
+      add_mod_25519 ~valid:false "invalid qm" ~x:!1 ~y:!2 ~z:!3 ~qm:!0 ~tj;
+      add_mod_25519 ~valid:false "invalid tj" ~x:!1 ~y:!2 ~z:!3 ~qm:!1 ~tj:!0;
+    ]
+
+  let list = mod_add_tests
+end
+
 module Big_circuit = struct
   (* generates circuit with 2^k - 1 constraints that adds 2^(k + 1) inputs 4 by 4,
      then adds 2^(k-1) inputs 2 by 2, then multiplies 2^(k-2) inputs 2 by 2, and
@@ -626,7 +676,7 @@ end
 
 let list =
   Unit_tests_for_each_selector.list @ General_circuits.list @ General.list
-  @ Big_circuit.list
+  @ Mod_Arith.list @ Big_circuit.list
 
 let list_slow = Big_circuit.list_slow
 

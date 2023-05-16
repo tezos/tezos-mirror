@@ -40,6 +40,7 @@ let () =
               ("Schnorr", Test_schnorr.tests);
               ("Merkle", Test_merkle.tests);
               ("Merkle N-arity: Plonk integration", Test_merkle_narity.tests);
+              ("ModularArith", Test_mod_arith.tests);
               ("Edwards", Test_edwards.tests);
               ("Weierstrass", Test_weierstrass.tests);
               ("Serialization", Test_serialization.tests);
