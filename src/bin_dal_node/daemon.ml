@@ -149,7 +149,7 @@ module Handler = struct
           {
             plugin = (module Dal_plugin);
             proto_parameters;
-            cryptobox = _;
+            cryptobox;
             shards_proofs_precomputation = _;
           } ->
           let block_level = header.shell.level in
@@ -162,8 +162,11 @@ module Handler = struct
           let* slot_headers =
             Dal_plugin.get_published_slot_headers block_info
           in
-          let*! () =
+          let* () =
             Slot_manager.store_slot_headers
+              ~level_committee:(Node_context.fetch_committee ctxt)
+              cryptobox
+              proto_parameters
               ~block_level
               ~block_hash
               slot_headers

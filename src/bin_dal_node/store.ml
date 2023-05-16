@@ -392,15 +392,22 @@ module Legacy = struct
         return @@ Some dec)
       res_opt
 
-  let add_slot_headers ~block_level ~block_hash:_ slot_headers node_store =
-    let open Lwt_syntax in
+  let publish_slot_data ~level_committee:_ _node_store _cryptobox
+      _proto_parameters _commitment _published_level _slot_index =
+    let open Lwt_result_syntax in
+    (* Implemented in the next commit. *)
+    return_unit
+
+  let add_slot_headers ~level_committee cryptobox proto_parameters ~block_level
+      ~block_hash:_ slot_headers node_store =
+    let open Lwt_result_syntax in
     let slots_store = node_store.store in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4388
        Handle reorgs. *)
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4389
              https://gitlab.com/tezos/tezos/-/issues/4528
        Handle statuses evolution. *)
-    List.iter_s
+    List.iter_es
       (fun (slot_header, status) ->
         let Dal_plugin.{slot_index; commitment; published_level} =
           slot_header
@@ -409,7 +416,7 @@ module Legacy = struct
         assert (Int32.equal published_level block_level) ;
         let index = Services.Types.{slot_level = published_level; slot_index} in
         let header_path = Path.Commitment.header commitment index in
-        let* () =
+        let*! () =
           set
             ~msg:(Path.to_string ~prefix:"add_slot_headers:" header_path)
             slots_store
@@ -424,13 +431,13 @@ module Legacy = struct
             let data = encode_commitment commitment in
             (* Before adding the item in accepted path, we should remove it from
                others path, as it may appear there with an Unseen status. *)
-            let* () =
+            let*! () =
               remove
                 ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
                 slots_store
                 others_path
             in
-            let* () =
+            let*! () =
               set
                 ~msg:
                   (Path.to_string ~prefix:"add_slot_headers:" commitment_path)
@@ -438,17 +445,30 @@ module Legacy = struct
                 commitment_path
                 data
             in
-            set
-              ~msg:(Path.to_string ~prefix:"add_slot_headers:" status_path)
-              slots_store
-              status_path
-              (encode_header_status `Waiting_attestation)
+            let*! () =
+              set
+                ~msg:(Path.to_string ~prefix:"add_slot_headers:" status_path)
+                slots_store
+                status_path
+                (encode_header_status `Waiting_attestation)
+            in
+            publish_slot_data
+              ~level_committee
+              node_store
+              cryptobox
+              proto_parameters
+              commitment
+              published_level
+              slot_index
         | Dal_plugin.Failed ->
-            set
-              ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
-              slots_store
-              others_path
-              (encode_header_status `Not_selected))
+            let*! () =
+              set
+                ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
+                slots_store
+                others_path
+                (encode_header_status `Not_selected)
+            in
+            return_unit)
       slot_headers
 
   let update_slot_headers_attestation ~published_level ~number_of_slots store
