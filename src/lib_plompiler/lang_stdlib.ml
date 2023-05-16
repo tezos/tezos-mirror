@@ -107,7 +107,7 @@ module type LIB = sig
 
     val xor : bl repr -> bl repr -> bl repr t
 
-    val rotate : bl repr -> int -> bl repr
+    val rotate_right : bl repr -> int -> bl repr
   end
 
   val add2 :
@@ -336,7 +336,7 @@ module Lib (C : COMMON) = struct
       let* l = map2M Bool.xor (of_list a) (of_list b) in
       ret @@ to_list l
 
-    let rotate a i =
+    let rotate_right a i =
       let split_n n l =
         let rec aux acc k l =
           if k = n then (List.rev acc, l)

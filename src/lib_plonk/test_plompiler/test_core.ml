@@ -796,13 +796,13 @@ functor
         @@ test_ifthenelse_bytes (Input.bool false) l r l;
       ]
 
-    let test_rotate l i z () =
+    let test_rotate_right l i z () =
       let* l = input ~kind:`Public l in
       let* z = input z in
-      let o = rotate l i in
+      let o = rotate_right l i in
       assert_equal o z
 
-    let tests_rotate =
+    let tests_rotate_right =
       List.map
         (fun (i, a, b) ->
           let a =
@@ -811,7 +811,8 @@ functor
           let b =
             input_bitlist Plompiler.Utils.(bitlist @@ Stdlib.Bytes.of_string b)
           in
-          test ~valid:true ~name:"Bytes.test_rotate" @@ test_rotate a i b)
+          test ~valid:true ~name:"Bytes.test_rotate_right"
+          @@ test_rotate_right a i b)
         [
           (1, "\001", "\128");
           (2, "\001", "\064");
@@ -836,7 +837,8 @@ functor
           (7, "\000\000\001", "\002\000\000");
         ]
 
-    let tests = tests_add @ tests_xor @ tests_ifthenelse_bytes @ tests_rotate
+    let tests =
+      tests_add @ tests_xor @ tests_ifthenelse_bytes @ tests_rotate_right
   end
 
 module ECC : Test =
