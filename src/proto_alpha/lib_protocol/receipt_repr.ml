@@ -270,26 +270,24 @@ let compare_balance ba bb =
         | Block_fees -> 1
         | Deposits _ -> 2
         | Nonce_revelation_rewards -> 3
-        (* 4 was for Double_signing_evidence_rewards that has been removed.
-           https://gitlab.com/tezos/tezos/-/merge_requests/7758 *)
-        | Endorsing_rewards -> 5
-        | Baking_rewards -> 6
-        | Baking_bonuses -> 7
-        | Storage_fees -> 8
-        | Double_signing_punishments -> 9
-        | Lost_endorsing_rewards _ -> 10
-        | Liquidity_baking_subsidies -> 11
-        | Burned -> 12
-        | Commitments _ -> 13
-        | Bootstrap -> 14
-        | Invoice -> 15
-        | Initial_commitments -> 16
-        | Minted -> 17
-        | Frozen_bonds _ -> 18
-        | Tx_rollup_rejection_punishments -> 19
-        | Tx_rollup_rejection_rewards -> 20
-        | Sc_rollup_refutation_punishments -> 21
-        | Sc_rollup_refutation_rewards -> 22
+        | Endorsing_rewards -> 4
+        | Baking_rewards -> 5
+        | Baking_bonuses -> 6
+        | Storage_fees -> 7
+        | Double_signing_punishments -> 8
+        | Lost_endorsing_rewards _ -> 9
+        | Liquidity_baking_subsidies -> 10
+        | Burned -> 11
+        | Commitments _ -> 12
+        | Bootstrap -> 13
+        | Invoice -> 14
+        | Initial_commitments -> 15
+        | Minted -> 16
+        | Frozen_bonds _ -> 17
+        | Tx_rollup_rejection_punishments -> 18
+        | Tx_rollup_rejection_rewards -> 19
+        | Sc_rollup_refutation_punishments -> 20
+        | Sc_rollup_refutation_rewards -> 21
         (* don't forget to add parameterized cases in the first part of the function *)
       in
       Compare.Int.compare (index ba) (index bb)
