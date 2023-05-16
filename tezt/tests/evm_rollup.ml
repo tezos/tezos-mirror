@@ -669,6 +669,26 @@ let test_latest_block =
     ~error_msg:"Expected latest being block number %R, but got %L" ;
   unit
 
+let test_eth_call_nullable_recipient =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "eth_call"; "null"]
+    ~title:"Check `eth_call.to` input can be null"
+  @@ fun protocol ->
+  let* {evm_proxy_server; _} = setup_past_genesis protocol in
+  let* call_result =
+    Evm_proxy_server.(
+      call_evm_rpc
+        evm_proxy_server
+        {
+          method_ = "eth_call";
+          parameters = `A [`O [("to", `Null)]; `String "latest"];
+        })
+  in
+  (* Check the RPC returns a `result`. *)
+  let _result = call_result |> Evm_proxy_server.extract_result in
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -685,6 +705,7 @@ let register_evm_proxy_server ~protocols =
   test_rpc_web3_clientVersion protocols ;
   test_simulate protocols ;
   test_full_blocks protocols ;
-  test_latest_block protocols
+  test_latest_block protocols ;
+  test_eth_call_nullable_recipient protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
