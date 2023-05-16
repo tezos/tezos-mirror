@@ -97,6 +97,7 @@ type t = {
   dac_timeout : Z.t option;
   batcher : batcher;
   injector : injector;
+  l1_blocks_cache_size : int;
   l2_blocks_cache_size : int;
   log_kernel_debug : bool;
 }
@@ -154,6 +155,10 @@ val default_batcher : batcher
 (** [default_injector] is the default configuration parameters for the
     injector. *)
 val default_injector : injector
+
+(** [default_l1_blocks_cache_size] is the default number of L1 blocks that are
+    cached by the rollup node *)
+val default_l1_blocks_cache_size : int
 
 (** [default_l2_blocks_cache_size] is the default number of L2 blocks that are
     cached by the rollup node *)
