@@ -26,7 +26,8 @@
 (* Testing
    -------
    Component:    RPCs
-   Invocation:   dune exec tezt/tests/main.exe -- --file rpc_versioning.ml
+   Invocation:   dune exec tezt/tests/main.exe -- --file
+                 rpc_versioning_attestation.ml
    Subject:      rpc versioning
 *)
 
@@ -512,7 +513,89 @@ module Mempool = struct
     test_pending_double_preconsensus_evidence protocols
 end
 
+module Run_Simulate = struct
+  type rpc = Run | Simulate
+
+  let get_rpc rpc op =
+    match rpc with
+    | Run -> RPC.post_chain_block_helpers_scripts_run_operation (Data op)
+    | Simulate ->
+        RPC.post_chain_block_helpers_scripts_simulate_operation
+          ~data:(Data op)
+          ()
+
+  let get_rpc_name = function
+    | Run -> "run_operations"
+    | Simulate -> "simulate_operations"
+
+  let test_rpc_operation_unsupported rpc kind protocol =
+    let* _node, client = Client.init_with_protocol ~protocol `Client () in
+    let signer = Constant.bootstrap1 in
+
+    let call_rpc_operation_and_check_error op =
+      let* op_json = Operation.make_run_operation_input op client in
+      let msg =
+        rex
+          "Command failed: The run_operation RPC does not support consensus \
+           operations."
+        (* both run_operation and simulate_operation returns the same error *)
+      in
+      let*? p = RPC.Client.spawn client @@ get_rpc rpc op_json in
+      Process.check_error ~msg p
+    in
+
+    let call_and_check_error ~use_legacy_name =
+      Log.info
+        "Create a %s operation, call %s and check that the call fail"
+        (Operation.Consensus.kind_to_string kind use_legacy_name)
+        (get_rpc_name rpc) ;
+
+      let* consensus_op =
+        create_consensus_op ~use_legacy_name ~signer ~kind client
+      in
+      call_rpc_operation_and_check_error consensus_op
+    in
+
+    let* () = call_and_check_error ~use_legacy_name:true in
+    call_and_check_error ~use_legacy_name:false
+
+  let test_run_operation_consensus =
+    register_test
+      ~title:"Run operation with consensus operations"
+      ~additionnal_tags:["run"; "operations"; "consensus"]
+    @@ fun protocol ->
+    test_rpc_operation_unsupported Run Operation.Attestation protocol
+
+  let test_run_operation_preconsensus =
+    register_test
+      ~title:"Run operation with preconsensus operations"
+      ~additionnal_tags:["run"; "operations"; "pre"; "consensus"]
+    @@ fun protocol ->
+    test_rpc_operation_unsupported Run Operation.Preattestation protocol
+
+  let test_simulate_operation_consensus =
+    register_test
+      ~title:"Simulate operation with consensus operations"
+      ~additionnal_tags:["simulate"; "operations"; "consensus"]
+    @@ fun protocol ->
+    test_rpc_operation_unsupported Simulate Operation.Attestation protocol
+
+  let test_simulate_operation_preconsensus =
+    register_test
+      ~title:"Simulate operation with preconsensus operations"
+      ~additionnal_tags:["simulate"; "operations"; "pre"; "consensus"]
+    @@ fun protocol ->
+    test_rpc_operation_unsupported Simulate Operation.Preattestation protocol
+
+  let register ~protocols =
+    test_run_operation_consensus protocols ;
+    test_run_operation_preconsensus protocols ;
+    test_simulate_operation_consensus protocols ;
+    test_simulate_operation_preconsensus protocols
+end
+
 let register ~protocols =
   Forge.register ~protocols ;
   Parse.register ~protocols ;
-  Mempool.register ~protocols
+  Mempool.register ~protocols ;
+  Run_Simulate.register ~protocols
