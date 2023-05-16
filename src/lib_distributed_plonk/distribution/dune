@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name plonk_for_distribution)
+ (name distribution)
  (public_name octez-plonk.distribution)
  (instrumentation (backend bisect_ppx))
  (libraries

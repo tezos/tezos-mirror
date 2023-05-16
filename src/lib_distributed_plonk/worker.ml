@@ -38,7 +38,7 @@ module type S = sig
   val worker_proc : string -> Distributed.Process_id.t -> unit -> 'a D.t
 end
 
-module Make (Main : Plonk_for_distribution.Main_protocol.S) : S = struct
+module Make (Main : Distribution.Main_protocol.S) : S = struct
   module Msg = Message.Make (Main)
   module D = Distributed_wrapper.Make (Msg)
   open Main

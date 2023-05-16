@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Distributed_plonk_test.Distribution_helpers
 open Distributed_plonk
+open Distribution_helpers
 
 let test_distribution ?(circuit_builder = Circuit_Builder.base) dp () =
   let module DP = (val dp : DP_for_tests) in

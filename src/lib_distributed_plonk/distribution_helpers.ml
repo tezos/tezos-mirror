@@ -25,7 +25,6 @@
 
 open Plonk_test
 open Helpers
-open Distributed_plonk
 
 let nb_proofs = 12
 
@@ -48,18 +47,18 @@ end
 module type DP_for_tests = sig
   include Distributed_prover.S
 
-  module Worker_Main : Plonk_for_distribution.Main_protocol.S
+  module Worker_Main : Distribution.Main_protocol.S
 
   val pp_file : string
 
   val get_distributed_pp : MP.prover_public_parameters -> bytes
 end
 
-module DP_PlonK (Main : Plonk_for_distribution.Main_protocol.S) = struct
+module DP_PlonK (Main : Distribution.Main_protocol.S) = struct
   include Distributed_prover.Make (Main)
   module Worker_Main = Main
 
-  let pp_file = Distributed_plonk.Filenames.plonk_pp_file
+  let pp_file = Filenames.plonk_pp_file
 
   let get_distributed_pp pp_prover =
     Plompiler.Utils.to_bytes MP.prover_public_parameters_t pp_prover
@@ -69,7 +68,7 @@ module DP_aPlonk (PI : Aplonk.Pi_parameters.S) = struct
   include Distributed_prover.Super_impl (PI)
   module Worker_Main = Distributed_prover.Main_Pack
 
-  let pp_file = Distributed_plonk.Filenames.meta_pp_file
+  let pp_file = Filenames.meta_pp_file
 
   let get_distributed_pp pp_prover =
     let ({main_pp; _} : MP.prover_public_parameters) = pp_prover in

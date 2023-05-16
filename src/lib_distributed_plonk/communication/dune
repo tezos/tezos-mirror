@@ -12,4 +12,4 @@
  (preprocess (pps ppx_repr))
  (flags
   (:standard)
-  -open Plonk_for_distribution))
+  -open Distribution))
