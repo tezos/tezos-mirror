@@ -82,6 +82,11 @@ val payloads_history_of_messages :
   Sc_rollup.Inbox_message.t list ->
   Sc_rollup.Inbox_merkelized_payload_hashes.History.t tzresult
 
+(** [same_as_layer_1 node_ctxt block node_inbox] ensures that the rollup
+    node agrees with the L1 node that inbox for [block] is [node_inbox]. *)
+val same_as_layer_1 :
+  _ Node_context.t -> Block_hash.t -> Sc_rollup.Inbox.t -> unit tzresult Lwt.t
+
 (**/**)
 
 module Internal_for_tests : sig
