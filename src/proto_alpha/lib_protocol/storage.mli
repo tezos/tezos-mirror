@@ -385,6 +385,9 @@ module Consensus_keys :
 
 type slashed_level = {for_double_endorsing : bool; for_double_baking : bool}
 
+(** [slashed_level] with all fields being [false]. *)
+val default_slashed_level : slashed_level
+
 (** Set used to avoid slashing multiple times the same event *)
 module Slashed_deposits :
   Indexed_data_storage

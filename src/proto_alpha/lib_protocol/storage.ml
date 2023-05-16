@@ -967,6 +967,9 @@ module Consensus_keys =
 
 type slashed_level = {for_double_endorsing : bool; for_double_baking : bool}
 
+let default_slashed_level =
+  {for_double_endorsing = false; for_double_baking = false}
+
 module Slashed_level = struct
   type t = slashed_level
 
