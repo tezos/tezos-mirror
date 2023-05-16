@@ -138,7 +138,21 @@ let fetch_tezos_shell_header cctxt hash =
     | Ok shell_header -> return_some shell_header
   in
   let+ shell_header =
-    Blocks_cache.bind_or_put headers_cache hash fetch Lwt.return
+    let do_cached_header_fetch () =
+      Blocks_cache.bind_or_put headers_cache hash fetch Lwt.return
+    in
+    match Blocks_cache.bind blocks_cache hash Lwt.return with
+    | None -> do_cached_header_fetch ()
+    | Some block -> (
+        (* There is already a full block being fetched. *)
+        let* block in
+        match block with
+        | None ->
+            (* Fetching full block failed. *)
+            do_cached_header_fetch ()
+        | Some block ->
+            (* The full block is already in the cache. *)
+            return_some block.header.shell)
   in
   match (shell_header, !errors) with
   | None, None ->
@@ -184,4 +198,6 @@ let fetch_tezos_block cctxt hash =
         Block_hash.pp
         hash
   | None, Some errs -> Error errs
-  | Some block, _ -> Ok block
+  | Some block, _ ->
+      Blocks_cache.put headers_cache hash (Lwt.return_some block.header.shell) ;
+      Ok block
