@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/5579
-   Add support for first publicly released DAC API [V1]. *)
-
 (** [V0] is experimental DAC API. [V0] is deprecated, however for the
     time being the API will be binding. It will be used by
     1M/tps demo. The plan is to remove it once we get rid of the 
@@ -117,3 +114,7 @@ val get_health_live :
     and fail with [tzfail Dac_node_not_ready] otherwise. *)
 val get_health_ready :
   ([`GET], unit, unit, unit, unit, bool) Tezos_rpc.Service.service
+
+(** [V1] is a second major DAC API release. 
+    [V1] API is work in progress. Do not use! *)
+module V1 : sig end

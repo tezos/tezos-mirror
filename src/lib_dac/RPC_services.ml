@@ -136,3 +136,5 @@ let get_health_ready =
     ~query:Tezos_rpc.Query.empty
     ~output:Data_encoding.bool
     Tezos_rpc.Path.(open_root / "health" / "ready")
+
+module V1 = struct end

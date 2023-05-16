@@ -27,7 +27,14 @@
 (** [Api_version] module is used for versioning DAC API. *)
 
 (** [t] type is used to version DAC API. *)
-type t = V0  (** [V0] is experimental DAC API. Use at your own risk! *)
+type t =
+  | V0  (** [V0] is experimental DAC API. Use at your own risk! *)
+  | V1
+      (** [V1] is a second major DAC API release. 
+          [V1] API is work in progress. Do not use! *)
 
 (** [v0_prefix] is [V0] API RPC prefix. *)
 val v0_prefix : (unit, unit) Tezos_rpc.Path.t
+
+(** [v1_prefix] is [V1] API RPC prefix. *)
+val v1_prefix : (unit, unit) Tezos_rpc.Path.t
