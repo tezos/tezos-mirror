@@ -107,10 +107,10 @@ sequence of bytes following no particular underlying format. The
 interpretation of this sequence of bytes is the responsibility of each
 kernel.
 
-There are two ways for an end-user to push an external message to the
-rollups inbox: first, she can inject the dedicated Layer 1 operation
+There are two ways for end-users to push an external message to the
+rollups inbox: first, they can inject the dedicated Layer 1 operation
 using the Octez client (see command ``send smart rollup message
-<messages> from <src>``); second, she can use the batcher
+<messages> from <src>``); second, they can use the batcher
 of a smart rollup node. More details can be found in :ref:`sending_external_inbox_message_nairobi`.
 
 Internal messages
@@ -224,8 +224,8 @@ must be wrong.
 Notice that, to publish a commitment, an operator must provide a
 deposit of 10,000 tez. For this reason, the operator is said to be a
 **staker**. Several users can stake on the same commitment. When a
-staker publishes a new commitment based on a commitment she is staking
-on, she does not have to provide a new deposit: the deposit also
+staker *S* publishes a new commitment based on a commitment that *S* is staking
+on, *S* does not have to provide a new deposit: the deposit also
 applies to this new commitment.
 
 There is no need to synchronize between operators: if two honest
@@ -282,14 +282,14 @@ provide a proof that they correctly interpreted this conflicting tick.
 
 The Layer 1 PVM then determines whether these proofs are valid. There
 are only two possible outcomes: either one of the staker has provided
-a valid proof, she wins the game, and is rewarded with half of the
-opponent's deposit (the other half being burnt) ; or, both stakers have
+a valid proof, then that staker wins the game, and is rewarded with half of the
+opponent's deposit (the other half being burnt); or, both stakers have
 provided an invalid proof and they both lose their deposit. In the
 end, at most one stake will be kept in the commitment tree. When a
 commitment has no more stake on it (because all stakers have lost the
 related refutation games), it is removed from the tree. An honest
-player must therefore play as many refutation games as there are
-stakes on the commitments in conflict with her own commitment.
+player *H* must therefore play as many refutation games as there are
+stakes on the commitments in conflict with *H*'s own commitment.
 
 Finally, notice that each player is subject to a timer similar to a
 chess clock, allowing each player to play only up to one week: after
@@ -299,7 +299,7 @@ two players can last at most 2 weeks.
 
 There is no timeout for starting a refutation game after having
 published a concurrent commitment. However, assuming the existence of
-an honest participant, she will start the refutation game with all
+an honest participant, that participant will start the refutation game with all
 concurrent stakers to avoid the rollup being stuck.
 
 Workflows
@@ -1363,7 +1363,7 @@ evaluate the WASM PVM without relying on any node and network:
 
   octez-smart-rollup-wasm-debugger "${WASM_FILE}" --inputs "${JSON_INPUTS}" --rollup "${SOR_ADDR}"
 
-``octez-smart-rollup-wasm-debugger`` takes as its argument the WASM kernel to be debugged, either a a ``.wasm`` file (the binary
+``octez-smart-rollup-wasm-debugger`` takes as its argument the WASM kernel to be debugged, either a ``.wasm`` file (the binary
 representation of WebAssembly modules) or as a ``.wast`` file (its textual
 representation), and actually parses and typechecks the kernel before
 giving it to the PVM.
