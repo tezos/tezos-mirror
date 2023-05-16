@@ -258,7 +258,7 @@ let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
 let process_l1_block_operations node_ctxt (head : Layer1.header) =
   let open Lwt_result_syntax in
   let* block =
-    Layer1.fetch_tezos_block node_ctxt.Node_context.cctxt head.hash
+    Layer1.fetch_tezos_block node_ctxt.Node_context.l1_ctxt head.hash
   in
   let apply (type kind) accu ~source (operation : kind manager_operation) result
       =
@@ -457,7 +457,7 @@ let on_layer_1_head node_ctxt (head : Layer1.header) =
   let get_header Layer1.{hash; level} =
     if Block_hash.equal hash head.hash then return head
     else
-      let+ header = Layer1.fetch_tezos_shell_header node_ctxt.cctxt hash in
+      let+ header = Layer1.fetch_tezos_shell_header node_ctxt.l1_ctxt hash in
       {Layer1.hash; level; header}
   in
   let* () =
@@ -691,12 +691,15 @@ let run ~data_dir ?log_kernel_debug_file (configuration : Configuration.t)
     Layer1.start
       ~name:"sc_rollup_node"
       ~reconnection_delay:configuration.reconnection_delay
+      ~l1_blocks_cache_size:configuration.l1_blocks_cache_size
       ~protocols:[Protocol.hash]
       cctxt
   in
-  let*! head, {shell = {predecessor; _}; _} = Layer1.wait_first l1_ctxt in
-  let* predecessor = Layer1.fetch_tezos_shell_header cctxt predecessor in
-  let*! () = Event.received_first_block head in
+  let*! head = Layer1.wait_first l1_ctxt in
+  let* predecessor =
+    Layer1.fetch_tezos_shell_header l1_ctxt head.header.predecessor
+  in
+  let*! () = Event.received_first_block head.hash in
   let* node_ctxt =
     Node_context.init
       cctxt
