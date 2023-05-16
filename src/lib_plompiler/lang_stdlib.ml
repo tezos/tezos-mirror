@@ -315,6 +315,7 @@ module Lib (C : COMMON) = struct
   end
 
   module Bytes = struct
+    (* first element of the list is the Least Significant Bit *)
     type bl = bool list
 
     let input_bitlist l = Input.list (List.map Input.bool l)

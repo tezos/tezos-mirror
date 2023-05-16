@@ -23,31 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk_test
+let test_bitlist () =
+  List.iter
+    (fun (le, input, output) ->
+      let input = Bytes.of_string input in
+      let output =
+        List.map
+          (fun n -> match n with 0 -> false | 1 -> true | _ -> assert false)
+          output
+      in
+      assert (Plompiler.Utils.bitlist ~le input = output))
+    [
+      (false, "", []);
+      (false, "\001", [1; 0; 0; 0; 0; 0; 0; 0]);
+      (true, "\001", [1; 0; 0; 0; 0; 0; 0; 0]);
+      (false, "\128", [0; 0; 0; 0; 0; 0; 0; 1]);
+      (false, "\001\000", [0; 0; 0; 0; 0; 0; 0; 0; 1; 0; 0; 0; 0; 0; 0; 0]);
+      (true, "\001\000", [1; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0]);
+      (false, "\000\001", [1; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0]);
+      (true, "\000\001", [0; 0; 0; 0; 0; 0; 0; 0; 1; 0; 0; 0; 0; 0; 0; 0]);
+      (false, "\001\001", [1; 0; 0; 0; 0; 0; 0; 0; 1; 0; 0; 0; 0; 0; 0; 0]);
+      (false, "\128\001", [1; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 1]);
+      (true, "\128\001", [0; 0; 0; 0; 0; 0; 0; 1; 1; 0; 0; 0; 0; 0; 0; 0]);
+    ]
 
-let () =
-  Helpers.with_seed (fun () ->
-      Helpers.with_output_to_file (fun () ->
-          Alcotest.run
-            "Plompiler"
-            [
-              ("Utils", Test_utils.tests);
-              ("Core", Test_core.tests);
-              ("Blake", Test_blake.tests);
-              ("Poseidon", Test_poseidon.tests);
-              ("Anemoi", Test_anemoi.tests);
-              ("Enum", Test_enum.tests);
-              ("Schnorr", Test_schnorr.tests);
-              ("Merkle", Test_merkle.tests);
-              ("Merkle N-arity: Plonk integration", Test_merkle_narity.tests);
-              ("Edwards", Test_edwards.tests);
-              ("Weierstrass", Test_weierstrass.tests);
-              ("Serialization", Test_serialization.tests);
-              ("Lookups", Test_lookup.tests);
-              ("InputCom", Test_input_com.tests);
-              ("Linear algebra", Test_linear_algebra.tests);
-              ("Bench", Benchmark.bench);
-              ("Bench Poseidon", Bench_poseidon.bench);
-              ("Optimizer", Test_optimizer.tests);
-              ("Encoding", Test_encoding.tests);
-            ]))
+let tests = Alcotest.[test_case "bitlist" `Quick test_bitlist]

@@ -32,7 +32,8 @@
   test_poseidon
   test_schnorr
   test_serialization
-  test_weierstrass))
+  test_weierstrass
+  test_utils))
 
 (rule
  (alias runtest)

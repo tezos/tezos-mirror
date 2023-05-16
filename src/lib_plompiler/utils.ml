@@ -28,12 +28,26 @@ module S = Csir.Scalar
 (* Difference between the scalar order and the succeeding power of 2 *)
 let alpha = Z.(shift_left one (Z.numbits S.order) - S.order)
 
+(*
+  Plompiler uses lists of bits where the lower positions are less significant
+  e.g. the least significant bit of [bs] is [List.nth bs 0].
+
+  [bitlist] default endianess follows the semantics of [get_uint16] that can be
+  tested in utop:
+
+  Bytes.get_uint16_le (Bytes.of_string "\001\000") 0;;
+  - : int = 1
+
+  Bytes.get_uint16_be (Bytes.of_string "\001\000") 0;;
+  - : int = 256
+*)
+
 let bitlist : ?le:bool -> bytes -> bool list =
  fun ?(le = false) b ->
   let l = Bytes.length b in
   let start = if le then 0 else l - 1 in
   let stop = if le then l else -1 in
-  let next a = if le then a + 1 else a - 1 in
+  let next = if le then succ else pred in
   let rec loop_byte acc n =
     if n = stop then acc
     else
