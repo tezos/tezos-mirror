@@ -29,6 +29,7 @@ type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
   plugin : (module Dal_plugin.T);
+  shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation;
 }
 
 type status = Ready of ready_ctxt | Starting
@@ -68,7 +69,13 @@ let init config store gs_worker transport_layer cctxt =
 
 let set_ready ctxt plugin cryptobox proto_parameters =
   match ctxt.status with
-  | Starting -> ctxt.status <- Ready {plugin; cryptobox; proto_parameters}
+  | Starting ->
+      let shards_proofs_precomputation =
+        Cryptobox.precompute_shards_proofs cryptobox
+      in
+      ctxt.status <-
+        Ready
+          {plugin; cryptobox; proto_parameters; shards_proofs_precomputation}
   | Ready _ -> raise Status_already_ready
 
 type error += Node_not_ready

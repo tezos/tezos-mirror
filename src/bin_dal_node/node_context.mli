@@ -25,11 +25,16 @@
 
 (** A [ready_ctx] value contains globally needed informations for a running dal
     node. It is available when both cryptobox is initialized and the plugin
-    for dal has been loaded. *)
+    for dal has been loaded.
+
+   A [ready_ctx] also has a field [shards_proofs_precomputation] that contains
+   the (costly) precomputation needed to get shard proofs.
+*)
 type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
   plugin : (module Dal_plugin.T);
+  shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation;
 }
 
 (** The status of the dal node *)
