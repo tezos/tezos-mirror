@@ -1002,14 +1002,16 @@ functor
       let* s' = scalar_of_bytes b in
       assert_equal s s'
 
-    let t s () =
-      let b = Stdlib.Bytes.of_string s in
-      let bs = Plompiler.Utils.bitlist ~le:true b in
-      let bs = Input.list (List.map Input.bool bs) in
-      test_scalar_of_bytes bs (Input.scalar (S.of_bytes_exn b)) ()
-
     let tests_scalar_of_bytes =
-      [test ~valid:true ~name:"Rest.test_scalar_of_bytes" @@ t "\x010101"]
+      List.map
+        (fun s ->
+          let bs = Bytes.input_bytes ~le:true @@ Stdlib.Bytes.of_string s in
+          let scalar =
+            Input.scalar (S.of_bytes_exn @@ Stdlib.Bytes.of_string s)
+          in
+          test ~valid:true ~name:"Rest.test_scalar_of_bytes"
+          @@ test_scalar_of_bytes bs scalar)
+        ["\x010101"]
 
     let tests = tests_full_adder @ tests_scalar_of_bytes
   end
