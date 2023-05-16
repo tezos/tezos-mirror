@@ -9,11 +9,8 @@ use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 
-use std::str::from_utf8;
-
 use crate::error::{Error, StorageError};
 use tezos_ethereum::block::L2Block;
-use tezos_ethereum::eth_gen::Hash;
 use tezos_ethereum::transaction::{
     TransactionHash, TransactionReceipt, TransactionStatus, TRANSACTION_HASH_SIZE,
 };
@@ -117,13 +114,6 @@ fn write_u256(
     let mut bytes: [u8; WORD_SIZE] = value.into();
     value.to_little_endian(&mut bytes);
     host.store_write(path, &bytes, 0).map_err(Error::from)
-}
-
-fn address_path(address: Hash) -> Result<OwnedPath, Error> {
-    let address: &str =
-        from_utf8(address).map_err(crate::error::TransferError::InvalidAddressFormat)?;
-    let address_path: Vec<u8> = format!("/{}", &address.to_ascii_lowercase()).into();
-    OwnedPath::try_from(address_path).map_err(Error::from)
 }
 
 pub fn block_path(number: U256) -> Result<OwnedPath, Error> {
