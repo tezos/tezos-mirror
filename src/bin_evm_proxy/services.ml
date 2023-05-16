@@ -101,7 +101,9 @@ let dispatch_input
         return (Get_block_by_number.Output (Ok Mockup.(block ())))
     | Get_block_by_hash.Input _ ->
         return (Get_block_by_hash.Output (Ok Mockup.(block ())))
-    | Get_code.Input _ -> return (Get_code.Output (Ok Mockup.code))
+    | Get_code.Input (Some (address, _)) ->
+        let* code = Rollup_node_rpc.code address in
+        return (Get_code.Output (Ok code))
     | Gas_price.Input _ -> return (Gas_price.Output (Ok Mockup.gas_price))
     | Get_transaction_count.Input (Some (address, _)) ->
         let* nonce = Rollup_node_rpc.nonce address in

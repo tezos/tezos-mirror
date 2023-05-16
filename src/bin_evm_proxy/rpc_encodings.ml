@@ -283,11 +283,11 @@ end)
 module Get_code = MethodMaker (struct
   open Ethereum_types
 
-  type input = hash * block_param
+  type input = address * block_param
 
   type output = hash
 
-  let input_encoding = Data_encoding.tup2 hash_encoding block_param_encoding
+  let input_encoding = Data_encoding.tup2 address_encoding block_param_encoding
 
   let output_encoding = hash_encoding
 
