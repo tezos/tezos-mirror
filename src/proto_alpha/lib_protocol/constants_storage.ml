@@ -198,9 +198,9 @@ let tx_rollup_rejection_max_proof_size c =
   let tx_rollup = Raw_context.tx_rollup c in
   tx_rollup.rejection_max_proof_size
 
-let ratio_of_frozen_deposits_slashed_per_double_endorsement c =
+let percentage_of_frozen_deposits_slashed_per_double_endorsement c =
   let constants = Raw_context.constants c in
-  constants.ratio_of_frozen_deposits_slashed_per_double_endorsement
+  constants.percentage_of_frozen_deposits_slashed_per_double_endorsement
 
 let testnet_dictator c =
   let constants = Raw_context.constants c in

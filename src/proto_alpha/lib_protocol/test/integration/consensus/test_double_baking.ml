@@ -129,14 +129,11 @@ let test_valid_double_baking_followed_by_double_endorsing () =
   Context.Delegate.current_frozen_deposits (B blk_final) baker1
   >>=? fun frozen_deposits_after ->
   Context.get_constants (B genesis) >>=? fun csts ->
-  let r =
-    csts.parametric.ratio_of_frozen_deposits_slashed_per_double_endorsement
+  let p =
+    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_endorsement
   in
   let expected_frozen_deposits_after_de =
-    Test_tez.(
-      frozen_deposits_before
-      *! Int64.of_int (r.denominator - r.numerator)
-      /! Int64.of_int r.denominator)
+    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
   in
   (* the deposit after double baking and double endorsing equals the
      expected deposit after double endorsing minus the double baking
@@ -180,14 +177,11 @@ let test_valid_double_endorsing_followed_by_double_baking () =
   Context.Delegate.current_frozen_deposits (B blk_with_db_evidence) baker1
   >>=? fun frozen_deposits_after ->
   Context.get_constants (B genesis) >>=? fun csts ->
-  let r =
-    csts.parametric.ratio_of_frozen_deposits_slashed_per_double_endorsement
+  let p =
+    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_endorsement
   in
   let expected_frozen_deposits_after_de =
-    Test_tez.(
-      frozen_deposits_before
-      *! Int64.of_int (r.denominator - r.numerator)
-      /! Int64.of_int r.denominator)
+    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
   in
   (* the deposit after double baking and double endorsing equals the
      expected deposit after double endorsing minus the double baking

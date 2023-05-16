@@ -234,13 +234,14 @@ let check_constants constants =
        "The double baking punishment must be non-negative.")
   >>? fun () ->
   error_unless
-    (let Ratio_repr.{numerator; denominator} =
-       constants.ratio_of_frozen_deposits_slashed_per_double_endorsement
-     in
-     Compare.Int.(numerator >= 0 && denominator > 0))
+    Compare.Int.(
+      constants.percentage_of_frozen_deposits_slashed_per_double_endorsement
+      >= 0
+      && constants.percentage_of_frozen_deposits_slashed_per_double_endorsement
+         <= 100)
     (Invalid_protocol_constants
-       "The ratio of frozen deposits ratio slashed per double endorsement must \
-        be a non-negative valid ratio.")
+       "The percentage of frozen deposits slashed per double endorsement must \
+        be between 0 and 100 included.")
   >>? fun () ->
   error_unless
     (let snapshot_frequence =

@@ -65,15 +65,14 @@ let punish_double_endorsing ctxt delegate (level : Level_repr.t) =
   in
   let delegate_contract = Contract_repr.Implicit delegate in
   let* frozen_deposits = Frozen_deposits_storage.get ctxt delegate_contract in
-  let slashing_ratio : Ratio_repr.t =
-    Constants_storage.ratio_of_frozen_deposits_slashed_per_double_endorsement
+  let slashing_percentage =
+    Constants_storage
+    .percentage_of_frozen_deposits_slashed_per_double_endorsement
       ctxt
   in
   let punish_value =
     Tez_repr.(
-      div_exn
-        (mul_exn frozen_deposits.initial_amount slashing_ratio.numerator)
-        slashing_ratio.denominator)
+      div_exn (mul_exn frozen_deposits.initial_amount slashing_percentage) 100)
   in
   let punishing_amount =
     Tez_repr.(min frozen_deposits.current_amount punish_value)

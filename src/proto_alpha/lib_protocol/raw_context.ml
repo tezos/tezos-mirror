@@ -990,6 +990,11 @@ let prepare_first_block ~level ~timestamp ctxt =
         c_gen.reward_weights
       in
 
+      let percentage_of_frozen_deposits_slashed_per_double_endorsement =
+        100
+        * c.ratio_of_frozen_deposits_slashed_per_double_endorsement.numerator
+        / c.ratio_of_frozen_deposits_slashed_per_double_endorsement.denominator
+      in
       let constants =
         Constants_parametric_repr.
           {
@@ -1023,8 +1028,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             max_slashing_period = c.max_slashing_period;
             frozen_deposits_percentage = c.frozen_deposits_percentage;
             double_baking_punishment = c.double_baking_punishment;
-            ratio_of_frozen_deposits_slashed_per_double_endorsement =
-              c.ratio_of_frozen_deposits_slashed_per_double_endorsement;
+            percentage_of_frozen_deposits_slashed_per_double_endorsement;
             (* The `testnet_dictator` should absolutely be None on mainnet *)
             testnet_dictator = c.testnet_dictator;
             initial_seed = c.initial_seed;
