@@ -110,3 +110,10 @@ end
 let get_health_live = make GET ["health"; "live"] JSON.as_bool
 
 let get_health_ready = make GET ["health"; "ready"] JSON.as_bool
+
+module V1 = struct
+  let api_prefix = "v1"
+
+  let get_pages page_hash =
+    make GET [api_prefix; "pages"; page_hash] JSON.as_string
+end

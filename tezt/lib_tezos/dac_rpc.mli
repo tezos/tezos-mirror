@@ -85,3 +85,12 @@ val get_health_live : (Dac_node.t, bool) RPC_core.t
     [Node_context.get_status cctxt] is [Ready]
     and fail with [tzfail Dac_node_not_ready] otherwise. *)
 val get_health_ready : (Dac_node.t, bool) RPC_core.t
+
+(** [V1] is a second major DAC API release which is currently work in progress. *)
+module V1 : sig
+  (** [get_pages hash] requests the preimage of hash, consisting of a
+      single page, from cctxt. When the request succeeds, the raw page will be
+      returned as a sequence of bytes. This is achieved by calling
+      "GET v1/pages". *)
+  val get_pages : string -> (Dac_node.t, string) RPC_core.t
+end
