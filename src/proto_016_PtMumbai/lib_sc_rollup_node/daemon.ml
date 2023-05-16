@@ -332,6 +332,7 @@ let exit_after_proto_migration node_ctxt ?predecessor head =
 
 let rec process_head (node_ctxt : _ Node_context.t) (head : Layer1.header) =
   let open Lwt_result_syntax in
+  let start_timestamp = Time.System.now () in
   let* already_processed = Node_context.is_processed node_ctxt head.hash in
   unless (already_processed || before_origination node_ctxt head) @@ fun () ->
   let*! () = Daemon_event.head_processing head.hash head.level in
@@ -404,7 +405,11 @@ let rec process_head (node_ctxt : _ Node_context.t) (head : Layer1.header) =
           Int32.(sub head.level (of_int node_ctxt.block_finality_time))
       in
       let* () = Node_context.save_l2_head node_ctxt l2_block in
-      let*! () = Daemon_event.new_head_processed head.hash head.level in
+      let stop_timestamp = Time.System.now () in
+      let process_time = Ptime.diff stop_timestamp start_timestamp in
+      let*! () =
+        Daemon_event.new_head_processed head.hash head.level process_time
+      in
       return_unit
 
 (* [on_layer_1_head node_ctxt head] processes a new head from the L1. It

@@ -30,9 +30,10 @@
     block of the given [hash] and at the given [level] is being processed. *)
 val head_processing : Block_hash.t -> int32 -> unit Lwt.t
 
-(** [new_head_processed hash level] emits the event that the daemon has finished
-    processing the head of the given [hash] and at the given [level]. *)
-val new_head_processed : Block_hash.t -> int32 -> unit Lwt.t
+(** [new_head_processed hash level process_time] emits the event that the daemon
+    has finished processing the head of the given [hash] and at the given
+    [level] in [process_time] seconds. *)
+val new_head_processed : Block_hash.t -> int32 -> Ptime.Span.t -> unit Lwt.t
 
 (** [processing_heads_iteration heads] emits the event that the [heads] are
     going to be processed. *)
