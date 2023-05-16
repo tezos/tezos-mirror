@@ -975,7 +975,11 @@ let prepare_first_block ~level ~timestamp ctxt =
 
       let adaptive_inflation =
         Constants_parametric_repr.
-          {enable = false; staking_over_baking_limit = 5}
+          {
+            enable = false;
+            staking_over_baking_limit = 5;
+            max_costaking_baker_count = 5;
+          }
       in
 
       let reward_weights =

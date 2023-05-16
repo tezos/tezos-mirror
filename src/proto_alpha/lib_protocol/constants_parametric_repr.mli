@@ -143,6 +143,8 @@ type adaptive_inflation = {
   staking_over_baking_limit
     (* Global maximum costake tokens taken into account per baking token. Each baker can set their own lower limit. *) :
     int;
+  max_costaking_baker_count :
+    (* Maximal number of bakers an account can costake to. *) int;
 }
 
 type reward_weights = {
