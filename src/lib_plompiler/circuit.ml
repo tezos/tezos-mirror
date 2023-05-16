@@ -965,6 +965,72 @@ module Ecc = struct
     append gate ~solver >* ret (Pair (Scalar x3, Scalar y3))
 end
 
+module Mod_arith = struct
+  (* Refer to [lib_plompiler/gadget_mod_arith.ml] for documentation on
+     modular arithmetic and details about all parameters:
+     [modulus], [nb_limbs], [base], [moduli], [qm_bound] and [ts_bounds] *)
+  let add ~label ~modulus ~nb_limbs ~base ~moduli ~qm_bound ~ts_bounds (List xs)
+      (List ys) =
+    (* This is just a sanity check, inputs are assumed to be well-formed,
+       in particular, their limb values are in the range [0, base) *)
+    assert (List.compare_length_with xs nb_limbs = 0) ;
+    assert (List.compare_length_with ys nb_limbs = 0) ;
+    (* Assert that all bounds are compatible with our range-check protocol,
+       which is design to check membership in intervals of the form [0, 2^k) *)
+    let qm_ubound = snd qm_bound in
+    let ts_ubounds = List.map snd ts_bounds in
+    assert (List.for_all Utils.is_power_of_2 (base :: qm_ubound :: ts_ubounds)) ;
+    (* Create the corresponding constraints *)
+    with_label ~label:"Mod_arith.add"
+    @@ let* zs = fresh @@ Dummy.list nb_limbs Dummy.scalar in
+       let* qm = fresh Dummy.scalar in
+       let* ts = fresh @@ Dummy.list (List.length moduli) Dummy.scalar in
+       let inp1 = List.map unscalar xs in
+       let inp2 = List.map unscalar ys in
+       let out = List.map unscalar (of_list zs) in
+       let scalar_qm = qm in
+       let scalar_ts = of_list ts in
+       let qm = unscalar qm in
+       let ts = List.map unscalar scalar_ts in
+       let gate =
+         [|
+           CS.new_constraint
+             ~wires:(inp1 @ inp2)
+             ~q_mod_add:[(label, one)]
+             "mod_arith-add.1";
+           CS.new_constraint ~wires:(out @ [qm] @ ts) "mod_arith-add.2";
+         |]
+       in
+       let solver =
+         Mod_Add
+           {
+             modulus;
+             base;
+             nb_limbs;
+             moduli;
+             qm_bound;
+             ts_bounds;
+             inp1;
+             inp2;
+             out;
+             qm;
+             ts;
+           }
+       in
+       (* The output is not assumed to be well-formed, we need to enforce this
+          with constraints. In particular, we need to range-check every limb
+          in the output in the range [0, base). *)
+       iterM (Num.range_check ~nb_bits:(Z.log2 base)) (of_list zs)
+       (* qm needs to be range-checked in the interval [0, qm_ubound) *)
+       >* Num.range_check ~nb_bits:(Z.log2 qm_ubound) scalar_qm
+          (* every tj needs to be range-checked in the interval [0, tj_ubound) *)
+       >* iter2M
+            (fun tj_ubound tj -> Num.range_check ~nb_bits:(Z.log2 tj_ubound) tj)
+            ts_ubounds
+            scalar_ts
+       >* append gate ~solver >* ret zs
+end
+
 module Poseidon = struct
   module VS = Linear_algebra.Make_VectorSpace (S)
   module Poly = Polynomial.MakeUnivariate (S)

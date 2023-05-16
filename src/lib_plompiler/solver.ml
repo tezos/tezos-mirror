@@ -205,6 +205,29 @@ type anemoi_custom_desc = {
 }
 [@@deriving repr]
 
+let z_repr = Repr.map Repr.string Z.of_string Z.to_string
+
+module Z = struct
+  let t = z_repr
+
+  include Z
+end
+
+type mod_arith_desc = {
+  modulus : Z.t;
+  base : Z.t;
+  nb_limbs : int;
+  moduli : Z.t list;
+  qm_bound : Z.t * Z.t;
+  ts_bounds : (Z.t * Z.t) list;
+  inp1 : int list;
+  inp2 : int list;
+  out : int list;
+  qm : int;
+  ts : int list;
+}
+[@@deriving repr]
+
 type solver_desc =
   | Arith of arith_desc
   | Pow5 of pow5_desc
@@ -222,6 +245,7 @@ type solver_desc =
   | AnemoiRound of anemoi_desc
   | AnemoiDoubleRound of anemoi_double_desc
   | AnemoiCustom of anemoi_custom_desc
+  | Mod_Add of mod_arith_desc
   | Updater of Optimizer.trace_info
 [@@deriving repr]
 
@@ -388,7 +412,68 @@ let solve_one trace solver =
         Gadget_anemoi.Anemoi128.compute_one_round x1' y1' kx2 ky2
       in
       trace.(x2) <- x2' ;
-      trace.(y2) <- y2') ;
+      trace.(y2) <- y2'
+  | Mod_Add
+      {
+        modulus;
+        base;
+        nb_limbs;
+        moduli;
+        qm_bound;
+        ts_bounds;
+        inp1;
+        inp2;
+        out;
+        qm;
+        ts;
+      } ->
+      (* See [lib_plompiler/gadget_mod_arith.ml] for explanations *)
+      (* This is just a sanity check *)
+      assert (List.compare_length_with inp1 nb_limbs = 0) ;
+      assert (List.compare_length_with inp2 nb_limbs = 0) ;
+      assert (List.compare_length_with out nb_limbs = 0) ;
+      let sum = List.fold_left Z.add Z.zero in
+      let ( %! ) = Z.rem in
+      let xs = List.map (fun v -> trace.(v) |> S.to_z) inp1 in
+      let ys = List.map (fun v -> trace.(v) |> S.to_z) inp2 in
+      let zs = Utils.mod_add_limbs ~modulus ~base xs ys in
+      List.iter2 (fun v zi -> trace.(v) <- S.of_z zi) out zs ;
+      let qm_shift, qm_ubound = qm_bound in
+      let bs_mod_m =
+        List.init nb_limbs (fun i -> Z.pow base i %! modulus) |> List.rev
+      in
+      let x_plus_y_minus_z =
+        List.map2 (fun (xi, yi) zi -> Z.(xi + yi - zi)) (List.combine xs ys) zs
+      in
+      (* \sum_i (B^i mod m) * (x_i + y_i - z_i) = (qm + qm_shift) * m *)
+      let qm_value, r =
+        let lhs = sum @@ List.map2 Z.mul bs_mod_m x_plus_y_minus_z in
+        Z.(div_rem (lhs - (qm_shift * modulus)) modulus)
+      in
+      assert (Z.(equal r zero)) ;
+      assert (Z.(compare qm_value zero >= 0)) ;
+      assert (Z.(compare qm_value qm_ubound < 0)) ;
+      trace.(qm) <- S.of_z qm_value ;
+      (* For every modulo mj in moduli,
+         \sum_i ((B^i mod m) mod mj) * (x_i + y_i - z_i)
+         - qm * (m mod mj) - ((qm_shift * m) mod mj) = (tj + tj_shift) * mj *)
+      List.iter2
+        (fun mj (tj, (tj_shift, tj_ubound)) ->
+          let bs_mod_m_mod_mj = List.map (fun v -> v %! mj) bs_mod_m in
+          let terms = List.map2 Z.mul bs_mod_m_mod_mj x_plus_y_minus_z in
+          let lhs =
+            Z.(
+              sum terms
+              - (qm_value * (modulus %! mj))
+              - (qm_shift * modulus %! mj))
+          in
+          let tj_value, r = Z.(div_rem (lhs - (tj_shift * mj)) mj) in
+          assert (Z.(equal r zero)) ;
+          assert (Z.(compare tj_value zero >= 0)) ;
+          assert (Z.(compare tj_value tj_ubound < 0)) ;
+          trace.(tj) <- S.of_z tj_value)
+        moduli
+        (List.combine ts ts_bounds)) ;
   trace
 
 let solve : t -> S.t array -> S.t array =

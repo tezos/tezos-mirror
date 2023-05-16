@@ -346,6 +346,16 @@ module Ecc = struct
          (s_of_base @@ W.get_v_coordinate out)
 end
 
+module Mod_arith = struct
+  let add ~label:_ ~modulus ~nb_limbs:_ ~base ~moduli:_ ~qm_bound:_ ~ts_bounds:_
+      x y =
+    let xs = List.map (fun s -> of_s s |> S.to_z) (of_list x) in
+    let ys = List.map (fun s -> of_s s |> S.to_z) (of_list y) in
+    let zs = Utils.mod_add_limbs ~modulus ~base xs ys in
+    let z = List.map (fun z -> S.of_z z |> to_s) zs |> to_list in
+    ret z
+end
+
 module Poseidon = struct
   module VS = Linear_algebra.Make_VectorSpace (S)
 

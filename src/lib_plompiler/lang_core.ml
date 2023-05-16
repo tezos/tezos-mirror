@@ -236,6 +236,21 @@ module type COMMON = sig
       (scalar * scalar) repr t
   end
 
+  (* See [lib_plompiler/gadget_mod_arith.ml] for documentation on mod_arith *)
+  module Mod_arith : sig
+    val add :
+      label:string ->
+      modulus:Z.t ->
+      nb_limbs:int ->
+      base:Z.t ->
+      moduli:Z.t list ->
+      qm_bound:Z.t * Z.t ->
+      ts_bounds:(Z.t * Z.t) list ->
+      scalar list repr ->
+      scalar list repr ->
+      scalar list repr t
+  end
+
   module Poseidon : sig
     val poseidon128_full_round :
       matrix:S.t array array ->

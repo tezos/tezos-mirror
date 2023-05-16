@@ -147,6 +147,23 @@ type anemoi_custom_desc = {
   ky2 : S.t;
 }
 
+(* See [lib_plompiler/gadget_mod_arith.ml] for documentation on mod_arith *)
+type mod_arith_desc = {
+  (* parameters *)
+  modulus : Z.t;
+  base : Z.t;
+  nb_limbs : int;
+  moduli : Z.t list;
+  qm_bound : Z.t * Z.t;
+  ts_bounds : (Z.t * Z.t) list;
+  (* variables *)
+  inp1 : int list;
+  inp2 : int list;
+  out : int list;
+  qm : int;
+  ts : int list;
+}
+
 type solver_desc =
   | Arith of arith_desc
   | Pow5 of pow5_desc
@@ -164,6 +181,7 @@ type solver_desc =
   | AnemoiRound of anemoi_desc
   | AnemoiDoubleRound of anemoi_double_desc
   | AnemoiCustom of anemoi_custom_desc
+  | Mod_Add of mod_arith_desc
   | Updater of Optimizer.trace_info
 
 type solvers
