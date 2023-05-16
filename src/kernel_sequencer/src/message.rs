@@ -13,7 +13,8 @@ use tezos_data_encoding::{
     enc::{self, BinResult, BinWriter},
     nom::{NomReader, NomResult},
 };
-use tezos_smart_rollup_encoding::{public_key::PublicKey, smart_rollup::SmartRollupAddress};
+use tezos_smart_rollup_encoding::public_key::PublicKey;
+use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 
 /// Framing protocol v0
 ///
@@ -36,7 +37,12 @@ pub struct Bytes {
 
 /// Sequence of messages sent by the sequencer
 ///
-/// The sequence contains the delayed messages and the messages sent by the user to the sequencer
+/// The sequence contains the number of messages
+/// that should be processed from the delayed inbox
+/// and the messages from the sequencer
+///  
+/// The delayed messages will be processed first
+/// And then the messages will be processed
 #[derive(NomReader, BinWriter, Clone, Debug, PartialEq, Eq)]
 pub struct Sequence {
     nonce: u32,
