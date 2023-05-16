@@ -37,6 +37,9 @@ RPC Changes
   and ``smart_rollups/smart_rollup/<address>/staker1/<pkh>/staker2/<pkh>/timeout_reached`` into ``/staker1/<staker1_pkh>/staker2/<staker2_pkh>``.
   This changes the RPC description but not its use. (MR :gl:`!8339`)
 
+- Update context with new reward parameters. This changes the JSON from the RPC
+  ``/chains/main/blocks/head/context/constants``. (MR :gl:`!8657`)
+
 Operation receipts
 ------------------
 

@@ -375,12 +375,12 @@ let reward_weights_encoding =
         vdf_revelation_tip_weight;
       })
     (obj7
-       (req "base_index_of_total_rewards_per_minute" Tez_repr.encoding)
-       (req "baking_reward_fixed_weight" int31)
+       (req "base_total_rewards_per_minute" Tez_repr.encoding)
+       (req "baking_reward_fixed_portion_weight" int31)
        (req "baking_reward_bonus_weight" int31)
        (req "endorsing_reward_weight" int31)
        (req "liquidity_baking_subsidy_weight" int31)
-       (req "nonce_revelation_tip_weight" int31)
+       (req "seed_nonce_revelation_tip_weight" int31)
        (req "vdf_revelation_tip_weight" int31))
 
 let encoding =
