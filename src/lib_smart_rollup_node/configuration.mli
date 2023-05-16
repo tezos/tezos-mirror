@@ -99,6 +99,7 @@ type t = {
   injector : injector;
   l1_blocks_cache_size : int;
   l2_blocks_cache_size : int;
+  prefetch_blocks : int option;
   log_kernel_debug : bool;
 }
 
