@@ -33,9 +33,18 @@ let version_service =
     ~output:Data_encoding.string
     Path.(root / "version")
 
+let client_version =
+  Format.sprintf
+    "%s/%s-%s/%s/ocamlc.%s"
+    "octez-evm-proxy-server"
+    Tezos_version.(Version.to_string Current_git_info.version)
+    Tezos_version.Current_git_info.abbreviated_commit_hash
+    Stdlib.Sys.os_type
+    Stdlib.Sys.ocaml_version
+
 let version dir =
   Directory.register0 dir version_service (fun () () ->
-      Lwt.return_ok Tezos_version.Bin_version.version_string)
+      Lwt.return_ok client_version)
 
 (* The proxy server can either take a single request or multiple requests at
    once. *)
@@ -130,6 +139,8 @@ let dispatch_input
     | Txpool_content.Input _ ->
         let* txpool = Rollup_node_rpc.txpool () in
         return (Txpool_content.Output (Ok txpool))
+    | Web3_clientVersion.Input _ ->
+        return (Web3_clientVersion.Output (Ok client_version))
     | _ -> Error_monad.failwith "Unsupported method\n%!"
   in
   return (output, id)

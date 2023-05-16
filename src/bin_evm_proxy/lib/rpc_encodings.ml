@@ -420,6 +420,18 @@ module Txpool_content = MethodMaker (struct
   let method_ = "txpool_content"
 end)
 
+module Web3_clientVersion = MethodMaker (struct
+  type input = unit
+
+  type output = string
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = Data_encoding.string
+
+  let method_ = "web3_clientVersion"
+end)
+
 let methods : (module METHOD) list =
   [
     (module Network_id);
@@ -439,6 +451,7 @@ let methods : (module METHOD) list =
     (module Eth_call);
     (module Get_estimate_gas);
     (module Txpool_content);
+    (module Web3_clientVersion);
   ]
 
 module Input = struct

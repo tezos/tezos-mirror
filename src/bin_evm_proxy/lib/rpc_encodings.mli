@@ -258,3 +258,6 @@ module Get_estimate_gas :
 
 module Txpool_content :
   METHOD with type m_input = unit and type m_output = Ethereum_types.txpool
+
+module Web3_clientVersion :
+  METHOD with type m_input = unit and type m_output = string
