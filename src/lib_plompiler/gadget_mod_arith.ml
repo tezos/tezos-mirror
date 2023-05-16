@@ -343,3 +343,19 @@ functor
         ~qm_bound:(fst bounds_add)
         ~ts_bounds:(snd bounds_add)
   end
+
+module ArithMod25519 = Make (struct
+  let label = "25519"
+
+  let modulus = Z.(shift_left one 255 - of_int 19)
+
+  let base = Z.(shift_left one 85)
+
+  (* We want the moduli to be as large as possible (to reach the lcm bound with
+     as few moduli as possible). But they cannot be too large (or else we will
+     not be able to prevent wrap-arounds). The base := 2^85 is a fantastic
+     modulus for algebra over 2^255-19, since it is much larger than what it is
+     usually possible, but there is no wrap-around in its identity because
+     its powers are small modulo 2^255-19. *)
+  let moduli_add = [base]
+end)

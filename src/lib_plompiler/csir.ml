@@ -234,7 +234,7 @@ module CS = struct
              (label, [ThisConstr; NextConstr] @ List.init 6 (fun i -> Wire i)))
              (* We list all the labels defined in the MOD_ARITH instantiations
                 at the end of [lib_plompiler/gadget_mod_arith.ml] *)
-           [])
+           ["25519"])
       ~q_plookup:[ThisConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
       ~q_table:[ThisConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
       ()

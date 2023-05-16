@@ -254,3 +254,5 @@ module Make_ModAdd (MOD_ARITH : Plompiler__Gadget_mod_arith.MOD_ARITH) :
       (Scalar.order :: M.moduli_add)
       (None :: t_infos)
 end
+
+module AddMod25519 = Make_ModAdd (Plompiler.ArithMod25519)
