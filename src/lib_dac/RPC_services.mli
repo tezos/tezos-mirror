@@ -117,4 +117,16 @@ val get_health_ready :
 
 (** [V1] is a second major DAC API release. 
     [V1] API is work in progress. Do not use! *)
-module V1 : sig end
+module V1 : sig
+  (** "GET v1/pages" requests the preimage of hash, consisting of a
+      single page, from cctxt. When the request succeeds, the raw page will be
+      returned as a sequence of bytes. *)
+  val get_pages :
+    ( [`GET],
+      unit,
+      unit * Dac_plugin.raw_hash,
+      unit,
+      unit,
+      Bytes.t )
+    Tezos_rpc.Service.service
+end
