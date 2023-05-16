@@ -13,10 +13,12 @@
   cohttp-lwt-unix
   octez-node-config
   prometheus-app
-  octez-injector)
+  octez-injector
+  tezos-version.value)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix
   -open Tezos_crypto
-  -open Octez_injector))
+  -open Octez_injector
+  -open Tezos_version_value))

@@ -8,13 +8,13 @@
  (libraries
   tezos-base
   tezos-base.unix
-  tezos-version
   tezos-protocol-environment.sigs
   tezos-stdlib-unix
   compiler-libs.common
   lwt.unix
   ocplib-ocamlres
-  unix)
+  unix
+  tezos-version.value)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -61,7 +61,8 @@
  (libraries
   tezos-base
   octez-protocol-compiler
-  compiler-libs.optcomp)
+  compiler-libs.optcomp
+  tezos-version.value)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

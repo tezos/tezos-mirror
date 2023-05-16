@@ -10,7 +10,8 @@
   tezos-base
   tezos-clic
   tezos-protocol-alpha
-  octez_smart_rollup_client_alpha)
+  octez_smart_rollup_client_alpha
+  tezos-version.value)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)

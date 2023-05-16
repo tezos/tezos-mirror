@@ -8,7 +8,7 @@
  (libraries
   tezos-base
   tezos-clic
-  tezos-version
+  tezos-version.value
   tezos-protocol-016-PtMumbai
   tezos-protocol-plugin-016-PtMumbai
   tezos-protocol-environment

@@ -173,7 +173,7 @@ let main {compile_ml; pack_objects; link_shared} =
       ( "--version",
         Unit
           (fun () ->
-            Format.printf "%s\n" Tezos_version.Bin_version.version_string ;
+            Format.printf "%s\n" Tezos_version_value.Bin_version.version_string ;
             Stdlib.exit 0),
         " Display version information" );
       ( "-warning",

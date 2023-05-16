@@ -19,6 +19,7 @@ depends: [
   "tezos-smart-rollup-alpha"
   "tezos-smart-rollup-layer2-alpha"
   "tezos-clic"
+  "tezos-version"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

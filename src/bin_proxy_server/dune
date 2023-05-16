@@ -20,7 +20,7 @@
   tezos-rpc-http-server
   tezos-shell-services
   tezos-shell-context
-  tezos-version
+  tezos-version.value
   uri
   (select void_for_linking-tezos-client-genesis from
    (tezos-client-genesis -> void_for_linking-tezos-client-genesis.empty)

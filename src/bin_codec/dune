@@ -16,6 +16,7 @@
   tezos-stdlib-unix
   tezos-event-logging
   tezos-signer-services
+  tezos-version.value
   (select void_for_linking-tezos-client-005-PsBabyM1 from
    (tezos-client-005-PsBabyM1 -> void_for_linking-tezos-client-005-PsBabyM1.empty)
    (-> void_for_linking-tezos-client-005-PsBabyM1.empty))

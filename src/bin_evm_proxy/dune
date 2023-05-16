@@ -12,6 +12,7 @@
   tezos-clic
   tezos-rpc-http
   tezos-rpc-http-server
+  tezos-version.value
   evm_proxy_lib)
  (link_flags
   (:standard)

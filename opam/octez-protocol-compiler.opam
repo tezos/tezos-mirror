@@ -12,11 +12,11 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezos-base"
   "tezos-protocol-environment"
-  "tezos-version"
   "tezos-stdlib-unix"
   "lwt" { >= "5.6.0" }
   "ocp-ocamlres" { >= "0.4" }
   "base-unix"
+  "tezos-version"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

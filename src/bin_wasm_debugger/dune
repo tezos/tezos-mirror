@@ -16,7 +16,8 @@
   octez_smart_rollup_wasm_benchmark_lib
   tezos-scoru-wasm-helpers
   tezos-webassembly-interpreter
-  tezos-webassembly-interpreter-extra)
+  tezos-webassembly-interpreter-extra
+  tezos-version.value)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)

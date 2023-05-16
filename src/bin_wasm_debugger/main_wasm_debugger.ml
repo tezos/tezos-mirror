@@ -277,7 +277,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     match result with
     | Ok _ -> ()
     | Error [Tezos_clic.Version] ->
-        let version = Tezos_version.Bin_version.version_string in
+        let version = Tezos_version_value.Bin_version.version_string in
         Format.printf "%s\n" version ;
         exit 0
     | Error e ->

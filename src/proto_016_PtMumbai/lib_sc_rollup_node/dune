@@ -39,7 +39,8 @@
   octez-smart-rollup-node
   tezos-scoru-wasm
   tezos-scoru-wasm-fast
-  tezos-crypto-dal)
+  tezos-crypto-dal
+  tezos-version.value)
  (flags
   (:standard)
   -open Tezos_base

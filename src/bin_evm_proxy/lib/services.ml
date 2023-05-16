@@ -37,8 +37,9 @@ let client_version =
   Format.sprintf
     "%s/%s-%s/%s/ocamlc.%s"
     "octez-evm-proxy-server"
-    Tezos_version.(Version.to_string Current_git_info.version)
-    Tezos_version.Current_git_info.abbreviated_commit_hash
+    (Tezos_version.Version.to_string
+       Tezos_version_value.Current_git_info.version)
+    Tezos_version_value.Current_git_info.abbreviated_commit_hash
     Stdlib.Sys.os_type
     Stdlib.Sys.ocaml_version
 

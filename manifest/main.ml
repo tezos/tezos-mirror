@@ -1991,6 +1991,18 @@ let octez_version =
     ~synopsis:"Tezos: version information generated from Git"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_version_parser]
     ~js_compatible:true
+
+let octez_version_value =
+  public_lib
+    "tezos-version.value"
+    ~path:"src/lib_version/value/"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_version;
+        octez_version_parser;
+      ]
+    ~js_compatible:true
       (* We want generated_git_info.cmi to be compiled with -opaque so
          that a change in the implementation doesn't force rebuilding all
          the reverse dependencies. *)
@@ -2002,19 +2014,8 @@ let octez_version =
           targets_rule
             ["generated_git_info.ml"]
             ~deps:[[S "universe"]]
-            ~action:[S "run"; S "./exe/get_git_info.exe"];
+            ~action:[S "run"; S "../exe/get_git_info.exe"];
         ]
-
-let _octez_version_value =
-  public_lib
-    "tezos-version.value"
-    ~path:"src/lib_version/value/"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_version;
-        octez_version_parser;
-      ]
 
 let _octez_version_get_git_info =
   private_exe
@@ -2030,7 +2031,9 @@ let _octez_print_version_exe =
     "tezos-version"
     ~internal_name:"tezos_print_version"
     ~path:"src/lib_version/exe"
-    ~deps:[octez_version |> open_; octez_base_unix]
+    ~opam:"tezos-version"
+    ~deps:
+      [octez_version_value |> open_; octez_version |> open_; octez_base_unix]
     ~modules:["tezos_print_version"]
     ~bisect_ppx:No
 
@@ -2820,13 +2823,13 @@ let octez_protocol_compiler_lib =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix |> open_;
-        octez_version;
         tezos_protocol_environment_sigs;
         octez_stdlib_unix |> open_;
         compiler_libs_common;
         lwt_unix;
         ocplib_ocamlres;
         unix;
+        octez_version_value;
       ]
     ~opam_only_deps:[octez_protocol_environment]
     ~modules:
@@ -2912,6 +2915,7 @@ let octez_protocol_compiler_native =
         octez_base |> open_ ~m:"TzPervasives";
         octez_protocol_compiler_lib |> open_;
         compiler_libs_optcomp;
+        octez_version_value;
       ]
     ~modules:["Native"]
     ~dune:
@@ -3175,6 +3179,7 @@ let octez_shell =
         octez_workers |> open_;
         octez_validation |> open_;
         octez_version |> open_;
+        octez_version_value |> open_;
         lwt_exit;
       ]
 
@@ -3653,6 +3658,7 @@ let octez_client_base_unix =
         octez_proxy;
         octez_proxy_rpc;
         octez_signer_backends_unix;
+        octez_version_value;
         lwt_exit;
         uri;
       ]
@@ -4072,6 +4078,7 @@ let octez_smart_rollup_node_lib =
         octez_node_config;
         prometheus_app;
         octez_injector |> open_;
+        octez_version_value |> open_;
       ]
 
 let octez_scoru_wasm_helpers =
@@ -5649,7 +5656,7 @@ let hash = Protocol.hash
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             octez_clic;
-            octez_version;
+            octez_version_value;
             main |> open_;
             lifted |> if_ N.(number >= 018) |> open_;
             plugin |> if_some |> open_;
@@ -6051,6 +6058,7 @@ let hash = Protocol.hash
             octez_scoru_wasm;
             octez_scoru_wasm_fast;
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
+            octez_version_value;
           ]
         ~conflicts:[Conflicts.checkseum]
     in
@@ -6130,6 +6138,7 @@ let hash = Protocol.hash
             octez_clic;
             main |> open_;
             octez_sc_rollup_client |> if_some |> open_;
+            octez_version_value;
           ]
     in
     let _sc_rollup_node =
@@ -6988,6 +6997,7 @@ let _octez_codec =
          octez_stdlib_unix |> open_;
          octez_event_logging |> open_;
          octez_signer_services;
+         octez_version_value;
        ]
       @ Protocol.all_optionally
       @@ [
@@ -7025,7 +7035,7 @@ let _octez_proxy_server =
          octez_rpc_http_server;
          octez_shell_services;
          octez_shell_context;
-         octez_version;
+         octez_version_value;
          uri;
        ]
       @ Protocol.all_optionally [Protocol.client; Protocol.plugin])
@@ -7051,6 +7061,7 @@ let _octez_snoop =
         str;
         pyml;
         prbnmcn_stats;
+        octez_version_value;
       ]
     ~linkall:true
     ~dune:
@@ -7348,6 +7359,7 @@ let _octez_scoru_wasm_debugger =
         octez_scoru_wasm_helpers |> open_;
         octez_webassembly_interpreter |> open_;
         octez_webassembly_interpreter_extra |> open_;
+        octez_version_value;
       ]
 
 let evm_proxy_lib =
@@ -7363,7 +7375,7 @@ let evm_proxy_lib =
         octez_base |> open_ ~m:"TzPervasives";
         octez_rpc_http |> open_;
         octez_rpc_http_client_unix;
-        octez_version;
+        octez_version_value;
         lwt_exit;
         rlp;
         rope;
@@ -7403,6 +7415,7 @@ let _evm_proxy =
         octez_clic;
         octez_rpc_http |> open_;
         octez_rpc_http_server;
+        octez_version_value;
         evm_proxy_lib;
       ]
     ~bisect_ppx:Yes

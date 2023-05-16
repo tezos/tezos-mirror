@@ -40,7 +40,7 @@ let () =
   | [|_; "--minor"|] -> print_endline (string_of_int version.minor)
   | [|_; "--additional-info"|] ->
       print_endline (string_of_additional_info version.additional_info)
-  | [|_; "--full"|] | [|_|] -> print_endline (Version.to_string version)
+  | [|_; "--full"|] | [|_|] -> print_endline (to_string version)
   | [|_; "--help"|] -> print_endline help_string
   | _ ->
       print_endline help_string ;

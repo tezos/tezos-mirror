@@ -19,6 +19,7 @@ depends: [
   "tezos-smart-rollup-017-PtNairob"
   "tezos-smart-rollup-layer2-017-PtNairob"
   "tezos-clic"
+  "tezos-version"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

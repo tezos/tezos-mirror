@@ -512,8 +512,8 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   let*! () =
     Event.(emit starting_node)
       ( config.blockchain_network.chain_name,
-        Tezos_version.Current_git_info.version,
-        Tezos_version.Current_git_info.abbreviated_commit_hash )
+        Tezos_version_value.Current_git_info.version,
+        Tezos_version_value.Current_git_info.abbreviated_commit_hash )
   in
   let*! () = init_zcash () in
   let* () =

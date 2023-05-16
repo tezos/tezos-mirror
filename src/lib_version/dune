@@ -13,10 +13,4 @@
  (js_of_ocaml)
  (flags
   (:standard)
-  -opaque
   -open Tezos_base.TzPervasives))
-
-(rule
- (targets generated_git_info.ml)
- (deps (universe))
- (action (run ./exe/get_git_info.exe)))

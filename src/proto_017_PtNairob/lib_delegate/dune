@@ -8,7 +8,7 @@
  (libraries
   tezos-base
   tezos-clic
-  tezos-version
+  tezos-version.value
   tezos-protocol-017-PtNairob
   tezos-protocol-plugin-017-PtNairob
   tezos-protocol-environment

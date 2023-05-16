@@ -320,7 +320,7 @@ let build_rpc_directory validator mainchain_validator =
       let next () = Lwt_stream.get stream in
       Tezos_rpc.Answer.return_stream {next; shutdown}) ;
   gen_register0 Monitor_services.S.commit_hash (fun () () ->
-      Tezos_rpc.Answer.return Tezos_version.Current_git_info.commit_hash) ;
+      Tezos_rpc.Answer.return Tezos_version_value.Current_git_info.commit_hash) ;
   gen_register0 Monitor_services.S.active_chains (fun () () ->
       let stream, stopper = Validator.chains_watcher validator in
       let shutdown () = Lwt_watcher.shutdown stopper in

@@ -13,6 +13,7 @@
  (public_name tezos-version)
  (package tezos-version)
  (libraries
+  tezos-version.value
   tezos-version
   tezos-base.unix)
  (link_flags
@@ -20,5 +21,6 @@
   (:include %{workspace_root}/static-link-flags.sexp))
  (flags
   (:standard)
+  -open Tezos_version_value
   -open Tezos_version)
  (modules tezos_print_version))
