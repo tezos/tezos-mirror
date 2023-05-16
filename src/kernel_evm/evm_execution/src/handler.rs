@@ -103,6 +103,9 @@ struct TransactionLayerData {
     /// The log records gathered in this layer of transactions and any
     /// committed sub layers.
     pub logs: Vec<Log>,
+    /// The addresses of contracts that have been deleted as part of
+    /// the current transaction.
+    pub deleted_contracts: Vec<H160>,
 }
 
 impl TransactionLayerData {
@@ -113,6 +116,7 @@ impl TransactionLayerData {
         TransactionLayerData {
             is_static,
             logs: vec![],
+            deleted_contracts: vec![],
         }
     }
 }
@@ -318,6 +322,12 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         if let Ok(ExitReason::Succeed(_)) = result {
             let code_out = runtime.machine().return_value();
 
+            if self.deleted(address) {
+                // The contract has been deleted, so the address is empty. However, after
+                // creating the new contract, the _new_ contract isn't deleted.
+                self.unmark_deletion(address);
+            }
+
             self.set_contract_code(address, code_out)?;
         }
 
@@ -388,7 +398,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 )),
                 Err(e) => Err(EthereumError::PrecompileFailed(e)),
             }
-        } else {
+        } else if !self.deleted(address) {
             let code = self.code(address);
 
             let mut runtime = evm::Runtime::new(
@@ -400,13 +410,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
             let result = self.execute(&mut runtime);
 
-            if let Ok(ExitReason::Succeed(ExitSucceed::Suicided)) = result {
-                // TODO: transfer to beneficiary and erase contract
-                // issue: https://gitlab.com/tezos/tezos/-/issues/4902
-                todo!("https://gitlab.com/tezos/tezos/-/issues/4902")
-            }
-
             return Ok((result?, None, runtime.machine().return_value()));
+        } else {
+            // Contract must be empty since it was deleted, so there are no
+            // instructions to run.
+            return Ok((ExitReason::Succeed(ExitSucceed::Stopped), None, vec![]));
         }
     }
 
@@ -571,6 +579,26 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .unwrap_or(Ok(U256::zero()))
     }
 
+    /// If a contract has been marked for deletion, and another contract is
+    /// created in its place, we need to unmark it, so that we don't delete the
+    /// new contract when we finalize the effects of the transactions.
+    fn unmark_deletion(&mut self, address: H160) {
+        for data in &mut self.transaction_data {
+            data.deleted_contracts.retain(|a| *a != address);
+        }
+    }
+
+    /// Completely delete an account including nonce, code, and data. This is for
+    /// contract selfdestruct completion, ie, when contract selfdestructs takes final
+    /// effect.
+    fn delete_contract(&mut self, address: H160) -> Result<(), EthereumError> {
+        debug_msg!(self.host, "Deleting contract at {:?}", address);
+
+        self.evm_account_storage
+            .delete(self.host, &account_path(&address)?)
+            .map_err(EthereumError::from)
+    }
+
     /// Borrow a reference to the host - needed for eg precompiled contracts
     pub fn borrow_host(&mut self) -> &'_ mut Host {
         self.host
@@ -654,11 +682,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             ));
         }
 
-        self.evm_account_storage
-            .commit_transaction(self.host)
-            .map_err(EthereumError::from)?;
-
         if let Some(last_layer) = self.transaction_data.pop() {
+            self.evm_account_storage
+                .commit_transaction(self.host)
+                .map_err(EthereumError::from)?;
+
             Ok(ExecutionOutcome {
                 gas_used: self.gas_used(),
                 is_success: true,
@@ -734,11 +762,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         execution_result: Result<CreateOutcome, EthereumError>,
     ) -> Result<ExecutionOutcome, EthereumError> {
         match execution_result {
-            Ok((
-                ExitReason::Succeed(ExitSucceed::Stopped | ExitSucceed::Returned),
-                new_address,
-                result,
-            )) => self.commit_initial_transaction(new_address, result),
+            Ok((r @ ExitReason::Succeed(_), new_address, result)) => {
+                self.commit_initial_transaction(new_address, result)
+            }
             Ok((ExitReason::Revert(ExitRevert::Reverted), _, _)) => {
                 self.rollback_initial_transaction()
             }
@@ -761,9 +787,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
                 self.rollback_initial_transaction()?;
                 Err(EthereumError::FatalMachineError(fatal_error))
-            }
-            Ok((ExitReason::Succeed(ExitSucceed::Suicided), _, _)) => {
-                todo!("https://gitlab.com/tezos/tezos/-/issues/4902")
             }
             Err(EthereumError::EthereumAccountError(
                 AccountStorageError::BalanceUnderflow,
@@ -842,6 +865,14 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     .logs
                     .try_reserve_exact(committed_data.logs.len())?;
                 top_layer.logs.append(&mut committed_data.logs);
+
+                top_layer
+                    .deleted_contracts
+                    .reserve(committed_data.deleted_contracts.len());
+                top_layer
+                    .deleted_contracts
+                    .append(&mut committed_data.deleted_contracts);
+
                 Ok(())
             } else {
                 Err(EthereumError::InconsistentState(Cow::from(
@@ -890,12 +921,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         &mut self,
         execution_result: Result<CreateOutcome, EthereumError>,
     ) -> Capture<CreateOutcome, T> {
-        if let Ok((
-            ExitReason::Succeed(r @ ExitSucceed::Stopped | r @ ExitSucceed::Returned),
-            _,
-            _,
-        )) = execution_result
-        {
+        if let Ok((ref r @ ExitReason::Succeed(_), _, _)) = execution_result {
             debug_msg!(self.host, "Intermediate transaction with: {:?}", r);
 
             if let Err(err) = self.commit_inter_transaction() {
@@ -1024,9 +1050,13 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn deleted(&self, address: H160) -> bool {
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/5321
-        // If a contract suicides it gets deleted. Keep track of those deletionsin the handler
-        false // STUB
+        for data in &self.transaction_data {
+            if data.deleted_contracts.contains(&address) {
+                return true;
+            }
+        }
+
+        false
     }
 
     fn is_cold(&self, address: H160, index: Option<H256>) -> bool {
@@ -1067,9 +1097,28 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn mark_delete(&mut self, address: H160, target: H160) -> Result<(), ExitError> {
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/5321
-        // Contract suicide will mark a contract for deletion.
-        Ok(()) // STUB
+        let balance = self.balance(address);
+
+        self.execute_transfer(address, target, balance, None)
+            .map_err(|err| {
+                ExitError::Other(Cow::from(
+                    "Could not execute transfer on contract delete",
+                ))
+            })?;
+
+        if let Some(top_data) = self.transaction_data.last_mut() {
+            top_data.deleted_contracts.push(address);
+
+            if self.delete_contract(address).is_err() {
+                Err(ExitError::Other(Cow::from("Failed to delete contract")))
+            } else {
+                Ok(())
+            }
+        } else {
+            Err(ExitError::Other(Cow::from(
+                "No transaction data for delete",
+            )))
+        }
     }
 
     fn create(
