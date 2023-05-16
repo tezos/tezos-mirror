@@ -460,12 +460,16 @@ let on_layer_1_head node_ctxt (head : Layer1.header) =
       let+ header = Layer1.fetch_tezos_shell_header node_ctxt.l1_ctxt hash in
       {Layer1.hash; level; header}
   in
+  let new_chain_prefetching =
+    Layer1.make_prefetching_schedule node_ctxt.l1_ctxt reorg.new_chain
+  in
   let* () =
     List.iter_es
-      (fun block ->
+      (fun (block, to_prefetch) ->
+        Layer1.prefetch_tezos_blocks node_ctxt.l1_ctxt to_prefetch ;
         let* header = get_header block in
         process_head node_ctxt header)
-      reorg.new_chain
+      new_chain_prefetching
   in
   let* () = Publisher.publish_commitments () in
   let* () = Publisher.cement_commitments () in
@@ -687,12 +691,13 @@ let run ~data_dir ?log_kernel_debug_file (configuration : Configuration.t)
       configuration.sc_rollup_node_operators
   in
   let*! () = Event.waiting_first_block () in
-  let*! l1_ctxt =
+  let* l1_ctxt =
     Layer1.start
       ~name:"sc_rollup_node"
       ~reconnection_delay:configuration.reconnection_delay
       ~l1_blocks_cache_size:configuration.l1_blocks_cache_size
       ~protocols:[Protocol.hash]
+      ?prefetch_blocks:configuration.prefetch_blocks
       cctxt
   in
   let*! head = Layer1.wait_first l1_ctxt in

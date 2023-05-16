@@ -58,8 +58,9 @@ val start :
   reconnection_delay:float ->
   l1_blocks_cache_size:int ->
   ?protocols:Protocol_hash.t list ->
+  ?prefetch_blocks:int ->
   #Client_context.full ->
-  t Lwt.t
+  t tzresult Lwt.t
 
 (** [shutdown t] properly shuts the layer 1 down. *)
 val shutdown : t -> unit Lwt.t
@@ -112,6 +113,18 @@ val fetch_tezos_block :
   t ->
   Block_hash.t ->
   Protocol_client_context.Alpha_block_services.block_info tzresult Lwt.t
+
+(** [make_prefetching_schedule l1_ctxt blocks] returns the list [blocks] with
+    each element associated to a list of blocks to prefetch of at most
+    [l1_ctxt.prefetch_blocks]. If [blocks = [b1; ...; bn]] and [prefetch_blocks
+    = 3] then the result will be [(b1, [b1;b2;b3]); (b2, []); (b3, []); (b4,
+    [b4;b5;b6]); ...]. *)
+val make_prefetching_schedule : t -> 'block trace -> ('block * 'block list) list
+
+(** [prefetch_tezos_blocks l1_ctxt blocks] prefetches the blocks
+    asynchronously. NOTE: the number of blocks to prefetch must not be greater
+    than the size of the blocks cache otherwise they will be lost. *)
+val prefetch_tezos_blocks : t -> head list -> unit
 
 (**/**)
 

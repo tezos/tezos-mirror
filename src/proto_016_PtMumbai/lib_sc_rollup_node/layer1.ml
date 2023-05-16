@@ -101,15 +101,24 @@ type nonrec t = {
       (** Global blocks cache for the smart rollup node. *)
   headers_cache : headers_cache;
       (** Global block headers cache for the smart rollup node. *)
+  prefetch_blocks : int;  (** Number of blocks to prefetch by default. *)
 }
 
-let start ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols cctxt =
-  let open Lwt_syntax in
-  let+ l1 = start ~name ~reconnection_delay ?protocols cctxt in
+let start ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols
+    ?(prefetch_blocks = l1_blocks_cache_size) cctxt =
+  let open Lwt_result_syntax in
+  let*? () =
+    if prefetch_blocks > l1_blocks_cache_size then
+      error_with
+        "Blocks to prefetch must be less than the cache size: %d"
+        l1_blocks_cache_size
+    else Ok ()
+  in
+  let*! l1 = start ~name ~reconnection_delay ?protocols cctxt in
   let blocks_cache = Blocks_cache.create l1_blocks_cache_size in
   let headers_cache = Blocks_cache.create l1_blocks_cache_size in
   let cctxt = (cctxt :> Client_context.full) in
-  {l1; cctxt; blocks_cache; headers_cache}
+  return {l1; cctxt; blocks_cache; headers_cache; prefetch_blocks}
 
 let shutdown {l1; _} = shutdown l1
 
@@ -141,6 +150,7 @@ module Internal_for_tests = struct
       cctxt = (cctxt :> Client_context.full);
       blocks_cache = Blocks_cache.create 1;
       headers_cache = Blocks_cache.create 1;
+      prefetch_blocks = 0;
     }
 end
 
@@ -237,3 +247,29 @@ let fetch_tezos_block {cctxt; blocks_cache; headers_cache; _} hash =
   | Some block, _ ->
       Blocks_cache.put headers_cache hash (Lwt.return_some block.header.shell) ;
       Ok block
+
+let make_prefetching_schedule {prefetch_blocks; _} blocks =
+  let blocks_with_prefetching, _, first_prefetch =
+    List.fold_left
+      (fun (acc, nb_prefetch, prefetch) b ->
+        let nb_prefetch = nb_prefetch + 1 in
+        let prefetch = b :: prefetch in
+        if nb_prefetch >= prefetch_blocks then ((b, prefetch) :: acc, 0, [])
+        else ((b, []) :: acc, nb_prefetch, prefetch))
+      ([], 0, [])
+      (List.rev blocks)
+  in
+  match (blocks_with_prefetching, first_prefetch) with
+  | [], _ | _, [] -> blocks_with_prefetching
+  | (first, _) :: rest, _ -> (first, first_prefetch) :: rest
+
+let prefetch_tezos_blocks l1_ctxt = function
+  | [] -> ()
+  | blocks ->
+      Lwt.async @@ fun () ->
+      List.iter_p
+        (fun {hash; _} ->
+          let open Lwt_syntax in
+          let+ _maybe_block = fetch_tezos_block l1_ctxt hash in
+          ())
+        blocks
