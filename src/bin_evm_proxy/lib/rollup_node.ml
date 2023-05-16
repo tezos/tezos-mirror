@@ -360,7 +360,10 @@ module RPC = struct
       match transactions_answer with
       | Some bytes ->
           let chunks = chunks bytes Ethereum_types.transaction_hash_size in
-          List.map (fun bytes -> Hash Hex.(of_string bytes |> show)) chunks
+          let hashes =
+            List.map (fun bytes -> Hash Hex.(of_string bytes |> show)) chunks
+          in
+          TxHash hashes
       | None ->
           raise
           @@ Invalid_block_structure

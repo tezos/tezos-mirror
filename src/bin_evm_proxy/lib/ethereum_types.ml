@@ -140,135 +140,6 @@ let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
 
 let empty_hash = Hash "0x"
 
-(** Ethereum block hash representation from RPCs. *)
-type block = {
-  number : block_height option;
-  hash : block_hash option;
-  parent : block_hash;
-  nonce : hash;
-  sha3Uncles : hash;
-  logsBloom : hash option;
-  transactionRoot : hash;
-  stateRoot : hash;
-  receiptRoot : hash;
-  miner : hash;
-  difficulty : quantity;
-  totalDifficulty : quantity;
-  extraData : string;
-  size : quantity;
-  gasLimit : quantity;
-  gasUsed : quantity;
-  timestamp : quantity;
-  transactions : hash list;
-  uncles : hash list;
-}
-
-let block_encoding =
-  let open Data_encoding in
-  conv
-    (fun {
-           number;
-           hash;
-           parent;
-           nonce;
-           sha3Uncles;
-           logsBloom;
-           transactionRoot;
-           stateRoot;
-           receiptRoot;
-           miner;
-           difficulty;
-           totalDifficulty;
-           extraData;
-           size;
-           gasLimit;
-           gasUsed;
-           timestamp;
-           transactions;
-           uncles;
-         } ->
-      ( ( number,
-          hash,
-          parent,
-          nonce,
-          sha3Uncles,
-          logsBloom,
-          transactionRoot,
-          stateRoot,
-          receiptRoot,
-          miner ),
-        ( difficulty,
-          totalDifficulty,
-          extraData,
-          size,
-          gasLimit,
-          gasUsed,
-          timestamp,
-          transactions,
-          uncles ) ))
-    (fun ( ( number,
-             hash,
-             parent,
-             nonce,
-             sha3Uncles,
-             logsBloom,
-             transactionRoot,
-             stateRoot,
-             receiptRoot,
-             miner ),
-           ( difficulty,
-             totalDifficulty,
-             extraData,
-             size,
-             gasLimit,
-             gasUsed,
-             timestamp,
-             transactions,
-             uncles ) ) ->
-      {
-        number;
-        hash;
-        parent;
-        nonce;
-        sha3Uncles;
-        logsBloom;
-        transactionRoot;
-        stateRoot;
-        receiptRoot;
-        miner;
-        difficulty;
-        totalDifficulty;
-        extraData;
-        size;
-        gasLimit;
-        gasUsed;
-        timestamp;
-        transactions;
-        uncles;
-      })
-    (merge_objs
-       (obj10
-          (req "number" (option block_height_encoding))
-          (req "hash" (option block_hash_encoding))
-          (req "parent" block_hash_encoding)
-          (req "nonce" hash_encoding)
-          (req "sha3Uncles" hash_encoding)
-          (req "logsBloom" (option hash_encoding))
-          (req "transactionRoot" hash_encoding)
-          (req "stateRoot" hash_encoding)
-          (req "receiptRoot" hash_encoding)
-          (req "miner" hash_encoding))
-       (obj9
-          (req "difficulty" quantity_encoding)
-          (req "totalDifficulty" quantity_encoding)
-          (req "extraData" string)
-          (req "size" quantity_encoding)
-          (req "gasLimit" quantity_encoding)
-          (req "gasUsed" quantity_encoding)
-          (req "timestamp" quantity_encoding)
-          (req "transactions" (list hash_encoding))
-          (req "uncles" (list hash_encoding))))
-
 type transaction_log = {
   address : address;
   topics : hash list;
@@ -519,6 +390,157 @@ let transaction_object_encoding =
           (req "v" quantity_encoding)
           (req "r" hash_encoding)
           (req "s" hash_encoding)))
+
+type block_transactions =
+  | TxHash of hash list
+  | TxFull of transaction_object list
+
+let block_transactions_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"hash"
+        (Tag 0)
+        (list hash_encoding)
+        (function TxHash hashes -> Some hashes | _ -> None)
+        (fun hashes -> TxHash hashes);
+      case
+        ~title:"full"
+        (Tag 1)
+        (list transaction_object_encoding)
+        (function TxFull txs -> Some txs | _ -> None)
+        (fun txs -> TxFull txs);
+    ]
+
+(** Ethereum block hash representation from RPCs. *)
+type block = {
+  number : block_height option;
+  hash : block_hash option;
+  parent : block_hash;
+  nonce : hash;
+  sha3Uncles : hash;
+  logsBloom : hash option;
+  transactionRoot : hash;
+  stateRoot : hash;
+  receiptRoot : hash;
+  miner : hash;
+  difficulty : quantity;
+  totalDifficulty : quantity;
+  extraData : string;
+  size : quantity;
+  gasLimit : quantity;
+  gasUsed : quantity;
+  timestamp : quantity;
+  transactions : block_transactions;
+  uncles : hash list;
+}
+
+let block_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           number;
+           hash;
+           parent;
+           nonce;
+           sha3Uncles;
+           logsBloom;
+           transactionRoot;
+           stateRoot;
+           receiptRoot;
+           miner;
+           difficulty;
+           totalDifficulty;
+           extraData;
+           size;
+           gasLimit;
+           gasUsed;
+           timestamp;
+           transactions;
+           uncles;
+         } ->
+      ( ( number,
+          hash,
+          parent,
+          nonce,
+          sha3Uncles,
+          logsBloom,
+          transactionRoot,
+          stateRoot,
+          receiptRoot,
+          miner ),
+        ( difficulty,
+          totalDifficulty,
+          extraData,
+          size,
+          gasLimit,
+          gasUsed,
+          timestamp,
+          transactions,
+          uncles ) ))
+    (fun ( ( number,
+             hash,
+             parent,
+             nonce,
+             sha3Uncles,
+             logsBloom,
+             transactionRoot,
+             stateRoot,
+             receiptRoot,
+             miner ),
+           ( difficulty,
+             totalDifficulty,
+             extraData,
+             size,
+             gasLimit,
+             gasUsed,
+             timestamp,
+             transactions,
+             uncles ) ) ->
+      {
+        number;
+        hash;
+        parent;
+        nonce;
+        sha3Uncles;
+        logsBloom;
+        transactionRoot;
+        stateRoot;
+        receiptRoot;
+        miner;
+        difficulty;
+        totalDifficulty;
+        extraData;
+        size;
+        gasLimit;
+        gasUsed;
+        timestamp;
+        transactions;
+        uncles;
+      })
+    (merge_objs
+       (obj10
+          (req "number" (option block_height_encoding))
+          (req "hash" (option block_hash_encoding))
+          (req "parent" block_hash_encoding)
+          (req "nonce" hash_encoding)
+          (req "sha3Uncles" hash_encoding)
+          (req "logsBloom" (option hash_encoding))
+          (req "transactionRoot" hash_encoding)
+          (req "stateRoot" hash_encoding)
+          (req "receiptRoot" hash_encoding)
+          (req "miner" hash_encoding))
+       (obj9
+          (req "difficulty" quantity_encoding)
+          (req "totalDifficulty" quantity_encoding)
+          (req "extraData" string)
+          (req "size" quantity_encoding)
+          (req "gasLimit" quantity_encoding)
+          (req "gasUsed" quantity_encoding)
+          (req "timestamp" quantity_encoding)
+          (req "transactions" block_transactions_encoding)
+          (req "uncles" (list hash_encoding))))
 
 type transaction = {
   from : address;

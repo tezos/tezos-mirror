@@ -107,9 +107,13 @@ let dispatch_input
         in
         return (Get_block_by_number.Output (Ok block))
     | Get_block_by_number.Input None ->
-        return (Get_block_by_number.Output (Ok Mockup.(block ())))
+        return
+          (Get_block_by_number.Output
+             (Ok Mockup.(block (TxHash [transaction_hash]))))
     | Get_block_by_hash.Input _ ->
-        return (Get_block_by_hash.Output (Ok Mockup.(block ())))
+        return
+          (Get_block_by_hash.Output
+             (Ok Mockup.(block (TxHash [transaction_hash]))))
     | Get_code.Input (Some (address, _)) ->
         let* code = Rollup_node_rpc.code address in
         return (Get_code.Output (Ok code))
