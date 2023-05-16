@@ -92,7 +92,7 @@ let get_certificate_output raw_output =
       | Some hex -> Some (Certificate (`Hex hex))
       | None -> assert false)
 
-let send_payload ?hooks ?threshold dac_client hex_payload =
+let send_hex_payload ?hooks ?threshold dac_client hex_payload =
   let coordinator_endpoint =
     Printf.sprintf
       "%s:%d"
@@ -117,6 +117,37 @@ let send_payload ?hooks ?threshold dac_client hex_payload =
          "with";
          "content";
          Hex.show hex_payload;
+       ]
+      @ threshold_arg)
+  in
+  let* raw_output = Process.check_and_read_stdout process in
+  Lwt.return @@ send_payload_output raw_output
+
+let send_payload_from_file ?hooks ?threshold dac_client filename =
+  let coordinator_endpoint =
+    Printf.sprintf
+      "%s:%d"
+      (Dac_node.rpc_host dac_client.dac_node)
+      (Dac_node.rpc_port dac_client.dac_node)
+  in
+  let threshold_arg =
+    match threshold with
+    | None -> []
+    | Some n -> ["--wait-for-threshold"; string_of_int n]
+  in
+  let*? process =
+    spawn_command
+      ?hooks
+      dac_client
+      ([
+         "send";
+         "payload";
+         "to";
+         "coordinator";
+         coordinator_endpoint;
+         "from";
+         "file";
+         filename;
        ]
       @ threshold_arg)
   in

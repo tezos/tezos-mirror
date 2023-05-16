@@ -40,13 +40,22 @@ val create :
     Can be either a root hash or a certificate. *)
 type output = Root_hash of Hex.t | Certificate of Hex.t
 
-(** [send_payload ?hooks ?threshold dac_client hex] sends the Hex payload [hex]
-    to the coordinator of [dac_client]. If the [threshold] value is specified,
-    then the command will wait for a  [Certificate] with an amount of
-    signatures greater or equal to [threshold], before returning. Otherwise,
-    the [Root_hash] of the payload is returned. *)
-val send_payload :
+(** [send_hex_payload ?hooks ?threshold dac_client hex] sends the Hex
+    payload [hex] to the coordinator of [dac_client]. If the [threshold] value
+    is specified, the command will wait for a [Certificate] with an
+    amount of signatures greater or equal to [threshold], before returning.
+    Otherwise, the [Root_hash] of the payload is returned. *)
+val send_hex_payload :
   ?hooks:Process_hooks.t -> ?threshold:int -> t -> Hex.t -> output Lwt.t
+
+(** [send_payload_from_file ?hooks ?threshold dac_client filename] reads the
+    payload content from [file] and sends it to the coordinator of
+    [dac_client]. If the [threshold] value is specified, then the command will
+    wait for a  [Certificate] with an amount of signatures greater or equal to
+    [threshold], before returning. Otherwise, the [Root_hash] of the payload is
+    returned. *)
+val send_payload_from_file :
+  ?hooks:Process_hooks.t -> ?threshold:int -> t -> string -> output Lwt.t
 
 (** [get_certificate ?hooks dac_client root_hash] returns the certificate
     available to the coordinator of [dac_client] for [root_hash], if any.
