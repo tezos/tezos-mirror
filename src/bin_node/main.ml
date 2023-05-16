@@ -95,7 +95,8 @@ let () =
   if Filename.basename Sys.argv.(0) = Updater.compiler_name then (
     try
       Octez_protocol_compiler.Compiler.main
-        Octez_protocol_compiler_native.Native.driver ;
+        Octez_protocol_compiler_native.Native.driver
+        Tezos_version_value.Bin_version.version_string ;
       Stdlib.exit 0
     with exn ->
       Format.eprintf "%a\n%!" Opterrors.report_error exn ;

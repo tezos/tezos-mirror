@@ -15,7 +15,8 @@
  (instrumentation (backend bisect_ppx))
  (modes native)
  (libraries
-  octez-protocol-compiler.native)
+  octez-protocol-compiler.native
+  tezos-version.value)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)

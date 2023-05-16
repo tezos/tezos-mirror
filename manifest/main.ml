@@ -2829,7 +2829,6 @@ let octez_protocol_compiler_lib =
         lwt_unix;
         ocplib_ocamlres;
         unix;
-        octez_version_value;
       ]
     ~opam_only_deps:[octez_protocol_environment]
     ~modules:
@@ -2915,7 +2914,6 @@ let octez_protocol_compiler_native =
         octez_base |> open_ ~m:"TzPervasives";
         octez_protocol_compiler_lib |> open_;
         compiler_libs_optcomp;
-        octez_version_value;
       ]
     ~modules:["Native"]
     ~dune:
@@ -2964,6 +2962,7 @@ let octez_validation =
         octez_shell_services |> open_;
         octez_protocol_updater |> open_;
         octez_stdlib_unix |> open_;
+        octez_version_value;
       ]
 
 let octez_store_shared =
@@ -3811,7 +3810,7 @@ let _octez_protocol_compiler_bin =
     ~opam:"octez-protocol-compiler"
     ~internal_name:"main_native"
     ~modes:[Native]
-    ~deps:[octez_protocol_compiler_native]
+    ~deps:[octez_protocol_compiler_native; octez_version_value]
     ~linkall:true
     ~modules:["Main_native"]
 
