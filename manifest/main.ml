@@ -3178,7 +3178,6 @@ let octez_shell =
         octez_workers |> open_;
         octez_validation |> open_;
         octez_version |> open_;
-        octez_version_value |> open_;
         lwt_exit;
       ]
 
@@ -6618,6 +6617,7 @@ let _octez_shell_tests =
         octez_event_logging_test_helpers |> open_;
         octez_test_helpers |> open_;
         alcotezt;
+        octez_version_value;
       ]
 
 (* INTERNAL EXES *)
@@ -6868,6 +6868,7 @@ let _octez_node =
          octez_base |> open_ ~m:"TzPervasives" |> open_;
          octez_base_unix;
          octez_version;
+         octez_version_value;
          octez_node_config |> open_;
          octez_stdlib_unix |> open_;
          octez_shell_services |> open_;

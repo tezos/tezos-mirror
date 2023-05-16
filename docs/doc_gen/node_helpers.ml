@@ -60,9 +60,22 @@ let with_node f =
         dal = Tezos_crypto_dal.Cryptobox.Config.default;
       }
     in
+    let version =
+      Tezos_version.Version.to_string
+        Tezos_version_value.Current_git_info.version
+    in
+    let commit_info =
+      ({
+         commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+         commit_date = Tezos_version_value.Current_git_info.committer_date;
+       }
+        : Tezos_version.Node_version.commit_info)
+    in
     let* node =
       Node.create
         ~singleprocess:true
+        ~version
+        ~commit_info
         node_config
         Tezos_shell_services.Shell_limits.default_peer_validator_limits
         Tezos_shell_services.Shell_limits.default_block_validator_limits

@@ -55,14 +55,20 @@ val create :
   ?sandboxed:bool ->
   ?sandbox_parameters:Data_encoding.json ->
   singleprocess:bool ->
+  version:string ->
+  commit_info:Node_version.commit_info ->
   config ->
   Shell_limits.peer_validator_limits ->
   Shell_limits.block_validator_limits ->
   Shell_limits.prevalidator_limits ->
   Shell_limits.chain_validator_limits ->
   History_mode.t option ->
-  t tzresult Lwt.t
+  (t, tztrace) result Lwt.t
 
 val shutdown : t -> unit Lwt.t
 
-val build_rpc_directory : t -> unit Tezos_rpc.Directory.t
+val build_rpc_directory :
+  version:Tezos_version_parser.t ->
+  commit_info:Node_version.commit_info ->
+  t ->
+  unit Tezos_rpc.Directory.t

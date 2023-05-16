@@ -24,7 +24,8 @@
   tezos-validation
   tezos-event-logging-test-helpers
   tezos-test-helpers
-  octez-alcotezt)
+  octez-alcotezt
+  tezos-version.value)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

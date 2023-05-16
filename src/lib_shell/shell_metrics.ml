@@ -549,8 +549,6 @@ module Version = struct
         ]
       "version"
 
-  let version = Tezos_version.Version.to_string Current_git_info.version
-
   let network_version net =
     let Network_version.{chain_name; distributed_db_version; p2p_version} =
       P2p.announced_version net
@@ -561,11 +559,8 @@ module Version = struct
       Format.asprintf "%a" P2p_version.pp p2p_version;
     ]
 
-  let commit_hash = Current_git_info.commit_hash
-
-  let commit_date = Current_git_info.committer_date
-
-  let init net =
+  let init ~version
+      ~commit_info:({commit_hash; commit_date} : Node_version.commit_info) net =
     let _ =
       Prometheus.Gauge.labels metric
       @@ [version] @ network_version net @ [commit_hash; commit_date]

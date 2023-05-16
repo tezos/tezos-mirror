@@ -328,10 +328,22 @@ let init_node ?sandbox ?target ~identity ~singleprocess ~internal_events
           ~new_history_mode:history_mode
     | _ -> return_unit
   in
+  let version =
+    Tezos_version.Version.to_string Tezos_version_value.Current_git_info.version
+  in
+  let commit_info =
+    ({
+       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+       commit_date = Tezos_version_value.Current_git_info.committer_date;
+     }
+      : Tezos_version.Node_version.commit_info)
+  in
   Node.create
     ~sandboxed:(sandbox <> None)
     ?sandbox_parameters:(Option.map snd sandbox_param)
     ~singleprocess
+    ~version
+    ~commit_info
     node_config
     config.shell.peer_validator_limits
     config.shell.block_validator_limits
@@ -361,7 +373,15 @@ let launch_rpc_server ~acl_policy ~media_types (config : Config_file.t) node
   let open Lwt_result_syntax in
   let rpc_config = config.rpc in
   let host = Ipaddr.V6.to_string addr in
-  let dir = Node.build_rpc_directory node in
+  let version = Tezos_version_value.Current_git_info.version in
+  let commit_info =
+    ({
+       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+       commit_date = Tezos_version_value.Current_git_info.committer_date;
+     }
+      : Tezos_version.Node_version.commit_info)
+  in
+  let dir = Node.build_rpc_directory ~version ~commit_info node in
   let dir = Node_directory.build_node_directory config dir in
   let dir =
     Tezos_rpc.Directory.register_describe_directory_service
