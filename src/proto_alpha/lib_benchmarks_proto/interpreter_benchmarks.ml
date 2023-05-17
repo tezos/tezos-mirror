@@ -2940,29 +2940,11 @@ module Registration_section = struct
     ()
   end
 
-  module Sapling_no_inputs = struct
+  module Sapling_non_empty = struct
     let module A = Register_Sapling_benchmark (struct
-      let type_transaction = Sapling_generation.No_inputs
+      let type_transaction = Sapling_generation.Non_empty
 
-      let suffix = "no_inputs"
-    end) in
-    ()
-  end
-
-  module Sapling_no_outputs = struct
-    let module A = Register_Sapling_benchmark (struct
-      let type_transaction = Sapling_generation.No_outputs
-
-      let suffix = "no_output"
-    end) in
-    ()
-  end
-
-  module Sapling_full = struct
-    let module A = Register_Sapling_benchmark (struct
-      let type_transaction = Sapling_generation.Full_transaction
-
-      let suffix = "full"
+      let suffix = "non_empty"
     end) in
     ()
   end

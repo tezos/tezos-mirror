@@ -148,7 +148,7 @@ module Apply_diff_bench : Benchmark.S = struct
         let transitions =
           Sapling_generation.load
             ~filename:sapling_txs_file
-            Sapling_generation.Full_transaction
+            Sapling_generation.Non_empty
         in
         let length = List.length transitions in
         if length < bench_num then
