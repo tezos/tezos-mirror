@@ -2510,26 +2510,6 @@ module Tx_kernel_e2e = struct
       (test_tx_kernel_e2e_with_dac_observer_missing_pages commitment_period)
 end
 
-(** [Api] module consist of tests about valid API calls and API versioning. *)
-module Api = struct
-  (** Test that existing endpoints only support valid API version prefix. *)
-  let test_only_valid_api_version_prefix_is_supported
-      Scenarios.{coordinator_node; _} =
-    (* We want to test that [api_version_rpc_arg] only captures
-       valid api version. For this we choose a concrete endpoint from V0 API,
-       and pass it invalid [api_version]. *)
-    let* response =
-      RPC.call_raw
-        coordinator_node
-        Dac_rpc.(
-          post_store_preimage
-            ~payload:"test"
-            ~pagination_scheme:"Merkle_tree_V0"
-            ~api_version:"Invalid API version prefix")
-    in
-    Lwt.return @@ RPC.check_string_response ~code:400 response
-end
-
 let register ~protocols =
   (* Tests with layer1 and dac nodes *)
   Legacy.test_dac_node_startup protocols ;
@@ -2656,12 +2636,5 @@ let register ~protocols =
     Full_infrastructure.test_client
     protocols ;
   Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_synced_with_dac protocols ;
-  Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_missing_pages protocols ;
-  scenario_with_full_dac_infrastructure
-    ~__FILE__
-    ~committee_size:0
-    ~observers:0
-    ~tags:["dac"; "dac_node"]
-    "only valid api version prefix is supported"
-    Api.test_only_valid_api_version_prefix_is_supported
-    protocols
+  Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_missing_pages protocols
+  

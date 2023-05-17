@@ -23,46 +23,43 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module S = struct
-  let root_hashes =
-    Tezos_rpc.Service.get_service
-      ~description:
-        "Monitor a stream of root hashes that are produced by another dac node \
-         responsible for the serialization of the dac payload (coordinator).  "
-      ~query:Tezos_rpc.Query.empty
-      ~output:Dac_plugin.raw_hash_encoding
-      Tezos_rpc.Path.(
-        open_root /: RPC_services.Api.version_rpc_arg / "monitor"
-        / "root_hashes")
+module V0 = struct
+  module S = struct
+    let v0_prefix = Api_version.v0_prefix
 
-  let certificate =
-    Tezos_rpc.Service.get_service
-      ~description:
-        "Monitor a stream of updates to certificates for a given root hash. \
-         Every time a new signature for the root hash is received by the \
-         coordinator node, the corresponding certificate is updated and \
-         streamed via this endpoint. This monitor endpoint guarantees at least \
-         once delivery, i.e. a certificate update could be streamed multiple \
-         times."
-      ~query:Tezos_rpc.Query.empty
-      ~output:Certificate_repr.encoding
-      Tezos_rpc.Path.(
-        open_root /: RPC_services.Api.version_rpc_arg / "monitor"
-        / "certificate" /: Dac_plugin.raw_hash_rpc_arg)
+    let root_hashes =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "Monitor a stream of root hashes that are produced by another dac \
+           node responsible for the serialization of the dac payload \
+           (coordinator).  "
+        ~query:Tezos_rpc.Query.empty
+        ~output:Dac_plugin.raw_hash_encoding
+        Tezos_rpc.Path.(v0_prefix / "monitor" / "root_hashes")
+
+    let certificate =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "Monitor a stream of updates to certificates for a given root hash. \
+           Every time a new signature for the root hash is received by the \
+           coordinator node, the corresponding certificate is updated and \
+           streamed via this endpoint. This monitor endpoint guarantees at \
+           least once delivery, i.e. a certificate update could be streamed \
+           multiple times."
+        ~query:Tezos_rpc.Query.empty
+        ~output:Certificate_repr.encoding
+        Tezos_rpc.Path.(
+          v0_prefix / "monitor" / "certificate" /: Dac_plugin.raw_hash_rpc_arg)
+  end
+
+  let root_hashes dac_node_cctxt =
+    Tezos_rpc.Context.make_streamed_call S.root_hashes dac_node_cctxt () () ()
+
+  let certificate dac_node_cctxt root_hash =
+    Tezos_rpc.Context.make_streamed_call
+      S.certificate
+      dac_node_cctxt
+      ((), root_hash)
+      ()
+      ()
 end
-
-let root_hashes dac_node_cctxt api_version =
-  Tezos_rpc.Context.make_streamed_call
-    S.root_hashes
-    dac_node_cctxt
-    ((), api_version)
-    ()
-    ()
-
-let certificate dac_node_cctxt root_hash api_version =
-  Tezos_rpc.Context.make_streamed_call
-    S.certificate
-    dac_node_cctxt
-    (((), api_version), root_hash)
-    ()
-    ()
