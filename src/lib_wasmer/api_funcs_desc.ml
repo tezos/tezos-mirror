@@ -281,6 +281,9 @@ module Functions (S : FOREIGN) = struct
       foreign
         "wasm_functype_results"
         (ptr Types.Functype.t @-> returning (ptr Types.Valtype.Vec.t))
+
+    let delete =
+      foreign "wasm_functype_delete" (ptr Types.Functype.t @-> returning void)
   end
 
   (** Functions with the [wasm_func_] prefix *)
