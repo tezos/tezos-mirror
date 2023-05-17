@@ -56,13 +56,13 @@ val add_l2_genesis_block :
   boot_sector:string ->
   Sc_rollup_block.t tzresult Lwt.t
 
-(** [append_l2_block node_ctxt ?is_migration_block messages] creates and append
+(** [append_l2_block node_ctxt ?is_first_block messages] creates and append
     an L2 block containing the [messages] given in argument. The block is added
     on top of the last L2 block in the chain (i.e. the head known by the node),
     and is returned. *)
 val append_l2_block :
   [`Read | `Write] Node_context.t ->
-  ?is_migration_block:bool ->
+  ?is_first_block:bool ->
   Sc_rollup.Inbox_message.t list ->
   Sc_rollup_block.t tzresult Lwt.t
 

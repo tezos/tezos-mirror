@@ -796,7 +796,7 @@ let get_inbox_by_block_hash node_ctxt hash =
   inbox_of_head node_ctxt {hash; level}
 
 type messages_info = {
-  is_migration_block : bool;
+  is_first_block : bool;
   predecessor : Block_hash.t;
   predecessor_timestamp : Timestamp.t;
   messages : Sc_rollup.Inbox_message.t list;
@@ -813,20 +813,16 @@ let get_messages {store; _} messages_hash =
         messages_hash
   | Some
       ( messages,
-        (is_migration_block, predecessor, predecessor_timestamp, _num_messages)
-      ) ->
-      return {is_migration_block; predecessor; predecessor_timestamp; messages}
+        (is_first_block, predecessor, predecessor_timestamp, _num_messages) ) ->
+      return {is_first_block; predecessor; predecessor_timestamp; messages}
 
 let find_messages {store; _} hash =
   let open Lwt_result_syntax in
   let+ msgs = Store.Messages.read store.messages hash in
   Option.map
     (fun ( messages,
-           ( is_migration_block,
-             predecessor,
-             predecessor_timestamp,
-             _num_messages ) ) ->
-      {is_migration_block; predecessor; predecessor_timestamp; messages})
+           (is_first_block, predecessor, predecessor_timestamp, _num_messages)
+         ) -> {is_first_block; predecessor; predecessor_timestamp; messages})
     msgs
 
 let get_num_messages {store; _} hash =
@@ -842,15 +838,12 @@ let get_num_messages {store; _} hash =
       return num_messages
 
 let save_messages {store; _} key
-    {is_migration_block; predecessor; predecessor_timestamp; messages} =
+    {is_first_block; predecessor; predecessor_timestamp; messages} =
   Store.Messages.append
     store.messages
     ~key
     ~header:
-      ( is_migration_block,
-        predecessor,
-        predecessor_timestamp,
-        List.length messages )
+      (is_first_block, predecessor, predecessor_timestamp, List.length messages)
     ~value:messages
 
 let get_full_l2_block node_ctxt block_hash =

@@ -257,17 +257,12 @@ module Make (Interpreter : Interpreter.S) :
                ~error:(Format.kasprintf Stdlib.failwith "%a" pp_print_trace))
           @@
           let open Lwt_result_syntax in
-          let* {
-                 is_migration_block;
-                 predecessor;
-                 predecessor_timestamp;
-                 messages;
-               } =
+          let* {is_first_block; predecessor; predecessor_timestamp; messages} =
             Node_context.get_messages node_ctxt witness
           in
           let*? hist =
             Inbox.payloads_history_of_messages
-              ~is_migration_block
+              ~is_first_block
               ~predecessor
               ~predecessor_timestamp
               messages

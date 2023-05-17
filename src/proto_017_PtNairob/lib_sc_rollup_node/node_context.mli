@@ -307,7 +307,7 @@ val commitment_was_published :
 (** {3 Inboxes} *)
 
 type messages_info = {
-  is_migration_block : bool;
+  is_first_block : bool;
   predecessor : Block_hash.t;
   predecessor_timestamp : Timestamp.t;
   messages : Sc_rollup.Inbox_message.t list;

@@ -111,7 +111,7 @@ module Messages =
         let encoding =
           let open Data_encoding in
           obj4
-            (req "is_migration_block" bool)
+            (req "is_first_block" bool)
             (req "predecessor" Block_hash.encoding)
             (req "predecessor_timestamp" Timestamp.encoding)
             (req "num_messages" int31)

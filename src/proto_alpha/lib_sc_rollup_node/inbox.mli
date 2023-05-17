@@ -54,11 +54,11 @@ val process_head :
 (** [start ()] initializes the inbox to track the messages being published. *)
 val start : unit -> unit Lwt.t
 
-(** [add_messages ~is_migration_block ~predecessor_timestamp
+(** [add_messages ~is_first_block ~predecessor_timestamp
     ~predecessor inbox messages] adds [messages] to the [inbox] using
     {!Sc_rollup.Inbox.add_all_messages}. *)
 val add_messages :
-  is_migration_block:bool ->
+  is_first_block:bool ->
   predecessor_timestamp:Timestamp.time ->
   predecessor:Block_hash.t ->
   Inbox.t ->
@@ -70,13 +70,13 @@ val add_messages :
   tzresult
   Lwt.t
 
-(** [payloads_history_of_messages ~is_migration_block ~predecessor
+(** [payloads_history_of_messages ~is_first_block ~predecessor
     ~predecessor_timestamp messages] builds the payloads history for
     the list of [messages]. This allows to not store payloads
     histories (which contain merkelized skip lists) but simply
     messages. *)
 val payloads_history_of_messages :
-  is_migration_block:bool ->
+  is_first_block:bool ->
   predecessor:Block_hash.t ->
   predecessor_timestamp:Timestamp.time ->
   Sc_rollup.Inbox_message.t list ->
@@ -87,7 +87,7 @@ val payloads_history_of_messages :
 module Internal_for_tests : sig
   val process_messages :
     Node_context.rw ->
-    is_migration_block:bool ->
+    is_first_block:bool ->
     predecessor:Layer1.header ->
     level:int32 ->
     Sc_rollup.Inbox_message.t list ->
