@@ -59,14 +59,22 @@ val iter_heads :
 
 (** {2 Helper functions for the Layer 1 chain} *)
 
-(** [get_predecessor_opt state head] returns the predecessor of block [head],
-    when [head] is not the genesis block. *)
+(** [get_predecessor_opt ?max_read state head] returns the predecessor of block
+    [head], when [head] is not the genesis block. [max_read] (by default [8]) is
+    used to cache a number of predecessors to avoid some RPC calls when one need
+    to access multiple predecessors. *)
 val get_predecessor_opt :
-  t -> Block_hash.t * int32 -> (Block_hash.t * int32) option tzresult Lwt.t
+  ?max_read:int ->
+  t ->
+  Block_hash.t * int32 ->
+  (Block_hash.t * int32) option tzresult Lwt.t
 
-(** [get_predecessor state head] returns the predecessor block of [head]. *)
+(** [get_predecessor ?max_read state head] returns the predecessor block of [head]. *)
 val get_predecessor :
-  t -> Block_hash.t * int32 -> (Block_hash.t * int32) tzresult Lwt.t
+  ?max_read:int ->
+  t ->
+  Block_hash.t * int32 ->
+  (Block_hash.t * int32) tzresult Lwt.t
 
 (** [nth_predecessor ~get_predecessor n head] returns [block, history] where
     [block] is the nth predecessor of [head] and [history] is the list of blocks

@@ -184,13 +184,19 @@ let predecessors_of_blocks hashes =
     number of RPCs, this information is requested for a batch of hashes
     and cached locally. *)
 let get_predecessor =
-  let max_cached = 1023 and max_read = 8 in
+  let max_cached = 65536 in
+  let hard_max_read = max_cached in
+  (* 2MB *)
   let module HM =
     Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong) (Block_hash)
   in
   let cache = HM.create max_cached in
-  fun cctxt (chain : Tezos_shell_services.Chain_services.chain) ancestor ->
+  fun ~max_read
+      cctxt
+      (chain : Tezos_shell_services.Chain_services.chain)
+      ancestor ->
     let open Lwt_result_syntax in
+    let max_read = min max_read hard_max_read in
     match HM.find_opt cache ancestor with
     | Some pred -> return_some pred
     | None -> (
@@ -214,17 +220,17 @@ let get_predecessor =
             | Some predecessor -> return_some predecessor)
         | _ -> return_none)
 
-let get_predecessor_opt state (hash, level) =
+let get_predecessor_opt ?(max_read = 8) state (hash, level) =
   let open Lwt_result_syntax in
   if level = 0l then return_none
   else
     let level = Int32.pred level in
-    let+ hash = get_predecessor state.cctxt state.cctxt#chain hash in
+    let+ hash = get_predecessor ~max_read state.cctxt state.cctxt#chain hash in
     Option.map (fun hash -> (hash, level)) hash
 
-let get_predecessor state ((hash, _) as head) =
+let get_predecessor ?max_read state ((hash, _) as head) =
   let open Lwt_result_syntax in
-  let* pred = get_predecessor_opt state head in
+  let* pred = get_predecessor_opt ?max_read state head in
   match pred with
   | None -> tzfail (Cannot_find_predecessor hash)
   | Some pred -> return pred
@@ -271,7 +277,7 @@ let get_tezos_reorg_for_new_head l1_state
     else if old_head_level < new_head_level then
       let+ new_head, new_chain =
         nth_predecessor
-          ~get_predecessor:(get_predecessor l1_state)
+          ~get_predecessor:(get_predecessor ~max_read:distance l1_state)
           distance
           new_head
       in
@@ -295,10 +301,11 @@ let get_tezos_reorg_for_new_head l1_state ?get_old_predecessor old_head new_head
       (* No known tezos head, we want all blocks from l. *)
       if new_head_level < l then return Reorg.no_reorg
       else
+        let distance = Int32.sub new_head_level l |> Int32.to_int in
         let* _block_at_l, new_chain =
           nth_predecessor
-            ~get_predecessor:(get_predecessor l1_state)
-            (Int32.sub new_head_level l |> Int32.to_int)
+            ~get_predecessor:(get_predecessor ~max_read:distance l1_state)
+            distance
             new_head
         in
         return Reorg.{old_chain = []; new_chain}

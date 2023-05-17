@@ -101,6 +101,8 @@ Docker Images
 Smart Rollup node
 -----------------
 
+- Faster bootstrapping process. (MR :gl:`!8618`)
+
 Smart Rollup client
 -------------------
 
