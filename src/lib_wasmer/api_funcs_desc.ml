@@ -419,6 +419,11 @@ module Functions (S : FOREIGN) = struct
       foreign
         "wasm_exporttype_type"
         (ptr Types.Exporttype.t @-> returning (ptr Types.Externtype.t))
+
+    let delete =
+      foreign
+        "wasm_exporttype_delete"
+        (ptr Types.Exporttype.t @-> returning void)
   end
 
   (** Functions with the [wasm_exporttype_vec_] prefix *)

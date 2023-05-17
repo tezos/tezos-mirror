@@ -44,9 +44,8 @@ type t =
   Types.Extern.t Ctypes.ptr Resolver.t
 
 let from_instance inst =
-  let exports =
-    Module.exports inst.Instance.module_ |> Export_type_vector.to_list
-  in
+  let exports_vec = Module.exports inst.Instance.module_ in
+  let exports = Export_type_vector.to_list exports_vec in
   let externs_vec = Extern_vector.empty () in
   Functions.Instance.exports inst.instance (Ctypes.addr externs_vec) ;
   let externs = Extern_vector.to_list externs_vec in
@@ -60,6 +59,9 @@ let from_instance inst =
       externs
       Resolver.empty
   in
+  (* The exports vector is consumed in read-only or copying fashion, therefore
+     there are no references to it at this point. We can clean it up. *)
+  Functions.Exporttype_vec.delete (Ctypes.addr exports_vec) ;
   resolved
 
 let delete = Resolver.iter (fun _ extern -> Functions.Extern.delete extern)
