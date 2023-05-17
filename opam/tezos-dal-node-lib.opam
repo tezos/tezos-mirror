@@ -17,9 +17,9 @@ depends: [
   "tezos-client-base-unix"
   "tezos-stdlib-unix"
   "tezos-crypto-dal"
-  "tezos-gossipsub"
   "tezos-p2p"
   "tezos-p2p-services"
+  "tezos-gossipsub"
   "tezos-crypto"
 ]
 build: [

@@ -111,6 +111,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     events_stream : event Stream.t;
     p2p_output_stream : p2p_output Stream.t;
     app_output_stream : app_output Stream.t;
+    events_logging : event -> unit Monad.t;
   }
 
   let send_p2p_output ~emit_p2p_output ~mk_output =
@@ -514,10 +515,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     let emit_p2p_output = rev_push t.p2p_output_stream in
     let emit_app_output = rev_push t.app_output_stream in
     let events_stream = t.events_stream in
+    let events_logging = t.events_logging in
     let rec loop gossip_state =
       let* event = Stream.pop events_stream in
       if !shutdown then return ()
       else
+        let* () = events_logging event in
         loop @@ apply_event ~emit_p2p_output ~emit_app_output gossip_state event
     in
     let promise = loop t.gossip_state in
@@ -565,13 +568,15 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            resolved. *)
         event_loop_promise
 
-  let make rng limits parameters =
+  let make ?(events_logging = fun _event -> Monad.return ()) rng limits
+      parameters =
     {
       gossip_state = GS.make rng limits parameters;
       status = Starting;
       events_stream = Stream.empty ();
       p2p_output_stream = Stream.empty ();
       app_output_stream = Stream.empty ();
+      events_logging;
     }
 
   let p2p_output_stream t = t.p2p_output_stream

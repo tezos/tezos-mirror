@@ -53,6 +53,9 @@ val rpc_host : t -> string
 (** Get the RPC port given as [--rpc-addr] to an dal node. *)
 val rpc_port : t -> int
 
+(** Get the node's point pair "address:port" given as [--net-addr] to a dal node. *)
+val listen_addr : t -> string
+
 (** Return the endpoint of the dal node, i.e., http://rpc_host:rpc_port. *)
 val endpoint : t -> string
 
@@ -95,8 +98,11 @@ val wait : t -> Unix.process_status Lwt.t
     If [use_unsafe_srs] is [true], the dal node runs with unsafe computed SRS
     allowing tests to run faster, without the need of large file. Default is
     [true] in tezt.
+
+    [expected_pow] allows to change the PoW difficulty. Default value is 0.
 *)
-val init_config : ?use_unsafe_srs:bool -> t -> string Lwt.t
+val init_config :
+  ?use_unsafe_srs:bool -> ?expected_pow:float -> t -> string Lwt.t
 
 module Config_file : sig
   (** DAL node configuration files. *)
@@ -114,3 +120,6 @@ module Config_file : sig
         [Node.Config_file.update node (JSON.put ("use_unsafe_srs", "true"))] *)
   val update : t -> (JSON.t -> JSON.t) -> unit
 end
+
+(** Read the content of the node's identity file. *)
+val read_identity : t -> JSON.t

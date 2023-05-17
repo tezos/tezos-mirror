@@ -60,6 +60,16 @@ let int_parameter =
       in
       if i < 0 then failwith "Parameter must be non-negative" else return i)
 
+let float_parameter =
+  let open Tezos_clic in
+  parameter (fun _ p ->
+      let open Lwt_result_syntax in
+      let* i =
+        try Lwt.return_ok (float_of_string p)
+        with _ -> failwith "Cannot read float"
+      in
+      if i < 0. then failwith "Parameter must be non-negative" else return i)
+
 let rpc_port_arg =
   let default = Configuration.default_rpc_port |> string_of_int in
   Tezos_clic.default_arg
@@ -71,6 +81,19 @@ let rpc_port_arg =
          default)
     ~default
     int_parameter
+
+let expected_pow_arg =
+  let default = string_of_float Configuration.default_expected_pow in
+  Tezos_clic.default_arg
+    ~long:"expected-pow"
+    ~placeholder:"expected-pow"
+    ~doc:
+      (Format.sprintf
+         "Expected PoW difficulty to generate nodes' P2P identities. Default \
+          value is %s"
+         default)
+    ~default
+    float_parameter
 
 let listen_addr_arg =
   let default = P2p_point.Id.to_string Configuration.default_listen_addr in
@@ -99,14 +122,18 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure DAL node."
-    (args5
+    (args6
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
        listen_addr_arg
-       use_unsafe_srs_for_tests_arg)
+       use_unsafe_srs_for_tests_arg
+       expected_pow_arg)
     (prefixes ["init-config"] stop)
-    (fun (data_dir, rpc_addr, rpc_port, listen_addr, use_unsafe_srs) cctxt ->
+    (fun
+      (data_dir, rpc_addr, rpc_port, listen_addr, use_unsafe_srs, expected_pow)
+      cctxt
+    ->
       let open Configuration in
       let listen_addr = P2p_point.Id.of_string_exn listen_addr in
       let config =
@@ -118,7 +145,7 @@ let config_init_command =
           neighbors = [];
           peers = [];
           listen_addr;
-          expected_pow = default_expected_pow;
+          expected_pow;
           network_name = default_network_name;
         }
       in

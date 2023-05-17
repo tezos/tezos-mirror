@@ -24,40 +24,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Gs_interface
-
-module Worker = struct
-  module Config = Gs_interface.Worker_config
-  module Default_parameters = Gs_default_parameters
-  module Logging = Gs_logging
-  include Gs_interface.Worker_instance
-end
-
-module Transport_layer = struct
-  module Interface = Transport_layer_interface
-  module Default_parameters = Transport_layer_default_parameters
-
-  type t =
-    ( Interface.p2p_message,
-      Interface.peer_metadata,
-      Interface.connection_metadata )
-    P2p.t
-
-  let create ~network_name config limits =
-    P2p.create
-      ~config
-      ~limits
-      Interface.peer_meta_config
-      Interface.conn_meta_config
-    @@ Interface.message_config ~network_name
-
-  let activate ?(additional_points = []) p2p =
-    let () = P2p.activate p2p in
-    P2p.pool p2p
-    |> Option.iter (fun pool ->
-           List.iter
-             (fun point -> P2p_pool.register_point pool point |> ignore)
-             additional_points)
-end
-
-module Transport_layer_hooks = Gs_transport_connection
+(** [event e] logs the event [e] of the Gossipsub worker *)
+val event : Gs_interface.Worker_instance.event -> unit Gs_interface.Monad.t

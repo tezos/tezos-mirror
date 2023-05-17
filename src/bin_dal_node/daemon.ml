@@ -246,7 +246,7 @@ let daemonize handlers =
 let run ~data_dir cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
-  let* ({network_name; rpc_addr; rpc_port; _} as config) =
+  let* ({network_name; rpc_addr; rpc_port; peers; _} as config) =
     Configuration.load ~data_dir
   in
   let config = {config with data_dir} in
@@ -260,18 +260,22 @@ let run ~data_dir cctxt =
       Random.State.make [|seed|]
     in
     let open Worker_parameters in
-    Gossipsub.(Worker.make rng limits peer_filter_parameters |> Worker.start [])
+    Gossipsub.Worker.(
+      make ~events_logging:Logging.event rng limits peer_filter_parameters
+      |> start [])
   in
-  (* Create and activate a transport (P2P) layer instance. *)
+  (* Create a transport (P2P) layer instance. *)
   let* transport_layer =
     let open Transport_layer_parameters in
     let* p2p_config = p2p_config config in
     Gossipsub.Transport_layer.create p2p_config p2p_limits ~network_name
   in
-  Gossipsub.Transport_layer.activate transport_layer ;
   let* store = Store.init config in
   let ctxt = Node_context.init config store gs_worker transport_layer cctxt in
   let* rpc_server = RPC_server.(start config ctxt) in
+  (* activate the p2p instance. *)
+  Gossipsub.Transport_layer.activate ~additional_points:peers transport_layer ;
+  let () = Gossipsub.Transport_layer_hooks.activate gs_worker transport_layer in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () = Event.(emit rpc_server_is_ready (rpc_addr, rpc_port)) in
   (* Start daemon to resolve current protocol plugin *)

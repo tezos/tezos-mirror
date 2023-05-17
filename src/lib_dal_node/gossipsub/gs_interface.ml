@@ -255,25 +255,27 @@ module Automaton_config :
   end
 end
 
+module Monad = struct
+  type 'a t = 'a Lwt.t
+
+  let ( let* ) = Lwt.bind
+
+  let return = Lwt.return
+
+  let sleep (span : Span.t) = Lwt_unix.sleep @@ Span.to_float_s span
+end
+
 (** Instantiate the worker functor *)
-module Worker :
+module Worker_config :
   Gossipsub_intf.WORKER_CONFIGURATION
     with type GS.Topic.t = topic
      and type GS.Message_id.t = message_id
      and type GS.Message.t = message
      and type GS.Peer.t = peer
-     and module GS.Span = Span = struct
+     and module GS.Span = Span
+     and module Monad = Monad = struct
   module GS = Tezos_gossipsub.Make (Automaton_config)
-
-  module Monad = struct
-    type 'a t = 'a Lwt.t
-
-    let ( let* ) = Lwt.bind
-
-    let return = Lwt.return
-
-    let sleep (span : Span.t) = Lwt_unix.sleep @@ Span.to_float_s span
-  end
+  module Monad = Monad
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5596
 
@@ -311,3 +313,5 @@ let span_encoding : Span.t Data_encoding.t =
        (fun span -> Span.to_int_s span)
        (fun span -> Span.of_int_s span)
        (obj1 (req "span" int16))
+
+module Worker_instance = Tezos_gossipsub.Worker (Worker_config)

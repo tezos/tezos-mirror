@@ -24,40 +24,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Gs_interface
+module Worker = Gs_interface.Worker_instance
 
-module Worker = struct
-  module Config = Gs_interface.Worker_config
-  module Default_parameters = Gs_default_parameters
-  module Logging = Gs_logging
-  include Gs_interface.Worker_instance
-end
+(** This handler forwards information about connections established by the P2P layer
+    to the Gossipsub worker. *)
+let new_connection_handler gs_worker p2p_layer peer conn =
+  let info = P2p.connection_info p2p_layer conn in
+  let outbound = not info.incoming in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5584
 
-module Transport_layer = struct
-  module Interface = Transport_layer_interface
-  module Default_parameters = Transport_layer_default_parameters
+     Add the ability to have direct peers. *)
+  let direct = false in
+  Worker.(New_connection {peer; direct; outbound} |> p2p_input gs_worker)
 
-  type t =
-    ( Interface.p2p_message,
-      Interface.peer_metadata,
-      Interface.connection_metadata )
-    P2p.t
-
-  let create ~network_name config limits =
-    P2p.create
-      ~config
-      ~limits
-      Interface.peer_meta_config
-      Interface.conn_meta_config
-    @@ Interface.message_config ~network_name
-
-  let activate ?(additional_points = []) p2p =
-    let () = P2p.activate p2p in
-    P2p.pool p2p
-    |> Option.iter (fun pool ->
-           List.iter
-             (fun point -> P2p_pool.register_point pool point |> ignore)
-             additional_points)
-end
-
-module Transport_layer_hooks = Gs_transport_connection
+let activate gs_worker p2p_layer =
+  (* Register a handler to notify new P2P connections to GS. *)
+  let () =
+    new_connection_handler gs_worker p2p_layer
+    |> P2p.on_new_connection p2p_layer
+  in
+  ()

@@ -50,11 +50,13 @@ val message_encoding : message Data_encoding.t
     of the GS parameters. *)
 module Worker : sig
   module Config :
-    module type of Gs_interface.Worker
+    module type of Gs_interface.Worker_config
       with type GS.Topic.t = topic
        and type GS.Message_id.t = message_id
        and type GS.Message.t = message
        and type GS.Peer.t = peer
+       and module GS.Span = Gs_interface.Span
+       and module Monad = Gs_interface.Monad
 
   module Default_parameters : module type of Gs_default_parameters
 
@@ -65,6 +67,10 @@ module Worker : sig
        and type GS.Message.t = message
        and type GS.Peer.t = peer
        and module GS.Span = Config.GS.Span
+
+  module Logging : sig
+    val event : event -> unit Monad.t
+  end
 end
 
 (** The transport layer module exposes the needed primitives, interface and
@@ -76,8 +82,21 @@ module Transport_layer : sig
 
   type t
 
+  (** [create ~network_name config limits] create a new instance of type
+      {!t}. It is a wrapper on top of {!P2p.activate}. *)
   val create :
     network_name:string -> P2p.config -> P2p_limits.t -> t tzresult Lwt.t
 
-  val activate : t -> unit
+  (** [activate ?additional_points t] activates the given transport layer [t]. It
+      is a wrapper on top of {!P2p.activate}. If some [additional_points] are
+      given, they are added to [t]'s known points. *)
+  val activate : ?additional_points:P2p_point.Id.t list -> t -> unit
+end
+
+(** This module implements the list of hooks that allow interconnecting the
+    Gossipsub worker with the transport layer. They are exposed via the
+    {!Transport_layer_hooks.activate} function below. *)
+module Transport_layer_hooks : sig
+  (** See {!Gs_transport_connection.activate}. *)
+  val activate : Worker.t -> Transport_layer.t -> unit
 end
