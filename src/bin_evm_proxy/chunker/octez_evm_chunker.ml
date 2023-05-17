@@ -43,10 +43,12 @@
 
 open Evm_proxy_lib
 
+let zero_address = Tezos_crypto.Hashed.Smart_rollup_address.(zero |> to_string)
+
 let encode_address address =
-  let open Lwt_result_syntax in
+  let open Result_syntax in
   let open Tezos_crypto.Hashed.Smart_rollup_address in
-  let*? s = of_b58check address in
+  let* s = of_b58check address in
   let s = to_string s in
   return s
 
@@ -63,10 +65,10 @@ let main args =
     return_unit
   in
   match args with
+  | Some [s] -> print_chunks zero_address s
   | Some [smart_rollup_address; s] ->
-      let* smart_rollup_address = encode_address smart_rollup_address in
-      let* () = print_chunks smart_rollup_address s in
-      return ()
+      let*? smart_rollup_address = encode_address smart_rollup_address in
+      print_chunks smart_rollup_address s
   | _ ->
       Format.printf
         "Usage: octez_evm_chunker <address> <hash>\n\
