@@ -111,6 +111,8 @@ let mem_of_extern extern =
       (Functions.Memory.data mem)
       (Functions.Memory.data_size mem |> Unsigned.Size_t.to_int)
   in
+  (* The memory type is no longer used after this, so we must delete it. *)
+  Functions.Memory_type.delete mem_type ;
   Memory.{raw; min; max}
 
 let mem exports name =
