@@ -187,6 +187,11 @@ module Exports : sig
   (** [from_intance instance] extracts the exports from the given instance. *)
   val from_instance : Instance.t -> t
 
+  (** [delete exports] cleans up the exports collection to free its associated
+      objects. You must not use previously extracted export objects after
+      calling call. *)
+  val delete : t -> unit
+
   (** [fn exports name typ] looks for a function called [name] and type checks
       it against [typ]. *)
   val fn : t -> string -> 'a fn -> 'a

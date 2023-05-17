@@ -256,6 +256,9 @@ module Functions (S : FOREIGN) = struct
       foreign
         "wasm_extern_as_memory"
         (ptr Types.Extern.t @-> returning (ptr Types.Memory.t))
+
+    let delete =
+      foreign "wasm_extern_delete" (ptr Types.Extern.t @-> returning void)
   end
 
   (** Functions with the [wasm_extern_vec_] prefix *)

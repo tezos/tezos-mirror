@@ -47,17 +47,22 @@ let from_instance inst =
   let exports =
     Module.exports inst.Instance.module_ |> Export_type_vector.to_list
   in
-  let externs = Extern_vector.empty () in
-  Functions.Instance.exports inst.instance (Ctypes.addr externs) ;
-  let externs = Extern_vector.to_list externs in
-  List.fold_right2
-    (fun export extern tail ->
-      let name = Export_type.name export in
-      let kind = Export_type.type_ export |> Functions.Externtype.kind in
-      Resolver.add (name, kind) extern tail)
-    exports
-    externs
-    Resolver.empty
+  let externs_vec = Extern_vector.empty () in
+  Functions.Instance.exports inst.instance (Ctypes.addr externs_vec) ;
+  let externs = Extern_vector.to_list externs_vec in
+  let resolved =
+    List.fold_right2
+      (fun export extern tail ->
+        let name = Export_type.name export in
+        let kind = Export_type.type_ export |> Functions.Externtype.kind in
+        Resolver.add (name, kind) extern tail)
+      exports
+      externs
+      Resolver.empty
+  in
+  resolved
+
+let delete = Resolver.iter (fun _ extern -> Functions.Extern.delete extern)
 
 exception Export_not_found of {name : string; kind : Unsigned.uint8}
 
