@@ -83,6 +83,12 @@ module Worker : sig
   module Logging : sig
     val event : event -> unit Monad.t
   end
+
+  (** A hook to set or update messages validation function. Should be called once
+    at startup and every time the DAL parameters change. *)
+  module Validate_message_hook : sig
+    val set : (message -> message_id -> [`Invalid | `Unknown | `Valid]) -> unit
+  end
 end
 
 (** The transport layer module exposes the needed primitives, interface and

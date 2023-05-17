@@ -31,6 +31,7 @@ module Worker = struct
   module Default_parameters = Gs_default_parameters
   module Logging = Gs_logging
   include Gs_interface.Worker_instance
+  module Validate_message_hook = Validate_message_hook
 end
 
 module Transport_layer = struct
