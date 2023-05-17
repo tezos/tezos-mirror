@@ -58,6 +58,8 @@ SDK
   protocol.
 - Implement host function ``store_delete_value`` introduced in the ``Nairobi`` protocol.
 - Introduce ``PublicKey`` definition in ``tezos-smart-rollup-encoding``
+- Add ``store_read_all`` and ``store_write_all`` to read (resp. write) a full value from (to) the
+  storage, leveraging the need to chunk the reading (resp. writing).
 
 Installer client
 ----------------
