@@ -801,6 +801,53 @@ functor
         @@ test_ifthenelse_bytes (Input.bool false) l r l;
       ]
 
+    let test_rotate_left l i z () =
+      let* l = input ~kind:`Public l in
+      let* z = input z in
+      let o = rotate_left l i in
+      assert_equal o z
+
+    let tests_rotate_left =
+      List.map
+        (fun (i, a, b) ->
+          let a = input_bytes @@ Stdlib.Bytes.of_string a in
+          let b = input_bytes @@ Stdlib.Bytes.of_string b in
+          test ~valid:true ~name:"Bytes.test_rotate_left"
+          @@ test_rotate_left a i b)
+        [
+          (0, "\001", "\001");
+          (1, "\001", "\002");
+          (2, "\001", "\004");
+          (3, "\001", "\008");
+          (4, "\001", "\016");
+          (5, "\001", "\032");
+          (6, "\001", "\064");
+          (7, "\001", "\128");
+          (8, "\001", "\001");
+          (0, "\000\001", "\000\001");
+          (1, "\000\001", "\000\002");
+          (2, "\000\001", "\000\004");
+          (3, "\000\001", "\000\008");
+          (4, "\000\001", "\000\016");
+          (5, "\000\001", "\000\032");
+          (6, "\000\001", "\000\064");
+          (7, "\000\001", "\000\128");
+          (8, "\000\001", "\001\000");
+          (1, "\000\128", "\001\000");
+          (1, "\128\000", "\000\001");
+          (0, "\000\000\001", "\000\000\001");
+          (1, "\000\000\001", "\000\000\002");
+          (2, "\000\000\001", "\000\000\004");
+          (3, "\000\000\001", "\000\000\008");
+          (4, "\000\000\001", "\000\000\016");
+          (5, "\000\000\001", "\000\000\032");
+          (6, "\000\000\001", "\000\000\064");
+          (7, "\000\000\001", "\000\000\128");
+          (8, "\000\000\001", "\000\001\000");
+          (1, "\000\000\128", "\000\001\000");
+          (1, "\128\000\000", "\000\000\001");
+        ]
+
     let test_rotate_right l i z () =
       let* l = input ~kind:`Public l in
       let* z = input z in
@@ -938,8 +985,8 @@ functor
 
     let tests =
       tests_constant @ tests_add @ tests_xor @ tests_ifthenelse_bytes
-      @ tests_rotate_right @ tests_not @ tests_band @ tests_shift_left
-      @ tests_shift_right
+      @ tests_rotate_left @ tests_rotate_right @ tests_not @ tests_band
+      @ tests_shift_left @ tests_shift_right
   end
 
 module ECC : Test =

@@ -120,6 +120,12 @@ module type LIB = sig
 
     val band : bl repr -> bl repr -> bl repr t
 
+    (* [rotate_left bl 1] shifts the bits left by 1 position, so each bit is more
+       significant. The most significant bit becomes the least significant
+       i.e. it is "rotated".
+       [rotate_left bl (length bl) = bl] *)
+    val rotate_left : bl repr -> int -> bl repr
+
     val rotate_right : bl repr -> int -> bl repr
 
     (* [shift_left bl 1] shifts all bits left by 1 position, so each bit is more
@@ -684,6 +690,8 @@ module Lib (C : COMMON) = struct
       in
       let head, tail = split_n i (of_list a) in
       to_list @@ tail @ head
+
+    let rotate_left a i = rotate_right a (length a - i)
 
     let shift_left a i =
       let* zero = Bool.constant false in

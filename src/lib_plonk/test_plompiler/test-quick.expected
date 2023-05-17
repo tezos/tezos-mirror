@@ -1144,6 +1144,192 @@ Constraints: 41
 Bytes.test_ifthenelse_optimized:
 Constraints: 32
 
+Bytes.test_rotate_left:
+Constraints: 24
+
+Bytes.test_rotate_left_optimized:
+Constraints: 16
+
+Bytes.test_rotate_left:
+Constraints: 24
+
+Bytes.test_rotate_left_optimized:
+Constraints: 16
+
+Bytes.test_rotate_left:
+Constraints: 24
+
+Bytes.test_rotate_left_optimized:
+Constraints: 16
+
+Bytes.test_rotate_left:
+Constraints: 24
+
+Bytes.test_rotate_left_optimized:
+Constraints: 16
+
+Bytes.test_rotate_left:
+Constraints: 24
+
+Bytes.test_rotate_left_optimized:
+Constraints: 16
+
+Bytes.test_rotate_left:
+Constraints: 24
+
+Bytes.test_rotate_left_optimized:
+Constraints: 16
+
+Bytes.test_rotate_left:
+Constraints: 24
+
+Bytes.test_rotate_left_optimized:
+Constraints: 16
+
+Bytes.test_rotate_left:
+Constraints: 24
+
+Bytes.test_rotate_left_optimized:
+Constraints: 16
+
+Bytes.test_rotate_left:
+Constraints: 24
+
+Bytes.test_rotate_left_optimized:
+Constraints: 16
+
+Bytes.test_rotate_left:
+Constraints: 48
+
+Bytes.test_rotate_left_optimized:
+Constraints: 32
+
+Bytes.test_rotate_left:
+Constraints: 48
+
+Bytes.test_rotate_left_optimized:
+Constraints: 32
+
+Bytes.test_rotate_left:
+Constraints: 48
+
+Bytes.test_rotate_left_optimized:
+Constraints: 32
+
+Bytes.test_rotate_left:
+Constraints: 48
+
+Bytes.test_rotate_left_optimized:
+Constraints: 32
+
+Bytes.test_rotate_left:
+Constraints: 48
+
+Bytes.test_rotate_left_optimized:
+Constraints: 32
+
+Bytes.test_rotate_left:
+Constraints: 48
+
+Bytes.test_rotate_left_optimized:
+Constraints: 32
+
+Bytes.test_rotate_left:
+Constraints: 48
+
+Bytes.test_rotate_left_optimized:
+Constraints: 32
+
+Bytes.test_rotate_left:
+Constraints: 48
+
+Bytes.test_rotate_left_optimized:
+Constraints: 32
+
+Bytes.test_rotate_left:
+Constraints: 48
+
+Bytes.test_rotate_left_optimized:
+Constraints: 32
+
+Bytes.test_rotate_left:
+Constraints: 48
+
+Bytes.test_rotate_left_optimized:
+Constraints: 32
+
+Bytes.test_rotate_left:
+Constraints: 48
+
+Bytes.test_rotate_left_optimized:
+Constraints: 32
+
+Bytes.test_rotate_left:
+Constraints: 72
+
+Bytes.test_rotate_left_optimized:
+Constraints: 48
+
+Bytes.test_rotate_left:
+Constraints: 72
+
+Bytes.test_rotate_left_optimized:
+Constraints: 48
+
+Bytes.test_rotate_left:
+Constraints: 72
+
+Bytes.test_rotate_left_optimized:
+Constraints: 48
+
+Bytes.test_rotate_left:
+Constraints: 72
+
+Bytes.test_rotate_left_optimized:
+Constraints: 48
+
+Bytes.test_rotate_left:
+Constraints: 72
+
+Bytes.test_rotate_left_optimized:
+Constraints: 48
+
+Bytes.test_rotate_left:
+Constraints: 72
+
+Bytes.test_rotate_left_optimized:
+Constraints: 48
+
+Bytes.test_rotate_left:
+Constraints: 72
+
+Bytes.test_rotate_left_optimized:
+Constraints: 48
+
+Bytes.test_rotate_left:
+Constraints: 72
+
+Bytes.test_rotate_left_optimized:
+Constraints: 48
+
+Bytes.test_rotate_left:
+Constraints: 72
+
+Bytes.test_rotate_left_optimized:
+Constraints: 48
+
+Bytes.test_rotate_left:
+Constraints: 72
+
+Bytes.test_rotate_left_optimized:
+Constraints: 48
+
+Bytes.test_rotate_left:
+Constraints: 72
+
+Bytes.test_rotate_left_optimized:
+Constraints: 48
+
 Bytes.test_rotate_right:
 Constraints: 24
 
