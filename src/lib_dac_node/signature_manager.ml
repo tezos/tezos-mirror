@@ -333,8 +333,9 @@ let should_update_certificate dac_plugin cctxt ro_node_store committee_members
     let* () = verify_signature dac_plugin pub_key signature root_hash in
     return true
 
-let stream_certificate_update dac_plugin committee_members
-    (Certificate_repr.{root_hash; _} as certificate) certificate_streamers =
+let stream_certificate_update dac_plugin committee_members certificate
+    certificate_streamers =
+  let root_hash = Certificate_repr.get_root_hash certificate in
   let open Result_syntax in
   let* () =
     Certificate_streamers.push
@@ -387,8 +388,8 @@ let handle_put_dac_member_signature dac_plugin certificate_streamers_opt
         (stream_certificate_update
            dac_plugin
            committee_members
-           Certificate_repr.
-             {root_hash = raw_root_hash; aggregate_signature; witnesses})
+           Certificate_repr.(
+             V0 (V0.make raw_root_hash aggregate_signature witnesses)))
         certificate_streamers_opt
     in
     return ()

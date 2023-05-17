@@ -53,14 +53,14 @@ val put_dac_member_signature :
   signature:Tezos_crypto.Aggregate_signature.t ->
   (Dac_node.t, unit) RPC_core.t
 
-(** [get_certificate ~hex_root_hash] fetches the DAC certificate for the
-    provided [hex_root_hash]. *)
-val get_certificate :
-  hex_root_hash:Hex.t -> (Dac_node.t, int * string * string) RPC_core.t
-
 (** [get_missing_page ~hex_root_hash] calls GET missing_page/[page_hash] 
         endpoint. *)
 val get_missing_page : hex_root_hash:Hex.t -> (Dac_node.t, string) RPC_core.t
+
+(** [get_certificate ~hex_root_hash] fetches the DAC certificate for the
+    provided [hex_root_hash]. *)
+val get_certificate :
+  hex_root_hash:Hex.t -> (Dac_node.t, int * string * string * int) RPC_core.t
 
 module Coordinator : sig
   (** [post_preimage ~payload] sends a [payload] to the DAC

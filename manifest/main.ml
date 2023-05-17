@@ -3956,6 +3956,24 @@ let _octez_dac_node_lib_tests =
         alcotezt;
       ]
 
+let _octez_dac_lib_tests =
+  tezt
+    ["test_certificate"]
+    ~path:"src/lib_dac/test"
+    ~opam:"tezos-dac-lib-test"
+    ~synopsis:"Test for dac lib"
+    ~with_macos_security_framework:true
+    ~deps:
+      [
+        octez_stdlib |> open_;
+        octez_stdlib_unix |> open_;
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
+        octez_test_helpers |> open_;
+        octez_base_test_helpers |> open_;
+        octez_dac_lib |> open_;
+        alcotezt;
+      ]
+
 let octez_node_config =
   public_lib
     "octez-node-config"

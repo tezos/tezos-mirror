@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2022-2023 Trili Tech <contact@trili.tech>                   *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2023 Marigold  <contact@tmarigold.dev>                      *)
+(* Copyright (c) 2023 Marigold  <contact@marigold.dev>                      *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -145,8 +145,8 @@ let handle_get_certificate dac_plugin node_store raw_root_hash =
   let+ value_opt = Store.Certificate_store.find node_store root_hash in
   Option.map
     (fun Store.{aggregate_signature; witnesses} ->
-      Certificate_repr.
-        {aggregate_signature; witnesses; root_hash = raw_root_hash})
+      Certificate_repr.(
+        V0 (V0.make raw_root_hash aggregate_signature witnesses)))
     value_opt
 
 let handle_get_missing_page cctxt page_store dac_plugin raw_root_hash =
@@ -252,8 +252,8 @@ module Coordinator = struct
           Option.iter
             (fun Store.{aggregate_signature; witnesses} ->
               let certificate =
-                Certificate_repr.
-                  {root_hash = raw_root_hash; aggregate_signature; witnesses}
+                Certificate_repr.(
+                  V0 (V0.make raw_root_hash aggregate_signature witnesses))
               in
               let _ =
                 Certificate_streamers.push

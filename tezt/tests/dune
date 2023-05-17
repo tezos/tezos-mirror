@@ -91,6 +91,7 @@
   src_lib_hacl_test_tezt_lib
   src_lib_error_monad_test_tezt_lib
   src_lib_dac_node_test_tezt_lib
+  src_lib_dac_test_tezt_lib
   src_lib_crypto_dal_test_tezt_lib
   src_lib_crypto_test_unix_tezt_lib
   src_lib_crypto_test_tezt_lib

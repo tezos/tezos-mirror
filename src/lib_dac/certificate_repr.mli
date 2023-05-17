@@ -1,8 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Trili Tech  <contact@trili.tech>                       *)
-(* Copyright (c) 2023 Marigold  <contact@marigold.dev>                       *)
+(* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,34 +24,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [Irmin_store] representation for Dac node. *)
-module Irmin_store : sig
-  include Store_sigs.Store
+(** This is the first version of the [Certificate_repr.t]. In the future
+    if it is needed to add a field of modify type of an existing field,
+      one must simply create a [V1] module with the new definition 
+    of [type t]. *)
+module V0 : sig
+  (** Representation of a Data Availibility Committee Certificate.
+     Type is private to make sure correct [version] is used.
+     Use [make] function to create a [Certificate_repr.V0.t]. *)
+  type t
 
-  include Store_sigs.BACKEND
+  (** Create a [Certificate_repr.V0.t] from given [Dac_plugin.raw_hash],
+     [Tezos_crypto.Aggregate_signature.signature] and [Z.t].
+     This function is in charge to add the correct [version]. *)
+  val make :
+    Dac_plugin.raw_hash ->
+    Tezos_crypto.Aggregate_signature.signature ->
+    Z.t ->
+    t
 end
 
-(** [Signature_store] is a nested map where [primary_key]s are root_hashes and
-    [secondary_key]s are dac member public key hashes. Root hashes are strings
-    instead of [Dac_hash.t] because we want to avoid runtime functorization of
-    the module. 
-  *)
-module Signature_store :
-  Store_sigs.Nested_map
-    with type 'a store = 'a Irmin_store.t
-     and type primary_key = Dac_plugin.hash
-     and type secondary_key = Tezos_crypto.Aggregate_signature.public_key_hash
-     and type value = Tezos_crypto.Aggregate_signature.signature
+type t = V0 of V0.t
 
-type certificate_store_value = {
-  aggregate_signature : Tezos_crypto.Aggregate_signature.signature;
-  witnesses : Z.t;
-}
+(** Used to return any version of [Certificate_repr] on 
+     DAC RPC endpoints. *)
+val encoding : t Data_encoding.t
 
-(** Key-value store for Dac certificates where keys are hexified [Dac_hash.t]
-    and values are [Certificate_repr.t]. *)
-module Certificate_store :
-  Store_sigs.Map
-    with type 'a store = 'a Irmin_store.t
-     and type key = Dac_plugin.hash
-     and type value = certificate_store_value
+(** Helper to get [root_hash] from any given version of [Certificate_repr]. *)
+val get_root_hash : t -> Dac_plugin.raw_hash
+
+(** Helper to get [aggregate_signature] from any given version of [Certificate_repr]. *)
+val get_aggregate_signature : t -> Tezos_crypto.Aggregate_signature.signature
+
+(** Helper to get [witnesses] from any given version of [Certificate_repr]. *)
+val get_witnesses : t -> Z.t
+
+(** Helper to get [version] from any given version of [Certificate_repr]. *)
+val get_version : t -> int
+
+(** [Certificate_repr.all_committee_members_have_signed committee_members certificate] 
+     will return [true] if all members have signed, otherwise it will return [false]. *)
+val all_committee_members_have_signed : 'a list -> t -> bool
