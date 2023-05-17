@@ -54,6 +54,9 @@ SDK
 - Introduce ``dac::certificate`` submodule for handling serialization and deserialization of DAC certificates.
 - Add ``inbox::ExternalMessageFrame`` to ``tezos-smart-rollup-encoding``, to define a shared framing protocol for
   Smart Rollup external messages.
+- Add a feature flag ``proto-nairobi`` to enable host functions introduced in the ``Nairobi``
+  protocol.
+- Implement host function ``store_delete_value`` introduced in the ``Nairobi`` protocol.
 
 Installer client
 ----------------
