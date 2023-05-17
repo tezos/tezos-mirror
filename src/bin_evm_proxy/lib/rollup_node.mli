@@ -22,6 +22,15 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+(** [make_encoded_messages ~smart_rollup_address raw_tx] returns the hash of the
+    transaction, and a list of transactions to include in the inbox.
+    - [smart_rollup_address] is encoded on 20 bytes
+    - [raw_tx] is an ethereum transaction in hex format
+    (without the 0x prefix)*)
+val make_encoded_messages :
+  smart_rollup_address:string ->
+  Ethereum_types.hash ->
+  (string * string list, 'a) result
 
 (** List of services supported to communicate with a rollup node. *)
 module type S = sig

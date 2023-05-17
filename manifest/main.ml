@@ -7326,6 +7326,23 @@ let _octez_scoru_wasm_debugger =
         octez_webassembly_interpreter_extra |> open_;
       ]
 
+let evm_proxy_lib =
+  private_lib
+    "evm_proxy_lib"
+    ~path:"src/bin_evm_proxy/lib"
+    ~opam:"octez-evm-proxy-lib"
+    ~synopsis:
+      "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
+       rollup"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_rpc_http |> open_;
+        octez_rpc_http_client_unix;
+        octez_version;
+        lwt_exit;
+      ]
+
 let _evm_proxy =
   public_exe
     (sf "octez-evm-proxy-server")
@@ -7341,17 +7358,19 @@ let _evm_proxy =
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_clic;
-        octez_rpc;
         octez_rpc_http |> open_;
         octez_rpc_http_server;
-        octez_rpc_http_client_unix;
-        octez_stdlib_unix |> open_;
-        octez_crypto |> open_;
-        octez_stdlib |> open_;
-        octez_version;
-        lwt_exit;
+        evm_proxy_lib;
       ]
     ~bisect_ppx:Yes
+
+let _octez_evm_chunker_exe =
+  private_exe
+    "octez_evm_chunker"
+    ~path:"src/bin_evm_proxy/chunker"
+    ~synopsis:"EVM kernel transaction chunker"
+    ~opam:"octez-evm-chunker"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; evm_proxy_lib]
 
 let octez_scoru_wasm_regressions =
   private_lib

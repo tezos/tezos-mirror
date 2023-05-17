@@ -11,9 +11,6 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "tezos-base"
-  "tezos-clic"
-  "tezos-rpc-http"
-  "tezos-rpc-http-server"
   "octez-evm-proxy-lib"
 ]
 build: [
@@ -21,4 +18,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "An implementation of a subset of Ethereum JSON-RPC API for the EVM rollup"
+synopsis: "EVM kernel transaction chunker"

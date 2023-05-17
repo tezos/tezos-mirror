@@ -11,10 +11,10 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "tezos-base"
-  "tezos-clic"
   "tezos-rpc-http"
-  "tezos-rpc-http-server"
-  "octez-evm-proxy-lib"
+  "tezos-rpc-http-client-unix"
+  "tezos-version"
+  "lwt-exit"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
