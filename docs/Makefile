@@ -85,12 +85,9 @@ odoc-lite: docexes
 	  --include="src/proto_017*" \
 	  --exclude="src/proto_0*" \
 		../src ../tezt ../vendors ../dune ../dune-project $(TMPDOCDIR)/
-	# FIXME: https://gitlab.com/tezos/tezos/-/issues/2971
-	# The new version of odoc (2.1.0) is stricter than the old version (1.5.3),
-	# we temporarily deactivate the odoc checks.
-	# cd $(TMPDOCDIR); ODOC_WARN_ERROR=true dune build @doc
+	patch -d $(TMPDOCDIR) -p1 <odoc_protocols.patch
 	@echo "Running odoc, outputs messages to $(TMPDOCDIR)/odoc.log"
-	cd $(TMPDOCDIR); dune build @doc >odoc.log 2>&1; \
+	cd $(TMPDOCDIR); ODOC_WARN_ERROR=true dune build @doc >odoc.log 2>&1; \
 	  RESULT=$$?; (grep '^Error:' odoc.log || true); exit $$RESULT
 	@rm -rf _build/api/odoc
 	@mkdir -p _build/api

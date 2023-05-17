@@ -39,10 +39,12 @@ module Encodings (L : LIB) = struct
 
     For example, for the representation of a point (pair of scalars),
     one might have:
+    {[
     ( {x:int; y:int},
       scalar repr * scalar repr,
       scalar * scalar
     ) encoding
+    ]}
 
     The first type, the record [{x:int; y:int}], represents an OCaml point,
     which becomes the argument taken by the [input] function.

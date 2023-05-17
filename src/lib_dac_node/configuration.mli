@@ -159,12 +159,12 @@ val reveal_data_dir : t -> string
 
 (** [default_data_dir] is the data directory that the DAC node
     will use, when one is not specified in the configuration:
-    currently set to "${HOME}/.tezos-dac-node." *)
+    currently set to [${HOME}/.tezos-dac-node]. *)
 val default_data_dir : string
 
 (** [default_reveal_data_dir] is the directory that the DAC node
     will use to store pages on disk. Currently set to
-    "${HOME}/.tezos_rollup_node/wasm_2_0_0". *)
+    [${HOME}/.tezos_rollup_node/wasm_2_0_0]. *)
 val default_reveal_data_dir : string
 
 (** [default_rpc_address] is the default address of the RPC server

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** {1} Function evaluation in a detached process
+(** {1 Function evaluation in a detached process}
 
     This library uses a process detached in a separated unix process to
    execute a given function, with bidirectional communication channels

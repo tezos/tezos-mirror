@@ -55,7 +55,7 @@ module type Stubs_sig = sig
    - [size a = size b = size] *)
   val add_arrays_inplace : ec_array -> ec_array -> int -> unit
 
-  (** [mul_arrays evaluations arrays (dim1, dim2)] computes the EC point multiplication 
+  (** [mul_arrays evaluations arrays (dim1, dim2)] computes the EC point multiplication
    given the scalar multipliers [evaluations] and the points [arrays].
 
    requires:
@@ -74,8 +74,8 @@ module type EC_carray_sig = sig
   [domain] can be obtained using {!Domain.build}.
 
   The ECFFT computes the G-linear map
-  G^n -> G^n :
-  (P_i)_{i=0,...,n-1} |-> (sum_{i=0}^{n-1} [domain.(i*j mod n)]P_i)_{j=0,...,n-1}.
+  [G^n -> G^n :
+  (P_i)_{i=0,...,n-1} |-> (sum_{i=0}^{n-1} [domain.(i*j mod n)]P_i)_{j=0,...,n-1}].
 
   where [a]P denotes the elliptic curve point multiplication.
 
@@ -100,7 +100,7 @@ module type EC_carray_sig = sig
 
   type evaluations
 
-  (** [mul_arrays evaluations arrays] computes the EC point multiplication 
+  (** [mul_arrays evaluations arrays] computes the EC point multiplication
    given the scalar multipliers [evaluations] and the points [arrays] *)
   val mul_arrays : evaluations:evaluations array -> arrays:t array -> t array
 end

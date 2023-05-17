@@ -35,7 +35,7 @@ module Stubs = struct
 
   requires:
   - [1 < n <= size res]
-  
+
   ensures:
   - [res[i] = g^i] for [i = 0..(n-1)] *)
   external compute_domain : fr_array -> int -> fr -> unit
@@ -140,12 +140,12 @@ end
 module type Domain_unsafe_sig = sig
   include Domain_sig
 
-  (** [to_carray d] converts [d] from type {!t} to type {!Fr_carray.t}
+  (** [to_carray d] converts [d] from type {!type:t} to type {!type:Fr_carray.t}
 
       Note: [to_carray d] doesn't create a copy of [d] *)
   val to_carray : t -> Fr_carray.t
 
-  (** [of_carray d] converts [d] from type {!Fr_carray.t} to type {!t}
+  (** [of_carray d] converts [d] from type {!type:Fr_carray.t} to type {!type:t}
 
       Note: [of_carray d] doesn't create a copy of [d] *)
   val of_carray : Fr_carray.t -> t

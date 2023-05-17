@@ -176,12 +176,12 @@ module type Evaluations_sig = sig
 
   type domain
 
-  (** [of_domain d] converts [d] from type {!domain} to type {!t}.
+  (** [of_domain d] converts [d] from type {!type:domain} to type {!type:t}.
 
   Note: [of_domain d] doesn't create a copy of [d] *)
   val of_domain : domain -> t
 
-  (** [to_domain d] converts [d] from type {!t} to type {!domain}.
+  (** [to_domain d] converts [d] from type {!type:t} to type {!type:domain}.
 
   Note: [to_domain d] doesn't create a copy of [d] *)
   val to_domain : t -> domain
@@ -768,7 +768,7 @@ end
 module type Evaluations_unsafe_sig = sig
   include Evaluations_sig
 
-  (** [to_carray t] converts [t] from type {!t} to type {!Fr_carray.t}
+  (** [to_carray t] converts [t] from type {!type:t} to type {!type:Fr_carray.t}
 
       Note: [to_carray t] doesn't create a copy of [t] *)
   val to_carray : t -> Fr_carray.t

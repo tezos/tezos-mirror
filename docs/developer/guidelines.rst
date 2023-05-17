@@ -134,6 +134,20 @@ Here are a few tips and guidelines on using docstrings.
 
 For more information on using docstrings, see the ``odoc`` `documentation for library authors <https://ocaml.github.io/odoc/odoc_for_authors.html>`__.
 
+Docstrings errors
+"""""""""""""""""
+
+When ``odoc`` is generating documentation from docstrings, it performs various syntax and semantics checks and may thereby emit many kinds of warnings.
+Some of these warnings are turned into errors when the flag ``ODOC_WARN_ERROR`` is on.
+You have to fix at least these errors for making the CI green.
+
+When ``odoc`` returns a non-zero exit code, the list of errors is displayed in the terminal but some details are abstracted away.
+The full details of each error, and also the regular warnings, can be found in the log produced by ``odoc`` in file ``${TMPDOCDIR}/odoc.log``, where variable ``TMPDOCDIR`` is defined in file :src:`docs/Makefile`.
+Search for the string ``Error:`` in that file to find all the errors.
+
+You may consult a list of `typical error messages found by odoc in the Tezos repository <https://gitlab.com/nomadic-labs/protodoc/-/blob/master/doc/errors.md>`__.
+These examples may help both to avoid common pitfalls when writing docstrings,  and to better understand ``odoc`` errors that you may encounter.
+
 index.mld files
 ---------------
 

@@ -65,7 +65,7 @@ val setup_l1 :
   Protocol.t ->
   (Node.t * Client.t) Lwt.t
 
-(** [originate_sc_rollup] is a wrapper above {Client.originate_sc_rollup} that
+(** [originate_sc_rollup] is a wrapper above {!Client.originate_sc_rollup} that
     waits for the block to be included. *)
 val originate_sc_rollup :
   ?hooks:Process_hooks.t ->

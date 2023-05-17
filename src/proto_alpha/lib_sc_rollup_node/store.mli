@@ -100,7 +100,7 @@ module Dal_confirmed_slots_history :
      and type 'a store := 'a Irmin_store.t
 
 (** Confirmed DAL slots histories cache. See documentation of
-    {Dal_slot_repr.Slots_history} for more details. *)
+    {!Dal_slot_repr.Slots_history} for more details. *)
 module Dal_confirmed_slots_histories :
   Store_sigs.Append_only_map
     with type key := Block_hash.t

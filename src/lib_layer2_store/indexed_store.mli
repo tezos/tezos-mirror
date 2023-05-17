@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** This library provides functors to build various kinds of stores using
-    mirage's {{:https://github.com/mirage/index} index}} and Octez
+    mirage's {{:https://github.com/mirage/index} index} and Octez
     {{:https://gitlab.com/nomadic-labs/data-encoding} data-encoding}
     libraries.
 

@@ -34,7 +34,7 @@ module type S = sig
       with type context = Context.rw_index
        and type hash = Sc_rollup.State_hash.t
 
-  (** Kind of the PVM (same as {!name}).  *)
+  (** Kind of the PVM. *)
   val kind : Sc_rollup.Kind.t
 
   (** [get_tick state] gets the total tick counter for the given PVM state. *)
@@ -88,7 +88,7 @@ module type S = sig
 
     (** [set context state] saves the PVM state [state] in the context and
         returns the updated context. Note: [set] does not perform any write on
-        disk, this information must be committed using {!Context.commit}. *)
+        disk, this information must be committed using {!val:Context.commit}. *)
     val set : 'a Context.t -> state -> 'a Context.t Lwt.t
   end
 end

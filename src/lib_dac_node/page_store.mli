@@ -131,10 +131,10 @@ end
       This function may fail with
       {ul
         {li [Reveal_data_path_not_a_directory reveal_data_dir] if the
-          path exists and is not a directory,
+          path exists and is not a directory,}
 
         {li [Cannot_create_reveal_data_dir reveal_data_dir] If the
-            creation of the directory fails.}}
+            creation of the directory fails.}
       }
   *)
 val ensure_reveal_data_dir_exists : string -> unit tzresult Lwt.t

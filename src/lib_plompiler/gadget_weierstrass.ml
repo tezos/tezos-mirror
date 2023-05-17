@@ -59,7 +59,7 @@ module type AFFINE = functor (L : LIB) -> sig
 
   val from_coordinates : scalar repr -> scalar repr -> point repr t
 
-  (** [unsafe_from_coordinates x y] is similar to !{from_coordinates} but
+  (** [unsafe_from_coordinates x y] is similar to {!from_coordinates} but
       does not verify the point is on the curve. It can be used to build a
       variable of type *point* without adding any constraint.
   *)

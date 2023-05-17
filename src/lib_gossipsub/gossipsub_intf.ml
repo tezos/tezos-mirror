@@ -211,7 +211,7 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
       (** The optimal number of full connections per topic. For
           example, if it is 6, each peer will want to have about six peers in
           their mesh for each topic they're subscribed to. It should be set
-          somewhere between {degree_low} and {degree_high}. *)
+          somewhere between {!degree_low} and {!degree_high}. *)
   publish_threshold : float;
       (** The threshold value (as a score) from which we can publish a
           message to our peers. *)
@@ -264,8 +264,8 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
           the mesh is pruned due to over subscription, we make sure that we have
           outbound connections to at least [degree_out] of the survivor
           peers. This prevents Sybil attackers from overwhelming our mesh with
-          incoming connections. [degree_out] must be set below {degree_low}, and
-          must not exceed [degree_optimal / 2]. *)
+          incoming connections. [degree_out] must be set below {!degree_low},
+          and must not exceed [degree_optimal / 2]. *)
   degree_lazy : int;
       (** [degree_lazy] affects how many peers the local peer will emit gossip
           to at each heartbeat. The local peer will send gossip to at least
@@ -293,7 +293,7 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
       (** The number of heartbeat ticks setting the frequency at which to
           attempt to improve the mesh with opportunistic grafting. Every
           [opportunistic_graft_ticks], if the median score of the mesh peers
-          falls below the {opportunistic_graft_threshold}, then the local peer
+          falls below the {!opportunistic_graft_threshold}, then the local peer
           will select some high-scoring mesh peers to graft.  *)
   opportunistic_graft_peers : int;
       (** The number of peers to opportunistically graft. *)
