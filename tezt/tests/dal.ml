@@ -2623,6 +2623,41 @@ let check_events_with_message ~event_with_message dal_node ~from_shard ~to_shard
       if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
       else None)
 
+(** This function is quite similar to those above, except that it checks that a
+    range of messages (shards) on a tracked topic have been notified by GS to
+    the DAL node. This is typically needed to then be able to attest slots. *)
+let check_message_notified_to_app_event dal_node ~from_shard ~to_shard
+    ~expected_commitment ~expected_level ~expected_pkh ~expected_slot =
+  let remaining = ref (to_shard - from_shard + 1) in
+  let seen = Array.make !remaining false in
+  let get_shard_index_opt event =
+    let level = JSON.(event |-> "level" |> as_int) in
+    let slot_index = JSON.(event |-> "slot_index" |> as_int) in
+    let shard_index = JSON.(event |-> "shard_index" |> as_int) in
+    let pkh = JSON.(event |-> "pkh" |> as_string) in
+    let commitment = JSON.(event |-> "commitment" |> as_string) in
+    let*?? () = check_expected expected_pkh pkh in
+    let*?? () = check_expected expected_level level in
+    let*?? () = check_expected expected_slot slot_index in
+    let*?? () = check_expected expected_commitment commitment in
+    Some shard_index
+  in
+  Dal_node.wait_for
+    dal_node
+    "gossipsub_transport_event-app_message_delivered.v0"
+    (fun event ->
+      let*?? shard_index = get_shard_index_opt event in
+      let index = shard_index - from_shard in
+      Check.(
+        (seen.(index) = false)
+          bool
+          ~error_msg:
+            (sf "Shard_index %d already seen. Invariant broken" shard_index)) ;
+      seen.(index) <- true ;
+      let () = remaining := !remaining - 1 in
+      if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
+      else None)
+
 let test_dal_node_p2p_connection _protocol _parameters _cryptobox node client
     dal_node1 =
   let dal_node2 = Dal_node.create ~node ~client () in
