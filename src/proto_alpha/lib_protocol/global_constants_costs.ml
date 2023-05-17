@@ -31,14 +31,17 @@ let ( + ) = S.add
 
 let ( lsr ) = S.shift_right
 
+(* model global_constants_storage/expr_to_address_in_context *)
 (* Approximating 200 + 1.266960 * number of bytes *)
 let expr_to_address_in_context_cost bytes =
   let v0 = Bytes.length bytes |> S.safe_int in
   S.safe_int 200 + (v0 + (v0 lsr 2)) |> Gas_limit_repr.atomic_step_cost
 
+(* model global_constants_storage/expand_constant_branch *)
 let expand_constants_branch_cost =
   Gas_limit_repr.atomic_step_cost @@ S.safe_int 4095
 
+(* model global_constants_storage/expand_no_constant_branch *)
 (* Approximating 100 + 4.639474 * n*log(n) *)
 let expand_no_constants_branch_cost node =
   let v0 = Script_repr.micheline_nodes node |> S.safe_int in
