@@ -54,18 +54,16 @@ let create_certificate root_hash signature witnesses =
 (** When creating a [Certificate.V0.t] with [make] function
     Version field in created certificate must be equal to 0. *)
 let test_version_is_0 () =
-  let open Lwt_result_syntax in
   let certificate =
     create_certificate
       "00dce42551fb786c51b29b723f4abba3ea04eb3d239a9a59ec5a5434e151e105e4"
       "asigHmGKUsRdN53gbjZoZ36akZEhJn6Cp2dsDzbypqMeaAxoHebs8xLkUpi4xtWpaLaxRkXSsyUeN7ZJsQ8no7B2nP75Kd9D5XKLQmfTE3qRYomyaAX9rRjSMk9hFEK4HJRnizgHA36zc"
       1
   in
-  return @@ assert (Certificate_repr.get_version certificate = 0)
+  assert (Certificate_repr.get_version certificate = 0)
 
 (** Encode to binary a certificate fails. *)
 let binary_encode () =
-  let open Lwt_result_syntax in
   let certificate =
     create_certificate
       "00dce42551fb786c51b29b723f4abba3ea04eb3d239a9a59ec5a5434e151e105e4"
@@ -76,12 +74,9 @@ let binary_encode () =
     Data_encoding.Binary.to_bytes Certificate_repr.encoding certificate
   in
 
-  match encoded_certificate with
-  | Ok _ -> return @@ assert false
-  | Error _ -> return @@ assert true
+  match encoded_certificate with Ok _ -> assert false | Error _ -> assert true
 
 let json_encode_decode () =
-  let open Lwt_result_syntax in
   let certificate =
     create_certificate
       "00dce42551fb786c51b29b723f4abba3ea04eb3d239a9a59ec5a5434e151e105e4"
@@ -94,10 +89,9 @@ let json_encode_decode () =
   let decoded_certificate =
     Data_encoding.Json.destruct Certificate_repr.encoding encoded_certificate
   in
-  return @@ assert (assert_equal_certificate certificate decoded_certificate)
+  assert (assert_equal_certificate certificate decoded_certificate)
 
 let json_decode () =
-  let open Lwt_result_syntax in
   let certificate =
     create_certificate
       "00dce42551fb786c51b29b723f4abba3ea04eb3d239a9a59ec5a5434e151e105e4"
@@ -119,11 +113,10 @@ let json_decode () =
      |}
   in
   match expected_json with
-  | Ok expected_json -> return @@ assert (encoded_certificate = expected_json)
+  | Ok expected_json -> assert (encoded_certificate = expected_json)
   | _ -> assert false
 
 let json_encode () =
-  let open Lwt_result_syntax in
   let certificate =
     create_certificate
       "00dce42551fb786c51b29b723f4abba3ea04eb3d239a9a59ec5a5434e151e105e4"
@@ -146,21 +139,19 @@ let json_encode () =
       let decoded_certificate =
         Data_encoding.Json.destruct Certificate_repr.encoding expected_json
       in
-      return @@ assert (certificate = decoded_certificate)
+      assert (certificate = decoded_certificate)
   | _ -> assert false
 
 let tests =
   [
-    Tztest.tztest
+    Alcotest.test_case
       "Verify Certificate_repr.version is equal to 0"
       `Quick
       test_version_is_0;
-    Tztest.tztest "Simple Binary encode" `Quick binary_encode;
-    Tztest.tztest "Simple JSON encode decode" `Quick json_encode_decode;
-    Tztest.tztest "Simple JSON decode" `Quick json_decode;
-    Tztest.tztest "Simple JSON encode" `Quick json_encode;
+    Alcotest.test_case "Simple Binary encode" `Quick binary_encode;
+    Alcotest.test_case "Simple JSON encode decode" `Quick json_encode_decode;
+    Alcotest.test_case "Simple JSON decode" `Quick json_decode;
+    Alcotest.test_case "Simple JSON encode" `Quick json_encode;
   ]
 
-let () =
-  Alcotest_lwt.run ~__FILE__ "lib_dac" [("Certificate_repr.ml", tests)]
-  |> Lwt_main.run
+let () = Alcotest.run ~__FILE__ "lib_dac" [("Certificate_repr.ml", tests)]
