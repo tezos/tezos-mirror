@@ -36,3 +36,6 @@ val stored_slot_shards : (Cryptobox.Commitment.t * int) t
 (** Decoding a value failed. See {!Types.kind} for kind of considered
     values. *)
 val decoding_data_failed : Types.kind t
+
+(** Loading shard data from disk failed. *)
+val loading_shard_data_failed : string t

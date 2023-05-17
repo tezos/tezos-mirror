@@ -80,6 +80,13 @@ module Shards = struct
     *)
     return @@ Lwt_watcher.notify shards_watcher commitment
 
+  let read_all shards_store commitment ~number_of_shards =
+    read_values shards_store
+    @@ List.fold_left
+         (fun seq shard_index -> Seq.cons (commitment, shard_index) seq)
+         Seq.empty
+         (0 -- (number_of_shards - 1))
+
   let init node_store_dir shard_store_dir =
     let ( // ) = Filename.concat in
     let dir_path = node_store_dir // shard_store_dir in
@@ -392,11 +399,108 @@ module Legacy = struct
         return @@ Some dec)
       res_opt
 
-  let publish_slot_data ~level_committee:_ _node_store _cryptobox
-      _proto_parameters _commitment _published_level _slot_index =
+  let get_opt array i =
+    if i >= 0 && i < Array.length array then Some array.(i) else None
+
+  (** [shards_to_attestors committee] takes a committee [Committee_cache.committee]
+      and returns a function that, given a shard index, yields the pkh of its
+      attestor for that level. *)
+  let shards_to_attestors committee =
+    let rec do_n ~n f acc = if n <= 0 then acc else do_n ~n:(n - 1) f (f acc) in
+    let to_array committee =
+      (* We transform the map to a list *)
+      Tezos_crypto.Signature.Public_key_hash.Map.bindings committee
+      (* We sort the list in decreasing order w.r.t. to start_indices. *)
+      |> List.fast_sort (fun (_pkh1, shard_indices1) (_pkh2, shard_indices2) ->
+             shard_indices2.Committee_cache.start_index
+             - shard_indices1.Committee_cache.start_index)
+         (* We fold on the sorted list, starting from bigger start_indices. *)
+      |> List.fold_left
+           (fun accu (pkh, Committee_cache.{start_index = _; offset}) ->
+             (* We put in the accu list as many [pkh] occurrences as the number
+                of shards this pkh should attest, namely, [offset]. *)
+             do_n ~n:offset (fun acc -> pkh :: acc) accu)
+           []
+      (* We build an array from the list. The array indices coincide with shard
+         indices. *)
+      |> Array.of_list
+    in
+    let committee = to_array committee in
+    fun index -> get_opt committee index
+
+  (* This function publishes the shards of a commitment that is waiting for
+     attestion on L1 if this node has those shards on disk and their proofs in
+     memory. *)
+  let publish_slot_data ~level_committee node_store cryptobox proto_parameters
+      commitment published_level slot_index =
     let open Lwt_result_syntax in
-    (* Implemented in the next commit. *)
-    return_unit
+    match
+      Shard_proofs_cache.find_opt node_store.in_memory_shard_proofs commitment
+    with
+    | None ->
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5676
+
+            Recompute the proofs if we have shards on disk? Useful if the node
+            restarted. *)
+        return_unit
+    | Some shard_proofs ->
+        let attestation_level =
+          Int32.(
+            add
+              published_level
+              (of_int proto_parameters.Dal_plugin.attestation_lag))
+        in
+        let* committee = level_committee ~level:attestation_level in
+        let attestor_of_shard = shards_to_attestors committee in
+        let Cryptobox.{number_of_shards; _} = Cryptobox.parameters cryptobox in
+        Shards.read_all node_store.shard_store commitment ~number_of_shards
+        |> Seq_s.iter_ep (function
+               | _, Error [Stored_data.Missing_stored_data s] ->
+                   let*! () =
+                     Event.(
+                       emit
+                         loading_shard_data_failed
+                         ("Missing stored data " ^ s))
+                   in
+                   return_unit
+               | _, Error err ->
+                   let*! () =
+                     Event.(
+                       emit
+                         loading_shard_data_failed
+                         (Format.asprintf "%a" pp_print_trace err))
+                   in
+                   return_unit
+               | (commitment, shard_index), Ok share -> (
+                   match
+                     ( attestor_of_shard shard_index,
+                       get_opt shard_proofs shard_index )
+                   with
+                   | None, _ ->
+                       failwith
+                         "Invariant broken: no attestor found for shard %d"
+                         shard_index
+                   | _, None ->
+                       failwith
+                         "Invariant broken: no shard proof found for shard %d"
+                         shard_index
+                   | Some pkh, Some shard_proof ->
+                       let message = Gossipsub.{share; shard_proof} in
+                       let topic = Gossipsub.{slot_index; pkh} in
+                       let message_id =
+                         Gossipsub.
+                           {
+                             commitment;
+                             level = published_level;
+                             slot_index;
+                             shard_index;
+                             pkh;
+                           }
+                       in
+                       Gossipsub.Worker.(
+                         Publish_message {message; topic; message_id}
+                         |> app_input node_store.gs_worker) ;
+                       return_unit))
 
   let add_slot_headers ~level_committee cryptobox proto_parameters ~block_level
       ~block_hash:_ slot_headers node_store =
