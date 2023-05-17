@@ -56,7 +56,7 @@ let test_order_in_top_level =
   permutations top_level_elements
   |> Lwt_list.iter_s @@ fun elements ->
      let script = String.concat ";\n" elements in
-     let* () = Client.typecheck_script client ~script in
+     let* () = Client.typecheck_script client ~scripts:[script] in
      unit
 
 let register ~protocols = test_order_in_top_level protocols

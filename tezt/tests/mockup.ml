@@ -234,7 +234,7 @@ let test_typechecking_and_normalization_work_with_constants =
     Michelson_script.(find ["mini_scenarios"; "constant_unit"] protocol |> path)
   in
   let* _ = Client.normalize_script ~script client in
-  let* () = Client.typecheck_script ~script client in
+  let* () = Client.typecheck_script ~scripts:[script] client in
   return ()
 
 let test_simple_baking_event =

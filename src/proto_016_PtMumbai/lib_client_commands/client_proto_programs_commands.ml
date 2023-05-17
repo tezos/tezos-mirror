@@ -367,38 +367,77 @@ let commands () =
         return_unit);
     command
       ~group
-      ~desc:"Ask the node to typecheck a script."
-      (args5
+      ~desc:"Ask the node to typecheck one or several scripts."
+      (args6
          show_types_switch
          emacs_mode_switch
          no_print_source_flag
          run_gas_limit_arg
-         legacy_switch)
-      (prefixes ["typecheck"; "script"] @@ Program.source_param @@ stop)
-      (fun (show_types, emacs_mode, no_print_source, original_gas, legacy)
-           program
+         legacy_switch
+         display_names_flag)
+      (prefixes ["typecheck"; "script"]
+      @@ seq_of_param @@ file_or_literal_param ())
+      (fun ( show_types,
+             emacs_mode,
+             no_print_source,
+             original_gas,
+             legacy,
+             display_names )
+           expr_strings
            cctxt ->
         let open Lwt_result_syntax in
         let setup = (emacs_mode, no_print_source) in
-        handle_parsing_error "types" cctxt setup program @@ fun program ->
-        let* original_gas = resolve_max_gas cctxt cctxt#block original_gas in
-        let*! res =
-          typecheck_program
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~gas:original_gas
-            ~legacy
-            ~show_types
-            program
-        in
-        print_typecheck_result
-          ~emacs:emacs_mode
-          ~show_types
-          ~print_source_on_error:(not no_print_source)
-          program
-          res
-          cctxt);
+        match expr_strings with
+        | [] ->
+            let*! () =
+              cctxt#warning "No scripts were specified on the command line"
+            in
+            return_unit
+        | _ :: _ ->
+            let* _number_of_literal_scripts =
+              List.fold_left_es
+                (fun i (src, expr_string) ->
+                  let program =
+                    Michelson_v1_parser.parse_toplevel expr_string
+                  in
+                  let name, i =
+                    match src with
+                    | Some src -> (src, i)
+                    | None ->
+                        let i = i + 1 in
+                        ("Literal script " ^ string_of_int i, i)
+                  in
+                  let* () =
+                    handle_parsing_error "types" cctxt setup program
+                    @@ fun program ->
+                    let* original_gas =
+                      resolve_max_gas cctxt cctxt#block original_gas
+                    in
+                    let*! res =
+                      typecheck_program
+                        cctxt
+                        ~chain:cctxt#chain
+                        ~block:cctxt#block
+                        ~gas:original_gas
+                        ~legacy
+                        ~show_types
+                        program
+                    in
+                    print_typecheck_result
+                      ~emacs:emacs_mode
+                      ~show_types
+                      ~print_source_on_error:(not no_print_source)
+                      ~display_names
+                      ~name
+                      program
+                      res
+                      cctxt
+                  in
+                  return i)
+                0
+                expr_strings
+            in
+            return_unit);
     command
       ~group
       ~desc:"Ask the node to typecheck a data expression."
@@ -540,9 +579,9 @@ let commands () =
             in
             return_unit
         | _ :: _ ->
-            let* hash_name_rows =
-              List.mapi_ep
-                (fun i (src, expr_string) ->
+            let* hash_name_rows_rev, _number_of_literal_scripts =
+              List.fold_left_es
+                (fun (l, i) (src, expr_string) ->
                   let program =
                     Michelson_v1_parser.parse_toplevel ~check expr_string
                   in
@@ -559,14 +598,18 @@ let commands () =
                       Script_expr_hash.pp
                       (Script_expr_hash.hash_bytes [bytes])
                   in
-                  let name =
-                    Option.value
-                      src
-                      ~default:("Literal script " ^ string_of_int (i + 1))
+                  let name, i =
+                    match src with
+                    | Some src -> (src, i)
+                    | None ->
+                        let i = i + 1 in
+                        ("Literal script " ^ string_of_int i, i)
                   in
-                  return (hash, name))
+                  return ((hash, name) :: l, i))
+                ([], 0)
                 expr_strings
             in
+            let hash_name_rows = List.rev hash_name_rows_rev in
             Tezos_clic_unix.Scriptable.output
               scriptable
               ~for_human:(fun () ->
@@ -860,11 +903,14 @@ let commands () =
       @@ file_or_literal_param () @@ prefix "from" @@ convert_input_format_param
       @@ prefix "to" @@ convert_output_format_param @@ stop)
       (fun (zero_loc, legacy, check)
-           (_, expr_string)
+           (origin, expr_string)
            from_format
            to_format
            (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
+        let name =
+          match origin with Some path -> path | None -> "Literal script"
+        in
         let* (expression : Alpha_context.Script.expr) =
           match from_format with
           | `Michelson ->
@@ -888,6 +934,8 @@ let commands () =
                       ~emacs:false
                       ~show_types:true
                       ~print_source_on_error:true
+                      ~display_names:false
+                      ~name
                       program
                       res
                       cctxt

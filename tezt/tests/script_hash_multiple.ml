@@ -96,7 +96,7 @@ let test_script_hash_multiple =
     (hashes_mixed_named
     = [
         expected_output_line ~name:id_script_path id_script_hash;
-        expected_output_line ~name:"Literal script 2" id_script_hash;
+        expected_output_line ~name:"Literal script 1" id_script_hash;
       ])
       (list string)
       ~__LOC__

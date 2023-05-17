@@ -75,7 +75,7 @@ let test_originate_first_explosion client protocol () =
   let expected_msg =
     rex "Gas limit exceeded during typechecking or execution"
   in
-  let* () = Client.typecheck_script ~script:first_explosion client in
+  let* () = Client.typecheck_script ~scripts:[first_explosion] client in
   let gas_limit =
     match protocol with Protocol.Nairobi | Alpha -> 645 | Mumbai -> 1479
   in
@@ -96,7 +96,7 @@ let test_originate_first_explosion client protocol () =
 let test_typecheck_script_big_type client _protocol () =
   let expected_msg = rex "type exceeded maximum type size" in
   let process =
-    Client.spawn_typecheck_script ~script:first_explosion_bigtype client
+    Client.spawn_typecheck_script ~scripts:[first_explosion_bigtype] client
   in
   let _ = Process.check_error ~exit_code:1 ~msg:expected_msg process in
   unit

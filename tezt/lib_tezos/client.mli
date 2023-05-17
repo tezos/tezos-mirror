@@ -1536,13 +1536,14 @@ val spawn_typecheck_data :
 val typecheck_script :
   ?hooks:Process.hooks ->
   ?protocol_hash:string ->
-  script:string ->
+  scripts:string list ->
   ?no_base_dir_warnings:bool ->
   ?details:bool ->
   ?emacs:bool ->
   ?no_print_source:bool ->
   ?gas:int ->
   ?legacy:bool ->
+  ?display_names:bool ->
   t ->
   unit Lwt.t
 
@@ -1550,13 +1551,14 @@ val typecheck_script :
 val spawn_typecheck_script :
   ?hooks:Process.hooks ->
   ?protocol_hash:string ->
-  script:string ->
+  scripts:string list ->
   ?no_base_dir_warnings:bool ->
   ?details:bool ->
   ?emacs:bool ->
   ?no_print_source:bool ->
   ?gas:int ->
   ?legacy:bool ->
+  ?display_names:bool ->
   t ->
   Process.t
 
