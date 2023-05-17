@@ -105,3 +105,7 @@ module Worker_instance :
      and type GS.Peer.t = peer
      and module GS.Span = Span
      and module Monad = Monad
+
+module Validate_message_hook : sig
+  val set : (message -> message_id -> [`Invalid | `Unknown | `Valid]) -> unit
+end
