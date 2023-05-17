@@ -202,7 +202,7 @@ Commitments
 ^^^^^^^^^^^
 
 Starting from the rollup origination level, levels are partitioned
-into **commitment periods** of 30 consecutive blocks.
+into **commitment periods** of 60 consecutive blocks.
 
 A **commitment** claims that the interpretation of all inbox messages
 published during a given commitment period and applied on the state of
@@ -1622,7 +1622,7 @@ Glossary
    cemented (hence, at least two weeks after the actual execution of
    the operation).
 
-#. **Commitment period**: A period of 30 blocks during which all inbox
+#. **Commitment period**: A period of 60 blocks during which all inbox
    messages must be processed by the rollup node state to compute a
    commitment. A commitment must be published for each commitment
    period.
