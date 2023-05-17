@@ -110,5 +110,10 @@ end
     {!Transport_layer_hooks.activate} function below. *)
 module Transport_layer_hooks : sig
   (** See {!Gs_transport_connection.activate}. *)
-  val activate : Worker.t -> Transport_layer.t -> unit Lwt.t
+  val activate :
+    Worker.t ->
+    Transport_layer.t ->
+    app_messages_callback:
+      (Gs_interface.message -> Gs_interface.message_id -> unit tzresult Lwt.t) ->
+    unit Lwt.t
 end

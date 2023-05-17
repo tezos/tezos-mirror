@@ -249,10 +249,22 @@ let daemonize handlers =
    return_unit)
   |> lwt_map_error (List.fold_left (fun acc errs -> errs @ acc) [])
 
-let connect_gossipsub_with_p2p gs_worker transport_layer =
+let connect_gossipsub_with_p2p gs_worker transport_layer node_store =
+  let open Gossipsub in
+  let shards_handler ({shard_store; shards_watcher; _} : Store.node_store) =
+    let save_and_notify =
+      Store.Shards.save_and_notify shard_store shards_watcher
+    in
+    fun ({share; _} : message) ({commitment; shard_index; _} : message_id) ->
+      Seq.return {Cryptobox.share; index = shard_index}
+      |> save_and_notify commitment |> Errors.to_tzresult
+  in
   Lwt.dont_wait
     (fun () ->
-      Gossipsub.Transport_layer_hooks.activate gs_worker transport_layer)
+      Transport_layer_hooks.activate
+        gs_worker
+        transport_layer
+        ~app_messages_callback:(shards_handler node_store))
     (fun exn ->
       "[dal_node] error in Daemon.connect_gossipsub_with_p2p: "
       ^ Printexc.to_string exn
@@ -293,7 +305,7 @@ let run ~data_dir cctxt =
   let* rpc_server = RPC_server.(start config ctxt) in
   (* activate the p2p instance. *)
   Gossipsub.Transport_layer.activate ~additional_points:peers transport_layer ;
-  connect_gossipsub_with_p2p gs_worker transport_layer ;
+  connect_gossipsub_with_p2p gs_worker transport_layer store ;
 
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () = Event.(emit rpc_server_is_ready (rpc_addr, rpc_port)) in
