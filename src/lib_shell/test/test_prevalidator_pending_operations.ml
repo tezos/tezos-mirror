@@ -37,9 +37,12 @@ module CompareListQ = Compare.List (Q)
 
 let pending_of_list =
   List.fold_left
-    (fun pendings ((op : _ Shell_operation.operation), priority) ->
-      if Operation_hash.Set.mem op.hash (Pending_ops.hashes pendings) then
-        (* no duplicate hashes *)
+    (fun pendings (op, priority) ->
+      if
+        Operation_hash.Set.mem
+          (Shell_operation.Internal_for_tests.hash_of op)
+          (Pending_ops.hashes pendings)
+      then (* no duplicate hashes *)
         pendings
       else Pending_ops.add op priority pendings)
     Pending_ops.empty

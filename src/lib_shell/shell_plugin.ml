@@ -34,24 +34,38 @@ module type FILTER = sig
 
     val default_config : config
 
-    type filter_info
+    type state
 
     val init :
       Tezos_protocol_environment.Context.t ->
       head:Tezos_base.Block_header.shell_header ->
-      filter_info tzresult Lwt.t
+      state tzresult Lwt.t
 
     val flush :
-      filter_info ->
-      head:Tezos_base.Block_header.shell_header ->
-      filter_info tzresult Lwt.t
+      state -> head:Tezos_base.Block_header.shell_header -> state tzresult Lwt.t
+
+    val remove : filter_state:state -> Operation_hash.t -> state
 
     val pre_filter :
-      filter_info ->
       config ->
+      filter_state:state ->
       Proto.operation ->
       [ `Passed_prefilter of Prevalidator_pending_operations.priority
       | Prevalidator_classification.error_classification ]
+      Lwt.t
+
+    val add_operation_and_enforce_mempool_bound :
+      ?replace:Operation_hash.t ->
+      config ->
+      state ->
+      Operation_hash.t * Proto.operation ->
+      ( state
+        * [ `No_replace
+          | `Replace of
+            Operation_hash.t * Prevalidator_classification.error_classification
+          ],
+        Prevalidator_classification.error_classification )
+      result
       Lwt.t
 
     val conflict_handler : config -> Proto.Mempool.conflict_handler
@@ -66,7 +80,7 @@ module type RPC = sig
 end
 
 module No_filter (Proto : Registered_protocol.T) :
-  FILTER with module Proto = Proto and type Mempool.filter_info = unit = struct
+  FILTER with module Proto = Proto and type Mempool.state = unit = struct
   module Proto = Proto
 
   module Mempool = struct
@@ -76,13 +90,19 @@ module No_filter (Proto : Registered_protocol.T) :
 
     let default_config = ()
 
-    type filter_info = unit
+    type state = unit
 
     let init _ ~head:_ = Lwt_result_syntax.return_unit
 
+    let remove ~filter_state _ = filter_state
+
     let flush _ ~head:_ = Lwt_result_syntax.return_unit
 
-    let pre_filter _ _ _ = Lwt.return @@ `Passed_prefilter (`Low [])
+    let pre_filter _ ~filter_state:_ _ =
+      Lwt.return @@ `Passed_prefilter (`Low [])
+
+    let add_operation_and_enforce_mempool_bound ?replace:_ _ filter_state _ =
+      Lwt_result.return (filter_state, `No_replace)
 
     let conflict_handler _ ~existing_operation ~new_operation =
       if Proto.compare_operations existing_operation new_operation < 0 then
