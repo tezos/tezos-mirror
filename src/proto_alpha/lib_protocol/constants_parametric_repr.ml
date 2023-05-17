@@ -123,7 +123,7 @@ type zk_rollup = {
   min_pending_to_process : int;
 }
 
-type adaptive_inflation = {enable : bool}
+type adaptive_inflation = {enable : bool; staking_over_baking_limit : int}
 
 type reward_weights = {
   base_total_rewards_per_minute : Tez_repr.t;
@@ -334,9 +334,13 @@ let zk_rollup_encoding =
 let adaptive_inflation_encoding =
   let open Data_encoding in
   conv
-    (fun ({enable} : adaptive_inflation) -> enable)
-    (fun adaptive_inflation_enable -> {enable = adaptive_inflation_enable})
-    (obj1 (req "adaptive_inflation_enable" bool))
+    (fun ({enable; staking_over_baking_limit} : adaptive_inflation) ->
+      (enable, staking_over_baking_limit))
+    (fun (adaptive_inflation_enable, staking_over_baking_limit) ->
+      {enable = adaptive_inflation_enable; staking_over_baking_limit})
+    (obj2
+       (req "adaptive_inflation_enable" bool)
+       (req "staking_over_baking_limit" uint8))
 
 let reward_weights_encoding =
   let open Data_encoding in
