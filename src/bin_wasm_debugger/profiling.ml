@@ -252,64 +252,64 @@ let update_call_stack current_tick (current_node, call_stack) symbols state =
       update_on_eval current_tick (current_node, call_stack) symbols step_kont
   | _ -> return_none
 
-(** [eval_and_profile ?write_debug ?reveal_builtins symbols tree] profiles a
+module Make (Wasm_utils : Wasm_utils_intf.S) = struct
+  (** [eval_and_profile ?write_debug ?reveal_builtins symbols tree] profiles a
     kernel up to the next result, and returns the call stack. *)
-let eval_and_profile ?write_debug ?reveal_builtins symbols tree =
-  let open Lwt_syntax in
-  (* The call context is built as a side effect of the evaluation. *)
-  let call_stack = ref (Toplevel [], []) in
+  let eval_and_profile ?write_debug ?reveal_builtins symbols tree =
+    let open Lwt_syntax in
+    (* The call context is built as a side effect of the evaluation. *)
+    let call_stack = ref (Toplevel [], []) in
 
-  let compute_and_snapshot pvm_state =
-    let* updated_stack =
-      update_call_stack
-        pvm_state.Wasm_pvm_state.Internal_state.current_tick
-        !call_stack
-        symbols
-        pvm_state.tick_state
-    in
-    Option.iter
-      (fun (current_node, current_call_stack) ->
-        call_stack := (current_node, current_call_stack))
-      updated_stack ;
+    let compute_and_snapshot pvm_state =
+      let* updated_stack =
+        update_call_stack
+          pvm_state.Wasm_pvm_state.Internal_state.current_tick
+          !call_stack
+          symbols
+          pvm_state.tick_state
+      in
+      Option.iter
+        (fun (current_node, current_call_stack) ->
+          call_stack := (current_node, current_call_stack))
+        updated_stack ;
 
-    let* input_request_val = Wasm_vm.get_info pvm_state in
-    match (input_request_val.input_request, pvm_state.tick_state) with
-    | Reveal_required _, _ when reveal_builtins <> None -> return_true
-    | Input_required, _ | Reveal_required _, _ -> return_false
-    | _ -> return_true
-  in
-  let rec eval_until_input_requested accumulated_ticks tree =
-    let* pvm_state =
-      Encodings_util.Tree_encoding_runner.decode
-        Wasm_pvm.pvm_state_encoding
-        tree
+      let* input_request_val = Wasm_vm.get_info pvm_state in
+      match (input_request_val.input_request, pvm_state.tick_state) with
+      | Reveal_required _, _ when reveal_builtins <> None -> return_true
+      | Input_required, _ | Reveal_required _, _ -> return_false
+      | _ -> return_true
     in
-    let* info = Wasm_utils.Wasm.get_info tree in
-    let run () =
-      let* tree, ticks =
-        Wasm_utils.Wasm.Internal_for_tests.compute_step_many_until
-          ?write_debug
-          ?reveal_builtins
-          ~max_steps:(Z.to_int64 pvm_state.max_nb_ticks)
-          compute_and_snapshot
+    let rec eval_until_input_requested accumulated_ticks tree =
+      let* pvm_state =
+        Wasm_utils.Tree_encoding_runner.decode Wasm_pvm.pvm_state_encoding tree
+      in
+      let* info = Wasm_utils.Wasm.get_info tree in
+      let run () =
+        let* tree, ticks =
+          Wasm_utils.Wasm.Internal_for_tests.compute_step_many_until
+            ?write_debug
+            ?reveal_builtins
+            ~max_steps:(Z.to_int64 pvm_state.max_nb_ticks)
+            compute_and_snapshot
+            tree
+        in
+        eval_until_input_requested
+          (Z.add accumulated_ticks @@ Z.of_int64 ticks)
           tree
       in
-      eval_until_input_requested
-        (Z.add accumulated_ticks @@ Z.of_int64 ticks)
-        tree
+      match info.Wasm_pvm_state.input_request with
+      | No_input_required -> run ()
+      | Reveal_required _ when reveal_builtins <> None -> run ()
+      | Input_required | Reveal_required _ -> return (tree, accumulated_ticks)
     in
-    match info.Wasm_pvm_state.input_request with
-    | No_input_required -> run ()
-    | Reveal_required _ when reveal_builtins <> None -> run ()
-    | Input_required | Reveal_required _ -> return (tree, accumulated_ticks)
-  in
-  let+ tree, ticks = eval_until_input_requested Z.zero tree in
-  let call_stack =
-    match !call_stack with
-    | Toplevel l, stack -> (Toplevel (List.rev l), stack)
-    | n -> n
-  in
-  (tree, ticks, call_stack)
+    let+ tree, ticks = eval_until_input_requested Z.zero tree in
+    let call_stack =
+      match !call_stack with
+      | Toplevel l, stack -> (Toplevel (List.rev l), stack)
+      | n -> n
+    in
+    (tree, ticks, call_stack)
+end
 
 (** Flamegraph building
 
