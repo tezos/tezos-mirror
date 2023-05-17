@@ -30,8 +30,9 @@
     Subject:    Tests for the Dac_plugin.raw_hash.
 *)
 
+(* On all the following tests, the raw_hash used is coming from
+   tezt/tests/dac_example_payloads/preimage.json *)
 let test_encode_decode_json () =
-  let open Lwt_result_syntax in
   let raw_hash =
     Dac_plugin.raw_hash_of_bytes
       (Bytes.of_string
@@ -43,10 +44,9 @@ let test_encode_decode_json () =
   let decoded_raw_hash =
     Data_encoding.Json.destruct Dac_plugin.raw_hash_encoding encoded_raw_hash
   in
-  return @@ assert (raw_hash = decoded_raw_hash)
+  assert (raw_hash = decoded_raw_hash)
 
 let test_cannot_encode_binary () =
-  let open Lwt_result_syntax in
   let raw_hash =
     Dac_plugin.raw_hash_of_bytes
       (Bytes.of_string
@@ -55,38 +55,31 @@ let test_cannot_encode_binary () =
   let encoded_raw_hash =
     Data_encoding.Binary.to_string Dac_plugin.raw_hash_encoding raw_hash
   in
-  match encoded_raw_hash with
-  | Error _ -> return @@ assert true
-  | Ok _ -> return @@ assert false
+  match encoded_raw_hash with Error _ -> () | Ok _ -> assert false
 
 let test_cannot_decode_binary () =
-  let open Lwt_result_syntax in
   let raw_hash =
     "00dce42551fb786c51b29b723f4abba3ea04eb3d239a9a59ec5a5434e151e105e4"
   in
   let encoded_raw_hash =
     Data_encoding.Binary.of_string Dac_plugin.raw_hash_encoding raw_hash
   in
-  match encoded_raw_hash with
-  | Error _ -> return @@ assert true
-  | Ok _ -> return @@ assert false
+  match encoded_raw_hash with Error _ -> () | Ok _ -> assert false
 
 let tests =
   [
-    Tztest.tztest
+    Alcotest.test_case
       "Encode and decode to JSON leads to the same Dac_plugin.raw_hash"
       `Quick
       test_encode_decode_json;
-    Tztest.tztest
+    Alcotest.test_case
       "Cannot encode a raw_hash to binary"
       `Quick
       test_cannot_encode_binary;
-    Tztest.tztest
+    Alcotest.test_case
       "Cannot decode a raw_hash to binary"
       `Quick
       test_cannot_decode_binary;
   ]
 
-let () =
-  Alcotest_lwt.run ~__FILE__ "lib_dac" [("Dac_plugin.ml", tests)]
-  |> Lwt_main.run
+let () = Alcotest.run ~__FILE__ "lib_dac" [("Dac_plugin.ml", tests)]
