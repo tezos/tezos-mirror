@@ -178,7 +178,7 @@ module Message = struct
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5558
 
      Define the notion of validity in the DAL node. *)
-  let valid _msg = `Valid
+  let valid _msg _msg_id = `Valid
 end
 
 module Peer = struct

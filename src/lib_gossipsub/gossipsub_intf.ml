@@ -60,7 +60,7 @@ module type AUTOMATON_SUBCONFIG = sig
     include PRINTABLE
 
     (** [valid] performs an application layer-level validity check on a message. *)
-    val valid : t -> [`Valid | `Unknown | `Invalid]
+    val valid : t -> Message_id.t -> [`Valid | `Unknown | `Invalid]
   end
 end
 
