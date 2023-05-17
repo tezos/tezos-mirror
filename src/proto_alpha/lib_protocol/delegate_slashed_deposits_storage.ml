@@ -37,6 +37,25 @@ let already_slashed_for_double_baking ctxt delegate (level : Level_repr.t) =
   | None -> return_false
   | Some slashed -> return slashed.for_double_baking
 
+let finish_punish ctxt delegate (level : Level_repr.t) updated_slashed
+    punishing_amount =
+  let open Lwt_result_syntax in
+  let reward, amount_to_burn = Tez_repr.div2_sub punishing_amount in
+  let* ctxt, balance_updates =
+    Token.transfer
+      ctxt
+      (`Frozen_deposits delegate)
+      `Double_signing_punishments
+      amount_to_burn
+  in
+  let*! ctxt =
+    Storage.Slashed_deposits.add
+      (ctxt, level.cycle)
+      (level.level, delegate)
+      updated_slashed
+  in
+  return (ctxt, reward, balance_updates)
+
 let punish_double_endorsing ctxt delegate (level : Level_repr.t) =
   let open Lwt_result_syntax in
   let* slashed =
@@ -61,23 +80,15 @@ let punish_double_endorsing ctxt delegate (level : Level_repr.t) =
         (mul_exn frozen_deposits.initial_amount slashing_ratio.numerator)
         slashing_ratio.denominator)
   in
-  let amount_to_burn =
+  let punishing_amount =
     Tez_repr.(min frozen_deposits.current_amount punish_value)
   in
-  let* ctxt, balance_updates =
-    Token.transfer
-      ctxt
-      (`Frozen_deposits delegate)
-      `Double_signing_punishments
-      amount_to_burn
-  in
-  let*! ctxt =
-    Storage.Slashed_deposits.add
-      (ctxt, level.cycle)
-      (level.level, delegate)
-      updated_slashed
-  in
-  return (ctxt, amount_to_burn, balance_updates)
+  finish_punish
+    ctxt
+    delegate
+    (level : Level_repr.t)
+    updated_slashed
+    punishing_amount
 
 let punish_double_baking ctxt delegate (level : Level_repr.t) =
   let open Lwt_result_syntax in
@@ -96,23 +107,15 @@ let punish_double_baking ctxt delegate (level : Level_repr.t) =
   let slashing_for_one_block =
     Constants_storage.double_baking_punishment ctxt
   in
-  let amount_to_burn =
+  let punishing_amount =
     Tez_repr.(min frozen_deposits.current_amount slashing_for_one_block)
   in
-  let* ctxt, balance_updates =
-    Token.transfer
-      ctxt
-      (`Frozen_deposits delegate)
-      `Double_signing_punishments
-      amount_to_burn
-  in
-  let*! ctxt =
-    Storage.Slashed_deposits.add
-      (ctxt, level.cycle)
-      (level.level, delegate)
-      updated_slashed
-  in
-  return (ctxt, amount_to_burn, balance_updates)
+  finish_punish
+    ctxt
+    delegate
+    (level : Level_repr.t)
+    updated_slashed
+    punishing_amount
 
 let clear_outdated_slashed_deposits ctxt ~new_cycle =
   let max_slashable_period = Constants_storage.max_slashing_period ctxt in

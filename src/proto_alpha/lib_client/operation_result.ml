@@ -350,7 +350,6 @@ let pp_balance_updates ppf balance_updates =
           | Block_fees -> "payload fees(the block proposer)"
           | Deposits pkh -> Format.asprintf "deposits(%a)" pp_baker pkh
           | Nonce_revelation_rewards -> "nonce revelation rewards"
-          | Double_signing_evidence_rewards -> "double signing evidence rewards"
           | Endorsing_rewards -> "endorsing rewards"
           | Baking_rewards -> "baking rewards"
           | Baking_bonuses -> "baking bonuses"

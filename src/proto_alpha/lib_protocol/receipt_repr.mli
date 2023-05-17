@@ -30,7 +30,6 @@ type balance =
   | Block_fees
   | Deposits of Signature.Public_key_hash.t
   | Nonce_revelation_rewards
-  | Double_signing_evidence_rewards
   | Endorsing_rewards
   | Baking_rewards
   | Baking_bonuses

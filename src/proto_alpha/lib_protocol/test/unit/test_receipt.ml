@@ -73,7 +73,6 @@ let test_encodings () =
   test_encodings Block_fees >>=? fun () ->
   test_encodings (Deposits pkh) >>=? fun () ->
   test_encodings Nonce_revelation_rewards >>=? fun () ->
-  test_encodings Double_signing_evidence_rewards >>=? fun () ->
   test_encodings Endorsing_rewards >>=? fun () ->
   test_encodings Baking_rewards >>=? fun () ->
   test_encodings Baking_bonuses >>=? fun () ->

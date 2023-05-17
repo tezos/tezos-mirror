@@ -1830,15 +1830,12 @@ let punish_delegate ctxt delegate level mistake mk_result ~payload_producer =
     | `Double_baking -> Delegate.punish_double_baking
     | `Double_endorsing -> Delegate.punish_double_endorsing
   in
-  punish ctxt delegate level >>=? fun (ctxt, burned, punish_balance_updates) ->
-  (match Tez.(burned /? 2L) with
-  | Ok reward ->
-      Token.transfer
-        ctxt
-        `Double_signing_evidence_rewards
-        (`Contract (Contract.Implicit payload_producer.Consensus_key.delegate))
-        reward
-  | Error _ -> (* reward is Tez.zero *) return (ctxt, []))
+  punish ctxt delegate level >>=? fun (ctxt, reward, punish_balance_updates) ->
+  Token.transfer
+    ctxt
+    (`Frozen_deposits delegate)
+    (`Contract (Contract.Implicit payload_producer.Consensus_key.delegate))
+    reward
   >|=? fun (ctxt, reward_balance_updates) ->
   let balance_updates = reward_balance_updates @ punish_balance_updates in
   (ctxt, Single_result (mk_result balance_updates))
