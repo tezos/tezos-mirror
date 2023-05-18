@@ -109,29 +109,29 @@ let test_on_new_connection =
       (`Make_default_pool ())
       (`Dependencies dependencies)
   in
-  let callbacks_nb = ref 0 in
+  let num_connect = ref 0 in
   P2p_connect_handler.on_new_connection t (fun _id _conn ->
-      callbacks_nb := !callbacks_nb + 1) ;
+      num_connect := !num_connect + 1) ;
   Alcotest.(
     check'
       int
       ~msg:"Before any connection, on_new_connection is never called"
       ~expected:0
-      ~actual:!callbacks_nb) ;
+      ~actual:!num_connect) ;
   let* _conn = P2p_connect_handler.connect t point_id in
   Alcotest.(
     check'
       int
       ~msg:"After connect, on_new_connection called"
       ~expected:1
-      ~actual:!callbacks_nb) ;
+      ~actual:!num_connect) ;
   let*! () = P2p_connect_handler.destroy t in
   Alcotest.(
     check'
       int
       ~msg:"After destruction, no new call to on_new_connection"
       ~expected:1
-      ~actual:!callbacks_nb) ;
+      ~actual:!num_connect) ;
   return_unit
 
 let tests =
