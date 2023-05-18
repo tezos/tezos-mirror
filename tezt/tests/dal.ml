@@ -2500,6 +2500,69 @@ let check_new_connection_event ~main_node ~other_node ~is_outbound =
       in
       check_expected is_outbound JSON.(event |-> "outbound" |> as_bool))
 
+type peer_id = string
+
+type event_with_topic =
+  | Subscribe of peer_id
+  | Unsubscribe of peer_id
+  | Graft of peer_id
+  | Join
+  | Leave
+
+let event_with_topic_to_string = function
+  | Subscribe _ -> "subscribe"
+  | Unsubscribe _ -> "unsubscribe"
+  | Graft _ -> "graft"
+  | Join -> "join"
+  | Leave -> "leave"
+
+(** This function monitors the Gossipsub worker events whose name is given by
+    [event_with_topic].
+
+    More precisely, since topics depend on a pkh and the number of DAL slots,
+    this function monitors all the events {pkh; slot_index = 0} ... {pkh;
+    slot_index = num_slots - 1}.
+
+    Depending on the value of [event_with_topic], some extra checks, such as the
+    peer id in case of Graft and Subscribe, are also done.
+*)
+let check_events_with_topic ~event_with_topic dal_node ~num_slots expected_pkh =
+  let remaining = ref num_slots in
+  let seen = Array.make num_slots false in
+  let get_slot_index_opt event =
+    let*?? topic =
+      match event_with_topic with
+      | Subscribe expected_peer
+      | Unsubscribe expected_peer
+      | Graft expected_peer ->
+          let*?? () =
+            check_expected
+              expected_peer
+              JSON.(event |-> "peer" |> JSON.as_string)
+          in
+          Some JSON.(event |-> "topic")
+      | Join | Leave -> Some event
+    in
+    let*?? () =
+      check_expected expected_pkh JSON.(topic |-> "pkh" |> JSON.as_string)
+    in
+    Some JSON.(topic |-> "slot_index" |> as_int)
+  in
+  wait_for_gossipsub_worker_event
+    dal_node
+    ~name:(event_with_topic_to_string event_with_topic)
+    (fun event ->
+      let*?? slot_index = get_slot_index_opt event in
+      Check.(
+        (seen.(slot_index) = false)
+          bool
+          ~error_msg:
+            (sf "Slot_index %d already seen. Invariant broken" slot_index)) ;
+      seen.(slot_index) <- true ;
+      let () = remaining := !remaining - 1 in
+      if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
+      else None)
+
 let test_dal_node_p2p_connection _protocol _parameters _cryptobox node client
     dal_node1 =
   let dal_node2 = Dal_node.create ~node ~client () in
@@ -2520,6 +2583,18 @@ let test_dal_node_p2p_connection _protocol _parameters _cryptobox node client
   let* () = Dal_node.run dal_node2 in
   let* () = conn_ev_in_node1 and* () = conn_ev_in_node2 in
   unit
+
+let test_dal_node_join_topic _protocol _parameters _cryptobox _node client
+    dal_node1 =
+  let pkh1 = Constant.bootstrap1.public_key_hash in
+  let profile1 = Rollup.Dal.RPC.Attestor pkh1 in
+  let* params = Rollup.Dal.Parameters.from_client client in
+  let num_slots = params.number_of_slots in
+  let event_waiter =
+    check_events_with_topic ~event_with_topic:Join dal_node1 ~num_slots pkh1
+  in
+  let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profile profile1) in
+  event_waiter
 
 let register ~protocols =
   (* Tests with Layer1 node only *)
@@ -2614,6 +2689,10 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     "GS/P2P connection"
     test_dal_node_p2p_connection
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    "GS join topic"
+    test_dal_node_join_topic
     protocols ;
 
   (* Tests with all nodes *)

@@ -31,11 +31,23 @@
 (** Below, we expose the main types needed for the integration with the existing
     DAL node alongside their encodings. *)
 
-type topic = Gs_interface.topic
+type topic = Gs_interface.topic = {
+  slot_index : int;
+  pkh : Signature.Public_key_hash.t;
+}
 
-type message_id = Gs_interface.message_id
+type message_id = Gs_interface.message_id = {
+  commitment : Cryptobox.Commitment.t;
+  level : int32;
+  slot_index : int;
+  shard_index : int;
+  pkh : Signature.Public_key_hash.t;
+}
 
-type message = Gs_interface.message
+type message = Gs_interface.message = {
+  share : Cryptobox.share;
+  shard_proof : Cryptobox.shard_proof;
+}
 
 type peer = Gs_interface.peer
 

@@ -95,6 +95,7 @@ type node_store = {
   store : t;
   shard_store : Shards.t;
   shards_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
+  gs_worker : Gossipsub.Worker.t;
 }
 
 (** [open_shards_stream node_store] opens a stream that should be notified when
@@ -102,8 +103,9 @@ type node_store = {
 let open_shards_stream {shards_watcher; _} =
   Lwt_watcher.create_stream shards_watcher
 
-(** [init config] inits the store on the filesystem using the given [config]. *)
-let init config =
+(** [init gs_worker config] inits the store on the filesystem using the
+    given [config] and [gs_worker]. *)
+let init gs_worker config =
   let open Lwt_result_syntax in
   let base_dir = Configuration.data_dir_path config path in
   let shards_watcher = Lwt_watcher.create_input () in
@@ -111,7 +113,7 @@ let init config =
   let*! store = main repo in
   let shard_store = Shards.init base_dir shard_store_dir in
   let*! () = Event.(emit store_is_ready ()) in
-  return {shard_store; store; shards_watcher}
+  return {shard_store; store; shards_watcher; gs_worker}
 
 let trace_decoding_error ~data_kind ~tztrace_of_error r =
   let open Result_syntax in
@@ -474,13 +476,24 @@ module Legacy = struct
     let* profiles = list node_store.store path in
     return @@ List.map_e (fun (p, _) -> decode_profile p) profiles
 
-  let add_profile node_store profile =
+  let add_profile Dal_plugin.{number_of_slots; _} node_store profile =
+    let open Lwt_syntax in
     let path = Path.Profile.profile profile in
-    set
-      ~msg:(Printf.sprintf "New profile added: %s" (Path.to_string path))
-      node_store.store
-      path
-      ""
+    let* () =
+      set
+        ~msg:(Printf.sprintf "New profile added: %s" (Path.to_string path))
+        node_store.store
+        path
+        ""
+    in
+    match profile with
+    | Attestor pkh ->
+        List.iter
+          (fun slot_index ->
+            Join Gossipsub.{slot_index; pkh}
+            |> Gossipsub.Worker.(app_input node_store.gs_worker))
+          Utils.Infix.(0 -- (number_of_slots - 1)) ;
+        return_unit
 
   (** Filter the given list of indices according to the values of the given slot
       level and index. *)

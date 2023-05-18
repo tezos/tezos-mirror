@@ -28,7 +28,10 @@
 (** Adds a profile to the dal [node_store]. If already present,
     the store does not change. *)
 val add_profile :
-  Store.node_store -> Services.Types.profile -> unit tzresult Lwt.t
+  Dal_plugin.proto_parameters ->
+  Store.node_store ->
+  Services.Types.profile ->
+  unit tzresult Lwt.t
 
 (** [get_profiles node_store] returns the list of profiles that the node tracks *)
 val get_profiles :
