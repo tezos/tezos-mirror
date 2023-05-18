@@ -156,7 +156,8 @@ impl Store {
 
     pub fn add_preimage(&mut self, preimage: Vec<u8>) -> [u8; PREIMAGE_HASH_SIZE] {
         let hash_with_prefix =
-            tezos_smart_rollup_encoding::dac::make_preimage_hash(&preimage).unwrap();
+            tezos_smart_rollup_encoding::dac::pages::make_preimage_hash(&preimage)
+                .unwrap();
 
         self.preimages.insert(hash_with_prefix, preimage);
         hash_with_prefix

@@ -1,6 +1,6 @@
 //! Test of reveal preimage mechanism from [encoding::dac].
 
-use tezos_smart_rollup_encoding::dac::*;
+use tezos_smart_rollup_encoding::dac::pages::*;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 #[test]
