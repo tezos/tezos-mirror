@@ -496,6 +496,7 @@ let cont_sized_step cont_name args = {name = Cont_name cont_name; args}
 
 (* ------------------------------------------------------------------------- *)
 
+(* Changing the ordering breaks the workload file compatibility *)
 let all_instructions =
   [
     N_IDrop;
@@ -671,6 +672,7 @@ let all_instructions =
     N_IUnit;
   ]
 
+(* Changing the ordering breaks the workload file compatibility *)
 let all_continuations =
   [
     N_KNil;
