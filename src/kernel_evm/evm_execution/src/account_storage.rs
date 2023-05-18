@@ -20,9 +20,6 @@ pub const WORD_SIZE: usize = 32_usize;
 /// interface.
 #[derive(Error, Copy, Eq, PartialEq, Clone, Debug)]
 pub enum AccountStorageError {
-    /// The account does not hold enough Ether for a transaction
-    #[error("Insufficient Ether")]
-    NotEnoughEther,
     /// Some runtime error happened while using durable storage
     #[error("Runtime error: {0:?}")]
     RuntimeError(host::runtime::RuntimeError),

@@ -12,7 +12,7 @@ use alloc::borrow::Cow;
 use alloc::collections::TryReserveError;
 use debug::debug_msg;
 use evm::executor::stack::PrecompileFailure;
-use evm::{Config, ExitError, ExitFatal};
+use evm::Config;
 use host::runtime::Runtime;
 use primitive_types::{H160, U256};
 use tezos_ethereum::block::BlockConstants;
@@ -39,19 +39,10 @@ use precompiles::PrecompileSet;
 /// transfer for instance.
 #[derive(Error, Debug, Eq, PartialEq)]
 pub enum EthereumError {
-    /// EVM returned with a machine error
-    #[error("Internal machine error when running contract")]
-    MachineExitError(ExitError),
-    /// A fatal error from executing EVM.
-    #[error("Fatal machine error when running contract")]
-    FatalMachineError(ExitFatal),
     /// Calling a precompiled failed (implies there was a precompiled contract
     /// at the call address.
     #[error("Precompile call failed")]
     PrecompileFailed(PrecompileFailure),
-    /// Contract did revert
-    #[error("Contract call reverted")]
-    CallRevert,
     /// The SputnikVM runtime returned a Trap. This should be impossible.
     #[error("Internal SputnikVM trap")]
     InternalTrapError,
@@ -90,12 +81,6 @@ pub enum EthereumError {
     /// result of a bug in the EvmHandler.
     #[error("Inconsistent EvmHandler state: {0}")]
     InconsistentState(Cow<'static, str>),
-}
-
-impl From<ExitError> for EthereumError {
-    fn from(err: ExitError) -> Self {
-        EthereumError::MachineExitError(err)
-    }
 }
 
 /// Execute an Ethereum Transaction
