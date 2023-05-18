@@ -2501,6 +2501,12 @@ let check_new_connection_event ~main_node ~other_node ~is_outbound =
       in
       check_expected is_outbound JSON.(event |-> "outbound" |> as_bool))
 
+let check_disconnection_event dal_node ~peer_id =
+  wait_for_gossipsub_worker_event
+    ~name:"disconnection"
+    dal_node
+    (fun peer_event -> check_expected peer_id JSON.(peer_event |> as_string))
+
 type peer_id = string
 
 type event_with_topic =
@@ -2658,11 +2664,12 @@ let check_message_notified_to_app_event dal_node ~from_shard ~to_shard
       if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
       else None)
 
-let test_dal_node_p2p_connection _protocol _parameters _cryptobox node client
-    dal_node1 =
+let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
+    _cryptobox node client dal_node1 =
   let dal_node2 = Dal_node.create ~node ~client () in
   let* _config_file = Dal_node.init_config dal_node2 in
   update_known_peers dal_node2 [dal_node1] ;
+  (* run dal_node2 and check "new connection" event. *)
   let conn_ev_in_node1 =
     check_new_connection_event
       ~main_node:dal_node1
@@ -2677,7 +2684,13 @@ let test_dal_node_p2p_connection _protocol _parameters _cryptobox node client
   in
   let* () = Dal_node.run dal_node2 in
   let* () = conn_ev_in_node1 and* () = conn_ev_in_node2 in
-  unit
+  let peer_id =
+    JSON.(Dal_node.read_identity dal_node2 |-> "peer_id" |> as_string)
+  in
+  (* kill dal_node2 and check "disconnection" event in node1. *)
+  let disconn_ev_in_node1 = check_disconnection_event dal_node1 ~peer_id in
+  let* () = Dal_node.kill dal_node2 in
+  disconn_ev_in_node1
 
 let test_dal_node_join_topic _protocol _parameters _cryptobox _node client
     dal_node1 =
@@ -2942,8 +2955,8 @@ let register ~protocols =
 
   (* Tests with layer1 and dal nodes (with p2p/GS) *)
   scenario_with_layer1_and_dal_nodes
-    "GS/P2P connection"
-    test_dal_node_p2p_connection
+    "GS/P2P connection and disconnection"
+    test_dal_node_p2p_connection_and_disconnection
     protocols ;
   scenario_with_layer1_and_dal_nodes
     "GS join topic"
