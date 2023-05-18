@@ -154,7 +154,11 @@ module Committee_member = struct
         {root_hash = Dac_plugin.hash_to_raw root_hash; signature; signer_pkh}
     in
     let* () =
-      Dac_node_client.put_dac_member_signature
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5627
+         Currently we have only one major DAC API version ([V0]). For this
+         reason, we can always default to it. This should be revisited once we
+         add another major version. *)
+      Dac_node_client.V0.put_dac_member_signature
         coordinator_cctxt
         ~signature:signature_repr
     in
@@ -202,7 +206,7 @@ module Committee_member = struct
     let*! () = Event.(emit subscribed_to_root_hashes_stream ()) in
     make_stream_daemon
       (handler dac_plugin remote_store)
-      (Monitor_services.root_hashes coordinator_cctxt)
+      (Monitor_services.root_hashes coordinator_cctxt RPC_services.Api.V0)
 end
 
 (** Handlers specific to an [Observer]. An [Observer] is responsible for
@@ -245,7 +249,7 @@ module Observer = struct
     let*! () = Event.(emit subscribed_to_root_hashes_stream ()) in
     make_stream_daemon
       (handler dac_plugin remote_store)
-      (Monitor_services.root_hashes coordinator_cctxt)
+      (Monitor_services.root_hashes coordinator_cctxt RPC_services.Api.V0)
 end
 
 (** Handlers specific to a [Legacy] DAC node. If no
@@ -295,7 +299,11 @@ module Legacy = struct
             }
         in
         let* () =
-          Dac_node_client.put_dac_member_signature
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/5627
+             Currently we have only one major DAC API version ([V0]). For this
+             reason, we can always default to it. This should be revisited once
+             we add another major version. *)
+          Dac_node_client.V0.put_dac_member_signature
             coordinator_cctxt
             ~signature:signature_repr
         in
@@ -307,7 +315,7 @@ module Legacy = struct
 
   (** This handler will be invoked only when a [coordinator_cctxt] is specified
       in the DAC node configuration. The DAC node tries to subscribes to the
-      stream of root hashes via the streamed GET /monitor/root_hashes RPC call
+      stream of root hashes via the streamed GET v0/monitor/root_hashes RPC call
       to the dac node corresponding to [coordinator_cctxt]. *)
   let new_root_hash ctxt coordinator_cctxt wallet_cctxt dac_plugin page_store =
     let committee_member_opt = ctxt.Node_context.Legacy.committee_member_opt in
@@ -354,7 +362,7 @@ module Legacy = struct
     let*! () = Event.(emit subscribed_to_root_hashes_stream ()) in
     make_stream_daemon
       (handler dac_plugin remote_store)
-      (Monitor_services.root_hashes coordinator_cctxt)
+      (Monitor_services.root_hashes coordinator_cctxt RPC_services.Api.V0)
 end
 
 let handlers node_ctxt =

@@ -165,9 +165,9 @@ let register_post_store_preimage ctx cctxt dac_sk_uris page_store hash_streamer
     directory =
   directory
   |> add_service
-       Tezos_rpc.Directory.register0
+       Tezos_rpc.Directory.register1
        RPC_services.post_store_preimage
-       (fun () input ->
+       (fun _api_version () input ->
          handle_post_store_preimage
            ctx
            cctxt
@@ -179,35 +179,36 @@ let register_post_store_preimage ctx cctxt dac_sk_uris page_store hash_streamer
 let register_get_verify_signature dac_plugin public_keys_opt directory =
   directory
   |> add_service
-       Tezos_rpc.Directory.register0
+       Tezos_rpc.Directory.register1
        RPC_services.get_verify_signature
-       (fun external_message () ->
+       (fun _api_version external_message () ->
          handle_get_verify_signature dac_plugin public_keys_opt external_message)
 
 let register_get_preimage dac_plugin page_store =
   add_service
-    Tezos_rpc.Directory.register1
+    Tezos_rpc.Directory.register2
     RPC_services.get_preimage
-    (fun hash () () -> handle_get_preimage dac_plugin page_store hash)
+    (fun _api_version hash () () ->
+      handle_get_preimage dac_plugin page_store hash)
 
 let register_monitor_root_hashes hash_streamer dir =
   Tezos_rpc.Directory.gen_register
     dir
     Monitor_services.S.root_hashes
-    (fun () () () -> handle_monitor_root_hashes hash_streamer)
+    (fun _api_version () () -> handle_monitor_root_hashes hash_streamer)
 
 let register_get_certificate node_store dac_plugin =
   add_service
-    Tezos_rpc.Directory.register1
+    Tezos_rpc.Directory.register2
     RPC_services.get_certificate
-    (fun root_hash () () ->
+    (fun _api_version root_hash () () ->
       handle_get_certificate dac_plugin node_store root_hash)
 
 let register_get_missing_page dac_plugin page_store cctxt =
   add_service
-    Tezos_rpc.Directory.register1
+    Tezos_rpc.Directory.register2
     RPC_services.get_missing_page
-    (fun root_hash () () ->
+    (fun _api_version root_hash () () ->
       handle_get_missing_page cctxt page_store dac_plugin root_hash)
 
 module Coordinator = struct
@@ -285,7 +286,7 @@ module Coordinator = struct
     Tezos_rpc.Directory.gen_register
       dir
       Monitor_services.S.certificate
-      (fun ((), root_hash) () () ->
+      (fun (((), _api_version), root_hash) () () ->
         let open Lwt_result_syntax in
         let*! handler =
           handle_monitor_certificate
@@ -301,17 +302,17 @@ module Coordinator = struct
 
   let register_post_preimage dac_plugin hash_streamer page_store =
     add_service
-      Tezos_rpc.Directory.register0
+      Tezos_rpc.Directory.register1
       RPC_services.Coordinator.post_preimage
-      (fun () payload ->
+      (fun _api_version () payload ->
         handle_post_preimage dac_plugin page_store hash_streamer payload)
 
   let register_put_dac_member_signature ctx dac_plugin rw_node_store page_store
       cctxt =
     add_service
-      Tezos_rpc.Directory.register0
+      Tezos_rpc.Directory.register1
       RPC_services.put_dac_member_signature
-      (fun () dac_member_signature ->
+      (fun _api_version () dac_member_signature ->
         Signature_manager.Coordinator.handle_put_dac_member_signature
           ctx
           dac_plugin
@@ -325,14 +326,10 @@ module Coordinator = struct
     let hash_streamer =
       coordinator_node_ctxt.Node_context.Coordinator.hash_streamer
     in
-    let public_keys_opt =
-      Node_context.Coordinator.public_keys_opt coordinator_node_ctxt
-    in
     let certificate_streamers = coordinator_node_ctxt.certificate_streamers in
     let committee_members = coordinator_node_ctxt.committee_members in
     Tezos_rpc.Directory.empty
     |> register_post_preimage dac_plugin hash_streamer page_store
-    |> register_get_verify_signature dac_plugin public_keys_opt
     |> register_get_preimage dac_plugin page_store
     |> register_monitor_root_hashes hash_streamer
     |> register_monitor_certificate
@@ -365,9 +362,9 @@ module Legacy = struct
   let register_put_dac_member_signature ctx dac_plugin rw_node_store page_store
       cctxt =
     add_service
-      Tezos_rpc.Directory.register0
+      Tezos_rpc.Directory.register1
       RPC_services.put_dac_member_signature
-      (fun () dac_member_signature ->
+      (fun _api_version () dac_member_signature ->
         Signature_manager.Legacy.handle_put_dac_member_signature
           ctx
           dac_plugin

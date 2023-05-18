@@ -44,12 +44,15 @@ let assert_lwt_failure ?__LOC__ msg lwt_under_inspection =
   in
   if passed then unit else Test.fail ?__LOC__ msg
 
-let init_hex_root_hash ?payload coordinator_node =
+let init_hex_root_hash ?payload coordinator_node ~api_version =
   let payload = Option.value payload ~default:"hello test message" in
   let* root_hash, _l1_op =
     RPC.call
       coordinator_node
-      (Dac_rpc.post_store_preimage ~payload ~pagination_scheme:"Merkle_tree_V0")
+      (Dac_rpc.post_store_preimage
+         ~payload
+         ~pagination_scheme:"Merkle_tree_V0"
+         ~api_version)
   in
   let hex_root_hash = `Hex root_hash in
   return hex_root_hash
@@ -94,12 +97,13 @@ let parse_certificate json =
 (* Helper process that listens to certificate updates through a
    RPC request. Upon termination, the list of certificate updates
    is returned *)
-let streamed_certificates_client coordinator_node root_hash =
+let streamed_certificates_client coordinator_node root_hash api_version =
   let endpoint =
     Format.sprintf
-      "http://%s:%d/monitor/certificate/%s"
+      "http://%s:%d/%s/monitor/certificate/%s"
       (Dac_node.rpc_host coordinator_node)
       (Dac_node.rpc_port coordinator_node)
+      api_version
       root_hash
   in
   RPC.Curl.get_raw endpoint
@@ -197,14 +201,14 @@ let check_preimage expected_preimage actual_preimage =
      [coordinator]. It returns the list  of the hashes contained in the
      [page_hash], if the page corresponds to a hash page. Otherwise, it returns
      the empty list. *)
-let check_downloaded_page coordinator observer page_hash =
+let check_downloaded_page coordinator observer page_hash ~api_version =
   let* coordinator_hex_encoded_page =
-    RPC.call coordinator (Dac_rpc.get_preimage page_hash)
+    RPC.call coordinator Dac_rpc.(get_preimage page_hash ~api_version)
   in
   let coordinator_page = Hex.to_string (`Hex coordinator_hex_encoded_page) in
   (* Check that the page has been saved by the observer. *)
   let* observer_hex_encoded_page =
-    RPC.call observer (Dac_rpc.get_preimage page_hash)
+    RPC.call observer (Dac_rpc.get_preimage page_hash ~api_version)
   in
   let observer_page = Hex.to_string (`Hex observer_hex_encoded_page) in
   (* Check that the raw page for the root hash  stored in the coordinator
@@ -240,12 +244,14 @@ let check_downloaded_page coordinator observer page_hash =
     in
     return @@ split_hashes concatenated_hashes []
 
-let check_downloaded_preimage coordinator observer root_hash =
+let check_downloaded_preimage coordinator observer root_hash ~api_version =
   let rec go hashes =
     match hashes with
     | [] -> return ()
     | hash :: hashes ->
-        let* next_hashes = check_downloaded_page coordinator observer hash in
+        let* next_hashes =
+          check_downloaded_page coordinator observer hash ~api_version
+        in
         go (hashes @ next_hashes)
   in
   go [root_hash]
@@ -293,6 +299,9 @@ let sample_payload example_filename =
     no notion of profiles. Once we have a fully working profiles, tests from this
     module should be refactored. *)
 module Legacy = struct
+  (** [Legacy] test suite uses [v0] DAC API. *)
+  let api_version = Dac_rpc.Api.v0
+
   let set_coordinator dac_node coordinator =
     let coordinator =
       `O
@@ -316,7 +325,8 @@ module Legacy = struct
         coordinator
         (Dac_rpc.post_store_preimage
            ~payload
-           ~pagination_scheme:"Merkle_tree_V0")
+           ~pagination_scheme:"Merkle_tree_V0"
+           ~api_version)
     in
     return @@ check_valid_root_hash expected_rh actual_rh
 
@@ -436,7 +446,8 @@ module Legacy = struct
         dac_node
         (Dac_rpc.post_store_preimage
            ~payload
-           ~pagination_scheme:"Merkle_tree_V0")
+           ~pagination_scheme:"Merkle_tree_V0"
+           ~api_version)
     in
     (* Expected reveal hash equals to the result of
        [Tezos_dac_alpha.Dac_pages_encoding.Merkle_tree.V0.serialize_payload "test"].
@@ -459,7 +470,7 @@ module Legacy = struct
     in
     check_preimage payload recovered_preimage ;
     let* is_signature_valid =
-      RPC.call dac_node (Dac_rpc.get_verify_signature l1_operation)
+      RPC.call dac_node (Dac_rpc.get_verify_signature l1_operation ~api_version)
     in
     Check.(
       (is_signature_valid = true)
@@ -476,7 +487,8 @@ module Legacy = struct
         dac_node
         (Dac_rpc.post_store_preimage
            ~payload
-           ~pagination_scheme:"Hash_chain_V0")
+           ~pagination_scheme:"Hash_chain_V0"
+           ~api_version)
     in
     (* Expected reveal hash equals to the result of
        [Tezos_dac_alpha.Dac_pages_encoding.Hash_chain.V0.serialize_payload "test"].
@@ -508,7 +520,8 @@ module Legacy = struct
         dac_node
         (Dac_rpc.post_store_preimage
            ~payload
-           ~pagination_scheme:"Merkle_tree_V0")
+           ~pagination_scheme:"Merkle_tree_V0"
+           ~api_version)
     in
     (* Expected reveal hash equals to the result of
        [Tezos_dac_alpha.Dac_pages_encoding.Merkle_tree.V0.serialize_payload "test"].
@@ -526,7 +539,9 @@ module Legacy = struct
     let recovered_payload = really_input_string cin (in_channel_length cin) in
     let () = close_in cin in
     let recovered_preimage = Hex.of_string recovered_payload in
-    let* preimage = RPC.call dac_node (Dac_rpc.get_preimage expected_rh) in
+    let* preimage =
+      RPC.call dac_node (Dac_rpc.get_preimage expected_rh ~api_version)
+    in
     Check.(
       (preimage = Hex.show recovered_preimage)
         string
@@ -566,7 +581,8 @@ module Legacy = struct
         dac_node
         (Dac_rpc.post_store_preimage
            ~payload
-           ~pagination_scheme:"Hash_chain_V0")
+           ~pagination_scheme:"Hash_chain_V0"
+           ~api_version)
     in
     let expected_rh =
       "0027782d2a7020be332cc42c4e66592ec50305f559a4011981f1d5af81428e7aa3"
@@ -608,7 +624,8 @@ module Legacy = struct
         dac_node
         (Dac_rpc.post_store_preimage
            ~payload
-           ~pagination_scheme:"Hash_chain_V0")
+           ~pagination_scheme:"Hash_chain_V0"
+           ~api_version)
     in
     let errorneous_hash =
       "0027782d2a7020be332cc42c4e66592ec50305f559a4011981f1d5af81428ecafe"
@@ -866,7 +883,7 @@ module Legacy = struct
     let* () = push_promise in
     (* Assert [observer] emitted event of received [expected_rh]. *)
     let* () = fetch_root_hash_promise in
-    check_downloaded_preimage coordinator observer expected_rh
+    check_downloaded_preimage coordinator observer expected_rh ~api_version
 
   (* 1. Observer should fetch missing page from Coordinator when GET /missing_page/{hash}
         is called.
@@ -882,7 +899,10 @@ module Legacy = struct
       wait_for_root_hash_pushed_to_data_streamer coordinator root_hash
     in
     let* hex_root_hash =
-      init_hex_root_hash ~payload:"test payload abc 123" coordinator
+      init_hex_root_hash
+        ~payload:"test payload abc 123"
+        coordinator
+        ~api_version
     in
     assert (root_hash = Hex.show hex_root_hash) ;
     let* () = root_hash_stream_promise in
@@ -896,17 +916,23 @@ module Legacy = struct
       assert_lwt_failure
         ~__LOC__
         "Expected retrieve_preimage"
-        (RPC.call observer (Dac_rpc.get_preimage (Hex.show hex_root_hash)))
+        (RPC.call
+           observer
+           (Dac_rpc.get_preimage (Hex.show hex_root_hash) ~api_version))
     in
     let* missing_page =
-      RPC.call observer (Dac_rpc.get_missing_page ~hex_root_hash)
+      RPC.call observer (Dac_rpc.get_missing_page ~hex_root_hash ~api_version)
     in
     let* coordinator_page =
-      RPC.call coordinator (Dac_rpc.get_preimage (Hex.show hex_root_hash))
+      RPC.call
+        coordinator
+        (Dac_rpc.get_preimage (Hex.show hex_root_hash) ~api_version)
     in
     check_preimage coordinator_page missing_page ;
     let* observer_preimage =
-      RPC.call observer (Dac_rpc.get_preimage (Hex.show hex_root_hash))
+      RPC.call
+        observer
+        (Dac_rpc.get_preimage (Hex.show hex_root_hash) ~api_version)
     in
     check_preimage coordinator_page observer_preimage ;
     unit
@@ -924,7 +950,8 @@ module Legacy = struct
           (Dac_rpc.put_dac_member_signature
              ~hex_root_hash
              ~dac_member_pkh:invalid_signer_key.aggregate_public_key_hash
-             ~signature)
+             ~signature
+             ~api_version)
       in
       assert_lwt_failure
         ~__LOC__
@@ -949,7 +976,8 @@ module Legacy = struct
           (Dac_rpc.put_dac_member_signature
              ~hex_root_hash
              ~dac_member_pkh:memberj.aggregate_public_key_hash
-             ~signature)
+             ~signature
+             ~api_version)
       in
       assert_lwt_failure
         ~__LOC__
@@ -980,14 +1008,17 @@ module Legacy = struct
                 (Dac_rpc.put_dac_member_signature
                    ~hex_root_hash
                    ~dac_member_pkh:member.aggregate_public_key_hash
-                   ~signature)
+                   ~signature
+                   ~api_version)
             in
             return (member :: keys))
           (return [])
           members
       in
       let* witnesses, certificate, _root_hash, _version =
-        RPC.call coordinator_node (Dac_rpc.get_certificate ~hex_root_hash)
+        RPC.call
+          coordinator_node
+          (Dac_rpc.get_certificate ~hex_root_hash ~api_version)
       in
       assert_witnesses ~__LOC__ 3 witnesses ;
       assert_verify_aggregate_signature members_keys hex_root_hash certificate ;
@@ -996,7 +1027,10 @@ module Legacy = struct
     let test_store_same_signature_more_than_once_should_be_noop
         (coordinator_node, _hex_root_hash, dac_committee) =
       let* hex_root_hash =
-        init_hex_root_hash ~payload:"noop test abc 3210" coordinator_node
+        init_hex_root_hash
+          ~payload:"noop test abc 3210"
+          coordinator_node
+          ~api_version
       in
       let member_i = 2 in
       let member = List.nth dac_committee member_i in
@@ -1008,12 +1042,15 @@ module Legacy = struct
           (Dac_rpc.put_dac_member_signature
              ~hex_root_hash
              ~dac_member_pkh
-             ~signature)
+             ~signature
+             ~api_version)
       in
       let* () = call () in
       let* () = call () in
       let* witnesses, certificate, _root_hash, _version =
-        RPC.call coordinator_node (Dac_rpc.get_certificate ~hex_root_hash)
+        RPC.call
+          coordinator_node
+          (Dac_rpc.get_certificate ~hex_root_hash ~api_version)
       in
       assert_witnesses ~__LOC__ 4 witnesses ;
       assert_verify_aggregate_signature [member] hex_root_hash certificate ;
@@ -1035,7 +1072,8 @@ module Legacy = struct
           (Dac_rpc.put_dac_member_signature
              ~hex_root_hash:false_root_hash
              ~dac_member_pkh
-             ~signature)
+             ~signature
+             ~api_version)
       in
       assert_lwt_failure
         ~__LOC__
@@ -1044,7 +1082,7 @@ module Legacy = struct
 
     let test_handle_store_signature _protocol _tezos_node tz_client coordinator
         _threshold dac_committee =
-      let* hex_root_hash = init_hex_root_hash coordinator in
+      let* hex_root_hash = init_hex_root_hash coordinator ~api_version in
       let dac_env = (coordinator, hex_root_hash, dac_committee) in
       let* () = test_non_committee_signer_should_fail tz_client dac_env in
       let* () = test_signature_verification_failure_should_fail dac_env in
@@ -1067,6 +1105,7 @@ module Legacy = struct
       let* hex_root_hash =
         init_hex_root_hash
           ~payload:"test get certificate payload 123"
+          ~api_version
           coordinator
       in
       let signature = bls_sign_hex_hash member hex_root_hash in
@@ -1076,10 +1115,13 @@ module Legacy = struct
           (Dac_rpc.put_dac_member_signature
              ~hex_root_hash
              ~dac_member_pkh:member.aggregate_public_key_hash
-             ~signature)
+             ~signature
+             ~api_version)
       in
       let* witnesses, certificate, _root_hash, _version =
-        RPC.call coordinator (Dac_rpc.get_certificate ~hex_root_hash)
+        RPC.call
+          coordinator
+          (Dac_rpc.get_certificate ~hex_root_hash ~api_version)
       in
       let expected_witnesses = Z.shift_left Z.one i in
       assert_witnesses ~__LOC__ (Z.to_int expected_witnesses) witnesses ;
@@ -1088,10 +1130,19 @@ module Legacy = struct
   end
 end
 
+(** [Full_infrastructure] is a test suite consisting only of tests with the DAC
+    nodes running in non-[Legacy] modes. *)
 module Full_infrastructure = struct
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5577
+     Once we introduce DAC API ("v1"),  [Full_infrastructure] test suite should
+     be refactored to use [v1] api as well. *)
+  let api_version = Dac_rpc.Api.v0
+
   let coordinator_serializes_payload coordinator ~payload ~expected_rh =
     let* actual_rh =
-      RPC.call coordinator (Dac_rpc.Coordinator.post_preimage ~payload)
+      RPC.call
+        coordinator
+        (Dac_rpc.Coordinator.post_preimage ~payload ~api_version)
     in
     return @@ check_valid_root_hash expected_rh actual_rh
 
@@ -1108,7 +1159,9 @@ module Full_infrastructure = struct
       wait_for_root_hash_pushed_to_data_streamer coordinator_node expected_rh
     in
     let* actual_rh =
-      RPC.call coordinator_node (Dac_rpc.Coordinator.post_preimage ~payload)
+      RPC.call
+        coordinator_node
+        (Dac_rpc.Coordinator.post_preimage ~payload ~api_version)
     in
     let () = check_valid_root_hash expected_rh actual_rh in
     let* () = root_hash_pushed_to_data_streamer_promise in
@@ -1191,7 +1244,11 @@ module Full_infrastructure = struct
        This might be inefficient *)
     Lwt_list.iter_s
       (fun dac_node ->
-        check_downloaded_preimage coordinator_node dac_node expected_rh)
+        check_downloaded_preimage
+          coordinator_node
+          dac_node
+          expected_rh
+          ~api_version)
       (committee_members_nodes @ observer_nodes)
 
   let test_streaming_certificates
@@ -1220,7 +1277,8 @@ module Full_infrastructure = struct
     assert (List.length committee_members > 0) ;
     let payload, expected_rh = sample_payload "preimage" in
     let certificate_stream_client =
-      Runnable.run @@ streamed_certificates_client coordinator_node expected_rh
+      Runnable.run
+      @@ streamed_certificates_client coordinator_node expected_rh api_version
     in
     let push_promise =
       wait_for_root_hash_pushed_to_data_streamer coordinator_node expected_rh
@@ -1286,18 +1344,19 @@ module Full_infrastructure = struct
       List.nth certificate_updates (List.length certificate_updates - 1)
     in
     (* 5. Check that certificate is consistent with the one returned
-       from the GET /certificate endpoint. *)
+       from the GET [api_version]/certificate endpoint. *)
     let* get_certificate =
       RPC.call
         coordinator_node
-        (Dac_rpc.get_certificate ~hex_root_hash:(`Hex expected_rh))
+        (Dac_rpc.get_certificate ~hex_root_hash:(`Hex expected_rh) ~api_version)
     in
     check_certificate get_certificate last_certificate_update ;
     (* 6. Request certificate via streamed endpoints again, check that one
        item is returned with the same certificate returned by the GET
        endpoint. *)
     let* second_certificates_stream =
-      Runnable.run @@ streamed_certificates_client coordinator_node expected_rh
+      Runnable.run
+      @@ streamed_certificates_client coordinator_node expected_rh api_version
     in
     Check.(
       (1 = List.length second_certificates_stream)
@@ -1500,6 +1559,11 @@ end
 module Tx_kernel_e2e = struct
   open Sc_rollup_helpers
   module Bls = Tezos_crypto.Signature.Bls
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5577
+     Once we introduce DAC API ("v1"), [Tx_kernel_e2e] test suite should
+     be refactored to use [v1] api as well. *)
+  let api_version = Dac_rpc.Api.v0
 
   let send_message ?(src = Constant.bootstrap2.alias) client msg =
     let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
@@ -2014,13 +2078,17 @@ module Tx_kernel_e2e = struct
       else unit
     in
     let* preimage_hash =
-      RPC.call coordinator_node (Dac_rpc.Coordinator.post_preimage ~payload)
+      RPC.call
+        coordinator_node
+        (Dac_rpc.Coordinator.post_preimage ~payload ~api_version)
     in
     let* () = Lwt.join wait_for_member_signature_pushed_to_coordinator in
     let* witnesses, signature, root_hash, _version =
       RPC.call
         coordinator_node
-        (Dac_rpc.get_certificate ~hex_root_hash:(`Hex preimage_hash))
+        (Dac_rpc.get_certificate
+           ~hex_root_hash:(`Hex preimage_hash)
+           ~api_version)
     in
     let root_hash = `Hex root_hash |> Hex.to_string |> String.to_bytes in
     let signature =
@@ -2442,6 +2510,26 @@ module Tx_kernel_e2e = struct
       (test_tx_kernel_e2e_with_dac_observer_missing_pages commitment_period)
 end
 
+(** [Api] module consist of tests about valid API calls and API versioning. *)
+module Api = struct
+  (** Test that existing endpoints only support valid API version prefix. *)
+  let test_only_valid_api_version_prefix_is_supported
+      Scenarios.{coordinator_node; _} =
+    (* We want to test that [api_version_rpc_arg] only captures
+       valid api version. For this we choose a concrete endpoint from V0 API,
+       and pass it invalid [api_version]. *)
+    let* response =
+      RPC.call_raw
+        coordinator_node
+        Dac_rpc.(
+          post_store_preimage
+            ~payload:"test"
+            ~pagination_scheme:"Merkle_tree_V0"
+            ~api_version:"Invalid API version prefix")
+    in
+    Lwt.return @@ RPC.check_string_response ~code:400 response
+end
+
 let register ~protocols =
   (* Tests with layer1 and dac nodes *)
   Legacy.test_dac_node_startup protocols ;
@@ -2568,4 +2656,12 @@ let register ~protocols =
     Full_infrastructure.test_client
     protocols ;
   Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_synced_with_dac protocols ;
-  Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_missing_pages protocols
+  Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_missing_pages protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~committee_size:0
+    ~observers:0
+    ~tags:["dac"; "dac_node"]
+    "only valid api version prefix is supported"
+    Api.test_only_valid_api_version_prefix_is_supported
+    protocols
