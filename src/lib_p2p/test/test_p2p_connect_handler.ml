@@ -113,22 +113,44 @@ let test_on_new_connection =
       (`Dependencies dependencies)
   in
   let num_connect = ref 0 in
-  P2p_connect_handler.on_new_connection t (fun _id _conn ->
-      num_connect := !num_connect + 1) ;
+  let num_disconnect = ref 0 in
+  P2p_connect_handler.on_new_connection t (fun _id _conn -> incr num_connect) ;
+  P2p_connect_handler.on_disconnection t (fun _id -> incr num_disconnect) ;
   check
     ~msg:"Before any connection, on_new_connection is never called"
     ~expected:0
     ~actual:!num_connect ;
-  let* _conn = P2p_connect_handler.connect t point_id in
+  check
+    ~msg:"Before any connection, on_disconnection is never called"
+    ~expected:0
+    ~actual:!num_disconnect ;
+  let* conn = P2p_connect_handler.connect t point_id in
   check
     ~msg:"After connect, on_new_connection called"
     ~expected:1
     ~actual:!num_connect ;
+  check
+    ~msg:"After connect, on_disconnection is not called"
+    ~expected:0
+    ~actual:!num_disconnect ;
+  let*! () = P2p_conn.disconnect ~wait:true conn in
+  check
+    ~msg:"After disconnect, on_new_connection is not called"
+    ~expected:1
+    ~actual:!num_connect ;
+  check
+    ~msg:"After disconnect, on_disconnection is called"
+    ~expected:1
+    ~actual:!num_disconnect ;
   let*! () = P2p_connect_handler.destroy t in
   check
     ~msg:"After destruction, no new call to on_new_connection"
     ~expected:1
     ~actual:!num_connect ;
+  check
+    ~msg:"After destruction, no new call to on_disconnection"
+    ~expected:1
+    ~actual:!num_disconnect ;
   return_unit
 
 let tests =
