@@ -118,7 +118,7 @@ let get_commitment_slot node_store cryptobox commitment =
   | Some slot_content -> return slot_content
 
 let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
-    commitment shard_proofs =
+    commitment ~with_proof =
   let open Lwt_result_syntax in
   let* slot = get_commitment_slot node_store cryptobox commitment in
   let*? polynomial = polynomial_from_slot cryptobox slot in
@@ -131,7 +131,7 @@ let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
         commitment
         shards)
   in
-  if shard_proofs.Services.Types.with_proof then
+  if with_proof then
     let shard_proofs =
       Cryptobox.prove_shards
         cryptobox

@@ -84,7 +84,7 @@ module Slots_handlers = struct
                 | Error _ -> assert false
                 | Ok proof -> return_some proof)))
 
-  let put_commitment_shards ctxt commitment () with_proof =
+  let put_commitment_shards ctxt commitment () Services.Types.{with_proof} =
     call_handler2
       ctxt
       (fun store {cryptobox; shards_proofs_precomputation; _} ->
@@ -93,7 +93,7 @@ module Slots_handlers = struct
           store
           cryptobox
           commitment
-          with_proof
+          ~with_proof
         |> Errors.to_option_tzresult)
 
   let get_commitment_by_published_level_and_index ctxt level slot_index () () =
