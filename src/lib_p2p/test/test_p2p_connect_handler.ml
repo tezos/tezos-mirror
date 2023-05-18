@@ -102,6 +102,9 @@ let test_correct_incoming_connection_number =
 
 let test_on_new_connection =
   let open Lwt_result_syntax in
+  let check ~msg ~expected ~actual =
+    Alcotest.(check' int ~msg ~expected ~actual)
+  in
   tztest "on_new_connection hook is triggered on new connection" `Quick
   @@ fun () ->
   let t =
@@ -112,26 +115,20 @@ let test_on_new_connection =
   let num_connect = ref 0 in
   P2p_connect_handler.on_new_connection t (fun _id _conn ->
       num_connect := !num_connect + 1) ;
-  Alcotest.(
-    check'
-      int
-      ~msg:"Before any connection, on_new_connection is never called"
-      ~expected:0
-      ~actual:!num_connect) ;
+  check
+    ~msg:"Before any connection, on_new_connection is never called"
+    ~expected:0
+    ~actual:!num_connect ;
   let* _conn = P2p_connect_handler.connect t point_id in
-  Alcotest.(
-    check'
-      int
-      ~msg:"After connect, on_new_connection called"
-      ~expected:1
-      ~actual:!num_connect) ;
+  check
+    ~msg:"After connect, on_new_connection called"
+    ~expected:1
+    ~actual:!num_connect ;
   let*! () = P2p_connect_handler.destroy t in
-  Alcotest.(
-    check'
-      int
-      ~msg:"After destruction, no new call to on_new_connection"
-      ~expected:1
-      ~actual:!num_connect) ;
+  check
+    ~msg:"After destruction, no new call to on_new_connection"
+    ~expected:1
+    ~actual:!num_connect ;
   return_unit
 
 let tests =
