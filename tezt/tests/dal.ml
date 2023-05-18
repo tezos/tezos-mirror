@@ -2644,7 +2644,7 @@ let check_message_notified_to_app_event dal_node ~from_shard ~to_shard
   in
   Dal_node.wait_for
     dal_node
-    "gossipsub_transport_event-app_message_delivered.v0"
+    "gossipsub_transport_event-message_notified_to_app.v0"
     (fun event ->
       let*?? shard_index = get_shard_index_opt event in
       let index = shard_index - from_shard in
@@ -2713,7 +2713,8 @@ let test_dal_node_gs_topic_subscribe_and_graft_and_publication _protocol
   let* () = conn_ev_in_node1 and* () = conn_ev_in_node2 in
 
   (* node1 joins topic {pkh} -> it sends subscribe messages to node2. *)
-  let pkh1 = Constant.bootstrap1.public_key_hash in
+  let account1 = Constant.bootstrap1 in
+  let pkh1 = account1.public_key_hash in
   let profile1 = Rollup.Dal.RPC.Attestor pkh1 in
   let* params = Rollup.Dal.Parameters.from_client client in
   let num_slots = params.number_of_slots in
@@ -2772,14 +2773,15 @@ let test_dal_node_gs_topic_subscribe_and_graft_and_publication _protocol
   (* Preparing event waiters for different shards that will be published by
      dal_node1 once the slot header is included in an L1 block.
 
-     We also prepare an event waiter for the shards that will be received by
-     dal_node2 on its topics. *)
+     We also prepare a waiter event for:
+     - the shards that will be received by dal_node2 on its topics;
+     - the messages (shards) that will be notified to dal_node2 on its topic. *)
   let published_level = Node.get_level node + 1 in
-  let attested_level = published_level + parameters.attestation_lag in
-  let* waiter_publish_list, waiter_direct_forward =
+  let attestable_level = published_level + parameters.attestation_lag in
+  let* waiter_publish_list, waiter_direct_forward, waiter_app_notifs =
     let open Rollup.Dal.Committee in
     (* Get the committee from L1 *)
-    let* committee_from_l1 = at_level node ~level:attested_level in
+    let* committee_from_l1 = at_level node ~level:attestable_level in
     (* For messages publication, we'll have one waiter promise per attestor. *)
     let waiter_publish_list =
       List.map
@@ -2796,29 +2798,58 @@ let test_dal_node_gs_topic_subscribe_and_graft_and_publication _protocol
         committee_from_l1
     in
     (* For messages reception, we'll have one promise for attestor [pkh1]. *)
-    let waiter_direct_forward =
+    let waiter_direct_forward, waiter_app_notifs =
       match
         List.find (fun {attestor; _} -> attestor = pkh1) committee_from_l1
       with
       | {attestor; first_shard_index; power} ->
-          check_events_with_message
-            ~event_with_message:(Message_with_header peer_id1)
-            dal_node2
-            ~from_shard:first_shard_index
-            ~to_shard:(first_shard_index + power - 1)
-            ~expected_commitment:slot_commitment
-            ~expected_level:published_level
-            ~expected_pkh:attestor
-            ~expected_slot:slot_index
+          ( check_events_with_message
+              ~event_with_message:(Message_with_header peer_id1)
+              dal_node2
+              ~from_shard:first_shard_index
+              ~to_shard:(first_shard_index + power - 1)
+              ~expected_commitment:slot_commitment
+              ~expected_level:published_level
+              ~expected_pkh:attestor
+              ~expected_slot:slot_index,
+            check_message_notified_to_app_event
+              dal_node2
+              ~from_shard:first_shard_index
+              ~to_shard:(first_shard_index + power - 1)
+              ~expected_commitment:slot_commitment
+              ~expected_level:published_level
+              ~expected_pkh:attestor
+              ~expected_slot:slot_index )
       | exception Not_found ->
           Test.fail "Should not happen as %s is part of the committee" pkh1
     in
-    return (waiter_publish_list, waiter_direct_forward)
+    return (waiter_publish_list, waiter_direct_forward, waiter_app_notifs)
   in
   (* We bake a block that includes [slot_header] operation. *)
   let* () = Client.bake_for_and_wait client in
-  let* () = Lwt.join waiter_publish_list and* () = waiter_direct_forward in
-  unit
+  let* () = Lwt.join waiter_publish_list
+  and* () = waiter_direct_forward
+  and* () = waiter_app_notifs in
+
+  (* Check that dal_node2 has the shards needed by attestor account1/pkh1 to
+     attest the slot with index 0. *)
+  let* res =
+    RPC.call
+      dal_node2
+      (Rollup.Dal.RPC.get_attestable_slots
+         ~attestor:account1
+         ~attested_level:attestable_level)
+  in
+  match res with
+  | Not_in_committee -> Test.fail "attestor %s not in committee" account1.alias
+  | Attestable_slots slots ->
+      (* only slot 0 is attestable. Others are set to false. *)
+      let expected = true :: List.init (num_slots - 1) (fun _ -> false) in
+      Check.(
+        (expected = slots)
+          (list bool)
+          ~error_msg:"Expected %L attestable slots list flags, got %R") ;
+      unit
 
 let register ~protocols =
   (* Tests with Layer1 node only *)
@@ -2919,7 +2950,7 @@ let register ~protocols =
     test_dal_node_join_topic
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    "GS topic subscribe and graft and publication"
+    "GS topic subscribe, graft, and exchange message"
     test_dal_node_gs_topic_subscribe_and_graft_and_publication
     protocols ;
 
