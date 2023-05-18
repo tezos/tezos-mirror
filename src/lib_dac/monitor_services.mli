@@ -23,49 +23,53 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module S : sig
-  (** Define RPC "GET [api_version]/monitor/root_hashes". *)
-  val root_hashes :
-    ( [`GET],
-      unit,
-      unit * RPC_services.Api.version,
-      unit,
-      unit,
-      Dac_plugin.raw_hash )
-    Tezos_rpc.Service.service
+(** [V0] is experimental DAC API. [V0] is deprecated, however for the
+    time being the API will be binding. It will be used by
+    1M/tps demo. The plan is to remove it once we get rid of the 
+    [Legacy] mode. Use at your own risk! *)
+module V0 : sig
+  module S : sig
+    (** Define RPC "GET v0/monitor/root_hashes". *)
+    val root_hashes :
+      ( [`GET],
+        unit,
+        unit,
+        unit,
+        unit,
+        Dac_plugin.raw_hash )
+      Tezos_rpc.Service.service
 
-  (** Define RPC GET [api_version]/monitor/certificate/hex_root_hash. *)
-  val certificate :
-    ( [`GET],
-      unit,
-      (unit * RPC_services.Api.version) * Dac_plugin.raw_hash,
-      unit,
-      unit,
-      Certificate_repr.t )
-    Tezos_rpc.Service.service
-end
+    (** Define RPC "GET v0/monitor/certificate/hex_root_hash". *)
+    val certificate :
+      ( [`GET],
+        unit,
+        unit * Dac_plugin.raw_hash,
+        unit,
+        unit,
+        Certificate_repr.t )
+      Tezos_rpc.Service.service
+  end
 
-(** [root_hashes streamed_cctxt raw_hash api_version] returns a stream
+  (** [root_hashes streamed_cctxt raw_hash] returns a stream
     of root hashes and a stopper for it.
 
-    Stream is produced by calling RPC "GET [api_version]/monitor/root_hashes".
+    Stream is produced by calling RPC "GET v0/monitor/root_hashes".
 *)
-val root_hashes :
-  #Tezos_rpc.Context.streamed ->
-  RPC_services.Api.version ->
-  (Dac_plugin.raw_hash Lwt_stream.t * Tezos_rpc.Context.stopper)
-  Error_monad.tzresult
-  Lwt.t
+  val root_hashes :
+    #Tezos_rpc.Context.streamed ->
+    (Dac_plugin.raw_hash Lwt_stream.t * Tezos_rpc.Context.stopper)
+    Error_monad.tzresult
+    Lwt.t
 
-(** [certificate streamed_cctxt raw_hash api_version] returns a stream and a
+  (** [certificate streamed_cctxt raw_hash] returns a stream and a
     stopper for monitoring certificate updates for a given root hash.
     
-    Stream is produced by calling RPC "GET [api_version]/monitor/certificate".
+    Stream is produced by calling RPC "GET v0/monitor/certificate".
 *)
-val certificate :
-  #Tezos_rpc.Context.streamed ->
-  Dac_plugin.raw_hash ->
-  RPC_services.Api.version ->
-  (Certificate_repr.t Lwt_stream.t * Tezos_rpc.Context.stopper)
-  Error_monad.tzresult
-  Lwt.t
+  val certificate :
+    #Tezos_rpc.Context.streamed ->
+    Dac_plugin.raw_hash ->
+    (Certificate_repr.t Lwt_stream.t * Tezos_rpc.Context.stopper)
+    Error_monad.tzresult
+    Lwt.t
+end

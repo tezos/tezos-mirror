@@ -52,58 +52,42 @@ module V0 = struct
      was computed.
   *)
   let get_preimage (cctxt : #cctxt) ~page_hash =
-    cctxt#call_service
-      RPC_services.get_preimage
-      (((), RPC_services.Api.V0), page_hash)
-      ()
-      ()
+    cctxt#call_service RPC_services.V0.get_preimage ((), page_hash) () ()
 
   let post_store_preimage (cctxt : #cctxt) ~payload ~pagination_scheme =
     cctxt#call_service
-      RPC_services.post_store_preimage
-      ((), RPC_services.Api.V0)
+      RPC_services.V0.post_store_preimage
+      ()
       ()
       (payload, pagination_scheme)
 
   let get_verify_signature (cctxt : #cctxt) ~external_message =
     cctxt#call_service
-      RPC_services.get_verify_signature
-      ((), RPC_services.Api.V0)
+      RPC_services.V0.get_verify_signature
+      ()
       external_message
       ()
 
   let put_dac_member_signature (cctxt : #cctxt) ~signature =
-    cctxt#call_service
-      RPC_services.put_dac_member_signature
-      ((), RPC_services.Api.V0)
-      ()
-      signature
+    cctxt#call_service RPC_services.V0.put_dac_member_signature () () signature
 
   let get_certificate (cctxt : #cctxt) ~root_page_hash =
     cctxt#call_service
-      RPC_services.get_certificate
-      (((), RPC_services.Api.V0), root_page_hash)
+      RPC_services.V0.get_certificate
+      ((), root_page_hash)
       ()
       ()
 
   let monitor_certificate (cctxt : #cctxt) ~root_hash =
-    Monitor_services.certificate cctxt root_hash RPC_services.Api.V0
+    Monitor_services.V0.certificate cctxt root_hash
 
   module Coordinator = struct
     let post_preimage (cctxt : #cctxt) ~payload =
-      cctxt#call_service
-        RPC_services.Coordinator.post_preimage
-        ((), RPC_services.Api.V0)
-        ()
-        payload
+      cctxt#call_service RPC_services.V0.Coordinator.post_preimage () () payload
   end
 
   module Observer = struct
     let get_missing_page (cctxt : #cctxt) page_hash =
-      cctxt#call_service
-        RPC_services.get_missing_page
-        (((), RPC_services.Api.V0), page_hash)
-        ()
-        ()
+      cctxt#call_service RPC_services.V0.get_missing_page ((), page_hash) () ()
   end
 end

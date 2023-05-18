@@ -206,7 +206,7 @@ module Committee_member = struct
     let*! () = Event.(emit subscribed_to_root_hashes_stream ()) in
     make_stream_daemon
       (handler dac_plugin remote_store)
-      (Monitor_services.root_hashes coordinator_cctxt RPC_services.Api.V0)
+      (Monitor_services.V0.root_hashes coordinator_cctxt)
 end
 
 (** Handlers specific to an [Observer]. An [Observer] is responsible for
@@ -249,7 +249,7 @@ module Observer = struct
     let*! () = Event.(emit subscribed_to_root_hashes_stream ()) in
     make_stream_daemon
       (handler dac_plugin remote_store)
-      (Monitor_services.root_hashes coordinator_cctxt RPC_services.Api.V0)
+      (Monitor_services.V0.root_hashes coordinator_cctxt)
 end
 
 (** Handlers specific to a [Legacy] DAC node. If no
@@ -362,7 +362,7 @@ module Legacy = struct
     let*! () = Event.(emit subscribed_to_root_hashes_stream ()) in
     make_stream_daemon
       (handler dac_plugin remote_store)
-      (Monitor_services.root_hashes coordinator_cctxt RPC_services.Api.V0)
+      (Monitor_services.V0.root_hashes coordinator_cctxt)
 end
 
 let handlers node_ctxt =
