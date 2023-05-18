@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.com>                        *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -292,6 +293,8 @@ module Sc_rollup_verify_output_proof_benchmark = struct
 
   let generated_code_destination = None
 
+  let group = Benchmarks_proto.Benchmark.Standalone
+
   let tags = ["sc_rollup"]
 
   type config = {
@@ -490,6 +493,7 @@ end
     The inferred cost model is [c1 + c2 * proof_length]. *)
 module Sc_rollup_deserialize_output_proof_benchmark = struct
   open Pvm_state_generator
+  open Benchmarks_proto
   module Full_Wasm =
     Sc_rollup_wasm.V2_0_0.Make (Environment.Wasm_2_0_0.Make) (Wasm_context)
 
@@ -502,6 +506,8 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
   let module_filename = __FILE__
 
   let generated_code_destination = None
+
+  let group = Benchmark.Standalone
 
   let tags = ["sc_rollup"]
 

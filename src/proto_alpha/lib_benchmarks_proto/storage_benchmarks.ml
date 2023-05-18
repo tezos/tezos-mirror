@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -31,6 +32,7 @@
   *)
 
 open Tezos_benchmark
+open Benchmarks_proto
 open Storage_functors
 open Protocol
 
@@ -170,17 +172,15 @@ module List_key_values_benchmark_boilerplate = struct
   let workload_to_vector {size} =
     Sparse_vec.String.of_list [("size", float_of_int size)]
 
-  let models =
-    [
-      ( "list_key_values",
-        Model.make
-          ~conv:(fun {size} -> (size, ()))
-          ~model:
-            (Model.affine
-               ~name
-               ~intercept:(fv "list_key_values_intercept")
-               ~coeff:(fv "list_key_values_step")) );
-    ]
+  let group = Benchmark.Group "list_key_values"
+
+  let model =
+    Model.make
+      ~conv:(fun {size} -> (size, ()))
+      ~model:
+        (Model.affine
+           ~intercept:(fv "list_key_values_intercept")
+           ~coeff:(fv "list_key_values_step"))
 end
 
 module List_key_values_benchmark = struct
@@ -190,7 +190,7 @@ module List_key_values_benchmark = struct
 
   let generated_code_destination = None
 
-  let benchmark rng_state {max_size} () =
+  let create_benchmark ~rng_state {max_size} =
     let wrap m = m >|= Environment.wrap_tzresult in
     let size =
       Base_samplers.sample_in_interval
@@ -218,9 +218,6 @@ module List_key_values_benchmark = struct
       Table.list_key_values ~length:0 ctxt |> Lwt_main.run |> ignore
     in
     Generator.Plain {workload; closure}
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (benchmark rng_state config)
 end
 
 module List_key_values_benchmark_intercept = struct
@@ -232,7 +229,7 @@ module List_key_values_benchmark_intercept = struct
 
   let generated_code_destination = None
 
-  let benchmark _rng_state _config () =
+  let create_benchmark ~rng_state:_ _config =
     let ctxt =
       match Lwt_main.run (default_raw_context ()) with
       | Ok ctxt -> ctxt
@@ -246,12 +243,8 @@ module List_key_values_benchmark_intercept = struct
       Table.list_key_values ~length:0 ctxt |> Lwt_main.run |> ignore
     in
     Generator.Plain {workload; closure}
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (benchmark rng_state config)
 end
 
-let () = Registration_helpers.register (module List_key_values_benchmark)
+let () = Registration.register (module List_key_values_benchmark)
 
-let () =
-  Registration_helpers.register (module List_key_values_benchmark_intercept)
+let () = Registration.register (module List_key_values_benchmark_intercept)

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,8 +25,9 @@
 (*****************************************************************************)
 
 open Protocol
+open Benchmarks_proto
 
-let ns = Namespace.make Registration_helpers.ns "script_typed_ir_size"
+let ns = Namespace.make Registration.ns "script_typed_ir_size"
 
 let fv s = Free_variable.of_namespace (ns s)
 
@@ -52,28 +54,24 @@ module Size_benchmarks_shared_config = struct
 
   let tags = [Tags.translator]
 
-  let size_based_model name =
-    let intercept_variable = fv (Format.asprintf "%s_const" name) in
-    let coeff_variable = fv (Format.asprintf "%s_size_coeff" name) in
+  let size_based_model ~name =
+    let basename = Namespace.basename name in
+    let intercept_variable = fv (Format.asprintf "%s_const" basename) in
+    let coeff_variable = fv (Format.asprintf "%s_size_coeff" basename) in
     Model.make
+      ~name
       ~conv:(function {size} -> (size, ()))
-      ~model:
-        (Model.affine
-           ~name:(ns name)
-           ~intercept:intercept_variable
-           ~coeff:coeff_variable)
+      ~model:(Model.affine ~intercept:intercept_variable ~coeff:coeff_variable)
 end
 
-module Value_size_benchmark : sig
-  include Tezos_benchmark.Benchmark.S
-
-  val size_based_model : string -> workload Model.t
-end = struct
+module Value_size_benchmark : Tezos_benchmark.Benchmark.S = struct
   include Size_benchmarks_shared_config
 
   let name = ns "VALUE_SIZE"
 
-  let models = [(model_name, size_based_model (Namespace.basename name))]
+  let models =
+    let model = size_based_model ~name in
+    [(model_name, model)]
 
   let info = "Benchmarking Script_typed_ir_size.value_size"
 
@@ -138,7 +136,7 @@ let () = Registration_helpers.register (module Value_size_benchmark)
 
 (** Benchmarking {!Script_typed_ir_size.ty_size}. *)
 
-module Type_size_benchmark : Tezos_benchmark.Benchmark.S = struct
+module Type_size_benchmark : Benchmark.S = struct
   include Size_benchmarks_shared_config
 
   type config = unit
@@ -156,7 +154,9 @@ module Type_size_benchmark : Tezos_benchmark.Benchmark.S = struct
 
   let generated_code_destination = None
 
-  let models = [(model_name, size_based_model (Namespace.basename name))]
+  let group = Benchmark.Group model_name
+
+  let model = size_based_model
 
   let type_size_benchmark (Script_typed_ir.Ex_ty ty) =
     let open Script_typed_ir_size.Internal_for_tests in
@@ -166,7 +166,7 @@ module Type_size_benchmark : Tezos_benchmark.Benchmark.S = struct
     let closure () = ignore (ty_size ty) in
     Generator.Plain {workload; closure}
 
-  let make_bench rng_state _cfg () =
+  let create_benchmark ~rng_state _cfg =
     (* The [size] here is a parameter to the random sampler and does not
        match the [size] returned by [type_size]. *)
     let size =
@@ -176,25 +176,18 @@ module Type_size_benchmark : Tezos_benchmark.Benchmark.S = struct
       Michelson_generation.Samplers.Random_type.m_type ~size rng_state
     in
     type_size_benchmark ex_ty
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Type_size_benchmark)
+let () = Registration.register (module Type_size_benchmark)
 
 (** Benchmarking {!Script_typed_ir_size.kinstr_size}. *)
 
-module Kinstr_size_benchmark : sig
-  include Tezos_benchmark.Benchmark.S
-
-  val size_based_model : string -> workload Model.t
-end = struct
+module Kinstr_size_benchmark : Tezos_benchmark.Benchmark.S = struct
   include Size_benchmarks_shared_config
 
   let name = ns "KINSTR_SIZE"
 
-  let models = [(model_name, size_based_model (Namespace.basename name))]
+  let models = [(model_name, size_based_model ~name)]
 
   let info = "Benchmarking Script_typed_ir_size.kinstr_size"
 
@@ -283,12 +276,13 @@ module Node_size_benchmark : Benchmark.S = struct
 
   let generated_code_destination = None
 
-  let size_based_model =
+  let group = Benchmark.Group model_name
+
+  let model =
     Model.make
       ~conv:(function {micheline_nodes} -> (micheline_nodes, ()))
       ~model:
         (Model.affine
-           ~name
            ~intercept:
              (fv (Format.asprintf "%s_const" (Namespace.basename name)))
            ~coeff:
@@ -297,8 +291,6 @@ module Node_size_benchmark : Benchmark.S = struct
                    "%s_ns_per_node_coeff"
                    (Namespace.basename name))))
 
-  let models = [(model_name, size_based_model)]
-
   let micheline_nodes_benchmark node =
     let open Cache_memory_helpers in
     let nodes = Nodes.to_int @@ fst @@ node_size node in
@@ -306,12 +298,9 @@ module Node_size_benchmark : Benchmark.S = struct
     let closure () = ignore (Script_typed_ir_size.node_size node) in
     Generator.Plain {workload; closure}
 
-  let make_bench rng_state _cfg () =
+  let create_benchmark ~rng_state _cfg =
     let term = Script_repr_benchmarks.Sampler.sample rng_state in
     micheline_nodes_benchmark term
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Node_size_benchmark)
+let () = Registration.register (module Node_size_benchmark)

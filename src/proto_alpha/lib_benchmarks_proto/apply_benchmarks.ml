@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,8 +25,9 @@
 (*****************************************************************************)
 
 open Tezos_benchmark
+open Benchmarks_proto
 
-let ns = Namespace.make Registration_helpers.ns "apply"
+let ns = Namespace.make Registration.ns "apply"
 
 let fv s = Free_variable.of_namespace (ns s)
 
@@ -66,6 +68,8 @@ module Take_fees_benchmark = struct
 
   let generated_code_destination = None
 
+  let group = Benchmark.Standalone
+
   let tags = ["apply"]
 
   type config = unit
@@ -87,7 +91,6 @@ module Take_fees_benchmark = struct
     Sparse_vec.String.of_list [("batch_length", float_of_int batch_length)]
 
   let model =
-    let open Benchmarks_proto in
     Model.make
       ~conv:(fun {batch_length} -> (batch_length, ()))
       ~model:Model.affine

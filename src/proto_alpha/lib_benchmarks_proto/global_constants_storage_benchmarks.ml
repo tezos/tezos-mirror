@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Marigold <team@marigold.dev>                           *)
+(* Copyright (c) 2022-2023 Marigold <team@marigold.dev>                      *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -301,6 +301,8 @@ module Set_add : Benchmark.S = struct
 
   let generated_code_destination = None
 
+  let group = Benchmark.Standalone
+
   let tags = ["global_constants"]
 
   type config = unit
@@ -345,6 +347,8 @@ module Set_elements : Benchmark.S = struct
   let module_filename = __FILE__
 
   let generated_code_destination = None
+
+  let group = Benchmark.Standalone
 
   let tags = ["global_constants"]
 
@@ -392,6 +396,8 @@ module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
   let module_filename = __FILE__
 
   let generated_code_destination = None
+
+  let group = Benchmark.Standalone
 
   let tags = ["global_constants"]
 
@@ -452,6 +458,8 @@ struct
   let module_filename = __FILE__
 
   let generated_code_destination = None
+
+  let group = Benchmark.Standalone
 
   let tags = ["global_constants"]
 
@@ -527,6 +535,8 @@ module Global_constants_storage_expand_models = struct
 
     let generated_code_destination = None
 
+    let group = Benchmark.Standalone
+
     let tags = ["global_constants"]
 
     type config = unit
@@ -591,6 +601,8 @@ module Global_constants_storage_expand_models = struct
     let module_filename = __FILE__
 
     let generated_code_destination = None
+
+    let group = Benchmark.Standalone
 
     let tags = ["global_constants"]
 

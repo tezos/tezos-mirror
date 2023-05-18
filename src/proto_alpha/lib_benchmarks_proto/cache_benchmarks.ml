@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,6 +25,7 @@
 (*****************************************************************************)
 
 open Protocol
+open Benchmarks_proto
 
 let ns = Namespace.make Registration_helpers.ns "cache"
 
@@ -137,6 +139,8 @@ module Cache_update_benchmark : Benchmarks_proto.Benchmark.S = struct
 
   let generated_code_destination = None
 
+  let group = Benchmark.Standalone
+
   (** It is expected that cache keys are non-adversarial,
       ie do not share a long common prefix. This is the case for [Script_cache],
       for which the keys are B58-encoded contract hashes.
@@ -146,7 +150,7 @@ module Cache_update_benchmark : Benchmarks_proto.Benchmark.S = struct
       We therefore do not take into account the length of the key in the model. *)
   let model =
     let affine_logn name =
-      let open Model in
+      let open Tezos_benchmark.Model in
       let param_name param =
         Free_variable.of_namespace (Namespace.cons name param)
       in

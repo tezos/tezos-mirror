@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -545,6 +546,8 @@ let check_printable_benchmark =
 
 let () = Registration_helpers.register check_printable_benchmark
 
+open Benchmarks_proto
+
 module Ty_eq : Benchmark.S = struct
   type config = {max_size : int}
 
@@ -581,16 +584,12 @@ module Ty_eq : Benchmark.S = struct
 
   let tags = [Tags.translator]
 
-  let intercept_var = fv (Format.asprintf "%s_const" (Namespace.basename name))
+  let group = Benchmark.Group "size_translator_model"
 
-  let coeff_var = fv (Format.asprintf "%s_coeff" (Namespace.basename name))
-
-  let size_model =
+  let model =
     Model.make
       ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
-      ~model:(Model.affine ~name ~intercept:intercept_var ~coeff:coeff_var)
-
-  let models = [("size_translator_model", size_model)]
+      ~model:Model.affine
 
   let ty_eq_benchmark rng_state nodes (ty : Script_typed_ir.ex_ty) =
     Lwt_main.run
@@ -627,7 +626,7 @@ module Ty_eq : Benchmark.S = struct
     | Ok closure -> closure
     | Error errs -> global_error name errs
 
-  let make_bench rng_state (cfg : config) () =
+  let create_benchmark ~rng_state (cfg : config) =
     let nodes =
       Base_samplers.(
         sample_in_interval ~range:{min = 1; max = cfg.max_size} rng_state)
@@ -636,12 +635,9 @@ module Ty_eq : Benchmark.S = struct
       Michelson_generation.Samplers.Random_type.m_type ~size:nodes rng_state
     in
     ty_eq_benchmark rng_state nodes ty
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Ty_eq)
+let () = Registration.register (module Ty_eq)
 
 (* A dummy type generator, sampling linear terms of a given size.
    The generator always returns types of the shape:
@@ -728,7 +724,9 @@ module Parse_type_benchmark : Benchmark.S = struct
 
   let generated_code_destination = None
 
-  let make_bench rng_state config () =
+  let group = Benchmark.Group "size_translator_model"
+
+  let create_benchmark ~rng_state config =
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
       let ctxt = Gas_helpers.set_limit ctxt in
       let size = Random.State.int rng_state config.max_size in
@@ -755,23 +753,13 @@ module Parse_type_benchmark : Benchmark.S = struct
     | Ok closure -> closure
     | Error errs -> global_error name errs
 
-  let size_model =
+  let model =
     Model.make
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:
-             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
-           ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
-
-  let models = [("size_translator_model", size_model)]
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (make_bench rng_state config)
+      ~model:Model.affine
 end
 
-let () = Registration_helpers.register (module Parse_type_benchmark)
+let () = Registration.register (module Parse_type_benchmark)
 
 module Unparse_type_benchmark : Benchmark.S = struct
   include Parse_type_shared
@@ -784,7 +772,9 @@ module Unparse_type_benchmark : Benchmark.S = struct
 
   let generated_code_destination = None
 
-  let make_bench rng_state config () =
+  let group = Benchmark.Group "size_translator_model"
+
+  let create_benchmark ~rng_state config =
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
       let ctxt = Gas_helpers.set_limit ctxt in
       let size = Random.State.int rng_state config.max_size in
@@ -808,20 +798,10 @@ module Unparse_type_benchmark : Benchmark.S = struct
     | Ok closure -> closure
     | Error errs -> global_error name errs
 
-  let size_model =
+  let model =
     Model.make
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:
-             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
-           ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
-
-  let models = [("size_translator_model", size_model)]
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (make_bench rng_state config)
+      ~model:Model.affine
 end
 
-let () = Registration_helpers.register (module Unparse_type_benchmark)
+let () = Registration.register (module Unparse_type_benchmark)

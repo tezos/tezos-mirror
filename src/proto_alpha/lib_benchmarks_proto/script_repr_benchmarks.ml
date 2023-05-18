@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,8 +25,9 @@
 (*****************************************************************************)
 
 open Protocol
+open Benchmarks_proto
 
-let ns = Namespace.make Registration_helpers.ns "script_repr"
+let ns = Namespace.make Registration.ns "script_repr"
 
 let fv s = Free_variable.of_namespace (ns s)
 
@@ -84,12 +86,13 @@ module Micheline_nodes_benchmark : Benchmark.S = struct
 
   let generated_code_destination = None
 
-  let size_based_model =
+  let group = Benchmark.Group "size_translator_model"
+
+  let model =
     Model.make
       ~conv:(function {micheline_nodes} -> (micheline_nodes, ()))
       ~model:
         (Model.affine
-           ~name
            ~intercept:
              (fv (Format.asprintf "%s_const" (Namespace.basename name)))
            ~coeff:
@@ -98,23 +101,18 @@ module Micheline_nodes_benchmark : Benchmark.S = struct
                    "%s_ns_per_node_coeff"
                    (Namespace.basename name))))
 
-  let models = [("size_translator_model", size_based_model)]
-
   let micheline_nodes_benchmark node =
     let nodes = Script_repr.micheline_nodes node in
     let workload = {micheline_nodes = nodes} in
     let closure () = ignore (Script_repr.micheline_nodes node) in
     Generator.Plain {workload; closure}
 
-  let make_bench rng_state _cfg () =
+  let create_benchmark ~rng_state _cfg =
     let term = Sampler.sample rng_state in
     micheline_nodes_benchmark term
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Micheline_nodes_benchmark)
+let () = Registration.register (module Micheline_nodes_benchmark)
 
 module Script_repr_strip_annotations : Benchmark.S = struct
   include Script_repr_shared_config
@@ -127,22 +125,19 @@ module Script_repr_strip_annotations : Benchmark.S = struct
 
   let generated_code_destination = None
 
-  let strip_annotations_model =
+  let group = Benchmark.Group "strip_annotations_model"
+
+  let model =
     Model.(
       make
         ~conv:(fun {micheline_nodes} -> (micheline_nodes, ()))
-        ~model:(linear ~name ~coeff:(fv "nodes")))
+        ~model:(linear ~coeff:(fv "nodes")))
 
-  let models = [("strip_annotations_model", strip_annotations_model)]
-
-  let create_benchmark rng_state () =
+  let create_benchmark ~rng_state () =
     let node = Sampler.sample rng_state in
     let closure () = ignore @@ Script_repr.strip_annotations node in
     let micheline_nodes = Script_repr.micheline_nodes node in
     Generator.Plain {workload = {micheline_nodes}; closure}
-
-  let create_benchmarks ~rng_state ~bench_num _cfg =
-    List.repeat bench_num (create_benchmark rng_state)
 end
 
-let () = Registration_helpers.register (module Script_repr_strip_annotations)
+let () = Registration.register (module Script_repr_strip_annotations)

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -56,6 +57,8 @@ module Next : Benchmark.S = struct
 
   let module_filename = __FILE__
 
+  let group = Benchmark.Standalone
+
   let config_encoding =
     let open Data_encoding in
     conv (fun {max_items} -> max_items) (fun max_items -> {max_items}) int31
@@ -107,6 +110,8 @@ module Hash_cell : Benchmark.S = struct
   let tags = ["skip_list"]
 
   let module_filename = __FILE__
+
+  let group = Benchmark.Standalone
 
   include Skip_list
   module Hash = Sc_rollup_inbox_repr.Hash
