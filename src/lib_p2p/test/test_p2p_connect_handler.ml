@@ -118,7 +118,7 @@ let test_on_new_connection =
       ~msg:"Before any connection, on_new_connection is never called"
       ~expected:0
       ~actual:!callbacks_nb) ;
-  let*! _conn = P2p_connect_handler.connect t point_id in
+  let* _conn = P2p_connect_handler.connect t point_id in
   Alcotest.(
     check'
       int
