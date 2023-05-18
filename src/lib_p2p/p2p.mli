@@ -293,6 +293,9 @@ val on_new_connection :
   (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) ->
   unit
 
+val on_disconnection :
+  ('msg, 'peer_meta, 'conn_meta) net -> (P2p_peer.Id.t -> unit) -> unit
+
 val greylist_addr : ('msg, 'peer_meta, 'conn_meta) net -> P2p_addr.t -> unit
 
 val greylist_peer : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> unit

@@ -450,6 +450,9 @@ module Real = struct
   let on_new_connection {connect_handler; _} f =
     P2p_connect_handler.on_new_connection connect_handler f
 
+  let on_disconnection {connect_handler; _} f =
+    P2p_connect_handler.on_disconnection connect_handler f
+
   let negotiated_version _ conn = P2p_conn.negotiated_version conn
 end
 
@@ -521,6 +524,7 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
     (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit;
   on_new_connection :
     (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit;
+  on_disconnection : (P2p_peer.Id.t -> unit) -> unit;
   negotiated_version :
     ('msg, 'peer_meta, 'conn_meta) connection -> Network_version.t;
   activate : unit -> unit;
@@ -604,6 +608,7 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
       fold_connections = (fun ~init ~f -> Real.fold_connections net ~init ~f);
       iter_connections = Real.iter_connections net;
       on_new_connection = Real.on_new_connection net;
+      on_disconnection = Real.on_disconnection net;
       negotiated_version = Real.negotiated_version net;
       activate = Real.activate net;
       watcher = net.Real.watcher;
@@ -649,6 +654,7 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     fold_connections = (fun ~init ~f:_ -> init);
     iter_connections = (fun _f -> ());
     on_new_connection = (fun _f -> ());
+    on_disconnection = (fun _f -> ());
     negotiated_version = (fun _ -> announced_version);
     pool = None;
     connect_handler = None;
@@ -704,6 +710,8 @@ let fold_connections net = net.fold_connections
 let iter_connections net = net.iter_connections
 
 let on_new_connection net = net.on_new_connection
+
+let on_disconnection net = net.on_disconnection
 
 let greylist_addr net addr =
   Option.iter (fun pool -> P2p_pool.greylist_addr pool addr) net.pool
