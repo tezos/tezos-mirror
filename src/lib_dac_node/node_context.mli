@@ -80,6 +80,9 @@ module Observer : sig
     coordinator_cctxt : Dac_node_client.cctxt;
         (** The [Dac_node_client.cctxt] used by the [Observer] node to
         send requests to a [Coordinator] node. *)
+    committee_cctxts : Dac_node_client.cctxt list;
+        (** The list of [Dac_node_client.cctxt] used by the [Observer] node
+        to send requests to each [Committee_member] node respectively. *)
   }
 end
 

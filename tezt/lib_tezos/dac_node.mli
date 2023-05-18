@@ -85,7 +85,8 @@ val create_committee_member :
   t
 
 (** Creates a DAC node to run in observer mode, using the specified coordinator
-    rpc host and port. *)
+    rpc host and port and set the committee member endpoints to 
+    [committee_member_rpcs]. *)
 val create_observer :
   ?path:string ->
   ?name:string ->
@@ -97,6 +98,7 @@ val create_observer :
   ?reveal_data_dir:string ->
   ?coordinator_rpc_host:string ->
   ?coordinator_rpc_port:int ->
+  committee_member_rpcs:(string * int) list ->
   node:Node.t ->
   client:Client.t ->
   unit ->

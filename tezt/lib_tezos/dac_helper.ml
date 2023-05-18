@@ -230,7 +230,8 @@ let with_committee_member ?name ?sc_rollup_node ?(pvm_name = "arith")
   f dac_node committee_member
 
 let with_observer ?name ?sc_rollup_node ?(pvm_name = "arith")
-    ?(wait_ready = true) tezos_node coordinator_node tezos_client f =
+    ?(wait_ready = true) ~committee_member_rpcs tezos_node coordinator_node
+    tezos_client f =
   let reveal_data_dir =
     Option.map
       (fun sc_rollup_node ->
@@ -245,6 +246,7 @@ let with_observer ?name ?sc_rollup_node ?(pvm_name = "arith")
       ?reveal_data_dir
       ~coordinator_rpc_host:(Dac_node.rpc_host coordinator_node)
       ~coordinator_rpc_port:(Dac_node.rpc_port coordinator_node)
+      ~committee_member_rpcs
       ()
   in
   let* _dir = Dac_node.init_config dac_node in
@@ -317,6 +319,13 @@ let scenario_with_full_dac_infrastructure ?(tags = ["dac"; "full"])
               ())
           committee_members
       in
+      let committee_member_rpcs =
+        List.map
+          (fun committee_member_node ->
+            ( Dac_node.rpc_host committee_member_node,
+              Dac_node.rpc_port committee_member_node ))
+          committee_members_nodes
+      in
       let rollup_nodes, observer_nodes =
         List.init observers Fun.id
         |> List.map (fun i ->
@@ -342,6 +351,7 @@ let scenario_with_full_dac_infrastructure ?(tags = ["dac"; "full"])
                    ~reveal_data_dir
                    ~coordinator_rpc_host:(Dac_node.rpc_host coordinator_node)
                    ~coordinator_rpc_port:(Dac_node.rpc_port coordinator_node)
+                   ~committee_member_rpcs
                    ()
                in
                (rollup_node_i, dac_node_i))

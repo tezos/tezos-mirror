@@ -95,21 +95,42 @@ module Committee_member = struct
 end
 
 module Observer = struct
-  type t = {coordinator_rpc_address : string; coordinator_rpc_port : int}
+  type t = {
+    coordinator_rpc_address : string;
+    coordinator_rpc_port : int;
+    committee_rpc_addresses : (string * int) list;
+  }
 
-  let make coordinator_rpc_address coordinator_rpc_port =
-    {coordinator_rpc_address; coordinator_rpc_port}
+  let make ~committee_rpc_addresses coordinator_rpc_address coordinator_rpc_port
+      =
+    {coordinator_rpc_address; coordinator_rpc_port; committee_rpc_addresses}
 
   let encoding =
     Data_encoding.(
       conv
-        (fun {coordinator_rpc_address; coordinator_rpc_port} ->
-          (coordinator_rpc_address, coordinator_rpc_port))
-        (fun (coordinator_rpc_address, coordinator_rpc_port) ->
-          {coordinator_rpc_address; coordinator_rpc_port})
-        (obj2
+        (fun {
+               coordinator_rpc_address;
+               coordinator_rpc_port;
+               committee_rpc_addresses;
+             } ->
+          ( coordinator_rpc_address,
+            coordinator_rpc_port,
+            committee_rpc_addresses ))
+        (fun ( coordinator_rpc_address,
+               coordinator_rpc_port,
+               committee_rpc_addresses ) ->
+          {
+            coordinator_rpc_address;
+            coordinator_rpc_port;
+            committee_rpc_addresses;
+          })
+        (obj3
            (req "coordinator_rpc_address" string)
-           (req "coordinator_rpc_port" uint16)))
+           (req "coordinator_rpc_port" uint16)
+           (req
+              "committee_rpc_addresses"
+              (Data_encoding.list
+                 (obj2 (req "rpc_address" string) (req "rpc_port" uint16))))))
 
   let name = "Observer"
 end
@@ -202,8 +223,13 @@ let make_committee_member coordinator_rpc_address coordinator_rpc_port
        coordinator_rpc_port
        committee_member_address)
 
-let make_observer coordinator_rpc_address coordinator_rpc_port =
-  Observer (Observer.make coordinator_rpc_address coordinator_rpc_port)
+let make_observer ~committee_rpc_addresses coordinator_rpc_address
+    coordinator_rpc_port =
+  Observer
+    (Observer.make
+       ~committee_rpc_addresses
+       coordinator_rpc_address
+       coordinator_rpc_port)
 
 let make_legacy ?coordinator_host_and_port threshold committee_members_addresses
     committee_member_address_opt =

@@ -127,7 +127,7 @@ let rpc_port_arg =
     ~default
     positive_int_parameter
 
-let coordinator_rpc_parameter =
+let raw_rpc_parameter =
   Tezos_clic.parameter (fun _cctxt h ->
       match String.split ':' h with
       | [host_name; port] -> (
@@ -140,7 +140,12 @@ let coordinator_rpc_param ?(name = "DAC coordinator rpc address parameter")
   let desc =
     String.concat "\n" [desc; "An address of the form <rpc_address>:<rpc_port>"]
   in
-  Tezos_clic.param ~name ~desc coordinator_rpc_parameter
+  Tezos_clic.param ~name ~desc raw_rpc_parameter
+
+let committee_rpc_addresses_param
+    ?(name = "DAC committee member rpc address parameter.")
+    ?(desc = "RPC address of the DAC committee member.") =
+  Tezos_clic.param ~name ~desc raw_rpc_parameter
 
 module Config_init = struct
   let create_configuration ~data_dir ~reveal_data_dir ~rpc_address ~rpc_port
@@ -262,9 +267,12 @@ module Config_init = struct
       ~desc:"Configure DAC node in observer mode."
       (args4 data_dir_arg rpc_address_arg rpc_port_arg reveal_data_dir_arg)
       (prefixes ["configure"; "as"; "observer"; "with"; "coordinator"]
-      @@ coordinator_rpc_param @@ stop)
+      @@ coordinator_rpc_param
+      @@ prefixes ["and"; "committee"; "member"; "rpc"; "addresses"]
+      @@ seq_of_param @@ committee_rpc_addresses_param)
       (fun (data_dir, rpc_address, rpc_port, reveal_data_dir)
            (coordinator_rpc_address, coordinator_rpc_port)
+           committee_rpc_addresses
            cctxt ->
         create_configuration
           ~data_dir
@@ -272,6 +280,7 @@ module Config_init = struct
           ~rpc_address
           ~rpc_port
           (Configuration.make_observer
+             ~committee_rpc_addresses
              coordinator_rpc_address
              coordinator_rpc_port)
           cctxt)
