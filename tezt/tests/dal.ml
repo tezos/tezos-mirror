@@ -2596,6 +2596,68 @@ let test_dal_node_join_topic _protocol _parameters _cryptobox _node client
   let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profile profile1) in
   event_waiter
 
+let test_dal_node_gs_topic_subscribe_and_graft _protocol _parameters _cryptobox
+    node client dal_node1 =
+  (* connect *)
+  let dal_node2 = Dal_node.create ~node ~client () in
+  let* _config_file = Dal_node.init_config dal_node2 in
+  update_known_peers dal_node2 [dal_node1] ;
+  let conn_ev_in_node1 =
+    check_new_connection_event
+      ~main_node:dal_node1
+      ~other_node:dal_node2
+      ~is_outbound:false
+  in
+  let conn_ev_in_node2 =
+    check_new_connection_event
+      ~main_node:dal_node2
+      ~other_node:dal_node1
+      ~is_outbound:true
+  in
+  let* () = Dal_node.run dal_node2 in
+  let* () = conn_ev_in_node1 and* () = conn_ev_in_node2 in
+
+  (* node1 joins topic {pkh} -> it sends subscribe messages to node2. *)
+  let pkh1 = Constant.bootstrap1.public_key_hash in
+  let profile1 = Rollup.Dal.RPC.Attestor pkh1 in
+  let* params = Rollup.Dal.Parameters.from_client client in
+  let num_slots = params.number_of_slots in
+  let peer_id1 =
+    JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
+  in
+  let peer_id2 =
+    JSON.(Dal_node.read_identity dal_node2 |-> "peer_id" |> as_string)
+  in
+
+  let event_waiter =
+    check_events_with_topic
+      ~event_with_topic:(Subscribe peer_id1)
+      dal_node2
+      ~num_slots
+      pkh1
+  in
+  let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profile profile1) in
+  let* () = event_waiter in
+
+  (* node2 joins topic {pkh} -> it sends subscribe and graft messages to
+     node1. *)
+  let event_waiter_subscribe =
+    check_events_with_topic
+      ~event_with_topic:(Subscribe peer_id2)
+      dal_node1
+      ~num_slots
+      pkh1
+  in
+  let event_waiter_graft =
+    check_events_with_topic
+      ~event_with_topic:(Graft peer_id2)
+      dal_node1
+      ~num_slots
+      pkh1
+  in
+  let* () = RPC.call dal_node2 (Rollup.Dal.RPC.patch_profile profile1) in
+  Lwt.join [event_waiter_subscribe; event_waiter_graft]
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -2693,6 +2755,10 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     "GS join topic"
     test_dal_node_join_topic
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    "GS topic subscribe and graft"
+    test_dal_node_gs_topic_subscribe_and_graft
     protocols ;
 
   (* Tests with all nodes *)

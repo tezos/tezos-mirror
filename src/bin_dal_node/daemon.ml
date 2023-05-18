@@ -240,6 +240,15 @@ let daemonize handlers =
    return_unit)
   |> lwt_map_error (List.fold_left (fun acc errs -> errs @ acc) [])
 
+let connect_gossipsub_with_p2p gs_worker transport_layer =
+  Lwt.dont_wait
+    (fun () ->
+      Gossipsub.Transport_layer_hooks.activate gs_worker transport_layer)
+    (fun exn ->
+      "[dal_node] error in Daemon.connect_gossipsub_with_p2p: "
+      ^ Printexc.to_string exn
+      |> Stdlib.failwith)
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
 *)
@@ -275,7 +284,8 @@ let run ~data_dir cctxt =
   let* rpc_server = RPC_server.(start config ctxt) in
   (* activate the p2p instance. *)
   Gossipsub.Transport_layer.activate ~additional_points:peers transport_layer ;
-  let () = Gossipsub.Transport_layer_hooks.activate gs_worker transport_layer in
+  connect_gossipsub_with_p2p gs_worker transport_layer ;
+
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () = Event.(emit rpc_server_is_ready (rpc_addr, rpc_port)) in
   (* Start daemon to resolve current protocol plugin *)

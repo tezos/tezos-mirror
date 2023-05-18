@@ -34,4 +34,4 @@ val activate :
     Transport_layer_interface.peer_metadata,
     Transport_layer_interface.connection_metadata )
   P2p.t ->
-  unit
+  unit Lwt.t
