@@ -38,7 +38,17 @@ type supported_hashes = Blake2B
 
 let raw_compare = Bytes.compare
 
-let raw_hash_encoding = Data_encoding.bytes' Hex
+let raw_hash_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        Json_only
+        Data_encoding.bytes
+        ~title:"raw_hash"
+        (fun raw_hash -> Some raw_hash)
+        (fun raw_hash -> raw_hash);
+    ]
 
 let hash_to_raw = Fun.id
 

@@ -26,7 +26,7 @@
   -open Tezos_base_test_helpers
   -open Tezos_dac_lib
   -open Octez_alcotezt)
- (modules test_certificate))
+ (modules test_certificate test_dac_plugin))
 
 (executable
  (name main)
