@@ -2688,22 +2688,8 @@ let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
     _cryptobox node client dal_node1 =
   let dal_node2 = Dal_node.create ~node ~client () in
   let* _config_file = Dal_node.init_config dal_node2 in
-  update_known_peers dal_node2 [dal_node1] ;
-  (* run dal_node2 and check "new connection" event. *)
-  let conn_ev_in_node1 =
-    check_new_connection_event
-      ~main_node:dal_node1
-      ~other_node:dal_node2
-      ~is_outbound:false
-  in
-  let conn_ev_in_node2 =
-    check_new_connection_event
-      ~main_node:dal_node2
-      ~other_node:dal_node1
-      ~is_outbound:true
-  in
-  let* () = Dal_node.run dal_node2 in
-  let* () = conn_ev_in_node1 and* () = conn_ev_in_node2 in
+  (* Connect the nodes *)
+  let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
   let peer_id =
     JSON.(Dal_node.read_identity dal_node2 |-> "peer_id" |> as_string)
   in
@@ -2726,24 +2712,10 @@ let test_dal_node_join_topic _protocol _parameters _cryptobox _node client
 
 let test_dal_node_gs_topic_subscribe_and_graft_and_publication _protocol
     parameters _cryptobox node client dal_node1 =
-  (* connect *)
   let dal_node2 = Dal_node.create ~node ~client () in
   let* _config_file = Dal_node.init_config dal_node2 in
-  update_known_peers dal_node2 [dal_node1] ;
-  let conn_ev_in_node1 =
-    check_new_connection_event
-      ~main_node:dal_node1
-      ~other_node:dal_node2
-      ~is_outbound:false
-  in
-  let conn_ev_in_node2 =
-    check_new_connection_event
-      ~main_node:dal_node2
-      ~other_node:dal_node1
-      ~is_outbound:true
-  in
-  let* () = Dal_node.run dal_node2 in
-  let* () = conn_ev_in_node1 and* () = conn_ev_in_node2 in
+  (* Connect the nodes *)
+  let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
 
   (* node1 joins topic {pkh} -> it sends subscribe messages to node2. *)
   let account1 = Constant.bootstrap1 in
