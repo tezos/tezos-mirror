@@ -2820,9 +2820,28 @@ let test_dal_node_join_topic _protocol _parameters _cryptobox _node client
   let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profile profile1) in
   event_waiter
 
-let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
-    node client dal_node1 =
-  let dal_node2 = Dal_node.create ~node ~client () in
+(** This generic test function is used to test messages exchanges between two
+    DAL nodes via the P2P/GS layers, once connections are established and topics
+    are joined.
+
+   The [mk_dal_node2] function is used to create a second DAL node. We may
+   decide to create a regular/normal or a modified dal node.
+
+   The [expect_app_notification] flag is used to tell whether we should wait for
+   the application layer of the second DAL node to be notified with received messages.
+   In case we don't expect the application layer to be notified (e.g. messages are invalid), 
+   set to [false].
+
+   The [is_first_slot_attestable] flag is used to tell whether the first slot
+   (that has been injected by this function) can be attested by the considered
+   attestor or not. In particular, it should be set to [false] if the
+   application layer of the second DAL node was not notified about the messages
+   sent by the first DAL node.
+*)
+let generic_gs_messages_exchange protocol parameters _cryptobox node client
+    dal_node1 ~mk_dal_node2 ~mk_app_notification_event ~is_first_slot_attestable
+    =
+  let* dal_node2 = mk_dal_node2 protocol parameters in
   let* _config_file = Dal_node.init_config dal_node2 in
   (* Connect the nodes *)
   let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
@@ -2880,7 +2899,7 @@ let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
         JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
   in
   let waiter_app_notifs =
-    waiter_successful_shards_app_notification
+    mk_app_notification_event
       committee
       dal_node2
       slot_commitment
@@ -2906,12 +2925,28 @@ let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
   | Not_in_committee -> Test.fail "attestor %s not in committee" account1.alias
   | Attestable_slots slots ->
       (* only slot 0 is attestable. Others are set to false. *)
-      let expected = true :: List.init (num_slots - 1) (fun _ -> false) in
+      let expected =
+        is_first_slot_attestable :: List.init (num_slots - 1) (fun _ -> false)
+      in
       Check.(
         (expected = slots)
           (list bool)
           ~error_msg:"Expected %L attestable slots list flags, got %R") ;
       unit
+
+let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
+    node client dal_node1 =
+  generic_gs_messages_exchange
+    _protocol
+    parameters
+    _cryptobox
+    node
+    client
+    dal_node1
+    ~mk_dal_node2:(fun _protocol _parameters ->
+      Dal_node.create ~node ~client () |> return)
+    ~mk_app_notification_event:waiter_successful_shards_app_notification
+    ~is_first_slot_attestable:true
 
 let register ~protocols =
   (* Tests with Layer1 node only *)
