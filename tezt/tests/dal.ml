@@ -2664,6 +2664,26 @@ let check_message_notified_to_app_event dal_node ~from_shard ~to_shard
       if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
       else None)
 
+(** Add [dal_node1]'s P2P point to [dal_node2], start [dal_node2] and wait until
+    a p2p connection is established between the two nodes. *)
+let connect_nodes_via_p2p dal_node1 dal_node2 =
+  update_known_peers dal_node2 [dal_node1] ;
+  let conn_ev_in_node1 =
+    check_new_connection_event
+      ~main_node:dal_node1
+      ~other_node:dal_node2
+      ~is_outbound:false
+  in
+  let conn_ev_in_node2 =
+    check_new_connection_event
+      ~main_node:dal_node2
+      ~other_node:dal_node1
+      ~is_outbound:true
+  in
+  let* () = Dal_node.run dal_node2 in
+  let* () = conn_ev_in_node1 and* () = conn_ev_in_node2 in
+  unit
+
 let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
     _cryptobox node client dal_node1 =
   let dal_node2 = Dal_node.create ~node ~client () in
