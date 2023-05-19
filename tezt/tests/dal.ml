@@ -2958,14 +2958,17 @@ let register ~protocols =
 
   (* Tests with layer1 and dal nodes (with p2p/GS) *)
   scenario_with_layer1_and_dal_nodes
+    ~tags:["gossipsub"]
     "GS/P2P connection and disconnection"
     test_dal_node_p2p_connection_and_disconnection
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~tags:["gossipsub"]
     "GS join topic"
     test_dal_node_join_topic
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~tags:["gossipsub"]
     "GS valid messages exchange"
     test_dal_node_gs_valid_messages_exchange
     protocols ;
