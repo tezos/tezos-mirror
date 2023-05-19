@@ -66,6 +66,16 @@ pub enum EthereumError {
     /// call itself got too much gas
     #[error("Gas limit overflow: {0}")]
     GasLimitOverflow(U256),
+    /// The transaction stack has an unexpected size.
+    ///  - First element tells the stack size at time of error.
+    ///  - Second element telss if the error happened when we were expecting to deal
+    ///    beginning or end of the initial transaction.
+    ///  - The last element tells if the error happended at the beginning of a transaction
+    ///    (if false, this happened at the commit or rollback of the transaction).
+    #[error(
+        "Inconsistent transaction stack: depth is {0}, is_initial is {1}, is_begin is {2}"
+    )]
+    InconsistentTransactionStack(usize, bool, bool),
 }
 
 impl From<ExitError> for EthereumError {
@@ -219,7 +229,7 @@ mod test {
             callee,
             caller,
             call_data,
-            None,
+            Some(22000),
             Some(transaction_value),
         );
 
@@ -275,7 +285,7 @@ mod test {
             callee,
             caller,
             call_data,
-            None,
+            Some(21000),
             Some(transaction_value),
         );
 
@@ -688,6 +698,62 @@ mod test {
         });
 
         assert_eq!(expected_result, result);
+    }
+
+    #[test]
+    fn no_transfer_when_contract_call_fails() {
+        let mut mock_runtime = MockHost::default();
+        let block = BlockConstants::first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+        let caller = H160::from_low_u64_be(118_u64);
+
+        let address = H160::from_low_u64_be(117_u64);
+        let input = vec![0_u8];
+        let code: Vec<u8> = vec![
+            Opcode::PUSH1.as_u8(),
+            0u8,
+            Opcode::PUSH1.as_u8(),
+            0u8,
+            Opcode::INVALID.as_u8(),
+        ];
+
+        set_account_code(&mut mock_runtime, &mut evm_account_storage, &address, &code);
+        set_balance(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &caller,
+            U256::from(101_u32),
+        );
+
+        let result = run_transaction(
+            &mut mock_runtime,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            address,
+            caller,
+            input,
+            None,
+            Some(U256::from(100)),
+        );
+
+        let expected_result = Ok(ExecutionOutcome {
+            gas_used: 0,
+            is_success: false,
+            new_address: None,
+            logs: vec![],
+        });
+
+        assert_eq!(expected_result, result);
+        assert_eq!(
+            get_balance(&mut mock_runtime, &mut evm_account_storage, &caller),
+            U256::from(101_u32)
+        );
+        assert_eq!(
+            get_balance(&mut mock_runtime, &mut evm_account_storage, &address),
+            U256::zero()
+        );
     }
 
     #[test]
