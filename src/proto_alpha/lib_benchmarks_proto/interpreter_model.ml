@@ -494,8 +494,8 @@ let ir_model instr_or_cont =
       | N_IMul_bls12_381_fr_z | N_IMul_bls12_381_z_fr
       | N_IPairing_check_bls12_381 ->
           affine_model name |> m
-      | N_IComb -> affine_offset_model name ~offset:2 |> m
-      | N_IComb_get | N_IComb_set | N_IUncomb -> affine_model name |> m
+      | N_IComb | N_IUncomb -> affine_offset_model name ~offset:2 |> m
+      | N_IComb_get | N_IComb_set -> affine_model name |> m
       | N_ITicket | N_IRead_ticket -> const1_model name |> m
       | N_ISplit_ticket -> linear_max_model name |> m
       | N_IJoin_tickets -> join_tickets_model name |> m
