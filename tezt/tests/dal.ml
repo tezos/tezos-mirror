@@ -2638,6 +2638,73 @@ let check_events_with_message ~event_with_message dal_node ~from_shard ~to_shard
       if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
       else None)
 
+type event_with_message_id = IHave of {pkh : string; slot_index : int} | IWant
+
+let event_with_message_id_to_string = function
+  | IHave _ -> "ihave"
+  | IWant -> "iwant"
+
+(** This function monitors the Gossipsub worker events whose name is given by
+    [event_with_message_id]. It's somehow similar to function
+    {!check_events_with_message}, but for IHave and IWant messages' events. *)
+let check_events_with_message_id ~event_with_message_id dal_node ~from_shard
+    ~to_shard ~expected_commitment ~expected_level ~expected_pkh ~expected_slot
+    ~expected_peer =
+  let remaining = ref (to_shard - from_shard + 1) in
+  let seen = Array.make !remaining false in
+  let get_shard_indices_of_messages event =
+    let*?? () =
+      check_expected expected_peer JSON.(event |-> "peer" |> as_string)
+    in
+    let*?? () =
+      match event_with_message_id with
+      | IWant -> Some ()
+      | IHave {pkh; slot_index} ->
+          let topic = JSON.(event |-> "topic") in
+          let*?? () = check_expected pkh expected_pkh in
+          let*?? () = check_expected pkh JSON.(topic |-> "pkh" |> as_string) in
+          check_expected slot_index JSON.(topic |-> "slot_index" |> as_int)
+    in
+    let message_ids = JSON.(event |-> "message_ids" |> as_list) in
+    Option.some
+    @@ List.map
+         (fun id ->
+           let level = JSON.(id |-> "level" |> as_int) in
+           let slot_index = JSON.(id |-> "slot_index" |> as_int) in
+           let shard_index = JSON.(id |-> "shard_index" |> as_int) in
+           let pkh = JSON.(id |-> "pkh" |> as_string) in
+           let commitment = JSON.(id |-> "commitment" |> as_string) in
+           let*?? () = check_expected expected_pkh pkh in
+           let*?? () = check_expected expected_level level in
+           let*?? () = check_expected expected_slot slot_index in
+           let*?? () = check_expected expected_commitment commitment in
+           Some shard_index)
+         message_ids
+  in
+  wait_for_gossipsub_worker_event
+    ~name:(event_with_message_id_to_string event_with_message_id)
+    dal_node
+    (fun event ->
+      let*?? shard_indices = get_shard_indices_of_messages event in
+      List.iter
+        (fun shard_index_opt ->
+          match shard_index_opt with
+          | None -> ()
+          | Some shard_index ->
+              let index = shard_index - from_shard in
+              Check.(
+                (seen.(index) = false)
+                  bool
+                  ~error_msg:
+                    (sf
+                       "Shard_index %d already seen. Invariant broken"
+                       shard_index)) ;
+              seen.(index) <- true ;
+              decr remaining)
+        shard_indices ;
+      if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
+      else None)
+
 (** This function is quite similar to those above, except that it checks that a
     range of messages (shards) on a tracked topic have been notified by GS to
     the DAL node. This is typically needed to then be able to attest slots. *)
