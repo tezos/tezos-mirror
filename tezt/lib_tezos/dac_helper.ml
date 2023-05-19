@@ -157,36 +157,12 @@ let with_legacy_dac_node ?name ?sc_rollup_node ?(pvm_name = "arith")
   f dac_node committee_members
 
 let with_coordinator_node ?name ?sc_rollup_node ?(pvm_name = "arith")
-    ?(wait_ready = true) ?(custom_committee_members = []) ~committee_size
-    tezos_node tezos_client f =
-  let range i = List.init i Fun.id in
+    ?(wait_ready = true) ~committee_members tezos_node tezos_client f =
   let reveal_data_dir =
     Option.map
       (fun sc_rollup_node ->
         Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
       sc_rollup_node
-  in
-  let* committee_members =
-    List.fold_left
-      (fun keys i ->
-        let* keys in
-        let* key =
-          Client.bls_gen_and_show_keys
-            ~alias:(Format.sprintf "committee-member-%d" i)
-            tezos_client
-        in
-        return (key :: keys))
-      (return [])
-      (range committee_size)
-  in
-  let* () =
-    Lwt_list.iter_s
-      (fun (aggregate_key : Account.aggregate_key) ->
-        Client.bls_import_secret_key aggregate_key tezos_client)
-      custom_committee_members
-  in
-  let committee_members =
-    List.append committee_members custom_committee_members
   in
   let dac_node =
     Dac_node.create_coordinator
@@ -196,7 +172,7 @@ let with_coordinator_node ?name ?sc_rollup_node ?(pvm_name = "arith")
       ?reveal_data_dir
       ~committee_members:
         (List.map
-           (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key_hash)
+           (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key)
            committee_members)
       ()
   in
@@ -298,13 +274,39 @@ let scenario_with_full_dac_infrastructure ?(tags = ["dac"; "full"])
       @@ fun node client key ->
       with_fresh_rollup ~protocol ~pvm_name node client key
       @@ fun sc_rollup_address sc_rollup_node ->
+      let range i = List.init i Fun.id in
+      let* committee_members =
+        List.fold_left
+          (fun keys i ->
+            let* keys in
+            let* key =
+              Client.bls_gen_and_show_keys
+                ~alias:(Format.sprintf "committee-member-%d" i)
+                client
+            in
+            return (key :: keys))
+          (return [])
+          (range committee_size)
+      in
+      let* () =
+        Lwt_list.iter_s
+          (fun (aggregate_key : Account.aggregate_key) ->
+            Client.bls_import_secret_key aggregate_key client)
+          custom_committee_members
+      in
+      let committee_members =
+        List.append committee_members custom_committee_members
+      in
+      (* Use a fresh tezos client for the coordinator. This is needed to make
+         sure that the coordinator does not have access to the secret keys of
+         the coordinator stored in the wallet directory of [client]. *)
+      let* coordinator_wallet_client = Client.init () in
       with_coordinator_node
         node
-        client
+        coordinator_wallet_client
         ~name:"coordinator"
         ~pvm_name
-        ~custom_committee_members
-        ~committee_size
+        ~committee_members
       @@ fun coordinator_node committee_members ->
       let committee_members_nodes =
         List.mapi

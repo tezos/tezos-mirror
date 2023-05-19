@@ -69,8 +69,7 @@ val with_coordinator_node :
   ?sc_rollup_node:Sc_rollup_node.t ->
   ?pvm_name:string ->
   ?wait_ready:bool ->
-  ?custom_committee_members:Account.aggregate_key list ->
-  committee_size:int ->
+  committee_members:Account.aggregate_key list ->
   Node.t ->
   Client.t ->
   (Dac_node.t -> Account.aggregate_key list -> 'a Lwt.t) ->

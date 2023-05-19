@@ -27,23 +27,18 @@
     wallets exclusive to [Coordinator] nodes. *)
 module Coordinator : sig
   (** The type of an account wallet for [Coordinator] nodes. An account wallet
-      contains the public key hash and an optional public key for each account
-      wallet. [Coordinator] nodes can operate even if the public key of a
-      committee member is not defined. Secret keys URIs are not included in
-      [Coordinator] account wallets, as [Coordinator] nodes never sign any
-      data. *)
+      contains the public key hash and a public key for each account
+      wallet. Secret keys URIs are not included in [Coordinator] account
+      wallets, as [Coordinator] nodes never sign any data. *)
   type t = {
     public_key_hash : Tezos_crypto.Aggregate_signature.public_key_hash;
-    public_key_opt : Tezos_crypto.Aggregate_signature.public_key option;
+    public_key : Tezos_crypto.Aggregate_signature.public_key;
   }
 
-  (** [of_committee_member_address pkh wallet_cctxt] constructs a value of
-      type [Coordinator.t] from the public key hash [pkh], by using the wallet
-      context [wallet_cctxt]. *)
-  val of_committee_member_address :
-    Tezos_crypto.Aggregate_signature.public_key_hash ->
-    #Client_context.wallet ->
-    t tzresult Lwt.t
+  (** [of_committee_member_public_key public_key] constructs a value of
+      type [Coordinator.t] from the public key [public_key]. *)
+  val of_committee_member_public_key :
+    Tezos_crypto.Aggregate_signature.public_key -> t tzresult Lwt.t
 end
 
 (** Module containing the definition of account wallet and functions operating

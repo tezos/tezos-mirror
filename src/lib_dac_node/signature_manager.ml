@@ -307,8 +307,8 @@ let check_coordinator_knows_root_hash dac_plugin page_store root_hash =
   | Ok false -> raise Not_found
   | Ok true -> return ()
 
-let should_update_certificate dac_plugin cctxt ro_node_store committee_members
-    Signature_repr.{signer_pkh; root_hash; signature} =
+let should_update_certificate dac_plugin get_public_key_opt ro_node_store
+    committee_members Signature_repr.{signer_pkh; root_hash; signature} =
   let open Lwt_result_syntax in
   let ((module Plugin) : Dac_plugin.t) = dac_plugin in
   let*? root_hash = Dac_plugin.raw_to_hash dac_plugin root_hash in
@@ -317,7 +317,7 @@ let should_update_certificate dac_plugin cctxt ro_node_store committee_members
       (check_is_dac_member committee_members signer_pkh)
       (Public_key_is_non_committee_member signer_pkh)
   in
-  let* pub_key_opt = Wallet_cctxt_helpers.get_public_key cctxt signer_pkh in
+  let pub_key_opt = get_public_key_opt signer_pkh in
   let* pub_key =
     Option.fold_f
       ~none:(fun () ->
@@ -355,9 +355,9 @@ let stream_certificate_update dac_plugin committee_members certificate
     return ()
   else return ()
 
-let handle_put_dac_member_signature dac_plugin certificate_streamers_opt
-    rw_node_store page_store cctxt committee_members committee_member_signature
-    =
+let handle_put_dac_member_signature dac_plugin get_public_key_opt
+    certificate_streamers_opt rw_node_store page_store committee_members
+    committee_member_signature =
   let open Lwt_result_syntax in
   let ((module Plugin) : Dac_plugin.t) = dac_plugin in
   let Signature_repr.{root_hash = raw_root_hash; _} =
@@ -368,7 +368,7 @@ let handle_put_dac_member_signature dac_plugin certificate_streamers_opt
   let* should_update_certificate =
     should_update_certificate
       dac_plugin
-      cctxt
+      get_public_key_opt
       rw_node_store
       committee_members
       committee_member_signature
@@ -397,14 +397,24 @@ let handle_put_dac_member_signature dac_plugin certificate_streamers_opt
 
 module Coordinator = struct
   let handle_put_dac_member_signature ctx dac_plugin rw_node_store page_store
-      cctxt dac_member_signature =
+      dac_member_signature =
     let committee_members = Node_context.Coordinator.committee_members ctx in
+    let get_public_key_opt committee_member_address =
+      List.find_map
+        (fun Wallet_account.Coordinator.{public_key_hash; public_key} ->
+          if
+            Tezos_crypto.Aggregate_signature.Public_key_hash.(
+              committee_member_address <> public_key_hash)
+          then None
+          else Some public_key)
+        ctx.committee_members
+    in
     handle_put_dac_member_signature
       dac_plugin
+      get_public_key_opt
       (Some ctx.certificate_streamers)
       rw_node_store
       page_store
-      cctxt
       committee_members
       dac_member_signature
 end
@@ -432,14 +442,24 @@ module Legacy = struct
         | Some signature -> return @@ (signature, witnesses))
 
   let handle_put_dac_member_signature ctx dac_plugin rw_node_store page_store
-      cctxt dac_member_signature =
+      dac_member_signature =
     let committee_members = Node_context.Legacy.committee_members ctx in
+    let get_public_key_opt committee_member_address =
+      List.find_map
+        (fun Wallet_account.Legacy.{public_key_hash; public_key_opt; _} ->
+          if
+            Tezos_crypto.Aggregate_signature.Public_key_hash.(
+              committee_member_address <> public_key_hash)
+          then None
+          else public_key_opt)
+        ctx.committee_members
+    in
     handle_put_dac_member_signature
       dac_plugin
+      get_public_key_opt
       None
       rw_node_store
       page_store
-      cctxt
       committee_members
       dac_member_signature
 end

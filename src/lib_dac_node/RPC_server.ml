@@ -307,7 +307,7 @@ module Coordinator = struct
         handle_post_preimage dac_plugin page_store hash_streamer payload)
 
   let register_put_dac_member_signature ctx dac_plugin rw_node_store page_store
-      cctxt =
+      =
     add_service
       Tezos_rpc.Directory.register0
       RPC_services.V0.put_dac_member_signature
@@ -317,11 +317,9 @@ module Coordinator = struct
           dac_plugin
           rw_node_store
           page_store
-          cctxt
           dac_member_signature)
 
-  let dynamic_rpc_dir dac_plugin rw_store page_store cctxt coordinator_node_ctxt
-      =
+  let dynamic_rpc_dir dac_plugin rw_store page_store coordinator_node_ctxt =
     let hash_streamer =
       coordinator_node_ctxt.Node_context.Coordinator.hash_streamer
     in
@@ -341,7 +339,6 @@ module Coordinator = struct
          dac_plugin
          rw_store
          page_store
-         cctxt
     |> register_get_certificate rw_store dac_plugin
 end
 
@@ -359,7 +356,7 @@ end
 
 module Legacy = struct
   let register_put_dac_member_signature ctx dac_plugin rw_node_store page_store
-      cctxt =
+      =
     add_service
       Tezos_rpc.Directory.register0
       RPC_services.V0.put_dac_member_signature
@@ -369,7 +366,6 @@ module Legacy = struct
           dac_plugin
           rw_node_store
           page_store
-          cctxt
           dac_member_signature)
 
   let dynamic_rpc_dir dac_plugin rw_store page_store cctxt legacy_node_ctxt =
@@ -402,7 +398,6 @@ module Legacy = struct
          dac_plugin
          rw_store
          page_store
-         cctxt
     |> register_get_certificate rw_store dac_plugin
     |> register_get_missing_page
 end
@@ -419,7 +414,6 @@ let start ~rpc_address ~rpc_port node_ctxt =
           dac_plugin
           rw_store
           page_store
-          cctxt
           coordinator_node_ctxt
     | Committee_member _committee_member_node_ctxt ->
         Committee_member.dynamic_rpc_dir dac_plugin page_store
