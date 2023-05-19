@@ -3,16 +3,14 @@
 // SPDX-License-Identifier: MIT
 #![allow(dead_code)]
 
+use hex::ToHex;
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 
-use std::str::from_utf8;
-
 use crate::error::{Error, StorageError};
 use tezos_ethereum::block::L2Block;
-use tezos_ethereum::eth_gen::Hash;
 use tezos_ethereum::transaction::{
     TransactionHash, TransactionReceipt, TransactionStatus, TRANSACTION_HASH_SIZE,
 };
@@ -118,13 +116,6 @@ fn write_u256(
     host.store_write(path, &bytes, 0).map_err(Error::from)
 }
 
-fn address_path(address: Hash) -> Result<OwnedPath, Error> {
-    let address: &str =
-        from_utf8(address).map_err(crate::error::TransferError::InvalidAddressFormat)?;
-    let address_path: Vec<u8> = format!("/{}", &address.to_ascii_lowercase()).into();
-    OwnedPath::try_from(address_path).map_err(Error::from)
-}
-
 pub fn block_path(number: U256) -> Result<OwnedPath, Error> {
     let number: &str = &number.to_string();
     let raw_number_path: Vec<u8> = format!("/{}", &number).into();
@@ -176,7 +167,7 @@ pub fn read_current_block<Host: Runtime>(host: &mut Host) -> Result<L2Block, Err
             debug_msg!(
                 host,
                 "Reading block {} at number {} containing {} transaction(s).\n",
-                String::from_utf8(block.hash.as_bytes().to_vec()).expect("INVALID HASH"),
+                block.hash.as_bytes().encode_hex::<String>(),
                 block.number,
                 block.transactions.len()
             );
@@ -260,7 +251,7 @@ pub fn store_current_block<Host: Runtime>(
             debug_msg!(
                 host,
                 "Storing block {} at number {} containing {} transaction(s).\n",
-                String::from_utf8(block.hash.as_bytes().to_vec()).expect("INVALID HASH"),
+                block.hash.as_bytes().encode_hex::<String>(),
                 block.number,
                 block.transactions.len()
             );
