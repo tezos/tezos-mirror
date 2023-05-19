@@ -3061,7 +3061,8 @@ let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
     ~expect_app_notification
     ~is_first_slot_attestable
 
-let test_gs_prune protocol parameters _cryptobox node client dal_node1 =
+let test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
+    dal_node1 =
   let rec repeat_i n f =
     if n <= 0 then unit
     else
@@ -3113,6 +3114,9 @@ let test_gs_prune protocol parameters _cryptobox node client dal_node1 =
   (* The two nodes join the same topics *)
   let* () = nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 in
 
+  let peer_id1 =
+    JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
+  in
   let peer_id2 =
     JSON.(Dal_node.read_identity dal_node2 |-> "peer_id" |> as_string)
   in
@@ -3130,6 +3134,63 @@ let test_gs_prune protocol parameters _cryptobox node client dal_node1 =
   (* We bake a block and wait for the prune events. *)
   let* () = Client.bake_for_and_wait client in
   let* () = event_waiter_prune in
+
+  (* Now, we'll inject a new slot for the next published_level in
+     dal_node1. Since it's pruned, dal_node2 will be notified via IHave
+     messages, to which it will respond by IWant messages. *)
+  let* slot_index, commitment =
+    publish_and_store_slot
+      ~with_proof:true
+      node
+      client
+      dal_node1
+      ~slot_size
+      account1
+      0
+      slot_content
+  in
+
+  let publish_level = Node.get_level node + 1 in
+  let attested_level = publish_level + parameters.attestation_lag in
+  let* committee = Rollup.Dal.Committee.at_level node ~level:attested_level in
+
+  let Rollup.Dal.Committee.{attestor; first_shard_index; power} =
+    match
+      List.find
+        (fun Rollup.Dal.Committee.{attestor; _} -> attestor = pkh1)
+        committee
+    with
+    | {attestor; first_shard_index; power} ->
+        {attestor; first_shard_index; power}
+    | exception Not_found ->
+        Test.fail "Should not happen as %s is part of the committee" pkh1
+  in
+  let iwant_events_waiter =
+    check_events_with_message_id
+      ~event_with_message_id:IWant
+      dal_node1
+      ~from_shard:first_shard_index
+      ~to_shard:(first_shard_index + power - 1)
+      ~expected_commitment:commitment
+      ~expected_level:publish_level
+      ~expected_pkh:attestor
+      ~expected_slot:slot_index
+      ~expected_peer:peer_id2
+  in
+  let ihave_events_waiter =
+    check_events_with_message_id
+      ~event_with_message_id:(IHave {pkh = pkh1; slot_index = 0})
+      dal_node2
+      ~from_shard:first_shard_index
+      ~to_shard:(first_shard_index + power - 1)
+      ~expected_commitment:commitment
+      ~expected_level:publish_level
+      ~expected_pkh:attestor
+      ~expected_slot:slot_index
+      ~expected_peer:peer_id1
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* () = iwant_events_waiter and* () = ihave_events_waiter in
   unit
 
 let register ~protocols =
@@ -3244,8 +3305,8 @@ let register ~protocols =
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["gossipsub"]
-    "GS prune due to negative score"
-    test_gs_prune
+    "GS prune due to negative score, ihave and iwant"
+    test_gs_prune_ihave_and_iwant
     protocols ;
 
   (* Tests with all nodes *)
