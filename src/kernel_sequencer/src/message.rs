@@ -8,7 +8,7 @@ use tezos_data_encoding::{
     enc::{self, BinResult, BinWriter},
     nom::{NomReader, NomResult},
 };
-use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
+use tezos_smart_rollup_encoding::{public_key::PublicKey, smart_rollup::SmartRollupAddress};
 
 /// Framing protocol v0
 ///
@@ -41,9 +41,22 @@ pub struct Sequence {
     signature: Signature,
 }
 
+/// Message to set the appropriate sequencer
+///
+/// This message should be sent by the admin public key
+/// This admin key should sign the new sequencer public key
+#[derive(NomReader, BinWriter, Clone, Debug, PartialEq, Eq)]
+pub struct SetSequencer {
+    nonce: u32,
+    admin_public_key: PublicKey,
+    sequencer_public_key: PublicKey,
+    signature: Signature,
+}
+
 #[derive(NomReader, BinWriter, Debug, Clone, Eq, PartialEq)]
 pub enum SequencerMsg {
     Sequence(Sequence),
+    SetSequencer(SetSequencer),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -117,6 +130,7 @@ mod tests {
     use crate::message::{Framed, SequencerMsg};
 
     use super::{KernelMessage, Sequence};
+    use crate::message::SetSequencer;
     use tezos_crypto_rs::hash::{SecretKeyEd25519, SeedEd25519};
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::nom::NomReader;
@@ -153,6 +167,35 @@ mod tests {
         // Serializing
         let mut bin: Vec<u8> = Vec::new();
         sequence.bin_write(&mut bin).unwrap();
+
+        // Deserializing
+        let (_, msg_read) = KernelMessage::nom_read(&bin).expect("deserialization should work");
+
+        assert_eq!(msg_read, sequence);
+    }
+
+    #[test]
+    fn test_set_sequencer_serialization() {
+        let (public_key, secret) =
+            key_pair("edsk3a5SDDdMWw3Q5hPiJwDXUosmZMTuKQkriPqY6UqtSfdLifpZbB");
+        let signature = secret.sign([0x0]).expect("sign should work");
+
+        let sequence = KernelMessage::Sequencer(Framed {
+            destination: SmartRollupAddress::from_b58check("sr1EzLeJYWrvch2Mhvrk1nUVYrnjGQ8A4qdb")
+                .expect("decoding should work"),
+            payload: SequencerMsg::SetSequencer(SetSequencer {
+                nonce: 0,
+                admin_public_key: public_key.clone(),
+                sequencer_public_key: public_key,
+                signature,
+            }),
+        });
+
+        // Serializing
+        let mut bin: Vec<u8> = Vec::new();
+        sequence.bin_write(&mut bin).unwrap();
+
+        println!("{:?}", bin);
 
         // Deserializing
         let (_, msg_read) = KernelMessage::nom_read(&bin).expect("deserialization should work");
