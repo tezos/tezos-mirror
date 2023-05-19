@@ -1404,7 +1404,7 @@ module Full_infrastructure = struct
           "Raw certificate does not match the expected one: Actual = %L <> %R \
            = Expected")
 
-  let test_client
+  let test_client ~send_payload_from_file
       Scenarios.
         {
           coordinator_node;
@@ -1474,10 +1474,18 @@ module Full_infrastructure = struct
     (* 2. Dac client posts a preimage to coordinator, and waits for all
           committee members to sign. *)
     let* client_sends_payload_output =
-      Dac_client.send_payload
-        coordinator_client
-        (Hex.of_string payload)
-        ~threshold:(List.length committee_members)
+      if send_payload_from_file then
+        let filename = Temp.file "dac_payload" in
+        let () = write_file filename ~contents:payload in
+        Dac_client.send_payload_from_file
+          coordinator_client
+          filename
+          ~threshold:(List.length committee_members)
+      else
+        Dac_client.send_hex_payload
+          coordinator_client
+          (Hex.of_string payload)
+          ~threshold:(List.length committee_members)
     in
     let last_certificate_update =
       match client_sends_payload_output with
@@ -2580,8 +2588,16 @@ let register ~protocols =
     ~observers:0
     ~committee_size:2
     ~tags:["dac"; "dac_node"]
-    "test client commands"
-    Full_infrastructure.test_client
+    "test client commands (hex payload from CLI)"
+    (Full_infrastructure.test_client ~send_payload_from_file:false)
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:0
+    ~committee_size:2
+    ~tags:["dac"; "dac_node"]
+    "test client commands (binary payload from file)"
+    (Full_infrastructure.test_client ~send_payload_from_file:true)
     protocols ;
   Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_synced_with_dac protocols ;
   Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_missing_pages protocols
