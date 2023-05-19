@@ -60,6 +60,9 @@ let regression_test ~__FILE__ ?(tags = []) title f =
 let dal_enable_param dal_enable =
   make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
 
+let redundancy_factor_param redundancy_factor =
+  make_int_parameter ["dal_parametric"; "redundancy_factor"] redundancy_factor
+
 (* Some initialization functions to start needed nodes. *)
 
 let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 5)
@@ -2839,8 +2842,7 @@ let test_dal_node_join_topic _protocol _parameters _cryptobox _node client
    sent by the first DAL node.
 *)
 let generic_gs_messages_exchange protocol parameters _cryptobox node client
-    dal_node1 ~mk_dal_node2 ~mk_app_notification_event ~is_first_slot_attestable
-    =
+    dal_node1 ~mk_dal_node2 ~expect_app_notification ~is_first_slot_attestable =
   let* dal_node2 = mk_dal_node2 protocol parameters in
   let* _config_file = Dal_node.init_config dal_node2 in
   (* Connect the nodes *)
@@ -2899,13 +2901,15 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
         JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
   in
   let waiter_app_notifs =
-    mk_app_notification_event
-      committee
-      dal_node2
-      slot_commitment
-      ~publish_level
-      ~slot_index
-      ~pkh:pkh1
+    if expect_app_notification then
+      waiter_successful_shards_app_notification
+        committee
+        dal_node2
+        slot_commitment
+        ~publish_level
+        ~slot_index
+        ~pkh:pkh1
+    else unit
   in
 
   (* We bake a block that includes [slot_header] operation. *)
@@ -2945,8 +2949,43 @@ let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
     dal_node1
     ~mk_dal_node2:(fun _protocol _parameters ->
       Dal_node.create ~node ~client () |> return)
-    ~mk_app_notification_event:waiter_successful_shards_app_notification
+    ~expect_app_notification:true
     ~is_first_slot_attestable:true
+
+let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
+    node client dal_node1 =
+  (* Create a non-compatible DAL node. *)
+  let mk_dal_node2 protocol parameters =
+    (* Create another L1 node with different DAL parameters. *)
+    let* node2, client2, _xdal_parameters2 =
+      let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
+      let parameters =
+        dal_enable_param (Some true)
+        @ redundancy_factor_param (Some (2 * crypto_params.redundancy_factor))
+      in
+      setup_node ~protocol ~parameters ()
+    in
+    (* Create a second DAL node with node2 and client2 as argument (so different
+       DAL parameters compared to dal_node1. *)
+    let dal_node2 = Dal_node.create ~node:node2 ~client:client2 () in
+    return dal_node2
+  in
+  (* Messages are invalid, so the app layer is not notified. *)
+  let expect_app_notification = false in
+  (* The first slot published by [generic_gs_messages_exchange] is not
+     attestable by the considered attestor pk1 = bootstrap1, because the shards
+     received by the Gossipsub layer are classified as 'Invalid'. *)
+  let is_first_slot_attestable = false in
+  generic_gs_messages_exchange
+    _protocol
+    parameters
+    _cryptobox
+    node
+    client
+    dal_node1
+    ~mk_dal_node2
+    ~expect_app_notification
+    ~is_first_slot_attestable
 
 let register ~protocols =
   (* Tests with Layer1 node only *)
@@ -3052,6 +3091,11 @@ let register ~protocols =
     ~tags:["gossipsub"]
     "GS valid messages exchange"
     test_dal_node_gs_valid_messages_exchange
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["gossipsub"]
+    "GS invalid messages exchange"
+    test_dal_node_gs_invalid_messages_exchange
     protocols ;
 
   (* Tests with all nodes *)
