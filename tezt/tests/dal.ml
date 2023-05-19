@@ -2684,6 +2684,49 @@ let connect_nodes_via_p2p dal_node1 dal_node2 =
   let* () = conn_ev_in_node1 and* () = conn_ev_in_node2 in
   unit
 
+(** This helper function makes the nodes [dal_node1] and [dal_node2] join the
+    topics of the attestor [pkh], by calling the RPC for tracking the corresponding profile.
+    The second node calls the RPC only after receiving the Subscribe messages
+    from the first node, so that when it joins the topics, it also sends Graft messages
+    in addition to sending Subscribe messages. *)
+let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
+  let profile1 = Rollup.Dal.RPC.Attestor pkh1 in
+  let peer_id1 =
+    JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
+  in
+  let peer_id2 =
+    JSON.(Dal_node.read_identity dal_node2 |-> "peer_id" |> as_string)
+  in
+  (* node1 joins topic {pkh} -> it sends subscribe messages to node2. *)
+  let event_waiter =
+    check_events_with_topic
+      ~event_with_topic:(Subscribe peer_id1)
+      dal_node2
+      ~num_slots
+      pkh1
+  in
+  let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profile profile1) in
+  let* () = event_waiter in
+
+  (* node2 joins topic {pkh} -> it sends subscribe and graft messages to
+     node1. *)
+  let event_waiter_subscribe =
+    check_events_with_topic
+      ~event_with_topic:(Subscribe peer_id2)
+      dal_node1
+      ~num_slots
+      pkh1
+  in
+  let event_waiter_graft =
+    check_events_with_topic
+      ~event_with_topic:(Graft peer_id2)
+      dal_node1
+      ~num_slots
+      pkh1
+  in
+  let* () = RPC.call dal_node2 (Rollup.Dal.RPC.patch_profile profile1) in
+  Lwt.join [event_waiter_subscribe; event_waiter_graft]
+
 let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
     _cryptobox node client dal_node1 =
   let dal_node2 = Dal_node.create ~node ~client () in
