@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -22,7 +23,7 @@ pub fn read_input<Host: Runtime>(
 ) -> Result<Option<Message>, RuntimeError> {
     let RollupMetadata {
         raw_rollup_address, ..
-    } = host.reveal_metadata()?;
+    } = host.reveal_metadata();
     loop {
         let msg = host.read_input()?;
         match msg {

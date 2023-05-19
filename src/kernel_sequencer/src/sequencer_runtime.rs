@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -124,7 +125,7 @@ where
         self.host.mark_for_reboot()
     }
 
-    fn reveal_metadata(&self) -> Result<RollupMetadata, RuntimeError> {
+    fn reveal_metadata(&self) -> RollupMetadata {
         self.host.reveal_metadata()
     }
 

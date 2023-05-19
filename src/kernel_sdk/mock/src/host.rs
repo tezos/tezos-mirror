@@ -302,7 +302,7 @@ mod tests {
         let mock_host = MockHost::from(state); // Act
 
         // Act
-        let result = mock_host.reveal_metadata().unwrap();
+        let result = mock_host.reveal_metadata();
 
         // Assert
         assert_eq!(expected_metadata, result);

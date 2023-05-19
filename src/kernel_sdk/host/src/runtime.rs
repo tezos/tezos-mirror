@@ -187,7 +187,7 @@ pub trait Runtime {
     fn mark_for_reboot(&mut self) -> Result<(), RuntimeError>;
 
     /// Returns [RollupMetadata]
-    fn reveal_metadata(&self) -> Result<RollupMetadata, RuntimeError>;
+    fn reveal_metadata(&self) -> RollupMetadata;
 
     /// True if the last kernel run was aborted.
     fn last_run_aborted(&self) -> Result<bool, RuntimeError>;
@@ -444,7 +444,7 @@ where
         }
     }
 
-    fn reveal_metadata(&self) -> Result<RollupMetadata, RuntimeError> {
+    fn reveal_metadata(&self) -> RollupMetadata {
         let mut destination = [0u8; METADATA_SIZE];
         let res = unsafe {
             SmartRollupCore::reveal_metadata(
@@ -453,10 +453,13 @@ where
                 destination.len(),
             )
         };
-        match Error::wrap(res) {
-            Ok(_) => Ok(RollupMetadata::from(destination)),
-            Err(e) => Err(RuntimeError::HostErr(e)),
-        }
+
+        // Revealing metadata should always succeed
+        debug_assert!(res == METADATA_SIZE as i32, "SDK_ERROR: Revealing metadata always succeeds. \
+                                             If you see this message, please report it to the \
+                                             SDK developers at https://gitlab.com/tezos/tezos");
+
+        RollupMetadata::from(destination)
     }
 
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
@@ -961,7 +964,7 @@ mod tests {
             });
 
         // Act
-        let result = mock.reveal_metadata().unwrap();
+        let result = mock.reveal_metadata();
 
         // Assert
         assert_eq!(expected_metadata, result);
