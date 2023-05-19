@@ -2753,8 +2753,8 @@ let test_dal_node_join_topic _protocol _parameters _cryptobox _node client
   let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profile profile1) in
   event_waiter
 
-let test_dal_node_gs_topic_subscribe_and_graft_and_publication _protocol
-    parameters _cryptobox node client dal_node1 =
+let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
+    node client dal_node1 =
   let dal_node2 = Dal_node.create ~node ~client () in
   let* _config_file = Dal_node.init_config dal_node2 in
   (* Connect the nodes *)
@@ -2966,8 +2966,8 @@ let register ~protocols =
     test_dal_node_join_topic
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    "GS topic subscribe, graft, and exchange message"
-    test_dal_node_gs_topic_subscribe_and_graft_and_publication
+    "GS valid messages exchange"
+    test_dal_node_gs_valid_messages_exchange
     protocols ;
 
   (* Tests with all nodes *)
