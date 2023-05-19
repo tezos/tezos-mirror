@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use tezos_data_encoding::nom::NomReader;
+use tezos_data_encoding_derive::BinWriter;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 use tezos_smart_rollup_host::{
     input::Message,
@@ -13,8 +14,16 @@ use tezos_smart_rollup_host::{
 
 use crate::{
     message::{Framed, KernelMessage, Sequence, SequencerMsg, SetSequencer},
+    queue::Queue,
     routing::FilterBehavior,
 };
+
+/// Message added to the delayed inbox
+#[derive(BinWriter)]
+pub struct UserMessage {
+    timeout_level: u32,
+    payload: Vec<u8>,
+}
 
 /// Return a message from the inbox
 ///
@@ -25,6 +34,8 @@ use crate::{
 pub fn read_input<Host: Runtime>(
     host: &mut Host,
     filter_behavior: FilterBehavior,
+    timeout_window: u32,
+    delayed_inbox_queue: &mut Queue,
 ) -> Result<Option<Message>, RuntimeError> {
     let RollupMetadata {
         raw_rollup_address, ..
@@ -52,7 +63,15 @@ pub fn read_input<Host: Runtime>(
                             &raw_rollup_address,
                         ),
                         KernelMessage::DelayedMessage(user_message) => {
-                            handle_message(user_message, filter_behavior, &raw_rollup_address)
+                            let _ = handle_message(
+                                host,
+                                delayed_inbox_queue,
+                                timeout_window,
+                                user_message,
+                                msg.level,
+                                filter_behavior,
+                                &raw_rollup_address,
+                            );
                         }
                     },
                 }
@@ -83,13 +102,25 @@ fn handle_set_sequencer_message(
 }
 
 /// Handle messages
-fn handle_message(
+fn handle_message<H: Runtime>(
+    host: &mut H,
+    queue: &mut Queue,
+    timeout_window: u32,
     user_message: Vec<u8>,
+    level: u32,
     filter_behavior: FilterBehavior,
     rollup_address: &[u8; RAW_ROLLUP_ADDRESS_SIZE],
-) {
+) -> Result<(), RuntimeError> {
     // Check if the message should be included in the delayed inbox
     if filter_behavior.predicate(user_message.as_ref(), rollup_address) {
         // add the message to the delayed inbox
+        let user_message = UserMessage {
+            timeout_level: level + timeout_window,
+            payload: user_message,
+        };
+
+        queue.add(host, &user_message)?;
     }
+
+    Ok(())
 }

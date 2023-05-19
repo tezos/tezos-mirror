@@ -11,7 +11,10 @@ use tezos_smart_rollup_host::{
     runtime::{Runtime, RuntimeError, ValueType},
 };
 
-use crate::{delayed_inbox::read_input, routing::FilterBehavior, storage::map_user_path};
+use crate::{
+    delayed_inbox::read_input, queue::Queue, routing::FilterBehavior, storage::map_user_path,
+    storage::DELAYED_INBOX_PATH,
+};
 
 pub struct SequencerRuntime<R>
 where
@@ -20,6 +23,10 @@ where
     host: R,
     /// if true then the input is added to the delayed inbox
     input_predicate: FilterBehavior,
+    /// maximum number of level a message can stay in the delayed inbox
+    timeout_window: u32,
+    /// The delayed inbox queue
+    delayed_inbox_queue: Queue,
 }
 
 /// Runtime that handles the delayed inbox and the sequencer protocol.
@@ -30,10 +37,13 @@ impl<R> SequencerRuntime<R>
 where
     R: Runtime,
 {
-    pub fn new(host: R, input_predicate: FilterBehavior) -> Self {
+    pub fn new(host: R, input_predicate: FilterBehavior, timeout_window: u32) -> Self {
+        let delayed_inbox_queue = Queue::new(&host, &DELAYED_INBOX_PATH).unwrap();
         Self {
             host,
             input_predicate,
+            timeout_window,
+            delayed_inbox_queue,
         }
     }
 }
@@ -51,7 +61,12 @@ where
     }
 
     fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
-        read_input(&mut self.host, self.input_predicate)
+        read_input(
+            &mut self.host,
+            self.input_predicate,
+            self.timeout_window,
+            &mut self.delayed_inbox_queue,
+        )
     }
 
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
