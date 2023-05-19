@@ -2760,47 +2760,12 @@ let test_dal_node_gs_topic_subscribe_and_graft_and_publication _protocol
   (* Connect the nodes *)
   let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
 
-  (* node1 joins topic {pkh} -> it sends subscribe messages to node2. *)
-  let account1 = Constant.bootstrap1 in
-  let pkh1 = account1.public_key_hash in
-  let profile1 = Rollup.Dal.RPC.Attestor pkh1 in
   let* params = Rollup.Dal.Parameters.from_client client in
   let num_slots = params.number_of_slots in
-  let peer_id1 =
-    JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
-  in
-  let peer_id2 =
-    JSON.(Dal_node.read_identity dal_node2 |-> "peer_id" |> as_string)
-  in
-
-  let event_waiter =
-    check_events_with_topic
-      ~event_with_topic:(Subscribe peer_id1)
-      dal_node2
-      ~num_slots
-      pkh1
-  in
-  let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profile profile1) in
-  let* () = event_waiter in
-
-  (* node2 joins topic {pkh} -> it sends subscribe and graft messages to
-     node1. *)
-  let event_waiter_subscribe =
-    check_events_with_topic
-      ~event_with_topic:(Subscribe peer_id2)
-      dal_node1
-      ~num_slots
-      pkh1
-  in
-  let event_waiter_graft =
-    check_events_with_topic
-      ~event_with_topic:(Graft peer_id2)
-      dal_node1
-      ~num_slots
-      pkh1
-  in
-  let* () = RPC.call dal_node2 (Rollup.Dal.RPC.patch_profile profile1) in
-  let* () = Lwt.join [event_waiter_subscribe; event_waiter_graft] in
+  let account1 = Constant.bootstrap1 in
+  let pkh1 = account1.public_key_hash in
+  (* The two nodes join the same topics *)
+  let* () = nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 in
 
   (* Posting a DAL message to DAL node and to L1 *)
   let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
@@ -2851,6 +2816,9 @@ let test_dal_node_gs_topic_subscribe_and_graft_and_publication _protocol
         List.find (fun {attestor; _} -> attestor = pkh1) committee_from_l1
       with
       | {attestor; first_shard_index; power} ->
+          let peer_id1 =
+            JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
+          in
           ( check_events_with_message
               ~event_with_message:(Message_with_header peer_id1)
               dal_node2
