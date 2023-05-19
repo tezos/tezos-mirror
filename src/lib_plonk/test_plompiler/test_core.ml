@@ -781,6 +781,19 @@ functor
         test ~valid:false ~name:"Bytes.test_xor" @@ test_xor o o i;
       ]
 
+    let test_concat a b o () =
+      let* a = input ~kind:`Public a in
+      let* b = input b in
+      let* o = input o in
+      let o' = Bytes.concat [|a; b|] in
+      assert_equal o o'
+
+    let tests_concat =
+      let a = input_bytes @@ bytes_of_hex "08" in
+      let b = input_bytes @@ bytes_of_hex "01" in
+      let o = input_bytes @@ bytes_of_hex "0801" in
+      [test ~valid:true ~name:"Bytes.test_concat" @@ test_concat a b o]
+
     let test_ifthenelse_bytes b l r z () =
       let* b = input ~kind:`Public b in
       let* l = input ~kind:`Public l in
@@ -984,9 +997,9 @@ functor
         ]
 
     let tests =
-      tests_constant @ tests_add @ tests_xor @ tests_ifthenelse_bytes
-      @ tests_rotate_left @ tests_rotate_right @ tests_not @ tests_band
-      @ tests_shift_left @ tests_shift_right
+      tests_constant @ tests_add @ tests_xor @ tests_concat
+      @ tests_ifthenelse_bytes @ tests_rotate_left @ tests_rotate_right
+      @ tests_not @ tests_band @ tests_shift_left @ tests_shift_right
   end
 
 module ECC : Test =

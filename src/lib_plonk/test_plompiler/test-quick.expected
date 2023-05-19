@@ -1132,6 +1132,12 @@ Constraints: 160
 Bytes.blake_optimized:
 Constraints: 96
 
+Bytes.test_concat:
+Constraints: 48
+
+Bytes.test_concat_optimized:
+Constraints: 32
+
 Bytes.test_ifthenelse:
 Constraints: 41
 

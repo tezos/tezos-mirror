@@ -112,6 +112,8 @@ module type LIB = sig
     (* length in bits *)
     val length : bl repr -> int
 
+    val concat : bl repr array -> bl repr
+
     val add : ?ignore_carry:bool -> bl repr -> bl repr -> bl repr t
 
     val xor : bl repr -> bl repr -> bl repr t
@@ -629,6 +631,14 @@ module Lib (C : COMMON) = struct
       constant ~le b
 
     let length b = List.length (of_list b)
+
+    let concat : bl repr array -> bl repr =
+     fun bs ->
+      let bs = Array.to_list bs in
+      let bs = List.rev bs in
+      let bs = List.map of_list bs in
+      let bs = List.concat bs in
+      to_list bs
 
     let check_args_length name a b =
       let la = length a in
