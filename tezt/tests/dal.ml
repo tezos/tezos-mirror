@@ -2519,6 +2519,7 @@ type event_with_topic =
   | Subscribe of peer_id
   | Unsubscribe of peer_id
   | Graft of peer_id
+  | Prune of peer_id
   | Join
   | Leave
 
@@ -2526,6 +2527,7 @@ let event_with_topic_to_string = function
   | Subscribe _ -> "subscribe"
   | Unsubscribe _ -> "unsubscribe"
   | Graft _ -> "graft"
+  | Prune _ -> "prune"
   | Join -> "join"
   | Leave -> "leave"
 
@@ -2547,7 +2549,8 @@ let check_events_with_topic ~event_with_topic dal_node ~num_slots expected_pkh =
       match event_with_topic with
       | Subscribe expected_peer
       | Unsubscribe expected_peer
-      | Graft expected_peer ->
+      | Graft expected_peer
+      | Prune expected_peer ->
           let*?? () =
             check_expected
               expected_peer
