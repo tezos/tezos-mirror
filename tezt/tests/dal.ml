@@ -2749,6 +2749,29 @@ let waiters_publish_shards l1_committee dal_node commitment ~publish_level
         ~expected_slot:slot_index)
     l1_committee
 
+(** This helper returns the promise that allows to wait for the reception of
+    messages of [slot_index] published at level [publish_level] by the attestor
+    [pkh].
+
+    The [l1_committee] used to determine the topic of published messages is the
+    one at the attesattion level corresponding to [publish_level]. *)
+let waiter_receive_shards l1_committee dal_node commitment ~publish_level
+    ~slot_index ~pkh ~from_peer =
+  let open Rollup.Dal.Committee in
+  match List.find (fun {attestor; _} -> attestor = pkh) l1_committee with
+  | {attestor; first_shard_index; power} ->
+      check_events_with_message
+        ~event_with_message:(Message_with_header from_peer)
+        dal_node
+        ~from_shard:first_shard_index
+        ~to_shard:(first_shard_index + power - 1)
+        ~expected_commitment:commitment
+        ~expected_level:pub_level
+        ~expected_pkh:attestor
+        ~expected_slot:slot_index
+  | exception Not_found ->
+      Test.fail "Should not happen as %s is part of the committee" pkh
+
 let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
     _cryptobox node client dal_node1 =
   let dal_node2 = Dal_node.create ~node ~client () in
