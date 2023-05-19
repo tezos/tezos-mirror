@@ -2727,6 +2727,28 @@ let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
   let* () = RPC.call dal_node2 (Rollup.Dal.RPC.patch_profile profile1) in
   Lwt.join [event_waiter_subscribe; event_waiter_graft]
 
+(** This helper returns the list of promises that allow to wait for the
+    publication of a slot's shards into the Gossipsub layer.
+
+    The [l1_committee] used to determine the topic of published messages is the
+    one at the attesattion level corresponding to [publish_level].
+*)
+let waiters_publish_shards l1_committee dal_node commitment ~publish_level
+    ~slot_index =
+  let open Rollup.Dal.Committee in
+  List.map
+    (fun {attestor; first_shard_index; power} ->
+      check_events_with_message
+        ~event_with_message:Publish_message
+        dal_node
+        ~from_shard:first_shard_index
+        ~to_shard:(first_shard_index + power - 1)
+        ~expected_commitment:commitment
+        ~expected_level:publish_level
+        ~expected_pkh:attestor
+        ~expected_slot:slot_index)
+    l1_committee
+
 let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
     _cryptobox node client dal_node1 =
   let dal_node2 = Dal_node.create ~node ~client () in
