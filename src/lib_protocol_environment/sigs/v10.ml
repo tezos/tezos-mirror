@@ -10238,14 +10238,12 @@ type chest_key
 val chest_key_encoding : chest_key Data_encoding.t
 
 (** Result of the opening of a chest.
-    The opening can fail in two way which we distinguish to blame the right person.
-    One can provide a false unlocked_value or unlocked_proof, in which case
-    we return [Bogus_opening] and the provider of the chest key is at fault.
-    Otherwise, one can lock the wrong key or put garbage in the ciphertext in which case
-    we return [Bogus_cipher] and the provider of the chest is at fault.
+    The opening can fail if one provides a false unlocked_value or
+    unlocked_proof, in which case we return [Bogus_opening] and the provider of
+    the chest key is at fault.
     Otherwise we return [Correct payload] where payload was what had
     originally been put in the chest. *)
-type opening_result = Correct of Bytes.t | Bogus_cipher | Bogus_opening
+type opening_result = Correct of Bytes.t | Bogus_opening
 
 (** Takes a chest, chest key and time and tries to recover the underlying
     plaintext. See the documentation of opening_result. *)

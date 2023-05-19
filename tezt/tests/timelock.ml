@@ -356,40 +356,7 @@ let test_contract_error_opening ~protocol () =
   let giver = Constant.bootstrap3.alias in
   let arg = "Right (Right " ^ chest_key_to_string chest_key ^ ")" in
   let* () = Client.transfer ~burn_cap ~amount ~giver ~receiver ~arg client in
-  let* b_result = assert_storage ~chest ~guess ~msg:"0x11" client receiver in
-  assert (b_init && b_guess && b_result) ;
-  unit
-
-let test_contract_incorrect_chest ~protocol () =
-  let* client, receiver = originate_contract protocol "timelock_flip.tz" in
-  (* bootstrap2 starts a coin toss game by submitting a fake chest *)
-  let str = "head" in
-  let* chest_file, chest, _, _ = create_timelock client path time str in
-  let* chest =
-    let* _, chest2, _, _ = create_timelock client path "10" "fake" in
-    return {chest with ciphertext = chest2.ciphertext}
-  in
-  let chest = chest_to_string chest in
-  let giver = Constant.bootstrap2.alias in
-  let arg = "Left " ^ chest in
-  let* () = Client.transfer ~burn_cap ~amount ~giver ~receiver ~arg client in
-  let* b_init = assert_storage ~chest client receiver in
-  (* bootstrap3 submits their guess *)
-  let giver = Constant.bootstrap3.alias in
-  let guess = Bytes.of_string "tail" |> bytes_to_string in
-  let arg = "Right (Left " ^ guess ^ ")" in
-  let* () = Client.transfer ~burn_cap ~amount ~giver ~receiver ~arg client in
-  let* b_guess = assert_storage ~chest ~guess ~msg:"0xb0" client receiver in
-  (* bootstrap3 opens the chest to finish the game *)
-  let* _chest_key_file, chest_key = open_timelock client path chest_file time in
-  let giver = Constant.bootstrap3.alias in
-  let arg = "Right (Right " ^ chest_key_to_string chest_key ^ ")" in
-  let* () = Client.transfer ~burn_cap ~amount ~giver ~receiver ~arg client in
-  (* The expecting message in the contract here is 0x01 and not 0x10.
-     This is because the error Bogus_cipher is not currently used. Indeed, if
-     the decryption fails, the timelock library returns Bytes.empty instead of
-     the said exception. *)
-  let* b_result = assert_storage ~chest ~guess ~msg:"0x01" client receiver in
+  let* b_result = assert_storage ~chest ~guess ~msg:"0x10" client receiver in
   assert (b_init && b_guess && b_result) ;
   unit
 
@@ -407,5 +374,4 @@ let register ~protocols =
       ("Incorrect guess test on timelock", test_contract_incorrect_guess);
       ("Guess too late test on timelock", test_contract_guess_too_late);
       ("Error opening test on timelock", test_contract_error_opening);
-      ("Incorrect chest test on timelock", test_contract_incorrect_chest);
     ]

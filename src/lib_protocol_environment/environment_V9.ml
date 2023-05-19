@@ -98,9 +98,10 @@ module type T = sig
         ('m, 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t
        and type Error_monad.shell_tztrace = Error_monad.tztrace
        and type 'a Error_monad.shell_tzresult = ('a, Error_monad.tztrace) result
-       and type Timelock.chest = Tezos_crypto.Timelock.chest
-       and type Timelock.chest_key = Tezos_crypto.Timelock.chest_key
-       and type Timelock.opening_result = Tezos_crypto.Timelock.opening_result
+       and type Timelock.chest = Tezos_crypto.Timelock_legacy.chest
+       and type Timelock.chest_key = Tezos_crypto.Timelock_legacy.chest_key
+       and type Timelock.opening_result =
+        Tezos_crypto.Timelock_legacy.opening_result
        and module Sapling = Tezos_sapling.Core.Validator
        and type ('a, 'b) Either.t = ('a, 'b) Stdlib.Either.t
        and type Bls.Primitive.Fr.t = Bls12_381.Fr.t
@@ -308,7 +309,7 @@ struct
   module P256 = Tezos_crypto.Signature.P256
   module Bls = Tezos_crypto.Signature.Bls
   module Signature = Tezos_crypto.Signature.V1
-  module Timelock = Tezos_crypto.Timelock
+  module Timelock = Tezos_crypto.Timelock_legacy
   module Vdf = Class_group_vdf.Vdf_self_contained
 
   module S = struct

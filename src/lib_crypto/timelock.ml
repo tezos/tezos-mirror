@@ -329,7 +329,7 @@ type chest_key = timelock_proof
 
 let chest_key_encoding = proof_encoding
 
-type opening_result = Correct of Bytes.t | Bogus_cipher | Bogus_opening
+type opening_result = Correct of Bytes.t | Bogus_opening
 
 let create_chest_and_chest_key ?(precompute_path = None) ~payload ~time () =
   let locked_value, proof =

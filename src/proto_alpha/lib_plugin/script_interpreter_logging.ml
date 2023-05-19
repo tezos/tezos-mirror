@@ -1702,7 +1702,7 @@ module Stack_utils = struct
             reconstruct = (fun k -> IJoin_tickets (loc, ty, k));
           }
     | IOpen_chest (loc, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
-        let s = Item_t (or_bytes_bool_t, s) in
+        let s = Item_t (option_bytes_t, s) in
         ok
         @@ Ex_split_kinstr
              {

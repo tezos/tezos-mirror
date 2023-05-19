@@ -4296,7 +4296,7 @@ and parse_instr :
   | ( Prim (loc, I_OPEN_CHEST, [], _),
       Item_t (Chest_key_t, Item_t (Chest_t, Item_t (Nat_t, rest))) ) ->
       let instr = {apply = (fun k -> IOpen_chest (loc, k))} in
-      typed ctxt loc instr (Item_t (or_bytes_bool_t, rest))
+      typed ctxt loc instr (Item_t (option_bytes_t, rest))
   (* Events *)
   | Prim (loc, I_EMIT, [], annot), Item_t (data, rest) ->
       check_packable ~allow_contract:false loc data >>?= fun () ->

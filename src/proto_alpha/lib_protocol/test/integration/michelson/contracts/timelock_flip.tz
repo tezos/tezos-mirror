@@ -71,7 +71,7 @@ code { UNPAIR 5;
                            SWAP;
                            DIP 2 {PUSH nat 1024};
                            OPEN_CHEST;
-                           IF_LEFT { # If the chest opens successfully,
+                           IF_SOME { # If the chest opens successfully,
                                      # we compare the guess with the locked value.
                                      DUP 4;
                                      COMPARE;
@@ -80,10 +80,8 @@ code { UNPAIR 5;
                                           PUSH bytes 0x00}
                                         { # else we store 0x01
                                           PUSH bytes 0x01}}
-                                   { IF { # We store 0x11 for the first type of failure
-                                          PUSH bytes 0x11}
-                                        { # We store 0x10 for the second type of failure
-                                          PUSH bytes 0x10}};
+                                   { # We store 0x10 in case of failure
+                                     PUSH bytes 0x10};
                            DIG 3;
                            PAIR;
                            DIG 2;
