@@ -3061,6 +3061,77 @@ let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
     ~expect_app_notification
     ~is_first_slot_attestable
 
+let test_gs_prune protocol parameters _cryptobox node client dal_node1 =
+  let rec repeat_i n f =
+    if n <= 0 then unit
+    else
+      let* () = f n in
+      repeat_i (n - 1) f
+  in
+  let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
+  let slot_size = crypto_params.slot_size in
+  let slot_content = generate_dummy_slot slot_size in
+
+  (* Inject as much slots as possible with available bootstrap accounts.
+     The goal is to continuously send invalid messages from dal_node1 to dal_node2,
+     thus lowering the score of dal_node1 to the point where it becomes negative. *)
+  let* () =
+    let num_slots =
+      min
+        (Array.length Account.Bootstrap.keys)
+        parameters.Rollup.Dal.Parameters.number_of_slots
+    in
+    repeat_i num_slots (fun i ->
+        let slot_index = i - 1 in
+        let account = Account.Bootstrap.keys.(slot_index) in
+        let* _slot_index, _slot_commitment =
+          publish_and_store_slot
+            ~with_proof:true
+            node
+            client
+            dal_node1
+            ~slot_size
+            account
+            slot_index
+            slot_content
+        in
+        unit)
+  in
+
+  (* Create another (invalid) DAL node *)
+  let* dal_node2 = make_invalid_dal_node protocol parameters in
+  let* _config_file = Dal_node.init_config dal_node2 in
+
+  (* Connect the nodes *)
+  let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
+
+  let* params = Rollup.Dal.Parameters.from_client client in
+  let num_slots = params.number_of_slots in
+  let account1 = Constant.bootstrap1 in
+  let pkh1 = account1.public_key_hash in
+
+  (* The two nodes join the same topics *)
+  let* () = nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 in
+
+  let peer_id2 =
+    JSON.(Dal_node.read_identity dal_node2 |-> "peer_id" |> as_string)
+  in
+  (* Once a block is baked and shards injected into GS, we expect dal_node1 to
+     be pruned by dal_node2 because its score will become negative due to
+     invalid messages. *)
+  let event_waiter_prune =
+    check_events_with_topic
+      ~event_with_topic:(Prune peer_id2)
+      dal_node1
+      ~num_slots
+      pkh1
+  in
+
+  (* We bake a block and wait for the prune events. *)
+  let* () = Client.bake_for_and_wait client in
+  let* () = event_waiter_prune in
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -3170,6 +3241,11 @@ let register ~protocols =
     ~tags:["gossipsub"]
     "GS invalid messages exchange"
     test_dal_node_gs_invalid_messages_exchange
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["gossipsub"]
+    "GS prune due to negative score"
+    test_gs_prune
     protocols ;
 
   (* Tests with all nodes *)
