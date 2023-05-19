@@ -318,6 +318,26 @@ let affine ~name ~intercept ~coeff =
   end in
   (module M : Model_impl with type arg_type = int * unit)
 
+let affine_offset ~name ~intercept ~coeff ~offset =
+  let module M = struct
+    type arg_type = int * unit
+
+    let name = name
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size
+
+      let arity = arity_1
+
+      let model =
+        lam ~name:"size" @@ fun size ->
+        free ~name:intercept + (free ~name:coeff * sat_sub size (int offset))
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * unit)
+
 let quadratic ~name ~coeff =
   let module M = struct
     type arg_type = int * unit

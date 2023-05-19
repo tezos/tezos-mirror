@@ -162,6 +162,14 @@ val affine :
   coeff:Free_variable.t ->
   (int * unit) model
 
+(** [fun n -> intercept + coeff × (n - offset)] *)
+val affine_offset :
+  name:Namespace.t ->
+  intercept:Free_variable.t ->
+  coeff:Free_variable.t ->
+  offset:int ->
+  (int * unit) model
+
 (** [fun n -> coeff * n²] *)
 val quadratic : name:Namespace.t -> coeff:Free_variable.t -> (int * unit) model
 

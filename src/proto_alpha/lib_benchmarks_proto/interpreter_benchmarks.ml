@@ -925,6 +925,13 @@ module Registration_section = struct
           in
           let node = pair width in
           parse_instr rng_state node long_stack)
+        () ;
+      benchmark
+        ~name:Interpreter_workload.N_IComb
+        ~intercept:true
+        ~kinstr_and_stack_sampler:(fun _ rng_state () ->
+          let node = pair 2 in
+          parse_instr rng_state node long_stack)
         ()
 
     let rec make_comb_stack (comb_width : int) (depth : int) acc =
