@@ -2783,7 +2783,7 @@ let waiter_successful_shards_app_notification l1_committee dal_node commitment
   let open Rollup.Dal.Committee in
   match List.find (fun {attestor; _} -> attestor = pkh) l1_committee with
   | {attestor; first_shard_index; power} ->
-      check_app_message_delivered_event
+      check_message_notified_to_app_event
         dal_node
         ~from_shard:first_shard_index
         ~to_shard:(first_shard_index + power - 1)
@@ -2856,62 +2856,43 @@ let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
      We also prepare a waiter event for:
      - the shards that will be received by dal_node2 on its topics;
      - the messages (shards) that will be notified to dal_node2 on its topic. *)
-  let published_level = Node.get_level node + 1 in
-  let attestable_level = published_level + parameters.attestation_lag in
-  let* waiter_publish_list, waiter_direct_forward, waiter_app_notifs =
-    let open Rollup.Dal.Committee in
-    (* Get the committee from L1 *)
-    let* committee_from_l1 = at_level node ~level:attestable_level in
-    (* For messages publication, we'll have one waiter promise per attestor. *)
-    let waiter_publish_list =
-      List.map
-        (fun {attestor; first_shard_index; power} ->
-          check_events_with_message
-            ~event_with_message:Publish_message
-            dal_node1
-            ~from_shard:first_shard_index
-            ~to_shard:(first_shard_index + power - 1)
-            ~expected_commitment:slot_commitment
-            ~expected_level:published_level
-            ~expected_pkh:attestor
-            ~expected_slot:slot_index)
-        committee_from_l1
-    in
-    (* For messages reception, we'll have one promise for attestor [pkh1]. *)
-    let waiter_direct_forward, waiter_app_notifs =
-      match
-        List.find (fun {attestor; _} -> attestor = pkh1) committee_from_l1
-      with
-      | {attestor; first_shard_index; power} ->
-          let peer_id1 =
-            JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
-          in
-          ( check_events_with_message
-              ~event_with_message:(Message_with_header peer_id1)
-              dal_node2
-              ~from_shard:first_shard_index
-              ~to_shard:(first_shard_index + power - 1)
-              ~expected_commitment:slot_commitment
-              ~expected_level:published_level
-              ~expected_pkh:attestor
-              ~expected_slot:slot_index,
-            check_message_notified_to_app_event
-              dal_node2
-              ~from_shard:first_shard_index
-              ~to_shard:(first_shard_index + power - 1)
-              ~expected_commitment:slot_commitment
-              ~expected_level:published_level
-              ~expected_pkh:attestor
-              ~expected_slot:slot_index )
-      | exception Not_found ->
-          Test.fail "Should not happen as %s is part of the committee" pkh1
-    in
-    return (waiter_publish_list, waiter_direct_forward, waiter_app_notifs)
+  let publish_level = Node.get_level node + 1 in
+  let attested_level = publish_level + parameters.attestation_lag in
+  let* committee = Rollup.Dal.Committee.at_level node ~level:attested_level in
+
+  let waiter_publish_list =
+    waiters_publish_shards
+      committee
+      dal_node1
+      slot_commitment
+      ~publish_level
+      ~slot_index
   in
+  let waiter_receive_shards =
+    waiter_receive_shards
+      committee
+      dal_node2
+      slot_commitment
+      ~publish_level
+      ~slot_index
+      ~pkh:pkh1
+      ~from_peer:
+        JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
+  in
+  let waiter_app_notifs =
+    waiter_successful_shards_app_notification
+      committee
+      dal_node2
+      slot_commitment
+      ~publish_level
+      ~slot_index
+      ~pkh:pkh1
+  in
+
   (* We bake a block that includes [slot_header] operation. *)
   let* () = Client.bake_for_and_wait client in
   let* () = Lwt.join waiter_publish_list
-  and* () = waiter_direct_forward
+  and* () = waiter_receive_shards
   and* () = waiter_app_notifs in
 
   (* Check that dal_node2 has the shards needed by attestor account1/pkh1 to
@@ -2919,9 +2900,7 @@ let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
   let* res =
     RPC.call
       dal_node2
-      (Rollup.Dal.RPC.get_attestable_slots
-         ~attestor:account1
-         ~attested_level:attestable_level)
+      (Rollup.Dal.RPC.get_attestable_slots ~attestor:account1 ~attested_level)
   in
   match res with
   | Not_in_committee -> Test.fail "attestor %s not in committee" account1.alias
