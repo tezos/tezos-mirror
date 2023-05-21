@@ -58,6 +58,13 @@ val spawn_run : t -> Process.t
     [proxy_server]. *)
 val endpoint : t -> string
 
-(** [call_evm_rpc proxy_server ~method_ ~parameters] sends a JSON-RPC request to
-    the [proxy_server], for the given [method_] and [parameters]. *)
-val call_evm_rpc : t -> method_:string -> parameters:JSON.u -> JSON.t Lwt.t
+(** JSON-RPC request. *)
+type request = {method_ : string; parameters : JSON.u}
+
+(** [call_evm_rpc proxy_server ~request] sends a JSON-RPC request to the
+    [proxy_server], for the given [request]. *)
+val call_evm_rpc : t -> request -> JSON.t Lwt.t
+
+(** [batch_evm_rpc proxy_server ~requests] sends multiple JSON-RPC requests to the
+    [proxy_server], for the given [requests]. *)
+val batch_evm_rpc : t -> request list -> JSON.t Lwt.t

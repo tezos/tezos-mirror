@@ -62,8 +62,7 @@ let get_transaction_count proxy_server address =
   let* transaction_count =
     Evm_proxy_server.call_evm_rpc
       proxy_server
-      ~method_:"eth_getTransactionCount"
-      ~parameters
+      {method_ = "eth_getTransactionCount"; parameters}
   in
   return JSON.(transaction_count |-> "result" |> as_int64)
 
