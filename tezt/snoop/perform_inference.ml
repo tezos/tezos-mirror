@@ -71,6 +71,7 @@ let main () =
       "skip_list/hash_cell/model";
       "sc_rollup/Sc_rollup_deserialize_output_proof_benchmark/model";
       "sc_rollup/Sc_rollup_verify_output_proof_benchmark/model";
+      "bloomer";
     ]
   in
   Lwt_list.iter_s
