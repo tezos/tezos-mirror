@@ -50,6 +50,8 @@ let models =
     "sc_rollup/Sc_rollup_deserialize_output_proof_benchmark/model";
     "sc_rollup/Sc_rollup_verify_output_proof_benchmark/model";
     "bloomer";
+    "strip_locations_model";
+    "apply_diff";
   ]
 
 let cleanup model_name =

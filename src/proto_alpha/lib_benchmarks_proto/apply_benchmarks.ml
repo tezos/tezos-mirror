@@ -59,6 +59,9 @@ let make_context ~rng_state =
   in
   return (ctxt, src, dst)
 
+(* This benchmark is introduced for !7761 and #4788. Its result is not used in the protocol
+   therefore we do not need to perform it regularly.
+*)
 module Take_fees_benchmark = struct
   let name = ns "Take_fees"
 
