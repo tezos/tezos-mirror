@@ -246,112 +246,116 @@ and infer_for_measurements ~model_name measurements
   let map, scores_list, report =
     List.fold_left
       (fun (overrides_map, scores_list, report) solved ->
-        Format.eprintf
-          "Running inference for %a@."
-          Namespace.pp
-          solved.Dep_graph.Solver.Solved.name ;
-        Format.eprintf "  @[%a@]@." Dep_graph.Solver.Solved.pp solved ;
         let measure =
-          Stdlib.Option.get @@ Namespace.Hashtbl.find measurements solved.name
+          Stdlib.Option.get
+          @@ Namespace.Hashtbl.find
+               measurements
+               solved.Dep_graph.Solver.Solved.name
         in
-        let overrides var = Free_variable.Map.find var overrides_map in
         let (Measure.Measurement ((module Bench), m)) = measure in
-        let model =
-          match Dep_graph.find_model_or_generic model_name Bench.models with
-          | None ->
-              Format.eprintf
-                "No valid model (%s or generic) found in the workload %a. \
-                 Available models:.@."
-                model_name
-                Namespace.pp
-                solved.name ;
-              list_all_models Format.err_formatter ;
-              exit 1
-          | Some model -> model
-        in
-        let problem =
-          Inference.make_problem ~data:m.Measure.workload_data ~model ~overrides
-        in
-        if infer_opts.print_problem then (
-          Format.eprintf "Dumping problem to stdout as requested by user@." ;
-          Csv.export_stdout (Inference.problem_to_csv problem)) ;
-        let is_constant_input =
-          is_constant_input (module Bench) m.Measure.workload_data
-        in
-        let solution =
-          Inference.solve_problem ~is_constant_input problem solver
-        in
-        let report =
-          Option.map
-            (Report.add_section
-               ~measure
-               ~model_name
-               ~problem
-               ~solution
-               ~overrides_map
-               ~display_options
-               ~short:true)
-            report
-        in
-        let overrides_map =
-          List.fold_left
-            (fun map (variable, solution) ->
-              if Free_variable.Set.mem variable solved.provides then (
-                Format.eprintf
-                  "Adding solution %a := %f@."
-                  Free_variable.pp
-                  variable
-                  solution ;
-                Free_variable.Map.add variable solution map)
-              else if Free_variable.Set.mem variable solved.dependencies then (
-                (* Variables analyzed as dependencies inferred.  It is a bug
-                   of the dependency analysis or the inference. *)
-                Format.eprintf
-                  "ERROR: bug found.  A dependency variable is solved %a = %f@."
-                  Free_variable.pp
-                  variable
-                  solution ;
-                exit 1)
-              else (
-                (* Variables eliminated at dependency analysis may not be gone
-                   at the infernece. They have arbitrary solution
-                   (in LASSO 0.0) and therefore must be ignored.
+        (* Run inference of the models only bound by the local [model_name] *)
+        Option.fold
+          (Dep_graph.find_model_or_generic model_name Bench.models)
+          ~none:(overrides_map, scores_list, report)
+          ~some:(fun model ->
+            Format.eprintf
+              "Running inference for %a (model_name: %s)@."
+              Namespace.pp
+              solved.Dep_graph.Solver.Solved.name
+              model_name ;
+            Format.eprintf "  @[%a@]@." Dep_graph.Solver.Solved.pp solved ;
+            let overrides var = Free_variable.Map.find var overrides_map in
+            let problem =
+              Inference.make_problem
+                ~data:m.Measure.workload_data
+                ~model
+                ~overrides
+            in
+            if infer_opts.print_problem then (
+              Format.eprintf "Dumping problem to stdout as requested by user@." ;
+              Csv.export_stdout (Inference.problem_to_csv problem)) ;
+            let is_constant_input =
+              is_constant_input (module Bench) m.Measure.workload_data
+            in
+            let solution =
+              Inference.solve_problem ~is_constant_input problem solver
+            in
+            let report =
+              Option.map
+                (Report.add_section
+                   ~measure
+                   ~model_name
+                   ~problem
+                   ~solution
+                   ~overrides_map
+                   ~display_options
+                   ~short:true)
+                report
+            in
+            let overrides_map =
+              List.fold_left
+                (fun map (variable, solution) ->
+                  if Free_variable.Set.mem variable solved.provides then (
+                    Format.eprintf
+                      "Adding solution %a := %f@."
+                      Free_variable.pp
+                      variable
+                      solution ;
+                    Free_variable.Map.add variable solution map)
+                  else if Free_variable.Set.mem variable solved.dependencies
+                  then (
+                    (* Variables analyzed as dependencies inferred.  It is a bug
+                       of the dependency analysis or the inference. *)
+                    Format.eprintf
+                      "ERROR: bug found.  A dependency variable is solved %a = \
+                       %f@."
+                      Free_variable.pp
+                      variable
+                      solution ;
+                    exit 1)
+                  else (
+                    (* Variables eliminated at dependency analysis may not be gone
+                       at the infernece. They have arbitrary solution
+                       (in LASSO 0.0) and therefore must be ignored.
 
-                   We should remove this case by fixing the expression used in
-                   the inference.
-                *)
-                Format.eprintf
-                  "@[<v2>Warning: ignoring a solution of an eliminated \
-                   variable %a = %f@,\
-                   It is safe to proceed but it may be caused by a bug of \
-                   inference.@]@."
-                  Free_variable.pp
-                  variable
-                  solution ;
-                map))
-            overrides_map
-            solution.mapping
-        in
-        (* solved.provides should be really solved by the inference *)
-        Free_variable.Set.iter
-          (fun fv ->
-            if
-              not
-              @@ List.mem_assoc ~equal:Free_variable.equal fv solution.mapping
-            then
-              Format.eprintf
-                "@[<v2>Warning: a provided free variable %a is not solved by \
-                 the inference.@,\
-                 It is safe to proceed but it may be caused by a bug of \
-                 dependency analysis.@]@."
-                Free_variable.pp
-                fv)
-          solved.provides ;
-        let scores_label = (model_name, Bench.name) in
-        let scores_list = (scores_label, solution.scores) :: scores_list in
-        perform_plot measure model_name problem solution infer_opts ;
-        perform_csv_export scores_label solution infer_opts ;
-        (overrides_map, scores_list, report))
+                       We should remove this case by fixing the expression used in
+                       the inference.
+                    *)
+                    Format.eprintf
+                      "@[<v2>Warning: ignoring a solution of an eliminated \
+                       variable %a = %f@,\
+                       It is safe to proceed but it may be caused by a bug of \
+                       inference.@]@."
+                      Free_variable.pp
+                      variable
+                      solution ;
+                    map))
+                overrides_map
+                solution.mapping
+            in
+            (* solved.provides should be really solved by the inference *)
+            Free_variable.Set.iter
+              (fun fv ->
+                if
+                  not
+                  @@ List.mem_assoc
+                       ~equal:Free_variable.equal
+                       fv
+                       solution.mapping
+                then
+                  Format.eprintf
+                    "@[<v2>Warning: a provided free variable %a is not solved \
+                     by the inference.@,\
+                     It is safe to proceed but it may be caused by a bug of \
+                     dependency analysis.@]@."
+                    Free_variable.pp
+                    fv)
+              solved.provides ;
+            let scores_label = (model_name, Bench.name) in
+            let scores_list = (scores_label, solution.scores) :: scores_list in
+            perform_plot measure model_name problem solution infer_opts ;
+            perform_csv_export scores_label solution infer_opts ;
+            (overrides_map, scores_list, report)))
       (overrides_map, scores_list, report)
       solved_list
   in
