@@ -28,9 +28,3 @@
     reraises it as a [Failure] with the error details prefixed by [msg].
 *)
 val handle_python_error : string -> (unit -> 'a) -> 'a
-
-(** [import_once name] returns a closure to import Python module [name].
-    The module is imported at the first call of the closure. its second
-    and later calls return the module already imported.
-*)
-val import_once : string -> unit -> Pytypes.pyobject
