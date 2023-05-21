@@ -39,7 +39,7 @@ type tag =
   | Io
   | Misc
   | Builtin
-  | Gtoc
+  | Global_constants
   | Cache
   | Carbonated_map
   | Tickets
@@ -47,6 +47,9 @@ type tag =
   | Skip_list
   | Sc_rollup
   | Shell
+  | Apply
+  | Example
+  | Micheline
 
 type michelson_term_kind = Data | Code
 
@@ -348,7 +351,7 @@ let string_of_tag (tag : tag) =
   | Io -> "io"
   | Misc -> "misc"
   | Builtin -> "builtin"
-  | Gtoc -> "global_constants"
+  | Global_constants -> "global_constants"
   | Cache -> "cache"
   | Carbonated_map -> "carbonated_map"
   | Tickets -> "tickets"
@@ -356,6 +359,9 @@ let string_of_tag (tag : tag) =
   | Skip_list -> "skip_list"
   | Sc_rollup -> "sc_rollup"
   | Shell -> "shell"
+  | Apply -> "apply"
+  | Example -> "example"
+  | Micheline -> "micheline"
 
 let list_benchmarks_command mode tags =
   let tags = List.map string_of_tag tags in
