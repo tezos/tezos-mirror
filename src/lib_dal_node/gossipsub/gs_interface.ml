@@ -152,7 +152,7 @@ module Message_id = struct
   let pp fmt {level; slot_index; commitment; shard_index; pkh} =
     Format.fprintf
       fmt
-      "{ level=%ld; slot_index=%d; commitment=%a; topic=%a }"
+      "{ level=%ld; shard_index=%d; commitment=%a; topic=%a }"
       level
       shard_index
       Cryptobox.Commitment.pp

@@ -70,28 +70,41 @@ val get_commitment_slot :
   Cryptobox.commitment ->
   (slot, [Errors.decoding | Errors.not_found]) result Lwt.t
 
-(** [add_commitment_shards node_store cryptobox commitment ~with_proof]
-    registers the shards of the slot whose commitment is given.
+(** [add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
+    commitment ~with_proof] registers the shards of the slot whose commitment is
+    given.
+
+    If [with_proof] is true, proofs are generated for the computed
+    shards using [shards_proofs_precomputation] and stored in a bounded
+    structure in memory.
 
     In addition to decoding errors, the function returns [`Not_found]
     if there is no slot content for [commitment] in [node_store]. *)
 val add_commitment_shards :
+  shards_proofs_precomputation:Cryptobox.shards_proofs_precomputation ->
   Store.node_store ->
   Cryptobox.t ->
   Cryptobox.commitment ->
-  Services.Types.with_proof ->
+  with_proof:bool ->
   (unit, [Errors.decoding | Errors.not_found | Errors.other]) result Lwt.t
 
-(** [store_slot_headers ~block_level ~block_hash slot_headers node_store] stores
-    [slot_headers] onto the [node_store] associated to the given [block_hash]
-    baked at level [block_level].
-*)
+(** [store_slot_headers ~level_committee ~block_level ~block_hash cryptobox
+    proto_parameters slot_headers node_store] stores [slot_headers] onto the
+    [node_store] associated to the given [block_hash] baked at level
+    [block_level].
+
+    If a slot header's status becomes "waiting for attestation" after this update and
+    this node contains the slot's shards and shards proofs, the corresponding
+    Gossipsub messages are pushed into the GS worker. *)
 val store_slot_headers :
+  level_committee:(level:int32 -> Committee_cache.committee tzresult Lwt.t) ->
   block_level:int32 ->
   block_hash:Block_hash.t ->
+  Cryptobox.t ->
+  Dal_plugin.proto_parameters ->
   (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
   Store.node_store ->
-  unit Lwt.t
+  unit tzresult Lwt.t
 
 (** [update_selected_slot_headers_statuses ~block_level ~attestation_lag
     ~number_of_slots attested_slots store] updates the statuses of the

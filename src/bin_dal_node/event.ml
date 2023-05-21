@@ -49,3 +49,11 @@ let decoding_data_failed =
     ~msg:"Error while decoding a {data_kind} value"
     ~level:Warning
     ("data_kind", Types.kind_encoding)
+
+let loading_shard_data_failed =
+  declare_1
+    ~section
+    ~name:"loading_shard_data_failed"
+    ~msg:"Error while reading shard data {message}"
+    ~level:Warning
+    ("message", Data_encoding.string)

@@ -145,7 +145,13 @@ module Handler = struct
     let handler _stopper (block_hash, (header : Tezos_base.Block_header.t)) =
       match Node_context.get_status ctxt with
       | Starting -> return_unit
-      | Ready {plugin = (module Dal_plugin); proto_parameters; _} ->
+      | Ready
+          {
+            plugin = (module Dal_plugin);
+            proto_parameters;
+            cryptobox;
+            shards_proofs_precomputation = _;
+          } ->
           let block_level = header.shell.level in
           let* block_info =
             Dal_plugin.block_info
@@ -156,8 +162,11 @@ module Handler = struct
           let* slot_headers =
             Dal_plugin.get_published_slot_headers block_info
           in
-          let*! () =
+          let* () =
             Slot_manager.store_slot_headers
+              ~level_committee:(Node_context.fetch_committee ctxt)
+              cryptobox
+              proto_parameters
               ~block_level
               ~block_hash
               slot_headers

@@ -80,6 +80,13 @@ module Shards = struct
     *)
     return @@ Lwt_watcher.notify shards_watcher commitment
 
+  let read_all shards_store commitment ~number_of_shards =
+    read_values shards_store
+    @@ List.fold_left
+         (fun seq shard_index -> Seq.cons (commitment, shard_index) seq)
+         Seq.empty
+         (0 -- (number_of_shards - 1))
+
   let init node_store_dir shard_store_dir =
     let ( // ) = Filename.concat in
     let dir_path = node_store_dir // shard_store_dir in
@@ -90,12 +97,23 @@ module Shards = struct
         Stored_data.make_file ~filepath Cryptobox.share_encoding Stdlib.( = ))
 end
 
+module Shard_proofs_cache =
+  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
+    (struct
+      type t = Cryptobox.Commitment.t
+
+      let equal = Cryptobox.Commitment.equal
+
+      let hash = Hashtbl.hash
+    end)
+
 (** Store context *)
 type node_store = {
   store : t;
   shard_store : Shards.t;
   shards_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
   gs_worker : Gossipsub.Worker.t;
+  in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;
 }
 
 (** [open_shards_stream node_store] opens a stream that should be notified when
@@ -113,7 +131,26 @@ let init gs_worker config =
   let*! store = main repo in
   let shard_store = Shards.init base_dir shard_store_dir in
   let*! () = Event.(emit store_is_ready ()) in
-  return {shard_store; store; shards_watcher; gs_worker}
+
+  (* The size of the cache of 1024 entries is chosen such that: if a DAL node
+     stores the shard proofs of 128 slots per level, the cache will be able to
+     store the proofs for 8 levels, which should be quite sufficient
+     with the current attestation lag.
+
+     A shard proof takes 52 bytes with the current encoding (could be improved
+     to 48), so the maximum memory footprint of the cache is dominated by (keys
+     size is negligible):
+
+     1024 (cache size) * 2048 (shards per slot) * 52 bytes = 109 mb *)
+  let cache_size = 1024 in
+  return
+    {
+      shard_store;
+      store;
+      shards_watcher;
+      gs_worker;
+      in_memory_shard_proofs = Shard_proofs_cache.create cache_size;
+    }
 
 let trace_decoding_error ~data_kind ~tztrace_of_error r =
   let open Result_syntax in
@@ -362,15 +399,119 @@ module Legacy = struct
         return @@ Some dec)
       res_opt
 
-  let add_slot_headers ~block_level ~block_hash:_ slot_headers node_store =
-    let open Lwt_syntax in
+  let get_opt array i =
+    if i >= 0 && i < Array.length array then Some array.(i) else None
+
+  (** [shards_to_attestors committee] takes a committee [Committee_cache.committee]
+      and returns a function that, given a shard index, yields the pkh of its
+      attestor for that level. *)
+  let shards_to_attestors committee =
+    let rec do_n ~n f acc = if n <= 0 then acc else do_n ~n:(n - 1) f (f acc) in
+    let to_array committee =
+      (* We transform the map to a list *)
+      Tezos_crypto.Signature.Public_key_hash.Map.bindings committee
+      (* We sort the list in decreasing order w.r.t. to start_indices. *)
+      |> List.fast_sort (fun (_pkh1, shard_indices1) (_pkh2, shard_indices2) ->
+             shard_indices2.Committee_cache.start_index
+             - shard_indices1.Committee_cache.start_index)
+         (* We fold on the sorted list, starting from bigger start_indices. *)
+      |> List.fold_left
+           (fun accu (pkh, Committee_cache.{start_index = _; offset}) ->
+             (* We put in the accu list as many [pkh] occurrences as the number
+                of shards this pkh should attest, namely, [offset]. *)
+             do_n ~n:offset (fun acc -> pkh :: acc) accu)
+           []
+      (* We build an array from the list. The array indices coincide with shard
+         indices. *)
+      |> Array.of_list
+    in
+    let committee = to_array committee in
+    fun index -> get_opt committee index
+
+  (* This function publishes the shards of a commitment that is waiting for
+     attestion on L1 if this node has those shards on disk and their proofs in
+     memory. *)
+  let publish_slot_data ~level_committee node_store cryptobox proto_parameters
+      commitment published_level slot_index =
+    let open Lwt_result_syntax in
+    match
+      Shard_proofs_cache.find_opt node_store.in_memory_shard_proofs commitment
+    with
+    | None ->
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5676
+
+            Recompute the proofs if we have shards on disk? Useful if the node
+            restarted. *)
+        return_unit
+    | Some shard_proofs ->
+        let attestation_level =
+          Int32.(
+            add
+              published_level
+              (of_int proto_parameters.Dal_plugin.attestation_lag))
+        in
+        let* committee = level_committee ~level:attestation_level in
+        let attestor_of_shard = shards_to_attestors committee in
+        let Cryptobox.{number_of_shards; _} = Cryptobox.parameters cryptobox in
+        Shards.read_all node_store.shard_store commitment ~number_of_shards
+        |> Seq_s.iter_ep (function
+               | _, Error [Stored_data.Missing_stored_data s] ->
+                   let*! () =
+                     Event.(
+                       emit
+                         loading_shard_data_failed
+                         ("Missing stored data " ^ s))
+                   in
+                   return_unit
+               | _, Error err ->
+                   let*! () =
+                     Event.(
+                       emit
+                         loading_shard_data_failed
+                         (Format.asprintf "%a" pp_print_trace err))
+                   in
+                   return_unit
+               | (commitment, shard_index), Ok share -> (
+                   match
+                     ( attestor_of_shard shard_index,
+                       get_opt shard_proofs shard_index )
+                   with
+                   | None, _ ->
+                       failwith
+                         "Invariant broken: no attestor found for shard %d"
+                         shard_index
+                   | _, None ->
+                       failwith
+                         "Invariant broken: no shard proof found for shard %d"
+                         shard_index
+                   | Some pkh, Some shard_proof ->
+                       let message = Gossipsub.{share; shard_proof} in
+                       let topic = Gossipsub.{slot_index; pkh} in
+                       let message_id =
+                         Gossipsub.
+                           {
+                             commitment;
+                             level = published_level;
+                             slot_index;
+                             shard_index;
+                             pkh;
+                           }
+                       in
+                       Gossipsub.Worker.(
+                         Publish_message {message; topic; message_id}
+                         |> app_input node_store.gs_worker) ;
+                       return_unit))
+
+  let add_slot_headers ~level_committee cryptobox proto_parameters ~block_level
+      ~block_hash:_ slot_headers node_store =
+    let open Lwt_result_syntax in
     let slots_store = node_store.store in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4388
        Handle reorgs. *)
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4389
              https://gitlab.com/tezos/tezos/-/issues/4528
        Handle statuses evolution. *)
-    List.iter_s
+    List.iter_es
       (fun (slot_header, status) ->
         let Dal_plugin.{slot_index; commitment; published_level} =
           slot_header
@@ -379,7 +520,7 @@ module Legacy = struct
         assert (Int32.equal published_level block_level) ;
         let index = Services.Types.{slot_level = published_level; slot_index} in
         let header_path = Path.Commitment.header commitment index in
-        let* () =
+        let*! () =
           set
             ~msg:(Path.to_string ~prefix:"add_slot_headers:" header_path)
             slots_store
@@ -394,13 +535,13 @@ module Legacy = struct
             let data = encode_commitment commitment in
             (* Before adding the item in accepted path, we should remove it from
                others path, as it may appear there with an Unseen status. *)
-            let* () =
+            let*! () =
               remove
                 ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
                 slots_store
                 others_path
             in
-            let* () =
+            let*! () =
               set
                 ~msg:
                   (Path.to_string ~prefix:"add_slot_headers:" commitment_path)
@@ -408,17 +549,30 @@ module Legacy = struct
                 commitment_path
                 data
             in
-            set
-              ~msg:(Path.to_string ~prefix:"add_slot_headers:" status_path)
-              slots_store
-              status_path
-              (encode_header_status `Waiting_attestation)
+            let*! () =
+              set
+                ~msg:(Path.to_string ~prefix:"add_slot_headers:" status_path)
+                slots_store
+                status_path
+                (encode_header_status `Waiting_attestation)
+            in
+            publish_slot_data
+              ~level_committee
+              node_store
+              cryptobox
+              proto_parameters
+              commitment
+              published_level
+              slot_index
         | Dal_plugin.Failed ->
-            set
-              ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
-              slots_store
-              others_path
-              (encode_header_status `Not_selected))
+            let*! () =
+              set
+                ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
+                slots_store
+                others_path
+                (encode_header_status `Not_selected)
+            in
+            return_unit)
       slot_headers
 
   let update_slot_headers_attestation ~published_level ~number_of_slots store
@@ -649,4 +803,13 @@ module Legacy = struct
           (fun header ->
             if header.Services.Types.status = hs then Some header else None)
           accu
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
+
+     handle with_proof flag -> store proofs on disk? *)
+  let save_shard_proofs node_store commitment shard_proofs =
+    Shard_proofs_cache.replace
+      node_store.in_memory_shard_proofs
+      commitment
+      shard_proofs
 end

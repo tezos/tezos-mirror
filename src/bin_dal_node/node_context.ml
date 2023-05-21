@@ -29,6 +29,7 @@ type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
   plugin : (module Dal_plugin.T);
+  shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation;
 }
 
 type status = Ready of ready_ctxt | Starting
@@ -68,7 +69,13 @@ let init config store gs_worker transport_layer cctxt =
 
 let set_ready ctxt plugin cryptobox proto_parameters =
   match ctxt.status with
-  | Starting -> ctxt.status <- Ready {plugin; cryptobox; proto_parameters}
+  | Starting ->
+      let shards_proofs_precomputation =
+        Cryptobox.precompute_shards_proofs cryptobox
+      in
+      ctxt.status <-
+        Ready
+          {plugin; cryptobox; proto_parameters; shards_proofs_precomputation}
   | Ready _ -> raise Status_already_ready
 
 type error += Node_not_ready
@@ -103,23 +110,25 @@ let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
 
 let get_neighbors_cctxts ctxt = ctxt.neighbors_cctxts
 
-let fetch_assigned_shard_indices ctxt ~level ~pkh =
+let fetch_committee ctxt ~level =
   let open Lwt_result_syntax in
   let {tezos_node_cctxt = cctxt; committee_cache = cache; _} = ctxt in
-  let+ committee =
-    match Committee_cache.find cache ~level with
-    | Some committee -> return committee
-    | None ->
-        let*? {plugin = (module Plugin); _} = get_ready ctxt in
-        let+ committee = Plugin.get_committee cctxt ~level in
-        let committee =
-          Tezos_crypto.Signature.Public_key_hash.Map.map
-            (fun (start_index, offset) -> Committee_cache.{start_index; offset})
-            committee
-        in
-        Committee_cache.add cache ~level ~committee ;
-        committee
-  in
+  match Committee_cache.find cache ~level with
+  | Some committee -> return committee
+  | None ->
+      let*? {plugin = (module Plugin); _} = get_ready ctxt in
+      let+ committee = Plugin.get_committee cctxt ~level in
+      let committee =
+        Tezos_crypto.Signature.Public_key_hash.Map.map
+          (fun (start_index, offset) -> Committee_cache.{start_index; offset})
+          committee
+      in
+      Committee_cache.add cache ~level ~committee ;
+      committee
+
+let fetch_assigned_shard_indices ctxt ~level ~pkh =
+  let open Lwt_result_syntax in
+  let+ committee = fetch_committee ctxt ~level in
   match Tezos_crypto.Signature.Public_key_hash.Map.find pkh committee with
   | None -> []
   | Some {start_index; offset} ->

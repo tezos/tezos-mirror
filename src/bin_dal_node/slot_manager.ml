@@ -117,22 +117,40 @@ let get_commitment_slot node_store cryptobox commitment =
   | None -> fail `Not_found
   | Some slot_content -> return slot_content
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
-   handle with_proof flag. *)
-let add_commitment_shards node_store cryptobox commitment _with_proof =
+let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
+    commitment ~with_proof =
   let open Lwt_result_syntax in
   let* slot = get_commitment_slot node_store cryptobox commitment in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
-  Store.(
-    Shards.save_and_notify
-      node_store.shard_store
-      node_store.shards_watcher
-      commitment
-      shards)
+  let* () =
+    Store.(
+      Shards.save_and_notify
+        node_store.shard_store
+        node_store.shards_watcher
+        commitment
+        shards)
+  in
+  if with_proof then
+    let shard_proofs =
+      Cryptobox.prove_shards
+        cryptobox
+        ~polynomial
+        ~precomputation:shards_proofs_precomputation
+    in
+    Store.Legacy.save_shard_proofs node_store commitment shard_proofs |> return
+  else return_unit
 
-let store_slot_headers ~block_level ~block_hash slot_headers node_store =
-  Store.Legacy.add_slot_headers ~block_level ~block_hash slot_headers node_store
+let store_slot_headers ~level_committee ~block_level ~block_hash cryptobox
+    proto_parameters slot_headers node_store =
+  Store.Legacy.add_slot_headers
+    ~level_committee
+    ~block_level
+    ~block_hash
+    cryptobox
+    proto_parameters
+    slot_headers
+    node_store
 
 let update_selected_slot_headers_statuses ~block_level ~attestation_lag
     ~number_of_slots attested_slots node_store =
