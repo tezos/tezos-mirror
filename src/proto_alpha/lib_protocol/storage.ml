@@ -168,6 +168,21 @@ module Missed_endorsements_info = struct
       (obj2 (req "remaining_slots" int31) (req "missed_levels" int31))
 end
 
+module Slashed_deposits_history = struct
+  type slashed_percentage = int
+
+  let slashed_percentage_encoding = Data_encoding.uint8
+
+  type t = (Cycle_repr.t * slashed_percentage) list
+
+  let encoding =
+    let open Data_encoding in
+    list
+      (obj2
+         (req "cycle" Cycle_repr.encoding)
+         (req "slashed_percentage" slashed_percentage_encoding))
+end
+
 module Contract = struct
   module Raw_context =
     Make_subcontext (Registered) (Raw_context)
@@ -388,6 +403,14 @@ module Contract = struct
         let name = ["frozen_deposits_limit"]
       end)
       (Tez_repr)
+
+  module Slashed_deposits =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["slashed_deposits"]
+      end)
+      (Slashed_deposits_history)
 
   module Bond_id_index =
     Make_indexed_subcontext
