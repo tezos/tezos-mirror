@@ -144,6 +144,7 @@ let handle_get_verify_signature dac_plugin public_keys_opt encoded_l1_message =
         signature
         witnesses
 
+(** [handle_get_preimage] is shared by both [V0] and [V1] API. *)
 let handle_get_preimage dac_plugin page_store raw_hash =
   let open Lwt_result_syntax in
   let*? hash = Dac_plugin.raw_to_hash dac_plugin raw_hash in
@@ -244,6 +245,12 @@ let register_get_missing_page dac_plugin page_store cctxt =
     RPC_services.V0.get_missing_page
     (fun root_hash () () ->
       handle_get_missing_page cctxt page_store dac_plugin root_hash)
+
+let register_get_pages dac_plugin page_store =
+  add_service
+    Tezos_rpc.Directory.register1
+    RPC_services.V1.get_pages
+    (fun hash () () -> handle_get_preimage dac_plugin page_store hash)
 
 module Coordinator = struct
   let handle_post_preimage dac_plugin page_store hash_streamer payload =
@@ -375,11 +382,14 @@ module Coordinator = struct
          rw_store
          page_store
     |> register_get_certificate rw_store dac_plugin
+    |> register_get_pages dac_plugin page_store
 end
 
 module Committee_member = struct
   let dynamic_rpc_dir dac_plugin page_store =
-    Tezos_rpc.Directory.empty |> register_get_preimage dac_plugin page_store
+    Tezos_rpc.Directory.empty
+    |> register_get_preimage dac_plugin page_store
+    |> register_get_pages dac_plugin page_store
 end
 
 module Observer = struct
@@ -387,6 +397,7 @@ module Observer = struct
     Tezos_rpc.Directory.empty
     |> register_get_preimage dac_plugin page_store
     |> register_get_missing_page dac_plugin page_store coordinator_cctxt
+    |> register_get_pages dac_plugin page_store
 end
 
 module Legacy = struct

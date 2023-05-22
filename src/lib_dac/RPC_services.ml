@@ -136,3 +136,14 @@ let get_health_ready =
     ~query:Tezos_rpc.Query.empty
     ~output:Data_encoding.bool
     Tezos_rpc.Path.(open_root / "health" / "ready")
+
+module V1 = struct
+  let v1_prefix = Api_version.v1_prefix
+
+  let get_pages =
+    Tezos_rpc.Service.get_service
+      ~description:"Retrieves a page by its page hash and returns its contents"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Data_encoding.bytes
+      Tezos_rpc.Path.(v1_prefix / "pages" /: Dac_plugin.raw_hash_rpc_arg)
+end
