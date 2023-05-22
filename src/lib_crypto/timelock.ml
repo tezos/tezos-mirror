@@ -319,6 +319,8 @@ let chest_encoding =
            Error "locked value is not in the rsa group"
          else if not @@ Z.equal rsa_public rsa2048 then
            Error "not RSA2048 rsa2048"
+         else if not @@ (Bytes.length ciphertext.payload > Crypto_box.tag_length)
+         then Error "unexpected payload (smaller than expected tag length)"
          else Ok {locked_value; rsa_public; ciphertext})
        (obj3
           (req "locked_value" n)
