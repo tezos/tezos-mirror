@@ -57,15 +57,6 @@ let evm_proxy_server_version proxy_server =
   let get_version_url = endpoint ^ "/version" in
   RPC.Curl.get get_version_url
 
-let get_transaction_count proxy_server address =
-  let parameters : JSON.u = `A [`String address; `String "latest"] in
-  let* transaction_count =
-    Evm_proxy_server.call_evm_rpc
-      proxy_server
-      {method_ = "eth_getTransactionCount"; parameters}
-  in
-  return JSON.(transaction_count |-> "result" |> as_int64)
-
 (** [next_evm_level ~sc_rollup_node ~node ~client] moves [sc_rollup_node] to
     the [node]'s next level. *)
 let next_evm_level ~sc_rollup_node ~node ~client =
@@ -291,14 +282,30 @@ let test_rpc_getBlockByNumber =
     ~error_msg:"Unexpected list of transactions, should be %%R, but got %%L" ;
   unit
 
+let transaction_count_request address =
+  Evm_proxy_server.
+    {
+      method_ = "eth_getTransactionCount";
+      parameters = `A [`String address; `String "latest"];
+    }
+
+let get_transaction_count proxy_server address =
+  let* transaction_count =
+    Evm_proxy_server.call_evm_rpc
+      proxy_server
+      (transaction_count_request address)
+  in
+  return JSON.(transaction_count |-> "result" |> as_int64)
+
 let test_rpc_getTransactionCount =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "get_transaction_count"]
     ~title:"RPC method eth_getTransactionCount"
   @@ fun protocol ->
-  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
-  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
+  let* {node; client; sc_rollup_node; evm_proxy_server; _} =
+    setup_evm_kernel protocol
+  in
   (* Force a level to got past the genesis block *)
   let* _level = next_evm_level ~sc_rollup_node ~node ~client in
   let* transaction_count =
@@ -308,6 +315,73 @@ let test_rpc_getTransactionCount =
   in
   Check.((transaction_count = 0L) int64)
     ~error_msg:"Expected a nonce of %R, but got %L" ;
+  unit
+
+let test_rpc_getTransactionCountBatch =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "get_transaction_count_as_batch"]
+    ~title:"RPC method eth_getTransactionCount in batch"
+  @@ fun protocol ->
+  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
+  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
+  (* Force a level to get past the genesis block *)
+  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+  let* transaction_count =
+    get_transaction_count
+      evm_proxy_server
+      Eth_account.bootstrap_accounts.(0).address
+  in
+  let* transaction_count_batch =
+    let* transaction_count =
+      Evm_proxy_server.batch_evm_rpc
+        evm_proxy_server
+        [transaction_count_request Eth_account.bootstrap_accounts.(0).address]
+    in
+    match JSON.as_list transaction_count with
+    | [transaction_count] ->
+        return JSON.(transaction_count |-> "result" |> as_int64)
+    | _ -> Test.fail "Unexpected result from batching one request"
+  in
+  Check.((transaction_count = transaction_count_batch) int64)
+    ~error_msg:"Nonce from a single request is %L, but got %R from batching it" ;
+  unit
+
+let test_rpc_batch =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "rpc"; "batch"]
+    ~title:"RPC batch requests"
+  @@ fun protocol ->
+  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
+  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
+  (* Force a level to get past the genesis block *)
+  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+  let* transaction_count, chain_id =
+    let transaction_count =
+      transaction_count_request Eth_account.bootstrap_accounts.(0).address
+    in
+    let chain_id =
+      Evm_proxy_server.{method_ = "eth_chainId"; parameters = `Null}
+    in
+    let* results =
+      Evm_proxy_server.batch_evm_rpc
+        evm_proxy_server
+        [transaction_count; chain_id]
+    in
+    match JSON.as_list results with
+    | [transaction_count; chain_id] ->
+        return
+          ( JSON.(transaction_count |-> "result" |> as_int64),
+            JSON.(chain_id |-> "result" |> as_int64) )
+    | _ -> Test.fail "Unexpected result from batching two requests"
+  in
+  Check.((transaction_count = 0L) int64)
+    ~error_msg:"Expected a nonce of %R, but got %L" ;
+  (* Default chain id for Ethereum custom networks, not chosen randomly. *)
+  let default_chain_id = 1337L in
+  Check.((chain_id = default_chain_id) int64)
+    ~error_msg:"Expected a chain_id of %R, but got %L" ;
   unit
 
 let test_l2_blocks_progression =
@@ -423,6 +497,8 @@ let register_evm_proxy_server ~protocols =
   test_rpc_getBalance protocols ;
   test_rpc_getBlockByNumber protocols ;
   test_rpc_getTransactionCount protocols ;
+  test_rpc_getTransactionCountBatch protocols ;
+  test_rpc_batch protocols ;
   test_l2_blocks_progression protocols ;
   test_l2_transfer protocols ;
   test_chunked_transaction protocols ;
