@@ -24,14 +24,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [activate gs_worker transport_layer] connects the given [gs_worker] and
-    [transport_layer]. (Dis)connections and messages of the transport layer are
-    forwarded to the GS worker. P2P output messages and (dis)connection requests
-    are forwarded from the GS worker to the transport layer. *)
+(** [activate gs_worker transport_layer ~app_messages_handler] connects the
+    given [gs_worker] and [transport_layer]. (Dis)connections and messages of
+    the transport layer are forwarded to the GS worker. P2P output messages and
+    (dis)connection requests are forwarded from the GS worker to the transport
+    layer.
+
+    The [app_messages_handler] is invoked when some application messages are put
+    by the Gossipsub worker in the application output stream.
+*)
 val activate :
   Gs_interface.Worker_instance.t ->
   ( Transport_layer_interface.p2p_message,
     Transport_layer_interface.peer_metadata,
     Transport_layer_interface.connection_metadata )
   P2p.t ->
+  app_messages_callback:
+    (Gs_interface.message -> Gs_interface.message_id -> unit tzresult Lwt.t) ->
   unit Lwt.t
