@@ -23,9 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_hacl
-
 (* -------- Helpers I/O functions -------- *)
+let blake : ?key:string -> string -> bytes =
+ fun ?key s ->
+  let key = Option.map Bytes.of_string key in
+  let module Blake2b = Hacl_star.Hacl.Blake2b_32 in
+  Blake2b.hash ?key (Bytes.of_string s) 32
+
 let add_path r n = r ^ "/" ^ n
 
 let read_enc filepath filename enc =
@@ -165,15 +169,13 @@ let gen_locked_value_opt rsa_public =
 
 (* The resulting prime has size 256 bits or slightly more. *)
 let hash_to_prime rsa_public ~time value key =
-  let personalization = Bytes.of_string "\032" in
-  let s =
+  let personalization = "\032" in
+  let to_hash =
     String.concat
       "\xff\x00\xff\x00\xff\x00\xff\x00"
       (Int.to_string time :: List.map Z.to_bits [rsa_public; value; key])
   in
-  let (Hacl.Blake2b.Hash hash_result) =
-    Hacl.Blake2b.direct ~key:personalization (Bytes.of_string s) 32
-  in
+  let hash_result = blake ~key:personalization to_hash in
   (* Beware, the function nextprime gives a biased distribution,
      using it here is fine as the input is already uniformly distributed *)
   Z.(nextprime (of_bits (Bytes.to_string hash_result)))
@@ -264,7 +266,7 @@ let precompute_timelock ?(locked_value = None) ?(precompute_path = None) ~time
   | None -> compute_tuple ()
   | Some filepath ->
       let brsa = Z.to_bits rsa2048 in
-      let file_prefix = Blake2B.(hash_string [brsa] |> to_hex) |> Hex.show in
+      let file_prefix = blake brsa |> Hex.of_bytes |> Hex.show in
       let filename = file_prefix ^ "_" ^ string_of_int time ^ ".json" in
       let file_exists = Sys.file_exists (add_path filepath filename) in
       if file_exists then read_enc filepath filename vdf_tuple_encoding
@@ -293,8 +295,7 @@ let proof_of_vdf_tuple rsa_public ~time vdf_tuple =
 let timelock_proof_to_symmetric_key rsa_public proof =
   let updated = Z.powm proof.vdf_tuple.unlocked_value proof.nonce rsa_public in
   let kdf_key = "Tezoskdftimelockv1" in
-  let to_hash = Z.to_string updated in
-  let hash = Blake2B.(to_bytes @@ hash_string ~key:kdf_key [to_hash]) in
+  let hash = blake ~key:kdf_key (Z.to_string updated) in
   Crypto_box.Secretbox.unsafe_of_bytes hash
 
 let locked_value_to_symmetric_key rsa_public ~time locked_value proof =
