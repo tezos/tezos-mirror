@@ -814,12 +814,12 @@ module Anonymous = struct
         Format.fprintf
           ppf
           "Delegate %a at level %a has already been denounced for a double %a."
-          pp_denunciation_kind
-          kind
           Signature.Public_key_hash.pp
           delegate
           Level.pp
-          level)
+          level
+          pp_denunciation_kind
+          kind)
       Data_encoding.(
         obj3
           (req "denunciation_kind" denunciation_kind_encoding)
