@@ -96,8 +96,8 @@ val pre_filter :
     to {!Protocol.Alpha_context.Operation.compare}.
 
     A manager operation is replaced only when the new operation's fee
-    and fee/gas ratio both exceed the old operation's by at least a
-    factor specified in the {!config}.
+    and fee/gas ratio both exceed (or match) the old operation's metrics
+    multiplied by the [replace_by_fee] factor specified in the {!config}.
 
     Precondition: both operations must be individually valid (to be
     able to call {!Protocol.Alpha_context.Operation.compare}). *)
@@ -121,6 +121,27 @@ val find_manager :
     successfully validated by the protocol. *)
 val fee_needed_to_overtake :
   op_to_overtake:Protocol.Alpha_context.packed_operation ->
+  candidate_op:Protocol.Alpha_context.packed_operation ->
+  int64 option
+
+(** Compute the minimal fee (expressed in mutez) that [candidate_op]
+    would need to have in order for the {!conflict_handler} to let it
+    replace [op_to_replace], when both operations are manager operations.
+
+    As specified in {!conflict_handler}, this means that
+    [candidate_op] with the returned fee needs to have both its fee and
+    its fee/gas ratio exceed (or match) [op_to_replace]'s same metrics
+    bumped by the {!config}'s [replace_by_fee_factor].
+
+    Return [None] when at least one operation is not a manager operation.
+
+    Also return [None] if both operations are manager operations but
+    there was an error while computing the needed fee. However, note
+    that this cannot happen when both manager operations have been
+    successfully validated by the protocol. *)
+val fee_needed_to_replace_by_fee :
+  config ->
+  op_to_replace:Protocol.Alpha_context.packed_operation ->
   candidate_op:Protocol.Alpha_context.packed_operation ->
   int64 option
 
