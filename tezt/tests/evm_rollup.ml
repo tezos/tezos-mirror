@@ -84,22 +84,19 @@ let wait_for_application ~sc_rollup_node ~node ~client apply () =
   let* start_level = Client.level client in
   let max_iteration = 10 in
   let tx_hash = apply () in
-  let next_level =
-    let rec go () =
-      (* Sleep few seconds to give a better chance to [tx_hash] of being
-         choosen. *)
-      let* () = Lwt_unix.sleep 5. in
-      let* new_level = next_evm_level ~sc_rollup_node ~node ~client in
-      if start_level + max_iteration < new_level then
-        Test.fail
-          "Baked more than %d blocks and the operation's application is still \
-           pending"
-          max_iteration
-      else go ()
-    in
-    go ()
+  let rec loop () =
+    let* () = Lwt_unix.sleep 5. in
+    let* new_level = next_evm_level ~sc_rollup_node ~node ~client in
+    if start_level + max_iteration < new_level then
+      Test.fail
+        "Baked more than %d blocks and the operation's application is still \
+         pending"
+        max_iteration ;
+    if Lwt.state tx_hash = Lwt.Sleep then loop () else unit
   in
-  Lwt.choose [tx_hash; next_level]
+  (* Using [Lwt.both] ensures that any exception thrown in [tx_hash] will be
+     thrown by [Lwt.both] as well. *)
+  Lwt.both tx_hash (loop ())
 
 let send_and_wait_until_tx_mined ~sc_rollup_node ~node ~client
     ~source_private_key ~to_public_key ~value ~evm_proxy_server_endpoint ?data
