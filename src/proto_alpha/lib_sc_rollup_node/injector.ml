@@ -31,6 +31,53 @@ module Block_cache =
   Aches_lwt.Lache.Make_result
     (Aches.Rache.Transfer (Aches.Rache.LRU) (Block_hash))
 
+let injector_operation_to_manager :
+    L1_operation.t -> Protocol.Alpha_context.packed_manager_operation = function
+  | Add_messages {messages} -> Manager (Sc_rollup_add_messages {messages})
+  | Cement {rollup; commitment = _} ->
+      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
+      Manager (Sc_rollup_cement {rollup})
+  | Publish {rollup; commitment} ->
+      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
+      let commitment = Sc_rollup_proto_types.Commitment.of_octez commitment in
+      Manager (Sc_rollup_publish {rollup; commitment})
+  | Refute {rollup; opponent; refutation} ->
+      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
+      let refutation =
+        Sc_rollup_proto_types.Game.refutation_of_octez refutation
+      in
+      Manager (Sc_rollup_refute {rollup; opponent; refutation})
+  | Timeout {rollup; stakers} ->
+      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
+      let stakers = Sc_rollup_proto_types.Game.index_of_octez stakers in
+      Manager (Sc_rollup_timeout {rollup; stakers})
+
+let injector_operation_of_manager :
+    type kind.
+    kind Protocol.Alpha_context.manager_operation -> L1_operation.t option =
+  function
+  | Sc_rollup_add_messages {messages} -> Some (Add_messages {messages})
+  | Sc_rollup_cement {rollup} ->
+      let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
+      let commitment = Octez_smart_rollup.Commitment.Hash.zero in
+      (* Just for printing *)
+      Some (Cement {rollup; commitment})
+  | Sc_rollup_publish {rollup; commitment} ->
+      let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
+      let commitment = Sc_rollup_proto_types.Commitment.to_octez commitment in
+      Some (Publish {rollup; commitment})
+  | Sc_rollup_refute {rollup; opponent; refutation} ->
+      let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
+      let refutation =
+        Sc_rollup_proto_types.Game.refutation_to_octez refutation
+      in
+      Some (Refute {rollup; opponent; refutation})
+  | Sc_rollup_timeout {rollup; stakers} ->
+      let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
+      let stakers = Sc_rollup_proto_types.Game.index_to_octez stakers in
+      Some (Timeout {rollup; stakers})
+  | _ -> None
+
 module Parameters :
   PARAMETERS
     with type state = Node_context.ro
@@ -153,7 +200,7 @@ module Proto_client = struct
       (Contents contents)
 
   let operation_size op =
-    manager_operation_size (L1_operation.to_manager_operation op)
+    manager_operation_size (injector_operation_to_manager op)
 
   (* The operation size overhead is an upper bound (in practice) of the overhead
      that will be added to a manager operation. To compute it we can use any
@@ -302,9 +349,7 @@ module Proto_client = struct
     let annotated_operations =
       List.map
         (fun operation ->
-          let (Manager operation) =
-            L1_operation.to_manager_operation operation
-          in
+          let (Manager operation) = injector_operation_to_manager operation in
           Annotated_manager_operation
             (Injection.prepare_manager_operation
                ~fee:Limit.unknown

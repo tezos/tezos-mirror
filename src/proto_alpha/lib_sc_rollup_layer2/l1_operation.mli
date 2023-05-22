@@ -40,13 +40,6 @@ type t =
 (** Encoding for L1 operations (used by injector for on-disk persistence). *)
 val encoding : t Data_encoding.t
 
-(** Manager operation for a given L1 operation. *)
-val to_manager_operation : t -> Protocol.Alpha_context.packed_manager_operation
-
-(** L1 operation corresponding to a manager operation if any. *)
-val of_manager_operation :
-  'a Protocol.Alpha_context.manager_operation -> t option
-
 (** Pretty printer (human readable) for L1 operations. *)
 val pp : Format.formatter -> t -> unit
 
