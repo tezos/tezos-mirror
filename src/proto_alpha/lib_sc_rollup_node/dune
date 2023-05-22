@@ -26,6 +26,7 @@
   tezos-dac-lib
   tezos-dac-client-lib
   tezos-shell-services
+  octez-smart-rollup
   tezos-smart-rollup-alpha
   tezos-smart-rollup-layer2-alpha
   tezos-layer2-utils-alpha
@@ -62,6 +63,7 @@
   -open Tezos_dac_lib
   -open Tezos_dac_client_lib
   -open Tezos_shell_services
+  -open Octez_smart_rollup
   -open Tezos_smart_rollup_alpha
   -open Tezos_smart_rollup_layer2_alpha
   -open Tezos_layer2_utils_alpha

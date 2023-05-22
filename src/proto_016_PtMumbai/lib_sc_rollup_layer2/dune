@@ -17,4 +17,5 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_protocol_016_PtMumbai
-  -open Octez_injector))
+  -open Octez_injector
+  -open Octez_smart_rollup))

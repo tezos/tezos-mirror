@@ -25,6 +25,7 @@ depends: [
   "tezos-dal-node-services"
   "tezos-dal-node-lib"
   "tezos-shell-services"
+  "octez-smart-rollup"
   "tezos-smart-rollup-016-PtMumbai"
   "tezos-smart-rollup-layer2-016-PtMumbai"
   "tezos-layer2-utils-016-PtMumbai"

@@ -4095,12 +4095,13 @@ let octez_smart_rollup_node_lib =
         octez_base_unix;
         octez_stdlib_unix |> open_;
         octez_crypto |> open_;
+        octez_client_base |> open_;
+        octez_client_base_unix |> open_;
         cohttp_lwt_unix;
         octez_node_config;
         prometheus_app;
         octez_injector |> open_;
         octez_version_value |> open_;
-        octez_client_base |> open_;
         octez_smart_rollup_lib |> open_;
       ]
 
@@ -6037,7 +6038,7 @@ let hash = Protocol.hash
             octez_base |> open_ ~m:"TzPervasives";
             main |> open_;
             octez_injector |> open_;
-            octez_smart_rollup_lib;
+            octez_smart_rollup_lib |> open_;
           ]
         ~inline_tests:ppx_expect
         ~linkall:true
@@ -6073,6 +6074,7 @@ let hash = Protocol.hash
             octez_dac_lib |> if_ N.(number >= 018) |> open_;
             octez_dac_client_lib |> if_ N.(number >= 018) |> open_;
             octez_shell_services |> open_;
+            octez_smart_rollup_lib |> open_;
             octez_sc_rollup |> if_some |> open_;
             octez_sc_rollup_layer2 |> if_some |> open_;
             layer2_utils |> if_some |> open_;

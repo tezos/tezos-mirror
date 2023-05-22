@@ -28,6 +28,7 @@ depends: [
   "tezos-dac-lib"
   "tezos-dac-client-lib"
   "tezos-shell-services"
+  "octez-smart-rollup"
   "tezos-smart-rollup-alpha"
   "tezos-smart-rollup-layer2-alpha"
   "tezos-layer2-utils-alpha"

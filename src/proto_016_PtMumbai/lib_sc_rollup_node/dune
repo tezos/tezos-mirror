@@ -23,6 +23,7 @@
   tezos-dal-node-services
   tezos-dal-node-lib
   tezos-shell-services
+  octez-smart-rollup
   tezos-smart-rollup-016-PtMumbai
   tezos-smart-rollup-layer2-016-PtMumbai
   tezos-layer2-utils-016-PtMumbai
@@ -56,6 +57,7 @@
   -open Tezos_workers
   -open Tezos_dal_node_lib
   -open Tezos_shell_services
+  -open Octez_smart_rollup
   -open Tezos_smart_rollup_016_PtMumbai
   -open Tezos_smart_rollup_layer2_016_PtMumbai
   -open Tezos_layer2_utils_016_PtMumbai
