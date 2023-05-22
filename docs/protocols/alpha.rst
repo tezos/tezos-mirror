@@ -24,6 +24,12 @@ Zero Knowledge Rollups (ongoing)
 Data Availability Layer (ongoing)
 ---------------------------------
 
+Adaptive Inflation (ongoing)
+----------------------------
+
+- Introduce feature flag for Adaptive Inflation. (MR :gl:`!8566`)
+
+
 Gas improvements
 ----------------
 
@@ -83,3 +89,8 @@ Internal
 
 - Move notion of Smart rollup address in the shell to make it common to all protocols,
   and expose it in the environment. (MR :gl:`!8562`)
+
+- Refactoring : stake splitted between a frozen part and a delegated part. (MR :gl:`!8051`)
+
+- Refactoring : rewards computed as a relative portion of the total amount of tez
+  rewarded per minute (about 85tez/min). (MR :gl:`!8657`)
