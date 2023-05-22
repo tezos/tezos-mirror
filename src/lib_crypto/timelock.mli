@@ -200,11 +200,11 @@ val get_plaintext_size : chest -> int
 module Internal_for_tests : sig
   val locked_value_to_z : locked_value -> Z.t
 
+  val rsa2048 : Z.t
+
   val unlocked_value_to_z : unlocked_value -> Z.t
 
   val vdf_proof_to_z : vdf_proof -> Z.t
-
-  val rsa_public_to_z : rsa_public -> Z.t
 
   val prove_wesolowski : time:int -> locked_value -> unlocked_value -> vdf_proof
 
