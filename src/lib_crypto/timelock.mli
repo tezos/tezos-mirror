@@ -138,12 +138,6 @@ val precompute_timelock :
     (to verify the [vdf_tuple] is correct). *)
 val proof_of_vdf_tuple : time:int -> vdf_tuple -> locked_value * timelock_proof
 
-(** Receives a claim opening with a proof and potentially secret.
-    If the proof is valid hashes the opening using
-    [unlocked_value_to_symmetric_key], returns None otherwise. *)
-val locked_value_to_symmetric_key :
-  time:int -> locked_value -> timelock_proof -> symmetric_key option
-
 (** encrypt using authenticated encryption, i.e. ciphertext contains
     a ciphertext and a message authentication code. *)
 val encrypt : symmetric_key -> bytes -> ciphertext
