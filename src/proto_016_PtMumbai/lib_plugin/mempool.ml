@@ -564,22 +564,31 @@ let is_manager_operation op =
 let compute_fee_and_gas_limit {protocol_data = Operation_data data; _} =
   compute_manager_contents_fee_and_gas_limit data.contents
 
+let gas_as_q gas = Gas.Arith.integral_to_z gas |> Q.of_bigint
+
+let fee_and_ratio_as_q fee gas =
+  let fee = Tez.to_mutez fee |> Z.of_int64 |> Q.of_bigint in
+  let gas = gas_as_q gas in
+  let ratio = Q.div fee gas in
+  (fee, ratio)
+
+let bumped_fee_and_ratio_as_q config fee gas =
+  let bump = Q.mul config.replace_by_fee_factor in
+  let fee, ratio = fee_and_ratio_as_q fee gas in
+  (bump fee, bump ratio)
+
 (** Determine whether the new manager operation is sufficiently better
     than the old manager operation to replace it. Sufficiently better
     means that the new operation's fee and fee/gas ratio are both
     greater than or equal to the old operation's same metrics bumped by
     the factor [config.replace_by_fee_factor]. *)
-let better_fees_and_ratio =
-  let bump config q = Q.mul q config.replace_by_fee_factor in
-  fun config old_gas old_fee new_gas new_fee ->
-    let old_fee = Tez.to_mutez old_fee |> Z.of_int64 |> Q.of_bigint in
-    let old_gas = Gas.Arith.integral_to_z old_gas |> Q.of_bigint in
-    let new_fee = Tez.to_mutez new_fee |> Z.of_int64 |> Q.of_bigint in
-    let new_gas = Gas.Arith.integral_to_z new_gas |> Q.of_bigint in
-    let old_ratio = Q.div old_fee old_gas in
-    let new_ratio = Q.div new_fee new_gas in
-    Q.compare new_ratio (bump config old_ratio) >= 0
-    && Q.compare new_fee (bump config old_fee) >= 0
+let better_fees_and_ratio config old_gas old_fee new_gas new_fee =
+  let bumped_old_fee, bumped_old_ratio =
+    bumped_fee_and_ratio_as_q config old_fee old_gas
+  in
+  let new_fee, new_ratio = fee_and_ratio_as_q new_fee new_gas in
+  Q.compare new_fee bumped_old_fee >= 0
+  && Q.compare new_ratio bumped_old_ratio >= 0
 
 (** [conflict_handler config] returns a conflict handler for
     {!Mempool.add_operation} (see {!Mempool.conflict_handler}).
