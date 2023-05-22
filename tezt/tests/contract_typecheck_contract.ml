@@ -175,9 +175,9 @@ code {
   in
   unit
 
-(** The address of an implicit account followed by some entrypoint typechecks:
-    - at type address if the entrypoint is not "default",
-    - at type (contract <ty>) if the entrypoint is empty and ty is unit. *)
+(** An acceptable handle to an implicit account has two possibilities.
+    - it is of type address if the entrypoint is not "default",
+    - it is of type (contract <ty>) if the entrypoint is empty and ty is unit or ticket. *)
 let test_implicit =
   Protocol.register_test ~__FILE__ ~title:"Test Implicit" ~tags
   @@ fun protocol ->
@@ -185,8 +185,15 @@ let test_implicit =
   let tz1 = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" in
   let* () = check_address client tz1 in
   let* () = check_contract_ok client tz1 None "unit" in
+  let* () = check_contract_ok client tz1 None "ticket string" in
   let no_entrypoint_error = "Contract has no entrypoint named a" in
-  let type_mismatch_error = "Type nat is not compatible with type unit." in
+  let type_mismatch_error =
+    match protocol with
+    | Alpha ->
+        "is not acceptable as a handle to an implicit account, whose \
+         parameters type can only be unit or ticket <ty>"
+    | Mumbai | Nairobi -> "Type nat is not compatible with type unit."
+  in
   let* () =
     check_contract_ko client tz1 (Some "a") "unit" no_entrypoint_error
   in

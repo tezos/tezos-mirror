@@ -172,6 +172,11 @@ type error +=
   | Inconsistent_types : Script.location * Script.expr * Script.expr -> error
 
 type error +=
+  | Unexpected_implicit_account_parameters_type :
+      Script.location * Script.expr
+      -> error
+
+type error +=
   | Inconsistent_memo_sizes : Sapling.Memo_size.t * Sapling.Memo_size.t -> error
 
 type error += Unordered_map_keys of Script.location * Script.expr

@@ -4595,7 +4595,9 @@ and parse_contract :
                        (match error_details with
                        | Fast -> (Inconsistent_types_fast : err)
                        | Informative loc ->
-                           trace_of_error @@ default_ty_eq_error loc arg unit_t)
+                           trace_of_error
+                           @@ Unexpected_implicit_account_parameters_type
+                                (loc, serialize_ty_for_error arg))
             in
             Gas_monad.run ctxt typecheck >|? fun (v, ctxt) -> (ctxt, v)
           else

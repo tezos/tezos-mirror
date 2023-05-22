@@ -588,6 +588,21 @@ let () =
     (function
       | Inconsistent_types (loc, tya, tyb) -> Some (loc, tya, tyb) | _ -> None)
     (fun (loc, tya, tyb) -> Inconsistent_types (loc, tya, tyb)) ;
+  (* Inconsistent types *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.unexpected_implicit_account_parameters_type"
+    ~title:"Unexpected implicit account parameters type"
+    ~description:
+      "An implicit account can only accept either a unit or a ticket value as \
+       a call parameter."
+    (obj2
+       (req "loc" Script.location_encoding)
+       (req "type" Script.expr_encoding))
+    (function
+      | Unexpected_implicit_account_parameters_type (loc, ty) -> Some (loc, ty)
+      | _ -> None)
+    (fun (loc, ty) -> Unexpected_implicit_account_parameters_type (loc, ty)) ;
   (* Inconsistent memo_sizes *)
   register_error_kind
     `Permanent

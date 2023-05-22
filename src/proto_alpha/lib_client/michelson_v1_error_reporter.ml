@@ -811,6 +811,16 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                       print_execution_trace
                       trace)
               trace
+        | Unexpected_implicit_account_parameters_type (loc, expr) ->
+            Format.fprintf
+              ppf
+              "@[<hov 0>@[<hov 2>%aExpression@ %a@]@ @[<hov 2>is not \
+               acceptable as a handle to an implicit account, whose parameters \
+               type can only be unit or ticket <ty>.@]@]"
+              print_loc
+              loc
+              print_expr
+              expr
         | err -> Format.fprintf ppf "%a" Environment.Error_monad.pp err) ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
