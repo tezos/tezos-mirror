@@ -43,6 +43,10 @@ val find :
   Contract_repr.t ->
   Signature.Public_key_hash.t option tzresult Lwt.t
 
+(** [is_delegate ctxt pkh] returns whether [pkh] is a delegate. *)
+val is_delegate :
+  Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
+
 (** [init ctxt contract delegate] sets the [delegate] associated to [contract].
 
     This function assumes that [contract] does not have a delegate already. *)

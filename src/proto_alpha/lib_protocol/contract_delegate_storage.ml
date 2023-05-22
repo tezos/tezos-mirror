@@ -47,6 +47,13 @@ let check_not_tz4 : Signature.Public_key_hash.t -> unit tzresult = function
 
 let find = Storage.Contract.Delegate.find
 
+let is_delegate ctxt pkh =
+  let open Lwt_result_syntax in
+  let+ delegate = find ctxt (Contract_repr.Implicit pkh) in
+  match delegate with
+  | None -> false
+  | Some delegate -> Signature.Public_key_hash.(delegate = pkh)
+
 let init ctxt contract delegate =
   check_not_tz4 delegate >>?= fun () ->
   Storage.Contract.Delegate.init ctxt contract delegate >>=? fun ctxt ->

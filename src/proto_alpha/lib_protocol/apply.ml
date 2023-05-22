@@ -43,6 +43,7 @@ type error +=
   | Multiple_revelation
   | Invalid_transfer_to_sc_rollup
   | Invalid_sender of Destination.t
+  | Invalid_staking_destination of public_key_hash
 
 let () =
   register_error_kind
@@ -217,7 +218,24 @@ let () =
         c)
     Data_encoding.(obj1 (req "contract" Destination.encoding))
     (function Invalid_sender c -> Some c | _ -> None)
-    (fun c -> Invalid_sender c)
+    (fun c -> Invalid_sender c) ;
+  register_error_kind
+    `Permanent
+    ~id:"operations.invalid_staking_destination"
+    ~title:"Invalid destination for a stake operation"
+    ~description:
+      "The transaction destination must be a registered delegate. Additionally \
+       it must equal the operation source for now."
+    ~pp:(fun ppf pkh ->
+      Format.fprintf
+        ppf
+        "Invalid destination (%a) for this stake operation. Only registered \
+         delegate are allowed."
+        Signature.Public_key_hash.pp
+        pkh)
+    Data_encoding.(obj1 (req "destination" Contract.implicit_encoding))
+    (function Invalid_staking_destination pkh -> Some pkh | _ -> None)
+    (fun pkh -> Invalid_staking_destination pkh)
 
 open Apply_results
 open Apply_operation_result
@@ -266,6 +284,40 @@ let apply_transaction_to_implicit ~ctxt ~sender ~amount ~pkh ~before_operation =
         storage_size = Z.zero;
         paid_storage_size_diff = Z.zero;
         allocated_destination_contract = not already_allocated;
+      }
+  in
+  return (ctxt, result, [])
+
+let apply_stake ~ctxt ~sender ~amount ~delegate ~before_operation =
+  let contract = Contract.Implicit delegate in
+  (* Staking of zero is forbidden. *)
+  error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
+  error_unless
+    Signature.Public_key_hash.(sender = delegate)
+    (Invalid_staking_destination delegate)
+  >>?= fun () ->
+  Contract.is_delegate ctxt delegate >>=? fun is_delegate ->
+  error_unless is_delegate (Invalid_staking_destination delegate) >>?= fun () ->
+  Token.transfer
+    ctxt
+    (`Contract (Contract.Implicit sender))
+    (`Frozen_deposits delegate)
+    amount
+  >>=? fun (ctxt, balance_updates) ->
+  (* Since [delegate] is an already existing delegate, it is already allocated. *)
+  let allocated_destination_contract = false in
+  let result =
+    Transaction_to_contract_result
+      {
+        storage = None;
+        lazy_storage_diff = None;
+        balance_updates;
+        ticket_receipt = [];
+        originated_contracts = [];
+        consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+        storage_size = Z.zero;
+        paid_storage_size_diff = Z.zero;
+        allocated_destination_contract;
       }
   in
   return (ctxt, result, [])
@@ -740,20 +792,25 @@ let apply_manager_operation :
         ctxt
         parameters
       >>?= fun (parameters, ctxt) ->
-      (* Only allow [Unit] parameter to implicit accounts. *)
-      (match Micheline.root parameters with
-      | Prim (_, Michelson_v1_primitives.D_Unit, [], _) -> Result.return_unit
-      | _ -> error (Script_interpreter.Bad_contract_parameter source_contract))
-      >>?= fun () ->
-      (if Entrypoint.is_default entrypoint then Result.return_unit
-      else error (Script_tc_errors.No_such_entrypoint entrypoint))
-      >>?= fun () ->
-      apply_transaction_to_implicit
-        ~ctxt
-        ~sender:source_contract
-        ~amount
-        ~pkh
-        ~before_operation:ctxt_before_op
+      (match (Entrypoint.to_string entrypoint, Micheline.root parameters) with
+      | "default", Prim (_, D_Unit, [], _) ->
+          apply_transaction_to_implicit
+            ~ctxt
+            ~sender:source_contract
+            ~amount
+            ~pkh
+            ~before_operation:ctxt_before_op
+      | "stake", Prim (_, D_Unit, [], _) ->
+          apply_stake
+            ~ctxt
+            ~sender:source
+            ~amount
+            ~delegate:pkh
+            ~before_operation:ctxt_before_op
+      | ("default" | "stake"), _ ->
+          (* Only allow [Unit] parameter to implicit accounts' default and stake entrypoints. *)
+          tzfail (Script_interpreter.Bad_contract_parameter source_contract)
+      | _ -> tzfail (Script_tc_errors.No_such_entrypoint entrypoint))
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
   | Transaction
       {amount; parameters; destination = Originated contract_hash; entrypoint}

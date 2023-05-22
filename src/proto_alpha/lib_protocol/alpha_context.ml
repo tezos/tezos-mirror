@@ -363,6 +363,8 @@ module Contract = struct
 
   let get_manager_key = Contract_manager_storage.get_manager_key
 
+  let is_delegate = Contract_delegate_storage.is_delegate
+
   module Delegate = struct
     let find = Contract_delegate_storage.find
 
