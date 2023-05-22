@@ -47,11 +47,6 @@
 (** We will time-lock symmetric keys to then handle arbitrary bytes *)
 type symmetric_key
 
-(** RSA public key to define a group in which we will work.
-    The key is an integer n = p*q with p, q primes number. The group we work in
-    is the set of inversible mod n. *)
-type rsa_public
-
 (** Locked value that can be accessed with a number of sequential operations.
     It is concretely a member of the RSA group. *)
 type locked_value
@@ -167,11 +162,7 @@ val proof_encoding : timelock_proof Data_encoding.t
 
 (** Contains a value (the decryption of the ciphertext) that can be provably
     recovered in [time] sequential operation. *)
-type chest = {
-  locked_value : locked_value;
-  rsa_public : rsa_public;
-  ciphertext : ciphertext;
-}
+type chest = {locked_value : locked_value; ciphertext : ciphertext}
 
 val chest_encoding : chest Data_encoding.t
 

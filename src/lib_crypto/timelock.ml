@@ -78,8 +78,6 @@ let decrypt symmetric_key ciphertext =
     ciphertext.nonce
 
 (* -------- Timelock types, conversion functions and encodings -------- *)
-(* RSA group rsa2048 = p * q where p and q are prime numbers *)
-type rsa_public = Z.t
 
 (* default RSA rsa2048: the 2048 bit RSA rsa2048 challenge
    c.f. https://en.wikipedia.org/wiki/RSA_numbers#RSA-2048 *)
@@ -296,29 +294,20 @@ let locked_value_to_symmetric_key ~time locked_value proof =
   else None
 
 (* -------- Timelock high level functions (used in Tezos) -------- *)
-type chest = {
-  locked_value : locked_value;
-  rsa_public : rsa_public;
-  ciphertext : ciphertext;
-}
+type chest = {locked_value : locked_value; ciphertext : ciphertext}
 
 let chest_encoding =
   let open Data_encoding in
   def "timelock.chest"
   @@ conv_with_guard
-       (fun chest -> (chest.locked_value, chest.rsa_public, chest.ciphertext))
-       (fun (locked_value, rsa_public, ciphertext) ->
-         if Z.Compare.(locked_value < Z.zero || locked_value >= rsa_public) then
+       (fun chest -> (chest.locked_value, chest.ciphertext))
+       (fun (locked_value, ciphertext) ->
+         if Z.Compare.(locked_value < Z.zero) then
            Error "locked value is not in the rsa group"
-         else if not @@ Z.equal rsa_public rsa2048 then
-           Error "not RSA2048 rsa2048"
          else if not @@ (Bytes.length ciphertext.payload > Crypto_box.tag_length)
          then Error "unexpected payload (smaller than expected tag length)"
-         else Ok {locked_value; rsa_public; ciphertext})
-       (obj3
-          (req "locked_value" n)
-          (req "rsa_public" n)
-          (req "ciphertext" ciphertext_encoding))
+         else Ok {locked_value; ciphertext})
+       (obj2 (req "locked_value" n) (req "ciphertext" ciphertext_encoding))
 
 type chest_key = timelock_proof
 
@@ -333,7 +322,7 @@ let create_chest_and_chest_key ?(precompute_path = None) ~payload ~time () =
   in
   let sym_key = timelock_proof_to_symmetric_key proof in
   let ciphertext = encrypt sym_key payload in
-  ({locked_value; rsa_public = rsa2048; ciphertext}, proof)
+  ({locked_value; ciphertext}, proof)
 
 let create_chest_key chest ~time = unlock_and_prove ~time chest.locked_value
 
