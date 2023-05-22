@@ -410,14 +410,14 @@ let test_l2_deploy =
       ()
   in
   let contract_compiled_file = kernel_inputs_path ^ "/storage.bin" in
-  let send_deploy =
+  let send_deploy () =
     Eth_cli.deploy
       ~source_private_key:sender.private_key
       ~endpoint:evm_proxy_server_endpoint
       ~abi:"simpleStorage"
       ~bin:contract_compiled_file
   in
-  let* contract_address =
+  let* contract_address, tx_hash =
     wait_for_application ~sc_rollup_node ~node ~client send_deploy ()
   in
   let* code_in_kernel =
@@ -430,6 +430,18 @@ let test_l2_deploy =
   in
   Check.((code_in_kernel = expected_code) string)
     ~error_msg:"Unexpected code %L, it should be %R" ;
+  (* The transaction was a contract creation, the transaction object
+     must not contain the [to] field. *)
+  let* tx_object =
+    Eth_cli.transaction_get ~endpoint:evm_proxy_server_endpoint ~tx_hash
+  in
+  (match tx_object with
+  | Some tx_object ->
+      Check.((tx_object.to_ = None) (option string))
+        ~error_msg:
+          "The transaction object of a contract creation should not have the \
+           [to] field present"
+  | None -> Test.fail "The transaction object of %s should be available" tx_hash) ;
   unit
 
 let transfer ?data protocol =
@@ -448,7 +460,7 @@ let transfer ?data protocol =
   let* sender_nonce = get_transaction_count evm_proxy_server sender.address in
   (* We always send less than the balance, to ensure it always works. *)
   let value = Wei.(sender_balance - one) in
-  let* _tx_hash =
+  let* tx_hash =
     send_and_wait_until_tx_mined
       ~sc_rollup_node
       ~node
@@ -474,6 +486,23 @@ let transfer ?data protocol =
   Check.((new_sender_nonce = Int64.succ sender_nonce) int64)
     ~error_msg:
       "Unexpected sender nonce after transfer, should be %R, but got %L" ;
+  (* Perform some sanity checks on the transaction object produced by the
+     kernel. *)
+  let* tx_object =
+    Eth_cli.transaction_get ~endpoint:evm_proxy_server_endpoint ~tx_hash
+  in
+  let tx_object =
+    match tx_object with
+    | Some tx_object -> tx_object
+    | None ->
+        Test.fail "The transaction object of %s should be available" tx_hash
+  in
+  Check.((tx_object.from = sender.address) string)
+    ~error_msg:"Unexpected transaction's sender" ;
+  Check.((tx_object.to_ = Some receiver.address) (option string))
+    ~error_msg:"Unexpected transaction's receiver" ;
+  Check.((tx_object.value = value) Wei.typ)
+    ~error_msg:"Unexpected transaction's value" ;
   unit
 
 let test_l2_transfer =

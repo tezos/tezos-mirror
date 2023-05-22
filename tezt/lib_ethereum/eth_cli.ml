@@ -25,19 +25,22 @@
 
 let path = "eth"
 
-let spawn_command_and_read command decode =
+let spawn_command_and_read_json command decode =
   let process = Process.spawn path command in
   let* output = Process.check_and_read_stdout process in
   return (JSON.parse ~origin:"eth_spawn_command" output |> decode)
 
+let spawn_command_and_read_string command =
+  let process = Process.spawn path command in
+  Process.check_and_read_stdout process
+
 let spawn_command command =
   let process = Process.spawn path command in
-  let* output = Process.check process in
-  return output
+  Process.check process
 
 let balance ~account ~endpoint =
   let* balance =
-    spawn_command_and_read
+    spawn_command_and_read_json
       ["address:balance"; account; "--network"; endpoint]
       JSON.as_int
   in
@@ -45,7 +48,7 @@ let balance ~account ~endpoint =
 
 let transaction_send ~source_private_key ~to_public_key ~value ~endpoint ?data
     () =
-  spawn_command_and_read
+  spawn_command_and_read_json
     ([
        "transaction:send";
        "--pk";
@@ -60,22 +63,41 @@ let transaction_send ~source_private_key ~to_public_key ~value ~endpoint ?data
     @ match data with Some data -> ["--data"; data] | None -> [])
     JSON.as_string
 
+let transaction_get ~endpoint ~tx_hash =
+  let* output =
+    spawn_command_and_read_string
+      ["transaction:get"; tx_hash; "--network"; endpoint]
+  in
+  let output = String.trim output in
+  if output = "null" then return None
+  else
+    return
+      (Some
+         (JSON.parse ~origin:"transaction_get" output
+         |> Transaction.transaction_object_of_json))
+
 let get_block ~block_id ~endpoint =
-  spawn_command_and_read
+  spawn_command_and_read_json
     ["block:get"; block_id; "--network"; endpoint]
     Block.of_json
 
 let block_number ~endpoint =
-  spawn_command_and_read ["block:number"; "--network"; endpoint] JSON.as_int
+  spawn_command_and_read_json
+    ["block:number"; "--network"; endpoint]
+    JSON.as_int
 
 let add_abi ~label ~abi () = spawn_command ["abi:add"; label; abi]
 
-let deploy ~source_private_key ~endpoint ~abi ~bin () =
+let deploy ~source_private_key ~endpoint ~abi ~bin =
   let decode json =
     let open JSON in
-    json |-> "receipt" |-> "contractAddress" |> as_string
+    let contract_address =
+      json |-> "receipt" |-> "contractAddress" |> as_string
+    in
+    let tx_hash = json |-> "receipt" |-> "transactionHash" |> as_string in
+    (contract_address, tx_hash)
   in
-  spawn_command_and_read
+  spawn_command_and_read_json
     [
       "contract:deploy";
       "--pk";
