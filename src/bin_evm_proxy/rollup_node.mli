@@ -78,6 +78,9 @@ module type S = sig
   val transaction_object :
     Ethereum_types.hash ->
     Ethereum_types.transaction_object option tzresult Lwt.t
+
+  (** [txpool ()] returns the pending and queued transactions. *)
+  val txpool : unit -> Ethereum_types.txpool tzresult Lwt.t
 end
 
 (** Instantiate a module of type {!S} that communicates with a rollup

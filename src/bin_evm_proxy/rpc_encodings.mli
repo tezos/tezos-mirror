@@ -249,3 +249,6 @@ module Get_estimate_gas :
   METHOD
     with type m_input = Ethereum_types.call
      and type m_output = Ethereum_types.quantity
+
+module Txpool_content :
+  METHOD with type m_input = unit and type m_output = Ethereum_types.txpool

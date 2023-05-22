@@ -162,3 +162,56 @@ let nth_block ~full_transaction_object:_ _n = return (block ())
 let transaction_receipt _tx_hash = return (transaction_receipt ())
 
 let transaction_object _tx_hash = return (Some transaction_object)
+
+let tx_pending =
+  {
+    blockHash = None;
+    blockNumber = None;
+    from = bootstrap_address;
+    gas = qty_f Z.zero;
+    gasPrice = qty_f Z.zero;
+    hash =
+      Hash "af953a2d01f55cfe080c0c94150a60105e8ac3d51153058a1f03dd239dd08586";
+    input = Some (Hash "");
+    nonce = qty_f Z.zero;
+    to_ = Some bootstrap_address2;
+    transactionIndex = qty_f Z.zero;
+    value = qty_f Z.zero;
+    v = qty_f Z.zero;
+    r = hash_f @@ "00";
+    s = hash_f @@ "00";
+  }
+
+let tx_queued =
+  {
+    blockHash = None;
+    blockNumber = None;
+    from = bootstrap_address2;
+    gas = qty_f Z.zero;
+    gasPrice = qty_f Z.zero;
+    hash =
+      Hash "af953a2d01f55cfe080c0c94150a60105e8ac3d51153058a1f03dd239dd08588";
+    input = Some (Hash "0x");
+    nonce = qty_f Z.zero;
+    to_ = Some bootstrap_address;
+    transactionIndex = qty_f Z.zero;
+    value = qty_f Z.zero;
+    v = qty_f Z.zero;
+    r = hash_f @@ "00";
+    s = hash_f @@ "00";
+  }
+
+let txpool _ =
+  return
+    {
+      pending =
+        AddressMap.add
+          bootstrap_address
+          (NonceMap.add Z.zero tx_pending NonceMap.empty)
+          AddressMap.empty;
+      queued =
+        AddressMap.add
+          bootstrap_address2
+          (NonceMap.add Z.zero tx_queued NonceMap.empty)
+          AddressMap.empty;
+    }

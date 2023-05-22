@@ -127,6 +127,9 @@ let dispatch_input
     | Eth_call.Input _ -> return (Eth_call.Output (Ok Mockup.call))
     | Get_estimate_gas.Input _ ->
         return (Get_estimate_gas.Output (Ok Mockup.gas_price))
+    | Txpool_content.Input _ ->
+        let* txpool = Rollup_node_rpc.txpool () in
+        return (Txpool_content.Output (Ok txpool))
     | _ -> Error_monad.failwith "Unsupported method\n%!"
   in
   return (output, id)
