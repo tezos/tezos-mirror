@@ -114,7 +114,20 @@ let () =
             else 100. *. diff /. divisor
           in
           Printf.printf ",%f,%f,%f,%f\n" final_min final_max diff change ;
-          if change > 20. then
+          (* For  small values (let's say lower than 10ns), a 20% evolution
+             amounts to a maximum of 2ns. That's not much. So in this case,
+             let's require a change by more than 2ns.
+             However, while it's indeed not much for the constant part of a
+             complexity model, it can be a lot for coefficents (linear,
+             quadratic, etc.), that are sometimes smaller than 1, but can make
+             a huge difference if their value doubles for instance. So let's
+             apply this rule only to constant parts of complexity models, which
+             are usually recognized by ending with 'const' or 'intercept'. *)
+          let is_const =
+            String.ends_with ~suffix:"const" name
+            || String.ends_with ~suffix:"intercept" name
+          in
+          if change > 20. && ((not is_const) || diff > 2.) then
             Printf.eprintf "%f%% regression for %s.\n" change name
       | _, _ -> Printf.printf ",,,,\n")
     all_param_names ;
