@@ -2673,17 +2673,19 @@ module Delegate : sig
   val already_slashed_for_double_baking :
     context -> public_key_hash -> Level.t -> bool tzresult Lwt.t
 
+  type punishing_amounts = {reward : Tez.t; amount_to_burn : Tez.t}
+
   val punish_double_endorsing :
     context ->
     public_key_hash ->
     Level.t ->
-    (context * Tez.t * Receipt.balance_updates) tzresult Lwt.t
+    (context * punishing_amounts) tzresult Lwt.t
 
   val punish_double_baking :
     context ->
     public_key_hash ->
     Level.t ->
-    (context * Tez.t * Receipt.balance_updates) tzresult Lwt.t
+    (context * punishing_amounts) tzresult Lwt.t
 
   val full_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
 

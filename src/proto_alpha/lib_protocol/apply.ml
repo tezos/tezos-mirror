@@ -1887,7 +1887,13 @@ let punish_delegate ctxt delegate level mistake mk_result ~payload_producer =
     | `Double_baking -> Delegate.punish_double_baking
     | `Double_endorsing -> Delegate.punish_double_endorsing
   in
-  punish ctxt delegate level >>=? fun (ctxt, reward, punish_balance_updates) ->
+  punish ctxt delegate level >>=? fun (ctxt, {reward; amount_to_burn}) ->
+  Token.transfer
+    ctxt
+    (`Frozen_deposits delegate)
+    `Double_signing_punishments
+    amount_to_burn
+  >>=? fun (ctxt, punish_balance_updates) ->
   Token.transfer
     ctxt
     (`Frozen_deposits delegate)
