@@ -129,6 +129,8 @@ module type T = sig
 
   module RPC_context : [%sig "v10/RPC_context.mli"]
 
+  module Context_binary : [%sig "v10/context_binary.mli"]
+
   module Wasm_2_0_0 : [%sig "v10/wasm_2_0_0.mli"]
 
   module Plonk : [%sig "v10/plonk.mli"]

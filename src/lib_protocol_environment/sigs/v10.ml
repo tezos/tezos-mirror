@@ -12005,6 +12005,49 @@ end
 # 130 "v10.in.ml"
 
 
+  module Context_binary : sig
+# 1 "v10/context_binary.mli"
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+type t
+
+type tree
+
+module Tree :
+  Context.TREE
+    with type t = t
+    with type tree = tree
+    with type key = string list
+    with type value = bytes
+
+val make_empty_context : ?root:string -> unit -> t
+end
+# 132 "v10.in.ml"
+
+
   module Wasm_2_0_0 : sig
 # 1 "v10/wasm_2_0_0.mli"
 (*****************************************************************************)
@@ -12078,7 +12121,7 @@ module Make
   val get_info : Tree.tree -> info Lwt.t
 end
 end
-# 132 "v10.in.ml"
+# 134 "v10.in.ml"
 
 
   module Plonk : sig
@@ -12197,7 +12240,7 @@ val scalar_array_encoding : scalar array Data_encoding.t
     on the given [inputs] according to the [public_parameters]. *)
 val verify : public_parameters -> verifier_inputs -> proof -> bool
 end
-# 134 "v10.in.ml"
+# 136 "v10.in.ml"
 
 
   module Dal : sig
@@ -12320,7 +12363,7 @@ val verify_page :
   page_proof ->
   (bool, [> `Segment_index_out_of_range | `Page_length_mismatch]) Result.t
 end
-# 136 "v10.in.ml"
+# 138 "v10.in.ml"
 
 
   module Smart_rollup : sig
@@ -12377,6 +12420,6 @@ module Inbox_hash : S.HASH
 (** Smart rollup merkelized payload hashes' hash *)
 module Merkelized_payload_hashes_hash : S.HASH
 end
-# 138 "v10.in.ml"
+# 140 "v10.in.ml"
 
 end
