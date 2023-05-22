@@ -87,4 +87,9 @@ module Kind = struct
   let pvm_of = function
     | Example_arith -> example_arith_pvm
     | Wasm_2_0_0 -> wasm_2_0_0_pvm
+
+  let no_proof_machine_of : t -> (module Sc_rollup_machine_no_proofs.S) =
+    function
+    | Example_arith -> (module Sc_rollup_machine_no_proofs.Arith)
+    | Wasm_2_0_0 -> (module Sc_rollup_machine_no_proofs.Wasm)
 end

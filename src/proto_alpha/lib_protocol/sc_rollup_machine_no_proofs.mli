@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,57 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Here is the list of PVMs available in this protocol. *)
+(** This module provides instantiation of both the WASM and Arith PVM which can
+    be used to perform rollup computations, {b but} cannot be used to compute
+    proofs. *)
 
-module PVM : sig
-  type boot_sector = string
+type void = |
 
-  module type S = sig
-    val parse_boot_sector : string -> boot_sector option
+type t = Context_binary.t
 
-    val pp_boot_sector : Format.formatter -> boot_sector -> unit
+type tree = Context_binary.tree
 
-    include Sc_rollup_PVM_sig.S
-  end
+val empty_tree : unit -> tree
 
-  type ('state, 'proof, 'output) implementation =
-    (module S
-       with type state = 'state
-        and type proof = 'proof
-        and type output_proof = 'output)
+module type S = sig
+  val parse_boot_sector : string -> string option
 
-  type t = Packed : ('state, 'proof, 'output) implementation -> t [@@unboxed]
+  val pp_boot_sector : Format.formatter -> string -> unit
+
+  include
+    Sc_rollup_PVM_sig.S
+      with type context = t
+       and type state = tree
+       and type proof = void
 end
 
-(** A smart contract rollup has a kind, which assigns meaning to
-   rollup operations. *)
-module Kind : sig
-  (**
+module Arith : S
 
-     The list of available rollup kinds.
-
-     This list must only be appended for backward compatibility.
-  *)
-  type t = Example_arith | Wasm_2_0_0
-
-  val encoding : t Data_encoding.t
-
-  val equal : t -> t -> bool
-
-  (** [pvm_of kind] returns the [PVM] of the given [kind]. *)
-  val pvm_of : t -> PVM.t
-
-  (** [no_proof_machine_of kind] returns a machine of a given [kind] capable of
-      computing a rollup semantics, but incapable of doing any proof-related
-      computations. *)
-  val no_proof_machine_of : t -> (module Sc_rollup_machine_no_proofs.S)
-
-  (** [all] returns all implemented PVM. *)
-  val all : t list
-
-  val of_string : string -> t option
-
-  val to_string : t -> string
-
-  val pp : Format.formatter -> t -> unit
-end
+module Wasm : S
