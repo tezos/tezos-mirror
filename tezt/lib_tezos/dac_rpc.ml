@@ -109,4 +109,4 @@ end
 
 let get_health_live = make GET ["health"; "live"] JSON.as_bool
 
-let get_health_ready = make GET ["health"; "ready"] JSON.as_string
+let get_health_ready = make GET ["health"; "ready"] JSON.as_bool

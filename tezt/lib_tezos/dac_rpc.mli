@@ -84,4 +84,4 @@ val get_health_live : (Dac_node.t, bool) RPC_core.t
 (** [get_health_ready] returns [true] if 
     [Node_context.get_status cctxt] is [Ready]
     and fail with [tzfail Dac_node_not_ready] otherwise. *)
-val get_health_ready : (Dac_node.t, string) RPC_core.t
+val get_health_ready : (Dac_node.t, bool) RPC_core.t
