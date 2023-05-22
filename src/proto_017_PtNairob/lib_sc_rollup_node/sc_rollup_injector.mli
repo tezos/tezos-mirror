@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,35 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Octez_smart_rollup
-
-(** L1 operations produced (and injected) by the rollup node. *)
-type t =
-  | Add_messages of {messages : string list}
-  | Cement of {rollup : Address.t; commitment : Commitment.Hash.t}
-  | Publish of {rollup : Address.t; commitment : Commitment.t}
-  | Refute of {
-      rollup : Address.t;
-      opponent : Signature.Public_key_hash.t;
-      refutation : Game.refutation;
-    }
-  | Timeout of {
-      rollup : Address.t;
-      stakers : Signature.Public_key_hash.t * Signature.Public_key_hash.t;
-    }
-
-(** Encoding for L1 operations (used by injector for on-disk persistence). *)
-val encoding : t Data_encoding.t
-
 (** Manager operation for a given L1 operation. *)
-val to_manager_operation : t -> Protocol.Alpha_context.packed_manager_operation
+val injector_operation_to_manager :
+  L1_operation.t -> Protocol.Alpha_context.packed_manager_operation
 
 (** L1 operation corresponding to a manager operation if any. *)
-val of_manager_operation :
-  'a Protocol.Alpha_context.manager_operation -> t option
-
-(** Pretty printer (human readable) for L1 operations. *)
-val pp : Format.formatter -> t -> unit
-
-(** [false] if the injector will accept duplicate such operations. *)
-val unique : t -> bool
+val injector_operation_of_manager :
+  'a Protocol.Alpha_context.manager_operation -> L1_operation.t option

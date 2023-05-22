@@ -593,7 +593,16 @@ let run node_ctxt configuration
       unless (signers = []) @@ fun () ->
       Injector.init
         node_ctxt.cctxt
-        (Node_context.readonly node_ctxt)
+        {
+          cctxt = (node_ctxt.cctxt :> Client_context.full);
+          fee_parameters = configuration.fee_parameters;
+          minimal_block_delay =
+            node_ctxt.protocol_constants.Constants.parametric
+              .minimal_block_delay |> Period.to_seconds;
+          delay_increment_per_round =
+            node_ctxt.protocol_constants.Constants.parametric
+              .delay_increment_per_round |> Period.to_seconds;
+        }
         ~data_dir:node_ctxt.data_dir
         ~signers
         ~retention_period:configuration.injector.retention_period
