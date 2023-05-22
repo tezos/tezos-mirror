@@ -862,6 +862,8 @@ module type AUTOMATON = sig
       val get_message_for_peer :
         Peer.t -> Message_id.t -> t -> (t * Message.t * int) option
 
+      val seen_message : Message_id.t -> t -> bool
+
       module Internal_for_tests : sig
         val get_access_counters : t -> (Message_id.t * int Peer.Map.t) Seq.t
       end
