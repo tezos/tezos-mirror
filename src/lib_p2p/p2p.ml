@@ -322,16 +322,8 @@ module Real = struct
     let peer_id = (P2p_conn.info conn).peer_id in
     let* () =
       match msg with
-      | Ok _ ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/4874
-
-             the counter should be moved to P2p_conn instead *)
-          Prometheus.Counter.inc_one P2p_metrics.Messages.user_message_received ;
-          Events.(emit message_read) peer_id
-      | Error _ ->
-          Prometheus.Counter.inc_one
-            P2p_metrics.Messages.user_message_received_error ;
-          Events.(emit message_read_error) peer_id
+      | Ok _ -> Events.(emit message_read) peer_id
+      | Error _ -> Events.(emit message_read_error) peer_id
     in
     return msg
 
@@ -367,10 +359,6 @@ module Real = struct
       match r with
       | Ok () ->
           let peer_id = (P2p_conn.info conn).peer_id in
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/4874
-
-             the counter should be moved to P2p_conn instead *)
-          Prometheus.Counter.inc_one P2p_metrics.Messages.user_message_sent ;
           Events.(emit message_sent) peer_id
       | Error trace ->
           Events.(emit sending_message_error)
@@ -381,10 +369,6 @@ module Real = struct
   let try_send _net conn v =
     match P2p_conn.write_now conn v with
     | Ok v ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4874
-
-           the counter should be moved to P2p_conn instead *)
-        Prometheus.Counter.inc_one P2p_metrics.Messages.user_message_sent ;
         Events.(emit__dont_wait__use_with_care message_trysent)
           (P2p_conn.info conn).peer_id ;
         v
