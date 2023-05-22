@@ -15,7 +15,6 @@ use evm_execution::account_storage::init_account_storage;
 use evm_execution::account_storage::AccountStorageError;
 use evm_execution::account_storage::EthereumAccountStorage;
 use primitive_types::{H160, U256};
-use tezos_ethereum::address::EthereumAddress;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_ethereum::transaction::TransactionReceipt;
 use tezos_ethereum::transaction::TransactionStatus;
@@ -107,7 +106,7 @@ fn bootstrap_genesis_accounts<Host: Runtime>(
     collect_mint_transactions(transactions_hashes)
 }
 
-fn craft_mint_address(genesis_mint_address: &str) -> Option<EthereumAddress> {
+fn craft_mint_address(genesis_mint_address: &str) -> Option<H160> {
     let encoded_genesis_mint_address: Vec<u8> = hex::decode(genesis_mint_address).ok()?;
     let encoded_genesis_mint_address: [u8; 20] =
         encoded_genesis_mint_address.try_into().ok()?;
@@ -118,7 +117,7 @@ fn store_genesis_receipts<Host: Runtime>(
     host: &mut Host,
     genesis_block: L2Block,
 ) -> Result<(), Error> {
-    let genesis_address: EthereumAddress = GENESIS_ADDRESSS.into();
+    let genesis_address: H160 = GENESIS_ADDRESSS.into();
 
     for (hash, index) in genesis_block.transactions.iter().zip(0u32..) {
         let mint_account = &MINT_ACCOUNTS[index as usize];

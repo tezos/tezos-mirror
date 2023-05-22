@@ -290,7 +290,7 @@ pub fn store_transaction_receipt<Host: Runtime>(
     host.store_write(&block_number_path, &le_receipt_block_number, 0)?;
     // From
     let from_path = concat(receipt_path, &TRANSACTION_RECEIPT_FROM)?;
-    let from: H160 = receipt.from.into();
+    let from: H160 = receipt.from;
     host.store_write(&from_path, from.as_bytes(), 0)?;
     // Type
     let type_path = concat(receipt_path, &TRANSACTION_RECEIPT_TYPE)?;
@@ -300,7 +300,6 @@ pub fn store_transaction_receipt<Host: Runtime>(
     host.store_write(&status_path, (&receipt.status).into(), 0)?;
     // To
     if let Some(to) = receipt.to {
-        let to: H160 = to.into();
         let to_path = concat(receipt_path, &TRANSACTION_RECEIPT_TO)?;
         host.store_write(&to_path, to.as_bytes(), 0)?;
     };

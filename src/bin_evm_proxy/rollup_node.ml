@@ -358,11 +358,15 @@ module RPC = struct
 
   let transaction_receipt base (Hash tx_hash) =
     let open Lwt_result_syntax in
-    let inspect_durable_and_decode key decode =
+    let inspect_durable_and_decode_opt key decode =
       let* bytes = call_service ~base durable_state_value () {key} () in
       match bytes with
-      | Some bytes -> return (decode bytes)
-      | None -> failwith "null"
+      | Some bytes -> return (Some (decode bytes))
+      | None -> return None
+    in
+    let inspect_durable_and_decode key decode =
+      let* opt = inspect_durable_and_decode_opt key decode in
+      match opt with Some bytes -> return bytes | None -> failwith "null"
     in
     let decode_block_hash bytes =
       Block_hash (Bytes.to_string bytes |> Hex.of_string |> Hex.show)
@@ -390,7 +394,7 @@ module RPC = struct
     in
     (* This can be none *)
     let* to_ =
-      inspect_durable_and_decode
+      inspect_durable_and_decode_opt
         (Durable_storage_path.Transaction_receipt.to_ tx_hash)
         decode_address
     in

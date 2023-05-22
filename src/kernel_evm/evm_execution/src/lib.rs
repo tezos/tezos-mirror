@@ -91,7 +91,7 @@ pub fn run_transaction<'a, Host>(
     block: &'a BlockConstants,
     evm_account_storage: &'a mut EthereumAccountStorage,
     precompiles: &'a precompiles::PrecompileBTreeMap<Host>,
-    address: H160,
+    address: Option<H160>,
     caller: H160,
     call_data: Vec<u8>,
     gas_limit: Option<u64>,
@@ -102,7 +102,7 @@ where
 {
     debug_msg!(host, "Going to run an Ethereum transaction");
     debug_msg!(host, " - from address: {}", caller);
-    debug_msg!(host, " - to address: {}", address);
+    debug_msg!(host, " - to address: {:?}", address);
 
     let config = Config::london();
     let mut handler = handler::EvmHandler::<'_, Host>::new(
@@ -118,15 +118,17 @@ where
     // TODO: check gas_limit vs caller balance. Make sure caller has
     // enough funds to pay for gas.
 
-    if call_data.is_empty() {
-        // This is a transfer transaction
-        handler.transfer(caller, address, value.unwrap_or(U256::zero()), gas_limit)
-    } else if address.is_zero() {
+    if let Some(address) = address {
+        if call_data.is_empty() {
+            // This is a transfer transaction
+            handler.transfer(caller, address, value.unwrap_or(U256::zero()), gas_limit)
+        } else {
+            // This must be a contract-call transaction
+            handler.call_contract(caller, address, value, call_data, gas_limit, false)
+        }
+    } else {
         // This is a create-contract transaction
         handler.create_contract(caller, value, call_data, gas_limit)
-    } else {
-        // This must be a contract-call transaction
-        handler.call_contract(caller, address, value, call_data, gas_limit, false)
     }
 }
 
@@ -142,7 +144,6 @@ mod test {
     use host::runtime::Runtime;
     use primitive_types::H160;
     use std::str::FromStr;
-    use tezos_ethereum::address::EthereumAddress;
     use tezos_ethereum::signatures::EthereumTransactionCommon;
     use tezos_smart_rollup_mock::MockHost;
 
@@ -229,7 +230,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            callee,
+            Some(callee),
             caller,
             call_data,
             Some(22000),
@@ -285,7 +286,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            callee,
+            Some(callee),
             caller,
             call_data,
             Some(21000),
@@ -318,7 +319,7 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
-        let callee = H160::zero();
+        let callee = None;
         let caller = H160::from_low_u64_be(328794);
         let transaction_value = U256::from(100_u32);
         let call_data: Vec<u8> = hex::decode(STORAGE_CONTRACT_INITIALIZATION).unwrap();
@@ -363,7 +364,7 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
-        let callee = H160::zero();
+        let callee = None;
         let caller = H160::from_low_u64_be(117);
         let transaction_value = U256::from(0);
         let call_data: Vec<u8> = hex::decode(STORAGE_CONTRACT_INITIALIZATION).unwrap();
@@ -406,7 +407,7 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
-        let callee = H160::zero();
+        let callee = None;
         let caller = H160::from_low_u64_be(117);
         let transaction_value = U256::from(0);
         let call_data: Vec<u8> = hex::decode(ERC20_CONTRACT_INITIALISATION).unwrap();
@@ -447,7 +448,7 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
-        let callee = H160::zero();
+        let callee = None;
         let caller = H160::from_low_u64_be(2893);
         let transaction_value = U256::from(100_u32);
         // Some EVM instructions. They are all valid, but the last one is opcode
@@ -505,7 +506,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            target,
+            Some(target),
             caller,
             data.to_vec(),
             None,
@@ -571,7 +572,7 @@ mod test {
                 tezos_ethereum::signatures::string_to_sk_and_address(s.to_string())
                     .unwrap();
             let value: [u8; 20] = hex::decode(ea).unwrap().try_into().unwrap();
-            let ea = EthereumAddress::from(value);
+            let ea = value.into();
             assert_eq!(a, ea);
         })
     }
@@ -593,7 +594,7 @@ mod test {
                 .unwrap()
                 .try_into()
                 .unwrap();
-        let expected_address = EthereumAddress::from(expected_address_string);
+        let expected_address: H160 = expected_address_string.into();
         assert_eq!(expected_address, address);
         assert_eq!(expected_address, address_from_sk)
     }
@@ -637,7 +638,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            target,
+            Some(target),
             caller,
             data.to_vec(),
             Some(6),
@@ -681,7 +682,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            target,
+            Some(target),
             caller,
             data.to_vec(),
             Some(6),
@@ -726,7 +727,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            target,
+            Some(target),
             caller,
             data.to_vec(),
             None,
@@ -775,7 +776,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            address,
+            Some(address),
             caller,
             input,
             None,
@@ -817,7 +818,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            target,
+            Some(target),
             caller,
             data.to_vec(),
             Some(1),
@@ -918,7 +919,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            target,
+            Some(target),
             caller,
             data.to_vec(),
             None,
