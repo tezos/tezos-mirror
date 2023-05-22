@@ -38,11 +38,18 @@ module type T = sig
       see {!Tezos_protocol_environment.PROTOCOL} *)
   type validation_state
 
-  (** Type {!Shell_plugin.FILTER.Mempool.state}. *)
-  type filter_state
+  (** Mempool configuration that groups both the plugin config
+      (e.g. minimal fee to pass the {!pre_filter}) and the bounding
+      config (e.g. max number of valid operations in the mempool). *)
+  type config
 
-  (** Type {!Shell_plugin.FILTER.Mempool.config}. *)
-  type filter_config
+  (** Default mempool configuration. *)
+  val default_config : config
+
+  (** Encoding for {!config}.
+
+      Internally an object without any variable fields. *)
+  val config_encoding : config Data_encoding.t
 
   (** The type implemented by {!Tezos_store.Store.chain_store} in
       production, and mocked in tests *)
@@ -53,7 +60,7 @@ module type T = sig
       {!remove_operation}.
 
       This state notably contains a representation of the protocol
-      mempool, as well as the filter state. *)
+      mempool, as well as the bounding state. *)
   type t
 
   (** Create an empty state based on the [head] block.
@@ -83,24 +90,22 @@ module type T = sig
       See [Shell_plugin.FILTER.Mempool.pre_filter]. *)
   val pre_filter :
     t ->
-    filter_config ->
+    config ->
     protocol_operation Shell_operation.operation ->
     [ `Passed_prefilter of Prevalidator_pending_operations.priority
     | Prevalidator_classification.error_classification ]
     Lwt.t
 
   (** Contain the hash and new classification of any operations that
-      had to be removed to make room for the newly validated
-      operation. *)
+      had to be removed to make room for a newly added operation. *)
   type replacements =
     (Operation_hash.t * Prevalidator_classification.error_classification) list
 
   (** Result of {!add_operation}.
 
-      Contain the updated (or unchanged) state {!t},
-      the operation (in which [count_successful_prechecks]
-      has been incremented if appropriate), its classification,
-      and the potential {!replacements}.
+      Contain the updated (or unchanged) state {!t}, the operation (in
+      which the [signature_checked] field has been updated if
+      appropriate), its classification, and the potential {!replacements}.
 
       Invariant: [replacements] can only be non-empty when the
       classification is [`Prechecked]. *)
@@ -110,24 +115,21 @@ module type T = sig
     * Prevalidator_classification.classification
     * replacements
 
-  (** Call the protocol [Mempool.add_operation] function, providing it
-      with the [conflict_handler] from the plugin.
-
-      Then if the protocol accepts the operation, call the plugin
-      [add_operation_and_enforce_mempool_bound], which is responsible
-      for bounding the number of manager operations in the mempool.
+  (** Try and add an operation to the protocol's mempool; also ensure
+      that this mempool remains bounded (in terms of both operation
+      count and total byte size; the bounds are specified in the [config]).
 
       See {!add_result} for a description of the output. *)
   val add_operation :
     t ->
-    filter_config ->
+    config ->
     protocol_operation Shell_operation.operation ->
     add_result Lwt.t
 
   (** Remove an operation from the state.
 
       The state remains unchanged when the operation was not
-      present. *)
+      present (though not physically equal to the input state). *)
   val remove_operation : t -> Operation_hash.t -> t
 
   module Internal_for_tests : sig
@@ -135,14 +137,20 @@ module type T = sig
         representation of the mempool. *)
     val get_mempool_operations : t -> protocol_operation Operation_hash.Map.t
 
-    (** Return the filter_state component of the state. *)
-    val get_filter_state : t -> filter_state
-
     (** Type {!Tezos_protocol_environment.PROTOCOL.Mempool.t}. *)
     type mempool
 
     (** Modify the [mempool] field of the internal state [t]. *)
     val set_mempool : t -> mempool -> t
+
+    (** Type [Prevalidator_bounding.T.state]. *)
+    type bounding_state
+
+    (** Return the [bounding_state] component of the state. *)
+    val get_bounding_state : t -> bounding_state
+
+    (** Modify the [bounding_state] component of the state. *)
+    val set_bounding_state : t -> bounding_state -> t
   end
 end
 
@@ -151,8 +159,6 @@ module Make : functor (Filter : Shell_plugin.FILTER) ->
   T
     with type protocol_operation = Filter.Proto.operation
      and type validation_state = Filter.Proto.validation_state
-     and type filter_state = Filter.Mempool.state
-     and type filter_config = Filter.Mempool.config
      and type chain_store = Store.chain_store
 
 (**/**)
@@ -180,12 +186,13 @@ module Internal_for_tests : sig
   module Make : functor
     (Chain_store : CHAIN_STORE)
     (Filter : Shell_plugin.FILTER)
+    (Bounding : Prevalidator_bounding.T
+                  with type protocol_operation = Filter.Proto.operation)
     ->
     T
       with type protocol_operation = Filter.Proto.operation
        and type validation_state = Filter.Proto.validation_state
-       and type filter_state = Filter.Mempool.state
-       and type filter_config = Filter.Mempool.config
        and type chain_store = Chain_store.chain_store
        and type Internal_for_tests.mempool = Filter.Proto.Mempool.t
+       and type Internal_for_tests.bounding_state = Bounding.state
 end

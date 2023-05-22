@@ -175,18 +175,17 @@ let test_manager_ops () =
 
   (* Config that requires 10% better fee and ratio to replace. *)
   let config10 =
-    {
-      Plugin.Mempool.default_config with
-      replace_by_fee_factor = Q.make (Z.of_int 11) (Z.of_int 10);
-    }
+    Plugin.Mempool.Internal_for_tests.default_config_with_replace_factor
+      (Q.make (Z.of_int 11) (Z.of_int 10))
   in
+
   check_conflict_handler ~__LOC__ config10 ~old ~nw:op_same `Keep ;
   check_conflict_handler ~__LOC__ config10 ~old ~nw:op_fee5 `Keep ;
   check_conflict_handler ~__LOC__ config10 ~old ~nw:op_ratio5 `Keep ;
   check_conflict_handler ~__LOC__ config10 ~old ~nw:op_both5 `Keep ;
   (* Config that replaces when the new op has at least as much fee and ratio. *)
   let config0 =
-    {Plugin.Mempool.default_config with replace_by_fee_factor = Q.one}
+    Plugin.Mempool.Internal_for_tests.default_config_with_replace_factor Q.one
   in
   check_conflict_handler ~__LOC__ config0 ~old ~nw:op_same `Replace ;
   check_conflict_handler ~__LOC__ config0 ~old ~nw:op_fee5 `Replace ;

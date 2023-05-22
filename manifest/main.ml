@@ -5465,15 +5465,8 @@ let hash = Protocol.hash
     let _plugin_tests =
       opt_map (both plugin test_helpers) @@ fun (plugin, test_helpers) ->
       only_if active @@ fun () ->
-      tezt
-        [
-          "test_consensus_filter";
-          "test_filter_state";
-          "test_plugin";
-          "test_conflict_handler";
-          "test_utils";
-          "generators";
-        ]
+      tests
+        ["test_conflict_handler"; "test_consensus_filter"]
         ~path:(path // "lib_plugin/test")
         ~with_macos_security_framework:true
         ~synopsis:"Tezos/Protocol: protocol plugin tests"
@@ -6546,6 +6539,7 @@ let _octez_shell_tests =
       "test_node";
       "test_peer_validator";
       "test_prevalidation";
+      "test_prevalidator_bounding";
       "test_prevalidator_classification";
       "test_prevalidator_classification_operations";
       "test_prevalidator_pending_operations";
