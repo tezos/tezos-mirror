@@ -162,7 +162,6 @@
         "Delegate_missed_endorsements_storage",
         "Delegate_slashed_deposits_storage",
         "Delegate_cycles",
-        "Bootstrap_storage",
 
         "Vote_storage",
         "Ticket_storage",
@@ -176,7 +175,6 @@
 
         "Remove_zero_amount_ticket_migration_for_o",
         "Legacy_script_patches",
-        "Init_storage",
         "Sapling_validator",
 
         "Global_constants_costs",
@@ -194,6 +192,9 @@
         "Dal_slot_storage",
         "Sc_rollup_refutation_storage",
         "Zk_rollup_errors",
+
+        "Bootstrap_storage",
+        "Init_storage",
 
         "Destination_storage",
 
