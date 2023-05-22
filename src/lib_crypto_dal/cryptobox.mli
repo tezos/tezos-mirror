@@ -294,6 +294,8 @@ val shard_proof_encoding : shard_proof Data_encoding.t
     - [Error `Invalid_shard] if the verification fails
     - [Error `Invalid_degree_strictly_less_than_expected _] if the
     SRS contained in [t] is too small to proceed with the verification
+    - [Error `Shard_length_mismatch] if the shard is not of the expected
+    length [shard_length] given for the initialisation of [t]
     - [Error (`Shard_index_out_of_range msg)] if the shard index
     is not within the range [0, number_of_shards - 1]
     (where [number_of_shards] is found in [t]).
@@ -313,6 +315,7 @@ val verify_shard :
   ( unit,
     [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container
     | `Invalid_shard
+    | `Shard_length_mismatch
     | `Shard_index_out_of_range of string ] )
   Result.t
 

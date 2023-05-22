@@ -1627,17 +1627,22 @@ module Inner = struct
              0
              (t.number_of_shards - 1)))
     else
-      let root =
-        Domains.get t.domain_erasure_encoded_polynomial_length shard_index
-      in
-      let domain = Domains.build t.shard_length in
-      let srs_point = t.srs.kate_amortized_srs_g2_shards in
-      match
-        verify t ~commitment ~srs_point ~domain ~root ~evaluations ~proof
-      with
-      | Ok true -> Ok ()
-      | Ok false -> Error `Invalid_shard
-      | Error e -> Error e
+      let expected_shard_length = t.shard_length in
+      let got_shard_length = Array.length evaluations in
+      if expected_shard_length <> got_shard_length then
+        Error `Shard_length_mismatch
+      else
+        let root =
+          Domains.get t.domain_erasure_encoded_polynomial_length shard_index
+        in
+        let domain = Domains.build t.shard_length in
+        let srs_point = t.srs.kate_amortized_srs_g2_shards in
+        match
+          verify t ~commitment ~srs_point ~domain ~root ~evaluations ~proof
+        with
+        | Ok true -> Ok ()
+        | Ok false -> Error `Invalid_shard
+        | Error e -> Error e
 
   let prove_page t p page_index =
     if page_index < 0 || page_index >= t.pages_per_slot then

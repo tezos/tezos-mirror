@@ -700,6 +700,35 @@ module Test = struct
         | Error `Page_length_mismatch -> true
         | _ -> false)
 
+  let test_shard_length_mismatch =
+    let open QCheck2 in
+    let open Error_monad.Result_syntax in
+    Test.make
+      ~name:"shard_length_mismatch"
+      ~print:print_parameters
+      generate_parameters
+      (fun params ->
+        init () ;
+        assume (ensure_validity params) ;
+        (let* t = Cryptobox.make (get_cryptobox_parameters params) in
+         let state = QCheck_base_runner.random_state () in
+         let commitment =
+           Cryptobox.Internal_for_tests.dummy_commitment ~state ()
+         in
+         let length = randrange ~min:1 1000 in
+         assume (length <> Cryptobox.Internal_for_tests.shard_length t) ;
+         let index = randrange params.number_of_shards in
+         let shard =
+           Cryptobox.Internal_for_tests.make_dummy_shard ~state ~index ~length
+         in
+         let shard_proof =
+           Cryptobox.Internal_for_tests.dummy_shard_proof ~state ()
+         in
+         Cryptobox.verify_shard t commitment shard shard_proof)
+        |> function
+        | Error `Shard_length_mismatch -> true
+        | _ -> false)
+
   let test_prove_page_out_of_bounds =
     let open QCheck2 in
     let open Error_monad.Result_syntax in
@@ -968,6 +997,7 @@ let () =
             Test.test_dal_initialisation_twice_failure;
             Test.test_wrong_slot_size;
             Test.test_page_length_mismatch;
+            Test.test_shard_length_mismatch;
             Test.test_prove_page_out_of_bounds;
             Test.test_verify_page_out_of_bounds;
             Test.test_verify_shard_out_of_bounds;
