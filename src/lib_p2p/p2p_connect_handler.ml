@@ -104,6 +104,7 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   incoming : Lwt_canceler.t P2p_point.Table.t;
   mutable new_connection_hook :
     (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) P2p_conn.t -> unit) list;
+  mutable disconnection_hook : (P2p_peer.Id.t -> unit) list;
   answerer : 'msg P2p_answerer.t Lazy.t;
   dependencies : ('msg, 'peer_meta, 'conn_meta) dependencies;
 }
@@ -136,6 +137,7 @@ let create ?(p2p_versions = P2p_version.supported) config pool message_config
     encoding = P2p_message.encoding message_config.P2p_params.encoding;
     triggers;
     new_connection_hook = [];
+    disconnection_hook = [];
     log;
     pool;
     answerer;
@@ -198,6 +200,7 @@ let create_connection t p2p_conn id_point point_info peer_info
         point_info ;
       t.log (Disconnection peer_id) ;
       P2p_peer_state.set_disconnected ~timestamp peer_info ;
+      List.iter (fun f -> f peer_id) t.disconnection_hook ;
       Option.iter
         (fun point_info -> P2p_pool.Points.remove_connected t.pool point_info)
         point_info ;
@@ -534,6 +537,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
                  t.config.reconnection_config)
               connection_point_info ;
             P2p_peer_state.set_disconnected ~timestamp peer_info ;
+            List.iter (fun f -> f info.peer_id) t.disconnection_hook ;
             Lwt.return_error err)
       in
       let id_point =
@@ -692,6 +696,8 @@ let stat t = P2p_io_scheduler.global_stat t.io_sched
 
 let on_new_connection t f = t.new_connection_hook <- f :: t.new_connection_hook
 
+let on_disconnection t f = t.disconnection_hook <- f :: t.disconnection_hook
+
 let destroy t =
   P2p_point.Table.iter_p
     (fun _point canceler -> Error_monad.cancel_with_exceptions canceler)
@@ -844,7 +850,7 @@ module Internal_for_tests = struct
       ?(custom_p2p_versions = [P2p_version.zero])
       ?(encoding = make_crashing_encoding ())
       ?(incoming = P2p_point.Table.create ~random:true 53)
-      ?(new_connection_hook = [])
+      ?(new_connection_hook = []) ?(disconnection_hook = [])
       ?(answerer = lazy (P2p_protocol.create_private ())) pool dependencies :
       ('msg, 'peer_meta, 'conn_meta) t =
     let pool =
@@ -874,6 +880,7 @@ module Internal_for_tests = struct
       encoding;
       incoming;
       new_connection_hook;
+      disconnection_hook;
       answerer;
       dependencies;
     }

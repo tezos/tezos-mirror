@@ -140,6 +140,9 @@ val on_new_connection :
   (P2p_peer.Id.t -> ('msg, 'peer, 'conn) P2p_conn.t -> unit) ->
   unit
 
+(** [on_disconnection t f] installs [f] as a hook for disconnections in [t]. *)
+val on_disconnection : ('msg, 'peer, 'conn) t -> (P2p_peer.Id.t -> unit) -> unit
+
 val destroy : ('msg, 'peer, 'conn) t -> unit Lwt.t
 
 (**/**)
@@ -214,6 +217,7 @@ module Internal_for_tests : sig
     ?incoming:Lwt_canceler.t P2p_point.Table.t ->
     ?new_connection_hook:
       (P2p_peer.Id.t -> ('msg, 'peer, 'conn) P2p_conn.t -> unit) list ->
+    ?disconnection_hook:(P2p_peer.Id.t -> unit) list ->
     ?answerer:'msg P2p_answerer.t Lazy.t ->
     [< `Pool of ('msg, 'peer, 'conn) P2p_pool.t | `Make_default_pool of 'peer] ->
     [< `Dependencies of ('msg, 'peer, 'conn) dependencies
