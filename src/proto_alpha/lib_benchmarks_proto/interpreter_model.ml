@@ -193,6 +193,17 @@ module Models = struct
       ~break1
       ~break2
 
+  let break_model_2_const_offset name break1 break2 ~offset =
+    Model.breakdown2_const_offset
+      ~name:(ns name)
+      ~coeff1:(fv (sf "%s_coeff1" name))
+      ~coeff2:(fv (sf "%s_coeff2" name))
+      ~coeff3:(fv (sf "%s_coeff3" name))
+      ~const:(fv (sf "%s_const" name))
+      ~break1
+      ~break2
+      ~offset
+
   let nlogm_model name =
     (* For instructions with cost function
        [\lambda size1. \lambda size2. const + coeff * size1 log2(size2)] *)
@@ -483,7 +494,7 @@ let ir_model instr_or_cont =
           const1_model name |> m
       (* The following two instructions are expected to have an affine model. However,
          we observe 3 affine parts, on [0;300], [300;400] and [400;\inf[. *)
-      | N_IDupN -> break_model_2 name 300 400 |> m
+      | N_IDupN -> break_model_2_const_offset name 300 400 ~offset:1 |> m
       | N_IDropN -> break_model_2_const name 300 400 |> m
       | N_IDig | N_IDug | N_IDipN -> affine_model name |> m
       | N_IAdd_bls12_381_g1 | N_IAdd_bls12_381_g2 | N_IAdd_bls12_381_fr

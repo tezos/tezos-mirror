@@ -288,3 +288,15 @@ val breakdown2_const :
   break1:int ->
   break2:int ->
   (int * unit) model
+
+(** [breakdown2] with a non-zero value at 0 and offset *)
+val breakdown2_const_offset :
+  name:Namespace.t ->
+  coeff1:Free_variable.t ->
+  coeff2:Free_variable.t ->
+  coeff3:Free_variable.t ->
+  const:Free_variable.t ->
+  break1:int ->
+  break2:int ->
+  offset:int ->
+  (int * unit) model

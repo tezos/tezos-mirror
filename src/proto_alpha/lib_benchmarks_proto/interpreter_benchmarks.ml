@@ -1065,6 +1065,13 @@ module Registration_section = struct
         ~kinstr_and_stack_sampler:(fun _cfg rng_state () ->
           let node = dup (1 + sample_depth rng_state) in
           parse_instr rng_state node long_stack)
+        () ;
+      benchmark
+        ~name:Interpreter_workload.N_IDupN
+        ~intercept:true
+        ~kinstr_and_stack_sampler:(fun _cfg rng_state () ->
+          let node = dup 1 in
+          parse_instr rng_state node long_stack)
         ()
   end
 

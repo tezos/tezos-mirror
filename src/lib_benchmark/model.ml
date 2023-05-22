@@ -682,3 +682,29 @@ let breakdown2_const ~name ~coeff1 ~coeff2 ~coeff3 ~const ~break1 ~break2 =
     end
   end in
   (module M : Model_impl with type arg_type = int * unit)
+
+let breakdown2_const_offset ~name ~coeff1 ~coeff2 ~coeff3 ~const ~break1 ~break2
+    ~offset =
+  assert (0 <= break1 && break1 <= break2) ;
+  let module M = struct
+    type arg_type = int * unit
+
+    let name = name
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size
+
+      let arity = arity_1
+
+      let model =
+        lam ~name:"size" @@ fun size ->
+        let_ ~name:"size" (sat_sub size (int offset)) @@ fun size ->
+        (free ~name:coeff1 * min (int break1) size)
+        + (free ~name:coeff2 * sat_sub (min (int break2) size) (int break1))
+        + (free ~name:coeff3 * sat_sub size (int break2))
+        + free ~name:const
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * unit)
