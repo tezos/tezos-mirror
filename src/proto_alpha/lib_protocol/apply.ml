@@ -1055,13 +1055,8 @@ let apply_manager_operation :
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result = Dal_publish_slot_header_result {slot_header; consumed_gas} in
       return (ctxt, result, [])
-  | Sc_rollup_originate {kind; boot_sector; origination_proof; parameters_ty} ->
-      Sc_rollup_operations.originate
-        ctxt
-        ~kind
-        ~boot_sector
-        ~origination_proof
-        ~parameters_ty
+  | Sc_rollup_originate {kind; boot_sector; parameters_ty} ->
+      Sc_rollup_operations.originate ctxt ~kind ~boot_sector ~parameters_ty
       >>=? fun ({address; size; genesis_commitment_hash}, ctxt) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =

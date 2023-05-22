@@ -226,22 +226,8 @@ let validate_untyped_parameters_ty ctxt parameters_ty =
      for L1 to L2 messages is not propagated to the rollup. *)
   validate_parameters_ty ctxt arg_type entrypoint
 
-let check_origination_proof (type state proof output)
-    ~(pvm : (state, proof, output) Sc_rollup.PVM.implementation) boot_sector
-    origination_proof =
+let originate ctxt ~kind ~boot_sector ~parameters_ty =
   let open Lwt_result_syntax in
-  let (module PVM) = pvm in
-  let*! is_valid = PVM.verify_origination_proof origination_proof boot_sector in
-  let* () =
-    fail_when
-      (not is_valid)
-      (Sc_rollup_proof_repr.Sc_rollup_proof_check "invalid origination proof")
-  in
-  return PVM.(proof_stop_state origination_proof)
-
-let originate ctxt ~kind ~boot_sector ~origination_proof ~parameters_ty =
-  let open Lwt_result_syntax in
-  let (Packed ((module PVM) as pvm)) = Sc_rollup.Kind.pvm_of kind in
   let*? ctxt =
     let open Result_syntax in
     let* parameters_ty, ctxt =
@@ -252,12 +238,10 @@ let originate ctxt ~kind ~boot_sector ~origination_proof ~parameters_ty =
     in
     validate_untyped_parameters_ty ctxt parameters_ty
   in
-  let*? origination_proof =
-    Sc_rollup.Proof.unserialize_pvm_step ~pvm origination_proof
-  in
-  let* genesis_hash =
-    check_origination_proof ~pvm boot_sector origination_proof
-  in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5693
+     Provide a gas model for this snippet *)
+  let*! genesis_hash = Sc_rollup.genesis_state_hash_of kind ~boot_sector in
+  (* End of TODO *)
   let genesis_commitment =
     Sc_rollup.Commitment.genesis_commitment
       ~genesis_state_hash:genesis_hash

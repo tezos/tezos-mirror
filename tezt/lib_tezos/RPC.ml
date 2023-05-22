@@ -870,26 +870,6 @@ let get_chain_block_context_smart_rollups_all_inbox ?(chain = "main")
     ]
     Fun.id
 
-let post_chain_block_context_smart_rollups_all_origination_proof
-    ?(chain = "main") ?(block = "head") ~kind ~boot_sector () =
-  let data : RPC_core.data =
-    Data (`O [("kind", `String kind); ("kernel", `String boot_sector)])
-  in
-  make
-    ~data
-    POST
-    [
-      "chains";
-      chain;
-      "blocks";
-      block;
-      "context";
-      "smart_rollups";
-      "all";
-      "origination_proof";
-    ]
-    Fun.id
-
 let get_chain_block_context_smart_rollups_smart_rollup_genesis_info
     ?(chain = "main") ?(block = "head") sc_rollup =
   make

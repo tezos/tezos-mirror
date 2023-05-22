@@ -45,30 +45,13 @@ type origination_result = {
   genesis_commitment_hash : Sc_rollup.Commitment.Hash.t;
 }
 
-(** [originate context ~kind ~boot_sector ~origination_proof
-    ~parameters_ty] adds a new rollup running in a given [kind]
-    initialized with a [boot_sector] and to accept smart contract
-    calls of type [parameters_ty].
-
-    [origination_proof], which covers the specialization of the PVM
-    initial state with the [boot_sector], is used by the protocol to
-    compute the genesis commitment, after its correctness has been
-    checked.
-
-    {b Note:} The need to provide an [origination_proof] is motivated
-    by technical limitations of Irmin (as of June, 2022), that
-    requires a context to get an empty tree. As soon as this
-    limitation is lifted, then we can drop the [origination_proof]
-    argument.
-
-    Returns an error if [origination_proof] is invalid ({i e.g.}, it
-    does not target the expected PVM).
-*)
+(** [originate context ~kind ~boot_sector ~parameters_ty] adds a new rollup
+    running in a given [kind] initialized with a [boot_sector] and to accept
+    smart contract calls of type [parameters_ty]. *)
 val originate :
   context ->
   kind:Sc_rollup.Kind.t ->
   boot_sector:string ->
-  origination_proof:Sc_rollup.Proof.serialized ->
   parameters_ty:Script_repr.lazy_expr ->
   (origination_result * context) tzresult Lwt.t
 

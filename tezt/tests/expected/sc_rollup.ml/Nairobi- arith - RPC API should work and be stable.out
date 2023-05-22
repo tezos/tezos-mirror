@@ -34,12 +34,6 @@ This sequence of operations was run:
 
 Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 
-./octez-client rpc post /chains/main/blocks/head/context/smart_rollups/all/origination_proof with '{
-  "kind": "arith",
-  "kernel": ""
-}'
-"030002104135165622d08b0c6eac951c9d4fd65109585907bc30ef0617f6c26853c6badb10db4d3b595f59e0b53740f164bf951bcfae9e0873fd23fbce82fac4f404e18106737461747573c87a31b1c8e3af61756b336bcfc3b0c292c89b40cc8a5080ba99c45463d110ce8b"
-
 ./octez-smart-rollup-client-PtNairob rpc get /global/smart_rollup_address
 "[SMART_ROLLUP_HASH]"
 

@@ -96,15 +96,6 @@ let init_contract ~typecheck_smart_contract (ctxt, balance_updates)
   >|=? fun (ctxt, new_balance_updates) ->
   (ctxt, new_balance_updates @ balance_updates)
 
-let genesis_hash ~boot_sector kind =
-  let open Lwt_result_syntax in
-  let (module Machine) = Sc_rollups.Kind.no_proof_machine_of kind in
-  let empty = Sc_rollup_machine_no_proofs.empty_tree () in
-  let*! state = Machine.initial_state ~empty in
-  let*! state = Machine.install_boot_sector state boot_sector in
-  let*! genesis_hash = Machine.state_hash state in
-  return genesis_hash
-
 let init_smart_rollup ~typecheck_smart_rollup ctxt
     ({address; boot_sector; pvm_kind; parameters_ty} :
       Parameters_repr.bootstrap_smart_rollup) =
@@ -114,7 +105,7 @@ let init_smart_rollup ~typecheck_smart_rollup ctxt
     let* parameters_ty = Script_repr.force_decode parameters_ty in
     typecheck_smart_rollup ctxt parameters_ty
   in
-  let* genesis_hash = genesis_hash ~boot_sector pvm_kind in
+  let*! genesis_hash = Sc_rollups.genesis_state_hash_of pvm_kind ~boot_sector in
   let genesis_commitment : Sc_rollup_commitment_repr.t =
     {
       compressed_state = genesis_hash;

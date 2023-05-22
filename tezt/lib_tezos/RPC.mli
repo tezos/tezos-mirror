@@ -816,15 +816,6 @@ val get_chain_block_context_smart_rollups_smart_rollup_staker_games :
 val get_chain_block_context_smart_rollups_all_inbox :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [POST chains/<chain>/blocks/<block>/context/smart_rollups/all/origination_proof] *)
-val post_chain_block_context_smart_rollups_all_origination_proof :
-  ?chain:string ->
-  ?block:string ->
-  kind:string ->
-  boot_sector:string ->
-  unit ->
-  JSON.t t
-
 (** RPC: [GET chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/genesis_info] *)
 val get_chain_block_context_smart_rollups_smart_rollup_genesis_info :
   ?chain:string -> ?block:string -> string -> JSON.t t

@@ -64,11 +64,6 @@ module Kind : sig
   (** [pvm_of kind] returns the [PVM] of the given [kind]. *)
   val pvm_of : t -> PVM.t
 
-  (** [no_proof_machine_of kind] returns a machine of a given [kind] capable of
-      computing a rollup semantics, but incapable of doing any proof-related
-      computations. *)
-  val no_proof_machine_of : t -> (module Sc_rollup_machine_no_proofs.S)
-
   (** [all] returns all implemented PVM. *)
   val all : t list
 
@@ -78,3 +73,8 @@ module Kind : sig
 
   val pp : Format.formatter -> t -> unit
 end
+
+(** [genesis_hash_of machine ~boot_sector] computes the initial state hash of a
+    rollup given an initial [boot_sector]. *)
+val genesis_state_hash_of :
+  boot_sector:string -> Kind.t -> Sc_rollup_repr.State_hash.t Lwt.t

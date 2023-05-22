@@ -126,73 +126,10 @@ let make_empty_context = Tezos_context_memory.Context_binary.make_empty_context
 
 let make_empty_tree = Tezos_context_memory.Context_binary.make_empty_tree
 
-let compute_origination_proof ~boot_sector = function
-  | Sc_rollup.Kind.Example_arith ->
-      let open Lwt_syntax in
-      let context = make_empty_context () in
-      let+ proof = Arith_pvm.produce_origination_proof context boot_sector in
-      let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
-      WithExceptions.Result.get_ok ~loc:__LOC__
-      @@ Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Arith_pvm) proof
-  | Sc_rollup.Kind.Wasm_2_0_0 ->
-      let open Lwt_syntax in
-      let context = make_empty_context () in
-      let+ proof = Wasm_pvm.produce_origination_proof context boot_sector in
-      let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
-      WithExceptions.Result.get_ok ~loc:__LOC__
-      @@ Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Wasm_pvm) proof
-
-(** [wrong_arith_origination_proof ~alter_binary_bit ~boot_sector]
-    returns a serialized proof computed with a Arith PVM using 32-ary
-    trees.
-
-    If [alter_binary_bit] is set to true, the resulting proof lies
-    about the arity of its trees. *)
-let wrong_arith_origination_proof ~alter_binary_bit ~boot_sector =
+let genesis_commitment ~boot_sector ~origination_level kind =
   let open Lwt_syntax in
-  let context = Tezos_context_memory.Context.make_empty_context () in
-  let+ proof = Wrong_arith_pvm.produce_origination_proof context boot_sector in
-  let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
-  let proof =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4386 This should
-       be exposed more cleanly in the Tezos context libraries.
-
-       Basically, the 2nd bit of the `version` field is set to 1 to
-       signal a proof for a [Context_binary] tree.*)
-    if alter_binary_bit then {proof with version = proof.version land 0b10}
-    else proof
-  in
-  WithExceptions.Result.get_ok ~loc:__LOC__
-  @@ Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Arith_pvm) proof
-
-let wrap_origination_proof ~kind ~boot_sector proof_string_opt :
-    Sc_rollup.Proof.serialized tzresult Lwt.t =
-  let open Lwt_result_syntax in
-  match proof_string_opt with
-  | None ->
-      let*! origination_proof = compute_origination_proof ~boot_sector kind in
-      return origination_proof
-  | Some proof_string -> return proof_string
-
-let genesis_commitment ~boot_sector ~origination_level = function
-  | Sc_rollup.Kind.Example_arith ->
-      let open Lwt_syntax in
-      let context = make_empty_context () in
-      let* proof = Arith_pvm.produce_origination_proof context boot_sector in
-      let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
-      let genesis_state_hash = Arith_pvm.proof_stop_state proof in
-      return
-        Sc_rollup.Commitment.(
-          genesis_commitment ~origination_level ~genesis_state_hash)
-  | Sc_rollup.Kind.Wasm_2_0_0 ->
-      let open Lwt_syntax in
-      let context = make_empty_context () in
-      let* proof = Wasm_pvm.produce_origination_proof context boot_sector in
-      let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
-      let genesis_state_hash = Wasm_pvm.proof_stop_state proof in
-      return
-        Sc_rollup.Commitment.(
-          genesis_commitment ~origination_level ~genesis_state_hash)
+  let+ genesis_state_hash = Sc_rollup.genesis_state_hash_of kind ~boot_sector in
+  Sc_rollup.Commitment.genesis_commitment ~origination_level ~genesis_state_hash
 
 let genesis_commitment_raw ~boot_sector ~origination_level kind =
   let open Lwt_syntax in
@@ -614,14 +551,7 @@ let dumb_init_repr level =
     level
 
 let origination_op ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
-    ?origination_proof ?(boot_sector = "") ?(parameters_ty = "unit") ctxt src
-    kind =
-  let open Lwt_result_syntax in
-  let*! origination_proof =
-    match origination_proof with
-    | Some origination_proof -> Lwt.return origination_proof
-    | None -> compute_origination_proof ~boot_sector kind
-  in
+    ?(boot_sector = "") ?(parameters_ty = "unit") ctxt src kind =
   Op.sc_rollup_origination
     ?force_reveal
     ?counter
@@ -633,7 +563,6 @@ let origination_op ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     kind
     ~boot_sector
     ~parameters_ty:(Script.lazy_expr @@ Expr.from_string parameters_ty)
-    ~origination_proof
 
 let latest_level_proof inbox =
   Sc_rollup.Inbox.Internal_for_tests.level_proof_of_history_proof
