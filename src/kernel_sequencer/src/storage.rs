@@ -10,12 +10,12 @@ use tezos_smart_rollup_host::{
 
 const SEQUENCER_PREFIX_PATH: RefPath = RefPath::assert_from(b"/__sequencer");
 const USER_PREFIX_PATH: RefPath = RefPath::assert_from(b"/u");
+pub const DELAYED_INBOX_PATH: RefPath = RefPath::assert_from(b"/delayed-inbox");
 
 /// Prefix the given path by `/__sequencer`.
 ///
 /// This function has to be used when writing/reading storage related to the sequencer kernel.
 /// Then with this function, all the sequencer kernel storage should be under the path `__sequencer`.
-#[allow(dead_code)]
 pub fn sequencer_prefix<T: Path>(path: &T) -> Result<OwnedPath, RuntimeError> {
     concat(&SEQUENCER_PREFIX_PATH, path).map_err(|_| RuntimeError::HostErr(Error::StoreInvalidKey))
 }
