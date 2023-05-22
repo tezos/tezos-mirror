@@ -152,7 +152,6 @@ let random_z size = Hacl.Rand.gen size |> Bytes.to_string |> Z.of_bits
 (* Generates almost uniformly a Zarith element between 0 and [public key].
    Intended for generating the timelock *)
 let gen_locked_value_unsafe () =
-  let size_rsa2048 = Z.to_bits rsa2048 |> String.length in
   (* We divide by 8 to convert to bytes *)
   Z.erem (random_z ((size_rsa2048 / 8) + 16)) rsa2048
 
