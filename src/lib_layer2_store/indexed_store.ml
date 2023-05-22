@@ -409,7 +409,7 @@ module Make_indexed_file
     (V : ENCODABLE_VALUE_HEADER) =
 struct
   module Cache =
-    Aches_lwt.Lache.Make_option (Aches.Rache.Transfer (Aches.Rache.LRU) (K))
+    Aches_lwt.Lache.Make_result (Aches.Rache.Transfer (Aches.Rache.LRU) (K))
   module Raw_header = Make_index_value (V.Header)
 
   module IHeader = struct
@@ -475,7 +475,7 @@ struct
     index : Header_index.t;
     fd : Lwt_unix.file_descr;
     scheduler : Lwt_idle_waiter.t;
-    cache : (V.t * V.Header.t) tzresult Cache.t;
+    cache : (V.t * V.Header.t, tztrace) Cache.t;
   }
 
   (* The log_size corresponds to the maximum size of the memory zone
@@ -493,9 +493,7 @@ struct
     @@ fun () ->
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
     let cached =
-      Cache.bind store.cache key @@ function
-      | None | Some (Error _) -> Lwt.return_false
-      | Some (Ok _) -> Lwt.return_true
+      Cache.bind store.cache key (fun v -> Lwt.return (Result.is_ok v))
     in
     let*! cached = Option.value cached ~default:Lwt.return_false in
     return (cached || Header_index.mem store.index key)
@@ -506,39 +504,34 @@ struct
     @@ protect
     @@ fun () ->
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    let read_from_disk () =
-      try
-        let {IHeader.header; _} = Header_index.find store.index key in
-        return_some header
-      with Not_found -> return_none
-    in
     let cached =
       Cache.bind store.cache key @@ function
-      | None -> return_none
-      | Some (Ok (_value, header)) -> return_some header
-      | Some (Error _ as e) -> Lwt.return e
+      | Ok (_value, header) -> return header
+      | Error _ as e -> Lwt.return e
     in
     match cached with
-    | None -> read_from_disk ()
-    | Some header_opt ->
-        let* header_opt in
-        Option.fold_f header_opt ~none:read_from_disk ~some:return_some
+    | Some header -> Lwt_result.map Option.some header
+    | None -> (
+        match Header_index.find store.index key with
+        | exception Not_found -> return_none
+        | {header; _} -> return_some header)
 
   let read store key =
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
     let read_from_disk key =
-      let open Lwt_syntax in
+      let open Lwt_result_syntax in
       match Header_index.find store.index key with
-      | exception Not_found -> Lwt.return_none
+      | exception Not_found -> tzfail (Exn Not_found)
       | {IHeader.offset; header} ->
-          let+ value = Values_file.pread_value store.fd ~file_offset:offset in
-          Some (Result.map (fun (value, _ofs) -> (value, header)) value)
+          let+ value, _ofs =
+            Values_file.pread_value store.fd ~file_offset:offset
+          in
+          (value, header)
     in
     let open Lwt_result_syntax in
     Cache.bind_or_put store.cache key read_from_disk @@ function
-    | None -> return_none
-    | Some (Ok value) -> return_some value
-    | Some (Error _ as e) -> Lwt.return e
+    | Ok value -> return_some value
+    | Error _ -> return_none
 
   let locked_write_value store ~offset ~value ~key ~header =
     trace_eval (fun () -> Cannot_write_to_store N.name)
@@ -561,7 +554,7 @@ struct
     @@ fun () ->
     let open Lwt_result_syntax in
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    Cache.put store.cache key (Lwt.return_some (Ok (value, header))) ;
+    Cache.put store.cache key (return (value, header)) ;
     let*! offset = Lwt_unix.lseek store.fd 0 Unix.SEEK_END in
     let*! _written_len = locked_write_value store ~offset ~value ~key ~header in
     if flush then Header_index.flush store.index ;
