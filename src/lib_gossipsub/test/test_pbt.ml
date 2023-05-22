@@ -118,7 +118,7 @@ module Basic_fragments = struct
 
   (* This creates a list of [count] [add_peer;graft] with distinct peers
      such that exactly [count_outbound] of them are [outbound] peers. *)
-  let add_distinct_peers_and_graft count count_outbound topic =
+  let add_distinct_peers_and_graft count ~count_outbound topic =
     assert (count_outbound <= count) ;
     let many_peer_gens =
       List.init ~when_negative_length:() count (fun i ->
@@ -134,10 +134,10 @@ module Basic_fragments = struct
     |> List.flatten
 end
 
-let dump_trace_and_fail ~__LOC__ prefix limits pp_state msg =
+let dump_trace_and_fail ?__LOC__ prefix limits pp_state msg =
   let open Gossipsub_pbt_generators in
   Tezt.Test.fail
-    ~__LOC__
+    ?__LOC__
     "Limits:@;%a@;Dumping trace until failure:@;@[<hov>%a@]@;%s@;"
     pp_limits
     limits
@@ -761,7 +761,7 @@ module Test_peers_below_degree_high = struct
        return (count_outbound, peer_count))
     @@ fun (count_outbound, peer_count) ->
     of_list [I.join {topic}]
-    @% add_distinct_peers_and_graft peer_count count_outbound topic
+    @% add_distinct_peers_and_graft peer_count ~count_outbound topic
     @% heartbeat
 
   (* A generator that should satisfy [Tezos_gossipsub.check_limits]. *)
@@ -1156,8 +1156,379 @@ module Test_handle_ihave = struct
     unit
 end
 
+module Test_opportunistic_grafting = struct
+  open Gossipsub_pbt_generators
+
+  (* This test checks opportunistic grafting as follows:
+     1. Subscribe many distinct peers to some unique topic.
+        Partition this set in two, two times:
+        - one in the mesh (of cardinal higher than [degree_high]), one outside
+        - one with a low score, one with a high score; the score is controlled
+          through P5, the app specific scoring; the low score is below
+          [opportunistic_graft_threshold], the high one above
+     2. Perform a heartbeat.
+     3. Test some properties specific to opportunistic grafting and some generic to maintenance:
+        * Check that the mesh size is [degree_optimal + opportunistic_graft_peers]
+        * Check that there are [opportunistic_graft_peers] grafted peers with high-score.
+        * Check that a minimum number of peers are pruned.
+        * Check that grafted peers were not in the mesh and are now in the mesh.
+        * Check that pruned peers were in the mesh and aren't now in the mesh.
+        * Check that no peer is both grafted and pruned.
+
+     Parameters:
+       count_in_mesh := number of peers in the topic mesh
+       count_out_mesh := number of peers outside the topic mesh
+       count_low := number of peers with low score
+
+     Constraints:
+     - [count_in_mesh > degree_high], so that there are peers to be pruned during the heartbeat
+     - We need at least [1 + degree_optimal / 2] low-score peers in the mesh
+       after pruning; and there will be at most [count_in_mesh - degree_optimal]
+       low-score peers that will be pruned.
+       Therefore we need to have:
+         [count_low
+          >= 1 + degree_optimal / 2 + count_in_mesh - degree_optimal
+           = 1 + count_in_mesh - degree_optimal / 2]
+  *)
+
+  let topic = "dummy_topic"
+
+  let expected_topic_set = GS.Topic.Set.singleton topic
+
+  let pp_state fmtr state =
+    let v = GS.Introspection.view state in
+    Fmt.Dump.record
+      Fmt.Dump.
+        [
+          field
+            "mesh"
+            (fun v -> v.GS.Introspection.mesh)
+            GS.Introspection.(pp_topic_map pp_peer_set);
+          field
+            "connections"
+            (fun v -> v.GS.Introspection.connections)
+            GS.Introspection.pp_connections;
+          field
+            "scores"
+            (fun v -> Peer.Map.map GS.Score.value v.GS.Introspection.scores)
+            GS.Introspection.pp_scores;
+        ]
+      fmtr
+      v
+
+  let predicate
+      (Transition {time = _; input; state; state'; output} : transition) () =
+    let open Result_syntax in
+    match input with
+    | Add_peer _ -> (
+        match output with
+        | Peer_already_known -> fail (`unexpected_output (O output))
+        | Peer_added -> return_unit)
+    | Join _ -> (
+        match output with
+        | Already_joined -> fail (`unexpected_output (O output))
+        | Joining_topic _ -> return_unit)
+    | Subscribe _ -> (
+        match output with
+        | Subscribe_to_unknown_peer -> fail (`unexpected_output (O output))
+        | Subscribed -> return_unit)
+    | Set_application_score _ -> return_unit
+    | Graft _ -> (
+        match output with
+        | Peer_filtered | Unsubscribed_topic | Unexpected_grafting_peer
+        | Grafting_peer_with_negative_score | Peer_backed_off
+        | Grafting_direct_peer | Peer_already_in_mesh | Mesh_full ->
+            fail (`unexpected_output (O output))
+        | Grafting_successfully -> return_unit)
+    | Heartbeat -> (
+        match output with
+        | Heartbeat {to_prune; to_graft; _} ->
+            let open GS.Introspection in
+            let mesh_size mesh =
+              let peer_set = GS.Topic.Map.find topic mesh in
+              match peer_set with
+              | None -> 0
+              | Some set -> GS.Peer.Set.cardinal set
+            in
+            let previous_state_has_enough_peers_in_mesh s =
+              (* The mesh should have too many peers in [s]. *)
+              let v = view s in
+              let card = mesh_size v.mesh in
+              (* Cardinality should be > [degree_high]. *)
+              if card <= v.limits.degree_high then
+                fail (`invalid_state_before_heartbeat s)
+              else return_unit
+            in
+            (* The topic set has exactly one topic. *)
+            let valid_record =
+              GS.Peer.Map.for_all (fun _peer topic_set ->
+                  GS.Topic.Set.equal topic_set expected_topic_set)
+            in
+            let expected_mesh_size s' =
+              (* The automaton should have pruned enough peers. *)
+              let v = view s' in
+              (* Check that we pruned enough peers to reach [expected]. *)
+              let expected =
+                v.limits.degree_optimal + v.limits.opportunistic_graft_peers
+              in
+              let mesh_size = mesh_size v.mesh in
+              if mesh_size <> expected then
+                fail (`unexpected_mesh_size (mesh_size, expected))
+              else return_unit
+            in
+            let peer_is_both_grafted_and_pruned () =
+              GS.Peer.Map.exists
+                (fun peer _topics -> GS.Peer.Map.mem peer to_graft)
+                to_prune
+            in
+            (* Checks that each peer in [peers]:
+               - is in [mesh] if [in = true], and
+               - is not in [mesh] if [in = false]. *)
+            let check_in_mesh peers mesh ~in_mesh =
+              let topic_mesh = GS.Topic.Map.find topic mesh in
+              match topic_mesh with
+              | None -> not in_mesh
+              | Some peer_set ->
+                  GS.Peer.Map.for_all
+                    (fun peer _topics ->
+                      let is_in = GS.Peer.Set.mem peer peer_set in
+                      if in_mesh then is_in else not is_in)
+                    peers
+            in
+            let grafted_peers_have_high_score v' to_graft =
+              let min_score =
+                GS.Score.of_float v'.limits.opportunistic_graft_threshold
+              in
+              Peer.Map.for_all
+                (fun peer _topicset ->
+                  match Peer.Map.find_opt peer v'.scores with
+                  | None -> false
+                  | Some score -> GS.Score.(value score > min_score))
+                to_graft
+            in
+            let valid_to_graft s s' =
+              if not (valid_record to_graft) then
+                fail `inconsistent_graft_record
+              else
+                let v = view s in
+                let expected = v.limits.opportunistic_graft_peers in
+                let count_grafted = Peer.Map.cardinal to_graft in
+                if count_grafted <> expected then
+                  fail (`unexpected_to_graft_size (count_grafted, expected))
+                else if not (check_in_mesh to_graft v.mesh ~in_mesh:false) then
+                  fail `grafted_peer_in_old_mesh
+                else
+                  let v' = view s' in
+                  if not (check_in_mesh to_graft v'.mesh ~in_mesh:true) then
+                    fail `grafted_peer_not_in_new_mesh
+                  else if not (grafted_peers_have_high_score v' to_graft) then
+                    fail `grafted_peer_with_low_score
+                  else return_unit
+            in
+            let valid_to_prune s s' =
+              if not (valid_record to_prune) then
+                fail `inconsistent_prune_record
+              else
+                let v = view s in
+                let expected_min =
+                  v.limits.degree_high + 1 - v.limits.degree_optimal
+                in
+                let count_pruned = Peer.Map.cardinal to_prune in
+                if count_pruned < expected_min then
+                  fail (`unexpected_to_prune_size (count_pruned, expected_min))
+                else if not (check_in_mesh to_prune v.mesh ~in_mesh:true) then
+                  fail `pruned_peer_not_in_old_mesh
+                else
+                  let v' = view s' in
+                  if not (check_in_mesh to_prune v'.mesh ~in_mesh:false) then
+                    fail `pruned_peer_in_new_mesh
+                  else return_unit
+            in
+            let* () = previous_state_has_enough_peers_in_mesh state in
+            let* () = expected_mesh_size state' in
+            let* () = valid_to_graft state state' in
+            let* () = valid_to_prune state state' in
+            if peer_is_both_grafted_and_pruned () then
+              fail `peer_is_both_grafted_and_pruned
+            else return_unit)
+    | _ -> fail (`unexpected_input (I input))
+
+  let scenario limits =
+    let open Fragment in
+    let open Basic_fragments in
+    let open M in
+    let add_additional_peers ~first_peer count =
+      let peers_gen =
+        List.init ~when_negative_length:() count (fun i ->
+            let open M in
+            (* Set [direct = false] otherwise the peer won't be grafted. *)
+            let gen_direct = M.return false in
+            let gen_outbound = M.bool in
+            add_peer
+              ~gen_peer:(return (first_peer + i))
+              ~gen_direct
+              ~gen_outbound)
+        |> WithExceptions.Result.get_ok ~loc:__LOC__
+        |> M.flatten_l
+      in
+      of_input_gen peers_gen @@ fun peers ->
+      List.map
+        (fun ap -> [I.add_peer ap; I.subscribe {topic; peer = ap.peer}])
+        peers
+      |> List.flatten
+    in
+    (* set a score above [opportunistic_graft_threshold] for [count] peers
+       starting with [first_peer] *)
+    let set_high_score ~first_peer count =
+      let set_score_list =
+        List.init ~when_negative_length:() count (fun i ->
+            I.set_application_score
+              {
+                peer = first_peer + i;
+                score =
+                  1.
+                  +. limits.opportunistic_graft_threshold
+                     /. limits.score_limits.app_specific_weight;
+              })
+        |> WithExceptions.Result.get_ok ~loc:__LOC__
+      in
+      of_list set_score_list
+    in
+    bind_gen
+      (let* count_in_mesh =
+         let n = limits.degree_high in
+         M.int_range (n + 1) (n * 2)
+       in
+       let* count_out_mesh =
+         let n = limits.opportunistic_graft_peers in
+         M.int_range n (n * 2)
+       in
+       let* count_low =
+         M.int_range
+           (1 + count_in_mesh - (limits.degree_optimal / 2))
+           count_in_mesh
+       in
+       return (count_in_mesh, count_out_mesh, count_low))
+    @@ fun (count_in_mesh, count_out_mesh, count_low) ->
+    let count_high = count_in_mesh + count_out_mesh - count_low in
+    of_list [I.join {topic}]
+    @% add_distinct_peers_and_graft
+         count_in_mesh
+         ~count_outbound:count_in_mesh
+         topic
+    @% add_additional_peers ~first_peer:count_in_mesh count_out_mesh
+    @% set_high_score ~first_peer:count_low count_high
+    @% heartbeat
+
+  let pp_output fmtr (O o) = GS.pp_output fmtr o
+
+  (* A generator that should satisfy [Tezos_gossipsub.check_limits]. *)
+  let limit_generator (default_limits : (_, _, _, _) limits) =
+    let open M in
+    let* degree_optimal = M.int_range 2 20 in
+    let* degree_low, degree_high =
+      M.pair
+        (M.int_range 1 degree_optimal)
+        (M.int_range degree_optimal (2 * degree_optimal))
+    in
+    let* degree_out = M.int_range 0 (Int.min degree_low (degree_optimal / 2)) in
+    let* degree_score = M.int_range 0 (degree_optimal - degree_out) in
+    return
+      {
+        default_limits with
+        degree_optimal;
+        degree_low;
+        degree_high;
+        degree_out;
+        degree_score;
+        opportunistic_graft_ticks = 1L;
+      }
+
+  let fail_test trace limits =
+    let print_error error_msg =
+      dump_trace_and_fail trace limits pp_state error_msg
+    in
+    function
+    | `unexpected_input (I i) ->
+        print_error
+          (Format.asprintf "Faulty test: unexpected input %a" pp_input i)
+    | `unexpected_output (O o) ->
+        print_error
+          (Format.asprintf "Faulty test: unexpected output %a" GS.pp_output o)
+    | `invalid_state_before_heartbeat s ->
+        print_error
+          (Format.asprintf
+             "Faulty test: invalid state before heartbeat %a"
+             pp_state
+             s)
+    | `inconsistent_prune_record ->
+        print_error "At heartbeat, some prune record is ill-formed"
+    | `inconsistent_graft_record ->
+        print_error "At heartbeat, some graft record is ill-formed"
+    | `grafted_peer_in_old_mesh ->
+        print_error "At heartbeat, a grafted peer is in the old mesh"
+    | `grafted_peer_not_in_new_mesh ->
+        print_error "At heartbeat, a grafted peer is not in the new mesh"
+    | `grafted_peer_with_low_score ->
+        print_error "At heartbeat, a grafted peer has low score"
+    | `pruned_peer_not_in_old_mesh ->
+        print_error "At heartbeat, a pruned peer is not in the old mesh"
+    | `pruned_peer_in_new_mesh ->
+        print_error "At heartbeat, a pruned peer is in the new mesh"
+    | `peer_is_both_grafted_and_pruned ->
+        print_error
+          "At heartbeat, there is a peer that is both grafted and pruned"
+    | `unexpected_to_graft_size (actual, expected) ->
+        print_error
+          (Format.asprintf
+             "At heartbeat, the number of pruned peers (%d) is different than \
+              expected (%d)"
+             actual
+             expected)
+    | `unexpected_to_prune_size (actual, expected_min) ->
+        print_error
+          (Format.asprintf
+             "At heartbeat, the number of pruned peers (%d) is smaller than \
+              the minimum expected (%d)"
+             actual
+             expected_min)
+    | `unexpected_mesh_size (mesh_size, expected) ->
+        print_error
+          (Format.asprintf
+             "Peers in mesh = %d, expected = %d"
+             mesh_size
+             expected)
+
+  let test rng limits parameters =
+    Tezt_core.Test.register
+      ~__FILE__
+      ~title:"Gossipsub: opportunistic_grafting"
+      ~tags:["gossipsub"; "heartbeat"; "opportunistic_grafting"]
+    @@ fun () ->
+    let scenario =
+      let open M in
+      let* limits = limit_generator limits in
+      let state = GS.make rng limits parameters in
+      let+ trace = run state (scenario limits) in
+      (trace, limits)
+    in
+    let test =
+      QCheck2.Test.make
+        ~count:1_000
+        ~name:"Gossipsub: opportunistic_grafting"
+        scenario
+      @@ fun (trace, limits) ->
+      match check_fold predicate () trace with
+      | Ok () -> true
+      | Error (e, prefix) -> fail_test prefix limits e
+    in
+    QCheck2.Test.check_exn ~rand:rng test ;
+    unit
+end
+
 let register rng limits parameters =
   Test_remove_peer.test rng limits parameters ;
   Test_message_cache.test rng ;
   Test_peers_below_degree_high.test rng limits parameters ;
-  Test_handle_ihave.test rng limits parameters
+  Test_handle_ihave.test rng limits parameters ;
+  Test_opportunistic_grafting.test rng limits parameters
