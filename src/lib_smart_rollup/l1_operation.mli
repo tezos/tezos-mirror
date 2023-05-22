@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Octez_smart_rollup
-
 (** L1 operations produced (and injected) by the rollup node. *)
 type t =
   | Add_messages of {messages : string list}

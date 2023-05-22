@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Octez_smart_rollup
-
 type t =
   | Add_messages of {messages : string list}
   | Cement of {rollup : Address.t; commitment : Commitment.Hash.t}
