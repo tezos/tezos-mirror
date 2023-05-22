@@ -166,8 +166,6 @@ module type COMMON = sig
 
   val input : ?kind:input_kind -> 'a Input.t -> 'a repr t
 
-  val new_input_com : unit repr t
-
   val begin_input_com : 'b -> 'b open_input_com
 
   val ( |: ) : ('c repr -> 'd) open_input_com -> 'c Input.t -> 'd open_input_com
