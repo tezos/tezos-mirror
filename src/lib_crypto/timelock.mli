@@ -170,8 +170,6 @@ val decrypt : symmetric_key -> ciphertext -> bytes option
 
 val ciphertext_encoding : ciphertext Data_encoding.t
 
-val rsa_public_encoding : rsa_public Data_encoding.t
-
 val vdf_tuple_encoding : vdf_tuple Data_encoding.t
 
 val proof_encoding : timelock_proof Data_encoding.t
