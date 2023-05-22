@@ -34,15 +34,6 @@ open Environment.Error_monad
     the actual time when the operation is included in a block. *)
 let default_operation_inclusion_latency = 3
 
-let parse_operation (op : Operation.raw) =
-  match
-    Data_encoding.Binary.of_bytes_opt
-      Operation.protocol_data_encoding_with_legacy_attestation_name
-      op.proto
-  with
-  | Some protocol_data -> ok {shell = op.shell; protocol_data}
-  | None -> error Plugin_errors.Cannot_parse_operation
-
 let path = RPC_path.(open_root / "helpers")
 
 let elab_conf =
@@ -2866,16 +2857,66 @@ module Parse = struct
 
     let path = RPC_path.(path / "parse")
 
+    type version = Version_0 | Version_1
+
+    let string_of_version = function Version_0 -> "0" | Version_1 -> "1"
+
+    let version_of_string = function
+      | "0" -> Ok Version_0
+      | "1" -> Ok Version_1
+      | _ -> Error "Cannot parse version (supported versions \"0\" and \"1\")"
+
+    let default_parse_operations_version = Version_0
+
+    let version_arg =
+      let open RPC_arg in
+      make
+        ~name:"version"
+        ~destruct:version_of_string
+        ~construct:string_of_version
+        ()
+
+    let operations_query =
+      let open RPC_query in
+      query (fun version ->
+          object
+            method version = version
+          end)
+      |+ field "version" version_arg default_parse_operations_version (fun t ->
+             t#version)
+      |> seal
+
+    let parse_operations_encoding =
+      union
+        [
+          case
+            ~title:"new_encoding_parse_operations"
+            (Tag 1)
+            (list (dynamic_size Operation.encoding))
+            (function
+              | Version_1, parse_operations -> Some parse_operations
+              | Version_0, _ -> None)
+            (fun parse_operations -> (Version_1, parse_operations));
+          case
+            ~title:"old_encoding_parse_operations"
+            Json_only
+            (list
+               (dynamic_size Operation.encoding_with_legacy_attestation_name))
+            (function
+              | Version_0, parse_operations -> Some parse_operations
+              | Version_1, _ -> None)
+            (fun parse_operations -> (Version_0, parse_operations));
+        ]
+
     let operations =
       RPC_service.post_service
         ~description:"Parse operations"
-        ~query:RPC_query.empty
+        ~query:operations_query
         ~input:
           (obj2
              (req "operations" (list (dynamic_size Operation.raw_encoding)))
              (opt "check_signature" bool))
-        ~output:
-          (list (dynamic_size Operation.encoding_with_legacy_attestation_name))
+        ~output:parse_operations_encoding
         RPC_path.(path / "operations")
 
     let block =
@@ -2896,26 +2937,59 @@ module Parse = struct
     | None -> Stdlib.failwith "Cant_parse_protocol_data"
     | Some protocol_data -> protocol_data
 
+  let parse_operation (op : Operation.raw) =
+    match
+      Data_encoding.Binary.of_bytes_opt
+        Operation.protocol_data_encoding_with_legacy_attestation_name
+        op.proto
+    with
+    | Some protocol_data -> ok {shell = op.shell; protocol_data}
+    | None -> error Plugin_errors.Cannot_parse_operation
+
   let register () =
+    let open Lwt_result_syntax in
     Registration.register0
       ~chunked:true
       S.operations
-      (fun _ctxt () (operations, check) ->
-        List.map_es
-          (fun raw ->
-            parse_operation raw >>?= fun op ->
-            (match check with
-            | Some true -> return_unit (* FIXME *)
-            (* I.check_signature ctxt *)
-            (* op.protocol_data.signature op.shell op.protocol_data.contents *)
-            | Some false | None -> return_unit)
-            >|=? fun () -> op)
-          operations) ;
+      (fun _ctxt params (operations, check) ->
+        let* ops =
+          List.map_es
+            (fun raw ->
+              let*? op = parse_operation raw in
+              let () =
+                match check with
+                | Some true -> ()
+                (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5702
+                   The signature of the parsed operation should be properly
+                   checked *)
+                (* I.check_signature ctxt *)
+                (* op.protocol_data.signature op.shell op.protocol_data.contents *)
+                | Some false | None -> ()
+              in
+              return op)
+            operations
+        in
+        let version = params#version in
+        return (version, ops)) ;
     Registration.register0_noctxt ~chunked:false S.block (fun () raw_block ->
         return @@ parse_protocol_data raw_block.protocol_data)
 
-  let operations ctxt block ?check operations =
-    RPC_context.make_call0 S.operations ctxt block () (operations, check)
+  let operations ctxt block ?(version = S.default_parse_operations_version)
+      ?check operations =
+    let open Lwt_result_syntax in
+    let*! v =
+      RPC_context.make_call0
+        S.operations
+        ctxt
+        block
+        (object
+           method version = version
+        end)
+        (operations, check)
+    in
+    match v with
+    | Error e -> fail e
+    | Ok ((Version_0 | Version_1), parse_operation) -> return parse_operation
 
   let block ctxt block shell protocol_data =
     RPC_context.make_call0
