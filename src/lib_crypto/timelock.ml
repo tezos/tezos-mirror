@@ -347,7 +347,9 @@ let get_plaintext_size chest =
   Bytes.length chest.ciphertext.payload - Crypto_box.tag_length
 
 let open_chest chest chest_key ~time =
-  if time < 0 then failwith "Timelock: trying to open with a negative time"
+  if time <= 0 then
+    raise
+      (Invalid_argument "Timelock.open_chest: the time bound must be positive")
   else
     let sym_key_opt =
       locked_value_to_symmetric_key
@@ -419,6 +421,9 @@ let proof_of_vdf_tuple_unsafe rsa_public ~time vdf_tuple =
   else raise (Invalid_argument "Timelock tuple verification failed.")
 
 let chest_sampler ~rng_state ~plaintext_size ~time =
+  if time <= 0 then
+    raise
+      (Invalid_argument "Timelock.open_chest: the time bound must be positive") ;
   Random.set_state rng_state ;
   let plaintext = gen_random_bytes_bench_unsafe plaintext_size in
   (* As we only benchmark the type encodings and the verification function,

@@ -3291,10 +3291,11 @@ module Registration_section = struct
         ~kinstr
         ~stack_type
         ~stack_sampler:(fun _ rng_state () ->
+          let time = 1 in
           let chest, chest_key =
-            Timelock_samplers.chest_sampler ~plaintext_size:1 ~time:0 ~rng_state
+            Timelock_samplers.chest_sampler ~plaintext_size:1 ~time ~rng_state
           in
-          resulting_stack chest chest_key 0)
+          resulting_stack chest chest_key time)
         ()
 
     let () =
