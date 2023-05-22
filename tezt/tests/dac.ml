@@ -194,6 +194,24 @@ let check_preimage expected_preimage actual_preimage =
       ~error_msg:
         "Preimage does not match expected value (Current: %L <> Expected: %R)")
 
+let check_not_ready dac_node =
+  assert_lwt_failure
+    ~__LOC__
+    "Expected DAC node not ready"
+    (RPC.call dac_node Dac_rpc.get_health_ready)
+
+let check_alive dac_node =
+  let* () =
+    Dac_node.wait_for dac_node "rpc_server_started.v0" (fun _ -> Some ())
+  in
+  let* liveness = RPC.call dac_node Dac_rpc.get_health_live in
+  return @@ assert liveness
+
+let check_liveness_and_readiness dac_node =
+  let* liveness = RPC.call dac_node Dac_rpc.get_health_live in
+  let* readiness = RPC.call dac_node Dac_rpc.get_health_ready in
+  return @@ assert (liveness && readiness)
+
 (** [check_downloaded_page coordinator observer page_hash] checks that the
      [observer] has downloaded a page with [page_hash] from the [coordinator],
      that the contents of the page corresponds to the ones of the
@@ -332,7 +350,7 @@ module Legacy = struct
       ~supports:Protocol.(From_protocol (Protocol.number Alpha))
     @@ fun protocol ->
     let* node, client = Client.init_with_protocol `Client ~protocol () in
-    let run_dac = Dac_node.run ~wait_ready:false in
+    let run_dac = Dac_node.run ~wait_ready:true in
     let* committee_member =
       Client.bls_gen_keys ~alias:"committee_member" client
     in
@@ -352,10 +370,11 @@ module Legacy = struct
     in
     let* _dir = Dac_node.init_config dac_node in
     let ready_promise =
-      Dac_node.wait_for dac_node "dac_is_ready.v0" (fun _ -> Some ())
+      Dac_node.wait_for dac_node "committee_keys_imported.v0" (fun _ -> Some ())
     in
     let* () = run_dac dac_node in
     let* () = ready_promise in
+    let* () = check_liveness_and_readiness dac_node in
     let* () = Dac_node.terminate dac_node in
     unit
 
@@ -428,6 +447,34 @@ module Legacy = struct
           Client.bake_for_and_wait client;
         ]
     in
+    let* () = Dac_node.terminate dac_node in
+    return ()
+
+  let test_dac_not_ready_without_protocol =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"dac Legacy startup not ready with unsupported protocol"
+      ~tags:["dac"; "dac_node"]
+    @@ fun protocol ->
+    let run_dac = Dac_node.run ~wait_ready:false in
+    let nodes_args = Node.[Synchronisation_threshold 0] in
+    let* node, client =
+      Client.init_with_protocol
+        `Client
+        ~protocol
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args
+        ()
+    in
+    let dac_node =
+      Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
+    in
+    let* _dir = Dac_node.init_config dac_node in
+    let* () = run_dac dac_node in
+    (* GET /health/live must succeed *)
+    let* () = check_alive dac_node in
+    (* GET /health/ready must fail *)
+    let* () = check_not_ready dac_node in
     let* () = Dac_node.terminate dac_node in
     return ()
 
@@ -1094,6 +1141,96 @@ module Legacy = struct
   end
 end
 
+module Coordinator = struct
+  let test_dac_not_ready_without_protocol =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"dac coordinator startup not ready with unsupported protocol"
+      ~tags:["dac"; "dac_node"]
+    @@ fun protocol ->
+    let run_dac = Dac_node.run ~wait_ready:false in
+    let nodes_args = Node.[Synchronisation_threshold 0] in
+    let* node, client =
+      Client.init_with_protocol
+        `Client
+        ~protocol
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args
+        ()
+    in
+    let dac_node =
+      Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
+    in
+    let* _dir = Dac_node.init_config dac_node in
+    let* () = run_dac dac_node in
+    (* GET /health/live must succeed *)
+    let* () = check_alive dac_node in
+    (* GET /health/ready must fail *)
+    let* () = check_not_ready dac_node in
+    let* () = Dac_node.terminate dac_node in
+    return ()
+end
+
+module Observer = struct
+  let test_dac_not_ready_without_protocol =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"dac Observer startup not ready with unsupported protocol"
+      ~tags:["dac"; "dac_node"]
+    @@ fun protocol ->
+    let run_dac = Dac_node.run ~wait_ready:false in
+    let nodes_args = Node.[Synchronisation_threshold 0] in
+    let* node, client =
+      Client.init_with_protocol
+        `Client
+        ~protocol
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args
+        ()
+    in
+    let dac_node =
+      Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
+    in
+    let* _dir = Dac_node.init_config dac_node in
+    let* () = run_dac dac_node in
+    (* GET /health/live must succeed *)
+    let* () = check_alive dac_node in
+    (* GET /health/ready must fail *)
+    let* () = check_not_ready dac_node in
+    let* () = Dac_node.terminate dac_node in
+    return ()
+end
+
+module Member = struct
+  let test_dac_not_ready_without_protocol =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"dac Member startup not ready with unsupported protocol"
+      ~tags:["dac"; "dac_node"]
+    @@ fun protocol ->
+    let run_dac = Dac_node.run ~wait_ready:false in
+    let nodes_args = Node.[Synchronisation_threshold 0] in
+    let* node, client =
+      Client.init_with_protocol
+        `Client
+        ~protocol
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args
+        ()
+    in
+    let dac_node =
+      Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
+    in
+    let* _dir = Dac_node.init_config dac_node in
+    let* () = run_dac dac_node in
+    (* GET /health/live must succeed *)
+    let* () = check_alive dac_node in
+    (* GET /health/ready must fail *)
+    let* () = check_not_ready dac_node in
+    let* () = Dac_node.terminate dac_node in
+    return ()
+end
+
 (** [Full_infrastructure] is a test suite consisting only of tests with the DAC
     nodes running in non-[Legacy] modes. *)
 module Full_infrastructure = struct
@@ -1177,6 +1314,7 @@ module Full_infrastructure = struct
             wait_for_node_subscribed_to_data_streamer ()
           in
           let* () = Dac_node.run ~wait_ready:true node in
+          let* () = check_liveness_and_readiness node in
           node_is_subscribed)
         (committee_members_nodes @ observer_nodes)
     in
@@ -1269,6 +1407,7 @@ module Full_infrastructure = struct
             wait_for_node_subscribed_to_data_streamer ()
           in
           let* () = Dac_node.run ~wait_ready:true node in
+          let* () = check_liveness_and_readiness node in
           node_is_subscribed)
         (committee_members_nodes @ observer_nodes)
     in
@@ -1468,6 +1607,7 @@ module Full_infrastructure = struct
             wait_for_node_subscribed_to_data_streamer ()
           in
           let* () = Dac_node.run ~wait_ready:true node in
+          let* () = check_liveness_and_readiness node in
           node_is_subscribed)
         (committee_members_nodes @ observer_nodes)
     in
@@ -2033,6 +2173,7 @@ module Tx_kernel_e2e = struct
               wait_for_handle_new_subscription_to_hash_streamer coordinator_node
             in
             let* () = Dac_node.run dac_member in
+            let* () = check_liveness_and_readiness dac_member in
             ev)
           committee_members_nodes
       else unit
@@ -2089,6 +2230,7 @@ module Tx_kernel_e2e = struct
     let observer_node = List.nth observer_nodes 0 in
     let* _ = Dac_node.init_config observer_node in
     let* () = Dac_node.run observer_node in
+    let* () = check_liveness_and_readiness observer_node in
     let* boot_sector =
       prepare_installer_kernel
         ~preimages_dir:
@@ -2373,6 +2515,7 @@ module Tx_kernel_e2e = struct
           "Observer node is in invalid state: Unexpected preimage hash found \
            in reveal data dir.") ;
     let* () = Dac_node.run ~wait_ready:true observer_node in
+    let* () = check_liveness_and_readiness observer_node in
 
     (* Send DAC certificate as an External Message to L1 *)
     let* {level; _} =
@@ -2465,6 +2608,12 @@ module Tx_kernel_e2e = struct
       "kernel_e2e.dac_observer_missing_pages"
       (test_tx_kernel_e2e_with_dac_observer_missing_pages commitment_period)
 end
+
+let register_with_unsupported_protocol ~protocols =
+  Legacy.test_dac_not_ready_without_protocol protocols ;
+  Coordinator.test_dac_not_ready_without_protocol protocols ;
+  Observer.test_dac_not_ready_without_protocol protocols ;
+  Member.test_dac_not_ready_without_protocol protocols
 
 let register ~protocols =
   (* Tests with layer1 and dac nodes *)

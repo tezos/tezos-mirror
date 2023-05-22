@@ -165,7 +165,7 @@ module Legacy = struct
       *)
       if recovered_keys < threshold then
         Event.(emit dac_threshold_not_reached (recovered_keys, threshold))
-      else Event.(emit dac_is_ready) ()
+      else Event.(emit committee_keys_imported) ()
     in
     return wallet_accounts
 

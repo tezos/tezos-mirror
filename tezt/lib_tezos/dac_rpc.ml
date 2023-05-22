@@ -106,3 +106,7 @@ module V0 = struct
       make ~data POST [api_prefix; "preimage"] JSON.as_string
   end
 end
+
+let get_health_live = make GET ["health"; "live"] JSON.as_bool
+
+let get_health_ready = make GET ["health"; "ready"] JSON.as_bool
