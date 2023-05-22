@@ -583,8 +583,8 @@ module RPC = struct
         in
         return_some
           {
-            blockHash = block_hash;
-            blockNumber = block_number;
+            blockHash = Some block_hash;
+            blockNumber = Some block_number;
             from;
             gas = gas_used;
             gasPrice = gas_price;

@@ -95,14 +95,20 @@ let block () =
     uncles = [];
   }
 
+let bootstrap_address =
+  address_of_string "0x6F4d14B90C48bEFb49CA3fe6663dEC70731A8bC7"
+
+let bootstrap_address2 =
+  address_of_string "0xA5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E"
+
 let transaction_receipt () =
   {
     transactionHash = transaction_hash;
     transactionIndex = qty_f Z.zero;
     blockHash = block_hash;
     blockNumber = qty_f @@ Z.of_int !block_height_counter;
-    from = address_of_string "0x6F4d14B90C48bEFb49CA3fe6663dEC70731A8bC7";
-    to_ = Some (address_of_string "0xA5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E");
+    from = bootstrap_address;
+    to_ = Some bootstrap_address2;
     contractAddress =
       Some (address_of_string "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c");
     cumulativeGasUsed = gas_price;
@@ -116,8 +122,8 @@ let transaction_receipt () =
 
 let transaction_object =
   {
-    blockHash = block_hash;
-    blockNumber = qty_f @@ Z.of_int 42;
+    blockHash = Some block_hash;
+    blockNumber = Some (qty_f @@ Z.of_int 42);
     from = address_of_string "0x6F4d14B90C48bEFb49CA3fe6663dEC70731A8bC7";
     gas = qty_f Z.zero;
     gasPrice = qty_f Z.zero;

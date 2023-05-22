@@ -41,8 +41,10 @@ type address = Address of string [@@ocaml.unboxed]
 
 let address_of_string s = Address (String.lowercase_ascii (strip_0x s))
 
+let address_to_string (Address a) = append_0x a
+
 let address_encoding =
-  Data_encoding.(conv (fun (Address a) -> append_0x a) address_of_string string)
+  Data_encoding.(conv address_to_string address_of_string string)
 
 (** Ethereum generic quantity, always encoded in hexadecimal. *)
 type quantity = Qty of Z.t [@@ocaml.unboxed]
@@ -424,8 +426,8 @@ let transaction_receipt_encoding =
           (req "contractAddress" (option address_encoding))))
 
 type transaction_object = {
-  blockHash : block_hash;
-  blockNumber : quantity;
+  blockHash : block_hash option;
+  blockNumber : quantity option;
   from : address;
   gas : quantity;
   gasPrice : quantity;
@@ -500,8 +502,8 @@ let transaction_object_encoding =
       })
     (merge_objs
        (obj10
-          (req "blockHash" block_hash_encoding)
-          (req "blockNumber" quantity_encoding)
+          (req "blockHash" (option block_hash_encoding))
+          (req "blockNumber" (option quantity_encoding))
           (req "from" address_encoding)
           (req "gas" quantity_encoding)
           (req "gasPrice" quantity_encoding)
