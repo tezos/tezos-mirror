@@ -274,6 +274,60 @@ let test_cannot_bake_with_zero_deposits_limit () =
   (* Assert.proto_error_with_info ~loc:__LOC__ b1 "Zero frozen deposits" *)
   Assert.error ~loc:__LOC__ b1 (fun _ -> true)
 
+let test_may_bake_again_after_full_deposit_slash () =
+  let order_ops op1 op2 =
+    let oph1 = Operation.hash op1 in
+    let oph2 = Operation.hash op2 in
+    let c = Operation_hash.compare oph1 oph2 in
+    if c < 0 then (op1, op2) else (op2, op1)
+  in
+  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
+  let (good_contract, good_account), (slashed_contract, slashed_account) =
+    get_first_2_accounts_contracts contracts
+  in
+  Op.transaction
+    (B genesis)
+    good_contract
+    slashed_contract
+    Alpha_context.Tez.one_cent
+  >>=? fun operation ->
+  Block.bake ~policy:(By_account slashed_account) ~operation genesis
+  >>=? fun blk_a ->
+  Block.bake ~policy:(By_account slashed_account) genesis >>=? fun blk_b ->
+  Op.raw_preendorsement ~delegate:slashed_account blk_a >>=? fun preendo1 ->
+  Op.raw_preendorsement ~delegate:slashed_account blk_b >>=? fun preendo2 ->
+  let preendo1, preendo2 = order_ops preendo1 preendo2 in
+  let double_preendo_op =
+    Op.double_preendorsement (B blk_a) preendo1 preendo2
+  in
+  Block.bake
+    ~policy:(By_account good_account)
+    ~operation:double_preendo_op
+    blk_a
+  >>=? fun b ->
+  Op.transaction (B b) good_contract slashed_contract Alpha_context.Tez.one_cent
+  >>=? fun operation ->
+  Block.bake ~policy:(By_account slashed_account) ~operation b >>=? fun blk_a ->
+  Block.bake ~policy:(By_account slashed_account) b >>=? fun blk_b ->
+  Op.raw_endorsement ~delegate:slashed_account blk_a >>=? fun endo1 ->
+  Op.raw_endorsement ~delegate:slashed_account blk_b >>=? fun endo2 ->
+  let endo1, endo2 = order_ops endo1 endo2 in
+  let double_endo_op = Op.double_endorsement (B blk_a) endo1 endo2 in
+  Block.bake ~policy:(By_account good_account) ~operation:double_endo_op b
+  >>=? fun b ->
+  (* Assert that the [slashed_account]'s deposit is now 0 *)
+  Context.Delegate.current_frozen_deposits (B b) slashed_account >>=? fun fd ->
+  Assert.equal_tez ~loc:__LOC__ fd Tez.zero >>=? fun () ->
+  (* Check that we are not allowed to bake with [slashed_account] *)
+  Block.bake ~policy:(By_account slashed_account) b >>= fun res ->
+  Assert.error ~loc:__LOC__ res (fun _ -> true) >>=? fun () ->
+  Block.bake_until_cycle_end ~policy:(By_account good_account) b >>=? fun b ->
+  (* Assert that the [slashed_account]'s deposit is correctly reset *)
+  Context.Delegate.current_frozen_deposits (B b) slashed_account >>=? fun fd ->
+  Assert.not_equal_tez ~loc:__LOC__ fd Tez.zero >>=? fun () ->
+  (* Check that we are now allowed to bake with [slashed_account] *)
+  Block.bake ~policy:(By_account slashed_account) b >>=? fun _b -> return_unit
+
 let test_deposits_after_stake_removal () =
   Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
   let (contract1, account1), (contract2, account2) =
@@ -664,6 +718,10 @@ let tests =
         "cannot bake with zero deposits limit"
         `Quick
         test_cannot_bake_with_zero_deposits_limit;
+      tztest
+        "may bake again after full slash"
+        `Quick
+        test_may_bake_again_after_full_deposit_slash;
       tztest
         "deposits after stake removal"
         `Quick
