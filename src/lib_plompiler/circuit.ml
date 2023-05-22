@@ -971,12 +971,11 @@ module Poseidon = struct
     let mul = Poly.( * )
   end)
 
-  let poseidon128_full_round ~matrix ~k ~variant
-      (Scalar x0, Scalar x1, Scalar x2) =
+  let poseidon128_full_round ~matrix ~k (Scalar x0, Scalar x1, Scalar x2) =
     let*& y0 = fresh Dummy.scalar in
     let*& y1 = fresh Dummy.scalar in
     let*& y2 = fresh Dummy.scalar in
-    let solver = Poseidon128Full {x0; y0; x1; y1; x2; y2; k; variant} in
+    let solver = Poseidon128Full {x0; y0; x1; y1; x2; y2; k; matrix} in
     let minv = VS.inverse matrix in
     let k_vec = VS.(mul minv (transpose [|k|])) in
 
@@ -1022,7 +1021,7 @@ module Poseidon = struct
       ~solver
     >* ret @@ to_list [Scalar y0; Scalar y1; Scalar y2]
 
-  let poseidon128_four_partial_rounds ~matrix ~ks ~variant
+  let poseidon128_four_partial_rounds ~matrix ~ks
       (Scalar x0, Scalar x1, Scalar x2) =
     let*& a = fresh Dummy.scalar in
     let*& a_5 = fresh Dummy.scalar in
@@ -1036,7 +1035,7 @@ module Poseidon = struct
     let k_cols = Array.init 4 (fun i -> VS.filter_cols (Int.equal i) ks) in
     let solver =
       Poseidon128Partial
-        {a; b; c; a_5; b_5; c_5; x0; y0; x1; y1; x2; y2; k_cols; variant}
+        {a; b; c; a_5; b_5; c_5; x0; y0; x1; y1; x2; y2; k_cols; matrix}
     in
 
     (* We represent variables x0, x1, x2_5, a, a_5, b, b_5, c, c_5, y0, y1, y2

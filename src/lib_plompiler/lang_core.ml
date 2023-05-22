@@ -238,14 +238,12 @@ module type COMMON = sig
     val poseidon128_full_round :
       matrix:S.t array array ->
       k:S.t array ->
-      variant:Variants.t ->
       scalar repr * scalar repr * scalar repr ->
       scalar list repr t
 
     val poseidon128_four_partial_rounds :
       matrix:S.t array array ->
       ks:S.t array array ->
-      variant:Variants.t ->
       scalar repr * scalar repr * scalar repr ->
       scalar list repr t
   end
