@@ -67,7 +67,7 @@ end
 
 (** This handler forwards information about connections established by the P2P layer
     to the Gossipsub worker. *)
-let new_connection_handler gs_worker p2p_layer peer conn =
+let new_connections_handler gs_worker p2p_layer peer conn =
   let info = P2p.connection_info p2p_layer conn in
   let outbound = not info.incoming in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5584
@@ -75,6 +75,11 @@ let new_connection_handler gs_worker p2p_layer peer conn =
      Add the ability to have direct peers. *)
   let direct = false in
   Worker.(New_connection {peer; direct; outbound} |> p2p_input gs_worker)
+
+(** This handler forwards information about P2P disconnections to the Gossipsub
+    worker. *)
+let disconnections_handler gs_worker peer =
+  Worker.(Disconnection {peer} |> p2p_input gs_worker)
 
 (* This function translates a Worker p2p_message to the type of messages sent
    via the P2P layer. The two types don't coincide because of Prune. *)
@@ -198,9 +203,11 @@ let app_messages_handler gs_worker ~app_messages_callback =
 let activate gs_worker p2p_layer ~app_messages_callback =
   (* Register a handler to notify new P2P connections to GS. *)
   let () =
-    new_connection_handler gs_worker p2p_layer
+    new_connections_handler gs_worker p2p_layer
     |> P2p.on_new_connection p2p_layer
   in
+  (* Register a handler to notify P2P disconnections to GS. *)
+  let () = disconnections_handler gs_worker |> P2p.on_disconnection p2p_layer in
   Lwt.join
     [
       gs_worker_p2p_output_handler gs_worker p2p_layer;
