@@ -128,8 +128,10 @@ struct
       (pp_print_list ~pp_sep:(fun fmtr () -> fprintf fmtr "@,") pp)
       trace
 
-  let add_peer ~gen_peer =
-    let+ direct = bool and+ outbound = bool and+ peer = gen_peer in
+  let add_peer ~gen_peer ~gen_direct ~gen_outbound =
+    let+ direct = gen_direct
+    and+ outbound = gen_outbound
+    and+ peer = gen_peer in
     ({direct; outbound; peer} : GS.add_peer)
 
   let remove_peer ~gen_peer =

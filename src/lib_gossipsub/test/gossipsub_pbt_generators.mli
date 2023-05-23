@@ -91,7 +91,8 @@ val pp_trace :
 
 (** {2 Input generation helpers.} *)
 
-val add_peer : gen_peer:Peer.t t -> add_peer t
+val add_peer :
+  gen_peer:Peer.t t -> gen_direct:bool t -> gen_outbound:bool t -> add_peer t
 
 val remove_peer : gen_peer:Peer.t t -> remove_peer t
 

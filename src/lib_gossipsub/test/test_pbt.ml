@@ -45,8 +45,8 @@ module Basic_fragments = struct
   let prune_backoff = Milliseconds.Span.of_int_s 10
 
   let add_then_remove_peer ~gen_peer : t =
-    of_input_gen (add_peer ~gen_peer) @@ fun ap ->
-    [I.add_peer ap; I.remove_peer {peer = ap.peer}]
+    of_input_gen (add_peer ~gen_peer ~gen_direct:M.bool ~gen_outbound:M.bool)
+    @@ fun ap -> [I.add_peer ap; I.remove_peer {peer = ap.peer}]
 
   let join_then_leave_topic ~gen_topic : t =
     of_input_gen (join ~gen_topic) @@ fun jp ->
@@ -73,11 +73,10 @@ module Basic_fragments = struct
     assert (count_outbound <= count) ;
     let many_peer_gens =
       List.init ~when_negative_length:() count (fun i ->
-          let open M in
-          let+ ap = add_peer ~gen_peer:(M.return i) in
           (* Setting [direct=false] otherwise the peers won't be grafted. *)
-          if i < count_outbound then {ap with direct = false; outbound = true}
-          else ap)
+          let gen_direct = M.return false in
+          let gen_outbound = M.return (i < count_outbound) in
+          add_peer ~gen_peer:(M.return i) ~gen_direct ~gen_outbound)
       |> WithExceptions.Result.get_ok ~loc:__LOC__
       |> M.flatten_l
     in
