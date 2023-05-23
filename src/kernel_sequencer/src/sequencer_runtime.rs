@@ -180,3 +180,57 @@ where
         self.host.runtime_version()
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::SequencerRuntime;
+    use tezos_data_encoding_derive::BinWriter;
+    use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
+    use tezos_smart_rollup_mock::MockHost;
+
+    #[derive(BinWriter)]
+    struct UserMessage {
+        payload: u32,
+    }
+
+    impl UserMessage {
+        fn new(payload: u32) -> UserMessage {
+            UserMessage { payload }
+        }
+    }
+
+    #[test]
+    fn test_add_user_message() {
+        let mut mock_host = MockHost::default();
+        mock_host.add_external(UserMessage::new(1));
+        mock_host.add_external(UserMessage::new(2));
+        mock_host.add_external(UserMessage::new(3));
+
+        let mut sequencer_runtime =
+            SequencerRuntime::new(mock_host, crate::FilterBehavior::AllowAll, 1);
+
+        let input = sequencer_runtime.read_input().unwrap();
+        let SequencerRuntime { host, .. } = sequencer_runtime;
+
+        assert!(input.is_none());
+        assert!(host
+            .store_has(&RefPath::assert_from(
+                b"/__sequencer/delayed-inbox/elements/0"
+            ))
+            .unwrap()
+            .is_some());
+        assert!(host
+            .store_has(&RefPath::assert_from(
+                b"/__sequencer/delayed-inbox/elements/1"
+            ))
+            .unwrap()
+            .is_some());
+        assert!(host
+            .store_has(&RefPath::assert_from(
+                b"/__sequencer/delayed-inbox/elements/2"
+            ))
+            .unwrap()
+            .is_some());
+    }
+}
