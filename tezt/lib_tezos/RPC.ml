@@ -506,6 +506,19 @@ let post_chain_block_helpers_forge_block_header ?(chain = "main")
     ["chains"; chain; "blocks"; block; "helpers"; "forge_block_header"]
     Fun.id
 
+let post_chain_block_helpers_parse_operations ?(chain = "main")
+    ?(block = "head") ?(check_signature = true) ?version ops =
+  let query_string = Query_arg.opt "version" Fun.id version in
+  let data : RPC_core.data =
+    Data (`O [("operations", ops); ("check_signature", `Bool check_signature)])
+  in
+  make
+    ~query_string
+    ~data
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "parse"; "operations"]
+    Fun.id
+
 let post_chain_block_helpers_scripts_simulate_operation ?(chain = "main")
     ?(block = "head") ~data () =
   make
