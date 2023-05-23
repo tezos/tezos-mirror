@@ -230,14 +230,12 @@ let chest_size chest =
   (*
      type chest = {
        locked_value : locked_value;
-       rsa_public : rsa_public;
        ciphertext : ciphertext;
      }
   *)
   let locked_value_size = 256 in
-  let rsa_public_size = 256 in
   let ciphertext_size = Script_timelock.get_plaintext_size chest in
-  h3w +? (locked_value_size + rsa_public_size + ciphertext_size)
+  h3w +? (locked_value_size + ciphertext_size)
 
 let chest_key_size _ =
   (*
