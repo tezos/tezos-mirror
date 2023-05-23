@@ -195,13 +195,13 @@ let pp_solution ppf solution =
   in
   fprintf
     ppf
-    "@[<2>free_variables:@ @[%a@]@]@;"
+    "@[<2>free_variables:@ @[<v>%a@]@]@;"
     (pp_print_list (fun ppf (fv, float) ->
          fprintf ppf "%a = %.12g" Free_variable.pp fv float))
     alist ;
   fprintf
     ppf
-    "@[<2>scores:@ @[%a@]@]@;"
+    "@[<2>scores:@ @[<v>%a@]@]@;"
     (pp_print_list (fun ppf ((s, ns), scores) ->
          fprintf ppf "%s %a : %a" s Namespace.pp ns Inference.pp_scores scores))
     (List.sort (fun (k1, _) (k2, _) -> compare k1 k2) solution.scores_list)
