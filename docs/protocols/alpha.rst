@@ -36,6 +36,15 @@ Gas improvements
 Breaking Changes
 ----------------
 
+- Protocol parameter ``ratio_of_frozen_deposits_slashed_per_double_endorsement`` is
+  converted from the ratio ``1/5`` into the percentage ``50%`` and renamed to
+  ``percentage_of_frozen_deposits_slashed_per_double_endorsement``. (MR :gl:`!8753`)
+
+- Protocol parameter ``double_baking_punishment`` is converted from a fixed
+  value of ``640tz`` into the percentage ``11%`` and renamed to
+  ``percentage_of_frozen_deposits_slashed_per_double_baking``. (MR :gl:`!8753`)
+
+
 RPC Changes
 -----------
 

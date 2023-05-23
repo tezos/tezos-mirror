@@ -126,7 +126,8 @@ end = struct
                {
                  parametric =
                    {
-                     ratio_of_frozen_deposits_slashed_per_double_endorsement = r;
+                     percentage_of_frozen_deposits_slashed_per_double_endorsement =
+                       p;
                      _;
                    };
                  _;
@@ -141,10 +142,7 @@ end = struct
     (* the diff of the two balances in normal and in denunciation cases *)
     let diff_end_bal = Test_tez.(bal_good -! bal_bad) in
     (* amount lost due to denunciation *)
-    let lost_deposit =
-      Test_tez.(
-        frozen_deposit *! Int64.of_int r.numerator /! Int64.of_int r.denominator)
-    in
+    let lost_deposit = Test_tez.(frozen_deposit *! Int64.of_int p /! 100L) in
     (* have of the lost deposts will be earned by the baker *)
     let denun_reward = Test_tez.(lost_deposit /! 2L) in
     (* if the baker is the endorser, he'll only loose half of the deposits *)

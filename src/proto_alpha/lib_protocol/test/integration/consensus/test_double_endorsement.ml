@@ -99,14 +99,11 @@ let test_valid_double_endorsement_evidence () =
   Context.Delegate.current_frozen_deposits (B blk_final) delegate
   >>=? fun frozen_deposits_after ->
   Context.get_constants (B genesis) >>=? fun csts ->
-  let r =
-    csts.parametric.ratio_of_frozen_deposits_slashed_per_double_endorsement
+  let p =
+    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_endorsement
   in
   let expected_frozen_deposits_after =
-    Test_tez.(
-      frozen_deposits_before
-      *! Int64.of_int (r.denominator - r.numerator)
-      /! Int64.of_int r.denominator)
+    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
   in
   Assert.equal_tez
     ~loc:__LOC__
@@ -392,9 +389,9 @@ let test_freeze_more_with_low_balance =
         consensus_threshold = 0;
         origination_size = 0;
         preserved_cycles = 5;
-        ratio_of_frozen_deposits_slashed_per_double_endorsement =
-          (* enforce that ratio is 50% is the test's params. *)
-          {numerator = 1; denominator = 2};
+        percentage_of_frozen_deposits_slashed_per_double_endorsement =
+          (* enforce that percentage is 50% in the test's params. *)
+          50;
       }
     in
     Context.init_with_constants2 constants >>=? fun (genesis, (c1, c2)) ->
@@ -430,14 +427,12 @@ let test_freeze_more_with_low_balance =
     >>=? fun () ->
     (* We also check that compared to deposits at block [b2], [account1] lost
        50% of its deposits. *)
-    let slash_ratio =
-      constants.ratio_of_frozen_deposits_slashed_per_double_endorsement
+    let slash_percentage =
+      constants.percentage_of_frozen_deposits_slashed_per_double_endorsement
     in
     let expected_frozen_deposits_after =
       Test_tez.(
-        info2.frozen_deposits
-        *! Int64.of_int (slash_ratio.denominator - slash_ratio.numerator)
-        /! Int64.of_int slash_ratio.denominator)
+        info2.frozen_deposits *! Int64.of_int (100 - slash_percentage) /! 100L)
     in
     Assert.equal_tez
       ~loc:__LOC__

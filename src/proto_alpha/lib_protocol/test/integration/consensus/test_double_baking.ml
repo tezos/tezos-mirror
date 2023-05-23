@@ -68,8 +68,10 @@ let double_baking ctxt ?(correct_order = true) bh1 bh2 =
     exposed by a double baking evidence operation. *)
 let test_valid_double_baking_evidence () =
   Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, contracts) ->
-  Context.get_constants (B genesis)
-  >>=? fun Constants.{parametric = {double_baking_punishment; _}; _} ->
+  Context.get_constants (B genesis) >>=? fun c ->
+  let p =
+    c.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
+  in
   Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
   block_fork ~policy:(By_account baker1) contracts genesis
   >>=? fun (blk_a, blk_b) ->
@@ -80,10 +82,13 @@ let test_valid_double_baking_evidence () =
   >>=? fun frozen_deposits_before ->
   Context.Delegate.current_frozen_deposits (B blk_final) baker1
   >>=? fun frozen_deposits_after ->
-  let slashed_amount =
-    Test_tez.(frozen_deposits_before -! frozen_deposits_after)
+  let expected_frozen_deposits_after =
+    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
   in
-  Assert.equal_tez ~loc:__LOC__ slashed_amount double_baking_punishment
+  Assert.equal_tez
+    ~loc:__LOC__
+    frozen_deposits_after
+    expected_frozen_deposits_after
   >>=? fun () ->
   (* Check that the initial frozen deposits has not changed *)
   Context.Delegate.initial_frozen_deposits (B blk_final) baker1
@@ -129,23 +134,21 @@ let test_valid_double_baking_followed_by_double_endorsing () =
   Context.Delegate.current_frozen_deposits (B blk_final) baker1
   >>=? fun frozen_deposits_after ->
   Context.get_constants (B genesis) >>=? fun csts ->
-  let r =
-    csts.parametric.ratio_of_frozen_deposits_slashed_per_double_endorsement
+  let p_de =
+    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_endorsement
   in
-  let expected_frozen_deposits_after_de =
-    Test_tez.(
-      frozen_deposits_before
-      *! Int64.of_int (r.denominator - r.numerator)
-      /! Int64.of_int r.denominator)
+  let p_db =
+    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
   in
-  (* the deposit after double baking and double endorsing equals the
-     expected deposit after double endorsing minus the double baking
-     punishment *)
+  let p = p_de + p_db (* assuming the sum doesn't exceed 100% *) in
+  let expected_frozen_deposits_after =
+    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
+  in
+  (* Both slashings are computed on the initial amount of frozen deposits so
+     the percentages are additive, not multiplicative. *)
   Assert.equal_tez
     ~loc:__LOC__
-    Test_tez.(
-      expected_frozen_deposits_after_de
-      -! csts.parametric.double_baking_punishment)
+    expected_frozen_deposits_after
     frozen_deposits_after
 
 (* auxiliary function used in [test_valid_double_endorsing_followed_by_double_baking] *)
@@ -180,23 +183,21 @@ let test_valid_double_endorsing_followed_by_double_baking () =
   Context.Delegate.current_frozen_deposits (B blk_with_db_evidence) baker1
   >>=? fun frozen_deposits_after ->
   Context.get_constants (B genesis) >>=? fun csts ->
-  let r =
-    csts.parametric.ratio_of_frozen_deposits_slashed_per_double_endorsement
+  let p_de =
+    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_endorsement
   in
-  let expected_frozen_deposits_after_de =
-    Test_tez.(
-      frozen_deposits_before
-      *! Int64.of_int (r.denominator - r.numerator)
-      /! Int64.of_int r.denominator)
+  let p_db =
+    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
   in
-  (* the deposit after double baking and double endorsing equals the
-     expected deposit after double endorsing minus the double baking
-     punishment *)
+  let p = p_de + p_db (* assuming the sum doesn't exceed 100% *) in
+  let expected_frozen_deposits_after =
+    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
+  in
+  (* Both slashings are computed on the initial amount of frozen deposits so
+     the percentages are additive, not multiplicative. *)
   Assert.equal_tez
     ~loc:__LOC__
-    Test_tez.(
-      expected_frozen_deposits_after_de
-      -! csts.parametric.double_baking_punishment)
+    expected_frozen_deposits_after
     frozen_deposits_after
 
 (** Test that the payload producer of the block containing a double
@@ -204,8 +205,10 @@ let test_valid_double_endorsing_followed_by_double_baking () =
    the reward. *)
 let test_payload_producer_gets_evidence_rewards () =
   Context.init_n ~consensus_threshold:0 10 () >>=? fun (genesis, contracts) ->
-  Context.get_constants (B genesis)
-  >>=? fun Constants.{parametric = {double_baking_punishment; _}; _} ->
+  Context.get_constants (B genesis) >>=? fun c ->
+  let p =
+    c.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
+  in
   Context.get_baking_reward_fixed_portion (B genesis)
   >>=? fun baking_reward_fixed_portion ->
   Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
@@ -239,11 +242,17 @@ let test_payload_producer_gets_evidence_rewards () =
   >>=? fun frozen_deposits_before ->
   Context.Delegate.current_frozen_deposits (B b') baker1
   >>=? fun frozen_deposits_after ->
+  let expected_frozen_deposits_after =
+    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
+  in
+  Assert.equal_tez
+    ~loc:__LOC__
+    frozen_deposits_after
+    expected_frozen_deposits_after
+  >>=? fun () ->
   let slashed_amount =
     Test_tez.(frozen_deposits_before -! frozen_deposits_after)
   in
-  Assert.equal_tez ~loc:__LOC__ slashed_amount double_baking_punishment
-  >>=? fun () ->
   (* [baker2] included the double baking evidence in [b_with_evidence]
      and so it receives the reward for the evidence included in [b']
      (besides the reward for proposing the payload). *)
@@ -263,7 +272,7 @@ let test_payload_producer_gets_evidence_rewards () =
   Assert.equal_tez
     ~loc:__LOC__
     full_balance_at_b'
-    Test_tez.(full_balance_at_b1 -! double_baking_punishment)
+    Test_tez.(full_balance_at_b1 -! slashed_amount)
 
 (****************************************************************)
 (*  The following test scenarios are supposed to raise errors.  *)

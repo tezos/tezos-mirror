@@ -884,8 +884,8 @@ module Constants : sig
       consensus_threshold : int;
       max_slashing_period : int;
       frozen_deposits_percentage : int;
-      double_baking_punishment : Tez.t;
-      ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio.t;
+      percentage_of_frozen_deposits_slashed_per_double_baking : int;
+      percentage_of_frozen_deposits_slashed_per_double_endorsement : int;
       testnet_dictator : public_key_hash option;
       initial_seed : State_hash.t option;
       cache_script_size : int;
@@ -971,10 +971,10 @@ module Constants : sig
 
   val frozen_deposits_percentage : context -> int
 
-  val double_baking_punishment : context -> Tez.t
+  val percentage_of_frozen_deposits_slashed_per_double_baking : context -> int
 
-  val ratio_of_frozen_deposits_slashed_per_double_endorsement :
-    context -> Ratio.t
+  val percentage_of_frozen_deposits_slashed_per_double_endorsement :
+    context -> int
 
   val testnet_dictator : context -> public_key_hash option
 

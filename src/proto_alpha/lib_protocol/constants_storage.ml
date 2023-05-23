@@ -134,9 +134,9 @@ let frozen_deposits_percentage c =
   let constants = Raw_context.constants c in
   constants.frozen_deposits_percentage
 
-let double_baking_punishment c =
+let percentage_of_frozen_deposits_slashed_per_double_baking c =
   let constants = Raw_context.constants c in
-  constants.double_baking_punishment
+  constants.percentage_of_frozen_deposits_slashed_per_double_baking
 
 let tx_rollup_enable c =
   let tx_rollup = Raw_context.tx_rollup c in
@@ -198,9 +198,9 @@ let tx_rollup_rejection_max_proof_size c =
   let tx_rollup = Raw_context.tx_rollup c in
   tx_rollup.rejection_max_proof_size
 
-let ratio_of_frozen_deposits_slashed_per_double_endorsement c =
+let percentage_of_frozen_deposits_slashed_per_double_endorsement c =
   let constants = Raw_context.constants c in
-  constants.ratio_of_frozen_deposits_slashed_per_double_endorsement
+  constants.percentage_of_frozen_deposits_slashed_per_double_endorsement
 
 let testnet_dictator c =
   let constants = Raw_context.constants c in
