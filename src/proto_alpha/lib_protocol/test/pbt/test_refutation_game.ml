@@ -842,7 +842,7 @@ module Arith_test_pvm = struct
 
   let initial_state () =
     let open Lwt_syntax in
-    let empty = Sc_rollup_helpers.make_empty_tree () in
+    let empty = Sc_rollup_helpers.Arith_pvm.make_empty_state () in
     let* state = initial_state ~empty in
     let* state = install_boot_sector state "" in
     return state
@@ -1060,12 +1060,6 @@ let pp_player_client ppf
     final_tick
 
 module Player_client = struct
-  let empty_memory_ctxt id =
-    let open Lwt_syntax in
-    Lwt_main.run
-    @@ let+ index = Tezos_context_memory.Context_binary.init id in
-       Tezos_context_memory.Context_binary.empty index
-
   (** Construct an inbox based on [list_of_messages] in the player context. *)
   let construct_inbox ~inbox list_of_messages =
     let history = Sc_rollup.Inbox.History.empty ~capacity:10000L in
@@ -1219,7 +1213,9 @@ module Player_client = struct
   let gen ~inbox ~rollup ~origination_level ~start_level ~max_level player
       payloads_per_levels =
     let open QCheck2.Gen in
-    let ctxt = empty_memory_ctxt "foo" in
+    let ctxt : Context_helpers.In_memory.Tree.t =
+      ArithPVM.make_empty_context ()
+    in
     let metadata = Sc_rollup.Metadata.{address = rollup; origination_level} in
     let* tick, our_states, payloads_per_levels =
       gen_our_states
@@ -1308,7 +1304,7 @@ let build_proof ~player_client start_tick (game : Game.t) =
 
     let initial_state ~empty:_ = initial_state ()
 
-    let context = player_client.context
+    let context : context = player_client.context
 
     let state = state
 

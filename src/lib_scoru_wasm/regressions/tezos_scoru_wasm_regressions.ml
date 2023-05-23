@@ -29,90 +29,8 @@ open Tezos_scoru_wasm_helpers
 open Tezos_scoru_wasm_helpers.Wasm_utils
 
 (* Helpers *)
-module Context_binary = Tezos_context_memory.Context_binary
 
-module Prover = struct
-  open Tezos_protocol_alpha
-  open Tezos_protocol_alpha.Protocol
-
-  module Tree :
-    Environment.Context.TREE
-      with type t = Context_binary.t
-       and type tree = Context_binary.tree
-       and type key = string list
-       and type value = bytes = struct
-    type t = Context_binary.t
-
-    type tree = Context_binary.tree
-
-    type key = Context_binary.key
-
-    type value = Context_binary.value
-
-    include Context_binary.Tree
-  end
-
-  module WASM_P :
-    Alpha_context.Sc_rollup.Generic_pvm_context_sig
-      with type Tree.t = Context_binary.t
-       and type Tree.tree = Context_binary.tree
-       and type Tree.key = string list
-       and type Tree.value = bytes
-       and type proof = Context_binary.Proof.tree Context_binary.Proof.t =
-  struct
-    open Alpha_context
-    module Tree = Tree
-
-    type tree = Tree.tree
-
-    type proof = Context_binary.Proof.tree Context_binary.Proof.t
-
-    let proof_encoding =
-      Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2
-      .tree_proof_encoding
-
-    let kinded_hash_to_state_hash :
-        Context_binary.Proof.kinded_hash -> Sc_rollup.State_hash.t = function
-      | `Value hash | `Node hash ->
-          Sc_rollup.State_hash.context_hash_to_state_hash hash
-
-    let proof_before proof =
-      kinded_hash_to_state_hash proof.Context_binary.Proof.before
-
-    let proof_after proof =
-      kinded_hash_to_state_hash proof.Context_binary.Proof.after
-
-    let produce_proof context tree step =
-      let open Lwt_syntax in
-      let* context = Context_binary.add_tree context [] tree in
-      let* (_hash : Context_hash.t) =
-        Context_binary.commit ~time:Time.Protocol.epoch context
-      in
-      let index = Context_binary.index context in
-      match Context_binary.Tree.kinded_key tree with
-      | Some k ->
-          let* p = Context_binary.produce_tree_proof index k step in
-          return (Some p)
-      | None ->
-          Stdlib.failwith
-            "produce_proof: internal error, [kinded_key] returned [None]"
-
-    let verify_proof proof step =
-      let open Lwt_syntax in
-      let* result = Context_binary.verify_tree_proof proof step in
-      match result with
-      | Ok v -> return (Some v)
-      | Error _ ->
-          (* We skip the error analysis here since proof verification is not a
-             job for the rollup node. *)
-          return None
-  end
-
-  include
-    Alpha_context.Sc_rollup.Wasm_2_0_0PVM.Make
-      (Environment.Wasm_2_0_0.Make)
-      (WASM_P)
-end
+module Prover = Pvm_in_memory.Wasm
 
 module Verifier =
   Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup.Wasm_2_0_0PVM
@@ -214,11 +132,6 @@ let checked_eval ~proof_size_limit context s =
   in
   unit
 
-let context ~name () =
-  let open Lwt_syntax in
-  let* index = Context_binary.init name in
-  return (Context_binary.empty index)
-
 let register_gen ~from_binary ~fail_on_stuck ?ticks_per_snapshot ~tag ~inputs
     ~skip_ticks ~ticks_to_check ~name ~versions k kernel =
   let eval context s =
@@ -252,7 +165,7 @@ let register_gen ~from_binary ~fail_on_stuck ?ticks_per_snapshot ~tag ~inputs
             sprintf "kernel %s run (%s, %s)" name tag (version_name version))
         ~tags:["wasm_2_0_0"; name; tag; version_name version]
         (fun () ->
-          let* context = context ~name () in
+          let context = Prover.make_empty_context () in
           let* tree =
             initial_tree ~from_binary ~version ?ticks_per_snapshot kernel
           in
