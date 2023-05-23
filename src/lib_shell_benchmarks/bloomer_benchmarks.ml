@@ -75,6 +75,8 @@ let make_bloomer () =
     ~countdown_bits:4
     ~index_bits:(Bits.numbits (2 * 1024 * 8 * 1024 / 4))
 
+(* This is a feature of the peer-to-peer layer.
+   The benchmark is not used to generate values for the protocol. *)
 let () =
   Registration.register
   @@ make_bench
@@ -91,6 +93,8 @@ let () =
          let closure () = ignore (Bloomer.mem bloomer string) in
          Generator.Plain {workload = (); closure})
 
+(* This is a feature of the peer-to-peer layer.
+   The benchmark is not used to generate values for the protocol. *)
 let () =
   Registration.register
   @@ make_bench
