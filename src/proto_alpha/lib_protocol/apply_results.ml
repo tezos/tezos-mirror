@@ -57,10 +57,6 @@ type _ successful_manager_operation_result =
       global_address : Script_expr_hash.t;
     }
       -> Kind.register_global_constant successful_manager_operation_result
-  | Set_deposits_limit_result : {
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.set_deposits_limit successful_manager_operation_result
   | Increase_paid_storage_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
@@ -470,21 +466,6 @@ module Manager_result = struct
         | Update_consensus_key_result {consumed_gas} -> consumed_gas)
       ~inj:(fun consumed_gas -> Update_consensus_key_result {consumed_gas})
 
-  let set_deposits_limit_case =
-    make
-      ~op_case:Operation.Encoding.Manager_operations.set_deposits_limit_case
-      ~encoding:
-        Data_encoding.(
-          obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
-      ~select:(function
-        | Successful_manager_result (Set_deposits_limit_result _ as op) ->
-            Some op
-        | _ -> None)
-      ~kind:Kind.Set_deposits_limit_manager_kind
-      ~proj:(function
-        | Set_deposits_limit_result {consumed_gas} -> consumed_gas)
-      ~inj:(fun consumed_gas -> Set_deposits_limit_result {consumed_gas})
-
   let increase_paid_storage_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.increase_paid_storage_case
@@ -858,7 +839,6 @@ let successful_manager_operation_result_encoding :
          make Manager_result.origination_case;
          make Manager_result.delegation_case;
          make Manager_result.update_consensus_key_case;
-         make Manager_result.set_deposits_limit_case;
          make Manager_result.increase_paid_storage_case;
          make Manager_result.sc_rollup_originate_case;
        ]
@@ -946,10 +926,6 @@ let equal_manager_kind :
   | Kind.Event_manager_kind, Kind.Event_manager_kind -> Some Eq
   | Kind.Event_manager_kind, _ -> None
   | Kind.Register_global_constant_manager_kind, _ -> None
-  | Kind.Set_deposits_limit_manager_kind, Kind.Set_deposits_limit_manager_kind
-    ->
-      Some Eq
-  | Kind.Set_deposits_limit_manager_kind, _ -> None
   | ( Kind.Increase_paid_storage_manager_kind,
       Kind.Increase_paid_storage_manager_kind ) ->
       Some Eq
@@ -1512,17 +1488,6 @@ module Encoding = struct
             Some (op, res)
         | _ -> None)
 
-  let set_deposits_limit_case =
-    make_manager_case
-      Operation.Encoding.set_deposits_limit_case
-      Manager_result.set_deposits_limit_case
-      (function
-        | Contents_and_result
-            ( (Manager_operation {operation = Set_deposits_limit _; _} as op),
-              res ) ->
-            Some (op, res)
-        | _ -> None)
-
   let increase_paid_storage_case =
     make_manager_case
       Operation.Encoding.increase_paid_storage_case
@@ -1696,7 +1661,6 @@ let common_cases =
     origination_case;
     delegation_case;
     register_global_constant_case;
-    set_deposits_limit_case;
     increase_paid_storage_case;
     update_consensus_key_case;
     transfer_ticket_case;
@@ -2100,32 +2064,6 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Register_global_constant _; _}, _ -> None
-  | ( Manager_operation {operation = Set_deposits_limit _; _},
-      Manager_operation_result
-        {operation_result = Applied (Set_deposits_limit_result _); _} ) ->
-      Some Eq
-  | ( Manager_operation {operation = Set_deposits_limit _; _},
-      Manager_operation_result
-        {operation_result = Backtracked (Set_deposits_limit_result _, _); _} )
-    ->
-      Some Eq
-  | ( Manager_operation {operation = Set_deposits_limit _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Failed (Alpha_context.Kind.Set_deposits_limit_manager_kind, _);
-          _;
-        } ) ->
-      Some Eq
-  | ( Manager_operation {operation = Set_deposits_limit _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Skipped Alpha_context.Kind.Set_deposits_limit_manager_kind;
-          _;
-        } ) ->
-      Some Eq
-  | Manager_operation {operation = Set_deposits_limit _; _}, _ -> None
   | ( Manager_operation {operation = Increase_paid_storage _; _},
       Manager_operation_result
         {operation_result = Applied (Increase_paid_storage_result _); _} ) ->

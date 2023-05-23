@@ -212,17 +212,6 @@ let fold = Storage.Delegates.fold
 
 let list = Storage.Delegates.elements
 
-let frozen_deposits_limit ctxt delegate =
-  Storage.Contract.Frozen_deposits_limit.find
-    ctxt
-    (Contract_repr.Implicit delegate)
-
-let set_frozen_deposits_limit ctxt delegate limit =
-  Storage.Contract.Frozen_deposits_limit.add_or_remove
-    ctxt
-    (Contract_repr.Implicit delegate)
-    limit
-
 let frozen_deposits ctxt delegate =
   Frozen_deposits_storage.get ctxt (Contract_repr.Implicit delegate)
 

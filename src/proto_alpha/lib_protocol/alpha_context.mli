@@ -2096,12 +2096,6 @@ end
 module Delegate : sig
   val check_not_tz4 : Signature.public_key_hash -> unit tzresult
 
-  val frozen_deposits_limit :
-    context -> public_key_hash -> Tez.t option tzresult Lwt.t
-
-  val set_frozen_deposits_limit :
-    context -> public_key_hash -> Tez.t option -> context Lwt.t
-
   val fold :
     context ->
     order:[`Sorted | `Undefined] ->
@@ -4039,8 +4033,6 @@ module Kind : sig
 
   type event = Event_kind
 
-  type set_deposits_limit = Set_deposits_limit_kind
-
   type increase_paid_storage = Increase_paid_storage_kind
 
   type update_consensus_key = Update_consensus_key_kind
@@ -4085,7 +4077,6 @@ module Kind : sig
     | Delegation_manager_kind : delegation manager
     | Event_manager_kind : event manager
     | Register_global_constant_manager_kind : register_global_constant manager
-    | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Update_consensus_key_manager_kind : update_consensus_key manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
@@ -4226,9 +4217,6 @@ and _ manager_operation =
       value : Script.lazy_expr;
     }
       -> Kind.register_global_constant manager_operation
-  | Set_deposits_limit :
-      Tez.t option
-      -> Kind.set_deposits_limit manager_operation
   | Increase_paid_storage : {
       amount_in_bytes : Z.t;
       destination : Contract_hash.t;
@@ -4478,8 +4466,6 @@ module Operation : sig
     val register_global_constant_case :
       Kind.register_global_constant Kind.manager case
 
-    val set_deposits_limit_case : Kind.set_deposits_limit Kind.manager case
-
     val increase_paid_storage_case :
       Kind.increase_paid_storage Kind.manager case
 
@@ -4534,8 +4520,6 @@ module Operation : sig
       val update_consensus_key_case : Kind.update_consensus_key case
 
       val register_global_constant_case : Kind.register_global_constant case
-
-      val set_deposits_limit_case : Kind.set_deposits_limit case
 
       val increase_paid_storage_case : Kind.increase_paid_storage case
 
