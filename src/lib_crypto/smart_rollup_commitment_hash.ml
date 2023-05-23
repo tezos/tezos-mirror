@@ -1,9 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -30,13 +29,14 @@ include
   Blake2B.Make
     (Base58)
     (struct
-      let name = "smart_rollup_address"
+      let name = "smart_rollup_commitment_hash"
 
-      let title = "A smart rollup address"
+      let title = "The hash of a commitment of a smart rollup"
 
-      let b58check_prefix = Base58.Prefix.smart_rollup_address
+      let b58check_prefix = Base58.Prefix.smart_rollup_commitment
 
-      let size = Some 20
+      (* defaults to 32 *)
+      let size = None
     end)
 
-let () = Base58.check_encoded_prefix b58check_encoding "sr1" 36
+let () = Base58.check_encoded_prefix b58check_encoding "src1" 54

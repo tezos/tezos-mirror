@@ -27,7 +27,7 @@
 open Sc_rollup_repr
 
 module Hash : sig
-  include S.HASH
+  include S.HASH with type t = Smart_rollup.Commitment_hash.t
 
   include Storage_description.INDEX with type t := t
 end

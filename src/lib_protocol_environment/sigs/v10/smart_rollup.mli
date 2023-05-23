@@ -1,9 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -26,17 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include
-  Blake2B.Make
-    (Base58)
-    (struct
-      let name = "smart_rollup_address"
+(** Smart rollup addresses *)
+module Address : S.HASH
 
-      let title = "A smart rollup address"
+(** Smart rollup commitment hashes *)
+module Commitment_hash : S.HASH
 
-      let b58check_prefix = Base58.Prefix.smart_rollup_address
+(** Smart rollup PVM state hashes. Refer to
+    {!Tezos_crypto.Hashed.Smart_rollup_state_hash} in
+    [src/lib_crypto/smart_rollup_state_hash.mli] for documentation. *)
+module State_hash : sig
+  include S.HASH
 
-      let size = Some 20
-    end)
+  val context_hash_to_state_hash : Context_hash.t -> t
 
-let () = Base58.check_encoded_prefix b58check_encoding "sr1" 36
+  type unreachable__use_context_hash_to_state_hash
+
+  val hash_bytes : unreachable__use_context_hash_to_state_hash
+
+  val hash_string : unreachable__use_context_hash_to_state_hash
+end
+
+(** Smart rollup inbox hashes *)
+module Inbox_hash : S.HASH
+
+(** Smart rollup merkelized payload hashes' hash *)
+module Merkelized_payload_hashes_hash : S.HASH

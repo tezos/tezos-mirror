@@ -1,9 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -26,17 +25,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include
-  Blake2B.Make
-    (Base58)
-    (struct
-      let name = "smart_rollup_address"
+include S.HASH
 
-      let title = "A smart rollup address"
+(** [context_hash_to_state_hash ch] turns an (Irmin) context hash into a state
+    hash. *)
+val context_hash_to_state_hash : Context_hash.t -> t
 
-      let b58check_prefix = Base58.Prefix.smart_rollup_address
+(** Hackish way to disable [hash_bytes] and [hash_string] to force people to use
+    {!context_hash_to_state_hash} (without changing content of {!S.HASH}). *)
+type unreachable__use_context_hash_to_state_hash
 
-      let size = Some 20
-    end)
+val hash_bytes : unreachable__use_context_hash_to_state_hash
 
-let () = Base58.check_encoded_prefix b58check_encoding "sr1" 36
+val hash_string : unreachable__use_context_hash_to_state_hash

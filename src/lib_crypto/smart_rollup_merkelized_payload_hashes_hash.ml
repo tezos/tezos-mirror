@@ -1,6 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -23,5 +25,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Smart rollup addresses *)
-include S.HASH
+include
+  Blake2B.Make
+    (Base58)
+    (struct
+      let name = "smart_rollup_merkelized_payload_hashes_hash"
+
+      let title =
+        "The hash of the Merkelized payload hashes of a smart rollup inbox"
+
+      let b58check_prefix = Base58.Prefix.smart_rollup_merkelized_payload
+
+      (* defaults to 32 *)
+      let size = None
+    end)
+
+let () = Base58.check_encoded_prefix b58check_encoding "srib2" 55

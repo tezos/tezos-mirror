@@ -42,34 +42,7 @@ module Skip_list_parameters = struct
 end
 
 module Skip_list = Skip_list_repr.Make (Skip_list_parameters)
-
-(* 32 *)
-let hash_prefix = "\003\255\138\145\140" (* srib2(55) *)
-
-module Hash = struct
-  let prefix = "srib2"
-
-  let encoded_size = 55
-
-  module H =
-    Blake2B.Make
-      (Base58)
-      (struct
-        let name = "Smart_rollup_merkelized_payload_hashes_hash"
-
-        let title =
-          "The merkelized payload hashes' hash of the smart rollup inbox"
-
-        let b58check_prefix = hash_prefix
-
-        (* defaults to 32 *)
-        let size = None
-      end)
-
-  include H
-
-  let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
-end
+module Hash = Smart_rollup.Merkelized_payload_hashes_hash
 
 type t = (Sc_rollup_inbox_message_repr.Hash.t, Hash.t) Skip_list.cell
 

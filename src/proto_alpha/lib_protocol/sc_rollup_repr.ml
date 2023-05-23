@@ -26,13 +26,13 @@
 (*****************************************************************************)
 
 module Address = struct
-  include Smart_rollup_address
+  include Smart_rollup.Address
 
   let prefix = "sr1"
 
   let () = Base58.check_encoded_prefix b58check_encoding prefix 36
 
-  let of_b58data = function Smart_rollup_address.Data h -> Some h | _ -> None
+  let of_b58data = function Smart_rollup.Address.Data h -> Some h | _ -> None
 end
 
 module Internal_for_tests = struct
@@ -43,52 +43,10 @@ module Internal_for_tests = struct
     Address.hash_bytes [data]
 end
 
-(* 32 *)
-let state_hash_prefix = "\017\165\235\240" (* srs1(54) *)
-
-module State_hash = struct
-  let prefix = "srs1"
-
-  let encoded_size = 54
-
-  module H =
-    Blake2B.Make
-      (Base58)
-      (struct
-        let name = "Smart_rollup_state_hash"
-
-        let title = "The hash of the VM state of a smart rollup"
-
-        let b58check_prefix = state_hash_prefix
-
-        (* defaults to 32 *)
-        let size = None
-      end)
-
-  include H
-
-  let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
-
-  include Path_encoding.Make_hex (H)
-
-  let context_hash_to_state_hash =
-    (* Both State_hash and Context_hash's hashes are supposed to have the
-       same size. This top-level check enforces this invariant, in which case,
-       no exception could be thrown by [of_bytes_exn] below *)
-    let () = assert (Compare.Int.equal size Context_hash.size) in
-    fun h -> of_bytes_exn @@ Context_hash.to_bytes h
-
-  (* Hackish way to disable hash_bytes and hash_string to force people to use
-     context_hash_to_state_hash (without changing content of HASH.S) *)
-  type unreachable = |
-
-  let hash_bytes = function (_ : unreachable) -> .
-
-  let hash_string = function (_ : unreachable) -> .
-end
+module State_hash = Smart_rollup.State_hash
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/5506
-   Remove type and module aliases for Smart_rollup_address. *)
+   Remove type and module aliases for Smart_rollup.Address. *)
 
 type t = Address.t
 

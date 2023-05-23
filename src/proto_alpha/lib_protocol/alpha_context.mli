@@ -2353,7 +2353,7 @@ end
 module Bond_id : sig
   type t =
     | Tx_rollup_bond_id of Tx_rollup.t
-    | Sc_rollup_bond_id of Smart_rollup_address.t
+    | Sc_rollup_bond_id of Smart_rollup.Address.t
 
   val pp : Format.formatter -> t -> unit
 
@@ -3232,12 +3232,11 @@ module Sc_rollup : sig
     module Map : Map.S with type key = t
   end
 
-  module Address : sig
-    include
-      module type of Smart_rollup_address with type t = Smart_rollup_address.t
+  module Address : module type of struct
+    include Smart_rollup.Address
   end
 
-  type t = Smart_rollup_address.t
+  type t = Smart_rollup.Address.t
 
   type rollup := t
 
@@ -3259,16 +3258,8 @@ module Sc_rollup : sig
     end
   end
 
-  module State_hash : sig
-    include S.HASH
-
-    val context_hash_to_state_hash : Context_hash.t -> t
-
-    type unreachable = |
-
-    val hash_bytes : unreachable -> t
-
-    val hash_string : unreachable -> t
+  module State_hash : module type of struct
+    include Smart_rollup.State_hash
   end
 
   (** See {!Sc_rollup_metadata_repr}. *)
@@ -3323,7 +3314,8 @@ module Sc_rollup : sig
   end
 
   module Inbox_merkelized_payload_hashes : sig
-    module Hash : S.HASH
+    module Hash :
+      S.HASH with type t = Smart_rollup.Merkelized_payload_hashes_hash.t
 
     type t
 
@@ -3426,7 +3418,7 @@ module Sc_rollup : sig
   module Inbox : sig
     module Skip_list : Skip_list_repr.S
 
-    module Hash : S.HASH
+    module Hash : S.HASH with type t = Smart_rollup.Inbox_hash.t
 
     type level_proof = {
       hash : Inbox_merkelized_payload_hashes.Hash.t;
@@ -3899,7 +3891,7 @@ module Sc_rollup : sig
   end
 
   module Commitment : sig
-    module Hash : S.HASH
+    module Hash : S.HASH with type t = Smart_rollup.Commitment_hash.t
 
     type t = {
       compressed_state : State_hash.t;

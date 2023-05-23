@@ -1,9 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -30,13 +29,25 @@ include
   Blake2B.Make
     (Base58)
     (struct
-      let name = "smart_rollup_address"
+      let name = "smart_rollup_state_hash"
 
-      let title = "A smart rollup address"
+      let title = "The hash of the VM state of a smart rollup"
 
-      let b58check_prefix = Base58.Prefix.smart_rollup_address
+      let b58check_prefix = Base58.Prefix.smart_rollup_state
 
-      let size = Some 20
+      (* Same size as context hashes, from which they are derived. *)
+      let size = Some Context_hash.size
     end)
 
-let () = Base58.check_encoded_prefix b58check_encoding "sr1" 36
+let () = Base58.check_encoded_prefix b58check_encoding "srs1" 54
+
+let context_hash_to_state_hash h = of_bytes_exn @@ Context_hash.to_bytes h
+
+(* Hackish way to disable hash_bytes and hash_string to force people to use
+   context_hash_to_state_hash (without changing content of S.HASH) *)
+type unreachable__use_context_hash_to_state_hash =
+  | Unreachable__use_context_hash_to_state_hash
+
+let hash_bytes = Unreachable__use_context_hash_to_state_hash
+
+let hash_string = Unreachable__use_context_hash_to_state_hash

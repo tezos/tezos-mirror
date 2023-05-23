@@ -26,33 +26,9 @@
 
 open Sc_rollup_repr
 
-(* 32 *)
-let hash_prefix = "\017\165\134\138" (* src1(54) *)
-
 module Hash = struct
-  let prefix = "src1"
-
-  let encoded_size = 54
-
-  module H =
-    Blake2B.Make
-      (Base58)
-      (struct
-        let name = "Smart_rollup_commitment_hash"
-
-        let title = "The hash of a commitment of a smart rollup"
-
-        let b58check_prefix = hash_prefix
-
-        (* defaults to 32 *)
-        let size = None
-      end)
-
-  include H
-
-  let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
-
-  include Path_encoding.Make_hex (H)
+  include Smart_rollup.Commitment_hash
+  include Path_encoding.Make_hex (Smart_rollup.Commitment_hash)
 end
 
 module V1 = struct

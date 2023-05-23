@@ -38,6 +38,11 @@ module Hashed = struct
   module Operation_metadata_list_list_hash = Operation_metadata_list_list_hash
   module Protocol_hash = Protocol_hash
   module Smart_rollup_address = Smart_rollup_address
+  module Smart_rollup_commitment_hash = Smart_rollup_commitment_hash
+  module Smart_rollup_state_hash = Smart_rollup_state_hash
+  module Smart_rollup_inbox_hash = Smart_rollup_inbox_hash
+  module Smart_rollup_merkelized_payload_hashes_hash =
+    Smart_rollup_merkelized_payload_hashes_hash
 end
 
 module Signature = struct
