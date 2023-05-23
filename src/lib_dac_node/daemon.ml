@@ -60,8 +60,14 @@ let run ~data_dir cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
   let* (Configuration.
-          {rpc_address; rpc_port; reveal_data_dir; mode = _; data_dir = _} as
-       config) =
+          {
+            rpc_address;
+            rpc_port;
+            reveal_data_dir;
+            mode = _;
+            data_dir = _;
+            allow_v1_api;
+          } as config) =
     Configuration.load ~data_dir
   in
   let operating_mode_string = Configuration.mode_name config in
@@ -70,7 +76,9 @@ let run ~data_dir cctxt =
   let* ctxt = Node_context.init config cctxt in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4725
      Stop DAC node when in Legacy mode, if threshold is not reached. *)
-  let* rpc_server = RPC_server.start ~rpc_address ~rpc_port ctxt in
+  let* rpc_server =
+    RPC_server.start ~rpc_address ~rpc_port ~allow_v1_api ctxt
+  in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () = Event.(emit rpc_server_is_ready (rpc_address, rpc_port)) in
   (* Start daemon to resolve current protocol plugin *)

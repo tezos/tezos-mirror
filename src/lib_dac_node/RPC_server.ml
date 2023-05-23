@@ -259,7 +259,7 @@ module V1 = struct
   end
 end
 
-let start ~rpc_address ~rpc_port node_ctxt =
+let start ~rpc_address ~rpc_port ~allow_v1_api:_ node_ctxt =
   let open Lwt_syntax in
   let rw_store = Node_context.get_node_store node_ctxt Store_sigs.Read_write in
   let page_store = Node_context.get_page_store node_ctxt in

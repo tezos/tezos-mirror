@@ -112,6 +112,7 @@ type t = private {
   mode : mode;
       (** Configuration parameters specific to the operating mode of the
           DAC. *)
+  allow_v1_api : bool;  (** Feature flag for registering [V1] API endpoints.*)
 }
 
 (** [mode_name t] returns a string representation of the operating mode
@@ -153,10 +154,16 @@ val make_legacy :
   Tezos_crypto.Aggregate_signature.public_key_hash option ->
   mode
 
-(** [make ~data_dir ~reveal_data_dir rpc_address rpc_port mode] creates a
-    configuration value from the specified parameters. *)
+(** [make ~data_dir ~reveal_data_dir ~allow_v1_api rpc_address rpc_port mode]
+    creates a configuration value from the specified parameters. *)
 val make :
-  data_dir:string -> reveal_data_dir:string -> string -> int -> mode -> t
+  data_dir:string ->
+  reveal_data_dir:string ->
+  allow_v1_api:bool ->
+  string ->
+  int ->
+  mode ->
+  t
 
 (** [filename config] gets the path to config file *)
 val filename : t -> string
