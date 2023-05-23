@@ -162,16 +162,9 @@ let get_stakes_for_selected_index ctxt index =
     ~f:(fun (delegate, staking_balance) (acc, total_stake) ->
       let delegate_contract = Contract_repr.Implicit delegate in
       let open Tez_repr in
-      let* frozen_deposits_limit =
-        Delegate_storage.frozen_deposits_limit ctxt delegate
-      in
-      let* frozen_deposits =
+      let* {current_amount = frozen; initial_amount = _} =
         Frozen_deposits_storage.get ctxt delegate_contract
       in
-      let frozen_deposits_limit =
-        match frozen_deposits_limit with Some fdp -> fdp | None -> max_mutez
-      in
-      let frozen = min frozen_deposits.current_amount frozen_deposits_limit in
       (* This subtraction may result in a negative value if tez were frozen
          after the snapshot. This is fine, they are then taken into account as
          frozen stake rather than delegated. *)
