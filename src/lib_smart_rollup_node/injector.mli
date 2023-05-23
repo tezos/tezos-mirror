@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -35,11 +36,3 @@ include
     with type state := state
      and type tag := Configuration.purpose
      and type operation := L1_operation.t
-
-(** Manager operation for a given L1 operation. *)
-val injector_operation_to_manager :
-  L1_operation.t -> Protocol.Alpha_context.packed_manager_operation
-
-(** L1 operation corresponding to a manager operation if any. *)
-val injector_operation_of_manager :
-  'a Protocol.Alpha_context.manager_operation -> L1_operation.t option

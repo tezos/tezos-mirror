@@ -78,112 +78,12 @@ let injector_operation_of_manager :
       Some (Timeout {rollup; stakers})
   | _ -> None
 
-type state = {
-  cctxt : Client_context.full;
-  fee_parameters : Configuration.fee_parameters;
-  minimal_block_delay : int64;
-  delay_increment_per_round : int64;
-}
-
-module Parameters :
-  PARAMETERS
-    with type state = state
-     and type Tag.t = Configuration.purpose
-     and type Operation.t = L1_operation.t = struct
-  type nonrec state = state
-
-  let events_section = [Protocol.name; "sc_rollup_node"]
-
-  module Tag : TAG with type t = Configuration.purpose = struct
-    type t = Configuration.purpose
-
-    let compare = Stdlib.compare
-
-    let equal = Stdlib.( = )
-
-    let hash = Hashtbl.hash
-
-    let string_of_tag = Configuration.string_of_purpose
-
-    let pp ppf t = Format.pp_print_string ppf (string_of_tag t)
-
-    let encoding : t Data_encoding.t =
-      let open Data_encoding in
-      string_enum
-        (List.map (fun t -> (string_of_tag t, t)) Configuration.purposes)
-  end
-
-  module Operation = L1_operation
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
-     Very coarse approximation for the number of operation we
-     expect for each block *)
-  let table_estimated_size : Tag.t -> int = function
-    | Publish -> 1
-    | Add_messages -> 100
-    | Cement -> 1
-    | Timeout -> 1
-    | Refute -> 1
-
-  let operation_tag : Operation.t -> Tag.t = function
-    | Add_messages _ -> Add_messages
-    | Cement _ -> Cement
-    | Publish _ -> Publish
-    | Timeout _ -> Timeout
-    | Refute _ -> Refute
-
-  let fee_parameter {fee_parameters; _} operation =
-    let purpose = operation_tag operation in
-    Configuration.Operator_purpose_map.find purpose fee_parameters
-    |> Option.value ~default:(Configuration.default_fee_parameter ~purpose ())
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
-     Decide if some batches must have all the operations succeed. See
-     {!Injector_sigs.Parameter.batch_must_succeed}. *)
-  let batch_must_succeed _ = `At_least_one
-
-  let retry_unsuccessful_operation _state (_op : Operation.t) status =
-    let open Lwt_syntax in
-    match status with
-    | Backtracked | Skipped | Other_branch ->
-        (* Always retry backtracked or skipped operations, or operations that
-           are on another branch because of a reorg:
-
-           - Commitments are always produced on finalized blocks. They don't
-             need to be recomputed, and as such are valid in another branch.
-
-           - The cementation operations should be re-injected because the node
-             only keeps track of the last cemented level and the last published
-             commitment, without rollbacks.
-
-           - Messages posted to an inbox should be re-emitted (i.e. re-queued)
-             in case of a fork.
-
-           - Timeout should be re-submitted as the timeout may be reached as well
-             on the other branch.
-
-           - Refutation should be re-submitted in case of fork.
-             TODO: https://gitlab.com/tezos/tezos/-/issues/3459
-             maybe check if game exists on other branch as well.
-        *)
-        return Retry
-    | Failed error -> (
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4071
-           Think about which operations should be retried and when. *)
-        match classify_trace error with
-        | Permanent | Outdated -> return Forget
-        | Branch | Temporary -> return Retry)
-    | Never_included ->
-        (* Forget operations that are never included *)
-        return Forget
-end
-
 module Proto_client = struct
   open Protocol_client_context
 
-  type operation = Parameters.Operation.t
+  type operation = L1_operation.t
 
-  type state = Parameters.state
+  type state = Injector.state
 
   type unsigned_operation =
     Tezos_base.Operation.shell_header * packed_contents_list
@@ -317,7 +217,7 @@ module Proto_client = struct
             operations)
         Lwt.return
 
-  let operation_status {cctxt; _} block_hash operation_hash ~index =
+  let operation_status {Injector.cctxt; _} block_hash operation_hash ~index =
     let open Lwt_result_syntax in
     let* operations = get_block_operations cctxt block_hash in
     match Operation_hash.Map.find_opt operation_hash operations with
@@ -456,7 +356,8 @@ module Proto_client = struct
       Operation.encoding_with_legacy_attestation_name
       op
 
-  let time_until_next_block {minimal_block_delay; delay_increment_per_round; _}
+  let time_until_next_block
+      {Injector.minimal_block_delay; delay_increment_per_round; _}
       (header : Tezos_base.Block_header.shell_header option) =
     let open Result_syntax in
     match header with
@@ -492,6 +393,4 @@ module Proto_client = struct
           (Time.System.now ())
 end
 
-include Injector_functor.Make (Parameters)
-
-let () = register_proto_client Protocol.hash (module Proto_client)
+let () = Injector.register_proto_client Protocol.hash (module Proto_client)

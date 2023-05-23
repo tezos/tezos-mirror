@@ -149,7 +149,7 @@ let new_heads_processed = new_heads_iteration Simple.new_heads_processed
 let included_operation (type kind)
     (operation : kind Protocol.Alpha_context.manager_operation)
     (result : kind Protocol.Apply_results.manager_operation_result) =
-  match Injector.injector_operation_of_manager operation with
+  match Sc_rollup_injector.injector_operation_of_manager operation with
   | None -> Lwt.return_unit
   | Some operation -> (
       match result with
