@@ -72,6 +72,8 @@ Gas improvements
 Breaking Changes
 ----------------
 
+- Operation ``Set_deposits_limit`` removed. (MR :gl:`!8831`)
+
 - Protocol parameter ``ratio_of_frozen_deposits_slashed_per_double_endorsement`` is
   converted from the ratio ``1/5`` into the percentage ``50%`` and renamed to
   ``percentage_of_frozen_deposits_slashed_per_double_endorsement``. (MR :gl:`!8753`)
