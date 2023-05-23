@@ -242,13 +242,13 @@ let chest_size chest =
 let chest_key_size _ =
   (*
      type chest_key = {
-       unlocked_value : unlocked_value;
-       proof : timelock_proof
+       vdf_tuple : vdf_tuple; a record of 3 group elements, each of size 256 bytes
+       nonce : Z.t;  RSA modulus size (256 bytes) + 128 bits
      }
   *)
-  let unlocked_value_size = 256 in
-  let proof_size = 256 in
-  h2w +? (unlocked_value_size + proof_size)
+  let vdf_tuple_size = 3 * 256 in
+  let nonce_size = 256 + 16 in
+  h2w +? (vdf_tuple_size + nonce_size)
 
 (* The following mutually recursive functions are mostly
    tail-recursive and the only recursive call that is not a tailcall
