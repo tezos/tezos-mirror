@@ -343,7 +343,7 @@ an Octez node has been launched locally, typically by issuing:
 
 in a terminal where ``${NETWORK}`` is of the
 form ``https://teztnets.xyz/dailynet-YYYY-MM-DD``
-and ``${ONODE_DIR}`` is a path for the Octez node store.
+and ``${ONODE_DIR}`` is a path for the Octez node store, by default ``~/.tezos-node``.
 
 The commands will only work when ``proto_alpha`` is activated.
 This can be checked by:
@@ -359,9 +359,19 @@ that must return:
    { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
      "next_protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" }
 
+In case you do not already have an implicit account, you can generate one with:
+
+.. code:: sh
+
+   octez-client gen keys "${ACCOUNT_NAME}"
+   octez-client show address "${ACCOUNT_NAME}"
+
+Then, the ``${OPERATOR_ADDR}`` can be set to the hash value (``tz1...``) returned. 
+
 Finally, you need to check that your balance is greater than 10,000
 tez to make sure that staking is possible. In case your balance is not
-sufficient, you can get test tokens from :ref:`a faucet <faucet>`.
+sufficient, you can get test tokens for the ``tz1`` address from :ref:`a faucet <faucet>`, 
+after your node gets synchronized with Dailynet. 
 
 
 .. code:: sh
@@ -453,7 +463,8 @@ Now that the rollup is originated, anyone can make it progress by deploying a
 rollup node.
 
 First, we need to decide on a directory where the rollup node stores
-its data. Let us assign ``${ROLLUP_NODE_DIR}`` with this path.
+its data. Let us assign ``${ROLLUP_NODE_DIR}`` with this path, by default
+``~/.tezos-smart-rollup-node``.
 
 
 The rollup node can then be run with:
@@ -465,7 +476,7 @@ The rollup node can then be run with:
                     with operators "${OPERATOR_ADDR}" \
                     --data-dir "${ROLLUP_NODE_DIR}"
 
-where ``${OCLIENT_DIR}`` is the data directory of the Octez client.
+where ``${OCLIENT_DIR}`` is the data directory of the Octez client, by default  ``~/.tezos-client``.
 
 The log should show that the rollup node follows the Layer 1 chain and
 processes the inbox of each level.
@@ -589,7 +600,7 @@ representation of the message payload, one can do:
 
 .. code:: sh
 
-    octez-client" -d "${OCLIENT_DIR}" -p ProtoALphaAL \
+    octez-client -d "${OCLIENT_DIR}" -p ProtoALphaAL \
      send smart rollup message "hex:[ \"${EMESSAGE}\" ]" \
      from "${OPERATOR_ADDR}"
 
@@ -609,13 +620,14 @@ originated a Layer 1 smart contract as follows:
      running 'parameter string; storage string; code {CAR; NIL operation; PAIR};' \
      --init '""' --burn-cap 0.4
 
-and that this contract is identified by a address ``${CONTRACT}``, then one
-can encode an outbox transaction using the Octez rollup client as follows:
+and that this contract is identified by an address ``${CONTRACT}`` 
+(a ``KT1...`` address), then one can encode an 
+outbox transaction using the Octez rollup client as follows:
 
 .. code:: sh
 
     MESSAGE='[ { \
-      "destination" : "${CONTRACT}", \
+      "destination" : "KT1...", \
       "parameters" : "\"Hello world\"", \
       "entrypoint" : "%default" } ]'
 
