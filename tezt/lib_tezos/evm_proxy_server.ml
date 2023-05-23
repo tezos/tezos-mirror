@@ -182,3 +182,31 @@ let fetch_contract_code evm_proxy_server contract_address =
       }
   in
   return JSON.(code |-> "result" |> as_string)
+
+type txpool_slot = {address : string; transactions : (int64 * JSON.t) list}
+
+let txpool_content evm_proxy_server =
+  let* txpool =
+    call_evm_rpc
+      evm_proxy_server
+      {method_ = "txpool_content"; parameters = `A []}
+  in
+  Log.info "Result: %s" (JSON.encode txpool) ;
+  let txpool = JSON.(txpool |-> "result") in
+  let parse field =
+    let open JSON in
+    let pool = txpool |-> field in
+    (* `|->` returns `Null if the field does not exists, and `Null is
+       interpreted as the empty list by `as_object`. As such, we must ensure the
+       field exists. *)
+    if is_null pool then Test.fail "%s must exists" field
+    else
+      pool |> as_object
+      |> List.map (fun (address, transactions) ->
+             let transactions =
+               transactions |> as_object
+               |> List.map (fun (nonce, tx) -> (Int64.of_string nonce, tx))
+             in
+             {address; transactions})
+  in
+  return (parse "pending", parse "queued")

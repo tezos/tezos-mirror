@@ -76,3 +76,11 @@ val batch_evm_rpc : t -> request list -> JSON.t Lwt.t
 (** [fetch_contract_code proxy_server contract] returns the code associated to
     the given contract in the rollup. *)
 val fetch_contract_code : t -> string -> string Lwt.t
+
+(** A slot in the transaction pool associates an address to a mapping of nonces
+    to transactions. *)
+type txpool_slot = {address : string; transactions : (int64 * JSON.t) list}
+
+(** [txpool_content proxy_server] returns the transaction hash and nonce
+    contained in the `pending` and `queued` pools. *)
+val txpool_content : t -> (txpool_slot list * txpool_slot list) Lwt.t
