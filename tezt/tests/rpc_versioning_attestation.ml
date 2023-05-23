@@ -72,6 +72,53 @@ let create_consensus_op ~use_legacy_name ~signer ~kind client =
   check_kind consensus_json consensus_name ;
   Lwt.return consensus_op
 
+let mk_double_consensus_evidence kind use_legacy_name op1 op2 client =
+  let* op1_sign = Operation.sign op1 client in
+  let* op2_sign = Operation.sign op2 client in
+  return
+    (Operation.Anonymous.double_consensus_evidence
+       ~kind
+       ~use_legacy_name
+       (op1, op1_sign)
+       (op2, op2_sign))
+
+let create_double_consensus_evidence ~use_legacy_name ~double_evidence_kind
+    client =
+  let consensus_kind =
+    match double_evidence_kind with
+    | Operation.Anonymous.Double_attestation_evidence -> Operation.Attestation
+    | Operation.Anonymous.Double_preattestation_evidence ->
+        Operation.Preattestation
+  in
+  let consensus_name =
+    Operation.Anonymous.kind_to_string double_evidence_kind use_legacy_name
+  in
+  Log.info "Create an %s operation" consensus_name ;
+
+  let signer = Constant.bootstrap1 in
+  let consensus1 = mk_consensus consensus_kind use_legacy_name in
+  let* op1 = Operation.Consensus.operation ~signer consensus1 client in
+  let consensus2 = mk_consensus ~slot:2 consensus_kind use_legacy_name in
+  let* op2 = Operation.Consensus.operation ~signer consensus2 client in
+  let* double_consensus_evidence =
+    mk_double_consensus_evidence
+      double_evidence_kind
+      use_legacy_name
+      op1
+      op2
+      client
+  in
+  let* double_consensus_evidence_op =
+    Operation.Anonymous.operation double_consensus_evidence client
+  in
+
+  Log.info "Ensures that the generated JSON contains the %s kind" consensus_name ;
+  let consensus_json =
+    JSON.annotate ~origin:__LOC__ @@ Operation.json double_consensus_evidence_op
+  in
+  check_kind consensus_json consensus_name ;
+  Lwt.return double_consensus_evidence_op
+
 module Forge = struct
   let check_hex_from_ops op1 op2 client =
     Log.info
@@ -107,65 +154,20 @@ module Forge = struct
       ~additionnal_tags:["forge"; "operations"; "consensus"; "pre"]
     @@ fun protocol -> test_consensus Operation.Preattestation protocol
 
-  let mk_double_consensus_evidence kind use_legacy_name op1 op2 client =
-    let* op1_sign = Operation.sign op1 client in
-    let* op2_sign = Operation.sign op2 client in
-    return
-      (Operation.Anonymous.double_consensus_evidence
-         ~kind
-         ~use_legacy_name
-         (op1, op1_sign)
-         (op2, op2_sign))
-
   let test_double_consensus_evidence double_evidence_kind protocol =
     let* _node, client = Client.init_with_protocol ~protocol `Client () in
 
-    let create_double_consensus_evidence ~use_legacy_name =
-      let consensus_kind =
-        match double_evidence_kind with
-        | Operation.Anonymous.Double_attestation_evidence ->
-            Operation.Attestation
-        | Operation.Anonymous.Double_preattestation_evidence ->
-            Operation.Preattestation
-      in
-      let consensus_name =
-        Operation.Anonymous.kind_to_string double_evidence_kind use_legacy_name
-      in
-      Log.info "Create an %s operation" consensus_name ;
-
-      let signer = Constant.bootstrap1 in
-      let consensus1 = mk_consensus consensus_kind use_legacy_name in
-      let* op1 = Operation.Consensus.operation ~signer consensus1 client in
-      let consensus2 = mk_consensus ~slot:2 consensus_kind use_legacy_name in
-      let* op2 = Operation.Consensus.operation ~signer consensus2 client in
-      let* double_consensus_evidence =
-        mk_double_consensus_evidence
-          double_evidence_kind
-          use_legacy_name
-          op1
-          op2
-          client
-      in
-      let* double_consensus_evidence_op =
-        Operation.Anonymous.operation double_consensus_evidence client
-      in
-
-      Log.info
-        "Ensures that the generated JSON contains the %s kind"
-        consensus_name ;
-      let consensus_json =
-        JSON.annotate ~origin:__LOC__
-        @@ Operation.json double_consensus_evidence_op
-      in
-      check_kind consensus_json consensus_name ;
-      Lwt.return double_consensus_evidence_op
-    in
-
     let* legacy_double_consensus_evidence_op =
-      create_double_consensus_evidence ~use_legacy_name:true
+      create_double_consensus_evidence
+        ~use_legacy_name:true
+        ~double_evidence_kind
+        client
     in
     let* double_consensus_evidence_op =
-      create_double_consensus_evidence ~use_legacy_name:false
+      create_double_consensus_evidence
+        ~use_legacy_name:false
+        ~double_evidence_kind
+        client
     in
     check_hex_from_ops
       legacy_double_consensus_evidence_op
@@ -351,9 +353,56 @@ module Parse = struct
       ~additionnal_tags:["parse"; "raw"; "operations"; "consensus"; "pre"]
     @@ fun protocol -> test_parse Operation.Preattestation protocol
 
+  let test_parse_double_evidence double_evidence_kind protocol =
+    let* _node, client = Client.init_with_protocol ~protocol `Client () in
+
+    let create_raw_double_consensus_evidence () =
+      let* double_consensus_evidence_op =
+        create_double_consensus_evidence
+          ~use_legacy_name:false
+          ~double_evidence_kind
+          client
+      in
+      create_raw_op ~protocol double_consensus_evidence_op client
+    in
+    let* raw = create_raw_double_consensus_evidence () in
+
+    let check_version ~use_legacy_name =
+      let name =
+        Operation.Anonymous.kind_to_string double_evidence_kind use_legacy_name
+      in
+      check_version ~use_legacy_name name raw client
+    in
+
+    let* () = check_version ~use_legacy_name:true in
+    let* () = check_version ~use_legacy_name:false in
+    check_unknown_version raw client
+
+  let test_parse_double_consensus_evidence =
+    register_test
+      ~title:"Parse raw double consensus evidence operations"
+      ~additionnal_tags:
+        ["parse"; "raw"; "operations"; "double"; "consensus"; "evidence"]
+    @@ fun protocol ->
+    test_parse_double_evidence
+      Operation.Anonymous.Double_attestation_evidence
+      protocol
+
+  let test_parse_double_preconsensus_evidence =
+    register_test
+      ~title:"Parse raw double pre-consensus evidence operations"
+      ~additionnal_tags:
+        ["parse"; "raw"; "operations"; "double"; "consensus"; "pre"; "evidence"]
+    @@ fun protocol ->
+    test_parse_double_evidence
+      Operation.Anonymous.Double_preattestation_evidence
+      protocol
+
   let register ~protocols =
     test_parse_consensus protocols ;
-    test_parse_preconsensus protocols
+    test_parse_preconsensus protocols ;
+    test_parse_double_consensus_evidence protocols ;
+    test_parse_double_preconsensus_evidence protocols
 end
 
 let register ~protocols =
