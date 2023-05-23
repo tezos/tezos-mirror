@@ -82,6 +82,12 @@ Breaking Changes
   of frozen deposit. We convert it from a percentage to a factor named
   ``delegation_over_baking_limit`` whose value is 9. (MR :gl:`!8884`)
 
+- The frozen deposits are not computed automatically from the baker's total stake
+  (own tokens and delegated ones). Hence there are no automatic transfers of the
+  baker's spendable balance to their frozen deposits. Bakers need to use the
+  ``stake`` pseudo-operation to increase their frozen deposits. (MR :gl:`!8087`)
+
+
 RPC Changes
 -----------
 
