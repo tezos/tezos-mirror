@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -35,8 +36,7 @@ let const_time_model ~const_name ~name =
     ~conv:(fun () -> ())
     ~model:(Model.unknown_const1 ~name ~const:(fv const_name))
 
-let make_bench ~name ~info ~model ~generator ~make_bench :
-    Tezos_benchmark.Benchmark.t =
+let make_bench ~name ~info ~model ~generator ~make_bench : Benchmark.t =
   let module Bench : Benchmark.S = struct
     type config = unit
 
@@ -60,11 +60,13 @@ let make_bench ~name ~info ~model ~generator ~make_bench :
 
     let tags = ["misc"]
 
-    let create_benchmarks ~rng_state ~bench_num () =
-      let generator () = generator rng_state in
-      List.repeat bench_num (make_bench generator)
+    let group = Benchmark.Group "bloomer"
 
-    let models = [("bloomer", model ~name)]
+    let create_benchmark ~rng_state _ =
+      let generator () = generator rng_state in
+      make_bench generator
+
+    let model = model
   end in
   (module Bench)
 
@@ -88,7 +90,7 @@ let () =
          let string = "test" in
          Bloomer.add bloomer string ;
          (bloomer, string))
-       ~make_bench:(fun generator () ->
+       ~make_bench:(fun generator ->
          let bloomer, string = generator () in
          let closure () = ignore (Bloomer.mem bloomer string) in
          Generator.Plain {workload = (); closure})
@@ -102,7 +104,7 @@ let () =
        ~info:"Benchmarking Bloomer.add"
        ~model:(const_time_model ~const_name:"bloomer_add_const")
        ~generator:(fun _rng_state -> make_bloomer ())
-       ~make_bench:(fun generator () ->
+       ~make_bench:(fun generator ->
          let bloomer = generator () in
          let closure () = ignore (Bloomer.add bloomer "test") in
          Generator.Plain {workload = (); closure})

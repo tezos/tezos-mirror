@@ -58,7 +58,7 @@ struct
       ~generator:Sampler.pk
       ()
 
-  let () = Registration.register public_key_encoding
+  let () = Registration.register_base public_key_encoding
 
   let public_key_to_b58check =
     make_encode_fixed_size_to_string
@@ -67,7 +67,7 @@ struct
       ~generator:Sampler.pk
       ()
 
-  let () = Registration.register public_key_to_b58check
+  let () = Registration.register_base public_key_to_b58check
 
   let public_key_hash_encoding =
     make_encode_fixed_size
@@ -76,7 +76,7 @@ struct
       ~generator:Sampler.pkh
       ()
 
-  let () = Registration.register public_key_hash_encoding
+  let () = Registration.register_base public_key_hash_encoding
 
   let public_key_hash_to_b58check =
     make_encode_fixed_size_to_string
@@ -85,7 +85,7 @@ struct
       ~generator:Sampler.pkh
       ()
 
-  let () = Registration.register public_key_hash_to_b58check
+  let () = Registration.register_base public_key_hash_to_b58check
 
   let secret_key_encoding =
     make_encode_fixed_size
@@ -94,7 +94,7 @@ struct
       ~generator:Sampler.pkh
       ()
 
-  let () = Registration.register secret_key_encoding
+  let () = Registration.register_base secret_key_encoding
 
   let secret_key_to_b58check =
     make_encode_fixed_size_to_string
@@ -103,7 +103,7 @@ struct
       ~generator:Sampler.sk
       ()
 
-  let () = Registration.register secret_key_to_b58check
+  let () = Registration.register_base secret_key_to_b58check
 
   let signature_encoding =
     make_encode_fixed_size
@@ -112,7 +112,7 @@ struct
       ~generator:(fun _rng_state -> Tezos_crypto.Signature.zero)
       ()
 
-  let () = Registration.register signature_encoding
+  let () = Registration.register_base signature_encoding
 
   let signature_to_b58check =
     make_encode_fixed_size_to_string
@@ -121,7 +121,7 @@ struct
       ~generator:(fun _rng_state -> Tezos_crypto.Signature.zero)
       ()
 
-  let () = Registration.register signature_to_b58check
+  let () = Registration.register_base signature_to_b58check
 
   (* decoding benches *)
 
@@ -132,7 +132,7 @@ struct
       ~generator:Sampler.pk
       ()
 
-  let () = Registration.register public_key_decoding
+  let () = Registration.register_base public_key_decoding
 
   let public_key_from_b58check =
     make_decode_fixed_size_from_string
@@ -142,7 +142,7 @@ struct
       ~generator:Sampler.pk
       ()
 
-  let () = Registration.register public_key_from_b58check
+  let () = Registration.register_base public_key_from_b58check
 
   let public_key_hash_decoding =
     make_decode_fixed_size
@@ -151,7 +151,7 @@ struct
       ~generator:Sampler.pkh
       ()
 
-  let () = Registration.register public_key_hash_decoding
+  let () = Registration.register_base public_key_hash_decoding
 
   let public_key_hash_from_b58check =
     make_decode_fixed_size_from_string
@@ -161,7 +161,7 @@ struct
       ~generator:Sampler.pkh
       ()
 
-  let () = Registration.register public_key_hash_from_b58check
+  let () = Registration.register_base public_key_hash_from_b58check
 
   let secret_key_decoding =
     make_decode_fixed_size
@@ -170,7 +170,7 @@ struct
       ~generator:Sampler.sk
       ()
 
-  let () = Registration.register secret_key_decoding
+  let () = Registration.register_base secret_key_decoding
 
   let secret_key_from_b58check =
     make_decode_fixed_size_from_string
@@ -180,7 +180,7 @@ struct
       ~generator:Sampler.sk
       ()
 
-  let () = Registration.register secret_key_from_b58check
+  let () = Registration.register_base secret_key_from_b58check
 
   let signature_decoding =
     make_decode_fixed_size
@@ -189,7 +189,7 @@ struct
       ~generator:(fun _rng_state -> Tezos_crypto.Signature.zero)
       ()
 
-  let () = Registration.register signature_decoding
+  let () = Registration.register_base signature_decoding
 
   let signature_from_b58check =
     make_decode_fixed_size_from_string
@@ -199,7 +199,7 @@ struct
       ~generator:(fun _rng_state -> Tezos_crypto.Signature.zero)
       ()
 
-  let () = Registration.register signature_from_b58check
+  let () = Registration.register_base signature_from_b58check
 end
 
 module Ed25519 = Make_elliptic_curve_encoding_benchmarks (struct
@@ -227,7 +227,7 @@ let chain_id_encoding =
         [Base_samplers.bytes ~size:{min = 32; max = 32} rng_state])
     ()
 
-let () = Registration.register chain_id_encoding
+let () = Registration.register_base chain_id_encoding
 
 let chain_id_decoding =
   make_encode_fixed_size
@@ -238,7 +238,7 @@ let chain_id_decoding =
         [Base_samplers.bytes ~size:{min = 32; max = 32} rng_state])
     ()
 
-let () = Registration.register chain_id_decoding
+let () = Registration.register_base chain_id_decoding
 
 let chain_id_readable_encoding =
   make_encode_fixed_size_to_string
@@ -249,7 +249,7 @@ let chain_id_readable_encoding =
         [Base_samplers.bytes ~size:{min = 32; max = 32} rng_state])
     ()
 
-let () = Registration.register chain_id_readable_encoding
+let () = Registration.register_base chain_id_readable_encoding
 
 let chain_id_readable_decoding =
   make_decode_fixed_size_from_string
@@ -261,7 +261,7 @@ let chain_id_readable_decoding =
         [Base_samplers.bytes ~size:{min = 32; max = 32} rng_state])
     ()
 
-let () = Registration.register chain_id_readable_decoding
+let () = Registration.register_base chain_id_readable_decoding
 
 (** The following benchmarks are not used directly to define precise
     gas models but the inferred gas constants may be used for
@@ -279,7 +279,7 @@ let nat_encoding =
       (n, {bytes = nbytes}))
     ()
 
-let () = Registration.register nat_encoding
+let () = Registration.register_base nat_encoding
 
 let nat_decoding =
   make_decode_variable_size
@@ -293,7 +293,7 @@ let nat_decoding =
       (n, {bytes = nbytes}))
     ()
 
-let () = Registration.register nat_decoding
+let () = Registration.register_base nat_decoding
 
 let int_encoding =
   make_encode_variable_size
@@ -307,7 +307,7 @@ let int_encoding =
       (n, {bytes = nbytes}))
     ()
 
-let () = Registration.register int_encoding
+let () = Registration.register_base int_encoding
 
 let int_decoding =
   make_decode_variable_size
@@ -321,7 +321,7 @@ let int_decoding =
       (n, {bytes = nbytes}))
     ()
 
-let () = Registration.register int_decoding
+let () = Registration.register_base int_decoding
 
 let string_encoding =
   make_encode_variable_size
@@ -335,7 +335,7 @@ let string_encoding =
       (s, {bytes = nbytes}))
     ()
 
-let () = Registration.register string_encoding
+let () = Registration.register_base string_encoding
 
 let string_decoding =
   make_decode_variable_size
@@ -349,7 +349,7 @@ let string_decoding =
       (s, {bytes = nbytes}))
     ()
 
-let () = Registration.register string_decoding
+let () = Registration.register_base string_decoding
 
 let adversarial_string_list_encoding =
   make_encode_variable_size
@@ -366,7 +366,7 @@ let adversarial_string_list_encoding =
       (l, {bytes = Data_encoding.(Binary.length (list string) l)}))
     ()
 
-let () = Registration.register adversarial_string_list_encoding
+let () = Registration.register_base adversarial_string_list_encoding
 
 let adversarial_string_list_decoding =
   make_decode_variable_size
@@ -383,4 +383,4 @@ let adversarial_string_list_decoding =
       (l, {bytes = Data_encoding.(Binary.length (list string) l)}))
     ()
 
-let () = Registration.register adversarial_string_list_decoding
+let () = Registration.register_base adversarial_string_list_decoding
