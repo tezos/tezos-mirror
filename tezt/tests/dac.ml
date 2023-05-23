@@ -2896,6 +2896,7 @@ let register ~protocols =
   Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_synced_with_dac protocols ;
   Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_missing_pages protocols ;
   scenario_with_full_dac_infrastructure
+    ~allow_v1_api:true
     ~__FILE__
     ~observers:0
     ~committee_size:0

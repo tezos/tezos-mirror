@@ -259,7 +259,7 @@ module V1 = struct
   end
 end
 
-let start ~rpc_address ~rpc_port ~allow_v1_api:_ node_ctxt =
+let start ~rpc_address ~rpc_port ~allow_v1_api node_ctxt =
   let open Lwt_syntax in
   let rw_store = Node_context.get_node_store node_ctxt Store_sigs.Read_write in
   let page_store = Node_context.get_page_store node_ctxt in
@@ -313,7 +313,9 @@ let start ~rpc_address ~rpc_port ~allow_v1_api:_ node_ctxt =
             Lwt.return
               (Tezos_rpc.Directory.merge
                  (register_v0_dynamic_rpc (module Dac_plugin))
-                 (register_v1_dynamic_rpc (module Dac_plugin))
+                 (if allow_v1_api then
+                  register_v1_dynamic_rpc (module Dac_plugin)
+                 else Tezos_rpc.Directory.empty)
               |> register_health_endpoints)
         | Starting ->
             Lwt.return (Tezos_rpc.Directory.empty |> register_health_endpoints))
