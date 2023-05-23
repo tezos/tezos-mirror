@@ -244,18 +244,17 @@ struct
       the gossipsub automaton. Fragments support sequential and parallel
       composition. *)
   module Fragment = struct
-    type raw = Thread of event SeqM.t | Par of raw list | Seq of raw list
+    type raw = Thread of event Seq.t | Par of raw list | Seq of raw list
 
     type t = raw M.t
 
-    let raw_of_list l = Thread (List.to_seq l |> Seq.map input |> SeqM.of_seq)
+    let raw_of_list l = Thread (List.to_seq l |> Seq.map input)
 
-    let of_list (l : ex_input list) =
-      M.return (Thread (List.to_seq l |> Seq.map input |> SeqM.of_seq))
+    let of_list (l : ex_input list) = raw_of_list l |> M.return
 
     (* Smart [raw] constructors *)
 
-    let empty_raw = Thread SeqM.empty
+    let empty_raw = Thread Seq.empty
 
     let seq rs =
       match rs with
@@ -294,8 +293,7 @@ struct
       let open M in
       match raw with
       | Thread seq -> (
-          let* opt = SeqM.uncons seq in
-          match opt with
+          match Seq.uncons seq with
           | None -> k None
           | Some (hd, tail) -> k (Some (hd, Thread tail)))
       | Seq [] -> k None
@@ -335,8 +333,7 @@ struct
       raw_of_list (f x)
 
     let tick : t =
-      Thread
-        ([Elapse (Milliseconds.Span.of_int_s 1)] |> List.to_seq |> SeqM.of_seq)
+      Thread ([Elapse (Milliseconds.Span.of_int_s 1)] |> List.to_seq)
       |> M.return
 
     let repeat : int -> t -> t =
