@@ -225,7 +225,9 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
       Storage.Tenderbake.First_level_of_protocol.update ctxt level
       >>=? fun ctxt ->
       migrate_stake_distribution_for_o ctxt >>=? fun ctxt ->
-      initialize_total_supply_for_o ctxt >>= fun ctxt -> return (ctxt, []))
+      initialize_total_supply_for_o ctxt >>= fun ctxt ->
+      Remove_zero_amount_ticket_migration_for_o.remove_zero_ticket_entries ctxt
+      >>= fun ctxt -> return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   List.fold_left_es patch_script ctxt Legacy_script_patches.addresses_to_patch
   >>=? fun ctxt ->
