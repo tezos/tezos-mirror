@@ -88,7 +88,11 @@ let register_model (type a) bench_name local_model_name (model : a Model.t) :
               {model; from = [{bench_name; local_model_name}]}
         | Some {model = Model m'; from} ->
             (* Check equality of models by their free variables *)
-            if Model.get_free_variable_set m <> Model.get_free_variable_set m'
+            if
+              not
+                (Free_variable.Set.equal
+                   (Model.get_free_variable_set m)
+                   (Model.get_free_variable_set m'))
             then
               Format.eprintf
                 "Warning: Registered different model with same name %a@."
