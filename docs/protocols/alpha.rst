@@ -35,6 +35,13 @@ Adaptive Inflation (ongoing)
 
 - Introduce feature flag for Adaptive Inflation. (MR :gl:`!8566`)
 
+When the feature flag is enabled, the following extra changes happen:
+
+- Most rewards (baking rewards, baking bonuses, attestation rewards, revelation
+  rewards) are paid on the frozen deposits balance rather than the spendable
+  balance. Manager operations fees and denunciation rewards are still paid on
+  the spendable balance. (MR :gl:`!8091`)
+
 
 Gas improvements
 ----------------
