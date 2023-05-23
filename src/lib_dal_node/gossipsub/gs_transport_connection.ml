@@ -65,6 +65,61 @@ module Events = struct
       ("failure", Data_encoding.string)
 end
 
+(** This module implements a cache of alternative peers (alternative PX)
+    advertised by P2P neighbors within Prune messages.
+
+    The cache associates a P2P point to each pair made of the advertised peer
+    and the peer that advertised it. In case of redundancy, the last advertised
+    point is kept in the cache.
+
+    The cache is in theory not bounded. However, some invariants on the way
+    {!insert} and {!drop} are used below ensures that we remove the added entries very
+    quickly.
+*)
+module PX_cache : sig
+  (** The cache data structure for advertised alternative PXs. *)
+  type t
+
+  (** Create a new cache data structure. The [size] parameter is an indication
+      on the size of internal table storing data. Its default value is
+      [2048]. *)
+  val create : ?size:int -> unit -> t
+
+  (** [insert t ~origin ~px point] associates the given [point] to [(origin,
+      px)] pair of peers. If a point already exists for the pair, it is
+      overwritten.  *)
+  val insert :
+    t -> origin:P2p_peer.Id.t -> px:P2p_peer.Id.t -> P2p_point.Id.t -> unit
+
+  (** [drop t ~origin ~px] drops the entry [(origin, px)] from the cache and
+      returns the [point] being dropped, if any. *)
+  val drop :
+    t -> origin:P2p_peer.Id.t -> px:P2p_peer.Id.t -> P2p_point.Id.t option
+end = struct
+  type key = {origin : P2p_peer.Id.t; px : P2p_peer.Id.t}
+
+  module Table = Hashtbl.Make (struct
+    type t = key
+
+    let equal {origin; px} k2 =
+      P2p_peer.Id.equal origin k2.origin && P2p_peer.Id.equal px k2.px
+
+    let hash {origin; px} = (P2p_peer.Id.hash origin * 3) + P2p_peer.Id.hash px
+  end)
+
+  type t = P2p_point.Id.t Table.t
+
+  let create ?(size = 2048) () = Table.create size
+
+  let insert table ~origin ~px point = Table.replace table {px; origin} point
+
+  let drop table ~origin ~px =
+    let key = {origin; px} in
+    let point_opt = Table.find_opt table key in
+    Table.remove table key ;
+    point_opt
+end
+
 (** This handler forwards information about connections established by the P2P layer
     to the Gossipsub worker. *)
 let new_connections_handler gs_worker p2p_layer peer conn =
@@ -102,16 +157,21 @@ let wrap_p2p_message =
 
 (* This function translates a message received via the P2P layer to a Worker
    p2p_message. The two types don't coincide because of Prune. *)
-let unwrap_p2p_message =
+let unwrap_p2p_message p2p_layer ~from_peer px_cache =
   let open Worker in
   let module I = Transport_layer_interface in
   function
   | I.Graft {topic} -> Graft {topic}
-  | I.Prune _ ->
-      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5646
-
-         Handle Prune messages in GS/P2P interconnection. *)
-      assert false
+  | I.Prune {topic; px; backoff} ->
+      let px =
+        Seq.map
+          (fun I.{point; peer} ->
+            if Option.is_none @@ P2p.find_connection_by_peer_id p2p_layer peer
+            then PX_cache.insert px_cache ~origin:from_peer ~px:peer point ;
+            peer)
+          px
+      in
+      Prune {topic; px; backoff}
   | I.IHave {topic; message_ids} -> IHave {topic; message_ids}
   | I.IWant {message_ids} -> IWant {message_ids}
   | I.Subscribe {topic} -> Subscribe {topic}
@@ -160,7 +220,10 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer =
       | Kick {peer = _} ->
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5647
 
-             Handle Disconnect, Connect and Kick directives from GS *)
+             Handle Disconnect, Connect, Forget and Kick directives from GS.
+
+             Plug PX_cache.drop in Connect (MR !8801). *)
+          let () = ignore PX_cache.drop in
           assert false
     in
     loop output_stream
@@ -169,13 +232,20 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer =
 
 (** This handler forwards p2p messages received via Octez p2p to the Gossipsub
     worker. *)
-let transport_layer_inputs_handler gs_worker p2p_layer =
+let transport_layer_inputs_handler gs_worker p2p_layer advertised_px_cache =
   let open Lwt_syntax in
   let rec loop () =
     let* conn, msg = P2p.recv_any p2p_layer in
-    let {P2p_connection.Info.peer_id; _} = P2p.connection_info p2p_layer conn in
+    let {P2p_connection.Info.peer_id = from_peer; _} =
+      P2p.connection_info p2p_layer conn
+    in
     Worker.(
-      In_message {from_peer = peer_id; p2p_message = unwrap_p2p_message msg}
+      In_message
+        {
+          from_peer;
+          p2p_message =
+            unwrap_p2p_message p2p_layer ~from_peer advertised_px_cache msg;
+        }
       |> p2p_input gs_worker) ;
     loop ()
   in
@@ -204,6 +274,7 @@ let app_messages_handler gs_worker ~app_messages_callback =
   Worker.app_output_stream gs_worker |> loop
 
 let activate gs_worker p2p_layer ~app_messages_callback =
+  let px_cache = PX_cache.create () in
   (* Register a handler to notify new P2P connections to GS. *)
   let () =
     new_connections_handler gs_worker p2p_layer
@@ -214,6 +285,6 @@ let activate gs_worker p2p_layer ~app_messages_callback =
   Lwt.join
     [
       gs_worker_p2p_output_handler gs_worker p2p_layer;
-      transport_layer_inputs_handler gs_worker p2p_layer;
+      transport_layer_inputs_handler gs_worker p2p_layer px_cache;
       app_messages_handler gs_worker ~app_messages_callback;
     ]
