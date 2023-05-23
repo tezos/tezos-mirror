@@ -376,6 +376,7 @@ let init ctx id ~memo_size =
   Roots.init ctx id >>=? fun ctx -> Ciphertexts.init ctx id >|= ok
 
 (* Gas costs for apply_diff. *)
+(* model sapling/SAPLING_APPLY_DIFF *)
 let sapling_apply_diff_cost ~inputs ~outputs =
   let open Saturation_repr in
   add

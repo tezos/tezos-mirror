@@ -43,6 +43,7 @@ module Cache_costs = struct
   let cache_update_coeff = S.safe_int 43
 
   (* Cost of calling [Environment_cache.update]. *)
+  (* model cache/CACHE_UPDATE *)
   let cache_update ~cache_size_in_bytes =
     let approx_card = approximate_cardinal cache_size_in_bytes in
     Gas_limit_repr.atomic_step_cost

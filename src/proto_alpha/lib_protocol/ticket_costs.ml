@@ -27,13 +27,17 @@ open Alpha_context
 module S = Saturation_repr
 
 module Constants = struct
+  (* model tickets/COLLECT_TICKETS_STEP *)
   let cost_collect_tickets_step = S.safe_int 80
 
+  (* model tickets/TYPE_HAS_TICKETS *)
   let cost_has_tickets_of_ty type_size =
     S.add (S.safe_int 10) (S.mul (S.safe_int 6) type_size)
 
+  (* model tickets/COMPARE_TICKET_HASH *)
   let cost_compare_ticket_hash = S.safe_int 10
 
+  (* model tickets/COMPARE_CONTRACT *)
   let cost_compare_key_contract = S.safe_int 10
 end
 

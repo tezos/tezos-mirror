@@ -162,6 +162,7 @@ end
 module Micheline_decoding = struct
   (* Cost vector allowing to compute decoding costs as a function of the
      size of the Micheline term *)
+  (* model encoding/DECODING_MICHELINE *)
   let micheline_size_dependent_cost =
     let traversal_cost = S.safe_int 60 in
     let string_per_byte_cost = S.safe_int 10 in
@@ -171,6 +172,7 @@ module Micheline_decoding = struct
       ~string_bytes:string_per_byte_cost
       ~z_bytes:z_per_byte_cost
 
+  (* model encoding/DECODING_MICHELINE *)
   let bytes_dependent_cost = S.safe_int 20
 end
 
@@ -179,6 +181,7 @@ end
 module Micheline_encoding = struct
   (* Cost vector allowing to compute encoding cost as a function of the
      size of the Micheline term *)
+  (* model encoding/ENCODING_MICHELINE *)
   let micheline_size_dependent_cost =
     let traversal_cost = S.safe_int 100 in
     let string_per_byte_cost = S.safe_int 10 in
@@ -188,12 +191,14 @@ module Micheline_encoding = struct
       ~string_bytes:string_per_byte_cost
       ~z_bytes:z_per_byte_cost
 
+  (* model encoding/ENCODING_MICHELINE *)
   let bytes_dependent_cost = S.safe_int 33
 end
 
 let expr_size expr = Micheline_size.of_node (Micheline.root expr)
 
 (* Compute the cost of serializing a term of given [size]. *)
+(* model micheline/strip_locations_micheline *)
 let serialization_cost size =
   Gas_limit_repr.atomic_step_cost
   @@ Micheline_size.dot_product
