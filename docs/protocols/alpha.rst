@@ -129,3 +129,5 @@ Internal
 - Consensus: optimized validation of attestations by maintaining a set
   of forbidden delegates instead of checking through an I/O that the
   delegate has a sufficient frozen deposit. (MR :gl:`!8722`)
+
+- Store a history of percentages of slashed deposits. (MR :gl:`!8828`)
