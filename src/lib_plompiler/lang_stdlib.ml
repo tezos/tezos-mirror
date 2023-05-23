@@ -23,21 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Plompiler standard library. *)
+
 open Lang_core
 
+(** The {!LIB} module type extends the core language defined in {!Lang_core.COMMON}
+    by adding functions that build upon those primitives.
+*)
 module type LIB = sig
   include COMMON
 
+  (** [foldiM] is the monadic version of a fold over a natural number. *)
   val foldiM : ('a -> int -> 'a t) -> 'a -> int -> 'a t
 
+  (** [fold2M] is the monadic version of [List.fold_left2]. *)
   val fold2M : ('a -> 'b -> 'c -> 'a t) -> 'a -> 'b list -> 'c list -> 'a t
 
+  (** [mapM] is the monadic version of [List.map]. *)
   val mapM : ('a -> 'b t) -> 'a list -> 'b list t
 
+  (** [map2M] is the monadic version of [List.map2]. *)
   val map2M : ('a -> 'b -> 'c t) -> 'a list -> 'b list -> 'c list t
 
+  (** [iterM] is the monadic version of [List.iter]. *)
   val iterM : ('a -> unit repr t) -> 'a list -> unit repr t
 
+  (** [iter2M] is the monadic version of [List.iter2]. *)
   val iter2M : ('a -> 'b -> unit repr t) -> 'a list -> 'b list -> unit repr t
 
   module Bool : sig
@@ -54,21 +65,39 @@ module type LIB = sig
   module Num : sig
     include NUM
 
+    (** [square a] returns the value [a^2]. *)
     val square : scalar repr -> scalar repr t
 
+    (** [pow b e_bits] returns the value [b^e] where [e] is the
+        number represented by the binary decomposition [e_bits]. *)
     val pow : scalar repr -> bool repr list -> scalar repr t
 
+    (** [add_list ~qc ~coeffs l] returns the sum of the elements of [l]
+        weighted by [coeffs].
+
+        Note: if [coeffs] is defined, it should be of the same length
+        as [l].
+    *)
     val add_list :
       ?qc:S.t -> ?coeffs:S.t list -> scalar list repr -> scalar repr t
 
+    (** [mul_list l] returns the product of the elements of [l]. *)
     val mul_list : scalar list repr -> scalar repr t
 
+    (** [mul_by_constant k a] returns the value [k * a]. *)
     val mul_by_constant : S.t -> scalar repr -> scalar repr t
 
+    (* [scalar_of_bytes bs] returns the scalar represented by the binary
+       sequence [bs].
+       Specifically, it evaluates P(X) = \sum_i bᵢ Xⁱ at 2 with Horner's
+       method:
+       P(2) = b₀ + 2 (b₁+ 2 (b₂ + 2(…))). *)
     val scalar_of_bytes : bool list repr -> scalar repr t
 
+    (** [is_eq_const a k] returns whether [a] is equal to [k]. *)
     val is_eq_const : scalar repr -> S.t -> bool repr t
 
+    (** [assert_eq_const a k] asserts that [a] is equal to [k]. *)
     val assert_eq_const : scalar repr -> S.t -> unit repr t
 
     (** [is_upper_bounded ~bound x] returns whether the scalar [x] is
@@ -92,50 +121,73 @@ module type LIB = sig
    and type 'a repr = 'a repr
    and type 'a t = 'a t
 
+  (** Enumerations, represented as a list of cases. *)
   module Enum (N : sig
     val n : int
   end) : sig
-    (* [switch_case k l] returns the k-th element of the list [l] if k ∈ [0,n)
-       or the first element of [l] otherwise. *)
+    (** [switch_case k l] returns the k-th element of the list [l] if
+        k ∈ \[0,n) or the first element of [l] otherwise. *)
     val switch_case : scalar repr -> 'a list repr -> 'a repr t
   end
 
+  (** Representation of bytes. *)
   module Bytes : sig
+    (** Little-endian representation of bytes.
+        First element of the list is the Least Significant Bit. *)
     type bl = bool list
 
+    (** [input_bytes ~le bs] returns the representation of [bs]
+        that Plompiler expects as input. *)
     val input_bytes : le:bool -> bytes -> bl Input.t
 
+    (** [constant ~le bs] returns a value holding the bytes [bs].
+      [le] can be used to set the endianness. *)
     val constant : le:bool -> bytes -> bl repr t
 
+    (** [constant_uint32 ~le n] returns a value holding the bytes correspoding
+      to the uint [n].
+      [le] can be used to set the endianness. *)
     val constant_uint32 : le:bool -> Stdint.uint32 -> bl repr t
 
-    (* length in bits *)
+    (** [length b] returns the length of [b] in bits. *)
     val length : bl repr -> int
 
+    (** [concat bs] returns the concatenation of the bitlists in [bs]. *)
     val concat : bl repr array -> bl repr
 
+    (** [add b1 b2] computes the addition of [b1] and [b2]. *)
     val add : ?ignore_carry:bool -> bl repr -> bl repr -> bl repr t
 
+    (** [xor b1 b2] computes the bitwise xor between [b1] and [b2]. *)
     val xor : bl repr -> bl repr -> bl repr t
 
+    (** [not b] computes the bitwise negation of [b]. *)
     val not : bl repr -> bl repr t
 
+    (** [band b1 b2] computes the bitwise conjunction between [b1] and [b2]. *)
     val band : bl repr -> bl repr -> bl repr t
 
-    (* [rotate_left bl 1] shifts the bits left by 1 position, so each bit is more
-       significant. The most significant bit becomes the least significant
-       i.e. it is "rotated".
-       [rotate_left bl (length bl) = bl] *)
+    (** [rotate_left bl n] shifts the bits left by n positions,
+      so that each bit is more significant.
+      The most significant bit becomes the least significant
+      i.e. it is "rotated".
+      [rotate_left bl (length bl) = bl] *)
     val rotate_left : bl repr -> int -> bl repr t
 
+    (** [rotate_right bl n] shifts the bits right by n positions.
+        Similar to {!rotate_left}, but to the right. *)
     val rotate_right : bl repr -> int -> bl repr t
 
-    (* [shift_left bl 1] shifts all bits left by 1 position, so each bit is more
-       significant. The most signigicant bit is lost and the least significant
-       bit is set to zero. More precisely, if we interpret the [bl] as an integer
+    (** [shift_left bl n] shifts all bits left by n positions,
+      so that each bit is more significant.
+      The most signigicant bit is lost and the least significant bit is
+      set to zero.
+      More precisely, if we interpret the [bl] as an integer
        [shift_left bl i = bl * 2^i mod 2^{length a}] *)
     val shift_left : bl repr -> int -> bl repr t
 
+    (** [shift_right bl n] shifts all bits right by n positions.
+        Similar to {!shift_left}, but to the right. *)
     val shift_right : bl repr -> int -> bl repr t
 
     module Internal : sig
@@ -147,11 +199,10 @@ module type LIB = sig
     end
   end
 
+  (** Module for describing operations over fixed size integers *)
   module Limbs (N : sig
     val nb_bits : int
   end) : sig
-    (* This module is a more generic version of Bytes, where each scalar
-       stores an [nb_bits]-bit number. *)
     type sl = scalar list
 
     val of_bytes : Bytes.bl repr -> sl repr t
@@ -160,17 +211,32 @@ module type LIB = sig
 
     val to_scalar : sl repr -> scalar repr t
 
+    (** [xor_lookup a b] returns the exclusive disjunction of [a] and [b].
+      This primitive uses a precomputed lookup table called "xor" ^ [nb_bits].
+    *)
     val xor_lookup : sl repr -> sl repr -> sl repr t
 
+    (** [band_lookup a b] returns the conjunction of [a] and [b].
+      This primitive uses a precomputed lookup table called "band" ^ [nb_bits].
+    *)
     val band_lookup : sl repr -> sl repr -> sl repr t
 
+    (** [bnot_lookup b] returns the negation of [b].
+      This primitive uses a precomputed lookup table called "bnot" ^ [nb_bits].
+    *)
     val bnot_lookup : sl repr -> sl repr t
 
+    (** [rotate_right_lookup x y i] returns the low [nb_bits] of
+      [rotate_right (x + y * 2 ^ nb_bits) i] where [0 < i < nb_bits].
+      This primitive uses a precomputed lookup table called
+      "rotate_right" ^ [nb_bits] ^ "_" ^ [i].
+    *)
     val rotate_right_lookup : sl repr -> int -> sl repr t
 
     val shift_right_lookup : sl repr -> int -> sl repr t
   end
 
+  (** [add2 p1 p2] returns the pair [(fst p1 + fst p2, snd p1 + snd p2)]. *)
   val add2 :
     (scalar * scalar) repr -> (scalar * scalar) repr -> (scalar * scalar) repr t
 
