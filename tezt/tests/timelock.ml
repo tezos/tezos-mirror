@@ -316,9 +316,9 @@ let test_contract_guess_too_late ~protocol () =
   let giver = Constant.bootstrap3.alias in
   let key = create_chest_key chest ~time:(int_of_string time) in
   let plaintext =
-    let k = timelock_proof_to_symmetric_key key in
-    let plain = decrypt k chest.ciphertext in
-    Option.value ~default:(Bytes.of_string "tail") plain
+    match open_chest chest key ~time:(int_of_string time) with
+    | Correct plain -> plain
+    | _ -> assert false
   in
   let* () =
     Lwt_list.fold_left_s
