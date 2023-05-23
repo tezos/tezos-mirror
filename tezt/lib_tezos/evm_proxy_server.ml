@@ -134,7 +134,9 @@ let init ?runner ?rpc_addr ?rpc_port rollup_node =
   let* () = run proxy_server in
   return proxy_server
 
-let request method_ parameters : JSON.t =
+type request = {method_ : string; parameters : JSON.u}
+
+let request_to_JSON {method_; parameters} : JSON.u =
   `O
     [
       ("jsonrpc", `String "2.0");
@@ -142,8 +144,20 @@ let request method_ parameters : JSON.t =
       ("params", parameters);
       ("id", `String "0");
     ]
+
+let build_request request =
+  request_to_JSON request |> JSON.annotate ~origin:"evm_proxy_server"
+
+let batch_requests requests =
+  `A (List.map request_to_JSON requests)
   |> JSON.annotate ~origin:"evm_proxy_server"
 
-let call_evm_rpc proxy_server ~method_ ~parameters =
+(* We keep both encoding (with a single object or an array of objects) and both
+   function on purpose, to ensure both encoding are supported by the server. *)
+let call_evm_rpc proxy_server request =
   let endpoint = endpoint proxy_server in
-  RPC.Curl.post endpoint (request method_ parameters) |> Runnable.run
+  RPC.Curl.post endpoint (build_request request) |> Runnable.run
+
+let batch_evm_rpc proxy_server requests =
+  let endpoint = endpoint proxy_server in
+  RPC.Curl.post endpoint (batch_requests requests) |> Runnable.run

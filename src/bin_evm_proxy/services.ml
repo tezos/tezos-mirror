@@ -37,11 +37,33 @@ let version dir =
   Directory.register0 dir version_service (fun () () ->
       Lwt.return_ok Tezos_version.Bin_version.version_string)
 
+(* The proxy server can either take a single request or multiple requests at
+   once. *)
+type 'a request = Singleton of 'a | Batch of 'a list
+
+let request_encoding kind =
+  Data_encoding.(
+    union
+      [
+        case
+          ~title:"singleton"
+          (Tag 0)
+          kind
+          (function Singleton i -> Some i | _ -> None)
+          (fun i -> Singleton i);
+        case
+          ~title:"batch"
+          (Tag 1)
+          (list kind)
+          (function Batch i -> Some i | _ -> None)
+          (fun i -> Batch i);
+      ])
+
 let dispatch_service =
   Service.post_service
     ~query:Query.empty
-    ~input:Input.encoding
-    ~output:Output.encoding
+    ~input:(request_encoding Input.encoding)
+    ~output:(request_encoding Output.encoding)
     Path.(root)
 
 let get_block ~full_transaction_object block_param
@@ -52,64 +74,70 @@ let get_block ~full_transaction_object block_param
   | Latest | Earliest | Pending ->
       Rollup_node_rpc.current_block ~full_transaction_object
 
-let dispatch ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
-    dir =
-  Directory.register0 dir dispatch_service (fun () (input, id) ->
+let dispatch_input
+    ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) (input, id)
+    =
+  let open Lwt_result_syntax in
+  let* output =
+    match input with
+    | Accounts.Input _ -> return (Accounts.Output (Ok []))
+    | Network_id.Input _ -> return (Network_id.Output (Ok Mockup.net_version))
+    | Chain_id.Input _ -> return (Chain_id.Output (Ok Mockup.chain_id))
+    | Get_balance.Input (Some (address, _block_param)) ->
+        let* balance = Rollup_node_rpc.balance address in
+        return (Get_balance.Output (Ok balance))
+    | Block_number.Input _ ->
+        let* block_number = Rollup_node_rpc.current_block_number () in
+        return (Block_number.Output (Ok block_number))
+    | Get_block_by_number.Input (Some (block_param, full_transaction_object)) ->
+        let* block =
+          get_block
+            ~full_transaction_object
+            block_param
+            (module Rollup_node_rpc)
+        in
+        return (Get_block_by_number.Output (Ok block))
+    | Get_block_by_number.Input None ->
+        return (Get_block_by_number.Output (Ok Mockup.(block ())))
+    | Get_block_by_hash.Input _ ->
+        return (Get_block_by_hash.Output (Ok Mockup.(block ())))
+    | Get_code.Input _ -> return (Get_code.Output (Ok Mockup.code))
+    | Gas_price.Input _ -> return (Gas_price.Output (Ok Mockup.gas_price))
+    | Get_transaction_count.Input (Some (address, _)) ->
+        let* nonce = Rollup_node_rpc.nonce address in
+        return (Get_transaction_count.Output (Ok nonce))
+    | Get_transaction_receipt.Input (Some tx_hash) ->
+        let* receipt =
+          let*! res = Rollup_node_rpc.transaction_receipt tx_hash in
+          match res with Ok x -> return_some x | Error _ -> return_none
+        in
+        return (Get_transaction_receipt.Output (Ok receipt))
+    | Get_transaction_by_hash.Input _ ->
+        return (Get_transaction_by_hash.Output (Ok Mockup.transaction_object))
+    | Send_raw_transaction.Input (Some tx_raw) ->
+        let* tx_hash =
+          Rollup_node_rpc.inject_raw_transaction ~smart_rollup_address tx_raw
+        in
+        return (Send_raw_transaction.Output (Ok tx_hash))
+    | Send_transaction.Input _ ->
+        return (Send_transaction.Output (Ok Mockup.transaction_hash))
+    | Eth_call.Input _ -> return (Eth_call.Output (Ok Mockup.call))
+    | Get_estimate_gas.Input _ ->
+        return (Get_estimate_gas.Output (Ok Mockup.gas_price))
+    | _ -> Error_monad.failwith "Unsupported method\n%!"
+  in
+  return (output, id)
+
+let dispatch ctx dir =
+  Directory.register0 dir dispatch_service (fun () input ->
       let open Lwt_result_syntax in
-      let* output =
-        match input with
-        | Accounts.Input _ -> return (Accounts.Output (Ok []))
-        | Network_id.Input _ ->
-            return (Network_id.Output (Ok Mockup.net_version))
-        | Chain_id.Input _ -> return (Chain_id.Output (Ok Mockup.chain_id))
-        | Get_balance.Input (Some (address, _block_param)) ->
-            let* balance = Rollup_node_rpc.balance address in
-            return (Get_balance.Output (Ok balance))
-        | Block_number.Input _ ->
-            let* block_number = Rollup_node_rpc.current_block_number () in
-            return (Block_number.Output (Ok block_number))
-        | Get_block_by_number.Input
-            (Some (block_param, full_transaction_object)) ->
-            let* block =
-              get_block
-                ~full_transaction_object
-                block_param
-                (module Rollup_node_rpc)
-            in
-            return (Get_block_by_number.Output (Ok block))
-        | Get_block_by_number.Input None ->
-            return (Get_block_by_number.Output (Ok (Mockup.block ())))
-        | Get_block_by_hash.Input _ ->
-            return (Get_block_by_hash.Output (Ok (Mockup.block ())))
-        | Get_code.Input _ -> return (Get_code.Output (Ok Mockup.code))
-        | Gas_price.Input _ -> return (Gas_price.Output (Ok Mockup.gas_price))
-        | Get_transaction_count.Input (Some (address, _)) ->
-            let* nonce = Rollup_node_rpc.nonce address in
-            return (Get_transaction_count.Output (Ok nonce))
-        | Get_transaction_receipt.Input (Some tx_hash) ->
-            let* receipt =
-              let*! res = Rollup_node_rpc.transaction_receipt tx_hash in
-              match res with Ok x -> return_some x | Error _ -> return_none
-            in
-            return (Get_transaction_receipt.Output (Ok receipt))
-        | Get_transaction_by_hash.Input _ ->
-            return
-              (Get_transaction_by_hash.Output (Ok Mockup.transaction_object))
-        | Send_raw_transaction.Input (Some tx_raw) ->
-            let* tx_hash =
-              Rollup_node_rpc.inject_raw_transaction
-                ~smart_rollup_address
-                tx_raw
-            in
-            return (Send_raw_transaction.Output (Ok tx_hash))
-        | Send_transaction.Input _ ->
-            return (Send_transaction.Output (Ok Mockup.transaction_hash))
-        | Eth_call.Input _ -> return (Eth_call.Output (Ok Mockup.call))
-        | Get_estimate_gas.Input _ ->
-            return (Get_estimate_gas.Output (Ok Mockup.gas_price))
-        | _ -> Error_monad.failwith "Unsupported method\n%!"
-      in
-      return (output, id))
+      match input with
+      | Singleton input ->
+          let+ output = dispatch_input ctx input in
+          Singleton output
+      | Batch inputs ->
+          let+ outputs = List.map_es (dispatch_input ctx) inputs in
+          Batch outputs)
 
 let directory (rollup_node_config : (module Rollup_node.S) * string) =
   Directory.empty |> version |> dispatch rollup_node_config
