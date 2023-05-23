@@ -72,10 +72,10 @@ let parse_block_row
 
 let select_blocks db_pool level =
   let q =
-    "SELECT b.hash, b.predecessor, d.address, d.alias, b.round, b.timestamp, \
+    "SELECT b.hash, p.hash, d.address, d.alias, b.round, b.timestamp, \
      r.timestamp, n.name FROM blocks b, blocks_reception r, delegates d , \
-     nodes n ON r.block = b.id AND d.id = b.baker AND n.id = r.source WHERE \
-     b.level = ?"
+     nodes n ON r.block = b.id AND d.id = b.baker AND n.id = r.source LEFT \
+     JOIN blocks p ON p.id = b.predecessor WHERE b.level = ?"
   in
   let request =
     Caqti_request.Infix.(
@@ -85,7 +85,7 @@ let select_blocks db_pool level =
               (tup4
                  (tup2
                     Sql_requests.Type.block_hash
-                    Sql_requests.Type.block_hash)
+                    (option Sql_requests.Type.block_hash))
                  Sql_requests.Type.public_key_hash
                  (option string)
                  int32)

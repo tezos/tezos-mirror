@@ -501,7 +501,7 @@ type chunk =
   | Block of
       Int32.t
       * Block_hash.t
-      * Block_hash.t
+      * Block_hash.t option
       * Int32.t
       * Time.Protocol.t
       * (string * Time.System.t) list

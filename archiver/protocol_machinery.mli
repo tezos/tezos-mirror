@@ -81,7 +81,7 @@ module type PROTOCOL_SERVICES = sig
     * Time.Protocol.t
     * int
     * Block_hash.t
-    * Block_hash.t)
+    * Block_hash.t option)
     tzresult
     Lwt.t
 end

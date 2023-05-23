@@ -189,7 +189,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         info.header.shell.timestamp,
         info.header.protocol_data.contents.priority,
         info.hash,
-        info.header.shell.predecessor )
+        Some info.header.shell.predecessor )
 end
 
 module M = General_archiver.Define (Services)

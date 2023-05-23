@@ -230,7 +230,7 @@ let maybe_insert_block =
   Caqti_request.Infix.(
     Caqti_type.(
       tup2
-        (tup4 int32 Type.time_protocol Type.block_hash Type.block_hash)
+        (tup4 int32 Type.time_protocol Type.block_hash (option Type.block_hash))
         (tup2 Type.public_key_hash int32)
       ->. unit))
     "INSERT INTO blocks (timestamp, hash, level, round, predecessor, baker) \

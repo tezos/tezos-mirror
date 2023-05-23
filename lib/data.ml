@@ -182,7 +182,7 @@ end
 module Block = struct
   type t = {
     hash : Block_hash.t;
-    predecessor : Block_hash.t;
+    predecessor : Block_hash.t option;
     delegate : Tezos_crypto.Signature.public_key_hash;
     delegate_alias : string option;
     round : Int32.t;
@@ -232,7 +232,7 @@ module Block = struct
         })
       (obj8
          (req "hash" Block_hash.encoding)
-         (req "predecessor" Block_hash.encoding)
+         (opt "predecessor" Block_hash.encoding)
          (dft
             "delegate"
             Tezos_crypto.Signature.Public_key_hash.encoding
