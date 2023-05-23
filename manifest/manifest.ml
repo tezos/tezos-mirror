@@ -2740,7 +2740,10 @@ let generate_opam ?release for_package (internals : Target.internal list) :
       |> String_set.of_list |> String_set.elements
       |> List.concat_map make_runtest
     in
-    {Opam.command = [S "rm"; S "-r"; S "vendors"]; with_test = Never}
+    {
+      Opam.command = [S "rm"; S "-r"; S "vendors"; S "contrib"];
+      with_test = Never;
+    }
     :: build :: runtests
   in
   let licenses =
