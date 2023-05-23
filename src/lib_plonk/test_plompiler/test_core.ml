@@ -731,8 +731,6 @@ functor
 
     open Utils (L)
 
-    let input_bitlist l = Input.list (List.map Input.bool l)
-
     let test_add a b z () =
       let* a = input ~kind:`Public a in
       let* b = input b in
@@ -741,10 +739,8 @@ functor
       assert_equal z z'
 
     let tests_add =
-      let ex = Plompiler.Utils.(bitlist @@ bytes_of_hex "08") in
-      let input_bitlist l = Input.list (List.map Input.bool l) in
-      let i = input_bitlist ex in
-      let o = input_bitlist Plompiler.Utils.(bitlist @@ bytes_of_hex "10") in
+      let i = input_bytes @@ Stdlib.Bytes.of_string "\008" in
+      let o = input_bytes @@ Stdlib.Bytes.of_string "\016" in
       [
         test ~valid:true ~name:"Bytes.test_add" @@ test_add i i o;
         test ~valid:false ~name:"Bytes.test_add" @@ test_add o o i;
@@ -757,19 +753,14 @@ functor
       let* z' = xor a b in
       assert_equal z z'
 
+    let bytes_of_hex = Plompiler.Utils.bytes_of_hex
+
     let tests_xor =
-      let ex = Plompiler.Utils.(bitlist @@ bytes_of_hex "08") in
-      let i = input_bitlist ex in
-      let o = input_bitlist Plompiler.Utils.(bitlist @@ bytes_of_hex "00") in
-      let i1 =
-        input_bitlist Plompiler.Utils.(bitlist @@ bytes_of_hex "510e527f")
-      in
-      let i2 =
-        input_bitlist Plompiler.Utils.(bitlist @@ bytes_of_hex "00000041")
-      in
-      let o1 =
-        input_bitlist Plompiler.Utils.(bitlist @@ bytes_of_hex "510e523e")
-      in
+      let i = input_bytes @@ bytes_of_hex "08" in
+      let o = input_bytes @@ bytes_of_hex "00" in
+      let i1 = input_bytes @@ bytes_of_hex "510e527f" in
+      let i2 = input_bytes @@ bytes_of_hex "00000041" in
+      let o1 = input_bytes @@ bytes_of_hex "510e523e" in
       [
         test ~valid:true ~name:"Bytes.test_xor" @@ test_xor i i o;
         test ~valid:true ~name:"Bytes.blake" @@ test_xor i1 i2 o1;
@@ -785,8 +776,8 @@ functor
       assert_equal z o
 
     let tests_ifthenelse_bytes =
-      let l = input_bitlist Plompiler.Utils.(bitlist @@ bytes_of_hex "01") in
-      let r = input_bitlist Plompiler.Utils.(bitlist @@ bytes_of_hex "00") in
+      let l = input_bytes @@ bytes_of_hex "01" in
+      let r = input_bytes @@ bytes_of_hex "00" in
       [
         test ~valid:true ~name:"Bytes.test_ifthenelse"
         @@ test_ifthenelse_bytes (Input.bool true) l r l;
@@ -796,23 +787,21 @@ functor
         @@ test_ifthenelse_bytes (Input.bool false) l r l;
       ]
 
-    let test_rotate l i z () =
+    let test_rotate_right l i z () =
       let* l = input ~kind:`Public l in
       let* z = input z in
-      let o = rotate l i in
+      let o = rotate_right l i in
       assert_equal o z
 
-    let tests_rotate =
+    let tests_rotate_right =
       List.map
         (fun (i, a, b) ->
-          let a =
-            input_bitlist Plompiler.Utils.(bitlist @@ Stdlib.Bytes.of_string a)
-          in
-          let b =
-            input_bitlist Plompiler.Utils.(bitlist @@ Stdlib.Bytes.of_string b)
-          in
-          test ~valid:true ~name:"Bytes.test_rotate" @@ test_rotate a i b)
+          let a = input_bytes @@ Stdlib.Bytes.of_string a in
+          let b = input_bytes @@ Stdlib.Bytes.of_string b in
+          test ~valid:true ~name:"Bytes.test_rotate_right"
+          @@ test_rotate_right a i b)
         [
+          (0, "\001", "\001");
           (1, "\001", "\128");
           (2, "\001", "\064");
           (3, "\001", "\032");
@@ -820,6 +809,8 @@ functor
           (5, "\001", "\008");
           (6, "\001", "\004");
           (7, "\001", "\002");
+          (8, "\001", "\001");
+          (0, "\000\001", "\000\001");
           (1, "\000\001", "\128\000");
           (2, "\000\001", "\064\000");
           (3, "\000\001", "\032\000");
@@ -827,6 +818,10 @@ functor
           (5, "\000\001", "\008\000");
           (6, "\000\001", "\004\000");
           (7, "\000\001", "\002\000");
+          (8, "\000\001", "\001\000");
+          (9, "\000\001", "\000\128");
+          (1, "\001\000", "\000\128");
+          (0, "\000\000\001", "\000\000\001");
           (1, "\000\000\001", "\128\000\000");
           (2, "\000\000\001", "\064\000\000");
           (3, "\000\000\001", "\032\000\000");
@@ -834,9 +829,12 @@ functor
           (5, "\000\000\001", "\008\000\000");
           (6, "\000\000\001", "\004\000\000");
           (7, "\000\000\001", "\002\000\000");
+          (8, "\000\000\001", "\001\000\000");
+          (9, "\000\000\001", "\000\128\000");
         ]
 
-    let tests = tests_add @ tests_xor @ tests_ifthenelse_bytes @ tests_rotate
+    let tests =
+      tests_add @ tests_xor @ tests_ifthenelse_bytes @ tests_rotate_right
   end
 
 module ECC : Test =
@@ -1004,14 +1002,16 @@ functor
       let* s' = scalar_of_bytes b in
       assert_equal s s'
 
-    let t s () =
-      let b = Stdlib.Bytes.of_string s in
-      let bs = Plompiler.Utils.bitlist ~le:true b in
-      let bs = Input.list (List.map Input.bool bs) in
-      test_scalar_of_bytes bs (Input.scalar (S.of_bytes_exn b)) ()
-
     let tests_scalar_of_bytes =
-      [test ~valid:true ~name:"Rest.test_scalar_of_bytes" @@ t "\x010101"]
+      List.map
+        (fun s ->
+          let bs = Bytes.input_bytes ~le:true @@ Stdlib.Bytes.of_string s in
+          let scalar =
+            Input.scalar (S.of_bytes_exn @@ Stdlib.Bytes.of_string s)
+          in
+          test ~valid:true ~name:"Rest.test_scalar_of_bytes"
+          @@ test_scalar_of_bytes bs scalar)
+        ["\x010101"]
 
     let tests = tests_full_adder @ tests_scalar_of_bytes
   end

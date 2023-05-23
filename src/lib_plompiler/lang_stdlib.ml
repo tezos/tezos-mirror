@@ -103,11 +103,13 @@ module type LIB = sig
   module Bytes : sig
     type bl = bool list
 
+    val input_bytes : ?le:bool -> bytes -> bl Input.t
+
     val add : ?ignore_carry:bool -> bl repr -> bl repr -> bl repr t
 
     val xor : bl repr -> bl repr -> bl repr t
 
-    val rotate : bl repr -> int -> bl repr
+    val rotate_right : bl repr -> int -> bl repr
   end
 
   val add2 :
@@ -313,7 +315,12 @@ module Lib (C : COMMON) = struct
   end
 
   module Bytes = struct
+    (* first element of the list is the Least Significant Bit *)
     type bl = bool list
+
+    let input_bitlist l = Input.list (List.map Input.bool l)
+
+    let input_bytes ?le b = input_bitlist @@ Utils.bitlist ?le b
 
     let add ?(ignore_carry = false) a b =
       let ha, ta = (List.hd (of_list a), List.tl (of_list a)) in
@@ -336,7 +343,7 @@ module Lib (C : COMMON) = struct
       let* l = map2M Bool.xor (of_list a) (of_list b) in
       ret @@ to_list l
 
-    let rotate a i =
+    let rotate_right a i =
       let split_n n l =
         let rec aux acc k l =
           if k = n then (List.rev acc, l)

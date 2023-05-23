@@ -1451,6 +1451,7 @@ let _octez_plonk_test_plompiler_main =
         "test_schnorr";
         "test_serialization";
         "test_weierstrass";
+        "test_utils";
       ]
     ~bisect_ppx:No
     ~deps:[octez_plonk_test_helpers]
