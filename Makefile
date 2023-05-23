@@ -475,7 +475,7 @@ coverage-clean:
 	@-rm -Rf ${COVERAGE_OUTPUT}/*.coverage ${COVERAGE_REPORT}
 
 .PHONY: clean
-clean: coverage-clean clean-old-names clean-kernels
+clean: coverage-clean clean-old-names
 	@-dune clean
 	@-rm -f ${ALL_EXECUTABLES}
 	@-${MAKE} -C docs clean
