@@ -11,11 +11,13 @@
   tezos-scoru-wasm-helpers
   tezos-test-helpers
   tezos-protocol-alpha
+  tezos-smart-rollup-alpha
   tezt)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_scoru_wasm
+  -open Tezos_smart_rollup_alpha
   -open Tezt
   -open Tezt.Base))

@@ -22,6 +22,7 @@ depends: [
   "tezos-shell-services"
   "octez-plompiler"
   "tezos-crypto-dal"
+  "tezos-smart-rollup-alpha"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
