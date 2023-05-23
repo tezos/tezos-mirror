@@ -78,12 +78,19 @@ let injector_operation_of_manager :
       Some (Timeout {rollup; stakers})
   | _ -> None
 
+type state = {
+  cctxt : Client_context.full;
+  fee_parameters : Configuration.fee_parameters;
+  minimal_block_delay : int64;
+  delay_increment_per_round : int64;
+}
+
 module Parameters :
   PARAMETERS
-    with type state = Node_context.ro
+    with type state = state
      and type Tag.t = Configuration.purpose
      and type Operation.t = L1_operation.t = struct
-  type state = Node_context.ro
+  type nonrec state = state
 
   let events_section = [Protocol.name; "sc_rollup_node"]
 
@@ -125,15 +132,17 @@ module Parameters :
     | Timeout _ -> Timeout
     | Refute _ -> Refute
 
-  let fee_parameter node_ctxt operation =
-    Node_context.get_fee_parameter node_ctxt (operation_tag operation)
+  let fee_parameter {fee_parameters; _} operation =
+    let purpose = operation_tag operation in
+    Configuration.Operator_purpose_map.find purpose fee_parameters
+    |> Option.value ~default:(Configuration.default_fee_parameter ~purpose ())
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
      Decide if some batches must have all the operations succeed. See
      {!Injector_sigs.Parameter.batch_must_succeed}. *)
   let batch_must_succeed _ = `At_least_one
 
-  let retry_unsuccessful_operation _node_ctxt (_op : Operation.t) status =
+  let retry_unsuccessful_operation _state (_op : Operation.t) status =
     let open Lwt_syntax in
     match status with
     | Backtracked | Skipped | Other_branch ->
@@ -308,10 +317,9 @@ module Proto_client = struct
             operations)
         Lwt.return
 
-  let operation_status (node_ctxt : Node_context.ro) block_hash operation_hash
-      ~index =
+  let operation_status {cctxt; _} block_hash operation_hash ~index =
     let open Lwt_result_syntax in
-    let* operations = get_block_operations node_ctxt.cctxt block_hash in
+    let* operations = get_block_operations cctxt block_hash in
     match Operation_hash.Map.find_opt operation_hash operations with
     | None -> return_none
     | Some operation -> (
@@ -448,18 +456,16 @@ module Proto_client = struct
       Operation.encoding_with_legacy_attestation_name
       op
 
-  let time_until_next_block (node_ctxt : Node_context.ro)
+  let time_until_next_block {minimal_block_delay; delay_increment_per_round; _}
       (header : Tezos_base.Block_header.shell_header option) =
     let open Result_syntax in
-    let Constants.Parametric.{minimal_block_delay; delay_increment_per_round; _}
-        =
-      node_ctxt.protocol_constants.Constants.parametric
-    in
     match header with
-    | None ->
-        minimal_block_delay |> Period.to_seconds |> Int64.to_int
-        |> Ptime.Span.of_int_s
+    | None -> minimal_block_delay |> Int64.to_int |> Ptime.Span.of_int_s
     | Some header ->
+        let minimal_block_delay = Period.of_seconds_exn minimal_block_delay in
+        let delay_increment_per_round =
+          Period.of_seconds_exn delay_increment_per_round
+        in
         let next_level_timestamp =
           let* durations =
             Round.Durations.create
