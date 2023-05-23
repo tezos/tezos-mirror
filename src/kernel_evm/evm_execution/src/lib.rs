@@ -23,9 +23,6 @@ pub mod precompiles;
 pub mod storage;
 pub mod transaction;
 
-#[cfg(feature = "testing")]
-pub mod testing;
-
 extern crate alloc;
 extern crate tezos_crypto_rs as crypto;
 extern crate tezos_smart_rollup_debug as debug;
