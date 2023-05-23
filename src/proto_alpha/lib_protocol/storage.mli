@@ -57,6 +57,15 @@ module Slashed_deposits_history : sig
   type slashed_percentage = int
 
   type t = (Cycle_repr.t * slashed_percentage) list
+
+  (** [add cycle percentage history] adds the [percentage] for the [cycle] in
+      the [history].
+      If the cycle exists, the associated percentage is updated and capped at
+      100 and the cycle order in the list is unchanged.
+      If the cycle does not exist, the new pair [(cycle, percentage)] is added
+      at the beginning of the list.
+  *)
+  val add : Cycle_repr.t -> slashed_percentage -> t -> t
 end
 
 module Contract : sig

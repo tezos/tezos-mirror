@@ -181,6 +181,19 @@ module Slashed_deposits_history = struct
       (obj2
          (req "cycle" Cycle_repr.encoding)
          (req "slashed_percentage" slashed_percentage_encoding))
+
+  let add cycle percentage history =
+    let rec loop rev_prefix = function
+      | [] ->
+          (* cycle does not exist -> add at the head *)
+          (cycle, percentage) :: history
+      | (c, p) :: tl when Cycle_repr.(c = cycle) ->
+          let p = Compare.Int.min 100 (p + percentage) in
+          (* cycle found, do not change the order *)
+          List.rev_append rev_prefix ((c, p) :: tl)
+      | hd :: tl -> loop (hd :: rev_prefix) tl
+    in
+    loop [] history
 end
 
 module Contract = struct
