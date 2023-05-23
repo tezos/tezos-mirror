@@ -151,6 +151,14 @@ let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
       evm_proxy_server;
     }
 
+let setup_past_genesis ?originator_key ?rollup_operator_key protocol =
+  let* ({node; client; sc_rollup_node; _} as full_setup) =
+    setup_evm_kernel ?originator_key ?rollup_operator_key protocol
+  in
+  (* Force a level to got past the genesis block *)
+  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+  return full_setup
+
 let test_evm_proxy_server_connection =
   Protocol.register_test
     ~__FILE__
@@ -230,10 +238,7 @@ let test_rpc_getBalance =
     ~tags:["evm"; "get_balance"]
     ~title:"RPC method eth_getBalance"
   @@ fun protocol ->
-  let* {node; client; sc_rollup_node; evm_proxy_server; _} =
-    setup_evm_kernel protocol
-  in
-  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+  let* {evm_proxy_server; _} = setup_past_genesis protocol in
   let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let* balance =
     Eth_cli.balance
@@ -253,17 +258,8 @@ let test_rpc_getBlockByNumber =
     ~tags:["evm"; "get_block_by_number"]
     ~title:"RPC method eth_getBlockByNumber"
   @@ fun protocol ->
-  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
-  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
+  let* {evm_proxy_server; _} = setup_past_genesis protocol in
   let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
-  let* () = Client.bake_for_and_wait client in
-  let first_evm_run_level = Node.get_level node in
-  let* _level =
-    Sc_rollup_node.wait_for_level
-      ~timeout:30.
-      sc_rollup_node
-      first_evm_run_level
-  in
   let* block =
     Eth_cli.get_block ~block_id:"0" ~endpoint:evm_proxy_server_endpoint
   in
@@ -303,11 +299,7 @@ let test_rpc_getTransactionCount =
     ~tags:["evm"; "get_transaction_count"]
     ~title:"RPC method eth_getTransactionCount"
   @@ fun protocol ->
-  let* {node; client; sc_rollup_node; evm_proxy_server; _} =
-    setup_evm_kernel protocol
-  in
-  (* Force a level to got past the genesis block *)
-  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+  let* {evm_proxy_server; _} = setup_past_genesis protocol in
   let* transaction_count =
     get_transaction_count
       evm_proxy_server
@@ -323,10 +315,7 @@ let test_rpc_getTransactionCountBatch =
     ~tags:["evm"; "get_transaction_count_as_batch"]
     ~title:"RPC method eth_getTransactionCount in batch"
   @@ fun protocol ->
-  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
-  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
-  (* Force a level to get past the genesis block *)
-  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+  let* {evm_proxy_server; _} = setup_past_genesis protocol in
   let* transaction_count =
     get_transaction_count
       evm_proxy_server
@@ -353,10 +342,7 @@ let test_rpc_batch =
     ~tags:["evm"; "rpc"; "batch"]
     ~title:"RPC batch requests"
   @@ fun protocol ->
-  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
-  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
-  (* Force a level to get past the genesis block *)
-  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+  let* {evm_proxy_server; _} = setup_past_genesis protocol in
   let* transaction_count, chain_id =
     let transaction_count =
       transaction_count_request Eth_account.bootstrap_accounts.(0).address
@@ -415,7 +401,6 @@ let test_l2_deploy =
   let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
   let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
   let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
-  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* () =
     Eth_cli.add_abi
@@ -434,10 +419,10 @@ let test_l2_deploy =
   unit
 
 let transfer ?data protocol =
-  let* {node; client; sc_rollup_node; _} = setup_evm_kernel protocol in
-  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
+  let* {node; client; sc_rollup_node; evm_proxy_server; _} =
+    setup_past_genesis protocol
+  in
   let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
-  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
   let balance account =
     Eth_cli.balance ~account ~endpoint:evm_proxy_server_endpoint
   in
