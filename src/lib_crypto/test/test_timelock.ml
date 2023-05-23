@@ -123,15 +123,15 @@ let test_low_level_negative () =
     let open Internal_for_tests in
     let g, g' =
       let locked = locked_value_to_z chest_key.vdf_tuple.locked_value in
-      (locked |> Z.to_string, Z.(locked + one |> to_string))
+      (locked, Z.(locked + one))
     in
     let c, c' =
       let challenge = unlocked_value_to_z chest_key.vdf_tuple.unlocked_value in
-      (challenge |> Z.to_string, Z.(challenge + one |> to_string))
+      (challenge, Z.(challenge + one))
     in
     let pi, pi' =
       let proof = vdf_proof_to_z chest_key.vdf_tuple.vdf_proof in
-      (proof |> Z.to_string, Z.(proof + one |> to_string))
+      (proof, Z.(proof + one))
     in
     [
       {vdf_tuple = to_vdf_tuple_unsafe g' c pi; nonce = chest_key.nonce};
@@ -178,12 +178,7 @@ let test_wesolowski () =
     let exponent = Z.(pow (of_int 2) time / l) in
     Z.powm g exponent rsa2048
   in
-  let tuple_high_memory =
-    to_vdf_tuple_unsafe
-      (Z.to_string g)
-      (Z.to_string c)
-      (Z.to_string pi_high_memory)
-  in
+  let tuple_high_memory = to_vdf_tuple_unsafe g c pi_high_memory in
   assert (Z.(equal pi pi_high_memory)) ;
   assert (verify_wesolowski ~time tuple_high_memory) ;
   ()

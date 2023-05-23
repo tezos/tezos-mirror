@@ -79,19 +79,6 @@ type vdf_tuple = {
   vdf_proof : vdf_proof;
 }
 
-(** Function taking as input a [time] and three strings
-    representing a locked and unlocked value as well as a wesolowski proof and
-    returning Some vdf_tuple if the elements are in the RSA group
-    with rsa2048 as modulus and the Wesolowski proof verifies,
-    None otherwise. *)
-val to_vdf_tuple_opt :
-  time:int -> string -> string -> string -> vdf_tuple option
-
-(** Function taking as input three strings representing a locked and unlocked
-    value as well as a wesolowski proof and returning a
-    vdf_tuple. *)
-val to_vdf_tuple_unsafe : string -> string -> string -> vdf_tuple
-
 (** Proof that the opening of a value is the claimed value.
     It is concretely an optional vdf_tuple and a member of the RSA
     group. *)
@@ -194,6 +181,8 @@ module Internal_for_tests : sig
   val prove_wesolowski : time:int -> locked_value -> unlocked_value -> vdf_proof
 
   val verify_wesolowski : time:int -> vdf_tuple -> bool
+
+  val to_vdf_tuple_unsafe : Z.t -> Z.t -> Z.t -> vdf_tuple
 
   val hash_to_prime : time:int -> locked_value -> unlocked_value -> Z.t
 end

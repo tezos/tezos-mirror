@@ -123,13 +123,6 @@ let vdf_tuple_encoding =
           (req "unlocked_value" n)
           (req "vdf_proof" n))
 
-let to_vdf_tuple_unsafe x y z =
-  {
-    locked_value = Z.of_string x;
-    unlocked_value = Z.of_string y;
-    vdf_proof = Z.of_string z;
-  }
-
 (* Timelock proof:
    - a VDF tuple, and a random coin
    - a scalar, either the random coin for the precomputer or 1 *)
@@ -207,13 +200,6 @@ let verify_wesolowski ~time vdf_tuple =
       powm vdf_tuple.vdf_proof l rsa2048
       * powm vdf_tuple.locked_value r rsa2048
       mod rsa2048)
-
-let to_vdf_tuple_opt ~time x y z =
-  let tuple = to_vdf_tuple_unsafe x y z in
-  let x, y, z = Z.(of_string x, of_string y, of_string z) in
-  let b_group = x < rsa2048 && y < rsa2048 && z < rsa2048 in
-  let b_weso = verify_wesolowski ~time tuple in
-  if b_group && b_weso then Some tuple else None
 
 let verify ~time locked_value proof =
   (* Verify link between precomputed tuple, challenge and evaluation *)
@@ -344,6 +330,9 @@ module Internal_for_tests = struct
   let unlocked_value_to_z x = x
 
   let vdf_proof_to_z x = x
+
+  let to_vdf_tuple_unsafe locked_value unlocked_value vdf_proof =
+    {locked_value; unlocked_value; vdf_proof}
 
   let hash_to_prime = hash_to_prime
 
