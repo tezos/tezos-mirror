@@ -286,4 +286,76 @@ module Forge = struct
     test_forge_invalid_double_preconsensus_evidence protocols
 end
 
-let register ~protocols = Forge.register ~protocols
+module Parse = struct
+  let parse_operations_rpc ~version raw =
+    RPC.post_chain_block_helpers_parse_operations
+      ~version
+      (`A [JSON.unannotate raw])
+
+  let check_parsed_kind kind json =
+    check_kind JSON.(json |> as_list |> List.hd) kind
+
+  let create_raw_op ~protocol op client =
+    Log.info "Sign and forge the operation" ;
+    let* signature = Operation.sign op client in
+    let* (`Hex h1) = Operation.hex ~signature op client in
+    Log.info
+      "Use octez-codec to retrieve the raw representation of the operation \
+       from its hexadecimal representation" ;
+    Codec.decode
+      ~name:(Protocol.encoding_prefix protocol ^ "." ^ "operation.raw")
+      h1
+
+  let check_version ~use_legacy_name name raw client =
+    let* t =
+      RPC.Client.call client
+      @@ parse_operations_rpc
+           ~version:(if use_legacy_name then "0" else "1")
+           raw
+    in
+    return (check_parsed_kind name t)
+
+  let check_unknown_version raw client =
+    let version = "2" in
+    let*? p = RPC.Client.spawn client @@ parse_operations_rpc ~version raw in
+    let msg = rex (sf "Failed to parse argument 'version'") in
+    Process.check_error ~msg p
+
+  let test_parse kind protocol =
+    let* _node, client = Client.init_with_protocol ~protocol `Client () in
+    let signer = Constant.bootstrap1 in
+
+    let* consensus_op =
+      create_consensus_op ~use_legacy_name:false ~signer ~kind client
+    in
+    let* raw = create_raw_op ~protocol consensus_op client in
+
+    let check_version ~use_legacy_name =
+      let name = Operation.Consensus.kind_to_string kind use_legacy_name in
+      check_version ~use_legacy_name name raw client
+    in
+
+    let* () = check_version ~use_legacy_name:true in
+    let* () = check_version ~use_legacy_name:false in
+    check_unknown_version raw client
+
+  let test_parse_consensus =
+    register_test
+      ~title:"Parse raw consensus operations"
+      ~additionnal_tags:["parse"; "raw"; "operations"; "consensus"]
+    @@ fun protocol -> test_parse Operation.Attestation protocol
+
+  let test_parse_preconsensus =
+    register_test
+      ~title:"Parse raw pre-consensus operations"
+      ~additionnal_tags:["parse"; "raw"; "operations"; "consensus"; "pre"]
+    @@ fun protocol -> test_parse Operation.Preattestation protocol
+
+  let register ~protocols =
+    test_parse_consensus protocols ;
+    test_parse_preconsensus protocols
+end
+
+let register ~protocols =
+  Forge.register ~protocols ;
+  Parse.register ~protocols
