@@ -55,6 +55,8 @@ module type T = sig
        and type Context_hash.Version.t = Context_hash.Version.t
        and type Context.config = Tezos_context_sigs.Config.t
        and module Context.Proof = Environment_context.Context.Proof
+       and type Context_binary.t = Tezos_context_memory.Context_binary.t
+       and type Context_binary.tree = Tezos_context_memory.Context_binary.tree
        and type Protocol_hash.t = Protocol_hash.t
        and type Time.t = Time.Protocol.t
        and type Operation.shell_header = Operation.shell_header
@@ -1107,6 +1109,22 @@ struct
       Tezos_context_merkle_proof_encoding.Merkle_proof_encoding
 
     let complete ctxt s = Base58.complete ctxt s
+  end
+
+  module Context_binary = struct
+    include Tezos_context_memory.Context_binary
+
+    module Tree = struct
+      type nonrec tree = tree
+
+      type nonrec t = t
+
+      type key = string list
+
+      type value = bytes
+
+      include Tezos_context_memory.Context_binary.Tree
+    end
   end
 
   module Wasm_2_0_0 = struct

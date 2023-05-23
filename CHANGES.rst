@@ -95,6 +95,11 @@ Proxy Server
 Protocol Compiler And Environment
 ---------------------------------
 
+- Added a new version of the protocol environment (V10)
+
+  - Exposed a limited API to manipulate an Irmin binary tree within the
+    protocol.
+
 Codec
 -----
 
