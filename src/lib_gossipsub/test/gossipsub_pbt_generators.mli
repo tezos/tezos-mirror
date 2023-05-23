@@ -80,6 +80,8 @@ type trace = transition list
 
 val pp_input : Format.formatter -> 'a input -> unit
 
+val pp_output : Format.formatter -> output -> unit
+
 val pp_trace :
   ?pp_state:(Format.formatter -> state -> unit) ->
   ?pp_state':(Format.formatter -> state -> unit) ->

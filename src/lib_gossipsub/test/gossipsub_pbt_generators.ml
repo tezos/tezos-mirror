@@ -113,6 +113,8 @@ struct
     | Unsubscribe unsubscribe ->
         fprintf fmtr "Unsubscribe %a" GS.pp_unsubscribe unsubscribe
 
+  let pp_output fmtr (O o) = GS.pp_output fmtr o
+
   let pp_trace ?pp_state ?pp_state' ?pp_output () fmtr trace =
     let open Format in
     let pp fmtr (Transition {time; input; state; state'; output}) =
