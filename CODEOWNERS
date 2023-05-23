@@ -79,6 +79,7 @@
 # @lrand = Lucas Randazzo
 # @lthms = Thomas Letan
 # @mbouaziz = Mehdi Bouaziz
+# @MBourgoin = Mathias Bourgoin
 # @mebsout = Alain Mebsout
 # @murbard = Arthur B.
 # @naih = Nicolas Ayache
@@ -97,9 +98,10 @@
 # @vbotbol = vbot
 # @vch9 = Valentin Chaboche
 # @vect0r = Victor Allombert
+# @victor-dumitrescu = Victor Dumitrescu
 # @yrg = Yann Regis-Gianas
 #
-* @ACoquereau @alocascio @andrea.cerone @arvidnl @bsall @camlspotter @dianegalloiswong @emturner @eugenz @hhugo1 @igarnier @iguerNL @jobjo @julien.t @Killian-Delarue @klakplok @linoscope @lrand @lthms @mbouaziz @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @picdc @pirbo @rafoo_ @raphael-proust @romain.nl @Saroupille @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @yrg
+* @ACoquereau @alocascio @andrea.cerone @arvidnl @bsall @camlspotter @dianegalloiswong @emturner @eugenz @hhugo1 @igarnier @iguerNL @jobjo @julien.t @Killian-Delarue @klakplok @linoscope @lrand @lthms @mbouaziz @MBourgoin @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @picdc @pirbo @rafoo_ @raphael-proust @romain.nl @Saroupille @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @victor-dumitrescu @yrg
 
 # CODEOWNERS Owners
 #
