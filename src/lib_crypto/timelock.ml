@@ -30,10 +30,10 @@ let blake : ?key:string -> string -> bytes =
   let module Blake2b = Hacl_star.Hacl.Blake2b_32 in
   Blake2b.hash ?key (Bytes.of_string s) 32
 
-let add_path r n = r ^ "/" ^ n
+let ( / ) r n = r ^ "/" ^ n
 
 let read_enc filepath filename enc =
-  let inc = open_in (add_path filepath filename) in
+  let inc = open_in (filepath / filename) in
   let file_size = In_channel.length inc |> Int64.to_int in
   let data = Stdlib.really_input_string inc file_size in
   close_in inc ;
@@ -42,7 +42,7 @@ let read_enc filepath filename enc =
   | Error _ -> raise (Invalid_argument "Could not read file")
 
 let write_enc filepath filename enc data =
-  let outc = open_out (add_path filepath filename) in
+  let outc = open_out (filepath / filename) in
   Printf.fprintf outc "%s" Data_encoding.Json.(construct enc data |> to_string) ;
   close_out outc
 
@@ -269,7 +269,7 @@ let precompute_timelock ?(locked_value = None) ?(precompute_path = None) ~time
       let brsa = Z.to_bits rsa2048 in
       let file_prefix = blake brsa |> Hex.of_bytes |> Hex.show in
       let filename = file_prefix ^ "_" ^ string_of_int time ^ ".json" in
-      let file_exists = Sys.file_exists (add_path filepath filename) in
+      let file_exists = Sys.file_exists (filepath / filename) in
       if file_exists then read_enc filepath filename vdf_tuple_encoding
       else
         let precomputed = compute_tuple () in
