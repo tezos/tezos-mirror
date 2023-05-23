@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** PlonK circuit generating backend for Plompiler. *)
+
 include Lang_core
 module Tables = Csir.Tables
 open Solver
@@ -38,6 +40,8 @@ let wql, wqr, wqo = (0, 1, 2)
 
 type scalar = X of S.t
 
+(* Wire representation.
+   Each atom is represented by an index in the trace. *)
 type _ repr =
   | Unit : unit repr
   | Scalar : int -> scalar repr
@@ -60,30 +64,33 @@ let compare_trace_kind x y =
 
 module Scalar_map = Map.Make (S)
 
+(* State of the interpreter. *)
 type state = {
   nvars : int;
+  (* Number of variables in the circuit. *)
   cs : CS.t;
+  (* Constraint system. *)
   inputs : S.t array;
+  (* Inputs declared for the circuit. *)
   input_com_sizes : int list;
-  pi_size : int;
+  (* Sizes for input commitments. *)
+  pi_size : int; (* Size of public inputs. *)
+  input_flag : trace_kind;
   (* Flag indicating the type of inputs we are expecting. Inputs must
      come in order: (i) InputCom; (ii) Public; (iii) Private;
      (iv) NoInput (corresponding to intermediary variables).
      If we receive an input with earlier precedence than [input_flag], an
      error should be raised. *)
-  input_flag : trace_kind;
-  (*
-    Boolean wires to be checked.
-    If at the end of the circuit ([get_cs]) this is not empty, their
-    conjunction will be asserted.
-  *)
   check_wires : bool repr list;
-  (* Delayed computation, used to dump the implicit checks at the end.
-     This is necessary because some implicit checks on the inputs might
-     create intermediary variables, which would set to false the [input_flag]
-     before some inputs are processed.
-  *)
+  (* Boolean wires to be checked.
+     If at the end of the circuit ([get_cs]) this is not empty, their
+     conjunction will be asserted. *)
   delayed : state -> state * unit repr;
+      (* Delayed computation, used to dump the implicit checks at the end.
+         This is necessary because some implicit checks on the inputs might
+         create intermediary variables, which would set to false the [input_flag]
+         before some inputs are processed.
+      *)
   tables : string list;
   solver : Solver.t;
   range_checks : Range_checks.t;
@@ -96,6 +103,7 @@ type state = {
   cache : scalar repr Scalar_map.t;
 }
 
+(* A Plompiler program is just a state monad. *)
 type 'a t = state -> state * 'a
 
 let ret : 'a -> 'a t = fun x s -> (s, x)
@@ -107,6 +115,7 @@ let ( let* ) : 'a t -> ('a -> 'b t) -> 'b t =
 
 let unscalar (Scalar s) = s
 
+(* Monadic bind that unwraps a scalar repr. *)
 let ( let*& ) : scalar repr t -> (int -> 'b repr t) -> 'b repr t =
  fun m f ->
   let* m in
@@ -162,10 +171,12 @@ let with_bool_check : bool repr t -> unit repr t =
   ({s with check_wires = b :: s.check_wires}, Unit)
 
 module Input = struct
+  (* Checks to be performed on an input *)
   type 'a implicit_check = 'a repr -> unit repr t
 
   let default_check : 'a implicit_check = fun _ -> ret Unit
 
+  (* Structured inputs *)
   type 'a t' =
     | U : unit t'
     | S : scalar -> scalar t'
@@ -216,6 +227,8 @@ module Input = struct
 
   let to_list (L l, _) = List.map (fun i -> (i, default_check)) l
 
+  (* Traverse the input structure, replacing the scalars
+     with increasing indices starting from [start]. *)
   let rec make_repr : type a. a t' -> int -> a repr * int =
    fun input start ->
     match input with
@@ -238,6 +251,8 @@ module Input = struct
         (List (List.rev l), e)
 end
 
+(* Dummy inputs, useful for computing a circuit before knowning
+   the actual inputs. *)
 module Dummy = struct
   let scalar = Input.(S (X S.zero))
 
@@ -257,6 +272,8 @@ let rec encode : type a. a Input.t' -> S.t list =
 
 let serialize i = Array.of_list @@ encode i
 
+(* Physical equality: the reprs have the same structure
+   and use the same wires. *)
 let rec eq : type a. a repr -> a repr -> bool =
  fun a b ->
   match (a, b) with
@@ -301,6 +318,7 @@ let default_solver ?(to_solve = W 2) g =
       to_solve;
     }
 
+(* Add a gate to the constraint system *)
 let append : CS.gate -> ?solver:Solver.solver_desc -> unit repr t =
  fun gate ?solver s ->
   let solver =
@@ -315,6 +333,7 @@ let append : CS.gate -> ?solver:Solver.solver_desc -> unit repr t =
   let solver = Solver.append_solver solver s.solver in
   ({s with cs; solver}, Unit)
 
+(* Add a lookup to the CS *)
 let append_lookup :
     wires:int tagged list -> table:string -> string -> unit repr t =
  fun ~wires ~table label s ->
@@ -1739,11 +1758,14 @@ module Anemoi = struct
        append gate ~solver >* ret @@ pair (Scalar x2) (Scalar y2)
 end
 
+(* Forces the delayed checks, and computes the conjunction of
+   check wires. *)
 let get_checks_wire s =
   let s, Unit = s.delayed s in
   let s, w = Bool.band_list s.check_wires s in
   ({s with check_wires = []; delayed = ret Unit}, w)
 
+(* Run the monad *)
 let get f =
   let s, res =
     f

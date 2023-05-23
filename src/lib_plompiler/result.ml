@@ -23,6 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** "Pure value" backend for Plompiler.
+    It actually implements a simple state monad to keep track
+    of implicit checks.
+*)
+
 include Lang_core
 
 type scalar = X of S.t
@@ -126,6 +131,8 @@ let rec encode : type a. a Input.t' -> S.t list =
 
 let serialize i = Array.of_list @@ encode (fst i)
 
+(* Note: this doesn't match [Circuit]'s concept of physical equality,
+   as we don't have wires here. *)
 let rec eq : type a. a repr -> a repr -> bool =
  fun a b ->
   match (a, b) with
