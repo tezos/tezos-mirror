@@ -157,7 +157,8 @@ let with_legacy_dac_node ?name ?sc_rollup_node ?(pvm_name = "arith")
   f dac_node committee_members
 
 let with_coordinator_node ?name ?sc_rollup_node ?(pvm_name = "arith")
-    ?(wait_ready = true) ~committee_members tezos_node tezos_client f =
+    ?(wait_ready = true) ?(allow_v1_api = false) ~committee_members tezos_node
+    tezos_client f =
   let reveal_data_dir =
     Option.map
       (fun sc_rollup_node ->
@@ -170,6 +171,7 @@ let with_coordinator_node ?name ?sc_rollup_node ?(pvm_name = "arith")
       ~node:tezos_node
       ~client:tezos_client
       ?reveal_data_dir
+      ~allow_v1_api
       ~committee_members:
         (List.map
            (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key)
@@ -181,8 +183,8 @@ let with_coordinator_node ?name ?sc_rollup_node ?(pvm_name = "arith")
   f dac_node committee_members
 
 let with_committee_member ?name ?sc_rollup_node ?(pvm_name = "arith")
-    ?(wait_ready = true) ~committee_member tezos_node coordinator_node
-    tezos_client f =
+    ?(wait_ready = true) ?(allow_v1_api = false) ~committee_member tezos_node
+    coordinator_node tezos_client f =
   let reveal_data_dir =
     Option.map
       (fun sc_rollup_node ->
@@ -198,6 +200,7 @@ let with_committee_member ?name ?sc_rollup_node ?(pvm_name = "arith")
       ?reveal_data_dir
       ~coordinator_rpc_host:(Dac_node.rpc_host coordinator_node)
       ~coordinator_rpc_port:(Dac_node.rpc_port coordinator_node)
+      ~allow_v1_api
       ~address:public_key_hash
       ()
   in
@@ -206,8 +209,8 @@ let with_committee_member ?name ?sc_rollup_node ?(pvm_name = "arith")
   f dac_node committee_member
 
 let with_observer ?name ?sc_rollup_node ?(pvm_name = "arith")
-    ?(wait_ready = true) ~committee_member_rpcs tezos_node coordinator_node
-    tezos_client f =
+    ?(wait_ready = true) ?(allow_v1_api = false) ~committee_member_rpcs
+    tezos_node coordinator_node tezos_client f =
   let reveal_data_dir =
     Option.map
       (fun sc_rollup_node ->
@@ -222,6 +225,7 @@ let with_observer ?name ?sc_rollup_node ?(pvm_name = "arith")
       ?reveal_data_dir
       ~coordinator_rpc_host:(Dac_node.rpc_host coordinator_node)
       ~coordinator_rpc_port:(Dac_node.rpc_port coordinator_node)
+      ~allow_v1_api
       ~committee_member_rpcs
       ()
   in
@@ -257,8 +261,9 @@ let with_fresh_rollup ?(pvm_name = "arith") ~protocol tezos_node tezos_client
 
 let scenario_with_full_dac_infrastructure ?(tags = ["dac"; "full"])
     ?(pvm_name = "arith") ?(custom_committee_members = []) ?commitment_period
-    ?challenge_window ?event_sections_levels ?node_arguments ~__FILE__
-    ~committee_size ~observers variant scenario =
+    ?challenge_window ?event_sections_levels ?node_arguments
+    ?(allow_v1_api = false) ~__FILE__ ~committee_size ~observers variant
+    scenario =
   let description = "Testing Full DAC infrastructure" in
   test
     ~__FILE__
@@ -307,6 +312,7 @@ let scenario_with_full_dac_infrastructure ?(tags = ["dac"; "full"])
         ~name:"coordinator"
         ~pvm_name
         ~committee_members
+        ~allow_v1_api
       @@ fun coordinator_node committee_members ->
       let committee_members_nodes =
         List.mapi
@@ -318,6 +324,7 @@ let scenario_with_full_dac_infrastructure ?(tags = ["dac"; "full"])
               ~coordinator_rpc_host:(Dac_node.rpc_host coordinator_node)
               ~coordinator_rpc_port:(Dac_node.rpc_port coordinator_node)
               ~address:aggregate_public_key_hash
+              ~allow_v1_api
               ())
           committee_members
       in
@@ -354,6 +361,7 @@ let scenario_with_full_dac_infrastructure ?(tags = ["dac"; "full"])
                    ~coordinator_rpc_host:(Dac_node.rpc_host coordinator_node)
                    ~coordinator_rpc_port:(Dac_node.rpc_port coordinator_node)
                    ~committee_member_rpcs
+                   ~allow_v1_api
                    ()
                in
                (rollup_node_i, dac_node_i))
