@@ -256,6 +256,9 @@ module Functions (S : FOREIGN) = struct
       foreign
         "wasm_extern_as_memory"
         (ptr Types.Extern.t @-> returning (ptr Types.Memory.t))
+
+    let delete =
+      foreign "wasm_extern_delete" (ptr Types.Extern.t @-> returning void)
   end
 
   (** Functions with the [wasm_extern_vec_] prefix *)
@@ -278,6 +281,9 @@ module Functions (S : FOREIGN) = struct
       foreign
         "wasm_functype_results"
         (ptr Types.Functype.t @-> returning (ptr Types.Valtype.Vec.t))
+
+    let delete =
+      foreign "wasm_functype_delete" (ptr Types.Functype.t @-> returning void)
   end
 
   (** Functions with the [wasm_func_] prefix *)
@@ -416,6 +422,11 @@ module Functions (S : FOREIGN) = struct
       foreign
         "wasm_exporttype_type"
         (ptr Types.Exporttype.t @-> returning (ptr Types.Externtype.t))
+
+    let delete =
+      foreign
+        "wasm_exporttype_delete"
+        (ptr Types.Exporttype.t @-> returning void)
   end
 
   (** Functions with the [wasm_exporttype_vec_] prefix *)

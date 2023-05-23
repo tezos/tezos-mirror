@@ -95,6 +95,8 @@ let compute ~version ~reveal_builtins ~write_debug durable buffers =
     Lwt.finalize kernel_run (fun () ->
         (* Make sure that the instance is deleted regardless of whether
            [kernel_run] succeeds or not. *)
+        main_mem := None ;
+        Wasmer.Exports.delete exports ;
         Wasmer.Instance.delete instance ;
         Lwt.return_unit)
   in

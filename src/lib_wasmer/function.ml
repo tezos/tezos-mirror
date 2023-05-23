@@ -96,7 +96,11 @@ let create : type f. Store.t -> f Function_type.t -> f -> owned * (unit -> unit)
   let try_run =
     Ctypes.coerce Func_callback_maker.t Types.Func_callback.t try_run
   in
-  (Functions.Func.new_ store func_type try_run, free)
+  let owned = Functions.Func.new_ store func_type try_run in
+  (* [wasm_func_new] doesn't consume [func_type], therefore we must manually
+     garbage collect it. *)
+  Functions.Functype.delete func_type ;
+  (owned, free)
 
 let call_raw func inputs =
   let open Lwt.Syntax in
@@ -160,6 +164,9 @@ let unpack_outputs results outputs =
   go results 0 Fun.id
 
 let call func typ =
-  Function_type.check_types typ (Functions.Func.type_ func) ;
+  let func_type = Functions.Func.type_ func in
+  Function_type.check_types typ func_type ;
+  (* Once the types have been checked, [func_type] can be deleted. *)
+  Functions.Functype.delete func_type ;
   let (Function_type.Function (params, results)) = typ in
   pack_inputs params func (unpack_outputs results)

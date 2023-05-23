@@ -67,9 +67,8 @@ let resolve_imports store modul resolver =
     | None -> raise (Unsatisfied_import {module_; name; kind})
     | Some m -> Extern.to_extern store m
   in
-  let imports =
-    Module.imports modul |> Import_type_vector.to_array |> Array.map lookup
-  in
+  let imports_vec = Module.imports modul in
+  let imports = Import_type_vector.to_array imports_vec |> Array.map lookup in
   let externs = Extern_vector.from_array (Array.map fst imports) in
   let clean =
     Array.fold_left
@@ -81,6 +80,9 @@ let resolve_imports store modul resolver =
       Fun.id
       imports
   in
+  (* There are no references to the imports vector after this, so we can
+     delete it. *)
+  Functions.Importtype_vec.delete (Ctypes.addr imports_vec) ;
   (externs, clean)
 
 let create store module_ externs =

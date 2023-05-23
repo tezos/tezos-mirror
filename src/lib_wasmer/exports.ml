@@ -44,20 +44,27 @@ type t =
   Types.Extern.t Ctypes.ptr Resolver.t
 
 let from_instance inst =
-  let exports =
-    Module.exports inst.Instance.module_ |> Export_type_vector.to_list
+  let exports_vec = Module.exports inst.Instance.module_ in
+  let exports = Export_type_vector.to_list exports_vec in
+  let externs_vec = Extern_vector.empty () in
+  Functions.Instance.exports inst.instance (Ctypes.addr externs_vec) ;
+  let externs = Extern_vector.to_list externs_vec in
+  let resolved =
+    List.fold_right2
+      (fun export extern tail ->
+        let name = Export_type.name export in
+        let kind = Export_type.type_ export |> Functions.Externtype.kind in
+        Resolver.add (name, kind) extern tail)
+      exports
+      externs
+      Resolver.empty
   in
-  let externs = Extern_vector.empty () in
-  Functions.Instance.exports inst.instance (Ctypes.addr externs) ;
-  let externs = Extern_vector.to_list externs in
-  List.fold_right2
-    (fun export extern tail ->
-      let name = Export_type.name export in
-      let kind = Export_type.type_ export |> Functions.Externtype.kind in
-      Resolver.add (name, kind) extern tail)
-    exports
-    externs
-    Resolver.empty
+  (* The exports vector is consumed in read-only or copying fashion, therefore
+     there are no references to it at this point. We can clean it up. *)
+  Functions.Exporttype_vec.delete (Ctypes.addr exports_vec) ;
+  resolved
+
+let delete = Resolver.iter (fun _ extern -> Functions.Extern.delete extern)
 
 exception Export_not_found of {name : string; kind : Unsigned.uint8}
 
@@ -104,6 +111,8 @@ let mem_of_extern extern =
       (Functions.Memory.data mem)
       (Functions.Memory.data_size mem |> Unsigned.Size_t.to_int)
   in
+  (* The memory type is no longer used after this, so we must delete it. *)
+  Functions.Memory_type.delete mem_type ;
   Memory.{raw; min; max}
 
 let mem exports name =
