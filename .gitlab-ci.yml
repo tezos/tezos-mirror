@@ -79,9 +79,6 @@ variables:
   # https://gitlab.com/tezos/docker-images/ci-docker
   image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.6.0"
 
-.image_template__alpine:
-  image: alpine:3.15
-
 # The "manual" stage exists to fix a UI problem that occurs when mixing
 # manual and non-manual jobs.
 stages:
