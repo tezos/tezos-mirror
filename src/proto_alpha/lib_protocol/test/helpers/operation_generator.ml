@@ -70,7 +70,6 @@ let manager_kinds =
     `KTransaction;
     `KOrigination;
     `KDelegation;
-    `KSet_deposits_limit;
     `KIncrease_paid_storage;
     `KRegister_global_constant;
     `KTransfer_ticket;
@@ -502,11 +501,6 @@ let generate_increase_paid_storage =
   let+ destination = random_contract_hash in
   Increase_paid_storage {amount_in_bytes; destination}
 
-let generate_set_deposits_limit =
-  let open QCheck2.Gen in
-  let+ amount_opt = option gen_amount in
-  Set_deposits_limit amount_opt
-
 let generate_register_global_constant =
   let value = Script_repr.lazy_expr (Expr.from_string "Pair 1 2") in
   QCheck2.Gen.pure (Register_global_constant {value})
@@ -605,8 +599,6 @@ let generator_of ?source = function
   | `KReveal -> generate_manager_operation ?source generate_reveal
   | `KTransaction -> generate_manager_operation ?source generate_transaction
   | `KOrigination -> generate_manager_operation ?source generate_origination
-  | `KSet_deposits_limit ->
-      generate_manager_operation ?source generate_set_deposits_limit
   | `KIncrease_paid_storage ->
       generate_manager_operation ?source generate_increase_paid_storage
   | `KDelegation -> generate_manager_operation ?source generate_delegation

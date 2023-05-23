@@ -174,17 +174,6 @@ val delegation :
   public_key_hash option ->
   Operation.packed tzresult Lwt.t
 
-val set_deposits_limit :
-  ?force_reveal:bool ->
-  ?fee:Tez.tez ->
-  ?gas_limit:gas_limit ->
-  ?storage_limit:Z.t ->
-  ?counter:Manager_counter.t ->
-  Context.t ->
-  Contract.t ->
-  Tez.tez option ->
-  Operation.packed tzresult Lwt.t
-
 val increase_paid_storage :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
