@@ -34,6 +34,7 @@ let test_set_deposits_limit =
     ~__FILE__
     ~title:"set deposits limit"
     ~tags:["deposits_limit"]
+    ~supports:Protocol.(Until_protocol (number Nairobi))
   @@ fun protocol ->
   let* _, client = Client.init_with_protocol ~protocol `Client () in
   let src = Constant.bootstrap1.alias in
@@ -46,6 +47,7 @@ let test_unset_deposits_limit =
     ~__FILE__
     ~title:"unset deposits limit"
     ~tags:["deposits_limit"]
+    ~supports:Protocol.(Until_protocol (number Nairobi))
   @@ fun protocol ->
   let* _, client = Client.init_with_protocol ~protocol `Client () in
   let src = Constant.bootstrap1.alias in
