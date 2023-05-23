@@ -89,7 +89,7 @@ type pos128full_desc = {
   x2 : int;
   y2 : int;
   k : S.t array;
-  variant : Variants.t;
+  matrix : matrix;
 }
 
 type pos128partial_desc = {
@@ -106,7 +106,7 @@ type pos128partial_desc = {
   x2 : int;
   y2 : int;
   k_cols : matrix array;
-  variant : Variants.t;
+  matrix : matrix;
 }
 
 type anemoi_desc = {

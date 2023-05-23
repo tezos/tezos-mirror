@@ -343,7 +343,7 @@ end
 module Poseidon = struct
   module VS = Linear_algebra.Make_VectorSpace (S)
 
-  let poseidon128_full_round ~matrix ~k ~variant:_ (x0, x1, x2) =
+  let poseidon128_full_round ~matrix ~k (x0, x1, x2) =
     let pow5 x = S.pow (of_s x) (Z.of_int 5) in
     let x_vec = [|Array.map pow5 [|x0; x1; x2|]|] |> VS.transpose in
     let y_vec = VS.mul matrix x_vec in
@@ -352,7 +352,7 @@ module Poseidon = struct
     let y2 = S.add k.(2) @@ y_vec.(2).(0) in
     ret @@ to_list [S (X y0); S (X y1); S (X y2)]
 
-  let poseidon128_four_partial_rounds ~matrix ~ks ~variant:_ (x0, x1, x2) =
+  let poseidon128_four_partial_rounds ~matrix ~ks (x0, x1, x2) =
     let k0 = VS.filter_cols (Int.equal 0) ks in
     let k1 = VS.filter_cols (Int.equal 1) ks in
     let k2 = VS.filter_cols (Int.equal 2) ks in

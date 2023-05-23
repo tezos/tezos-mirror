@@ -166,8 +166,6 @@ module type COMMON = sig
 
   val input : ?kind:input_kind -> 'a Input.t -> 'a repr t
 
-  val new_input_com : unit repr t
-
   val begin_input_com : 'b -> 'b open_input_com
 
   val ( |: ) : ('c repr -> 'd) open_input_com -> 'c Input.t -> 'd open_input_com
@@ -240,14 +238,12 @@ module type COMMON = sig
     val poseidon128_full_round :
       matrix:S.t array array ->
       k:S.t array ->
-      variant:Variants.t ->
       scalar repr * scalar repr * scalar repr ->
       scalar list repr t
 
     val poseidon128_four_partial_rounds :
       matrix:S.t array array ->
       ks:S.t array array ->
-      variant:Variants.t ->
       scalar repr * scalar repr * scalar repr ->
       scalar list repr t
   end

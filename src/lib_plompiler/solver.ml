@@ -90,7 +90,7 @@ type pos128full_desc = {
   x2 : int;
   y2 : int;
   k : VS.t array;
-  variant : Variants.t;
+  matrix : VS.matrix;
 }
 
 type swap_desc = {b : int; x : int; y : int; u : int; v : int} [@@deriving repr]
@@ -99,8 +99,8 @@ type swap_desc = {b : int; x : int; y : int; u : int; v : int} [@@deriving repr]
    S.t but for some reason Repr does not see this equality. *)
 let pos128full_desc_t =
   let open Repr in
-  record "pos128full_desc" (fun x0 y0 x1 y1 x2 y2 k variant ->
-      {x0; y0; x1; y1; x2; y2; k; variant})
+  record "pos128full_desc" (fun x0 y0 x1 y1 x2 y2 k matrix ->
+      {x0; y0; x1; y1; x2; y2; k; matrix})
   |+ field "x0" int (fun t -> t.x0)
   |+ field "y0" int (fun t -> t.y0)
   |+ field "x1" int (fun t -> t.x1)
@@ -108,7 +108,7 @@ let pos128full_desc_t =
   |+ field "x2" int (fun t -> t.x2)
   |+ field "y2" int (fun t -> t.y2)
   |+ field "k" (array S.t) (fun t -> t.k)
-  |+ field "variant" Variants.t (fun t -> t.variant)
+  |+ field "matrix" (array (array S.t)) (fun t -> t.matrix)
   |> sealr
 
 type pos128partial_desc = {
@@ -126,15 +126,15 @@ type pos128partial_desc = {
   y2 : int;
   (* Can we share these? *)
   k_cols : VS.matrix array;
-  variant : Variants.t;
+  matrix : VS.matrix;
 }
 
 let pos128partial_desc_t =
   let open Repr in
   record
     "pos128partial_desc"
-    (fun a b c a_5 b_5 c_5 x0 y0 x1 y1 x2 y2 k_cols variant ->
-      {a; b; c; a_5; b_5; c_5; x0; y0; x1; y1; x2; y2; k_cols; variant})
+    (fun a b c a_5 b_5 c_5 x0 y0 x1 y1 x2 y2 k_cols matrix ->
+      {a; b; c; a_5; b_5; c_5; x0; y0; x1; y1; x2; y2; k_cols; matrix})
   |+ field "a" int (fun t -> t.a)
   |+ field "b" int (fun t -> t.b)
   |+ field "c" int (fun t -> t.c)
@@ -148,7 +148,7 @@ let pos128partial_desc_t =
   |+ field "x2" int (fun t -> t.x2)
   |+ field "y2" int (fun t -> t.y2)
   |+ field "k_cols" (array (array (array S.t))) (fun t -> t.k_cols)
-  |+ field "variant" Variants.t (fun t -> t.variant)
+  |+ field "matrix" (array (array S.t)) (fun t -> t.matrix)
   |> sealr
 
 type anemoi_desc = {
@@ -328,11 +328,7 @@ let solve_one trace solver =
       let x_res, y_res = if S.is_zero b then (x, y) else (y, x) in
       trace.(u) <- x_res ;
       trace.(v) <- y_res
-  | Poseidon128Full {x0; y0; x1; y1; x2; y2; k; variant} ->
-      let matrix =
-        Array.map (Array.map S.of_string)
-        @@ if variant = PFull128 then Mds_full.v else Mds_128.v
-      in
+  | Poseidon128Full {x0; y0; x1; y1; x2; y2; k; matrix} ->
       let pow5 x = S.pow trace.(x) (Z.of_int 5) in
       let x_vec = [|Array.map pow5 [|x0; x1; x2|]|] |> VS.transpose in
       let y_vec = VS.mul matrix x_vec in
@@ -340,11 +336,7 @@ let solve_one trace solver =
         (fun i yi -> trace.(yi) <- S.add k.(i) @@ y_vec.(i).(0))
         [y0; y1; y2]
   | Poseidon128Partial
-      {a; b; c; a_5; b_5; c_5; x0; y0; x1; y1; x2; y2; k_cols; variant} ->
-      let matrix =
-        Array.map (Array.map S.of_string)
-        @@ if variant = PFull128 then Mds_full.v else Mds_128.v
-      in
+      {a; b; c; a_5; b_5; c_5; x0; y0; x1; y1; x2; y2; k_cols; matrix} ->
       let pow5 x = S.pow x (Z.of_int 5) in
       let ppow5 v = [|v.(0); v.(1); [|pow5 v.(2).(0)|]|] in
       let x_vec = [|[|trace.(x0)|]; [|trace.(x1)|]; [|trace.(x2)|]|] in
