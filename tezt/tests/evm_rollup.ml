@@ -408,14 +408,27 @@ let test_l2_deploy =
       ~abi:(kernel_inputs_path ^ "/storage_abi.json")
       ()
   in
+  let contract_compiled_file = kernel_inputs_path ^ "/storage.bin" in
   let send_deploy =
     Eth_cli.deploy
       ~source_private_key:sender.private_key
       ~endpoint:evm_proxy_server_endpoint
       ~abi:"simpleStorage"
-      ~bin:(kernel_inputs_path ^ "/storage.bin")
+      ~bin:contract_compiled_file
   in
-  let* _ = wait_for_application ~sc_rollup_node ~node ~client send_deploy () in
+  let* contract_address =
+    wait_for_application ~sc_rollup_node ~node ~client send_deploy ()
+  in
+  let* code_in_kernel =
+    Evm_proxy_server.fetch_contract_code evm_proxy_server contract_address
+  in
+  (* The same deployment has been reproduced on the Sepolia testnet, resulting
+     on this specific code. *)
+  let expected_code =
+    "0x608060405234801561001057600080fd5b50600436106100415760003560e01c80634e70b1dc1461004657806360fe47b1146100645780636d4ce63c14610080575b600080fd5b61004e61009e565b60405161005b91906100d0565b60405180910390f35b61007e6004803603810190610079919061011c565b6100a4565b005b6100886100ae565b60405161009591906100d0565b60405180910390f35b60005481565b8060008190555050565b60008054905090565b6000819050919050565b6100ca816100b7565b82525050565b60006020820190506100e560008301846100c1565b92915050565b600080fd5b6100f9816100b7565b811461010457600080fd5b50565b600081359050610116816100f0565b92915050565b600060208284031215610132576101316100eb565b5b600061014084828501610107565b9150509291505056fea2646970667358221220ec57e49a647342208a1f5c9b1f2049bf1a27f02e19940819f38929bf67670a5964736f6c63430008120033"
+  in
+  Check.((code_in_kernel = expected_code) string)
+    ~error_msg:"Unexpected code %L, it should be %R" ;
   unit
 
 let transfer ?data protocol =

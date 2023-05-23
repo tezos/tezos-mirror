@@ -50,7 +50,8 @@ val add_abi : label:string -> abi:string -> unit -> unit Lwt.t
     transaction deploying [bin] whose interface [abi] is registered in the
     client, and sends the raw transaction to the JSON-API server listening at
     [endpoint]. [bin] is a path to the binary file, and [abi] is the label used
-    while registering the ABI in the client. *)
+    while registering the ABI in the client. Returns the deployed contract
+    address. *)
 val deploy :
   source_private_key:string ->
   endpoint:string ->

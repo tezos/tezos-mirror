@@ -161,3 +161,14 @@ let call_evm_rpc proxy_server request =
 let batch_evm_rpc proxy_server requests =
   let endpoint = endpoint proxy_server in
   RPC.Curl.post endpoint (batch_requests requests) |> Runnable.run
+
+let fetch_contract_code evm_proxy_server contract_address =
+  let* code =
+    call_evm_rpc
+      evm_proxy_server
+      {
+        method_ = "eth_getCode";
+        parameters = `A [`String contract_address; `String "latest"];
+      }
+  in
+  return JSON.(code |-> "result" |> as_string)
