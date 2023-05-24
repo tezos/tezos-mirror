@@ -249,9 +249,7 @@ end
 module Make_s
     (Filter : Shell_plugin.FILTER)
     (Prevalidation_t : Prevalidation.T
-                         with type validation_state =
-                           Filter.Proto.validation_state
-                          and type protocol_operation = Filter.Proto.operation) :
+                         with type protocol_operation = Filter.Proto.operation) :
   S
     with type config = Prevalidation_t.config
      and type protocol_operation = Filter.Proto.operation
@@ -859,9 +857,7 @@ module Make
     (Filter : Shell_plugin.FILTER)
     (Arg : ARG)
     (Prevalidation_t : Prevalidation.T
-                         with type validation_state =
-                           Filter.Proto.validation_state
-                          and type protocol_operation = Filter.Proto.operation
+                         with type protocol_operation = Filter.Proto.operation
                           and type chain_store = Store.chain_store) : T = struct
   module S = Make_s (Filter) (Prevalidation_t)
   open S

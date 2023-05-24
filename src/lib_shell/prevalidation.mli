@@ -34,10 +34,6 @@ module type T = sig
       see {!Tezos_protocol_environment.PROTOCOL.operation} *)
   type protocol_operation
 
-  (** Similar to the same type in the protocol,
-      see {!Tezos_protocol_environment.PROTOCOL} *)
-  type validation_state
-
   (** Mempool configuration that groups both the plugin config
       (e.g. minimal fee to pass the {!pre_filter}) and the bounding
       config (e.g. max number of valid operations in the mempool). *)
@@ -158,7 +154,6 @@ end
 module Make : functor (Filter : Shell_plugin.FILTER) ->
   T
     with type protocol_operation = Filter.Proto.operation
-     and type validation_state = Filter.Proto.validation_state
      and type chain_store = Store.chain_store
 
 (**/**)
@@ -191,7 +186,6 @@ module Internal_for_tests : sig
     ->
     T
       with type protocol_operation = Filter.Proto.operation
-       and type validation_state = Filter.Proto.validation_state
        and type chain_store = Chain_store.chain_store
        and type Internal_for_tests.mempool = Filter.Proto.Mempool.t
        and type Internal_for_tests.bounding_state = Bounding.state

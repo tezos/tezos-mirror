@@ -41,8 +41,6 @@ end
 module type T = sig
   type protocol_operation
 
-  type validation_state
-
   type config
 
   val default_config : config
@@ -110,15 +108,12 @@ module MakeAbstract
                   with type protocol_operation = Filter.Proto.operation) :
   T
     with type protocol_operation = Filter.Proto.operation
-     and type validation_state = Filter.Proto.validation_state
      and type chain_store = Chain_store.chain_store
      and type Internal_for_tests.mempool = Filter.Proto.Mempool.t
      and type Internal_for_tests.bounding_state = Bounding.state = struct
   module Proto = Filter.Proto
 
   type protocol_operation = Proto.operation
-
-  type validation_state = Proto.validation_state
 
   type config = Filter.Mempool.config * Prevalidator_bounding.config
 
@@ -388,7 +383,6 @@ end
 module Make (Filter : Shell_plugin.FILTER) :
   T
     with type protocol_operation = Filter.Proto.operation
-     and type validation_state = Filter.Proto.validation_state
      and type chain_store = Store.chain_store =
   MakeAbstract (Production_chain_store) (Filter)
     (Prevalidator_bounding.Make (Filter.Proto))
