@@ -33,6 +33,9 @@ type error +=
       expected : Dac_plugin.raw_hash;
       actual : Dac_plugin.raw_hash;
     }
+  | Cannot_fetch_remote_page_with_flooding_strategy of {
+      hash : Dac_plugin.raw_hash;
+    }
 
 let () =
   register_error_kind
@@ -112,7 +115,26 @@ let () =
     (function
       | Incorrect_page_hash {expected; actual} -> Some (expected, actual)
       | _ -> None)
-    (fun (expected, actual) -> Incorrect_page_hash {expected; actual})
+    (fun (expected, actual) -> Incorrect_page_hash {expected; actual}) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"remote_with_flooding_load_failed"
+    ~title:"Cannot load page content from remote store using flooding strategy"
+    ~description:
+      "Cannot load page content from remote store using flooding strategy."
+    ~pp:(fun ppf hash ->
+      Format.fprintf
+        ppf
+        "Cannot load page content from remote store using flooding strategy \
+         for hash %a."
+        Dac_plugin.pp_raw_hash
+        hash)
+    Data_encoding.(obj1 (req "hash" Dac_plugin.raw_hash_encoding))
+    (function
+      | Cannot_fetch_remote_page_with_flooding_strategy {hash} -> Some hash
+      | _ -> None)
+    (fun hash -> Cannot_fetch_remote_page_with_flooding_strategy {hash})
 
 let ensure_reveal_data_dir_exists reveal_data_dir =
   let open Lwt_result_syntax in
@@ -287,6 +309,66 @@ module Remote : S with type configuration = remote_configuration = struct
   type configuration = remote_configuration
 
   let init {cctxt; page_store} = Internal.init (cctxt, page_store)
+end
+
+type remote_with_flooding_configuration = {
+  timeout : float;
+  cctxts : Dac_node_client.cctxt list;
+  page_store : Filesystem.t;
+}
+
+module Remote_with_flooding :
+  S with type configuration = remote_with_flooding_configuration = struct
+  module F = Filesystem_with_integrity_check
+
+  module Internal :
+    S
+      with type configuration =
+        (float * Dac_node_client.cctxt list) * Filesystem.t
+       and type t = (float * Dac_node_client.cctxt list) * Filesystem.t =
+    With_remote_fetch
+      (struct
+        type remote_context = float * Dac_node_client.cctxt list
+
+        (** TODO: https://gitlab.com/tezos/tezos/-/issues/5673
+            Optimize flooding.
+        *)
+        let fetch _dac_plugin (timeout, remote_cctxts) hash =
+          let open Lwt_result_syntax in
+          let page_hash = Dac_plugin.hash_to_raw hash in
+          let fetch_page cctxt =
+            Lwt_unix.with_timeout timeout (fun () ->
+                Dac_node_client.V0.get_preimage cctxt ~page_hash)
+          in
+          let*! results =
+            List.filter_map_p
+              (fun committee_member_cctxt ->
+                Lwt.catch
+                  (fun () ->
+                    let*! page_data = fetch_page committee_member_cctxt in
+                    match page_data with
+                    | Ok page_data -> Lwt.return (Some page_data)
+                    | Error _ -> Lwt.return_none)
+                  (fun _ -> Lwt.return_none))
+              remote_cctxts
+          in
+          match List.hd results with
+          | Some a -> return a
+          | None ->
+              tzfail
+                (Cannot_fetch_remote_page_with_flooding_strategy
+                   {hash = Dac_plugin.hash_to_raw hash})
+      end)
+      (F)
+
+  include Internal
+
+  type t = Internal.t
+
+  type configuration = remote_with_flooding_configuration
+
+  let init {timeout; cctxts; page_store} =
+    Internal.init ((timeout, cctxts), page_store)
 end
 
 module Internal_for_tests = struct

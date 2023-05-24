@@ -281,6 +281,14 @@ let cannot_retrieve_keys_from_address =
     ~level:Notice
     ("address", Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
 
+let fetched_missing_page =
+  declare_1
+    ~section
+    ~name:"missing_page_fetched"
+    ~msg:"Successfully fetched missing page for hash: {hash}"
+    ~level:Notice
+    ("hash", Data_encoding.(string' Hex))
+
 let proto_short_hash_string hash =
   Format.asprintf "%a" Protocol_hash.pp_short hash
 
@@ -321,10 +329,6 @@ let emit_rpc_started = emit rpc_server_started
 let emit_cannot_retrieve_keys_from_address address =
   emit cannot_retrieve_keys_from_address address
 
-let fetched_missing_page =
-  declare_1
-    ~section
-    ~name:"missing_page_fetched"
-    ~msg:"Successfully fetched missing page for hash: {hash}"
-    ~level:Notice
-    ("hash", Dac_plugin.raw_hash_encoding)
+let emit_fetched_missing_page root_hash =
+  let (`Hex root_hash) = Dac_plugin.hash_to_hex root_hash in
+  emit fetched_missing_page root_hash

@@ -921,50 +921,6 @@ module Legacy = struct
     let* () = fetch_root_hash_promise in
     check_downloaded_preimage coordinator observer expected_rh
 
-  (* 1. Observer should fetch missing page from Coordinator when GET /missing_page/{hash}
-        is called.
-     2. As a side effect, Observer should save fetched page into its page store before
-        returning it in the response. This can be observed by checking the result of
-        retrieving preimage before and after the GET /missing_page/{hash} call.*)
-  let test_observer_get_missing_page _protocol node client coordinator threshold
-      _committee_members =
-    let root_hash =
-      "00649d431e829f4adc68edecb8d8d8071154b57086cc124b465f6f6600a4bc91c7"
-    in
-    let root_hash_stream_promise =
-      wait_for_root_hash_pushed_to_data_streamer coordinator root_hash
-    in
-    let* hex_root_hash =
-      init_hex_root_hash ~payload:"test payload abc 123" coordinator
-    in
-
-    assert (root_hash = Hex.show hex_root_hash) ;
-    let* () = root_hash_stream_promise in
-    let observer =
-      Dac_node.create_legacy ~threshold ~committee_members:[] ~node ~client ()
-    in
-    let* _ = Dac_node.init_config observer in
-    let () = set_coordinator observer coordinator in
-    let* () = Dac_node.run observer in
-    let* () =
-      assert_lwt_failure
-        ~__LOC__
-        "Expected retrieve_preimage"
-        (RPC.call observer (Dac_rpc.V0.get_preimage (Hex.show hex_root_hash)))
-    in
-    let* missing_page =
-      RPC.call observer (Dac_rpc.V0.get_missing_page ~hex_root_hash)
-    in
-    let* coordinator_page =
-      RPC.call coordinator (Dac_rpc.V0.get_preimage (Hex.show hex_root_hash))
-    in
-    check_preimage coordinator_page missing_page ;
-    let* observer_preimage =
-      RPC.call observer (Dac_rpc.V0.get_preimage (Hex.show hex_root_hash))
-    in
-    check_preimage coordinator_page observer_preimage ;
-    unit
-
   module Signature_manager = struct
     let test_non_committee_signer_should_fail tz_client
         (coordinator_node, hex_root_hash, _dac_committee) =
@@ -1656,7 +1612,158 @@ module Full_infrastructure = struct
           one previously output by the client. *)
     check_raw_certificate get_certificate last_certificate_update ;
     return ()
+
+  (* 1. Observer should fetch missing page from Committee Members when GET /missing_page/{hash}
+        is called.
+     2. As a side effect, Observer should save fetched page into its page store before
+        returning it in the response. This can be observed by checking the result of
+        retrieving preimage before and after the GET /missing_page/{hash} call.*)
+  let test_observer_get_missing_page scenario =
+    let Scenarios.{coordinator_node; committee_members_nodes; observer_nodes; _}
+        =
+      scenario
+    in
+    Check.(
+      (List.length observer_nodes = 1)
+        ~__LOC__
+        int
+        ~error_msg:"Expected number of Observers to be 1.") ;
+    let observer_node = List.hd observer_nodes in
+    let payload, expected_rh = sample_payload "preimage" in
+    (* Initialize Committee Member nodes and wait for each node to subscribe to Coordinator's
+       root hash stream. *)
+    let* _ =
+      Lwt_list.iter_s
+        (fun committee_member_node ->
+          let* _ = Dac_node.init_config committee_member_node in
+          let wait_subscribe =
+            wait_for_handle_new_subscription_to_hash_streamer coordinator_node
+          in
+          let* () = Dac_node.run ~wait_ready:true committee_member_node in
+          let* _ = wait_subscribe in
+          return ())
+        committee_members_nodes
+    in
+
+    let committee_members_processed_rh_promise =
+      List.map
+        (fun committee_member_node ->
+          wait_for_received_root_hash_processed
+            committee_member_node
+            expected_rh)
+        committee_members_nodes
+    in
+
+    (* Post payload with Observer offline so that Observer will not receive root hash. Wait
+       for root hash to finish processing by each committee member before continuing. *)
+    let* root_hash =
+      RPC.call coordinator_node (Dac_rpc.V0.Coordinator.post_preimage ~payload)
+    in
+    assert (root_hash = expected_rh) ;
+    let hex_root_hash = `Hex root_hash in
+    let* _ = Lwt.join committee_members_processed_rh_promise in
+
+    (* Initialize Observer node and wait for each node to subscribe to hash streamer. Assert
+       that each node starts cold (without preimage of root_hash in disk) ie. get_preimage of
+       Observer node should fail.
+    *)
+    let* _ =
+      let* _ = Dac_node.init_config observer_node in
+      let wait_subscribe =
+        wait_for_handle_new_subscription_to_hash_streamer coordinator_node
+      in
+      let* _ = Dac_node.run ~wait_ready:true observer_node in
+      let* _ = wait_subscribe in
+      assert_lwt_failure
+        ~__LOC__
+        "Expected get_preimage to fail."
+        (RPC.call
+           observer_node
+           (Dac_rpc.V0.get_preimage (Hex.show hex_root_hash)))
+    in
+
+    (* Get missing page then assert that the retrieved missing page from Observer is the
+       same as the get_preimage page from Coordinator. *)
+    let* missing_page =
+      RPC.call observer_node (Dac_rpc.V0.get_missing_page ~hex_root_hash)
+    in
+    let* coordinator_page =
+      RPC.call coordinator_node (Dac_rpc.V0.get_preimage root_hash)
+    in
+    check_preimage coordinator_page missing_page ;
+
+    (* Now, Observer get_preimage should pass. This means get_missing_page
+       saved the missing page on disk as a side effect.*)
+    let* observer_preimage =
+      RPC.call observer_node (Dac_rpc.V0.get_preimage (Hex.show hex_root_hash))
+    in
+    check_preimage coordinator_page observer_preimage ;
+    unit
 end
+
+let test_observer_times_out_when_page_cannot_be_fetched _protocol node client
+    _key =
+  with_coordinator_node ~name:"coordinator" ~committee_members:[] node client
+  @@ fun coordinator_node _ ->
+  (* Root hash that will never be found. *)
+  let missing_root_hash =
+    "00a3703854279d2f377d689163d1ec911a840d84b56c4c6f6cafdf0610394df7c6"
+  in
+  let sleeping_node_timeout = 20. in
+  (* Fake our commmitee member connection to point to the sleeping node. *)
+  Dac_node.with_sleeping_node ~timeout:sleeping_node_timeout @@ fun rpc ->
+  let committee_member_rpcs = [rpc] in
+  let observer_timeout = 4 in
+  let wait_connected_to_coordinator =
+    wait_for_handle_new_subscription_to_hash_streamer coordinator_node
+  in
+  let observer_node =
+    Dac_node.create_observer
+      ~name:"observer"
+      ~coordinator_rpc_port:(Dac_node.rpc_port coordinator_node)
+      ~coordinator_rpc_host:(Dac_node.rpc_host coordinator_node)
+      ~timeout:observer_timeout
+      ~committee_member_rpcs
+      ~node
+      ~client
+      ()
+  in
+  let* _dir = Dac_node.init_config observer_node in
+  let* () = Dac_node.run observer_node ~wait_ready:true in
+  let* () = wait_connected_to_coordinator in
+  (* Capture the time it takes for the endpoint to fail. It should fail after
+     [observer_timeout] seconds but before [sleeping_node_timeout] seconds *)
+  let start_time = ref 0. in
+  let end_time = ref 0. in
+  let* _ =
+    Lwt.catch
+      (fun () ->
+        start_time := Unix.gettimeofday () ;
+        Lwt.map
+          (fun _ -> ())
+          (RPC.call
+             observer_node
+             (Dac_rpc.V0.get_missing_page
+                ~hex_root_hash:(`Hex missing_root_hash))))
+      (fun _ ->
+        end_time := Unix.gettimeofday () ;
+        Lwt.return_unit)
+  in
+  let request_time = Float.sub !end_time !start_time in
+  let observer_timeout = Float.of_int observer_timeout in
+  let result =
+    request_time >= observer_timeout && request_time < sleeping_node_timeout
+  in
+  Check.(
+    (result = true)
+      bool
+      ~__LOC__
+      ~error_msg:
+        (Printf.sprintf
+           "Expected timeout after %f seconds but less than %f seconds."
+           observer_timeout
+           sleeping_node_timeout)) ;
+  unit
 
 (* Modified from tezt/tests/tx_sc_rollup.ml *)
 module Tx_kernel_e2e = struct
@@ -2740,13 +2847,19 @@ let register ~protocols =
     "dac_coordinator_post_preimage_endpoint"
     Full_infrastructure.test_coordinator_post_preimage_endpoint
     protocols ;
-  scenario_with_layer1_and_legacy_dac_nodes
+  scenario_with_full_dac_infrastructure
     ~__FILE__
-    ~threshold:0
-    ~committee_size:1
+    ~observers:1
+    ~committee_size:2
     ~tags:["dac"; "dac_node"]
     "dac_observer_get_missing_page"
-    Legacy.test_observer_get_missing_page
+    Full_infrastructure.test_observer_get_missing_page
+    protocols ;
+  scenario_with_layer1_node
+    ~__FILE__
+    ~tags:["dac"; "dac_node"]
+    "dac_observer_times_out_when_page_cannot_be_fetched"
+    test_observer_times_out_when_page_cannot_be_fetched
     protocols ;
   scenario_with_full_dac_infrastructure
     ~__FILE__

@@ -59,7 +59,11 @@ module Observer : sig
     coordinator_rpc_address : string;
     coordinator_rpc_port : int;
     committee_rpc_addresses : (string * int) list;
+    timeout : int;
   }
+
+  (** Default timeout for fetching a missing page from Committee members. *)
+  val default_timeout : int
 end
 
 (** Legacy specific configuration. *)
@@ -131,7 +135,11 @@ val make_committee_member :
     endpoints to [committee_endpoints] and Coordinator endpoint to
     [(coordinator_rpc_address * coordinator_rpc_port)] as the coordinator. *)
 val make_observer :
-  committee_rpc_addresses:(string * int) list -> string -> int -> mode
+  committee_rpc_addresses:(string * int) list ->
+  ?timeout:int ->
+  string ->
+  int ->
+  mode
 
 (** [make_legacy ?coordinator_host_and_port threshold
     committee_members_addresses]

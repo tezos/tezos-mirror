@@ -113,6 +113,13 @@ let positive_int_parameter =
       in
       if i < 0 then tzfail @@ Invalid_positive_int_parameter p else return i)
 
+let timeout ~doc =
+  Tezos_clic.arg
+    ~long:"timeout"
+    ~placeholder:"timeout"
+    ~doc
+    positive_int_parameter
+
 let threshold_param ?(name = "DAC threshold parameter")
     ?(desc =
       "Number of DAC member signatures required to validate a root page hash") =
@@ -280,12 +287,22 @@ module Config_init = struct
     command
       ~group
       ~desc:"Configure DAC node in observer mode."
-      (args4 data_dir_arg rpc_address_arg rpc_port_arg reveal_data_dir_arg)
+      (args5
+         data_dir_arg
+         rpc_address_arg
+         rpc_port_arg
+         reveal_data_dir_arg
+         (timeout
+            ~doc:
+              (Format.sprintf
+                 "The timeout in seconds for requesting a missing page from \
+                  Committee Member. Defaults to %i seconds."
+                 Configuration.Observer.default_timeout)))
       (prefixes ["configure"; "as"; "observer"; "with"; "coordinator"]
       @@ coordinator_rpc_param
       @@ prefixes ["and"; "committee"; "member"; "rpc"; "addresses"]
       @@ seq_of_param @@ committee_rpc_addresses_param)
-      (fun (data_dir, rpc_address, rpc_port, reveal_data_dir)
+      (fun (data_dir, rpc_address, rpc_port, reveal_data_dir, timeout)
            (coordinator_rpc_address, coordinator_rpc_port)
            committee_rpc_addresses
            cctxt ->
@@ -296,6 +313,7 @@ module Config_init = struct
           ~rpc_port
           (Configuration.make_observer
              ~committee_rpc_addresses
+             ?timeout
              coordinator_rpc_address
              coordinator_rpc_port)
           cctxt)

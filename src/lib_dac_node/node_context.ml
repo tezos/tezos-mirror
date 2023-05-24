@@ -99,6 +99,7 @@ module Observer = struct
   type t = {
     coordinator_cctxt : Dac_node_client.cctxt;
     committee_cctxts : Dac_node_client.cctxt list;
+    timeout : int;
   }
 
   let init observer_config =
@@ -108,6 +109,7 @@ module Observer = struct
             coordinator_rpc_address;
             coordinator_rpc_port;
             committee_rpc_addresses;
+            timeout;
           } =
       observer_config
     in
@@ -123,7 +125,7 @@ module Observer = struct
           Dac_node_client.make_unix_cctxt ~scheme:"http" ~host ~port)
         committee_rpc_addresses
     in
-    return {coordinator_cctxt; committee_cctxts}
+    return {coordinator_cctxt; committee_cctxts; timeout}
 end
 
 module Legacy = struct
