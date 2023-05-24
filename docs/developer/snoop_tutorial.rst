@@ -299,4 +299,15 @@ the more the two overlap, the more precise we are.
 Step 4: options
 ---------------
 
-# Changing bench-num and nsamples for faster benchmarking.
+Some of our benchmarks can take a long time to run. ``octez-snoop`` offers
+options to vary the number of random values or the number of times they are
+measured, using options ``--nsamples`` and ``--bench-num`` (see
+:ref:`the manual <benchmark_tool_manual>`). The default values are 300 random
+values and 100 measurements for each. We can specify lower numbers to reduce
+benchmark time, but it will also degrade the precision of the results.
+
+Another option of particular interest is ``--plot``. It can be used to
+automatically open windows at the end of the whole process. They will show the
+same plots as in the report generated at the previous step, but we can interact
+with the plots, which is very convenient when they are multi-dimensional (i.e.
+when the complexity model relies on more parameters).
