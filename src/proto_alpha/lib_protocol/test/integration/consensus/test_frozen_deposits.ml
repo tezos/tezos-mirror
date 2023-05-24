@@ -331,9 +331,6 @@ let test_deposits_after_stake_removal () =
   >>=? fun initial_frozen_deposits_1 ->
   Context.Delegate.current_frozen_deposits (B genesis) account2
   >>=? fun initial_frozen_deposits_2 ->
-  let expected_new_frozen_deposits_2 =
-    Test_tez.(initial_frozen_deposits_2 *! 3L /! 2L)
-  in
   (* Move half the account1's balance to account2 *)
   Context.Delegate.full_balance (B genesis) account1 >>=? fun full_balance ->
   let half_balance = Test_tez.(full_balance /! 2L) in
@@ -348,28 +345,19 @@ let test_deposits_after_stake_removal () =
   >>=? fun frozen_deposits_2 ->
   Assert.equal_tez ~loc:__LOC__ frozen_deposits_2 initial_frozen_deposits_2
   >>=? fun () ->
-  (* Bake a cycle to act account2's new frozen deposits *)
+  (* Bake a cycle. *)
   Block.bake_until_cycle_end b >>=? fun b ->
+  (* Frozen deposits aren't affected by balance change... *)
   let rec loop b n =
     if n = 0 then return b
     else
       Context.Delegate.current_frozen_deposits (B b) account1
       >>=? fun frozen_deposits_1 ->
-      (* the frozen_deposits is frozen_deposits_percentage of the maximum active stake
-         during the last preserved_cycles + max_slashing_period cycles;
-         consequently, though the active stake of account1 has decreased at
-         cycle c, this decrease makes the frozen deposits smaller only after
-         preserved cycles + max_slashing_period. *)
       Assert.equal_tez ~loc:__LOC__ frozen_deposits_1 initial_frozen_deposits_1
       >>=? fun () ->
-      (* the active stake of account2 has increased and this increase affects
-         the frozen_deposits from this cycle as it is greater than previous ones. *)
       Context.Delegate.current_frozen_deposits (B b) account2
       >>=? fun frozen_deposits_2 ->
-      Assert.equal_tez
-        ~loc:__LOC__
-        frozen_deposits_2
-        expected_new_frozen_deposits_2
+      Assert.equal_tez ~loc:__LOC__ frozen_deposits_2 initial_frozen_deposits_2
       >>=? fun () ->
       Block.bake_until_cycle_end b >>=? fun b -> loop b (pred n)
   in
@@ -386,9 +374,10 @@ let test_deposits_after_stake_removal () =
     frozen_deposits_1
     Test_tez.(initial_frozen_deposits_1 /! 2L)
   >>=? fun () ->
+  (* but account2's frozen deposits aren't increased automatically *)
   Context.Delegate.current_frozen_deposits (B b) account2
   >>=? fun frozen_deposits_2 ->
-  Assert.equal_tez ~loc:__LOC__ frozen_deposits_2 expected_new_frozen_deposits_2
+  Assert.equal_tez ~loc:__LOC__ frozen_deposits_2 initial_frozen_deposits_2
 
 let test_unfreeze_deposits_after_deactivation () =
   Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
