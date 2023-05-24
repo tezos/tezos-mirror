@@ -1,7 +1,15 @@
 In-depth usage example: more control over your benchmark
 ========================================================
 
-Step 2: Checking the timer
+This section borrows the example from the :doc:`Snoop tutorial <snoop_tutorial>`
+on the ``blake2b`` hashing function, but relies on Snoop sub-commands for better
+control over the benchmark process (corresponding to Step 2 in the tutorial).
+The objectives and the output files are the same as in the tutorial:
+benchmarking, inferring gas parameter values and generating the corresponding
+OCaml code, but sub-commands help to understand each sub-step, especially in
+case of unexpected results.
+
+Step 1: Checking the timer
 --------------------------
 
 Before we perform the benchmarks, we need to ensure that the system timer
@@ -74,7 +82,7 @@ A reliable timer should have a latency of the order of 20 to 30 nanoseconds, wit
 It can happen on some hardware or software configurations that the timer latency is of the order of
 *microseconds* or worse: this makes benchmarking short-lived computations impossible.
 
-Step 3: Benchmarking
+Step 2: Benchmarking
 --------------------
 
 If the results obtained in the previous section are reasonable,
@@ -115,7 +123,7 @@ Here's the output:
 
 Since the size of inputs varies a lot, the statistics over all benchmarks are less useful.
 
-Step 3.5: (optional) Removing outliers
+Step 2.5: (optional) Removing outliers
 --------------------------------------
 
 It is possible to remove outliers from the raw benchmark data. The command is the following:
@@ -138,7 +146,7 @@ The best defense against outliers is to have clean data in the first place: use 
 
 .. _Fitting the model:
 
-Step 4: Fitting the model
+Step 3: Fitting the model
 -------------------------
 
 We can now proceed to inferring the free parameters from the model using the data.
@@ -203,7 +211,7 @@ if the model is good, one should observe that the empirical data lies
 along a linear subspace. Here, the model is trivial so the central plot
 is less interesting.
 
-Step 5: Generating code
+Step 4: Generating code
 -----------------------
 
 As a final step, we demonstrate how to generate code corresponding to the
