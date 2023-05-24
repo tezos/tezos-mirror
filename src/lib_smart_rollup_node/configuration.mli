@@ -200,3 +200,50 @@ val save : force:bool -> data_dir:string -> t -> unit tzresult Lwt.t
 
 (** [load ~data_dir] loads a configuration stored in [data_dir]. *)
 val load : data_dir:string -> t tzresult Lwt.t
+
+module Cli : sig
+  val configuration_from_args :
+    rpc_addr:string option ->
+    rpc_port:int option ->
+    metrics_addr:string option ->
+    loser_mode:Loser_mode.t option ->
+    reconnection_delay:float option ->
+    dal_node_endpoint:Uri.t option ->
+    dac_observer_endpoint:Uri.t option ->
+    dac_timeout:Z.t option ->
+    injector_retention_period:int option ->
+    injector_attempts:int option ->
+    injection_ttl:int option ->
+    mode:mode ->
+    sc_rollup_address:Hashed.Smart_rollup_address.t ->
+    boot_sector_file:string option ->
+    sc_rollup_node_operators:
+      [< `Default of Signature.public_key_hash
+      | `Purpose of purpose * Signature.public_key_hash ]
+      trace ->
+    log_kernel_debug:bool ->
+    t tzresult
+
+  val create_or_read_config :
+    data_dir:string ->
+    rpc_addr:string option ->
+    rpc_port:int option ->
+    metrics_addr:string option ->
+    loser_mode:Loser_mode.t option ->
+    reconnection_delay:float option ->
+    dal_node_endpoint:Uri.t option ->
+    dac_observer_endpoint:Uri.t option ->
+    dac_timeout:Z.t option ->
+    injector_retention_period:int option ->
+    injector_attempts:int option ->
+    injection_ttl:int option ->
+    mode:mode option ->
+    sc_rollup_address:Smart_rollup_alias.Address.t option ->
+    boot_sector_file:string option ->
+    sc_rollup_node_operators:
+      [< `Default of Signature.public_key_hash
+      | `Purpose of purpose * Signature.public_key_hash ]
+      list ->
+    log_kernel_debug:bool ->
+    t tzresult Lwt.t
+end

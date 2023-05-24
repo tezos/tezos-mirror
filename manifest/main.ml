@@ -4080,6 +4080,7 @@ let octez_smart_rollup_node_lib =
         prometheus_app;
         octez_injector |> open_;
         octez_version_value |> open_;
+        octez_client_base |> open_;
       ]
 
 let octez_scoru_wasm_helpers =

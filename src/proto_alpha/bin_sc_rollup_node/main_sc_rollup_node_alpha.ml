@@ -296,197 +296,6 @@ let group =
     title = "Commands related to the smart rollup node.";
   }
 
-let make_operators sc_rollup_node_operators =
-  let open Configuration in
-  let purposed_operators, default_operators =
-    List.partition_map
-      (function
-        | `Purpose p_operator -> Left p_operator
-        | `Default operator -> Right operator)
-      sc_rollup_node_operators
-  in
-  let default_operator =
-    match default_operators with
-    | [] -> None
-    | [default_operator] -> Some default_operator
-    | _ -> Stdlib.failwith "Multiple default operators"
-  in
-  make_purpose_map purposed_operators ~default:default_operator
-
-let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
-    ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
-    ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
-    ~sc_rollup_address ~boot_sector_file ~sc_rollup_node_operators
-    ~log_kernel_debug =
-  let open Configuration in
-  let sc_rollup_node_operators = make_operators sc_rollup_node_operators in
-  let config =
-    {
-      sc_rollup_address;
-      boot_sector_file;
-      sc_rollup_node_operators;
-      rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
-      rpc_port = Option.value ~default:default_rpc_port rpc_port;
-      reconnection_delay =
-        Option.value ~default:default_reconnection_delay reconnection_delay;
-      dal_node_endpoint;
-      dac_observer_endpoint;
-      dac_timeout;
-      metrics_addr;
-      fee_parameters = Operator_purpose_map.empty;
-      mode;
-      loser_mode = Option.value ~default:Loser_mode.no_failures loser_mode;
-      batcher = Configuration.default_batcher;
-      injector =
-        {
-          retention_period =
-            Option.value
-              ~default:default_injector.retention_period
-              injector_retention_period;
-          attempts =
-            Option.value ~default:default_injector.attempts injector_attempts;
-          injection_ttl =
-            Option.value ~default:default_injector.injection_ttl injection_ttl;
-        };
-      l1_blocks_cache_size = Configuration.default_l1_blocks_cache_size;
-      l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size;
-      prefetch_blocks = None;
-      log_kernel_debug;
-    }
-  in
-  check_mode config
-
-let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
-    ~metrics_addr ~loser_mode ~reconnection_delay ~dal_node_endpoint
-    ~dac_observer_endpoint ~dac_timeout ~injector_retention_period
-    ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file
-    ~sc_rollup_node_operators ~log_kernel_debug =
-  let open Configuration in
-  let new_sc_rollup_node_operators = make_operators sc_rollup_node_operators in
-  (* Merge operators *)
-  let sc_rollup_node_operators =
-    Operator_purpose_map.merge
-      (fun _purpose -> Option.either)
-      new_sc_rollup_node_operators
-      configuration.sc_rollup_node_operators
-  in
-  let configuration =
-    Configuration.
-      {
-        configuration with
-        sc_rollup_address =
-          Option.value
-            ~default:configuration.sc_rollup_address
-            sc_rollup_address;
-        boot_sector_file =
-          Option.either boot_sector_file configuration.boot_sector_file;
-        sc_rollup_node_operators;
-        mode = Option.value ~default:configuration.mode mode;
-        rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
-        rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
-        dal_node_endpoint =
-          Option.either dal_node_endpoint configuration.dal_node_endpoint;
-        dac_observer_endpoint =
-          Option.either
-            dac_observer_endpoint
-            configuration.dac_observer_endpoint;
-        dac_timeout = Option.either dac_timeout configuration.dac_timeout;
-        reconnection_delay =
-          Option.value
-            ~default:configuration.reconnection_delay
-            reconnection_delay;
-        injector =
-          {
-            retention_period =
-              Option.value
-                ~default:default_injector.retention_period
-                injector_retention_period;
-            attempts =
-              Option.value ~default:default_injector.attempts injector_attempts;
-            injection_ttl =
-              Option.value ~default:default_injector.injection_ttl injection_ttl;
-          };
-        loser_mode = Option.value ~default:configuration.loser_mode loser_mode;
-        metrics_addr = Option.either metrics_addr configuration.metrics_addr;
-        log_kernel_debug = log_kernel_debug || configuration.log_kernel_debug;
-      }
-  in
-  Configuration.check_mode configuration
-
-let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
-    ~loser_mode ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint
-    ~dac_timeout ~injector_retention_period ~injector_attempts ~injection_ttl
-    ~mode ~sc_rollup_address ~boot_sector_file ~sc_rollup_node_operators
-    ~log_kernel_debug =
-  let open Lwt_result_syntax in
-  let config_file = Configuration.config_filename ~data_dir in
-  let*! exists_config = Lwt_unix.file_exists config_file in
-  if exists_config then
-    (* Read configuration from file and patch if user wanted to override
-       some fields with values provided by arguments. *)
-    let* configuration = Configuration.load ~data_dir in
-    let*? configuration =
-      patch_configuration_from_args
-        configuration
-        ~rpc_addr
-        ~rpc_port
-        ~metrics_addr
-        ~loser_mode
-        ~reconnection_delay
-        ~dal_node_endpoint
-        ~dac_observer_endpoint
-        ~dac_timeout
-        ~injector_retention_period
-        ~injector_attempts
-        ~injection_ttl
-        ~mode
-        ~sc_rollup_address
-        ~boot_sector_file
-        ~sc_rollup_node_operators
-        ~log_kernel_debug
-    in
-    return configuration
-  else
-    (* Build configuration from arguments only. *)
-    let*? mode =
-      Option.value_e
-        mode
-        ~error:
-          (TzTrace.make
-          @@ error_of_fmt
-               "Argument --mode is required when configuration file is not \
-                present.")
-    in
-    let*? sc_rollup_address =
-      Option.value_e
-        sc_rollup_address
-        ~error:
-          (TzTrace.make
-          @@ error_of_fmt
-               "Argument --rollup is required when configuration file is not \
-                present.")
-    in
-    let*? config =
-      configuration_from_args
-        ~rpc_addr
-        ~rpc_port
-        ~metrics_addr
-        ~loser_mode
-        ~reconnection_delay
-        ~dal_node_endpoint
-        ~dac_observer_endpoint
-        ~dac_timeout
-        ~injector_retention_period
-        ~injector_attempts
-        ~injection_ttl
-        ~mode
-        ~sc_rollup_address
-        ~boot_sector_file
-        ~sc_rollup_node_operators
-        ~log_kernel_debug
-    in
-    return config
-
 let config_init_command =
   let open Lwt_result_syntax in
   let open Tezos_clic in
@@ -534,7 +343,7 @@ let config_init_command =
          sc_rollup_node_operators
          cctxt ->
       let*? config =
-        configuration_from_args
+        Configuration.Cli.configuration_from_args
           ~rpc_addr
           ~rpc_port
           ~metrics_addr
@@ -604,7 +413,7 @@ let legacy_run_command =
            boot_sector_file )
          cctxt ->
       let* configuration =
-        create_or_read_config
+        Configuration.Cli.create_or_read_config
           ~data_dir
           ~rpc_addr
           ~rpc_port
@@ -673,7 +482,7 @@ let run_command =
          sc_rollup_node_operators
          cctxt ->
       let* configuration =
-        create_or_read_config
+        Configuration.Cli.create_or_read_config
           ~data_dir
           ~rpc_addr
           ~rpc_port

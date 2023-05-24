@@ -14,11 +14,13 @@
   octez-node-config
   prometheus-app
   octez-injector
-  tezos-version.value)
+  tezos-version.value
+  tezos-client-base)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix
   -open Tezos_crypto
   -open Octez_injector
-  -open Tezos_version_value))
+  -open Tezos_version_value
+  -open Tezos_client_base))
