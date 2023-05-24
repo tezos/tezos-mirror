@@ -493,6 +493,13 @@ module Delegate_sampler_state :
      and type value = Raw_context.consensus_pk Sampler.t
      and type t := Raw_context.t
 
+(** Multiplicative coefficient for rewards under Adaptive Inflation *)
+module Reward_coeff :
+  Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Q.t
+     and type t := Raw_context.t
+
 (** Votes *)
 
 module Vote : sig

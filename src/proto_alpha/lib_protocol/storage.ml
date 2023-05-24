@@ -1108,6 +1108,28 @@ module Cycle = struct
         let encoding = Sampler.encoding Raw_context.consensus_pk_encoding
       end)
 
+  module Reward_coeff =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["reward_coeff"]
+      end)
+      (struct
+        type t = Q.t
+
+        let encoding =
+          Data_encoding.(
+            conv_with_guard
+              (fun Q.{num; den} -> (num, den))
+              (fun (num, den) ->
+                if Compare.Z.(num > Z.zero && den > Z.zero) then
+                  Ok (Q.make num den)
+                else
+                  Error
+                    "Invalid Reward Coefficient: only positive values allowed")
+              (obj2 (req "numerator" n) (req "denominator" n)))
+      end)
+
   type unrevealed_nonce = {
     nonce_hash : Nonce_hash.t;
     delegate : Signature.Public_key_hash.t;
@@ -1226,6 +1248,7 @@ module Stake = struct
 end
 
 module Delegate_sampler_state = Cycle.Delegate_sampler_state
+module Reward_coeff = Cycle.Reward_coeff
 
 (** Votes *)
 
