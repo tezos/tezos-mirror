@@ -538,6 +538,29 @@ let test_rpc_txpool_content =
   let* _result = Evm_proxy_server.txpool_content evm_proxy_server in
   unit
 
+let test_rpc_web3_clientVersion =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "client_version"]
+    ~title:"Check RPC web3_clientVersion"
+  @@ fun _protocol ->
+  let* evm_proxy_server = setup_mockup () in
+  let* web3_clientVersion =
+    Evm_proxy_server.(
+      call_evm_rpc
+        evm_proxy_server
+        {method_ = "web3_clientVersion"; parameters = `A []})
+  in
+  let* server_version =
+    evm_proxy_server_version evm_proxy_server |> Runnable.run
+  in
+  Check.(
+    (JSON.(web3_clientVersion |-> "result" |> as_string)
+    = JSON.as_string server_version)
+      string)
+    ~error_msg:"Expected version %%R, got %%L." ;
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -550,6 +573,7 @@ let register_evm_proxy_server ~protocols =
   test_l2_transfer protocols ;
   test_chunked_transaction protocols ;
   test_l2_deploy protocols ;
-  test_rpc_txpool_content protocols
+  test_rpc_txpool_content protocols ;
+  test_rpc_web3_clientVersion protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
