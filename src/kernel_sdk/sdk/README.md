@@ -42,6 +42,12 @@ export AR="${LLVM_PATH}/bin/llvm-ar"
 export CC="${LLVM_PATH}/bin/clang"
 ```
 
+On Linux, often the default `CC` is gcc, which is not supported for kernel builds. Ensure clang is being used:
+
+```shell
+export CC=clang
+```
+
 ## Features
 
 | Feature         | Default? | Enables                             | About                                         |
@@ -97,7 +103,7 @@ fn hello_kernel(host: &mut impl Runtime) {
 With those two files saved to `Cargo.toml` & `src/lib.rs`, you can compile the kernel:
 
 ```shell
-CC=clang cargo build --release --target wasm32-unknown-unknown
+cargo build --release --target wasm32-unknown-unknown
 cp target/wasm32-unknown-unknown/release/kernel.wasm .
 ```
 
