@@ -51,7 +51,7 @@ type error +=
       saved_address : Sc_rollup.Address.t;
     }
   | Missing_PVM_state of Block_hash.t * Int32.t
-  | Cannot_checkout_context of Block_hash.t * Sc_rollup_context_hash.t option
+  | Cannot_checkout_context of Block_hash.t * Smart_rollup_context_hash.t option
   | No_batcher
   | No_publisher
   | Refutation_player_failed_to_start
@@ -246,14 +246,14 @@ let () =
         "The context %sfor block %a cannot be checkouted"
         (Option.fold
            ~none:""
-           ~some:Sc_rollup_context_hash.to_b58check
+           ~some:Smart_rollup_context_hash.to_b58check
            context_hash)
         Block_hash.pp
         block)
     Data_encoding.(
       obj2
         (req "block" Block_hash.encoding)
-        (opt "context" Sc_rollup_context_hash.encoding))
+        (opt "context" Smart_rollup_context_hash.encoding))
     (function
       | Cannot_checkout_context (block, context) -> Some (block, context)
       | _ -> None)

@@ -62,17 +62,17 @@ type ro = [`Read] t
 
 type commit = IStore.commit
 
-type hash = Sc_rollup_context_hash.t
+type hash = Smart_rollup_context_hash.t
 
 type path = string list
 
-let () = assert (Sc_rollup_context_hash.size = IStore.Hash.hash_size)
+let () = assert (Smart_rollup_context_hash.size = IStore.Hash.hash_size)
 
 let hash_to_istore_hash h =
-  Sc_rollup_context_hash.to_string h |> IStore.Hash.unsafe_of_raw_string
+  Smart_rollup_context_hash.to_string h |> IStore.Hash.unsafe_of_raw_string
 
 let istore_hash_to_hash h =
-  IStore.Hash.to_raw_string h |> Sc_rollup_context_hash.of_string_exn
+  IStore.Hash.to_raw_string h |> Smart_rollup_context_hash.of_string_exn
 
 let load : type a. a mode -> string -> a raw_index Lwt.t =
  fun mode path ->
