@@ -1,5 +1,5 @@
-Usage example
-=============
+In-depth usage example: more control over your benchmark
+========================================================
 
 We present a typical benchmark workflow using ``octez-snoop``.
 We'll consider the case of the ``blake2b`` hashing function, which
