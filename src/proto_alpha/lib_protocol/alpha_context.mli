@@ -5127,10 +5127,11 @@ end
 val prepare_first_block :
   Chain_id.t ->
   Context.t ->
-  typecheck:
+  typecheck_smart_contract:
     (context ->
     Script.t ->
     ((Script.t * Lazy_storage.diffs option) * context) tzresult Lwt.t) ->
+  typecheck_smart_rollup:(context -> Script.expr -> context tzresult) ->
   level:Int32.t ->
   timestamp:Time.t ->
   predecessor:Block_hash.t ->
@@ -5192,9 +5193,17 @@ module Parameters : sig
     script : Script.t;
   }
 
+  type bootstrap_smart_rollup = {
+    address : Sc_rollup_repr.Address.t;
+    pvm_kind : Sc_rollups.Kind.t;
+    boot_sector : string;
+    parameters_ty : Script_repr.lazy_expr;
+  }
+
   type t = {
     bootstrap_accounts : bootstrap_account list;
     bootstrap_contracts : bootstrap_contract list;
+    bootstrap_smart_rollups : bootstrap_smart_rollup list;
     commitments : Commitment.t list;
     constants : Constants.Parametric.t;
     security_deposit_ramp_up_cycles : int option;

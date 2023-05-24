@@ -156,8 +156,8 @@ let initialize_total_supply_for_o ctxt =
     ctxt
     (Tez_repr.of_mutez_exn 940_000_000_000_000L)
 
-let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
-    =
+let prepare_first_block _chain_id ctxt ~typecheck_smart_contract
+    ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
   >>=? fun (previous_protocol, ctxt) ->
   let parametric = Raw_context.constants ctxt in
@@ -192,10 +192,12 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
       Contract_storage.init ctxt >>=? fun ctxt ->
       Bootstrap_storage.init
         ctxt
-        ~typecheck
+        ~typecheck_smart_contract
+        ~typecheck_smart_rollup
         ?no_reward_cycles:param.no_reward_cycles
         param.bootstrap_accounts
         param.bootstrap_contracts
+        param.bootstrap_smart_rollups
       >>=? fun (ctxt, bootstrap_balance_updates) ->
       Delegate_cycles.init_first_cycles ctxt ~origin:Protocol_migration
       >>=? fun (ctxt, deposits_balance_updates) ->
@@ -205,7 +207,7 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
       >>=? fun ctxt ->
       Vote_storage.update_listings ctxt >>=? fun ctxt ->
       (* Must be called after other originations since it unsets the origination nonce. *)
-      Liquidity_baking_migration.init ctxt ~typecheck
+      Liquidity_baking_migration.init ctxt ~typecheck:typecheck_smart_contract
       >>=? fun (ctxt, operation_results) ->
       Storage.Pending_migration.Operation_results.init ctxt operation_results
       >>=? fun ctxt ->

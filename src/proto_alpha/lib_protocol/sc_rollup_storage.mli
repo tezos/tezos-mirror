@@ -43,6 +43,21 @@ val originate :
   tzresult
   Lwt.t
 
+(** [raw_originate context ~kind ~parameters_ty ~genesis_commitment ~address] is
+    exactly {!originate} but provides the rollup's address ([address]) instead
+    of randomly generating it.
+
+    This should not be used by [apply.ml], this is needed for bootstrap
+    smart rollups only.
+*)
+val raw_originate :
+  Raw_context.t ->
+  kind:Sc_rollups.Kind.t ->
+  parameters_ty:Script_repr.lazy_expr ->
+  genesis_commitment:Sc_rollup_commitment_repr.t ->
+  address:Sc_rollup_repr.Address.t ->
+  (Z.t * Sc_rollup_commitment_repr.Hash.t * Raw_context.t) tzresult Lwt.t
+
 (** [kind context address] returns the kind of the given rollup [address] iff
     [address] is an existing rollup. Fails with an [Sc_rollup_does_not_exist]
     error in case the rollup does not exist. *)

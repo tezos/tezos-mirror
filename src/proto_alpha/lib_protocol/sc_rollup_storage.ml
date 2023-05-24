@@ -51,11 +51,13 @@ let new_address ctxt =
 
 let init_genesis_info ctxt address genesis_commitment =
   let open Lwt_result_syntax in
-  let level = (Raw_context.current_level ctxt).level in
   let*? ctxt, commitment_hash =
     Sc_rollup_commitment_storage.hash ctxt genesis_commitment
   in
-  let genesis_info = Commitment.{commitment_hash; level} in
+  (* The [genesis_commitment.inbox_level] is equal to the current level. *)
+  let genesis_info : Commitment.genesis_info =
+    {commitment_hash; level = genesis_commitment.inbox_level}
+  in
   let* ctxt, size = Store.Genesis_info.init ctxt address genesis_info in
   return (ctxt, genesis_info, size)
 
@@ -107,9 +109,8 @@ let init_commitment_storage ctxt address
       + commitment_first_publication_level_diff
       + commitments_per_inbox_level_diff )
 
-let originate ctxt ~kind ~parameters_ty ~genesis_commitment =
+let raw_originate ctxt ~kind ~parameters_ty ~genesis_commitment ~address =
   let open Lwt_result_syntax in
-  let*? ctxt, address = new_address ctxt in
   let* ctxt, pvm_kind_size = Store.PVM_kind.init ctxt address kind in
   let* ctxt, param_ty_size =
     Store.Parameters_type.init ctxt address parameters_ty
@@ -132,7 +133,15 @@ let originate ctxt ~kind ~parameters_ty ~genesis_commitment =
       (origination_size + stored_kind_size + addresses_size + param_ty_size
      + pvm_kind_size + genesis_info_size_diff + commitment_size_diff)
   in
-  return (address, size, genesis_info.commitment_hash, ctxt)
+  return (size, genesis_info.commitment_hash, ctxt)
+
+let originate ctxt ~kind ~parameters_ty ~genesis_commitment =
+  let open Lwt_result_syntax in
+  let*? ctxt, address = new_address ctxt in
+  let* size, genesis_commitment, ctxt =
+    raw_originate ctxt ~kind ~parameters_ty ~genesis_commitment ~address
+  in
+  return (address, size, genesis_commitment, ctxt)
 
 let kind ctxt address =
   let open Lwt_result_syntax in

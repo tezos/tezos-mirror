@@ -38,9 +38,17 @@ type bootstrap_contract = {
   script : Script_repr.t;
 }
 
+type bootstrap_smart_rollup = {
+  address : Sc_rollup_repr.Address.t;
+  pvm_kind : Sc_rollups.Kind.t;
+  boot_sector : string;
+  parameters_ty : Script_repr.lazy_expr;
+}
+
 type t = {
   bootstrap_accounts : bootstrap_account list;
   bootstrap_contracts : bootstrap_contract list;
+  bootstrap_smart_rollups : bootstrap_smart_rollup list;
   commitments : Commitment_repr.t list;
   constants : Constants_parametric_repr.t;
   security_deposit_ramp_up_cycles : int option;
@@ -209,12 +217,26 @@ let bootstrap_contract_encoding =
        (req "amount" Tez_repr.encoding)
        (req "script" Script_repr.encoding))
 
+let bootstrap_smart_rollup_encoding =
+  let open Data_encoding in
+  conv
+    (fun {address; pvm_kind; boot_sector; parameters_ty} ->
+      (address, pvm_kind, boot_sector, parameters_ty))
+    (fun (address, pvm_kind, boot_sector, parameters_ty) ->
+      {address; pvm_kind; boot_sector; parameters_ty})
+    (obj4
+       (req "address" Sc_rollup_repr.Address.encoding)
+       (req "pvm_kind" Sc_rollups.Kind.encoding)
+       (req "kernel" (string Hex))
+       (req "parameters_ty" Script_repr.lazy_expr_encoding))
+
 let encoding =
   let open Data_encoding in
   conv
     (fun {
            bootstrap_accounts;
            bootstrap_contracts;
+           bootstrap_smart_rollups;
            commitments;
            constants;
            security_deposit_ramp_up_cycles;
@@ -222,12 +244,14 @@ let encoding =
          } ->
       ( ( bootstrap_accounts,
           bootstrap_contracts,
+          bootstrap_smart_rollups,
           commitments,
           security_deposit_ramp_up_cycles,
           no_reward_cycles ),
         constants ))
     (fun ( ( bootstrap_accounts,
              bootstrap_contracts,
+             bootstrap_smart_rollups,
              commitments,
              security_deposit_ramp_up_cycles,
              no_reward_cycles ),
@@ -235,15 +259,20 @@ let encoding =
       {
         bootstrap_accounts;
         bootstrap_contracts;
+        bootstrap_smart_rollups;
         commitments;
         constants;
         security_deposit_ramp_up_cycles;
         no_reward_cycles;
       })
     (merge_objs
-       (obj5
+       (obj6
           (req "bootstrap_accounts" (list bootstrap_account_encoding))
           (dft "bootstrap_contracts" (list bootstrap_contract_encoding) [])
+          (dft
+             "bootstrap_smart_rollups"
+             (list bootstrap_smart_rollup_encoding)
+             [])
           (dft "commitments" (list Commitment_repr.encoding) [])
           (opt "security_deposit_ramp_up_cycles" int31)
           (opt "no_reward_cycles" int31))

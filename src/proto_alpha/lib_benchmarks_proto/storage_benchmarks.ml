@@ -65,7 +65,11 @@ let default_raw_context () =
       let*! ctxt = add empty ["version"] (Bytes.of_string "genesis") in
       add ctxt protocol_param_key proto_params)
   in
-  let typecheck ctxt script_repr = return ((script_repr, None), ctxt) in
+  let typecheck_smart_contract ctxt script_repr =
+    return ((script_repr, None), ctxt)
+  in
+  let typecheck_smart_rollup ctxt _script_repr = Result_syntax.return ctxt in
+
   let*! e =
     Init_storage.prepare_first_block
       Chain_id.zero
@@ -73,7 +77,8 @@ let default_raw_context () =
       ~level:0l
       ~timestamp:(Time.Protocol.of_seconds 1643125688L)
       ~predecessor:Block_hash.zero
-      ~typecheck
+      ~typecheck_smart_contract
+      ~typecheck_smart_rollup
   in
   Lwt.return @@ Environment.wrap_tzresult e
 

@@ -82,6 +82,10 @@ val execute_outbox_message :
   output_proof:string ->
   (execute_outbox_message_result * context) tzresult Lwt.t
 
+(** [validate_untyped_parameters_ty ctxt script] parses the type and check
+    that the entrypoints are well-formed. *)
+val validate_untyped_parameters_ty : context -> Script.expr -> context tzresult
+
 (** A module used for testing purposes only. *)
 module Internal_for_tests : sig
   (** Same as {!execute_outbox_message} but allows overriding the extraction

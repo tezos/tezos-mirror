@@ -351,8 +351,8 @@ let init chain_id ctxt block_header =
   let level = block_header.Block_header.level in
   let timestamp = block_header.timestamp in
   let predecessor = block_header.predecessor in
-  let typecheck (ctxt : Alpha_context.context) (script : Alpha_context.Script.t)
-      =
+  let typecheck_smart_contract (ctxt : Alpha_context.context)
+      (script : Alpha_context.Script.t) =
     let allow_forged_in_storage =
       false
       (* There should be no forged value in bootstrap contracts. *)
@@ -393,7 +393,8 @@ let init chain_id ctxt block_header =
   in
   Alpha_context.prepare_first_block
     chain_id
-    ~typecheck
+    ~typecheck_smart_contract
+    ~typecheck_smart_rollup:Sc_rollup_operations.validate_untyped_parameters_ty
     ~level
     ~timestamp
     ~predecessor

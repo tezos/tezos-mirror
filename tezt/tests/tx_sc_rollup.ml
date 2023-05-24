@@ -295,8 +295,7 @@ let rec bake_until cond client sc_rollup_node =
     in
     bake_until cond client sc_rollup_node
 
-let test_tx_kernel_e2e protocol =
-  let commitment_period = 10 and challenge_window = 10 in
+let setup_classic ~commitment_period ~challenge_window protocol =
   let* node, client = setup_l1 ~commitment_period ~challenge_window protocol in
   let bootstrap1_key = Constant.bootstrap1.alias in
   let sc_rollup_node =
@@ -325,6 +324,59 @@ let test_tx_kernel_e2e protocol =
       client
   in
   let* () = Client.bake_for_and_wait client in
+  return (client, sc_rollup_node, sc_rollup_address, [])
+
+let setup_bootstrap ~commitment_period ~challenge_window protocol =
+  let bootstrap1_key = Constant.bootstrap1.alias in
+  let data_dir = Temp.dir "tx-kernel-data-dir" in
+  let* boot_sector =
+    prepare_installer_kernel
+      ~preimages_dir:(Filename.concat data_dir "wasm_2_0_0")
+      "tx-kernel"
+  in
+  let boot_sector_file = Filename.temp_file "boot-sector" ".hex" in
+  let () = write_file boot_sector_file ~contents:boot_sector in
+  let sc_rollup_address = "sr163Lv22CdE8QagCwf48PWDTquk6isQwv57" in
+  let* parameters_ty =
+    let client = Client.create_with_mode Client.Mockup in
+    Client.convert_data_to_json ~data:"pair string (ticket string)" client
+  in
+  let bootstrap_tx_kernel : Protocol.bootstrap_smart_rollup =
+    {
+      address = sc_rollup_address;
+      pvm_kind = "wasm_2_0_0";
+      boot_sector;
+      parameters_ty;
+    }
+  in
+  let* node, client =
+    setup_l1
+      ~bootstrap_smart_rollups:[bootstrap_tx_kernel]
+      ~commitment_period
+      ~challenge_window
+      protocol
+  in
+  let sc_rollup_node =
+    Sc_rollup_node.create
+      ~protocol
+      Operator
+      node
+      ~data_dir
+      ~base_dir:(Client.base_dir client)
+      ~default_operator:bootstrap1_key
+  in
+  let* () = Client.bake_for_and_wait client in
+  return
+    ( client,
+      sc_rollup_node,
+      sc_rollup_address,
+      ["--boot-sector-file"; boot_sector_file] )
+
+let tx_kernel_e2e setup protocol =
+  let commitment_period = 10 and challenge_window = 10 in
+  let* client, sc_rollup_node, sc_rollup_address, node_args =
+    setup ~commitment_period ~challenge_window protocol
+  in
 
   (* Run the rollup node, ensure origination succeeds. *)
   let* genesis_info =
@@ -333,7 +385,7 @@ let test_tx_kernel_e2e protocol =
          sc_rollup_address
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address node_args in
   let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level
@@ -548,10 +600,11 @@ let test_tx_kernel_e2e protocol =
   in
   unit
 
-let register_test ?(regression = false) ~__FILE__ ~tags ~title f =
+let register_test ?supports ?(regression = false) ~__FILE__ ~tags ~title f =
   let tags = "tx_sc_rollup" :: tags in
-  if regression then Protocol.register_regression_test ~__FILE__ ~title ~tags f
-  else Protocol.register_test ~__FILE__ ~title ~tags f
+  if regression then
+    Protocol.register_regression_test ?supports ~__FILE__ ~title ~tags f
+  else Protocol.register_test ?supports ~__FILE__ ~title ~tags f
 
 let test_tx_kernel_e2e =
   register_test
@@ -559,6 +612,18 @@ let test_tx_kernel_e2e =
     ~__FILE__
     ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"]
     ~title:(Printf.sprintf "wasm_2_0_0 - tx kernel should run e2e (kernel_e2e)")
-    test_tx_kernel_e2e
+    (tx_kernel_e2e setup_classic)
 
-let register ~protocols = test_tx_kernel_e2e protocols
+let test_bootstrapped_tx_kernel_e2e =
+  register_test
+    ~supports:(Protocol.From_protocol 018)
+    ~__FILE__
+    ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"; "bootstrap"]
+    ~title:
+      (Printf.sprintf
+         "wasm_2_0_0 - bootstrapped tx kernel should run e2e (kernel_e2e)")
+    (tx_kernel_e2e setup_bootstrap)
+
+let register ~protocols =
+  test_tx_kernel_e2e protocols ;
+  test_bootstrapped_tx_kernel_e2e protocols

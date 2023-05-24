@@ -107,6 +107,13 @@ val encoding_prefix : t -> string
 type parameter_overrides =
   (string list * [`None | `Int of int | `String_of_int of int | JSON.u]) list
 
+type bootstrap_smart_rollup = {
+  address : string;
+  pvm_kind : string;
+  boot_sector : string;
+  parameters_ty : Ezjsonm.value;
+}
+
 (** Write a protocol parameter file.
 
     This function first builds a default parameter file from the [base]
@@ -123,10 +130,12 @@ type parameter_overrides =
       add to activation parameters. Each account is a triplet
       [(key, balance, revealed)]. If [revealed] the public key is added,
       else the public key hash is added. Revealed keys are expected to bake
-      from the start. Default [balance] is 4000000 tez. *)
+      from the start. Default [balance] is 4000000 tez.
+    - [bootstrap_smart_rollups] when given. *)
 val write_parameter_file :
   ?bootstrap_accounts:(Account.key * int option) list ->
   ?additional_bootstrap_accounts:(Account.key * int option * bool) list ->
+  ?bootstrap_smart_rollups:bootstrap_smart_rollup list ->
   base:(string, t * constants option) Either.t ->
   parameter_overrides ->
   string Lwt.t

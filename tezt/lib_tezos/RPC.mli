@@ -806,7 +806,7 @@ val get_chain_block_context_contract_all_ticket_balances :
 
 (** RPC: [GET chains/<chain>/blocks/<block>/context/smart_rollups/all] *)
 val get_chain_block_context_smart_rollups_all :
-  ?chain:string -> ?block:string -> unit -> JSON.t t
+  ?chain:string -> ?block:string -> unit -> string list t
 
 (** RPC: [GET chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/staker/<staker>/games] *)
 val get_chain_block_context_smart_rollups_smart_rollup_staker_games :

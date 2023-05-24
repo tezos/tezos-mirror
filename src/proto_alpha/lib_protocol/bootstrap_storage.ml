@@ -75,11 +75,11 @@ let init_account (ctxt, balance_updates)
       >>=? fun () -> return ctxt)
   >|=? fun ctxt -> (ctxt, new_balance_updates @ balance_updates)
 
-let init_contract ~typecheck (ctxt, balance_updates)
+let init_contract ~typecheck_smart_contract (ctxt, balance_updates)
     ({delegate; amount; script} : Parameters_repr.bootstrap_contract) =
   Contract_storage.fresh_contract_from_current_nonce ctxt
   >>?= fun (ctxt, contract_hash) ->
-  typecheck ctxt script >>=? fun (script, ctxt) ->
+  typecheck_smart_contract ctxt script >>=? fun (script, ctxt) ->
   Contract_storage.raw_originate
     ctxt
     ~prepaid_bootstrap_storage:true
@@ -96,13 +96,66 @@ let init_contract ~typecheck (ctxt, balance_updates)
   >|=? fun (ctxt, new_balance_updates) ->
   (ctxt, new_balance_updates @ balance_updates)
 
-let init ctxt ~typecheck ?no_reward_cycles accounts contracts =
+let genesis_hash ~boot_sector kind =
+  let open Lwt_result_syntax in
+  let (module Machine) = Sc_rollups.Kind.no_proof_machine_of kind in
+  let empty = Sc_rollup_machine_no_proofs.empty_tree () in
+  let*! state = Machine.initial_state ~empty in
+  let*! state = Machine.install_boot_sector state boot_sector in
+  let*! genesis_hash = Machine.state_hash state in
+  return genesis_hash
+
+let init_smart_rollup ~typecheck_smart_rollup ctxt
+    ({address; boot_sector; pvm_kind; parameters_ty} :
+      Parameters_repr.bootstrap_smart_rollup) =
+  let open Lwt_result_syntax in
+  let*? ctxt =
+    let open Result_syntax in
+    let* parameters_ty = Script_repr.force_decode parameters_ty in
+    typecheck_smart_rollup ctxt parameters_ty
+  in
+  let* genesis_hash = genesis_hash ~boot_sector pvm_kind in
+  let genesis_commitment : Sc_rollup_commitment_repr.t =
+    {
+      compressed_state = genesis_hash;
+      (* Level 0: Genesis block.
+         Level 1: Block on protocol genesis, that only activates protocols.
+         Level 2: First block on the activated protocol.
+
+         Therefore we originate the rollup at level 2 so the rollup node
+         doesn't ask a block on a different protocol.
+      *)
+      inbox_level = Raw_level_repr.of_int32_exn 2l;
+      predecessor = Sc_rollup_commitment_repr.Hash.zero;
+      number_of_ticks = Sc_rollup_repr.Number_of_ticks.zero;
+    }
+  in
+  let* _, _, ctxt =
+    Sc_rollup_storage.raw_originate
+      ctxt
+      ~kind:pvm_kind
+      ~genesis_commitment
+      ~parameters_ty
+      ~address
+  in
+  return ctxt
+
+let init ctxt ~typecheck_smart_contract ~typecheck_smart_rollup
+    ?no_reward_cycles accounts contracts smart_rollups =
   let nonce = Operation_hash.hash_string ["Un festival de GADT."] in
   let ctxt = Raw_context.init_origination_nonce ctxt nonce in
   List.fold_left_es init_account (ctxt, []) accounts
   >>=? fun (ctxt, balance_updates) ->
-  List.fold_left_es (init_contract ~typecheck) (ctxt, balance_updates) contracts
+  List.fold_left_es
+    (init_contract ~typecheck_smart_contract)
+    (ctxt, balance_updates)
+    contracts
   >>=? fun (ctxt, balance_updates) ->
+  List.fold_left_es
+    (init_smart_rollup ~typecheck_smart_rollup)
+    ctxt
+    smart_rollups
+  >>=? fun ctxt ->
   (match no_reward_cycles with
   | None -> return ctxt
   | Some cycles ->

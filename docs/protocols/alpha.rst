@@ -18,6 +18,9 @@ It requires protocol environment V10, compared to V9 for Nairobi.
 Smart Rollups
 -------------
 
+- Add the support for bootstrapped smart rollups in storage initialization,
+  similarly to bootstrapped accounts and smart contracts. (MR :gl:`!8552`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 

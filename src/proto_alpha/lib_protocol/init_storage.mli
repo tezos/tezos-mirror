@@ -34,12 +34,14 @@
 val prepare_first_block :
   Chain_id.t ->
   Context.t ->
-  typecheck:
+  typecheck_smart_contract:
     (Raw_context.t ->
     Script_repr.t ->
     ((Script_repr.t * Lazy_storage_diff.diffs option) * Raw_context.t)
     Error_monad.tzresult
     Lwt.t) ->
+  typecheck_smart_rollup:
+    (Raw_context.t -> Script_repr.expr -> Raw_context.t tzresult) ->
   level:int32 ->
   timestamp:Time.t ->
   predecessor:Block_hash.t ->
