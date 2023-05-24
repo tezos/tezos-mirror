@@ -825,6 +825,13 @@ let find_messages node_ctxt messages_hash =
       let is_first_block =
         pred_header.header.proto_level <> grand_parent_header.header.proto_level
       in
+      let*? messages =
+        Environment.wrap_tzresult
+        @@ List.map_e
+             (fun m ->
+               Sc_rollup.Inbox_message.(deserialize @@ unsafe_of_string m))
+             messages
+      in
       return_some
         {
           is_first_block;
@@ -853,7 +860,15 @@ let get_messages_without_proto_messages node_ctxt =
       let* msg = Store.Messages.read node_ctxt.store.messages messages_hash in
       match msg with
       | None -> return_none
-      | Some (messages, _block_hash) -> return_some messages)
+      | Some (messages, _block_hash) ->
+          let*? messages =
+            Environment.wrap_tzresult
+            @@ List.map_e
+                 (fun m ->
+                   Sc_rollup.Inbox_message.(deserialize @@ unsafe_of_string m))
+                 messages
+          in
+          return_some messages)
     node_ctxt
 
 let get_num_messages {store; _} hash =
@@ -868,7 +883,16 @@ let get_num_messages {store; _} hash =
   | Some (messages, _block_hash) -> return (List.length messages)
 
 let save_messages {store; _} key ~block_hash messages =
-  Store.Messages.append store.messages ~key ~header:block_hash ~value:messages
+  let open Lwt_result_syntax in
+  let*? messages =
+    Environment.wrap_tzresult
+    @@ List.map_e Sc_rollup.Inbox_message.serialize messages
+  in
+  Store.Messages.append
+    store.messages
+    ~key
+    ~header:block_hash
+    ~value:(messages :> string list)
 
 let get_full_l2_block node_ctxt block_hash =
   let open Lwt_result_syntax in

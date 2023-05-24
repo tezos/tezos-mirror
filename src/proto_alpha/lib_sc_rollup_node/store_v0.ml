@@ -103,12 +103,11 @@ module Messages =
     end)
     (Make_hash_index_key (Sc_rollup.Inbox_merkelized_payload_hashes.Hash))
     (struct
-      type t = Sc_rollup.Inbox_message.t list
+      type t = string list
 
       let name = "messages_list"
 
-      let encoding =
-        Data_encoding.(list @@ dynamic_size Sc_rollup.Inbox_message.encoding)
+      let encoding = Data_encoding.(list @@ dynamic_size (Variable.string' Hex))
 
       module Header = struct
         type t = Block_hash.t * Timestamp.t * int
