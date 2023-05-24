@@ -3305,8 +3305,9 @@ module Registration_section = struct
         ~stack_type
         ~stack_sampler:(fun _ rng_state () ->
           let log_time =
+            (* Chest generation takes too long time for [log_time > 20] *)
             Base_samplers.sample_in_interval
-              ~range:{min = 0; max = 29}
+              ~range:{min = 0; max = 20}
               rng_state
           in
           let time = Int.shift_left 1 log_time in
