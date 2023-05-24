@@ -43,6 +43,7 @@ module Parameters = struct
     coordinator_rpc_host : string;
     coordinator_rpc_port : int;
     committee_member_rpcs : (string * int) list;
+    timeout : int option;
   }
 
   type mode_settings =
@@ -114,6 +115,8 @@ let spawn_command dac_node =
 
 let raw_rpc (host, port) = Printf.sprintf "%s:%d" host port
 
+let localhost = "127.0.0.1"
+
 let spawn_config_init dac_node =
   let arg_command =
     [
@@ -177,7 +180,17 @@ let spawn_config_init dac_node =
           committee_member_params.address;
         ]
     | Observer
-        {coordinator_rpc_host; coordinator_rpc_port; committee_member_rpcs} ->
+        {
+          coordinator_rpc_host;
+          coordinator_rpc_port;
+          committee_member_rpcs;
+          timeout;
+        } ->
+        let with_timeout =
+          match timeout with
+          | Some t -> ["--timeout"; Int.to_string t]
+          | None -> []
+        in
         let coordinator_host =
           coordinator_rpc_host ^ ":" ^ Int.to_string coordinator_rpc_port
         in
@@ -195,7 +208,7 @@ let spawn_config_init dac_node =
           "rpc";
           "addresses";
         ]
-        @ committee_member_rpcs
+        @ committee_member_rpcs @ with_timeout
   in
   spawn_command dac_node (mode_command @ arg_command)
 
@@ -347,8 +360,8 @@ let create_coordinator ?(path = Constant.dac_node) ?name ?color ?data_dir
     ()
 
 let create_committee_member ?(path = Constant.dac_node) ?name ?color ?data_dir
-    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir
-    ?(coordinator_rpc_host = "127.0.0.1") ?coordinator_rpc_port ~address ~node
+    ?event_pipe ?(rpc_host = localhost) ?rpc_port ?reveal_data_dir
+    ?(coordinator_rpc_host = localhost) ?coordinator_rpc_port ~address ~node
     ~client () =
   let coordinator_rpc_port =
     match coordinator_rpc_port with None -> Port.fresh () | Some port -> port
@@ -371,14 +384,20 @@ let create_committee_member ?(path = Constant.dac_node) ?name ?color ?data_dir
     ()
 
 let create_observer ?(path = Constant.dac_node) ?name ?color ?data_dir
-    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir
-    ?(coordinator_rpc_host = "127.0.0.1") ?coordinator_rpc_port
+    ?event_pipe ?(rpc_host = localhost) ?rpc_port ?reveal_data_dir
+    ?(coordinator_rpc_host = localhost) ?coordinator_rpc_port ?timeout
     ~committee_member_rpcs ~node ~client () =
   let coordinator_rpc_port =
     match coordinator_rpc_port with None -> Port.fresh () | Some port -> port
   in
   let mode =
-    Observer {coordinator_rpc_host; coordinator_rpc_port; committee_member_rpcs}
+    Observer
+      {
+        coordinator_rpc_host;
+        coordinator_rpc_port;
+        committee_member_rpcs;
+        timeout;
+      }
   in
   create
     ~path
@@ -426,3 +445,33 @@ let run ?(wait_ready = true) ?env node =
   let* () = run ?env node in
   let* () = if wait_ready then wait_for_ready node else Lwt.return_unit in
   return ()
+
+let with_sleeping_node ?rpc_port ?(rpc_address = localhost) ~timeout f =
+  let make_host str =
+    match Ipaddr.of_string str with
+    | Ok (Ipaddr.V4 addr) -> Ipaddr.v6_of_v4 addr
+    | Ok (V6 addr) -> addr
+    | Error (`Msg _) ->
+        raise
+          (Invalid_argument
+             "Invalid rpc_address when initializing sleeping_node.")
+  in
+  let open Cohttp_lwt_unix in
+  let callback _conn _req _body =
+    let* _ = Lwt_unix.sleep timeout in
+    Server.respond_string ~status:`OK ~body:"ok" ()
+  in
+  let stop, resolver = Lwt.task () in
+  let stopper () = Lwt.wakeup_later resolver () in
+  let rpc_port = Option.value rpc_port ~default:(Port.fresh ()) in
+  let port = `Port rpc_port in
+  let host = Ipaddr.V6.to_string (make_host rpc_address) in
+  let server = Server.make ~callback () in
+  let _ =
+    let* ctx = Conduit_lwt_unix.init ~src:host () in
+    let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
+    Server.create ~ctx ~stop ~mode:(`TCP port) server
+  in
+  Lwt.finalize
+    (fun () -> f (rpc_address, rpc_port))
+    (fun () -> return (stopper ()))

@@ -171,16 +171,16 @@ let handle_get_certificate dac_plugin node_store raw_root_hash =
         V0 (V0.make raw_root_hash aggregate_signature witnesses)))
     value_opt
 
-let handle_get_missing_page cctxt page_store dac_plugin raw_root_hash =
+let handle_get_missing_page timeout cctxts page_store dac_plugin raw_root_hash =
   let open Lwt_result_syntax in
   let*? root_hash = Dac_plugin.raw_to_hash dac_plugin raw_root_hash in
-  let remote_store = Page_store.Remote.(init {cctxt; page_store}) in
-  let* preimage =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5142
-        Retrieve missing page from dac committee via "flooding". *)
-    Page_store.Remote.load dac_plugin remote_store root_hash
+  let remote_store =
+    Page_store.Remote_with_flooding.(init {timeout; cctxts; page_store})
   in
-  let*! () = Event.(emit fetched_missing_page raw_root_hash) in
+  let* preimage =
+    Page_store.Remote_with_flooding.load dac_plugin remote_store root_hash
+  in
+  let*! () = Event.emit_fetched_missing_page root_hash in
   return preimage
 
 let register_get_health_live cctxt directory =
@@ -239,12 +239,12 @@ let register_get_certificate node_store dac_plugin =
     (fun root_hash () () ->
       handle_get_certificate dac_plugin node_store root_hash)
 
-let register_get_missing_page dac_plugin page_store cctxt =
+let register_get_missing_page dac_plugin page_store cctxts timeout =
   add_service
     Tezos_rpc.Directory.register1
     RPC_services.V0.get_missing_page
     (fun root_hash () () ->
-      handle_get_missing_page cctxt page_store dac_plugin root_hash)
+      handle_get_missing_page timeout cctxts page_store dac_plugin root_hash)
 
 let register_get_pages dac_plugin page_store =
   add_service
@@ -393,11 +393,14 @@ module Committee_member = struct
 end
 
 module Observer = struct
-  let dynamic_rpc_dir dac_plugin coordinator_cctxt page_store =
+  let dynamic_rpc_dir dac_plugin committee_member_cctxts timeout page_store =
     Tezos_rpc.Directory.empty
     |> register_get_preimage dac_plugin page_store
-    |> register_get_missing_page dac_plugin page_store coordinator_cctxt
-    |> register_get_pages dac_plugin page_store
+    |> register_get_missing_page
+         dac_plugin
+         page_store
+         committee_member_cctxts
+         timeout
 end
 
 module Legacy = struct
@@ -422,13 +425,6 @@ module Legacy = struct
     let secret_key_uris_opt =
       Node_context.Legacy.secret_key_uris_opt legacy_node_ctxt
     in
-    let register_get_missing_page =
-      match legacy_node_ctxt.coordinator_cctxt with
-      | None -> fun dir -> dir
-      | Some cctxt ->
-          fun dir ->
-            dir |> register_get_missing_page dac_plugin page_store cctxt
-    in
     Tezos_rpc.Directory.empty
     |> register_post_store_preimage
          dac_plugin
@@ -445,7 +441,6 @@ module Legacy = struct
          rw_store
          page_store
     |> register_get_certificate rw_store dac_plugin
-    |> register_get_missing_page
 end
 
 let start ~rpc_address ~rpc_port node_ctxt =
@@ -463,8 +458,12 @@ let start ~rpc_address ~rpc_port node_ctxt =
           coordinator_node_ctxt
     | Committee_member _committee_member_node_ctxt ->
         Committee_member.dynamic_rpc_dir dac_plugin page_store
-    | Observer {coordinator_cctxt; _} ->
-        Observer.dynamic_rpc_dir dac_plugin coordinator_cctxt page_store
+    | Observer {committee_cctxts; timeout; _} ->
+        Observer.dynamic_rpc_dir
+          dac_plugin
+          committee_cctxts
+          (Float.of_int timeout)
+          page_store
     | Legacy legacy_node_ctxt ->
         Legacy.dynamic_rpc_dir
           dac_plugin

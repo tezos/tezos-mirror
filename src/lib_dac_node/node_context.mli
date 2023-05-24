@@ -83,6 +83,8 @@ module Observer : sig
     committee_cctxts : Dac_node_client.cctxt list;
         (** The list of [Dac_node_client.cctxt] used by the [Observer] node
         to send requests to each [Committee_member] node respectively. *)
+    timeout : int;
+        (** Timeout in seconds for fetching a missing page from [Committee_Member]. *)
   }
 end
 

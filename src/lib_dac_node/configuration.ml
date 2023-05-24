@@ -101,11 +101,19 @@ module Observer = struct
     coordinator_rpc_address : string;
     coordinator_rpc_port : int;
     committee_rpc_addresses : (string * int) list;
+    timeout : int;
   }
 
-  let make ~committee_rpc_addresses coordinator_rpc_address coordinator_rpc_port
-      =
-    {coordinator_rpc_address; coordinator_rpc_port; committee_rpc_addresses}
+  let default_timeout = 6
+
+  let make ~committee_rpc_addresses ?(timeout = default_timeout)
+      coordinator_rpc_address coordinator_rpc_port =
+    {
+      coordinator_rpc_address;
+      timeout;
+      coordinator_rpc_port;
+      committee_rpc_addresses;
+    }
 
   let encoding =
     Data_encoding.(
@@ -114,25 +122,30 @@ module Observer = struct
                coordinator_rpc_address;
                coordinator_rpc_port;
                committee_rpc_addresses;
+               timeout;
              } ->
           ( coordinator_rpc_address,
             coordinator_rpc_port,
-            committee_rpc_addresses ))
+            committee_rpc_addresses,
+            timeout ))
         (fun ( coordinator_rpc_address,
                coordinator_rpc_port,
-               committee_rpc_addresses ) ->
+               committee_rpc_addresses,
+               timeout ) ->
           {
             coordinator_rpc_address;
             coordinator_rpc_port;
             committee_rpc_addresses;
+            timeout;
           })
-        (obj3
+        (obj4
            (req "coordinator_rpc_address" string)
            (req "coordinator_rpc_port" uint16)
            (req
               "committee_rpc_addresses"
               (Data_encoding.list
-                 (obj2 (req "rpc_address" string) (req "rpc_port" uint16))))))
+                 (obj2 (req "rpc_address" string) (req "rpc_port" uint16))))
+           (req "timeout" Data_encoding.uint8)))
 
   let name = "Observer"
 end
@@ -225,11 +238,12 @@ let make_committee_member coordinator_rpc_address coordinator_rpc_port
        coordinator_rpc_port
        committee_member_address)
 
-let make_observer ~committee_rpc_addresses coordinator_rpc_address
+let make_observer ~committee_rpc_addresses ?timeout coordinator_rpc_address
     coordinator_rpc_port =
   Observer
     (Observer.make
        ~committee_rpc_addresses
+       ?timeout
        coordinator_rpc_address
        coordinator_rpc_port)
 

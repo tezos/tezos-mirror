@@ -98,6 +98,7 @@ val create_observer :
   ?reveal_data_dir:string ->
   ?coordinator_rpc_host:string ->
   ?coordinator_rpc_port:int ->
+  ?timeout:int ->
   committee_member_rpcs:(string * int) list ->
   node:Node.t ->
   client:Client.t ->
@@ -177,3 +178,13 @@ module Config_file : sig
       running, it needs to be restarted manually. *)
   val update : t -> (JSON.t -> JSON.t) -> unit
 end
+
+(** [with_sleeping_node] creates and runs an embedded node that sleeps for [timeout] 
+    seconds upon receiving any request then returns "ok". It is used to test 
+    timeout capabilities of clients. *)
+val with_sleeping_node :
+  ?rpc_port:int ->
+  ?rpc_address:string ->
+  timeout:float ->
+  (string * int -> unit Lwt.t) ->
+  unit Lwt.t

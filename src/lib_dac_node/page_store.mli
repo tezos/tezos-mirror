@@ -33,6 +33,9 @@ type error +=
       expected : Dac_plugin.raw_hash;
       actual : Dac_plugin.raw_hash;
     }
+  | Cannot_fetch_remote_page_with_flooding_strategy of {
+      hash : Dac_plugin.raw_hash;
+    }
 
 (** [S] is the module type defining the backend required for
     persisting DAC pages data onto the page storage. *)
@@ -94,6 +97,26 @@ type remote_configuration = {
    uses a connection to a Dac node to retrieve pages that are not
    saved locally. *)
 module Remote : S with type configuration = remote_configuration
+
+type remote_with_flooding_configuration = {
+  timeout : float;
+  cctxts : Dac_node_client.cctxt list;
+  page_store : Filesystem.t;
+}
+
+(** A [Page_store] implementation backed by the local filesystem, which
+   uses connections to a collection of Dac nodes to retrieve pages that are not
+   saved locally. It retrieves pages by sending the same page request to each remote
+   node and saves only 1 copy of the page locally. 
+   
+   It is typically used by the Observer node to retrieve missing pages from the DAC
+   committee members.
+   *)
+
+(** TODO: https://gitlab.com/tezos/tezos/-/issues/5672
+    Merge Remote_with_flooding into Remote *)
+module Remote_with_flooding :
+  S with type configuration = remote_with_flooding_configuration
 
 (**/**)
 
