@@ -59,6 +59,12 @@ let load_reward_coeff ctxt ~cycle =
   in
   return ctxt
 
+let compute_bonus ~total_supply ~total_frozen_stake ~previous_bonus =
+  ignore total_supply ;
+  ignore total_frozen_stake ;
+  ignore previous_bonus ;
+  default_bonus
+
 let compute_coeff =
   let q_400 = Q.of_int 400 in
   let q_min_per_year = Q.of_int 525600 in
