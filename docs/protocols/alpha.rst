@@ -104,3 +104,7 @@ Internal
 
 - Refactoring : rewards computed as a relative portion of the total amount of tez
   rewarded per minute (about 85tez/min). (MR :gl:`!8657`)
+
+- Introduce the notion of rollups “machine” which can compute the semantics of
+  a given rollup, but cannot be used to generate or verify proof. (MR
+  :gl:`!8815`)

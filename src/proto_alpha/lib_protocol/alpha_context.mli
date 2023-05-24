@@ -3740,6 +3740,12 @@ module Sc_rollup : sig
     [@@unboxed]
   end
 
+  module type MACHINE =
+    PVM.S
+      with type context = Context_binary.t
+       and type state = Context_binary.tree
+       and type proof = Sc_rollup_machine_no_proofs.void
+
   module Kind : sig
     type t = Example_arith | Wasm_2_0_0
 
@@ -3748,6 +3754,8 @@ module Sc_rollup : sig
     val pp : Format.formatter -> t -> unit
 
     val pvm_of : t -> PVM.t
+
+    val no_proof_machine_of : t -> (module MACHINE)
 
     val all : t list
 
