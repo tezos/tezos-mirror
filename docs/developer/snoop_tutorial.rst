@@ -48,11 +48,11 @@ kind.
      let generated_code_destination = None
      let tags = ["example"]
 
-Typically, a benchmark will depend on a set of parameters corresponding e.g. to
-the parameters of the samplers used to generate input data to the function
-being benchmarked. This corresponds to the type ``config``. A ``default_config``
-is provided, which can be overridden by specifying a well-formatted JSON file.
-This is made possible by defining a ``config_encoding`` using the
+Typically, a benchmark will depend on a set of parameters for the samplers which
+generate input data to the function being benchmarked. These parameters
+correspond to the type ``config``. A ``default_config`` is provided, which can
+be overridden by specifying a well-formatted JSON file. Reading and writing this
+file is made possible by defining a ``config_encoding`` using the
 :doc:`data-encoding <data_encoding>` library.
 
 .. code-block:: ocaml
@@ -74,7 +74,7 @@ reference. The ``workload`` corresponds to the information on the input of the
 function being benchmarked required to predict its execution time. Typically, it
 corresponds to some notion of "size" of the input. In order to be saved to disk,
 we must define a ``workload_encoding`` as well. The ``workload`` type is abstract
-from the outside of the module, however, for plotting purposes, it is necessary
+seen from the outside of the module, however, for plotting purposes, it is necessary
 to exhibit a vector-like structure on these workloads. The ``workload_to_vector``
 function maps workloads to sparse vectors. If one is not interested in plotting,
 this function can be made to always return ``Sparse_vec.String.zero``.
@@ -117,11 +117,11 @@ suspension yielding a benchmark when evaluated.
 
 One might wonder why this particular signature has been chosen, instead of
 returning directly a list of benchmarks, or simply requiring a benchmark
-generator to be defined.
+generator to be defined. The reasons for this are:
 
-- The current signature allows for setup code to be shared by all benchmarks
-  being generated (not the case here).
-- Returning a list of suspensions allows to delay the sampling process
+- the current signature allows for setup code to be shared by all benchmarks
+  being generated (not the case here);
+- returning a list of suspensions allows to delay the sampling process
   and the memory allocation associated to benchmark generation until
   actually needed, hence preventing memory leaks.
 
