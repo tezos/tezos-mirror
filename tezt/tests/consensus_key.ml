@@ -202,18 +202,7 @@ let test_update_consensus_key =
   let* () = Client.register_key ~consensus:key_c.alias key_b.alias client in
 
   Log.info "Bake until the end of the next cycle..." ;
-  let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
-  let* () =
-    check_current_level
-      client
-      {
-        level = 8;
-        level_position = 7;
-        cycle = 1;
-        cycle_position = 3;
-        expected_commitment = true;
-      }
-  in
+  let* () = bake_n_cycles (preserved_cycles + 1) client in
 
   Log.info "Bootstrap1 should not be able to bake anymore..." ;
   let* () =
@@ -239,20 +228,7 @@ let test_update_consensus_key =
   in
 
   Log.info "Bake until the end of the next cycle..." ;
-  let* () =
-    repeat 6 (fun () -> Client.bake_for_and_wait ~keys:[key_a.alias] client)
-  in
-  let* () =
-    check_current_level
-      client
-      {
-        level = 16;
-        level_position = 15;
-        cycle = 3;
-        cycle_position = 3;
-        expected_commitment = true;
-      }
-  in
+  let* () = bake_n_cycles (preserved_cycles + 1) ~keys:[key_a.alias] client in
 
   Log.info "We are not able to bake with `key_a` nor `key_c` anymore..." ;
   let* () = Client.bake_for ~expect_failure:true ~keys:[key_a.alias] client in
@@ -280,19 +256,10 @@ let test_update_consensus_key =
 
   Log.info "Bake until the end of the next cycle..." ;
   let* () =
-    repeat 6 (fun () ->
-        Client.bake_for_and_wait ~keys:[Constant.bootstrap1.alias] client)
-  in
-  let* () =
-    check_current_level
+    bake_n_cycles
+      (preserved_cycles + 1)
+      ~keys:[Constant.bootstrap1.alias]
       client
-      {
-        level = 24;
-        level_position = 23;
-        cycle = 5;
-        cycle_position = 3;
-        expected_commitment = true;
-      }
   in
 
   Log.info "Invalid drain: unregistered delegate." ;
