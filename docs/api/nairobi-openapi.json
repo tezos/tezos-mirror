@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "17.0~rc1"
+    "version": "17.0"
   },
   "paths": {
     "/": {
