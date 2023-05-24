@@ -42,6 +42,21 @@ module Messages :
      and type value := Sc_rollup.Inbox_message.t list
      and type header := Block_hash.t
 
+(** Storage for persisting inboxes. *)
+module Inboxes :
+  SIMPLE_INDEXED_FILE
+    with type key := Sc_rollup.Inbox.Hash.t
+     and type value := Sc_rollup.Inbox.t
+     and type header := unit
+
+(** Storage containing commitments and corresponding commitment hashes that the
+    rollup node has knowledge of. *)
+module Commitments :
+  SIMPLE_INDEXED_FILE
+    with type key := Sc_rollup.Commitment.Hash.t
+     and type value := Sc_rollup.Commitment.t
+     and type header := unit
+
 type +'a store = {
   l2_blocks : 'a L2_blocks.t;
   messages : 'a Messages.t;

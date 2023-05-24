@@ -307,6 +307,14 @@ module V2_migrations = struct
     let open Filename.Infix in
     storage_dir // "messages"
 
+  let commitments_store_location ~storage_dir =
+    let open Filename.Infix in
+    storage_dir // "commitments"
+
+  let inboxes_store_location ~storage_dir =
+    let open Filename.Infix in
+    storage_dir // "inboxes"
+
   let migrate_messages read_messages (v2_store : _ Store_v2.t)
       (l2_block : Sc_rollup_block.t) =
     let open Lwt_result_syntax in
@@ -321,23 +329,83 @@ module V2_migrations = struct
           ~header
           ~value:messages
 
+  let migrate_commitment read_commitment (v2_store : _ Store_v2.t)
+      (l2_block : Sc_rollup_block.t) =
+    let open Lwt_result_syntax in
+    match l2_block.header.commitment_hash with
+    | None -> return_unit
+    | Some commitment_hash -> (
+        let* v1_commitment = read_commitment commitment_hash in
+        match v1_commitment with
+        | None -> return_unit
+        | Some commitment ->
+            Store_v2.Commitments.append
+              v2_store.commitments
+              ~key:commitment_hash
+              ~value:commitment)
+
+  let migrate_inbox read_inbox (v2_store : _ Store_v2.t)
+      (l2_block : Sc_rollup_block.t) =
+    let open Lwt_result_syntax in
+    let* v1_inbox = read_inbox l2_block.header.inbox_hash in
+    match v1_inbox with
+    | None -> return_unit
+    | Some (inbox, ()) ->
+        Store_v2.Inboxes.append
+          v2_store.inboxes
+          ~key:l2_block.header.inbox_hash
+          ~value:inbox
+
   let final_actions ~storage_dir ~tmp_dir _ _ =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.remove_dir (messages_store_location ~storage_dir)
     in
     let*! () =
+      Lwt_utils_unix.remove_dir (commitments_store_location ~storage_dir)
+    in
+    let*! () =
+      Lwt_utils_unix.remove_dir (inboxes_store_location ~storage_dir)
+    in
+    let*! () =
       Lwt_unix.rename
         (messages_store_location ~storage_dir:tmp_dir)
         (messages_store_location ~storage_dir)
+    in
+    let*! () =
+      Lwt_unix.rename
+        (commitments_store_location ~storage_dir:tmp_dir)
+        (commitments_store_location ~storage_dir)
+    in
+    let*! () =
+      Lwt_unix.rename
+        (inboxes_store_location ~storage_dir:tmp_dir)
+        (inboxes_store_location ~storage_dir)
     in
     return_unit
 
   module From_v1 =
     Make (Store_v1) (Store_v2)
       (struct
-        let migrate_block_action v1_store =
-          migrate_messages Store_v1.(Messages.read v1_store.messages)
+        let migrate_block_action v1_store v2_store l2_block =
+          let open Lwt_result_syntax in
+          let* () =
+            migrate_messages
+              Store_v1.(Messages.read v1_store.messages)
+              v2_store
+              l2_block
+          and* () =
+            migrate_commitment
+              Store_v1.(Commitments.find v1_store.commitments)
+              v2_store
+              l2_block
+          and* () =
+            migrate_inbox
+              Store_v1.(Inboxes.read v1_store.inboxes)
+              v2_store
+              l2_block
+          in
+          return_unit
 
         let final_actions = final_actions
       end)
@@ -345,8 +413,25 @@ module V2_migrations = struct
   module From_v0 =
     Make (Store_v0) (Store_v2)
       (struct
-        let migrate_block_action v0_store =
-          migrate_messages Store_v0.(Messages.read v0_store.messages)
+        let migrate_block_action v0_store v2_store l2_block =
+          let open Lwt_result_syntax in
+          let* () =
+            migrate_messages
+              Store_v0.(Messages.read v0_store.messages)
+              v2_store
+              l2_block
+          and* () =
+            migrate_commitment
+              Store_v0.(Commitments.find v0_store.commitments)
+              v2_store
+              l2_block
+          and* () =
+            migrate_inbox
+              Store_v0.(Inboxes.read v0_store.inboxes)
+              v2_store
+              l2_block
+          in
+          return_unit
 
         let final_actions = final_actions
       end)

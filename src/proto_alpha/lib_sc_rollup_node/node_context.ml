@@ -678,17 +678,19 @@ let block_with_tick ({store; _} as node_ctxt) ~max_level tick =
 
 let get_commitment {store; _} commitment_hash =
   let open Lwt_result_syntax in
-  let* commitment = Store.Commitments.find store.commitments commitment_hash in
+  let* commitment = Store.Commitments.read store.commitments commitment_hash in
   match commitment with
   | None ->
       failwith
         "Could not retrieve commitment %a"
         Sc_rollup.Commitment.Hash.pp
         commitment_hash
-  | Some c -> return c
+  | Some (c, ()) -> return c
 
 let find_commitment {store; _} hash =
-  Store.Commitments.find store.commitments hash
+  let open Lwt_result_syntax in
+  let+ commitment = Store.Commitments.read store.commitments hash in
+  Option.map fst commitment
 
 let commitment_exists {store; _} hash =
   Store.Commitments.mem store.commitments hash
@@ -696,7 +698,9 @@ let commitment_exists {store; _} hash =
 let save_commitment {store; _} commitment =
   let open Lwt_result_syntax in
   let hash = Sc_rollup.Commitment.hash_uncarbonated commitment in
-  let+ () = Store.Commitments.add store.commitments hash commitment in
+  let+ () =
+    Store.Commitments.append store.commitments ~key:hash ~value:commitment
+  in
   hash
 
 let commitment_published_at_level {store; _} commitment =

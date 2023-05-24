@@ -67,6 +67,84 @@ module Messages =
       end
     end)
 
+module Empty_header = struct
+  type t = unit
+
+  let name = "empty"
+
+  let encoding = Data_encoding.unit
+
+  let fixed_size = 0
+end
+
+module Add_empty_header = struct
+  module Header = Empty_header
+
+  let header _ = ()
+end
+
+(** Versioned inboxes *)
+module Inboxes =
+  Indexed_store.Make_simple_indexed_file
+    (struct
+      let name = "inboxes"
+    end)
+    (Make_hash_index_key (Sc_rollup.Inbox.Hash))
+    (struct
+      type t = Sc_rollup.Inbox.t
+
+      let to_repr inbox =
+        inbox
+        |> Data_encoding.Binary.to_string_exn Sc_rollup.Inbox.encoding
+        |> Data_encoding.Binary.of_string_exn Sc_rollup_inbox_repr.encoding
+
+      let of_repr inbox =
+        inbox
+        |> Data_encoding.Binary.to_string_exn Sc_rollup_inbox_repr.encoding
+        |> Data_encoding.Binary.of_string_exn Sc_rollup.Inbox.encoding
+
+      let encoding =
+        Data_encoding.conv
+          (fun x -> to_repr x |> Sc_rollup_inbox_repr.to_versioned)
+          (fun x -> Sc_rollup_inbox_repr.of_versioned x |> of_repr)
+          Sc_rollup_inbox_repr.versioned_encoding
+
+      let name = "inbox"
+
+      include Add_empty_header
+    end)
+
+(** Versioned commitments *)
+module Commitments =
+  Indexed_store.Make_simple_indexed_file
+    (struct
+      let name = "commitments"
+    end)
+    (Make_hash_index_key (Sc_rollup.Commitment.Hash))
+    (struct
+      type t = Sc_rollup.Commitment.t
+
+      let to_repr commitment =
+        commitment
+        |> Data_encoding.Binary.to_string_exn Sc_rollup.Commitment.encoding
+        |> Data_encoding.Binary.of_string_exn Sc_rollup_commitment_repr.encoding
+
+      let of_repr commitment =
+        commitment
+        |> Data_encoding.Binary.to_string_exn Sc_rollup_commitment_repr.encoding
+        |> Data_encoding.Binary.of_string_exn Sc_rollup.Commitment.encoding
+
+      let encoding =
+        Data_encoding.conv
+          (fun x -> to_repr x |> Sc_rollup_commitment_repr.to_versioned)
+          (fun x -> Sc_rollup_commitment_repr.of_versioned x |> of_repr)
+          Sc_rollup_commitment_repr.versioned_encoding
+
+      let name = "commitment"
+
+      include Add_empty_header
+    end)
+
 type nonrec 'a store = {
   l2_blocks : 'a L2_blocks.t;
   messages : 'a Messages.t;
@@ -142,7 +220,9 @@ let load (type a) (mode : a mode) ~l2_blocks_cache_size data_dir :
   let* l2_blocks = L2_blocks.load mode ~path:(path "l2_blocks") ~cache_size in
   let* messages = Messages.load mode ~path:(path "messages") ~cache_size in
   let* inboxes = Inboxes.load mode ~path:(path "inboxes") ~cache_size in
-  let* commitments = Commitments.load mode ~path:(path "commitments") in
+  let* commitments =
+    Commitments.load mode ~path:(path "commitments") ~cache_size
+  in
   let* commitments_published_at_level =
     Commitments_published_at_level.load
       mode
