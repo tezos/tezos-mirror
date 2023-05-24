@@ -6,6 +6,7 @@ use core::str::Utf8Error;
 use evm_execution::EthereumError;
 use primitive_types::U256;
 use rlp::DecoderError;
+use tezos_ethereum::signatures::SigError;
 use tezos_smart_rollup_host::path::{OwnedPath, PathError};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 
@@ -36,6 +37,8 @@ pub enum Error {
     InvalidConversion,
     InvalidRunTransaction,
     Simulation(EthereumError),
+    InvalidSignature(SigError),
+    InvalidSignatureCheck,
 }
 
 impl From<PathError> for Error {

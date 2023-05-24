@@ -502,9 +502,11 @@ version = "0.1.0"
 dependencies = [
  "evm-execution",
  "hex",
+ "libsecp256k1",
  "num-traits",
  "primitive-types",
  "rlp",
+ "sha3",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
