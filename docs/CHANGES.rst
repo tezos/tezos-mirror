@@ -3,6 +3,15 @@
 Changelog
 '''''''''
 
+Version 17.0
+============
+
+Node
+----
+
+- Fixed a bug where the node could freeze when an old block was
+  requested during a store merge. (MR :gl:`!8952`)`
+
 Version 17.0-rc1
 ================
 

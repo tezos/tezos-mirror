@@ -79,9 +79,6 @@ Node
   systematically broadcasts only its new head (instead of sometime
   broadcasting a sparse history of the chain).
 
-- Fixed a bug where the node could freeze when an old block was
-  requested during a store merge. (MR :gl:`!8952`)`
-
 - Added version ``1`` to RPC ``POST ../helpers/parse/operations``. It can be
   used by calling the RPC with the parameter ``?version=1`` (default version is
   still ``0``). Version ``1`` allows the RPC to output ``attestation``,
