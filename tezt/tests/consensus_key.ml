@@ -63,11 +63,11 @@ module Helpers = struct
     let* _i = Node.wait_for_level node (level + 1) in
     Lwt.return_unit
 
-  let bake_n_cycles n client =
+  let bake_n_cycles ?keys n client =
     let rec loop n =
       if n = 0 then unit
       else
-        let* () = Client.bake_for_and_wait client in
+        let* () = Client.bake_for_and_wait ?keys client in
         loop (n - 1)
     in
     let* current_level = get_current_level client in
