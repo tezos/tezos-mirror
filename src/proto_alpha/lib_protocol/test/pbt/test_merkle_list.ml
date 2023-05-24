@@ -84,6 +84,18 @@ let test_scons_compute_equiv ~count =
       let compute = compute input in
       Hash.equal snoc compute)
 
+let test_of_list_compute_equiv ~count =
+  let open Merkle_list_helper in
+  QCheck2.Test.make ~count ~name:"of_list_compute_equiv" input (fun input ->
+      Hash.equal (root (of_list input)) (compute input))
+
+let test_of_list_snoc_tr_equiv ~count =
+  let open Merkle_list_helper in
+  QCheck2.Test.make ~count ~name:"of_list_snoc_tr_equiv" input (fun input ->
+      let of_list = of_list input in
+      let snoc_tr = List.fold_left snoc_tr nil input in
+      Merkle_list_helper.Internal_for_tests.equal of_list snoc_tr)
+
 let ok_exn = function Ok x -> x | Error _ -> raise (Invalid_argument "ok_exn")
 
 let test_check_path ~count =
@@ -119,6 +131,12 @@ let () =
           [
             test_scons_scons_tr_equiv ~count:1000;
             test_scons_compute_equiv ~count:1000;
+          ] );
+      ( "of_list_equiv",
+        qcheck_wrap
+          [
+            test_of_list_compute_equiv ~count:1000;
+            test_of_list_snoc_tr_equiv ~count:1000;
           ] );
       ( "check_path",
         qcheck_wrap
