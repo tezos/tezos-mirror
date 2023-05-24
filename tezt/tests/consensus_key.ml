@@ -626,9 +626,9 @@ let register ?(regression = true) title test =
   let manual_staking = Protocol.(protocol > Nairobi) in
   test ~manual_staking client baker_0 baker_1 account_0 account_1
 
-let test_register_delegate_with_consensus_key ?(expect_failure = false)
-    ?(baker = Constant.bootstrap1.alias) ~(new_delegate : Account.key)
-    ~(new_consensus_key : Account.key) client =
+let test_register_delegate_with_consensus_key ~manual_staking
+    ?(expect_failure = false) ?(baker = Constant.bootstrap1.alias)
+    ~(new_delegate : Account.key) ~(new_consensus_key : Account.key) client =
   let* () =
     transfer
       ~source:baker
@@ -645,6 +645,28 @@ let test_register_delegate_with_consensus_key ?(expect_failure = false)
       ~baker
       client
   in
+  let* () = Client.bake_for_and_wait client in
+
+  let* () =
+    if manual_staking then (
+      Log.info
+        "Add stake for `new_delegate` so that `new_consensus_key` can bake \
+         later on." ;
+      let* () =
+        Client.transfer
+          ~entrypoint:"stake"
+          ~burn_cap:Tez.one
+          ~amount:(Tez.of_int 500_000)
+          ~giver:new_delegate.alias
+          ~receiver:new_delegate.alias
+          client
+      in
+
+      Log.info "Bake until the end of the next cycle with `baker`..." ;
+      bake_n_cycles (preserved_cycles + 1) ~keys:[baker] client)
+    else return ()
+  in
+
   (* Check that one can bake with the consensus key *)
   let* () = Client.bake_for_and_wait ~keys:[new_consensus_key.alias] client in
   unit
@@ -837,10 +859,11 @@ let register ~protocols =
   let () =
     register
       "Test register with consensus key"
-      (fun ~manual_staking:_ client baker_0 _baker_1 account_0 account_1 ->
+      (fun ~manual_staking client baker_0 _baker_1 account_0 account_1 ->
         let new_delegate = account_0 in
         let new_consensus_key = account_1 in
         test_register_delegate_with_consensus_key
+          ~manual_staking
           ~baker:baker_0.alias
           ~new_delegate
           ~new_consensus_key
