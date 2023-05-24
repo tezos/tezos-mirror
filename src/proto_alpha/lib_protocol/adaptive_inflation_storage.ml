@@ -27,11 +27,13 @@
    rewards * coeff = rewards *)
 let default = Q.one
 
-let get_reward_coeff ctxt ~current_cycle =
+let get_reward_coeff ctxt ~cycle =
   let open Lwt_result_syntax in
   let ai_enable = (Raw_context.constants ctxt).adaptive_inflation.enable in
   if ai_enable then
-    let* k_opt = Storage.Reward_coeff.find ctxt current_cycle in
+    (* Even if AI is enabled, the storage can be empty: this is the case for
+       the first 5 cycles after AI is enabled *)
+    let* k_opt = Storage.Reward_coeff.find ctxt cycle in
     return (Option.value ~default k_opt)
   else return default
 
@@ -40,3 +42,31 @@ let compute_coeff ~total_supply ~total_frozen_stake =
   ignore total_frozen_stake ;
   default
 
+let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
+  let open Lwt_result_syntax in
+  let ai_enable = (Raw_context.constants ctxt).adaptive_inflation.enable in
+  if not ai_enable then return ctxt
+  else
+    let preserved = Constants_storage.preserved_cycles ctxt in
+    let for_cycle = Cycle_repr.add new_cycle preserved in
+    let* total_supply = Storage.Contract.Total_supply.get ctxt in
+    let* total_stake = Stake_storage.get_total_active_stake ctxt for_cycle in
+    let total_frozen_stake = Stake_repr.get_frozen total_stake in
+    let coeff = compute_coeff ~total_supply ~total_frozen_stake in
+    let*! ctxt = Storage.Reward_coeff.add ctxt for_cycle coeff in
+    return ctxt
+
+let clear_outdated_reward_data ctxt ~new_cycle =
+  match Cycle_repr.sub new_cycle 1 with
+  | None -> Lwt.return ctxt
+  | Some cycle -> Storage.Reward_coeff.remove ctxt cycle
+
+let update_stored_rewards_at_cycle_end ctxt ~new_cycle =
+  let open Lwt_result_syntax in
+  let* ctxt = compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle in
+  let*! ctxt = clear_outdated_reward_data ctxt ~new_cycle in
+  let* new_reward = get_reward_coeff ctxt ~cycle:new_cycle in
+  let ctxt =
+    Raw_context.update_reward_coeff_for_current_cycle ctxt new_reward
+  in
+  return ctxt

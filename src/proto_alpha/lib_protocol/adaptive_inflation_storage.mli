@@ -22,3 +22,15 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(** [update_stored_rewards_at_cycle_end ctxt ~new_cycle] updates
+    {!Storage.Reward_coeff} with a new coefficient that will be applied
+    [preserved_cycles] cycles after the given [new_cycle]. This new coefficient
+    depends on the current {!Storage.Total_supply}, and the total active stake
+    for when this coefficient is computed.
+
+    This function also removes obsolete values from {!Storage.Reward_coeff},
+    and stores the current cycle's coefficient in the context for faster
+    access. *)
+val update_stored_rewards_at_cycle_end :
+  Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t

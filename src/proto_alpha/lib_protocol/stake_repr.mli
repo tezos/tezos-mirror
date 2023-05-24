@@ -35,6 +35,9 @@ val encoding : t Data_encoding.t
 (** Sum of the [frozen] and [delegated] parts of a stake. *)
 val total : t -> Tez_repr.t tzresult
 
+(** Returns only the frozen part of a stake *)
+val get_frozen : t -> Tez_repr.t
+
 (** Weight for staking rights. *)
 val staking_weight : t -> int64
 
