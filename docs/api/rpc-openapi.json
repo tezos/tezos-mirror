@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "16.1"
+    "version": "17.0+dev"
   },
   "paths": {
     "/chains/{chain_id}": {
@@ -850,7 +850,17 @@
                               "maximum": 1073741823
                             },
                             "swap-linger": {
-                              "$ref": "#/components/schemas/timespan.system"
+                              "nullable": true,
+                              "oneOf": [
+                                {
+                                  "title": "Some",
+                                  "oneOf": [
+                                    {
+                                      "$ref": "#/components/schemas/timespan.system"
+                                    }
+                                  ]
+                                }
+                              ]
                             },
                             "binary-chunks-size": {
                               "type": "integer",
@@ -953,10 +963,16 @@
                               ]
                             },
                             "maintenance-idle-time": {
-                              "description": "How long to wait at most, in seconds, before running a maintenance loop.",
+                              "description": "How long to wait at most, in seconds, before running a maintenance loop. If null -- decoding to None -- is provided then the maintenance is disabled.",
+                              "nullable": true,
                               "oneOf": [
                                 {
-                                  "$ref": "#/components/schemas/timespan.system"
+                                  "title": "Some",
+                                  "oneOf": [
+                                    {
+                                      "$ref": "#/components/schemas/timespan.system"
+                                    }
+                                  ]
                                 }
                               ]
                             }
@@ -1003,6 +1019,10 @@
                               ]
                             }
                           }
+                        },
+                        "disable_peer_discovery": {
+                          "description": "This field should be used for testing purpose only. If set to [true], the node will not participate to the peer discovery mechanism. The node will not be able to find new peers to connect with.",
+                          "type": "boolean"
                         }
                       }
                     },
@@ -1198,13 +1218,6 @@
                           ]
                         },
                         {
-                          "title": "limanet",
-                          "type": "string",
-                          "enum": [
-                            "limanet"
-                          ]
-                        },
-                        {
                           "title": "mumbainet",
                           "type": "string",
                           "enum": [
@@ -1294,21 +1307,47 @@
                         "activated": {
                           "type": "boolean"
                         },
-                        "srs_size": {
+                        "use_mock_srs_for_testing": {
                           "nullable": true,
                           "oneOf": [
                             {
                               "title": "Some",
-                              "type": "integer",
-                              "minimum": -1073741824,
-                              "maximum": 1073741823
+                              "type": "object",
+                              "properties": {
+                                "slot_size": {
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
+                                },
+                                "page_size": {
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
+                                },
+                                "redundancy_factor": {
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
+                                },
+                                "number_of_shards": {
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
+                                }
+                              },
+                              "required": [
+                                "slot_size",
+                                "page_size",
+                                "redundancy_factor",
+                                "number_of_shards"
+                              ]
                             }
                           ]
                         }
                       },
                       "required": [
                         "activated",
-                        "srs_size"
+                        "use_mock_srs_for_testing"
                       ]
                     }
                   }
@@ -2065,6 +2104,15 @@
             "in": "path",
             "description": "A chain identifier. This is either a chain hash in Base58Check notation or a one the predefined aliases: 'main', 'test'.",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "protocol",
+            "in": "query",
+            "description": "Protocol_hash (Base58Check-encoded)",
+            "required": false,
             "schema": {
               "type": "string"
             }
