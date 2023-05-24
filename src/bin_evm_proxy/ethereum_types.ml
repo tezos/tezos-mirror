@@ -138,6 +138,8 @@ let hash_to_bytes (Hash h) = Hex.to_bytes_exn (`Hex h) |> Bytes.to_string
 
 let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
 
+let empty_hash = Hash "0x"
+
 (** Ethereum block hash representation from RPCs. *)
 type block = {
   number : block_height option;
@@ -432,7 +434,7 @@ type transaction_object = {
   gas : quantity;
   gasPrice : quantity;
   hash : hash;
-  input : hash option;
+  input : hash;
   nonce : quantity;
   to_ : address option;
   transactionIndex : quantity;
@@ -508,7 +510,7 @@ let transaction_object_encoding =
           (req "gas" quantity_encoding)
           (req "gasPrice" quantity_encoding)
           (req "hash" hash_encoding)
-          (req "input" (option hash_encoding))
+          (req "input" hash_encoding)
           (req "nonce" quantity_encoding)
           (req "to" (option address_encoding))
           (req "transactionIndex" quantity_encoding))

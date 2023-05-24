@@ -128,7 +128,7 @@ let transaction_object =
     gas = qty_f Z.zero;
     gasPrice = qty_f Z.zero;
     hash = transaction_hash;
-    input = None;
+    input = empty_hash;
     nonce = qty_f Z.zero;
     to_ = Some (address_of_string "0xA5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E");
     transactionIndex = qty_f Z.zero;
@@ -138,7 +138,7 @@ let transaction_object =
     s = hash_f @@ "00";
   }
 
-let call = hash_f "0x"
+let call = empty_hash
 
 let return = Lwt_result_syntax.return
 
@@ -172,7 +172,7 @@ let tx_pending =
     gasPrice = qty_f Z.zero;
     hash =
       Hash "af953a2d01f55cfe080c0c94150a60105e8ac3d51153058a1f03dd239dd08586";
-    input = Some (Hash "");
+    input = empty_hash;
     nonce = qty_f Z.zero;
     to_ = Some bootstrap_address2;
     transactionIndex = qty_f Z.zero;
@@ -191,7 +191,7 @@ let tx_queued =
     gasPrice = qty_f Z.zero;
     hash =
       Hash "af953a2d01f55cfe080c0c94150a60105e8ac3d51153058a1f03dd239dd08588";
-    input = Some (Hash "0x");
+    input = empty_hash;
     nonce = qty_f Z.zero;
     to_ = Some bootstrap_address;
     transactionIndex = qty_f Z.zero;

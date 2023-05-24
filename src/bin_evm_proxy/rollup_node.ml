@@ -589,7 +589,7 @@ module RPC = struct
             gas = gas_used;
             gasPrice = gas_price;
             hash;
-            input;
+            input = Option.value ~default:(Hash "") input;
             nonce;
             to_;
             transactionIndex = index;
