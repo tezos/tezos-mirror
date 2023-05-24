@@ -513,6 +513,14 @@ let post_chain_block_helpers_preapply_block ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "helpers"; "preapply"; "block"]
     Fun.id
 
+let post_chain_block_helpers_preapply_operations ?(chain = "main")
+    ?(block = "head") ~data () =
+  make
+    ~data
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "preapply"; "operations"]
+    Fun.id
+
 let post_chain_block_helpers_forge_operations ?(chain = "main")
     ?(block = "head") ~data () =
   make
