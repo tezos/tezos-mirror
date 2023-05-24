@@ -65,6 +65,8 @@ module type T = sig
 
   val snoc_tr : t -> elt -> t
 
+  val of_list : elt list -> t
+
   val compute : elt list -> h
 
   val path_encoding : path Data_encoding.t
@@ -304,16 +306,37 @@ end)
 
   let path_depth path = List.length path
 
-  let compute l =
-    let rec aux l =
+  let breadth_first_traversal ~leaf_func ~node_func ~empty ~res l =
+    let rec aux ~depth l =
       let rec pairs acc = function
         | [] -> List.rev acc
-        | [x] -> List.rev (hash2 x empty :: acc)
-        | x :: y :: xs -> pairs (hash2 x y :: acc) xs
+        | [x] -> List.rev (node_func x empty :: acc)
+        | x :: y :: xs -> pairs (node_func x y :: acc) xs
       in
-      match pairs [] l with [] -> empty | [h] -> h | pl -> aux pl
+      match pairs [] l with
+      | [] -> res depth empty
+      | [t] -> res depth t
+      | pl -> aux ~depth:(depth + 1) pl
     in
-    aux (List.map hash_elt l)
+    aux (List.map leaf_func l) ~depth:0
+
+  let compute =
+    breadth_first_traversal
+      ~leaf_func:hash_elt
+      ~node_func:hash2
+      ~empty
+      ~res:(fun _ x -> x)
+
+  let of_list l =
+    let depth, tree =
+      breadth_first_traversal
+        ~leaf_func:leaf_of
+        ~node_func:node_of
+        ~empty:Empty
+        ~res:(fun d l -> (d + 1, l))
+        l
+    in
+    {tree; depth; next_pos = List.length l}
 
   let root t = root t.tree
 
