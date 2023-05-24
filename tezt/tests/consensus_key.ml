@@ -34,6 +34,10 @@
 
 let hooks = Tezos_regression.hooks
 
+let blocks_per_cycle = 4
+
+let preserved_cycles = 1
+
 module Helpers = struct
   let level_type : RPC.level Check.typ =
     Check.convert
@@ -58,13 +62,27 @@ module Helpers = struct
     in
     let* _i = Node.wait_for_level node (level + 1) in
     Lwt.return_unit
+
+  let bake_n_cycles n client =
+    let rec loop n =
+      if n = 0 then unit
+      else
+        let* () = Client.bake_for_and_wait client in
+        loop (n - 1)
+    in
+    let* current_level = get_current_level client in
+    let current_level = current_level.level in
+    let nb_baked_blocks_in_cycle = current_level mod blocks_per_cycle in
+    let nb_blocks_to_bake = (n * blocks_per_cycle) - nb_baked_blocks_in_cycle in
+    Log.info
+      "Bake past %d cycles (from level %d to %d)"
+      n
+      current_level
+      (current_level + nb_blocks_to_bake) ;
+    loop nb_blocks_to_bake
 end
 
 open Helpers
-
-let blocks_per_cycle = 4
-
-let preserved_cycles = 1
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4243
    Instead of [~expect_failure:true], the helpers should take a
@@ -433,24 +451,6 @@ let test_update_consensus_key =
     ~error_msg:"Destination of the transaction has been credited." ;
 
   unit
-
-let bake_n_cycles n client =
-  let rec loop n =
-    if n = 0 then unit
-    else
-      let* () = Client.bake_for_and_wait client in
-      loop (n - 1)
-  in
-  let* current_level = Helpers.get_current_level client in
-  let current_level = current_level.level in
-  let nb_baked_blocks_in_cycle = current_level mod blocks_per_cycle in
-  let nb_blocks_to_bake = (n * blocks_per_cycle) - nb_baked_blocks_in_cycle in
-  Log.info
-    "Bake past %d cycles (from level %d to %d)"
-    n
-    current_level
-    (current_level + nb_blocks_to_bake) ;
-  loop nb_blocks_to_bake
 
 let update_consensus_key ?(expect_failure = false)
     ?(baker = Constant.bootstrap1.alias) ~(src : Account.key)
