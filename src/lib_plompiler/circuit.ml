@@ -141,7 +141,13 @@ let rec iterM f l =
       let* _ = f x in
       iterM f xs
 
-let iter2M f ls rs = iterM (fun (a, b) -> f a b) (List.combine ls rs)
+let iter2M f ls rs =
+  let lrs =
+    try List.combine ls rs
+    with Invalid_argument _ ->
+      failwith "iter2M: inputs are of different length"
+  in
+  iterM (fun (a, b) -> f a b) lrs
 
 let with_bool_check : bool repr t -> unit repr t =
  fun c s ->
