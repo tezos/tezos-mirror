@@ -2200,7 +2200,7 @@ module Delegate : sig
     val pending_updates :
       context ->
       public_key_hash ->
-      (Cycle.t * public_key_hash) list tzresult Lwt.t
+      (Cycle.t * public_key_hash * public_key) list tzresult Lwt.t
 
     val register_update :
       context -> public_key_hash -> public_key -> context tzresult Lwt.t

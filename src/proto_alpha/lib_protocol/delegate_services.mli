@@ -43,6 +43,16 @@ val list :
   unit ->
   Signature.Public_key_hash.t list shell_tzresult Lwt.t
 
+type consensus_key = {
+  consensus_key_pkh : Signature.Public_key_hash.t;
+  consensus_key_pk : Signature.Public_key.t;
+}
+
+type consensus_keys_info = {
+  active : consensus_key;
+  pendings : (Cycle.t * consensus_key) list;
+}
+
 type info = {
   full_balance : Tez.t;  (** Balance + Frozen balance *)
   current_frozen_deposits : Tez.t;
@@ -133,9 +143,7 @@ val consensus_key :
   'a #RPC_context.simple ->
   'a ->
   Signature.Public_key_hash.t ->
-  (Signature.Public_key_hash.t * (Cycle.t * Signature.Public_key_hash.t) list)
-  shell_tzresult
-  Lwt.t
+  consensus_keys_info shell_tzresult Lwt.t
 
 val participation :
   'a #RPC_context.simple ->

@@ -82,7 +82,9 @@ val active_pubkey_for_cycle :
 val pending_updates :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
-  (Cycle_repr.t * Signature.Public_key_hash.t) list tzresult Lwt.t
+  (Cycle_repr.t * Signature.Public_key_hash.t * Signature.Public_key.t) list
+  tzresult
+  Lwt.t
 
 (** Register a consensus-key update. *)
 val register_update :

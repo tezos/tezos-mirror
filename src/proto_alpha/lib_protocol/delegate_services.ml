@@ -72,6 +72,42 @@ let () =
     (function Balance_rpc_non_delegate pkh -> Some pkh | _ -> None)
     (fun pkh -> Balance_rpc_non_delegate pkh)
 
+type consensus_key = {
+  consensus_key_pkh : Signature.Public_key_hash.t;
+  consensus_key_pk : Signature.Public_key.t;
+}
+
+let consensus_key_encoding =
+  let open Data_encoding in
+  conv
+    (fun {consensus_key_pkh; consensus_key_pk} ->
+      (consensus_key_pkh, consensus_key_pk))
+    (fun (consensus_key_pkh, consensus_key_pk) ->
+      {consensus_key_pkh; consensus_key_pk})
+    (obj2
+       (req "pkh" Signature.Public_key_hash.encoding)
+       (req "pk" Signature.Public_key.encoding))
+
+type consensus_keys_info = {
+  active : consensus_key;
+  pendings : (Cycle.t * consensus_key) list;
+}
+
+let consensus_key_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {active; pendings} -> (active, pendings))
+    (fun (active, pendings) -> {active; pendings})
+    (obj2
+       (req "active" consensus_key_encoding)
+       (dft
+          "pendings"
+          (list
+             (merge_objs
+                (obj1 (req "cycle" Cycle.encoding))
+                consensus_key_encoding))
+          []))
+
 type info = {
   full_balance : Tez.t;
   current_frozen_deposits : Tez.t;
@@ -353,17 +389,7 @@ module S = struct
         "The active consensus key for a given delegate and the pending \
          consensus keys."
       ~query:RPC_query.empty
-      ~output:
-        Data_encoding.(
-          obj2
-            (req "active" Signature.Public_key_hash.encoding)
-            (dft
-               "pendings"
-               (list
-                  (obj2
-                     (req "cycle" Cycle.encoding)
-                     (req "pkh" Signature.Public_key_hash.encoding)))
-               []))
+      ~output:consensus_key_info_encoding
       RPC_path.(path / "consensus_key")
 
   let participation =
@@ -441,6 +467,9 @@ let register () =
       Vote.get_delegate_info ctxt pkh >>=? fun voting_info ->
       Delegate.Consensus_key.active_pubkey ctxt pkh >>=? fun consensus_key ->
       Delegate.Consensus_key.pending_updates ctxt pkh >|=? fun pendings ->
+      let pending_consensus_keys =
+        List.map (fun (cycle, pkh, _) -> (cycle, pkh)) pendings
+      in
       {
         full_balance;
         current_frozen_deposits = frozen_deposits.current_amount;
@@ -453,7 +482,7 @@ let register () =
         grace_period;
         voting_info;
         active_consensus_key = consensus_key.consensus_pkh;
-        pending_consensus_keys = pendings;
+        pending_consensus_keys;
       }) ;
   register1 ~chunked:false S.full_balance (fun ctxt pkh () () ->
       trace (Balance_rpc_non_delegate pkh) (check_delegate_registered ctxt pkh)
@@ -491,9 +520,20 @@ let register () =
       check_delegate_registered ctxt pkh >>=? fun () ->
       Vote.get_delegate_info ctxt pkh) ;
   register1 ~chunked:false S.consensus_key (fun ctxt pkh () () ->
-      Delegate.Consensus_key.active_pubkey ctxt pkh >>=? fun pk ->
+      Delegate.Consensus_key.active_pubkey ctxt pkh
+      >>=? fun {
+                 consensus_pk = consensus_key_pk;
+                 consensus_pkh = consensus_key_pkh;
+                 _;
+               } ->
       Delegate.Consensus_key.pending_updates ctxt pkh >>=? fun pendings ->
-      return (pk.consensus_pkh, pendings)) ;
+      let pendings =
+        List.map
+          (fun (cycle, consensus_key_pkh, consensus_key_pk) ->
+            (cycle, {consensus_key_pk; consensus_key_pkh}))
+          pendings
+      in
+      return {active = {consensus_key_pk; consensus_key_pkh}; pendings}) ;
   register1 ~chunked:false S.participation (fun ctxt pkh () () ->
       check_delegate_registered ctxt pkh >>=? fun () ->
       Delegate.participation_info ctxt pkh)
