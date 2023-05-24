@@ -47,6 +47,15 @@ module Internal_for_tests : sig
     | Seed_nonce_revelation_tip
     | Vdf_revelation_tip
 
+  (** [reward_from_constants ~coeff csts ~reward_kind] returns the amount of
+      rewards in {!Tez_repr.t} for the given [reward_kind], according to the
+      given parameters in [csts]. The (optional) value [coeff] is a
+      multiplicative factor applied to the rewards (default = 1).
+      It verifies [reward_from_constants ~coeff csts ~reward_kind =
+      coeff * reward_from_constants csts ~reward_kind]. *)
   val reward_from_constants :
-    csts:Constants_parametric_repr.t -> reward_kind:reward_kind -> Tez_repr.t
+    ?coeff:Q.t ->
+    Constants_parametric_repr.t ->
+    reward_kind:reward_kind ->
+    Tez_repr.t
 end

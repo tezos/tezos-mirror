@@ -139,7 +139,7 @@ let test_participation_rpc () =
   let allowed_missed_slots = expected_cycle_activity - minimal_cycle_activity in
   let endorsing_reward_per_slot =
     Alpha_context.Delegate.Rewards.Internal_for_tests.reward_from_constants
-      ~csts:csts.parametric
+      csts.parametric
       ~reward_kind:Endorsing_reward_per_slot
   in
   let expected_endorsing_rewards =
