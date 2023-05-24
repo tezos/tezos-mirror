@@ -296,7 +296,7 @@ let inline_linear ~nb_inputs gates =
       linear
     |> fst
     |> IMap.filter (fun w _ ->
-           w > nb_inputs && (not @@ ISet.mem w non_linear_wires))
+           w >= nb_inputs && (not @@ ISet.mem w non_linear_wires))
   in
 
   (* During the process of inlining, some wire occurrences will point to
@@ -704,7 +704,7 @@ let inline_renamings ~nb_inputs gates =
      in the same partition get renamed to the same wire (when renamed) *)
   let renaming =
     IMap.mapi
-      (fun i i_set -> if i <= nb_inputs then i else ISet.min_elt i_set)
+      (fun i i_set -> if i < nb_inputs then i else ISet.min_elt i_set)
       renaming_partitions
   in
   let free_wires =
