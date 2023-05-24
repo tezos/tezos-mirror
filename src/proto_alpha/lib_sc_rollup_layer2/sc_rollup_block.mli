@@ -54,8 +54,8 @@ type header = {
     messages.  *)
 type content = {
   inbox : Sc_rollup.Inbox.t;  (** Inbox for this block. *)
-  messages : Sc_rollup.Inbox_message.t list;
-      (** Messages added to the inbox in this block. *)
+  messages : string list;
+      (** Serialized messages added to the inbox in this block. *)
   commitment : Sc_rollup.Commitment.t option;
       (** Commitment, if any is computed for this block. [header.commitment =
           Some h] iff [commitment = Some c] and [hash c = h]. *)

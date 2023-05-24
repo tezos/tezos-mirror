@@ -860,15 +860,7 @@ let get_messages_without_proto_messages node_ctxt =
       let* msg = Store.Messages.read node_ctxt.store.messages messages_hash in
       match msg with
       | None -> return_none
-      | Some (messages, _block_hash) ->
-          let*? messages =
-            Environment.wrap_tzresult
-            @@ List.map_e
-                 (fun m ->
-                   Sc_rollup.Inbox_message.(deserialize @@ unsafe_of_string m))
-                 messages
-          in
-          return_some messages)
+      | Some (messages, _block_hash) -> return_some messages)
     node_ctxt
 
 let get_num_messages {store; _} hash =

@@ -39,7 +39,7 @@ type header = {
 
 type content = {
   inbox : Sc_rollup.Inbox.t;
-  messages : Sc_rollup.Inbox_message.t list;
+  messages : string list;
   commitment : Sc_rollup.Commitment.t option;
 }
 
@@ -158,7 +158,7 @@ let content_encoding =
           ~description:"Inbox for this block.")
        (req
           "messages"
-          (list (dynamic_size Sc_rollup.Inbox_message.encoding))
+          (list (dynamic_size (Variable.string' Hex)))
           ~description:"Messages added to the inbox in this block.")
        (opt
           "commitment"
