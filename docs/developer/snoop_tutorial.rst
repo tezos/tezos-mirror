@@ -158,7 +158,88 @@ This concludes the definition of the benchmark. Let's register it:
 Step 2: Running the benchmark, inferring parameters, and generating code
 ------------------------------------------------------------------------
 
-# Running the octez-snoop generate code for benchmarks command.
+Now, we are ready to run our benchmark. All we need is the full name of the
+benchmark, which involves namespaces. Fortunately, ``octez-snoop`` enjoys a few
+commands to help us if we are not sure what the final name of the benchmark is.
+
+::
+
+   octez-snoop list all benchmarks | grep blake2b
+
+Which prints:
+
+::
+
+   example/Blake2b_example: Illustrating tezos-benchmark by benchmarking blake2b
+
+We can also query more information about the benchmark, resulting from the
+registration process.
+
+::
+
+   octez-snoop display info for benchmark example/Blake2b_example
+
+And here is what we get.
+
+::
+
+   Name:
+       example/Blake2b_example
+   Filename:
+       src/lib_benchmark/example/blake2b.ml
+   Generated code destination:
+       Destination not specified
+   Info:
+       Illustrating tezos-benchmark by benchmarking blake2b
+   Tags:
+       example
+   Models:
+       blake2b:
+           Aggregated model containing the following abstract models:
+               example/Blake2b_example
+               builtin/timer_model
+
+Models and other entities that Snoop manipulates can be displayed, and
+:ref:`the Snoop manual <benchmark_tool_manual>` has a dedicated section that we
+can explore.
+
+Also, we need to install some Python libraries before going further.
+
+::
+
+   pip install scikit-learn statsmodels
+
+Now we can proceed with our initial goal, and ask Snoop to perform some
+measurements and generate OCaml code that reflects the gas cost of running
+``blake2b`` depending on its input.
+
+::
+
+   octez-snoop generate code for benchmarks example/Blake2b_example --out-dir /tmp/snoop_results
+
+The tool is quite verbose, but we will not detail what it is telling us here;
+this is the purpose of the :doc:`Snoop in-depth example <snoop_example>` section
+of the documentation. Two lines are worth noticing though.
+
+::
+
+   Adding solution example/blake2b_ns_p_byte := 0.976187
+   Adding solution example/blake2b_const := 295.080202
+
+These are the values that ``octez-snoop`` has inferred for the parameters of the
+model we declared, and based on the measurements it performed. The obtained
+values are highly dependent on the architecture of the computer and the
+processes running in parallel while measuring the execution time.
+
+What Snoop did was to:
+
+- run the benchmark on a certain number of random inputs, and a certain number
+  of times for each input;
+- infer values for the model parameters so that the model fits as closely as
+  possible the measures obtained at the previous step;
+- generate an OCaml function representing the model, where rational values are
+  approximated using integers manipulation;
+- plot the model and the measurements together in a report.
 
 Step 3: checking the generated files
 ------------------------------------
