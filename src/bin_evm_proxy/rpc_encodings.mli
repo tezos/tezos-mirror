@@ -209,7 +209,7 @@ module Get_block_by_hash :
 
 module Get_code :
   METHOD
-    with type m_input = Ethereum_types.hash * Ethereum_types.block_param
+    with type m_input = Ethereum_types.address * Ethereum_types.block_param
      and type m_output = Ethereum_types.hash
 
 module Gas_price :

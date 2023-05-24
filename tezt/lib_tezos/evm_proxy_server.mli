@@ -68,3 +68,7 @@ val call_evm_rpc : t -> request -> JSON.t Lwt.t
 (** [batch_evm_rpc proxy_server ~requests] sends multiple JSON-RPC requests to the
     [proxy_server], for the given [requests]. *)
 val batch_evm_rpc : t -> request list -> JSON.t Lwt.t
+
+(** [fetch_contract_code proxy_server contract] returns the code associated to
+    the given contract in the rollup. *)
+val fetch_contract_code : t -> string -> string Lwt.t

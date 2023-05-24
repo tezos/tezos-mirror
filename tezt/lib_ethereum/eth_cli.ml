@@ -73,7 +73,7 @@ let add_abi ~label ~abi () = spawn_command ["abi:add"; label; abi]
 let deploy ~source_private_key ~endpoint ~abi ~bin () =
   let decode json =
     let open JSON in
-    json |-> "address" |> as_string
+    json |-> "receipt" |-> "contractAddress" |> as_string
   in
   spawn_command_and_read
     [
