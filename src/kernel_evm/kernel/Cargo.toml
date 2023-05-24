@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 #
 # SPDX-License-Identifier: MIT
 
@@ -30,6 +31,15 @@ path = "../../kernel_sdk/debug"
 
 [dependencies.tezos-smart-rollup-encoding]
 path = "../../kernel_sdk/encoding"
+
+[dependencies.installer-kernel]
+path = "../../kernel_sdk/installer-kernel"
+
+[dependencies.tezos-smart-rollup-installer-config]
+path = "../../kernel_sdk/installer-config"
+
+[dependencies.tezos-smart-rollup-installer]
+path = "../../kernel_sdk/installer-client"
 
 [dev-dependencies.tezos-smart-rollup-mock]
 path = "../../kernel_sdk/mock"

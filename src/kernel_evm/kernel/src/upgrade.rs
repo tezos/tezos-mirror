@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -13,6 +14,14 @@ use primitive_types::{H160, U256};
 use sha3::{Digest, Keccak256};
 use tezos_ethereum::signatures::{caller, signature};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup_debug::debug_msg;
+use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_installer::installer::with_config_program;
+use tezos_smart_rollup_installer::{KERNEL_BOOT_PATH, PREPARE_KERNEL_PATH};
+use tezos_smart_rollup_installer_config::binary::owned::{
+    OwnedConfigInstruction, OwnedConfigProgram,
+};
 
 // TODO: https://gitlab.com/tezos/tezos/-/issues/5894, define the dictator key
 // via the config installer set function
@@ -72,4 +81,46 @@ pub fn check_dictator_signature(
     } else {
         Err(Error::InvalidSignatureCheck)
     }
+}
+
+// Path that will contain the config interpretation.
+pub const CONFIG_INTERPRETER_PATH: RefPath =
+    RefPath::assert_from(b"/installer/config_interpreter");
+
+// TODO: https://gitlab.com/tezos/tezos/-/issues/5907, expose an explicit kernel
+// upgrade function in the SDK that would move most of the code below.
+pub fn upgrade_kernel<Host: Runtime>(
+    host: &mut Host,
+    root_hash: [u8; PREIMAGE_HASH_SIZE],
+) -> Result<(), Error> {
+    debug_msg!(host, "Kernel upgrade initialisation.\n");
+    let root_hash = root_hash.to_vec();
+
+    // Create config consisting of a reveal instruction, followed by a move one.
+    let reveal_instructions = vec![
+        OwnedConfigInstruction::reveal_instr(
+            root_hash.into(),
+            OwnedPath::from(PREPARE_KERNEL_PATH),
+        ),
+        OwnedConfigInstruction::move_instr(
+            OwnedPath::from(PREPARE_KERNEL_PATH),
+            OwnedPath::from(KERNEL_BOOT_PATH),
+        ),
+    ];
+
+    let kernel_config = with_config_program(OwnedConfigProgram(reveal_instructions));
+
+    host.store_write_all(&CONFIG_INTERPRETER_PATH, &kernel_config)?;
+
+    if let Err(e) = installer_kernel::install_kernel(host, CONFIG_INTERPRETER_PATH) {
+        debug_msg!(
+            host,
+            "Error \"{}\" was detected during kernel installation.\n",
+            e
+        );
+    } else {
+        debug_msg!(host, "Kernel is ready to be upgraded.\n");
+    }
+
+    Ok(())
 }
