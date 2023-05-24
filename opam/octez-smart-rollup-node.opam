@@ -21,6 +21,7 @@ depends: [
   "octez-injector"
   "tezos-version"
   "octez-smart-rollup"
+  "tezos-layer2-store"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

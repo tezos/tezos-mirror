@@ -17,7 +17,8 @@
   prometheus-app
   octez-injector
   tezos-version.value
-  octez-smart-rollup)
+  octez-smart-rollup
+  tezos_layer2_store)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -27,4 +28,5 @@
   -open Tezos_client_base_unix
   -open Octez_injector
   -open Tezos_version_value
-  -open Octez_smart_rollup))
+  -open Octez_smart_rollup
+  -open Tezos_layer2_store))
