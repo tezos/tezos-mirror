@@ -209,6 +209,16 @@ let make_run_operation_input ?chain_id t client =
         ("chain_id", `String chain_id);
       ])
 
+let make_preapply_operation_input ~protocol ~signature t =
+  let protocol = Protocol.hash protocol in
+  `O
+    [
+      ("protocol", `String protocol);
+      ("branch", `String t.branch);
+      ("contents", t.contents);
+      ("signature", `String (Tezos_crypto.Signature.to_b58check signature));
+    ]
+
 module Consensus = struct
   type t =
     | Consensus of {

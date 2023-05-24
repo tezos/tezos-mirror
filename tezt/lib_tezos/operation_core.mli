@@ -183,6 +183,15 @@ val inject_operations :
    [chain_id] when it is not provided. *)
 val make_run_operation_input : ?chain_id:string -> t -> Client.t -> JSON.u Lwt.t
 
+(** Craft a json representing the full operation, in a format that is
+   compatible with the [preapply/operations] RPC
+   ({!RPC.post_chain_block_helpers_preapply_operations}).
+
+   This json contains many more fields than the one produced by the
+   {!json} function above. *)
+val make_preapply_operation_input :
+  protocol:Protocol.t -> signature:Tezos_crypto.Signature.t -> t -> JSON.u
+
 module Consensus : sig
   (** A representation of a consensus operation. *)
   type t
