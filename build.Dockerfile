@@ -1,6 +1,9 @@
 ARG BASE_IMAGE=registry.gitlab.com/tezos/opam-repository
 ARG BASE_IMAGE_VERSION
-FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION}
+ARG RUST_TOOLCHAIN_IMAGE
+ARG RUST_TOOLCHAIN_IMAGE_VERSION
+
+FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as without-evm-artifacts
 # use alpine /bin/ash and set pipefail.
 # see https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 SHELL ["/bin/ash", "-o", "pipefail", "-c"]
@@ -11,7 +14,7 @@ ARG GIT_SHORTREF
 ARG GIT_DATETIME
 ARG GIT_VERSION
 WORKDIR /home/tezos
-RUN mkdir -p /home/tezos/tezos/scripts /home/tezos/tezos/script-inputs /home/tezos/tezos/parameters
+RUN mkdir -p /home/tezos/tezos/scripts /home/tezos/tezos/script-inputs /home/tezos/tezos/parameters /home/tezos/evm_kernel
 COPY --chown=tezos:nogroup Makefile tezos
 COPY --chown=tezos:nogroup script-inputs/active_protocol_versions tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/active_protocol_versions_without_number tezos/script-inputs/
@@ -35,3 +38,15 @@ RUN while read -r protocol; do \
     mkdir -p tezos/parameters/"$protocol"-parameters && \
     cp tezos/src/proto_"$(echo "$protocol" | tr - _)"/parameters/*.json tezos/parameters/"$protocol"-parameters; \
     done < tezos/script-inputs/active_protocol_versions
+
+FROM ${RUST_TOOLCHAIN_IMAGE}:${RUST_TOOLCHAIN_IMAGE_VERSION} AS layer2-builder
+WORKDIR /home/tezos/
+RUN mkdir -p /home/tezos/evm_kernel
+COPY --chown=tezos:nogroup kernels.mk evm_kernel
+COPY --chown=tezos:nogroup src evm_kernel/src
+RUN make -C evm_kernel/src/kernel_evm build-deps && make -C evm_kernel -f kernels.mk evm_kernel.wasm
+
+# We move the EVM kernel in the final image in a dedicated stage to parallelize
+# the two builder stages.
+FROM without-evm-artifacts as with-evm-artifacts
+COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/evm_kernel.wasm evm_kernel

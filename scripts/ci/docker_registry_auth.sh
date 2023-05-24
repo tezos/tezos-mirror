@@ -27,6 +27,8 @@ echo "CI_DOCKER_HUB=${CI_DOCKER_HUB:-}"
 echo "CI_PROJECT_NAME=${CI_PROJECT_NAME}"
 echo "CI_PROJECT_NAMESPACE=${CI_PROJECT_NAMESPACE}"
 echo "IMAGE_ARCH_PREFIX=${IMAGE_ARCH_PREFIX:-}"
+echo "DOCKER_BUILD_TARGET=${DOCKER_BUILD_TARGET}"
+echo "RUST_TOOLCHAIN_IMAGE=${RUST_TOOLCHAIN_IMAGE}"
 
 # CI_DOCKER_HUB is used to switch to Docker Hub if credentials are available with CI_DOCKER_AUTH
 # /!\ CI_DOCKER_HUB can be unset, CI_DOCKER_AUTH is only available on protected branches
