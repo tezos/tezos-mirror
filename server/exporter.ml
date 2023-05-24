@@ -26,8 +26,23 @@
 open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
 
 let parse_block_row
-    ( ((hash, predecessor), delegate, delegate_alias, round),
-      (timestamp, reception_time, source) ) acc =
+    ((hash, predecessor, delegate, delegate_alias), (round, timestamp)) acc =
+  Tezos_crypto.Hashed.Block_hash.Map.add
+    hash
+    Teztale_lib.Data.Block.
+      {
+        hash;
+        predecessor;
+        delegate;
+        delegate_alias;
+        round;
+        reception_times = [];
+        timestamp;
+        nonce = None;
+      }
+    acc
+
+let parse_block_reception_row (hash, reception_time, source) acc =
   Tezos_crypto.Hashed.Block_hash.Map.update
     hash
     (function
@@ -55,50 +70,45 @@ let parse_block_row
                 timestamp;
                 nonce;
               }
-      | None ->
-          Some
-            Teztale_lib.Data.Block.
-              {
-                hash;
-                predecessor;
-                delegate;
-                delegate_alias;
-                round;
-                reception_times = [(source, reception_time)];
-                timestamp;
-                nonce = None;
-              })
+      | None -> None)
     acc
 
 let select_blocks db_pool level =
-  let q =
-    "SELECT b.hash, p.hash, d.address, d.alias, b.round, b.timestamp, \
-     r.timestamp, n.name FROM blocks b, blocks_reception r, delegates d , \
-     nodes n ON r.block = b.id AND d.id = b.baker AND n.id = r.source LEFT \
-     JOIN blocks p ON p.id = b.predecessor WHERE b.level = ?"
-  in
-  let request =
+  let block_request =
     Caqti_request.Infix.(
       Caqti_type.int32
       ->* Caqti_type.(
             tup2
               (tup4
-                 (tup2
-                    Sql_requests.Type.block_hash
-                    (option Sql_requests.Type.block_hash))
+                 Sql_requests.Type.block_hash
+                 (option Sql_requests.Type.block_hash)
                  Sql_requests.Type.public_key_hash
-                 (option string)
-                 int32)
-              (tup3 Sql_requests.Type.time_protocol ptime string)))
-      q
+                 (option string))
+              (tup2 int32 Sql_requests.Type.time_protocol)))
+      "SELECT b.hash, p.hash, d.address, d.alias, b.round, b.timestamp FROM \
+       blocks b, delegates d ON d.id = b.baker LEFT JOIN blocks p ON p.id = \
+       b.predecessor WHERE b.level = ?"
+  in
+  let* blocks =
+    Caqti_lwt.Pool.use
+      (fun (module Db : Caqti_lwt.CONNECTION) ->
+        Db.fold
+          block_request
+          parse_block_row
+          level
+          Tezos_crypto.Hashed.Block_hash.Map.empty)
+      db_pool
+  in
+  let reception_request =
+    Caqti_request.Infix.(
+      Caqti_type.int32
+      ->* Caqti_type.(tup3 Sql_requests.Type.block_hash ptime string))
+      "SELECT b.hash, r.timestamp, n.name FROM blocks b, blocks_reception r , \
+       nodes n ON r.block = b.id AND n.id = r.source WHERE b.level = ?"
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
-      Db.fold
-        request
-        parse_block_row
-        level
-        Tezos_crypto.Hashed.Block_hash.Map.empty)
+      Db.fold reception_request parse_block_reception_row level blocks)
     db_pool
 
 module Op_key = struct
