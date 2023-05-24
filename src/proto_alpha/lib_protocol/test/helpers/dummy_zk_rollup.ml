@@ -408,10 +408,7 @@ end = struct
   let circuit_map =
     let get_circuit _name c =
       let r = LibCircuit.get_cs ~optimize:true c in
-      let _initial, public_input_size = LibCircuit.get_inputs c in
-      ( Plonk.Circuit.to_plonk ~public_input_size r.cs,
-        public_input_size,
-        r.solver )
+      (Plonk.Circuit.to_plonk r, r.public_input_size, r.solver)
     in
     SMap.of_list
     @@ List.map

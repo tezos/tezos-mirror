@@ -281,10 +281,8 @@ module Make_common (MP : Distribution.Main_protocol.S) = struct
         transcript,
         ( cmt_perm_and_plook,
           commitment_wires,
-          randomness.beta_perm,
-          randomness.gamma_perm,
-          randomness.beta_rc,
-          randomness.gamma_rc,
+          randomness.beta,
+          randomness.gamma,
           randomness.delta ) )
 
   let distributed_prover_main ~workers ~inputs
@@ -298,7 +296,7 @@ module Make_common (MP : Distribution.Main_protocol.S) = struct
         (hash_verifier_inputs (to_verifier_inputs pp inputs))
         pp
     in
-    let* pp_proof, _transcript, (perm_and_plook, wires_cm, _, _, _, _, _) =
+    let* pp_proof, _transcript, (perm_and_plook, wires_cm, _, _, _) =
       distributed_prover ~workers ~pp_prove:pp_distributed_prove_main pp ~inputs
     in
     return {perm_and_plook; wires_cm; pp_proof}
@@ -408,40 +406,28 @@ module Super_impl (PI : Aplonk.Pi_parameters.S) = struct
         transcript )
 
   let distributed_prove_super_aggregation ~workers
-      (pp : Main_Pack.prover_public_parameters) ~input_commit_infos ~inputs =
+      (pp : Main_Pack.prover_public_parameters) ~input_commit_funcs ~inputs =
     let open Common in
     let open Main_Pack in
     let open D in
     (* TODO: can we commit only to the hidden pi?*)
-    let public_inputs_map, cms_pi = hash_pi pp input_commit_infos inputs in
+    let public_inputs_map, cms_pi = hash_pi pp input_commit_funcs inputs in
     (* add the PI in the transcript *)
     let pp = update_prv_pp_transcript_with_pi pp cms_pi in
-    let commit_to_answers_map = commit_to_answers_map input_commit_infos in
     let* ( (pp_proof, PP.{answers; batch; alpha; x; r; cms_answers; t_answers}),
            _transcript,
-           (perm_and_plook, wires_cm, beta, gamma, beta_rc, gamma_rc, delta) ) =
+           (perm_and_plook, wires_cm, beta, gamma, delta) ) =
       distributed_prover
         ~workers
         ~pp_prove:
-          (pp_distributed_prove_super_aggregation_main ~commit_to_answers_map)
+          (pp_distributed_prove_super_aggregation_main
+             ~commit_to_answers_map:
+               (SMap.map (fun f -> f.answers) input_commit_funcs))
         pp
         ~inputs
     in
     let ids_batch =
-      (* TODO #5551
-         Implement Plookup
-      *)
-      let rd =
-        {
-          beta_perm = beta;
-          gamma_perm = gamma;
-          beta_plook = Scalar.one;
-          gamma_plook = Scalar.one;
-          beta_rc;
-          gamma_rc;
-          delta;
-        }
-      in
+      let rd = {beta; gamma; delta} in
       compute_ids_batch pp rd alpha x public_inputs_map answers cms_answers
     in
     return
@@ -452,8 +438,6 @@ module Super_impl (PI : Aplonk.Pi_parameters.S) = struct
           alpha;
           beta;
           gamma;
-          beta_rc;
-          gamma_rc;
           delta;
           x;
           r;
@@ -471,7 +455,7 @@ module Super_impl (PI : Aplonk.Pi_parameters.S) = struct
       distributed_prove_super_aggregation
         ~workers
         pp.main_pp
-        ~input_commit_infos:(input_commit_infos pp)
+        ~input_commit_funcs:(input_commit_funcs pp inputs)
         ~inputs
     in
     return (meta_proof pp inputs distributed_proof)

@@ -77,7 +77,7 @@ module Make (Main : Distribution.Main_protocol.S) : S = struct
                 let content, rem = worker_commit_to_wires pp content in
                 return (Msg.Commit_to_wires_res {index; content}, rem)))
       in
-      let* {f_map; _}, {beta_plook; gamma_plook; beta_rc; gamma_rc} =
+      let* {f_map; _}, {beta; gamma} =
         handle_request
           main_pid
           ~step:Msg.S_ctp
@@ -98,15 +98,7 @@ module Make (Main : Distribution.Main_protocol.S) : S = struct
         Prover.build_gates_plook_rc1_identities
           ~shifts_map
           pp
-          {
-            beta_plook;
-            gamma_plook;
-            beta_rc;
-            gamma_rc;
-            beta_perm = Bls.Scalar.zero;
-            gamma_perm = Bls.Scalar.zero;
-            delta = Bls.Scalar.zero;
-          }
+          {beta; gamma; delta = Bls.Scalar.zero}
           inputs_map
       in
       let evaluated_ids = identities evaluations in

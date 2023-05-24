@@ -111,12 +111,6 @@ module StringMap = struct
       failwith "sub_map : first argument is not contained in the second." ;
     res
 
-  let two_maps_of_pair_map m =
-    fold
-      (fun k (v1, v2) (acc1, acc2) -> (add k v1 acc1, add k v2 acc2))
-      m
-      (empty, empty)
-
   let update_keys f map = fold (fun k v acc -> add (f k) v acc) map empty
 
   module Aggregation = struct
@@ -135,9 +129,9 @@ module StringMap = struct
       let len = String.length (string_of_int (n - 1)) in
       String.(make (len - length str) '0') ^ str
 
-    let add_prefix ?(no_sep = false) ?(n = 1) ?(i = 0) ?(shift = 0) prefix str =
+    let add_prefix ?(no_sep = false) ?(n = 0) ?(i = 0) ?(shift = 0) prefix str =
       let prefix = if prefix = "" || no_sep then prefix else prefix ^ sep in
-      if n = 1 then prefix ^ str else prefix ^ padded ~n (i + shift) ^ sep ^ str
+      if n = 0 then prefix ^ str else prefix ^ padded ~n (i + shift) ^ sep ^ str
 
     let build_all_names prefix n name =
       List.init n (fun i -> add_prefix ~n ~i prefix name)
@@ -178,6 +172,14 @@ module StringMap = struct
 
     let select_answers_by_circuit circuit_name =
       map (filter_by_circuit_name circuit_name)
+
+    let add_map_list_map m1 m2 =
+      mapi
+        (fun k l1 ->
+          match find_opt k m2 with
+          | Some l2 -> List.map2 union_disjoint l1 l2
+          | None -> l1)
+        m1
   end
 end
 
@@ -192,6 +194,7 @@ module type S = sig
 
   val values : 'a t -> 'a list
 
+  (* Splits a map of pairs into a pair of maps *)
   val to_pair : ('a * 'b) t -> 'a t * 'b t
 
   (* [add_unique k v map] adds [k -> v] to [map] & throw an error if [k] is
@@ -215,9 +218,6 @@ module type S = sig
   *)
   val sub_map : 'a t -> 'b t -> 'b t
 
-  (* Splits a map of couple into a couple of maps *)
-  val two_maps_of_pair_map : ('a * 'b) t -> 'a t * 'b t
-
   (* USE WITH CAUTION : be sure your update function won’t create duplications *)
   val update_keys : (key -> key) -> 'a t -> 'a t
 
@@ -237,6 +237,8 @@ module type S = sig
        allow a numbering until [n] with the same number of caracters
        for instance, [prefix ~n:11 ~i:5 ~shift:1 "hello" "world"] will return
        "06~hello~world"
+       [n] is zero by default, this means if no n is specified, no idx will be
+        added
        [no_sep] is false by default ; if set to true, the separator before the
         string to prefix will be ommitted :
        [prefix ~no_sep:true ~n:11 ~i:5 ~shift:1 "hello" "world"] will return
@@ -307,6 +309,9 @@ module type S = sig
        and filters the keys of the inner map, keeping the elements whose key
        corresponds to the given circuit name. *)
     val select_answers_by_circuit : string -> 'a t t -> 'a t t
+
+    (* [add_map_list_map m1 m2] will merge [m1] & [m2] ; the resulting map will contain the same keys as [m1] ; [m1] & [m2] can be disjoint, if a key is not found in [m2], the resulting map contains the same binding as [m1] for this key  *)
+    val add_map_list_map : 'a t list t -> 'a t list t -> 'a t list t
   end
 end
 

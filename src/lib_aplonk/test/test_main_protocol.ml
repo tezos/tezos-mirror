@@ -50,15 +50,33 @@ module External = struct
     let get_pi_module _ = (module Rollup_example : CircuitPI)
   end
 
-  let upper_bound_no_pi ~zero_knowledge () =
+  let upper_bound_no_pi ~zero_knowledge name case =
     let module Main = Aplonk.Main_protocol.Make (No_input_PIs) in
     let module H = Plonk_test.Helpers.Make (Main) in
     let open Plonk_test.Cases in
-    let qc = Unit_tests_for_each_selector.qc in
+    let circuits = SMap.of_list [(case.name, (case.circuit, 4))] in
+    let inputs = SMap.singleton case.name [case.witness] in
+    H.test_circuits
+      ~name:("upper_bound_no_pi_" ^ name)
+      ~zero_knowledge
+      circuits
+      inputs
 
-    let circuits = SMap.of_list [(qc.name, (qc.circuit, 4))] in
-    let inputs = SMap.singleton qc.name [qc.witness] in
-    H.test_circuits ~name:"upper_bound_no_pi" ~zero_knowledge circuits inputs
+  let upper_bound_no_pi_simple ~zero_knowledge () =
+    upper_bound_no_pi
+      ~zero_knowledge
+      "ql"
+      (Plonk_test.Cases.Unit_tests_for_each_selector.linear_selector_test 0)
+
+  let upper_bound_no_pi_next_wire ~zero_knowledge () =
+    upper_bound_no_pi
+      ~zero_knowledge
+      "qlg"
+      (Plonk_test.Cases.Unit_tests_for_each_selector.next_linear_selector_test
+         0)
+
+  let upper_bound_no_pi_rc ~zero_knowledge () =
+    upper_bound_no_pi ~zero_knowledge "RC" Plonk_test.Cases.Range_Checks.basic
 
   let upper_bound_pi_rollup ~zero_knowledge () =
     let module Main = Aplonk.Main_protocol.Make (Rollup_PIs) in
@@ -150,16 +168,20 @@ module External = struct
           ])
         [
           [qc; ql; qr; qd; qe];
-          (* FIXME: aPlonk doesn’t work when used with two circuits with different evaluation points for wires *)
-          (* [ql; qlg; Cases.Range_Checks.valid; Cases.Range_Checks.basic]; *)
-          [qc; Cases.Range_Checks.basic];
+          (* FIXME: #5458
+             aPlonk doesn’t work when used with two circuits with different evaluation points for wires
+             I (Anne-Laure) thought the problem was solved when I fixed the number of batches to the max of the circuits but it still fails in verification *)
+          (* [ql; qlg]; *)
+          [qc; Cases.Range_Checks.basic; Cases.Range_Checks.basic];
           [non_zero_values; non_zero_values; zero_values];
           [qlg; qrg; non_zero_values; zero_values];
         ]
     in
     no_pi_tests @ one_pi_tests @ [pi_rollup_case]
     @ [
-        ("nb_proofs no pi", upper_bound_no_pi);
+        ("nb_proofs no pi", upper_bound_no_pi_simple);
+        ("nb_proofs no pi (next wire)", upper_bound_no_pi_next_wire);
+        ("nb_proofs no pi (RC)", upper_bound_no_pi_rc);
         ("nb_proofs pi_rollup", upper_bound_pi_rollup);
       ]
     @ multi_tests

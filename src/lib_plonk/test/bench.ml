@@ -94,9 +94,7 @@ let () =
   Printf.printf "\n\n------------------\n" ;
   let cs_with_rc = Plompiler.LibCircuit.get_cs with_rc in
   let witness_with_rc = Plompiler.Solver.solve cs_with_rc.solver base_witness in
-  let circuit_with_rc =
-    Plonk.Circuit.to_plonk ~public_input_size:0 cs_with_rc.cs
-  in
+  let circuit_with_rc = Plonk.Circuit.to_plonk cs_with_rc in
   Printf.printf "\n\n------------------\n" ;
   (* Note that range checks are not the same as the ones in the previous
      circuit ; it is just indexes I took to make it work *)
@@ -110,9 +108,7 @@ let () =
   in
   let cs_no_rc = Plompiler.LibCircuit.get_cs no_rc in
   let witness_no_rc = Plompiler.Solver.solve cs_no_rc.solver base_witness in
-  let circuit_no_rc =
-    Plonk.Circuit.to_plonk ~range_checks ~public_input_size:0 cs_no_rc.cs
-  in
+  let circuit_no_rc = Plonk.Circuit.to_plonk ~range_checks cs_no_rc in
   let end_build_circuit = Unix.gettimeofday () in
   Printf.printf
     "Dummy circuit built in %f ms.\n"

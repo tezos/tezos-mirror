@@ -41,15 +41,7 @@ module type S = sig
 
   include Plonk.Main_protocol_intf.S with type proof := proof
 
-  type gate_randomness = {
-    beta_perm : Scalar.t;
-    gamma_perm : Scalar.t;
-    beta_plook : Scalar.t;
-    gamma_plook : Scalar.t;
-    beta_rc : Scalar.t;
-    gamma_rc : Scalar.t;
-    delta : Scalar.t;
-  }
+  type gate_randomness = {beta : Scalar.t; gamma : Scalar.t; delta : Scalar.t}
 
   val build_gates_randomness : bytes -> gate_randomness * bytes
 
@@ -59,7 +51,7 @@ module type S = sig
   val hash_verifier_inputs : verifier_inputs -> bytes
 
   module Prover : sig
-    val build_all_keys : prover_public_parameters -> int SMap.t -> string list
+    val build_all_keys_z : prover_public_parameters -> string list
 
     val commit_to_wires :
       ?all_keys:string list ->
@@ -90,15 +82,6 @@ module type S = sig
       gate_randomness ->
       Evaluations.t SMap.t SMap.t ->
       Poly.t SMap.t
-
-    (* builds the range check proof polynomials *)
-    val build_f_map_rc_1 :
-      ?shifts_map:(int * int) SMap.t ->
-      prover_public_parameters ->
-      gate_randomness ->
-      Evaluations.t SMap.t list SMap.t ->
-      Evaluations.t SMap.t SMap.t ->
-      Poly.t SMap.t * Evaluations.t SMap.t SMap.t
 
     (* builds the range check’s permutation proof polynomials *)
     val build_f_map_rc_2 :
@@ -153,12 +136,7 @@ module type S = sig
   }
   [@@deriving repr]
 
-  type commit_to_plook_rc_remember = {
-    beta_plook : scalar;
-    gamma_plook : scalar;
-    beta_rc : scalar;
-    gamma_rc : scalar;
-  }
+  type commit_to_plook_rc_remember = {beta : scalar; gamma : scalar}
 
   val commit_to_plook_rc :
     prover_public_parameters ->
@@ -219,13 +197,6 @@ module Common (PP : Polynomial_protocol.S) = struct
   type worker_inputs = {inputs : circuit_prover_input list; shift : int * int}
   [@@deriving repr]
 
-  (* [build_all_keys nb_proofs nb_wires] returns a list of prefixed wires_name *)
-  let build_all_wires_keys nb_proofs_map nb_wires =
-    let names = wire_names nb_wires in
-    List.concat_map (fun (circuit_name, n) ->
-        List.concat_map (SMap.Aggregation.build_all_names circuit_name n) names)
-    @@ SMap.bindings nb_proofs_map
-
   let split_inputs_map ~nb_workers inputs_map =
     let list_range i1 i2 = List.filteri (fun i _ -> i1 <= i && i < i2) in
     List.map
@@ -250,12 +221,7 @@ module Common (PP : Polynomial_protocol.S) = struct
   }
   [@@deriving repr]
 
-  type commit_to_plook_rc_remember = {
-    beta_plook : scalar;
-    gamma_plook : scalar;
-    beta_rc : scalar;
-    gamma_rc : scalar;
-  }
+  type commit_to_plook_rc_remember = {beta : scalar; gamma : scalar}
 
   type commit_to_wires_remember = {
     all_f_wires : Poly.t SMap.t;
@@ -269,7 +235,7 @@ module Common (PP : Polynomial_protocol.S) = struct
   let worker_commit_to_wires pp worker_inputs_map =
     let inputs_map = SMap.map (fun wi -> wi.inputs) worker_inputs_map in
     let shifts_map = SMap.map (fun wi -> wi.shift) worker_inputs_map in
-    let all_keys = build_all_wires_keys (SMap.map snd shifts_map) nb_wires in
+    let all_keys = build_all_wires_keys pp (SMap.map snd shifts_map) nb_wires in
     let wires_list_map, f_wires, _, all_f_wires, cm_wires, cm_aux_wires =
       commit_to_wires ~all_keys ~shifts_map pp inputs_map
     in
@@ -285,6 +251,7 @@ module Common (PP : Polynomial_protocol.S) = struct
 
   let commit_to_plook_rc pp shifts_map transcript f_wires_list_map =
     let rd, _transcript = build_gates_randomness transcript in
+    (* we should compute this in an other function *)
     let batched_wires_map =
       Perm.Shared_argument.build_batched_wires_values
         ~delta:rd.delta
@@ -292,31 +259,17 @@ module Common (PP : Polynomial_protocol.S) = struct
         ()
     in
     (* ******************************************* *)
-    let f_map_plook = build_f_map_plook ~shifts_map pp rd f_wires_list_map in
-    let f_map_rc, batched_wires_map =
-      Prover.build_f_map_rc_1
-        ~shifts_map
-        pp
-        rd
-        f_wires_list_map
-        batched_wires_map
-    in
-    let f_map = SMap.union_disjoint f_map_plook f_map_rc in
+    let f_map = build_f_map_plook ~shifts_map pp rd f_wires_list_map in
     (* commit to the plookup polynomials *)
     let cmt, prover_aux =
       (* TODO #5551
          Implement Plookup
       *)
-      let all_keys = build_all_keys pp (SMap.map snd shifts_map) in
+      let all_keys = build_all_keys_z pp in
       PP.PC.Commitment.commit ~all_keys pp.common_pp.pp_public_parameters f_map
     in
     ( {batched_wires_map; cmt; f_map; prover_aux},
-      {
-        beta_plook = rd.beta_plook;
-        gamma_plook = rd.gamma_plook;
-        beta_rc = rd.beta_rc;
-        gamma_rc = rd.gamma_rc;
-      } )
+      {beta = rd.beta; gamma = rd.gamma} )
 
   let batch_evaluated_ids ~alpha evaluated_ids all_ids_keys =
     let powers_map =
@@ -403,7 +356,7 @@ module Common (PP : Polynomial_protocol.S) = struct
       (build_perm_rc2_identities pp randomness) evaluations
     in
     let cmt =
-      let all_keys = build_all_keys pp (SMap.map List.length inputs_map) in
+      let all_keys = build_all_keys_z pp in
       Commitment.commit
         ~all_keys
         pp.common_pp.pp_public_parameters

@@ -1443,6 +1443,7 @@ type cs_result = {
   nvars : int;
   free_wires : int list;
   cs : Csir.CS.t;
+  public_input_size : int;
   input_com_sizes : int list;
   tables : Csir.Table.t list;
   solver : Solver.t;
@@ -1454,7 +1455,7 @@ let cs_ti_t = Repr.pair Csir.CS.t Optimizer.trace_info_t
 let get_cs ?(optimize = false) f : cs_result =
   let s, _ = get f in
   let ts = List.map (fun t_id -> Tables.find t_id tables) s.tables in
-  let cs, solver, free_wires, nvars =
+  let cs, solver, free_wires =
     if optimize then
       let circuit_id = Utils.get_circuit_id s.cs in
       let path = Utils.circuit_path circuit_id in
@@ -1476,14 +1477,15 @@ let get_cs ?(optimize = false) f : cs_result =
           close_out outc ;
           o
       in
-      (cs, Solver.append_solver (Updater ti) s.solver, ti.free_wires, s.nvars)
-    else (s.cs, s.solver, [], s.nvars)
+      (cs, Solver.append_solver (Updater ti) s.solver, ti.free_wires)
+    else (s.cs, s.solver, [])
   in
   {
-    nvars;
+    nvars = s.nvars;
     free_wires;
     cs;
     tables = ts;
+    public_input_size = s.pi_size;
     input_com_sizes = List.rev s.input_com_sizes;
     solver;
   }

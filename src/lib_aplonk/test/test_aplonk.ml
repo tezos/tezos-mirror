@@ -36,9 +36,9 @@ module Rollup_PIs = struct
   let get_pi_module _ = (module Rollup_example : CircuitPI)
 end
 
-let cs_of_repr public_input_size circuit =
+let cs_of_repr circuit =
   let cs = L.get_cs circuit in
-  let plonk_circuit = Plonk.Circuit.to_plonk ~public_input_size cs.cs in
+  let plonk_circuit = Plonk.Circuit.to_plonk cs in
   (plonk_circuit, cs.solver)
 
 (* Tests on Circuit functions *)
@@ -51,7 +51,7 @@ module Internal = struct
 
   (* Calls Plonk.(setup, prove & verify) on a plompiler circuit with the given inputs *)
   let test_plompiler_circuit ~name circuit inputs =
-    let circuit, solver = cs_of_repr 0 circuit in
+    let circuit, solver = cs_of_repr circuit in
     let witness =
       try Plompiler.Solver.solve solver inputs
       with e ->
@@ -82,8 +82,7 @@ module Internal = struct
       let* p2 = input (Input.scalar p2) in
       let* x = input (Input.scalar x) in
       let* exp = input (Input.scalar expected_PIx) in
-      let* xn = Circuits.Constraints.compute_xn x n in
-      let* zs = Circuits.Constraints.compute_zs xn in
+      let* zs = Circuits.Constraints.compute_zs x n in
       let* res = Circuits.Gates.cs_pi ~generator ~n ~x ~zs [p1; p2] in
       assert_equal exp res
     in
@@ -175,8 +174,7 @@ module External = struct
     let module PIs = struct
       let get_pi_module _ = (module PI : Aplonk.Pi_parameters.CircuitPI)
     end in
-    let l = PI.nb_inner in
-    let circuit, solver = cs_of_repr l circuit in
+    let circuit, solver = cs_of_repr circuit in
     let witness = get_witness (solver, witness) nb_proofs in
     let circuit_map = Plonk.SMap.singleton "" (circuit, nb_proofs) in
     let inputs = Plonk.SMap.singleton "" witness in
