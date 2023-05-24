@@ -87,6 +87,9 @@ RPC Changes
 - Remove the RPC for computing smart rollups’ origination proofs
   ``smart_rollups/all/origination_proof``. (MR :gl:`!8817`)
 
+- Add the consensus key's public key to the reponse of the
+  ``../context/delegates/<delegate_pkh>/consensus_key`` RPC. (MR :gl:`!8856`)
+
 Operation receipts
 ------------------
 
