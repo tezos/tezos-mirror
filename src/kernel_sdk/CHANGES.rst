@@ -48,6 +48,10 @@ SDK
 - Upgrade dependencies:
   - ``tezos_crypto_rs``, ``tezos_data_encoding`` to ``v0.5.0``.
   - ``nom`` to ``7.1``.
+- Rework ``dac`` module in ``tezos-smart-rollup-encoding``:
+  -  Keep ``PreimageHash`` in ``dac`` module.
+  -  Move all other functions/structs move to ``dac::pages`` submodule. Deprecate importing from them ``dac`` directly.
+- Introduce ``dac::certificate`` submodule for handling serialization and deserialization of DAC certificates.
 
 Installer client
 ----------------

@@ -4,9 +4,9 @@
 
 use tezos_smart_rollup::core_unsafe::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup::core_unsafe::PREIMAGE_HASH_SIZE;
-use tezos_smart_rollup::dac::reveal_loop;
-use tezos_smart_rollup::dac::V0SliceContentPage;
-use tezos_smart_rollup::dac::MAX_PAGE_SIZE;
+use tezos_smart_rollup::dac::pages::reveal_loop;
+use tezos_smart_rollup::dac::pages::V0SliceContentPage;
+use tezos_smart_rollup::dac::pages::MAX_PAGE_SIZE;
 use tezos_smart_rollup::host::Runtime;
 use tezos_smart_rollup::storage::path::Path;
 
