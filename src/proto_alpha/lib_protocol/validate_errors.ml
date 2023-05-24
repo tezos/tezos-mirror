@@ -1113,7 +1113,6 @@ module Manager = struct
     | Incorrect_reveal_position
     | Insufficient_gas_for_manager
     | Gas_quota_exceeded_init_deserialize
-    | Tx_rollup_feature_disabled
     | Sc_rollup_feature_disabled
     | Sc_rollup_arith_pvm_disabled
     | Zk_rollup_feature_disabled
@@ -1209,19 +1208,6 @@ module Manager = struct
       Data_encoding.empty
       (function Gas_quota_exceeded_init_deserialize -> Some () | _ -> None)
       (fun () -> Gas_quota_exceeded_init_deserialize) ;
-    register_error_kind
-      `Permanent
-      ~id:"validate.operation.tx_rollup_is_disabled"
-      ~title:"Tx rollup is disabled"
-      ~description:"Cannot originate a tx rollup as it is disabled."
-      ~pp:(fun ppf () ->
-        Format.fprintf
-          ppf
-          "Cannot apply a tx rollup operation as it is disabled. This feature \
-           will be enabled in a future proposal")
-      Data_encoding.unit
-      (function Tx_rollup_feature_disabled -> Some () | _ -> None)
-      (fun () -> Tx_rollup_feature_disabled) ;
     let scoru_disabled_description = "Smart rollups are disabled." in
     register_error_kind
       `Permanent

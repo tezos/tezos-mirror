@@ -236,8 +236,6 @@ type back = {
   sampler_state : (Seed_repr.seed * consensus_pk Sampler.t) Cycle_repr.Map.t;
   stake_distribution_for_current_cycle :
     Stake_repr.t Signature.Public_key_hash.Map.t option;
-  tx_rollup_current_messages :
-    Tx_rollup_inbox_repr.Merkle.tree Tx_rollup_repr.Map.t;
   sc_rollup_current_messages : Sc_rollup_inbox_merkelized_payload_hashes_repr.t;
   dal_slot_fee_market : Dal_slot_repr.Slot_market.t;
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3105
@@ -824,7 +822,6 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         dictator_proposal_seen = false;
         sampler_state = Cycle_repr.Map.empty;
         stake_distribution_for_current_cycle = None;
-        tx_rollup_current_messages = Tx_rollup_repr.Map.empty;
         sc_rollup_current_messages;
         dal_slot_fee_market =
           Dal_slot_repr.Slot_market.init
@@ -1465,27 +1462,6 @@ module Consensus :
       Data_encoding.(obj1 (req "loc" (string Plain)))
       (function Slot_map_not_found {loc} -> Some loc | _ -> None)
       (fun loc -> Slot_map_not_found {loc})
-end
-
-module Tx_rollup = struct
-  let add_message ctxt rollup message =
-    let root = ref Tx_rollup_inbox_repr.Merkle.(root empty) in
-    let updater element =
-      let tree =
-        Option.value element ~default:Tx_rollup_inbox_repr.Merkle.(empty)
-      in
-      let tree = Tx_rollup_inbox_repr.Merkle.add_message tree message in
-      root := Tx_rollup_inbox_repr.Merkle.root tree ;
-      Some tree
-    in
-    let map =
-      Tx_rollup_repr.Map.update
-        rollup
-        updater
-        ctxt.back.tx_rollup_current_messages
-    in
-    let back = {ctxt.back with tx_rollup_current_messages = map} in
-    ({ctxt with back}, !root)
 end
 
 (*

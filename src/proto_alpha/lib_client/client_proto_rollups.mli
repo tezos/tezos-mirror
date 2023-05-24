@@ -26,6 +26,4 @@
 open Protocol
 open Alpha_context
 
-type rollup_entity = {rollup : Tx_rollup.t; origination_level : int32 option}
-
 module Epoxy_alias : Client_aliases.Alias with type t = Zk_rollup.t
