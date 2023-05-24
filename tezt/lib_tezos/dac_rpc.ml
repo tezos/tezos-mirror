@@ -43,10 +43,13 @@ let get_bytes_from_json_string_node json =
 module V0 = struct
   let api_prefix = "v0"
 
-  let get_preimage page_hash =
-    make GET [api_prefix; "preimage"; page_hash] JSON.as_string
+  let get_preimage dac_node page_hash =
+    let to_fetch =
+      make GET [api_prefix; "preimage"; page_hash] JSON.as_string
+    in
+    RPC.call dac_node to_fetch
 
-  let post_store_preimage ~payload ~pagination_scheme =
+  let post_store_preimage dac_node ~payload ~pagination_scheme =
     let preimage =
       JSON.parse
         ~origin:"dal_node_dac_store_preimage_rpc"
@@ -56,20 +59,27 @@ module V0 = struct
            pagination_scheme)
     in
     let data : RPC_core.data = Data (JSON.unannotate preimage) in
-    make ~data POST [api_prefix; "store_preimage"] @@ fun json ->
-    JSON.
-      ( json |-> "root_hash" |> as_string,
-        json |-> "external_message" |> get_bytes_from_json_string_node )
+    let to_fetch =
+      make ~data POST [api_prefix; "store_preimage"] @@ fun json ->
+      JSON.
+        ( json |-> "root_hash" |> as_string,
+          json |-> "external_message" |> get_bytes_from_json_string_node )
+    in
+    RPC.call dac_node to_fetch
 
-  let get_verify_signature external_msg =
+  let get_verify_signature dac_node external_msg =
     let query_string =
       [
         ("external_message", match Hex.of_string external_msg with `Hex s -> s);
       ]
     in
-    make ~query_string GET [api_prefix; "verify_signature"] JSON.as_bool
+    let to_fetch =
+      make ~query_string GET [api_prefix; "verify_signature"] JSON.as_bool
+    in
+    RPC.call dac_node to_fetch
 
-  let put_dac_member_signature ~hex_root_hash ~dac_member_pkh ~signature =
+  let put_dac_member_signature dac_node ~hex_root_hash ~dac_member_pkh
+      ~signature =
     let (`Hex root_hash) = hex_root_hash in
     let payload =
       `O
@@ -81,39 +91,57 @@ module V0 = struct
         ]
     in
     let data : RPC_core.data = Data payload in
-    make ~data PUT [api_prefix; "dac_member_signature"] @@ fun _resp -> ()
+    let to_fetch =
+      make ~data PUT [api_prefix; "dac_member_signature"] @@ fun _resp -> ()
+    in
+    RPC.call dac_node to_fetch
 
-  let get_missing_page ~hex_root_hash =
-    make GET [api_prefix; "missing_page"; Hex.show hex_root_hash] JSON.as_string
+  let get_missing_page dac_node ~hex_root_hash =
+    let to_fetch =
+      make
+        GET
+        [api_prefix; "missing_page"; Hex.show hex_root_hash]
+        JSON.as_string
+    in
+    RPC.call dac_node to_fetch
 
-  let get_certificate ~hex_root_hash =
+  let get_certificate dac_node ~hex_root_hash =
     let (`Hex page_hash) = hex_root_hash in
-    make GET [api_prefix; "certificates"; page_hash] @@ fun json ->
-    JSON.
-      ( json |-> "witnesses" |> as_int,
-        json |-> "aggregate_signature" |> as_string,
-        json |-> "root_hash" |> as_string,
-        json |-> "version" |> as_int )
+    let to_fetch =
+      make GET [api_prefix; "certificates"; page_hash] @@ fun json ->
+      JSON.
+        ( json |-> "witnesses" |> as_int,
+          json |-> "aggregate_signature" |> as_string,
+          json |-> "root_hash" |> as_string,
+          json |-> "version" |> as_int )
+    in
+    RPC.call dac_node to_fetch
 
   module Coordinator = struct
-    let post_preimage ~payload =
+    let post_preimage dac_node ~payload =
       let preimage =
         JSON.parse
           ~origin:"Rollup.DAC.RPC.coordinator_post_preimage"
           (encode_bytes_to_hex_string payload)
       in
       let data : RPC_core.data = Data (JSON.unannotate preimage) in
-      make ~data POST [api_prefix; "preimage"] JSON.as_string
+      let to_fetch = make ~data POST [api_prefix; "preimage"] JSON.as_string in
+      RPC.call dac_node to_fetch
   end
 end
 
-let get_health_live = make GET ["health"; "live"] JSON.as_bool
+let get_health_live dac_node =
+  let to_fetch = make GET ["health"; "live"] JSON.as_bool in
+  RPC.call dac_node to_fetch
 
-let get_health_ready = make GET ["health"; "ready"] JSON.as_bool
+let get_health_ready dac_node =
+  let to_fetch = make GET ["health"; "ready"] JSON.as_bool in
+  RPC.call dac_node to_fetch
 
 module V1 = struct
   let api_prefix = "v1"
 
-  let get_pages page_hash =
-    make GET [api_prefix; "pages"; page_hash] JSON.as_string
+  let get_pages dac_node page_hash =
+    let to_fetch = make GET [api_prefix; "pages"; page_hash] JSON.as_string in
+    RPC.call dac_node to_fetch
 end
