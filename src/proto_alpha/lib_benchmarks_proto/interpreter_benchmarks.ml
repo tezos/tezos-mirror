@@ -925,6 +925,13 @@ module Registration_section = struct
           in
           let node = pair width in
           parse_instr rng_state node long_stack)
+        () ;
+      benchmark
+        ~name:Interpreter_workload.N_IComb
+        ~intercept:true
+        ~kinstr_and_stack_sampler:(fun _ rng_state () ->
+          let node = pair 2 in
+          parse_instr rng_state node long_stack)
         ()
 
     let rec make_comb_stack (comb_width : int) (depth : int) acc =
@@ -968,6 +975,17 @@ module Registration_section = struct
             make_comb_stack width 1 (Ex_stack (unit @$ bot, ((), eos)))
           in
           parse_instr rng_state node stack)
+        () ;
+      benchmark
+        ~name:Interpreter_workload.N_IUncomb
+        ~intercept:true
+        ~kinstr_and_stack_sampler:(fun _ rng_state () ->
+          let width = 2 in
+          let node = unpair width in
+          let stack =
+            make_comb_stack width 1 (Ex_stack (unit @$ bot, ((), eos)))
+          in
+          parse_instr rng_state node stack)
         ()
 
     let () =
@@ -989,6 +1007,14 @@ module Registration_section = struct
           let stack =
             make_comb_stack width 1 (Ex_stack (unit @$ bot, ((), eos)))
           in
+          parse_instr rng_state node stack)
+        () ;
+      benchmark
+        ~name:Interpreter_workload.N_IComb_get
+        ~intercept:true
+        ~kinstr_and_stack_sampler:(fun _ rng_state () ->
+          let node = comb_get 0 in
+          let stack = make_comb_stack 2 1 (Ex_stack (unit @$ bot, ((), eos))) in
           parse_instr rng_state node stack)
         ()
 
@@ -1017,6 +1043,19 @@ module Registration_section = struct
             Ex_stack (unit @$ stack_ty, ((), stack))
           in
           parse_instr rng_state node stack)
+        () ;
+      benchmark
+        ~name:Interpreter_workload.N_IComb_set
+        ~intercept:true
+        ~kinstr_and_stack_sampler:(fun _ rng_state () ->
+          let node = comb_set 0 in
+          let stack =
+            let (Ex_stack (stack_ty, stack)) =
+              make_comb_stack 2 1 (Ex_stack (unit @$ bot, ((), eos)))
+            in
+            Ex_stack (unit @$ stack_ty, ((), stack))
+          in
+          parse_instr rng_state node stack)
         ()
 
     let () =
@@ -1025,6 +1064,13 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IDupN
         ~kinstr_and_stack_sampler:(fun _cfg rng_state () ->
           let node = dup (1 + sample_depth rng_state) in
+          parse_instr rng_state node long_stack)
+        () ;
+      benchmark
+        ~name:Interpreter_workload.N_IDupN
+        ~intercept:true
+        ~kinstr_and_stack_sampler:(fun _cfg rng_state () ->
+          let node = dup 1 in
           parse_instr rng_state node long_stack)
         ()
   end

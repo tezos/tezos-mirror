@@ -158,6 +158,15 @@ module Models = struct
       ~intercept:(fv (sf "%s_const" name))
       ~coeff:(fv (sf "%s_coeff" name))
 
+  let affine_offset_model name ~offset =
+    (* For instructions with cost function
+       [\lambda size. const + coeff * (size - offset)] *)
+    Model.affine_offset
+      ~name:(ns name)
+      ~intercept:(fv (sf "%s_const" name))
+      ~coeff:(fv (sf "%s_coeff" name))
+      ~offset
+
   let break_model name break =
     Model.breakdown
       ~name:(ns name)
@@ -183,6 +192,17 @@ module Models = struct
       ~const:(fv (sf "%s_const" name))
       ~break1
       ~break2
+
+  let break_model_2_const_offset name break1 break2 ~offset =
+    Model.breakdown2_const_offset
+      ~name:(ns name)
+      ~coeff1:(fv (sf "%s_coeff1" name))
+      ~coeff2:(fv (sf "%s_coeff2" name))
+      ~coeff3:(fv (sf "%s_coeff3" name))
+      ~const:(fv (sf "%s_const" name))
+      ~break1
+      ~break2
+      ~offset
 
   let nlogm_model name =
     (* For instructions with cost function
@@ -474,7 +494,7 @@ let ir_model instr_or_cont =
           const1_model name |> m
       (* The following two instructions are expected to have an affine model. However,
          we observe 3 affine parts, on [0;300], [300;400] and [400;\inf[. *)
-      | N_IDupN -> break_model_2 name 300 400 |> m
+      | N_IDupN -> break_model_2_const_offset name 300 400 ~offset:1 |> m
       | N_IDropN -> break_model_2_const name 300 400 |> m
       | N_IDig | N_IDug | N_IDipN -> affine_model name |> m
       | N_IAdd_bls12_381_g1 | N_IAdd_bls12_381_g2 | N_IAdd_bls12_381_fr
@@ -485,8 +505,8 @@ let ir_model instr_or_cont =
       | N_IMul_bls12_381_fr_z | N_IMul_bls12_381_z_fr
       | N_IPairing_check_bls12_381 ->
           affine_model name |> m
-      | N_IComb_get | N_IComb | N_IComb_set | N_IUncomb ->
-          affine_model name |> m
+      | N_IComb | N_IUncomb -> affine_offset_model name ~offset:2 |> m
+      | N_IComb_get | N_IComb_set -> affine_model name |> m
       | N_ITicket | N_IRead_ticket -> const1_model name |> m
       | N_ISplit_ticket -> linear_max_model name |> m
       | N_IJoin_tickets -> join_tickets_model name |> m

@@ -162,6 +162,14 @@ val affine :
   coeff:Free_variable.t ->
   (int * unit) model
 
+(** [fun n -> intercept + coeff × (n - offset)] *)
+val affine_offset :
+  name:Namespace.t ->
+  intercept:Free_variable.t ->
+  coeff:Free_variable.t ->
+  offset:int ->
+  (int * unit) model
+
 (** [fun n -> coeff * n²] *)
 val quadratic : name:Namespace.t -> coeff:Free_variable.t -> (int * unit) model
 
@@ -279,4 +287,16 @@ val breakdown2_const :
   const:Free_variable.t ->
   break1:int ->
   break2:int ->
+  (int * unit) model
+
+(** [breakdown2] with a non-zero value at 0 and offset *)
+val breakdown2_const_offset :
+  name:Namespace.t ->
+  coeff1:Free_variable.t ->
+  coeff2:Free_variable.t ->
+  coeff3:Free_variable.t ->
+  const:Free_variable.t ->
+  break1:int ->
+  break2:int ->
+  offset:int ->
   (int * unit) model
