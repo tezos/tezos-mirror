@@ -25,7 +25,10 @@
 
 (* Default reward coefficient when AI is not in effect, chosen so that
    rewards * coeff = rewards *)
-let default = Q.one
+let default_reward = Q.one
+
+(* Default bonus value *)
+let default_bonus = 0L
 
 let get_reward_coeff ctxt ~cycle =
   let open Lwt_result_syntax in
@@ -34,8 +37,19 @@ let get_reward_coeff ctxt ~cycle =
     (* Even if AI is enabled, the storage can be empty: this is the case for
        the first 5 cycles after AI is enabled *)
     let* k_opt = Storage.Reward_coeff.find ctxt cycle in
-    return (Option.value ~default k_opt)
-  else return default
+    return (Option.value ~default:default_reward k_opt)
+  else return default_reward
+
+let get_reward_bonus ctxt ~cycle =
+  let open Lwt_result_syntax in
+  match cycle with
+  | None -> return default_bonus
+  | Some cycle ->
+      let ai_enable = (Raw_context.constants ctxt).adaptive_inflation.enable in
+      if ai_enable then
+        let* k_opt = Storage.Reward_bonus.find ctxt cycle in
+        return (Option.value ~default:default_bonus k_opt)
+      else return default_bonus
 
 let load_reward_coeff ctxt ~cycle =
   let open Lwt_result_syntax in
