@@ -462,14 +462,10 @@ let test_frozen_deposits_with_delegation () =
   >>=? fun new_staking_balance ->
   Assert.equal_tez ~loc:__LOC__ new_staking_balance expected_new_staking_balance
   >>=? fun () ->
-  (* Bake one cycle to update the frozen deposits *)
+  (* Bake one cycle. *)
   Block.bake_until_cycle_end b >>=? fun b ->
-  let expected_new_frozen_deposits =
-    Test_tez.(
-      initial_frozen_deposits
-      +! delegated_amount
-         /! Int64.of_int (constants.delegation_over_baking_limit + 1))
-  in
+  (* Frozen deposits aren't affected by balance changes. *)
+  let expected_new_frozen_deposits = initial_frozen_deposits in
   Context.Delegate.current_frozen_deposits (B b) account1
   >>=? fun new_frozen_deposits ->
   Assert.equal_tez ~loc:__LOC__ new_frozen_deposits expected_new_frozen_deposits
