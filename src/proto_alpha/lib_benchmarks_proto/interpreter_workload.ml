@@ -773,7 +773,8 @@ module Instructions = struct
 
   let if_none = ir_sized_step N_IIf_none nullary
 
-  let opt_map = ir_sized_step N_IOpt_map nullary
+  let opt_map ~is_some =
+    ir_sized_step N_IOpt_map (unary "is_some" (if is_some then 1 else 0))
 
   let left = ir_sized_step N_ILeft nullary
 
@@ -1238,7 +1239,9 @@ let extract_ir_sized_step :
   | ICons_some (_, _), _ -> Instructions.cons_some
   | ICons_none (_, _, _), _ -> Instructions.cons_none
   | IIf_none _, _ -> Instructions.if_none
-  | IOpt_map _, _ -> Instructions.opt_map
+  | IOpt_map _, (opt, _) ->
+      let is_some = match opt with None -> false | Some _ -> true in
+      Instructions.opt_map ~is_some
   | ICons_left (_, _, _), _ -> Instructions.left
   | ICons_right (_, _, _), _ -> Instructions.right
   | IIf_left _, _ -> Instructions.if_left
