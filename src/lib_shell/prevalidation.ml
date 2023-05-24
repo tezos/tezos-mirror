@@ -337,7 +337,7 @@ module MakeAbstract
           update_manager_map state.manager_map state.mempool op replacements
         in
         let state = {state with mempool; bounding_state; manager_map} in
-        return (state, valid_op, `Prechecked, replacements)
+        return (state, valid_op, `Validated, replacements)
     | Error trace ->
         (* We convert any error from [check_conflict_and_bound] into an
            [add_result] here, rather than let [add_operation] below do

@@ -345,7 +345,7 @@ module Make_s
      [replacement_classification]. Note that we don't need to re-flush the
      mempool, as this function is only called in precheck mode.
 
-     The operation is expected to be (a) parsable and (b) in the "prechecked"
+     The operation is expected to be (a) parsable and (b) in the "validated"
      class. So, we softly handle the situations where the operation is
      unparsable or not found in any class in case this invariant is broken
      for some reason.
@@ -393,7 +393,7 @@ module Make_s
     let to_handle = (op, classification) :: to_replace in
     let mempool =
       match classification with
-      | `Prechecked | `Applied -> Mempool.cons_valid op.hash mempool
+      | `Validated | `Applied -> Mempool.cons_valid op.hash mempool
       | `Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _ ->
           mempool
     in
@@ -462,11 +462,11 @@ module Make_s
       in
       advertise pv_shell mempool_to_advertise ;
       let our_mempool =
-        let prechecked_hashes =
+        let validated_hashes =
           (* Outputs hashes in "decreasing" order which should not matter *)
           Classification.Sized_map.fold
             (fun x _ acc -> x :: acc)
-            pv_shell.classification.prechecked
+            pv_shell.classification.validated
             []
         in
         {
@@ -475,7 +475,7 @@ module Make_s
           Mempool.known_valid =
             List.fold_left
               (fun acc op -> op.hash :: acc)
-              prechecked_hashes
+              validated_hashes
               pv_shell.classification.applied_rev;
           pending = Pending_ops.hashes pv_shell.pending;
         }
@@ -664,7 +664,7 @@ module Make_s
                   to_handle
               in
               match op_status with
-              | Some (_h, (`Applied | `Prechecked)) ->
+              | Some (_h, (`Applied | `Validated)) ->
                   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2294
                      In case of `Passed_precheck_with_replace, we may want to only do
                      the injection/replacement if a flag `replace` is set to true
@@ -779,13 +779,13 @@ module Make_s
               ~mempool
               shell.predecessor
 
-    (* If [flush_if_prechecked] is [true], removing a prechecked
+    (* If [flush_if_validated] is [true], removing a validated
        operation triggers a flush of the mempool. Because flushing may
        be costly this should be done only when the action is triggered
        locally by the user. This allows a better UX if the user bans a
-       prechecked operation so that a branch delayed operation becomes
+       validated operation so that a branch delayed operation becomes
        [applied] again. *)
-    let remove ~flush_if_prechecked pv oph =
+    let remove ~flush_if_validated pv oph =
       let open Lwt_result_syntax in
       pv.shell.parameters.tools.chain_tools.clear_or_cancel oph ;
       pv.shell.advertisement <-
@@ -798,8 +798,8 @@ module Make_s
           pv.shell.fetching <- Operation_hash.Set.remove oph pv.shell.fetching ;
           return_unit
       | Some (_op, classification) -> (
-          match (classification, flush_if_prechecked) with
-          | `Prechecked, true | `Applied, _ ->
+          match (classification, flush_if_validated) with
+          | `Validated, true | `Applied, _ ->
               (* Modifying the list of operations classified as [Applied]
                  might change the classification of all the operations in
                  the mempool. Hence if the removed operation has been
@@ -819,7 +819,7 @@ module Make_s
           | `Branch_refused _, _
           | `Refused _, _
           | `Outdated _, _
-          | `Prechecked, false ->
+          | `Validated, false ->
               pv.validation_state <-
                 Prevalidation_t.remove_operation pv.validation_state oph ;
               return_unit)
@@ -828,7 +828,7 @@ module Make_s
       let open Lwt_result_syntax in
       pv.shell.banned_operations <-
         Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
-      let* res = remove ~flush_if_prechecked:true pv oph_to_ban in
+      let* res = remove ~flush_if_validated:true pv oph_to_ban in
       let*! () = Events.(emit operation_banned) oph_to_ban in
       return res
   end
@@ -990,19 +990,19 @@ module Make
           (fun pv params () ->
             (* FIXME https://gitlab.com/tezos/tezos/-/issues/2250
 
-               We merge prechecked operation with applied operation
+               We merge validated operation with applied operation
                so that the encoding of the RPC does not need to be
                changed. Once prechecking will be done by the protocol
                and not the plugin, we will change the encoding to
                reflect that. *)
-            let prechecked_with_applied =
+            let validated_with_applied =
               if params#applied then
                 let applied_seq =
                   pv.shell.classification.applied_rev |> List.to_seq
                   |> Seq.map (fun ({hash; _} as op) -> (hash, op))
                 in
                 Classification.Sized_map.to_map
-                  pv.shell.classification.prechecked
+                  pv.shell.classification.validated
                 |> Operation_hash.Map.to_seq |> Seq.append applied_seq
                 |> Seq.filter_map (fun (oph, op) ->
                        if
@@ -1059,7 +1059,7 @@ module Make
             in
             let pending_operations =
               {
-                Proto_services.Mempool.applied = prechecked_with_applied;
+                Proto_services.Mempool.applied = validated_with_applied;
                 refused;
                 outdated;
                 branch_refused;
@@ -1093,12 +1093,12 @@ module Make
             in
             (* FIXME https://gitlab.com/tezos/tezos/-/issues/2250
 
-               For the moment, applied and prechecked operations are
+               For the moment, applied and validated operations are
                handled the same way for the user point of view. *)
-            let prechecked_seq =
+            let validated_seq =
               if params#applied then
                 Classification.Sized_map.to_map
-                  pv.shell.classification.prechecked
+                  pv.shell.classification.validated
                 |> Operation_hash.Map.to_seq
                 |> Seq.map (fun (hash, {protocol; _}) ->
                        ((hash, protocol), None))
@@ -1140,12 +1140,12 @@ module Make
             let current_mempool =
               Seq.append outdated_seq branch_delayed_seq
               |> Seq.append branch_refused_seq
-              |> Seq.append refused_seq |> Seq.append prechecked_seq
+              |> Seq.append refused_seq |> Seq.append validated_seq
               |> Seq.append applied_seq |> Seq.filter filter |> List.of_seq
             in
             let current_mempool = ref (Some current_mempool) in
             let filter_result = function
-              | `Prechecked | `Applied -> params#applied
+              | `Validated | `Applied -> params#applied
               | `Refused _ -> params#refused
               | `Outdated _ -> params#outdated
               | `Branch_refused _ -> params#branch_refused
@@ -1163,7 +1163,7 @@ module Make
                   | Some (kind, op) when filter_result kind ->
                       let errors =
                         match kind with
-                        | `Prechecked | `Applied -> None
+                        | `Validated | `Applied -> None
                         | `Branch_delayed errors
                         | `Branch_refused errors
                         | `Refused errors
@@ -1331,7 +1331,7 @@ module Make
           List.length shell.classification.applied_rev |> float_of_int) ;
       Shell_metrics.Mempool.set_prechecked_collector (fun () ->
           Prevalidator_classification.Sized_map.cardinal
-            shell.classification.prechecked
+            shell.classification.validated
           |> float_of_int) ;
       Shell_metrics.Mempool.set_refused_collector (fun () ->
           Prevalidator_classification.cardinal shell.classification.refused

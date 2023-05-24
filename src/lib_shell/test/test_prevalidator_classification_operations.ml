@@ -463,7 +463,7 @@ module Recyle_operations = struct
     let expected_from_classification =
       Classification.Internal_for_tests.to_map
         ~applied:true
-        ~prechecked:true
+        ~validated:true
         ~branch_delayed:true
         ~branch_refused:handle_branch_refused
         ~refused:false
@@ -514,7 +514,7 @@ module Recyle_operations = struct
     let expected : unit operation Op_map.t =
       Classification.Internal_for_tests.to_map
         ~applied:false
-        ~prechecked:false
+        ~validated:false
         ~branch_delayed:false
         ~branch_refused:(not handle_branch_refused)
         ~refused:true
@@ -539,7 +539,7 @@ module Recyle_operations = struct
     let actual =
       Classification.Internal_for_tests.to_map
         ~applied:true
-        ~prechecked:true
+        ~validated:true
         ~branch_delayed:true
         ~branch_refused:true
         ~refused:true

@@ -33,7 +33,7 @@ type error_classification =
   | `Outdated of tztrace ]
 
 (** Classification of an operation in the mempool *)
-type classification = [`Applied | `Prechecked | error_classification]
+type classification = [`Applied | `Validated | error_classification]
 
 type 'protocol_data bounded_map
 
@@ -60,10 +60,10 @@ module Sized_map :
 
     - The field [in_mempool] is the set of all operation hashes
    present in fields: [refused; branch_refused; branch_delayed;
-   prechecked; applied].
+   validated; applied].
 
     - An operation cannot be at the same time in two of the following
-   fields: [refused; branch_refused; branch_delayed; prechecked;
+   fields: [refused; branch_refused; branch_delayed; validated;
    applied].
 
     Note: unparsable operations are handled in a different way because
@@ -84,7 +84,7 @@ type 'protocol_data t = private {
   branch_refused : 'protocol_data bounded_map;
   branch_delayed : 'protocol_data bounded_map;
   mutable applied_rev : 'protocol_data operation list;
-  mutable prechecked : 'protocol_data operation Sized_map.t;
+  mutable validated : 'protocol_data operation Sized_map.t;
   mutable unparsable : Operation_hash.Set.t;
   mutable in_mempool :
     ('protocol_data operation * classification) Operation_hash.Map.t;
@@ -151,7 +151,7 @@ val remove :
 
     As a summary:
 
-    - [Applied] and [Prechecked] are never discarded
+    - [Applied] and [Validated] are never discarded
 
     - [Branch_refused] and [Branch_delayed] are discarded 0 or 1 time
    (if the corresponding bounded_map is full)
@@ -254,7 +254,7 @@ module Internal_for_tests : sig
     named argument. *)
   val to_map :
     applied:bool ->
-    prechecked:bool ->
+    validated:bool ->
     branch_delayed:bool ->
     branch_refused:bool ->
     refused:bool ->

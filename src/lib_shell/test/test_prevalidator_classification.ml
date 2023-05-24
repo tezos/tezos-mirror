@@ -160,7 +160,7 @@ let qcheck_bounded_map_is_empty bounded_map =
   qcheck_eq_true ~actual
 
 (** Computes the set of operation hashes present in fields [refused; outdated;
-    branch_refused; branch_delayed; prechecked; applied_rev] of [t]. Also checks
+    branch_refused; branch_delayed; validated; applied_rev] of [t]. Also checks
     that these fields are disjoint. *)
 let disjoint_union_classified_fields ?fail_msg (t : unit Classification.t) =
   let ( +> ) acc next_set =
@@ -176,7 +176,7 @@ let disjoint_union_classified_fields ?fail_msg (t : unit Classification.t) =
   let to_set = Classification.Internal_for_tests.set_of_bounded_map in
   to_set t.refused +> to_set t.outdated +> to_set t.branch_refused
   +> to_set t.branch_delayed
-  +> (Classification.Sized_map.to_seq t.prechecked
+  +> (Classification.Sized_map.to_seq t.validated
      |> Seq.map fst |> Operation_hash.Set.of_seq)
   +> (Operation_hash.Set.of_list
      @@ List.rev_map (fun op -> op.hash) t.applied_rev)
@@ -236,7 +236,7 @@ let classification_pp pp classification =
     pp
     (match classification with
     | `Applied -> "Applied"
-    | `Prechecked -> "Prechecked"
+    | `Validated -> "Validated"
     | `Branch_delayed _ -> "Branch_delayed"
     | `Branch_refused _ -> "Branch_refused"
     | `Refused _ -> "Refused"
@@ -595,7 +595,7 @@ module To_map = struct
   let to_map_all =
     Classification.Internal_for_tests.to_map
       ~applied:true
-      ~prechecked:true
+      ~validated:true
       ~branch_delayed:true
       ~branch_refused:true
       ~refused:true
@@ -739,7 +739,7 @@ module To_map = struct
     let initial =
       Classification.Internal_for_tests.to_map
         ~applied:false
-        ~prechecked:false
+        ~validated:false
         ~branch_delayed:false
         ~branch_refused:(not handle_branch_refused)
         ~refused:true
@@ -783,7 +783,7 @@ module To_map = struct
       ~actual:
         (Classification.Internal_for_tests.to_map
            ~applied:false
-           ~prechecked:false
+           ~validated:false
            ~branch_delayed:false
            ~branch_refused:false
            ~refused:false

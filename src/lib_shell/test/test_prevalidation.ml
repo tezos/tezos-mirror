@@ -208,7 +208,7 @@ let pp_classification fmt classification =
   in
   match classification with
   | `Applied -> Format.fprintf fmt "Applied"
-  | `Prechecked -> Format.fprintf fmt "Prechecked"
+  | `Validated -> Format.fprintf fmt "Validated"
   | `Branch_delayed trace -> print_error_classification "Branch_delayed" trace
   | `Branch_refused trace -> print_error_classification "Branch_refused" trace
   | `Refused trace -> print_error_classification "Refused" trace
@@ -223,9 +223,9 @@ let unexpected_classification ~__LOC__ expected classification =
     classification
 
 let assert_success ~__LOC__ = function
-  | `Prechecked -> ()
+  | `Validated -> ()
   | classification ->
-      unexpected_classification ~__LOC__ "Prechecked" classification
+      unexpected_classification ~__LOC__ "Validated" classification
 
 let assert_operation_conflict ~__LOC__ = function
   | `Branch_delayed [Validation_errors.Operation_conflict _] -> ()
