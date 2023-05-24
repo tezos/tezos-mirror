@@ -129,6 +129,28 @@ val spendable_balance :
 val staking_balance :
   Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
+(** [is_forbidden_delegate ctxt delegate] returns [true] if the given
+    [delegate] is forbidden to bake or endorse. This means that its
+    current frozen deposit is equal to zero. Returns [false]
+    otherwise. *)
+val is_forbidden_delegate : Raw_context.t -> Signature.Public_key_hash.t -> bool
+
+(** [forbid_delegate ctxt delegate] adds [delegate] to the set of
+    forbidden delegates and stores the updated set, which prevents this
+    delegate from baking or endorsing. *)
+val forbid_delegate :
+  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t Lwt.t
+
+(** [load_forbidden_delegates ctxt] reads from the storage the saved
+    set of forbidden delegates and sets the raw context's in-memory
+    cached value. *)
+val load_forbidden_delegates : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
+(** [reset_forbidden_delegates ctxt delegates] overwrites the
+    forbidden delegates set with an empty set in both storage and
+    in-memory. *)
+val reset_forbidden_delegates : Raw_context.t -> Raw_context.t Lwt.t
+
 (** Returns the full 'balance' of the implicit contract associated to
     a given key, i.e. the sum of the spendable balance (given by [balance] or
     [Contract_storage.get_balance]) and of the frozen balance. The frozen

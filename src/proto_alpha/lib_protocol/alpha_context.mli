@@ -2180,6 +2180,11 @@ module Delegate : sig
 
   val deactivated : context -> public_key_hash -> bool tzresult Lwt.t
 
+  (** See {!Delegate_storage.is_forbidden_delegate}. *)
+  val is_forbidden_delegate : t -> public_key_hash -> bool
+
+  val forbid_delegate : t -> public_key_hash -> t Lwt.t
+
   (** See {!Delegate_activation_storage.last_cycle_before_deactivation}. *)
   val last_cycle_before_deactivation :
     context -> public_key_hash -> Cycle.t tzresult Lwt.t

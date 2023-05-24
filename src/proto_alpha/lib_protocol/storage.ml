@@ -129,6 +129,13 @@ module Tenderbake = struct
         let name = ["endorsement_branch"]
       end)
       (Branch)
+
+  module Forbidden_delegates =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["forbidden_delegates"]
+      end)
+      (Signature.Public_key_hash.Set)
 end
 
 (** Contracts handling *)

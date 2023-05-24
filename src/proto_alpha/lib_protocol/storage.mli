@@ -675,6 +675,13 @@ module Tenderbake : sig
     Single_data_storage
       with type value = Block_hash.t * Block_payload_hash.t
        and type t := Raw_context.t
+
+  (** [Forbidden_delegates] stores the set of delegates that are not
+      allowed to bake or endorse blocks. *)
+  module Forbidden_delegates :
+    Single_data_storage
+      with type value = Signature.Public_key_hash.Set.t
+       and type t := Raw_context.t
 end
 
 module Sc_rollup : sig

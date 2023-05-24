@@ -111,3 +111,7 @@ Internal
 - Introduce the notion of rollups “machine” which can compute the semantics of
   a given rollup, but cannot be used to generate or verify proof. (MR
   :gl:`!8815`)
+
+- Consensus: optimized validation of attestations by maintaining a set
+  of forbidden delegates instead of checking through an I/O that the
+  delegate has a sufficient frozen deposit. (MR :gl:`!8722`)

@@ -99,6 +99,10 @@ module Raw_consensus = struct
             slot with its power. This is [None] only in mempool mode, or in
             application mode when there is no locked round (so the block
             cannot contain any preendorsements). *)
+    forbidden_delegates : Signature.Public_key_hash.Set.t;
+        (** Delegates that are not allowed to bake or endorse blocks; i.e.,
+            delegates which have zero frozen deposit due to a previous
+            slashing. *)
     endorsements_seen : Slot_repr.Set.t;
         (** Record the endorsements already seen. Only initial slots are indexed. *)
     preendorsements_seen : Slot_repr.Set.t;
@@ -127,6 +131,7 @@ module Raw_consensus = struct
       current_endorsement_power = 0;
       allowed_endorsements = Some Slot_repr.Map.empty;
       allowed_preendorsements = Some Slot_repr.Map.empty;
+      forbidden_delegates = Signature.Public_key_hash.Set.empty;
       endorsements_seen = Slot_repr.Set.empty;
       preendorsements_seen = Slot_repr.Set.empty;
       locked_round_evidence = None;
@@ -180,6 +185,16 @@ module Raw_consensus = struct
       locked_round_evidence;
       preendorsements_seen =
         Slot_repr.Set.add initial_slot t.preendorsements_seen;
+    }
+
+  let set_forbidden_delegates delegates t =
+    {t with forbidden_delegates = delegates}
+
+  let forbid_delegate delegate t =
+    {
+      t with
+      forbidden_delegates =
+        Signature.Public_key_hash.Set.add delegate t.forbidden_delegates;
     }
 
   let set_preendorsements_quorum_round round t =
@@ -1361,6 +1376,8 @@ module type CONSENSUS = sig
 
   val allowed_preendorsements : t -> (consensus_pk * int) slot_map option
 
+  val forbidden_delegates : t -> Signature.Public_key_hash.Set.t
+
   type error += Slot_map_not_found of {loc : string}
 
   val current_endorsement_power : t -> int
@@ -1375,6 +1392,10 @@ module type CONSENSUS = sig
 
   val record_preendorsement :
     t -> initial_slot:slot -> power:int -> round -> t tzresult
+
+  val forbid_delegate : t -> Signature.Public_key_hash.t -> t
+
+  val set_forbidden_delegates : t -> Signature.Public_key_hash.Set.t -> t
 
   val endorsements_seen : t -> slot_set
 
@@ -1397,11 +1418,24 @@ module Consensus :
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
      and type consensus_pk := consensus_pk = struct
+  let[@inline] update_consensus_with ctxt f =
+    {ctxt with back = {ctxt.back with consensus = f ctxt.back.consensus}}
+
+  let[@inline] update_consensus_with_tzresult ctxt f =
+    f ctxt.back.consensus >|? fun consensus ->
+    {ctxt with back = {ctxt.back with consensus}}
+
   let[@inline] allowed_endorsements ctxt =
     ctxt.back.consensus.allowed_endorsements
 
   let[@inline] allowed_preendorsements ctxt =
     ctxt.back.consensus.allowed_preendorsements
+
+  let[@inline] forbidden_delegates ctxt =
+    ctxt.back.consensus.forbidden_delegates
+
+  let[@inline] set_forbidden_delegates ctxt delegates =
+    update_consensus_with ctxt (Raw_consensus.set_forbidden_delegates delegates)
 
   let[@inline] current_endorsement_power ctxt =
     ctxt.back.consensus.current_endorsement_power
@@ -1411,13 +1445,6 @@ module Consensus :
 
   let[@inline] locked_round_evidence ctxt =
     Raw_consensus.locked_round_evidence ctxt.back.consensus
-
-  let[@inline] update_consensus_with ctxt f =
-    {ctxt with back = {ctxt.back with consensus = f ctxt.back.consensus}}
-
-  let[@inline] update_consensus_with_tzresult ctxt f =
-    f ctxt.back.consensus >|? fun consensus ->
-    {ctxt with back = {ctxt.back with consensus}}
 
   let[@inline] initialize_consensus_operation ctxt ~allowed_endorsements
       ~allowed_preendorsements =
@@ -1436,6 +1463,9 @@ module Consensus :
     update_consensus_with_tzresult
       ctxt
       (Raw_consensus.record_endorsement ~initial_slot ~power)
+
+  let[@inline] forbid_delegate ctxt delegate =
+    update_consensus_with ctxt (Raw_consensus.forbid_delegate delegate)
 
   let[@inline] endorsements_seen ctxt = ctxt.back.consensus.endorsements_seen
 
