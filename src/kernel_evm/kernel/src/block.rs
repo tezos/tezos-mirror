@@ -205,8 +205,8 @@ mod tests {
     use crate::blueprint::Blueprint;
     use crate::genesis;
     use crate::inbox::Transaction;
-    use crate::storage::{
-        read_transaction_receipt_cumulative_gas_used, read_transaction_receipt_status,
+    use crate::storage::internal_for_tests::{
+        read_transaction_receipt, read_transaction_receipt_status,
     };
     use evm_execution::account_storage::{account_path, EthereumAccountStorage};
     use primitive_types::{H160, H256};
@@ -311,6 +311,35 @@ mod tests {
         dummy_eth_gen_transaction(nonce, v, r, s)
     }
 
+    fn dummy_eth_transaction_deploy() -> EthereumTransactionCommon {
+        let nonce = U256::from(0);
+        let gas_price = U256::from(40000000000u64);
+        let gas_limit = 21000u64;
+        let value = U256::zero();
+        // corresponding contract is kernel_benchmark/scripts/benchmarks/contracts/storage.sol
+        let data: Vec<u8> = hex::decode("608060405234801561001057600080fd5b5061017f806100206000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80634e70b1dc1461004657806360fe47b1146100645780636d4ce63c14610080575b600080fd5b61004e61009e565b60405161005b91906100d0565b60405180910390f35b61007e6004803603810190610079919061011c565b6100a4565b005b6100886100ae565b60405161009591906100d0565b60405180910390f35b60005481565b8060008190555050565b60008054905090565b6000819050919050565b6100ca816100b7565b82525050565b60006020820190506100e560008301846100c1565b92915050565b600080fd5b6100f9816100b7565b811461010457600080fd5b50565b600081359050610116816100f0565b92915050565b600060208284031215610132576101316100eb565b5b600061014084828501610107565b9150509291505056fea2646970667358221220ec57e49a647342208a1f5c9b1f2049bf1a27f02e19940819f38929bf67670a5964736f6c63430008120033").unwrap();
+
+        let tx = EthereumTransactionCommon {
+            chain_id: U256::one(),
+            nonce,
+            gas_price,
+            gas_limit,
+            to: None,
+            value,
+            data,
+            v: U256::one(),
+            r: H256::zero(),
+            s: H256::zero(),
+        };
+
+        // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
+        tx.sign_transaction(
+            "dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701"
+                .to_string(),
+        )
+        .unwrap()
+    }
+
     fn produce_block_with_several_valid_txs(
         host: &mut MockHost,
         evm_account_storage: &mut EthereumAccountStorage,
@@ -375,13 +404,9 @@ mod tests {
 
         produce(&mut host, queue).expect("The block production failed.");
 
-        match read_transaction_receipt_status(&mut host, &tx_hash) {
-            Ok(TransactionStatus::Failure) => (),
-            Ok(TransactionStatus::Success) => {
-                panic!("The receipt should have a failing status.")
-            }
-            Err(_) => panic!("Reading the receipt failed."),
-        }
+        let status = read_transaction_receipt_status(&mut host, &tx_hash)
+            .expect("Should have found receipt");
+        assert_eq!(TransactionStatus::Failure, status);
     }
 
     #[test]
@@ -413,13 +438,55 @@ mod tests {
 
         produce(&mut host, queue).expect("The block production failed.");
 
-        match read_transaction_receipt_status(&mut host, &tx_hash) {
-            Ok(TransactionStatus::Failure) => {
-                panic!("The receipt should have a success status.")
-            }
-            Ok(TransactionStatus::Success) => (),
-            Err(_) => panic!("Reading the receipt failed."),
-        }
+        let status = read_transaction_receipt_status(&mut host, &tx_hash)
+            .expect("Should have found receipt");
+        assert_eq!(TransactionStatus::Success, status);
+    }
+
+    #[test]
+    // Test if a valid transaction is producing a receipt with a contract address
+    fn test_valid_transactions_receipt_contract_address() {
+        let mut host = MockHost::default();
+        let _ = genesis::init_block(&mut host);
+
+        let tx_hash = [0; TRANSACTION_HASH_SIZE];
+        let tx = dummy_eth_transaction_deploy();
+        assert_eq!(
+            H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap(),
+            tx.caller().unwrap()
+        );
+        let valid_tx = Transaction {
+            tx_hash,
+            tx: dummy_eth_transaction_deploy(),
+        };
+
+        let transactions: Vec<Transaction> = vec![valid_tx];
+        let queue = Queue {
+            proposals: vec![Blueprint { transactions }],
+        };
+
+        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &sender,
+            U256::from(5000000000000000u64),
+        );
+
+        produce(&mut host, queue).expect("The block production failed.");
+
+        let receipt = read_transaction_receipt(&mut host, &tx_hash)
+            .expect("should have found receipt");
+        assert_eq!(TransactionStatus::Success, receipt.status);
+        assert_eq!(
+            H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap(),
+            receipt.from
+        );
+        assert_eq!(
+            Some(H160::from_str("d9d427235f5746ffd1d5a0d850e77880a94b668f").unwrap()),
+            receipt.contract_address
+        );
     }
 
     #[test]
@@ -526,15 +593,10 @@ mod tests {
         produce(&mut host, queue).expect("The block production failed.");
 
         for transaction in transactions {
-            match read_transaction_receipt_cumulative_gas_used(
-                &mut host,
-                &transaction.tx_hash,
-            ) {
-                Ok(cumulative_gas_used) => {
-                    assert_eq!(cumulative_gas_used, base_gas)
-                }
-                Err(_) => panic!("Reading the receipt's cumulative gas used failed."),
-            }
+            let receipt = read_transaction_receipt(&mut host, &transaction.tx_hash)
+                .expect("should have found receipt");
+            // NB: we do not use any gas for now, hence the following assertion
+            assert_eq!(receipt.cumulative_gas_used, base_gas);
         }
     }
 

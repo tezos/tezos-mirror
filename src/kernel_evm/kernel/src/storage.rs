@@ -12,7 +12,8 @@ use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 use crate::error::{Error, StorageError};
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::transaction::{
-    TransactionHash, TransactionReceipt, TransactionStatus, TRANSACTION_HASH_SIZE,
+    TransactionHash, TransactionReceipt, TransactionStatus, TransactionType,
+    TRANSACTION_HASH_SIZE,
 };
 use tezos_ethereum::wei::Wei;
 
@@ -34,13 +35,23 @@ const TRANSACTION_RECEIPT_BLOCK_HASH: RefPath = RefPath::assert_from(b"/block_ha
 const TRANSACTION_RECEIPT_BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/block_number");
 const TRANSACTION_RECEIPT_FROM: RefPath = RefPath::assert_from(b"/from");
 const TRANSACTION_RECEIPT_TO: RefPath = RefPath::assert_from(b"/to");
+const TRANSACTION_RECEIPT_CONTRACT_ADDRESS: RefPath =
+    RefPath::assert_from(b"/contract_address");
 const TRANSACTION_CUMULATIVE_GAS_USED: RefPath =
     RefPath::assert_from(b"/cumulative_gas_used");
 const TRANSACTION_RECEIPT_TYPE: RefPath = RefPath::assert_from(b"/type");
 const TRANSACTION_RECEIPT_STATUS: RefPath = RefPath::assert_from(b"/status");
 
+/// The size of an address. Size in bytes.
+const ADDRESS_SIZE: usize = 20;
+/// The size of a 256 bit hash. Size in bytes.
 const HASH_MAX_SIZE: usize = 32;
+/// The size of status. Size in bytes.
 const TRANSACTION_RECEIPT_STATUS_SIZE: usize = 1;
+/// The size of type of the transaction. Size in bytes.
+const TRANSACTION_RECEIPT_TYPE_SIZE: usize = 1;
+/// The size of one 256 bit word. Size in bytes
+pub const WORD_SIZE: usize = 32usize;
 
 // We can read/store at most [128] transaction hashes per block.
 // TRANSACTION_HASH_SIZE * 128 = 4096.
@@ -97,13 +108,16 @@ pub fn store_smart_rollup_address<Host: Runtime>(
         .map_err(Error::from)
 }
 
-/// The size of one 256 bit word. Size in bytes
-pub const WORD_SIZE: usize = 32usize;
-
 /// Read a single unsigned 256 bit value from storage at the path given.
 fn read_u256(host: &impl Runtime, path: &OwnedPath) -> Result<U256, Error> {
     let bytes = host.store_read(path, 0, WORD_SIZE)?;
     Ok(Wei::from_little_endian(&bytes))
+}
+
+/// Read a single address value from storage at the path given.
+fn read_address(host: &impl Runtime, path: &OwnedPath) -> Result<H160, Error> {
+    let bytes = host.store_read(path, 0, ADDRESS_SIZE)?;
+    Ok(H160::from_slice(&bytes))
 }
 
 fn write_u256(
@@ -303,6 +317,13 @@ pub fn store_transaction_receipt<Host: Runtime>(
         let to_path = concat(receipt_path, &TRANSACTION_RECEIPT_TO)?;
         host.store_write(&to_path, to.as_bytes(), 0)?;
     };
+    // Contract address
+    if let Some(contract_address) = receipt.contract_address {
+        let contract_address_path =
+            concat(receipt_path, &TRANSACTION_RECEIPT_CONTRACT_ADDRESS)?;
+        host.store_write(&contract_address_path, contract_address.as_bytes(), 0)?;
+    };
+
     // Cumulative gas used
     let cumulative_gas_used_path =
         concat(receipt_path, &TRANSACTION_CUMULATIVE_GAS_USED)?;
@@ -328,33 +349,6 @@ pub fn store_transaction_receipts<Host: Runtime>(
         store_transaction_receipt(&receipt_path, host, receipt)?;
     }
     Ok(())
-}
-
-pub fn read_transaction_receipt_status<Host: Runtime>(
-    host: &mut Host,
-    tx_hash: &TransactionHash,
-) -> Result<TransactionStatus, Error> {
-    let receipt_path = receipt_path(tx_hash)?;
-    let status_path = concat(&receipt_path, &TRANSACTION_RECEIPT_STATUS)?;
-    let raw_status = host
-        .store_read(&status_path, 0, TRANSACTION_RECEIPT_STATUS_SIZE)
-        .map_err(Error::from)?;
-    TransactionStatus::try_from(&raw_status).map_err(|_| {
-        Error::Storage(StorageError::InvalidEncoding {
-            path: status_path,
-            value: raw_status,
-        })
-    })
-}
-
-pub fn read_transaction_receipt_cumulative_gas_used<Host: Runtime>(
-    host: &mut Host,
-    tx_hash: &TransactionHash,
-) -> Result<U256, Error> {
-    let receipt_path = receipt_path(tx_hash)?;
-    let cumulative_gas_used_path =
-        concat(&receipt_path, &TRANSACTION_CUMULATIVE_GAS_USED)?;
-    read_u256(host, &cumulative_gas_used_path)
 }
 
 const CHUNKED_TRANSACTIONS: RefPath = RefPath::assert_from(b"/chunked_transactions");
@@ -533,4 +527,108 @@ pub fn create_chunked_transaction<Host: Runtime>(
         0,
     )
     .map_err(Error::from)
+}
+
+pub(crate) mod internal_for_tests {
+    use super::*;
+
+    /// Reads status from the receipt in storage.
+    pub fn read_transaction_receipt_status<Host: Runtime>(
+        host: &mut Host,
+        tx_hash: &TransactionHash,
+    ) -> Result<TransactionStatus, Error> {
+        let receipt = read_transaction_receipt(host, tx_hash)?;
+        Ok(receipt.status)
+    }
+
+    /// Reads cumulative gas used from the receipt in storage.
+    pub fn read_transaction_receipt_cumulative_gas_used<Host: Runtime>(
+        host: &mut Host,
+        tx_hash: &TransactionHash,
+    ) -> Result<U256, Error> {
+        let receipt = read_transaction_receipt(host, tx_hash)?;
+        Ok(receipt.cumulative_gas_used)
+    }
+
+    /// Reads a transaction receipt from storage.
+    pub fn read_transaction_receipt<Host: Runtime>(
+        host: &mut Host,
+        tx_hash: &TransactionHash,
+    ) -> Result<TransactionReceipt, Error> {
+        let receipt_path = receipt_path(tx_hash)?;
+
+        let index_path = concat(&receipt_path, &TRANSACTION_RECEIPT_INDEX)?;
+        let index_raw = host.store_read(&index_path, 0, WORD_SIZE)?;
+        let index = u32::from_le_bytes(
+            index_raw.try_into().map_err(|_| Error::InvalidConversion)?,
+        );
+
+        let block_hash_path = concat(&receipt_path, &TRANSACTION_RECEIPT_BLOCK_HASH)?;
+        let block_hash_raw = host.store_read(&block_hash_path, 0, HASH_MAX_SIZE)?;
+        let block_hash = H256::from_slice(block_hash_raw.as_slice());
+
+        let block_number_path = concat(&receipt_path, &TRANSACTION_RECEIPT_BLOCK_NUMBER)?;
+        let block_number = read_u256(host, &block_number_path)?;
+
+        let from_path = concat(&receipt_path, &TRANSACTION_RECEIPT_FROM)?;
+        let from = read_address(host, &from_path)?;
+
+        let cumulative_gas_used_path =
+            concat(&receipt_path, &TRANSACTION_CUMULATIVE_GAS_USED)?;
+        let cumulative_gas_used = read_u256(host, &cumulative_gas_used_path)?;
+
+        let type_path = concat(&receipt_path, &TRANSACTION_RECEIPT_TYPE)?;
+        let type_raw = host.store_read(&type_path, 0, TRANSACTION_RECEIPT_TYPE_SIZE)?;
+        let type_ = TransactionType::try_from(&type_raw).map_err(|_| {
+            Error::Storage(StorageError::InvalidEncoding {
+                path: type_path,
+                value: type_raw,
+            })
+        })?;
+
+        let status_path = concat(&receipt_path, &TRANSACTION_RECEIPT_STATUS)?;
+        let raw_status =
+            host.store_read(&status_path, 0, TRANSACTION_RECEIPT_STATUS_SIZE)?;
+        let status = TransactionStatus::try_from(&raw_status).map_err(|_| {
+            Error::Storage(StorageError::InvalidEncoding {
+                path: status_path,
+                value: raw_status,
+            })
+        })?;
+
+        // To can be None
+        let to_path = concat(&receipt_path, &TRANSACTION_RECEIPT_TO)?;
+        let to = if let Ok(Some(_)) = host.store_has(&to_path) {
+            Some(read_address(host, &to_path)?)
+        } else {
+            None
+        };
+
+        // Contract address can be None
+        let contract_address_path =
+            concat(&receipt_path, &TRANSACTION_RECEIPT_CONTRACT_ADDRESS)?;
+        let contract_address: Option<H160> = if let Ok(Some(_)) =
+            host.store_has(&contract_address_path)
+        {
+            let address_raw = host.store_read(&contract_address_path, 0, ADDRESS_SIZE)?;
+            Some(H160::from_slice(&address_raw))
+        } else {
+            None
+        };
+
+        Ok(TransactionReceipt {
+            hash: *tx_hash,
+            index,
+            block_hash,
+            block_number,
+            from,
+            to,
+            cumulative_gas_used,
+            effective_gas_price: U256::zero(),
+            gas_used: U256::zero(),
+            contract_address,
+            type_,
+            status,
+        })
+    }
 }
