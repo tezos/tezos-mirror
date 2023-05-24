@@ -370,6 +370,7 @@ let () =
       external_lib "ocp-indent" V.True;
       external_lib "ocaml-lsp-server" V.(at_least "1.6.1");
       external_lib "merge-fmt" V.True;
+      external_lib "js_of_ocaml-lwt" V.(at_least "5.2.0");
     ]
 
 (* INTERNAL LIBS *)
