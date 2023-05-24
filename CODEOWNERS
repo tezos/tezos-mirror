@@ -43,17 +43,17 @@
 /src/proto_*/lib_protocol/sc_rollup_inbox*         @sribaroud
 /src/proto_*/lib_protocol/sc_rollup_refutation*    @sribaroud
 
-/src/lib_aplonk               @victor-dumitrescu
+/src/lib_aplonk               @MarcBeunardeau
 /src/lib_bls12_381*           @victor-dumitrescu
 /src/lib_crypto               @victor-dumitrescu
 /src/lib_distributed_internal @alocascio
 /src/lib_distributed_plonk    @alocascio
 /src/lib_epoxy_tx             @alocascio
 /src/lib_hacl                 @victor-dumitrescu
-/src/lib_mec                  @victor-dumitrescu
+/src/lib_mec                  @MarcBeunardeau
 /src/lib_plompiler            @alocascio
-/src/lib_plonk                @alocascio
-/src/lib_polynomial           @victor-dumitrescu
+/src/lib_plonk                @MarcBeunardeau
+/src/lib_polynomial           @MarcBeunardeau
 
 /src/lib_webassembly         @lthms @ole.kruger @picdc
 /src/lib_scoru_wasm          @lthms @ole.kruger @picdc
@@ -90,6 +90,7 @@
 # @linoscope = Lin Oshitani
 # @lrand = Lucas Randazzo
 # @lthms = Thomas Letan
+# @MarcBeunardeau = Marc Beunardeau
 # @mbouaziz = Mehdi Bouaziz
 # @MBourgoin = Mathias Bourgoin
 # @mebsout = Alain Mebsout
@@ -113,7 +114,7 @@
 # @victor-dumitrescu = Victor Dumitrescu
 # @yrg = Yann Regis-Gianas
 #
-* @ACoquereau @alocascio @andrea.cerone @arvidnl @bsall @camlspotter @dianegalloiswong @emturner @eugenz @hhugo1 @igarnier @iguerNL @jobjo @julien.t @Killian-Delarue @klakplok @linoscope @lrand @lthms @mbouaziz @MBourgoin @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @picdc @pirbo @rafoo_ @raphael-proust @romain.nl @Saroupille @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @victor-dumitrescu @yrg
+* @ACoquereau @alocascio @andrea.cerone @arvidnl @bsall @camlspotter @dianegalloiswong @emturner @eugenz @hhugo1 @igarnier @iguerNL @jobjo @julien.t @Killian-Delarue @klakplok @linoscope @lrand @lthms @MarcBeunardeau @mbouaziz @MBourgoin @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @picdc @pirbo @rafoo_ @raphael-proust @romain.nl @Saroupille @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @victor-dumitrescu @yrg
 
 # CODEOWNERS Owners
 #
