@@ -257,6 +257,7 @@ mod test {
             is_success: false,
             new_address: None,
             logs: vec![],
+            result: None,
         });
 
         assert_eq!(expected_result, result);
@@ -313,6 +314,7 @@ mod test {
             is_success: true,
             new_address: None,
             logs: vec![],
+            result: Some(vec![]),
         });
 
         assert_eq!(expected_result, result);
@@ -363,6 +365,7 @@ mod test {
             is_success: false,
             new_address: None,
             logs: vec![],
+            result: None,
         });
 
         assert_eq!(expected_result, result);
@@ -410,6 +413,7 @@ mod test {
                 H160::from_str("907823e0a92f94355968feb2cbf0fbb594fe3214").unwrap(),
             ),
             logs: vec![],
+            result: Some(vec![]),
         });
 
         assert_eq!(expected_result, result);
@@ -495,6 +499,7 @@ mod test {
             is_success: false,
             new_address: None,
             logs: vec![],
+            result: None,
         });
 
         assert_eq!(expected_result, result);
@@ -534,6 +539,7 @@ mod test {
             is_success: true,
             new_address: None,
             logs: vec![],
+            result: Some(vec![]),
         });
 
         assert_eq!(expected_result, result);
@@ -666,6 +672,7 @@ mod test {
             is_success: true,
             new_address: None,
             logs: vec![],
+            result: Some(vec![]),
         });
 
         assert_eq!(expected_result, result);
@@ -710,6 +717,7 @@ mod test {
             is_success: false,
             new_address: None,
             logs: vec![],
+            result: None,
         });
 
         assert_eq!(expected_result, result);
@@ -755,6 +763,7 @@ mod test {
             is_success: false,
             new_address: None,
             logs: vec![],
+            result: None,
         });
 
         assert_eq!(expected_result, result);
@@ -803,6 +812,7 @@ mod test {
             is_success: false,
             new_address: None,
             logs: vec![],
+            result: None,
         });
 
         assert_eq!(expected_result, result);
@@ -846,6 +856,7 @@ mod test {
             is_success: true,
             new_address: None,
             logs: vec![],
+            result: Some(vec![0u8; 32]),
         });
 
         assert_eq!(expected_result, result);
@@ -1015,6 +1026,7 @@ mod test {
             is_success: false,
             new_address: None,
             logs: vec![],
+            result: None,
         });
 
         // assert that call fails
@@ -1088,6 +1100,7 @@ mod test {
             is_success: false,
             new_address: None,
             logs: vec![],
+            result: None,
         });
 
         // assert that call fails
@@ -1192,6 +1205,7 @@ mod test {
             is_success: true,
             new_address: None,
             logs: vec![log_record1, log_record2],
+            result: Some(vec![]),
         });
 
         assert_eq!(result, expected_result);
@@ -1280,6 +1294,7 @@ mod test {
             is_success: true,
             new_address: None,
             logs: vec![log_record1],
+            result: Some(vec![]),
         });
 
         assert_eq!(result, expected_result);
