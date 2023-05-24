@@ -199,7 +199,6 @@ let op_map_gen_n ?proto_gen ?block_hash_t (n : int) :
 let classification_gen : classification QCheck2.Gen.t =
   QCheck2.Gen.oneofa
     [|
-      `Applied;
       `Validated;
       `Branch_delayed [];
       `Branch_refused [];
@@ -208,8 +207,7 @@ let classification_gen : classification QCheck2.Gen.t =
     |]
 
 let unrefused_classification_gen : classification QCheck2.Gen.t =
-  QCheck2.Gen.oneofa
-    [|`Applied; `Validated; `Branch_delayed []; `Branch_refused []|]
+  QCheck2.Gen.oneofa [|`Validated; `Branch_delayed []; `Branch_refused []|]
 
 let parameters_gen : parameters QCheck2.Gen.t =
   let open QCheck2.Gen in
@@ -261,15 +259,13 @@ let with_t_operation_gen : unit t -> unit operation QCheck2.Gen.t =
     let freq_fresh t =
       max
         1
-        (freq_of_list t.applied_rev
-        + freq_of_map (Sized_map.to_map t.validated)
+        (freq_of_map (Sized_map.to_map t.validated)
         + freq_of_map (Classification.map t.branch_refused)
         + freq_of_map (Classification.map t.branch_delayed)
         + freq_of_map (Classification.map t.refused)
         + freq_of_map (Classification.map t.outdated))
     in
-    freq_and_gen_of_list t.applied_rev
-    @ freq_and_gen_of_list (List.map snd (Sized_map.bindings t.validated))
+    freq_and_gen_of_list (List.map snd (Sized_map.bindings t.validated))
     @ freq_and_gen_of_map (Classification.map t.branch_refused)
     @ freq_and_gen_of_map (Classification.map t.branch_delayed)
     @ freq_and_gen_of_map (Classification.map t.refused)

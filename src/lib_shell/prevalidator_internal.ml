@@ -392,7 +392,7 @@ module Make_s
     let to_handle = (op, classification) :: to_replace in
     let mempool =
       match classification with
-      | `Validated | `Applied -> Mempool.cons_valid op.hash mempool
+      | `Validated -> Mempool.cons_valid op.hash mempool
       | `Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _ ->
           mempool
     in
@@ -470,12 +470,8 @@ module Make_s
         in
         {
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2065
-             This field does not only contain valid operation *)
-          Mempool.known_valid =
-            List.fold_left
-              (fun acc op -> op.hash :: acc)
-              validated_hashes
-              pv_shell.classification.applied_rev;
+             This field does not need to be a list. *)
+          Mempool.known_valid = validated_hashes;
           pending = Pending_ops.hashes pv_shell.pending;
         }
       in
@@ -663,7 +659,7 @@ module Make_s
                   to_handle
               in
               match op_status with
-              | Some (_h, (`Applied | `Validated)) ->
+              | Some (_h, `Validated) ->
                   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2294
                      We may want to only do the injection/replacement if a
                      flag `replace` is set to true in the injection query. *)
@@ -797,7 +793,7 @@ module Make_s
           return_unit
       | Some (_op, classification) -> (
           match (classification, flush_if_validated) with
-          | `Validated, true | `Applied, _ ->
+          | `Validated, true ->
               (* Modifying the list of operations classified as [Applied]
                  might change the classification of all the operations in
                  the mempool. Hence if the removed operation has been
@@ -993,15 +989,11 @@ module Make
                changed. Once prechecking will be done by the protocol
                and not the plugin, we will change the encoding to
                reflect that. *)
-            let validated_with_applied =
+            let validated =
               if params#applied then
-                let applied_seq =
-                  pv.shell.classification.applied_rev |> List.to_seq
-                  |> Seq.map (fun ({hash; _} as op) -> (hash, op))
-                in
                 Classification.Sized_map.to_map
                   pv.shell.classification.validated
-                |> Operation_hash.Map.to_seq |> Seq.append applied_seq
+                |> Operation_hash.Map.to_seq
                 |> Seq.filter_map (fun (oph, op) ->
                        if
                          filter_validation_passes
@@ -1057,7 +1049,7 @@ module Make
             in
             let pending_operations =
               {
-                Proto_services.Mempool.applied = validated_with_applied;
+                Proto_services.Mempool.applied = validated;
                 refused;
                 outdated;
                 branch_refused;
@@ -1083,12 +1075,6 @@ module Make
               Lwt_watcher.create_stream pv.operation_stream
             in
             (* First call : retrieve the current set of op from the mempool *)
-            let applied_seq =
-              if params#applied then
-                pv.shell.classification.applied_rev |> List.to_seq
-                |> Seq.map (fun {hash; protocol; _} -> ((hash, protocol), None))
-              else Seq.empty
-            in
             (* FIXME https://gitlab.com/tezos/tezos/-/issues/2250
 
                For the moment, applied and validated operations are
@@ -1139,11 +1125,11 @@ module Make
               Seq.append outdated_seq branch_delayed_seq
               |> Seq.append branch_refused_seq
               |> Seq.append refused_seq |> Seq.append validated_seq
-              |> Seq.append applied_seq |> Seq.filter filter |> List.of_seq
+              |> Seq.filter filter |> List.of_seq
             in
             let current_mempool = ref (Some current_mempool) in
             let filter_result = function
-              | `Validated | `Applied -> params#applied
+              | `Validated -> params#applied
               | `Refused _ -> params#refused
               | `Outdated _ -> params#outdated
               | `Branch_refused _ -> params#branch_refused
@@ -1161,7 +1147,7 @@ module Make
                   | Some (kind, op) when filter_result kind ->
                       let errors =
                         match kind with
-                        | `Validated | `Applied -> None
+                        | `Validated -> None
                         | `Branch_delayed errors
                         | `Branch_refused errors
                         | `Refused errors
@@ -1325,8 +1311,7 @@ module Make
           worker = mk_worker_tools w;
         }
       in
-      Shell_metrics.Mempool.set_applied_collector (fun () ->
-          List.length shell.classification.applied_rev |> float_of_int) ;
+      Shell_metrics.Mempool.set_applied_collector (fun () -> 0.) ;
       Shell_metrics.Mempool.set_prechecked_collector (fun () ->
           Prevalidator_classification.Sized_map.cardinal
             shell.classification.validated

@@ -41,7 +41,6 @@ let classification_pp pp classification =
   Format.fprintf
     pp
     (match (classification :> Classification.classification) with
-    | `Applied -> "Applied"
     | `Validated -> "Validated"
     | `Branch_delayed _ -> "Branch_delayed"
     | `Branch_refused _ -> "Branch_refused"
@@ -53,29 +52,22 @@ let eq_classification cl1 cl2 =
     ( (cl1 :> Classification.classification),
       (cl2 :> Classification.classification) )
   with
-  | `Applied, `Applied
   | `Validated, `Validated
   | `Branch_delayed _, `Branch_delayed _
   | `Branch_refused _, `Branch_refused _
   | `Refused _, `Refused _
   | `Outdated _, `Outdated _ ->
       true
-  | ( `Applied,
-      ( `Validated | `Branch_delayed _ | `Branch_refused _ | `Refused _
-      | `Outdated _ ) )
   | ( `Validated,
-      ( `Applied | `Branch_delayed _ | `Branch_refused _ | `Refused _
-      | `Outdated _ ) )
+      (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) )
   | ( `Branch_delayed _,
-      (`Applied | `Validated | `Branch_refused _ | `Refused _ | `Outdated _) )
+      (`Validated | `Branch_refused _ | `Refused _ | `Outdated _) )
   | ( `Branch_refused _,
-      (`Applied | `Validated | `Branch_delayed _ | `Refused _ | `Outdated _) )
+      (`Validated | `Branch_delayed _ | `Refused _ | `Outdated _) )
   | ( `Refused _,
-      ( `Applied | `Validated | `Branch_delayed _ | `Branch_refused _
-      | `Outdated _ ) )
+      (`Validated | `Branch_delayed _ | `Branch_refused _ | `Outdated _) )
   | ( `Outdated _,
-      ( `Applied | `Validated | `Branch_delayed _ | `Branch_refused _
-      | `Refused _ ) ) ->
+      (`Validated | `Branch_delayed _ | `Branch_refused _ | `Refused _) ) ->
       false
 
 module Operation_map = struct
@@ -230,8 +222,6 @@ let disjoint_union_classified_fields ?fail_msg (t : unit Classification.t) =
   +> to_set t.branch_delayed
   +> (Classification.Sized_map.to_seq t.validated
      |> Seq.map fst |> Operation_hash.Set.of_seq)
-  +> (Operation_hash.Set.of_list
-     @@ List.rev_map (fun op -> op.hash) t.applied_rev)
 
 (** Checks both invariants of type [Prevalidator_classification.t]:
     - The field [in_mempool] is the set of all operation hashes present
@@ -311,7 +301,6 @@ let test_flush_empties_all_except_refused_and_outdated =
   let outdated_after = t.outdated |> Classification.map in
   qcheck_bounded_map_is_empty t.branch_refused ;
   qcheck_bounded_map_is_empty t.branch_delayed ;
-  qcheck_eq_true ~actual:(t.applied_rev = []) ;
   qcheck_eq'
     ~pp:Operation_map.pp_with_trace
     ~eq:Operation_map.eq
@@ -349,7 +338,6 @@ let test_flush_empties_all_except_refused_and_branch_refused =
       ()
   in
   qcheck_bounded_map_is_empty t.branch_delayed ;
-  qcheck_eq_true ~actual:(t.applied_rev = []) ;
   qcheck_eq'
     ~pp:Operation_map.pp_with_trace
     ~eq:Operation_map.eq
@@ -620,7 +608,6 @@ module To_map = struct
       arguments set to [true] *)
   let to_map_all =
     Classification.Internal_for_tests.to_map
-      ~applied:true
       ~validated:true
       ~branch_delayed:true
       ~branch_refused:true
@@ -764,7 +751,6 @@ module To_map = struct
     @@ fun (t, handle_branch_refused) ->
     let initial =
       Classification.Internal_for_tests.to_map
-        ~applied:false
         ~validated:false
         ~branch_delayed:false
         ~branch_refused:(not handle_branch_refused)
@@ -808,7 +794,6 @@ module To_map = struct
       ~expected:Operation_hash.Map.empty
       ~actual:
         (Classification.Internal_for_tests.to_map
-           ~applied:false
            ~validated:false
            ~branch_delayed:false
            ~branch_refused:false

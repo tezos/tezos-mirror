@@ -33,7 +33,7 @@ type error_classification =
   | `Outdated of tztrace ]
 
 (** Classification of an operation in the mempool *)
-type classification = [`Applied | `Validated | error_classification]
+type classification = [`Validated | error_classification]
 
 type 'protocol_data bounded_map
 
@@ -83,7 +83,6 @@ type 'protocol_data t = private {
   outdated : 'protocol_data bounded_map;
   branch_refused : 'protocol_data bounded_map;
   branch_delayed : 'protocol_data bounded_map;
-  mutable applied_rev : 'protocol_data operation list;
   mutable validated : 'protocol_data operation Sized_map.t;
   mutable unparsable : Operation_hash.Set.t;
   mutable in_mempool :
@@ -253,7 +252,6 @@ module Internal_for_tests : sig
     Fields of [t] are included according to the value of the corresponding
     named argument. *)
   val to_map :
-    applied:bool ->
     validated:bool ->
     branch_delayed:bool ->
     branch_refused:bool ->

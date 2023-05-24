@@ -207,7 +207,6 @@ let pp_classification fmt classification =
     Format.fprintf fmt "%s: %a" name pp_print_trace trace
   in
   match classification with
-  | `Applied -> Format.fprintf fmt "Applied"
   | `Validated -> Format.fprintf fmt "Validated"
   | `Branch_delayed trace -> print_error_classification "Branch_delayed" trace
   | `Branch_refused trace -> print_error_classification "Branch_refused" trace
