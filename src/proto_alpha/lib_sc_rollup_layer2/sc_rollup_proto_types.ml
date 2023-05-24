@@ -107,6 +107,36 @@ module Inbox_hash = struct
   let to_octez = Fun.id
 end
 
+module Inbox = struct
+  type t = Sc_rollup.Inbox.t
+
+  let to_repr inbox =
+    inbox
+    |> Data_encoding.Binary.to_string_exn Sc_rollup.Inbox.encoding
+    |> Data_encoding.Binary.of_string_exn Sc_rollup_inbox_repr.encoding
+
+  let of_repr inbox =
+    inbox
+    |> Data_encoding.Binary.to_string_exn Sc_rollup_inbox_repr.encoding
+    |> Data_encoding.Binary.of_string_exn Sc_rollup.Inbox.encoding
+
+  let of_octez (inbox : Octez_smart_rollup.Inbox.t) : t =
+    inbox |> Octez_smart_rollup.Inbox.to_versioned
+    |> Data_encoding.Binary.to_string_exn
+         Octez_smart_rollup.Inbox.versioned_encoding
+    |> Data_encoding.Binary.of_string_exn
+         Sc_rollup_inbox_repr.versioned_encoding
+    |> Sc_rollup_inbox_repr.of_versioned |> of_repr
+
+  let to_octez (inbox : t) : Octez_smart_rollup.Inbox.t =
+    inbox |> to_repr |> Sc_rollup_inbox_repr.to_versioned
+    |> Data_encoding.Binary.to_string_exn
+         Sc_rollup_inbox_repr.versioned_encoding
+    |> Data_encoding.Binary.of_string_exn
+         Octez_smart_rollup.Inbox.versioned_encoding
+    |> Octez_smart_rollup.Inbox.of_versioned
+end
+
 module Game = struct
   type dissection_chunk = Sc_rollup.Game.dissection_chunk
 

@@ -73,6 +73,14 @@ module Inbox_hash : sig
   val to_octez : t -> Octez_smart_rollup.Inbox_hash.t
 end
 
+module Inbox : sig
+  type t = Sc_rollup.Inbox.t
+
+  val of_octez : Octez_smart_rollup.Inbox.t -> t
+
+  val to_octez : t -> Octez_smart_rollup.Inbox.t
+end
+
 module Game : sig
   type dissection_chunk = Sc_rollup.Game.dissection_chunk
 
