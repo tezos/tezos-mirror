@@ -11,7 +11,7 @@ FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as intermediate
 # Pull in built binaries
 COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/bin/* /home/tezos/bin/
 # Add parameters for active protocols
-COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/parameters /home/tezos/scripts/
+COPY --chown=tezos:nogroup --from=builder /home/tezos/evm_kernel/evm_kernel.wasm* /home/tezos/tezos/parameters /home/tezos/scripts/
 # Add entrypoint scripts
 COPY --chown=tezos:nogroup scripts/docker/entrypoint.* /home/tezos/bin/
 # Add scripts

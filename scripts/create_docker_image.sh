@@ -14,8 +14,11 @@ build_deps_image_name=${3:-registry.gitlab.com/tezos/opam-repository}
 build_deps_image_version=${4:-$opam_repository_tag}
 executables=${5:-$(cat script-inputs/released-executables)}
 commit_short_sha="${6:-$(git rev-parse --short HEAD)}"
-commit_datetime="${7:-$(git show -s --pretty=format:%ci HEAD)}"
-commit_tag="${8:-$(git describe --tags --always)}"
+docker_target="${7:-without-evm-artifacts}"
+rust_toolchain_image="$8"
+rust_toolchain_image_version="${9:-$rust_toolchain_image_version}"
+commit_datetime="${10:-$(git show -s --pretty=format:%ci HEAD)}"
+commit_tag="${11:-$(git describe --tags --always)}"
 
 build_image_name="${image_name}build"
 
@@ -29,6 +32,7 @@ echo "### Building tezos..."
 docker build \
   -t "$build_image_name:$image_version" \
   -f build.Dockerfile \
+  --target "$docker_target" \
   --cache-from "$build_image_name:$image_version" \
   --build-arg "BASE_IMAGE=$build_deps_image_name" \
   --build-arg "BASE_IMAGE_VERSION=runtime-build-dependencies--$build_deps_image_version" \
@@ -36,6 +40,8 @@ docker build \
   --build-arg "GIT_SHORTREF=${commit_short_sha}" \
   --build-arg "GIT_DATETIME=${commit_datetime}" \
   --build-arg "GIT_VERSION=${commit_tag}" \
+  --build-arg "RUST_TOOLCHAIN_IMAGE=$rust_toolchain_image" \
+  --build-arg "RUST_TOOLCHAIN_IMAGE_VERSION=$rust_toolchain_image_version" \
   "$src_dir"
 
 echo "### Successfully built docker image: $build_image_name:$image_version"

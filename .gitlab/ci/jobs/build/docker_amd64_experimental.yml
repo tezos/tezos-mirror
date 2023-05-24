@@ -4,6 +4,7 @@ docker:amd64:
   extends:
     - .build_docker_release_template
   variables:
+    DOCKER_BUILD_TARGET: "with-evm-artifacts"
     IMAGE_ARCH_PREFIX: "amd64_"
     CI_DOCKER_HUB: "true"
     EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"
