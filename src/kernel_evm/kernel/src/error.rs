@@ -31,12 +31,18 @@ pub enum StorageError {
 }
 
 #[derive(Debug)]
+pub enum UpgradeProcessError {
+    InvalidUpgradeNonce,
+}
+
+#[derive(Debug)]
 pub enum Error {
     Transfer(TransferError),
     Storage(StorageError),
     InvalidConversion,
     InvalidRunTransaction,
     Simulation(EthereumError),
+    UpgradeError(UpgradeProcessError),
     InvalidSignature(SigError),
     InvalidSignatureCheck,
 }

@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -50,8 +51,8 @@ pub fn fetch<Host: Runtime>(
     smart_rollup_address: [u8; 20],
     chain_id: U256,
 ) -> Result<Queue, Error> {
-    let transactions = read_inbox(host, smart_rollup_address)?;
-    let transactions = filter_invalid_chain_id(transactions, chain_id);
+    let inbox_content = read_inbox(host, smart_rollup_address)?;
+    let transactions = filter_invalid_chain_id(inbox_content.transactions, chain_id);
     let blueprint = Blueprint { transactions };
     Ok(Queue {
         proposals: vec![blueprint],
