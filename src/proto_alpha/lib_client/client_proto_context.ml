@@ -979,17 +979,13 @@ let transfer_ticket (cctxt : #full) ~chain ~block ?confirmations ?dry_run
 let sc_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
     ~kind ~boot_sector ~parameters_ty ~src_pk ~src_sk ~fee_parameter () =
-  Proof_helpers.origination_proof ~boot_sector kind
-  >|= Environment.wrap_tzresult
-  >>=? fun origination_proof ->
   let op =
     Annotated_manager_operation.Single_manager
       (Injection.prepare_manager_operation
          ~fee:(Limit.of_option fee)
          ~gas_limit:(Limit.of_option gas_limit)
          ~storage_limit:(Limit.of_option storage_limit)
-         (Sc_rollup_originate
-            {kind; boot_sector; origination_proof; parameters_ty}))
+         (Sc_rollup_originate {kind; boot_sector; parameters_ty}))
   in
   Injection.inject_manager_operation
     cctxt

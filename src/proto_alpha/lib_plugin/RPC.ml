@@ -2249,17 +2249,6 @@ module Sc_rollup = struct
           path_sc_rollup / "commitment" /: Sc_rollup.Commitment.Hash.rpc_arg
           / "can_be_cemented")
 
-    let origination_proof =
-      RPC_service.post_service
-        ~description:"Proof for a smart rollup origination"
-        ~query:RPC_query.empty
-        ~input:
-          (obj2
-             (req "kind" Sc_rollup.Kind.encoding)
-             (req "kernel" (string Hex)))
-        ~output:Sc_rollup.Proof.serialized_encoding
-        RPC_path.(path_sc_rollups / "origination_proof")
-
     let root =
       RPC_service.get_service
         ~description:"List of all originated smart rollups"
@@ -2281,13 +2270,6 @@ module Sc_rollup = struct
   let register_inbox () =
     Registration.register0 ~chunked:true S.inbox (fun ctxt () () ->
         Sc_rollup.Inbox.get_inbox ctxt >>=? fun (inbox, _ctxt) -> return inbox)
-
-  let register_origination_proof () =
-    Registration.register0
-      ~chunked:true
-      S.origination_proof
-      (fun _ctxt () (kind, boot_sector) ->
-        Proof_helpers.origination_proof ~boot_sector kind)
 
   let register_kind () =
     Registration.opt_register1 ~chunked:true S.kind @@ fun ctxt address () () ->
@@ -2465,7 +2447,6 @@ module Sc_rollup = struct
   let register () =
     register_kind () ;
     register_inbox () ;
-    register_origination_proof () ;
     register_genesis_info () ;
     register_last_cemented_commitment_hash_with_level () ;
     register_staked_on_commitment () ;
@@ -2485,9 +2466,6 @@ module Sc_rollup = struct
   let list ctxt block = RPC_context.make_call0 S.root ctxt block () ()
 
   let inbox ctxt block = RPC_context.make_call0 S.inbox ctxt block () ()
-
-  let origination_proof ctxt block kind boot_sector =
-    RPC_context.make_call0 S.origination_proof ctxt block () (kind, boot_sector)
 
   let genesis_info ctxt block sc_rollup_address =
     RPC_context.make_call1 S.genesis_info ctxt block sc_rollup_address () ()

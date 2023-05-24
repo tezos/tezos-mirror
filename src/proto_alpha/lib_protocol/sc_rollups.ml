@@ -84,6 +84,10 @@ module Kind = struct
   let wasm_2_0_0_pvm =
     PVM.Packed (module Sc_rollup_wasm.V2_0_0.Protocol_implementation)
 
+  let reference_initial_state_hash_of = function
+    | Example_arith -> Sc_rollup_arith.reference_initial_state_hash
+    | Wasm_2_0_0 -> Sc_rollup_wasm.V2_0_0.reference_initial_state_hash
+
   let pvm_of = function
     | Example_arith -> example_arith_pvm
     | Wasm_2_0_0 -> wasm_2_0_0_pvm
@@ -93,3 +97,15 @@ module Kind = struct
     | Example_arith -> (module Sc_rollup_machine_no_proofs.Arith)
     | Wasm_2_0_0 -> (module Sc_rollup_machine_no_proofs.Wasm)
 end
+
+let genesis_state_hash_of ~boot_sector kind =
+  let open Lwt_syntax in
+  let (module Machine) = Kind.no_proof_machine_of kind in
+  let empty = Sc_rollup_machine_no_proofs.empty_tree () in
+  let* tree = Machine.initial_state ~empty in
+  let* initial_hash = Machine.state_hash tree in
+  assert (
+    Sc_rollup_repr.State_hash.(
+      initial_hash = Kind.reference_initial_state_hash_of kind)) ;
+  let* tree = Machine.install_boot_sector tree boot_sector in
+  Machine.state_hash tree

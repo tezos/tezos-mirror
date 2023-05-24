@@ -3163,10 +3163,6 @@ module Sc_rollup : sig
       val produce_proof :
         context -> input option -> state -> proof tzresult Lwt.t
 
-      val verify_origination_proof : proof -> string -> bool Lwt.t
-
-      val produce_origination_proof : context -> string -> proof tzresult Lwt.t
-
       type output_proof
 
       val output_proof_encoding : output_proof Data_encoding.t
@@ -3204,12 +3200,6 @@ module Sc_rollup : sig
     [@@unboxed]
   end
 
-  module type MACHINE =
-    PVM.S
-      with type context = Context_binary.t
-       and type state = Context_binary.tree
-       and type proof = Sc_rollup_machine_no_proofs.void
-
   module Kind : sig
     type t = Example_arith | Wasm_2_0_0
 
@@ -3219,8 +3209,6 @@ module Sc_rollup : sig
 
     val pvm_of : t -> PVM.t
 
-    val no_proof_machine_of : t -> (module MACHINE)
-
     val all : t list
 
     val of_string : string -> t option
@@ -3229,6 +3217,8 @@ module Sc_rollup : sig
 
     val equal : t -> t -> bool
   end
+
+  val genesis_state_hash_of : boot_sector:string -> Kind.t -> State_hash.t Lwt.t
 
   module ArithPVM : sig
     module type P = sig
@@ -4223,7 +4213,6 @@ and _ manager_operation =
   | Sc_rollup_originate : {
       kind : Sc_rollup.Kind.t;
       boot_sector : string;
-      origination_proof : Sc_rollup.Proof.serialized;
       parameters_ty : Script.lazy_expr;
     }
       -> Kind.sc_rollup_originate manager_operation

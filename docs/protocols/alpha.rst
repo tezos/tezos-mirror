@@ -21,6 +21,9 @@ Smart Rollups
 - Add the support for bootstrapped smart rollups in storage initialization,
   similarly to bootstrapped accounts and smart contracts. (MR :gl:`!8552`)
 
+- Remove the origination proof from the smart rollups’ origination operation.
+  (MR :gl:`!8817`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
@@ -57,6 +60,10 @@ RPC Changes
 
 - Update context with new reward parameters. This changes the JSON from the RPC
   ``/chains/main/blocks/head/context/constants``. (MR :gl:`!8657`)
+
+
+- Remove the RPC for computing smart rollups’ origination proofs
+  ``smart_rollups/all/origination_proof``. (MR :gl:`!8817`)
 
 Operation receipts
 ------------------

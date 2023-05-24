@@ -786,8 +786,7 @@ let originated_sc_rollup op =
   Sc_rollup.Internal_for_tests.originated_sc_rollup nonce
 
 let sc_rollup_origination ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
-    ~origination_proof ctxt (src : Contract.t) kind ~boot_sector ~parameters_ty
-    =
+    ctxt (src : Contract.t) kind ~boot_sector ~parameters_ty =
   let open Lwt_result_syntax in
   let* to_sign_op =
     manager_operation
@@ -798,7 +797,7 @@ let sc_rollup_origination ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
       ?storage_limit
       ~source:src
       ctxt
-      (Sc_rollup_originate {kind; boot_sector; origination_proof; parameters_ty})
+      (Sc_rollup_originate {kind; boot_sector; parameters_ty})
   in
   let* account = Context.Contract.manager ctxt src in
   let op = sign account.sk (Context.branch ctxt) to_sign_op in

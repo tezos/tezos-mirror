@@ -241,8 +241,7 @@ let pp_manager_operation_content (type kind) source ppf
         entrypoint
         Contract.pp
         source
-  | Sc_rollup_originate
-      {kind; boot_sector; origination_proof = _; parameters_ty} ->
+  | Sc_rollup_originate {kind; boot_sector; parameters_ty} ->
       Format.fprintf
         ppf
         "Smart rollup origination:@,\

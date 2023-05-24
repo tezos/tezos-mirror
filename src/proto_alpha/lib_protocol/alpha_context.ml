@@ -115,9 +115,6 @@ module Sc_rollup = struct
 
   module Refutation_storage = Sc_rollup_refutation_storage
   include Sc_rollup_storage
-
-  module type MACHINE = Sc_rollup_machine_no_proofs.S
-
   include Sc_rollups
 
   module Outbox = struct

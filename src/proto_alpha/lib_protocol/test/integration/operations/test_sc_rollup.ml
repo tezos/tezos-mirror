@@ -212,13 +212,12 @@ let test_disable_arith_pvm_feature_flag () =
   return_unit
 
 (** Initializes the context and originates a SCORU. *)
-let sc_originate ?boot_sector ?origination_proof ?parameters_ty block contract =
+let sc_originate ?boot_sector ?parameters_ty block contract =
   let open Lwt_result_syntax in
   let kind = Sc_rollup.Kind.Example_arith in
   let* operation, rollup =
     Sc_rollup_helpers.origination_op
       ?boot_sector
-      ?origination_proof
       ?parameters_ty
       (B block)
       contract
@@ -230,7 +229,7 @@ let sc_originate ?boot_sector ?origination_proof ?parameters_ty block contract =
   return (block, rollup)
 
 (** Initializes the context and originates a SCORU. *)
-let init_and_originate ?boot_sector ?origination_proof ?parameters_ty
+let init_and_originate ?boot_sector ?parameters_ty
     ?sc_rollup_challenge_window_in_blocks tup =
   let open Lwt_result_syntax in
   let* block, contracts =
@@ -238,7 +237,7 @@ let init_and_originate ?boot_sector ?origination_proof ?parameters_ty
   in
   let contract = Context.tup_hd tup contracts in
   let* block, rollup =
-    sc_originate ?boot_sector ?origination_proof ?parameters_ty block contract
+    sc_originate ?boot_sector ?parameters_ty block contract
   in
   return (block, contracts, rollup)
 
@@ -980,90 +979,6 @@ let test_originating_with_invalid_types () =
   assert_fails
     ~loc:__LOC__
     (sc_originate block contract ~parameters_ty:"operation")
-
-let test_originating_with_invalid_boot_sector_proof () =
-  let open Lwt_result_syntax in
-  let*! origination_proof =
-    Sc_rollup_helpers.compute_origination_proof
-      ~boot_sector:"a boot sector"
-      Sc_rollup.Kind.Example_arith
-  in
-  let*! res =
-    init_and_originate
-      ~boot_sector:"another boot sector"
-      ~origination_proof
-      Context.T1
-  in
-  match res with
-  | Error
-      (Environment.Ecoproto_error (Sc_rollup.Proof.Sc_rollup_proof_check _ as e)
-      :: _) ->
-      Assert.test_error_encodings e ;
-      return_unit
-  | _ -> failwith "It should have failed with [Sc_rollup_proof_check]"
-
-let test_originating_with_invalid_kind_proof () =
-  let open Lwt_result_syntax in
-  let*! origination_proof =
-    Sc_rollup_helpers.compute_origination_proof
-      ~boot_sector:"a boot sector"
-      Sc_rollup.Kind.Wasm_2_0_0
-  in
-  let*! res =
-    init_and_originate
-      ~boot_sector:"a boot sector"
-      ~origination_proof
-      Context.T1
-  in
-  match res with
-  | Error
-      (Environment.Ecoproto_error (Sc_rollup.Proof.Sc_rollup_proof_check _ as e)
-      :: _) ->
-      Assert.test_error_encodings e ;
-      return_unit
-  | _ -> failwith "It should have failed with [Sc_rollup_proof_check]"
-
-let test_originating_with_random_proof () =
-  let open Lwt_result_syntax in
-  let origination_proof =
-    Data_encoding.Binary.(
-      of_string_exn Sc_rollup.Proof.serialized_encoding
-      @@ to_string_exn Data_encoding.string Hex.(show @@ of_string "bad proof"))
-  in
-  let*! res =
-    init_and_originate
-      ~boot_sector:"some boot sector"
-      ~origination_proof
-      Context.T1
-  in
-  match res with
-  | Error
-      (Environment.Ecoproto_error (Sc_rollup.Proof.Sc_rollup_proof_check _ as e)
-      :: _) ->
-      Assert.test_error_encodings e ;
-      return_unit
-  | _ -> failwith "It should have failed with [Sc_rollup_proof_check]"
-
-let test_originating_with_wrong_tree ~alter_binary_bit () =
-  let open Lwt_result_syntax in
-  let*! origination_proof =
-    Sc_rollup_helpers.wrong_arith_origination_proof
-      ~alter_binary_bit
-      ~boot_sector:"this should produce an invalid proof"
-  in
-  let*! res =
-    init_and_originate
-      ~boot_sector:"some boot sector"
-      ~origination_proof
-      Context.T1
-  in
-  match res with
-  | Error
-      (Environment.Ecoproto_error (Sc_rollup.Proof.Sc_rollup_proof_check _ as e)
-      :: _) ->
-      Assert.test_error_encodings e ;
-      return_unit
-  | _ -> failwith "It should have failed with [Sc_rollup_proof_check]"
 
 let assert_equal_expr ~loc e1 e2 =
   let s1 = Format.asprintf "%a" Michelson_v1_printer.print_expr e1 in
@@ -3427,27 +3342,6 @@ let tests =
       "originating with valid type"
       `Quick
       test_originating_with_valid_type;
-    Tztest.tztest
-      "originating with invalid boot sector proof"
-      `Quick
-      test_originating_with_invalid_boot_sector_proof;
-    Tztest.tztest
-      "originating with invalid kind proof"
-      `Quick
-      test_originating_with_invalid_kind_proof;
-    Tztest.tztest
-      "originating with random proof"
-      `Quick
-      test_originating_with_random_proof;
-    Tztest.tztest
-      "originating with proof for Tezos context trees"
-      `Quick
-      (test_originating_with_wrong_tree ~alter_binary_bit:false);
-    Tztest.tztest
-      "originating with proof for Tezos context trees trying to pass as a \
-       binary tree"
-      `Quick
-      (test_originating_with_wrong_tree ~alter_binary_bit:true);
     Tztest.tztest
       "single transaction atomic batch"
       `Quick
