@@ -154,6 +154,7 @@
   Contract_storage
   Token
   Fees_storage
+  Adaptive_inflation_storage
   Delegate_consensus_key
   Delegate_storage
   Delegate_sampler
@@ -411,6 +412,7 @@
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   fees_storage.ml fees_storage.mli
+  adaptive_inflation_storage.ml adaptive_inflation_storage.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
@@ -670,6 +672,7 @@
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   fees_storage.ml fees_storage.mli
+  adaptive_inflation_storage.ml adaptive_inflation_storage.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
@@ -913,6 +916,7 @@
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   fees_storage.ml fees_storage.mli
+  adaptive_inflation_storage.ml adaptive_inflation_storage.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
