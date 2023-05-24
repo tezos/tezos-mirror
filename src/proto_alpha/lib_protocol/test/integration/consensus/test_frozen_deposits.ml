@@ -125,14 +125,8 @@ let test_invariants () =
     new_full_balance
     Test_tez.(new_spendable_balance +! new_frozen_deposits)
   >>=? fun () ->
-  let expected_new_frozen_deposits =
-    Test_tez.(
-      (* in this particular example, if we follow the calculation of the active
-         stake, it is precisely the new_staking_balance *)
-      new_staking_balance
-      /! Int64.of_int (constants.delegation_over_baking_limit + 1))
-  in
-  Assert.equal_tez ~loc:__LOC__ new_frozen_deposits expected_new_frozen_deposits
+  (* Frozen deposits aren't changed by delegation. *)
+  Assert.equal_tez ~loc:__LOC__ new_frozen_deposits frozen_deposits
 
 let test_set_limit balance_percentage () =
   Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
