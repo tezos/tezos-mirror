@@ -256,14 +256,12 @@ let pp_manager_operation_content (type kind) source ppf
         (Tezos_crypto.Blake2B.hash_string [boot_sector])
   | Sc_rollup_add_messages {messages = _} ->
       Format.pp_print_string ppf "Smart rollup messages submission:"
-  | Sc_rollup_cement {rollup; commitment} ->
+  | Sc_rollup_cement {rollup} ->
       Format.fprintf
         ppf
-        "Smart rollup commitment cementing:@,Address: %a@,Commitment: %a"
+        "Smart rollup commitment cementing:@,Address: %a"
         Sc_rollup.Address.pp
         rollup
-        Sc_rollup.Commitment.Hash.pp
-        commitment
   | Sc_rollup_publish {rollup; commitment} ->
       Format.fprintf
         ppf

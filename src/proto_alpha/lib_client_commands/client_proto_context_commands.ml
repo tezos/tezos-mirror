@@ -2918,10 +2918,6 @@ let commands_rw () =
          counter_arg
          fee_parameter_args)
       (prefixes ["cement"; "commitment"]
-      @@ param
-           ~name:"commitment"
-           ~desc:"The hash of the commitment to be cemented for a smart rollup."
-           Sc_rollup_params.commitment_hash_parameter
       @@ prefixes ["from"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
@@ -2939,7 +2935,6 @@ let commands_rw () =
              storage_limit,
              counter,
              fee_parameter )
-           commitment
            source
            rollup
            cctxt ->
@@ -2959,7 +2954,6 @@ let commands_rw () =
             ~simulation
             ~source
             ~rollup
-            ~commitment
             ~src_pk
             ~src_sk
             ~fee_parameter

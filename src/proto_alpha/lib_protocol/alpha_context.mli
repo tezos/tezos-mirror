@@ -4230,7 +4230,6 @@ and _ manager_operation =
       -> Kind.sc_rollup_add_messages manager_operation
   | Sc_rollup_cement : {
       rollup : Sc_rollup.t;
-      commitment : Sc_rollup.Commitment.Hash.t;
     }
       -> Kind.sc_rollup_cement manager_operation
   | Sc_rollup_publish : {

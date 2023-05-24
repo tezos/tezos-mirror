@@ -2364,24 +2364,19 @@ module Sc_rollup = struct
     let parse process = Process.check process in
     {value = process; run = parse}
 
-  let cement_commitment ?hooks ?(wait = "none") ?burn_cap ~hash ~src ~dst client
-      =
+  let cement_commitment protocol ?hooks ?(wait = "none") ?burn_cap ~hash ~src
+      ~dst client =
+    let commitment_arg =
+      if Protocol.(number protocol >= 018) then
+        (* Version after protocol 017 do not specify the commitment. *) []
+      else [hash]
+    in
     let process =
       spawn_command
         ?hooks
         client
-        (["--wait"; wait]
-        @ [
-            "cement";
-            "commitment";
-            hash;
-            "from";
-            src;
-            "for";
-            "smart";
-            "rollup";
-            dst;
-          ]
+        (["--wait"; wait] @ ["cement"; "commitment"] @ commitment_arg
+        @ ["from"; src; "for"; "smart"; "rollup"; dst]
         @ optional_arg "burn-cap" Tez.to_string burn_cap)
     in
     let parse process = Process.check process in

@@ -27,7 +27,7 @@ open Protocol.Alpha_context
 
 type t =
   | Add_messages of {messages : string list}
-  | Cement of {rollup : Sc_rollup.t; commitment : Sc_rollup.Commitment.Hash.t}
+  | Cement of {rollup : Sc_rollup.t}
   | Publish of {rollup : Sc_rollup.t; commitment : Sc_rollup.Commitment.t}
   | Refute of {
       rollup : Sc_rollup.t;
@@ -58,13 +58,9 @@ let encoding : t Data_encoding.t =
          case
            1
            "cement"
-           (obj2
-              (req "rollup" Sc_rollup.Address.encoding)
-              (req "commitment" Sc_rollup.Commitment.Hash.encoding))
-           (function
-             | Cement {rollup; commitment} -> Some (rollup, commitment)
-             | _ -> None)
-           (fun (rollup, commitment) -> Cement {rollup; commitment});
+           (obj1 (req "rollup" Sc_rollup.Address.encoding))
+           (function Cement {rollup} -> Some rollup | _ -> None)
+           (fun rollup -> Cement {rollup});
          case
            2
            "publish"
@@ -105,12 +101,7 @@ let pp ppf = function
         ppf
         "publishing %d messages to smart rollups' inbox"
         (List.length messages)
-  | Cement {rollup = _; commitment} ->
-      Format.fprintf
-        ppf
-        "cementing commitment %a"
-        Sc_rollup.Commitment.Hash.pp
-        commitment
+  | Cement {rollup = _} -> Format.fprintf ppf "cementing commitment"
   | Publish {rollup = _; commitment = Sc_rollup.Commitment.{inbox_level; _}} ->
       Format.fprintf
         ppf
@@ -158,8 +149,7 @@ let pp ppf = function
 
 let to_manager_operation : t -> packed_manager_operation = function
   | Add_messages {messages} -> Manager (Sc_rollup_add_messages {messages})
-  | Cement {rollup; commitment} ->
-      Manager (Sc_rollup_cement {rollup; commitment})
+  | Cement {rollup} -> Manager (Sc_rollup_cement {rollup})
   | Publish {rollup; commitment} ->
       Manager (Sc_rollup_publish {rollup; commitment})
   | Refute {rollup; opponent; refutation} ->
@@ -169,7 +159,7 @@ let to_manager_operation : t -> packed_manager_operation = function
 let of_manager_operation : type kind. kind manager_operation -> t option =
   function
   | Sc_rollup_add_messages {messages} -> Some (Add_messages {messages})
-  | Sc_rollup_cement {rollup; commitment} -> Some (Cement {rollup; commitment})
+  | Sc_rollup_cement {rollup} -> Some (Cement {rollup})
   | Sc_rollup_publish {rollup; commitment} ->
       Some (Publish {rollup; commitment})
   | Sc_rollup_refute {rollup; opponent; refutation} ->
@@ -178,5 +168,5 @@ let of_manager_operation : type kind. kind manager_operation -> t option =
   | _ -> None
 
 let unique = function
-  | Add_messages _ -> false
-  | Cement _ | Publish _ | Refute _ | Timeout _ -> true
+  | Add_messages _ | Cement _ -> false
+  | Publish _ | Refute _ | Timeout _ -> true

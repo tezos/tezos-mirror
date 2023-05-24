@@ -24,6 +24,16 @@ Smart Rollups
 - Remove the origination proof from the smart rollups’ origination operation.
   (MR :gl:`!8817`)
 
+- The field ``commitment`` in the operation ``Sc_rollup_cement`` is now removed.
+  It was no longer used and was deprecated in Nairobi. This also mean that the
+  commitment does not need to be provided in the client command. (MR :gl:`!8850`)
+
+  Before::
+    ./octez-client cement commitment <commitment hash> from <src> for smart rollup <smart rollup address>
+
+  Now::
+    ./octez-client cement commitment from <src> for smart rollup <smart rollup address>
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 

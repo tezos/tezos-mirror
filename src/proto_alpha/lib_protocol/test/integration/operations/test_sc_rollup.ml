@@ -538,7 +538,7 @@ let publish_commitments block staker rollup commitments =
     block
     commitments
 
-let cement_commitment ?challenge_window_in_blocks block rollup staker hash =
+let cement_commitment ?challenge_window_in_blocks block rollup staker =
   let open Lwt_result_syntax in
   let* challenge_window_in_blocks =
     match challenge_window_in_blocks with
@@ -548,13 +548,14 @@ let cement_commitment ?challenge_window_in_blocks block rollup staker hash =
         return constants.parametric.sc_rollup.challenge_window_in_blocks
   in
   let* block = Block.bake_n challenge_window_in_blocks block in
-  let* cement = Op.sc_rollup_cement (B block) staker rollup hash in
+  let* cement = Op.sc_rollup_cement (B block) staker rollup in
   Block.bake ~operation:cement block
 
 let cement_commitments ?challenge_window_in_blocks block rollup staker hashes =
+  (* [hashes] is useful to know the number of commitments we expect to cement. *)
   List.fold_left_es
-    (fun block hash ->
-      cement_commitment ?challenge_window_in_blocks block rollup staker hash)
+    (fun block _hash ->
+      cement_commitment ?challenge_window_in_blocks block rollup staker)
     block
     hashes
 
@@ -569,7 +570,7 @@ let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
   in
   let*?@ incr, hash = hash_commitment incr commitment in
-  let* cement_op = Op.sc_rollup_cement (I incr) originator rollup hash in
+  let* cement_op = Op.sc_rollup_cement (I incr) originator rollup in
   let* incr = Incremental.add_operation incr cement_op in
   let* block = Incremental.finalize_block incr in
   let* incr =
@@ -800,10 +801,9 @@ let test_publish_cement_and_recover_bond () =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
   let* i = Incremental.begin_construction b in
-  let*?@ i, hash = hash_commitment i c in
   (* stake not on LCC *)
   let* () = recover_bond_not_lcc i contract rollup in
-  let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
+  let* cement_op = Op.sc_rollup_cement (I i) contract rollup in
   let* i = Incremental.add_operation i cement_op in
   let* b = Incremental.finalize_block i in
   let* i =
@@ -880,8 +880,7 @@ let test_cement_fails_on_conflict () =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
   let* i = Incremental.begin_construction b in
-  let*?@ i, hash = hash_commitment i commitment1 in
-  let* cement_op = Op.sc_rollup_cement (I i) contract1 rollup hash in
+  let* cement_op = Op.sc_rollup_cement (I i) contract1 rollup in
   let expect_apply_failure = function
     | Environment.Ecoproto_error (Sc_rollup_errors.Sc_rollup_disputed as e) :: _
       ->
@@ -906,8 +905,7 @@ let commit_and_cement_after_n_bloc ?expect_apply_failure block contract rollup n
   (* This pattern would add an additional block, so we decrement [n] by one. *)
   let* b = Block.bake_n (n - 1) b in
   let* i = Incremental.begin_construction b in
-  let*?@ i, hash = hash_commitment i commitment in
-  let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
+  let* cement_op = Op.sc_rollup_cement (I i) contract rollup in
   let* (_ : Incremental.t) =
     Incremental.add_operation ?expect_apply_failure i cement_op
   in
@@ -2902,8 +2900,7 @@ let test_offline_staker_does_not_prevent_cementation () =
   let* b =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
-  let hash = Sc_rollup.Commitment.hash_uncarbonated commitment1 in
-  let* cement_op = Op.sc_rollup_cement (B b) contract1 rollup hash in
+  let* cement_op = Op.sc_rollup_cement (B b) contract1 rollup in
   let* b = Block.bake ~operation:cement_op b in
 
   (* A now goes offline, B takes over. *)
@@ -2919,8 +2916,7 @@ let test_offline_staker_does_not_prevent_cementation () =
   let* b =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
-  let hash = Sc_rollup.Commitment.hash_uncarbonated commitment2 in
-  let* cement_op = Op.sc_rollup_cement (B b) contract2 rollup hash in
+  let* cement_op = Op.sc_rollup_cement (B b) contract2 rollup in
   let* _b = Block.bake ~operation:cement_op b in
   return_unit
 
