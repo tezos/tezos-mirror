@@ -95,6 +95,7 @@ let test_update_consensus_key =
     ~title:"update consensus key"
     ~tags:["consensus_key"]
   @@ fun protocol ->
+  let manual_staking = Protocol.(protocol > Nairobi) in
   let parameters =
     (* we update paramaters for faster testing: no need to wait
        5 cycles for the consensus key to activate. *)
@@ -200,9 +201,25 @@ let test_update_consensus_key =
 
   Log.info "Register a delegate with a consensus key." ;
   let* () = Client.register_key ~consensus:key_c.alias key_b.alias client in
+  let* () = Client.bake_for_and_wait client in
 
-  Log.info "Bake until the end of the next cycle..." ;
-  let* () = bake_n_cycles (preserved_cycles + 1) client in
+  let* () =
+    if manual_staking then (
+      Log.info "Add stake for `key_b` so that `key_c` can bake later on." ;
+      Client.transfer
+        ~entrypoint:"stake"
+        ~burn_cap:Tez.one
+        ~amount:(Tez.of_int 500_000)
+        ~giver:key_b.alias
+        ~receiver:key_b.alias
+        client)
+    else return ()
+  in
+
+  Log.info "Bake until the end of the next cycle with bootstrap1..." ;
+  let* () =
+    bake_n_cycles preserved_cycles ~keys:[Constant.bootstrap1.alias] client
+  in
 
   Log.info "Bootstrap1 should not be able to bake anymore..." ;
   let* () =
@@ -212,8 +229,22 @@ let test_update_consensus_key =
       client
   in
 
-  Log.info "... while `key_a` and `key_c` are able to bake." ;
+  let* () =
+    if manual_staking then (
+      Log.info "`key_c` cannot bake yet." ;
+      Client.bake_for ~expect_failure:true ~keys:[key_c.alias] client)
+    else return ()
+  in
+
+  Log.info "... while `key_a` is able to bake." ;
   let* () = Client.bake_for_and_wait ~keys:[key_a.alias] client in
+
+  Log.info "Bake until the end of the next cycle, again." ;
+  let* () =
+    bake_n_cycles preserved_cycles ~keys:[Constant.bootstrap2.alias] client
+  in
+
+  Log.info "`key_c` is now able to bake as well." ;
   let* () = Client.bake_for_and_wait ~keys:[key_c.alias] client in
 
   Log.info "Switch back to the initial consensus key." ;
