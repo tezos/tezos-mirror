@@ -30,6 +30,10 @@ let default_reward = Q.one
 (* Default bonus value *)
 let default_bonus = 0L
 
+(* Order of magnitude of the total supply in mutez
+   Approximately 2^50 *)
+let bonus_unit = 1_000_000_000_000_000L
+
 let get_reward_coeff ctxt ~cycle =
   let open Lwt_result_syntax in
   let ai_enable = (Raw_context.constants ctxt).adaptive_inflation.enable in
@@ -68,7 +72,7 @@ let compute_bonus ~total_supply ~total_frozen_stake ~previous_bonus =
 let compute_coeff =
   let q_400 = Q.of_int 400 in
   let q_min_per_year = Q.of_int 525600 in
-  fun ~base_total_rewards_per_minute ~total_supply ~total_frozen_stake ->
+  fun ~base_total_rewards_per_minute ~total_supply ~total_frozen_stake ~bonus ->
     let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
     let q_total_frozen_stake =
       Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
@@ -76,11 +80,13 @@ let compute_coeff =
     let q_base_total_rewards_per_minute =
       Tez_repr.to_mutez base_total_rewards_per_minute |> Q.of_int64
     in
+    let q_bonus = Q.(div (of_int64 bonus) (of_int64 bonus_unit)) in
     let x =
       Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
     in
     let inv_f = Q.(mul (mul x x) q_400) in
     let f = Q.inv inv_f (* f = 1/400 * (1/x)^2 = yearly inflation rate *) in
+    let f = Q.add f q_bonus in
     (* f is truncated so that 0.5% <= f <= 10% *)
     let f = Q.(min f (1 // 10)) in
     let f = Q.(max f (5 // 1000)) in
@@ -95,18 +101,25 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
   else
     let preserved = Constants_storage.preserved_cycles ctxt in
     let for_cycle = Cycle_repr.add new_cycle preserved in
+    let before_for_cycle = Cycle_repr.pred for_cycle in
     let* total_supply = Storage.Contract.Total_supply.get ctxt in
     let* total_stake = Stake_storage.get_total_active_stake ctxt for_cycle in
     let base_total_rewards_per_minute =
       (Constants_storage.reward_weights ctxt).base_total_rewards_per_minute
     in
     let total_frozen_stake = Stake_repr.get_frozen total_stake in
+    let* previous_bonus = get_reward_bonus ctxt ~cycle:before_for_cycle in
+    let bonus =
+      compute_bonus ~total_supply ~total_frozen_stake ~previous_bonus
+    in
     let coeff =
       compute_coeff
         ~base_total_rewards_per_minute
         ~total_supply
         ~total_frozen_stake
+        ~bonus
     in
+    let*! ctxt = Storage.Reward_bonus.add ctxt for_cycle bonus in
     let*! ctxt = Storage.Reward_coeff.add ctxt for_cycle coeff in
     return ctxt
 
