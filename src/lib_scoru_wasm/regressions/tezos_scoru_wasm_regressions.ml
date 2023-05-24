@@ -53,7 +53,7 @@ module Prover = struct
   end
 
   module WASM_P :
-    Alpha_context.Sc_rollup.Wasm_2_0_0PVM.P
+    Alpha_context.Sc_rollup.Generic_pvm_context_sig
       with type Tree.t = Context_binary.t
        and type Tree.tree = Context_binary.tree
        and type Tree.key = string list

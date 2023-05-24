@@ -43,9 +43,6 @@ module Context_no_proofs = struct
 
   type tree = Context_binary.tree
 
-  let hash_tree tree =
-    Sc_rollup_repr.State_hash.context_hash_to_state_hash (Tree.hash tree)
-
   type proof = void
 
   let verify_proof = function (_ : proof) -> .

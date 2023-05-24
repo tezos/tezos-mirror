@@ -165,29 +165,7 @@ module Protocol_implementation :
     tree structure). *)
 val reference_initial_state_hash : Sc_rollup_repr.State_hash.t
 
-module type P = sig
-  module Tree : Context.TREE with type key = string list and type value = bytes
-
-  type tree = Tree.tree
-
-  val hash_tree : tree -> Sc_rollup_repr.State_hash.t
-
-  type proof
-
-  val proof_encoding : proof Data_encoding.t
-
-  val proof_before : proof -> Sc_rollup_repr.State_hash.t
-
-  val proof_after : proof -> Sc_rollup_repr.State_hash.t
-
-  val verify_proof :
-    proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
-
-  val produce_proof :
-    Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
-end
-
-module Make (Context : P) :
+module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
   S
     with type context = Context.Tree.t
      and type state = Context.tree

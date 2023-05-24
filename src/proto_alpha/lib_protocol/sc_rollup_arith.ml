@@ -91,28 +91,6 @@ let () =
     (function Arith_proof_production_failed -> Some () | _ -> None)
     (fun () -> Arith_proof_production_failed)
 
-module type P = sig
-  module Tree : Context.TREE with type key = string list and type value = bytes
-
-  type tree = Tree.tree
-
-  val hash_tree : tree -> State_hash.t
-
-  type proof
-
-  val proof_encoding : proof Data_encoding.t
-
-  val proof_before : proof -> State_hash.t
-
-  val proof_after : proof -> State_hash.t
-
-  val verify_proof :
-    proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
-
-  val produce_proof :
-    Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
-end
-
 module type S = sig
   include PS.S
 
@@ -161,7 +139,7 @@ module type S = sig
   val get_is_stuck : state -> string option Lwt.t
 end
 
-module Make (Context : P) :
+module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
   S
     with type context = Context.Tree.t
      and type state = Context.tree
@@ -1750,8 +1728,6 @@ module Protocol_implementation = Make (struct
   end
 
   type tree = Context.tree
-
-  let hash_tree t = State_hash.context_hash_to_state_hash (Tree.hash t)
 
   type proof = Context.Proof.tree Context.Proof.t
 
