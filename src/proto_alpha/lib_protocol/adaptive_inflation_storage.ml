@@ -34,3 +34,9 @@ let get_reward_coeff ctxt ~current_cycle =
     let* k_opt = Storage.Reward_coeff.find ctxt current_cycle in
     return (Option.value ~default k_opt)
   else return default
+
+let compute_coeff ~total_supply ~total_frozen_stake =
+  ignore total_supply ;
+  ignore total_frozen_stake ;
+  default
+
