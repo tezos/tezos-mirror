@@ -73,6 +73,11 @@ module type S = sig
   (** [transaction_receipt tx_hash] returns the receipt of [tx_hash]. *)
   val transaction_receipt :
     Ethereum_types.hash -> Ethereum_types.transaction_receipt tzresult Lwt.t
+
+  (** [transaction_object tx_hash] returns the informations of [tx_hash]. *)
+  val transaction_object :
+    Ethereum_types.hash ->
+    Ethereum_types.transaction_object option tzresult Lwt.t
 end
 
 (** Instantiate a module of type {!S} that communicates with a rollup

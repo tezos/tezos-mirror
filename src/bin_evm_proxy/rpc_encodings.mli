@@ -228,7 +228,7 @@ module Get_transaction_receipt :
 module Get_transaction_by_hash :
   METHOD
     with type m_input = Ethereum_types.hash
-     and type m_output = Ethereum_types.transaction_object
+     and type m_output = Ethereum_types.transaction_object option
 
 module Send_raw_transaction :
   METHOD

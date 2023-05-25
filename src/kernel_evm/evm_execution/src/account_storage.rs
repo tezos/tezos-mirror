@@ -199,7 +199,7 @@ pub fn account_path(address: &H160) -> Result<OwnedPath, AccountStorageError> {
 }
 
 /// Store larger than MAX_FILE_CHUNK_SIZE amount of data. Placeholder for future SDK feature.
-fn store_write_all<T>(
+pub fn store_write_all<T>(
     host: &mut impl Runtime,
     path: &T,
     code: &[u8],

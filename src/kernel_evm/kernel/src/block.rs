@@ -9,13 +9,13 @@ use crate::error::StorageError::AccountInitialisation;
 use crate::error::TransferError::{
     CumulativeGasUsedOverflow, InvalidCallerAddress, InvalidNonce,
 };
+use crate::inbox::Transaction;
 use crate::storage;
 use evm_execution::account_storage::init_account_storage;
 use evm_execution::account_storage::EthereumAccountStorage;
 use evm_execution::handler::ExecutionOutcome;
 use evm_execution::{precompiles, run_transaction};
-
-use tezos_ethereum::transaction::TransactionHash;
+use tezos_ethereum::transaction::{TransactionHash, TransactionObject};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 use primitive_types::{H160, U256};
@@ -101,6 +101,29 @@ fn make_receipt(
     Ok(tx_receipt)
 }
 
+#[inline(always)]
+fn make_object(
+    transaction: Transaction,
+    from: H160,
+    index: u32,
+    gas_used: U256,
+) -> TransactionObject {
+    TransactionObject {
+        from,
+        gas_used,
+        gas_price: transaction.tx.gas_price,
+        hash: transaction.tx_hash,
+        input: transaction.tx.data,
+        nonce: transaction.tx.nonce,
+        to: transaction.tx.to,
+        index,
+        value: transaction.tx.value,
+        v: transaction.tx.v,
+        r: transaction.tx.r,
+        s: transaction.tx.s,
+    }
+}
+
 fn make_receipts(
     block: &L2Block,
     receipt_infos: Vec<TransactionReceiptInfo>,
@@ -148,6 +171,7 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
     for proposal in queue.proposals {
         let mut valid_txs = Vec::new();
         let mut receipts_infos = Vec::new();
+        let mut objects = Vec::new();
         let transactions = proposal.transactions;
 
         for (transaction, index) in transactions.into_iter().zip(0u32..) {
@@ -163,7 +187,7 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
                 &precompiles,
                 transaction.tx.to,
                 caller,
-                transaction.tx.data,
+                transaction.tx.data.clone(),
                 Some(transaction.tx.gas_limit),
                 Some(transaction.tx.value),
             ) {
@@ -185,6 +209,12 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
                     transaction.tx.to,
                 ),
             };
+            let gas_used = match &receipt_info.execution_outcome {
+                Some(execution_outcome) => execution_outcome.gas_used.into(),
+                None => U256::zero(),
+            };
+            let object = make_object(transaction, caller, index, gas_used);
+            objects.push(object);
             receipts_infos.push(receipt_info)
         }
 
@@ -194,6 +224,10 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
             host,
             &make_receipts(&new_block, receipts_infos)?,
         )?;
+        // Note that this is not efficient nor "properly" implemented. This
+        // is a temporary hack to answer to third-party tools that asks
+        // for transaction objects.
+        storage::store_transaction_objects(host, &new_block, &objects)?;
         current_block = new_block;
     }
     Ok(())

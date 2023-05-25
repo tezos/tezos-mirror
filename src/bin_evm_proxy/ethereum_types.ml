@@ -432,13 +432,13 @@ type transaction_object = {
   hash : hash;
   input : hash option;
   nonce : quantity;
-  to_ : address;
+  to_ : address option;
   transactionIndex : quantity;
       (* It can be null if it's in a pending block, but we don't have a notion of pending. *)
   value : quantity;
   v : quantity;
-  r : quantity;
-  s : quantity;
+  r : hash;
+  s : hash;
 }
 
 let transaction_object_encoding =
@@ -508,13 +508,13 @@ let transaction_object_encoding =
           (req "hash" hash_encoding)
           (req "input" (option hash_encoding))
           (req "nonce" quantity_encoding)
-          (req "to" address_encoding)
+          (req "to" (option address_encoding))
           (req "transactionIndex" quantity_encoding))
        (obj4
           (req "value" quantity_encoding)
           (req "v" quantity_encoding)
-          (req "r" quantity_encoding)
-          (req "s" quantity_encoding)))
+          (req "r" hash_encoding)
+          (req "s" hash_encoding)))
 
 type transaction = {
   from : address;

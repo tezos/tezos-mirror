@@ -124,12 +124,12 @@ let transaction_object =
     hash = transaction_hash;
     input = None;
     nonce = qty_f Z.zero;
-    to_ = address_of_string "0xA5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E";
+    to_ = Some (address_of_string "0xA5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E");
     transactionIndex = qty_f Z.zero;
     value = qty_f Z.zero;
     v = qty_f Z.zero;
-    r = qty_f Z.zero;
-    s = qty_f Z.zero;
+    r = hash_f @@ "00";
+    s = hash_f @@ "00";
   }
 
 let call = hash_f "0x"
@@ -154,3 +154,5 @@ let current_block_number () = return (block_height ())
 let nth_block ~full_transaction_object:_ _n = return (block ())
 
 let transaction_receipt _tx_hash = return (transaction_receipt ())
+
+let transaction_object _tx_hash = return (Some transaction_object)
