@@ -27,7 +27,7 @@ Prerequisites:
     + ``pyenv global 3.10.11`` to set the python version to ``3.10.11`` globally
     + ``pyenv shell 3.10.11`` to use ``python 3.10.11`` only in the current shell
 
-- `poetry <https://python-poetry.org/>`_ to manage the python dependencies and
+- `poetry 1.2.2 <https://python-poetry.org/>`_ to manage the python dependencies and
   run the tests in a sandboxed python environment. Follow the `installation instructions <https://python-poetry.org/docs/#installation>`__.
 
   Before using the python environment for the first time, the

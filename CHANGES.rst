@@ -106,6 +106,9 @@ Codec
 Docker Images
 -------------
 
+-  Bump up base image to ``alpine:3.17``. In particular, this changes Rust
+   version to 1.64.0.
+
 Smart Rollup node
 -----------------
 
@@ -121,3 +124,5 @@ Miscellaneous
 -------------
 
 - Updating and re-enabling the time-lock Michelson commands.
+
+- Recommend rust version 1.64.0 instead of 1.60.0.

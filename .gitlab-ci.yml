@@ -35,7 +35,7 @@ variables:
   # /!\ CI_REGISTRY is overriden to use a private Docker registry mirror in AWS ECR
   # in GitLab namespaces `nomadic-labs` and `tezos`
   ## This value MUST be the same as `opam_repository_tag` in `scripts/version.sh`
-  build_deps_image_version: 205530c16047066997bf2b210542ceeef8fb96d1
+  build_deps_image_version: bcfa7d61b34b1c325b1d32b9e9d93e92628b12ee
   build_deps_image_name: "${CI_REGISTRY}/tezos/opam-repository"
   GIT_STRATEGY: fetch
   GIT_DEPTH: "1"
@@ -78,9 +78,6 @@ variables:
 .image_template__docker:
   # https://gitlab.com/tezos/docker-images/ci-docker
   image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.6.0"
-
-.image_template__alpine:
-  image: alpine:3.15
 
 # The "manual" stage exists to fix a UI problem that occurs when mixing
 # manual and non-manual jobs.
