@@ -1,8 +1,6 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env (_ (env-vars (NODE_PRELOAD ocaml-bls12-381))))
-
 (library
  (name src_lib_bls12_381_signature_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
@@ -12,7 +10,6 @@
   octez-bls12-381-signature
   octez-alcotezt
   integers_stubs_js)
- (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -40,24 +37,3 @@
 (rule
  (targets main.ml)
  (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
-
-(executable
- (name main_js)
- (instrumentation (backend bisect_ppx --bisect-sigterm))
- (modes js)
- (libraries
-  src_lib_bls12_381_signature_test_tezt_lib
-  tezt.js)
- (js_of_ocaml)
- (modules main_js))
-
-(rule
- (alias runtest_js)
- (package octez-bls12-381-signature)
- (deps (glob_files_rec test_vectors/*))
- (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run node %{dep:./main_js.bc.js})))
-
-(rule
- (targets main_js.ml)
- (action (with-stdout-to %{targets} (echo "let () = Tezt_js.Test.run ()"))))
