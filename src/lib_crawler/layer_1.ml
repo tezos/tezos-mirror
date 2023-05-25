@@ -58,6 +58,7 @@ let () =
 
 type t = {
   name : string;
+  protocols : Protocol_hash.t list option;
   reconnection_delay : float;
   heads : (Block_hash.t * Block_header.t) Lwt_stream.t;
   cctxt : Client_context.full;
@@ -65,7 +66,7 @@ type t = {
   mutable running : bool;
 }
 
-let rec connect ~name ?(count = 0) ~delay cctxt =
+let rec connect ~name ?(count = 0) ~delay ~protocols cctxt =
   let open Lwt_syntax in
   let* () =
     if count = 0 then return_unit
@@ -83,7 +84,9 @@ let rec connect ~name ?(count = 0) ~delay cctxt =
       let* () = Layer1_event.wait_reconnect ~name delay in
       Lwt_unix.sleep delay
   in
-  let* res = Tezos_shell_services.Monitor_services.heads cctxt cctxt#chain in
+  let* res =
+    Tezos_shell_services.Monitor_services.heads ?protocols cctxt cctxt#chain
+  in
   match res with
   | Ok (heads, stopper) ->
       let heads =
@@ -94,21 +97,24 @@ let rec connect ~name ?(count = 0) ~delay cctxt =
             (hash, header))
           heads
       in
-      return_ok (heads, stopper)
+      return (heads, stopper)
   | Error e ->
       let* () = Layer1_event.cannot_connect ~name ~count e in
-      connect ~name ~delay ~count:(count + 1) cctxt
+      connect ~name ~delay ~protocols ~count:(count + 1) cctxt
 
-let start ~name ~reconnection_delay (cctxt : #Client_context.full) =
+let start ~name ~reconnection_delay ?protocols (cctxt : #Client_context.full) =
   let open Lwt_syntax in
   let* () = Layer1_event.starting ~name in
-  let+ heads, stopper = connect ~name ~delay:reconnection_delay cctxt in
+  let+ heads, stopper =
+    connect ~name ~delay:reconnection_delay ~protocols cctxt
+  in
   {
     name;
     cctxt = (cctxt :> Client_context.full);
     heads;
     stopper;
     reconnection_delay;
+    protocols;
     running = true;
   }
 
@@ -119,6 +125,7 @@ let reconnect l1_ctxt =
       ~name:l1_ctxt.name
       ~count:1
       ~delay:l1_ctxt.reconnection_delay
+      ~protocols:l1_ctxt.protocols
       l1_ctxt.cctxt
   in
   return {l1_ctxt with heads; stopper}
@@ -171,6 +178,18 @@ let iter_heads l1_ctxt f =
   Lwt.catch
     (fun () -> Lwt.no_cancel @@ loop l1_ctxt)
     (function Iter_error e -> Lwt.return_error e | exn -> fail (Exn exn))
+
+let wait_first l1_ctxt =
+  let rec loop l1_ctxt =
+    let open Lwt_syntax in
+    let* head = Lwt_stream.peek l1_ctxt.heads in
+    match head with
+    | Some head -> return head
+    | None ->
+        let* l1_ctxt = reconnect l1_ctxt in
+        loop l1_ctxt
+  in
+  Lwt.no_cancel @@ loop l1_ctxt
 
 (** [predecessors_of_blocks hashes] given a list of successive block hashes,
     from newest to oldest, returns an associative list that associates a hash to
@@ -325,6 +344,7 @@ module Internal_for_tests = struct
       heads;
       cctxt = (cctxt :> Client_context.full);
       stopper = Fun.id;
+      protocols = None;
       running = false;
     }
 end
