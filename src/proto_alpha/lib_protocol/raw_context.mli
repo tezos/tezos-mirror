@@ -287,6 +287,16 @@ val stake_distribution_for_current_cycle :
 val init_stake_distribution_for_current_cycle :
   t -> Stake_repr.t Signature.Public_key_hash.Map.t -> t
 
+(** Returns the reward coefficient for the current cycle
+    This value is equal to the value in {!Storage.Reward_coeff} if it exists,
+    or equal to [Q.one] otherwise. *)
+val reward_coeff_for_current_cycle : t -> Q.t
+
+(** Updates the reward coefficient for the current cycle.
+    This update should only be called once per cycle. It is done in
+    [Adaptive_inflation_storage] *)
+val update_reward_coeff_for_current_cycle : t -> Q.t -> t
+
 module Internal_for_tests : sig
   val add_level : t -> int -> t
 

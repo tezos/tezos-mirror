@@ -251,6 +251,7 @@ type back = {
   sampler_state : (Seed_repr.seed * consensus_pk Sampler.t) Cycle_repr.Map.t;
   stake_distribution_for_current_cycle :
     Stake_repr.t Signature.Public_key_hash.Map.t option;
+  reward_coeff_for_current_cycle : Q.t;
   sc_rollup_current_messages : Sc_rollup_inbox_merkelized_payload_hashes_repr.t;
   dal_slot_fee_market : Dal_slot_repr.Slot_market.t;
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3105
@@ -336,6 +337,9 @@ let[@inline] dictator_proposal_seen ctxt = ctxt.back.dictator_proposal_seen
 
 let[@inline] sampler_state ctxt = ctxt.back.sampler_state
 
+let[@inline] reward_coeff_for_current_cycle ctxt =
+  ctxt.back.reward_coeff_for_current_cycle
+
 let[@inline] update_back ctxt back = {ctxt with back}
 
 let[@inline] update_remaining_block_gas ctxt remaining_block_gas =
@@ -376,6 +380,10 @@ let[@inline] update_dictator_proposal_seen ctxt dictator_proposal_seen =
 
 let[@inline] update_sampler_state ctxt sampler_state =
   update_back ctxt {ctxt.back with sampler_state}
+
+let[@inline] update_reward_coeff_for_current_cycle ctxt
+    reward_coeff_for_current_cycle =
+  update_back ctxt {ctxt.back with reward_coeff_for_current_cycle}
 
 type error += Too_many_internal_operations (* `Permanent *)
 
@@ -835,6 +843,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         dictator_proposal_seen = false;
         sampler_state = Cycle_repr.Map.empty;
         stake_distribution_for_current_cycle = None;
+        reward_coeff_for_current_cycle = Q.one;
         sc_rollup_current_messages;
         dal_slot_fee_market =
           Dal_slot_repr.Slot_market.init
