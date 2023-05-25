@@ -204,14 +204,14 @@ let qcheck_bounded_map_is_empty bounded_map =
   qcheck_eq_true ~actual
 
 (** Computes the set of operation hashes present in fields [refused; outdated;
-    branch_refused; branch_delayed; validated; applied_rev] of [t]. Also checks
+    branch_refused; branch_delayed; validated] of [t]. Also checks
     that these fields are disjoint. *)
 let disjoint_union_classified_fields ?fail_msg (t : unit Classification.t) =
   let ( +> ) acc next_set =
     if not (Operation_hash.Set.disjoint acc next_set) then
       QCheck2.Test.fail_reportf
         "Invariant 'The fields: [refused; outdated; branch_refused; \
-         branch_delayed; applied] are disjoint' broken by t =@.%a@.%s"
+         branch_delayed; validated] are disjoint' broken by t =@.%a@.%s"
         Classification.Internal_for_tests.pp
         t
         (match fail_msg with None -> "" | Some msg -> "\n" ^ msg ^ "@.") ;
@@ -225,8 +225,8 @@ let disjoint_union_classified_fields ?fail_msg (t : unit Classification.t) =
 
 (** Checks both invariants of type [Prevalidator_classification.t]:
     - The field [in_mempool] is the set of all operation hashes present
-      in fields: [refused; outdated; branch_refused; branch_delayed; applied].
-    - The fields: [refused; outdated; branch_refused; branch_delayed; applied]
+      in fields: [refused; outdated; branch_refused; branch_delayed; validated].
+    - The fields: [refused; outdated; branch_refused; branch_delayed; validated]
       are disjoint.
     These invariants are enforced by [Prevalidator_classification]
     **as long as the caller does not [add] an operation which is already
@@ -262,7 +262,7 @@ let check_invariants ?fail_msg (t : unit Classification.t) =
     QCheck2.Test.fail_reportf
       "Invariant 'The field [in_mempool] is the set of all operation hashes \
        present in fields: [refused; outdated; branch_refused; branch_delayed; \
-       applied]' broken by t =@.%a\n\
+       validated]' broken by t =@.%a\n\
        @.%s@.%a@.%s"
       Classification.Internal_for_tests.pp
       t

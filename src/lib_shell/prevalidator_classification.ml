@@ -77,7 +77,7 @@ type parameters = {
   on_discarded_operation : Operation_hash.t -> unit;
 }
 
-(** Note that [applied] and [in_mempool] are intentionally unbounded.
+(** Note that [validated] and [in_mempool] are intentionally unbounded.
     See the mli for detailed documentation.
     All operations must maintain the invariant about [in_mempool]
     described in the mli. *)
@@ -156,14 +156,7 @@ let is_known_unparsable oph classes =
 
 (* Removing an operation is currently used for operations which are
    banned (this can only be achieved by the adminstrator of the
-   node). However, removing an operation which is applied invalidates
-   the classification of all the operations. Hence, the
-   classifications of all the operations should be reset. Currently,
-   this is not enforced by the function and has to be done by the
-   caller.
-
-   Later on, it would be probably better if this function returns a
-   set of pending operations instead. *)
+   node). *)
 let remove oph classes =
   match Map.find oph classes.in_mempool with
   | None -> None

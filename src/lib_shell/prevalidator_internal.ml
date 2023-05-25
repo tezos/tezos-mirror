@@ -398,8 +398,8 @@ module Make_s
     in
     return (v_state, mempool, to_handle)
 
-  (* Classify pending operations into either: [Refused |
-     Branch_delayed | Branch_refused | Applied | Outdated].
+  (* Classify pending operations into either:
+     [Refused | Outdated | Branch_delayed | Branch_refused | Validated].
      To ensure fairness with other worker requests, classification of
      operations is done by batch of [operation_batch_size] operations.
 
@@ -408,10 +408,8 @@ module Make_s
      - If an operation is classified, it is not part of the [pending]
      map
 
-     - A classified operation is part of the [in_mempool] set
-
-     - A classified operation is part only of one of the following
-     classes: [Branch_refused, Branch_delayed, Refused, Applied]
+     - See {!type-Prevalidator_classification.t} for additional details
+     and invariants on the classifications themselves.
 
      Moreover, this function ensures that only each newly classified
      operations are advertised to the remote peers. However, if a peer
@@ -777,8 +775,8 @@ module Make_s
        operation triggers a flush of the mempool. Because flushing may
        be costly this should be done only when the action is triggered
        locally by the user. This allows a better UX if the user bans a
-       validated operation so that a branch delayed operation becomes
-       [applied] again. *)
+       [validated] operation with the express goal to allow a
+       [branch_delayed] operation to become [validated] again. *)
     let remove ~flush_if_validated pv oph =
       let open Lwt_result_syntax in
       pv.shell.parameters.tools.chain_tools.clear_or_cancel oph ;
@@ -794,12 +792,6 @@ module Make_s
       | Some (_op, classification) -> (
           match (classification, flush_if_validated) with
           | `Validated, true ->
-              (* Modifying the list of operations classified as [Applied]
-                 might change the classification of all the operations in
-                 the mempool. Hence if the removed operation has been
-                 applied we flush the mempool to force the
-                 reclassification of all the operations except the one
-                 removed. *)
               let+ () =
                 on_flush
                   ~handle_branch_refused:false
@@ -982,13 +974,6 @@ module Make
           !dir
           (Proto_services.S.Mempool.pending_operations Tezos_rpc.Path.open_root)
           (fun pv params () ->
-            (* FIXME https://gitlab.com/tezos/tezos/-/issues/2250
-
-               We merge validated operation with applied operation
-               so that the encoding of the RPC does not need to be
-               changed. Once prechecking will be done by the protocol
-               and not the plugin, we will change the encoding to
-               reflect that. *)
             let validated =
               if params#applied then
                 Classification.Sized_map.to_map
@@ -1075,10 +1060,6 @@ module Make
               Lwt_watcher.create_stream pv.operation_stream
             in
             (* First call : retrieve the current set of op from the mempool *)
-            (* FIXME https://gitlab.com/tezos/tezos/-/issues/2250
-
-               For the moment, applied and validated operations are
-               handled the same way for the user point of view. *)
             let validated_seq =
               if params#applied then
                 Classification.Sized_map.to_map

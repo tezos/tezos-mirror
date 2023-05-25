@@ -24,10 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A newly received block is validated by replaying locally the block
-    creation, applying each operation and its finalization to ensure their
-    consistency. This module is stateless and creates and manipulates the
-    prevalidation_state. *)
+(** This module is used by the prevalidator worker to determine
+    whether an operation should be added to the mempool. To do so, it
+    calls on the protocol's [Mempool] to validate the operation, as
+    well as the {!Prevalidator_bounding} to ensure that the mempool
+    remains bounded. It also retrieves relevant information from the
+    protocol plugin. *)
 
 module type T = sig
   (** Similar to the same type in the protocol,
