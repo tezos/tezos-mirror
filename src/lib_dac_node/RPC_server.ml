@@ -137,12 +137,6 @@ let handle_get_verify_signature dac_plugin public_keys_opt encoded_l1_message =
         signature
         witnesses
 
-(** [handle_get_preimage] is shared by both [V0] and [V1] API. *)
-let handle_get_preimage dac_plugin page_store raw_hash =
-  let open Lwt_result_syntax in
-  let*? hash = Dac_plugin.raw_to_hash dac_plugin raw_hash in
-  Page_store.Filesystem.load dac_plugin page_store hash
-
 (* Handler for subscribing to the streaming of root hashes via
    GET monitor/root_hashes RPC call. *)
 let handle_monitor_root_hashes hash_streamer =
@@ -191,7 +185,11 @@ let register_get_preimage dac_plugin page_store =
   add_service
     Tezos_rpc.Directory.register1
     RPC_services.V0.get_preimage
-    (fun hash () () -> handle_get_preimage dac_plugin page_store hash)
+    (fun hash () () ->
+      RPC_handlers.Shared_by_V0_and_V1.handle_get_page
+        dac_plugin
+        page_store
+        hash)
 
 let register_monitor_root_hashes hash_streamer dir =
   Tezos_rpc.Directory.gen_register
@@ -210,7 +208,11 @@ let register_get_pages dac_plugin page_store =
   add_service
     Tezos_rpc.Directory.register1
     RPC_services.V1.get_pages
-    (fun hash () () -> handle_get_preimage dac_plugin page_store hash)
+    (fun hash () () ->
+      RPC_handlers.Shared_by_V0_and_V1.handle_get_page
+        dac_plugin
+        page_store
+        hash)
 
 module Coordinator = struct
   let handle_post_preimage dac_plugin page_store hash_streamer payload =

@@ -33,3 +33,16 @@ val handle_get_health_live : Node_context.t -> (bool, error trace) result Lwt.t
 
 (** [handle_get_health_ready] is a handler for "GET dac/health/ready". *)
 val handle_get_health_ready : Node_context.t -> (bool, error trace) result Lwt.t
+
+(** [Shared_by_V0_and_V1] encapsulates handlers that are common to
+    both [V0] and [V1] API. *)
+module Shared_by_V0_and_V1 : sig
+  (** [handle_get_page] is a handler shared by both "GET v0/preimage" 
+      and "GET v1/pages". It fetches a page that corresponds
+      to a given [raw_hash]. *)
+  val handle_get_page :
+    Dac_plugin.t ->
+    Page_store.Filesystem.t ->
+    Dac_plugin.raw_hash ->
+    (bytes, tztrace) result Lwt.t
+end

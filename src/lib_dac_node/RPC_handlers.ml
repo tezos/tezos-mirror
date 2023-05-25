@@ -47,3 +47,13 @@ let handle_get_health_ready node_ctxt =
   match Node_context.get_status node_ctxt with
   | Ready _ -> Lwt_result_syntax.return true
   | Starting -> Lwt_result_syntax.tzfail @@ DAC_node_not_ready "starting"
+
+module Shared_by_V0_and_V1 = struct
+  (** [handle_get_page] is a handler shared by both "GET v0/preimage" 
+      and "GET v1/pages". It fetches a page that corresponds
+      to a given [raw_hash]. *)
+  let handle_get_page dac_plugin page_store raw_hash =
+    let open Lwt_result_syntax in
+    let*? hash = Dac_plugin.raw_to_hash dac_plugin raw_hash in
+    Page_store.Filesystem.load dac_plugin page_store hash
+end
