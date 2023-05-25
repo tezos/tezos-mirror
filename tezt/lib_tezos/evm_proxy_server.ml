@@ -29,7 +29,7 @@ module Parameters = struct
     mutable pending_ready : unit option Lwt.u list;
     rpc_addr : string;
     rpc_port : int;
-    rollup_node : Sc_rollup_node.t;
+    rollup_node : Sc_rollup_node.t option;
     runner : Runner.t option;
   }
 
@@ -95,7 +95,11 @@ let wait_for_ready proxy_server =
       check_event proxy_server event_ready_name promise
 
 let create ?runner ?rpc_addr ?rpc_port rollup_node =
-  let rollup_node_endpoint = Sc_rollup_node.endpoint rollup_node in
+  let rollup_node_endpoint =
+    match rollup_node with
+    | None -> "mockup"
+    | Some rollup_node -> Sc_rollup_node.endpoint rollup_node
+  in
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port rollup_node_endpoint
   in
@@ -106,6 +110,12 @@ let create ?runner ?rpc_addr ?rpc_port rollup_node =
   in
   on_event proxy_server (handle_event proxy_server) ;
   proxy_server
+
+let mockup ?runner ?rpc_addr ?rpc_port () =
+  create ?runner ?rpc_addr ?rpc_port None
+
+let create ?runner ?rpc_addr ?rpc_port rollup_node =
+  create ?runner ?rpc_addr ?rpc_port (Some rollup_node)
 
 let run proxy_server =
   let* () =
