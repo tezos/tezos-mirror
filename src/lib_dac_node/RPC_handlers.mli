@@ -25,3 +25,11 @@
 (*****************************************************************************)
 
 (** [RPC_handlers] is a module with handlers for DAC API endpoints. *)
+
+type error += DAC_node_not_ready of string
+
+(** [handle_get_health_live] is a handler for "GET dac/health/live". *)
+val handle_get_health_live : Node_context.t -> (bool, error trace) result Lwt.t
+
+(** [handle_get_health_ready] is a handler for "GET dac/health/ready". *)
+val handle_get_health_ready : Node_context.t -> (bool, error trace) result Lwt.t

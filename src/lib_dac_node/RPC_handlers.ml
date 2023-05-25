@@ -23,3 +23,27 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+type error += DAC_node_not_ready of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dac_node_not_ready"
+    ~title:"DAC Node is not ready"
+    ~description:
+      "RPC server of DAC node is not started and plugin is not resolved."
+    ~pp:(fun ppf message ->
+      Format.fprintf ppf "DAC Node is not ready, current status is: %s" message)
+    Data_encoding.(obj1 (req "value" string))
+    (function DAC_node_not_ready message -> Some message | _ -> None)
+    (fun message -> DAC_node_not_ready message)
+
+let handle_get_health_live node_ctxt =
+  match Node_context.get_status node_ctxt with
+  | Ready _ | Starting -> Lwt_result_syntax.return true
+
+let handle_get_health_ready node_ctxt =
+  match Node_context.get_status node_ctxt with
+  | Ready _ -> Lwt_result_syntax.return true
+  | Starting -> Lwt_result_syntax.tzfail @@ DAC_node_not_ready "starting"

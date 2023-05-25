@@ -31,7 +31,6 @@ open Tezos_rpc_http_server
 type error +=
   | Cannot_construct_external_message
   | Cannot_deserialize_external_message
-  | DAC_node_not_ready of string
 
 let () =
   register_error_kind
@@ -53,30 +52,24 @@ let () =
       Format.fprintf ppf "External rollup message could not be deserialized")
     Data_encoding.unit
     (function Cannot_deserialize_external_message -> Some () | _ -> None)
-    (fun () -> Cannot_deserialize_external_message) ;
-  register_error_kind
-    `Permanent
-    ~id:"dac_node_not_ready"
-    ~title:"DAC Node is not ready"
-    ~description:
-      "RPC server of DAC node is not started and plugin is not resolved."
-    ~pp:(fun ppf message ->
-      Format.fprintf ppf "DAC Node is not ready, current status is: %s" message)
-    Data_encoding.(obj1 (req "value" string))
-    (function DAC_node_not_ready message -> Some message | _ -> None)
-    (fun message -> DAC_node_not_ready message)
+    (fun () -> Cannot_deserialize_external_message)
 
 let add_service registerer service handler directory =
   registerer directory service handler
 
-let handle_get_health_live node_ctxt =
-  match Node_context.get_status node_ctxt with
-  | Ready _ | Starting -> Lwt_result_syntax.return true
+let register_get_health_live cctxt directory =
+  directory
+  |> add_service
+       Tezos_rpc.Directory.register0
+       RPC_services.get_health_live
+       (fun () () -> RPC_handlers.handle_get_health_live cctxt)
 
-let handle_get_health_ready node_ctxt =
-  match Node_context.get_status node_ctxt with
-  | Ready _ -> Lwt_result_syntax.return true
-  | Starting -> Lwt_result_syntax.tzfail @@ DAC_node_not_ready "starting"
+let register_get_health_ready cctxt directory =
+  directory
+  |> add_service
+       Tezos_rpc.Directory.register0
+       RPC_services.get_health_ready
+       (fun () () -> RPC_handlers.handle_get_health_ready cctxt)
 
 let handle_post_store_preimage dac_plugin cctxt dac_sk_uris page_store
     hash_streamer (data, pagination_scheme) =
@@ -170,20 +163,6 @@ let handle_get_certificate dac_plugin node_store raw_root_hash =
       Certificate_repr.(
         V0 (V0.make raw_root_hash aggregate_signature witnesses)))
     value_opt
-
-let register_get_health_live cctxt directory =
-  directory
-  |> add_service
-       Tezos_rpc.Directory.register0
-       RPC_services.get_health_live
-       (fun () () -> handle_get_health_live cctxt)
-
-let register_get_health_ready cctxt directory =
-  directory
-  |> add_service
-       Tezos_rpc.Directory.register0
-       RPC_services.get_health_ready
-       (fun () () -> handle_get_health_ready cctxt)
 
 let register_post_store_preimage ctx cctxt dac_sk_uris page_store hash_streamer
     directory =
