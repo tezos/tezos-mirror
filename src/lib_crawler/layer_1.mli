@@ -43,7 +43,7 @@ val start :
   name:string ->
   reconnection_delay:float ->
   #Client_context.full ->
-  t tzresult Lwt.t
+  t Lwt.t
 
 (** [shutdown t] properly shuts the layer 1 down. *)
 val shutdown : t -> unit Lwt.t

@@ -100,8 +100,8 @@ let rec connect ~name ?(count = 0) ~delay cctxt =
       connect ~name ~delay ~count:(count + 1) cctxt
 
 let start ~name ~reconnection_delay (cctxt : #Client_context.full) =
-  let open Lwt_result_syntax in
-  let*! () = Layer1_event.starting ~name in
+  let open Lwt_syntax in
+  let* () = Layer1_event.starting ~name in
   let+ heads, stopper = connect ~name ~delay:reconnection_delay cctxt in
   {
     name;
@@ -113,7 +113,7 @@ let start ~name ~reconnection_delay (cctxt : #Client_context.full) =
   }
 
 let reconnect l1_ctxt =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let* heads, stopper =
     connect
       ~name:l1_ctxt.name
@@ -165,7 +165,7 @@ let iter_heads l1_ctxt f =
     in
     when_ l1_ctxt.running @@ fun () ->
     let*! () = Layer1_event.connection_lost ~name:l1_ctxt.name in
-    let* l1_ctxt = reconnect l1_ctxt in
+    let*! l1_ctxt = reconnect l1_ctxt in
     loop l1_ctxt
   in
   Lwt.catch
