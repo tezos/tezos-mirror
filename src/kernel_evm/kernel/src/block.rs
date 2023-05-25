@@ -349,6 +349,7 @@ mod tests {
 
         let queue = Queue {
             proposals: vec![Blueprint { transactions }],
+            kernel_upgrade: None,
         };
 
         let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
@@ -387,6 +388,7 @@ mod tests {
         let transactions: Vec<Transaction> = vec![invalid_tx];
         let queue = Queue {
             proposals: vec![Blueprint { transactions }],
+            kernel_upgrade: None,
         };
 
         produce(&mut host, queue).expect("The block production failed.");
@@ -412,6 +414,7 @@ mod tests {
         let transactions: Vec<Transaction> = vec![valid_tx];
         let queue = Queue {
             proposals: vec![Blueprint { transactions }],
+            kernel_upgrade: None,
         };
 
         let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
@@ -450,6 +453,7 @@ mod tests {
         let transactions: Vec<Transaction> = vec![valid_tx];
         let queue = Queue {
             proposals: vec![Blueprint { transactions }],
+            kernel_upgrade: None,
         };
 
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
@@ -520,6 +524,7 @@ mod tests {
                     transactions: transaction_1,
                 },
             ],
+            kernel_upgrade: None,
         };
 
         let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
@@ -566,6 +571,7 @@ mod tests {
             proposals: vec![Blueprint {
                 transactions: transactions.clone(),
             }],
+            kernel_upgrade: None,
         };
 
         let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
@@ -593,7 +599,10 @@ mod tests {
     fn test_read_storage_current_block_after_block_production_with_empty_queue() {
         let mut host = MockHost::default();
         let _ = genesis::init_block(&mut host);
-        let queue = Queue { proposals: vec![] };
+        let queue = Queue {
+            proposals: vec![],
+            kernel_upgrade: None,
+        };
 
         produce(&mut host, queue).expect("The block production failed.");
 
@@ -632,6 +641,7 @@ mod tests {
                 },
                 Blueprint { transactions },
             ],
+            kernel_upgrade: None,
         };
 
         let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();

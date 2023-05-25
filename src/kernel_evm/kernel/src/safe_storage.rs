@@ -1,7 +1,9 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
+use crate::upgrade::CONFIG_INTERPRETER_PATH;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_host::{
     input::Message,
@@ -9,6 +11,7 @@ use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, Path, RefPath},
     runtime::{Runtime, RuntimeError, ValueType},
 };
+use tezos_smart_rollup_installer::KERNEL_BOOT_PATH;
 
 pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
 
@@ -158,6 +161,23 @@ impl<Host: Runtime> Runtime for SafeStorage<&mut Host> {
 }
 
 impl<Host: Runtime> SafeStorage<&mut Host> {
+    pub fn promote_upgrade(&mut self) -> Result<(), RuntimeError> {
+        let safe_config_interpr_path = safe_path(&CONFIG_INTERPRETER_PATH)?;
+        match self.0.store_read(&safe_config_interpr_path, 0, 0) {
+            Ok(_) => {
+                // Upgrade detected
+                let safe_kernel_boot_path = safe_path(&KERNEL_BOOT_PATH)?;
+                self.0
+                    .store_move(&safe_kernel_boot_path, &KERNEL_BOOT_PATH)?;
+                self.0.store_delete(&safe_config_interpr_path)
+            }
+            Err(_) => {
+                // No on-going upgrade detected
+                Ok(())
+            }
+        }
+    }
+
     pub fn promote(&mut self, path: &impl Path) -> Result<(), RuntimeError> {
         self.0.store_move(&TMP_PATH, path)
     }
