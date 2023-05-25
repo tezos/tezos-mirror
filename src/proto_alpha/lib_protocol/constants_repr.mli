@@ -24,6 +24,9 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+val version_value : string
+
+val version : string
 
 val mainnet_id : Chain_id.t
 
