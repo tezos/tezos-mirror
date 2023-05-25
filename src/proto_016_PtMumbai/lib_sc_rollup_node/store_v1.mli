@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -24,4 +24,56 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Store_v1
+(** This version of the store is used for the rollup nodes for protocols for and
+    after Nairobi, i.e. >= 17. *)
+
+open Protocol
+open Alpha_context
+open Indexed_store
+
+include module type of struct
+  include Store_v0
+end
+
+(** Storage for persisting messages downloaded from the L1 node. *)
+module Messages :
+  INDEXED_FILE
+    with type key := Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+     and type value := Sc_rollup.Inbox_message.t list
+     and type header := bool * Block_hash.t * Timestamp.t * int
+
+module Dal_pages : sig
+  type removed_in_v1
+end
+
+module Dal_processed_slots : sig
+  type removed_in_v1
+end
+
+(** [Dal_slots_statuses] is a [Store_utils.Nested_map] used to store the
+    attestation status of DAL slots. The values of this storage module have type
+    `[`Confirmed | `Unconfirmed]`, depending on whether the content of the slot
+    has been attested on L1 or not. If an entry is not present for a
+    [(block_hash, slot_index)], this means that the corresponding block is not
+    processed yet.
+*)
+module Dal_slots_statuses :
+  Store_sigs.Nested_map
+    with type primary_key := Block_hash.t
+     and type secondary_key := Dal.Slot_index.t
+     and type value := [`Confirmed | `Unconfirmed]
+     and type 'a store := 'a Irmin_store.t
+
+type +'a store = {
+  l2_blocks : 'a L2_blocks.t;
+  messages : 'a Messages.t;
+  inboxes : 'a Inboxes.t;
+  commitments : 'a Commitments.t;
+  commitments_published_at_level : 'a Commitments_published_at_level.t;
+  l2_head : 'a L2_head.t;
+  last_finalized_level : 'a Last_finalized_level.t;
+  levels_to_hashes : 'a Levels_to_hashes.t;
+  irmin_store : 'a Irmin_store.t;
+}
+
+include Store_sig.S with type 'a store := 'a store

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +24,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This version of the store is used for the rollup nodes for protocol Mumbai,
+    i.e. = 16.
+
+    This interface is a copy of
+    [src/proto_016_PtMumbai/lib_sc_rollup_node/store.mli], which contains the
+    layout for the Mumbai rollup node.
+*)
+
 open Protocol
 open Alpha_context
 open Indexed_store
 
-module Irmin_store : Store_sigs.Store
+module Irmin_store : sig
+  include module type of Irmin_store.Make (struct
+    let name = "Tezos smart rollup node"
+  end)
+
+  include Store_sigs.Store with type 'a t := 'a t
+end
 
 module L2_blocks :
   INDEXED_FILE
@@ -100,7 +115,7 @@ module Dal_confirmed_slots_history :
      and type 'a store := 'a Irmin_store.t
 
 (** Confirmed DAL slots histories cache. See documentation of
-    {Dal_slot_repr.Slots_history} for more details. *)
+    {!Dal_slot_repr.Slots_history} for more details. *)
 module Dal_confirmed_slots_histories :
   Store_sigs.Append_only_map
     with type key := Block_hash.t
@@ -146,31 +161,4 @@ type +'a store = {
   irmin_store : 'a Irmin_store.t;
 }
 
-(** Type of store. The parameter indicates if the store can be written or only
-    read. *)
-type 'a t = ([< `Read | `Write > `Read] as 'a) store
-
-(** Read/write store {!t}. *)
-type rw = Store_sigs.rw t
-
-(** Read only store {!t}. *)
-type ro = Store_sigs.ro t
-
-(** [close store] closes the store. *)
-val close : _ t -> unit tzresult Lwt.t
-
-(** [load mode ~l2_blocks_cache_size directory] loads a store from the data
-    persisted in [directory]. If [mode] is {!Store_sigs.Read_only}, then the
-    indexes and irmin store will be opened in readonly mode and only read
-    operations will be permitted. This allows to open a store for read access
-    that is already opened in {!Store_sigs.Read_write} mode in another
-    process. [l2_blocks_cache_size] is the number of L2 blocks the rollup node
-    will keep in memory. *)
-val load :
-  'a Store_sigs.mode ->
-  l2_blocks_cache_size:int ->
-  string ->
-  'a store tzresult Lwt.t
-
-(** [readonly store] returns a read-only version of [store]. *)
-val readonly : _ t -> ro
+include Store_sig.S with type 'a store := 'a store

@@ -357,19 +357,6 @@ index ca8e5769b9..90a3c81f2f 100644
      val set : 'a Context.t -> state -> 'a Context.t Lwt.t
    end
  end
-diff --git a/src/proto_016_PtMumbai/lib_sc_rollup_node/store.mli b/src/proto_016_PtMumbai/lib_sc_rollup_node/store.mli
-index 598836d8f1..1fd2fb535f 100644
---- a/src/proto_016_PtMumbai/lib_sc_rollup_node/store.mli
-+++ b/src/proto_016_PtMumbai/lib_sc_rollup_node/store.mli
-@@ -100,7 +100,7 @@ module Dal_confirmed_slots_history :
-      and type 'a store := 'a Irmin_store.t
- 
- (** Confirmed DAL slots histories cache. See documentation of
--    {Dal_slot_repr.Slots_history} for more details. *)
-+    {!Dal_slot_repr.Slots_history} for more details. *)
- module Dal_confirmed_slots_histories :
-   Store_sigs.Append_only_map
-     with type key := Block_hash.t
 diff --git a/src/proto_017_PtNairob/lib_sc_rollup_node/context.mli b/src/proto_017_PtNairob/lib_sc_rollup_node/context.mli
 index 636bb700d1..1a54302fd8 100644
 --- a/src/proto_017_PtNairob/lib_sc_rollup_node/context.mli
@@ -466,16 +453,3 @@ index ca8e5769b9..90a3c81f2f 100644
      val set : 'a Context.t -> state -> 'a Context.t Lwt.t
    end
  end
-diff --git a/src/proto_017_PtNairob/lib_sc_rollup_node/store.mli b/src/proto_017_PtNairob/lib_sc_rollup_node/store.mli
-index 2bf1bd361a..b43b800956 100644
---- a/src/proto_017_PtNairob/lib_sc_rollup_node/store.mli
-+++ b/src/proto_017_PtNairob/lib_sc_rollup_node/store.mli
-@@ -100,7 +100,7 @@ module Dal_confirmed_slots_history :
-      and type 'a store := 'a Irmin_store.t
- 
- (** Confirmed DAL slots histories cache. See documentation of
--    {Dal_slot_repr.Slots_history} for more details. *)
-+    {!Dal_slot_repr.Slots_history} for more details. *)
- module Dal_confirmed_slots_histories :
-   Store_sigs.Append_only_map
-     with type key := Block_hash.t

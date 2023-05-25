@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +24,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This version of the store is used for the rollup nodes for protocol Mumbai,
+    i.e. = 16.
+
+    This interface is a copy of
+    [src/proto_016_PtMumbai/lib_sc_rollup_node/store.mli], which contains the
+    layout for the Mumbai rollup node.
+*)
+
 open Protocol
 open Alpha_context
 open Indexed_store
 
-module Irmin_store : Store_sigs.Store
+module Irmin_store : sig
+  include module type of Irmin_store.Make (struct
+    let name = "Tezos smart rollup node"
+  end)
+
+  include Store_sigs.Store with type 'a t := 'a t
+end
 
 module L2_blocks :
   INDEXED_FILE
@@ -40,7 +55,7 @@ module Messages :
   INDEXED_FILE
     with type key := Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
      and type value := Sc_rollup.Inbox_message.t list
-     and type header := bool * Block_hash.t * Timestamp.t * int
+     and type header := Block_hash.t * Timestamp.t * int
 
 (** Aggregated collection of messages from the L1 inbox *)
 module Inboxes :
@@ -100,21 +115,34 @@ module Dal_confirmed_slots_history :
      and type 'a store := 'a Irmin_store.t
 
 (** Confirmed DAL slots histories cache. See documentation of
-    {Dal_slot_repr.Slots_history} for more details. *)
+    {!Dal_slot_repr.Slots_history} for more details. *)
 module Dal_confirmed_slots_histories :
   Store_sigs.Append_only_map
     with type key := Block_hash.t
      and type value := Dal.Slots_history.History_cache.t
      and type 'a store := 'a Irmin_store.t
 
-(** [Dal_slots_statuses] is a [Store_utils.Nested_map] used to store the
-    attestation status of DAL slots. The values of this storage module have type
-    `[`Confirmed | `Unconfirmed]`, depending on whether the content of the slot
-    has been attested on L1 or not. If an entry is not present for a
-    [(block_hash, slot_index)], this means that the corresponding block is not
-    processed yet.
+(** [Dal_slot_pages] is a [Store_utils.Nested_map] used to store the contents
+    of dal slots fetched by the rollup node, as a list of pages. The values of
+    this storage module have type `string list`. A value of the form
+    [page_contents] refers to a page of a slot that has been confirmed, and
+    whose contents are [page_contents].
 *)
-module Dal_slots_statuses :
+module Dal_slot_pages :
+  Store_sigs.Nested_map
+    with type primary_key := Block_hash.t
+     and type secondary_key := Dal.Slot_index.t * Dal.Page.Index.t
+     and type value := Dal.Page.content
+     and type 'a store := 'a Irmin_store.t
+
+(** [Dal_processed_slots] is a [Store_utils.Nested_map] used to store the processing
+    status of dal slots content fetched by the rollup node. The values of
+    this storage module have type `[`Confirmed | `Unconfirmed]`, depending on
+    whether the content of the slot has been confirmed or not. If an entry is
+    not present for a [(block_hash, slot_index)], this either means that it's
+    not processed yet.
+*)
+module Dal_processed_slots :
   Store_sigs.Nested_map
     with type primary_key := Block_hash.t
      and type secondary_key := Dal.Slot_index.t
@@ -133,31 +161,4 @@ type +'a store = {
   irmin_store : 'a Irmin_store.t;
 }
 
-(** Type of store. The parameter indicates if the store can be written or only
-    read. *)
-type 'a t = ([< `Read | `Write > `Read] as 'a) store
-
-(** Read/write store {!t}. *)
-type rw = Store_sigs.rw t
-
-(** Read only store {!t}. *)
-type ro = Store_sigs.ro t
-
-(** [close store] closes the store. *)
-val close : _ t -> unit tzresult Lwt.t
-
-(** [load mode ~l2_blocks_cache_size directory] loads a store from the data
-    persisted in [directory]. If [mode] is {!Store_sigs.Read_only}, then the
-    indexes and irmin store will be opened in readonly mode and only read
-    operations will be permitted. This allows to open a store for read access
-    that is already opened in {!Store_sigs.Read_write} mode in another
-    process. [l2_blocks_cache_size] is the number of L2 blocks the rollup node
-    will keep in memory. *)
-val load :
-  'a Store_sigs.mode ->
-  l2_blocks_cache_size:int ->
-  string ->
-  'a store tzresult Lwt.t
-
-(** [readonly store] returns a read-only version of [store]. *)
-val readonly : _ t -> ro
+include Store_sig.S with type 'a store := 'a store

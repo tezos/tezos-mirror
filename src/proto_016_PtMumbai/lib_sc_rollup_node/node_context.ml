@@ -303,6 +303,10 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
     |> Protocol.Alpha_context.Sc_rollup.Address.of_bytes_exn
   in
   let* lockfile = lock ~data_dir in
+  let* () =
+    Store_migration.maybe_run_migration
+      ~storage_dir:(Configuration.default_storage_dir data_dir)
+  in
   let dal_cctxt =
     Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
   in
@@ -809,14 +813,15 @@ let get_messages {store; _} messages_hash =
         "Could not retrieve messages with payloads merkelized hash %a"
         Sc_rollup.Inbox_merkelized_payload_hashes.Hash.pp
         messages_hash
-  | Some (messages, (predecessor, predecessor_timestamp, _num_messages)) ->
+  | Some (messages, (_first, predecessor, predecessor_timestamp, _num_messages))
+    ->
       return {predecessor; predecessor_timestamp; messages}
 
 let find_messages {store; _} hash =
   let open Lwt_result_syntax in
   let+ msgs = Store.Messages.read store.messages hash in
   Option.map
-    (fun (messages, (predecessor, predecessor_timestamp, _num_messages)) ->
+    (fun (messages, (_first, predecessor, predecessor_timestamp, _num_messages)) ->
       {predecessor; predecessor_timestamp; messages})
     msgs
 
@@ -829,7 +834,7 @@ let get_num_messages {store; _} hash =
         "Could not retrieve number of messages for inbox witness %a"
         Sc_rollup.Inbox_merkelized_payload_hashes.Hash.pp
         hash
-  | Some (_predecessor, _predecessor_timestamp, num_messages) ->
+  | Some (_first, _predecessor, _predecessor_timestamp, num_messages) ->
       return num_messages
 
 let save_messages {store; _} key {predecessor; predecessor_timestamp; messages}
@@ -837,7 +842,11 @@ let save_messages {store; _} key {predecessor; predecessor_timestamp; messages}
   Store.Messages.append
     store.messages
     ~key
-    ~header:(predecessor, predecessor_timestamp, List.length messages)
+    ~header:
+      ( false (* Never first block of protocol for Mumbai *),
+        predecessor,
+        predecessor_timestamp,
+        List.length messages )
     ~value:messages
 
 let get_full_l2_block node_ctxt block_hash =
@@ -881,7 +890,7 @@ let save_slot_header {store; _} ~published_in_block_hash
     slot_header
 
 let processed_slot {store; _} ~confirmed_in_block_hash slot_index =
-  Store.Dal_processed_slots.find
+  Store.Dal_slots_statuses.find
     store.irmin_store
     ~primary_key:confirmed_in_block_hash
     ~secondary_key:slot_index
@@ -899,7 +908,7 @@ let find_slot_page {store; _} ~confirmed_in_block_hash ~slot_index ~page_index =
 
 let save_unconfirmed_slot {store; _} current_block_hash slot_index =
   (* No page is actually saved *)
-  Store.Dal_processed_slots.add
+  Store.Dal_slots_statuses.add
     store.irmin_store
     ~primary_key:current_block_hash
     ~secondary_key:slot_index
@@ -919,7 +928,7 @@ let save_confirmed_slot {store; _} current_block_hash slot_index pages =
           page)
       pages
   in
-  Store.Dal_processed_slots.add
+  Store.Dal_slots_statuses.add
     store.irmin_store
     ~primary_key:current_block_hash
     ~secondary_key:slot_index

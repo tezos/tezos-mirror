@@ -1,7 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -24,4 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Store_v1
+type t = V0 | V1
+
+(** Pretty-printer for store versions *)
+val pp : Format.formatter -> t -> unit
