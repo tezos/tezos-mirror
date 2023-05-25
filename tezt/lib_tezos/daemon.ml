@@ -73,6 +73,7 @@ module Make (X : PARAMETERS) = struct
 
   type session_status = {
     process : Process.t;
+    stdin : Lwt_io.output_channel;
     session_state : X.session_state;
     mutable event_loop_promise : unit Lwt.t option;
   }
@@ -319,8 +320,8 @@ module Make (X : PARAMETERS) = struct
         ("file-descriptor-path://" ^ daemon.event_pipe ^ args_str)
         env
     in
-    let process =
-      Process.spawn
+    let process, stdin =
+      Process.spawn_with_stdin
         ?runner
         ~name:daemon.name
         ~color:daemon.color
@@ -331,7 +332,9 @@ module Make (X : PARAMETERS) = struct
     (* Make sure the daemon status is [Running], otherwise
        [event_loop_promise] would stop immediately thinking the daemon
        has been terminated. *)
-    let running_status = {process; session_state; event_loop_promise = None} in
+    let running_status =
+      {process; session_state; stdin; event_loop_promise = None}
+    in
     daemon.status <- Running running_status ;
     let event_loop_promise =
       let rec event_loop () =
