@@ -959,9 +959,9 @@ module Make (C : AUTOMATON_CONFIG) :
    fun {peer; topic; px; backoff} -> Prune.handle peer topic ~px ~backoff
 
   module Receive_message = struct
-    let check_valid sender topic message =
+    let check_valid sender topic message message_id =
       let open Monad.Syntax in
-      match Message.valid message with
+      match Message.valid message message_id with
       | `Valid -> unit
       | `Unknown ->
           (* FIXME https://gitlab.com/tezos/tezos/-/issues/5486
@@ -987,7 +987,7 @@ module Make (C : AUTOMATON_CONFIG) :
             in
             fail Already_received
       in
-      let*? () = check_valid sender topic message in
+      let*? () = check_valid sender topic message message_id in
       let*! mesh_opt = find_mesh topic in
       let*? peers_in_mesh =
         match mesh_opt with

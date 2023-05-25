@@ -60,6 +60,9 @@ let regression_test ~__FILE__ ?(tags = []) title f =
 let dal_enable_param dal_enable =
   make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
 
+let redundancy_factor_param redundancy_factor =
+  make_int_parameter ["dal_parametric"; "redundancy_factor"] redundancy_factor
+
 (* Some initialization functions to start needed nodes. *)
 
 let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 5)
@@ -2664,51 +2667,9 @@ let check_message_notified_to_app_event dal_node ~from_shard ~to_shard
       if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
       else None)
 
-let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
-    _cryptobox node client dal_node1 =
-  let dal_node2 = Dal_node.create ~node ~client () in
-  let* _config_file = Dal_node.init_config dal_node2 in
-  update_known_peers dal_node2 [dal_node1] ;
-  (* run dal_node2 and check "new connection" event. *)
-  let conn_ev_in_node1 =
-    check_new_connection_event
-      ~main_node:dal_node1
-      ~other_node:dal_node2
-      ~is_outbound:false
-  in
-  let conn_ev_in_node2 =
-    check_new_connection_event
-      ~main_node:dal_node2
-      ~other_node:dal_node1
-      ~is_outbound:true
-  in
-  let* () = Dal_node.run dal_node2 in
-  let* () = conn_ev_in_node1 and* () = conn_ev_in_node2 in
-  let peer_id =
-    JSON.(Dal_node.read_identity dal_node2 |-> "peer_id" |> as_string)
-  in
-  (* kill dal_node2 and check "disconnection" event in node1. *)
-  let disconn_ev_in_node1 = check_disconnection_event dal_node1 ~peer_id in
-  let* () = Dal_node.kill dal_node2 in
-  disconn_ev_in_node1
-
-let test_dal_node_join_topic _protocol _parameters _cryptobox _node client
-    dal_node1 =
-  let pkh1 = Constant.bootstrap1.public_key_hash in
-  let profile1 = Rollup.Dal.RPC.Attestor pkh1 in
-  let* params = Rollup.Dal.Parameters.from_client client in
-  let num_slots = params.number_of_slots in
-  let event_waiter =
-    check_events_with_topic ~event_with_topic:Join dal_node1 ~num_slots pkh1
-  in
-  let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profile profile1) in
-  event_waiter
-
-let test_dal_node_gs_topic_subscribe_and_graft_and_publication _protocol
-    parameters _cryptobox node client dal_node1 =
-  (* connect *)
-  let dal_node2 = Dal_node.create ~node ~client () in
-  let* _config_file = Dal_node.init_config dal_node2 in
+(** Add [dal_node1]'s P2P point to [dal_node2], start [dal_node2] and wait until
+    a p2p connection is established between the two nodes. *)
+let connect_nodes_via_p2p dal_node1 dal_node2 =
   update_known_peers dal_node2 [dal_node1] ;
   let conn_ev_in_node1 =
     check_new_connection_event
@@ -2724,20 +2685,22 @@ let test_dal_node_gs_topic_subscribe_and_graft_and_publication _protocol
   in
   let* () = Dal_node.run dal_node2 in
   let* () = conn_ev_in_node1 and* () = conn_ev_in_node2 in
+  unit
 
-  (* node1 joins topic {pkh} -> it sends subscribe messages to node2. *)
-  let account1 = Constant.bootstrap1 in
-  let pkh1 = account1.public_key_hash in
+(** This helper function makes the nodes [dal_node1] and [dal_node2] join the
+    topics of the attestor [pkh], by calling the RPC for tracking the corresponding profile.
+    The second node calls the RPC only after receiving the Subscribe messages
+    from the first node, so that when it joins the topics, it also sends Graft messages
+    in addition to sending Subscribe messages. *)
+let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
   let profile1 = Rollup.Dal.RPC.Attestor pkh1 in
-  let* params = Rollup.Dal.Parameters.from_client client in
-  let num_slots = params.number_of_slots in
   let peer_id1 =
     JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
   in
   let peer_id2 =
     JSON.(Dal_node.read_identity dal_node2 |-> "peer_id" |> as_string)
   in
-
+  (* node1 joins topic {pkh} -> it sends subscribe messages to node2. *)
   let event_waiter =
     check_events_with_topic
       ~event_with_topic:(Subscribe peer_id1)
@@ -2765,7 +2728,132 @@ let test_dal_node_gs_topic_subscribe_and_graft_and_publication _protocol
       pkh1
   in
   let* () = RPC.call dal_node2 (Rollup.Dal.RPC.patch_profile profile1) in
-  let* () = Lwt.join [event_waiter_subscribe; event_waiter_graft] in
+  Lwt.join [event_waiter_subscribe; event_waiter_graft]
+
+(** This helper returns the list of promises that allow to wait for the
+    publication of a slot's shards into the Gossipsub layer.
+
+    The [l1_committee] used to determine the topic of published messages is the
+    one at the attesattion level corresponding to [publish_level].
+*)
+let waiters_publish_shards l1_committee dal_node commitment ~publish_level
+    ~slot_index =
+  let open Rollup.Dal.Committee in
+  List.map
+    (fun {attestor; first_shard_index; power} ->
+      check_events_with_message
+        ~event_with_message:Publish_message
+        dal_node
+        ~from_shard:first_shard_index
+        ~to_shard:(first_shard_index + power - 1)
+        ~expected_commitment:commitment
+        ~expected_level:publish_level
+        ~expected_pkh:attestor
+        ~expected_slot:slot_index)
+    l1_committee
+
+(** This helper returns the promise that allows to wait for the reception of
+    messages of [slot_index] published at level [publish_level] by the attestor
+    [pkh].
+
+    The [l1_committee] used to determine the topic of published messages is the
+    one at the attesattion level corresponding to [publish_level]. *)
+let waiter_receive_shards l1_committee dal_node commitment ~publish_level
+    ~slot_index ~pkh ~from_peer =
+  let open Rollup.Dal.Committee in
+  match List.find (fun {attestor; _} -> attestor = pkh) l1_committee with
+  | {attestor; first_shard_index; power} ->
+      check_events_with_message
+        ~event_with_message:(Message_with_header from_peer)
+        dal_node
+        ~from_shard:first_shard_index
+        ~to_shard:(first_shard_index + power - 1)
+        ~expected_commitment:commitment
+        ~expected_level:publish_level
+        ~expected_pkh:attestor
+        ~expected_slot:slot_index
+  | exception Not_found ->
+      Test.fail "Should not happen as %s is part of the committee" pkh
+
+(** This helper returns the promise that allows to wait for the successful
+    notification of messages of [slot_index] published at level [publish_level]
+    to the app layer of the attestor [pkh].
+
+    The [l1_committee] used to determine the topic of published messages is the
+    one at the attesattion level corresponding to [publish_level]. *)
+let waiter_successful_shards_app_notification l1_committee dal_node commitment
+    ~publish_level ~slot_index ~pkh =
+  let open Rollup.Dal.Committee in
+  match List.find (fun {attestor; _} -> attestor = pkh) l1_committee with
+  | {attestor; first_shard_index; power} ->
+      check_message_notified_to_app_event
+        dal_node
+        ~from_shard:first_shard_index
+        ~to_shard:(first_shard_index + power - 1)
+        ~expected_commitment:commitment
+        ~expected_level:publish_level
+        ~expected_pkh:attestor
+        ~expected_slot:slot_index
+  | exception Not_found ->
+      Test.fail "Should not happen as %s is part of the committee" pkh
+
+let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
+    _cryptobox node client dal_node1 =
+  let dal_node2 = Dal_node.create ~node ~client () in
+  let* _config_file = Dal_node.init_config dal_node2 in
+  (* Connect the nodes *)
+  let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
+  let peer_id =
+    JSON.(Dal_node.read_identity dal_node2 |-> "peer_id" |> as_string)
+  in
+  (* kill dal_node2 and check "disconnection" event in node1. *)
+  let disconn_ev_in_node1 = check_disconnection_event dal_node1 ~peer_id in
+  let* () = Dal_node.kill dal_node2 in
+  disconn_ev_in_node1
+
+let test_dal_node_join_topic _protocol _parameters _cryptobox _node client
+    dal_node1 =
+  let pkh1 = Constant.bootstrap1.public_key_hash in
+  let profile1 = Rollup.Dal.RPC.Attestor pkh1 in
+  let* params = Rollup.Dal.Parameters.from_client client in
+  let num_slots = params.number_of_slots in
+  let event_waiter =
+    check_events_with_topic ~event_with_topic:Join dal_node1 ~num_slots pkh1
+  in
+  let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profile profile1) in
+  event_waiter
+
+(** This generic test function is used to test messages exchanges between two
+    DAL nodes via the P2P/GS layers, once connections are established and topics
+    are joined.
+
+   The [mk_dal_node2] function is used to create a second DAL node. We may
+   decide to create a regular/normal or a modified dal node.
+
+   The [expect_app_notification] flag is used to tell whether we should wait for
+   the application layer of the second DAL node to be notified with received messages.
+   In case we don't expect the application layer to be notified (e.g. messages are invalid), 
+   set to [false].
+
+   The [is_first_slot_attestable] flag is used to tell whether the first slot
+   (that has been injected by this function) can be attested by the considered
+   attestor or not. In particular, it should be set to [false] if the
+   application layer of the second DAL node was not notified about the messages
+   sent by the first DAL node.
+*)
+let generic_gs_messages_exchange protocol parameters _cryptobox node client
+    dal_node1 ~mk_dal_node2 ~expect_app_notification ~is_first_slot_attestable =
+  let* dal_node2 = mk_dal_node2 protocol parameters in
+  let* _config_file = Dal_node.init_config dal_node2 in
+  (* Connect the nodes *)
+  let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
+
+  let* params = Rollup.Dal.Parameters.from_client client in
+  let num_slots = params.number_of_slots in
+  let account1 = Constant.bootstrap1 in
+  let pkh1 = account1.public_key_hash in
+  (* The two nodes join the same topics *)
+  let* () = nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 in
 
   (* Posting a DAL message to DAL node and to L1 *)
   let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
@@ -2789,59 +2877,45 @@ let test_dal_node_gs_topic_subscribe_and_graft_and_publication _protocol
      We also prepare a waiter event for:
      - the shards that will be received by dal_node2 on its topics;
      - the messages (shards) that will be notified to dal_node2 on its topic. *)
-  let published_level = Node.get_level node + 1 in
-  let attestable_level = published_level + parameters.attestation_lag in
-  let* waiter_publish_list, waiter_direct_forward, waiter_app_notifs =
-    let open Rollup.Dal.Committee in
-    (* Get the committee from L1 *)
-    let* committee_from_l1 = at_level node ~level:attestable_level in
-    (* For messages publication, we'll have one waiter promise per attestor. *)
-    let waiter_publish_list =
-      List.map
-        (fun {attestor; first_shard_index; power} ->
-          check_events_with_message
-            ~event_with_message:Publish_message
-            dal_node1
-            ~from_shard:first_shard_index
-            ~to_shard:(first_shard_index + power - 1)
-            ~expected_commitment:slot_commitment
-            ~expected_level:published_level
-            ~expected_pkh:attestor
-            ~expected_slot:slot_index)
-        committee_from_l1
-    in
-    (* For messages reception, we'll have one promise for attestor [pkh1]. *)
-    let waiter_direct_forward, waiter_app_notifs =
-      match
-        List.find (fun {attestor; _} -> attestor = pkh1) committee_from_l1
-      with
-      | {attestor; first_shard_index; power} ->
-          ( check_events_with_message
-              ~event_with_message:(Message_with_header peer_id1)
-              dal_node2
-              ~from_shard:first_shard_index
-              ~to_shard:(first_shard_index + power - 1)
-              ~expected_commitment:slot_commitment
-              ~expected_level:published_level
-              ~expected_pkh:attestor
-              ~expected_slot:slot_index,
-            check_message_notified_to_app_event
-              dal_node2
-              ~from_shard:first_shard_index
-              ~to_shard:(first_shard_index + power - 1)
-              ~expected_commitment:slot_commitment
-              ~expected_level:published_level
-              ~expected_pkh:attestor
-              ~expected_slot:slot_index )
-      | exception Not_found ->
-          Test.fail "Should not happen as %s is part of the committee" pkh1
-    in
-    return (waiter_publish_list, waiter_direct_forward, waiter_app_notifs)
+  let publish_level = Node.get_level node + 1 in
+  let attested_level = publish_level + parameters.attestation_lag in
+  let* committee = Rollup.Dal.Committee.at_level node ~level:attested_level in
+
+  let waiter_publish_list =
+    waiters_publish_shards
+      committee
+      dal_node1
+      slot_commitment
+      ~publish_level
+      ~slot_index
   in
+  let waiter_receive_shards =
+    waiter_receive_shards
+      committee
+      dal_node2
+      slot_commitment
+      ~publish_level
+      ~slot_index
+      ~pkh:pkh1
+      ~from_peer:
+        JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
+  in
+  let waiter_app_notifs =
+    if expect_app_notification then
+      waiter_successful_shards_app_notification
+        committee
+        dal_node2
+        slot_commitment
+        ~publish_level
+        ~slot_index
+        ~pkh:pkh1
+    else unit
+  in
+
   (* We bake a block that includes [slot_header] operation. *)
   let* () = Client.bake_for_and_wait client in
   let* () = Lwt.join waiter_publish_list
-  and* () = waiter_direct_forward
+  and* () = waiter_receive_shards
   and* () = waiter_app_notifs in
 
   (* Check that dal_node2 has the shards needed by attestor account1/pkh1 to
@@ -2849,20 +2923,69 @@ let test_dal_node_gs_topic_subscribe_and_graft_and_publication _protocol
   let* res =
     RPC.call
       dal_node2
-      (Rollup.Dal.RPC.get_attestable_slots
-         ~attestor:account1
-         ~attested_level:attestable_level)
+      (Rollup.Dal.RPC.get_attestable_slots ~attestor:account1 ~attested_level)
   in
   match res with
   | Not_in_committee -> Test.fail "attestor %s not in committee" account1.alias
   | Attestable_slots slots ->
       (* only slot 0 is attestable. Others are set to false. *)
-      let expected = true :: List.init (num_slots - 1) (fun _ -> false) in
+      let expected =
+        is_first_slot_attestable :: List.init (num_slots - 1) (fun _ -> false)
+      in
       Check.(
         (expected = slots)
           (list bool)
           ~error_msg:"Expected %L attestable slots list flags, got %R") ;
       unit
+
+let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
+    node client dal_node1 =
+  generic_gs_messages_exchange
+    _protocol
+    parameters
+    _cryptobox
+    node
+    client
+    dal_node1
+    ~mk_dal_node2:(fun _protocol _parameters ->
+      Dal_node.create ~node ~client () |> return)
+    ~expect_app_notification:true
+    ~is_first_slot_attestable:true
+
+let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
+    node client dal_node1 =
+  (* Create a non-compatible DAL node. *)
+  let mk_dal_node2 protocol parameters =
+    (* Create another L1 node with different DAL parameters. *)
+    let* node2, client2, _xdal_parameters2 =
+      let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
+      let parameters =
+        dal_enable_param (Some true)
+        @ redundancy_factor_param (Some (2 * crypto_params.redundancy_factor))
+      in
+      setup_node ~protocol ~parameters ()
+    in
+    (* Create a second DAL node with node2 and client2 as argument (so different
+       DAL parameters compared to dal_node1. *)
+    let dal_node2 = Dal_node.create ~node:node2 ~client:client2 () in
+    return dal_node2
+  in
+  (* Messages are invalid, so the app layer is not notified. *)
+  let expect_app_notification = false in
+  (* The first slot published by [generic_gs_messages_exchange] is not
+     attestable by the considered attestor pk1 = bootstrap1, because the shards
+     received by the Gossipsub layer are classified as 'Invalid'. *)
+  let is_first_slot_attestable = false in
+  generic_gs_messages_exchange
+    _protocol
+    parameters
+    _cryptobox
+    node
+    client
+    dal_node1
+    ~mk_dal_node2
+    ~expect_app_notification
+    ~is_first_slot_attestable
 
 let register ~protocols =
   (* Tests with Layer1 node only *)
@@ -2955,16 +3078,24 @@ let register ~protocols =
 
   (* Tests with layer1 and dal nodes (with p2p/GS) *)
   scenario_with_layer1_and_dal_nodes
+    ~tags:["gossipsub"]
     "GS/P2P connection and disconnection"
     test_dal_node_p2p_connection_and_disconnection
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~tags:["gossipsub"]
     "GS join topic"
     test_dal_node_join_topic
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    "GS topic subscribe, graft, and exchange message"
-    test_dal_node_gs_topic_subscribe_and_graft_and_publication
+    ~tags:["gossipsub"]
+    "GS valid messages exchange"
+    test_dal_node_gs_valid_messages_exchange
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["gossipsub"]
+    "GS invalid messages exchange"
+    test_dal_node_gs_invalid_messages_exchange
     protocols ;
 
   (* Tests with all nodes *)

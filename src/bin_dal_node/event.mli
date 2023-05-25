@@ -39,3 +39,6 @@ val decoding_data_failed : Types.kind t
 
 (** Loading shard data from disk failed. *)
 val loading_shard_data_failed : string t
+
+(** Validating a message received via Gossipsub/P2P failed. *)
+val message_validation_error : (Gossipsub.message_id * string) t
