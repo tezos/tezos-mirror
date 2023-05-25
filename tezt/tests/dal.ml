@@ -2905,7 +2905,7 @@ let test_dal_node_join_topic _protocol _parameters _cryptobox _node client
 
    The [expect_app_notification] flag is used to tell whether we should wait for
    the application layer of the second DAL node to be notified with received messages.
-   In case we don't expect the application layer to be notified (e.g. messages are invalid), 
+   In case we don't expect the application layer to be notified (e.g. messages are invalid),
    set to [false].
 
    The [is_first_slot_attestable] flag is used to tell whether the first slot
@@ -3025,24 +3025,25 @@ let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
     ~expect_app_notification:true
     ~is_first_slot_attestable:true
 
+(* Create a DAL node whose DAL parameters are not compatible with those in
+   [parameters]. For that, the redundancy_factor field is multiplied by 2. *)
+let make_invalid_dal_node protocol parameters =
+  (* Create another L1 node with different DAL parameters. *)
+  let* node2, client2, _xdal_parameters2 =
+    let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
+    let parameters =
+      dal_enable_param (Some true)
+      @ redundancy_factor_param (Some (2 * crypto_params.redundancy_factor))
+    in
+    setup_node ~protocol ~parameters ()
+  in
+  (* Create a second DAL node with node2 and client2 as argument (so different
+     DAL parameters compared to dal_node1. *)
+  let dal_node2 = Dal_node.create ~node:node2 ~client:client2 () in
+  return dal_node2
+
 let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
     node client dal_node1 =
-  (* Create a non-compatible DAL node. *)
-  let mk_dal_node2 protocol parameters =
-    (* Create another L1 node with different DAL parameters. *)
-    let* node2, client2, _xdal_parameters2 =
-      let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
-      let parameters =
-        dal_enable_param (Some true)
-        @ redundancy_factor_param (Some (2 * crypto_params.redundancy_factor))
-      in
-      setup_node ~protocol ~parameters ()
-    in
-    (* Create a second DAL node with node2 and client2 as argument (so different
-       DAL parameters compared to dal_node1. *)
-    let dal_node2 = Dal_node.create ~node:node2 ~client:client2 () in
-    return dal_node2
-  in
   (* Messages are invalid, so the app layer is not notified. *)
   let expect_app_notification = false in
   (* The first slot published by [generic_gs_messages_exchange] is not
@@ -3056,7 +3057,7 @@ let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
     node
     client
     dal_node1
-    ~mk_dal_node2
+    ~mk_dal_node2:make_invalid_dal_node
     ~expect_app_notification
     ~is_first_slot_attestable
 
