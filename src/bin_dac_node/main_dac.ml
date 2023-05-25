@@ -169,6 +169,18 @@ let committee_rpc_addresses_param
     ?(desc = "RPC address of the DAC committee member.") =
   Tezos_clic.param ~name ~desc raw_rpc_parameter
 
+let experimental_disclaimer () =
+  Format.eprintf
+    "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
+     @,\
+    \                 DAC is in an @{<warning>experimental release@} phase.    \
+     @,\
+     @,\
+    \         We encourage the community to develop rollups using DAC in\n\
+    \           Testnets and lower environments. Mainnet is @{<warning>NOT@} \
+     recommended.\n\
+     @."
+
 module Config_init = struct
   let create_configuration ~data_dir ~reveal_data_dir ~rpc_address ~rpc_port
       mode (cctxt : Client_context.full) =
@@ -216,6 +228,7 @@ module Config_init = struct
            committee_members_addresses
            threshold
            cctxt ->
+        experimental_disclaimer () ;
         create_configuration
           ~data_dir
           ~reveal_data_dir
@@ -248,6 +261,7 @@ module Config_init = struct
       (fun (data_dir, rpc_address, rpc_port, reveal_data_dir)
            committee_members
            cctxt ->
+        experimental_disclaimer () ;
         create_configuration
           ~data_dir
           ~reveal_data_dir
@@ -271,6 +285,7 @@ module Config_init = struct
            (coordinator_rpc_address, coordinator_rpc_port)
            address
            cctxt ->
+        experimental_disclaimer () ;
         create_configuration
           ~data_dir
           ~reveal_data_dir
@@ -306,6 +321,7 @@ module Config_init = struct
            (coordinator_rpc_address, coordinator_rpc_port)
            committee_rpc_addresses
            cctxt ->
+        experimental_disclaimer () ;
         create_configuration
           ~data_dir
           ~reveal_data_dir
@@ -327,14 +343,38 @@ module Config_init = struct
     ]
 end
 
+let check_network cctxt =
+  let open Lwt_syntax in
+  let* r = Tezos_shell_services.Version_services.version cctxt in
+  match r with
+  | Error _ -> Lwt.return_none
+  | Ok {network_version; _} ->
+      let has_prefix prefix =
+        String.has_prefix ~prefix (network_version.chain_name :> string)
+      in
+      if List.exists has_prefix ["TEZOS_BETANET"; "TEZOS_MAINNET"] then
+        Lwt.return_some `Mainnet
+      else Lwt.return_some `Testnet
+
+let display_disclaimer cctxt =
+  let open Lwt_syntax in
+  let+ network_opt = check_network cctxt in
+  match network_opt with
+  | None -> experimental_disclaimer ()
+  | Some `Mainnet -> experimental_disclaimer ()
+  | Some `Testnet -> ()
+
 let run_command =
   let open Tezos_clic in
+  let open Lwt_result_syntax in
   command
     ~group
     ~desc:"Run the DAC node."
     (args1 data_dir_arg)
     (prefixes ["run"] @@ stop)
-    (fun data_dir cctxt -> Daemon.run ~data_dir cctxt)
+    (fun data_dir cctxt ->
+      let*! () = display_disclaimer cctxt in
+      Daemon.run ~data_dir cctxt)
 
 let commands () = [run_command] @ Config_init.commands
 
