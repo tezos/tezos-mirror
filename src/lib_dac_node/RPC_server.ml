@@ -94,16 +94,6 @@ let register_get_certificate node_store dac_plugin =
     (fun root_hash () () ->
       RPC_handlers.V0.handle_get_certificate dac_plugin node_store root_hash)
 
-let register_get_pages dac_plugin page_store =
-  add_service
-    Tezos_rpc.Directory.register1
-    RPC_services.V1.get_pages
-    (fun hash () () ->
-      RPC_handlers.Shared_by_V0_and_V1.handle_get_page
-        dac_plugin
-        page_store
-        hash)
-
 module Coordinator = struct
   let register_monitor_certificate dac_plugin ro_node_store
       certificate_streamers committee_members dir =
@@ -169,14 +159,11 @@ module Coordinator = struct
          rw_store
          page_store
     |> register_get_certificate rw_store dac_plugin
-    |> register_get_pages dac_plugin page_store
 end
 
 module Committee_member = struct
   let dynamic_rpc_dir dac_plugin page_store =
-    Tezos_rpc.Directory.empty
-    |> register_get_preimage dac_plugin page_store
-    |> register_get_pages dac_plugin page_store
+    Tezos_rpc.Directory.empty |> register_get_preimage dac_plugin page_store
 end
 
 module Observer = struct
@@ -242,6 +229,33 @@ module Legacy = struct
     |> register_get_certificate rw_store dac_plugin
 end
 
+module V1 = struct
+  let register_get_pages dac_plugin page_store =
+    add_service
+      Tezos_rpc.Directory.register1
+      RPC_services.V1.get_pages
+      (fun hash () () ->
+        RPC_handlers.Shared_by_V0_and_V1.handle_get_page
+          dac_plugin
+          page_store
+          hash)
+
+  module Coordinator = struct
+    let dynamic_rpc_dir dac_plugin page_store =
+      Tezos_rpc.Directory.empty |> register_get_pages dac_plugin page_store
+  end
+
+  module Committee_member = struct
+    let dynamic_rpc_dir dac_plugin page_store =
+      Tezos_rpc.Directory.empty |> register_get_pages dac_plugin page_store
+  end
+
+  module Observer = struct
+    let dynamic_rpc_dir dac_plugin page_store =
+      Tezos_rpc.Directory.empty |> register_get_pages dac_plugin page_store
+  end
+end
+
 let start ~rpc_address ~rpc_port node_ctxt =
   let open Lwt_syntax in
   let rw_store = Node_context.get_node_store node_ctxt Store_sigs.Read_write in
@@ -250,19 +264,25 @@ let start ~rpc_address ~rpc_port node_ctxt =
   let register_dynamic_rpc dac_plugin =
     match Node_context.get_mode node_ctxt with
     | Coordinator coordinator_node_ctxt ->
-        Coordinator.dynamic_rpc_dir
-          dac_plugin
-          rw_store
-          page_store
-          coordinator_node_ctxt
+        Tezos_rpc.Directory.merge
+          (Coordinator.dynamic_rpc_dir
+             dac_plugin
+             rw_store
+             page_store
+             coordinator_node_ctxt)
+          (V1.Coordinator.dynamic_rpc_dir dac_plugin page_store)
     | Committee_member _committee_member_node_ctxt ->
-        Committee_member.dynamic_rpc_dir dac_plugin page_store
+        Tezos_rpc.Directory.merge
+          (Committee_member.dynamic_rpc_dir dac_plugin page_store)
+          (V1.Committee_member.dynamic_rpc_dir dac_plugin page_store)
     | Observer {committee_cctxts; timeout; _} ->
-        Observer.dynamic_rpc_dir
-          dac_plugin
-          committee_cctxts
-          (Float.of_int timeout)
-          page_store
+        Tezos_rpc.Directory.merge
+          (Observer.dynamic_rpc_dir
+             dac_plugin
+             committee_cctxts
+             (Float.of_int timeout)
+             page_store)
+          (V1.Observer.dynamic_rpc_dir dac_plugin page_store)
     | Legacy legacy_node_ctxt ->
         Legacy.dynamic_rpc_dir
           dac_plugin
