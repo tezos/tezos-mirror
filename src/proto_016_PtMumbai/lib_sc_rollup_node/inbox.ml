@@ -117,8 +117,9 @@ let add_messages ~predecessor_timestamp ~predecessor inbox messages =
          messages_with_protocol_internal_messages )
 
 let process_messages (node_ctxt : _ Node_context.t)
-    ~(predecessor : Layer1.header) ~level messages =
+    ~(predecessor : Layer1.header) (head : Layer1.header) messages =
   let open Lwt_result_syntax in
+  let level = head.level in
   let* inbox =
     Node_context.inbox_of_head node_ctxt (Layer1.head_of_header predecessor)
   in
@@ -144,7 +145,8 @@ let process_messages (node_ctxt : _ Node_context.t)
     Node_context.save_messages
       node_ctxt
       witness_hash
-      {predecessor = predecessor.hash; predecessor_timestamp; messages}
+      ~block_hash:head.hash
+      messages
   in
   let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
   return
@@ -171,11 +173,7 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
             inbox,
             _witness_hash,
             _messages_with_protocol_internal_messages ) as res) =
-      process_messages
-        node_ctxt
-        ~predecessor
-        ~level:head.level
-        collected_messages
+      process_messages node_ctxt ~predecessor head collected_messages
     in
     let* () = same_inbox_as_layer_1 node_ctxt head.hash inbox in
     return res

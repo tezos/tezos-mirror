@@ -600,7 +600,7 @@ module Make (PVM : Pvm.S) = struct
           node_ctxt
           ~is_first_block
           ~predecessor
-          ~level:head.level
+          head
           messages
       in
       let* ctxt, _num_messages, num_ticks, initial_tick =

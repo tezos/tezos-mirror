@@ -89,7 +89,7 @@ module Internal_for_tests : sig
     Node_context.rw ->
     is_first_block:bool ->
     predecessor:Layer1.header ->
-    level:int32 ->
+    Layer1.header ->
     Sc_rollup.Inbox_message.t list ->
     (Sc_rollup.Inbox.Hash.t
     * Sc_rollup.Inbox.t

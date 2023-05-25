@@ -604,7 +604,7 @@ module Make (PVM : Pvm.S) = struct
         Inbox.Internal_for_tests.process_messages
           node_ctxt
           ~predecessor
-          ~level:head.level
+          head
           messages
       in
       let* ctxt, _num_messages, num_ticks, initial_tick =
