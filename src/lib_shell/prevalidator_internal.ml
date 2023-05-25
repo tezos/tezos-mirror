@@ -342,8 +342,7 @@ module Make_s
     | `None -> `None
 
   (* This function retrieves an old/replaced operation and reclassifies it as
-     [replacement_classification]. Note that we don't need to re-flush the
-     mempool, as this function is only called in precheck mode.
+     [replacement_classification].
 
      The operation is expected to be (a) parsable and (b) in the "validated"
      class. So, we softly handle the situations where the operation is
@@ -666,9 +665,8 @@ module Make_s
               match op_status with
               | Some (_h, (`Applied | `Validated)) ->
                   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2294
-                     In case of `Passed_precheck_with_replace, we may want to only do
-                     the injection/replacement if a flag `replace` is set to true
-                     in the injection query. *)
+                     We may want to only do the injection/replacement if a
+                     flag `replace` is set to true in the injection query. *)
                   let*! () =
                     pv.shell.parameters.tools.chain_tools.inject_operation
                       oph
