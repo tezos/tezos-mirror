@@ -63,6 +63,9 @@ type 'a t = {
       (** Fee parameters to use when injecting operations in layer 1. *)
   protocol_constants : Constants.t;
       (** Protocol constants retrieved from the Tezos node. *)
+  proto_level : int;
+      (** Protocol supported by this rollup node (represented as a protocol
+          level). *)
   loser_mode : Loser_mode.t;
       (** If different from [Loser_mode.no_failures], the rollup node
           issues wrong commitments (for tests). *)
@@ -119,15 +122,17 @@ val get_fee_parameter :
     protocol. *)
 val protocol_max_batch_size : int
 
-(** [init cctxt ~data_dir mode configuration] initializes the rollup
-    representation. The rollup origination level and kind are fetched via an RPC
-    call to the layer1 node that [cctxt] uses for RPC requests.
+(** [init cctxt ~data_dir mode l1_ctxt ~proto_level configuration] initializes
+    the rollup representation. The rollup origination level and kind are fetched
+    via an RPC call to the layer1 node that [cctxt] uses for RPC requests.
 *)
 val init :
   Protocol_client_context.full ->
   data_dir:string ->
   ?log_kernel_debug_file:string ->
   'a Store_sigs.mode ->
+  Layer1.t ->
+  proto_level:int ->
   Configuration.t ->
   'a t tzresult Lwt.t
 
