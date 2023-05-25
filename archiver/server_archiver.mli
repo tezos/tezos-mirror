@@ -22,10 +22,13 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-type ctx = {
-  cohttp_ctx : Cohttp_lwt_unix.Net.ctx;
-  auth : string * string;
-  endpoint : Uri.t;
-}
+
+(** For efficiency reason, the authentification part is extracted once
+    for all *)
+type endpoint = {auth : string * string; endpoint : Uri.t}
+
+type ctx = {cohttp_ctx : Cohttp_lwt_unix.Net.ctx; endpoints : endpoint list}
+
+val extract_auth : Uri.t -> endpoint
 
 include Archiver.S with type t = ctx

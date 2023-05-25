@@ -49,7 +49,7 @@ examples/config.json`
 
 Run an octez node, with a RPC server open on localhost:8732 and do
 ```
-archiver/main.exe feed <teztale-server-endpoint> -u <login> -p <password>
+archiver/main.exe feed <teztale-server-endpoint-including-login:password>
 ```
 
 `teztale-archiver` is an octez client, it thus accepts the same global

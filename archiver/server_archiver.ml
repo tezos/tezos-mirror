@@ -25,31 +25,37 @@
 
 open Lwt_result_syntax
 
-type ctx = {
-  cohttp_ctx : Cohttp_lwt_unix.Net.ctx;
-  auth : string * string;
-  endpoint : Uri.t;
-}
+type endpoint = {auth : string * string; endpoint : Uri.t}
+
+type ctx = {cohttp_ctx : Cohttp_lwt_unix.Net.ctx; endpoints : endpoint list}
 
 type t = ctx
 
 let name = "remote-archiver"
 
+let extract_auth uri =
+  let user = Option.value (Uri.user uri) ~default:"archiver" in
+  let pass = Option.value (Uri.password uri) ~default:"secret" in
+  {auth = (user, pass); endpoint = Uri.with_uri ~userinfo:None uri}
+
 let send_something ctx path body log_msg_prefix =
   let headers =
     Cohttp.Header.init_with "content-type" "application/json; charset=UTF-8"
   in
-  let headers = Cohttp.Header.add_authorization headers (`Basic ctx.auth) in
-  let uri = Uri.with_path ctx.endpoint (Uri.path ctx.endpoint ^ "/" ^ path) in
-  let*! resp, out =
-    Cohttp_lwt_unix.Client.post ~ctx:ctx.cohttp_ctx ~body ~headers uri
-  in
-  let*! out = Cohttp_lwt.Body.to_string out in
-  Lwt_io.printlf
-    "%s%s: %s"
-    log_msg_prefix
-    (Cohttp.Code.string_of_status resp.status)
-    out
+  Lwt_list.iter_p
+    (fun {auth; endpoint} ->
+      let headers = Cohttp.Header.add_authorization headers (`Basic auth) in
+      let uri = Uri.with_path endpoint (Uri.path endpoint ^ "/" ^ path) in
+      let*! resp, out =
+        Cohttp_lwt_unix.Client.post ~ctx:ctx.cohttp_ctx ~body ~headers uri
+      in
+      let*! out = Cohttp_lwt.Body.to_string out in
+      Lwt_io.printlf
+        "%s%s: %s"
+        log_msg_prefix
+        (Cohttp.Code.string_of_status resp.status)
+        out)
+    ctx.endpoints
 
 let send_rights ctx level rights =
   let body =

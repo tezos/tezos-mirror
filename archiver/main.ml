@@ -30,24 +30,6 @@ let group =
     Tezos_clic.title = "A delegate operation monitor";
   }
 
-let user_arg =
-  Tezos_clic.default_arg
-    ~doc:"Name of the feeder"
-    ~short:'u'
-    ~long:"user"
-    ~placeholder:"name"
-    ~default:"archiver"
-    (Tezos_clic.parameter (fun _ p -> return p))
-
-let password_arg =
-  Tezos_clic.default_arg
-    ~doc:"Authentification to the endpoint"
-    ~short:'p'
-    ~long:"password"
-    ~placeholder:"secret"
-    ~default:""
-    (Tezos_clic.parameter (fun _ p -> return p))
-
 let starting_block_arg =
   Tezos_clic.default_arg
     ~doc:"Starting block"
@@ -118,21 +100,7 @@ let select_commands _ctxt Client_config.{chain; _} =
       Tezos_clic.command
         ~group
         ~desc:"upload a file hierarchy to a teztale_server"
-        (Tezos_clic.args2
-           (Tezos_clic.default_arg
-              ~doc:"Name of the feeder"
-              ~short:'u'
-              ~long:"user"
-              ~placeholder:"name"
-              ~default:"archiver"
-              (Tezos_clic.parameter (fun _ p -> return p)))
-           (Tezos_clic.default_arg
-              ~doc:"Name of the feeder"
-              ~short:'p'
-              ~long:"password"
-              ~placeholder:"secret"
-              ~default:""
-              (Tezos_clic.parameter (fun _ p -> return p))))
+        Tezos_clic.no_options
         (Tezos_clic.prefixes ["convert"; "from"]
         @@ Tezos_clic.string ~name:"archive_path" ~desc:"folder where files are"
         @@ Tezos_clic.prefix "to"
@@ -141,15 +109,18 @@ let select_commands _ctxt Client_config.{chain; _} =
              ~desc:"Teztale server to feed"
              (Tezos_clic.parameter (fun _ p -> return (Uri.of_string p)))
         @@ Tezos_clic.stop)
-        (fun (source, pass) prefix endpoint _cctxt ->
+        (fun () prefix endpoint _cctxt ->
+          let Server_archiver.{auth = source, pass; endpoint} =
+            Server_archiver.extract_auth endpoint
+          in
           Converter.main source pass endpoint prefix);
       Tezos_clic.command
         ~group
         ~desc:"inject endorsing rights in a teztale_server"
-        (Tezos_clic.args3 user_arg password_arg starting_block_arg)
+        (Tezos_clic.args1 starting_block_arg)
         (Tezos_clic.prefixes ["insert"; "rights"; "in"]
         @@ endpoint_param @@ Tezos_clic.stop)
-        (fun (source, pass, starting) endpoint cctxt ->
+        (fun starting endpoint cctxt ->
           let*! ctx =
             match X509.Authenticator.of_string "none" with
             | Error _ -> Conduit_lwt_unix.init ()
@@ -160,9 +131,8 @@ let select_commands _ctxt Client_config.{chain; _} =
                 Conduit_lwt_unix.init ~tls_authenticator ()
           in
           let cohttp_ctx = Cohttp_lwt_unix.Net.init ~ctx () in
-          let state =
-            Server_archiver.{cohttp_ctx; auth = (source, pass); endpoint}
-          in
+          let endpoints = [Server_archiver.extract_auth endpoint] in
+          let state = Server_archiver.{cohttp_ctx; endpoints} in
           let dumper = Server_archiver.launch state "source-not-used" in
           let main =
             General_archiver.print_failures
@@ -173,10 +143,35 @@ let select_commands _ctxt Client_config.{chain; _} =
       Tezos_clic.command
         ~group
         ~desc:"inject past blocks in a teztale_server"
-        (Tezos_clic.args3 user_arg password_arg starting_block_arg)
+        (Tezos_clic.args1 starting_block_arg)
         (Tezos_clic.prefixes ["insert"; "blocks"; "in"]
         @@ endpoint_param @@ Tezos_clic.stop)
-        (fun (source, pass, starting) endpoint cctxt ->
+        (fun starting endpoint cctxt ->
+          let*! ctx =
+            match X509.Authenticator.of_string "none" with
+            | Error _ -> Conduit_lwt_unix.init ()
+            | Ok f ->
+                let tls_authenticator =
+                  f (fun () -> Some (Time.System.now ()))
+                in
+                Conduit_lwt_unix.init ~tls_authenticator ()
+          in
+          let cohttp_ctx = Cohttp_lwt_unix.Net.init ~ctx () in
+          let endpoints = [Server_archiver.extract_auth endpoint] in
+          let state = Server_archiver.{cohttp_ctx; endpoints} in
+          let dumper = Server_archiver.launch state "source-not-used" in
+          let main =
+            General_archiver.print_failures
+              (General_archiver.Server_loops.blocks chain starting cctxt)
+          in
+          let*! out = Lwt.join [dumper; main] in
+          return out);
+      Tezos_clic.command
+        ~group
+        ~desc:"run the archiver to a teztale_server"
+        Tezos_clic.no_options
+        (Tezos_clic.prefixes ["feed"] @@ Tezos_clic.seq_of_param endpoint_param)
+        (fun () endpoints cctxt ->
           let*! ctx =
             match X509.Authenticator.of_string "none" with
             | Error _ -> Conduit_lwt_unix.init ()
@@ -188,32 +183,12 @@ let select_commands _ctxt Client_config.{chain; _} =
           in
           let cohttp_ctx = Cohttp_lwt_unix.Net.init ~ctx () in
           let state =
-            Server_archiver.{cohttp_ctx; auth = (source, pass); endpoint}
+            Server_archiver.
+              {
+                cohttp_ctx;
+                endpoints = List.map Server_archiver.extract_auth endpoints;
+              }
           in
-          let dumper = Server_archiver.launch state "source-not-used" in
-          let main =
-            General_archiver.print_failures
-              (General_archiver.Server_loops.blocks chain starting cctxt)
-          in
-          let*! out = Lwt.join [dumper; main] in
-          return out);
-      Tezos_clic.command
-        ~group
-        ~desc:"run the archiver to a teztale_server"
-        (Tezos_clic.args2 user_arg password_arg)
-        (Tezos_clic.prefixes ["feed"] @@ endpoint_param @@ Tezos_clic.stop)
-        (fun auth endpoint cctxt ->
-          let*! ctx =
-            match X509.Authenticator.of_string "none" with
-            | Error _ -> Conduit_lwt_unix.init ()
-            | Ok f ->
-                let tls_authenticator =
-                  f (fun () -> Some (Time.System.now ()))
-                in
-                Conduit_lwt_unix.init ~tls_authenticator ()
-          in
-          let cohttp_ctx = Cohttp_lwt_unix.Net.init ~ctx () in
-          let state = Server_archiver.{cohttp_ctx; auth; endpoint} in
           main_server state cctxt);
     ]
 
