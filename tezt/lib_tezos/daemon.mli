@@ -78,6 +78,7 @@ module Make : functor (X : PARAMETERS) -> sig
      daemon which would be actually running. *)
   type session_status = {
     process : Process.t;
+    stdin : Lwt_io.output_channel;
     session_state : X.session_state;
     mutable event_loop_promise : unit Lwt.t option;
   }
