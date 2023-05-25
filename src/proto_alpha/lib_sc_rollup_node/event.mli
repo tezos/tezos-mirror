@@ -76,6 +76,12 @@ val kernel_debug_dont_wait : string -> unit
     protocol but the rollup node has no DAL node. *)
 val warn_dal_enabled_no_node : unit -> unit Lwt.t
 
+(** Emit event that the node is waiting for the first block of its protocol. *)
+val waiting_first_block : unit -> unit Lwt.t
+
+(** Emit event that the node received the first block of its protocol. *)
+val received_first_block : Block_hash.t -> unit Lwt.t
+
 (** [acquiring_lock ()] emits an event to indicate that the node is attempting
     to acquire a lock on the data directory. *)
 val acquiring_lock : unit -> unit Lwt.t

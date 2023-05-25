@@ -125,6 +125,30 @@ module Simple = struct
          for the rollup node."
       ()
 
+  let waiting_first_block =
+    declare_0
+      ~section
+      ~name:"waiting_first_block"
+      ~level:Notice
+      ~msg:
+        (Format.asprintf
+           "Waiting for first block of protocol %a to appear."
+           Protocol_hash.pp
+           Protocol.hash)
+      ()
+
+  let received_first_block =
+    declare_1
+      ~section
+      ~name:"received_first_block"
+      ~level:Notice
+      ~msg:
+        (Format.asprintf
+           "First block of protocol %a received: {block}."
+           Protocol_hash.pp
+           Protocol.hash)
+      ("block", Block_hash.encoding)
+
   let acquiring_lock =
     declare_0
       ~section
@@ -165,5 +189,9 @@ let kernel_debug_dont_wait msg =
   Simple.(emit__dont_wait__use_with_care kernel_debug) msg
 
 let warn_dal_enabled_no_node () = Simple.(emit warn_dal_enabled_no_node) ()
+
+let waiting_first_block () = Simple.(emit waiting_first_block) ()
+
+let received_first_block b = Simple.(emit received_first_block) b
 
 let acquiring_lock () = Simple.(emit acquiring_lock) ()

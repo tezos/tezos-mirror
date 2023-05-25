@@ -640,12 +640,23 @@ let run ~data_dir ?log_kernel_debug_file (configuration : Configuration.t)
         ())
       configuration.sc_rollup_node_operators
   in
+  let*! () = Event.waiting_first_block () in
+  let*! l1_ctxt =
+    Layer1.start
+      ~name:"sc_rollup_node"
+      ~reconnection_delay:configuration.reconnection_delay
+      ~protocols:[Protocol.hash]
+      cctxt
+  in
+  let*! head, _ = Layer1.wait_first l1_ctxt in
+  let*! () = Event.received_first_block head in
   let* node_ctxt =
     Node_context.init
       cctxt
       ~data_dir
       ?log_kernel_debug_file
       Read_write
+      l1_ctxt
       configuration
   in
   run node_ctxt configuration

@@ -122,7 +122,7 @@ val get_fee_parameter :
     protocol. *)
 val protocol_max_batch_size : int
 
-(** [init cctxt ~data_dir mode configuration] initializes the rollup
+(** [init cctxt ~data_dir mode l1_ctxt configuration] initializes the rollup
     representation. The rollup origination level and kind are fetched via an RPC
     call to the layer1 node that [cctxt] uses for RPC requests.
 *)
@@ -131,6 +131,7 @@ val init :
   data_dir:string ->
   ?log_kernel_debug_file:string ->
   'a Store_sigs.mode ->
+  Layer1.t ->
   Configuration.t ->
   'a t tzresult Lwt.t
 
