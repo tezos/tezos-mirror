@@ -50,6 +50,7 @@ type 'a t = {
   pvm : (module Pvm.S);
   fee_parameters : Configuration.fee_parameters;
   protocol_constants : Constants.t;
+  proto_level : int;
   loser_mode : Loser_mode.t;
   lockfile : Lwt_unix.file_descr;
   store : 'a store;
@@ -268,7 +269,7 @@ let check_config config =
   ()
 
 let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
-    mode l1_ctxt
+    mode l1_ctxt ~proto_level
     Configuration.(
       {
         sc_rollup_address = rollup_address;
@@ -365,6 +366,7 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
       block_finality_time = 2;
       fee_parameters;
       protocol_constants;
+      proto_level;
       loser_mode;
       lockfile;
       store;
@@ -987,6 +989,7 @@ module Internal_for_tests = struct
         block_finality_time = 2;
         fee_parameters = Configuration.default_fee_parameters;
         protocol_constants;
+        proto_level = 0;
         loser_mode = Loser_mode.no_failures;
         lockfile;
         store;

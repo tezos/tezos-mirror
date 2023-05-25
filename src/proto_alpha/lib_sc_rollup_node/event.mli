@@ -82,6 +82,9 @@ val waiting_first_block : unit -> unit Lwt.t
 (** Emit event that the node received the first block of its protocol. *)
 val received_first_block : Block_hash.t -> unit Lwt.t
 
+(** Emit event that the node will shutdown because of protocol migration. *)
+val detected_protocol_migration : unit -> unit Lwt.t
+
 (** [acquiring_lock ()] emits an event to indicate that the node is attempting
     to acquire a lock on the data directory. *)
 val acquiring_lock : unit -> unit Lwt.t

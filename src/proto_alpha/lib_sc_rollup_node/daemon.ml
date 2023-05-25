@@ -290,6 +290,44 @@ let previous_context (node_ctxt : _ Node_context.t)
     return (Context.empty node_ctxt.context)
   else Node_context.checkout_context node_ctxt predecessor.Layer1.hash
 
+let classify_head (node_ctxt : _ Node_context.t)
+    ?(predecessor : Layer1.header option) (head : Layer1.header) =
+  let open Lwt_result_syntax in
+  if head.header.proto_level = node_ctxt.proto_level then
+    (* Same protocol as supported one, ok *)
+    return `Supported_proto
+  else if head.header.proto_level = node_ctxt.proto_level + 1 then
+    let* predecessor =
+      match predecessor with
+      | Some p -> return p
+      | None -> Node_context.get_predecessor_header node_ctxt head
+    in
+    if predecessor.header.proto_level = node_ctxt.proto_level then
+      (* Migration block from supported protocol to the next one, ok *)
+      return `Supported_migration
+    else return `Unsupported_proto
+  else return `Unsupported_proto
+
+let exit_on_other_proto node_ctxt ?predecessor head =
+  let open Lwt_result_syntax in
+  let* proto_class = classify_head node_ctxt ?predecessor head in
+  match proto_class with
+  | `Supported_proto | `Supported_migration -> return_unit
+  | `Unsupported_proto ->
+      let*! () = Event.detected_protocol_migration () in
+      let*! _ = Lwt_exit.exit_and_wait 0 in
+      return_unit
+
+let exit_after_proto_migration node_ctxt ?predecessor head =
+  let open Lwt_result_syntax in
+  let* proto_class = classify_head node_ctxt ?predecessor head in
+  match proto_class with
+  | `Supported_proto -> return_unit
+  | `Supported_migration | `Unsupported_proto ->
+      let*! () = Event.detected_protocol_migration () in
+      let*! _ = Lwt_exit.exit_and_wait 0 in
+      return_unit
+
 let rec process_head (node_ctxt : _ Node_context.t) (head : Layer1.header) =
   let open Lwt_result_syntax in
   let* already_processed = Node_context.is_processed node_ctxt head.hash in
@@ -302,6 +340,7 @@ let rec process_head (node_ctxt : _ Node_context.t) (head : Layer1.header) =
          exist in the chain. *)
       return_unit
   | Some predecessor ->
+      let* () = exit_on_other_proto node_ctxt ~predecessor head in
       let* () = process_head node_ctxt predecessor in
       let* ctxt = previous_context node_ctxt ~predecessor in
       let* () =
@@ -433,6 +472,7 @@ let on_layer_1_head node_ctxt (head : Layer1.header) =
   let* () = Batcher.batch () in
   let* () = Batcher.new_head stripped_head in
   let*! () = Injector.inject ~header:head.header () in
+  let* () = exit_after_proto_migration node_ctxt head in
   return_unit
 
 let daemonize (node_ctxt : _ Node_context.t) =
@@ -449,6 +489,7 @@ let degraded_refutation_mode (node_ctxt : _ Node_context.t) =
   Layer1.iter_heads node_ctxt.l1_ctxt @@ fun head ->
   let* () = Refutation_coordinator.process (Layer1.head_of_header head) in
   let*! () = Injector.inject () in
+  let* () = exit_on_other_proto node_ctxt head in
   return_unit
 
 let install_finalizer node_ctxt rpc_server =
@@ -648,7 +689,8 @@ let run ~data_dir ?log_kernel_debug_file (configuration : Configuration.t)
       ~protocols:[Protocol.hash]
       cctxt
   in
-  let*! head, _ = Layer1.wait_first l1_ctxt in
+  let*! head, {shell = {predecessor; _}; _} = Layer1.wait_first l1_ctxt in
+  let* predecessor = Layer1.fetch_tezos_shell_header cctxt predecessor in
   let*! () = Event.received_first_block head in
   let* node_ctxt =
     Node_context.init
@@ -657,6 +699,7 @@ let run ~data_dir ?log_kernel_debug_file (configuration : Configuration.t)
       ?log_kernel_debug_file
       Read_write
       l1_ctxt
+      ~proto_level:predecessor.proto_level
       configuration
   in
   run node_ctxt configuration

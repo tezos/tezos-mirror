@@ -149,6 +149,14 @@ module Simple = struct
            Protocol.hash)
       ("block", Block_hash.encoding)
 
+  let detected_protocol_migration =
+    declare_0
+      ~section
+      ~name:"detected_protocol_migration"
+      ~level:Notice
+      ~msg:"Detected protocol migration, the rollup node will now stop."
+      ()
+
   let acquiring_lock =
     declare_0
       ~section
@@ -193,5 +201,8 @@ let warn_dal_enabled_no_node () = Simple.(emit warn_dal_enabled_no_node) ()
 let waiting_first_block () = Simple.(emit waiting_first_block) ()
 
 let received_first_block b = Simple.(emit received_first_block) b
+
+let detected_protocol_migration () =
+  Simple.(emit detected_protocol_migration) ()
 
 let acquiring_lock () = Simple.(emit acquiring_lock) ()
