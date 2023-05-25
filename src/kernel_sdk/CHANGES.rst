@@ -57,6 +57,7 @@ SDK
 - Add a feature flag ``proto-nairobi`` to enable host functions introduced in the ``Nairobi``
   protocol.
 - Implement host function ``store_delete_value`` introduced in the ``Nairobi`` protocol.
+- Introduce ``PublicKey`` definition in ``tezos-smart-rollup-encoding``
 
 Installer client
 ----------------
