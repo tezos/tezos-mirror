@@ -25,11 +25,13 @@
 
 open Store_version
 
+type version_result = Version_known | Unintialized_version
+
 let messages_store_location ~storage_dir =
   let open Filename.Infix in
   storage_dir // "messages"
 
-let version_of_unversionned_store ~storage_dir =
+let version_of_unversioned_store ~storage_dir =
   let open Lwt_syntax in
   let path = messages_store_location ~storage_dir in
   let* messages_store_v0 = Store_v0.Messages.load ~path ~cache_size:1 Read_only
@@ -59,14 +61,18 @@ let version_of_unversionned_store ~storage_dir =
         return_none
     | Error _, Error _ ->
         failwith
-          "Cannot determine unversionned store version (no messages decodable)"
+          "Cannot determine unversioned store version (no messages decodable)"
   in
   Lwt.finalize guess_version cleanup
 
 let version_of_store ~storage_dir =
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5554
-     Use store version information when available. *)
-  version_of_unversionned_store ~storage_dir
+  let open Lwt_result_syntax in
+  let* version = Store_version.read_version_file ~dir:storage_dir in
+  match version with
+  | Some v -> return_some (v, Version_known)
+  | None ->
+      let+ v = version_of_unversioned_store ~storage_dir in
+      Option.map (fun v -> (v, Unintialized_version)) v
 
 module type MIGRATION_ACTIONS = sig
   type from_store
@@ -143,7 +149,7 @@ module Make
         Actions.final_actions ~storage_dir ~tmp_dir source_store dest_store
       in
       let*! () = Lwt_utils_unix.remove_dir tmp_dir in
-      return_unit
+      Store_version.write_version_file ~dir:storage_dir S_dest.version
     in
     Lwt.finalize run_migration cleanup
 
@@ -182,12 +188,16 @@ let maybe_run_migration ~storage_dir =
   let last_version = Store.version in
   match (current_version, last_version) with
   | None, _ ->
-      (* Store not initialized, nothing to do *)
-      return_unit
-  | Some current, last when last = current ->
-      (* Up to date, nothing to do *)
-      return_unit
-  | Some current, last -> (
+      (* Store not initialized, write last version *)
+      Store_version.write_version_file ~dir:storage_dir last_version
+  | Some (current, versioned), last when last = current -> (
+      match versioned with
+      | Unintialized_version ->
+          Store_version.write_version_file ~dir:storage_dir last_version
+      | Version_known ->
+          (* Up to date, nothing to do *)
+          return_unit)
+  | Some (current, _), last -> (
       let migrations = migration_path ~from:current ~dest:last in
       match migrations with
       | None ->

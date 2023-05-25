@@ -27,3 +27,9 @@ type t = V0 | V1
 
 (** Pretty-printer for store versions *)
 val pp : Format.formatter -> t -> unit
+
+(** Read the version file from [dir]. *)
+val read_version_file : dir:string -> t option tzresult Lwt.t
+
+(** Write a version to the version file in [dir]. *)
+val write_version_file : dir:string -> t -> unit tzresult Lwt.t
