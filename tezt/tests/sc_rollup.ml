@@ -1068,6 +1068,10 @@ let bake_until_lpc_updated ?hook ?(at_least = 0) ?(timeout = 15.) client
   let* _ = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:3. in
   return updated_level
 
+let check_batcher_message_status response status =
+  Check.((JSON.(response |-> "status" |> as_string) = status) string)
+    ~error_msg:"Status of message is %L but expected %R."
+
 (* Rollup node batcher *)
 let sc_rollup_node_batcher sc_rollup_node sc_rollup_client sc_rollup node client
     =
@@ -1081,11 +1085,8 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup_client sc_rollup node client
   let*! retrieved_msg1, status_msg1 =
     Sc_rollup_client.get_batcher_msg sc_rollup_client msg1_hash
   in
-  let check_status response status =
-    Check.((JSON.(response |-> "status" |> as_string) = status) string)
-      ~error_msg:"Status of message  is %L but expected %R."
-  in
-  check_status status_msg1 "pending_batch" ;
+
+  check_batcher_message_status status_msg1 "pending_batch" ;
   Check.((retrieved_msg1 = msg1) string)
     ~error_msg:"Message in queue is %L but injected %R." ;
   let*! queue = Sc_rollup_client.batcher_queue sc_rollup_client in
@@ -1100,13 +1101,13 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup_client sc_rollup node client
   let*! _msg1, status_msg1 =
     Sc_rollup_client.get_batcher_msg sc_rollup_client msg1_hash
   in
-  check_status status_msg1 "injected" ;
+  check_batcher_message_status status_msg1 "injected" ;
   (* We bake so that msg1 is included. *)
   let* () = Client.bake_for_and_wait client in
   let*! _msg1, status_msg1 =
     Sc_rollup_client.get_batcher_msg sc_rollup_client msg1_hash
   in
-  check_status status_msg1 "included" ;
+  check_batcher_message_status status_msg1 "included" ;
   let* _ =
     Sc_rollup_node.wait_for_level
       ~timeout:3.
@@ -1184,7 +1185,7 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup_client sc_rollup node client
   let*! _msg1, status_msg1 =
     Sc_rollup_client.get_batcher_msg sc_rollup_client msg1_hash
   in
-  check_status status_msg1 "committed" ;
+  check_batcher_message_status status_msg1 "committed" ;
   unit
 
 (* One can retrieve the list of originated SCORUs.
@@ -5237,6 +5238,48 @@ let test_bootstrap_smart_rollup_originated =
       ~error_msg:"Expected %R bootstrapped smart rollups, got %L") ;
   unit
 
+let test_inject_identital_messages ~kind =
+  test_full_scenario
+    ~kind
+    {
+      tags = ["injector"; "inject"; "identical"];
+      variant = None;
+      description = "The injector can inject identical messages";
+    }
+  @@ fun _protocol sc_rollup_node sc_rollup_client sc_rollup _node client ->
+  let* () =
+    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
+  in
+  let check_status response status =
+    Check.((JSON.(response |-> "status" |> as_string) = status) string)
+      ~error_msg:"Status of message is %L but expected %R."
+  in
+  (* Produce artificially what two large [Sc_rollup_add_messages] would look like.
+     As the batches are the same, if we don't allow identical operations
+     in the injector, only the first hashes will be included, as the two
+     manager operations are the same.
+  *)
+  let s = String.make 4090 'a' in
+  let msgs = List.init 7 (fun _ -> s) in
+  let*! hashes1 = Sc_rollup_client.inject sc_rollup_client msgs in
+  let*! hashes2 = Sc_rollup_client.inject sc_rollup_client msgs in
+  let hash1 = Stdlib.List.hd hashes1 in
+  let hash2 = Stdlib.List.hd hashes2 in
+  let injected =
+    wait_for_injecting_event ~tags:["add_messages"] sc_rollup_node
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* _ = injected in
+  let*! _msg1, status_msg1 =
+    Sc_rollup_client.get_batcher_msg sc_rollup_client hash1
+  in
+  check_status status_msg1 "injected" ;
+  let*! _msg1, status_msg2 =
+    Sc_rollup_client.get_batcher_msg sc_rollup_client hash2
+  in
+  check_status status_msg2 "injected" ;
+  unit
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -5376,6 +5419,7 @@ let register ~protocols =
   test_valid_dispute_dissection ~kind:"arith" protocols ;
   test_refutation_reward_and_punishment protocols ~kind:"arith" ;
   test_timeout ~kind:"arith" protocols ;
+  test_inject_identital_messages ~kind:"arith" protocols ;
   test_no_cementation_if_parent_not_lcc_or_if_disputed_commit
     ~kind:"arith"
     protocols ;
