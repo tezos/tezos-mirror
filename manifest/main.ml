@@ -892,12 +892,12 @@ let octez_bls12_381_signature =
 
 (* TODO: dep_globs aren't added to the rules for JS tests *)
 let _octez_bls12_381_signature_tests =
-  tests
-    ["test_aggregated_signature"; "test_signature"]
+  tezt
+    ["test_aggregated_signature"; "test_signature"; "utils"]
     ~path:"src/lib_bls12_381_signature/test"
     ~opam:"octez-bls12-381-signature"
     ~modes:[Native; JS]
-    ~deps:[bls12_381; octez_bls12_381_signature; alcotest; integers_stubs_js]
+    ~deps:[bls12_381; octez_bls12_381_signature; alcotezt; integers_stubs_js]
     ~dep_globs_rec:["test_vectors/*"]
     ~js_compatible:true
 
