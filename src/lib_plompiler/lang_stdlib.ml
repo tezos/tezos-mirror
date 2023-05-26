@@ -607,7 +607,7 @@ module Lib (C : COMMON) = struct
       Stdint.Uint32.to_bytes_big_endian u32 b 0 ;
       constant ~le b
 
-    let add ?(ignore_carry = false) a b =
+    let add ?(ignore_carry = true) a b =
       let ha, ta = (List.hd (of_list a), List.tl (of_list a)) in
       let hb, tb = (List.hd (of_list b), List.tl (of_list b)) in
       let* a_xor_b = Bool.xor ha hb in
