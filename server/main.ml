@@ -231,8 +231,8 @@ let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) level
         Db.exec
           Sql_requests.maybe_insert_operation
           Teztale_lib.Consensus_ops.
-            ( (level, op.op.hash, op.op.kind = Endorsement),
-              (op.delegate, op.op.round, level) ))
+            ( (level, op.op.hash, op.op.kind = Endorsement, op.op.round),
+              (op.delegate, op.op.kind = Endorsement, op.op.round, level) ))
       operations
   in
   Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
@@ -240,7 +240,7 @@ let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) level
       Db.exec
         Sql_requests.insert_included_operation
         ( Teztale_lib.Consensus_ops.
-            (op.delegate, op.op.kind = Endorsement, op.op.round),
+            (op.delegate, op.op.kind = Endorsement, op.op.round, op.op.round),
           (block_hash, level) ))
     operations
 
@@ -263,7 +263,7 @@ let endorsing_rights_callback db_pool g rights =
               (fun Teztale_lib.Consensus_ops.{address; first_slot; power} ->
                 Db.exec
                   Sql_requests.maybe_insert_endorsing_right
-                  (level, address, first_slot, power))
+                  (level, first_slot, power, address))
               rights))
       db_pool
   in
@@ -289,7 +289,7 @@ let block_callback db_pool g source
             let* () =
               Db.exec
                 Sql_requests.maybe_insert_block
-                ((level, timestamp, hash, predecessor), (delegate, round))
+                ((level, timestamp, hash, round), (predecessor, delegate))
             in
 
             let* () =
@@ -340,8 +340,14 @@ let operations_callback db_pool g source operations =
                       Db.exec
                         Sql_requests.maybe_insert_operation
                         Teztale_lib.Consensus_ops.
-                          ( (level, op.op.hash, op.op.kind = Endorsement),
-                            (delegate, op.op.round, level) ))
+                          ( ( level,
+                              op.op.hash,
+                              op.op.kind = Endorsement,
+                              op.op.round ),
+                            ( delegate,
+                              op.op.kind = Endorsement,
+                              op.op.round,
+                              level ) ))
                     ops)
                 operations
             in
@@ -356,7 +362,7 @@ let operations_callback db_pool g source operations =
                             op.errors,
                             delegate,
                             op.op.kind = Endorsement ),
-                          (op.op.round, source, level) ))
+                          (op.op.round, op.op.round, source, level) ))
                   ops)
               operations))
       db_pool
