@@ -29,7 +29,7 @@ module Parameters = struct
     mutable pending_ready : unit option Lwt.u list;
     rpc_addr : string;
     rpc_port : int;
-    rollup_node : Sc_rollup_node.t;
+    rollup_node : Sc_rollup_node.t option;
     runner : Runner.t option;
   }
 
@@ -95,7 +95,11 @@ let wait_for_ready proxy_server =
       check_event proxy_server event_ready_name promise
 
 let create ?runner ?rpc_addr ?rpc_port rollup_node =
-  let rollup_node_endpoint = Sc_rollup_node.endpoint rollup_node in
+  let rollup_node_endpoint =
+    match rollup_node with
+    | None -> "mockup"
+    | Some rollup_node -> Sc_rollup_node.endpoint rollup_node
+  in
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port rollup_node_endpoint
   in
@@ -106,6 +110,12 @@ let create ?runner ?rpc_addr ?rpc_port rollup_node =
   in
   on_event proxy_server (handle_event proxy_server) ;
   proxy_server
+
+let mockup ?runner ?rpc_addr ?rpc_port () =
+  create ?runner ?rpc_addr ?rpc_port None
+
+let create ?runner ?rpc_addr ?rpc_port rollup_node =
+  create ?runner ?rpc_addr ?rpc_port (Some rollup_node)
 
 let run proxy_server =
   let* () =
@@ -172,3 +182,31 @@ let fetch_contract_code evm_proxy_server contract_address =
       }
   in
   return JSON.(code |-> "result" |> as_string)
+
+type txpool_slot = {address : string; transactions : (int64 * JSON.t) list}
+
+let txpool_content evm_proxy_server =
+  let* txpool =
+    call_evm_rpc
+      evm_proxy_server
+      {method_ = "txpool_content"; parameters = `A []}
+  in
+  Log.info "Result: %s" (JSON.encode txpool) ;
+  let txpool = JSON.(txpool |-> "result") in
+  let parse field =
+    let open JSON in
+    let pool = txpool |-> field in
+    (* `|->` returns `Null if the field does not exists, and `Null is
+       interpreted as the empty list by `as_object`. As such, we must ensure the
+       field exists. *)
+    if is_null pool then Test.fail "%s must exists" field
+    else
+      pool |> as_object
+      |> List.map (fun (address, transactions) ->
+             let transactions =
+               transactions |> as_object
+               |> List.map (fun (nonce, tx) -> (Int64.of_string nonce, tx))
+             in
+             {address; transactions})
+  in
+  return (parse "pending", parse "queued")

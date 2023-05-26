@@ -583,13 +583,13 @@ module RPC = struct
         in
         return_some
           {
-            blockHash = block_hash;
-            blockNumber = block_number;
+            blockHash = Some block_hash;
+            blockNumber = Some block_number;
             from;
             gas = gas_used;
             gasPrice = gas_price;
             hash;
-            input;
+            input = Option.value ~default:(Hash "") input;
             nonce;
             to_;
             transactionIndex = index;
@@ -598,6 +598,9 @@ module RPC = struct
             r;
             s;
           }
+
+  let txpool _ () =
+    Lwt.return_ok {pending = AddressMap.empty; queued = AddressMap.empty}
 end
 
 module type S = sig
@@ -626,6 +629,8 @@ module type S = sig
   val transaction_object :
     Ethereum_types.hash ->
     Ethereum_types.transaction_object option tzresult Lwt.t
+
+  val txpool : unit -> Ethereum_types.txpool tzresult Lwt.t
 end
 
 module Make (Base : sig
@@ -650,4 +655,6 @@ end) : S = struct
   let transaction_receipt = RPC.transaction_receipt Base.base
 
   let transaction_object = RPC.transaction_object Base.base
+
+  let txpool = RPC.txpool Base.base
 end

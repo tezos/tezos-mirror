@@ -41,8 +41,10 @@ type address = Address of string [@@ocaml.unboxed]
 
 let address_of_string s = Address (String.lowercase_ascii (strip_0x s))
 
+let address_to_string (Address a) = append_0x a
+
 let address_encoding =
-  Data_encoding.(conv (fun (Address a) -> append_0x a) address_of_string string)
+  Data_encoding.(conv address_to_string address_of_string string)
 
 (** Ethereum generic quantity, always encoded in hexadecimal. *)
 type quantity = Qty of Z.t [@@ocaml.unboxed]
@@ -135,6 +137,8 @@ let hash_to_string (Hash h) = append_0x h
 let hash_to_bytes (Hash h) = Hex.to_bytes_exn (`Hex h) |> Bytes.to_string
 
 let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
+
+let empty_hash = Hash "0x"
 
 (** Ethereum block hash representation from RPCs. *)
 type block = {
@@ -424,13 +428,13 @@ let transaction_receipt_encoding =
           (req "contractAddress" (option address_encoding))))
 
 type transaction_object = {
-  blockHash : block_hash;
-  blockNumber : quantity;
+  blockHash : block_hash option;
+  blockNumber : quantity option;
   from : address;
   gas : quantity;
   gasPrice : quantity;
   hash : hash;
-  input : hash option;
+  input : hash;
   nonce : quantity;
   to_ : address option;
   transactionIndex : quantity;
@@ -500,13 +504,13 @@ let transaction_object_encoding =
       })
     (merge_objs
        (obj10
-          (req "blockHash" block_hash_encoding)
-          (req "blockNumber" quantity_encoding)
+          (req "blockHash" (option block_hash_encoding))
+          (req "blockNumber" (option quantity_encoding))
           (req "from" address_encoding)
           (req "gas" quantity_encoding)
           (req "gasPrice" quantity_encoding)
           (req "hash" hash_encoding)
-          (req "input" (option hash_encoding))
+          (req "input" hash_encoding)
           (req "nonce" quantity_encoding)
           (req "to" (option address_encoding))
           (req "transactionIndex" quantity_encoding))
@@ -565,3 +569,102 @@ let call_encoding =
        (opt "gasPrice" quantity_encoding)
        (opt "value" quantity_encoding)
        (req "data" (option hash_encoding)))
+
+(** The txpool encoding can be found in
+    https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-txpool#txpool-content.
+
+    Basically, `txpool_content` is a map associating addresses to counters and
+    transactions. In JSON, it is encoded as an object associating addresses as
+    fields to objects that contain counters as field and transaction objects as
+    values. I.e., the `txpool_` encodes it as:
+
+    ```
+    { "address1" :
+      { "counter1" : <transaction object of counter 1>,
+        "counter2" : <transaction object of counter 2>,
+        ...
+      },
+      "address2" :
+      { "counter1" : <transaction object of counter 1>,
+        "counter2" : <transaction object of counter 2>,
+        ...
+      },
+      ...
+    }
+    ```
+
+    As such, the encoding uses Ezjsonm representation directly to encode and
+    decode the txpool.
+*)
+module MapMake (Key : sig
+  include Stdlib.Map.OrderedType
+
+  val to_string : t -> string
+
+  val of_string : string -> t
+end) : sig
+  include Map.S with type key = Key.t
+
+  val associative_array_encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
+end = struct
+  module Instance = Map.Make (Key)
+
+  let associative_array_encoding value_encoding =
+    let open Data_encoding in
+    conv
+      (fun map ->
+        let bindings = Instance.bindings map in
+        let fields =
+          List.map
+            (fun (name, value) ->
+              (Key.to_string name, Json.construct value_encoding value))
+            bindings
+        in
+        `O fields)
+      (function
+        | `O fields ->
+            let bindings =
+              List.filter_map
+                (fun (name, value) ->
+                  try
+                    Some (Key.of_string name, Json.destruct value_encoding value)
+                  with _ -> None)
+                fields
+              |> List.to_seq
+            in
+            Instance.of_seq bindings
+        | _ -> Instance.empty)
+      Json.encoding
+
+  include Instance
+end
+
+module NonceMap = MapMake (Z)
+
+module Address = struct
+  type t = address
+
+  let compare (Address h) (Address h') = String.compare h h'
+
+  let to_string = address_to_string
+
+  let of_string = address_of_string
+end
+
+module AddressMap = MapMake (Address)
+
+type txpool = {
+  pending : transaction_object NonceMap.t AddressMap.t;
+  queued : transaction_object NonceMap.t AddressMap.t;
+}
+
+let txpool_encoding =
+  let open Data_encoding in
+  let field_encoding =
+    AddressMap.associative_array_encoding
+      (NonceMap.associative_array_encoding transaction_object_encoding)
+  in
+  conv
+    (fun {pending; queued} -> (pending, queued))
+    (fun (pending, queued) -> {pending; queued})
+    (obj2 (req "pending" field_encoding) (req "queued" field_encoding))

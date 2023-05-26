@@ -95,14 +95,20 @@ let block () =
     uncles = [];
   }
 
+let bootstrap_address =
+  address_of_string "0x6F4d14B90C48bEFb49CA3fe6663dEC70731A8bC7"
+
+let bootstrap_address2 =
+  address_of_string "0xA5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E"
+
 let transaction_receipt () =
   {
     transactionHash = transaction_hash;
     transactionIndex = qty_f Z.zero;
     blockHash = block_hash;
     blockNumber = qty_f @@ Z.of_int !block_height_counter;
-    from = address_of_string "0x6F4d14B90C48bEFb49CA3fe6663dEC70731A8bC7";
-    to_ = Some (address_of_string "0xA5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E");
+    from = bootstrap_address;
+    to_ = Some bootstrap_address2;
     contractAddress =
       Some (address_of_string "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c");
     cumulativeGasUsed = gas_price;
@@ -116,13 +122,13 @@ let transaction_receipt () =
 
 let transaction_object =
   {
-    blockHash = block_hash;
-    blockNumber = qty_f @@ Z.of_int 42;
+    blockHash = Some block_hash;
+    blockNumber = Some (qty_f @@ Z.of_int 42);
     from = address_of_string "0x6F4d14B90C48bEFb49CA3fe6663dEC70731A8bC7";
     gas = qty_f Z.zero;
     gasPrice = qty_f Z.zero;
     hash = transaction_hash;
-    input = None;
+    input = empty_hash;
     nonce = qty_f Z.zero;
     to_ = Some (address_of_string "0xA5A5bf58c7Dc91cBE5005A7E5c6314998Eda479E");
     transactionIndex = qty_f Z.zero;
@@ -132,7 +138,7 @@ let transaction_object =
     s = hash_f @@ "00";
   }
 
-let call = hash_f "0x"
+let call = empty_hash
 
 let return = Lwt_result_syntax.return
 
@@ -156,3 +162,56 @@ let nth_block ~full_transaction_object:_ _n = return (block ())
 let transaction_receipt _tx_hash = return (transaction_receipt ())
 
 let transaction_object _tx_hash = return (Some transaction_object)
+
+let tx_pending =
+  {
+    blockHash = None;
+    blockNumber = None;
+    from = bootstrap_address;
+    gas = qty_f Z.zero;
+    gasPrice = qty_f Z.zero;
+    hash =
+      Hash "af953a2d01f55cfe080c0c94150a60105e8ac3d51153058a1f03dd239dd08586";
+    input = empty_hash;
+    nonce = qty_f Z.zero;
+    to_ = Some bootstrap_address2;
+    transactionIndex = qty_f Z.zero;
+    value = qty_f Z.zero;
+    v = qty_f Z.zero;
+    r = hash_f @@ "00";
+    s = hash_f @@ "00";
+  }
+
+let tx_queued =
+  {
+    blockHash = None;
+    blockNumber = None;
+    from = bootstrap_address2;
+    gas = qty_f Z.zero;
+    gasPrice = qty_f Z.zero;
+    hash =
+      Hash "af953a2d01f55cfe080c0c94150a60105e8ac3d51153058a1f03dd239dd08588";
+    input = empty_hash;
+    nonce = qty_f Z.zero;
+    to_ = Some bootstrap_address;
+    transactionIndex = qty_f Z.zero;
+    value = qty_f Z.zero;
+    v = qty_f Z.zero;
+    r = hash_f @@ "00";
+    s = hash_f @@ "00";
+  }
+
+let txpool _ =
+  return
+    {
+      pending =
+        AddressMap.add
+          bootstrap_address
+          (NonceMap.add Z.zero tx_pending NonceMap.empty)
+          AddressMap.empty;
+      queued =
+        AddressMap.add
+          bootstrap_address2
+          (NonceMap.add Z.zero tx_queued NonceMap.empty)
+          AddressMap.empty;
+    }

@@ -160,6 +160,11 @@ let setup_past_genesis ?originator_key ?rollup_operator_key protocol =
   let* _level = next_evm_level ~sc_rollup_node ~node ~client in
   return full_setup
 
+let setup_mockup () =
+  let evm_proxy_server = Evm_proxy_server.mockup () in
+  let* () = Evm_proxy_server.run evm_proxy_server in
+  return evm_proxy_server
+
 let test_evm_proxy_server_connection =
   Protocol.register_test
     ~__FILE__
@@ -519,6 +524,20 @@ let test_chunked_transaction =
     ~title:"Check L2 chunked transfers are applied"
   @@ transfer ~data:("0x" ^ String.make 12_000 'a')
 
+let test_rpc_txpool_content =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "txpool_content"]
+    ~title:"Check RPC txpool_content is available"
+  @@ fun _protocol ->
+  let* evm_proxy_server = setup_mockup () in
+  (* The content of the txpool is not relevant for now, this test only checks
+     the the RPC is correct, i.e. an object containing both the `pending` and
+     `queued` fields, containing the correct objects: addresses pointing to a
+     mapping of nonces to transactions. *)
+  let* _result = Evm_proxy_server.txpool_content evm_proxy_server in
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -530,6 +549,7 @@ let register_evm_proxy_server ~protocols =
   test_l2_blocks_progression protocols ;
   test_l2_transfer protocols ;
   test_chunked_transaction protocols ;
-  test_l2_deploy protocols
+  test_l2_deploy protocols ;
+  test_rpc_txpool_content protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
