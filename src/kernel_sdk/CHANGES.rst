@@ -52,6 +52,8 @@ SDK
   -  Keep ``PreimageHash`` in ``dac`` module.
   -  Move all other functions/structs move to ``dac::pages`` submodule. Deprecate importing from them ``dac`` directly.
 - Introduce ``dac::certificate`` submodule for handling serialization and deserialization of DAC certificates.
+- Add ``inbox::ExternalMessageFrame`` to ``tezos-smart-rollup-encoding``, to define a shared framing protocol for
+  Smart Rollup external messages.
 
 Installer client
 ----------------
