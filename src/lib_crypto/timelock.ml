@@ -164,7 +164,7 @@ let proof_encoding =
 let gen_locked_value_unsafe () =
   (* We divide by 8 to convert to bytes *)
   let random_z size = Hacl.Rand.gen size |> Bytes.to_string |> Z.of_bits in
-  Z.erem (random_z ((size_rsa2048 / 8) + 16)) rsa2048
+  Z.erem (random_z (Int.div size_rsa2048 8 + 16)) rsa2048
 
 let gen_locked_value_opt () =
   try Some (gen_locked_value_unsafe ()) with _ -> None
@@ -294,7 +294,10 @@ let proof_of_vdf_tuple_aux ?rand ~time vdf_tuple =
       (Invalid_argument
          "Invalid timelock tuple, its elements are not in the RSA group.") ;
   if verify_wesolowski ~time vdf_tuple then
-    let nonce = generate_z ?rand () in
+    let nonce =
+      (Option.value rand ~default:Hacl.Rand.gen) 16
+      |> Bytes.to_string |> Z.of_bits
+    in
     let randomized_locked_value = Z.powm vdf_tuple.locked_value nonce rsa2048 in
     let proof = {vdf_tuple; nonce} in
     (randomized_locked_value, proof)
