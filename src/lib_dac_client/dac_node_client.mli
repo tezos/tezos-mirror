@@ -78,12 +78,12 @@ module V0 : sig
     root_page_hash:Dac_plugin.raw_hash ->
     Certificate_repr.t option tzresult Lwt.t
 
-  (** [get_serialized_certificate cctxt ~root_page_hash] fetches the DAC certificate for
-      the provided [root_page_hash]. *)
+  (** [get_serialized_certificate cctxt ~root_page_hash] fetches and serialize 
+  the DAC certificate for the provided [root_page_hash]. *)
   val get_serialized_certificate :
     #cctxt ->
     root_page_hash:Dac_plugin.raw_hash ->
-    Bytes.t option tzresult Lwt.t
+    String.t option tzresult Lwt.t
 
   (** [monitor_certificate cctxt ~root_hash] returns a stream and a
       stopper for monitoring certificate updates for [root_hash]. *)

@@ -75,15 +75,16 @@ module V0 : sig
       Certificate_repr.t option )
     Tezos_rpc.Service.service
 
-  (** "GET v0/serialized_certificate" endpoint returns the DAC certificate for the
-    provided [root_page_hash] encoded in Binary. *)
+  (** "GET v0/serialized_certificates" endpoint returns the binary encoded DAC 
+    certificate for the provided [root_page_hash] where contained [root_hash]
+    used encoding is compatible with the Kernel SDK. *)
   val get_serialized_certificate :
     ( [`GET],
       unit,
       unit * Dac_plugin.raw_hash,
       unit,
       unit,
-      Bytes.t option )
+      String.t option )
     Tezos_rpc.Service.service
 
   (** "GET v0/missing_page/[page_hash]" Observer fetches the missing page 

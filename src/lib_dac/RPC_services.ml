@@ -93,9 +93,10 @@ module V0 = struct
     Tezos_rpc.Service.get_service
       ~description:
         "Retrieve the Dac certificate encoded in binary associated with the \
-         given root page hash"
+         given root page hash. The contained [root_hash] is compatible with \
+         Kernel SDK."
       ~query:Tezos_rpc.Query.empty
-      ~output:(Data_encoding.option Data_encoding.bytes)
+      ~output:Data_encoding.(option (string' Hex))
       Tezos_rpc.Path.(
         v0_prefix / "serialized_certificates" /: Dac_plugin.raw_hash_rpc_arg)
 

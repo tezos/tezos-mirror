@@ -95,6 +95,10 @@ module V0 = struct
         json |-> "root_hash" |> as_string,
         json |-> "version" |> as_int )
 
+  let get_serialized_certificate ~hex_root_hash =
+    let (`Hex page_hash) = hex_root_hash in
+    make GET [api_prefix; "serialized_certificates"; page_hash] JSON.as_string
+
   module Coordinator = struct
     let post_preimage ~payload =
       let preimage =

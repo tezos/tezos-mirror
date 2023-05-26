@@ -1513,7 +1513,7 @@ module Full_infrastructure = struct
        3. The signature is checked against one constructed manually
        4. The signature of the root hash is requested again via the
           client `get certificate` command,
-       5. The returned signature is checked to be equvalent to the
+       5. The returned signature is checked to be equivalent to the
           one previously output by the client.
     *)
     (* The test requires at least one committee member *)
@@ -1590,7 +1590,7 @@ module Full_infrastructure = struct
     (* 3. The signature is checked against one constructed manually. *)
     check_raw_certificate last_certificate_update expected_certificate ;
     (* 4. The signature of the root hash is requested again via the
-          client `get certificate` command.v*)
+          client `get certificate` coommand. *)
     let* get_certificate_output =
       Dac_client.get_certificate coordinator_client (`Hex expected_rh)
     in
@@ -1603,9 +1603,110 @@ module Full_infrastructure = struct
              value `Some (Root_hash _ )`. *)
           assert false
     in
-    (* 5. The returned signature is checked to be equvalent to the
+    (* 5. The returned signature is checked to be equivalent to the
           one previously output by the client. *)
     check_raw_certificate get_certificate last_certificate_update ;
+    return ()
+
+  (** Verifies that the serialized certificate returned in GET /v0/serialized_certificates
+      is valid, by veryfing its content. *)
+  let test_serialized_certificate
+      Scenarios.
+        {
+          coordinator_node;
+          committee_members_nodes;
+          observer_nodes;
+          committee_members;
+          _;
+        } =
+    (* 0. Coordinator node is already running when the this function is
+          executed by the test
+       1. Run committee members and observers
+       2. Dac client posts a preimage to coordinator, and waits for all
+          committee members to sign
+       3. The signature is checked against one constructed manually
+       4. The signature of the root hash is requested again via the
+          client `get certificate` command,
+       5. The returned signature is checked to be equivalent to the
+          one previously output by the client.
+    *)
+    (* The test requires at least one committee member *)
+    assert (List.length committee_members > 0) ;
+    let coordinator_client = Dac_client.create coordinator_node in
+    let payload, expected_rh = sample_payload "preimage" in
+    let committee_members_opt =
+      List.map (fun committee_member -> Some committee_member) committee_members
+    in
+    let expected_certificate =
+      build_raw_certificate
+        committee_members_opt
+        (Hex.to_bytes (`Hex expected_rh))
+    in
+    let wait_for_node_subscribed_to_data_streamer () =
+      wait_for_handle_new_subscription_to_hash_streamer coordinator_node
+    in
+    (* Initialize configuration of all nodes. *)
+    let* _ =
+      Lwt_list.iter_s
+        (fun committee_member_node ->
+          let* _ = Dac_node.init_config committee_member_node in
+          return ())
+        committee_members_nodes
+    in
+    let* _ =
+      Lwt_list.iter_s
+        (fun observer_node ->
+          let* _ = Dac_node.init_config observer_node in
+          return ())
+        observer_nodes
+    in
+    (* 1. Run committee member and observer nodes.
+       Because the event resolution loop in the Daemon always resolves
+       all promises matching an event filter, when a new event is received,
+       we cannot wait for multiple subscription to the hash streamer, as
+       events of this kind are indistinguishable one from the other.
+       Instead, we wait for the subscription of one observer/committe_member
+       node to be notified before running the next node. *)
+    let* () =
+      Lwt_list.iter_s
+        (fun node ->
+          let node_is_subscribed =
+            wait_for_node_subscribed_to_data_streamer ()
+          in
+          let* () = Dac_node.run ~wait_ready:true node in
+          let* () = check_liveness_and_readiness node in
+          node_is_subscribed)
+        (committee_members_nodes @ observer_nodes)
+    in
+    (* 2. Dac client posts a preimage to coordinator, and waits for all
+          committee members to sign. *)
+    let* client_sends_payload_output =
+      Dac_client.send_hex_payload
+        coordinator_client
+        (Hex.of_string payload)
+        ~threshold:(List.length committee_members)
+    in
+    let last_certificate_update =
+      match client_sends_payload_output with
+      | Root_hash rh ->
+          Stdlib.failwith @@ "Expected certificate, found root hash"
+          ^ Hex.show rh
+      | Certificate c -> c
+    in
+    (* 3. The signature is checked against one constructed manually. *)
+    check_raw_certificate last_certificate_update expected_certificate ;
+    (* 4. The signature of the root hash is requested again via the
+          client `get certificate` command. *)
+    let* get_certificate =
+      RPC.call
+        coordinator_node
+        (Dac_rpc.V0.get_serialized_certificate
+           ~hex_root_hash:(`Hex expected_rh))
+    in
+    let certif = `Hex get_certificate in
+    (* 5. The returned signature is checked to be equivalent to the
+          one previously output by the client. *)
+    check_raw_certificate certif last_certificate_update ;
     return ()
 
   (* 1. Observer should fetch missing page from Committee Members when GET /missing_page/{hash}
@@ -2919,6 +3020,14 @@ let register ~protocols =
     ~tags:["dac"; "dac_node"]
     "test client commands (binary payload from file)"
     (Full_infrastructure.test_client ~send_payload_from_file:true)
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:0
+    ~committee_size:2
+    ~tags:["dac"; "dac_node"]
+    "test serialized certificate"
+    Full_infrastructure.test_serialized_certificate
     protocols ;
   Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_synced_with_dac protocols ;
   Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_missing_pages protocols ;

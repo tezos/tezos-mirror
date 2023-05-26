@@ -23,47 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let certificate_client_encoding =
-  let untagged =
-    Data_encoding.(
-      conv
-        (fun certificate ->
-          ( Dac_plugin.raw_hash_to_bytes
-            @@ Certificate_repr.get_root_hash certificate,
-            Certificate_repr.get_aggregate_signature certificate,
-            Certificate_repr.get_witnesses certificate ))
-        (fun (root_hash, aggregate_signature, witnesses) ->
-          Certificate_repr.(
-            V0
-              (V0.make
-                 (Dac_plugin.raw_hash_of_bytes root_hash)
-                 aggregate_signature
-                 witnesses)))
-        (obj3
-           (req "root_hash" (Fixed.bytes 33))
-           (req "aggregate_signature" Tezos_crypto.Aggregate_signature.encoding)
-           (req "witnesses" z)))
-  in
-  Data_encoding.(
-    union
-      ~tag_size:`Uint8
-      [
-        case
-          ~title:"certificate_V0"
-          (Tag 0)
-          untagged
-          (fun certificate -> Some certificate)
-          (fun certificate -> certificate);
-      ])
-
-let serialize_certificate certificate =
-  let as_bytes_res =
-    Data_encoding.Binary.to_bytes certificate_client_encoding certificate
-  in
-  match as_bytes_res with
-  | Ok as_bytes -> Lwt_result_syntax.return @@ Hex.of_bytes as_bytes
-  | Error _ -> failwith "Error while serializing the certificate"
-
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/5339
    rename PUT v1/preimage into v1/payload, and change name
    of function accordingly. *)
@@ -108,17 +67,23 @@ let wait_for_certificate cctxt root_hash threshold =
         else go certificate_opt num_witnesses
   in
   let* certificate_opt = go None 0 in
-  Option.map_es serialize_certificate certificate_opt
+  match certificate_opt with
+  | Some certificate ->
+      let+ serialize_certificate_opt =
+        Dac_node_client.V0.get_serialized_certificate
+          cctxt
+          ~root_page_hash:(Certificate_repr.get_root_hash certificate)
+      in
+      Option.map Hex.of_string serialize_certificate_opt
+  | None -> return None
 
 let get_certificate cctxt root_page_hash =
   let open Lwt_result_syntax in
-  let* certificate_opt =
+  let+ certificate_opt =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5627
        Currently we have only one major DAC API version ([V0]). For this reason,
        client binary can always default to it. This should be revisited once we
        add another major version. *)
     Dac_node_client.V0.get_serialized_certificate cctxt ~root_page_hash
   in
-  match certificate_opt with
-  | Some certificate -> return @@ Some (Hex.of_bytes certificate)
-  | None -> return None
+  Option.map Hex.of_string certificate_opt

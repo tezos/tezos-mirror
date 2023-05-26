@@ -76,12 +76,18 @@ module V0 = struct
     Z.(equal missing_witnesses zero)
 
   module Protocol_dependant = struct
-    type serialized_certificate = {
+    (** Very similar to V0.t but using a [root_hash] related to the
+        active protocol. *)
+    type t = {
       root_hash : Dac_plugin.hash;
       aggregate_signature : Tezos_crypto.Aggregate_signature.signature;
       witnesses : Z.t;
     }
 
+    (** This encoding is protocol dependant because the SDK Kernel
+        needs the provided [root_hash] to be 33 bytes long.
+        This specific encoding should not be on DAC side,
+        but this is the easiest/faster way to handle it. *)
     let certificate_client_encoding ((module Plugin) : Dac_plugin.t) =
       let untagged =
         Data_encoding.(
@@ -103,21 +109,22 @@ module V0 = struct
           [
             case
               ~title:"certificate_V0"
-              (Tag 0)
+              (Tag version)
               untagged
               (fun certificate -> Some certificate)
               (fun certificate -> certificate);
           ])
 
-    let serialize_certificate dac_plugin serialized_certificate =
+    let serialize_certificate dac_plugin ~root_hash ~aggregate_signature
+        ~witnesses =
       let bytes_as_result =
         Data_encoding.Binary.to_bytes
           (certificate_client_encoding dac_plugin)
-          serialized_certificate
+          {root_hash; aggregate_signature; witnesses}
       in
       match bytes_as_result with
-      | Ok serialized_certificate -> Some (Hex.of_bytes serialized_certificate)
-      | Error _ -> None
+      | Ok serialized_certificate -> serialized_certificate
+      | Error _ -> Stdlib.failwith "Error while serializing the certificate"
   end
 end
 
