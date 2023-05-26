@@ -23,7 +23,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-(** [handle_python_error msg f] execute [f ()] and tries to catch a Python
+(** [handle_python_error msg f] execute [f ()] and catches a Python
     exception  `Py.E _`. If a Python error is caught, [handle_python_error]
     reraises it as a [Failure] with the error details prefixed by [msg].
 *)
