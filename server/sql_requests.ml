@@ -23,96 +23,104 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let env driver_info s =
+  match (Caqti_driver_info.dialect_tag driver_info, s) with
+  | `Pgsql, "PRIMARY_INCREMENTING_INT" -> Caqti_query.L "SERIAL"
+  | `Sqlite, "PRIMARY_INCREMENTING_INT" -> Caqti_query.L "INTEGER"
+  | `Pgsql, "BYTES" -> Caqti_query.L "BYTEA"
+  | `Sqlite, "BYTES" -> Caqti_query.L "BLOB"
+  | _, _ -> raise Not_found
+
 let create_delegates =
-  "  CREATE TABLE IF NOT EXISTS delegates(\n\
-  \     id INTEGER PRIMARY KEY,\n\
-  \     address BLOB UNIQUE NOT NULL,\n\
-  \     alias TEXT)"
+  "CREATE TABLE IF NOT EXISTS delegates(\n\
+  \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \  address $(BYTES) UNIQUE NOT NULL,\n\
+  \  alias TEXT)"
 
 let create_nodes =
-  "   CREATE TABLE IF NOT EXISTS nodes(\n\
-  \     id INTEGER PRIMARY KEY,\n\
-  \     name TEXT UNIQUE NOT NULL,\n\
-  \     comment TEXT)"
+  "CREATE TABLE IF NOT EXISTS nodes(\n\
+  \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \  name TEXT UNIQUE NOT NULL,\n\
+  \  comment TEXT)"
 
 let create_blocks =
-  "   CREATE TABLE IF NOT EXISTS blocks(\n\
-  \     id INTEGER PRIMARY KEY,\n\
-  \     predecessor INTEGER,\n\
-  \     timestamp INTEGER NOT NULL, -- Unix time\n\
-  \     hash BLOB UNIQUE NOT NULL,\n\
-  \     level INTEGER NOT NULL,\n\
-  \     round INTEGER NOT NULL,\n\
-  \     baker INTEGER NOT NULL,\n\
-  \     FOREIGN KEY (baker) REFERENCES delegates(id))"
+  "CREATE TABLE IF NOT EXISTS blocks(\n\
+  \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \  predecessor INTEGER,\n\
+  \  timestamp INTEGER NOT NULL, -- Unix time\n\
+  \  hash $(BYTES) UNIQUE NOT NULL,\n\
+  \  level INTEGER NOT NULL,\n\
+  \  round INTEGER NOT NULL,\n\
+  \  baker INTEGER NOT NULL,\n\
+  \  FOREIGN KEY (baker) REFERENCES delegates(id))"
 
 let create_blocks_reception =
-  "   CREATE TABLE IF NOT EXISTS blocks_reception(\n\
-  \     id INTEGER PRIMARY KEY,\n\
-  \     timestamp TEXT NOT NULL, -- ISO8601 string\n\
-  \     block INTEGER NOT NULL,\n\
-  \     source INTEGER NOT NULL,\n\
-  \     FOREIGN KEY (block) REFERENCES blocks(id),\n\
-  \     FOREIGN KEY (source) REFERENCES nodes(id),\n\
-  \     UNIQUE (block, source))"
+  "CREATE TABLE IF NOT EXISTS blocks_reception(\n\
+  \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \  timestamp TEXT NOT NULL, -- ISO8601 string\n\
+  \  block INTEGER NOT NULL,\n\
+  \  source INTEGER NOT NULL,\n\
+  \  FOREIGN KEY (block) REFERENCES blocks(id),\n\
+  \  FOREIGN KEY (source) REFERENCES nodes(id),\n\
+  \  UNIQUE (block, source))"
 
 let create_operations =
-  "   CREATE TABLE IF NOT EXISTS operations(\n\
-  \     id INTEGER PRIMARY KEY,\n\
-  \     hash BLOB UNIQUE NOT NULL,\n\
-  \     endorsement INTEGER NOT NULL,\n\
-  \     endorser INTEGER NOT NULL,\n\
-  \     level INTEGER NOT NULL,\n\
-  \     round INTEGER,\n\
-  \     FOREIGN KEY (endorser) REFERENCES delegates(id))"
+  "CREATE TABLE IF NOT EXISTS operations(\n\
+  \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \  hash $(BYTES) UNIQUE NOT NULL,\n\
+  \  endorsement BOOLEAN NOT NULL,\n\
+  \  endorser INTEGER NOT NULL,\n\
+  \  level INTEGER NOT NULL,\n\
+  \  round INTEGER,\n\
+  \  FOREIGN KEY (endorser) REFERENCES delegates(id))"
 
 let create_operations_reception =
-  "   CREATE TABLE IF NOT EXISTS operations_reception(\n\
-  \     id INTEGER PRIMARY KEY,\n\
-  \     timestamp TEXT NOT NULL, -- ISO8601 string\n\
-  \     operation INTEGER NOT NULL,\n\
-  \     source INTEGER NOT NULL,\n\
-  \     errors BLOB,\n\
-  \     FOREIGN KEY (operation) REFERENCES operations(id),\n\
-  \     FOREIGN KEY (source) REFERENCES nodes(id),\n\
-  \     UNIQUE (operation,source))"
+  "CREATE TABLE IF NOT EXISTS operations_reception(\n\
+  \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \  timestamp TEXT NOT NULL, -- ISO8601 string\n\
+  \  operation INTEGER NOT NULL,\n\
+  \  source INTEGER NOT NULL,\n\
+  \  errors $(BYTES),\n\
+  \  FOREIGN KEY (operation) REFERENCES operations(id),\n\
+  \  FOREIGN KEY (source) REFERENCES nodes(id),\n\
+  \  UNIQUE (operation,source))"
 
 let create_operations_inclusion =
-  "   CREATE TABLE IF NOT EXISTS operations_inclusion(\n\
-  \      id INTEGER PRIMARY KEY,\n\
-  \      block INTEGER NOT NULL,\n\
-  \      operation INTEGER NOT NULL,\n\
-  \      FOREIGN KEY (block) REFERENCES blocks(id),\n\
-  \      FOREIGN KEY (operation) REFERENCES operations(id),\n\
-  \      UNIQUE (block, operation))"
+  "CREATE TABLE IF NOT EXISTS operations_inclusion(\n\
+  \   id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \   block INTEGER NOT NULL,\n\
+  \   operation INTEGER NOT NULL,\n\
+  \   FOREIGN KEY (block) REFERENCES blocks(id),\n\
+  \   FOREIGN KEY (operation) REFERENCES operations(id),\n\
+  \   UNIQUE (block, operation))"
 
 let create_endorsing_rights =
-  "   CREATE TABLE IF NOT EXISTS endorsing_rights(\n\
-  \      id INTEGER PRIMARY KEY,\n\
-  \      level INTEGER NOT NULL,\n\
-  \      delegate INTEGER NOT NULL,\n\
-  \      first_slot INTEGER NOT NULL,\n\
-  \      endorsing_power INTEGER NOT NULL,\n\
-  \      FOREIGN KEY (delegate) REFERENCES delegates(id),\n\
-  \      UNIQUE (level, delegate))"
+  "CREATE TABLE IF NOT EXISTS endorsing_rights(\n\
+  \   id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \   level INTEGER NOT NULL,\n\
+  \   delegate INTEGER NOT NULL,\n\
+  \   first_slot INTEGER NOT NULL,\n\
+  \   endorsing_power INTEGER NOT NULL,\n\
+  \   FOREIGN KEY (delegate) REFERENCES delegates(id),\n\
+  \   UNIQUE (level, delegate))"
 
 let create_endorsing_rights_level_idx =
-  "   CREATE INDEX IF NOT EXISTS endorsing_rights_level_idx ON \
+  "CREATE INDEX IF NOT EXISTS endorsing_rights_level_idx ON \
    endorsing_rights(level)"
 
 let create_operations_level_idx =
-  "   CREATE INDEX IF NOT EXISTS operations_level_idx ON operations(level)"
+  "CREATE INDEX IF NOT EXISTS operations_level_idx ON operations(level)"
 
 let create_blocks_reception_block_idx =
-  "   CREATE INDEX IF NOT EXISTS blocks_reception_block_idx ON \
+  "CREATE INDEX IF NOT EXISTS blocks_reception_block_idx ON \
    blocks_reception(block)"
 
 let create_operations_reception_operation_idx =
-  "   CREATE INDEX IF NOT EXISTS operations_reception_operation_idx ON \
+  "CREATE INDEX IF NOT EXISTS operations_reception_operation_idx ON \
    operations_reception(operation)"
 
 let create_operations_inclusion_operation_idx =
-  "   CREATE INDEX IF NOT EXISTS operations_inclusion_operation_idx ON \
+  "CREATE INDEX IF NOT EXISTS operations_inclusion_operation_idx ON \
    operations_inclusion(operation)"
 
 let create_tables =
@@ -132,11 +140,9 @@ let create_tables =
     create_operations_inclusion_operation_idx;
   ]
 
-let alter_blocks = "   ALTER TABLE blocks ADD COLUMN predecessor INTEGER"
+let alter_blocks = "ALTER TABLE blocks ADD COLUMN predecessor INTEGER"
 
 let alter_tables = [alter_blocks]
-
-let db_schema = String.concat "; " create_tables
 
 module Type = struct
   let decode_error x =

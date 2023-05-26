@@ -35,11 +35,11 @@ module Type : sig
   val errors : Tezos_error_monad.TzCore.error list option Caqti_type.t
 end
 
+val env : Caqti_driver_info.t -> string -> Caqti_query.t
+
 val create_tables : string list
 
 val alter_tables : string list
-
-val db_schema : string
 
 val maybe_insert_source : (string, unit, [`Zero]) Caqti_request.t
 

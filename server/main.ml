@@ -543,7 +543,7 @@ let config =
 let () =
   let uri = Uri.of_string config.Config.db_uri in
   Lwt_main.run
-    (match Caqti_lwt.connect_pool uri with
+    (match Caqti_lwt.connect_pool ~env:Sql_requests.env uri with
     | Error e -> Lwt_io.eprintl (Caqti_error.show e)
     | Ok pool ->
         Lwt.bind (maybe_alter_and_create_tables pool) (function

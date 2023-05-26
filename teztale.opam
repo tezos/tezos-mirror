@@ -10,7 +10,7 @@ depends: [
   "tls-lwt"
   "tezos-client-base-unix"
   "caqti-lwt"
-  "caqti-driver-sqlite3"
+  "caqti-dynload"
   "ocp-ocamlres"
 ]
 depopts: [

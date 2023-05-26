@@ -3,7 +3,7 @@
  (package teztale)
  (public_name teztale-server)
  (promote (until-clean))
- (libraries cohttp-lwt-unix caqti-lwt caqti-driver-sqlite3 teztale.lib))
+ (libraries cohttp-lwt-unix caqti-lwt caqti-dynload teztale.lib))
 
 (rule
  (targets visualization.ml)
