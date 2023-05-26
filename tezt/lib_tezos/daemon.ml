@@ -292,8 +292,8 @@ module Make (X : PARAMETERS) = struct
       match runner with
       | None -> None
       | Some runner ->
-          let cmd = "cat" in
-          let arguments = [daemon.event_pipe] in
+          let cmd = "tail" in
+          let arguments = ["--follow"; "--retry"; daemon.event_pipe] in
           let name = Filename.basename daemon.event_pipe in
           let process =
             Process.spawn ~name ~runner ~log_output:false cmd arguments
