@@ -2882,6 +2882,13 @@ module V1_API = struct
     return @@ RPC.check_string_response ~code:404 response
 end
 
+(** [Api_regression] is a module that encapsulates schema regression tests of
+    the DAC API. Here we test the binding contracts of the versioned API. *)
+module Api_regression = struct
+  (** [V0] module is used for regression testing [V0] API. *)
+  module V0 = struct end
+end
+
 let register ~protocols =
   (* Tests with layer1 and dac nodes *)
   Legacy.test_dac_node_startup protocols ;
