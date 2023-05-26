@@ -879,6 +879,12 @@ module Run_Simulate = struct
 end
 
 module Preapply = struct
+  let rpc ~version data =
+    RPC.post_chain_block_helpers_preapply_operations
+      ~data:(Data (`A [data]))
+      ~version
+      ()
+
   let test_consensus kind protocol =
     let* node, client = Client.init_with_protocol ~protocol `Client () in
     let* () = Client.bake_for_and_wait ~node client in
@@ -905,15 +911,10 @@ module Preapply = struct
           ~signature
           consensus_op
       in
-      let* _ =
-        RPC.Client.call client
-        @@ RPC.post_chain_block_helpers_preapply_operations
-             ~data:(Data (`A [consensus_json]))
-             ()
-      in
-      unit
+      let get_name = Operation.Consensus.kind_to_string kind in
+      let check json = check_kind JSON.(json |> as_list |> List.hd) in
+      check_rpc_versions ~check ~rpc ~get_name ~data:consensus_json client
     in
-
     let* () = preapply_op ~use_legacy_name:true in
     preapply_op ~use_legacy_name:false
 
@@ -947,13 +948,9 @@ module Preapply = struct
           ~signature
           double_consensus_evidence_op
       in
-      let* _ =
-        RPC.Client.call client
-        @@ RPC.post_chain_block_helpers_preapply_operations
-             ~data:(Data (`A [consensus_json]))
-             ()
-      in
-      unit
+      let get_name = Operation.Anonymous.kind_to_string double_evidence_kind in
+      let check json = check_kind JSON.(json |> as_list |> List.hd) in
+      check_rpc_versions ~check ~rpc ~get_name ~data:consensus_json client
     in
     let* () = preapply_op ~use_legacy_name:true in
     preapply_op ~use_legacy_name:false
