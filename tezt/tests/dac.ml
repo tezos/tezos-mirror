@@ -2752,6 +2752,29 @@ module V1_API = struct
     in
     let actual = remove_preamble (decode_hex_string_to_bytes raw) in
     return @@ check_preimage payload actual
+
+  (** [test_allow_v1_feature_flag] tests [--allow-v1-api] feature flag. *)
+  let test_allow_v1_feature_flag Scenarios.{coordinator_node; _} =
+    (* Running [Coordinator] node without explicitly providing [--allow-v1-api]
+       feature flag should not register [V1] API. Calling [V1] API endpoints
+       should therefore result in 404 (Not found) errors. To test this:
+
+       1. We post payload to [coordinator_node] to obtain valid [root_hash]
+       2. Calling "GET v1/pages/[root_hash]" should fail with 404 response,
+          because [--allow-v1-api] feature flag was not set.
+    *)
+    let* root_hash =
+      (* TODO https://gitlab.com/tezos/tezos/-/issues/5671
+         Once we have "PUT v1/preimage" we should use a call to [V1] api here
+         instead. *)
+      RPC.call
+        coordinator_node
+        (Dac_rpc.V0.Coordinator.post_preimage ~payload:"test")
+    in
+    let* response =
+      RPC.call_raw coordinator_node @@ Dac_rpc.V1.get_pages root_hash
+    in
+    return @@ RPC.check_string_response ~code:404 response
 end
 
 let register ~protocols =
@@ -2903,4 +2926,13 @@ let register ~protocols =
     ~tags:["dac"; "dac_node"]
     "test v1/get_pages"
     V1_API.test_get_pages
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~allow_v1_api:false
+    ~__FILE__
+    ~observers:0
+    ~committee_size:0
+    ~tags:["dac"; "dac_node"]
+    "test --allow_v1_api feature flag"
+    V1_API.test_allow_v1_feature_flag
     protocols
