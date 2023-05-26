@@ -187,9 +187,9 @@ let get_stakes_for_selected_index ctxt index =
           in
           return (min max_allowed_stake staking_balance)
         else
-          let*? sbal = staking_balance /? 100L in
+          let*? staking_balance_div_100 = staking_balance /? 100L in
           let*? a = frozen /? frozen_deposits_percentage in
-          if sbal <= a then return staking_balance
+          if staking_balance_div_100 <= a then return staking_balance
           else
             let*? r = max_mutez /? frozen_deposits_percentage in
             return r
