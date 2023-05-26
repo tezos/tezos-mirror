@@ -87,6 +87,21 @@ module type FILTER = sig
         (required by the protocol's operation comparison on which the
         implementation of this function relies). *)
     val conflict_handler : config -> Proto.Mempool.conflict_handler
+
+    (** Compute the minimal fee (expressed in mutez) that [candidate_op]
+        would need to have in order to be strictly greater than
+        [op_to_overtake] according to {!Proto.compare_operations}.
+
+        Return [None] when at least one operation is not a manager operation.
+
+        Also return [None] if both operations are manager operations but
+        there was an error while computing the needed fee. However,
+        note that this cannot happen when both manager operations have
+        been successfully validated by the protocol. *)
+    val fee_needed_to_overtake :
+      op_to_overtake:Proto.operation ->
+      candidate_op:Proto.operation ->
+      int64 option
   end
 end
 

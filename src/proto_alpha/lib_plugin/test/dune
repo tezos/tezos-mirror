@@ -1,9 +1,11 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names test_conflict_handler test_consensus_filter)
+(library
+ (name src_proto_alpha_lib_plugin_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-base-test-helpers
   tezos-base.unix
@@ -16,11 +18,11 @@
   tezos-protocol-alpha
   tezos-protocol-alpha.parameters
   tezos-alpha-test-helpers)
- (link_flags
-  (:standard)
-  (:include %{workspace_root}/macos-link-flags.sexp))
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_base_test_helpers
@@ -31,14 +33,30 @@
   -open Tezos_protocol_alpha
   -open Tezos_protocol_alpha.Protocol
   -open Tezos_protocol_alpha_parameters
-  -open Tezos_alpha_test_helpers))
+  -open Tezos_alpha_test_helpers)
+ (modules
+  helpers
+  test_conflict_handler
+  test_consensus_filter
+  test_fee_needed_to_overtake))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_proto_alpha_lib_plugin_test_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-protocol-plugin-alpha-tests)
- (action (run %{dep:./test_conflict_handler.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest)
- (package tezos-protocol-plugin-alpha-tests)
- (action (run %{dep:./test_consensus_filter.exe})))
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

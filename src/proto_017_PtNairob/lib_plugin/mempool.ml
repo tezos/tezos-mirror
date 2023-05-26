@@ -216,7 +216,7 @@ let consensus_prio = `High
 
 let other_prio = `Medium
 
-let get_manager_operation_gas_and_fee contents =
+let compute_manager_contents_fee_and_gas_limit contents =
   let open Operation in
   let l = to_list (Contents_list contents) in
   List.fold_left
@@ -309,7 +309,7 @@ let pre_filter_manager :
     then `Fees_ok
     else `Refused [Environment.wrap_tzerror Fees_too_low]
   in
-  match get_manager_operation_gas_and_fee op with
+  match compute_manager_contents_fee_and_gas_limit op with
   | Error err -> `Refused (Environment.wrap_tztrace err)
   | Ok (fee, gas_limit) -> (
       match check_gas_and_fee fee gas_limit with
@@ -560,6 +560,10 @@ let is_manager_operation op =
   | Some pass -> Compare.Int.equal pass Operation_repr.manager_pass
   | None -> false
 
+(* Should not fail on a valid manager operation. *)
+let compute_fee_and_gas_limit {protocol_data = Operation_data data; _} =
+  compute_manager_contents_fee_and_gas_limit data.contents
+
 (** Determine whether the new manager operation is sufficiently better
     than the old manager operation to replace it. Sufficiently better
     means that the new operation's fee and fee/gas ratio are both
@@ -596,14 +600,8 @@ let conflict_handler config : Mempool.conflict_handler =
   if is_manager_operation old_op && is_manager_operation new_op then
     let new_op_is_better =
       let open Result_syntax in
-      let {protocol_data = Operation_data old_protocol_data; _} = old_op in
-      let {protocol_data = Operation_data new_protocol_data; _} = new_op in
-      let* old_fee, old_gas_limit =
-        get_manager_operation_gas_and_fee old_protocol_data.contents
-      in
-      let* new_fee, new_gas_limit =
-        get_manager_operation_gas_and_fee new_protocol_data.contents
-      in
+      let* old_fee, old_gas_limit = compute_fee_and_gas_limit old_op in
+      let* new_fee, new_gas_limit = compute_fee_and_gas_limit new_op in
       return
         (better_fees_and_ratio
            config
@@ -617,6 +615,27 @@ let conflict_handler config : Mempool.conflict_handler =
     | Ok _ | Error _ -> `Keep
   else if Operation.compare existing_operation new_operation < 0 then `Replace
   else `Keep
+
+let fee_needed_to_overtake ~op_to_overtake ~candidate_op =
+  if is_manager_operation candidate_op && is_manager_operation op_to_overtake
+  then
+    (let open Result_syntax in
+    let* _fee, candidate_gas = compute_fee_and_gas_limit candidate_op in
+    let* target_fee, target_gas = compute_fee_and_gas_limit op_to_overtake in
+    if Gas.Arith.(target_gas = zero || candidate_gas = zero) then
+      (* This should not happen when both operations are valid. *)
+      Result.return_none
+    else
+      (* Compute the target ratio as in {!Operation_repr.weight_manager}. *)
+      let target_fee = Q.of_int64 (Tez.to_mutez target_fee) in
+      let target_gas = Q.of_bigint (Gas.Arith.integral_to_z target_gas) in
+      let target_ratio = Q.(target_fee / target_gas) in
+      (* Compute the minimal fee needed to have a strictly greater ratio. *)
+      let candidate_gas = Q.of_bigint (Gas.Arith.integral_to_z candidate_gas) in
+      Result.return_some
+        (Int64.succ Q.(to_int64 (target_ratio * candidate_gas))))
+    |> Option.of_result |> Option.join
+  else None
 
 module Internal_for_tests = struct
   let default_config_with_clock_drift clock_drift =
