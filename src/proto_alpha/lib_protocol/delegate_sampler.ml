@@ -178,10 +178,10 @@ let get_stakes_for_selected_index ctxt index =
         match frozen_deposits_limit with Some fdp -> fdp | None -> max_mutez
       in
       let frozen = min total_balance frozen_deposits_limit in
-      let* total_stake_for_cycle =
+      let total_stake_for_cycle =
         match frozen *? Int64.add 1L delegation_over_baking_limit with
-        | Ok max_allowed_stake -> return (min max_allowed_stake staking_balance)
-        | Error _max_allowed_stake_overflows -> return staking_balance
+        | Ok max_allowed_stake -> min max_allowed_stake staking_balance
+        | Error _max_allowed_stake_overflows -> staking_balance
       in
       let delegated =
         (* This subtraction should not result in a negative value because the
