@@ -1243,16 +1243,15 @@ let test_create_mockup_config_show_init_roundtrip protocols =
       }
   in
   let compute_expected_amounts bootstrap_accounts protocol_constants =
-    let frozen_deposits_percentage =
-      JSON.(protocol_constants |-> "frozen_deposits_percentage" |> as_int)
+    let convert =
+      let frozen_deposits_percentage =
+        JSON.(protocol_constants |-> "frozen_deposits_percentage" |> as_int)
+      in
+      let pct = 100 - frozen_deposits_percentage in
+      fun amount -> Tez.(of_mutez_int (pct * to_mutez amount / 100))
     in
-    let pct = 100 - frozen_deposits_percentage in
     List.map
-      (fun account ->
-        {
-          account with
-          amount = Tez.(of_mutez_int (pct * to_mutez account.amount / 100));
-        })
+      (fun account -> {account with amount = convert account.amount})
       bootstrap_accounts
   in
   (* Check that two JSON objects are equal by pair-wise comparing
