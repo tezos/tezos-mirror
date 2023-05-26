@@ -37,6 +37,47 @@ module Classification = Prevalidator_classification
 
 let is_in_mempool oph t = Classification.is_in_mempool oph t <> None
 
+let classification_pp pp classification =
+  Format.fprintf
+    pp
+    (match (classification :> Classification.classification) with
+    | `Applied -> "Applied"
+    | `Validated -> "Validated"
+    | `Branch_delayed _ -> "Branch_delayed"
+    | `Branch_refused _ -> "Branch_refused"
+    | `Refused _ -> "Refused"
+    | `Outdated _ -> "Outdated")
+
+let eq_classification cl1 cl2 =
+  match
+    ( (cl1 :> Classification.classification),
+      (cl2 :> Classification.classification) )
+  with
+  | `Applied, `Applied
+  | `Validated, `Validated
+  | `Branch_delayed _, `Branch_delayed _
+  | `Branch_refused _, `Branch_refused _
+  | `Refused _, `Refused _
+  | `Outdated _, `Outdated _ ->
+      true
+  | ( `Applied,
+      ( `Validated | `Branch_delayed _ | `Branch_refused _ | `Refused _
+      | `Outdated _ ) )
+  | ( `Validated,
+      ( `Applied | `Branch_delayed _ | `Branch_refused _ | `Refused _
+      | `Outdated _ ) )
+  | ( `Branch_delayed _,
+      (`Applied | `Validated | `Branch_refused _ | `Refused _ | `Outdated _) )
+  | ( `Branch_refused _,
+      (`Applied | `Validated | `Branch_delayed _ | `Refused _ | `Outdated _) )
+  | ( `Refused _,
+      ( `Applied | `Validated | `Branch_delayed _ | `Branch_refused _
+      | `Outdated _ ) )
+  | ( `Outdated _,
+      ( `Applied | `Validated | `Branch_delayed _ | `Branch_refused _
+      | `Refused _ ) ) ->
+      false
+
 module Operation_map = struct
   let pp_with_trace ppf map =
     Format.fprintf
@@ -77,10 +118,21 @@ type classification_event =
   | Remove of Operation_hash.t
   | Flush of bool
 
-let drop oph t =
-  let open Classification in
-  let (_ : (unit operation * classification) option) = remove oph t in
-  ()
+let drop ?expected_classification oph t =
+  match (Classification.remove oph t, expected_classification) with
+  | _, None -> ()
+  | None, Some expected ->
+      Test.fail
+        ~__LOC__
+        "drop: expected to remove an operation classified as %a, but the \
+         operation was not found"
+        classification_pp
+        expected
+  | Some (_op, classification), Some expected ->
+      Check.(
+        (classification = (expected :> Classification.classification))
+          (equalable classification_pp eq_classification)
+          ~error_msg:"drop: expected %R but got %L")
 
 let play_event event t =
   let open Classification in
@@ -231,17 +283,6 @@ let check_invariants ?fail_msg (t : unit Classification.t) =
       | None -> ""
       | Some msg -> Format.sprintf "\n%s@." msg)
 
-let classification_pp pp classification =
-  Format.fprintf
-    pp
-    (match classification with
-    | `Applied -> "Applied"
-    | `Validated -> "Validated"
-    | `Branch_delayed _ -> "Branch_delayed"
-    | `Branch_refused _ -> "Branch_refused"
-    | `Refused _ -> "Refused"
-    | `Outdated _ -> "Outdated")
-
 let event_pp pp = function
   | Add_if_not_present (classification, op) ->
       Format.fprintf
@@ -331,25 +372,9 @@ let test_is_in_mempool_remove =
   Classification.add unrefused_classification op t ;
   let oph = op.hash in
   qcheck_eq_true ~actual:(is_in_mempool oph t) ;
-  drop oph t ;
+  drop ~expected_classification:unrefused_classification oph t ;
   qcheck_eq_false ~actual:(is_in_mempool oph t) ;
   true
-
-let test_is_applied =
-  let open QCheck2 in
-  Test.make
-    ~name:"[is_applied] is well-behaved"
-    Generators.(Gen.pair t_gen (operation_with_hash_gen ()))
-  @@ fun (t, op) ->
-  Classification.add `Applied op t ;
-  let oph = op.hash in
-  qcheck_eq_true ~actual:(is_in_mempool oph t) ;
-  match Classification.remove oph t with
-  | None -> false
-  | Some (_op, classification) ->
-      qcheck_eq_true ~actual:(classification = `Applied) ;
-      qcheck_eq_false ~actual:(is_in_mempool oph t) ;
-      true
 
 let test_invariants =
   let open QCheck2 in
@@ -530,7 +555,8 @@ module Bounded = struct
     in
     let () =
       Operation_hash.Map.iter
-        (fun oph _op -> drop oph t)
+        (fun oph _op ->
+          drop ~expected_classification:error_classification oph t)
         (Classification.map bounded_map)
     in
     discarded_operations_rev := [] ;
@@ -824,7 +850,6 @@ let () =
           test_flush_empties_all_except_refused_and_branch_refused;
         ];
       mk_tests "is_in_mempool" [test_is_in_mempool_remove];
-      mk_tests "is_applied" [test_is_applied];
       mk_tests "unparsable" Unparsable.[test_add_is_known; test_flush_is_known];
       mk_tests "invariants" [test_invariants];
       mk_tests "bounded" [Bounded.test_bounded];
@@ -838,7 +863,6 @@ let () =
             test_map_remove_add;
             test_map_add_remove;
             test_flush;
-            test_is_applied;
             test_is_in_mempool;
             test_none;
           ];
