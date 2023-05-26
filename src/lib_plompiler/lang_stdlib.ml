@@ -612,7 +612,20 @@ module Lib (C : COMMON) = struct
 
     let length b = List.length (of_list b)
 
+    let check_args_length name a b =
+      let la = length a in
+      let lb = length b in
+      if la != lb then
+        raise
+          (Invalid_argument
+             (Format.sprintf
+                "%s arguments of different lengths %i %i"
+                name
+                la
+                lb))
+
     let add ?(ignore_carry = true) a b =
+      check_args_length "Bytes.add" a b ;
       let ha, ta = (List.hd (of_list a), List.tl (of_list a)) in
       let hb, tb = (List.hd (of_list b), List.tl (of_list b)) in
       let* a_xor_b = Bool.xor ha hb in
@@ -630,6 +643,7 @@ module Lib (C : COMMON) = struct
       ret @@ to_list @@ List.rev (if ignore_carry then res else carry :: res)
 
     let xor a b =
+      check_args_length "Bytes.xor" a b ;
       let* l = map2M Bool.xor (of_list a) (of_list b) in
       ret @@ to_list l
 
