@@ -193,11 +193,7 @@ let get_stakes_for_selected_index ctxt index =
         div_exn total_stake_for_cycle delegation_over_baking_limit_plus_1
       in
       let delegated =
-        (* This subtraction should not result in a negative value because the
-           staking balance includes the total balance.
-           But since the staking balance is taken from the snapshot and the
-           frozen balance is taken at the end of the cycle we have no strong
-           guarantees. *)
+        (* This subtraction cannot result in a negative value. *)
         sub_opt total_stake_for_cycle frozen |> Option.value ~default:zero
       in
       let stake_for_cycle = Stake_repr.make ~frozen ~delegated in
