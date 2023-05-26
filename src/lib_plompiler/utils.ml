@@ -45,6 +45,7 @@ let alpha = Z.(shift_left one (Z.numbits S.order) - S.order)
 let bitlist : ?le:bool -> bytes -> bool list =
  fun ?(le = false) b ->
   let l = Bytes.length b in
+  (* Depending on endianess we start, stop and step in different directions. *)
   let start = if le then 0 else l - 1 in
   let stop = if le then l else -1 in
   let next = if le then succ else pred in
@@ -55,6 +56,10 @@ let bitlist : ?le:bool -> bytes -> bool list =
       let rec loop_bit acc m =
         if m = 8 then acc
         else
+          (* For each position in a byte, a mask is built where all bits are
+             zero except the one at position. The masked byte is compute by
+             locagical AND of the mask and the current byte. If the masked
+             result is zero the bit at position is zero, otherwise it's one. *)
           let mask = 1 lsl m in
           let bit = byte land mask in
           let bit = if bit = 0 then false else true in
@@ -65,9 +70,45 @@ let bitlist : ?le:bool -> bytes -> bool list =
   in
   List.rev @@ loop_byte [] start
 
+(* Takes a list of booleans (typically from the Plompiler Bytes representation)
+   and returns OCaml Bytes. Works only if the input length is a multiple of a
+   byte. *)
+let of_bitlist : ?le:bool -> bool list -> bytes =
+ fun ?(le = false) bl ->
+  assert (List.length bl mod 8 = 0) ;
+  let rec loop_byte acc rest =
+    match rest with
+    | [] ->
+        let res = if le then List.rev acc else acc in
+        Bytes.(concat empty res)
+    | _ ->
+        let rec loop_bit acc pos rest =
+          if pos = 8 then (acc, rest)
+          else
+            match rest with
+            | [] -> assert false
+            | bit :: rest ->
+                (* For each position in a byte, a mask is built where all bits
+                   are zero except the one at position. The mask is then summed
+                   to the accumulator using a logical OR. *)
+                let mask = if bit then 1 lsl pos else 0 in
+                let acc = acc lor mask in
+                loop_bit acc (succ pos) rest
+        in
+        (* Each sequence of 8 bits is converted to an integer in the previous
+           loop and here it is interpreted as a uint8. *)
+        let byte_as_int, rest = loop_bit 0 0 rest in
+        let byte = Bytes.create 1 in
+        Bytes.set_uint8 byte 0 byte_as_int ;
+        loop_byte (byte :: acc) rest
+  in
+  loop_byte [] bl
+
 let bytes_of_hex hs =
   let h = `Hex hs in
   Hex.to_bytes h
+
+let hex_of_bytes bs = Hex.of_bytes bs |> Hex.show
 
 let bool_list_to_scalar : bool list -> S.t =
  fun b_list ->
