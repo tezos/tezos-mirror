@@ -281,3 +281,5 @@ let zk_rollup_origination_size c =
 let adaptive_inflation c = (Raw_context.constants c).adaptive_inflation
 
 let adaptive_inflation_enable c = (adaptive_inflation c).enable
+
+let freeze_rewards = adaptive_inflation_enable

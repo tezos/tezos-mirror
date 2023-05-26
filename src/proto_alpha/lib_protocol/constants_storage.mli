@@ -163,3 +163,5 @@ val zk_rollup_min_pending_to_process : Raw_context.t -> int
 val zk_rollup_origination_size : Raw_context.t -> int
 
 val adaptive_inflation_enable : Raw_context.t -> bool
+
+val freeze_rewards : Raw_context.t -> bool
