@@ -117,6 +117,8 @@ let get_certificate cctxt root_page_hash =
        Currently we have only one major DAC API version ([V0]). For this reason,
        client binary can always default to it. This should be revisited once we
        add another major version. *)
-    Dac_node_client.V0.get_certificate cctxt ~root_page_hash
+    Dac_node_client.V0.get_serialized_certificate cctxt ~root_page_hash
   in
-  Option.map_es serialize_certificate certificate_opt
+  match certificate_opt with
+  | Some certificate -> return @@ Some (Hex.of_bytes certificate)
+  | None -> return None

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Marigold  <contact@tmarigold.dev>                      *)
+(* Copyright (c) 2023 Marigold  <contact@marigold.dev>                      *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -73,6 +73,17 @@ module V0 : sig
       unit,
       unit,
       Certificate_repr.t option )
+    Tezos_rpc.Service.service
+
+  (** "GET v0/serialized_certificate" endpoint returns the DAC certificate for the
+    provided [root_page_hash] encoded in Binary. *)
+  val get_serialized_certificate :
+    ( [`GET],
+      unit,
+      unit * Dac_plugin.raw_hash,
+      unit,
+      unit,
+      Bytes.t option )
     Tezos_rpc.Service.service
 
   (** "GET v0/missing_page/[page_hash]" Observer fetches the missing page 

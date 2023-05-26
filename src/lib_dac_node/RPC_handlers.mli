@@ -82,6 +82,13 @@ module V0 : sig
     Dac_plugin.raw_hash ->
     (Certificate_repr.t option, tztrace) result Lwt.t
 
+  (** [handle_get_serialized_certificate] is a handler for "GET v0/certificate". *)
+  val handle_get_serialized_certificate :
+    Dac_plugin.t ->
+    [> `Read] Store.Irmin_store.t ->
+    Dac_plugin.raw_hash ->
+    (Bytes.t option, tztrace) result Lwt.t
+
   (** [Coordinator] encapsulates, Coordinator's mode specific handlers
       of [V0] API. *)
   module Coordinator : sig
