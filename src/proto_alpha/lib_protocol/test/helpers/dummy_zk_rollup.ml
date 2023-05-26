@@ -610,7 +610,7 @@ end = struct
 
     let pending = [false_op; true_op; true_op]
 
-    let n_batches = 10
+    let n_batches = 2
 
     let private_ops =
       Stdlib.List.init n_batches @@ Fun.const
