@@ -881,6 +881,23 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       module Preapply = struct
         let path = Tezos_rpc.Path.(path / "preapply")
 
+        let preapply_operation_encoding =
+          union
+            [
+              case
+                ~title:"operation_data_encoding"
+                (Tag 0)
+                next_operation_encoding
+                Option.some
+                Fun.id;
+              case
+                ~title:"operation_data_encoding_with_legacy_attestation_name"
+                Json_only
+                next_operation_encoding_with_legacy_attestation_name
+                Option.some
+                Fun.id;
+            ]
+
         let block_result_encoding =
           obj2
             (req "shell_header" Block_header.shell_header_encoding)
@@ -908,10 +925,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                         (dynamic_size Next_proto.block_header_data_encoding))))
                (req
                   "operations"
-                  (list
-                     (dynamic_size
-                        (list
-                           next_operation_encoding_with_legacy_attestation_name)))))
+                  (list (dynamic_size (list preapply_operation_encoding)))))
 
         let block_query =
           let open Tezos_rpc.Query in
@@ -942,7 +956,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                the given block and return the result of each operation \
                application."
             ~query:Tezos_rpc.Query.empty
-            ~input:(list next_operation_encoding_with_legacy_attestation_name)
+            ~input:(list preapply_operation_encoding)
             ~output:
               (list
                  (dynamic_size
