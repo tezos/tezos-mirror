@@ -686,7 +686,9 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
         ~timestamp
         ~protocol_data
         operations) ;
-  register0 S.Helpers.Preapply.operations (fun (chain_store, block) () ops ->
+  register0
+    S.Helpers.Preapply.operations
+    (fun (chain_store, block) params ops ->
       let* ctxt = Store.Block.context chain_store block in
       let chain_id = Store.Chain.chain_id chain_store in
       let mode =
@@ -737,7 +739,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
           (validation_state, application_state, [])
           hashed_ops
       in
-      return (List.rev acc)) ;
+      return (params#version, List.rev acc)) ;
   register1 S.Helpers.complete (fun (chain_store, block) prefix () () ->
       let* ctxt = Store.Block.context chain_store block in
       let*! l1 = Tezos_crypto.Base58.complete prefix in

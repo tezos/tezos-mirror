@@ -949,19 +949,57 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             ~output:block_result_encoding
             Tezos_rpc.Path.(path / "block")
 
+        let default_preapply_operations_version = Version_0
+
+        let preapply_supported_versions = [Version_0; Version_1]
+
+        let operations_query =
+          let open Tezos_rpc.Query in
+          query (fun version ->
+              object
+                method version = version
+              end)
+          |+ field
+               "version"
+               (version_arg preapply_supported_versions)
+               default_preapply_operations_version
+               (fun t -> t#version)
+          |> seal
+
+        let preapplied_operations_encoding =
+          union
+            [
+              case
+                ~title:"new_encoding_preapplied_operations"
+                (Tag 1)
+                (list
+                   (dynamic_size Next_proto.operation_data_and_receipt_encoding))
+                (function
+                  | Version_1, preapply_operations -> Some preapply_operations
+                  | (Version_0 | Version_2), _ -> None)
+                (fun preapply_operations -> (Version_1, preapply_operations));
+              case
+                ~title:"old_encoding_preapplied_operations"
+                (Tag 0)
+                (list
+                   (dynamic_size
+                      Next_proto
+                      .operation_data_and_receipt_encoding_with_legacy_attestation_name))
+                (function
+                  | Version_0, preapply_operations -> Some preapply_operations
+                  | (Version_1 | Version_2), _ -> None)
+                (fun preapply_operations -> (Version_0, preapply_operations));
+            ]
+
         let operations =
           Tezos_rpc.Service.post_service
             ~description:
               "Simulate the application of the operations with the context of \
                the given block and return the result of each operation \
                application."
-            ~query:Tezos_rpc.Query.empty
+            ~query:operations_query
             ~input:(list preapply_operation_encoding)
-            ~output:
-              (list
-                 (dynamic_size
-                    Next_proto
-                    .operation_data_and_receipt_encoding_with_legacy_attestation_name))
+            ~output:preapplied_operations_encoding
             Tezos_rpc.Path.(path / "operations")
       end
 
@@ -1779,10 +1817,21 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             end)
             {protocol_data; operations}
 
-      let operations ctxt =
-        let f = make_call0 S.operations ctxt in
-        fun ?(chain = `Main) ?(block = `Head 0) operations ->
-          f chain block () operations
+      let operations ctxt ?(chain = `Main) ?(block = `Head 0)
+          ?(version = S.default_preapply_operations_version) operations =
+        let open Lwt_result_syntax in
+        let* (Version_0 | Version_1 | Version_2), preapply_operations =
+          make_call0
+            S.operations
+            ctxt
+            chain
+            block
+            (object
+               method version = version
+            end)
+            operations
+        in
+        return preapply_operations
     end
 
     let complete ctxt =
