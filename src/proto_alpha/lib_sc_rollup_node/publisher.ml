@@ -434,115 +434,112 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
           (cement_commitment node_ctxt ~source)
           cementable_commitments
 
-  module Publisher = struct
-    module Types = struct
-      type nonrec state = state
+  module Types = struct
+    type nonrec state = state
 
-      type parameters = {node_ctxt : Node_context.ro}
-    end
-
-    module Name = struct
-      (* We only have a single committer in the node *)
-      type t = unit
-
-      let encoding = Data_encoding.unit
-
-      let base =
-        (* But we can have multiple instances in the unit tests. This is just to
-           avoid conflicts in the events declarations. *)
-        Commitment_event.section
-        @ [
-            ("publisher"
-            ^
-            if !instances_count = 1 then "" else string_of_int !instances_count
-            );
-          ]
-
-      let pp _ _ = ()
-
-      let equal () () = true
-    end
-
-    module Worker = Worker.MakeSingle (Name) (Request) (Types)
-
-    type worker = Worker.infinite Worker.queue Worker.t
-
-    module Handlers = struct
-      type self = worker
-
-      let on_request :
-          type r request_error.
-          worker ->
-          (r, request_error) Request.t ->
-          (r, request_error) result Lwt.t =
-       fun w request ->
-        let state = Worker.state w in
-        match request with
-        | Request.Publish -> protect @@ fun () -> on_publish_commitments state
-        | Request.Cement -> protect @@ fun () -> on_cement_commitments state
-
-      type launch_error = error trace
-
-      let on_launch _w () Types.{node_ctxt} = return node_ctxt
-
-      let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
-          unit tzresult Lwt.t =
-        let open Lwt_result_syntax in
-        let request_view = Request.view r in
-        let emit_and_return_errors errs =
-          let*! () =
-            Commitment_event.Publisher.request_failed request_view st errs
-          in
-          return_unit
-        in
-        match r with
-        | Request.Publish -> emit_and_return_errors errs
-        | Request.Cement -> emit_and_return_errors errs
-
-      let on_completion _w r _ st =
-        Commitment_event.Publisher.request_completed (Request.view r) st
-
-      let on_no_request _ = Lwt.return_unit
-
-      let on_close _w = Lwt.return_unit
-    end
-
-    let table = Worker.create_table Queue
-
-    let worker_promise, worker_waker = Lwt.task ()
-
-    let init node_ctxt =
-      let open Lwt_result_syntax in
-      let*! () = Commitment_event.starting () in
-      let node_ctxt = Node_context.readonly node_ctxt in
-      let+ worker = Worker.launch table () {node_ctxt} (module Handlers) in
-      Lwt.wakeup worker_waker worker
-
-    (* This is a publisher worker for a single scoru *)
-    let worker =
-      lazy
-        (match Lwt.state worker_promise with
-        | Lwt.Return worker -> ok worker
-        | Lwt.Fail _ | Lwt.Sleep -> error Sc_rollup_node_errors.No_publisher)
-
-    let publish_commitments () =
-      let open Lwt_result_syntax in
-      let*? w = Lazy.force worker in
-      let*! (_pushed : bool) = Worker.Queue.push_request w Request.Publish in
-      return_unit
-
-    let cement_commitments () =
-      let open Lwt_result_syntax in
-      let*? w = Lazy.force worker in
-      let*! (_pushed : bool) = Worker.Queue.push_request w Request.Cement in
-      return_unit
-
-    let shutdown () =
-      let w = Lazy.force worker in
-      match w with
-      | Error _ ->
-          (* There is no publisher, nothing to do *)
-          Lwt.return_unit
-      | Ok w -> Worker.shutdown w
+    type parameters = {node_ctxt : Node_context.ro}
   end
+
+  module Name = struct
+    (* We only have a single committer in the node *)
+    type t = unit
+
+    let encoding = Data_encoding.unit
+
+    let base =
+      (* But we can have multiple instances in the unit tests. This is just to
+         avoid conflicts in the events declarations. *)
+      Commitment_event.section
+      @ [
+          ("publisher"
+          ^ if !instances_count = 1 then "" else string_of_int !instances_count
+          );
+        ]
+
+    let pp _ _ = ()
+
+    let equal () () = true
+  end
+
+  module Worker = Worker.MakeSingle (Name) (Request) (Types)
+
+  type worker = Worker.infinite Worker.queue Worker.t
+
+  module Handlers = struct
+    type self = worker
+
+    let on_request :
+        type r request_error.
+        worker ->
+        (r, request_error) Request.t ->
+        (r, request_error) result Lwt.t =
+     fun w request ->
+      let state = Worker.state w in
+      match request with
+      | Request.Publish -> protect @@ fun () -> on_publish_commitments state
+      | Request.Cement -> protect @@ fun () -> on_cement_commitments state
+
+    type launch_error = error trace
+
+    let on_launch _w () Types.{node_ctxt} = return node_ctxt
+
+    let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
+        unit tzresult Lwt.t =
+      let open Lwt_result_syntax in
+      let request_view = Request.view r in
+      let emit_and_return_errors errs =
+        let*! () =
+          Commitment_event.Publisher.request_failed request_view st errs
+        in
+        return_unit
+      in
+      match r with
+      | Request.Publish -> emit_and_return_errors errs
+      | Request.Cement -> emit_and_return_errors errs
+
+    let on_completion _w r _ st =
+      Commitment_event.Publisher.request_completed (Request.view r) st
+
+    let on_no_request _ = Lwt.return_unit
+
+    let on_close _w = Lwt.return_unit
+  end
+
+  let table = Worker.create_table Queue
+
+  let worker_promise, worker_waker = Lwt.task ()
+
+  let init node_ctxt =
+    let open Lwt_result_syntax in
+    let*! () = Commitment_event.starting () in
+    let node_ctxt = Node_context.readonly node_ctxt in
+    let+ worker = Worker.launch table () {node_ctxt} (module Handlers) in
+    Lwt.wakeup worker_waker worker
+
+  (* This is a publisher worker for a single scoru *)
+  let worker =
+    lazy
+      (match Lwt.state worker_promise with
+      | Lwt.Return worker -> ok worker
+      | Lwt.Fail _ | Lwt.Sleep -> error Sc_rollup_node_errors.No_publisher)
+
+  let publish_commitments () =
+    let open Lwt_result_syntax in
+    let*? w = Lazy.force worker in
+    let*! (_pushed : bool) = Worker.Queue.push_request w Request.Publish in
+    return_unit
+
+  let cement_commitments () =
+    let open Lwt_result_syntax in
+    let*? w = Lazy.force worker in
+    let*! (_pushed : bool) = Worker.Queue.push_request w Request.Cement in
+    return_unit
+
+  let shutdown () =
+    let w = Lazy.force worker in
+    match w with
+    | Error _ ->
+        (* There is no publisher, nothing to do *)
+        Lwt.return_unit
+    | Ok w -> Worker.shutdown w
 end

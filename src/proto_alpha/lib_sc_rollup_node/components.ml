@@ -26,7 +26,7 @@
 
 module Make (PVM : Pvm.S) = struct
   module PVM = PVM
-  module Commitment = Commitment.Make (PVM)
+  module Publisher = Publisher.Make (PVM)
   module Simulation = Simulation.Make (PVM)
   module Refutation_coordinator = Refutation_coordinator.Make (PVM)
   module Batcher = Batcher.Make (Simulation)
