@@ -154,7 +154,11 @@ let load_sampler_for_cycle ctxt cycle =
 let get_stakes_for_selected_index ctxt index =
   let open Lwt_result_syntax in
   let delegation_over_baking_limit =
-    Int64.of_int @@ Constants_storage.delegation_over_baking_limit ctxt
+    Constants_storage.delegation_over_baking_limit ctxt
+  in
+  let delegation_over_baking_limit_plus_1 = delegation_over_baking_limit + 1 in
+  let delegation_over_baking_limit_plus_1_int64 =
+    Int64.of_int delegation_over_baking_limit_plus_1
   in
   Stake_storage.fold_snapshot
     ctxt
@@ -180,12 +184,14 @@ let get_stakes_for_selected_index ctxt index =
       let available_to_freeze = min total_balance frozen_deposits_limit in
       let total_stake_for_cycle =
         match
-          available_to_freeze *? Int64.add 1L delegation_over_baking_limit
+          available_to_freeze *? delegation_over_baking_limit_plus_1_int64
         with
         | Ok max_allowed_stake -> min max_allowed_stake staking_balance
         | Error _max_allowed_stake_overflows -> staking_balance
       in
-      let frozen = available_to_freeze in
+      let frozen =
+        div_exn total_stake_for_cycle delegation_over_baking_limit_plus_1
+      in
       let delegated =
         (* This subtraction should not result in a negative value because the
            staking balance includes the total balance.
