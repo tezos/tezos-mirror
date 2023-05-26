@@ -172,11 +172,10 @@ let gen_locked_value_opt () =
 (* Generates almost uniformly a Zarith element between 2 and [public key].
    Optional argument [rand] allows to use an unsafe function to generate
    randomness for benching. *)
-let rec generate_z ?(rand = Hacl.Rand.gen) () =
+let generate_z ?(rand = Hacl.Rand.gen) () =
   (* A random Z arith element of size [size] bytes *)
   let random_z size = rand size |> Bytes.to_string |> Z.of_bits in
-  let res = Z.erem (random_z (size_rsa2048 + 16)) rsa2048 in
-  if Z.(equal res zero) || Z.(equal res one) then generate_z () else res
+  Z.erem (random_z (size_rsa2048 + 16)) rsa2048
 
 (* The resulting prime has size 256 bits or slightly more. *)
 let hash_to_prime ~time value key =
