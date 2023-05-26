@@ -935,9 +935,58 @@ module Preapply = struct
       ~additionnal_tags:["preapply"; "operations"; "pre"; "consensus"]
     @@ fun protocol -> test_consensus Operation.Preattestation protocol
 
+  let test_double_consensus_evidence double_evidence_kind protocol =
+    let* node, client = Client.init_with_protocol ~protocol `Client () in
+    let* () = Client.bake_for_and_wait ~node client in
+
+    let preapply_op ~use_legacy_name =
+      let* double_consensus_evidence_op =
+        create_double_consensus_evidence
+          ~use_legacy_name
+          ~double_evidence_kind
+          client
+      in
+      let* signature = Operation.sign double_consensus_evidence_op client in
+      let consensus_json =
+        Operation.make_preapply_operation_input
+          ~protocol
+          ~signature
+          double_consensus_evidence_op
+      in
+      let* _ =
+        RPC.Client.call client
+        @@ RPC.post_chain_block_helpers_preapply_operations
+             ~data:(Data (`A [consensus_json]))
+             ()
+      in
+      unit
+    in
+    let* () = preapply_op ~use_legacy_name:true in
+    preapply_op ~use_legacy_name:false
+
+  let test_preapply_double_consensus_evidence =
+    register_test
+      ~title:"Preapply operation with double consensus evidence operations"
+      ~additionnal_tags:["preapply"; "double"; "operations"; "consensus"]
+    @@ fun protocol ->
+    test_double_consensus_evidence
+      Operation.Anonymous.Double_attestation_evidence
+      protocol
+
+  let test_preapply_double_preconsensus_evidence =
+    register_test
+      ~title:"Preapply operation with duoble preconsensus evidence operations"
+      ~additionnal_tags:["preapply"; "double"; "operations"; "pre"; "consensus"]
+    @@ fun protocol ->
+    test_double_consensus_evidence
+      Operation.Anonymous.Double_preattestation_evidence
+      protocol
+
   let register ~protocols =
     test_preapply_consensus protocols ;
-    test_preapply_preconsensus protocols
+    test_preapply_preconsensus protocols ;
+    test_preapply_double_consensus_evidence protocols ;
+    test_preapply_double_preconsensus_evidence protocols
 end
 
 let register ~protocols =
