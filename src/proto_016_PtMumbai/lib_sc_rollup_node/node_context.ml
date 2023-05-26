@@ -48,6 +48,7 @@ type 'a t = {
   pvm : (module Pvm.S);
   fee_parameters : Configuration.fee_parameters;
   protocol_constants : Constants.t;
+  proto_level : int;
   loser_mode : Loser_mode.t;
   lockfile : Lwt_unix.file_descr;
   store : 'a store;
@@ -277,7 +278,7 @@ let check_config config =
   ()
 
 let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
-    mode
+    mode l1_ctxt ~proto_level
     Configuration.(
       {
         sc_rollup_address = rollup_address;
@@ -287,7 +288,6 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
         loser_mode;
         l2_blocks_cache_size;
         dal_node_endpoint;
-        reconnection_delay;
         _;
       } as configuration) =
   let open Lwt_result_syntax in
@@ -315,9 +315,6 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
     Context.load mode (Configuration.default_context_dir data_dir)
   in
   let* () = Context.Rollup.check_or_set_address mode context rollup_address in
-  let* l1_ctxt =
-    Layer1.start ~name:"sc_rollup_node" ~reconnection_delay cctxt
-  in
   let publisher = Configuration.Operator_purpose_map.find Publish operators in
   let* protocol_constants = retrieve_constants cctxt
   and* lcc = get_last_cemented_commitment cctxt rollup_address
@@ -368,6 +365,7 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
       block_finality_time = 2;
       fee_parameters;
       protocol_constants;
+      proto_level;
       loser_mode;
       lockfile;
       store;
@@ -1007,6 +1005,7 @@ module Internal_for_tests = struct
         block_finality_time = 2;
         fee_parameters = Configuration.default_fee_parameters;
         protocol_constants;
+        proto_level = 0;
         loser_mode = Loser_mode.no_failures;
         lockfile;
         store;

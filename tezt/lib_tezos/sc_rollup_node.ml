@@ -352,8 +352,8 @@ let run ?(legacy = false) ?event_level ?event_sections_levels ?loser_mode node
   in
   do_runlike_command ?event_level ?event_sections_levels node cmd
 
-let run ?legacy ?event_level ?event_sections_levels ?loser_mode node
-    rollup_address arguments =
+let run ?legacy ?event_level ?event_sections_levels ?loser_mode
+    ?(wait_ready = true) node rollup_address arguments =
   let* () =
     run
       ?legacy
@@ -364,7 +364,7 @@ let run ?legacy ?event_level ?event_sections_levels ?loser_mode node
       rollup_address
       arguments
   in
-  let* () = wait_for_ready node in
+  let* () = if wait_ready then wait_for_ready node else unit in
   return ()
 
 let spawn_run node rollup_address extra_arguments =

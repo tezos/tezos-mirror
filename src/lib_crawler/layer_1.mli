@@ -34,16 +34,18 @@ type t
 
 (** {2 Monitoring the Layer 1 chain} *)
 
-(** [start ~name ~reconnection_delay cctxt] connects to a Tezos node and starts
-    monitoring new heads. One can iterate on the heads by calling {!iter_heads}
-    on its result. [reconnection_delay] gives an initial delay for the
-    reconnection which is used in an exponential backoff. The [name] is used to
-    differentiate events. *)
+(** [start ~name ~reconnection_delay ?protocols cctxt] connects to a Tezos node
+    and starts monitoring new heads. One can iterate on the heads by calling
+    {!iter_heads} on its result. [reconnection_delay] gives an initial delay for
+    the reconnection which is used in an exponential backoff. The [name] is used
+    to differentiate events. If [protocols] is provided, only heads of these
+    protocols will be monitored. *)
 val start :
   name:string ->
   reconnection_delay:float ->
+  ?protocols:Protocol_hash.t list ->
   #Client_context.full ->
-  t tzresult Lwt.t
+  t Lwt.t
 
 (** [shutdown t] properly shuts the layer 1 down. *)
 val shutdown : t -> unit Lwt.t
@@ -56,6 +58,10 @@ val iter_heads :
   t ->
   (Block_hash.t * Block_header.t -> unit tzresult Lwt.t) ->
   unit tzresult Lwt.t
+
+(** [wait_first t] waits for the first head to appear in the stream and
+    returns it. *)
+val wait_first : t -> (Block_hash.t * Block_header.t) Lwt.t
 
 (** {2 Helper functions for the Layer 1 chain} *)
 

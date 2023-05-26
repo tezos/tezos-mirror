@@ -1440,7 +1440,7 @@ module Make (Parameters : PARAMETERS) = struct
         Signature.Public_key_hash.Map.empty
         signers
     in
-    let* l1_ctxt = Layer_1.start ~name:"injector" ~reconnection_delay cctxt in
+    let*! l1_ctxt = Layer_1.start ~name:"injector" ~reconnection_delay cctxt in
     let* head_protocols = protocols_of_head cctxt in
     let* () =
       Signature.Public_key_hash.Map.iter_es
