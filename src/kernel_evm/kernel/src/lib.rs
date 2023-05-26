@@ -18,6 +18,7 @@ mod blueprint;
 mod error;
 mod genesis;
 mod inbox;
+mod simulation;
 mod storage;
 
 pub fn stage_one<Host: Runtime>(

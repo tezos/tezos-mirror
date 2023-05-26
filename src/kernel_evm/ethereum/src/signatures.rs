@@ -17,9 +17,14 @@ use libsecp256k1::{
     Signature,
 };
 use primitive_types::{H160, H256, U256};
-use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
+use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use sha3::{Digest, Keccak256};
 use thiserror::Error;
+
+use crate::rlp_helpers::{
+    append_h256, append_option, append_vec, decode_field, decode_field_h256,
+    decode_option, next,
+};
 
 #[derive(Error, Debug, PartialEq)]
 pub enum ParityError {
@@ -29,6 +34,7 @@ pub enum ParityError {
     #[error("Couldn't reconstruct parity from V: {0}")]
     V(U256),
 }
+
 #[derive(Error, Debug, PartialEq)]
 pub enum TransactionError {
     #[error("Error reading a hex string: {0}")]
@@ -58,6 +64,7 @@ impl From<TryFromSliceError> for TransactionError {
         Self::SlicingError
     }
 }
+
 /// produces address from a secret key
 pub fn string_to_sk_and_address(
     s: String,
@@ -175,6 +182,7 @@ impl EthereumTransactionCommon {
             Ok((Signature { r, s }, ri))
         }
     }
+
     /// Find the caller address from r and s of the common data
     /// for an Ethereum transaction, ie, what address is associated
     /// with the signature of the message.
@@ -248,17 +256,6 @@ impl EthereumTransactionCommon {
             hex::decode(e).or(Err(DecoderError::Custom("Couldn't parse hex value")))?;
         Self::from_rlp_bytes(&tx)
     }
-
-    fn append_internal_h256(h256: &H256, s: &mut rlp::RlpStream) {
-        if &H256::zero() != h256 {
-            s.append(h256);
-        } else {
-            // we could make the distinction between 0 and null
-            // but we don't, null is encoded as 0
-            // which is not such a big deal as H256 is used for hashed values
-            s.append_empty_data();
-        }
-    }
 }
 
 impl From<String> for EthereumTransactionCommon {
@@ -276,54 +273,6 @@ impl TryFrom<&[u8]> for EthereumTransactionCommon {
     }
 }
 
-/// Decoder helpers
-
-fn next<'a, 'v>(decoder: &mut RlpIterator<'a, 'v>) -> Result<Rlp<'a>, DecoderError> {
-    decoder.next().ok_or(DecoderError::RlpIncorrectListLen)
-}
-
-fn decode_field<T: Decodable>(
-    decoder: &Rlp<'_>,
-    field_name: &'static str,
-) -> Result<T, DecoderError> {
-    let custom_err = |_: DecoderError| (DecoderError::Custom(field_name));
-    decoder.as_val().map_err(custom_err)
-}
-
-fn decode_h256(decoder: &Rlp<'_>) -> Result<H256, DecoderError> {
-    let length = decoder.data()?.len();
-    if length == 32 {
-        Ok(H256::from_slice(decoder.data()?))
-    } else if length < 32 && length > 0 {
-        // there were missing 0 that encoding deleted
-        let missing = 32 - length;
-        let mut full = [0u8; 32];
-        full[missing..].copy_from_slice(decoder.data()?);
-        Ok(H256::from(full))
-    } else if decoder.data()?.is_empty() {
-        // considering the case empty allows to decode unsigned transactions
-        Ok(H256::zero())
-    } else {
-        Err(DecoderError::RlpInvalidLength)
-    }
-}
-
-fn decode_field_h256(
-    decoder: &Rlp<'_>,
-    field_name: &'static str,
-) -> Result<H256, DecoderError> {
-    let custom_err = |_: DecoderError| (DecoderError::Custom(field_name));
-    decode_h256(decoder).map_err(custom_err)
-}
-
-fn decode_field_to(decoder: &Rlp<'_>) -> Result<Option<H160>, DecoderError> {
-    if decoder.is_empty() {
-        Ok(None)
-    } else {
-        let addr: H160 = decode_field(decoder, "to")?;
-        Ok(Some(addr))
-    }
-}
 impl Decodable for EthereumTransactionCommon {
     fn decode(decoder: &Rlp<'_>) -> Result<EthereumTransactionCommon, DecoderError> {
         if decoder.is_list() {
@@ -332,7 +281,7 @@ impl Decodable for EthereumTransactionCommon {
                 let nonce: U256 = decode_field(&next(&mut it)?, "nonce")?;
                 let gas_price: U256 = decode_field(&next(&mut it)?, "gas_price")?;
                 let gas_limit: u64 = decode_field(&next(&mut it)?, "gas_limit")?;
-                let to: Option<H160> = decode_field_to(&next(&mut it)?)?;
+                let to: Option<H160> = decode_option(&next(&mut it)?, "to")?;
                 let value: U256 = decode_field(&next(&mut it)?, "value")?;
                 let data: Vec<u8> = decode_field(&next(&mut it)?, "data")?;
                 let v: U256 = decode_field(&next(&mut it)?, "v")?;
@@ -372,21 +321,12 @@ impl Encodable for EthereumTransactionCommon {
         stream.append(&self.nonce);
         stream.append(&self.gas_price);
         stream.append(&self.gas_limit);
-        if let Some(addr) = self.to {
-            stream.append(&addr);
-        } else {
-            stream.append_empty_data();
-        }
+        append_option(stream, self.to);
         stream.append(&self.value);
-        if self.data.is_empty() {
-            // no data == null, not empty vec
-            stream.append_empty_data();
-        } else {
-            stream.append_iter(self.data.iter().cloned());
-        }
+        append_vec(stream, self.data.clone());
         stream.append(&self.v);
-        Self::append_internal_h256(&self.r, stream);
-        Self::append_internal_h256(&self.s, stream);
+        append_h256(stream, self.r);
+        append_h256(stream, self.s);
         assert!(stream.is_finished());
     }
 }
@@ -402,6 +342,8 @@ impl Into<Vec<u8>> for EthereumTransactionCommon {
 #[cfg(test)]
 mod test {
     use std::ops::Neg;
+
+    use crate::rlp_helpers::decode_h256;
 
     use super::*;
     fn address_from_str(s: &str) -> Option<H160> {
