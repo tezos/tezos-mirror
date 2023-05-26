@@ -71,7 +71,8 @@
   test_sc_rollup_inbox_legacy
   test_sc_rollup_wasm
   test_local_contexts
-  test_dal_slot_proof))
+  test_dal_slot_proof
+  test_adaptive_inflation))
 
 (executable
  (name main)
