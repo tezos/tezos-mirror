@@ -37,6 +37,14 @@ let get_reward_coeff ctxt ~cycle =
     return (Option.value ~default k_opt)
   else return default
 
+let load_reward_coeff ctxt ~cycle =
+  let open Lwt_result_syntax in
+  let* new_reward = get_reward_coeff ctxt ~cycle in
+  let ctxt =
+    Raw_context.update_reward_coeff_for_current_cycle ctxt new_reward
+  in
+  return ctxt
+
 let compute_coeff =
   let q_400 = Q.of_int 400 in
   let q_min_per_year = Q.of_int 525600 in
@@ -91,8 +99,7 @@ let update_stored_rewards_at_cycle_end ctxt ~new_cycle =
   let open Lwt_result_syntax in
   let* ctxt = compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle in
   let*! ctxt = clear_outdated_reward_data ctxt ~new_cycle in
-  let* new_reward = get_reward_coeff ctxt ~cycle:new_cycle in
-  let ctxt =
-    Raw_context.update_reward_coeff_for_current_cycle ctxt new_reward
-  in
-  return ctxt
+  load_reward_coeff ctxt ~cycle:new_cycle
+
+let load_reward_coeff ctxt =
+  load_reward_coeff ctxt ~cycle:(Raw_context.current_level ctxt).cycle

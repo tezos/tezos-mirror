@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [load_reward_coeff ctxt] loads the current cycle's reward coeff from the
+    storage into the context *)
+val load_reward_coeff : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
 (** [update_stored_rewards_at_cycle_end ctxt ~new_cycle] updates
     {!Storage.Reward_coeff} with a new coefficient that will be applied
     [preserved_cycles] cycles after the given [new_cycle]. This new coefficient
