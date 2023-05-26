@@ -26,25 +26,8 @@
 
 open RPC_directory_helpers
 
-(** Durable part of the storage of this PVM. *)
-module type Durable_state = sig
-  type state
-
-  (** [value_length state key] returns the length of data stored
-        for the [key] in the durable storage of the PVM state [state], if any. *)
-  val value_length : state -> string -> int64 option Lwt.t
-
-  (** [lookup state key] returns the data stored
-        for the [key] in the durable storage of the PVM state [state], if any. *)
-  val lookup : state -> string -> bytes option Lwt.t
-
-  (** [subtrees state key] returns subtrees
-        for the [key] in the durable storage of the PVM state [state].
-        Empty list in case if path doesn't exist. *)
-  val list : state -> string -> string list Lwt.t
-end
-
-module Make_RPC (Durable_state : Durable_state with type state = Context.tree) =
+module Make_RPC
+    (Durable_state : Wasm_2_0_0_pvm.Durable_state with type state = Context.tree) =
 struct
   module Block_directory = Make_directory (struct
     include Sc_rollup_services.Global.Block
@@ -89,7 +72,7 @@ struct
     let*! subkeys = Durable_state.list state key in
     return subkeys
 
-  let build_directory =
+  let build_directory node_ctxt =
     register () ;
-    Block_directory.build_directory
+    Block_directory.build_directory node_ctxt
 end

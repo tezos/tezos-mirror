@@ -63,21 +63,20 @@ module type S = sig
     Protocol.Alpha_context.Sc_rollup.Commitment.t ->
     unit tzresult Lwt.t
 
-  (** Worker for publishing and cementing commitments. *)
-  module Publisher : sig
-    val init : _ Node_context.t -> unit tzresult Lwt.t
+  (** Initialize worker for publishing and cementing commitments. *)
+  val init : _ Node_context.t -> unit tzresult Lwt.t
 
-    (** [publish_commitments node_ctxt] publishes the commitments that were not
+  (** [publish_commitments node_ctxt] publishes the commitments that were not
       yet published up to the finalized head and which are after the last
       cemented commitment. *)
-    val publish_commitments : unit -> unit tzresult Lwt.t
+  val publish_commitments : unit -> unit tzresult Lwt.t
 
-    (** [cement_commitments node_ctxt] cements the commitments that can be
+  (** [cement_commitments node_ctxt] cements the commitments that can be
       cemented, i.e. the commitments that are after the current last cemented
       commitment and which have [sc_rollup_challenge_period] levels on top of
       them since they were originally published.  *)
-    val cement_commitments : unit -> unit tzresult Lwt.t
+  val cement_commitments : unit -> unit tzresult Lwt.t
 
-    val shutdown : unit -> unit Lwt.t
-  end
+  (** Stop worker for publishing and cementing commitments. *)
+  val shutdown : unit -> unit Lwt.t
 end

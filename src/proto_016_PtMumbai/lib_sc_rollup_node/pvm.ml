@@ -32,6 +32,7 @@ module type S = sig
   include
     Sc_rollup.PVM.S
       with type context = Context.rw_index
+       and type state = Context.tree
        and type hash = Sc_rollup.State_hash.t
 
   (** Kind of the PVM (same as {!name}).  *)
@@ -68,11 +69,6 @@ module type S = sig
     start_chunk:Sc_rollup.Dissection_chunk.t ->
     our_stop_chunk:Sc_rollup.Dissection_chunk.t ->
     Sc_rollup.Tick.t list
-
-  module RPC : sig
-    (** Build RPC directory of the PVM *)
-    val build_directory : Node_context.rw -> unit Environment.RPC_directory.t
-  end
 
   (** State storage for this PVM. *)
   module State : sig
