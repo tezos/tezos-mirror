@@ -30,7 +30,7 @@ let fv s = Free_variable.of_namespace (ns s)
 let gas_full t_kind code_or_data =
   let name =
     Format.asprintf
-      "%a_%a"
+      "%a_%a_gas"
       Translator_workload.pp_kind
       t_kind
       Translator_workload.pp_code_or_data
@@ -43,7 +43,7 @@ let gas_full t_kind code_or_data =
 let size_full t_kind code_or_data =
   let name =
     Format.asprintf
-      "%a_%a"
+      "%a_%a_size"
       Translator_workload.pp_kind
       t_kind
       Translator_workload.pp_code_or_data

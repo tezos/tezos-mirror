@@ -59,7 +59,7 @@ module Size_benchmarks_shared_config = struct
       ~conv:(function {size} -> (size, ()))
       ~model:
         (Model.affine
-           ~name:(ns "size_based_model")
+           ~name:(ns name)
            ~intercept:intercept_variable
            ~coeff:coeff_variable)
 end
