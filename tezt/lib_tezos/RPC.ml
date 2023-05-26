@@ -514,8 +514,10 @@ let post_chain_block_helpers_preapply_block ?(chain = "main") ?(block = "head")
     Fun.id
 
 let post_chain_block_helpers_preapply_operations ?(chain = "main")
-    ?(block = "head") ~data () =
+    ?(block = "head") ?version ~data () =
+  let query_string = Query_arg.opt "version" Fun.id version in
   make
+    ~query_string
     ~data
     POST
     ["chains"; chain; "blocks"; block; "helpers"; "preapply"; "operations"]
