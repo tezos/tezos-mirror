@@ -182,8 +182,10 @@ let get_stakes_for_selected_index ctxt index =
       let* total_stake_for_cycle =
         if frozen <= overflow_bound then
           let*? frozen_times_100 = frozen *? 100L in
-          let*? v = frozen_times_100 /? frozen_deposits_percentage in
-          return (min v staking_balance)
+          let*? max_allowed_stake =
+            frozen_times_100 /? frozen_deposits_percentage
+          in
+          return (min max_allowed_stake staking_balance)
         else
           let*? sbal = staking_balance /? 100L in
           let*? a = frozen /? frozen_deposits_percentage in
