@@ -166,7 +166,7 @@ type t = {
   consensus_committee_size : int;
   consensus_threshold : int;
   max_slashing_period : int;
-  frozen_deposits_percentage : int;
+  delegation_over_baking_limit : int;
   percentage_of_frozen_deposits_slashed_per_double_baking : int;
   percentage_of_frozen_deposits_slashed_per_double_endorsement : int;
   testnet_dictator : Signature.Public_key_hash.t option;
@@ -428,7 +428,7 @@ let encoding =
               c.consensus_threshold ),
             ( ( c.minimal_participation_ratio,
                 c.max_slashing_period,
-                c.frozen_deposits_percentage,
+                c.delegation_over_baking_limit,
                 c.percentage_of_frozen_deposits_slashed_per_double_baking,
                 c.percentage_of_frozen_deposits_slashed_per_double_endorsement,
                 c.testnet_dictator,
@@ -465,7 +465,7 @@ let encoding =
                  consensus_threshold ),
                ( ( minimal_participation_ratio,
                    max_slashing_period,
-                   frozen_deposits_percentage,
+                   delegation_over_baking_limit,
                    percentage_of_frozen_deposits_slashed_per_double_baking,
                    percentage_of_frozen_deposits_slashed_per_double_endorsement,
                    testnet_dictator,
@@ -503,7 +503,7 @@ let encoding =
         max_slashing_period;
         consensus_committee_size;
         consensus_threshold;
-        frozen_deposits_percentage;
+        delegation_over_baking_limit;
         percentage_of_frozen_deposits_slashed_per_double_baking;
         percentage_of_frozen_deposits_slashed_per_double_endorsement;
         testnet_dictator;
@@ -555,7 +555,7 @@ let encoding =
                 (obj7
                    (req "minimal_participation_ratio" Ratio_repr.encoding)
                    (req "max_slashing_period" int31)
-                   (req "frozen_deposits_percentage" int31)
+                   (req "delegation_over_baking_limit" uint8)
                    (req
                       "percentage_of_frozen_deposits_slashed_per_double_baking"
                       uint8)

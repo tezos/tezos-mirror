@@ -179,7 +179,7 @@ let constants_mainnet =
     (* 4667 slots *)
     minimal_participation_ratio = {numerator = 2; denominator = 3};
     max_slashing_period = 2;
-    frozen_deposits_percentage = 10;
+    delegation_over_baking_limit = 9;
     percentage_of_frozen_deposits_slashed_per_double_baking = 11;
     percentage_of_frozen_deposits_slashed_per_double_endorsement = 50;
     (* The `testnet_dictator` should absolutely be None on mainnet *)
@@ -341,7 +341,7 @@ let constants_sandbox =
     consensus_committee_size = 256;
     consensus_threshold = 0;
     max_slashing_period = 2;
-    frozen_deposits_percentage = 5;
+    delegation_over_baking_limit = 19;
   }
 
 let constants_test =
@@ -375,11 +375,10 @@ let constants_test =
     consensus_committee_size;
     consensus_threshold (* 17 slots *);
     max_slashing_period = 2;
-    frozen_deposits_percentage =
-      5
-      (* not 10 so that multiplication and
-         divisions do not easily get
-         intermingled *);
+    delegation_over_baking_limit =
+      19
+      (* Not 9 so that multiplication by a percentage and
+         divisions by a limit do not easily get intermingled. *);
   }
 
 let test_commitments =

@@ -129,8 +129,8 @@ let test_invariants () =
     Test_tez.(
       (* in this particular example, if we follow the calculation of the active
          stake, it is precisely the new_staking_balance *)
-      new_staking_balance /! 100L
-      *! Int64.of_int constants.frozen_deposits_percentage)
+      new_staking_balance
+      /! Int64.of_int (constants.delegation_over_baking_limit + 1))
   in
   Assert.equal_tez ~loc:__LOC__ new_frozen_deposits expected_new_frozen_deposits
 
@@ -148,7 +148,7 @@ let test_set_limit balance_percentage () =
   Context.Delegate.current_frozen_deposits (B genesis) account1
   >>=? fun frozen_deposits ->
   let expected_deposits =
-    full_balance *! Int64.of_int constants.frozen_deposits_percentage /! 100L
+    full_balance /! Int64.of_int (constants.delegation_over_baking_limit + 1)
   in
   Assert.equal_tez ~loc:__LOC__ frozen_deposits expected_deposits >>=? fun () ->
   (* Bake until end of first cycle *)
@@ -157,7 +157,7 @@ let test_set_limit balance_percentage () =
   Context.Delegate.current_frozen_deposits (B genesis) account1
   >>=? fun frozen_deposits ->
   let expected_deposits =
-    full_balance *! Int64.of_int constants.frozen_deposits_percentage /! 100L
+    full_balance /! Int64.of_int (constants.delegation_over_baking_limit + 1)
   in
   Assert.equal_tez ~loc:__LOC__ frozen_deposits expected_deposits >>=? fun () ->
   (* set deposits limit to balance_percentage out of the balance *)
@@ -485,8 +485,7 @@ let test_frozen_deposits_with_delegation () =
     Test_tez.(
       initial_frozen_deposits
       +! delegated_amount
-         *! Int64.of_int constants.frozen_deposits_percentage
-         /! 100L)
+         /! Int64.of_int (constants.delegation_over_baking_limit + 1))
   in
   Context.Delegate.current_frozen_deposits (B b) account1
   >>=? fun new_frozen_deposits ->
@@ -589,7 +588,7 @@ let test_frozen_deposits_with_overdelegation () =
   loop b cycles_to_bake >>=? fun (_b : Block.t) -> return_unit
 
 let test_set_limit_with_overdelegation () =
-  let constants = {constants with frozen_deposits_percentage = 10} in
+  let constants = {constants with delegation_over_baking_limit = 9} in
   Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
   let (contract1, account1), (contract2, account2) =
     get_first_2_accounts_contracts contracts

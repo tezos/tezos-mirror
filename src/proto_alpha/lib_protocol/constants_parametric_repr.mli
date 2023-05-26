@@ -194,8 +194,8 @@ type t = {
   (* in slots *)
   max_slashing_period : int;
   (* in cycles *)
-  frozen_deposits_percentage : int;
-  (* that is, (100 * delegated tz / own tz) *)
+  delegation_over_baking_limit : int;
+  (* upper bound on the (delegated tz / own frozen tz) ratio *)
   percentage_of_frozen_deposits_slashed_per_double_baking : int;
   percentage_of_frozen_deposits_slashed_per_double_endorsement : int;
   testnet_dictator : Signature.Public_key_hash.t option;

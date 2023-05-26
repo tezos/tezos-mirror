@@ -153,8 +153,8 @@ let load_sampler_for_cycle ctxt cycle =
 
 let get_stakes_for_selected_index ctxt index =
   let open Lwt_result_syntax in
-  let frozen_deposits_percentage =
-    Int64.of_int @@ Constants_storage.frozen_deposits_percentage ctxt
+  let delegation_over_baking_limit =
+    Int64.of_int @@ Constants_storage.delegation_over_baking_limit ctxt
   in
   Stake_storage.fold_snapshot
     ctxt
@@ -179,18 +179,9 @@ let get_stakes_for_selected_index ctxt index =
       in
       let frozen = min total_balance frozen_deposits_limit in
       let* total_stake_for_cycle =
-        match frozen *? 100L with
-        | Ok frozen_times_100 ->
-            let*? max_allowed_stake =
-              frozen_times_100 /? frozen_deposits_percentage
-            in
-            return (min max_allowed_stake staking_balance)
-        | Error _frozen_times_100_overflows ->
-            let*? staking_balance_div_100 = staking_balance /? 100L in
-            let*? frozen_div_fdp = frozen /? frozen_deposits_percentage in
-            if staking_balance_div_100 <= frozen_div_fdp then
-              return staking_balance
-            else Lwt.return (max_mutez /? frozen_deposits_percentage)
+        match frozen *? Int64.add 1L delegation_over_baking_limit with
+        | Ok max_allowed_stake -> return (min max_allowed_stake staking_balance)
+        | Error _max_allowed_stake_overflows -> return staking_balance
       in
       let delegated =
         (* This subtraction should not result in a negative value because the

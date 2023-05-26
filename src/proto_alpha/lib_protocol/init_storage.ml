@@ -110,21 +110,16 @@ let patch_script ctxt (address, hash, patched_code) =
 let migrate_stake_distribution_for_o ctxt =
   let open Lwt_result_syntax in
   let convert =
-    let max_delegated_percentage =
-      let frozen_deposits_percentage =
-        Constants_storage.frozen_deposits_percentage ctxt
-      in
-      Int64.of_int (100 - frozen_deposits_percentage)
+    let delegation_over_baking_limit =
+      Constants_storage.delegation_over_baking_limit ctxt
     in
     fun old_stake ->
-      let delegated =
-        match Tez_repr.(old_stake *? max_delegated_percentage) with
-        | Error _unexpected_overflow -> Tez_repr.zero
-        | Ok delegated_times_100 -> Tez_repr.div_exn delegated_times_100 100
+      let frozen =
+        Tez_repr.div_exn old_stake (delegation_over_baking_limit + 1)
       in
-      match Tez_repr.sub_opt old_stake delegated with
+      match Tez_repr.sub_opt old_stake frozen with
+      | Some delegated -> Stake_repr.make ~frozen ~delegated
       | None -> Stake_repr.make ~frozen:old_stake ~delegated:Tez_repr.zero
-      | Some frozen -> Stake_repr.make ~frozen ~delegated
   in
   let* ctxt =
     Storage.Stake.Total_active_stake_up_to_Nairobi.fold

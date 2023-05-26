@@ -219,14 +219,11 @@ let check_constants constants =
     (Invalid_protocol_constants
        "The unfreeze delay must be strictly greater than 0.")
   >>? fun () ->
-  (* The [frozen_deposits_percentage] should be a percentage *)
+  (* The [delegation_over_baking_limit] should be non-negative. *)
   error_unless
-    Compare.Int.(
-      constants.frozen_deposits_percentage > 0
-      && constants.frozen_deposits_percentage <= 100)
+    Compare.Int.(constants.delegation_over_baking_limit >= 0)
     (Invalid_protocol_constants
-       "The frozen percentage ratio must be strictly greater than 0 and less \
-        or equal than 100.")
+       "The delegation over baking limit must be greater than or equal to 0.")
   >>? fun () ->
   error_unless
     Compare.Int.(

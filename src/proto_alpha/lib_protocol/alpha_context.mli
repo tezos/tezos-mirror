@@ -883,7 +883,7 @@ module Constants : sig
       consensus_committee_size : int;
       consensus_threshold : int;
       max_slashing_period : int;
-      frozen_deposits_percentage : int;
+      delegation_over_baking_limit : int;
       percentage_of_frozen_deposits_slashed_per_double_baking : int;
       percentage_of_frozen_deposits_slashed_per_double_endorsement : int;
       testnet_dictator : public_key_hash option;
@@ -969,7 +969,7 @@ module Constants : sig
 
   val max_slashing_period : context -> int
 
-  val frozen_deposits_percentage : context -> int
+  val delegation_over_baking_limit : context -> int
 
   val percentage_of_frozen_deposits_slashed_per_double_baking : context -> int
 
