@@ -2330,6 +2330,11 @@ module Make (C : AUTOMATON_CONFIG) :
       | None -> []
       | Some fanout_peers -> Peer.Set.elements fanout_peers.peers
 
+    let get_peer_score peer {scores; _} =
+      match Peer.Map.find peer scores with
+      | None -> Score.zero
+      | Some score -> Score.value score
+
     let limits state = state.limits
 
     let has_joined topic {mesh; _} = Topic.Map.mem topic mesh

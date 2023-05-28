@@ -913,6 +913,9 @@ module type AUTOMATON = sig
     (** [get_fanout_peers topic state] returns the fanout peers of [topic]. *)
     val get_fanout_peers : Topic.t -> view -> Peer.t list
 
+    (** [get_peer_score peer view] returns the score of [peer]. *)
+    val get_peer_score : Peer.t -> view -> Score.value
+
     val limits : view -> limits
 
     (** [has_joined topic view] returns true if and only if the automaton is
