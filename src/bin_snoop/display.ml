@@ -522,7 +522,7 @@ let raw_workload (workload_data : (Sparse_vec.String.t * float array) list) =
 
 let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
   let (Measure.Measurement ((module Bench), measurement)) = measure in
-  let filename ?index kind =
+  let filename_prefix ?index kind =
     let dir = options.save_directory in
     let kind =
       match index with None -> kind | Some i -> Format.asprintf "%s-%d" kind i
@@ -530,7 +530,7 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
     Filename.Infix.(
       dir
       // Format.asprintf
-           "%a_%s_%s.pdf"
+           "%a_%s_%s"
            Namespace.pp_short
            Bench.name
            model_name
@@ -560,7 +560,8 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
         | Save ->
             List.mapi
               (fun i plot ->
-                let pdf_file = filename ~index:i kind in
+                let prefix = filename_prefix ~index:i kind in
+                let pdf_file = prefix ^ ".pdf" in
                 let target = pdf ?cm_size:(pdf_cm_size options) ~pdf_file () in
                 Plot.run ~target ~detach:true plot ;
                 pdf_file)
@@ -583,7 +584,8 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
                     x11)
             in
             let plots = Array.of_list (List.map (fun x -> [|Some x|]) plots) in
-            Plot.run_matrix ~target ~detach:true plots ;
+            let plot_file = filename_prefix kind ^ ".plot" in
+            Plot.run_matrix ~target ~detach:true plots ~filename:plot_file ;
             [])
     | Error msg ->
         Format.eprintf "Failed performing plot: %s@." msg ;

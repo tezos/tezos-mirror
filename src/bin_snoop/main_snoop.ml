@@ -808,7 +808,8 @@ module Auto_build = struct
         in
         (providers, providers_map))
 
-  let infer mkfilename local_model_name measurements solution infer_opts =
+  let infer ~outdir mkfilename local_model_name measurements solution infer_opts
+      =
     let solver = "lasso" in
     let csv_export = mkfilename ".sol.csv" in
     (* If [csv_export] already exists, it must be removed first,
@@ -826,6 +827,7 @@ module Auto_build = struct
         dot_file = Some dot_file;
         lasso_positive = true;
         report = ReportToFile report_file;
+        display = {infer_opts.Cmdline.display with save_directory = outdir};
       }
     in
     let solution =
@@ -960,6 +962,7 @@ module Auto_build = struct
             (* Infernece *)
             let solution =
               infer
+                ~outdir
                 mkfilename
                 local_model_name
                 measurements
