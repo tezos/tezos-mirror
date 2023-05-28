@@ -562,7 +562,7 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
               (fun i plot ->
                 let pdf_file = filename ~index:i kind in
                 let target = pdf ?cm_size:(pdf_cm_size options) ~pdf_file () in
-                Plot.run ~target exec_detach plot ;
+                Plot.run ~target ~detach:true plot ;
                 pdf_file)
               plots
         | Show ->
@@ -583,7 +583,7 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
                     x11)
             in
             let plots = Array.of_list (List.map (fun x -> [|Some x|]) plots) in
-            Plot.run_matrix ~target exec_detach plots ;
+            Plot.run_matrix ~target ~detach:true plots ;
             [])
     | Error msg ->
         Format.eprintf "Failed performing plot: %s@." msg ;
