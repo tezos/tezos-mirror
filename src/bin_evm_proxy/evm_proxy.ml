@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Evm_proxy_lib
+
 type rollup_node_endpoint = Mockup | Endpoint of Uri.t
 
 type config = {

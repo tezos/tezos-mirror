@@ -40,11 +40,13 @@ module JSONRPC : sig
   type id = id_repr option
 
   (** JSON-RPC Request object:
-      { "jsonrpc" : "2.0",
-        "method": <string>,
-        "params": <array | object>, //optional
-        "id": <string | number | NULL> //optional
-      }
+  {@js[
+    { "jsonrpc" : "2.0",
+    "method": <string>,
+    "params": <array | object>, //optional
+    "id": <string | number | NULL> //optional
+    }
+    ]}
   *)
   type 'params request = {
     method_ : string;
@@ -56,21 +58,25 @@ module JSONRPC : sig
     string -> 'a Data_encoding.t -> 'a request Data_encoding.t
 
   (** JSON-RPC Error representation.
+  {@js[
       { "code" : <number>,
         "message": <string>,
         "data": <any value>
       }
+    ]}
   *)
   type 'data error = {code : int; message : string; data : 'data option}
 
   val error_encoding : 'a Data_encoding.t -> 'a error Data_encoding.t
 
   (** JSON-RPC Response object:
+  {@js[
       { "jsonrpc": "2.0",
         "result": <any>,
         "error": <error object>,
         "id": <id>
       }
+    ]}
 
       Note that `result` and `error` cannot appear at the same time, hence the
       choice of using the result type as representation. *)
@@ -133,7 +139,7 @@ module type METHOD = sig
   (** Variant representing the method's response. *)
   type output += Output of m_output rpc_result
 
-  (** See {METHOD_DEF.method_}. *)
+  (** See METHOD_DEF.method_ *)
   val method_ : string
 
   val request_encoding : m_input JSONRPC.request Data_encoding.t
@@ -162,7 +168,7 @@ module MethodMaker : functor (M : METHOD_DEF) ->
 val methods : (module METHOD) list
 
 (** [Input] defines the input encoding matching the defined methods in
-    {methods}. *)
+    [methods]. *)
 module Input : sig
   type t = input
 
@@ -170,7 +176,7 @@ module Input : sig
 end
 
 (** [Output] defines the output encoding matching the defined methods in
-    {methods}. *)
+    [methods]. *)
 module Output : sig
   type nonrec 'a result = ('a, error JSONRPC.error) result
 

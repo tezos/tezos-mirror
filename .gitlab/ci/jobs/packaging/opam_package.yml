@@ -306,7 +306,11 @@ opam:octez-distributed-lwt-internal:
 
 # Ignoring unreleased package octez-epoxy-tx.
 
+# Ignoring unreleased package octez-evm-chunker.
+
 # Ignoring unreleased package octez-evm-proxy.
+
+# Ignoring unreleased package octez-evm-proxy-lib.
 
 opam:octez-injector:
   extends:
