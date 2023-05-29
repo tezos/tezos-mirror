@@ -579,6 +579,8 @@ let call_encoding =
     values. I.e., the `txpool_` encodes it as:
 
     ```
+    {@js[
+
     { "address1" :
       { "counter1" : <transaction object of counter 1>,
         "counter2" : <transaction object of counter 2>,
@@ -591,6 +593,7 @@ let call_encoding =
       },
       ...
     }
+    ]}
     ```
 
     As such, the encoding uses Ezjsonm representation directly to encode and
