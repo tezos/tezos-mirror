@@ -455,3 +455,47 @@ let scenario_with_layer1_legacy_and_rollup_nodes
             pvm_name
             threshold
             committee_members))
+
+module Call_endpoint = struct
+  module V0 = struct
+    let get_preimage dac_node page_hash =
+      RPC.call dac_node (Dac_rpc.V0.get_preimage page_hash)
+
+    let post_store_preimage dac_node ~payload ~pagination_scheme =
+      RPC.call
+        dac_node
+        (Dac_rpc.V0.post_store_preimage ~payload ~pagination_scheme)
+
+    let get_verify_signature dac_node external_message =
+      RPC.call dac_node (Dac_rpc.V0.get_verify_signature external_message)
+
+    let put_dac_member_signature dac_node ~hex_root_hash ~dac_member_pkh
+        ~signature =
+      RPC.call
+        dac_node
+        (Dac_rpc.V0.put_dac_member_signature
+           ~hex_root_hash
+           ~dac_member_pkh
+           ~signature)
+
+    let get_missing_page dac_node ~hex_root_hash =
+      RPC.call dac_node (Dac_rpc.V0.get_missing_page ~hex_root_hash)
+
+    let get_certificate dac_node ~hex_root_hash =
+      RPC.call dac_node (Dac_rpc.V0.get_certificate ~hex_root_hash)
+
+    module Coordinator = struct
+      let post_preimage dac_node ~payload =
+        RPC.call dac_node (Dac_rpc.V0.Coordinator.post_preimage ~payload)
+    end
+  end
+
+  module V1 = struct
+    let get_pages dac_node page_hash =
+      RPC.call dac_node (Dac_rpc.V1.get_pages page_hash)
+  end
+
+  let get_health_live dac_node = RPC.call dac_node Dac_rpc.get_health_live
+
+  let get_health_ready dac_node = RPC.call dac_node Dac_rpc.get_health_ready
+end
