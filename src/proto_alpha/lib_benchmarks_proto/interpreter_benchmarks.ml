@@ -3091,6 +3091,7 @@ module Registration_section = struct
       simple_benchmark
         ~check
         ~name:Interpreter_workload.N_IPairing_check_bls12_381
+        ~intercept_stack:(Script_list.empty, eos)
         ~stack_type:(list p @$ bot)
         ~kinstr:(IPairing_check_bls12_381 (dummy_loc, halt))
         ()
