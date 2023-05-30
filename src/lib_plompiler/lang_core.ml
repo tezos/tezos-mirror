@@ -32,6 +32,12 @@ module type NUM = sig
 
   type 'a t
 
+  val constant : S.t -> scalar repr t
+
+  val zero : scalar repr t
+
+  val one : scalar repr t
+
   val range_check : nb_bits:int -> scalar repr -> unit repr t
 
   val custom :
@@ -197,8 +203,6 @@ module type COMMON = sig
   val assert_equal : 'a repr -> 'a repr -> unit repr t
 
   val equal : 'a repr -> 'a repr -> bool repr t
-
-  val constant_scalar : S.t -> scalar repr t
 
   (** Returns a list of Boolean variables representing the little endian
     bit decomposition of the given scalar (with the least significant bit

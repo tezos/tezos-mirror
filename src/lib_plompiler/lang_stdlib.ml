@@ -435,7 +435,7 @@ module Lib (C : COMMON) = struct
 
     let pow x n_list =
       let* init =
-        let* left = constant_scalar S.one in
+        let* left = Num.one in
         ret (left, x)
       in
       let* res, _acc =
@@ -462,7 +462,7 @@ module Lib (C : COMMON) = struct
           let* res = Num.add ~qc ~ql ~qr x1 x2 in
           fold2M (fun acc x ql -> Num.add ~ql x acc) res xs qs
       | [x], [ql] -> Num.add_constant ~ql qc x
-      | [], [] -> constant_scalar qc
+      | [], [] -> Num.constant qc
       | _, _ -> assert false
 
     let mul_list l =
@@ -473,7 +473,7 @@ module Lib (C : COMMON) = struct
     (* Evaluates P(X) = \sum_i bᵢ Xⁱ at 2 with Horner's method:
        P(2) = b₀ + 2 (b₁+ 2 (b₂ + 2(…))). *)
     let scalar_of_bytes b =
-      let* zero = constant_scalar S.zero in
+      let* zero = Num.zero in
       foldM
         (fun acc b -> add acc (scalar_of_bool b) ~ql:S.(one + one) ~qr:S.one)
         zero

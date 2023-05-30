@@ -180,8 +180,6 @@ let rec foldM f e l =
 
 let scalar_of_bool (B b) = if b then S (X S.one) else S (X S.zero)
 
-let constant_scalar x = ret @@ Input.s x
-
 let unsafe_bool_of_scalar (S (X s)) = if S.(eq s one) then B true else B false
 
 module Num = struct
@@ -258,6 +256,12 @@ module Num = struct
   let pow5 sl =
     let l = of_s sl in
     ret @@ S (X S.(pow l (Z.of_int 5)))
+
+  let constant : S.t -> scalar repr t = fun s -> ret (S (X s))
+
+  let zero = constant S.zero
+
+  let one = constant S.one
 end
 
 module Bool = struct

@@ -337,7 +337,7 @@ functor
       assert (Utils.is_power_of_2 Params.base) ;
       iterM (Num.range_check ~nb_bits:(Z.log2 Params.base)) (of_list i) >* ret i
 
-    let constant n = mapM constant_scalar @@ scalar_limbs_of_z n <$> to_list
+    let constant n = mapM Num.constant @@ scalar_limbs_of_z n <$> to_list
 
     let zero = constant Z.zero
 

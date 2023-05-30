@@ -193,7 +193,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       with_label ~label:"zs"
       @@
       let nb_bits = S.size_in_bytes in
-      let* n_repr = constant_scalar n in
+      let* n_repr = Num.constant n in
       let* n_bytes = bits_of_scalar ~nb_bits n_repr in
       let* xn = Num.pow x (of_list n_bytes) in
       Num.add_constant S.(negate one) xn
@@ -207,7 +207,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     let sum_alpha_i list_circuit alpha =
       let list_circuit = List.rev list_circuit in
       match list_circuit with
-      | [] -> constant_scalar S.zero
+      | [] -> Num.zero
       | init :: list_circuit ->
           foldM
             (fun acc circuit ->
@@ -218,13 +218,13 @@ module V (Main : Aggregation.Main_protocol.S) = struct
 
     (* Circuit that computes (x₀ + αx₁ + α²x₂ + …) for list_circuit = [x₀, x₁, x₂, …] and ignores the coefficients when corresponding switch is false ; for instance, if switch₁ = 0 and all other switches are 1, it will compute (x₀ + αx₂ + α²x₃ + …) *)
     let sum_alpha_i_switched switches list_circuit alpha =
-      let* zero = constant_scalar S.zero in
+      let* zero = Num.zero in
       let* alpha_min_one = Num.add ~qc:S.(negate one) alpha zero in
       let nb_proofs = List.length switches in
       let list_circuit = List.rev list_circuit in
       let switches = List.rev switches in
       match list_circuit with
-      | [] -> constant_scalar S.zero
+      | [] -> Num.zero
       | list_circuit ->
           let* res, _ =
             fold2M

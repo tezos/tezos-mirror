@@ -497,18 +497,6 @@ let deserialize : type a. S.t array -> a Input.t -> a Input.t =
   in
   fun a (w, check) -> (fst @@ aux a w 0, check)
 
-let constant_scalar s =
-  let*& o = fresh Dummy.scalar in
-  append
-    [|
-      CS.new_constraint
-        ~wires:[0; 0; o]
-        ~qc:s
-        ~linear:[(wqo, mone)]
-        "constant_scalar";
-    |]
-  >* ret (Scalar o)
-
 let scalar_of_bool (Bool b) = Scalar b
 
 let unsafe_bool_of_scalar (Scalar b) = Bool b
@@ -676,6 +664,22 @@ module Num = struct
     in
     let solver = Pow5 {a = l; c = o} in
     append gate ~solver >* ret @@ Scalar o
+
+  let constant s =
+    let*& o = fresh Dummy.scalar in
+    append
+      [|
+        CS.new_constraint
+          ~wires:[0; 0; o]
+          ~qc:s
+          ~linear:[(wqo, mone)]
+          "constant_scalar";
+      |]
+    >* ret (Scalar o)
+
+  let zero = constant S.zero
+
+  let one = constant S.one
 end
 
 module Bool = struct
@@ -688,7 +692,7 @@ module Bool = struct
   let constant : bool -> bool repr t =
    fun b ->
     let s = if b then S.one else S.zero in
-    let* (Scalar s) = constant_scalar s in
+    let* (Scalar s) = Num.constant s in
     ret (Bool s)
 
   let assert_true (Bool bit) =

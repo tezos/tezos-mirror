@@ -65,7 +65,7 @@ let rc_circuit n nb_range_checks nb_bits =
      [rc] is true, it adds a range check on every input *)
   let circuit rc inputs =
     let* inputs = mapM input inputs in
-    let* i1 = constant_scalar S.zero in
+    let* i1 = Num.zero in
     let l = List.init (1 lsl n) (Fun.const i1) in
     let i = ref 0 in
     let* foo =

@@ -214,7 +214,7 @@ module Make_ModAdd (MOD_ARITH : Plompiler__Gadget_mod_arith.MOD_ARITH) :
     *)
     let open L in
     let xs, ys, zs, qm, t_infos = get_values wires wires_g in
-    let* zero = constant_scalar Scalar.zero in
+    let* zero = Num.zero in
     map2M
       (fun mj t_info ->
         (* \sum_i ((B^i mod m) mod mj) * (x_i + y_i - z_i)
