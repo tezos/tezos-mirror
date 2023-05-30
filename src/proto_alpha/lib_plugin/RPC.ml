@@ -430,7 +430,9 @@ module Scripts = struct
           (obj2
              (req "operation" Operation.encoding_with_legacy_attestation_name)
              (req "chain_id" Chain_id.encoding))
-        ~output:Apply_results.operation_data_and_metadata_encoding
+        ~output:
+          Apply_results
+          .operation_data_and_metadata_encoding_with_legacy_attestation_name
         RPC_path.(path / "run_operation")
 
     let simulate_query =
@@ -464,7 +466,9 @@ module Scripts = struct
              (req "operation" Operation.encoding_with_legacy_attestation_name)
              (req "chain_id" Chain_id.encoding)
              (dft "latency" int16 default_operation_inclusion_latency))
-        ~output:Apply_results.operation_data_and_metadata_encoding
+        ~output:
+          Apply_results
+          .operation_data_and_metadata_encoding_with_legacy_attestation_name
         RPC_path.(path / "simulate_operation")
 
     let entrypoint_type =

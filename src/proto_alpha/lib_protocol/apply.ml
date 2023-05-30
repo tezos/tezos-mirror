@@ -1767,14 +1767,14 @@ let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
     | Application _ | Partial_construction _ -> ctxt
   in
   let mk_preendorsement_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
-      preendorsement_power =
+      consensus_power =
     Single_result
       (Preendorsement_result
          {
            balance_updates = [];
            delegate;
            consensus_key = consensus_pkh;
-           preendorsement_power;
+           consensus_power;
          })
   in
   match mode with
@@ -1808,14 +1808,14 @@ let record_endorsement ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.endorsement contents_result_list) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let mk_endorsement_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
-      endorsement_power =
+      consensus_power =
     Single_result
       (Endorsement_result
          {
            balance_updates = [];
            delegate;
            consensus_key = consensus_pkh;
-           endorsement_power;
+           consensus_power;
          })
   in
   match mode with
