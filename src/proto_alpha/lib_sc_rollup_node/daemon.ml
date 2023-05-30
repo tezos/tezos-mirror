@@ -392,7 +392,7 @@ let rec process_head (daemon_components : (module Daemon_components.S))
         Sc_rollup_block.
           {
             block_hash = head.hash;
-            level;
+            level = head.level;
             predecessor = predecessor.hash;
             commitment_hash;
             previous_commitment_hash;
@@ -402,7 +402,13 @@ let rec process_head (daemon_components : (module Daemon_components.S))
           }
       in
       let l2_block =
-        Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
+        Sc_rollup_block.
+          {
+            header;
+            content = ();
+            num_ticks;
+            initial_tick = Sc_rollup.Tick.to_z initial_tick;
+          }
       in
       let* () =
         Node_context.mark_finalized_level
@@ -428,12 +434,7 @@ let on_layer_1_head (daemon_components : (module Daemon_components.S)) node_ctxt
   let old_head =
     match old_head with
     | Some h ->
-        `Head
-          Layer1.
-            {
-              hash = h.header.block_hash;
-              level = Raw_level.to_int32 h.header.level;
-            }
+        `Head Layer1.{hash = h.header.block_hash; level = h.header.level}
     | None ->
         (* if no head has been processed yet, we want to handle all blocks
            since, and including, the rollup origination. *)
@@ -690,7 +691,7 @@ module Internal_for_tests = struct
       Sc_rollup_block.
         {
           block_hash = head.hash;
-          level;
+          level = head.level;
           predecessor = predecessor.hash;
           commitment_hash;
           previous_commitment_hash;
@@ -700,7 +701,13 @@ module Internal_for_tests = struct
         }
     in
     let l2_block =
-      Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
+      Sc_rollup_block.
+        {
+          header;
+          content = ();
+          num_ticks;
+          initial_tick = Sc_rollup.Tick.to_z initial_tick;
+        }
     in
     let* () = Node_context.save_l2_head node_ctxt l2_block in
     return l2_block

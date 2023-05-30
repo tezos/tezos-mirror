@@ -168,7 +168,7 @@ let process_head (node_ctxt : _ Node_context.t) ctxt
     the messages the block ([remaining_messages]). *)
 let start_state_of_block node_ctxt (block : Sc_rollup_block.t) =
   let open Lwt_result_syntax in
-  let pred_level = Raw_level.to_int32 block.header.level |> Int32.pred in
+  let pred_level = Int32.pred block.header.level in
   let* ctxt =
     Node_context.checkout_context node_ctxt block.header.predecessor
   in
@@ -233,9 +233,8 @@ let state_of_tick_aux node_ctxt ~start_state (event : Sc_rollup_block.t) tick =
   let* start_state =
     match start_state with
     | Some start_state
-      when Raw_level.(
-             start_state.Fueled_pvm.Accounted.inbox_level = event.header.level)
-      ->
+      when Raw_level.to_int32 start_state.Fueled_pvm.Accounted.inbox_level
+           = event.header.level ->
         return start_state
     | _ ->
         (* Recompute start state on level change or if we don't have a
@@ -284,7 +283,7 @@ let state_of_tick node_ctxt ?start_state tick level =
   match event with
   | None -> return_none
   | Some event ->
-      assert (Raw_level.(event.header.level <= level)) ;
+      assert (event.header.level <= Raw_level.to_int32 level) ;
       let* result_state =
         if Node_context.is_loser node_ctxt then
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/5253

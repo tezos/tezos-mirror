@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
-
 (** {2 Structure of layer 2 blocks} *)
 
 (** A layer 2 block header contains information about the inbox and commitment
@@ -33,30 +30,31 @@ open Alpha_context
     messages. *)
 type header = {
   block_hash : Block_hash.t;  (** Tezos block hash. *)
-  level : Raw_level.t;
+  level : int32;
       (** Level of the block, corresponds to the level of the tezos block. *)
   predecessor : Block_hash.t;  (** Predecessor hash of the Tezos block. *)
-  commitment_hash : Sc_rollup.Commitment.Hash.t option;
+  commitment_hash : Commitment.Hash.t option;
       (** Hash of this block's commitment if any was computed for it. *)
-  previous_commitment_hash : Sc_rollup.Commitment.Hash.t;
+  previous_commitment_hash : Commitment.Hash.t;
       (** Previous commitment hash in the chain. If there is a commitment for this
           block, this field contains the commitment that was previously
           computed. *)
   context : Smart_rollup_context_hash.t;
       (** Hash of the layer 2 context for this block. *)
-  inbox_witness : Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t;
+  inbox_witness :
+    Tezos_crypto.Hashed.Smart_rollup_merkelized_payload_hashes_hash.t;
       (** Witness for the inbox for this block, i.e. the Merkle hash of payloads
           of messages. *)
-  inbox_hash : Sc_rollup.Inbox.Hash.t;  (** Hash of the inbox for this block. *)
+  inbox_hash : Inbox.Hash.t;  (** Hash of the inbox for this block. *)
 }
 
 (** Contents of blocks which include the actual content of the inbox and
     messages.  *)
 type content = {
-  inbox : Sc_rollup.Inbox.t;  (** Inbox for this block. *)
+  inbox : Inbox.t;  (** Inbox for this block. *)
   messages : string list;
       (** Serialized messages added to the inbox in this block. *)
-  commitment : Sc_rollup.Commitment.t option;
+  commitment : Commitment.t option;
       (** Commitment, if any is computed for this block. [header.commitment =
           Some h] iff [commitment = Some c] and [hash c = h]. *)
 }
@@ -66,7 +64,7 @@ type content = {
 type ('header, 'content) block = {
   header : 'header;  (** Header of this block. *)
   content : 'content;  (** Content of the block. *)
-  initial_tick : Sc_rollup.Tick.t;
+  initial_tick : Z.t;
       (** Initial tick of the PVM at this block, i.e. before evaluation of the
           messages. *)
   num_ticks : int64;
@@ -104,8 +102,8 @@ val full_encoding : full Data_encoding.t
 (** [most_recent_commitment header] returns the most recent commitment
     information at the block of with [header]. It is either the commitment for
     this block if there is one or the previous commitment otherwise. *)
-val most_recent_commitment : header -> Sc_rollup.Commitment.Hash.t
+val most_recent_commitment : header -> Commitment.Hash.t
 
 (** [final_tick block] is the final tick, after evaluation of the messages in
     the [block], i.e. [block.initial_tick + block.num_ticks]. *)
-val final_tick : ('a, 'b) block -> Sc_rollup.Tick.t
+val final_tick : ('a, 'b) block -> Z.t

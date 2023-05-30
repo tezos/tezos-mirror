@@ -468,7 +468,7 @@ let level_of_hash {l1_ctxt; store; _} hash =
   let open Lwt_result_syntax in
   let* l2_header = Store.L2_blocks.header store.l2_blocks hash in
   match l2_header with
-  | Some {level; _} -> return (Raw_level.to_int32 level)
+  | Some {level; _} -> return level
   | None ->
       let+ {level; _} = Layer1.fetch_tezos_shell_header l1_ctxt hash in
       level
@@ -544,7 +544,7 @@ let get_l2_block_predecessor node_ctxt hash =
   let+ header = Store.L2_blocks.header node_ctxt.store.l2_blocks hash in
   Option.map
     (fun {Sc_rollup_block.predecessor; level; _} ->
-      (predecessor, Int32.pred (Raw_level.to_int32 level)))
+      (predecessor, Int32.pred level))
     header
 
 let get_predecessor_opt node_ctxt (hash, level) =
@@ -616,8 +616,8 @@ let get_predecessor_header node_ctxt head =
     first look for a block before the [tick] *)
 let tick_search ~big_step_blocks node_ctxt head tick =
   let open Lwt_result_syntax in
-  if Sc_rollup.Tick.(head.Sc_rollup_block.initial_tick <= tick) then
-    if Sc_rollup.Tick.(Sc_rollup_block.final_tick head < tick) then
+  if Z.Compare.(head.Sc_rollup_block.initial_tick <= tick) then
+    if Z.Compare.(Sc_rollup_block.final_tick head < tick) then
       (* The head block does not contain the tick *)
       return_none
     else
@@ -627,20 +627,18 @@ let tick_search ~big_step_blocks node_ctxt head tick =
     let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
     let rec find_big_step (end_block : Sc_rollup_block.t) =
       let start_level =
-        Int32.sub
-          (Raw_level.to_int32 end_block.header.level)
-          (Int32.of_int big_step_blocks)
+        Int32.sub end_block.header.level (Int32.of_int big_step_blocks)
       in
       let start_level =
         if start_level < genesis_level then genesis_level else start_level
       in
       let* start_block = get_l2_block_by_level node_ctxt start_level in
-      if Sc_rollup.Tick.(start_block.initial_tick <= tick) then
+      if Z.Compare.(start_block.initial_tick <= tick) then
         return (start_block, end_block)
       else find_big_step start_block
     in
     let block_level Sc_rollup_block.{header = {level; _}; _} =
-      Raw_level.to_int32 level |> Int32.to_int
+      Int32.to_int level
     in
     let rec dicho start_block end_block =
       (* Precondition:
@@ -656,7 +654,7 @@ let tick_search ~big_step_blocks node_ctxt head tick =
         let* block_middle =
           get_l2_block_by_level node_ctxt (Int32.of_int middle_level)
         in
-        if Sc_rollup.Tick.(block_middle.initial_tick <= tick) then
+        if Z.Compare.(block_middle.initial_tick <= tick) then
           dicho block_middle end_block
         else dicho start_block block_middle
     in
@@ -679,11 +677,12 @@ let block_with_tick ({store; _} as node_ctxt) ~max_level tick =
         the refutation period as the big_step_blocks to do a dichotomy on the
         full space but we anticipate refutation to happen most of the time close
         to the head. *)
+     let max_level = Raw_level.to_int32 max_level in
      let** head =
-       if Raw_level.(head.header.level <= max_level) then return_some head
-       else find_l2_block_by_level node_ctxt (Raw_level.to_int32 max_level)
+       if head.header.level <= max_level then return_some head
+       else find_l2_block_by_level node_ctxt max_level
      in
-     tick_search ~big_step_blocks:4096 node_ctxt head tick
+     tick_search ~big_step_blocks:4096 node_ctxt head (Sc_rollup.Tick.to_z tick)
 
 let get_commitment {store; _} commitment_hash =
   let open Lwt_result_syntax in
@@ -894,6 +893,10 @@ let get_full_l2_block node_ctxt block_hash =
     get_messages_without_proto_messages node_ctxt block.header.inbox_witness
   and* commitment =
     Option.map_es (get_commitment node_ctxt) block.header.commitment_hash
+  in
+  let inbox = Sc_rollup_proto_types.Inbox.to_octez inbox in
+  let commitment =
+    Option.map Sc_rollup_proto_types.Commitment.to_octez commitment
   in
   return {block with content = {Sc_rollup_block.inbox; messages; commitment}}
 

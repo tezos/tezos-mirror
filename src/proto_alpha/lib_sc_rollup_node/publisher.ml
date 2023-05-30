@@ -110,9 +110,9 @@ let build_commitment (node_ctxt : _ Node_context.t)
   let*! compressed_state = PVM.state_hash pvm_state in
   let*! tick = PVM.get_tick pvm_state in
   let* prev_commitment_tick = tick_of_level node_ctxt prev_commitment_level in
+  let distance = Z.sub (Sc_rollup.Tick.to_z tick) prev_commitment_tick in
   let number_of_ticks =
-    Sc_rollup.Tick.distance tick prev_commitment_tick
-    |> Z.to_int64 |> Sc_rollup.Number_of_ticks.of_value
+    distance |> Z.to_int64 |> Sc_rollup.Number_of_ticks.of_value
   in
   let*? number_of_ticks =
     match number_of_ticks with
@@ -221,9 +221,7 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
   in
   let* head = Node_context.last_processed_head_opt node_ctxt in
   let next_head_level =
-    Option.map
-      (fun (b : Sc_rollup_block.t) -> Raw_level.succ b.header.level)
-      head
+    Option.map (fun (b : Sc_rollup_block.t) -> Int32.succ b.header.level) head
   in
   let sc_rollup_challenge_window_int32 =
     sc_rollup_challenge_window node_ctxt |> Int32.of_int
@@ -249,7 +247,9 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
           match (published_info, next_head_level) with
           | None, _ | _, None -> false
           | Some {first_published_at_level; _}, Some next_head_level ->
-              Raw_level.diff next_head_level first_published_at_level
+              Int32.sub
+                next_head_level
+                (Raw_level.to_int32 first_published_at_level)
               > sc_rollup_challenge_window_int32
         in
         let acc = if past_curfew then acc else commitment :: acc in
@@ -374,7 +374,7 @@ let cementable_commitments (node_ctxt : _ Node_context.t) =
           match earliest_cementing_level with
           | None -> acc
           | Some earliest_cementing_level ->
-              if Raw_level.(earliest_cementing_level > head_level) then
+              if Raw_level.to_int32 earliest_cementing_level > head_level then
                 (* Commitments whose cementing level are after the head's
                    successor won't be cementable in the next block. *)
                 acc

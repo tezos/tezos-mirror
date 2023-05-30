@@ -39,10 +39,7 @@ let get_head_hash_opt node_ctxt =
 let get_head_level_opt node_ctxt =
   let open Lwt_result_syntax in
   let+ res = Node_context.last_processed_head_opt node_ctxt in
-  Option.map
-    (fun Sc_rollup_block.{header = {level; _}; _} ->
-      Alpha_context.Raw_level.to_int32 level)
-    res
+  Option.map (fun Sc_rollup_block.{header = {level; _}; _} -> level) res
 
 module Slot_pages_map = struct
   open Protocol

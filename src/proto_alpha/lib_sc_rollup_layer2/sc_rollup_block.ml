@@ -23,30 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
-
 type header = {
   block_hash : Block_hash.t;
-  level : Raw_level.t;
+  level : int32;
   predecessor : Block_hash.t;
-  commitment_hash : Sc_rollup.Commitment.Hash.t option;
-  previous_commitment_hash : Sc_rollup.Commitment.Hash.t;
+  commitment_hash : Commitment.Hash.t option;
+  previous_commitment_hash : Commitment.Hash.t;
   context : Smart_rollup_context_hash.t;
-  inbox_witness : Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t;
-  inbox_hash : Sc_rollup.Inbox.Hash.t;
+  inbox_witness :
+    Tezos_crypto.Hashed.Smart_rollup_merkelized_payload_hashes_hash.t;
+  inbox_hash : Inbox.Hash.t;
 }
 
 type content = {
-  inbox : Sc_rollup.Inbox.t;
+  inbox : Inbox.t;
   messages : string list;
-  commitment : Sc_rollup.Commitment.t option;
+  commitment : Commitment.t option;
 }
 
 type ('header, 'content) block = {
   header : 'header;
   content : 'content;
-  initial_tick : Sc_rollup.Tick.t;
+  initial_tick : Z.t;
   num_ticks : int64;
 }
 
@@ -58,11 +56,11 @@ let commitment_hash_opt_encoding =
   let open Data_encoding in
   let binary =
     conv
-      (Option.value ~default:Sc_rollup.Commitment.Hash.zero)
-      (fun h -> if Sc_rollup.Commitment.Hash.(h = zero) then None else Some h)
-      Sc_rollup.Commitment.Hash.encoding
+      (Option.value ~default:Commitment.Hash.zero)
+      (fun h -> if Commitment.Hash.(h = zero) then None else Some h)
+      Commitment.Hash.encoding
   in
-  let json = option Sc_rollup.Commitment.Hash.encoding in
+  let json = option Commitment.Hash.encoding in
   splitted ~binary ~json
 
 let header_encoding =
@@ -108,7 +106,7 @@ let header_encoding =
        (req "block_hash" Block_hash.encoding ~description:"Tezos block hash.")
        (req
           "level"
-          Raw_level.encoding
+          int32
           ~description:
             "Level of the block, corresponds to the level of the tezos block.")
        (req
@@ -122,7 +120,7 @@ let header_encoding =
             "Hash of this block's commitment if any was computed for it.")
        (req
           "previous_commitment_hash"
-          Sc_rollup.Commitment.Hash.encoding
+          Commitment.Hash.encoding
           ~description:
             "Previous commitment hash in the chain. If there is a commitment \
              for this block, this field contains the commitment that was \
@@ -133,13 +131,14 @@ let header_encoding =
           ~description:"Hash of the layer 2 context for this block.")
        (req
           "inbox_witness"
-          Sc_rollup.Inbox_merkelized_payload_hashes.Hash.encoding
+          Tezos_crypto.Hashed.Smart_rollup_merkelized_payload_hashes_hash
+          .encoding
           ~description:
             "Witness for the inbox for this block, i.e. the Merkle hash of \
              payloads of messages.")
        (req
           "inbox_hash"
-          Sc_rollup.Inbox.Hash.encoding
+          Inbox.Hash.encoding
           ~description:"Hash of the inbox for this block.")
 
 let header_size =
@@ -152,17 +151,14 @@ let content_encoding =
     (fun {inbox; messages; commitment} -> (inbox, messages, commitment))
     (fun (inbox, messages, commitment) -> {inbox; messages; commitment})
   @@ obj3
-       (req
-          "inbox"
-          Sc_rollup.Inbox.encoding
-          ~description:"Inbox for this block.")
+       (req "inbox" Inbox.encoding ~description:"Inbox for this block.")
        (req
           "messages"
           (list (dynamic_size (Variable.string' Hex)))
           ~description:"Messages added to the inbox in this block.")
        (opt
           "commitment"
-          Sc_rollup.Commitment.encoding
+          Commitment.encoding
           ~description:"Commitment, if any is computed for this block.")
 
 let block_encoding header_encoding content_encoding =
@@ -177,7 +173,7 @@ let block_encoding header_encoding content_encoding =
   @@ obj2
        (req
           "initial_tick"
-          Sc_rollup.Tick.encoding
+          Data_encoding.n
           ~description:
             "Initial tick of the PVM at this block, i.e. before evaluation of \
              the messages.")
@@ -196,4 +192,4 @@ let most_recent_commitment (header : header) =
   Option.value header.commitment_hash ~default:header.previous_commitment_hash
 
 let final_tick {initial_tick; num_ticks; _} =
-  Sc_rollup.Tick.jump initial_tick (Z.of_int64 num_ticks)
+  Z.max Z.zero (Z.add initial_tick (Z.of_int64 num_ticks))
