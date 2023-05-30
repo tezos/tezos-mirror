@@ -49,6 +49,7 @@ module LibCircuit : sig
     public_input_size : int;
     input_com_sizes : int list;
     tables : Csir.Table.t list;
+    range_checks : (string * (int * int) list) list;
     solver : Solver.t;
   }
   [@@deriving repr]

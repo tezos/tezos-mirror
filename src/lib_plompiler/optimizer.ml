@@ -112,7 +112,7 @@ type scalar = Csir.Scalar.t [@@deriving repr]
    depend on each other, e.g. those using next selectors. *)
 type block = constr array
 
-(* coeff * wire *)
+(* Corresponds to linear term : coeff * wire *)
 type term = scalar * int [@@deriving repr]
 
 (** Type to store the trace_updater information.
@@ -136,7 +136,7 @@ type pseudo_constr = {
 }
 
 (** A pseudo block is a list of pseudo constraints that have been groupped
-    in order to apply the {!shared_wires} heuristic.Alcotest
+    in order to apply the {!shared_wires} heuristic.
     The constraints in a pseudo block satisfy (by construction) the invariant
     the pc_head of a constraint starts with the pc_tail of the previous one
     (when considering the term variables, coefficients may be different).
@@ -268,9 +268,10 @@ let pseudo_block_of_terms terms =
     gates. The wires selected for inlining must:
     - appear in exactly two linear gates of size one
     - not be inputs
+    - not be range-checked
     The inlined linear gates are returned as pseudo blocks because they may need
     to be split again to fit 3 wires. *)
-let inline_linear ~nb_inputs gates =
+let inline_linear ~nb_inputs ~range_checked gates =
   let linear, non_linear =
     List.partition_map
       (fun gate ->
@@ -288,7 +289,8 @@ let inline_linear ~nb_inputs gates =
   (* Associate each wire to the indices (of array [linear]) of the constraints
      where the wire appears. The only wires considered must not:
      - be a circuit input
-     - appear in a non-linear gate. *)
+     - appear in a non-linear gate
+     - be range-checked. *)
   let wire_occurrences =
     Array.fold_left
       (fun (map, i) gate -> (increase_occurrences map i gate, succ i))
@@ -296,7 +298,9 @@ let inline_linear ~nb_inputs gates =
       linear
     |> fst
     |> IMap.filter (fun w _ ->
-           w > nb_inputs && (not @@ ISet.mem w non_linear_wires))
+           w >= nb_inputs
+           && (not (ISet.mem w non_linear_wires))
+           && not (Range_checks.mem w range_checked))
   in
 
   (* During the process of inlining, some wire occurrences will point to
@@ -655,7 +659,7 @@ let add_boolean_checks ~boolean_vars gates =
    replace [x -> y] everywhere and remove the constraint.
    Alternatively, we could replace [y -> x].
    This is not possible if both [x] and [y] are inputs to the circuit. *)
-let inline_renamings ~nb_inputs gates =
+let inline_renamings ~nb_inputs ~range_checked gates =
   let renaming_pairs =
     List.filter_map
       (fun gate ->
@@ -704,7 +708,17 @@ let inline_renamings ~nb_inputs gates =
      in the same partition get renamed to the same wire (when renamed) *)
   let renaming =
     IMap.mapi
-      (fun i i_set -> if i <= nb_inputs then i else ISet.min_elt i_set)
+      (fun i i_set ->
+        (* For simplicity, range-checked variables are ignored and will not be inlined.
+           However, we could inline them as follows. Assume we have two range-checked
+           variables x and y, bound in [0, bx) and [0, by) respectively. And assume
+           there exists a constraint x - y = 0. We could apply the replacement x -> y
+           everywhere in the system and let the new range-check interval for x be
+           [0, min(bx, by)).
+           This could be a nice feature to have, but it is not clear that it will have
+           an impact in our current circuits, since the above situation does not ocur. *)
+        if i < nb_inputs || Range_checks.mem i range_checked then i
+        else ISet.min_elt i_set)
       renaming_partitions
   in
   let free_wires =
@@ -731,12 +745,18 @@ let remove_trivial gates =
     with potentially fewer constraints.
     As a second output, it returns the necessary information to build a function
     that updates the trace to make it compatible with the new constraints *)
-let optimize : nb_inputs:int -> CS.gate list -> CS.gate list * trace_info =
- fun ~nb_inputs gates ->
-  let gates, free_wires_inlining = inline_renamings ~nb_inputs gates in
+let optimize :
+    nb_inputs:int ->
+    range_checks:Range_checks.t ->
+    CS.gate list ->
+    CS.gate list * trace_info =
+ fun ~nb_inputs ~range_checks:range_checked gates ->
+  let gates, free_wires_inlining =
+    inline_renamings ~nb_inputs ~range_checked gates
+  in
   let gates = remove_trivial gates in
   let linear_pseudo_blocks, non_linear, free_wires =
-    inline_linear ~nb_inputs gates
+    inline_linear ~nb_inputs ~range_checked gates
   in
   let free_wires = List.sort Int.compare @@ free_wires_inlining @ free_wires in
   let non_linear, boolean_vars = remove_boolean_gates non_linear in

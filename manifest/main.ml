@@ -1452,6 +1452,7 @@ let _octez_plonk_test_plompiler_main =
         "test_merkle_narity";
         "test_optimizer";
         "test_poseidon";
+        "test_range_checks";
         "test_schnorr";
         "test_serialization";
         "test_weierstrass";

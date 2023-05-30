@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* MIT License                                                               *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,32 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk_test
+module IMap = Map.Make (Int)
 
-let () =
-  Helpers.with_seed (fun () ->
-      Helpers.with_output_to_file (fun () ->
-          Alcotest.run
-            "Plompiler"
-            [
-              ("Utils", Test_utils.tests);
-              ("Core", Test_core.tests);
-              ("Blake", Test_blake.tests);
-              ("Poseidon", Test_poseidon.tests);
-              ("Anemoi", Test_anemoi.tests);
-              ("Enum", Test_enum.tests);
-              ("Schnorr", Test_schnorr.tests);
-              ("Merkle", Test_merkle.tests);
-              ("Merkle N-arity: Plonk integration", Test_merkle_narity.tests);
-              ("Edwards", Test_edwards.tests);
-              ("Weierstrass", Test_weierstrass.tests);
-              ("Serialization", Test_serialization.tests);
-              ("Lookups", Test_lookup.tests);
-              ("InputCom", Test_input_com.tests);
-              ("Range-checks", Test_range_checks.tests);
-              ("Linear algebra", Test_linear_algebra.tests);
-              ("Bench", Benchmark.bench);
-              ("Bench Poseidon", Bench_poseidon.bench);
-              ("Optimizer", Test_optimizer.tests);
-              ("Encoding", Test_encoding.tests);
-            ]))
+(* (variable index -> bound) *)
+type t = int IMap.t
+
+let empty = IMap.empty
+
+let is_empty = IMap.is_empty
+
+let mem = IMap.mem
+
+let find_opt = IMap.find_opt
+
+let remove = IMap.remove
+
+let add ~nb_bits i =
+  IMap.update i (function
+      | None -> Some nb_bits
+      | _ ->
+          raise
+            (Invalid_argument
+               (Printf.sprintf
+                  "Range_check : index %d is already range-checked."
+                  i)))

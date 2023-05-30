@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* MIT License                                                               *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,32 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk_test
+(* Representation of range-checks in Plompiler
 
-let () =
-  Helpers.with_seed (fun () ->
-      Helpers.with_output_to_file (fun () ->
-          Alcotest.run
-            "Plompiler"
-            [
-              ("Utils", Test_utils.tests);
-              ("Core", Test_core.tests);
-              ("Blake", Test_blake.tests);
-              ("Poseidon", Test_poseidon.tests);
-              ("Anemoi", Test_anemoi.tests);
-              ("Enum", Test_enum.tests);
-              ("Schnorr", Test_schnorr.tests);
-              ("Merkle", Test_merkle.tests);
-              ("Merkle N-arity: Plonk integration", Test_merkle_narity.tests);
-              ("Edwards", Test_edwards.tests);
-              ("Weierstrass", Test_weierstrass.tests);
-              ("Serialization", Test_serialization.tests);
-              ("Lookups", Test_lookup.tests);
-              ("InputCom", Test_input_com.tests);
-              ("Range-checks", Test_range_checks.tests);
-              ("Linear algebra", Test_linear_algebra.tests);
-              ("Bench", Benchmark.bench);
-              ("Bench Poseidon", Bench_poseidon.bench);
-              ("Optimizer", Test_optimizer.tests);
-              ("Encoding", Test_encoding.tests);
-            ]))
+   Range checks represent a set of constraints applied to the wires, defining
+   an upper bound that is a power of 2. There is at most one constraint per
+   wire index.
+*)
+
+type t
+
+val empty : t
+
+(* [is_empty rc] returns true if there is no range-checks in [rc], false
+   otherwise *)
+val is_empty : t -> bool
+
+(* [mem i rc] returns true if [i] is range-checked in [rc], false otherwise *)
+val mem : int -> t -> bool
+
+(* [find_opt i rc] returns None if [i] is not range-checked in [rc], and
+   [Some nb_bits] otherwise, where [nb_bits] is the logarithm in base 2 of the
+   bound for the value at index [i] *)
+val find_opt : int -> t -> int option
+
+(* [remove i rc] removes [i] from the indices to range-check given by [rc] *)
+val remove : int -> t -> t
+
+(* [add ~nb_bits i rc] adds [i] with the bound [2^nb_bits] to [rc].
+   This function raises [Invalid_argument] if the index to add is
+   already range-checked. *)
+val add : nb_bits:int -> int -> t -> t
