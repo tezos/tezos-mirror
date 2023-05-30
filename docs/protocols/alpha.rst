@@ -122,7 +122,7 @@ Internal
   the shell to make them common to all protocols though the environment. (MR
   :gl:`!8562`, MR :gl:`!8625`)
 
-- Refactoring : stake splitted between a frozen part and a delegated part. (MR :gl:`!8051`)
+- Refactoring : stake splitted between a frozen part and a delegated part. (MRs :gl:`!8051`, :gl:`!8885`)
 
 - Refactoring : rewards computed as a relative portion of the total amount of tez
   rewarded per minute (about 85tez/min). (MR :gl:`!8657`)
