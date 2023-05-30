@@ -94,7 +94,9 @@ module Proof (Hash : sig
   val of_context_hash : Context_hash.t -> t
 end) (Proof_encoding : sig
   val proof_encoding :
-    Environment.Context.Proof.tree Environment.Context.Proof.t Data_encoding.t
+    Tezos_context_sigs.Context.Proof_types.tree
+    Tezos_context_sigs.Context.Proof_types.t
+    Data_encoding.t
 end) : sig
   (** Tree representation for proof generation.
 
@@ -163,11 +165,8 @@ end
 (** Static information about the rollup. *)
 module Rollup : sig
   val get_address :
-    _ index -> Protocol.Alpha_context.Sc_rollup.Address.t option tzresult Lwt.t
+    _ index -> Octez_smart_rollup.Address.t option tzresult Lwt.t
 
   val check_or_set_address :
-    'a mode ->
-    'a index ->
-    Protocol.Alpha_context.Sc_rollup.Address.t ->
-    unit tzresult Lwt.t
+    'a mode -> 'a index -> Octez_smart_rollup.Address.t -> unit tzresult Lwt.t
 end
