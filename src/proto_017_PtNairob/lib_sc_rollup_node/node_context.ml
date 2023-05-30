@@ -292,10 +292,6 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
       } as configuration) =
   let open Lwt_result_syntax in
   let*? () = check_config configuration in
-  let rollup_address =
-    (* Convert to protocol rollup address *)
-    Sc_rollup_proto_types.Address.of_octez rollup_address
-  in
   let* lockfile = lock ~data_dir in
   let* () =
     Store_migration.maybe_run_migration
@@ -315,6 +311,10 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
   in
   let* () = Context.Rollup.check_or_set_address mode context rollup_address in
   let publisher = Configuration.Operator_purpose_map.find Publish operators in
+  let rollup_address =
+    (* Convert to protocol rollup address *)
+    Sc_rollup_proto_types.Address.of_octez rollup_address
+  in
   let* protocol_constants = retrieve_constants cctxt
   and* lcc = get_last_cemented_commitment cctxt rollup_address
   and* lpc =
