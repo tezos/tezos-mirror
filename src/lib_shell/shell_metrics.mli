@@ -60,6 +60,31 @@ module Distributed_db : sig
   val init : kind:string -> entry_type:string -> t
 
   val update : t -> length:int -> unit
+
+  module Messages : sig
+    val on_received_msg :
+      (Distributed_db_message.t, 'peer_meta, 'conn_meta) P2p.connection ->
+      Distributed_db_message.t ->
+      unit
+
+    val on_sent_msg :
+      (Distributed_db_message.t, 'peer_meta, 'conn_meta) P2p.connection ->
+      Distributed_db_message.t ->
+      unit
+
+    val on_broadcasted_msg :
+      (Distributed_db_message.t, 'peer_meta, 'conn_meta) P2p.connection
+      P2p_peer.Table.t ->
+      ?except:
+        ((Distributed_db_message.t, 'peer_meta, 'conn_meta) P2p.connection ->
+        bool) ->
+      ?alt:
+        ((Distributed_db_message.t, 'peer_meta, 'conn_meta) P2p.connection ->
+        bool)
+        * Distributed_db_message.t ->
+      Distributed_db_message.t ->
+      unit
+  end
 end
 
 module Block_validator : sig
