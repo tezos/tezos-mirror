@@ -1102,6 +1102,18 @@ Constraints: 12
 ECC.test_edwards_add_optimized:
 Constraints: 11
 
+Bytes.test_constant:
+Constraints: 24
+
+Bytes.test_constant_optimized:
+Constraints: 8
+
+Bytes.test_constant:
+Constraints: 24
+
+Bytes.test_constant_optimized:
+Constraints: 8
+
 Bytes.test_add:
 Constraints: 69
 
@@ -2559,6 +2571,30 @@ Proof size: 2.69 KB
 Proof hash: 4354b30ac189071d319083e8b3a822469165829629cad8a665820f102eec1f20
 Prover_pp hash: 790d223c3bf2ab129f975664c1086110d10fdb66cdfcf4404880920901392661
 Verifier_pp hash: cdb4a62221463856fb4c646f93c4e998c0799a7db7c8226138b5a3d4feed674b
+
+Bytes.test_constant:
+Constraints: 24
+
+Bytes.test_constant_optimized:
+Constraints: 8
+
+Bytes.test_constant:
+Proof size: 2.09 KB
+Proof hash: 2faa96f1773a23257473f62a80a82c024a9b533801791d41060cc9117638cd84
+Prover_pp hash: bbb3d2c2caaa2fef3865098570d85ac2c69ce3f1a4ef452c5f64bb97830a4c51
+Verifier_pp hash: 9993a521cbe03571c5b1d7cac67998323622d3dfaafe62d22779eb2df67c6412
+
+Bytes.test_constant:
+Constraints: 24
+
+Bytes.test_constant_optimized:
+Constraints: 8
+
+Bytes.test_constant:
+Proof size: 2.09 KB
+Proof hash: 2faa96f1773a23257473f62a80a82c024a9b533801791d41060cc9117638cd84
+Prover_pp hash: bbb3d2c2caaa2fef3865098570d85ac2c69ce3f1a4ef452c5f64bb97830a4c51
+Verifier_pp hash: 9993a521cbe03571c5b1d7cac67998323622d3dfaafe62d22779eb2df67c6412
 
 Bytes.test_add:
 Constraints: 69

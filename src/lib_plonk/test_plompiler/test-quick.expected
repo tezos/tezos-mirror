@@ -1102,6 +1102,18 @@ Constraints: 12
 ECC.test_edwards_add_optimized:
 Constraints: 11
 
+Bytes.test_constant:
+Constraints: 24
+
+Bytes.test_constant_optimized:
+Constraints: 8
+
+Bytes.test_constant:
+Constraints: 24
+
+Bytes.test_constant_optimized:
+Constraints: 8
+
 Bytes.test_add:
 Constraints: 69
 

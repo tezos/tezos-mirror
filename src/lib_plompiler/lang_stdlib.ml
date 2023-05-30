@@ -105,6 +105,10 @@ module type LIB = sig
 
     val input_bytes : ?le:bool -> bytes -> bl Input.t
 
+    val constant : ?le:bool -> bytes -> bl repr t
+
+    val constant_uint32 : ?le:bool -> Stdint.uint32 -> bl repr t
+
     val add : ?ignore_carry:bool -> bl repr -> bl repr -> bl repr t
 
     val xor : bl repr -> bl repr -> bl repr t
@@ -114,10 +118,6 @@ module type LIB = sig
 
   val add2 :
     (scalar * scalar) repr -> (scalar * scalar) repr -> (scalar * scalar) repr t
-
-  val constant_bytes : ?le:bool -> bytes -> Bytes.bl repr t
-
-  val constant_uint32 : ?le:bool -> Stdint.uint32 -> Bytes.bl repr t
 
   module Encodings : sig
     (**
@@ -590,6 +590,23 @@ module Lib (C : COMMON) = struct
 
     let input_bytes ?le b = input_bitlist @@ Utils.bitlist ?le b
 
+    let constant ?(le = false) b =
+      let bl = Utils.bitlist ~le b in
+      let* ws =
+        foldM
+          (fun ws bit ->
+            let* w = Bool.constant bit in
+            ret (w :: ws))
+          []
+          bl
+      in
+      ret @@ to_list @@ List.rev ws
+
+    let constant_uint32 ?(le = false) u32 =
+      let b = Stdlib.Bytes.create 4 in
+      Stdint.Uint32.to_bytes_big_endian u32 b 0 ;
+      constant ~le b
+
     let add ?(ignore_carry = false) a b =
       let ha, ta = (List.hd (of_list a), List.tl (of_list a)) in
       let hb, tb = (List.hd (of_list b), List.tl (of_list b)) in
@@ -635,23 +652,6 @@ module Lib (C : COMMON) = struct
     let* x3 = Num.add x1 x2 in
     let* y3 = Num.add y1 y2 in
     ret (pair x3 y3)
-
-  let constant_bytes ?(le = false) b =
-    let bl = Utils.bitlist ~le b in
-    let* ws =
-      foldM
-        (fun ws bit ->
-          let* w = Bool.constant bit in
-          ret (w :: ws))
-        []
-        bl
-    in
-    ret @@ to_list @@ List.rev ws
-
-  let constant_uint32 ?(le = false) u32 =
-    let b = Stdlib.Bytes.create 4 in
-    Stdint.Uint32.to_bytes_big_endian u32 b 0 ;
-    constant_bytes ~le b
 
   module Encodings = struct
     type ('oh, 'u, 'p) encoding = {
