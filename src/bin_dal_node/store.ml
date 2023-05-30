@@ -81,11 +81,10 @@ module Shards = struct
     return @@ Lwt_watcher.notify shards_watcher commitment
 
   let read_all shards_store commitment ~number_of_shards =
-    read_values shards_store
-    @@ List.fold_left
-         (fun seq shard_index -> Seq.cons (commitment, shard_index) seq)
-         Seq.empty
-         (0 -- (number_of_shards - 1))
+    Seq.ints 0
+    |> Seq.take_while (fun x -> x < number_of_shards)
+    |> Seq.map (fun shard_index -> (commitment, shard_index))
+    |> read_values shards_store
 
   let init node_store_dir shard_store_dir =
     let ( // ) = Filename.concat in
@@ -114,6 +113,7 @@ type node_store = {
   shards_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
   gs_worker : Gossipsub.Worker.t;
   in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;
+      (* The length of the array is the number of shards per slot *)
 }
 
 (** [open_shards_stream node_store] opens a stream that should be notified when
@@ -131,25 +131,14 @@ let init gs_worker config =
   let*! store = main repo in
   let shard_store = Shards.init base_dir shard_store_dir in
   let*! () = Event.(emit store_is_ready ()) in
-
-  (* The size of the cache of 1024 entries is chosen such that: if a DAL node
-     stores the shard proofs of 128 slots per level, the cache will be able to
-     store the proofs for 8 levels, which should be quite sufficient
-     with the current attestation lag.
-
-     A shard proof takes 52 bytes with the current encoding (could be improved
-     to 48), so the maximum memory footprint of the cache is dominated by (keys
-     size is negligible):
-
-     1024 (cache size) * 2048 (shards per slot) * 52 bytes = 109 mb *)
-  let cache_size = 1024 in
   return
     {
       shard_store;
       store;
       shards_watcher;
       gs_worker;
-      in_memory_shard_proofs = Shard_proofs_cache.create cache_size;
+      in_memory_shard_proofs =
+        Shard_proofs_cache.create Constants.shards_proofs_cache_size;
     }
 
 let trace_decoding_error ~data_kind ~tztrace_of_error r =
@@ -440,8 +429,15 @@ module Legacy = struct
     | None ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5676
 
-            Recompute the proofs if we have shards on disk? Useful if the node
-            restarted. *)
+            If this happens, we should probably tell the user that
+            something bad happened. Either:
+
+            1. The proofs where not stored properly (an invariant is broken)
+
+            2. The node was restarted (unlikely to happen given the time frame)
+
+            3. The cache was full (unlikely to happen if
+            [shards_proofs_cache_size] is set properly. *)
         return_unit
     | Some shard_proofs ->
         let attestation_level =
