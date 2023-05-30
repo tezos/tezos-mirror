@@ -185,7 +185,7 @@ module Encodings = struct
          (req
             "messages"
             (list hex_string)
-            ~description:"Input messages for simulation")
+            ~description:"Serialized messages for simulation.")
          (opt
             "reveal_pages"
             (list hex_string)
