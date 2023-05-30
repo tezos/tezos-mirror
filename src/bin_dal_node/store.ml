@@ -113,6 +113,7 @@ type node_store = {
   shards_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
   gs_worker : Gossipsub.Worker.t;
   in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;
+      (* The length of the array is the number of shards per slot *)
 }
 
 (** [open_shards_stream node_store] opens a stream that should be notified when
