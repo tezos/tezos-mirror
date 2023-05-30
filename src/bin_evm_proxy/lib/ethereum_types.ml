@@ -138,7 +138,7 @@ let hash_to_bytes (Hash h) = Hex.to_bytes_exn (`Hex h) |> Bytes.to_string
 
 let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
 
-let empty_hash = Hash "0x"
+let empty_hash = Hash ""
 
 type transaction_log = {
   address : address;
