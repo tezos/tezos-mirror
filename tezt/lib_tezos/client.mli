@@ -34,6 +34,10 @@ type endpoint =
   | Proxy_server of Proxy_server.t  (** A proxy server *)
   | Foreign_endpoint of Foreign_endpoint.t  (** A service not managed by Tezt *)
 
+(** A string representation of an endpoint suitable to be used as a CLI
+    argument (e.g., [http://localhost:5893]). *)
+val string_of_endpoint : ?hostname:bool -> endpoint -> string
+
 (** Values that can be passed to the client's [--media-type] argument *)
 type media_type = Json | Binary | Any
 
