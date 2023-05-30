@@ -70,6 +70,10 @@ let init config store gs_worker transport_layer cctxt =
 let set_ready ctxt plugin cryptobox proto_parameters =
   match ctxt.status with
   | Starting ->
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
+
+         Instead of recompute those parameters, they could be stored
+         (for a given cryptobox). *)
       let shards_proofs_precomputation =
         Cryptobox.precompute_shards_proofs cryptobox
       in
