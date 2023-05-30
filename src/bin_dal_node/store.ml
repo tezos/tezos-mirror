@@ -131,25 +131,14 @@ let init gs_worker config =
   let*! store = main repo in
   let shard_store = Shards.init base_dir shard_store_dir in
   let*! () = Event.(emit store_is_ready ()) in
-
-  (* The size of the cache of 1024 entries is chosen such that: if a DAL node
-     stores the shard proofs of 128 slots per level, the cache will be able to
-     store the proofs for 8 levels, which should be quite sufficient
-     with the current attestation lag.
-
-     A shard proof takes 52 bytes with the current encoding (could be improved
-     to 48), so the maximum memory footprint of the cache is dominated by (keys
-     size is negligible):
-
-     1024 (cache size) * 2048 (shards per slot) * 52 bytes = 109 mb *)
-  let cache_size = 1024 in
   return
     {
       shard_store;
       store;
       shards_watcher;
       gs_worker;
-      in_memory_shard_proofs = Shard_proofs_cache.create cache_size;
+      in_memory_shard_proofs =
+        Shard_proofs_cache.create Constants.shards_proofs_cache_size;
     }
 
 let trace_decoding_error ~data_kind ~tztrace_of_error r =
