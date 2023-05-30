@@ -261,7 +261,11 @@ module Num = struct
 end
 
 module Bool = struct
-  include Num
+  type nonrec scalar = scalar
+
+  type nonrec 'a repr = 'a repr
+
+  type nonrec 'a t = 'a t
 
   let s_of_b b = if b then X S.one else X S.zero
 

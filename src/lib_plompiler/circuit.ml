@@ -679,7 +679,11 @@ module Num = struct
 end
 
 module Bool = struct
-  include Num
+  type nonrec scalar = scalar
+
+  type nonrec 'a repr = 'a repr
+
+  type nonrec 'a t = 'a t
 
   let constant : bool -> bool repr t =
    fun b ->
@@ -822,7 +826,7 @@ module Bool = struct
   let is_eq_const l s =
     with_label ~label:"Bool.is_eq_const"
     @@ let* diff = Num.add_constant ~ql:S.mone s l in
-       is_zero diff
+       Num.is_zero diff
 
   let band_list l =
     with_label ~label:"Bool.band_list"
