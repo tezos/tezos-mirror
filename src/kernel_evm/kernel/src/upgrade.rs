@@ -124,3 +124,31 @@ pub fn upgrade_kernel<Host: Runtime>(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    // Check if a random message signed by the dictator key is correctly decoded
+    // and if we can properly extract the phk of the caller
+    fn test_check_dictator_upgrade_signature() {
+        let smart_rollup_address: [u8; 20] = [0; 20];
+        let upgrade_nonce: [u8; UPGRADE_NONCE_SIZE] =
+            hex::decode("02000000").unwrap().try_into().unwrap();
+        let preimage_hash: [u8; PREIMAGE_HASH_SIZE] = hex::decode(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        )
+        .unwrap()
+        .try_into()
+        .unwrap();
+        let signature: [u8; SIGNATURE_HASH_SIZE] = hex::decode("d53b02f4b8075c9caad49fc1dc08eacf8678153004c6e0b078bf13fcce7038f221475b445a9fa56fc5a4569d2161f6b4ca77fa61194f0bd54e3198daa18471641b").unwrap().try_into().unwrap();
+        check_dictator_signature(
+            signature,
+            smart_rollup_address,
+            upgrade_nonce,
+            preimage_hash,
+        )
+        .expect("The upgrade signature check from the dictator failed.");
+    }
+}
