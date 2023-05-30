@@ -537,7 +537,6 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
                  t.config.reconnection_config)
               connection_point_info ;
             P2p_peer_state.set_disconnected ~timestamp peer_info ;
-            List.iter (fun f -> f info.peer_id) t.disconnection_hook ;
             Lwt.return_error err)
       in
       let id_point =
