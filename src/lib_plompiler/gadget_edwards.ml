@@ -117,7 +117,7 @@ functor
       ret @@ pair u v
 
     let scalar_mul s p =
-      let* one = Bool.constant_bool true in
+      let* one = Bool.constant true in
       with_label ~label:"Edwards.scalar_mul"
       @@
       let rev_s = List.rev (of_list s) in
@@ -133,7 +133,7 @@ functor
        - ls: [[s_11; ...; s_1m]; ...; [s_n1; ...; s_nm]]
        - lp: [p1; ...; pn] *)
     let multi_scalar_mul ls lp =
-      let* one = Bool.constant_bool true in
+      let* one = Bool.constant true in
       with_label ~label:"Edwards.multi_scalar_mul"
       @@
       (* Check we apply Shamir's trick on at least 2 points *)

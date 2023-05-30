@@ -115,8 +115,6 @@ module type LIB = sig
   val add2 :
     (scalar * scalar) repr -> (scalar * scalar) repr -> (scalar * scalar) repr t
 
-  val constant_bool : bool -> bool repr t
-
   val constant_bytes : ?le:bool -> bytes -> Bytes.bl repr t
 
   val constant_uint32 : ?le:bool -> Stdint.uint32 -> Bytes.bl repr t
@@ -638,16 +636,12 @@ module Lib (C : COMMON) = struct
     let* y3 = Num.add y1 y2 in
     ret (pair x3 y3)
 
-  let constant_bool b =
-    let* bit = constant_scalar (if b then S.one else S.zero) in
-    ret @@ unsafe_bool_of_scalar bit
-
   let constant_bytes ?(le = false) b =
     let bl = Utils.bitlist ~le b in
     let* ws =
       foldM
         (fun ws bit ->
-          let* w = constant_bool bit in
+          let* w = Bool.constant bit in
           ret (w :: ws))
         []
         bl

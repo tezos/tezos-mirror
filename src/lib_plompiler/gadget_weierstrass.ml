@@ -134,7 +134,7 @@ functor
        handle the point at infinity *)
     let scalar_mul s p =
       with_label ~label:"Weierstrass.scalar_mul"
-      @@ let* flag = constant_bool false in
+      @@ let* flag = Bool.constant false in
          let init = pair p flag in
          let* res =
            foldM

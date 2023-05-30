@@ -191,7 +191,7 @@ functor
           ]
       in
       let h = Array.of_list (List.rev h) in
-      let* z = constant_bool false in
+      let* z = Bool.constant false in
 
       let rec loop (blocks, acc_block, acc_u32) (nblock, nu32) rest =
         let blocks, acc_block, acc_u32, nblock, nu32 =

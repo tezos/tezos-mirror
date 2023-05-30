@@ -350,7 +350,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       let zg_rc, wires_g = split_rc_wires nb_rc wires_g in
       let z_rc, wires = split_rc_wires nb_rc wires in
       (* precompute some constant *)
-      let* t = Bool.constant_bool true in
+      let* t = Bool.constant true in
       let* zs = compute_zs x n in
       let* l1 = compute_l1 x zs n generator in
       (* split the arith selectors & other selectors in two lists *)

@@ -102,7 +102,7 @@ module type BOOL = sig
 
   val assert_false : bool repr -> unit repr t
 
-  val constant_bool : bool -> bool repr t
+  val constant : bool -> bool repr t
 
   val band_list : bool repr list -> bool repr t
 end
