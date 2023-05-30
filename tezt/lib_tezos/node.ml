@@ -471,15 +471,16 @@ let spawn_snapshot_info ?(json = false) node file =
 let snapshot_info ?json node file =
   spawn_snapshot_info ?json node file |> Process.check
 
-let spawn_snapshot_import ?(reconstruct = false) node file =
+let spawn_snapshot_import ?(no_check = false) ?(reconstruct = false) node file =
   spawn_command
     node
     (["snapshot"; "import"; "--data-dir"; node.persistent_state.data_dir]
     @ (if reconstruct then ["--reconstruct"] else [])
+    @ (if no_check then ["--no-check"] else [])
     @ [file])
 
-let snapshot_import ?reconstruct node file =
-  spawn_snapshot_import ?reconstruct node file |> Process.check
+let snapshot_import ?no_check ?reconstruct node file =
+  spawn_snapshot_import ?no_check ?reconstruct node file |> Process.check
 
 let spawn_reconstruct node =
   spawn_command
