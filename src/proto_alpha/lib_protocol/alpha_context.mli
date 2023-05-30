@@ -1030,6 +1030,8 @@ module Constants : sig
 
   val zk_rollup_min_pending_to_process : context -> int
 
+  val freeze_rewards : context -> bool
+
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : Parametric.t}
 

@@ -277,3 +277,9 @@ let zk_rollup_min_pending_to_process c =
 let zk_rollup_origination_size c =
   let zk_rollup = Raw_context.zk_rollup c in
   zk_rollup.origination_size
+
+let adaptive_inflation c = (Raw_context.constants c).adaptive_inflation
+
+let adaptive_inflation_enable c = (adaptive_inflation c).enable
+
+let freeze_rewards = adaptive_inflation_enable
