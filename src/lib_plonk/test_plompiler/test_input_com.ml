@@ -65,7 +65,7 @@ let test_input_com () =
   let x1, x2, x3, x4 = (S.random (), S.random (), S.random (), S.random ()) in
   let y = hash [|x1; x2; x3; x4|] in
   let private_inputs = Solver.solve cs.solver [|y; x1; x2; x3; x4|] in
-  assert (CS.sat cs.cs [] private_inputs) ;
+  assert (CS.sat cs private_inputs) ;
   let input_com_y = Main.input_commit pp_prv [|y|] in
   let input_com_x1x2 = Main.input_commit ~shift:1 pp_prv [|x1; x2|] in
   let public = [|x3|] in

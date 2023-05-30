@@ -252,7 +252,7 @@ struct
         PI.check
     in
     (* cs_global is used for sat *)
-    cs_global := SMap.add circuit_name cs.cs !cs_global ;
+    cs_global := SMap.add circuit_name cs !cs_global ;
     (* Plompiler.Utils.dump_label_traces
        ("../../../../flamegraph/flamegraph" ^ "_" ^ Int.to_string nb_proofs)
        cs.cs; *)
@@ -335,7 +335,7 @@ struct
       Main_KZG.{witness = trace; input_commitments = [cm_pi; cm_answers]}
     in
     let cs = SMap.find circuit_name !cs_global in
-    assert (Plonk.Circuit.sat cs [] trace) ;
+    assert (Plonk.Circuit.sat cs trace) ;
     let inputs = SMap.singleton ("meta_" ^ circuit_name) [secret] in
     let pp_aggreg_circuit =
       Main_KZG.update_prover_public_parameters transcript prover_meta_pp.meta_pp

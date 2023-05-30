@@ -75,7 +75,7 @@ let test_range_checks () =
   let cs = get_cs ~optimize:false circuit in
   let plonk_circuit = Plonk.Circuit.to_plonk cs in
   let private_inputs = Solver.solve cs.solver (Array.of_list (y :: w)) in
-  assert (CS.sat cs.cs [] private_inputs) ;
+  assert (CS.sat cs private_inputs) ;
   Helpers.test_circuit ~name:"RC.vanilla" plonk_circuit private_inputs ;
   (* Optimizer *)
   let o_cs = get_cs ~optimize:true circuit in
@@ -89,7 +89,7 @@ let test_range_checks () =
   let y = S.add_bulk invalid in
   let private_inputs = Solver.solve cs.solver (Array.of_list (y :: invalid)) in
   (* TODO: #5717 Handle range-checks in sat *)
-  (* assert (not (CS.sat cs.cs [] private_inputs)) ; *)
+  (* assert (not (CS.sat cs private_inputs)) ; *)
   Helpers.test_circuit
     ~outcome:Plonk_test.Cases.Proof_error
     ~name:"RC.invalid"

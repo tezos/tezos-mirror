@@ -64,7 +64,7 @@ let benchmark () =
   let initial, _ = get_inputs circuit in
   let private_inputs = Solver.solve cs.solver initial in
 
-  assert (CS.sat cs.cs [] private_inputs) ;
+  assert (CS.sat cs private_inputs) ;
 
   let inputs = Main.{witness = private_inputs; input_commitments = []} in
   let plonk_circuit = Plonk.Circuit.to_plonk cs in

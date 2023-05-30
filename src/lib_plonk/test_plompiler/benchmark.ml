@@ -587,7 +587,7 @@ let benchmark () =
           private_inputs
         in
         (* We check satisfiability of CS with the witness in case of a wrong erronerous transaction *)
-        assert (CS.sat cs.cs [] witness) ;
+        assert (CS.sat cs witness) ;
         let inputs = Main.{witness; input_commitments = []} in
         (inputs :: acc_inputs, Some cs))
       ([], None)

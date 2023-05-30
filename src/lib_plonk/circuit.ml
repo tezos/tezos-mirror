@@ -94,7 +94,7 @@ module Circuit : sig
 
   val get_selectors : t -> string list
 
-  val sat : CS.t -> Table.t list -> Scalar.t array -> bool
+  val sat : LibCircuit.cs_result -> Scalar.t array -> bool
 
   val to_plonk : Plompiler.LibCircuit.cs_result -> t
 end = struct
@@ -345,7 +345,7 @@ end = struct
            b))
       identities
 
-  let sat cs tables trace =
+  let sat (cs : Plompiler.LibCircuit.cs_result) trace =
     (* We initialise a map with all ids used in the circuit *)
     let identities =
       List.fold_left
@@ -363,14 +363,14 @@ end = struct
         (fun i gate ->
           (* Printf.printf "\n\nGate %i: %s" i
                 (Plompiler.Csir.CS.to_string_gate gate); *)
-          let b = sat_gate identities gate trace tables in
+          let b = sat_gate identities gate trace cs.tables in
           if b then ()
           else
             (* just to exit the iter *)
             raise
               (Constraint_not_satisfied
                  (Printf.sprintf "\nGate #%i not satisfied." i)))
-        cs ;
+        cs.cs ;
       true
     with Constraint_not_satisfied _ -> false
 
