@@ -339,7 +339,12 @@ module RPC = struct
 
   let block_hash base number =
     let open Lwt_result_syntax in
-    let key = Durable_storage_path.Block.hash number in
+    let* (Block_height block_number) =
+      match number with
+      | Durable_storage_path.Block.Current -> block_number base number
+      | Nth n -> return (Block_height n)
+    in
+    let key = Durable_storage_path.Block.hash (Nth block_number) in
     let+ hash_answer = call_service ~base durable_state_value () {key} () in
     match hash_answer with
     | Some bytes ->
