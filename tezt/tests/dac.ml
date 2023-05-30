@@ -2888,6 +2888,7 @@ let register ~protocols =
   Legacy.test_dac_node_imports_committee_members protocols ;
   Legacy.test_dac_node_dac_threshold_not_reached protocols ;
   scenario_with_layer1_legacy_and_rollup_nodes
+    ~hooks
     ~__FILE__
     ~tags:["dac"; "dac_node"]
     "dac_reveals_data_merkle_tree_v0"
@@ -2896,6 +2897,7 @@ let register ~protocols =
     ~threshold:1
     ~committee_size:1 ;
   scenario_with_layer1_legacy_and_rollup_nodes
+    ~hooks
     ~__FILE__
     ~tags:["dac"; "dac_node"]
     "dac_reveals_data_hash_chain_v0"
@@ -2904,6 +2906,7 @@ let register ~protocols =
     ~threshold:1
     ~committee_size:1 ;
   scenario_with_layer1_legacy_and_rollup_nodes
+    ~hooks
     ~__FILE__
     ~tags:["dac"; "dac_node"]
     ~threshold:0
@@ -2912,6 +2915,7 @@ let register ~protocols =
     Legacy.test_dac_node_handles_dac_retrieve_preimage_merkle_V0
     protocols ;
   scenario_with_layer1_legacy_and_rollup_nodes
+    ~hooks
     ~__FILE__
     ~tags:["dac"; "dac_node"]
     "dac_rollup_arith_uses_reveals"
@@ -2920,6 +2924,7 @@ let register ~protocols =
     ~threshold:1
     ~committee_size:1 ;
   scenario_with_layer1_legacy_and_rollup_nodes
+    ~hooks
     ~__FILE__
     ~tags:["dac"; "dac_node"]
     "dac_rollup_arith_wrong_hash"

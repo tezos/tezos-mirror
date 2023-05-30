@@ -109,6 +109,7 @@ val with_observer :
     an [Sc_rollup_node]. *)
 val with_fresh_rollup :
   ?pvm_name:string ->
+  ?hooks:Process_hooks.t ->
   protocol:Protocol.t ->
   Node.t ->
   Client.t ->
@@ -174,6 +175,7 @@ val scenario_with_layer1_legacy_and_rollup_nodes :
   ?commitment_period:int ->
   ?challenge_window:int ->
   ?committee_member_address:string ->
+  ?hooks:Process_hooks.t ->
   __FILE__:string ->
   threshold:int ->
   committee_size:int ->
