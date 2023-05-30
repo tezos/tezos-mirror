@@ -15,6 +15,7 @@ depends: [
   "tezos-rpc-http-client-unix"
   "tezos-version"
   "lwt-exit"
+  "rlp" { >= "0.1" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
