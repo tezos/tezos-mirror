@@ -226,6 +226,7 @@ mod tests {
     use super::*;
 
     use tezos_ethereum::wei;
+    use tezos_smart_rollup_host::runtime::ValueType;
     use tezos_smart_rollup_mock::MockHost;
 
     fn get_balance(
@@ -257,6 +258,29 @@ mod tests {
                 get_balance(&mut host, &mut evm_account_storage, &mint_address),
                 wei::from_eth(9999)
             );
+        }
+    }
+
+    #[test]
+    // Check that the transactions of the genesis block are correctly written in the
+    // storage.
+    fn test_genesis_transactions() {
+        let mut host = MockHost::default();
+
+        match init_block(&mut host) {
+            Ok(()) => (),
+            Err(_) => panic!("The initialization of block genesis failed."),
+        }
+
+        let block = storage::read_current_block(&mut host).unwrap();
+
+        assert_eq!(block.number, U256::zero());
+
+        for transaction in block.transactions {
+            let object_path = storage::object_path(&transaction).unwrap();
+            assert_eq!(host.store_has(&object_path), Ok(Some(ValueType::Subtree)));
+            let receipt_path = storage::receipt_path(&transaction).unwrap();
+            assert_eq!(host.store_has(&receipt_path), Ok(Some(ValueType::Subtree)));
         }
     }
 }
