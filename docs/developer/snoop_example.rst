@@ -23,15 +23,29 @@ and the call to ``Registration.register`` should be linked with ``octez-snoop``.
 See :doc:`snoop_arch` for complementary details.
 
 We'll define the benchmark module chunk by chunk and describe each part.
+For a starter, names are associated to various entities, and we use namespaces
+to help organize them.
+
+.. code-block:: ocaml
+
+   open Tezos_benchmark
+
+   let ns = Namespace.(make root "example")
+
 Benchmarks are referenced by ``name``. The ``info`` field is a brief
-description of the benchmark. Finally, there's also a system of ``tags``
-that allows listing benchmarks by kind.
+description of the benchmark. ``module_filename`` will help users finding where
+the benchmark is implemented simply using the command line interface. If we need to generate OCaml code to a
+specific location, we can set it with the ``generated_code_destination`` field.
+Finally, there's also a system of ``tags`` that allows listing benchmarks by
+kind.
 
 .. code-block:: ocaml
 
    module Blake2b_bench : Benchmark.S = struct
-     let name = "Blake2b_example"
+     let name = ns "Blake2b_example"
      let info = "Illustrating tezos-benchmark by benchmarking blake2b"
+     let module_filename = __FILE__
+     let generated_code_destination = None
      let tags = ["example"]
 
 Typically, a benchmark will depend on a set of parameters corresponding e.g. to
@@ -52,20 +66,18 @@ This is made possible by defining a ``config_encoding`` using the
          (fun max_bytes -> {max_bytes})
          (obj1 (req "max_bytes" int31))
 
-Benchmarking involves measuring the execution time of some piece of code
-and using the recorded execution time to fit a model.
-As explained in :doc:`snoop_arch`,
-a model is in fact a function of two parameters: a ``workload`` and the
-vector of free parameters to be fitted. The ``workload`` corresponds to
-the information on the input of the function being benchmarked required
-to predict its execution time. Typically, it corresponds to some notion
-of "size" of the input. In order to be saved to disk, we must define
-a ``workload_encoding`` as well. The ``workload`` type is abstract from the
-outside of the module, however, for plotting purposes, it is
-necessary to exhibit a vector-like structure on these workloads. The
-``workload_to_vector`` function maps workloads to sparse vectors. If one is
-not interested in plotting, this function can be made to always return
-``Sparse_vec.String.zero``.
+Benchmarking involves measuring the execution time of some piece of code and
+using the recorded execution time to fit a model. As explained in
+:doc:`snoop_arch`, a model is in fact a function of three parameters: a
+``workload``, the vector of free parameters to be fitted, and a name for future
+reference. The ``workload`` corresponds to the information on the input of the
+function being benchmarked required to predict its execution time. Typically, it
+corresponds to some notion of "size" of the input. In order to be saved to disk,
+we must define a ``workload_encoding`` as well. The ``workload`` type is abstract
+from the outside of the module, however, for plotting purposes, it is necessary
+to exhibit a vector-like structure on these workloads. The ``workload_to_vector``
+function maps workloads to sparse vectors. If one is not interested in plotting,
+this function can be made to always return ``Sparse_vec.String.zero``.
 
 .. code-block:: ocaml
 
@@ -94,16 +106,17 @@ This is the purpose of the ``conv`` parameter.
              ~conv:(fun {nbytes} -> (nbytes, ()))
              ~model:
                (Model.affine
-                  ~intercept:(Free_variable.of_string "blake2b_const")
-                  ~coeff:(Free_variable.of_string "blake2b_ns_p_byte")) ) ]
+                  ~name
+                  ~intercept:(Free_variable.of_namespace (ns "blake2b_const"))
+                  ~coeff:(Free_variable.of_namespace (ns "blake2b_ns_p_byte"))) ) ]
 
 Finally, we can define the actual benchmark. The function to be defined
 is ``create_benchmarks``, which expects to be given an ``rng_state``,
 a ``bench_num`` and a ``config`` and returns a list of suspensions, each
 suspension yielding a benchmark when evaluated.
 
-One might wonder why this particular signature was been chosen, instead of
-returning directly a list of benchmarks, or requiring simply a benchmark
+One might wonder why this particular signature has been chosen, instead of
+returning directly a list of benchmarks, or simply requiring a benchmark
 generator to be defined.
 
 - The current signature allows for setup code to be shared by all benchmarks
@@ -141,15 +154,6 @@ This concludes the definition of the benchmark. Let's register it:
 .. code-block:: ocaml
 
    let () = Registration.register (module Blake2b_bench)
-
-For illustrative purposes, we also make the ``blake2b`` available for code generation.
-
-.. code-block:: ocaml
-
-   let () =
-     Registration.register_for_codegen
-       "blake2b_codegen"
-       (Model.For_codegen (List.assoc "blake2b" Blake2b_bench.models))
 
 Step 2: Checking the timer
 --------------------------
