@@ -967,68 +967,22 @@ Bytes can be converted to natural numbers and integers.
 Cryptographic primitives
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
--  ``HASH_KEY``: Compute the b58check of a public key.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: key : 'S   ->   key_hash : 'S
-
+-  ``HASH_KEY``: Compute the b58check of a public key (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-HASH_KEY>`__).
 -  ``BLAKE2B``: Compute a cryptographic hash of the value contents using the
-   Blake2b-256 cryptographic hash function.
-
-::
-
-    :: bytes : 'S   ->   bytes : 'S
-
+   Blake2b-256 cryptographic hash function (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-BLAKE2B>`__).
 -  ``KECCAK``: Compute a cryptographic hash of the value contents using the
-   Keccak-256 cryptographic hash function.
-
-::
-
-    :: bytes : 'S   ->   bytes : 'S
-
+   Keccak-256 cryptographic hash function (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-KECCAK>`__).
 -  ``SHA256``: Compute a cryptographic hash of the value contents using the
-   Sha256 cryptographic hash function.
-
-::
-
-    :: bytes : 'S   ->   bytes : 'S
-
+   Sha256 cryptographic hash function (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SHA256>`__).
 -  ``SHA512``: Compute a cryptographic hash of the value contents using the
-   Sha512 cryptographic hash function.
-
-::
-
-    :: bytes : 'S   ->   bytes : 'S
-
+   Sha512 cryptographic hash function (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SHA512>`__).
 -  ``SHA3``: Compute a cryptographic hash of the value contents using the
-   SHA3-256 cryptographic hash function.
-
-::
-
-    :: bytes : 'S   ->   bytes : 'S
-
+   SHA3-256 cryptographic hash function (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SHA3>`__).
 -  ``CHECK_SIGNATURE``: Check that a sequence of bytes has been signed
-   with a given key.
-
-::
-
-    :: key : signature : bytes : 'S   ->   bool : 'S
-
--  ``COMPARE``: Key hash, key and signature comparison
-
-::
-
-    :: key_hash : key_hash : 'S   ->   int : 'S
-    :: key : key : 'S   ->   int : 'S
-    :: signature : signature : 'S   ->   int : 'S
-
-    > COMPARE / x : y : S  =>  -1 : S
-        iff x < y
-    > COMPARE / x : y : S  =>  0 : S
-        iff x = y
-    > COMPARE / x : y : S  =>  1 : S
-        iff x > y
+   with a given key (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CHECK_SIGNATURE>`__).
+-  ``COMPARE``: Key hash, key and signature comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 BLS12-381 primitives
 ~~~~~~~~~~~~~~~~~~~~~~~~
