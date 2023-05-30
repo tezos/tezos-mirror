@@ -149,6 +149,12 @@ let rpc_port_arg =
     ~default
     positive_int_parameter
 
+let allow_v1_api_arg : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"allow-v1-api"
+    ~doc:(Format.sprintf "Run dac node with both V0 and V1 (WIP) API.")
+    ()
+
 let raw_rpc_parameter =
   Tezos_clic.parameter (fun _cctxt h ->
       match String.split ':' h with
@@ -183,10 +189,16 @@ let experimental_disclaimer () =
 
 module Config_init = struct
   let create_configuration ~data_dir ~reveal_data_dir ~rpc_address ~rpc_port
-      mode (cctxt : Client_context.full) =
+      ~allow_v1_api mode (cctxt : Client_context.full) =
     let open Lwt_result_syntax in
     let config =
-      Configuration.make ~data_dir ~reveal_data_dir rpc_address rpc_port mode
+      Configuration.make
+        ~data_dir
+        ~reveal_data_dir
+        ~allow_v1_api
+        rpc_address
+        rpc_port
+        mode
     in
     let* () = Configuration.save config in
     let*! _ =
@@ -234,6 +246,8 @@ module Config_init = struct
           ~reveal_data_dir
           ~rpc_address
           ~rpc_port
+          ~allow_v1_api:false
+            (* [Legacy] mode exists only as part of the [V0]. *)
           (Configuration.make_legacy
              threshold
              committee_members_addresses
@@ -245,7 +259,12 @@ module Config_init = struct
     command
       ~group
       ~desc:"Configure DAC node in coordinator mode."
-      (args4 data_dir_arg rpc_address_arg rpc_port_arg reveal_data_dir_arg)
+      (args5
+         data_dir_arg
+         rpc_address_arg
+         rpc_port_arg
+         reveal_data_dir_arg
+         allow_v1_api_arg)
       (prefixes
          [
            "configure";
@@ -258,7 +277,7 @@ module Config_init = struct
            "members";
          ]
       @@ seq_of_param @@ tz4_public_key_param)
-      (fun (data_dir, rpc_address, rpc_port, reveal_data_dir)
+      (fun (data_dir, rpc_address, rpc_port, reveal_data_dir, allow_v1_api)
            committee_members
            cctxt ->
         experimental_disclaimer () ;
@@ -267,6 +286,7 @@ module Config_init = struct
           ~reveal_data_dir
           ~rpc_address
           ~rpc_port
+          ~allow_v1_api
           (Configuration.make_coordinator committee_members)
           cctxt)
 
@@ -275,13 +295,18 @@ module Config_init = struct
     command
       ~group
       ~desc:"Configure DAC node in committee member mode."
-      (args4 data_dir_arg rpc_address_arg rpc_port_arg reveal_data_dir_arg)
+      (args5
+         data_dir_arg
+         rpc_address_arg
+         rpc_port_arg
+         reveal_data_dir_arg
+         allow_v1_api_arg)
       (prefixes
          ["configure"; "as"; "committee"; "member"; "with"; "coordinator"]
       @@ coordinator_rpc_param
       @@ prefixes ["and"; "signer"]
       @@ tz4_address_param @@ stop)
-      (fun (data_dir, rpc_address, rpc_port, reveal_data_dir)
+      (fun (data_dir, rpc_address, rpc_port, reveal_data_dir, allow_v1_api)
            (coordinator_rpc_address, coordinator_rpc_port)
            address
            cctxt ->
@@ -291,6 +316,7 @@ module Config_init = struct
           ~reveal_data_dir
           ~rpc_address
           ~rpc_port
+          ~allow_v1_api
           (Configuration.make_committee_member
              coordinator_rpc_address
              coordinator_rpc_port
@@ -302,7 +328,7 @@ module Config_init = struct
     command
       ~group
       ~desc:"Configure DAC node in observer mode."
-      (args5
+      (args6
          data_dir_arg
          rpc_address_arg
          rpc_port_arg
@@ -312,12 +338,18 @@ module Config_init = struct
               (Format.sprintf
                  "The timeout in seconds for requesting a missing page from \
                   Committee Member. Defaults to %i seconds."
-                 Configuration.Observer.default_timeout)))
+                 Configuration.Observer.default_timeout))
+         allow_v1_api_arg)
       (prefixes ["configure"; "as"; "observer"; "with"; "coordinator"]
       @@ coordinator_rpc_param
       @@ prefixes ["and"; "committee"; "member"; "rpc"; "addresses"]
       @@ seq_of_param @@ committee_rpc_addresses_param)
-      (fun (data_dir, rpc_address, rpc_port, reveal_data_dir, timeout)
+      (fun ( data_dir,
+             rpc_address,
+             rpc_port,
+             reveal_data_dir,
+             timeout,
+             allow_v1_api )
            (coordinator_rpc_address, coordinator_rpc_port)
            committee_rpc_addresses
            cctxt ->
@@ -327,6 +359,7 @@ module Config_init = struct
           ~reveal_data_dir
           ~rpc_address
           ~rpc_port
+          ~allow_v1_api
           (Configuration.make_observer
              ~committee_rpc_addresses
              ?timeout

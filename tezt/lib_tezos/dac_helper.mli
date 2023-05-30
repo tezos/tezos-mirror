@@ -69,6 +69,7 @@ val with_coordinator_node :
   ?sc_rollup_node:Sc_rollup_node.t ->
   ?pvm_name:string ->
   ?wait_ready:bool ->
+  ?allow_v1_api:bool ->
   committee_members:Account.aggregate_key list ->
   Node.t ->
   Client.t ->
@@ -82,6 +83,7 @@ val with_committee_member :
   ?sc_rollup_node:Sc_rollup_node.t ->
   ?pvm_name:string ->
   ?wait_ready:bool ->
+  ?allow_v1_api:bool ->
   committee_member:Account.key ->
   Node.t ->
   Dac_node.t ->
@@ -95,6 +97,7 @@ val with_observer :
   ?sc_rollup_node:Sc_rollup_node.t ->
   ?pvm_name:string ->
   ?wait_ready:bool ->
+  ?allow_v1_api:bool ->
   committee_member_rpcs:(string * int) list ->
   Node.t ->
   Dac_node.t ->
@@ -125,6 +128,7 @@ val scenario_with_full_dac_infrastructure :
   ?challenge_window:int ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?node_arguments:Node.argument list ->
+  ?allow_v1_api:bool ->
   __FILE__:string ->
   committee_size:int ->
   observers:int ->

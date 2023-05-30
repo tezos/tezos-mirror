@@ -61,6 +61,7 @@ module Parameters = struct
     node : Node.t;
     client : Client.t;
     mutable pending_ready : unit option Lwt.u list;
+    allow_v1_api : bool;
   }
 
   type session_state = {mutable ready : bool}
@@ -110,6 +111,8 @@ let data_dir dac_node = dac_node.persistent_state.data_dir
 
 let reveal_data_dir dac_node = dac_node.persistent_state.reveal_data_dir
 
+let allow_v1_api dac_node = dac_node.persistent_state.allow_v1_api
+
 let spawn_command dac_node =
   Process.spawn ~name:dac_node.name ~color:dac_node.color dac_node.path
 
@@ -119,16 +122,18 @@ let localhost = "127.0.0.1"
 
 let spawn_config_init dac_node =
   let arg_command =
-    [
-      "--data-dir";
-      data_dir dac_node;
-      "--rpc-port";
-      string_of_int (rpc_port dac_node);
-      "--rpc-addr";
-      rpc_host dac_node;
-      "--reveal-data-dir";
-      reveal_data_dir dac_node;
-    ]
+    List.append
+      [
+        "--data-dir";
+        data_dir dac_node;
+        "--rpc-port";
+        string_of_int (rpc_port dac_node);
+        "--rpc-addr";
+        rpc_host dac_node;
+        "--reveal-data-dir";
+        reveal_data_dir dac_node;
+      ]
+    @@ if allow_v1_api dac_node then ["--allow-v1-api"] else []
   in
   let mode_command =
     match dac_node.persistent_state.mode with
@@ -282,8 +287,8 @@ let handle_event dac_node {name; value = _; timestamp = _} =
   match name with "dac_node_is_ready.v0" -> set_ready dac_node | _ -> ()
 
 let create ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir ~mode ~node ~client ()
-    =
+    ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir ~mode ~node ~client
+    ?(allow_v1_api = false) () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -311,6 +316,7 @@ let create ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
         pending_ready = [];
         node;
         client;
+        allow_v1_api;
       }
   in
   on_event dac_node (handle_event dac_node) ;
@@ -343,7 +349,7 @@ let create_legacy ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
 
 let create_coordinator ?(path = Constant.dac_node) ?name ?color ?data_dir
     ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir
-    ~committee_members ~node ~client () =
+    ?(allow_v1_api = false) ~committee_members ~node ~client () =
   let mode = Coordinator {committee_members} in
   create
     ~path
@@ -357,12 +363,13 @@ let create_coordinator ?(path = Constant.dac_node) ?name ?color ?data_dir
     ~mode
     ~node
     ~client
+    ~allow_v1_api
     ()
 
 let create_committee_member ?(path = Constant.dac_node) ?name ?color ?data_dir
     ?event_pipe ?(rpc_host = localhost) ?rpc_port ?reveal_data_dir
-    ?(coordinator_rpc_host = localhost) ?coordinator_rpc_port ~address ~node
-    ~client () =
+    ?(coordinator_rpc_host = localhost) ?coordinator_rpc_port
+    ?(allow_v1_api = false) ~address ~node ~client () =
   let coordinator_rpc_port =
     match coordinator_rpc_port with None -> Port.fresh () | Some port -> port
   in
@@ -381,12 +388,13 @@ let create_committee_member ?(path = Constant.dac_node) ?name ?color ?data_dir
     ~mode
     ~node
     ~client
+    ~allow_v1_api
     ()
 
 let create_observer ?(path = Constant.dac_node) ?name ?color ?data_dir
     ?event_pipe ?(rpc_host = localhost) ?rpc_port ?reveal_data_dir
     ?(coordinator_rpc_host = localhost) ?coordinator_rpc_port ?timeout
-    ~committee_member_rpcs ~node ~client () =
+    ?(allow_v1_api = false) ~committee_member_rpcs ~node ~client () =
   let coordinator_rpc_port =
     match coordinator_rpc_port with None -> Port.fresh () | Some port -> port
   in
@@ -411,6 +419,7 @@ let create_observer ?(path = Constant.dac_node) ?name ?color ?data_dir
     ~mode
     ~node
     ~client
+    ~allow_v1_api
     ()
 
 let make_arguments node =

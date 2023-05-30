@@ -265,6 +265,7 @@ type t = {
   mode : mode;
       (** Configuration parameters specific to the operating mode of the
           DAC. *)
+  allow_v1_api : bool;
 }
 
 let mode_name t =
@@ -274,8 +275,8 @@ let mode_name t =
   | Observer _ -> Observer.name
   | Legacy _ -> Legacy.name
 
-let make ~data_dir ~reveal_data_dir rpc_address rpc_port mode =
-  {data_dir; reveal_data_dir; rpc_address; rpc_port; mode}
+let make ~data_dir ~reveal_data_dir ~allow_v1_api rpc_address rpc_port mode =
+  {data_dir; reveal_data_dir; rpc_address; rpc_port; mode; allow_v1_api}
 
 let data_dir_path config subpath = Filename.concat config.data_dir subpath
 
@@ -320,11 +321,11 @@ let mode_encoding =
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {data_dir; rpc_address; rpc_port; reveal_data_dir; mode} ->
-      (data_dir, rpc_address, rpc_port, reveal_data_dir, mode))
-    (fun (data_dir, rpc_address, rpc_port, reveal_data_dir, mode) ->
-      {data_dir; rpc_address; rpc_port; reveal_data_dir; mode})
-    (obj5
+    (fun {data_dir; rpc_address; rpc_port; reveal_data_dir; mode; allow_v1_api} ->
+      (data_dir, rpc_address, rpc_port, reveal_data_dir, mode, allow_v1_api))
+    (fun (data_dir, rpc_address, rpc_port, reveal_data_dir, mode, allow_v1_api) ->
+      {data_dir; rpc_address; rpc_port; reveal_data_dir; mode; allow_v1_api})
+    (obj6
        (dft
           "data-dir"
           ~description:"Location of the data dir"
@@ -337,7 +338,8 @@ let encoding : t Data_encoding.t =
           ~description:"Reveal data directory"
           string
           default_reveal_data_dir)
-       (req "mode" ~description:"Running mode" mode_encoding))
+       (req "mode" ~description:"Running mode" mode_encoding)
+       (dft "allow_v1_api" ~description:"Allow V1 API boolean flag" bool false))
 
 type error += DAC_node_unable_to_write_configuration_file of string
 

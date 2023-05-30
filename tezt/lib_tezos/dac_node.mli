@@ -59,6 +59,7 @@ val create_coordinator :
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?reveal_data_dir:string ->
+  ?allow_v1_api:bool ->
   committee_members:string list ->
   node:Node.t ->
   client:Client.t ->
@@ -78,6 +79,7 @@ val create_committee_member :
   ?reveal_data_dir:string ->
   ?coordinator_rpc_host:string ->
   ?coordinator_rpc_port:int ->
+  ?allow_v1_api:bool ->
   address:string ->
   node:Node.t ->
   client:Client.t ->
@@ -99,6 +101,7 @@ val create_observer :
   ?coordinator_rpc_host:string ->
   ?coordinator_rpc_port:int ->
   ?timeout:int ->
+  ?allow_v1_api:bool ->
   committee_member_rpcs:(string * int) list ->
   node:Node.t ->
   client:Client.t ->
@@ -126,6 +129,9 @@ val data_dir : t -> string
 
 (** Get the reveal-data-dir of an dac node. *)
 val reveal_data_dir : t -> string
+
+(** [allow_v1_api dac_node] is [true] if current node allows running [V1] API. *)
+val allow_v1_api : t -> bool
 
 (** Calls [ls] on reveal data dir. *)
 val ls_reveal_data_dir : t -> string list Lwt.t
