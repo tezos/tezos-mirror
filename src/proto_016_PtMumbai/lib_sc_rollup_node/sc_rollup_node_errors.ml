@@ -47,8 +47,8 @@ type error +=
       inbox : Sc_rollup.Inbox.t;
     }
   | Unexpected_rollup of {
-      rollup_address : Sc_rollup.Address.t;
-      saved_address : Sc_rollup.Address.t;
+      rollup_address : Octez_smart_rollup.Address.t;
+      saved_address : Octez_smart_rollup.Address.t;
     }
   | Missing_PVM_state of Block_hash.t * Int32.t
   | Cannot_checkout_context of Block_hash.t * Smart_rollup_context_hash.t option
@@ -200,15 +200,15 @@ let () =
         ppf
         "This rollup node was already set up for rollup %a, it cannot be run \
          for a different rollup %a."
-        Sc_rollup.Address.pp
+        Octez_smart_rollup.Address.pp
         saved_address
-        Sc_rollup.Address.pp
+        Octez_smart_rollup.Address.pp
         rollup_address)
     `Permanent
     Data_encoding.(
       obj2
-        (req "rollup_address" Sc_rollup.Address.encoding)
-        (req "saved_address" Sc_rollup.Address.encoding))
+        (req "rollup_address" Octez_smart_rollup.Address.encoding)
+        (req "saved_address" Octez_smart_rollup.Address.encoding))
     (function
       | Unexpected_rollup {rollup_address; saved_address} ->
           Some (rollup_address, saved_address)

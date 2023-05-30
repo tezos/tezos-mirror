@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
 open Store_sigs
 module Context_encoding = Tezos_context_encoding.Context_binary
 
@@ -121,7 +119,9 @@ module Proof (Hash : sig
   val of_context_hash : Context_hash.t -> t
 end) (Proof_encoding : sig
   val proof_encoding :
-    Environment.Context.Proof.tree Environment.Context.Proof.t Data_encoding.t
+    Tezos_context_sigs.Context.Proof_types.tree
+    Tezos_context_sigs.Context.Proof_types.t
+    Data_encoding.t
 end) =
 struct
   module IStoreProof =
@@ -178,11 +178,6 @@ struct
         return None
 end
 
-module Inbox = struct
-  include Sc_rollup.Inbox
-  module Message = Sc_rollup.Inbox_message
-end
-
 (** State of the PVM that this rollup node deals with. *)
 module PVMState = struct
   type value = tree
@@ -214,7 +209,7 @@ module Rollup = struct
       IStore.Info.v date
     in
     let value =
-      Data_encoding.Binary.to_bytes_exn Sc_rollup.Address.encoding addr
+      Data_encoding.Binary.to_bytes_exn Octez_smart_rollup.Address.encoding addr
     in
     let*! store = IStore.main index.repo in
     let*! () = IStore.set_exn ~info store path value in
@@ -227,7 +222,7 @@ module Rollup = struct
     let*! value = IStore.find store path in
     return
     @@ Option.map
-         (Data_encoding.Binary.of_bytes_exn Sc_rollup.Address.encoding)
+         (Data_encoding.Binary.of_bytes_exn Octez_smart_rollup.Address.encoding)
          value
 
   let check_or_set_address (type a) (mode : a mode) (index : a raw_index)
@@ -236,7 +231,7 @@ module Rollup = struct
     let* saved_address = get_address index in
     match saved_address with
     | Some saved_address ->
-        fail_unless Sc_rollup.Address.(rollup_address = saved_address)
+        fail_unless Octez_smart_rollup.Address.(rollup_address = saved_address)
         @@ Sc_rollup_node_errors.Unexpected_rollup
              {rollup_address; saved_address}
     | None -> (
