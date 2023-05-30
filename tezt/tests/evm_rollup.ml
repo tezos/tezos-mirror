@@ -279,7 +279,13 @@ let test_rpc_getBlockByNumber =
         Eth_account.bootstrap_accounts
       |> to_list)
   in
-  Check.(block.transactions = expected_transactions)
+  let transactions =
+    match block.transactions with
+    | Empty -> Test.fail "Genesis block shouldn't be empty"
+    | Hash l -> l
+    | Full _ -> Test.fail "Expected only transaction hashes"
+  in
+  Check.(transactions = expected_transactions)
     (Check.list Check.string)
     ~error_msg:"Unexpected list of transactions, should be %%R, but got %%L" ;
   unit
