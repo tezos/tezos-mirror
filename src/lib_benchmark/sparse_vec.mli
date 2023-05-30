@@ -57,11 +57,10 @@ module type S = sig
 
   val get_opt : t -> basis -> R.t option
 
+  (** Returns [zero] if [basis] is not found in [t]. *)
   val get : t -> basis -> R.t
 
   val swap : t -> basis -> basis -> t
-
-  val eval : t -> basis -> R.t
 
   val of_list : (basis * R.t) list -> t
 

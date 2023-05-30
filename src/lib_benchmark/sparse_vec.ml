@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Map = Stdlib.Map
-
 (* Our favorite "ring" *)
 module R = Float
 
@@ -63,8 +61,6 @@ module type S = sig
 
   val swap : t -> basis -> basis -> t
 
-  val eval : t -> basis -> R.t
-
   val of_list : (basis * R.t) list -> t
 
   val to_list : t -> (basis * R.t) list
@@ -87,8 +83,8 @@ module type S = sig
   end
 end
 
-module Make (M : Tezos_error_monad.TzLwtreslib.Map.S) :
-  S with type t = R.t M.t and type basis = M.key = struct
+module Make (M : Map.S) : S with type t = R.t M.t and type basis = M.key =
+struct
   type t = R.t M.t
 
   type basis = M.key
@@ -101,7 +97,7 @@ module Make (M : Tezos_error_monad.TzLwtreslib.Map.S) :
 
   let zero = M.empty
 
-  let add (vec1 : t) (vec2 : t) : t =
+  let add vec1 vec2 =
     M.union
       (fun _elt i1 i2 ->
         let res = R.add i1 i2 in
@@ -119,16 +115,8 @@ module Make (M : Tezos_error_monad.TzLwtreslib.Map.S) :
 
   let iter = M.iter
 
-  let find_map : (basis -> R.t -> 'res option) -> t -> 'res option =
-    fun (type res) f vec ->
-     let exception Return of res in
-     try
-       M.iter
-         (fun basis elt ->
-           match f basis elt with None -> () | Some res -> raise (Return res))
-         vec ;
-       None
-     with Return res -> Some res
+  let find_map f vec =
+    Seq.find_map (fun (basis, elt) -> f basis elt) @@ M.to_seq vec
 
   let set vec i e =
     if R.compare e R.zero = 0 then M.remove i vec else M.add i e vec
@@ -143,38 +131,29 @@ module Make (M : Tezos_error_monad.TzLwtreslib.Map.S) :
     match (M.find_opt i vec, M.find_opt j vec) with
     | None, None -> vec
     | Some elt, None ->
-        let vec = set vec i R.zero in
+        let vec = M.remove i vec in
         set vec j elt
     | None, Some elt ->
-        let vec = set vec j R.zero in
+        let vec = M.remove j vec in
         set vec i elt
     | Some e1, Some e2 ->
         let vec = set vec i e2 in
         set vec j e1
 
-  let eval v u = match M.find_opt u v with None -> R.zero | Some c -> c
+  let of_list l = M.of_seq @@ List.to_seq l
 
-  let of_list : (basis * R.t) list -> t =
-   fun l -> List.fold_left (fun vec (i, elt) -> set vec i elt) zero l
+  let to_list = M.bindings
 
-  let to_list : t -> (basis * R.t) list = fun m -> List.of_seq (M.to_seq m)
-
-  let pp :
-      pp_basis:(Format.formatter -> basis -> unit) ->
-      pp_element:(Format.formatter -> R.t -> unit) ->
-      Format.formatter ->
-      t ->
-      unit =
-   fun ~pp_basis ~pp_element fmtr vec ->
-    if M.is_empty vec then Format.fprintf fmtr "∅"
-    else
-      let bindings = M.bindings vec in
-      Format.pp_print_list
-        ~pp_sep:(fun fmtr () -> Format.fprintf fmtr ";@,")
-        (fun fmtr (k, v) ->
-          Format.fprintf fmtr "%a ↦ %a" pp_basis k pp_element v)
-        fmtr
-        bindings
+  let pp ~pp_basis ~pp_element fmtr vec =
+    match M.bindings vec with
+    | [] -> Format.fprintf fmtr "∅"
+    | bindings ->
+        Format.pp_print_list
+          ~pp_sep:(fun fmtr () -> Format.fprintf fmtr ";@,")
+          (fun fmtr (k, v) ->
+            Format.fprintf fmtr "%a ↦ %a" pp_basis k pp_element v)
+          fmtr
+          bindings
 
   module Op = struct
     let ( .%[] ) vec x = get vec x
@@ -187,6 +166,4 @@ module Make (M : Tezos_error_monad.TzLwtreslib.Map.S) :
   end
 end
 
-module Make_compare (X : Map.OrderedType) =
-  Make (Tezos_error_monad.TzLwtreslib.Map.Make (X))
 module String = Make (String.Map)
