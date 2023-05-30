@@ -140,9 +140,10 @@ let inject ?(request = `Inject) ?(force = false) ?protocol ?signature ?error t
     let mode = Client.get_mode client in
     match Client.mode_to_endpoint mode with
     | None -> Test.fail "Operation.inject: Endpoint expected"
-    | Some (Proxy_server _) ->
+    | Some (Proxy_server _ | Foreign_endpoint _) ->
         Test.fail
-          "Operation.inject: Node endpoint expected instead of proxy server"
+          "Operation.inject: Node endpoint expected instead of proxy server or \
+           foreign endpoint"
     | Some (Node node) -> Node.wait_for_request ~request node
   in
   let runnable = RPC.Client.spawn client @@ inject_rpc (Data (`String op)) in
@@ -167,9 +168,10 @@ let inject_operations ?protocol ?(request = `Inject) ?(force = false) ?error
     let mode = Client.get_mode client in
     match Client.mode_to_endpoint mode with
     | None -> Test.fail "Operation.inject: Endpoint expected"
-    | Some (Proxy_server _) ->
+    | Some (Proxy_server _ | Foreign_endpoint _) ->
         Test.fail
-          "Operation.inject: Node endpoint expected instead of proxy server"
+          "Operation.inject: Node endpoint expected instead of proxy server or \
+           foreign endpoint"
     | Some (Node node) -> Node.wait_for_request ~request node
   in
   let rpc =

@@ -27,13 +27,17 @@
 open Runnable.Syntax
 open Cli_arg
 
-type endpoint = Node of Node.t | Proxy_server of Proxy_server.t
+type endpoint =
+  | Node of Node.t
+  | Proxy_server of Proxy_server.t
+  | Foreign_endpoint of Foreign_endpoint.t
 
 type media_type = Json | Binary | Any
 
 let rpc_port = function
   | Node n -> Node.rpc_port n
   | Proxy_server ps -> Proxy_server.rpc_port ps
+  | Foreign_endpoint fe -> Foreign_endpoint.rpc_port fe
 
 type mode =
   | Client of endpoint option * media_type option
@@ -90,8 +94,31 @@ let runner endpoint =
   match endpoint with
   | Node node -> Node.runner node
   | Proxy_server ps -> Proxy_server.runner ps
+  | Foreign_endpoint _ -> None
+
+let scheme = function
+  | Node n -> Node.rpc_scheme n
+  | Proxy_server _ -> "http"
+  | Foreign_endpoint fe -> Foreign_endpoint.rpc_scheme fe
 
 let address ?(hostname = false) ?from peer =
+  (* We locally overload the runner function to fake a runner for foreign
+     endpoints. Because the API contract of the [Runner] module is to
+     provide a way to connect to a remote host using SSH, we cannot return a
+     runner for a foreign endpoint, because the module does not provide such
+     invariants (for instance, the public RPC endpoint of Mondaynet is a good
+     candidate for a foreign endpoint to which we likely cannot connect to
+     using SSH).
+
+     We do provide this function because the runner is only used in the context
+     of the {!Runner.address} function, which only compares the addresses of
+     two runners to decide whether or not to use the localhost address
+     in the case where [from] has the same address as [peer]. *)
+  let runner = function
+    | Foreign_endpoint endpoint ->
+        Some (Runner.create ~address:(Foreign_endpoint.rpc_host endpoint) ())
+    | peer -> runner peer
+  in
   match from with
   | None -> Runner.address ~hostname (runner peer)
   | Some endpoint ->
@@ -133,6 +160,9 @@ let mode_to_endpoint = function
   | Client (Some endpoint, _) | Light (_, endpoint :: _) | Proxy endpoint ->
       Some endpoint
 
+let string_of_endpoint ?hostname e =
+  sf "%s://%s:%d" (scheme e) (address ?hostname e) (rpc_port e)
+
 (* [?endpoint] can be used to override the default node stored in the client.
    Mockup nodes do not use [--endpoint] at all: RPCs are mocked up.
    Light mode needs a file (specified with [--sources] on the CLI)
@@ -143,8 +173,7 @@ let endpoint_arg ?(endpoint : endpoint option) client =
   (* pass [?endpoint] first: it has precedence over client.mode *)
   match either endpoint (mode_to_endpoint client.mode) with
   | None -> []
-  | Some e ->
-      ["--endpoint"; sf "http://%s:%d" (address ~hostname:true e) (rpc_port e)]
+  | Some e -> ["--endpoint"; string_of_endpoint ~hostname:true e]
 
 let media_type_arg client =
   match client with
@@ -659,7 +688,9 @@ let activate_protocol ?endpoint ?block ?protocol ?protocol_hash ?fitness ?key
     client
   |> Process.check
 
-let node_of_endpoint = function Node n -> Some n | Proxy_server _ -> None
+let node_of_endpoint = function
+  | Node n -> Some n
+  | Proxy_server _ | Foreign_endpoint _ -> None
 
 let node_of_client_mode = function
   | Client (Some endpoint, _) -> node_of_endpoint endpoint
