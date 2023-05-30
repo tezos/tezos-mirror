@@ -110,14 +110,13 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
   let to_cycle = Cycle_repr.(add new_cycle preserved_cycles) in
   max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle
   >>=? fun (maxima, delegates_to_remove) ->
-  let frozen_deposits_percentage =
-    Constants_storage.frozen_deposits_percentage ctxt
+  let delegation_over_baking_limit =
+    Constants_storage.delegation_over_baking_limit ctxt
   in
   Signature.Public_key_hash.Map.fold_es
     (fun delegate maximum_stake (ctxt, balance_updates) ->
       let maximum_stake_to_be_deposited =
-        Tez_repr.(
-          div_exn (mul_exn maximum_stake frozen_deposits_percentage) 100)
+        Tez_repr.div_exn maximum_stake (delegation_over_baking_limit + 1)
       in
       (* Here we make sure to preserve the following invariant :
          maximum_stake_to_be_deposited <= frozen_deposits + balance

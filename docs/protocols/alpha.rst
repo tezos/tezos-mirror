@@ -57,6 +57,11 @@ Breaking Changes
   value of ``640tz`` into the percentage ``11%`` and renamed to
   ``percentage_of_frozen_deposits_slashed_per_double_baking``. (MR :gl:`!8753`)
 
+- Since protocol Ithaca, the ratio of delegated tez over the delegate's frozen deposit
+  must be at most 9. Until now, this was ensured by a protocol parameter named
+  ``frozen_deposits_percentage`` (whose value is 10%) representing the minimal percentage
+  of frozen deposit. We convert it from a percentage to a factor named
+  ``delegation_over_baking_limit`` whose value is 9. (MR :gl:`!8884`)
 
 RPC Changes
 -----------

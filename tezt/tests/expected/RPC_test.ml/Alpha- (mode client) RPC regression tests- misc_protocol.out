@@ -29,7 +29,7 @@
   "delay_increment_per_round": "1", "consensus_committee_size": 256,
   "consensus_threshold": 0,
   "minimal_participation_ratio": { "numerator": 2, "denominator": 3 },
-  "max_slashing_period": 2, "frozen_deposits_percentage": 5,
+  "max_slashing_period": 2, "delegation_over_baking_limit": 19,
   "percentage_of_frozen_deposits_slashed_per_double_baking": 11,
   "percentage_of_frozen_deposits_slashed_per_double_endorsement": 50,
   "cache_script_size": 100000000, "cache_stake_distribution_cycles": 8,

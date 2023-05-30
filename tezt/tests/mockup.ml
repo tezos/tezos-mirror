@@ -1242,17 +1242,26 @@ let test_create_mockup_config_show_init_roundtrip protocols =
         protocol_constants = JSON.parse_file protocol_constants;
       }
   in
-  let compute_expected_amounts bootstrap_accounts protocol_constants =
-    let frozen_deposits_percentage =
-      JSON.(protocol_constants |-> "frozen_deposits_percentage" |> as_int)
+  let compute_expected_amounts protocol bootstrap_accounts protocol_constants =
+    let convert =
+      if protocol > Protocol.Nairobi then
+        let delegation_over_baking_limit =
+          JSON.(protocol_constants |-> "delegation_over_baking_limit" |> as_int)
+        in
+        let delegation_over_baking_limit_plus_1 =
+          Int64.of_int (delegation_over_baking_limit + 1)
+        in
+        fun amount ->
+          Tez.(amount - (amount /! delegation_over_baking_limit_plus_1))
+      else
+        let frozen_deposits_percentage =
+          JSON.(protocol_constants |-> "frozen_deposits_percentage" |> as_int)
+        in
+        let pct = 100 - frozen_deposits_percentage in
+        fun amount -> Tez.(of_mutez_int (pct * to_mutez amount / 100))
     in
-    let pct = 100 - frozen_deposits_percentage in
     List.map
-      (fun account ->
-        {
-          account with
-          amount = Tez.(of_mutez_int (pct * to_mutez account.amount / 100));
-        })
+      (fun account -> {account with amount = convert account.amount})
       bootstrap_accounts
   in
   (* Check that two JSON objects are equal by pair-wise comparing
@@ -1389,6 +1398,7 @@ let test_create_mockup_config_show_init_roundtrip protocols =
      | Some initial_bootstrap_accounts ->
          let expected_amounts =
            compute_expected_amounts
+             protocol
              initial_bootstrap_accounts
              initial_state.protocol_constants
          in
@@ -1442,6 +1452,7 @@ let test_create_mockup_config_show_init_roundtrip protocols =
 
    let expected_amounts =
      compute_expected_amounts
+       protocol
        initial_state.bootstrap_accounts
        initial_state.protocol_constants
    in

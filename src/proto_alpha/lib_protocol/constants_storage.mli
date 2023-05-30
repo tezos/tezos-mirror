@@ -82,7 +82,7 @@ val minimal_participation_ratio : Raw_context.t -> Ratio_repr.t
 
 val max_slashing_period : Raw_context.t -> int
 
-val frozen_deposits_percentage : Raw_context.t -> int
+val delegation_over_baking_limit : Raw_context.t -> int
 
 val percentage_of_frozen_deposits_slashed_per_double_baking :
   Raw_context.t -> int

@@ -1018,6 +1018,9 @@ let prepare_first_block ~level ~timestamp ctxt =
         in
         1 + Int64.to_int percentage_rounded_down
       in
+      let delegation_over_baking_limit =
+        (100 / c.frozen_deposits_percentage) - 1
+      in
       let constants =
         Constants_parametric_repr.
           {
@@ -1049,7 +1052,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             consensus_threshold = c.consensus_threshold;
             minimal_participation_ratio = c.minimal_participation_ratio;
             max_slashing_period = c.max_slashing_period;
-            frozen_deposits_percentage = c.frozen_deposits_percentage;
+            delegation_over_baking_limit;
             percentage_of_frozen_deposits_slashed_per_double_baking;
             percentage_of_frozen_deposits_slashed_per_double_endorsement;
             (* The `testnet_dictator` should absolutely be None on mainnet *)

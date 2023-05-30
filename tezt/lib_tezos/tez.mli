@@ -67,6 +67,11 @@ val ( + ) : t -> t -> t
 (** Subtraction. This doesn't perform any bound checks. *)
 val ( - ) : t -> t -> t
 
+(** Division. This doesn't perform any bound checks.
+
+    @raise Division_by_zero when the second operand is zero. *)
+val ( /! ) : t -> int64 -> t
+
 (** Parsing. Parse a floating point number of tez.
 
     Any string of digits followed by an optional point and another string

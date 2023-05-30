@@ -130,9 +130,9 @@ let max_slashing_period c =
   let constants = Raw_context.constants c in
   constants.max_slashing_period
 
-let frozen_deposits_percentage c =
+let delegation_over_baking_limit c =
   let constants = Raw_context.constants c in
-  constants.frozen_deposits_percentage
+  constants.delegation_over_baking_limit
 
 let percentage_of_frozen_deposits_slashed_per_double_baking c =
   let constants = Raw_context.constants c in
