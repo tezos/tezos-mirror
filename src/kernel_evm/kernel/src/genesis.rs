@@ -14,12 +14,12 @@ use evm_execution::account_storage::account_path;
 use evm_execution::account_storage::init_account_storage;
 use evm_execution::account_storage::AccountStorageError;
 use evm_execution::account_storage::EthereumAccountStorage;
-use primitive_types::{H160, U256};
-use tezos_ethereum::transaction::TransactionHash;
+use primitive_types::{H160, H256, U256};
 use tezos_ethereum::transaction::TransactionReceipt;
 use tezos_ethereum::transaction::TransactionStatus;
 use tezos_ethereum::transaction::TransactionType;
 use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
+use tezos_ethereum::transaction::{TransactionHash, TransactionObject};
 use tezos_ethereum::wei::{self, Wei};
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::path::PathError;
@@ -113,7 +113,71 @@ fn craft_mint_address(genesis_mint_address: &str) -> Option<H160> {
     Some(encoded_genesis_mint_address.into())
 }
 
-fn store_genesis_receipts<Host: Runtime>(
+fn store_genesis_transaction_object<Host: Runtime>(
+    host: &mut Host,
+    block: &L2Block,
+    hash: &[u8; TRANSACTION_HASH_SIZE],
+    index: u32,
+    account: &MintAccount,
+    genesis_address: &H160,
+) -> Result<(), Error> {
+    let object = TransactionObject {
+        from: *genesis_address,
+        hash: *hash,
+        gas_used: U256::zero(),
+        gas_price: U256::zero(),
+        input: Vec::new(),
+        // Since the genesis address is the only transaction producer in the
+        // genesis block, it is consistent to consider the index of the
+        // transaction in the block as the updated nonce for the address.
+        nonce: index.into(),
+        to: craft_mint_address(account.mint_address),
+        index,
+        value: wei::from_eth(account.eth_amount),
+        v: U256::zero(),
+        r: H256::zero(),
+        s: H256::zero(),
+    };
+
+    let object_path = storage::object_path(&object.hash)?;
+    storage::store_transaction_object(
+        &object_path,
+        host,
+        block.hash,
+        block.number,
+        &object,
+    )
+}
+
+fn store_genesis_transaction_receipt<Host: Runtime>(
+    host: &mut Host,
+    block: &L2Block,
+    hash: &[u8; TRANSACTION_HASH_SIZE],
+    index: u32,
+    account: &MintAccount,
+    genesis_address: &H160,
+) -> Result<(), Error> {
+    let receipt = TransactionReceipt {
+        hash: *hash,
+        index,
+        block_hash: block.hash,
+        block_number: block.number,
+        from: *genesis_address,
+        to: craft_mint_address(account.mint_address),
+        cumulative_gas_used: U256::zero(),
+        effective_gas_price: U256::zero(),
+        gas_used: U256::zero(),
+        contract_address: None,
+        type_: TransactionType::Legacy,
+        status: TransactionStatus::Success,
+    };
+
+    let receipt_path = receipt_path(&receipt.hash)?;
+    storage::store_transaction_receipt(&receipt_path, host, &receipt)?;
+    storage::store_transaction_receipt(&receipt_path, host, &receipt)
+}
+
+fn store_genesis_transactions<Host: Runtime>(
     host: &mut Host,
     genesis_block: L2Block,
 ) -> Result<(), Error> {
@@ -122,23 +186,23 @@ fn store_genesis_receipts<Host: Runtime>(
     for (hash, index) in genesis_block.transactions.iter().zip(0u32..) {
         let mint_account = &MINT_ACCOUNTS[index as usize];
 
-        let receipt = TransactionReceipt {
-            hash: *hash,
+        store_genesis_transaction_object(
+            host,
+            &genesis_block,
+            hash,
             index,
-            block_hash: genesis_block.hash,
-            block_number: genesis_block.number,
-            from: genesis_address,
-            to: craft_mint_address(mint_account.mint_address),
-            cumulative_gas_used: U256::zero(),
-            effective_gas_price: U256::zero(),
-            gas_used: U256::zero(),
-            contract_address: None,
-            type_: TransactionType::Legacy,
-            status: TransactionStatus::Success,
-        };
+            mint_account,
+            &genesis_address,
+        )?;
 
-        let receipt_path = receipt_path(&receipt.hash)?;
-        storage::store_transaction_receipt(&receipt_path, host, &receipt)?;
+        store_genesis_transaction_receipt(
+            host,
+            &genesis_block,
+            hash,
+            index,
+            mint_account,
+            &genesis_address,
+        )?;
     }
 
     Ok(())
@@ -151,7 +215,7 @@ pub fn init_block<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     // Produce and store genesis' block
     let genesis_block = L2Block::new(GENESIS_LEVEL, transaction_hashes);
     storage::store_current_block(host, &genesis_block)?;
-    store_genesis_receipts(host, genesis_block)?;
+    store_genesis_transactions(host, genesis_block)?;
 
     debug_msg!(host, "Genesis block was initialized.\n");
     Ok(())
