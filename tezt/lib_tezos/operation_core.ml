@@ -36,7 +36,7 @@ type t = {
   branch : string;
   contents : JSON.u;
   kind : kind;
-  signer : Account.key;
+  signer : Account.key option;
   mutable raw : Hex.t option;
       (* This is mutable to avoid computing the raw representation several times. *)
 }
@@ -45,7 +45,7 @@ let get_branch ?(offset = 2) client =
   let block = sf "head~%d" offset in
   RPC.Client.call client @@ RPC.get_chain_block_hash ~block ()
 
-let make ~branch ~signer ~kind contents =
+let make ~branch ?signer ~kind contents =
   {branch; contents; kind; signer; raw = None}
 
 let json t = `O [("branch", Ezjsonm.string t.branch); ("contents", t.contents)]
@@ -89,23 +89,26 @@ let hex ?protocol ?signature t client =
       return (`Hex (raw ^ signature))
 
 let sign ?protocol ({kind; signer; _} as t) client =
-  let watermark =
-    match kind with
-    | Consensus {kind; chain_id} ->
-        let chain_id =
-          Tezos_crypto.Hashed.Chain_id.to_string
-            (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
-        in
-        let prefix =
-          match kind with Preattestation -> "\x12" | Attestation -> "\x13"
-        in
-        Tezos_crypto.Signature.Custom
-          (Bytes.cat (Bytes.of_string prefix) (Bytes.of_string chain_id))
-    | Voting | Manager -> Tezos_crypto.Signature.Generic_operation
-  in
-  let* hex = hex ?protocol t client in
-  let bytes = Hex.to_bytes hex in
-  return (Account.sign_bytes ~watermark ~signer bytes)
+  match signer with
+  | None -> return Tezos_crypto.Signature.zero
+  | Some signer ->
+      let watermark =
+        match kind with
+        | Consensus {kind; chain_id} ->
+            let chain_id =
+              Tezos_crypto.Hashed.Chain_id.to_string
+                (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
+            in
+            let prefix =
+              match kind with Preattestation -> "\x12" | Attestation -> "\x13"
+            in
+            Tezos_crypto.Signature.Custom
+              (Bytes.cat (Bytes.of_string prefix) (Bytes.of_string chain_id))
+        | Voting | Manager -> Tezos_crypto.Signature.Generic_operation
+      in
+      let* hex = hex ?protocol t client in
+      let bytes = Hex.to_bytes hex in
+      return (Account.sign_bytes ~watermark ~signer bytes)
 
 module Tezos_operation = Tezos_base.TzPervasives.Operation
 

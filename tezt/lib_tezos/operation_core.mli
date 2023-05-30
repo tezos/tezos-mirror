@@ -72,9 +72,9 @@ type kind =
   | Voting
   | Manager
 
-(** [make ~branch ~signer ~kind json client] builds the representation
+(** [make ~branch ?signer ~kind json client] builds the representation
    of an unsigned operation. *)
-val make : branch:string -> signer:Account.key -> kind:kind -> JSON.u -> t
+val make : branch:string -> ?signer:Account.key -> kind:kind -> JSON.u -> t
 
 (** [json t] gives the json representation of an unsigned operation. *)
 val json : t -> JSON.u
@@ -100,9 +100,10 @@ val hex :
   Client.t ->
   Hex.t Lwt.t
 
-(** [sign t client] signs the raw representation of operation [t] by
-   its signer (see {!val:make}). [client] is used to construct the
-   binary representation of [t]. *)
+(** [sign t client] signs the raw representation of operation [t] by its signer
+    (see {!val:make}). [client] is used to construct the binary representation
+    of [t]. Note that if no signer have been given to [t] the function returns
+    [Tezos_crypto.Signature.zero]. *)
 val sign :
   ?protocol:Protocol.t -> t -> Client.t -> Tezos_crypto.Signature.t Lwt.t
 
