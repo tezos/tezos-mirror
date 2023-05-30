@@ -93,21 +93,20 @@ module AnemoiDouble : Base_sig = struct
 
   let cs_round_identities ~kx ~ky (x, y) (x', y') =
     let open L in
-    let open Num in
     let mg2_p_1 = Scalar.negate g2_p_1 in
-    let* mv = add_list ~coeffs:[g; one; mone] (to_list [x'; ky; y']) in
-    let* w = add mv y in
+    let* mv = Num.add_list ~coeffs:[g; one; mone] (to_list [x'; ky; y']) in
+    let* w = Num.add mv y in
     let* c =
-      add_list
+      Num.add_list
         ~qc:(delta -@ gamma)
         ~coeffs:[g; one; one; mg2_p_1]
         (to_list [y'; kx; x; x'])
     in
-    let* beta_y2 = mul ~qm:beta y y in
-    let* beta_mv2_c = custom ~qx2b:beta ~ql:one c mv in
-    let* id1 = add ~qr:mone beta_mv2_c beta_y2 in
-    let* w5_x = custom ~qx5a:one ~qr:mone w x in
-    let* id2 = add ~qc:gamma w5_x beta_y2 in
+    let* beta_y2 = Num.mul ~qm:beta y y in
+    let* beta_mv2_c = Num.custom ~qx2b:beta ~ql:one c mv in
+    let* id1 = Num.add ~qr:mone beta_mv2_c beta_y2 in
+    let* w5_x = Num.custom ~qx5a:one ~qr:mone w x in
+    let* id2 = Num.add ~qc:gamma w5_x beta_y2 in
     ret [id1; id2]
 
   let evals_round_identities ~domain_size ~buffers ~selector ~id1_buffer

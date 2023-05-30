@@ -714,46 +714,45 @@ module ConditionalAddEdwards : Base_sig = struct
     let rx = wires_g.(3) in
     let ry = wires_g.(4) in
     let open L in
-    let open Num in
-    let sub x y = add ~qr:mone x y in
-    let* px_qy = mul px qy in
-    let* py_qx = mul py qx in
-    let* pqs = mul px_qy py_qx in
-    let* denom_first = custom ~qm:param_d bit pqs ~qc:one in
+    let sub x y = Num.add ~qr:mone x y in
+    let* px_qy = Num.mul px qy in
+    let* py_qx = Num.mul py qx in
+    let* pqs = Num.mul px_qy py_qx in
+    let* denom_first = Num.custom ~qm:param_d bit pqs ~qc:one in
     (* q · [rx · (1 + d · b · px · qx · py · qy)
          - (b · px · qy + b · py · qx - b · px + px)] = 0 *)
     let* first_identity =
       (* left  = rx · (1 + d · b · px · qx · py · qy) *)
-      let* left = mul denom_first rx in
+      let* left = Num.mul denom_first rx in
       (* right = b · (px · qy + py · qx - px) + px    *)
-      let* px_qy_plus_py_qx = add px_qy py_qx in
+      let* px_qy_plus_py_qx = Num.add px_qy py_qx in
       let* px_qy_plus_py_qx_minux_px = sub px_qy_plus_py_qx px in
-      let* right_b = mul bit px_qy_plus_py_qx_minux_px in
-      let* right = add px right_b in
+      let* right_b = Num.mul bit px_qy_plus_py_qx_minux_px in
+      let* right = Num.add px right_b in
       (* all = left - right
              = rx · (1 + d · b · px · qx · py · qy)
                - (b · px · qy + b · py · qx - b · px + px) *)
       let* all = sub left right in
-      mul qec all
+      Num.mul qec all
     in
     (* q · [ry · (1 - d · b · px · qx · py · qy)
         - (b · py · qy - a · b · px · qx - b · py + py )] = 0 *)
     let* second_identity =
       (* left  = ry · (1 - d · b · px · qx · py · qy)  *)
-      let* denom_second = add_constant ~ql:mone two denom_first in
-      let* left = mul ry denom_second in
+      let* denom_second = Num.add_constant ~ql:mone two denom_first in
+      let* left = Num.mul ry denom_second in
       (* right = b · (py · qy - a · px · qx - py) + py *)
-      let* py_qy = mul py qy in
-      let* a_px_qx = mul ~qm:param_a px qx in
+      let* py_qy = Num.mul py qy in
+      let* a_px_qx = Num.mul ~qm:param_a px qx in
       let* py_qy_plus_a_px_qx = sub py_qy a_px_qx in
       let* py_qy_plus_a_px_qx_minus_py = sub py_qy_plus_a_px_qx py in
-      let* right_b = mul bit py_qy_plus_a_px_qx_minus_py in
-      let* right = add right_b py in
+      let* right_b = Num.mul bit py_qy_plus_a_px_qx_minus_py in
+      let* right = Num.add right_b py in
       (* all = left - right
              = y · (1 - d · b · px · qx · py · qy)
                - (b · py · qy - a · b · px · qx - b · py + py ) *)
       let* all = sub left right in
-      mul qec all
+      Num.mul qec all
     in
     ret [first_identity; second_identity]
 end
