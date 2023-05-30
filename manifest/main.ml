@@ -1661,7 +1661,6 @@ let octez_stdlib_unix =
         conf_libev;
         uri;
       ]
-    ~inline_tests:ppx_expect
 
 let _octez_stdlib_unix_test =
   tezt
@@ -1800,6 +1799,7 @@ let octez_base_unix =
         uri;
         octez_event_logging |> open_;
       ]
+    ~inline_tests:ppx_expect
 
 let octez_base_p2p_identity_file =
   public_lib
@@ -3392,6 +3392,7 @@ let octez_client_commands =
         octez_shell_services |> open_;
         octez_p2p_services |> open_;
         octez_stdlib_unix;
+        octez_base_unix |> open_;
         octez_signer_backends;
         data_encoding |> open_;
         uri;

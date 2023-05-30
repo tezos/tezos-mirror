@@ -159,7 +159,14 @@ end = struct
     let open Data_encoding in
     conv (fun {path; _} -> path) (fun l -> make l) (list string)
 
-  let pp fmt section = Format.fprintf fmt "%s" (String.concat "." section.path)
+  let pp fmt section =
+    Format.fprintf
+      fmt
+      "%a"
+      (Format.pp_print_list
+         ~pp_sep:(fun fmt () -> Format.pp_print_char fmt '.')
+         Format.pp_print_string)
+      section.path
 end
 
 let registered_sections = ref String.Set.empty
@@ -449,11 +456,7 @@ module All_definitions = struct
         raise
           (registration_exn
              "duplicate Event name: %a %S"
-             (Format.pp_print_option (fun fmt ss ->
-                  Format.fprintf
-                    fmt
-                    "%s"
-                    (String.concat "." (Section.to_string_list ss))))
+             (Format.pp_print_option Section.pp)
              E.section
              E.name)
     | None ->

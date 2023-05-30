@@ -26,10 +26,11 @@
 (** An implementation of {!Tezos_base.Internal_event.SINK} which
     writes the events as JSON or pretty printed into a single file-descriptor.
 
-    It is registered with the URI scheme ["file-descriptor-path"] to
-    output to a file or
-    ["file-descriptor-stdout"]/["file-descriptor-stderr"] for [stdout]
-    and [stderr] respectively.
+    An URI scheme is used to describe such file descriptors:
+    - ["file-descriptor-path"] outputs to the file at the URI path
+    - ["file-descriptor-stdout"] outputs to [stdout]
+    - ["file-descriptor-stderr"] outputs to [stderr]
+    - ["file-descriptor-syslog"] ouputs to a [syslog] facility
 
     Available options are
 
@@ -41,11 +42,16 @@
       ["section-prefix=:info"] (the empty section prefix matches all
       sections). To exclude completely a section from the log stream that the
       sink will output, you can use the special level-threshold "none".
-    - ["format"] the output format used;
-      acceptable values are ["one-per-line"] (the default),
-      ["netstring"] (see {{:https://en.wikipedia.org/wiki/Netstring}The
-      Netstring format}) (both to separate JSON records), {i or} ["pp"] to
-      output the events pretty-printed as text using the [syslog] format.
+
+    - ["format"] the output format used.Note that syslog output will ignore this
+      option and use the syslog formatting. Possible values are
+      - ["one-per-line"] (the default),
+      - ["netstring"] (see {{:https://en.wikipedia.org/wiki/Netstring}The
+        Netstring format}) (both to separate JSON records),
+      - ["pp-rfc5424"] to output the events pretty-printed as text using
+        {{:https://www.rfc-editor.org/rfc/rfc5424}RFC 5424}
+      - ["pp-short"] to output the events pretty-printed in a shorter and more
+        user-friendly fashion.
 
     Options available only for ["file-descriptor-path://"]:
 
@@ -61,6 +67,13 @@
       path provided.
     - ["create-dirs=true"] allows to create the directory where the log
       files are stored and all its parents recursively if they don't exist.
+
+    Option available only for ["file-descriptor-syslog://"]:
+
+    - ["facility=<facility>"] is the targeted syslog output. [User] is the
+    default value if no value is provided. See
+    {{:https://www.rfc-editor.org/rfc/rfc3164}RFC 3164} for more information.
+    The possible values are defined in module [Syslog].
 
     Examples:
 

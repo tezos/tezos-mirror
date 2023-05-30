@@ -34,7 +34,10 @@ type rotating = {
   current : current ref;
 }
 
-type output = Static of Lwt_unix.file_descr | Rotating of rotating
+type output =
+  | Static of Lwt_unix.file_descr
+  | Rotating of rotating
+  | Syslog of Syslog.t
 
 type t = {
   output : output;
@@ -46,7 +49,8 @@ type t = {
     | `Pp_short ];
   (* Hopefully temporary hack to handle event which are emitted with
      the non-cooperative log functions in `Legacy_logging`: *)
-  lwt_bad_citizen_hack : string list ref;
+  lwt_bad_citizen_hack :
+    (string * Internal_event.Level.t * Internal_event.Section.t) list ref;
   filter :
     [ `Level_at_least of Internal_event.Level.t
     | `Per_section_prefix of
@@ -65,6 +69,8 @@ type 'event wrapped = {
 }
 
 let wrap time_stamp section event = {time_stamp; section; event}
+
+let is_syslog o = match o with Syslog _ -> true | _ -> false
 
 let wrapped_encoding event_encoding =
   let open Data_encoding in
@@ -93,11 +99,11 @@ let wrapped_encoding event_encoding =
 let make_with_pp_rfc5424 pp wrapped_event name =
   (* See https://tools.ietf.org/html/rfc5424#section-6 *)
   Format.asprintf
-    "%a [%s.%s] %a\n"
+    "%a [%a.%s] %a\n"
     (Ptime.pp_rfc3339 ~frac_s:3 ())
     wrapped_event.time_stamp
-    (Internal_event.Section.to_string_list wrapped_event.section
-    |> String.concat ".")
+    Internal_event.Section.pp
+    wrapped_event.section
     name
     (pp ~all_fields:false ~block:false)
     wrapped_event.event
@@ -190,6 +196,10 @@ let%expect_test _ =
   [%expect {| 2023-04-27T08:29:09.777-00:00 [my.section.my-event] toto |}] ;
   ()
 
+let make_for_syslog pp wrapped_event =
+  (* Syslog is handling the formating. Only the message is printed. *)
+  Format.asprintf "%a" (pp ~all_fields:false ~block:false) wrapped_event.event
+
 let day_of_the_year ts =
   let today =
     match Ptime.of_float_s ts with Some s -> s | None -> Ptime.min
@@ -244,8 +254,15 @@ let%expect_test _ =
   [%expect {| /dev/null-XXX |}] ;
   ()
 
+let overwrite_syslog_tag sys_logger section =
+  Syslog.
+    {
+      sys_logger with
+      tag = Format.asprintf "%a" Internal_event.Section.pp section;
+    }
+
 module Make_sink (K : sig
-  val kind : [`Path | `Stdout | `Stderr]
+  val kind : [`Path | `Stdout | `Stderr | `Syslog]
 end) : Internal_event.SINK with type t = t = struct
   type nonrec t = t
 
@@ -254,6 +271,7 @@ end) : Internal_event.SINK with type t = t = struct
     | `Path -> "file-descriptor-path"
     | `Stdout -> "file-descriptor-stdout"
     | `Stderr -> "file-descriptor-stderr"
+    | `Syslog -> "file-descriptor-syslog"
 
   let fail_parsing uri fmt =
     Format.kasprintf (failwith "Parsing URI: %s: %s" (Uri.to_string uri)) fmt
@@ -416,6 +434,22 @@ end) : Internal_event.SINK with type t = t = struct
                               current = ref {fd; day = cur_day};
                             })
                    | None -> Lwt.return (Static fd)))
+      | `Syslog ->
+          let* facility =
+            match Uri.get_query_param uri "facility" with
+            | None -> return Syslog.User
+            | Some facility -> (
+                match Syslog.facility_of_string_opt facility with
+                | None -> fail_parsing uri "Invalid syslog facility."
+                | Some f -> return f)
+          in
+          let path =
+            match Uri.path uri with "" | "/" -> None | path -> Some path
+          in
+          (* Syslog tag correspond to the event section, so it is added
+             afterwards *)
+          let*! logger = Syslog.create ?path ~tag:"octez" facility in
+          return (Syslog logger)
       | `Stdout -> return (Static Lwt_unix.stdout)
       | `Stderr -> return (Static Lwt_unix.stderr)
     in
@@ -486,13 +520,22 @@ end) : Internal_event.SINK with type t = t = struct
     in
     return_unit
 
-  let output_one now output to_write =
+  let output_one now output section level to_write =
     match output with
     | Static output ->
         protect (fun () ->
             Lwt_result.ok
             @@ Lwt_mutex.with_lock write_mutex (fun () ->
                    Lwt_utils_unix.write_string output to_write))
+    | Syslog sys_logger ->
+        protect (fun () ->
+            Lwt_result.ok
+            @@ Lwt_mutex.with_lock write_mutex (fun () ->
+                   Syslog.syslog
+                     ~timestamp:(Ptime.to_float_s now)
+                     (overwrite_syslog_tag sys_logger section)
+                     level
+                     to_write))
     | Rotating output -> output_one_with_rotation output now to_write
 
   let should_handle (type a) ?(section = Internal_event.Section.empty)
@@ -522,19 +565,25 @@ end) : Internal_event.SINK with type t = t = struct
     let now = Ptime_clock.now () in
     let wrapped_event = wrap now section event in
     let to_write =
-      let json () =
-        Data_encoding.Json.construct (wrapped_encoding M.encoding) wrapped_event
-      in
-      match format with
-      | `Pp_RFC5424 -> make_with_pp_rfc5424 M.pp wrapped_event M.name
-      | `Pp_short -> make_with_pp_short M.pp wrapped_event
-      | `One_per_line -> Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
-      | `Netstring ->
-          let bytes = Ezjsonm.value_to_string ~minify:true (json ()) in
-          Format.asprintf "%d:%s," (String.length bytes) bytes
+      if is_syslog output then make_for_syslog M.pp wrapped_event
+      else
+        let json () =
+          Data_encoding.Json.construct
+            (wrapped_encoding M.encoding)
+            wrapped_event
+        in
+        match format with
+        | `Pp_RFC5424 -> make_with_pp_rfc5424 M.pp wrapped_event M.name
+        | `Pp_short -> make_with_pp_short M.pp wrapped_event
+        | `One_per_line ->
+            Data_encoding.Json.to_string ~newline:true ~minify:true (json ())
+        | `Netstring ->
+            let bytes = Ezjsonm.value_to_string ~minify:true (json ()) in
+            Format.asprintf "%d:%s," (String.length bytes) bytes
     in
-    lwt_bad_citizen_hack := to_write :: !lwt_bad_citizen_hack ;
-    let*! r = output_one now output to_write in
+    lwt_bad_citizen_hack :=
+      (to_write, M.level, section) :: !lwt_bad_citizen_hack ;
+    let*! r = output_one now output section M.level to_write in
     match r with
     | Error [Exn (Unix.Unix_error (Unix.EBADF, _, _))] ->
         (* The file descriptor was closed before the event arrived,
@@ -543,21 +592,24 @@ end) : Internal_event.SINK with type t = t = struct
     | Error _ as err -> Lwt.return err
     | Ok () ->
         lwt_bad_citizen_hack :=
-          List.filter (( = ) to_write) !lwt_bad_citizen_hack ;
+          List.filter
+            (fun (m, _lvl, _section) -> m = to_write)
+            !lwt_bad_citizen_hack ;
         return_unit
 
   let close {lwt_bad_citizen_hack; output; _} =
     let open Lwt_result_syntax in
     let* () =
       List.iter_es
-        (fun event_string ->
+        (fun (event_string, level, section) ->
           let now = Ptime_clock.now () in
-          output_one now output event_string)
+          output_one now output section level event_string)
         !lwt_bad_citizen_hack
     in
     match K.kind with
-    | `Path -> (
+    | `Path | `Syslog -> (
         match output with
+        | Syslog sys_logger -> Lwt_result.ok @@ Syslog.close sys_logger
         | Rotating output ->
             let*! () = Lwt_unix.close !(output.current).fd in
             return_unit
@@ -577,8 +629,14 @@ module Sink_implementation_stderr = Make_sink (struct
   let kind = `Stderr
 end)
 
+module Sink_implementation_syslog = Make_sink (struct
+  let kind = `Syslog
+end)
+
 let () = Internal_event.All_sinks.register (module Sink_implementation_path)
 
 let () = Internal_event.All_sinks.register (module Sink_implementation_stdout)
 
 let () = Internal_event.All_sinks.register (module Sink_implementation_stderr)
+
+let () = Internal_event.All_sinks.register (module Sink_implementation_syslog)

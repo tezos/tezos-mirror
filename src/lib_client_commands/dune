@@ -14,6 +14,7 @@
   tezos-shell-services
   tezos-p2p-services
   tezos-stdlib-unix
+  tezos-base.unix
   tezos-signer-backends
   data-encoding
   uri)
@@ -25,4 +26,5 @@
   -open Tezos_client_base
   -open Tezos_shell_services
   -open Tezos_p2p_services
+  -open Tezos_base_unix
   -open Data_encoding))

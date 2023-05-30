@@ -54,10 +54,24 @@ type facility =
   | Security
   | Console
 
+val facility_to_string : facility -> string
+
+(** Converts from string. Possible string values are:
+    ["auth", "authpriv", "cron", "daemon", "ftp", "kernel", "local0", "local1",
+    "local2", "local3", "local4", "local5", "local6", "local7", "lpr", "mail",
+    "news", "syslog", "user", "uucp", "ntp", "security", "console"] *)
+val facility_of_string_opt : string -> facility option
+
 exception Syslog_error of string
 
 (** A syslog logger *)
-type t
+type t = {
+  mutable fd : Lwt_unix.file_descr;
+  tag : string;
+  facility : facility;
+  with_pid : bool;
+  path : string;
+}
 
 (** Creates a syslog logger.
 
@@ -77,9 +91,12 @@ val create : tag:string -> ?path:string -> ?with_pid:bool -> facility -> t Lwt.t
     depending on [logger] and [level]
 
     - [max_buflen] is the maximum length of the complete message after which
-    text is replaced by [...]. Default to [1024] due to original standard. *)
+      text is replaced by [...]. Default to [1024] due to original standard.
+    - [timestamp] is the timestamp to display. Uses [Unix.time] if not provided.
+*)
 val format_message :
   ?max_buflen:int ->
+  ?timestamp:float ->
   tag:string ->
   facility:facility ->
   with_pid:bool ->
@@ -92,6 +109,7 @@ val format_message :
     appropriate [level]. *)
 val syslog :
   ?max_buflen:int ->
+  ?timestamp:float ->
   t ->
   Tezos_event_logging.Internal_event.level ->
   string ->

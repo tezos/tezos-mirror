@@ -66,4 +66,4 @@ See for instance:
 -  The (simplest) module ``Lwt_log_sink``:
    :src:`src/lib_event_logging/internal_event.ml`,
 -  or, the much more complex,
-   :src:`src/lib_stdlib_unix/file_descriptor_sink.ml`.
+   :src:`src/lib_base/unix/file_descriptor_sink.ml`.
