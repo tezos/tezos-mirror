@@ -89,6 +89,8 @@ module Dune = struct
     names : string list;
   }
 
+  let dand s1 s2 = S "and" :: s1 :: s2
+
   (* Test whether an s-expression is empty. *)
   let rec is_empty = function
     | E -> true
@@ -1732,13 +1734,29 @@ module Target = struct
     | head :: tail -> Private_executable (head, tail)
 
   let test ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec ?locks
-      ?enabled_if ?(lib_deps = []) =
+      ?enabled_if ?(dune_with_test = Always) ?(lib_deps = []) =
     (match (alias, enabled_if, locks) with
     | "", Some _, _ | "", _, Some _ ->
         invalid_arg
           "Target.tests: cannot specify enabled_if or locks without alias"
     | _ -> ()) ;
-    let runtest_alias = if alias = "" then None else Some alias in
+    (* Ensures that there is an alias in case there is test constraint *)
+    let runtest_alias =
+      if alias = "" then
+        match dune_with_test with Always -> None | _ -> Some "runtest"
+      else Some alias
+    in
+    let enabled_if =
+      match dune_with_test with
+      | Always -> enabled_if
+      | Only_on_64_arch -> (
+          let enabled_if_dune_with_test = Dune.(S "%{arch_sixtyfour}") in
+          match enabled_if with
+          | Some enabled_if ->
+              Some Dune.(dand enabled_if_dune_with_test [enabled_if])
+          | None -> Some enabled_if_dune_with_test)
+      | Never -> Some Dune.(S "false")
+    in
     internal ?dep_files ?dep_globs ?dep_globs_rec @@ fun test_name ->
     Test_executable
       {names = (test_name, []); runtest_alias; locks; enabled_if; lib_deps}
@@ -1885,6 +1903,7 @@ type tezt_target = {
   modes : Dune.mode list option;
   synopsis : string option;
   opam_with_test : with_test option;
+  dune_with_test : with_test option;
   with_macos_security_framework : bool;
   flags : Flags.t option;
   dune : Dune.s_expr;
@@ -1897,8 +1916,9 @@ let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
 
 let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
     ?(js_deps = []) ?(dep_globs = []) ?(dep_globs_rec = []) ?(dep_files = [])
-    ?synopsis ?opam_with_test ?(with_macos_security_framework = false) ?flags
-    ?(dune = Dune.[]) ?(preprocess = []) ?(preprocessor_deps = []) modules =
+    ?synopsis ?opam_with_test ?dune_with_test
+    ?(with_macos_security_framework = false) ?flags ?(dune = Dune.[])
+    ?(preprocess = []) ?(preprocessor_deps = []) modules =
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
       ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
@@ -1934,6 +1954,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
       modes;
       synopsis;
       opam_with_test;
+      dune_with_test;
       with_macos_security_framework;
       flags;
       dune;
@@ -1958,6 +1979,7 @@ let register_tezt_targets ~make_tezt_exe =
         modes;
         synopsis;
         opam_with_test;
+        dune_with_test;
         with_macos_security_framework;
         flags;
         tezt_local_test_lib;
@@ -1995,6 +2017,7 @@ let register_tezt_targets ~make_tezt_exe =
           ~dep_files
           ~modules:[exe_name]
           ?opam_with_test
+          ?dune_with_test
           ~preprocess
           ~preprocessor_deps
           ?flags

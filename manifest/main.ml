@@ -409,7 +409,7 @@ let tezt_core_lib =
 let tezt_js_lib = external_sublib tezt_lib ~js_compatible:true "tezt.js"
 
 let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
-    ?dep_globs_rec ?dep_files ?opam_with_test ?synopsis
+    ?dep_globs_rec ?dep_files ?opam_with_test ?dune_with_test ?synopsis
     ?(with_macos_security_framework = false) ?flags ?dune ?preprocess
     ?preprocessor_deps l =
   tezt_without_tezt_lib_dependency
@@ -426,6 +426,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
     ?dep_globs_rec
     ?dep_files
     ?opam_with_test
+    ?dune_with_test
     ?flags
     ?dune
     ?preprocess
@@ -466,7 +467,8 @@ let registered_octez_libs : sub_lib_documentation_link list ref = ref []
 let octez_lib ?internal_name ?js_of_ocaml ?inline_tests ?foreign_stubs
     ?documentation ?conflicts ?flags ?time_measurement_ppx ?deps ?dune ?modules
     ?linkall ?js_compatible ?bisect_ppx ?preprocess ?opam_only_deps ?cram
-    ?release_status ?ctypes ?c_library_flags ?synopsis:_ public_name ~path =
+    ?release_status ?ctypes ?c_library_flags ?opam_with_test ?synopsis:_
+    public_name ~path =
   let name =
     let s = Option.value ~default:public_name internal_name in
     String.map
@@ -492,7 +494,7 @@ let octez_lib ?internal_name ?js_of_ocaml ?inline_tests ?foreign_stubs
     ~internal_name:name
     ~opam:"octez-libs"
     ~synopsis:"Octez libs"
-    ~opam_with_test:Always
+    ?opam_with_test
     ?linkall
     ?js_compatible
     ?bisect_ppx
