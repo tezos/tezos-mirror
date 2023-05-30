@@ -81,11 +81,10 @@ module Shards = struct
     return @@ Lwt_watcher.notify shards_watcher commitment
 
   let read_all shards_store commitment ~number_of_shards =
-    read_values shards_store
-    @@ List.fold_left
-         (fun seq shard_index -> Seq.cons (commitment, shard_index) seq)
-         Seq.empty
-         (0 -- (number_of_shards - 1))
+    Seq.ints 0
+    |> Seq.take_while (fun x -> x < number_of_shards)
+    |> Seq.map (fun shard_index -> (commitment, shard_index))
+    |> read_values shards_store
 
   let init node_store_dir shard_store_dir =
     let ( // ) = Filename.concat in
