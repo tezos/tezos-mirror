@@ -24,15 +24,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let handle_python_error msg closure =
-  match closure () with
-  | result -> result
-  | exception Py.E (x, y) ->
-      let s =
-        Printf.sprintf
-          "%s\n%s\n%s\n"
-          msg
-          (Py.Object.to_string x)
-          (Py.Object.to_string y)
-      in
-      Stdlib.failwith s
+module LinearModel : sig
+  val ridge :
+    alpha:float ->
+    ?fit_intercept:bool ->
+    input:Scikit_matrix.t ->
+    output:Scikit_matrix.t ->
+    unit ->
+    Scikit_matrix.t
+
+  val lasso :
+    alpha:float ->
+    ?fit_intercept:bool ->
+    ?positive:bool ->
+    input:Scikit_matrix.t ->
+    output:Scikit_matrix.t ->
+    unit ->
+    Scikit_matrix.t
+
+  val nnls : input:Scikit_matrix.t -> output:Scikit_matrix.t -> Scikit_matrix.t
+end
+
+val predict_output :
+  input:Scikit_matrix.t -> weights:Scikit_matrix.t -> Pytypes.pyobject
+
+val r2_score :
+  output:Scikit_matrix.t -> prediction:Pytypes.pyobject -> float option
+
+val rmse_score : output:Scikit_matrix.t -> prediction:Pytypes.pyobject -> float
+
+val benchmark_score :
+  input:Scikit_matrix.t ->
+  output:(float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array1.t ->
+  Scikit_matrix.t * Scikit_matrix.t

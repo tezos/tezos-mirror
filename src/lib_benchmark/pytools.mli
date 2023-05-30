@@ -23,16 +23,8 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
-let handle_python_error msg closure =
-  match closure () with
-  | result -> result
-  | exception Py.E (x, y) ->
-      let s =
-        Printf.sprintf
-          "%s\n%s\n%s\n"
-          msg
-          (Py.Object.to_string x)
-          (Py.Object.to_string y)
-      in
-      Stdlib.failwith s
+(** [handle_python_error msg f] execute [f ()] and catches a Python
+    exception  `Py.E _`. If a Python error is caught, [handle_python_error]
+    reraises it as a [Failure] with the error details prefixed by [msg].
+*)
+val handle_python_error : string -> (unit -> 'a) -> 'a

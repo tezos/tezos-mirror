@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <nomadic@tezcore.com>                    *)
+(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,8 +24,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let numpy = Pytools.import_once "numpy"
+(** Initializes Python *)
+val pyinit : unit -> unit
 
-let pyplot = Pytools.import_once "matplotlib.pyplot"
+(** Import [numpy] and returns its Python object.
+    It also initialize Python runtime if not yet.
+*)
+val numpy : unit -> Pytypes.pyobject
 
-let mpl_toolkits = Pytools.import_once "mpl_toolkits.mplot3d"
+(** Import [sklearn.linear_model] and returns its Python object.
+    It also initialize Python runtime if not yet.
+*)
+val linear_model : unit -> Pytypes.pyobject
+
+(** Import [scipy.optimize] and returns its Python object.
+    It also initialize Python runtime if not yet.
+*)
+val scipy_optimize : unit -> Pytypes.pyobject
+
+(** Import [sklearn.metrics] and returns its Python object.
+    It also initialize Python runtime if not yet.
+*)
+val sklearn_metrics : unit -> Pytypes.pyobject
+
+(** Import [statsmodels.api] and returns its Python object.
+    It also initialize Python runtime if not yet.
+*)
+val statsmodels_api : unit -> Pytypes.pyobject
+
+(** Import [statsmodels.stats] and returns its Python object.
+    It also initialize Python runtime if not yet.
+*)
+val statsmodels_stats : unit -> Pytypes.pyobject
