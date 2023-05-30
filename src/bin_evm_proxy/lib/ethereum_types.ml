@@ -523,13 +523,13 @@ let block_encoding =
        (obj10
           (req "number" (option block_height_encoding))
           (req "hash" (option block_hash_encoding))
-          (req "parent" block_hash_encoding)
+          (req "parentHash" block_hash_encoding)
           (req "nonce" hash_encoding)
           (req "sha3Uncles" hash_encoding)
           (req "logsBloom" (option hash_encoding))
-          (req "transactionRoot" hash_encoding)
+          (req "transactionsRoot" hash_encoding)
           (req "stateRoot" hash_encoding)
-          (req "receiptRoot" hash_encoding)
+          (req "receiptsRoot" hash_encoding)
           (req "miner" hash_encoding))
        (obj9
           (req "difficulty" quantity_encoding)
