@@ -288,11 +288,32 @@ val iter_connections :
   (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) ->
   unit
 
+(** [on_new_connection p2p f] registers a function [f] that is called
+    everytime we were successfully connected to a peer (after having
+    initialised a secured channel).
+
+    This function will not be called if we started to connect to a
+    peer and the connection was rejected during the initialisation of
+    the connection. For example, if the peer is using a different
+    network version. *)
 val on_new_connection :
   ('msg, 'peer_meta, 'conn_meta) net ->
   (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) ->
   unit
 
+(** [on_disconnection p2p f] registers a function [f] that is called
+    everytime we disconnect from a peer after we were successfully
+    connected to a peer (this call may happen at any moment during the
+    disconnection). The library ensures that anytime [f peer] is
+    called, then for any callback registered with [on_new_connection],
+    those callbacks would have been called with [peer] in the first
+    place (if the callbacks were registered at that time).
+
+    A direct implication of this is that any callback registered with
+    this function will not be called if we started to connect to a
+    peer and we disconnect from it because the connection was rejected
+    somehow.
+*)
 val on_disconnection :
   ('msg, 'peer_meta, 'conn_meta) net -> (P2p_peer.Id.t -> unit) -> unit
 
