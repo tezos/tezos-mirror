@@ -93,6 +93,10 @@ let simulate_messages_no_checks (node_ctxt : Node_context.ro)
   let module PVM = (val node_ctxt.pvm) in
   let*! state_hash = PVM.state_hash state in
   let*! tick = PVM.get_tick state in
+  let*? messages =
+    List.map_e Sc_rollup.Inbox_message.serialize messages
+    |> Environment.wrap_tzresult
+  in
   let eval_state =
     Fueled_pvm.
       {
