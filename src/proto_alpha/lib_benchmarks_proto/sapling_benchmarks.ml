@@ -40,7 +40,9 @@ module Apply_diff_bench : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose =
+    Benchmark.Generate_code
+      "src/proto_alpha/lib_protocol/michelson_v1_gas_costs_generated.ml"
 
   let tags = ["sapling"]
 

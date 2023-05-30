@@ -49,7 +49,12 @@ module Lwt_main_run_bench : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose =
+    Benchmark.Other_purpose
+      "Measuring the time spent to trigger a Lwt process. Indeed, several \
+       benchmarks rely on Lwt to run the benchmarked function. The cost of \
+       calling Lwt_main.run needs to be deducted from the total benchmark time \
+       of the function."
 
   let tags = ["misc"]
 

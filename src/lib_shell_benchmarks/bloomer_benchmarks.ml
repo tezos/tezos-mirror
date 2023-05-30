@@ -44,7 +44,9 @@ let make_bench ~name ~info ~model ~generator ~make_bench : Benchmark.t =
 
     let module_filename = __FILE__
 
-    let generated_code_destination = None
+    let purpose =
+      Benchmark.Other_purpose
+        "Measuring the cost of bloom filter.  Not used in the protocol."
 
     let config_encoding = Data_encoding.unit
 

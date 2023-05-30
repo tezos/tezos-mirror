@@ -37,6 +37,12 @@
     * [Generic]: for generic parameters only. *)
 type group = Standalone | Group of string | Generic
 
+(** Described the purpose of the benchmark.
+      * [Generate_code of destination]: generates code at the given [destination] file.
+      * [Other_purpose of purpose]: any other purpose. The goal is to explain why the function is benchmarked since it does not produce a cost function.
+  *)
+type purpose = Other_purpose of string | Generate_code of string
+
 (** Benchmark parameters. *)
 type 'config parameters = {bench_number : int; config : 'config}
 
@@ -51,8 +57,8 @@ module type S = sig
   (** File where the benchmark module is defined *)
   val module_filename : string
 
-  (** Destination of generated code *)
-  val generated_code_destination : string option
+  (** Purpose of the benchmark *)
+  val purpose : purpose
 
   (** Tags of the benchmark *)
   val tags : string list

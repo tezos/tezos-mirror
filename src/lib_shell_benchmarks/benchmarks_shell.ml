@@ -27,6 +27,10 @@ module Benchmark_base = Benchmark
 module Benchmark = struct
   type group = Benchmark.group = Standalone | Group of string | Generic
 
+  type purpose = Benchmark_base.purpose =
+    | Other_purpose of string
+    | Generate_code of string
+
   module type S = sig
     val name : Namespace.t
 
@@ -34,7 +38,7 @@ module Benchmark = struct
 
     val module_filename : string
 
-    val generated_code_destination : string option
+    val purpose : Benchmark.purpose
 
     val group : group
 

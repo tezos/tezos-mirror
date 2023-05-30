@@ -31,6 +31,13 @@ module Benchmark : sig
 
   (** The module type of benchmarks, a simplification of {!Benchmark.S} used by
       [Registration.register] below. *)
+  type purpose = Benchmark_base.purpose =
+    | Other_purpose of string
+    | Generate_code of string
+
+  (** The module type of benchmarks, a simplification of {!Benchmark.S} used by
+      [registration_simple] below. *)
+
   module type S = sig
     (** Name of the benchmark *)
     val name : Namespace.t
@@ -40,14 +47,6 @@ module Benchmark : sig
 
     (** Filename of the benchmark module *)
     val module_filename : string
-
-    (** Generated code file location, automatically prefix by
-            "src/proto_alpha/lib_protocol/"
-            and suffixed by
-            "_costs_generated.ml".
-            It is optional in case some benchmarks don't output code, but are used
-            for verification purposes. *)
-    val generated_code_destination : string option
 
     (** Inference group of the benchmark *)
     val group : group
@@ -75,6 +74,13 @@ module Benchmark : sig
 
     (** Cost model *)
     val model : name:Namespace.t -> workload Model.t
+
+    (** benchmark purpose, automatically prefix by
+        "src/proto_alpha/lib_protocol/"
+        and suffixed by
+        "_costs_generated.ml" when [Generate_code of location] is used.
+        Otherwise, the developer can submit an explanation as to what the benchmark is for with [Other_purpose of string]. *)
+    val purpose : Benchmark_base.purpose
 
     (** Creates a  benchmark, ready to be run.
             The benchmarks are thunked to prevent evaluating the workload until

@@ -28,6 +28,10 @@ module Benchmark_base = Benchmark
 module Benchmark : sig
   type group = Benchmark.group = Standalone | Group of string | Generic
 
+  type purpose = Benchmark_base.purpose =
+    | Other_purpose of string
+    | Generate_code of string
+
   (** The module type of benchmarks, a simplification of {!Benchmark.S} used by
       [registration_simple] below. *)
   module type S = sig
@@ -40,10 +44,8 @@ module Benchmark : sig
     (** Filename of the benchmark module *)
     val module_filename : string
 
-    (** Generated code file location.
-        It is optional in case some benchmarks don't output code, but are used
-        for verification purposes. *)
-    val generated_code_destination : string option
+    (** Purpose of the benchmark. *)
+    val purpose : Benchmark.purpose
 
     (** Inference group of the benchmark *)
     val group : group

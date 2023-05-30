@@ -28,6 +28,9 @@ module Context = Tezos_protocol_environment.Context
 module Shell_monad = Tezos_error_monad.Error_monad
 module Key_map = Io_helpers.Key_map
 
+let purpose =
+  Benchmark.Other_purpose "Measuring the time to access context file system"
+
 let ns = Namespace.make Shell_namespace.ns "io"
 
 let fv s = Free_variable.of_namespace (ns s)
@@ -266,7 +269,7 @@ module Context_size_dependent_read_bench : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = purpose
 
   include Context_size_dependent_shared
 
@@ -354,7 +357,7 @@ module Context_size_dependent_write_bench : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = purpose
 
   let tags = ["io"]
 
@@ -575,7 +578,7 @@ module Irmin_pack_read_bench : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = purpose
 
   let tags = ["io"]
 
@@ -743,7 +746,7 @@ module Irmin_pack_write_bench : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = purpose
 
   let tags = ["io"]
 
@@ -906,7 +909,7 @@ module Read_random_key_bench : Benchmark_base.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = purpose
 
   let tags = ["io"]
 
@@ -1053,7 +1056,7 @@ module Write_random_keys_bench : Benchmark_base.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = purpose
 
   let tags = ["io"]
 

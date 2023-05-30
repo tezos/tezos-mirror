@@ -188,7 +188,7 @@ module List_key_values_benchmark = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "storage"
 
   let create_benchmark ~rng_state {max_size} =
     let wrap m = m >|= Environment.wrap_tzresult in
@@ -227,7 +227,7 @@ module List_key_values_benchmark_intercept = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "storage"
 
   let create_benchmark ~rng_state:_ _config =
     let ctxt =
