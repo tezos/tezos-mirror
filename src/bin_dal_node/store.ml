@@ -429,8 +429,15 @@ module Legacy = struct
     | None ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5676
 
-            Recompute the proofs if we have shards on disk? Useful if the node
-            restarted. *)
+            If this happens, we should probably tell the user that
+            something bad happened. Either:
+
+            1. The proofs where not stored properly (an invariant is broken)
+
+            2. The node was restarted (unlikely to happen given the time frame)
+
+            3. The cache was full (unlikely to happen if
+            [shards_proofs_cache_size] is set properly. *)
         return_unit
     | Some shard_proofs ->
         let attestation_level =
