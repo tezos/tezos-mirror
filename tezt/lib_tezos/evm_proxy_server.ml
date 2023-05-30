@@ -172,6 +172,8 @@ let batch_evm_rpc proxy_server requests =
   let endpoint = endpoint proxy_server in
   RPC.Curl.post endpoint (batch_requests requests) |> Runnable.run
 
+let extract_result json = JSON.(json |-> "result")
+
 let fetch_contract_code evm_proxy_server contract_address =
   let* code =
     call_evm_rpc
@@ -181,7 +183,7 @@ let fetch_contract_code evm_proxy_server contract_address =
         parameters = `A [`String contract_address; `String "latest"];
       }
   in
-  return JSON.(code |-> "result" |> as_string)
+  return (extract_result code |> JSON.as_string)
 
 type txpool_slot = {address : string; transactions : (int64 * JSON.t) list}
 
@@ -192,7 +194,7 @@ let txpool_content evm_proxy_server =
       {method_ = "txpool_content"; parameters = `A []}
   in
   Log.info "Result: %s" (JSON.encode txpool) ;
-  let txpool = JSON.(txpool |-> "result") in
+  let txpool = extract_result txpool in
   let parse field =
     let open JSON in
     let pool = txpool |-> field in
