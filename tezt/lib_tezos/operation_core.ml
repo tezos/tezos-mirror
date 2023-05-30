@@ -25,10 +25,11 @@
 
 open Runnable.Syntax
 
-type consensus_kind = Endorsement | Preendorsement
+type consensus_kind = Attestation | Preattestation
 
 type kind =
   | Consensus of {kind : consensus_kind; chain_id : string}
+  | Anonymous
   | Voting
   | Manager
 
@@ -36,7 +37,7 @@ type t = {
   branch : string;
   contents : JSON.u;
   kind : kind;
-  signer : Account.key;
+  signer : Account.key option;
   mutable raw : Hex.t option;
       (* This is mutable to avoid computing the raw representation several times. *)
 }
@@ -45,7 +46,7 @@ let get_branch ?(offset = 2) client =
   let block = sf "head~%d" offset in
   RPC.Client.call client @@ RPC.get_chain_block_hash ~block ()
 
-let make ~branch ~signer ~kind contents =
+let make ~branch ?signer ~kind contents =
   {branch; contents; kind; signer; raw = None}
 
 let json t = `O [("branch", Ezjsonm.string t.branch); ("contents", t.contents)]
@@ -89,23 +90,27 @@ let hex ?protocol ?signature t client =
       return (`Hex (raw ^ signature))
 
 let sign ?protocol ({kind; signer; _} as t) client =
-  let watermark =
-    match kind with
-    | Consensus {kind; chain_id} ->
-        let chain_id =
-          Tezos_crypto.Hashed.Chain_id.to_string
-            (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
-        in
-        let prefix =
-          match kind with Preendorsement -> "\x12" | Endorsement -> "\x13"
-        in
-        Tezos_crypto.Signature.Custom
-          (Bytes.cat (Bytes.of_string prefix) (Bytes.of_string chain_id))
-    | Voting | Manager -> Tezos_crypto.Signature.Generic_operation
-  in
-  let* hex = hex ?protocol t client in
-  let bytes = Hex.to_bytes hex in
-  return (Account.sign_bytes ~watermark ~signer bytes)
+  match signer with
+  | None -> return Tezos_crypto.Signature.zero
+  | Some signer ->
+      let watermark =
+        match kind with
+        | Consensus {kind; chain_id} ->
+            let chain_id =
+              Tezos_crypto.Hashed.Chain_id.to_string
+                (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
+            in
+            let prefix =
+              match kind with Preattestation -> "\x12" | Attestation -> "\x13"
+            in
+            Tezos_crypto.Signature.Custom
+              (Bytes.cat (Bytes.of_string prefix) (Bytes.of_string chain_id))
+        | Anonymous | Voting | Manager ->
+            Tezos_crypto.Signature.Generic_operation
+      in
+      let* hex = hex ?protocol t client in
+      let bytes = Hex.to_bytes hex in
+      return (Account.sign_bytes ~watermark ~signer bytes)
 
 module Tezos_operation = Tezos_base.TzPervasives.Operation
 
@@ -207,6 +212,7 @@ module Consensus = struct
   type t =
     | Consensus of {
         kind : consensus_kind;
+        use_legacy_name : bool;
         slot : int;
         level : int;
         round : int;
@@ -214,23 +220,27 @@ module Consensus = struct
       }
     | Dal_attestation of {attestation : bool array; level : int}
 
-  let preendorsement ~slot ~level ~round ~block_payload_hash =
-    Consensus {kind = Preendorsement; slot; level; round; block_payload_hash}
+  let consensus ~use_legacy_name ~kind ~slot ~level ~round ~block_payload_hash =
+    Consensus {kind; use_legacy_name; slot; level; round; block_payload_hash}
 
-  let endorsement ~slot ~level ~round ~block_payload_hash =
-    Consensus {kind = Endorsement; slot; level; round; block_payload_hash}
+  let attestation = consensus ~kind:Attestation
+
+  let preattestation = consensus ~kind:Preattestation
 
   let dal_attestation ~attestation ~level = Dal_attestation {attestation; level}
 
+  let kind_to_string kind use_legacy_name =
+    let name = function true -> "endorsement" | false -> "attestation" in
+    match kind with
+    | Attestation -> name use_legacy_name
+    | Preattestation -> Format.sprintf "pre%s" (name use_legacy_name)
+
   let json signer = function
-    | Consensus {kind; slot; level; round; block_payload_hash} ->
+    | Consensus {kind; use_legacy_name; slot; level; round; block_payload_hash}
+      ->
         `O
           [
-            ( "kind",
-              Ezjsonm.string
-                (match kind with
-                | Preendorsement -> "preendorsement"
-                | Endorsement -> "endorsement") );
+            ("kind", Ezjsonm.string (kind_to_string kind use_legacy_name));
             ("slot", Ezjsonm.int slot);
             ("level", Ezjsonm.int level);
             ("round", Ezjsonm.int round);
@@ -267,12 +277,87 @@ module Consensus = struct
     let kind =
       match consensus_operation with
       | Consensus {kind; _} -> kind
-      | Dal_attestation _ -> Endorsement
+      | Dal_attestation _ -> Attestation
     in
     return (make ~branch ~signer ~kind:(Consensus {kind; chain_id}) json)
 
   let inject ?request ?force ?branch ?chain_id ?error ~signer consensus client =
     let* op = operation ?branch ?chain_id ~signer consensus client in
+    inject ?request ?force ?error op client
+end
+
+module Anonymous = struct
+  type double_consensus_evidence_kind =
+    | Double_attestation_evidence
+    | Double_preattestation_evidence
+
+  type nonrec t =
+    | Double_consensus_evidence of {
+        kind : double_consensus_evidence_kind;
+        use_legacy_name : bool;
+        op1 : t * Tezos_crypto.Signature.t;
+        op2 : t * Tezos_crypto.Signature.t;
+      }
+
+  let double_consensus_evidence ~kind ~use_legacy_name
+      (({kind = op1_kind; _}, _) as op1) (({kind = op2_kind; _}, _) as op2) =
+    match (kind, op1_kind, op2_kind) with
+    | ( Double_attestation_evidence,
+        Consensus {kind = Attestation; _},
+        Consensus {kind = Attestation; _} ) ->
+        Double_consensus_evidence {kind; use_legacy_name; op1; op2}
+    | ( Double_preattestation_evidence,
+        Consensus {kind = Preattestation; _},
+        Consensus {kind = Preattestation; _} ) ->
+        Double_consensus_evidence {kind; use_legacy_name; op1; op2}
+    | _, _, _ ->
+        Test.fail "Invalid arguments to create a double_consensus_evidence"
+
+  let double_attestation_evidence =
+    double_consensus_evidence ~kind:Double_attestation_evidence
+
+  let double_preattestation_evidence =
+    double_consensus_evidence ~kind:Double_preattestation_evidence
+
+  let kind_to_string kind use_legacy_name =
+    sf
+      "double_%s_evidence"
+      (Consensus.kind_to_string
+         (match kind with
+         | Double_attestation_evidence -> Attestation
+         | Double_preattestation_evidence -> Preattestation)
+         use_legacy_name)
+
+  let denunced_op_json (op, signature) =
+    `O
+      [
+        ("branch", `String op.branch);
+        ("operations", List.hd (Ezjsonm.get_list Fun.id op.contents));
+        ("signature", `String (Tezos_crypto.Signature.to_b58check signature));
+      ]
+
+  let json = function
+    | Double_consensus_evidence {kind; use_legacy_name; op1; op2} ->
+        let op1 = denunced_op_json op1 in
+        let op2 = denunced_op_json op2 in
+        `O
+          [
+            ("kind", Ezjsonm.string (kind_to_string kind use_legacy_name));
+            ("op1", op1);
+            ("op2", op2);
+          ]
+
+  let operation ?branch anonymous_operation client =
+    let json = `A [json anonymous_operation] in
+    let* branch =
+      match branch with
+      | None -> get_branch ~offset:0 client
+      | Some branch -> return branch
+    in
+    return (make ~branch ~kind:Anonymous json)
+
+  let inject ?request ?force ?branch ?error consensus client =
+    let* op = operation ?branch consensus client in
     inject ?request ?force ?error op client
 end
 

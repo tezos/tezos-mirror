@@ -2623,11 +2623,28 @@ module Forge = struct
 
     let path = RPC_path.(path / "forge")
 
+    let operations_encoding =
+      union
+        [
+          case
+            ~title:"operations_encoding"
+            (Tag 0)
+            Operation.unsigned_encoding
+            Option.some
+            Fun.id;
+          case
+            ~title:"operations_encoding_with_legacy_attestation_name"
+            Json_only
+            Operation.unsigned_encoding_with_legacy_attestation_name
+            Option.some
+            Fun.id;
+        ]
+
     let operations =
       RPC_service.post_service
         ~description:"Forge an operation"
         ~query:RPC_query.empty
-        ~input:Operation.unsigned_encoding_with_legacy_attestation_name
+        ~input:operations_encoding
         ~output:(bytes Hex)
         RPC_path.(path / "operations")
 
@@ -2662,11 +2679,11 @@ module Forge = struct
     Registration.register0_noctxt
       ~chunked:true
       S.operations
-      (fun () (shell, proto) ->
+      (fun () operation ->
         return
           (Data_encoding.Binary.to_bytes_exn
              Operation.unsigned_encoding_with_legacy_attestation_name
-             (shell, proto))) ;
+             operation)) ;
     Registration.register0_noctxt
       ~chunked:true
       S.protocol_data

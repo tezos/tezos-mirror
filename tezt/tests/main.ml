@@ -172,6 +172,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Proxy.register ~protocols ;
   Proxy_server_test.register ~protocols ;
   RPC_test.register protocols ;
+  Rpc_versioning_attestation.register ~protocols ;
   Reject_malformed_micheline.register ~protocols ;
   Replace_by_fees.register ~protocols ;
   Retro.register ~protocols ;

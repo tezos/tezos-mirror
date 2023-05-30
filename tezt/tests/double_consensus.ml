@@ -136,13 +136,13 @@ let double_consensus_wrong_slot
 
 let endorse_utils =
   ( Client.endorse_for,
-    Operation.Consensus.endorsement,
+    Operation.Consensus.attestation ~use_legacy_name:true,
     double_endorsement_waiter,
     "endorsement" )
 
 let preendorse_utils =
   ( Client.preendorse_for,
-    Operation.Consensus.preendorsement,
+    Operation.Consensus.preattestation ~use_legacy_name:true,
     double_preendorsement_waiter,
     "preendorsement" )
 
@@ -332,7 +332,12 @@ let operation_too_old =
     "Craft and inject an endorsement 1 level in the past and wait for \
      [consensus_operation_too_old.v0] event from the accuser." ;
   let op =
-    Operation.Consensus.endorsement ~slot ~level ~round:3 ~block_payload_hash
+    Operation.Consensus.attestation
+      ~use_legacy_name:true
+      ~slot
+      ~level
+      ~round:3
+      ~block_payload_hash
   in
   let waiter = consensus_operation_too_old_waiter accuser in
   let* _ =
@@ -403,7 +408,8 @@ let operation_too_far_in_future =
     "Craft and inject an endorsement 3 levels in the future and wait for \
      [consensus_operation_too_far_in_future.v0] event from the accuser." ;
   let op =
-    Operation.Consensus.endorsement
+    Operation.Consensus.attestation
+      ~use_legacy_name:true
       ~slot:(List.hd slots)
       ~level
       ~round:0
