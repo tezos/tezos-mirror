@@ -27,7 +27,8 @@
 
 (** This module maintains the storage related to slashing of delegates for
    double signing. In particular, it is responsible for maintaining the
-   {!Storage.Slashed_deposits} table.  *)
+   {!Storage.Slashed_deposits} and {!Storage.Contract.Slashed_deposits} tables.
+*)
 
 (** Returns true if the given delegate has already been slashed
     for double baking for the given level. *)

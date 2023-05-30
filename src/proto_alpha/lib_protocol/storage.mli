@@ -53,6 +53,21 @@ type deposits = {initial_amount : Tez_repr.t; current_amount : Tez_repr.t}
 
 type missed_endorsements_info = {remaining_slots : int; missed_levels : int}
 
+module Slashed_deposits_history : sig
+  type slashed_percentage = int
+
+  type t = (Cycle_repr.t * slashed_percentage) list
+
+  (** [add cycle percentage history] adds the [percentage] for the [cycle] in
+      the [history].
+      If the cycle exists, the associated percentage is updated and capped at
+      100 and the cycle order in the list is unchanged.
+      If the cycle does not exist, the new pair [(cycle, percentage)] is added
+      at the beginning of the list.
+  *)
+  val add : Cycle_repr.t -> slashed_percentage -> t -> t
+end
+
 module Contract : sig
   (** Storage from this submodule must only be accessed through the
       module `Contract`. *)
@@ -206,6 +221,27 @@ module Contract : sig
     Indexed_data_storage
       with type key = Contract_repr.t
        and type value = Z.t
+       and type t := Raw_context.t
+
+  (** History of slashed deposits: an associative list of cycles to slashed
+      percentages.
+
+      This storage is inefficient but is not expected to grow large (as of
+      2023-05-22, the last slashing on mainnet dates back to:
+      - 2021-12-17 for double baking (154 events in total),
+      - 2019-08-08 for double endorsing (24 events in total).
+
+      The slashing percentages are used to compute the real value of costake
+      withdrawals.
+      Currently there is no limit to the age of the events we need to store
+      because there is no such limit for costake withdrawals.
+      At worst we can revisit this decision in a later protocol amendment (in
+      25 cycles) or clean up this storage manually or automatically.
+  *)
+  module Slashed_deposits :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Slashed_deposits_history.t
        and type t := Raw_context.t
 
   (** Associates a contract and a bond_id with a bond, i.e. an amount of tez

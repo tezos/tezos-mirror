@@ -84,6 +84,19 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
       (level.level, delegate)
       updated_slashed
   in
+  let* slash_history_opt =
+    Storage.Contract.Slashed_deposits.find ctxt delegate_contract
+  in
+  let slash_history = Option.value slash_history_opt ~default:[] in
+  let slash_history =
+    Storage.Slashed_deposits_history.add
+      level.cycle
+      slashing_percentage
+      slash_history
+  in
+  let*! ctxt =
+    Storage.Contract.Slashed_deposits.add ctxt delegate_contract slash_history
+  in
   return (ctxt, {reward; amount_to_burn})
 
 let punish_double_endorsing =
