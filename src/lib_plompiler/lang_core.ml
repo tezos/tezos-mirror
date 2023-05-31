@@ -212,6 +212,11 @@ module type COMMON = sig
 
   val with_label : label:string -> 'a t -> 'a t
 
+  (** Prints on stdout the prefix string and the repr. It works only when
+      running the Result interpreter, it has no effect in the Circuit
+      interpreter. *)
+  val debug : string -> 'a repr -> unit repr t
+
   module Num :
     NUM
       with type scalar = scalar

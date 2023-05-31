@@ -471,6 +471,22 @@ let with_label ~label t =
   ignore label ;
   t
 
+let rec repr_to_string : type a. a repr -> string = function
+  | U -> "()"
+  | S (X s) -> S.string_of_scalar s
+  | B b -> if b then "T" else "F"
+  | P (a, b) -> "(" ^ repr_to_string a ^ "," ^ repr_to_string b ^ ")"
+  | L (B _ :: _ as bs) ->
+      (* special case to print bytes in hex *)
+      let bs = List.map (fun (B b) -> if b then true else false) bs in
+      let bs = Utils.of_bitlist bs in
+      Utils.hex_of_bytes bs
+  | L l -> String.concat ";" (List.map repr_to_string l)
+
+let debug s x =
+  Format.printf "%s: %s\n%!" s (repr_to_string x) ;
+  ret unit
+
 let get_result : 'a repr t -> 'a Input.t =
  fun m ->
   let s, r = m init_state in
