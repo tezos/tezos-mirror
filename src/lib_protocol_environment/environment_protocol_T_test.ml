@@ -98,9 +98,18 @@ module Mock_all_unit :
   let operation_data_and_receipt_encoding =
     Data_encoding.conv (Fun.const ()) (Fun.const ((), ())) Data_encoding.unit
 
+  let operation_data_and_receipt_encoding_with_legacy_attestation_name =
+    operation_data_and_receipt_encoding
+
   let operation_receipt_encoding = Data_encoding.unit
 
+  let operation_receipt_encoding_with_legacy_attestation_name =
+    operation_receipt_encoding
+
   let operation_data_encoding = Data_encoding.unit
+
+  let operation_data_encoding_with_legacy_attestation_name =
+    operation_data_encoding
 
   let block_header_metadata_encoding = Data_encoding.unit
 

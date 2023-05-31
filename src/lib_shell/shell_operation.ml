@@ -55,7 +55,9 @@ module MakeParser (Proto : Tezos_protocol_environment.PROTOCOL) :
   type protocol_operation = Proto.operation
 
   let parse_unsafe (proto : bytes) : Proto.operation_data tzresult =
-    safe_binary_of_bytes Proto.operation_data_encoding proto
+    safe_binary_of_bytes
+      Proto.operation_data_encoding_with_legacy_attestation_name
+      proto
 
   let parse hash (raw : Operation.t) =
     let open Result_syntax in

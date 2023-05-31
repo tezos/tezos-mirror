@@ -25,7 +25,8 @@
 
 open Protocol
 open Alpha_context
-module Block_services = Block_services.Make (Protocol) (Protocol)
+module Lifted_protocol = Tezos_protocol_017_PtNairob_lifted.Lifted_protocol
+module Block_services = Block_services.Make (Lifted_protocol) (Lifted_protocol)
 
 let ancestor_hash ~number_of_levels
     ({Node_context.genesis_info; _} as node_ctxt) head =

@@ -106,6 +106,8 @@ Protocol Compiler And Environment
   - Exposed a limited API to manipulate an Irmin binary tree within the
     protocol.
 
+  - Expose encoding with legacy attestation name. (MR :gl:`!8620`)
+
 Codec
 -----
 

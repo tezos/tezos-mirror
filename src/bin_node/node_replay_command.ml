@@ -336,11 +336,16 @@ let replay_one_block strict main_chain_store validator_process block =
           in
           let to_json metadata_bytes =
             Data_encoding.Json.construct
-              Proto.operation_data_and_receipt_encoding
+              Proto
+              .operation_data_and_receipt_encoding_with_legacy_attestation_name
               Data_encoding.Binary.
-                ( of_bytes_exn Proto.operation_data_encoding op,
-                  of_bytes_exn Proto.operation_receipt_encoding metadata_bytes
-                )
+                ( of_bytes_exn
+                    Proto.operation_data_encoding_with_legacy_attestation_name
+                    op,
+                  of_bytes_exn
+                    Proto
+                    .operation_receipt_encoding_with_legacy_attestation_name
+                    metadata_bytes )
           in
           let exp_json_opt, got_json_opt =
             match (exp_m, got_m) with

@@ -60,8 +60,14 @@ module Mock_protocol :
 
   let operation_data_encoding = Data_encoding.int16
 
+  let operation_data_encoding_with_legacy_attestation_name =
+    operation_data_encoding
+
   let operation_data_and_receipt_encoding =
     Data_encoding.conv fst (fun n -> (n, ())) Data_encoding.int16
+
+  let operation_data_and_receipt_encoding_with_legacy_attestation_name =
+    operation_data_and_receipt_encoding
 
   let acceptable_pass _ = assert false
 
