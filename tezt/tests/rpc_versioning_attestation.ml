@@ -633,11 +633,80 @@ module Run_Simulate = struct
     @@ fun protocol ->
     test_rpc_operation_unsupported Simulate Operation.Preattestation protocol
 
+  let test_rpc_double_consensus_evidence rpc double_evidence_kind protocol =
+    let* node, client = Client.init_with_protocol ~protocol `Client () in
+    let* () = Client.bake_for_and_wait ~node client in
+
+    let call_and_check_error ~use_legacy_name =
+      Log.info
+        "Create a %s operation and call %s "
+        (Operation.Anonymous.kind_to_string
+           double_evidence_kind
+           use_legacy_name)
+        (get_rpc_name rpc) ;
+
+      let* consensus_op =
+        create_double_consensus_evidence
+          ~use_legacy_name
+          ~double_evidence_kind
+          client
+      in
+      let* op_json = Operation.make_run_operation_input consensus_op client in
+      let* _ = RPC.Client.call client @@ get_rpc rpc op_json in
+      unit
+    in
+    let* () = call_and_check_error ~use_legacy_name:true in
+    call_and_check_error ~use_legacy_name:false
+
+  let test_run_operation_double_consensus_evidence =
+    register_test
+      ~title:"Run operation with double consensus evidence operations"
+      ~additionnal_tags:["run"; "operations"; "consensus"; "double"]
+    @@ fun protocol ->
+    test_rpc_double_consensus_evidence
+      Run
+      Operation.Anonymous.Double_attestation_evidence
+      protocol
+
+  let test_run_operation_double_preconsensus_evidence =
+    register_test
+      ~title:"Run operation with double preconsensus evidence operations"
+      ~additionnal_tags:["run"; "operations"; "consensus"; "pre"; "double"]
+    @@ fun protocol ->
+    test_rpc_double_consensus_evidence
+      Run
+      Operation.Anonymous.Double_preattestation_evidence
+      protocol
+
+  let test_simulate_operation_double_consensus_evidence =
+    register_test
+      ~title:"Simulate operation with double consensus evidence operations"
+      ~additionnal_tags:["simulate"; "operations"; "consensus"; "double"]
+    @@ fun protocol ->
+    test_rpc_double_consensus_evidence
+      Simulate
+      Operation.Anonymous.Double_attestation_evidence
+      protocol
+
+  let test_simulate_operation_double_preconsensus_evidence =
+    register_test
+      ~title:"Simulate operation with double preconsensus evidence operations"
+      ~additionnal_tags:["simulate"; "operations"; "consensus"; "pre"; "double"]
+    @@ fun protocol ->
+    test_rpc_double_consensus_evidence
+      Simulate
+      Operation.Anonymous.Double_preattestation_evidence
+      protocol
+
   let register ~protocols =
     test_run_operation_consensus protocols ;
     test_run_operation_preconsensus protocols ;
     test_simulate_operation_consensus protocols ;
-    test_simulate_operation_preconsensus protocols
+    test_simulate_operation_preconsensus protocols ;
+    test_run_operation_double_consensus_evidence protocols ;
+    test_run_operation_double_preconsensus_evidence protocols ;
+    test_simulate_operation_double_consensus_evidence protocols ;
+    test_simulate_operation_double_preconsensus_evidence protocols
 end
 
 let register ~protocols =
