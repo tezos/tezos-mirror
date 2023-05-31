@@ -571,8 +571,10 @@ let test_set_limit_with_overdelegation () =
   in
   (* - [account1] and [account2] will give 80% of their balance to
        [new_account]
-     - [new_account] will overdelegate to [account1] but [account1] will set
+     - [new_account] will overdelegate to [account1] and [account1] will set
        its frozen deposits limit to 15% of its stake *)
+  Context.Delegate.current_frozen_deposits (B genesis) account1
+  >>=? fun initial_frozen_deposits ->
   Context.Delegate.staking_balance (B genesis) account1
   >>=? fun initial_staking_balance ->
   Context.Delegate.staking_balance (B genesis) account2
@@ -609,9 +611,10 @@ let test_set_limit_with_overdelegation () =
   Op.delegation ~force_reveal:true (B b) new_contract (Some account1)
   >>=? fun delegation ->
   Block.bake ~operation:delegation b >>=? fun b ->
-  (* Finish the cycle to update the frozen deposits *)
+  (* Finish the cycle. account1's frozen deposits aren't increased
+     automatically. *)
   Block.bake_until_cycle_end b >>=? fun b ->
-  let expected_new_frozen_deposits = limit in
+  let expected_new_frozen_deposits = initial_frozen_deposits in
   Context.Delegate.current_frozen_deposits (B b) account1
   >>=? fun frozen_deposits ->
   Assert.equal_tez ~loc:__LOC__ frozen_deposits expected_new_frozen_deposits
