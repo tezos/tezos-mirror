@@ -6,6 +6,7 @@ use tezos_ethereum::signatures::EthereumTransactionCommon;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 use crate::parsing::{Input, InputResult, MAX_SIZE_PER_CHUNK};
+use crate::simulation;
 use crate::Error;
 
 use tezos_ethereum::transaction::TransactionHash;
@@ -77,6 +78,7 @@ pub fn read_inbox<Host: Runtime>(
                 // kernel enters in simulation mode, reading will be done by the
                 // simulation and all the previous and next transactions are
                 // discarded.
+                simulation::start_simulation_mode(host)?;
                 return Ok(Vec::new());
             }
         }
