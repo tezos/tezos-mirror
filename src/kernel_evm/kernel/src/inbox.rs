@@ -271,4 +271,35 @@ mod tests {
         }];
         assert_eq!(inbox_content.transactions, expected_transactions);
     }
+
+    #[test]
+    fn parse_valid_kernel_upgrade() {
+        let mut host = MockHost::default();
+        crate::storage::store_kernel_upgrade_nonce(&mut host, 1).unwrap();
+
+        let preimage_hash = hex::decode(
+            "004b28109df802cb1885ab29461bc1b410057a9f3a848d122ac7a742351a3a1f4e",
+        )
+        .unwrap()
+        .try_into()
+        .unwrap();
+        let nonce = hex::decode("02000000").unwrap().try_into().unwrap();
+        let signature = hex::decode("12ac7109f062badf77055608c11bd097eccd480bf99e615ac765c6275161ce2401c88232786c49fceb56e0c5caa3d5998337fc7e29946fa8733cf55fbd7b387e1b").unwrap().try_into().unwrap();
+
+        let kernel_upgrade = KernelUpgrade {
+            nonce,
+            preimage_hash,
+            signature,
+        };
+        let input = Input::Upgrade(kernel_upgrade.clone());
+
+        host.add_external(Bytes::from(input_to_bytes(
+            ZERO_SMART_ROLLUP_ADDRESS,
+            input,
+        )));
+
+        let inbox_content = read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS).unwrap();
+        let expected_upgrade = Some(kernel_upgrade);
+        assert_eq!(inbox_content.kernel_upgrade, expected_upgrade);
+    }
 }
