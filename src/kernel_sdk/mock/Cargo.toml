@@ -36,3 +36,6 @@ default-features = false
 path = "../host"
 version = "0.1.0"
 features = ["default"]
+
+[features]
+proto-nairobi = ["tezos-smart-rollup-core/proto-nairobi", "tezos-smart-rollup-host/proto-nairobi"]

@@ -58,6 +58,7 @@ export CC=clang
 | `dlmalloc`      | ✅       |                                     | Enables `dlmalloc` as default allocator       |
 | `crypto`        | ✅       | `tezos_crypto_rs`                   | Integration with `tezos_crypto_rs` types      |
 | `data-encoding` | ✅       | `tezos_data_encoding`               | Integration with `tezos_data_encoding` traits |
+| `proto-nairobi` | ❌       |                                     | Enables host functions introduced in `Nairobi` |
 | `testing`       | ❌       | `crypto`, `tezos_smart_rollup_mock` | Enables `MockHost` for writing tests          |
 
 ## Usage

@@ -25,3 +25,4 @@ version = "0.11.0"
 
 [features]
 "testing" = ["mockall"]
+"proto-nairobi" = []

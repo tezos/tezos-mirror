@@ -222,6 +222,17 @@ impl HostState {
         Ok(())
     }
 
+    #[cfg(feature = "proto-nairobi")]
+    pub(crate) fn handle_store_delete_value(
+        &mut self,
+        prefix: &[u8],
+    ) -> Result<(), Error> {
+        let durable_prefix = validate_path(prefix)?;
+
+        self.store.delete_value(&durable_prefix);
+        Ok(())
+    }
+
     pub(crate) fn handle_store_list_size(&self, prefix: &[u8]) -> Result<i64, Error> {
         let prefix = validate_path(prefix)?;
         self.store
@@ -478,6 +489,43 @@ mod tests {
             Err(Error::StoreNotANode),
             state.handle_store_list_size(prefix.as_bytes())
         );
+    }
+
+    #[test]
+    fn test_store_delete_value() {
+        // Arrange
+        let mut state = HostState::default();
+        let prefix = "/a/long/prefix";
+
+        state.handle_store_write(prefix.as_bytes(), 0, &[]).unwrap();
+
+        for i in 0..10 {
+            // subkey of prefix
+            let subkey = format!("{}/{}", prefix, i);
+            // not subkey as not a sub-path
+            let almost_subkey = format!("{}{}", prefix, i);
+            // completely different prefix
+            let not_subkey = format!("/different/prefix/{}", i);
+
+            state.handle_store_write(subkey.as_bytes(), 0, &[]).unwrap();
+            state
+                .handle_store_write(almost_subkey.as_bytes(), 0, &[])
+                .unwrap();
+            state
+                .handle_store_write(not_subkey.as_bytes(), 0, &[])
+                .unwrap();
+        }
+
+        // Act
+        state.handle_store_delete_value(prefix.as_bytes()).unwrap();
+
+        // Assert
+        assert_eq!(
+            Ok(VALUE_TYPE_SUBTREE),
+            state.handle_store_has(prefix.as_bytes())
+        );
+
+        assert_eq!(Ok(10), state.handle_store_list_size(prefix.as_bytes()));
     }
 
     #[test]

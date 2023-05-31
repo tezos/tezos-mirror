@@ -43,5 +43,6 @@ default = ["alloc", "crypto", "std"]
 crypto = ["tezos_crypto_rs"]
 alloc = ["thiserror", "tezos_data_encoding"]
 testing = ["crypto"]
+proto-nairobi = ["tezos-smart-rollup-core/proto-nairobi"]
 # Required for 'impl Error for RuntimeError'
 std = []
