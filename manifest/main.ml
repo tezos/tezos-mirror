@@ -452,6 +452,98 @@ let alcotezt =
     ~deps:[tezt_core_lib]
   |> open_
 
+type sub_lib_documentation_link = Module of string | Page of string
+
+(* List of the registered sublibraries of octez-libs *)
+let registered_octez_libs : sub_lib_documentation_link list ref = ref []
+
+(* Registers [public_name] as a sublibrary of the [octez-libs] package.
+
+   If [documentation] is [None] or only contains a package stanza, then the
+   documentation page of [octez-libs] will point to the module API of the public library.
+   Otherwise, it will assume that the package contains a [package_name.mld] file
+   and it will link to that. *)
+let octez_lib ?internal_name ?js_of_ocaml ?inline_tests ?foreign_stubs
+    ?documentation ?conflicts ?flags ?time_measurement_ppx ?deps ?dune ?modules
+    ?linkall ?js_compatible ?bisect_ppx ?preprocess ?opam_only_deps ?cram
+    ?release_status ?ctypes ?c_library_flags ?synopsis:_ public_name ~path =
+  let name =
+    let s = Option.value ~default:public_name internal_name in
+    String.map
+      (function
+        | '-' | '.' -> '_'
+        | '/' ->
+            invalid_arg ("octez library " ^ s ^ " name cannot contain \"/\"")
+        | c -> c)
+      s
+  in
+  let registered =
+    match documentation with
+    | None -> Module (String.capitalize_ascii name)
+    | Some (docs : Dune.s_expr) when docs = [Dune.[S "package"; S "octez-libs"]]
+      ->
+        (* In that specific case, we don't want the page to be used *)
+        Module (String.capitalize_ascii name)
+    | Some _docs -> Page name
+  in
+  registered_octez_libs := registered :: !registered_octez_libs ;
+  public_lib
+    ("octez-libs." ^ public_name)
+    ~internal_name:name
+    ~opam:"octez-libs"
+    ~synopsis:"Octez libs"
+    ~opam_with_test:Always
+    ?linkall
+    ?js_compatible
+    ?bisect_ppx
+    ?js_of_ocaml
+    ?inline_tests
+    ?foreign_stubs
+    ?documentation
+    ?conflicts
+    ?flags
+    ?time_measurement_ppx
+    ?deps
+    ?modules
+    ?dune
+    ?preprocess
+    ?opam_only_deps
+    ?cram
+    ?release_status
+    ?ctypes
+    ?c_library_flags
+    ~path
+
+(* Prints all the registered octez libraries as a documentation index *)
+let pp_octez_libs_index fmt registered_octez_libs =
+  let header =
+    "{0 Octez-libs: octez libraries}\n\n\
+     This is a package containing some libraries used by the Octez project.\n\n\
+     It contains the following libraries:\n\n"
+  in
+  let pp_registered pp = function
+    | Module registered ->
+        Format.fprintf pp "- {{!module-%s}%s}" registered registered
+    | Page registered ->
+        Format.fprintf pp "- {{!page-%s}%s}" registered registered
+  in
+  Format.fprintf
+    fmt
+    "%s%a"
+    header
+    (Format.pp_print_list
+       ~pp_sep:(fun pp () -> Format.fprintf pp "@.")
+       pp_registered)
+  @@ List.sort
+       (fun lib1 lib2 ->
+         match (lib1, lib2) with
+         | Page n1, Page n2
+         | Page n1, Module n2
+         | Module n1, Page n2
+         | Module n1, Module n2 ->
+             String.compare n1 n2)
+       registered_octez_libs
+
 let octez_test_helpers =
   public_lib
     "tezos-test-helpers"
@@ -2282,7 +2374,9 @@ let octez_workers =
     "tezos-workers"
     ~path:"src/lib_workers"
     ~synopsis:"Tezos: worker library"
-    ~documentation:[Dune.[S "package"; S "tezos-workers"]]
+    ~documentation:
+      Dune.
+        [[S "package"; S "tezos-workers"]; [S "mld_files"; S "tezos_workers"]]
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives" |> open_;
@@ -7991,5 +8085,10 @@ let () =
   in
   write "script-inputs/active_protocol_versions_without_number" @@ fun fmt ->
   List.iter (write_protocol fmt) Protocol.active
+
+(* Generate documentation index for Octez-libs *)
+let () =
+  write "src/lib_base/index.mld" @@ fun fmt ->
+  pp_octez_libs_index fmt !registered_octez_libs
 
 let () = postcheck ~exclude ()

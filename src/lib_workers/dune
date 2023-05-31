@@ -14,4 +14,4 @@
   -open Tezos_base
   -open Tezos_stdlib_unix))
 
-(documentation (package tezos-workers))
+(documentation (package tezos-workers) (mld_files tezos_workers))
