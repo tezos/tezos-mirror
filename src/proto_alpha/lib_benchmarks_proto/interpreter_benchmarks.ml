@@ -2455,18 +2455,21 @@ module Registration_section = struct
       benchmark
         ~name:Interpreter_workload.N_ICompare
         ~salt:"_intercepts"
-        ~kinstr_and_stack_sampler:(fun _ rng_state ->
+        ~kinstr_and_stack_sampler:(fun cfg rng_state ->
           (* Sample from values whose [size_of_comparable_value] is 1. *)
           (* [unit] and [bool] are excluded since they are relatively quick. *)
-          let module Samplers = Michelson_samplers_base.Make (struct
-            let parameters =
-              Michelson_samplers_base.
+          let sampler =
+            {
+              cfg.sampler with
+              base_parameters =
                 {
                   int_size = {min = 1; max = 1};
                   string_size = {min = 1; max = 1};
                   bytes_size = {min = 1; max = 1};
-                }
-          end) in
+                };
+            }
+          in
+          let _, (module Samplers) = make_default_samplers sampler in
           fun () ->
             let ty : Script_ir_translator.ex_comparable_ty =
               match Random.State.int rng_state 4 with
@@ -2477,20 +2480,11 @@ module Registration_section = struct
               | _ -> assert false
             in
             let (Ex_comparable_ty ty) = ty in
-            let sample : type a. a comparable_ty -> a Base_samplers.sampler =
-              function
-              | String_t -> Samplers.string
-              | Bytes_t -> Samplers.bytes
-              | Int_t -> Samplers.int
-              | Nat_t -> Samplers.nat
-              | _ -> assert false
-            in
-            let value1 = sample ty rng_state in
-            let value2 = sample ty rng_state in
+            let value = Samplers.Random_value.comparable ty rng_state in
             let kinstr = ICompare (dummy_loc, ty, halt) in
             Ex_stack_and_kinstr
               {
-                stack = (value1, (value2, eos));
+                stack = (value, (value, eos));
                 stack_type = ty @$ ty @$ bot;
                 kinstr;
               })
