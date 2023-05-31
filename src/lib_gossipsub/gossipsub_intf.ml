@@ -931,7 +931,7 @@ module type AUTOMATON = sig
     val get_peer_iwant_per_heartbeat : Peer.t -> view -> int
 
     (** [get_peer_backoff topic peer view] returns the backoff time of [peer] for [topic].
-        returns [None] if the peer is not backoffed for [topic]. *)
+        Returns [None] if the peer is not backoffed for [topic]. *)
     val get_peer_backoff : Topic.t -> Peer.t -> view -> Time.t option
 
     val limits : view -> limits
@@ -941,7 +941,7 @@ module type AUTOMATON = sig
         and hasn't left the [topic]. *)
     val has_joined : Topic.t -> view -> bool
 
-    (** [peer_in_mesh peer topic view] returns true if and only if [peer] is
+    (** [in_mesh peer topic view] returns true if and only if [peer] is
         in the mesh of [topic]. *)
     val in_mesh : Topic.t -> Peer.t -> view -> bool
 
