@@ -1040,6 +1040,7 @@ module type WORKER = sig
     | Disconnect of {peer : GS.Peer.t}
     | Kick of {peer : GS.Peer.t}
     | Connect of {px : GS.Peer.t; origin : GS.Peer.t}
+    | Forget of {px : GS.Peer.t; origin : GS.Peer.t}
 
   (** The application layer will be advertised about full messages it's
       interested in. *)

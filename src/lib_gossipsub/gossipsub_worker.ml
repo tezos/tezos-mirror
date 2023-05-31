@@ -96,6 +96,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Disconnect of {peer : Peer.t}
     | Kick of {peer : Peer.t}
     | Connect of {px : Peer.t; origin : Peer.t}
+    | Forget of {px : Peer.t; origin : Peer.t}
 
   type app_output = message_with_header
 
@@ -636,6 +637,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Kick {peer} -> Format.fprintf fmt "Kick{peer=%a}" Peer.pp peer
     | Connect {px; origin} ->
         Format.fprintf fmt "Connect{px=%a; origin=%a}" Peer.pp px Peer.pp origin
+    | Forget {px; origin} ->
+        Format.fprintf fmt "Forget{px=%a; origin=%a}" Peer.pp px Peer.pp origin
     | Out_message {to_peer; p2p_message} ->
         Format.fprintf
           fmt
