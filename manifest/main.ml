@@ -7439,7 +7439,6 @@ let exclude filename =
      There is no real good reason for that but only the core Tezt library is released. *)
   | "tezt" :: "long_tests" :: _ -> true
   | "tezt" :: "manual_tests" :: _ -> true
-  | "tezt" :: "records" :: _ -> true
   | "tezt" :: "remote_tests" :: _ -> true
   | "tezt" :: "snoop" :: _ -> true
   | "tezt" :: "vesting_contract_test" :: _ -> true

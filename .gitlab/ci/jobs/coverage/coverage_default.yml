@@ -10,9 +10,17 @@ unified_coverage:
     - .image_template__runtime_build_test_dependencies_template
     - .template__coverage_report
   dependencies: []
+  variables:
+    # The GitLab project to use in the coverage downloader.
+    PROJECT: $CI_PROJECT_PATH
+    # The default branch where the coverage downloader will search for
+    # merge commits.
+    DEFAULT_BRANCH: $CI_COMMIT_SHA
   script:
+    - . ./scripts/version.sh # sets COVERAGE_OUTPUT
     # On the project default branch, we fetch coverage from the last merged MR
-    - COVERAGE_START_COMMIT=$CI_COMMIT_SHA poetry run python3 scripts/ci/coverage.py
+    - dune exec scripts/ci/download_coverage/download.exe -- -a from=last-merged-pipeline --info --log-file _coverage_report/download_coverage.log
+    - ./scripts/ci/report_coverage.sh
   # This job will fail if coverage is not found, but that is not
   # reason to stop the pipeline.
   allow_failure: true
