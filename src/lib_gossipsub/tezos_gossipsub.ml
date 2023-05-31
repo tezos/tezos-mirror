@@ -2346,9 +2346,29 @@ module Make (C : AUTOMATON_CONFIG) :
           0
       | Some count -> count
 
+    let get_peer_backoff topic peer {backoff; _} =
+      match Topic.Map.find topic backoff with
+      | None -> None
+      | Some backoffs -> Peer.Map.find peer backoffs
+
     let limits state = state.limits
 
     let has_joined topic {mesh; _} = Topic.Map.mem topic mesh
+
+    let in_mesh topic peer {mesh; _} =
+      match Topic.Map.find topic mesh with
+      | None -> false
+      | Some topic_mesh -> Peer.Set.mem peer topic_mesh
+
+    let is_direct peer {connections; _} =
+      match Peer.Map.find peer connections with
+      | None -> false
+      | Some {direct; _} -> direct
+
+    let is_outbound peer {connections; _} =
+      match Peer.Map.find peer connections with
+      | None -> false
+      | Some {outbound; _} -> outbound
 
     let pp_connection fmtr c =
       let fields =
