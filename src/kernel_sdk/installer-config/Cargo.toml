@@ -52,7 +52,7 @@ version = "0.4.3"
 optional = true
 
 [dependencies.tezos_crypto_rs]
-version = "0.4"
+version = "0.5"
 default-features = false
 optional = true
 
