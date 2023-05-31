@@ -173,13 +173,14 @@ struct
     let+ peer = gen_peer and+ topic = gen_topic in
     ({peer; topic} : GS.graft)
 
-  let prune ~gen_peer ~gen_topic ~gen_span px_count =
+  let prune ~gen_peer ~gen_topic ~gen_backoff ~gen_px_count =
+    let* px_count = gen_px_count in
     let+ peer = gen_peer
     and+ topic = gen_topic
     and+ px =
       let+ l = list_repeat px_count gen_peer in
       List.to_seq l
-    and+ backoff = gen_span in
+    and+ backoff = gen_backoff in
     ({peer; topic; px; backoff} : GS.prune)
 
   let receive_message ~gen_peer ~gen_topic ~gen_message_id ~gen_message =
