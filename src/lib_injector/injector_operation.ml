@@ -64,7 +64,7 @@ module Make (O : PARAM_OPERATION) :
 
   let make operation =
     let nonce =
-      if O.unique operation then (
+      if not @@ O.unique operation then (
         let c = !counter in
         counter := Z.succ !counter ;
         Some c)
