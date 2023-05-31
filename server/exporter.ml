@@ -104,7 +104,7 @@ let select_blocks db_pool level =
       Caqti_type.int32
       ->* Caqti_type.(tup3 Sql_requests.Type.block_hash ptime string))
       "SELECT b.hash, r.timestamp, n.name FROM blocks b JOIN blocks_reception \
-       r, nodes n ON r.block = b.id AND n.id = r.source WHERE b.level = ?"
+       r ON r.block = b.id JOIN nodes n ON n.id = r.source WHERE b.level = ?"
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
@@ -181,10 +181,10 @@ let select_ops db_pool level =
               (tup3 Sql_requests.Type.public_key_hash (option string) int)
               (tup3 bool (option int32) Sql_requests.Type.block_hash)))
       "SELECT d.address, d.alias, e.endorsing_power, o.endorsement, o.round, \
-       b.hash FROM operations o JOIN endorsing_rights e, operations_inclusion \
-       i, blocks b, delegates d ON i.operation = o.id AND i.block = b.id AND \
-       o.endorser = d.id AND e.delegate = d.id WHERE o.level = ? AND e.level = \
-       ?"
+       b.hash FROM operations o JOIN operations_inclusion i ON i.operation = \
+       o.id JOIN delegates d ON o.endorser = d.id JOIN blocks b ON i.block = \
+       b.id JOIN endorsing_rights e ON e.delegate = d.id WHERE o.level = ? AND \
+       e.level = ?"
   in
   let q_received =
     Caqti_request.Infix.(
@@ -194,10 +194,10 @@ let select_ops db_pool level =
               (tup4 Sql_requests.Type.public_key_hash (option string) int ptime)
               (tup4 Sql_requests.Type.errors string bool (option int32))))
       "SELECT d.address, d.alias, e.endorsing_power, r.timestamp, r.errors, \
-       n.name, o.endorsement, o.round FROM operations o JOIN endorsing_rights \
-       e, operations_reception r, delegates d, nodes n ON r.operation = o.id \
-       AND o.endorser = d.id AND e.delegate = d.id AND n.id = r.source WHERE \
-       o.level = ? AND e.level = ?"
+       n.name, o.endorsement, o.round FROM operations o JOIN \
+       operations_reception r ON r.operation = o.id JOIN delegates d ON \
+       o.endorser = d.id JOIN endorsing_rights e ON e.delegate = d.id JOIN \
+       nodes n ON n.id = r.source WHERE o.level = ? AND e.level = ?"
   in
   let module Ops = Tezos_crypto.Signature.Public_key_hash.Map in
   let cb_missing (delegate, alias, power) info =

@@ -217,12 +217,13 @@ let maybe_insert_operation =
     Caqti_type.(
       tup2
         (tup4 int32 Type.operation_hash bool (option int32))
-        (tup4 Type.public_key_hash bool (option int32) int32)
+        Type.public_key_hash
       ->. unit))
     "INSERT INTO operations (level, hash, endorsement, endorser, round) SELECT \
-     ?, ?, ?, delegates.id, ? FROM delegates WHERE delegates.address = ? AND \
-     NOT EXISTS ( SELECT 1 FROM operations WHERE endorsement = ? AND endorser \
-     = delegates.id AND round = ? AND level = ?) ON CONFLICT DO NOTHING"
+     $1, $2, $3, delegates.id, $4 FROM delegates WHERE delegates.address = $5 \
+     AND NOT EXISTS ( SELECT 1 FROM operations WHERE endorsement = $3 AND \
+     endorser = delegates.id AND round = $4 AND level = $1) ON CONFLICT DO \
+     NOTHING"
 
 let maybe_insert_block =
   Caqti_request.Infix.(
@@ -243,27 +244,27 @@ let insert_received_operation =
     Caqti_type.(
       tup2
         (tup4 ptime Type.errors Type.public_key_hash bool)
-        (tup4 (option int32) (option int32) string int32)
+        (tup3 (option int32) string int32)
       ->. unit))
     "INSERT INTO operations_reception (timestamp, operation, source, errors) \
-     SELECT ?, operations.id, nodes.id, ? FROM operations, delegates, nodes \
-     WHERE delegates.address = ? AND operations.endorser = delegates.id AND \
-     operations.endorsement = ? AND ((operations.round IS NULL AND ? IS NULL) \
-     OR operations.round = ?) AND nodes.name = ? AND operations.level = ? ON \
-     CONFLICT DO NOTHING"
+     SELECT $1, operations.id, nodes.id, $2 FROM operations, delegates, nodes \
+     WHERE delegates.address = $3 AND operations.endorser = delegates.id AND \
+     operations.endorsement = $4 AND ((operations.round IS NULL AND $5 IS \
+     NULL) OR operations.round = $5) AND nodes.name = $6 AND operations.level \
+     = $7 ON CONFLICT DO NOTHING"
 
 let insert_included_operation =
   Caqti_request.Infix.(
     Caqti_type.(
       tup2
-        (tup4 Type.public_key_hash bool (option int32) (option int32))
+        (tup3 Type.public_key_hash bool (option int32))
         (tup2 Type.block_hash int32)
       ->. unit))
     "INSERT INTO operations_inclusion (block, operation) SELECT blocks.id, \
      operations.id FROM operations, delegates, blocks WHERE delegates.address \
-     = ? AND operations.endorser = delegates.id AND operations.endorsement = ? \
-     AND ((operations.round IS NULL AND ? IS NULL) OR operations.round = ?) \
-     AND blocks.hash = ? AND operations.level = ? ON CONFLICT DO NOTHING"
+     = $1 AND operations.endorser = delegates.id AND operations.endorsement = \
+     $2 AND ((operations.round IS NULL AND $3 IS NULL) OR operations.round = \
+     $3) AND blocks.hash = $4 AND operations.level = $5 ON CONFLICT DO NOTHING"
 
 let insert_received_block =
   Caqti_request.Infix.(Caqti_type.(tup3 ptime Type.block_hash string ->. unit))

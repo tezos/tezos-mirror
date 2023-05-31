@@ -232,7 +232,7 @@ let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) level
           Sql_requests.maybe_insert_operation
           Teztale_lib.Consensus_ops.
             ( (level, op.op.hash, op.op.kind = Endorsement, op.op.round),
-              (op.delegate, op.op.kind = Endorsement, op.op.round, level) ))
+              op.delegate ))
       operations
   in
   Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
@@ -240,7 +240,7 @@ let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) level
       Db.exec
         Sql_requests.insert_included_operation
         ( Teztale_lib.Consensus_ops.
-            (op.delegate, op.op.kind = Endorsement, op.op.round, op.op.round),
+            (op.delegate, op.op.kind = Endorsement, op.op.round),
           (block_hash, level) ))
     operations
 
@@ -344,10 +344,7 @@ let operations_callback db_pool g source operations =
                               op.op.hash,
                               op.op.kind = Endorsement,
                               op.op.round ),
-                            ( delegate,
-                              op.op.kind = Endorsement,
-                              op.op.round,
-                              level ) ))
+                            delegate ))
                     ops)
                 operations
             in
@@ -362,7 +359,7 @@ let operations_callback db_pool g source operations =
                             op.errors,
                             delegate,
                             op.op.kind = Endorsement ),
-                          (op.op.round, op.op.round, source, level) ))
+                          (op.op.round, source, level) ))
                   ops)
               operations))
       db_pool

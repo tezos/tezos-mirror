@@ -54,7 +54,7 @@ val maybe_insert_endorsing_right :
 
 val maybe_insert_operation :
   ( (int32 * Tezos_crypto.Hashed.Operation_hash.t * bool * int32 option)
-    * (Tezos_crypto.Signature.public_key_hash * bool * int32 option * int32),
+    * Tezos_crypto.Signature.public_key_hash,
     unit,
     [`Zero] )
   Caqti_request.t
@@ -75,13 +75,13 @@ val insert_received_operation :
     * Tezos_error_monad.TzCore.error list option
     * Tezos_crypto.Signature.public_key_hash
     * bool)
-    * (int32 option * int32 option * string * int32),
+    * (int32 option * string * int32),
     unit,
     [`Zero] )
   Caqti_request.t
 
 val insert_included_operation :
-  ( (Tezos_crypto.Signature.public_key_hash * bool * int32 option * int32 option)
+  ( (Tezos_crypto.Signature.public_key_hash * bool * int32 option)
     * (Tezos_crypto.Hashed.Block_hash.t * int32),
     unit,
     [`Zero] )
