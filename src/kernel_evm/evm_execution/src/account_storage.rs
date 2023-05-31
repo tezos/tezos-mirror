@@ -217,7 +217,7 @@ where
 }
 
 /// Read larger than MAX_FILE_CHUNK_SIZE data. Placeholder for future SDK feature.
-fn store_read_all<T>(host: &impl Runtime, path: &T) -> Result<Vec<u8>, RuntimeError>
+pub fn store_read_all<T>(host: &impl Runtime, path: &T) -> Result<Vec<u8>, RuntimeError>
 where
     T: Path,
 {

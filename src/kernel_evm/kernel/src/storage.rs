@@ -10,11 +10,12 @@ use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 
 use crate::error::{Error, StorageError};
-use evm_execution::account_storage::store_write_all;
+use evm_execution::account_storage::{store_read_all, store_write_all};
+use rlp::Encodable;
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::transaction::{
     TransactionHash, TransactionObject, TransactionReceipt, TransactionStatus,
-    TransactionType, TRANSACTION_HASH_SIZE,
+    TRANSACTION_HASH_SIZE,
 };
 use tezos_ethereum::wei::Wei;
 
@@ -31,18 +32,6 @@ const BLOCKS_TRANSACTIONS: RefPath = RefPath::assert_from(b"/transactions");
 
 const EVM_TRANSACTIONS_RECEIPTS: RefPath =
     RefPath::assert_from(b"/evm/transactions_receipts");
-const TRANSACTION_RECEIPT_HASH: RefPath = RefPath::assert_from(b"/hash");
-const TRANSACTION_RECEIPT_INDEX: RefPath = RefPath::assert_from(b"/index");
-const TRANSACTION_RECEIPT_BLOCK_HASH: RefPath = RefPath::assert_from(b"/block_hash");
-const TRANSACTION_RECEIPT_BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/block_number");
-const TRANSACTION_RECEIPT_FROM: RefPath = RefPath::assert_from(b"/from");
-const TRANSACTION_RECEIPT_TO: RefPath = RefPath::assert_from(b"/to");
-const TRANSACTION_RECEIPT_CONTRACT_ADDRESS: RefPath =
-    RefPath::assert_from(b"/contract_address");
-const TRANSACTION_CUMULATIVE_GAS_USED: RefPath =
-    RefPath::assert_from(b"/cumulative_gas_used");
-const TRANSACTION_RECEIPT_TYPE: RefPath = RefPath::assert_from(b"/type");
-const TRANSACTION_RECEIPT_STATUS: RefPath = RefPath::assert_from(b"/status");
 
 const EVM_TRANSACTIONS_OBJECTS: RefPath =
     RefPath::assert_from(b"/evm/transactions_objects");
@@ -318,65 +307,13 @@ pub fn store_simulation_result<Host: Runtime>(
     Ok(())
 }
 
-// TODO: This store a transaction receipt with multiple subkeys, it could
-// be stored in a single encoded value. However, this is for now easier
-// for the (OCaml) proxy server to do as is.
 pub fn store_transaction_receipt<Host: Runtime>(
     receipt_path: &OwnedPath,
     host: &mut Host,
     receipt: &TransactionReceipt,
 ) -> Result<(), Error> {
-    // Transaction hash
-    let hash_path = concat(receipt_path, &TRANSACTION_RECEIPT_HASH)?;
-    host.store_write(&hash_path, &receipt.hash, 0)?;
-    // Index
-    let index_path = concat(receipt_path, &TRANSACTION_RECEIPT_INDEX)?;
-    host.store_write(&index_path, &receipt.index.to_le_bytes(), 0)?;
-    // Block hash
-    let block_hash_path = concat(receipt_path, &TRANSACTION_RECEIPT_BLOCK_HASH)?;
-    host.store_write(&block_hash_path, receipt.block_hash.as_bytes(), 0)?;
-    // Block number
-    let block_number_path = concat(receipt_path, &TRANSACTION_RECEIPT_BLOCK_NUMBER)?;
-    let mut le_receipt_block_number: [u8; 32] = [0; 32];
-    receipt
-        .block_number
-        .to_little_endian(&mut le_receipt_block_number);
-    host.store_write(&block_number_path, &le_receipt_block_number, 0)?;
-    // From
-    let from_path = concat(receipt_path, &TRANSACTION_RECEIPT_FROM)?;
-    let from: H160 = receipt.from;
-    host.store_write(&from_path, from.as_bytes(), 0)?;
-    // Type
-    let type_path = concat(receipt_path, &TRANSACTION_RECEIPT_TYPE)?;
-    host.store_write(&type_path, (&receipt.type_).into(), 0)?;
-    // Status
-    let status_path = concat(receipt_path, &TRANSACTION_RECEIPT_STATUS)?;
-    host.store_write(&status_path, (&receipt.status).into(), 0)?;
-    // To
-    if let Some(to) = receipt.to {
-        let to_path = concat(receipt_path, &TRANSACTION_RECEIPT_TO)?;
-        host.store_write(&to_path, to.as_bytes(), 0)?;
-    };
-    // Contract address
-    if let Some(contract_address) = receipt.contract_address {
-        let contract_address_path =
-            concat(receipt_path, &TRANSACTION_RECEIPT_CONTRACT_ADDRESS)?;
-        host.store_write(&contract_address_path, contract_address.as_bytes(), 0)?;
-    };
-
-    // Cumulative gas used
-    let cumulative_gas_used_path =
-        concat(receipt_path, &TRANSACTION_CUMULATIVE_GAS_USED)?;
-    let mut le_receipt_cumulative_gas_used: [u8; 32] = [0; 32];
-    receipt
-        .cumulative_gas_used
-        .to_little_endian(&mut le_receipt_cumulative_gas_used);
-    host.store_write(
-        &cumulative_gas_used_path,
-        &le_receipt_cumulative_gas_used,
-        0,
-    )?;
-
+    let bytes = receipt.rlp_bytes();
+    store_write_all(host, receipt_path, &bytes)?;
     Ok(())
 }
 
@@ -660,79 +597,8 @@ pub(crate) mod internal_for_tests {
         tx_hash: &TransactionHash,
     ) -> Result<TransactionReceipt, Error> {
         let receipt_path = receipt_path(tx_hash)?;
-
-        let index_path = concat(&receipt_path, &TRANSACTION_RECEIPT_INDEX)?;
-        let index_raw = host.store_read(&index_path, 0, WORD_SIZE)?;
-        let index = u32::from_le_bytes(
-            index_raw.try_into().map_err(|_| Error::InvalidConversion)?,
-        );
-
-        let block_hash_path = concat(&receipt_path, &TRANSACTION_RECEIPT_BLOCK_HASH)?;
-        let block_hash_raw = host.store_read(&block_hash_path, 0, HASH_MAX_SIZE)?;
-        let block_hash = H256::from_slice(block_hash_raw.as_slice());
-
-        let block_number_path = concat(&receipt_path, &TRANSACTION_RECEIPT_BLOCK_NUMBER)?;
-        let block_number = read_u256(host, &block_number_path)?;
-
-        let from_path = concat(&receipt_path, &TRANSACTION_RECEIPT_FROM)?;
-        let from = read_address(host, &from_path)?;
-
-        let cumulative_gas_used_path =
-            concat(&receipt_path, &TRANSACTION_CUMULATIVE_GAS_USED)?;
-        let cumulative_gas_used = read_u256(host, &cumulative_gas_used_path)?;
-
-        let type_path = concat(&receipt_path, &TRANSACTION_RECEIPT_TYPE)?;
-        let type_raw = host.store_read(&type_path, 0, TRANSACTION_RECEIPT_TYPE_SIZE)?;
-        let type_ = TransactionType::try_from(&type_raw).map_err(|_| {
-            Error::Storage(StorageError::InvalidEncoding {
-                path: type_path,
-                value: type_raw,
-            })
-        })?;
-
-        let status_path = concat(&receipt_path, &TRANSACTION_RECEIPT_STATUS)?;
-        let raw_status =
-            host.store_read(&status_path, 0, TRANSACTION_RECEIPT_STATUS_SIZE)?;
-        let status = TransactionStatus::try_from(&raw_status).map_err(|_| {
-            Error::Storage(StorageError::InvalidEncoding {
-                path: status_path,
-                value: raw_status,
-            })
-        })?;
-
-        // To can be None
-        let to_path = concat(&receipt_path, &TRANSACTION_RECEIPT_TO)?;
-        let to = if let Ok(Some(_)) = host.store_has(&to_path) {
-            Some(read_address(host, &to_path)?)
-        } else {
-            None
-        };
-
-        // Contract address can be None
-        let contract_address_path =
-            concat(&receipt_path, &TRANSACTION_RECEIPT_CONTRACT_ADDRESS)?;
-        let contract_address: Option<H160> = if let Ok(Some(_)) =
-            host.store_has(&contract_address_path)
-        {
-            let address_raw = host.store_read(&contract_address_path, 0, ADDRESS_SIZE)?;
-            Some(H160::from_slice(&address_raw))
-        } else {
-            None
-        };
-
-        Ok(TransactionReceipt {
-            hash: *tx_hash,
-            index,
-            block_hash,
-            block_number,
-            from,
-            to,
-            cumulative_gas_used,
-            effective_gas_price: U256::zero(),
-            gas_used: U256::zero(),
-            contract_address,
-            type_,
-            status,
-        })
+        let bytes = store_read_all(host, &receipt_path)?;
+        let receipt = TransactionReceipt::from_rlp_bytes(&bytes)?;
+        Ok(receipt)
     }
 }
