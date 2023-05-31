@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context.Sc_rollup
-
 module Simple = struct
   include Internal_event.Simple
 
@@ -38,9 +36,9 @@ module Simple = struct
         "Transitioned PVM at inbox level {inbox_level} to {state_hash} at tick \
          {ticks} with {num_messages} messages"
       ~level:Notice
-      ("inbox_level", Protocol.Alpha_context.Raw_level.encoding)
-      ("state_hash", State_hash.encoding)
-      ("ticks", Tick.encoding)
+      ("inbox_level", Data_encoding.int32)
+      ("state_hash", Octez_smart_rollup.State_hash.encoding)
+      ("ticks", Data_encoding.n)
       ("num_messages", Data_encoding.int31)
 
   let intended_failure =

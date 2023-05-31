@@ -69,6 +69,6 @@ type source =
 val get :
   ?dac_client:Dac_observer_client.t ->
   data_dir:string ->
-  pvm_kind:Protocol.Alpha_context.Sc_rollup.Kind.t ->
+  pvm_kind:Kind.t ->
   Protocol.Sc_rollup_reveal_hash.t ->
   string tzresult Lwt.t

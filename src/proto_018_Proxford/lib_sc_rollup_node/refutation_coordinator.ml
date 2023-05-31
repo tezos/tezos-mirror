@@ -31,13 +31,25 @@ module Player = Refutation_player
 module Pkh_map = Signature.Public_key_hash.Map
 module Pkh_table = Signature.Public_key_hash.Table
 
-type state = {node_ctxt : Node_context.rw; pending_opponents : unit Pkh_table.t}
+type state = {
+  node_ctxt : Node_context.rw;
+  cctxt : Protocol_client_context.full;
+  pending_opponents : unit Pkh_table.t;
+}
 
-let get_conflicts cctxt head_block =
-  Plugin.RPC.Sc_rollup.conflicts cctxt (cctxt#chain, head_block)
+let get_conflicts cctxt head_block address key =
+  Plugin.RPC.Sc_rollup.conflicts
+    cctxt
+    (cctxt#chain, head_block)
+    (Sc_rollup_proto_types.Address.of_octez address)
+    key
 
-let get_ongoing_games cctxt head_block =
-  Plugin.RPC.Sc_rollup.ongoing_refutation_games cctxt (cctxt#chain, head_block)
+let get_ongoing_games cctxt head_block address key =
+  Plugin.RPC.Sc_rollup.ongoing_refutation_games
+    cctxt
+    (cctxt#chain, head_block)
+    (Sc_rollup_proto_types.Address.of_octez address)
+    key
 
 let untracked_conflicts opponent_players conflicts =
   List.filter
@@ -72,9 +84,11 @@ let on_process Layer1.{hash; level} state =
       (* Not injecting refutations, don't play refutation games *)
       return_unit
   | Some self ->
-      let Node_context.{rollup_address; cctxt; _} = node_ctxt in
+      let Node_context.{rollup_address; _} = node_ctxt in
       (* Current conflicts in L1 *)
-      let* conflicts = get_conflicts cctxt head_block rollup_address self in
+      let* conflicts =
+        get_conflicts state.cctxt head_block rollup_address self
+      in
       (* Map of opponents the node is playing against to the corresponding
          player worker *)
       let opponent_players =
@@ -85,7 +99,7 @@ let on_process Layer1.{hash; level} state =
       let new_conflicts = untracked_conflicts opponent_players conflicts in
       (* L1 ongoing games *)
       let* ongoing_games =
-        get_ongoing_games cctxt head_block rollup_address self
+        get_ongoing_games state.cctxt head_block rollup_address self
       in
       (* Map between opponents and their corresponding games *)
       let ongoing_game_map = make_game_map self ongoing_games in
@@ -121,7 +135,10 @@ let on_process Layer1.{hash; level} state =
 module Types = struct
   type nonrec state = state
 
-  type parameters = {node_ctxt : Node_context.rw}
+  type parameters = {
+    node_ctxt : Node_context.rw;
+    cctxt : Protocol_client_context.full;
+  }
 end
 
 module Name = struct
@@ -157,8 +174,8 @@ module Handlers = struct
 
   type launch_error = error trace
 
-  let on_launch _w () Types.{node_ctxt} =
-    return {node_ctxt; pending_opponents = Pkh_table.create 5}
+  let on_launch _w () Types.{node_ctxt; cctxt} =
+    return {node_ctxt; cctxt; pending_opponents = Pkh_table.create 5}
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
       unit tzresult Lwt.t =
@@ -187,7 +204,10 @@ let worker_promise, worker_waker = Lwt.task ()
 let init node_ctxt =
   let open Lwt_result_syntax in
   let*! () = Refutation_game_event.Coordinator.starting () in
-  let+ worker = Worker.launch table () {node_ctxt} (module Handlers) in
+  let cctxt =
+    new Protocol_client_context.wrap_full node_ctxt.Node_context.cctxt
+  in
+  let+ worker = Worker.launch table () {node_ctxt; cctxt} (module Handlers) in
   Lwt.wakeup worker_waker worker
 
 (* This is a refutation coordinator for a single scoru *)
