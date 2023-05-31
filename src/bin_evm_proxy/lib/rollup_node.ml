@@ -107,7 +107,7 @@ let chunks bytes size =
   collect 0 [] |> List.rev
 
 module Durable_storage_path = struct
-  let accounts = "/eth_accounts"
+  let accounts = "/evm/eth_accounts"
 
   let balance = "/balance"
 
@@ -149,7 +149,7 @@ module Durable_storage_path = struct
   end
 
   module Transaction_receipt = struct
-    let receipts = "/transactions_receipts"
+    let receipts = "/evm/transactions_receipts"
 
     let receipt_field tx_hash field = receipts ^ "/" ^ tx_hash ^ "/" ^ field
 
@@ -171,7 +171,7 @@ module Durable_storage_path = struct
   end
 
   module Transaction_object = struct
-    let objects = "/transactions_objects"
+    let objects = "/evm/transactions_objects"
 
     let object_field tx_hash field =
       Format.sprintf "%s/%s/%s" objects tx_hash field
