@@ -623,7 +623,8 @@ let register ?(regression = true) title test =
   let baker_1 = Constant.bootstrap2 in
   let* account_0 = Client.gen_and_show_keys ~alias:"dummy_account_0" client in
   let* account_1 = Client.gen_and_show_keys ~alias:"dummy_account_1" client in
-  test client baker_0 baker_1 account_0 account_1
+  let manual_staking = Protocol.(protocol > Nairobi) in
+  test ~manual_staking client baker_0 baker_1 account_0 account_1
 
 let test_register_delegate_with_consensus_key ?(expect_failure = false)
     ?(baker = Constant.bootstrap1.alias) ~(new_delegate : Account.key)
@@ -806,7 +807,7 @@ let register ~protocols =
   let () =
     register
       "Test set consensus key - baker is not delegate"
-      (fun client baker_0 baker_1 account_0 _account_1 ->
+      (fun ~manual_staking:_ client baker_0 baker_1 account_0 _account_1 ->
         let baker_0_consensus_key = account_0 in
         let* () =
           test_consensus_key_update
@@ -821,7 +822,7 @@ let register ~protocols =
   let () =
     register
       "Test set consensus key - baker is delegate"
-      (fun client baker_0 _baker_1 account_0 _account_1 ->
+      (fun ~manual_staking:_ client baker_0 _baker_1 account_0 _account_1 ->
         let baker_0_consensus_key = account_0 in
         let* () =
           test_consensus_key_update
@@ -836,7 +837,7 @@ let register ~protocols =
   let () =
     register
       "Test register with consensus key"
-      (fun client baker_0 _baker_1 account_0 account_1 ->
+      (fun ~manual_staking:_ client baker_0 _baker_1 account_0 account_1 ->
         let new_delegate = account_0 in
         let new_consensus_key = account_1 in
         test_register_delegate_with_consensus_key
@@ -850,7 +851,7 @@ let register ~protocols =
     register
       "Test revert to unique consensus key"
       ~regression:false
-      (fun client baker_0 _baker_1 account_0 account_1 ->
+      (fun ~manual_staking:_ client baker_0 _baker_1 account_0 account_1 ->
         let new_delegate = account_0 in
         let new_consensus_key = account_1 in
         test_revert_to_unique_consensus_key
@@ -863,7 +864,7 @@ let register ~protocols =
   let () =
     register
       "Test drain delegate with (baker = delegate & consensus = destination)"
-      (fun client baker_0 _baker_1 account_0 _account_1 ->
+      (fun ~manual_staking:_ client baker_0 _baker_1 account_0 _account_1 ->
         let delegate = baker_0 in
         let consensus = account_0 in
         let destination = account_0 in
@@ -878,7 +879,7 @@ let register ~protocols =
   let () =
     register
       "Test drain delegate with (baker = delegate & consensus <> destination)"
-      (fun client baker_0 _baker_1 account_0 account_1 ->
+      (fun ~manual_staking:_ client baker_0 _baker_1 account_0 account_1 ->
         let delegate = baker_0 in
         let consensus = account_0 in
         let destination = account_1 in
@@ -893,7 +894,7 @@ let register ~protocols =
   let () =
     register
       "Test drain delegate with (baker <> delegate & consensus = destination)"
-      (fun client baker_0 baker_1 account_0 _account_1 ->
+      (fun ~manual_staking:_ client baker_0 baker_1 account_0 _account_1 ->
         let delegate = baker_0 in
         let consensus = account_0 in
         let destination = account_0 in
@@ -908,7 +909,7 @@ let register ~protocols =
   let () =
     register
       "Test drain delegate with (baker <> delegate & consensus <> destination)"
-      (fun client baker_0 baker_1 account_0 account_1 ->
+      (fun ~manual_staking:_ client baker_0 baker_1 account_0 account_1 ->
         let delegate = baker_0 in
         let consensus = account_0 in
         let destination = account_1 in
