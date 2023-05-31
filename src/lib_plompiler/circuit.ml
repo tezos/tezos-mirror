@@ -58,6 +58,8 @@ let compare_trace_kind x y =
   in
   Int.compare (to_int x) (to_int y)
 
+module Scalar_map = Map.Make (S)
+
 type state = {
   nvars : int;
   cs : CS.t;
@@ -87,6 +89,11 @@ type state = {
   range_checks : Range_checks.t;
   (* label trace *)
   labels : string list;
+  (* one and zero are used so often that it's worth reusing them across the
+     whole circuit. Num.constant uses these two values as cache, which in turn
+     is used by Bool.constant and Bytes.constant and leads to important
+     reduction in circuit size. *)
+  cache : scalar repr Scalar_map.t;
 }
 
 type 'a t = state -> state * 'a
@@ -667,7 +674,7 @@ module Num = struct
     let solver = Pow5 {a = l; c = o} in
     append gate ~solver >* ret @@ Scalar o
 
-  let constant s =
+  let constant_aux s =
     let*& o = fresh Dummy.scalar in
     append
       [|
@@ -678,6 +685,16 @@ module Num = struct
           "constant_scalar";
       |]
     >* ret (Scalar o)
+
+  (* cache zero and one otherwise just add a fresh constraint *)
+  let constant x : scalar repr t =
+   fun st ->
+    match Scalar_map.find_opt x st.cache with
+    | None ->
+        let st, o = constant_aux x st in
+        let cache = Scalar_map.add x o st.cache in
+        ({st with cache}, o)
+    | Some o -> (st, o)
 
   let zero = constant S.zero
 
@@ -1524,6 +1541,7 @@ let get f =
         check_wires = [];
         range_checks = Range_checks.empty;
         labels = [];
+        cache = Scalar_map.empty;
       }
   in
   let s, Unit = s.delayed s in
