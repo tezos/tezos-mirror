@@ -98,6 +98,20 @@ Node
   ``attestation`` and ``preattestation`` are accepted in the input JSON. (MR
   :gl:`!8768`)
 
+- Removed ``lwt-log`` from the dependencies. The default logger has been updated
+  to use the ``file-descriptor-stdout`` sink instead of the previous ``lwt-log``
+  sink. This change has resulted in the removal of certain features from the log
+  implementation that were specific to "lwt-log". Some features, such as log
+  rules, syslog, and the output format, have been replaced with alternative
+  implementations. Additionally, the previous implementation of "syslog" had
+  some issues, including duplicated log headers or cropped messages, depending
+  on the file output. These issues have been addressed, and the new
+  implementation should now work correctly.
+
+- Removed ``template`` field from ``log`` configuration with the removal of
+  ``lwt-log`` library. Since it was believed to have low usage, no alternative
+  implementation has been provided.
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
