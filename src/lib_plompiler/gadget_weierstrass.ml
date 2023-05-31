@@ -38,43 +38,14 @@ let mone = S.negate one
 
 let mtwo = S.negate two
 
-module type AFFINE = functor (L : LIB) -> sig
-  open L
-
-  type point = scalar * scalar
-
-  val input_point : ?kind:input_kind -> S.t * S.t -> point repr t
-
-  val assert_is_on_curve : point repr -> unit repr t
-
-  val from_coordinates : scalar repr -> scalar repr -> point repr t
-
-  (** [unsafe_from_coordinates x y] is similar to {!from_coordinates} but
-      does not verify the point is on the curve. It can be used to build a
-      variable of type *point* without adding any constraint.
-  *)
-  val unsafe_from_coordinates : scalar repr -> scalar repr -> point repr t
-
-  val get_x_coordinate : point repr -> scalar repr
-
-  val get_y_coordinate : point repr -> scalar repr
-
-  val add : point repr -> point repr -> point repr t
-
-  val double : point repr -> point repr t
-
-  val scalar_mul : bool list repr -> point repr -> bool repr -> point repr t
-
-  val scalar_order : Z.t
-
-  val base_order : Z.t
-end
+module type AFFINE = Affine_curve_intf.WEIERSTRASS
 
 module MakeAffine (Curve : Mec.CurveSig.AffineWeierstrassT) : AFFINE =
 functor
   (L : LIB)
   ->
   struct
+    module L = L
     open L
 
     type point = scalar * scalar
@@ -91,6 +62,18 @@ functor
     let get_x_coordinate p = of_pair p |> fst
 
     let get_y_coordinate p = of_pair p |> snd
+
+    let is_on_curve p =
+      with_label ~label:"Weierstrass.is_on_curve"
+      @@
+      let x, y = of_pair p in
+      let* x2 = Num.square x in
+      let* y2 = Num.square y in
+      let ql = param_a in
+      let qc = Curve.b |> Curve.Base.to_z |> S.of_z in
+      let* tmp = Num.custom ~qm:one ~ql ~qc x x2 in
+      let* o = Num.custom ~ql:mone ~qr:one y2 tmp in
+      Num.is_zero o
 
     (* 2 constraints *)
     let assert_is_on_curve p =
@@ -146,30 +129,27 @@ functor
       let* y_r = Num.add ~qr:mone left y in
       pair x_r y_r |> ret
 
-    (* We need to check that the variable "flag" is set to false, to do so we can:
-          - make the variable "flag" public
-          - assert that the variable "flag" is false.
-          This needs to be done once for all scalar multiplications.
-       List.length(of_list s) * (9 + 2 + 7 + 7 + 1) constraints
-    *)
-    let scalar_mul s p flag =
+    (* /!\ This function may not return the expected result when
+       s > Curve.Base.order, because it uses incomplete formulas & thus doesn't
+       handle the point at infinity *)
+    let scalar_mul s p =
       with_label ~label:"Weierstrass.scalar_mul"
-      @@
-      let init = pair p flag in
-      let* res =
-        foldM
-          (fun acc b ->
-            let acc_res, acc_flag = of_pair acc in
-            let* acc_res = double acc_res in
-            let* sum = add acc_res p in
-            let* ite = Bool.ifthenelse acc_flag sum p in
-            let* acc_res = Bool.ifthenelse b ite acc_res in
-            let* acc_flag = Bool.bor acc_flag b in
-            let acc = pair acc_res acc_flag in
-            ret acc)
-          init
-          (List.rev (of_list s))
-      in
-      let result, _ = of_pair res in
-      ret result
+      @@ let* flag = constant_bool false in
+         let init = pair p flag in
+         let* res =
+           foldM
+             (fun acc b ->
+               let acc_res, acc_flag = of_pair acc in
+               let* acc_res = double acc_res in
+               let* sum = add acc_res p in
+               let* ite = Bool.ifthenelse acc_flag sum p in
+               let* acc_res = Bool.ifthenelse b ite acc_res in
+               let* acc_flag = Bool.bor acc_flag b in
+               let acc = pair acc_res acc_flag in
+               ret acc)
+             init
+             (List.rev (of_list s))
+         in
+         let result, _ = of_pair res in
+         ret result
   end

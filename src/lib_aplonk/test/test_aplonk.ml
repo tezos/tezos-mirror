@@ -265,8 +265,8 @@ module External = struct
       let* p1 = Edwards.input_point p1 in
       let* p2 = Edwards.input_point p2 in
       let* sum = Edwards.add p1 p2 in
-      let u = Edwards.get_u_coordinate sum in
-      let v = Edwards.get_v_coordinate sum in
+      let u = Edwards.get_x_coordinate sum in
+      let v = Edwards.get_y_coordinate sum in
       let* res = poseidon (to_list [x0; x1; u; v]) in
       assert_equal res res
     in

@@ -130,8 +130,10 @@ struct
   open Gadget_edwards
 
   module V : functor (L : LIB) -> sig
+    module Affine : Affine_curve_intf.S_Edwards with module L = L
+
     open L
-    open MakeAffine(Curve)(L)
+    open Affine
     open Encodings
 
     (* TODO make abstract once compression is done with encodings *)
@@ -161,15 +163,14 @@ struct
     (L : LIB)
     ->
     struct
+      module Affine = MakeAffine (Curve) (L)
+      open Affine
       open L
-
-      open MakeAffine (Curve) (L)
+      open Encodings
 
       open H.V (L)
 
       type pk = point
-
-      open Encodings
 
       let point_encoding : (Curve.t, pk repr, pk) encoding =
         let curve_base_to_s c = Lang_core.S.of_z @@ Curve.Base.to_z c in
@@ -240,11 +241,11 @@ struct
       let hash ~compressed sig_r msg =
         with_label ~label:"Schnorr.hash"
         @@
-        let sig_r_u = get_u_coordinate sig_r in
-        if compressed then digest ~input_length:2 @@ to_list [sig_r_u; msg]
+        let sig_r_x = get_x_coordinate sig_r in
+        if compressed then digest ~input_length:2 @@ to_list [sig_r_x; msg]
         else
-          let sig_r_v = get_v_coordinate sig_r in
-          digest @@ to_list [sig_r_u; sig_r_v; msg]
+          let sig_r_y = get_y_coordinate sig_r in
+          digest @@ to_list [sig_r_x; sig_r_y; msg]
 
       (* Requires : [c_bytes] is computed correctly by the prover.
          Otherwise an assert is triggered. *)
