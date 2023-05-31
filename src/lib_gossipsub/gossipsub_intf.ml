@@ -849,6 +849,9 @@ module type AUTOMATON = sig
 
   val pp_unsubscribe : Format.formatter -> unsubscribe -> unit
 
+  val pp_set_application_score :
+    Format.formatter -> set_application_score -> unit
+
   val pp_output : Format.formatter -> 'a output -> unit
 
   module Introspection : sig

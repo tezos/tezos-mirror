@@ -2102,6 +2102,10 @@ module Make (C : AUTOMATON_CONFIG) :
     let open Format in
     fprintf fmtr "{ topic=%a; peer=%a }" Topic.pp topic Peer.pp peer
 
+  let pp_set_application_score fmtr ({peer; score} : set_application_score) =
+    let open Format in
+    fprintf fmtr "{ peer=%a; score=%g }" Peer.pp peer score
+
   let pp_peer_map pp_elt =
     Fmt.Dump.iter_bindings Peer.Map.iter Fmt.nop Peer.pp pp_elt
 
