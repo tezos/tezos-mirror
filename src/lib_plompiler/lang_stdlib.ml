@@ -443,12 +443,13 @@ module Lib (C : COMMON) = struct
     include Bool
 
     let full_adder a b c_in =
-      let* a_xor_b = xor a b in
-      let* a_xor_b_xor_c = xor a_xor_b c_in in
-      let* a_xor_b_and_c = band a_xor_b c_in in
-      let* a_and_b = band a b in
-      let* c = bor a_xor_b_and_c a_and_b in
-      ret (pair a_xor_b_xor_c c)
+      with_label ~label:"Bool.full_adder"
+      @@ let* a_xor_b = xor a b in
+         let* a_xor_b_xor_c = xor a_xor_b c_in in
+         let* a_xor_b_and_c = band a_xor_b c_in in
+         let* a_and_b = band a b in
+         let* c = bor a_xor_b_and_c a_and_b in
+         ret (pair a_xor_b_xor_c c)
   end
 
   module Num = struct
@@ -654,6 +655,8 @@ module Lib (C : COMMON) = struct
 
     let add ?(ignore_carry = true) a b =
       check_args_length "Bytes.add" a b ;
+      with_label ~label:"Bytes.add"
+      @@
       let ha, ta = (List.hd (of_list a), List.tl (of_list a)) in
       let hb, tb = (List.hd (of_list b), List.tl (of_list b)) in
       let* a_xor_b = Bool.xor ha hb in
