@@ -126,7 +126,9 @@ module Dune = struct
        This is only used inside lists (i.e. the :: constructor) . *)
     let rec pp_s_expr_items need_space fmt = function
       | E -> ()
-      | S atom -> pp_atom fmt atom
+      | S atom ->
+          if need_space then Format.pp_print_space fmt () ;
+          pp_atom fmt atom
       | G _ | H _ | V _ ->
           (* See below: [invalid_arg] prevents this from happening. *)
           assert false
