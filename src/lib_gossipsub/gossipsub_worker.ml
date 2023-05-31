@@ -631,10 +631,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         pp_message_with_header fmt message_with_header
 
   let pp_p2p_output fmt = function
-    | Disconnect {peer} ->
-        Format.fprintf fmt "Disconnect{topic=%a}" Peer.pp peer
-    | Kick {peer} -> Format.fprintf fmt "Kick{topic=%a}" Peer.pp peer
-    | Connect {peer} -> Format.fprintf fmt "Connect{topic=%a}" Peer.pp peer
+    | Disconnect {peer} -> Format.fprintf fmt "Disconnect{peer=%a}" Peer.pp peer
+    | Kick {peer} -> Format.fprintf fmt "Kick{peer=%a}" Peer.pp peer
+    | Connect {peer} -> Format.fprintf fmt "Connect{peer=%a}" Peer.pp peer
     | Out_message {to_peer; p2p_message} ->
         Format.fprintf
           fmt
