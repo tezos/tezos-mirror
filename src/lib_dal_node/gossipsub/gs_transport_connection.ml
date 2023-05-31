@@ -154,7 +154,7 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer =
                     __FUNCTION__
                     (Printexc.to_string exc)) ;
               return_unit)
-      | Disconnect {peer = _} | Connect {peer = _} | Kick {peer = _} ->
+      | Disconnect {peer = _} | Connect {px = _; origin = _} | Kick {peer = _}
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5647
 
              Handle Disconnect, Connect and Kick directives from GS *)
