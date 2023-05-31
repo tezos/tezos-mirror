@@ -170,6 +170,7 @@ let all_local_model_names () =
   |> List.map (fun (_, (module B : Benchmark.S)) -> List.map fst B.models)
   |> List.flatten
   |> List.filter (fun s -> not (String.equal s "*"))
+  |> List.sort_uniq String.compare
 
 let all_custom_commands () = !clic_table
 
