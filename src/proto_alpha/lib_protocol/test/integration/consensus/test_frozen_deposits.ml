@@ -191,8 +191,6 @@ let test_unset_limit () =
   let (contract1, account1), (_contract2, account2) =
     get_first_2_accounts_contracts contracts
   in
-  Context.Delegate.current_frozen_deposits (B genesis) account1
-  >>=? fun frozen_deposits_at_genesis ->
   (* set the limit to 0 *)
   Op.set_deposits_limit (B genesis) contract1 (Some Tez.zero)
   >>=? fun operation ->
@@ -225,13 +223,10 @@ let test_unset_limit () =
   Block.bake_until_cycle_end ~policy:(By_account account2) b >>=? fun bfin ->
   Context.Delegate.current_frozen_deposits (B bfin) account1
   >>=? fun frozen_deposits_at_bfin ->
-  (* without a limit, the new deposit matches the one at genesis; note
-     that account1 hasn't baked any block so its stake did not change. *)
-  Assert.equal_tez
-    ~loc:__LOC__
-    frozen_deposits_at_bfin
-    frozen_deposits_at_genesis
-  >>=? fun () -> return_unit
+  (* without a limit and without manual staking, the new deposit is still zero;
+     note that account1 hasn't baked any block. *)
+  Assert.equal_tez ~loc:__LOC__ frozen_deposits_at_bfin Tez.zero >>=? fun () ->
+  return_unit
 
 let test_cannot_bake_with_zero_deposits_limit () =
   Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
