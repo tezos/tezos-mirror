@@ -114,16 +114,15 @@ let sign ?protocol ({kind; signer; _} as t) client =
 
 module Tezos_operation = Tezos_base.TzPervasives.Operation
 
-let to_raw_operation t client : Tezos_operation.t Lwt.t =
-  let open Tezos_base.TzPervasives in
-  let branch = Block_hash.of_b58check_exn t.branch in
-  let* raw = hex t client in
-  return Tezos_operation.{shell = {branch}; proto = Hex.to_bytes_exn raw}
-
 let hash t client : [`OpHash of string] Lwt.t =
-  let* op = to_raw_operation t client in
-  let hash = Tezos_operation.hash op in
-  return (`OpHash (Tezos_crypto.Hashed.Operation_hash.to_string hash))
+  let* signature = sign t client in
+  let* (`Hex hex) = hex ~signature t client in
+  let bytes = Hex.to_bytes (`Hex hex) in
+  let op =
+    Data_encoding.Binary.of_bytes_exn Tezos_base.Operation.encoding bytes
+  in
+  let hash = Tezos_base.Operation.hash op in
+  return (`OpHash (Tezos_crypto.Hashed.Operation_hash.to_b58check hash))
 
 let inject ?(request = `Inject) ?(force = false) ?protocol ?signature ?error t
     client : [`OpHash of string] Lwt.t =

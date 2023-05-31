@@ -108,6 +108,9 @@ val hex :
 val sign :
   ?protocol:Protocol.t -> t -> Client.t -> Tezos_crypto.Signature.t Lwt.t
 
+(** [hash t client] returns the hash of the operation  *)
+val hash : t -> Client.t -> [`OpHash of string] Lwt.t
+
 (** [inject ?(request=`Inject) ?(force=false) ?(signature=None)
    ?(error=None) t] injects an operation into the node. The node is
    extracted from the [Client]. If a node cannot be extracted, the
