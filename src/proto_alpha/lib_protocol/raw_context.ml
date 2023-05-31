@@ -656,12 +656,9 @@ let storage_error err = error (Storage_error err)
 let version_key = ["version"]
 
 (* This value is set by the snapshot_alpha.sh script, don't change it. *)
-let version_value = "alpha_current"
-
-let version = "v1"
 
 let protocol_migration_internal_message =
-  Sc_rollup_inbox_message_repr.Protocol_migration version_value
+  Sc_rollup_inbox_message_repr.Protocol_migration Constants_repr.version_value
 
 let protocol_migration_serialized_message =
   match
@@ -677,9 +674,9 @@ let protocol_migration_serialized_message =
         pp_trace
         trace
 
-let cycle_eras_key = [version; "cycle_eras"]
+let cycle_eras_key = [Constants_repr.version; "cycle_eras"]
 
-let constants_key = [version; "constants"]
+let constants_key = [Constants_repr.version; "constants"]
 
 let protocol_param_key = ["protocol_parameters"]
 
@@ -786,7 +783,8 @@ let check_inited ctxt =
   | None -> failwith "Internal error: un-initialized context."
   | Some bytes ->
       let s = Bytes.to_string bytes in
-      if Compare.String.(s = version_value) then Result.return_unit
+      if Compare.String.(s = Constants_repr.version_value) then
+        Result.return_unit
       else storage_error (Incompatible_protocol_version s)
 
 let check_cycle_eras (cycle_eras : Level_repr.cycle_eras)
@@ -856,15 +854,15 @@ let check_and_update_protocol_version ctxt =
        failwith "Internal error: un-initialized context in check_first_block."
    | Some bytes ->
        let s = Bytes.to_string bytes in
-       if Compare.String.(s = version_value) then
+       if Compare.String.(s = Constants_repr.version_value) then
          failwith "Internal error: previously initialized context."
        else if Compare.String.(s = "genesis") then
          get_proto_param ctxt >|=? fun (param, ctxt) -> (Genesis param, ctxt)
        else if Compare.String.(s = "nairobi_017") then return (Nairobi_017, ctxt)
        else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
-  Context.add ctxt version_key (Bytes.of_string version_value) >|= fun ctxt ->
-  ok (previous_proto, ctxt)
+  Context.add ctxt version_key (Bytes.of_string Constants_repr.version_value)
+  >|= fun ctxt -> ok (previous_proto, ctxt)
 
 (* only for the migration *)
 let[@warning "-32"] get_previous_protocol_constants ctxt =
