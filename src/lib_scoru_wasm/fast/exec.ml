@@ -46,15 +46,34 @@ let get_compiler () =
       |> Stdlib.failwith
   | None -> Wasmer.Config.CRANELIFT
 
-let store =
+let engine =
   Lazy.from_fun @@ fun () ->
-  let engine =
-    Wasmer.Engine.create Wasmer.Config.{compiler = get_compiler ()}
-  in
-  Wasmer.Store.create engine
+  Wasmer.Engine.create Wasmer.Config.{compiler = get_compiler ()}
+
+(** This store will largely remain empty. It is mainly useful when a function
+    wants to access the underlying engine, but its interface requires a store.
+
+    This is the case with [wasm_module_new]. In Wasmer, the underlying function
+    only needs access to the engine, but the standardised WebAssembly C API
+    dictates that the function requires a store parameter. *)
+let static_store = Lazy.map Wasmer.Store.create engine
+
+(** Allocate a new store, pass it to the given function and destroy the
+    store once the function is done.
+
+    We do this to combat an issue with Wasmer 3.3.0 where the store objects
+    belonging to a module instance are kept alive after the instance has been
+    destroyed. *)
+let with_store f =
+  let store = Wasmer.Store.create (Lazy.force engine) in
+  Lwt.finalize
+    (fun () -> f store)
+    (fun () ->
+      Wasmer.Store.delete store ;
+      Lwt.return_unit)
 
 let load_kernel durable =
-  let store = Lazy.force store in
+  let store = Lazy.force static_store in
   Module_cache.load_kernel store durable
 
 let compute ~version ~reveal_builtins ~write_debug durable buffers =
@@ -75,7 +94,8 @@ let compute ~version ~reveal_builtins ~write_debug durable buffers =
     let+ durable = f host_state.durable in
     host_state.durable <- durable
   in
-  let store = Lazy.force store in
+
+  with_store @@ fun store ->
   let* instance = Wasmer.Instance.create store module_ host_funcs in
 
   let* () =
