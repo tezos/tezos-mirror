@@ -10,7 +10,8 @@
   tezos-rpc-http
   tezos-rpc-http-client-unix
   tezos-version
-  lwt-exit)
+  lwt-exit
+  rlp)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
