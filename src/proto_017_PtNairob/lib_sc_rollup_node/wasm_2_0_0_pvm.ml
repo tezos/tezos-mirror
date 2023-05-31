@@ -123,7 +123,7 @@ end
 module Durable_state =
   Make_durable_state (Make_wrapped_tree (Wasm_2_0_0_proof_format.Tree))
 
-module Impl : Pvm.S = struct
+module Impl : Pvm_sig.S = struct
   module PVM =
     Sc_rollup.Wasm_2_0_0PVM.Make (Make_backend) (Wasm_2_0_0_proof_format)
   include PVM

@@ -63,20 +63,20 @@ end
 let add_level level increment =
   (* We only use this function with positive increments so it is safe *)
   if increment < 0 then invalid_arg "Commitment.add_level negative increment" ;
-  Raw_level.Internal_for_tests.add level increment
+  Int32.add level (Int32.of_int increment)
 
 let sub_level level decrement =
   (* We only use this function with positive increments so it is safe *)
   if decrement < 0 then invalid_arg "Commitment.sub_level negative decrement" ;
-  Raw_level.Internal_for_tests.sub level decrement
+  let r = Int32.sub level (Int32.of_int decrement) in
+  if r < 0l then None else Some r
 
 let sc_rollup_commitment_period node_ctxt =
-  node_ctxt.Node_context.protocol_constants.parametric.sc_rollup
+  node_ctxt.Node_context.protocol_constants.sc_rollup
     .commitment_period_in_blocks
 
 let sc_rollup_challenge_window node_ctxt =
-  node_ctxt.Node_context.protocol_constants.parametric.sc_rollup
-    .challenge_window_in_blocks
+  node_ctxt.Node_context.protocol_constants.sc_rollup.challenge_window_in_blocks
 
 let next_commitment_level node_ctxt last_commitment_level =
   add_level last_commitment_level (sc_rollup_commitment_period node_ctxt)
@@ -85,55 +85,47 @@ type state = Node_context.ro
 
 let tick_of_level (node_ctxt : _ Node_context.t) inbox_level =
   let open Lwt_result_syntax in
-  let* block =
-    Node_context.get_l2_block_by_level
-      node_ctxt
-      (Raw_level.to_int32 inbox_level)
-  in
+  let* block = Node_context.get_l2_block_by_level node_ctxt inbox_level in
   return (Sc_rollup_block.final_tick block)
 
 let build_commitment (node_ctxt : _ Node_context.t)
-    (prev_commitment : Sc_rollup.Commitment.Hash.t) ~prev_commitment_level
-    ~inbox_level ctxt =
+    (prev_commitment : Octez_smart_rollup.Commitment.Hash.t)
+    ~prev_commitment_level ~inbox_level ctxt =
   let open Lwt_result_syntax in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! pvm_state = PVM.State.find ctxt in
   let*? pvm_state =
     match pvm_state with
     | Some pvm_state -> Ok pvm_state
     | None ->
         error_with
-          "PVM state for commitment at level %a is not available"
-          Raw_level.pp
+          "PVM state for commitment at level %ld is not available"
           inbox_level
   in
   let*! compressed_state = PVM.state_hash pvm_state in
   let*! tick = PVM.get_tick pvm_state in
   let* prev_commitment_tick = tick_of_level node_ctxt prev_commitment_level in
   let distance = Z.sub (Sc_rollup.Tick.to_z tick) prev_commitment_tick in
-  let number_of_ticks =
-    distance |> Z.to_int64 |> Sc_rollup.Number_of_ticks.of_value
-  in
-  let*? number_of_ticks =
-    match number_of_ticks with
-    | Some number_of_ticks ->
-        if number_of_ticks = Sc_rollup.Number_of_ticks.zero then
-          error_with "A 0-tick commitment is impossible"
-        else Ok number_of_ticks
-    | None -> error_with "Invalid number of ticks for commitment"
+  let number_of_ticks = Z.to_int64 distance in
+  let*? () =
+    if number_of_ticks = 0L then error_with "A 0-tick commitment is impossible"
+    else if number_of_ticks < 0L then
+      error_with "Invalid number of ticks for commitment"
+    else Ok ()
   in
   return
-    Sc_rollup.Commitment.
+    Octez_smart_rollup.Commitment.
       {
         predecessor = prev_commitment;
         inbox_level;
         number_of_ticks;
-        compressed_state;
+        compressed_state =
+          Sc_rollup_proto_types.State_hash.to_octez compressed_state;
       }
 
 let genesis_commitment (node_ctxt : _ Node_context.t) ctxt =
   let open Lwt_result_syntax in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! pvm_state = PVM.State.find ctxt in
   let*? pvm_state =
     match pvm_state with
@@ -142,29 +134,27 @@ let genesis_commitment (node_ctxt : _ Node_context.t) ctxt =
   in
   let*! compressed_state = PVM.state_hash pvm_state in
   let commitment =
-    Sc_rollup.Commitment.
+    Octez_smart_rollup.Commitment.
       {
         predecessor = Hash.zero;
         inbox_level = node_ctxt.genesis_info.level;
-        number_of_ticks = Sc_rollup.Number_of_ticks.zero;
-        compressed_state;
+        number_of_ticks = 0L;
+        compressed_state =
+          Sc_rollup_proto_types.State_hash.to_octez compressed_state;
       }
   in
   (* Ensure the initial state corresponds to the one of the rollup's in the
      protocol. A mismatch is possible if a wrong external boot sector was
      provided. *)
-  let commitment_hash = Sc_rollup.Commitment.hash_uncarbonated commitment in
+  let commitment_hash = Octez_smart_rollup.Commitment.hash commitment in
   let+ () =
     fail_unless
-      Sc_rollup.Commitment.Hash.(
+      Octez_smart_rollup.Commitment.Hash.(
         commitment_hash = node_ctxt.genesis_info.commitment_hash)
       (Sc_rollup_node_errors.Invalid_genesis_state
          {
-           expected =
-             Sc_rollup_proto_types.Commitment_hash.to_octez
-               node_ctxt.genesis_info.commitment_hash;
-           actual =
-             Sc_rollup_proto_types.Commitment_hash.to_octez commitment_hash;
+           expected = node_ctxt.genesis_info.commitment_hash;
+           actual = commitment_hash;
          })
   in
   commitment
@@ -172,7 +162,7 @@ let genesis_commitment (node_ctxt : _ Node_context.t) ctxt =
 let create_commitment_if_necessary (node_ctxt : _ Node_context.t) ~predecessor
     current_level ctxt =
   let open Lwt_result_syntax in
-  if Raw_level.(current_level = node_ctxt.genesis_info.level) then
+  if current_level = node_ctxt.genesis_info.level then
     let*! () = Commitment_event.compute_commitment current_level in
     let+ genesis_commitment = genesis_commitment node_ctxt ctxt in
     Some genesis_commitment
@@ -180,7 +170,6 @@ let create_commitment_if_necessary (node_ctxt : _ Node_context.t) ~predecessor
     let* last_commitment_hash =
       let+ pred = Node_context.get_l2_block node_ctxt predecessor in
       Sc_rollup_block.most_recent_commitment pred.header
-      |> Sc_rollup_proto_types.Commitment_hash.of_octez
     in
     let* last_commitment =
       Node_context.get_commitment node_ctxt last_commitment_hash
@@ -188,7 +177,7 @@ let create_commitment_if_necessary (node_ctxt : _ Node_context.t) ~predecessor
     let next_commitment_level =
       next_commitment_level node_ctxt last_commitment.inbox_level
     in
-    if Raw_level.(current_level = next_commitment_level) then
+    if current_level = next_commitment_level then
       let*! () = Commitment_event.compute_commitment current_level in
       let+ commitment =
         build_commitment
@@ -204,7 +193,7 @@ let create_commitment_if_necessary (node_ctxt : _ Node_context.t) ~predecessor
 let process_head (node_ctxt : _ Node_context.t) ~predecessor
     Layer1.{level; header = _; _} ctxt =
   let open Lwt_result_syntax in
-  let current_level = Raw_level.of_int32_exn level in
+  let current_level = level in
   let* commitment =
     create_commitment_if_necessary node_ctxt ~predecessor current_level ctxt
   in
@@ -230,15 +219,15 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
   let sc_rollup_challenge_window_int32 =
     sc_rollup_challenge_window node_ctxt |> Int32.of_int
   in
-  let rec gather acc (commitment_hash : Sc_rollup.Commitment.Hash.t) =
+  let rec gather acc (commitment_hash : Octez_smart_rollup.Commitment.Hash.t) =
     let* commitment = Node_context.find_commitment node_ctxt commitment_hash in
     let lcc = Reference.get node_ctxt.lcc in
     match commitment with
     | None -> return acc
-    | Some commitment when Raw_level.(commitment.inbox_level <= lcc.level) ->
+    | Some commitment when commitment.inbox_level <= lcc.level ->
         (* Commitment is before or at the LCC, we have reached the end. *)
         return acc
-    | Some commitment when Raw_level.(commitment.inbox_level <= lpc_level) ->
+    | Some commitment when commitment.inbox_level <= lpc_level ->
         (* Commitment is before the last published one, we have also reached
            the end because we only publish commitments that are for the inbox
            of a finalized L1 block. *)
@@ -266,23 +255,18 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
          commitments that are missing. *)
       let commitment =
         Sc_rollup_block.most_recent_commitment finalized.header
-        |> Sc_rollup_proto_types.Commitment_hash.of_octez
       in
       gather [] commitment
 
 let publish_commitment (node_ctxt : _ Node_context.t) ~source
-    (commitment : Sc_rollup.Commitment.t) =
+    (commitment : Octez_smart_rollup.Commitment.t) =
   let open Lwt_result_syntax in
   let publish_operation =
-    L1_operation.Publish
-      {
-        rollup = Sc_rollup_proto_types.Address.to_octez node_ctxt.rollup_address;
-        commitment = Sc_rollup_proto_types.Commitment.to_octez commitment;
-      }
+    L1_operation.Publish {rollup = node_ctxt.rollup_address; commitment}
   in
   let*! () =
     Commitment_event.publish_commitment
-      (Sc_rollup.Commitment.hash_uncarbonated commitment)
+      (Octez_smart_rollup.Commitment.hash commitment)
       commitment.inbox_level
   in
   let* _hash = Injector.add_pending_operation ~source publish_operation in
@@ -303,7 +287,8 @@ let on_publish_commitments (node_ctxt : state) =
         let* commitments = missing_commitments node_ctxt in
         List.iter_es (publish_commitment node_ctxt ~source) commitments
 
-let publish_single_commitment node_ctxt (commitment : Sc_rollup.Commitment.t) =
+let publish_single_commitment node_ctxt
+    (commitment : Octez_smart_rollup.Commitment.t) =
   let open Lwt_result_syntax in
   let operator = Node_context.get_operator node_ctxt Publish in
   let lcc = Reference.get node_ctxt.lcc in
@@ -338,26 +323,20 @@ let earliest_cementing_level node_ctxt commitment_hash =
 let latest_cementable_commitment (node_ctxt : _ Node_context.t)
     (head : Sc_rollup_block.t) =
   let open Lwt_result_option_syntax in
-  let commitment_hash =
-    Sc_rollup_block.most_recent_commitment head.header
-    |> Sc_rollup_proto_types.Commitment_hash.of_octez
-  in
+  let commitment_hash = Sc_rollup_block.most_recent_commitment head.header in
   let** commitment = Node_context.find_commitment node_ctxt commitment_hash in
   let** cementable_level_bound =
     return
     @@ sub_level commitment.inbox_level (sc_rollup_challenge_window node_ctxt)
   in
   let lcc = Reference.get node_ctxt.lcc in
-  if Raw_level.(cementable_level_bound <= lcc.level) then return_none
+  if cementable_level_bound <= lcc.level then return_none
   else
     let** cementable_bound_block =
-      Node_context.find_l2_block_by_level
-        node_ctxt
-        (Raw_level.to_int32 cementable_level_bound)
+      Node_context.find_l2_block_by_level node_ctxt cementable_level_bound
     in
     let cementable_commitment =
       Sc_rollup_block.most_recent_commitment cementable_bound_block.header
-      |> Sc_rollup_proto_types.Commitment_hash.of_octez
     in
     return_some cementable_commitment
 
@@ -367,11 +346,11 @@ let cementable_commitments (node_ctxt : _ Node_context.t) =
   let*& head = Node_context.last_processed_head_opt node_ctxt in
   let head_level = head.header.level in
   let lcc = Reference.get node_ctxt.lcc in
-  let rec gather acc (commitment_hash : Sc_rollup.Commitment.Hash.t) =
+  let rec gather acc (commitment_hash : Octez_smart_rollup.Commitment.Hash.t) =
     let* commitment = Node_context.find_commitment node_ctxt commitment_hash in
     match commitment with
     | None -> return acc
-    | Some commitment when Raw_level.(commitment.inbox_level <= lcc.level) ->
+    | Some commitment when commitment.inbox_level <= lcc.level ->
         (* If we have moved backward passed or at the current LCC then we have
            reached the end. *)
         return acc
@@ -406,10 +385,10 @@ let cementable_commitments (node_ctxt : _ Node_context.t) =
          Layer 1 node as a failsafe. *)
       let* green_light =
         Plugin.RPC.Sc_rollup.can_be_cemented
-          node_ctxt.cctxt
+          (new Protocol_client_context.wrap_full node_ctxt.cctxt)
           (node_ctxt.cctxt#chain, `Head 0)
-          node_ctxt.rollup_address
-          first_cementable
+          (Sc_rollup_proto_types.Address.of_octez node_ctxt.rollup_address)
+          (Sc_rollup_proto_types.Commitment_hash.of_octez first_cementable)
       in
       if green_light then return cementable else return_nil
 
@@ -417,11 +396,7 @@ let cement_commitment (node_ctxt : _ Node_context.t) ~source commitment_hash =
   let open Lwt_result_syntax in
   let cement_operation =
     L1_operation.Cement
-      {
-        rollup = Sc_rollup_proto_types.Address.to_octez node_ctxt.rollup_address;
-        commitment =
-          Sc_rollup_proto_types.Commitment_hash.to_octez commitment_hash;
-      }
+      {rollup = node_ctxt.rollup_address; commitment = commitment_hash}
   in
   let* _hash = Injector.add_pending_operation ~source cement_operation in
   return_unit

@@ -44,7 +44,10 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
         match (operation, result) with
         | ( Sc_rollup_originate {kind; boot_sector; _},
             Sc_rollup_originate_result {address; _} )
-          when node_ctxt.rollup_address = address && node_ctxt.kind = kind ->
+          when Octez_smart_rollup.Address.(
+                 node_ctxt.rollup_address
+                 = Sc_rollup_proto_types.Address.to_octez address)
+               && node_ctxt.kind = Sc_rollup_proto_types.Kind.to_octez kind ->
             raise (Found_boot_sector boot_sector)
         | _ -> accu
       in
@@ -69,7 +72,7 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
 let genesis_state block_hash node_ctxt ctxt =
   let open Lwt_result_syntax in
   let* boot_sector = get_boot_sector block_hash node_ctxt in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! initial_state = PVM.initial_state ~empty:(PVM.State.empty ()) in
   let*! genesis_state = PVM.install_boot_sector initial_state boot_sector in
   let*! ctxt = PVM.State.set ctxt genesis_state in
@@ -80,9 +83,7 @@ let state_of_head node_ctxt ctxt Layer1.{hash; level} =
   let*! state = Context.PVMState.find ctxt in
   match state with
   | None ->
-      let genesis_level =
-        Raw_level.to_int32 node_ctxt.Node_context.genesis_info.level
-      in
+      let genesis_level = node_ctxt.Node_context.genesis_info.level in
       if level = genesis_level then genesis_state hash node_ctxt ctxt
       else tzfail (Sc_rollup_node_errors.Missing_PVM_state (hash, level))
   | Some state -> return (ctxt, state)
@@ -109,7 +110,9 @@ let transition_pvm node_ctxt ctxt predecessor Layer1.{hash = _; _}
        } =
     Delayed_write_monad.apply node_ctxt eval_result
   in
-  let module PVM = (val node_ctxt.pvm) in
+  let state_hash = Sc_rollup_proto_types.State_hash.to_octez state_hash in
+  let tick = Sc_rollup.Tick.to_z tick in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! ctxt = PVM.State.set ctxt state in
   let*! initial_tick = PVM.get_tick predecessor_state in
   (* Produce events. *)
@@ -121,25 +124,17 @@ let transition_pvm node_ctxt ctxt predecessor Layer1.{hash = _; _}
 (** [process_head node_ctxt ctxt ~predecessor head] runs the PVM for the given
       head. *)
 let process_head (node_ctxt : _ Node_context.t) ctxt
-    ~(predecessor : Layer1.header) (head : Layer1.header) (inbox, inbox_messages)
-    =
+    ~(predecessor : Layer1.header) (head : Layer1.header) inbox_and_messages =
   let open Lwt_result_syntax in
-  let first_inbox_level =
-    Raw_level.to_int32 node_ctxt.genesis_info.level |> Int32.succ
-  in
+  let first_inbox_level = node_ctxt.genesis_info.level |> Int32.succ in
   if head.Layer1.level >= first_inbox_level then
-    let*? inbox_messages =
-      List.map_e Sc_rollup.Inbox_message.serialize inbox_messages
-      |> Environment.wrap_tzresult
-    in
     transition_pvm
       node_ctxt
       ctxt
       (Layer1.head_of_header predecessor)
       (Layer1.head_of_header head)
-      (inbox, inbox_messages)
-  else if head.Layer1.level = Raw_level.to_int32 node_ctxt.genesis_info.level
-  then
+      inbox_and_messages
+  else if head.Layer1.level = node_ctxt.genesis_info.level then
     let* ctxt, state = genesis_state head.hash node_ctxt ctxt in
     let*! ctxt = Context.PVMState.set ctxt state in
     return (ctxt, 0, 0L, Sc_rollup.Tick.initial)
@@ -160,35 +155,25 @@ let start_state_of_block node_ctxt (block : Sc_rollup_block.t) =
       ctxt
       Layer1.{hash = block.header.predecessor; level = pred_level}
   in
-  let* inbox =
-    Node_context.get_inbox
-      node_ctxt
-      (Sc_rollup_proto_types.Inbox_hash.of_octez block.header.inbox_hash)
-  in
+  let* inbox = Node_context.get_inbox node_ctxt block.header.inbox_hash in
   let* {is_first_block; predecessor; predecessor_timestamp; messages} =
-    Node_context.get_messages
-      node_ctxt
-      (Sc_rollup_proto_types.Merkelized_payload_hashes_hash.of_octez
-         block.header.inbox_witness)
+    Node_context.get_messages node_ctxt block.header.inbox_witness
   in
-  let inbox_level = Sc_rollup.Inbox.inbox_level inbox in
-  let module PVM = (val node_ctxt.pvm) in
+  let inbox_level = Octez_smart_rollup.Inbox.inbox_level inbox in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! tick = PVM.get_tick state in
   let*! state_hash = PVM.state_hash state in
   let messages =
-    let open Sc_rollup.Inbox_message in
-    Internal Start_of_level
+    let open Sc_rollup_inbox_message_repr in
+    unsafe_to_string start_of_level_serialized
     ::
     (if is_first_block then
-     [Internal Sc_rollup.Inbox_message.protocol_migration_internal_message]
+     [unsafe_to_string Raw_context.protocol_migration_serialized_message]
     else [])
-    @ Internal (Info_per_level {predecessor; predecessor_timestamp})
+    @ unsafe_to_string
+        (info_per_level_serialized ~predecessor ~predecessor_timestamp)
       :: messages
-    @ [Internal End_of_level]
-  in
-  let*? messages =
-    List.map_e Sc_rollup.Inbox_message.serialize messages
-    |> Environment.wrap_tzresult
+    @ [unsafe_to_string end_of_level_serialized]
   in
   return
     Fueled_pvm.Accounted.
@@ -222,8 +207,7 @@ let state_of_tick_aux node_ctxt ~start_state (event : Sc_rollup_block.t) tick =
   let* start_state =
     match start_state with
     | Some start_state
-      when Raw_level.to_int32 start_state.Fueled_pvm.Accounted.inbox_level
-           = event.header.level ->
+      when start_state.Fueled_pvm.Accounted.inbox_level = event.header.level ->
         return start_state
     | _ ->
         (* Recompute start state on level change or if we don't have a
@@ -268,11 +252,14 @@ let memo_state_of_tick_aux node_ctxt ~start_state (event : Sc_rollup_block.t)
       returns [None].*)
 let state_of_tick node_ctxt ?start_state tick level =
   let open Lwt_result_syntax in
+  let level = Raw_level.to_int32 level in
+  let tick = Sc_rollup.Tick.to_z tick in
   let* event = Node_context.block_with_tick node_ctxt ~max_level:level tick in
   match event with
   | None -> return_none
   | Some event ->
-      assert (event.header.level <= Raw_level.to_int32 level) ;
+      assert (event.header.level <= level) ;
+      let tick = Sc_rollup.Tick.of_z tick in
       let* result_state =
         if Node_context.is_loser node_ctxt then
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/5253
