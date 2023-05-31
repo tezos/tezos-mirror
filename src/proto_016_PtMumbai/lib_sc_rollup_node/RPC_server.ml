@@ -199,8 +199,8 @@ let get_state (node_ctxt : _ Node_context.t) block_hash =
   let*! state = Context.PVMState.find ctxt in
   match state with None -> failwith "No state" | Some state -> return state
 
-let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages messages
-    =
+let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
+    ~insight_requests messages =
   let open Lwt_result_syntax in
   let open Alpha_context in
   let module PVM = (val node_ctxt.pvm) in
@@ -234,6 +234,13 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages messages
   let* {state; inbox_level; _}, num_ticks_end =
     Simulation.end_simulation node_ctxt sim
   in
+  let*! insights =
+    List.map_p
+      (function
+        | Sc_rollup_services.Pvm_state_key key -> PVM.State.lookup state key
+        | Durable_storage_key key -> PVM.Inspect_durable_state.lookup state key)
+      insight_requests
+  in
   let num_ticks = Z.(num_ticks_0 + num_ticks_end) in
   let*! outbox = PVM.get_outbox inbox_level state in
   let output =
@@ -244,7 +251,9 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages messages
   let*! state_hash = PVM.state_hash state in
   let*! status = PVM.get_status state in
   let status = PVM.string_of_status status in
-  return Sc_rollup_services.{state_hash; status; output; inbox_level; num_ticks}
+  return
+    Sc_rollup_services.
+      {state_hash; status; output; inbox_level; num_ticks; insights}
 
 let () =
   Block_directory.register0 Sc_rollup_services.Global.Block.total_ticks
@@ -371,8 +380,8 @@ let () =
 
 let () =
   Block_directory.register0 Sc_rollup_services.Global.Block.simulate
-  @@ fun (node_ctxt, block) () {messages; reveal_pages} ->
-  simulate_messages node_ctxt block ~reveal_pages messages
+  @@ fun (node_ctxt, block) () {messages; reveal_pages; insight_requests} ->
+  simulate_messages node_ctxt block ~reveal_pages ~insight_requests messages
 
 let () =
   Local_directory.register0 Sc_rollup_services.Local.injection

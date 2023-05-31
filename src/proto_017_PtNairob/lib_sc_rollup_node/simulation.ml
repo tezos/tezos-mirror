@@ -124,11 +124,6 @@ let simulate_messages (node_ctxt : Node_context.ro) sim messages =
       (sim.level_position = End)
       (Exn (Failure "Level for simulation is ended"))
   in
-  let*? () =
-    error_when
-      (messages = [])
-      (Environment.wrap_tzerror Sc_rollup_errors.Sc_rollup_add_zero_messages)
-  in
   let messages =
     if sim.level_position = Start then
       let {predecessor_timestamp; predecessor} = sim.info_per_level in

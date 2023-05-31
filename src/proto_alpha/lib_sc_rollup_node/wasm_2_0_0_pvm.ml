@@ -139,6 +139,12 @@ module Impl : S = struct
   module Durable_state =
     Make_durable_state (Make_wrapped_tree (Wasm_2_0_0_proof_format.Tree))
 
+  module Inspect_durable_state = struct
+    let lookup state keys =
+      let key = "/" ^ String.concat "/" keys in
+      Durable_state.lookup state key
+  end
+
   let string_of_status : status -> string = function
     | Waiting_for_input_message -> "Waiting for input message"
     | Waiting_for_reveal (Sc_rollup.Reveal_raw_data hash) ->

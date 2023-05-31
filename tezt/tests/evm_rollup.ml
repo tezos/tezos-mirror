@@ -561,6 +561,42 @@ let test_rpc_web3_clientVersion =
     ~error_msg:"Expected version %%R, got %%L." ;
   unit
 
+let test_simulate =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "simulate"]
+    ~title:"A block can be simulated in the rollup node"
+    (fun protocol ->
+      let* {evm_proxy_server; sc_rollup_client; _} =
+        setup_past_genesis protocol
+      in
+      let* json =
+        Evm_proxy_server.call_evm_rpc
+          evm_proxy_server
+          {method_ = "eth_blockNumber"; parameters = `A []}
+      in
+      let block_number =
+        JSON.(json |-> "result" |> as_string |> int_of_string)
+      in
+      let*! simulation_result =
+        Sc_rollup_client.simulate
+          ~insight_requests:
+            [`Durable_storage_key ["evm"; "blocks"; "current"; "number"]]
+          sc_rollup_client
+          []
+      in
+      let simulated_block_number =
+        match simulation_result.insights with
+        | [insight] ->
+            Option.map
+              (fun hex -> `Hex hex |> Hex.to_string |> Z.of_bits |> Z.to_int)
+              insight
+        | _ -> None
+      in
+      Check.((simulated_block_number = Some (block_number + 1)) (option int))
+        ~error_msg:"The simulation should advance one L2 block" ;
+      unit)
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -574,6 +610,7 @@ let register_evm_proxy_server ~protocols =
   test_chunked_transaction protocols ;
   test_l2_deploy protocols ;
   test_rpc_txpool_content protocols ;
-  test_rpc_web3_clientVersion protocols
+  test_rpc_web3_clientVersion protocols ;
+  test_simulate protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols

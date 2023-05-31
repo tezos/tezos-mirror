@@ -55,11 +55,19 @@ type eval_result = {
   output : Sc_rollup.output list;
   inbox_level : Raw_level.t;
   num_ticks : Z.t;
+  insights : bytes option list;
+      (** The simulation can ask to look at values on the state after
+          the simulation. *)
 }
+
+type insight_request =
+  | Pvm_state_key of string list
+  | Durable_storage_key of string list
 
 type simulate_input = {
   messages : string list;
   reveal_pages : string list option;
+  insight_requests : insight_request list;
 }
 
 type commitment_info = {
@@ -116,11 +124,11 @@ module Encodings = struct
 
   let eval_result =
     conv
-      (fun {state_hash; status; output; inbox_level; num_ticks} ->
-        (state_hash, status, output, inbox_level, num_ticks))
-      (fun (state_hash, status, output, inbox_level, num_ticks) ->
-        {state_hash; status; output; inbox_level; num_ticks})
-    @@ obj5
+      (fun {state_hash; status; output; inbox_level; num_ticks; insights} ->
+        (state_hash, status, output, inbox_level, num_ticks, insights))
+      (fun (state_hash, status, output, inbox_level, num_ticks, insights) ->
+        {state_hash; status; output; inbox_level; num_ticks; insights})
+    @@ obj6
          (req
             "state_hash"
             Sc_rollup.State_hash.encoding
@@ -140,12 +148,40 @@ module Encodings = struct
             "num_ticks"
             z
             ~description:"Ticks taken by the PVM for evaluating the messages")
+         (dft
+            "insights"
+            (list (option bytes))
+            []
+            ~description:"PVM state values requested after the simulation")
+
+  let insight_request =
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"pvm_state"
+          ~description:"Path in the PVM state"
+          (obj2 (req "kind" (constant "pvm_state")) (req "key" (list string)))
+          (function Pvm_state_key key -> Some ((), key) | _ -> None)
+          (fun ((), key) -> Pvm_state_key key);
+        case
+          (Tag 1)
+          ~title:"durable_storage"
+          ~description:"Path in the PVM durable storage"
+          (obj2
+             (req "kind" (constant "durable_storage"))
+             (req "key" (list string)))
+          (function Durable_storage_key key -> Some ((), key) | _ -> None)
+          (fun ((), key) -> Durable_storage_key key);
+      ]
 
   let simulate_input =
     conv
-      (fun {messages; reveal_pages} -> (messages, reveal_pages))
-      (fun (messages, reveal_pages) -> {messages; reveal_pages})
-    @@ obj2
+      (fun {messages; reveal_pages; insight_requests} ->
+        (messages, reveal_pages, insight_requests))
+      (fun (messages, reveal_pages, insight_requests) ->
+        {messages; reveal_pages; insight_requests})
+    @@ obj3
          (req
             "messages"
             (list hex_string)
@@ -154,6 +190,11 @@ module Encodings = struct
             "reveal_pages"
             (list hex_string)
             ~description:"Pages (at most 4kB) to be used for revelation ticks")
+         (dft
+            "insight_requests"
+            (list insight_request)
+            []
+            ~description:"Paths in the PVM to inspect after the simulation")
 
   let queued_message =
     obj2

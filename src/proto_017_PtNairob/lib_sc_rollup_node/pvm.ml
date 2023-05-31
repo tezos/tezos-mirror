@@ -87,4 +87,15 @@ module type S = sig
         disk, this information must be committed using {!Context.commit}. *)
     val set : 'a Context.t -> state -> 'a Context.t Lwt.t
   end
+
+  (** Inspect durable state using a more specialised way of reading the
+      PVM state.
+      For example in WASM, it decodes the durable storage in the state
+      before reading values.
+  *)
+  module Inspect_durable_state : sig
+    (** [lookup state path] returns the data stored for the path [path] in the
+        PVM state [state].  *)
+    val lookup : state -> string list -> bytes option Lwt.t
+  end
 end
