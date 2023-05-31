@@ -43,34 +43,19 @@ Sink Configuration
 The logging framework refers to sinks with URIs (a.k.a.  structured strings of
 the form ``schema://path?query``): the schema of the URI is used to find the
 appropriate sink-implementation, the rest of the URI is used to configure the
-particular instance. There can be as many instances of a given implementation as
-needed, except for the (legacy) *Lwt-Log Sink* which should be activated at most
-once.
-
-(Legacy) Lwt-Log Sink
-~~~~~~~~~~~~~~~~~~~~~
-
-This sink is the one currently activated by default:
-
--  Schema: ``lwt-log``
--  URI-Configuration: **none**; (for now) can only use the legacy
-   ``TEZOS_LOG`` environment variable or the specific section in the
-   node’s configuration file (see below).
-
-This sink can only output pretty-printed versions of the events, by default
-on standard output (stdout).
+particular instance.
 
 File-Descriptor Sinks
 ~~~~~~~~~~~~~~~~~~~~~
 
-This is configurable and duplicatable replacement for the lwt-log-sink;
-it allows to output events to regular Unix file-descriptors. It is
-actually a *family* of three URI-schemes:
+File-descriptor sinks allow to configure loggers that output events to
+regular Unix file-descriptors. They are duplicatable. They actually
+consist in a *family* of four URI-schemes:
 
--  ``file-descriptor-path://`` to output to a file,
--  ``file-descriptor-stdout://`` to output to ``stdout`` / ``1``, or
--  ``file-descriptor-stderr://`` to output to ``stderr`` / ``2``.
-- ``file-descriptor-syslog://`` ouputs to a ``syslog`` facility
+-  ``file-descriptor-path://`` outputs to a file
+-  ``file-descriptor-stdout://`` outputs to ``stdout`` / ``1``
+-  ``file-descriptor-stderr://`` outputs to ``stderr`` / ``2``
+-  ``file-descriptor-syslog://`` outputs to a ``syslog`` facility
 
 *Note:* ``-stdout`` and ``-stderr`` schemes are there for convenience
 and for making the API consistent; most Unix-ish systems nowadays have
@@ -128,13 +113,12 @@ Options available only for the ``file-descriptor-path://`` case:
 
 Option available only for ``file-descriptor-syslog://`` case:
 
-- ["facility=<facility>"] is the targeted syslog output. ``user`` is the default
-  value if no value is provided. See `RFC-3164
-  <https://www.rfc-editor.org/rfc/rfc3164#section-6>`__ for more information.
-  The possible values are: ``auth``, ``authpriv``, ``cron``, ``daemon``,
-  ``ftp``, ``kernel``, ``local0``, ``local1``, ``local2``, ``local3``,
-  ``local4``, ``local5``, ``local6``, ``local7``, ``lpr``, ``mail``, ``news``,
-  ``syslog``, ``user``, ``uucp``, ``ntp``, ``security``, ``console``
+- ``facility=<facility>`` is the targeted syslog output.
+  The possible values are: ``auth, authpriv, cron, daemon,
+  ftp, kernel, local0, local1, local2, local3,
+  local4, local5, local6, local7, lpr, mail, news,
+  syslog, user, uucp, ntp, security, console``.
+  ``user`` is the default facility if no value is provided. See `RFC-3164 <https://www.rfc-editor.org/rfc/rfc3164#section-6>`__ for more information.
 
   Examples:
 
@@ -224,8 +208,8 @@ Global Defaults
 
 By default, the Octez binaries generate **user logs** as follows:
 
-- ``lwt-log://`` sinks are activated by default and configured to
-  output events of level at least ``Notice``. Their goal is the stdout logging.
+- ``file-descriptor-stdout://`` sink is activated by default and configured to
+  output events of level at least ``Notice`` to stdout.
 
 The node and the baker additionally generate by default more detailed
 **internal logs** as follows:
@@ -267,10 +251,9 @@ called; this should include *all* the regular ``octez-*`` binaries.
       to configuration JSON files (format above) to load (which
       themselves activate sinks).
 
--  ``TEZOS_LOG`` and ``LWT_LOG`` (with lower priority) contain “rules”
-   to configure the ``lwt-log://`` sink. The rules are expressed with a
-   DSL documented at
-   `Lwt_log_core <https://ocsigen.org/lwt/3.2.1/api/Lwt_log_core>`__:
+- ``TEZOS_LOG`` and ``LWT_LOG`` (deprecated and has a lower priority) contain
+   “rules” to configure the default ``file-descriptor-stdout`` sink. The rules
+   are expressed with a DSL:
 
    -  rules are separated by semi-colons ``;``,
    -  each rule has the form ``pattern -> level``,
@@ -305,15 +288,19 @@ In particular the fields:
 
 -  ``"internal-events"`` contains a configuration of the sinks (format
    above).
--  ``"log"`` is an object which defines the configuration of the
-   ``lwt-log://`` sink; one can redirect the output to a file, set the
-   rules, and change the formatting template.
+- ``"log"`` is an object which defines the configuration of the default
+   ``file-descriptor-stdout`` sink; one can redirect the output to a file, set
+   the rules, and change the formatting template. The goal of this configuration
+   field is to be simpler to express that ``internal-events`` for simpler
+   changes.
+
+Note that ``log`` is ignored if ``internal-events`` is present.
 
 Command Line Options
 ~~~~~~~~~~~~~~~~~~~~
 
-See ``octez-node run --help``, the ``lwt-log://`` sink configuration can
-be also changed with 2 options:
+See ``octez-node run --help``, the default ``file-descriptor-stdout://`` sink
+configuration can be also changed with 2 options:
 
 -  ``-v`` / ``-vv``: set the global log level to ``Info`` or ``Debug``
    respectively.
@@ -327,9 +314,9 @@ The node exposes an administrative ``PUT`` endpoint:
 
 The input schema is the JSON configuration of the sinks. It
 deactivates all current sinks and activates the ones provided **except**
-the ``lwt-log://`` sink that is left untouched.
+the ``file-descriptor-stdout://`` sink that is left untouched.
 
-Example: (assuming the ``lwt-log://`` is active not to miss other
+Example: (assuming the ``file-descriptor-stdout://`` is active not to miss other
 events) this call adds a sink to suddenly start pretty-printing all
 ``rpc`` events to a ``/tmp/rpclogs`` file:
 
