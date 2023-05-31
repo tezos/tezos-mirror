@@ -161,6 +161,8 @@ let pair l r = P (l, r)
 
 let unit = U
 
+let to_s s = S (X s)
+
 let of_s (S (X s)) = s
 
 let map2 f x y = X (f x y)
@@ -342,6 +344,16 @@ module Ecc = struct
     @@ point
          (s_of_base @@ W.get_u_coordinate out)
          (s_of_base @@ W.get_v_coordinate out)
+end
+
+module Mod_arith = struct
+  let add ~label:_ ~modulus ~nb_limbs:_ ~base ~moduli:_ ~qm_bound:_ ~ts_bounds:_
+      x y =
+    let xs = List.map (fun s -> of_s s |> S.to_z) (of_list x) in
+    let ys = List.map (fun s -> of_s s |> S.to_z) (of_list y) in
+    let zs = Utils.mod_add_limbs ~modulus ~base xs ys in
+    let z = List.map (fun z -> S.of_z z |> to_s) zs |> to_list in
+    ret z
 end
 
 module Poseidon = struct

@@ -119,6 +119,59 @@ module Z = struct
         (fun s -> Z.to_bits s |> Bytes.of_string))
 end
 
+let ( %! ) = Z.rem
+
+(* [next_multiple_of k n] is the first multiple of [k : int] greater than
+   or equal to [n : int] *)
+let next_multiple_of k n = k * (1 + ((n - 1) / k))
+
+(* [is_power_of_2 n] returns [true] iff [n : Z.t] is a perfect power of 2 *)
+let is_power_of_2 n = Z.log2 n = Z.log2up n
+
+(* [min_nb_limbs ~modulus ~base] is the smallest integer k such that
+   base^k >= modulus *)
+let min_nb_limbs ~modulus ~base =
+  assert (Z.(modulus > one)) ;
+  assert (Z.(base > one)) ;
+  (* we want to compute ceil(log_base(modulus)), but we use this iterative
+     method as we only have support for log2 (and not log_base) over Z.t *)
+  let rec aux acc k =
+    if acc >= modulus then k else aux Z.(acc * base) (k + 1)
+  in
+  aux base 1
+
+(* [z_to_limbs ~len ~base n] takes an integer (n : Z.t) and returns a Z.t list
+   of [len] elements encoding its big-endian representation in base [base].
+   It fails if [n < 0 or n >= base^len]. *)
+let z_to_limbs ~len ~base n =
+  let rec aux output n =
+    let q, r = Z.div_rem n base in
+    if Z.(q = zero) then r :: output else aux (r :: output) q
+  in
+  if n < Z.zero then
+    raise @@ Failure "z_to_limbs: n must be greater than or equal to zero" ;
+  let limbs = aux [] n in
+  let nb_limbs = List.length limbs in
+  if nb_limbs > len then
+    raise @@ Failure "z_to_limbs: n must be strictly lower than base^len"
+  else List.init (len - nb_limbs) (Fun.const Z.zero) @ limbs
+
+(* [z_of_limbs ~base ls] returns the Z.t encoded in the given Z.t list [ls],
+   its big-endian representation in base [base]. *)
+let z_of_limbs ~base limbs =
+  List.fold_left (fun acc x -> Z.((base * acc) + x)) Z.zero limbs
+
+(* [mod_add_limbs ~modulus ~base xs ys] returns the result of adding [xs]
+   and [ys] modulo [modulus], where the inputs and the output are in big-endian
+   form in base [base]. *)
+let mod_add_limbs ~modulus ~base xs ys =
+  let nb_limbs = List.length xs in
+  assert (List.compare_length_with ys nb_limbs = 0) ;
+  let x = z_of_limbs ~base xs in
+  let y = z_of_limbs ~base ys in
+  let z = Z.((x + y) %! modulus) in
+  z_to_limbs ~len:nb_limbs ~base z
+
 let rec transpose = function
   | [] | [] :: _ -> []
   | rows -> List.(map hd rows :: (transpose @@ map tl rows))

@@ -113,6 +113,7 @@ module Aggregator = struct
     let open Boolean_gates in
     let open Hash_gates in
     let open Ecc_gates in
+    let open Mod_arith_gates in
     let linear_monomials =
       let open Plompiler.Csir in
       List.init nb_wires_arch (fun i -> (linear_selector_name i, i))
@@ -131,6 +132,7 @@ module Aggregator = struct
          (BoolCheck.q_label, (module BoolCheck));
          (CondSwap.q_label, (module CondSwap));
          (AnemoiDouble.q_label, (module AnemoiDouble));
+         (AddMod25519.q_label, (module AddMod25519));
        ]
       @ List.map (fun (q, i) -> (q, linear_monomial i q)) linear_monomials
       @ List.map
