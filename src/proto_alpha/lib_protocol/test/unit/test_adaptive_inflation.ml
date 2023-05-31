@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,24 +23,42 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Stake of a delegate. *)
-type t
+(** Testing
+    -------
+    Component:  Protocol (rewards)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+                 -- --file test_adaptive_inflation.ml
+    Subject:    Test reward values under adaptive inflation
+*)
 
-val zero : t
+open Protocol
+open Alpha_context
 
-val make : frozen:Tez_repr.t -> delegated:Tez_repr.t -> t
+let test_reward_coefficient () =
+  let csts = Default_parameters.constants_test in
+  let default =
+    Delegate.Rewards.Internal_for_tests.(
+      reward_from_constants csts ~reward_kind:Baking_reward_fixed_portion)
+  in
+  let default_times_4 =
+    Delegate.Rewards.Internal_for_tests.(
+      reward_from_constants
+        ~coeff:(Q.of_int 4)
+        csts
+        ~reward_kind:Baking_reward_fixed_portion)
+  in
+  assert (Tez.(equal (mul_exn default 4) default_times_4)) ;
+  return_unit
 
-val encoding : t Data_encoding.t
+let tests =
+  Tztest.
+    [
+      tztest
+        "adaptive inflation - application of coefficient to rewards"
+        `Quick
+        test_reward_coefficient;
+    ]
 
-(** Sum of the [frozen] and [delegated] parts of a stake. *)
-val total : t -> Tez_repr.t tzresult
-
-(** Returns only the frozen part of a stake *)
-val get_frozen : t -> Tez_repr.t
-
-(** Weight for staking rights. *)
-val staking_weight : t -> int64
-
-val compare : t -> t -> int
-
-val ( +? ) : t -> t -> t tzresult
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("adaptive inflation", tests)]
+  |> Lwt_main.run

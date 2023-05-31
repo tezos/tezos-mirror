@@ -2231,8 +2231,14 @@ module Delegate : sig
         | Seed_nonce_revelation_tip
         | Vdf_revelation_tip
 
+      (** [reward_from_constants ~coeff csts ~reward_kind] returns the amount of
+          rewards in {!Tez.t} for the given [reward_kind], according to the
+          given parameters in [csts]. The (optional) value [coeff] is a
+          multiplicative factor applied to the rewards (default = 1).
+          It verifies [reward_from_constants ~coeff csts ~reward_kind =
+          coeff * reward_from_constants csts ~reward_kind]. *)
       val reward_from_constants :
-        csts:Constants.Parametric.t -> reward_kind:reward_kind -> Tez.t
+        ?coeff:Q.t -> Constants.Parametric.t -> reward_kind:reward_kind -> Tez.t
     end
   end
 end

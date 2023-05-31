@@ -136,6 +136,7 @@
         "Contract_storage",
         "Token",
         "Fees_storage",
+        "Adaptive_inflation_storage",
         "Delegate_consensus_key",
         "Delegate_storage",
         "Delegate_sampler",

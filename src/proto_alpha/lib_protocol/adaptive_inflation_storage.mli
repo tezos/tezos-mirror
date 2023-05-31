@@ -23,24 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Stake of a delegate. *)
-type t
+(** [load_reward_coeff ctxt] loads the current cycle's reward coeff from the
+    storage into the context *)
+val load_reward_coeff : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-val zero : t
+(** [update_stored_rewards_at_cycle_end ctxt ~new_cycle] updates
+    {!Storage.Reward_coeff} with a new coefficient that will be applied
+    [preserved_cycles] cycles after the given [new_cycle]. This new coefficient
+    depends on the current {!Storage.Total_supply}, and the total active stake
+    for when this coefficient is computed.
 
-val make : frozen:Tez_repr.t -> delegated:Tez_repr.t -> t
-
-val encoding : t Data_encoding.t
-
-(** Sum of the [frozen] and [delegated] parts of a stake. *)
-val total : t -> Tez_repr.t tzresult
-
-(** Returns only the frozen part of a stake *)
-val get_frozen : t -> Tez_repr.t
-
-(** Weight for staking rights. *)
-val staking_weight : t -> int64
-
-val compare : t -> t -> int
-
-val ( +? ) : t -> t -> t tzresult
+    This function also removes obsolete values from {!Storage.Reward_coeff},
+    and stores the current cycle's coefficient in the context for faster
+    access. *)
+val update_stored_rewards_at_cycle_end :
+  Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t

@@ -206,7 +206,7 @@ let get_baking_reward_fixed_portion ctxt =
   get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
   return
     (Delegate.Rewards.Internal_for_tests.reward_from_constants
-       ~csts
+       csts
        ~reward_kind:Baking_reward_fixed_portion)
 
 let get_bonus_reward ctxt ~endorsing_power =
@@ -214,7 +214,7 @@ let get_bonus_reward ctxt ~endorsing_power =
   >>=? fun {Constants.parametric = {consensus_threshold; _} as csts; _} ->
   let baking_reward_bonus_per_slot =
     Delegate.Rewards.Internal_for_tests.reward_from_constants
-      ~csts
+      csts
       ~reward_kind:Baking_reward_bonus_per_slot
   in
   let multiplier = max 0 (endorsing_power - consensus_threshold) in
@@ -224,7 +224,7 @@ let get_endorsing_reward ctxt ~expected_endorsing_power =
   get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
   let endorsing_reward_per_slot =
     Delegate.Rewards.Internal_for_tests.reward_from_constants
-      ~csts
+      csts
       ~reward_kind:Endorsing_reward_per_slot
   in
   Lwt.return
@@ -235,7 +235,7 @@ let get_liquidity_baking_subsidy ctxt =
   get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
   return
     (Delegate.Rewards.Internal_for_tests.reward_from_constants
-       ~csts
+       csts
        ~reward_kind:Liquidity_baking_subsidy)
 
 let get_liquidity_baking_cpmm_address ctxt =
@@ -245,14 +245,14 @@ let get_seed_nonce_revelation_tip ctxt =
   get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
   return
     (Delegate.Rewards.Internal_for_tests.reward_from_constants
-       ~csts
+       csts
        ~reward_kind:Seed_nonce_revelation_tip)
 
 let get_vdf_revelation_tip ctxt =
   get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
   return
     (Delegate.Rewards.Internal_for_tests.reward_from_constants
-       ~csts
+       csts
        ~reward_kind:Vdf_revelation_tip)
 
 (* Voting *)

@@ -382,7 +382,7 @@ let default_subsidy =
   let c = Default_parameters.constants_test in
   Tez.to_mutez
   @@ Delegate.Rewards.Internal_for_tests.reward_from_constants
-       ~csts:c
+       c
        ~reward_kind:Liquidity_baking_subsidy
 
 let security_deposit = 640_000_000L

@@ -59,7 +59,9 @@ let tez_from_weights
   in
   normalized_rewards_per_block
 
-module Internal_for_tests = struct
+(* Bundling some functions inside a module so they can be exported as part
+   of `Internal_for_tests` further down. *)
+module M = struct
   type reward_kind =
     | Baking_reward_fixed_portion
     | Baking_reward_bonus_per_slot
@@ -68,7 +70,8 @@ module Internal_for_tests = struct
     | Seed_nonce_revelation_tip
     | Vdf_revelation_tip
 
-  let reward_from_constants ~(csts : Constants_parametric_repr.t) ~reward_kind =
+  let reward_from_constants ~(csts : Constants_parametric_repr.t) ~reward_kind
+      ~(coeff : Q.t) =
     let reward_weights = csts.reward_weights in
     let weight =
       match reward_kind with
@@ -93,36 +96,52 @@ module Internal_for_tests = struct
     let rewards =
       tez_from_weights ~reward_weights ~weight ~minimal_block_delay
     in
-    match reward_kind with
-    | Baking_reward_bonus_per_slot ->
-        let bonus_committee_size =
-          csts.consensus_committee_size - csts.consensus_threshold
-        in
-        if Compare.Int.(bonus_committee_size <= 0) then Tez_repr.zero
-        else Tez_repr.div_exn rewards bonus_committee_size
-    | Endorsing_reward_per_slot ->
-        Tez_repr.div_exn rewards csts.consensus_committee_size
-    | _ -> rewards
+    let base_rewards =
+      match reward_kind with
+      | Baking_reward_bonus_per_slot ->
+          let bonus_committee_size =
+            csts.consensus_committee_size - csts.consensus_threshold
+          in
+          if Compare.Int.(bonus_committee_size <= 0) then Tez_repr.zero
+          else Tez_repr.div_exn rewards bonus_committee_size
+      | Endorsing_reward_per_slot ->
+          Tez_repr.div_exn rewards csts.consensus_committee_size
+      | _ -> rewards
+    in
+    let mutez_base_rewards = Tez_repr.to_mutez base_rewards |> Z.of_int64 in
+    let mutez_rewards = Z.(div (mul mutez_base_rewards coeff.num) coeff.den) in
+    Tez_repr.of_mutez_exn (Z.to_int64 mutez_rewards)
 end
 
-open Internal_for_tests
+open M
 
-let reward_from_context ctxt reward_kind =
+let reward_from_context ~ctxt ~reward_kind =
   let csts = Raw_context.constants ctxt in
-  reward_from_constants ~csts ~reward_kind
+  let coeff = Raw_context.reward_coeff_for_current_cycle ctxt in
+  reward_from_constants ~csts ~reward_kind ~coeff
 
-let baking_reward_fixed_portion c =
-  reward_from_context c Baking_reward_fixed_portion
+let baking_reward_fixed_portion ctxt =
+  reward_from_context ~ctxt ~reward_kind:Baking_reward_fixed_portion
 
-let baking_reward_bonus_per_slot c =
-  reward_from_context c Baking_reward_bonus_per_slot
+let baking_reward_bonus_per_slot ctxt =
+  reward_from_context ~ctxt ~reward_kind:Baking_reward_bonus_per_slot
 
-let endorsing_reward_per_slot c =
-  reward_from_context c Endorsing_reward_per_slot
+let endorsing_reward_per_slot ctxt =
+  reward_from_context ~ctxt ~reward_kind:Endorsing_reward_per_slot
 
-let liquidity_baking_subsidy c = reward_from_context c Liquidity_baking_subsidy
+let liquidity_baking_subsidy ctxt =
+  reward_from_context ~ctxt ~reward_kind:Liquidity_baking_subsidy
 
-let seed_nonce_revelation_tip c =
-  reward_from_context c Seed_nonce_revelation_tip
+let seed_nonce_revelation_tip ctxt =
+  reward_from_context ~ctxt ~reward_kind:Seed_nonce_revelation_tip
 
-let vdf_revelation_tip c = reward_from_context c Vdf_revelation_tip
+let vdf_revelation_tip ctxt =
+  reward_from_context ~ctxt ~reward_kind:Vdf_revelation_tip
+
+module Internal_for_tests = struct
+  include M
+
+  let reward_from_constants ?(coeff = Q.one)
+      (csts : Constants_parametric_repr.t) ~reward_kind =
+    reward_from_constants ~csts ~reward_kind ~coeff
+end

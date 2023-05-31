@@ -181,7 +181,7 @@ let liquidity_baking_subsidy_param () =
   let get_reward =
     Protocol.Alpha_context.Delegate.Rewards.Internal_for_tests
     .reward_from_constants
-      ~csts:constants
+      constants
   in
   let baking_reward_bonus_per_slot =
     get_reward ~reward_kind:Baking_reward_bonus_per_slot

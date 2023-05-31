@@ -29,6 +29,8 @@ let make ~frozen ~delegated = {frozen; delegated}
 
 let total {frozen; delegated} = Tez_repr.(frozen +? delegated)
 
+let get_frozen {frozen; _} = frozen
+
 let encoding =
   let open Data_encoding in
   conv
