@@ -49,6 +49,8 @@ pub fn installer<Host: Runtime>(host: &mut Host) {
     if let Ok(config_program_size) = read_config_program_size(host) {
         if let Err(e) = install_kernel(host, config_program_size as usize) {
             Runtime::write_debug(host, e)
+        } else {
+            let _ = host.mark_for_reboot();
         }
     } else {
         host.write_debug("Failed to read size of config program")
