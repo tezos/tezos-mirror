@@ -39,6 +39,23 @@ let register_test ~title ?(additionnal_tags = []) f =
     ~tags:(["rpc"; "versioning"] @ additionnal_tags)
     f
 
+let get_consensus_info delegate client =
+  let* level = Client.level client in
+  let* slots =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_helper_validators ~delegate ~level ()
+  in
+  let slots =
+    List.map
+      JSON.as_int
+      JSON.(List.hd JSON.(slots |> as_list) |-> "slots" |> as_list)
+  in
+  let* block_header = RPC.Client.call client @@ RPC.get_chain_block_header () in
+  let block_payload_hash =
+    JSON.(block_header |-> "payload_hash" |> as_string)
+  in
+  return (level, slots, block_payload_hash)
+
 let mk_consensus ?(slot = 1) ?(level = 1) ?(round = 0)
     ?(block_payload_hash =
       "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG") kind
@@ -58,12 +75,15 @@ let check_kind json kind =
   if not (String.equal json_kind kind) then
     Test.fail ~__LOC__ "Operation should have %s kind, got: %s" kind json_kind
 
-let create_consensus_op ~use_legacy_name ~signer ~kind client =
+let create_consensus_op ?slot ?level ?round ?block_payload_hash ~use_legacy_name
+    ~signer ~kind client =
   let consensus_name =
     Operation.Consensus.kind_to_string kind use_legacy_name
   in
   Log.info "Create an %s operation" consensus_name ;
-  let consensus = mk_consensus kind use_legacy_name in
+  let consensus =
+    mk_consensus ?slot ?level ?round ?block_payload_hash kind use_legacy_name
+  in
   let* consensus_op = Operation.Consensus.operation ~signer consensus client in
 
   Log.info "Ensures that the generated JSON contains the %s kind" consensus_name ;
@@ -96,11 +116,33 @@ let create_double_consensus_evidence ~use_legacy_name ~double_evidence_kind
   in
   Log.info "Create an %s operation" consensus_name ;
 
+  let* level, slots, block_payload_hash =
+    get_consensus_info Constant.bootstrap1.public_key_hash client
+  in
   let signer = Constant.bootstrap1 in
-  let consensus1 = mk_consensus consensus_kind use_legacy_name in
+  let consensus1 =
+    mk_consensus
+      ~level
+      ~block_payload_hash
+      ~slot:(List.nth slots 1)
+      consensus_kind
+      use_legacy_name
+  in
   let* op1 = Operation.Consensus.operation ~signer consensus1 client in
-  let consensus2 = mk_consensus ~slot:2 consensus_kind use_legacy_name in
+  let* (`OpHash oph1) = Operation.hash op1 client in
+  let consensus2 =
+    mk_consensus
+      ~level
+      ~block_payload_hash
+      ~slot:(List.nth slots 2)
+      consensus_kind
+      use_legacy_name
+  in
   let* op2 = Operation.Consensus.operation ~signer consensus2 client in
+  let* (`OpHash oph2) = Operation.hash op2 client in
+  let op1, op2 =
+    if String.compare oph1 oph2 < 1 then (op1, op2) else (op2, op1)
+  in
   let* double_consensus_evidence =
     mk_double_consensus_evidence
       double_evidence_kind
@@ -156,7 +198,8 @@ module Forge = struct
     @@ fun protocol -> test_consensus Operation.Preattestation protocol
 
   let test_double_consensus_evidence double_evidence_kind protocol =
-    let* _node, client = Client.init_with_protocol ~protocol `Client () in
+    let* node, client = Client.init_with_protocol ~protocol `Client () in
+    let* () = Client.bake_for_and_wait ~node client in
 
     let* legacy_double_consensus_evidence_op =
       create_double_consensus_evidence
@@ -196,7 +239,8 @@ module Forge = struct
       protocol
 
   let test_invalid_double_consensus_evidence double_evidence_kind protocol =
-    let* _node, client = Client.init_with_protocol ~protocol `Client () in
+    let* node, client = Client.init_with_protocol ~protocol `Client () in
+    let* () = Client.bake_for_and_wait ~node client in
 
     let create_double_consensus_evidence ~use_legacy_name =
       let consensus_kind =
@@ -355,7 +399,8 @@ module Parse = struct
     @@ fun protocol -> test_parse Operation.Preattestation protocol
 
   let test_parse_double_evidence double_evidence_kind protocol =
-    let* _node, client = Client.init_with_protocol ~protocol `Client () in
+    let* node, client = Client.init_with_protocol ~protocol `Client () in
+    let* () = Client.bake_for_and_wait ~node client in
 
     let create_raw_double_consensus_evidence () =
       let* double_consensus_evidence_op =
@@ -449,7 +494,8 @@ module Mempool = struct
 
   let test_pending_operations_double_consensus_evidence double_evidence_kind
       protocol =
-    let* _node, client = Client.init_with_protocol ~protocol `Client () in
+    let* node, client = Client.init_with_protocol ~protocol `Client () in
+    let* () = Client.bake_for_and_wait ~node client in
 
     let* consensus_op =
       create_double_consensus_evidence
@@ -470,7 +516,7 @@ module Mempool = struct
       in
       return
         (check_kind
-           JSON.(mempool_json |-> "refused" |> as_list |> List.hd)
+           JSON.(mempool_json |-> "applied" |> as_list |> List.hd)
            (Operation.Anonymous.kind_to_string
               double_evidence_kind
               use_legacy_name))
