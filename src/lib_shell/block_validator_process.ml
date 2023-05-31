@@ -600,10 +600,10 @@ module External_validator_process = struct
      This is expected to be used each time the external validator
      process is (re)started.
      The scenario of the handshake is the following:
-     - the node sends some magic bytes,
-     - the external validator checks the bytes and sends it's magic
-       bytes,
-     - the node checks the received bytes,
+     - simultaneously, the node and the external validator send some magic bytes
+       to each others,
+     - simultaneously, the node and the external validator wait for each others
+       magic bytes and check their validity,
      - handshake is finished. *)
   let process_handshake process_input process_output =
     let open Lwt_result_syntax in
