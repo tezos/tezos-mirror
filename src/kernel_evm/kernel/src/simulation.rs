@@ -4,9 +4,16 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::{error::Error, error::StorageError, storage};
+
+use evm_execution::handler::ExecutionOutcome;
+use evm_execution::{
+    account_storage::init_account_storage, precompiles, run_transaction,
+};
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Rlp};
 use tezos_ethereum::rlp_helpers::{decode_field, decode_option, next};
+use tezos_smart_rollup_debug::Runtime;
 
 // https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_call
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -32,6 +39,29 @@ impl Simulation {
     pub fn from_rlp_bytes(bytes: &[u8]) -> Result<Simulation, DecoderError> {
         let decoder = Rlp::new(bytes);
         Simulation::decode(&decoder)
+    }
+
+    /// Execute the simulation
+    #[allow(unused)]
+    pub fn run<Host: Runtime>(&self, host: &mut Host) -> Result<ExecutionOutcome, Error> {
+        let current_block = storage::read_current_block(host)?;
+        let mut evm_account_storage = init_account_storage()
+            .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
+        let precompiles = precompiles::precompile_set::<Host>();
+        let default_caller = H160::zero();
+        let outcome = run_transaction(
+            host,
+            &current_block.constants(),
+            &mut evm_account_storage,
+            &precompiles,
+            Some(self.to),
+            self.from.unwrap_or(default_caller),
+            self.data.clone(),
+            self.gas,
+            self.value,
+        )
+        .map_err(Error::Simulation)?;
+        Ok(outcome)
     }
 }
 
@@ -73,6 +103,12 @@ impl TryFrom<&[u8]> for Simulation {
 
 #[cfg(test)]
 mod tests {
+
+    use tezos_ethereum::block::BlockConstants;
+    use tezos_smart_rollup_mock::MockHost;
+
+    use crate::genesis::init_block;
+
     use super::*;
 
     impl Simulation {
@@ -136,6 +172,91 @@ mod tests {
             expected,
             simulation.unwrap(),
             "The decoded result is not the one expected"
+        );
+    }
+
+    // The compiled initialization code for the Ethereum demo contract given
+    // as an example in kernel_evm/solidity_examples/storage.sol
+    const STORAGE_CONTRACT_INITIALIZATION: &str = "608060405234801561001057600080fd5b5061017f806100206000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80634e70b1dc1461004657806360fe47b1146100645780636d4ce63c14610080575b600080fd5b61004e61009e565b60405161005b91906100d0565b60405180910390f35b61007e6004803603810190610079919061011c565b6100a4565b005b6100886100ae565b60405161009591906100d0565b60405180910390f35b60005481565b8060008190555050565b60008054905090565b6000819050919050565b6100ca816100b7565b82525050565b60006020820190506100e560008301846100c1565b92915050565b600080fd5b6100f9816100b7565b811461010457600080fd5b50565b600081359050610116816100f0565b92915050565b600060208284031215610132576101316100eb565b5b600061014084828501610107565b9150509291505056fea2646970667358221220ec57e49a647342208a1f5c9b1f2049bf1a27f02e19940819f38929bf67670a5964736f6c63430008120033";
+    // call: num (direct access to state variable)
+    const STORAGE_CONTRACT_CALL_NUM: &str = "4e70b1dc";
+    // call: get (public view)
+    const STORAGE_CONTRACT_CALL_GET: &str = "6d4ce63c";
+
+    fn create_contract<Host>(host: &mut Host) -> H160
+    where
+        Host: Runtime,
+    {
+        // setup
+        assert!(init_block(host).is_ok());
+
+        let block = BlockConstants::first_block();
+        let precompiles = precompiles::precompile_set::<Host>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+
+        let callee = None;
+        let caller = H160::from_low_u64_be(117);
+        let transaction_value = U256::from(0);
+        let call_data: Vec<u8> = hex::decode(STORAGE_CONTRACT_INITIALIZATION).unwrap();
+
+        // create contract
+        let outcome = run_transaction(
+            host,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            callee,
+            caller,
+            call_data,
+            Some(10000),
+            Some(transaction_value),
+        );
+        assert!(outcome.is_ok(), "contract should have been created");
+        outcome.unwrap().new_address.unwrap()
+    }
+
+    #[test]
+    fn simulation_result() {
+        // setup
+        let mut host = MockHost::default();
+        let new_address = create_contract(&mut host);
+
+        // run simulation num
+        let simulation = Simulation {
+            from: None,
+            gas_price: None,
+            to: new_address,
+            data: hex::decode(STORAGE_CONTRACT_CALL_NUM).unwrap(),
+            gas: Some(10000),
+            value: None,
+        };
+        let outcome = simulation.run(&mut host);
+
+        assert!(outcome.is_ok(), "simulation should have succeeded");
+        let outcome = outcome.unwrap();
+        assert_eq!(
+            Some(vec![0u8; 32]),
+            outcome.result,
+            "simulation result should be 0"
+        );
+
+        // run simulation get
+        let simulation = Simulation {
+            from: None,
+            gas_price: None,
+            to: new_address,
+            data: hex::decode(STORAGE_CONTRACT_CALL_GET).unwrap(),
+            gas: Some(10000),
+            value: None,
+        };
+        let outcome = simulation.run(&mut host);
+
+        assert!(outcome.is_ok(), "simulation should have succeeded");
+        let outcome = outcome.unwrap();
+        assert_eq!(
+            Some(vec![0u8; 32]),
+            outcome.result,
+            "simulation result should be 0"
         );
     }
 }
