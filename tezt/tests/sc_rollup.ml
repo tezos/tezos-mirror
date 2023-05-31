@@ -293,7 +293,7 @@ let test_l1_scenario ?regression ?hooks ~kind ?boot_sector ?commitment_period
   let* sc_rollup =
     originate_sc_rollup ?hooks ~kind ?boot_sector ~src tezos_client
   in
-  scenario sc_rollup tezos_node tezos_client
+  scenario protocol sc_rollup tezos_node tezos_client
 
 let test_l1_migration_scenario ?parameters_ty ?(src = Constant.bootstrap1.alias)
     ?variant ?(tags = []) ~kind ~migrate_from ~migrate_to ~scenario_prior
@@ -480,10 +480,16 @@ let get_staked_on_commitment ~sc_rollup ~staker client =
   | Some hash -> return hash
   | None -> failwith (Format.sprintf "hash is missing %s" __LOC__)
 
-let cement_commitment ?(src = Constant.bootstrap1.alias) ?fail ~sc_rollup ~hash
-    client =
+let cement_commitment protocol ?(src = Constant.bootstrap1.alias) ?fail
+    ~sc_rollup ~hash client =
   let p =
-    Client.Sc_rollup.cement_commitment ~hooks ~dst:sc_rollup ~src ~hash client
+    Client.Sc_rollup.cement_commitment
+      protocol
+      ~hooks
+      ~dst:sc_rollup
+      ~src
+      ~hash
+      client
   in
   match fail with
   | None ->
@@ -531,7 +537,7 @@ let test_origination ~kind =
       description = "origination of a SCORU executes without error";
     }
     ~kind
-    (fun _ _ _ -> unit)
+    (fun _ _ _ _ -> unit)
 
 (* Initialize configuration
    ------------------------
@@ -667,7 +673,7 @@ let test_rollup_get_genesis_info ~kind =
       description = "genesis info and last cemented are equal at origination";
     }
     ~kind
-  @@ fun sc_rollup tezos_node tezos_client ->
+  @@ fun _protocol sc_rollup tezos_node tezos_client ->
   let origination_level = Node.get_level tezos_node in
   (* Bake 10 blocks to be sure that the origination_level of rollup is different
      from the level of the head node. *)
@@ -2287,7 +2293,7 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup_client
   in
 
   let* () =
-    cement_commitment client ~sc_rollup ~hash:cemented_commitment_hash
+    cement_commitment protocol client ~sc_rollup ~hash:cemented_commitment_hash
   in
   let* _ =
     Sc_rollup_node.wait_for_level
@@ -2635,7 +2641,7 @@ let test_boot_sector_is_evaluated ~boot_sector1 ~boot_sector2 ~kind =
       tags = ["boot_sector"];
       description = "boot sector is evaluated";
     }
-  @@ fun sc_rollup1 _tezos_node tezos_client ->
+  @@ fun _protocol sc_rollup1 _tezos_node tezos_client ->
   let* sc_rollup2 =
     originate_sc_rollup
       ~alias:"rollup2"
@@ -2929,7 +2935,7 @@ let test_cement_ignore_commitment ~kind =
       (* zero commitment hash *)
       "src12UJzB8mg7yU6nWPzicH7ofJbFjyJEbHvwtZdfRXi8DQHNp1LY8"
     in
-    cement_commitment client ~sc_rollup ~hash
+    cement_commitment protocol client ~sc_rollup ~hash
   in
   let* _level = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
   unit
@@ -3534,7 +3540,7 @@ let test_forking_scenario ~kind ~variant scenario =
       variant = Some variant;
       description = "rollup with a commitment dispute";
     }
-  @@ fun sc_rollup tezos_node tezos_client ->
+  @@ fun protocol sc_rollup tezos_node tezos_client ->
   (* Choosing challenge_windows to be quite longer than commitment_period
      to avoid being in a situation where the first commitment in the result
      of [mk_forking_commitments] is cementable without further bakes. *)
@@ -3557,6 +3563,7 @@ let test_forking_scenario ~kind ~variant scenario =
   scenario
     tezos_client
     tezos_node
+    protocol
     ~sc_rollup
     ~operator1
     ~operator2
@@ -3565,8 +3572,9 @@ let test_forking_scenario ~kind ~variant scenario =
     level1
 
 (* A more convenient wrapper around [cement_commitment]. *)
-let cement_commitments client sc_rollup ?fail =
-  Lwt_list.iter_s (fun hash -> cement_commitment client ~sc_rollup ~hash ?fail)
+let cement_commitments protocol client sc_rollup ?fail =
+  Lwt_list.iter_s (fun hash ->
+      cement_commitment protocol client ~sc_rollup ~hash ?fail)
 
 let timeout ?expect_failure ~sc_rollup ~staker1 ~staker2 ?(src = staker1) client
     =
@@ -3631,11 +3639,19 @@ let move_refute_with_unique_state_hash ?number_of_sections_in_dissection client
 *)
 let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit =
   test_forking_scenario ~variant:"publish, and cement on wrong commitment"
-  @@ fun client _node ~sc_rollup ~operator1 ~operator2 commits level0 level1 ->
+  @@ fun client
+             _node
+             protocol
+             ~sc_rollup
+             ~operator1
+             ~operator2
+             commits
+             level0
+             level1 ->
   let c1, c2, c31, c32, c311, _c321 = commits in
   let* constants = get_sc_rollup_constants client in
   let challenge_window = constants.challenge_window_in_blocks in
-  let cement = cement_commitments client sc_rollup in
+  let cement = cement_commitments protocol client sc_rollup in
   let missing_blocks_to_cement = level0 + challenge_window - level1 in
   let* () =
     if missing_blocks_to_cement <= 0 then unit (* We can already cement *)
@@ -3691,10 +3707,17 @@ let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit =
 *)
 let test_valid_dispute_dissection =
   test_forking_scenario ~variant:"valid dispute dissection"
-  @@ fun client _node ~sc_rollup ~operator1 ~operator2 commits _level0 _level1
-    ->
+  @@ fun client
+             _node
+             protocol
+             ~sc_rollup
+             ~operator1
+             ~operator2
+             commits
+             _level0
+             _level1 ->
   let c1, c2, c31, c32, _c311, _c321 = commits in
-  let cement = cement_commitments client sc_rollup in
+  let cement = cement_commitments protocol client sc_rollup in
   let* constants = get_sc_rollup_constants client in
   let challenge_window = constants.challenge_window_in_blocks in
   let commitment_period = constants.commitment_period_in_blocks in
@@ -3746,12 +3769,20 @@ let test_valid_dispute_dissection =
    to get to the point where we can timeout. *)
 let test_timeout =
   test_forking_scenario ~variant:"timeout"
-  @@ fun client _node ~sc_rollup ~operator1 ~operator2 commits level0 level1 ->
+  @@ fun client
+             _node
+             protocol
+             ~sc_rollup
+             ~operator1
+             ~operator2
+             commits
+             level0
+             level1 ->
   (* These are the commitments on the rollup. See [test_forking_scenario] to
        visualize the tree structure. *)
   let c1, c2, c31, c32, _c311, _c321 = commits in
   (* A helper function to cement a sequence of commitments. *)
-  let cement = cement_commitments client sc_rollup in
+  let cement = cement_commitments protocol client sc_rollup in
   let* constants = get_sc_rollup_constants client in
   let challenge_window = constants.challenge_window_in_blocks in
   let timeout_period = constants.timeout_period_in_blocks in
@@ -3936,7 +3967,7 @@ let test_refutation_reward_and_punishment ~kind =
       variant = None;
       description = "participant of a refutation game are slashed/rewarded";
     }
-  @@ fun sc_rollup node client ->
+  @@ fun _protocol sc_rollup node client ->
   (* Timeout is the easiest way to end a game, we set timeout period
          low to produce an outcome quickly. *)
   let* {commitment_period_in_blocks; stake_amount; _} =
@@ -4693,7 +4724,7 @@ let test_recover_bond_of_stakers =
       tags = ["commitment"; "staker"; "recover"];
       description = "recover bond of stakers";
     }
-  @@ fun sc_rollup _tezos_node tezos_client ->
+  @@ fun protocol sc_rollup _tezos_node tezos_client ->
   let* {
          commitment_period_in_blocks;
          challenge_window_in_blocks;
@@ -4736,7 +4767,9 @@ let test_recover_bond_of_stakers =
         Client.bake_for_and_wait tezos_client)
   in
   (* Cement. *)
-  let* () = cement_commitment tezos_client ~sc_rollup ~hash:commitment1 in
+  let* () =
+    cement_commitment protocol tezos_client ~sc_rollup ~hash:commitment1
+  in
 
   (* Staker1 withdraw its stake. *)
   let* () =
@@ -4908,7 +4941,7 @@ let test_migration_cement ~kind ~migrate_from ~migrate_to =
     (* no need to bake more to have the correct level for the
        cementation because commitment_period = challenge_period and we
        baked to be able to published a commit. *)
-    cement_commitment ~sc_rollup ~hash tezos_client
+    cement_commitment migrate_to ~sc_rollup ~hash tezos_client
   in
   test_l1_migration_scenario
     ~kind
@@ -4943,7 +4976,7 @@ let test_migration_recover ~kind ~migrate_from ~migrate_to =
       repeat missing_blocks_to_cement (fun () ->
           Client.bake_for_and_wait tezos_client)
     in
-    cement_commitment ~sc_rollup ~hash tezos_client
+    cement_commitment migrate_from ~sc_rollup ~hash tezos_client
   and scenario_after tezos_client ~sc_rollup () =
     let*! () =
       let recover_bond_fee = 1_000_000 in

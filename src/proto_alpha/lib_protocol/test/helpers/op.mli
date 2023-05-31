@@ -475,8 +475,7 @@ val sc_rollup_publish :
   Sc_rollup.Commitment.t ->
   Operation.packed tzresult Lwt.t
 
-(** [sc_rollup_cement ctxt source rollup commitment] tries to cement
-    the specified commitment.
+(** [sc_rollup_cement ctxt source rollup] tries to cement a commitment.
 
     Optional arguments allow to override defaults:
 
@@ -492,7 +491,6 @@ val sc_rollup_cement :
   Context.t ->
   Contract.t ->
   Sc_rollup.t ->
-  Sc_rollup.Commitment.Hash.t ->
   Operation.packed tzresult Lwt.t
 
 val sc_rollup_execute_outbox_message :

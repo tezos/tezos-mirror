@@ -106,9 +106,9 @@ This sequence of operations was run:
         Frozen_bonds([PUBLIC_KEY_HASH],[SMART_ROLLUP_HASH]) ... +ꜩ10000
 
 
-./octez-client --wait none cement commitment '[SC_ROLLUP_COMMITMENT_HASH]' from bootstrap1 for smart rollup '[SMART_ROLLUP_HASH]'
+./octez-client --wait none cement commitment from bootstrap1 for smart rollup '[SMART_ROLLUP_HASH]'
 Node is bootstrapped.
-Estimated gas: 4840.322 units (will add 100 for safety)
+Estimated gas: 4839.262 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -119,18 +119,17 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000771
+    Fee to the baker: ꜩ0.000738
     Expected counter: 3
-    Gas limit: 4941
+    Gas limit: 4940
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000771
-      payload fees(the block proposer) ....... +ꜩ0.000771
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000738
+      payload fees(the block proposer) ....... +ꜩ0.000738
     Smart rollup commitment cementing:
       Address: [SMART_ROLLUP_HASH]
-      Commitment: [SC_ROLLUP_COMMITMENT_HASH]
       This smart rollup commitment cementing was successfully applied
-      Consumed gas: 4840.256
+      Consumed gas: 4839.196
       Inbox level: 12
       Commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
 

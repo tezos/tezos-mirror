@@ -833,7 +833,6 @@ let mk_sc_rollup_cement (oinfos : operation_req) (infos : infos) =
     (B infos.ctxt.block)
     (contract_of (get_source infos))
     sc_rollup
-    (Sc_rollup.Commitment.hash_uncarbonated sc_dummy_commitment)
 
 let mk_sc_rollup_refute (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in

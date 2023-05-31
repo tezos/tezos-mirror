@@ -1779,6 +1779,7 @@ module Sc_rollup : sig
 
   (** Run [octez-client cement commitment <hash> from <src> for sc rollup <rollup>]. *)
   val cement_commitment :
+    Protocol.t ->
     ?hooks:Process.hooks ->
     ?wait:string ->
     ?burn_cap:Tez.t ->

@@ -435,12 +435,6 @@ and _ manager_operation =
       -> Kind.sc_rollup_add_messages manager_operation
   | Sc_rollup_cement : {
       rollup : Sc_rollup_repr.t;
-      commitment : Sc_rollup_commitment_repr.Hash.t;
-          (** The field [commitment] is deprecated. It is not used during the
-              application of [Sc_rollup_cement]. The commitment to cement is
-              computed by the protocol.
-
-              It is deprecated starting N, and can be removed in O. *)
     }
       -> Kind.sc_rollup_cement manager_operation
   | Sc_rollup_publish : {
