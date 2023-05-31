@@ -1,38 +1,39 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env (_ (env-vars (NODE_PRELOAD ocaml-bls12-381))))
-
-(executables
- (names test_aggregated_signature test_signature)
- (modes native js)
+(library
+ (name src_lib_bls12_381_signature_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   bls12-381
   octez-bls12-381-signature
-  alcotest
+  octez-alcotezt
   integers_stubs_js)
- (js_of_ocaml))
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Octez_alcotezt)
+ (modules test_aggregated_signature test_signature utils))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (modes native)
+ (libraries
+  src_lib_bls12_381_signature_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package octez-bls12-381-signature)
  (deps (glob_files_rec test_vectors/*))
- (action (run %{dep:./test_aggregated_signature.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest)
- (package octez-bls12-381-signature)
- (deps (glob_files_rec test_vectors/*))
- (action (run %{dep:./test_signature.exe})))
-
-(rule
- (alias runtest_js)
- (package octez-bls12-381-signature)
- (deps (glob_files_rec test_vectors/*))
- (action (run node %{dep:./test_aggregated_signature.bc.js})))
-
-(rule
- (alias runtest_js)
- (package octez-bls12-381-signature)
- (deps (glob_files_rec test_vectors/*))
- (action (run node %{dep:./test_signature.bc.js})))
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
