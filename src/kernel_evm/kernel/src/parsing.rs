@@ -4,33 +4,40 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_ethereum::signatures::EthereumTransactionCommon;
+use crate::inbox::Transaction;
+use tezos_ethereum::{
+    signatures::EthereumTransactionCommon, transaction::TransactionHash,
+};
 use tezos_smart_rollup_host::input::Message;
 
-use tezos_ethereum::transaction::TransactionHash;
-
-use crate::inbox::Transaction;
-
-#[derive(Debug, PartialEq)]
-pub enum Input {
-    SimpleTransaction(Box<Transaction>),
-    NewChunkedTransaction {
-        tx_hash: TransactionHash,
-        num_chunks: u16,
-    },
-    TransactionChunk {
-        tx_hash: TransactionHash,
-        i: u16,
-        data: Vec<u8>,
-    },
+/// On an option, either the value, or if `None`, interrupt and return the
+/// default value of the return type instead.
+#[macro_export]
+macro_rules! parsable {
+    ($expr : expr) => {
+        match $expr {
+            Some(x) => x,
+            None => return Default::default(),
+        }
+    };
 }
 
-#[derive(Debug, PartialEq)]
-pub enum InputResult {
-    NoInput,
-    Input(Input),
-    Unparsable,
+/// Divides one slice into two at an index.
+///
+/// The first will contain all indices from `[0, mid)` (excluding the index
+/// `mid` itself) and the second will contain all indices from `[mid, len)`
+/// (excluding the index `len` itself).
+///
+/// Will return None if `mid > len`.
+pub fn split_at(bytes: &[u8], mid: usize) -> Option<(&[u8], &[u8])> {
+    let left = bytes.get(0..mid)?;
+    let right = bytes.get(mid..)?;
+    Some((left, right))
 }
+
+pub const SIMULATION_TAG: u8 = u8::MAX;
+
+pub const EXTERNAL_TAG: u8 = 1;
 
 const SIMPLE_TRANSACTION_TAG: u8 = 0;
 
@@ -44,25 +51,36 @@ pub const MAX_SIZE_PER_CHUNK: usize = 4095 // Max input size minus external tag
             - 2  // Number of chunks (u16)
             - 32; // Transaction hash size
 
-macro_rules! parsable {
-    ($expr : expr) => {
-        match $expr {
-            Some(x) => x,
-            None => return InputResult::Unparsable,
-        }
-    };
+#[derive(Debug, PartialEq)]
+pub enum Input {
+    SimpleTransaction(Box<Transaction>),
+    NewChunkedTransaction {
+        tx_hash: TransactionHash,
+        num_chunks: u16,
+    },
+    TransactionChunk {
+        tx_hash: TransactionHash,
+        i: u16,
+        data: Vec<u8>,
+    },
+    Simulation,
+}
+
+#[derive(Debug, PartialEq, Default)]
+pub enum InputResult {
+    /// No further inputs
+    NoInput,
+    /// Some decoded input
+    Input(Input),
+    #[default]
+    /// Unparsable input, to be ignored
+    Unparsable,
 }
 
 impl InputResult {
-    fn split_at(bytes: &[u8], len: usize) -> Option<(&[u8], &[u8])> {
-        let left = bytes.get(0..len)?;
-        let right = bytes.get(len..)?;
-        Some((left, right))
-    }
-
     fn parse_simple_transaction(bytes: &[u8]) -> Self {
         // Next 32 bytes is the transaction hash.
-        let (tx_hash, remaining) = parsable!(Self::split_at(bytes, 32));
+        let (tx_hash, remaining) = parsable!(split_at(bytes, 32));
         let tx_hash: TransactionHash = parsable!(tx_hash.try_into().ok()); // Remaining bytes is the rlp encoded transaction.
         let tx: EthereumTransactionCommon = parsable!(remaining.try_into().ok());
         InputResult::Input(Input::SimpleTransaction(Box::new(Transaction {
@@ -73,10 +91,10 @@ impl InputResult {
 
     fn parse_new_chunked_transaction(bytes: &[u8]) -> Self {
         // Next 32 bytes is the transaction hash.
-        let (tx_hash, remaining) = parsable!(Self::split_at(bytes, 32));
+        let (tx_hash, remaining) = parsable!(split_at(bytes, 32));
         let tx_hash: TransactionHash = parsable!(tx_hash.try_into().ok());
         // Next 2 bytes is the number of chunks.
-        let (num_chunks, remaining) = parsable!(Self::split_at(remaining, 2));
+        let (num_chunks, remaining) = parsable!(split_at(remaining, 2));
         let num_chunks = u16::from_le_bytes(num_chunks.try_into().unwrap());
         if remaining.is_empty() {
             Self::Input(Input::NewChunkedTransaction {
@@ -90,10 +108,10 @@ impl InputResult {
 
     fn parse_transaction_chunk(bytes: &[u8]) -> Self {
         // Next 32 bytes is the transaction hash.
-        let (tx_hash, remaining) = parsable!(Self::split_at(bytes, 32));
+        let (tx_hash, remaining) = parsable!(split_at(bytes, 32));
         let tx_hash: TransactionHash = parsable!(tx_hash.try_into().ok());
         // Next 2 bytes is the index.
-        let (i, remaining) = parsable!(Self::split_at(remaining, 2));
+        let (i, remaining) = parsable!(split_at(remaining, 2));
         let i = u16::from_le_bytes(i.try_into().unwrap());
         Self::Input(Input::TransactionChunk {
             tx_hash,
@@ -102,18 +120,12 @@ impl InputResult {
         })
     }
 
-    pub fn parse(input: Message, smart_rollup_address: [u8; 20]) -> Self {
-        let bytes = Message::as_ref(&input);
-        let (input_tag, remaining) = parsable!(bytes.split_first());
-        // External messages starts with the tag 1, they are the only
-        // messages we consider.
-        if *input_tag != 1 {
-            return InputResult::Unparsable;
-        };
+    // External message structure :
+    // EXTERNAL_TAG 1B / ROLLUP_ADDRESS 20B / MESSAGE_TAG 1B / DATA
+    fn parse_external(input: &[u8], smart_rollup_address: &[u8]) -> Self {
         // Next 20 bytes is the targeted smart rollup address.
         let remaining = {
-            let (target_smart_rollup_address, remaining) =
-                parsable!(Self::split_at(remaining, 20));
+            let (target_smart_rollup_address, remaining) = parsable!(split_at(input, 20));
 
             if target_smart_rollup_address == smart_rollup_address {
                 remaining
@@ -128,5 +140,42 @@ impl InputResult {
             TRANSACTION_CHUNK_TAG => Self::parse_transaction_chunk(remaining),
             _ => InputResult::Unparsable,
         }
+    }
+
+    fn parse_simulation(input: &[u8]) -> Self {
+        if input.is_empty() {
+            InputResult::Input(Input::Simulation)
+        } else {
+            InputResult::Unparsable
+        }
+    }
+
+    pub fn parse(input: Message, smart_rollup_address: [u8; 20]) -> Self {
+        let bytes = Message::as_ref(&input);
+        let (input_tag, remaining) = parsable!(bytes.split_first());
+        // External messages starts with the tag 1, Internal with 0,
+        // Simulation with FF
+        match *input_tag {
+            SIMULATION_TAG => Self::parse_simulation(remaining),
+            EXTERNAL_TAG => Self::parse_external(remaining, &smart_rollup_address),
+            _ => InputResult::Unparsable,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tezos_smart_rollup_host::input::Message;
+
+    const ZERO_SMART_ROLLUP_ADDRESS: [u8; 20] = [0; 20];
+
+    #[test]
+    fn parse_unparsable_transaction() {
+        let message = Message::new(0, 0, vec![1, 9, 32, 58, 59, 30]);
+        assert_eq!(
+            InputResult::parse(message, ZERO_SMART_ROLLUP_ADDRESS),
+            InputResult::Unparsable
+        )
     }
 }

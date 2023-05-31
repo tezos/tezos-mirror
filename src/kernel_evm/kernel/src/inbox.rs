@@ -73,6 +73,12 @@ pub fn read_inbox<Host: Runtime>(
                     res.push(tx)
                 }
             }
+            InputResult::Input(Input::Simulation) => {
+                // kernel enters in simulation mode, reading will be done by the
+                // simulation and all the previous and next transactions are
+                // discarded.
+                return Ok(Vec::new());
+            }
         }
     }
 }
@@ -82,7 +88,6 @@ mod tests {
     use super::*;
     use tezos_data_encoding::types::Bytes;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
-    use tezos_smart_rollup_host::input::Message;
     use tezos_smart_rollup_mock::MockHost;
 
     const ZERO_SMART_ROLLUP_ADDRESS: [u8; 20] = [0; 20];
@@ -117,6 +122,7 @@ mod tests {
                 buffer.extend_from_slice(&u16::to_le_bytes(i));
                 buffer.extend_from_slice(&data);
             }
+            _ => (),
         };
         buffer
     }
@@ -190,14 +196,5 @@ mod tests {
             tx,
         }];
         assert_eq!(transactions, expected_transactions);
-    }
-
-    #[test]
-    fn parse_unparsable_transaction() {
-        let message = Message::new(0, 0, vec![1, 9, 32, 58, 59, 30]);
-        assert_eq!(
-            InputResult::parse(message, ZERO_SMART_ROLLUP_ADDRESS),
-            InputResult::Unparsable
-        )
     }
 }
