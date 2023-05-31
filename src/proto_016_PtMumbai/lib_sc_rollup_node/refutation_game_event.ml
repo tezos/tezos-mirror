@@ -79,10 +79,10 @@ module Simple = struct
          {our_commitment_hash} at level {level} with staker {other} that hash \
          issued commitment {their_commitment_hash}."
       ~level:Notice
-      ("our_commitment_hash", Sc_rollup.Commitment.Hash.encoding)
-      ("level", Raw_level.encoding)
-      ("other", Sc_rollup.Staker.encoding)
-      ("their_commitment_hash", Sc_rollup.Commitment.Hash.encoding)
+      ("our_commitment_hash", Octez_smart_rollup.Commitment.Hash.encoding)
+      ("level", Data_encoding.int32)
+      ("other", Signature.Public_key_hash.encoding)
+      ("their_commitment_hash", Octez_smart_rollup.Commitment.Hash.encoding)
 
   let timeout_detected =
     declare_1

@@ -52,7 +52,7 @@ type eval_result = {
   state_hash : Sc_rollup.State_hash.t;
   status : string;
   output : Sc_rollup.output list;
-  inbox_level : Raw_level.t;
+  inbox_level : int32;
   num_ticks : Z.t;
   insights : bytes option list;
       (** The simulation can ask to look at values on the state after
@@ -98,8 +98,8 @@ type message_status =
       l1_level : int32;
       finalized : bool;
       cemented : bool;
-      commitment : Sc_rollup.Commitment.t;
-      commitment_hash : Sc_rollup.Commitment.Hash.t;
+      commitment : Octez_smart_rollup.Commitment.t;
+      commitment_hash : Octez_smart_rollup.Commitment.Hash.t;
       first_published_at_level : int32;
       published_at_level : int32;
     }
@@ -109,13 +109,13 @@ module Encodings = struct
 
   let commitment_with_hash =
     obj2
-      (req "commitment" Sc_rollup.Commitment.encoding)
-      (req "hash" Sc_rollup.Commitment.Hash.encoding)
+      (req "commitment" Octez_smart_rollup.Commitment.encoding)
+      (req "hash" Octez_smart_rollup.Commitment.Hash.encoding)
 
   let commitment_with_hash_and_level_infos =
     obj4
-      (req "commitment" Sc_rollup.Commitment.encoding)
-      (req "hash" Sc_rollup.Commitment.Hash.encoding)
+      (req "commitment" Octez_smart_rollup.Commitment.encoding)
+      (req "hash" Octez_smart_rollup.Commitment.Hash.encoding)
       (opt "first_published_at_level" int32)
       (opt "published_at_level" int32)
 
@@ -141,7 +141,7 @@ module Encodings = struct
             ~description:"Output produced by evaluation of the messages")
          (req
             "inbox_level"
-            Raw_level.encoding
+            int32
             ~description:"Level of the inbox that would contain these messages")
          (req
             "num_ticks"
@@ -320,8 +320,8 @@ module Encodings = struct
                    (req "level" int32)))
              (req "finalized" bool)
              (req "cemented" bool)
-             (req "commitment" Sc_rollup.Commitment.encoding)
-             (req "hash" Sc_rollup.Commitment.Hash.encoding)
+             (req "commitment" Octez_smart_rollup.Commitment.encoding)
+             (req "hash" Octez_smart_rollup.Commitment.Hash.encoding)
              (req "first_published_at_level" int32)
              (req "published_at_level" int32))
           (function
@@ -606,7 +606,7 @@ module Global = struct
       Tezos_rpc.Service.get_service
         ~description:"Rollup inbox for block"
         ~query:Tezos_rpc.Query.empty
-        ~output:Sc_rollup.Inbox.encoding
+        ~output:Octez_smart_rollup.Inbox.encoding
         (path / "inbox")
 
     let ticks =
@@ -710,59 +710,19 @@ module Global = struct
         ~output:(Data_encoding.list Dal.Slot.Header.encoding)
         (path / "dal" / "slot_headers")
 
-    let dal_confirmed_slot_pages =
+    let dal_slot_status_encoding : [`Confirmed | `Unconfirmed] Data_encoding.t =
+      Data_encoding.string_enum
+        [("confirmed", `Confirmed); ("unconfirmed", `Unconfirmed)]
+
+    let dal_processed_slots =
       Tezos_rpc.Service.get_service
-        ~description:
-          "Data availability confirmed & downloaded slot pages for a given \
-           block hash"
+        ~description:"Data availability processed slots and their statuses"
         ~query:Tezos_rpc.Query.empty
         ~output:
-          (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3873
-               Estimate size of binary encoding and add a check_size to the
-             encoding. *)
           Data_encoding.(
             list
-            @@ obj2
-                 (req "index" Dal.Slot_index.encoding)
-                 (req "contents" (list Dal.Page.content_encoding)))
-        (path / "dal" / "confirmed_slot_pages")
-
-    type dal_slot_page_query = {index : Dal.Slot_index.t; page : int}
-
-    let dal_slot_page_query =
-      let open Tezos_rpc.Query in
-      let req name f = function
-        | None ->
-            raise
-              (Invalid (Format.sprintf "Query parameter %s is required" name))
-        | Some arg -> f arg
-      in
-      let invalid_parameter i =
-        raise (Invalid (Format.asprintf "Invalid parameter (%d)" i))
-      in
-      query (fun raw_index raw_page ->
-          let index = req "index" Dal.Slot_index.of_int raw_index in
-          let page = req "page" (fun p -> p) raw_page in
-          match index with
-          | None -> invalid_parameter @@ Option.value ~default:0 raw_index
-          | Some index ->
-              if page < 0 then invalid_parameter page else {index; page})
-      |+ opt_field "index" Tezos_rpc.Arg.int (fun q ->
-             Some (Dal.Slot_index.to_int q.index))
-      |+ opt_field "slot_page" Tezos_rpc.Arg.int (fun q -> Some q.page)
-      |> seal
-
-    let dal_slot_page =
-      Tezos_rpc.Service.get_service
-        ~description:
-          "Data availability downloaded slot pages for a given block hash"
-        ~query:dal_slot_page_query
-        ~output:
-          Data_encoding.(
-            obj2
-              (req "result" string)
-              (opt "contents" Dal.Page.content_encoding))
-        (path / "dal" / "slot_page")
+            @@ obj2 (req "index" int31) (req "status" dal_slot_status_encoding))
+        (path / "dal" / "processed_slots")
 
     module Outbox = struct
       let level_param =

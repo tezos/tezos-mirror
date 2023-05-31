@@ -36,7 +36,7 @@ type info_per_level = {
 
 type t = {
   ctxt : Context.ro;
-  inbox_level : Raw_level.t;
+  inbox_level : int32;
   state : Context.tree;
   reveal_map : string Sc_rollup_reveal_hash.Map.t option;
   nb_messages_inbox : int;
@@ -54,15 +54,14 @@ let simulate_info_per_level (node_ctxt : [`Read] Node_context.t) predecessor =
 
 let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
   let open Lwt_result_syntax in
-  let*? level = Environment.wrap_tzresult @@ Raw_level.of_int32 level in
   let*? () =
     error_unless
-      Raw_level.(level >= node_ctxt.Node_context.genesis_info.level)
+      (level >= node_ctxt.Node_context.genesis_info.level)
       (Exn (Failure "Cannot simulate before origination level"))
   in
-  let first_inbox_level = Raw_level.succ node_ctxt.genesis_info.level in
+  let first_inbox_level = Int32.succ node_ctxt.genesis_info.level in
   let* ctxt =
-    if Raw_level.(level < first_inbox_level) then
+    if level < first_inbox_level then
       (* This is before we have interpreted the boot sector, so we start
          with an empty context in genesis *)
       return (Context.empty node_ctxt.context)
@@ -70,7 +69,7 @@ let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
   in
   let* ctxt, state = Interpreter.state_of_head node_ctxt ctxt head in
   let+ info_per_level = simulate_info_per_level node_ctxt hash in
-  let inbox_level = Raw_level.succ level in
+  let inbox_level = Int32.succ level in
   {
     ctxt;
     inbox_level;
@@ -92,7 +91,7 @@ let simulate_messages_no_checks (node_ctxt : Node_context.ro)
        info_per_level = _;
      } as sim) messages =
   let open Lwt_result_syntax in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! state_hash = PVM.state_hash state in
   let*! tick = PVM.get_tick state in
   let eval_state =
@@ -130,17 +129,15 @@ let simulate_messages (node_ctxt : Node_context.ro) sim messages =
     let open Result_syntax in
     if sim.level_position = Start then
       let {predecessor_timestamp; predecessor} = sim.info_per_level in
-      let open Sc_rollup.Inbox_message in
-      let* internals =
-        List.map_e
-          serialize
-          [
-            Internal Start_of_level;
-            Internal (Info_per_level {predecessor_timestamp; predecessor});
-          ]
-        |> Environment.wrap_tzresult
+      let open Sc_rollup_inbox_message_repr in
+      let+ info_per_level =
+        Environment.wrap_tzresult
+        @@ serialize
+             (Internal (Info_per_level {predecessor; predecessor_timestamp}))
       in
-      return (internals @ messages)
+      unsafe_to_string start_of_level_serialized
+      :: unsafe_to_string info_per_level
+      :: messages
     else return messages
   in
   let+ sim, num_ticks = simulate_messages_no_checks node_ctxt sim messages in
@@ -153,10 +150,10 @@ let end_simulation node_ctxt sim =
       (sim.level_position = End)
       (Exn (Failure "Level for simulation is ended"))
   in
-  let*? eol =
-    Sc_rollup.Inbox_message.serialize
-      (Sc_rollup.Inbox_message.Internal End_of_level)
-    |> Environment.wrap_tzresult
+  let+ sim, num_ticks =
+    simulate_messages_no_checks
+      node_ctxt
+      sim
+      [Sc_rollup_inbox_message_repr.(unsafe_to_string end_of_level_serialized)]
   in
-  let+ sim, num_ticks = simulate_messages_no_checks node_ctxt sim [eol] in
   ({sim with level_position = End}, num_ticks)

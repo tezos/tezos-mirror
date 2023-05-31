@@ -68,6 +68,6 @@ type source =
    } *)
 val get :
   data_dir:string ->
-  pvm_kind:Protocol.Alpha_context.Sc_rollup.Kind.t ->
+  pvm_kind:Kind.t ->
   hash:Protocol.Sc_rollup_reveal_hash.t ->
   string tzresult Lwt.t

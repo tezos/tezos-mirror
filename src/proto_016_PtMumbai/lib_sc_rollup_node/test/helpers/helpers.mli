@@ -26,6 +26,7 @@
 open Octez_smart_rollup
 open Protocol
 open Alpha_context
+open Octez_smart_rollup_node
 
 (** {1 Helper functions to build and run unit tests for the rollup node} *)
 
@@ -39,8 +40,8 @@ open Alpha_context
     context need to use this function in order to avoid file descriptor
     leaks. *)
 val with_node_context :
-  ?constants:Constants.Parametric.t ->
-  Sc_rollup.Kind.t ->
+  ?constants:Rollup_constants.protocol_constants ->
+  Octez_smart_rollup.Kind.t ->
   boot_sector:string ->
   ([`Read | `Write] Node_context.t ->
   genesis:Sc_rollup_block.t ->
@@ -63,7 +64,7 @@ val add_l2_genesis_block :
     and is returned. *)
 val append_l2_block :
   [`Read | `Write] Node_context.t ->
-  Sc_rollup.Inbox_message.t list ->
+  string list ->
   Sc_rollup_block.t tzresult Lwt.t
 
 (** [append_l2_block node_ctxt message_batches] appends as many blocks as there
@@ -71,7 +72,7 @@ val append_l2_block :
     messages. The portion of the chain that was added is returned. *)
 val append_l2_blocks :
   [`Read | `Write] Node_context.t ->
-  Sc_rollup.Inbox_message.t list list ->
+  string list list ->
   Sc_rollup_block.t list tzresult Lwt.t
 
 (** [append_dummy_l2_chain node_ctxt ~length] append [length] L2 blocks with an
@@ -107,8 +108,8 @@ end
 val alcotest :
   string ->
   Alcotest.speed_level ->
-  ?constants:Constants.Parametric.t ->
-  Sc_rollup.Kind.t ->
+  ?constants:Rollup_constants.protocol_constants ->
+  Octez_smart_rollup.Kind.t ->
   boot_sector:string ->
   ([`Read | `Write] Node_context.t ->
   genesis:Sc_rollup_block.t ->

@@ -44,10 +44,10 @@ val process_head :
   Node_context.rw ->
   predecessor:Layer1.header ->
   Layer1.header ->
-  (Sc_rollup.Inbox.Hash.t
-  * Sc_rollup.Inbox.t
-  * Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
-  * Sc_rollup.Inbox_message.t list)
+  (Octez_smart_rollup.Inbox.Hash.t
+  * Octez_smart_rollup.Inbox.t
+  * Merkelized_payload_hashes_hash.t
+  * string list)
   tzresult
   Lwt.t
 
@@ -75,7 +75,7 @@ val add_messages :
 val payloads_history_of_messages :
   predecessor:Block_hash.t ->
   predecessor_timestamp:Timestamp.time ->
-  Sc_rollup.Inbox_message.t list ->
+  string list ->
   Sc_rollup.Inbox_merkelized_payload_hashes.History.t tzresult
 
 (** [same_as_layer_1 node_ctxt block node_inbox] ensures that the rollup
@@ -93,11 +93,11 @@ module Internal_for_tests : sig
     Node_context.rw ->
     predecessor:Layer1.header ->
     Layer1.header ->
-    Sc_rollup.Inbox_message.t list ->
-    (Sc_rollup.Inbox.Hash.t
-    * Sc_rollup.Inbox.t
-    * Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
-    * Sc_rollup.Inbox_message.t list)
+    string list ->
+    (Octez_smart_rollup.Inbox.Hash.t
+    * Octez_smart_rollup.Inbox.t
+    * Merkelized_payload_hashes_hash.t
+    * string list)
     tzresult
     Lwt.t
 end

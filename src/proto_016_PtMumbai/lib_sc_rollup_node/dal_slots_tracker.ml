@@ -33,7 +33,7 @@ let ancestor_hash ~number_of_levels
   let genesis_level = genesis_info.level in
   let rec go number_of_levels (Layer1.{hash; level} as head) =
     let open Lwt_result_syntax in
-    if level < Raw_level.to_int32 genesis_level then return_none
+    if level < genesis_level then return_none
     else if number_of_levels = 0 then return_some hash
     else
       let* pred_head = Node_context.get_predecessor_opt node_ctxt head in
@@ -69,9 +69,7 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
      we reduce the lag to 1, then the slots header will never be confirmed.
   *)
   let open Lwt_result_syntax in
-  let lag =
-    node_ctxt.Node_context.protocol_constants.parametric.dal.attestation_lag
-  in
+  let lag = node_ctxt.Node_context.protocol_constants.dal.attestation_lag in
   (* we are downloading endorsemented for slots at level [level], so
      we need to download the data at level [level - lag].
   *)
@@ -108,7 +106,7 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
       let confirmed_slots_indexes_list =
         List.filter
           (Dal.Attestation.is_attested confirmed_slots)
-          published_slots_indexes
+          (List.filter_map Dal.Slot_index.of_int published_slots_indexes)
       in
       let*? confirmed_slots_indexes =
         Environment.wrap_tzresult
@@ -118,101 +116,64 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
       in
       return @@ Some {published_block_hash; confirmed_slots_indexes}
 
-let is_slot_confirmed node_ctxt (Layer1.{hash; _} as head) slot_index =
-  let open Lwt_result_syntax in
-  let* slots_info_opt = slots_info node_ctxt head in
-  match slots_info_opt with
-  | None -> tzfail @@ Layer1_services.Cannot_read_block_metadata hash
-  | Some {confirmed_slots_indexes; _} ->
-      let*? is_confirmed =
-        Environment.wrap_tzresult
-        @@ Bitset.mem confirmed_slots_indexes (Dal.Slot_index.to_int slot_index)
-      in
-      return is_confirmed
-
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3884
    avoid going back and forth between bitsets and lists of slot indexes. *)
-let to_slot_index_list (constants : Constants.Parametric.t) bitset =
-  let open Result_syntax in
+let to_slot_index_list (constants : Rollup_constants.protocol_constants) bitset
+    =
   let all_slots = Misc.(0 --> (constants.dal.number_of_slots - 1)) in
-  let+ filtered = List.filter_e (Bitset.mem bitset) all_slots in
-  (* Because the maximum slot index is smaller than the number_of_slots protocol
-     constants, and this value is smaller than the hard limit imposed for slots,
-     then Dal.Slot_index.to_int will always return a defined value. See
-     `src/proto_alpha/lib_protocol/constants_repr.ml`.
-  *)
-  List.filter_map Dal.Slot_index.of_int filtered
+  List.filter_e (Bitset.mem bitset) all_slots
 
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/4139.
    Use a shared storage between dal and rollup node to store slots data.
 *)
 
 let download_and_save_slots
-    ({Node_context.dal_cctxt; protocol_constants; _} as node_context)
-    ~current_block_hash {published_block_hash; confirmed_slots_indexes} =
+    ({Node_context.protocol_constants; _} as node_context) ~current_block_hash
+    {published_block_hash; confirmed_slots_indexes} =
   let open Lwt_result_syntax in
   let*? all_slots =
-    Bitset.fill ~length:protocol_constants.parametric.dal.number_of_slots
+    Bitset.fill ~length:protocol_constants.dal.number_of_slots
     |> Environment.wrap_tzresult
   in
   let*? not_confirmed =
     Environment.wrap_tzresult
-    @@ to_slot_index_list protocol_constants.parametric
+    @@ to_slot_index_list protocol_constants
     @@ Bitset.diff all_slots confirmed_slots_indexes
   in
-  let*? _confirmed =
+  let*? confirmed =
     Environment.wrap_tzresult
-    @@ to_slot_index_list protocol_constants.parametric confirmed_slots_indexes
+    @@ to_slot_index_list protocol_constants confirmed_slots_indexes
   in
-  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/2766.
-     As part of the clean rollup storage workflow, we should make sure that
-     pages for old slots are removed from the storage when not needed anymore.
-  *)
   (* The contents of each slot index are written to a different location on
      disk, therefore calls to store contents for different slot indexes can
      be parallelized. *)
   let* () =
     List.iter_ep
       (fun s_slot ->
-        Node_context.save_unconfirmed_slot
+        Node_context.save_slot_status
           node_context
           current_block_hash
-          s_slot)
+          s_slot
+          `Unconfirmed)
       not_confirmed
   in
-  let* () =
-    [] (* Preparing for the pre-fetching logic. *)
-    |> List.iter_ep (fun s_slot ->
-           (* fails if slot_header is missing but the slot with index s_slot has been
-                confirmed. This scenario should not be possible. *)
-           let* {commitment; _} =
-             Node_context.get_slot_header
-               node_context
-               ~published_in_block_hash:published_block_hash
-               s_slot
-           in
-           (* DAL must be configured for this point to be reached *)
-           let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ dal_cctxt in
-           (* The slot with index s_slot is confirmed. We can
-              proceed retrieving it from the dal node and save it
-              in the store. *)
-           let* pages = Dal_node_client.get_slot_pages dal_cctxt commitment in
-           let* () =
-             Node_context.save_confirmed_slot
-               node_context
-               current_block_hash
-               s_slot
-               pages
-           in
-           let*! () =
-             Dal_slots_tracker_event.slot_has_been_confirmed
-               s_slot
-               published_block_hash
-               current_block_hash
-           in
-           return_unit)
-  in
-  return_unit
+  List.iter_ep
+    (fun s_slot ->
+      let* () =
+        Node_context.save_slot_status
+          node_context
+          current_block_hash
+          s_slot
+          `Confirmed
+      in
+      let*! () =
+        Dal_slots_tracker_event.slot_has_been_confirmed
+          (Sc_rollup_proto_types.Dal.Slot_index.of_octez s_slot)
+          published_block_hash
+          current_block_hash
+      in
+      return_unit)
+    confirmed
 
 module Confirmed_slots_history = struct
   (** [confirmed_slots_with_headers node_ctxt confirmations_info] returns the
@@ -224,22 +185,27 @@ module Confirmed_slots_history = struct
     let*? relevant_slots_indexes =
       Environment.wrap_tzresult
       @@ to_slot_index_list
-           node_ctxt.Node_context.protocol_constants.parametric
+           node_ctxt.Node_context.protocol_constants
            confirmed_slots_indexes
     in
     List.map_ep
       (fun slot_index ->
-        Node_context.get_slot_header
-          node_ctxt
-          ~published_in_block_hash:published_block_hash
-          slot_index)
+        let+ h =
+          Node_context.get_slot_header
+            node_ctxt
+            ~published_in_block_hash:published_block_hash
+            slot_index
+        in
+        Sc_rollup_proto_types.Dal.Slot_header.of_octez h)
       relevant_slots_indexes
 
   let read_slots_history_from_l1 {Node_context.cctxt; _} block =
     let open Lwt_result_syntax in
     (* We return the empty Slots_history if DAL is not enabled. *)
     let* slots_list_opt =
-      RPC.Dal.dal_confirmed_slots_history cctxt (cctxt#chain, `Hash (block, 0))
+      RPC.Dal.dal_confirmed_slots_history
+        (new Protocol_client_context.wrap_full cctxt)
+        (cctxt#chain, `Hash (block, 0))
     in
     return @@ Option.value slots_list_opt ~default:Dal.Slots_history.genesis
 
@@ -251,11 +217,10 @@ module Confirmed_slots_history = struct
   let should_process_dal_slots node_ctxt block_level =
     let open Node_context in
     let lag =
-      Int32.of_int
-        node_ctxt.Node_context.protocol_constants.parametric.dal.attestation_lag
+      Int32.of_int node_ctxt.Node_context.protocol_constants.dal.attestation_lag
     in
     let block_level = Raw_level.to_int32 block_level in
-    let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
+    let genesis_level = node_ctxt.genesis_info.level in
     Int32.(block_level >= add lag genesis_level)
 
   let dal_entry_of_block_hash node_ctxt
@@ -290,23 +255,32 @@ module Confirmed_slots_history = struct
           block_level
 
   let slots_history_of_hash node_ctxt block =
+    let find node_ctxt block =
+      let open Lwt_result_syntax in
+      let+ hist = Node_context.find_confirmed_slots_history node_ctxt block in
+      Option.map Sc_rollup_proto_types.Dal.Slot_history.of_octez hist
+    in
     dal_entry_of_block_hash
       node_ctxt
       block
       ~entry_kind:"slots history"
-      ~find:Node_context.find_confirmed_slots_history
+      ~find
       ~default:read_slots_history_from_l1
 
   let slots_history_cache_of_hash node_ctxt block =
+    let find node_ctxt block =
+      let open Lwt_result_syntax in
+      let+ hist = Node_context.find_confirmed_slots_histories node_ctxt block in
+      Option.map Sc_rollup_proto_types.Dal.Slot_history_cache.of_octez hist
+    in
     dal_entry_of_block_hash
       node_ctxt
       block
       ~entry_kind:"slots history cache"
-      ~find:Node_context.find_confirmed_slots_histories
+      ~find
       ~default:(fun node_ctxt _block ->
         let num_slots =
-          node_ctxt.Node_context.protocol_constants.parametric.dal
-            .number_of_slots
+          node_ctxt.Node_context.protocol_constants.dal.number_of_slots
         in
         (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3788
            Put an accurate value for capacity. The value
@@ -354,13 +328,13 @@ module Confirmed_slots_history = struct
       Node_context.save_confirmed_slots_history
         node_ctxt
         head_hash
-        slots_history
+        (Sc_rollup_proto_types.Dal.Slot_history.to_octez slots_history)
     in
     let* () =
       Node_context.save_confirmed_slots_histories
         node_ctxt
         head_hash
-        slots_cache
+        (Sc_rollup_proto_types.Dal.Slot_history_cache.to_octez slots_cache)
     in
     return ()
 end

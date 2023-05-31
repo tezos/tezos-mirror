@@ -89,39 +89,26 @@ let get_slot_pages =
       (Dal_node_client.get_slot_pages dal_cctxt)
       Lwt.return
 
-let check_confirmation_status_and_download
-    ({Node_context.dal_cctxt; _} as node_ctxt) ~confirmed_in_block_hash
-    ~published_in_block_hash index =
+let download_confirmed_slot_pages ({Node_context.dal_cctxt; _} as node_ctxt)
+    ~published_level ~index =
   let open Lwt_result_syntax in
-  let* confirmed_in_block_level =
-    Node_context.level_of_hash node_ctxt confirmed_in_block_hash
+  let* published_in_block_hash =
+    Node_context.hash_of_level node_ctxt (Raw_level.to_int32 published_level)
   in
-  let confirmed_in_head =
-    Layer1.{hash = confirmed_in_block_hash; level = confirmed_in_block_level}
+  let* header =
+    Node_context.get_slot_header node_ctxt ~published_in_block_hash index
   in
-  let* is_confirmed =
-    Dal_slots_tracker.is_slot_confirmed node_ctxt confirmed_in_head index
-  in
-  if is_confirmed then
-    let* {commitment; _} =
-      Node_context.get_slot_header node_ctxt ~published_in_block_hash index
-    in
-    let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ dal_cctxt in
-    (* DAL must be configured for this point to be reached *)
-    let* pages = get_slot_pages dal_cctxt commitment in
-    let save_pages node_ctxt =
-      Node_context.save_confirmed_slot
-        node_ctxt
-        confirmed_in_block_hash
-        index
-        pages
-    in
-    return (Delayed_write_monad.delay_write (Some pages) save_pages)
-  else
-    let save_slot node_ctxt =
-      Node_context.save_unconfirmed_slot node_ctxt confirmed_in_block_hash index
-    in
-    return (Delayed_write_monad.delay_write None save_slot)
+  let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ dal_cctxt in
+  (* DAL must be configured for this point to be reached *)
+  get_slot_pages dal_cctxt header.commitment
+
+let storage_invariant_broken published_level index =
+  failwith
+    "Internal error: [Node_context.find_slot_status] is supposed to have \
+     registered the status of the slot %d published at level %a in the store"
+    index
+    Raw_level.pp
+    published_level
 
 let slot_pages ~dal_attestation_lag node_ctxt
     Dal.Slot.Header.{published_level; index} =
@@ -132,37 +119,21 @@ let slot_pages ~dal_attestation_lag node_ctxt
       ~published_level
       node_ctxt
   in
+  let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
   let* processed =
-    Node_context.processed_slot node_ctxt ~confirmed_in_block_hash index
+    Node_context.find_slot_status node_ctxt ~confirmed_in_block_hash index
   in
   match processed with
-  | None ->
-      let* published_in_block_hash =
-        Node_context.hash_of_level
-          node_ctxt
-          (Raw_level.to_int32 published_level)
-      in
-      check_confirmation_status_and_download
-        node_ctxt
-        ~published_in_block_hash
-        ~confirmed_in_block_hash
-        index
-  | Some `Unconfirmed -> return (Delayed_write_monad.no_write None)
   | Some `Confirmed ->
       let* pages =
-        Node_context.list_slot_pages node_ctxt ~confirmed_in_block_hash
+        download_confirmed_slot_pages node_ctxt ~published_level ~index
       in
-      let pages =
-        List.filter_map
-          (fun ((slot_idx, _page_idx), v) ->
-            if Dal.Slot_index.equal index slot_idx then Some v else None)
-          pages
-      in
-      return (Delayed_write_monad.no_write (Some pages))
+      return (Some pages)
+  | Some `Unconfirmed -> return None
+  | None -> storage_invariant_broken published_level index
 
 let page_content ~dal_attestation_lag node_ctxt page_id =
   let open Lwt_result_syntax in
-  let open Delayed_write_monad.Lwt_result_syntax in
   let Dal.Page.{slot_id; page_index} = page_id in
   let Dal.Slot.Header.{published_level; index} = slot_id in
   let* confirmed_in_block_hash =
@@ -171,52 +142,17 @@ let page_content ~dal_attestation_lag node_ctxt page_id =
       ~published_level
       node_ctxt
   in
+  let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
   let* processed =
-    Node_context.processed_slot node_ctxt ~confirmed_in_block_hash index
+    Node_context.find_slot_status node_ctxt ~confirmed_in_block_hash index
   in
   match processed with
-  | None -> (
-      (* In this case we know that the slot header has not been prefetched
-         by the rollup node. We check whether it was confirmed by looking at the
-         block receipt metadata, before requesting the data to the dal node.
-         While the current logic in `Dal_slots_tracker.donwload_and_save_slots`
-         guarantees that if `processed = None`, then the slot has been confirmed,
-         having this additional check in place ensures that we do not rely on
-         the logic of that function when determining the confirmation status of
-         a slot. *)
-      let* published_in_block_hash =
-        Node_context.hash_of_level
-          node_ctxt
-          (Raw_level.to_int32 published_level)
-      in
-      let>* pages =
-        check_confirmation_status_and_download
-          node_ctxt
-          ~published_in_block_hash
-          ~confirmed_in_block_hash
-          index
-      in
-      match pages with
-      | None -> (* Slot is not confirmed *) return None
-      | Some (* Slot is confirmed *) pages -> (
-          match List.nth_opt pages page_index with
-          | Some page -> return @@ Some page
-          | None -> tzfail @@ Dal_invalid_page_for_slot page_id))
-  | Some `Unconfirmed -> return None
   | Some `Confirmed -> (
-      let* page_opt =
-        Node_context.find_slot_page
-          node_ctxt
-          ~confirmed_in_block_hash
-          ~slot_index:index
-          ~page_index
+      let* pages =
+        download_confirmed_slot_pages node_ctxt ~published_level ~index
       in
-      match page_opt with
-      | Some v -> return @@ Some v
-      | None ->
-          let* pages =
-            Node_context.list_slot_pages node_ctxt ~confirmed_in_block_hash
-          in
-          if page_index < 0 || List.compare_length_with pages page_index <= 0
-          then tzfail @@ Dal_invalid_page_for_slot page_id
-          else tzfail @@ Dal_slot_not_found_in_store slot_id)
+      match List.nth_opt pages page_index with
+      | Some page -> return @@ Some page
+      | None -> tzfail @@ Dal_invalid_page_for_slot page_id)
+  | Some `Unconfirmed -> return None
+  | None -> storage_invariant_broken published_level index
