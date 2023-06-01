@@ -257,11 +257,9 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
                     __FUNCTION__
                     (Printexc.to_string exc)) ;
               return_unit)
-      | Disconnect {peer = _} ->
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5647
-
-             Handle Disconnect, Connect, Forget and Kick directives from GS *)
-          assert false
+      | Disconnect {peer} ->
+          P2p.find_connection_by_peer_id p2p_layer peer
+          |> Option.iter_s (P2p.disconnect p2p_layer)
       | Connect {px; origin} -> try_connect p2p_layer px_cache ~px ~origin
       | Forget {px = _; origin = _} ->
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5647
