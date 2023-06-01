@@ -220,6 +220,7 @@ type mod_arith_desc = {
   moduli : Z.t list;
   qm_bound : Z.t * Z.t;
   ts_bounds : (Z.t * Z.t) list;
+  inverse : bool;
   inp1 : int list;
   inp2 : int list;
   out : int list;
@@ -421,6 +422,7 @@ let solve_one trace solver =
         moduli;
         qm_bound;
         ts_bounds;
+        inverse;
         inp1;
         inp2;
         out;
@@ -436,8 +438,17 @@ let solve_one trace solver =
       let ( %! ) = Z.rem in
       let xs = List.map (fun v -> trace.(v) |> S.to_z) inp1 in
       let ys = List.map (fun v -> trace.(v) |> S.to_z) inp2 in
-      let zs = Utils.mod_add_limbs ~modulus ~base xs ys in
+      let zs =
+        if inverse then Utils.mod_sub_limbs ~modulus ~base xs ys
+        else Utils.mod_add_limbs ~modulus ~base xs ys
+      in
       List.iter2 (fun v zi -> trace.(v) <- S.of_z zi) out zs ;
+      (* The rest of trace values from this point onwards, i.e. qm and tj,
+         are designed to enforce the equality xs + ys = zs.
+         If we are doing a substraction xs - ys = zs (when inverse = true),
+         we implement it as an addition zs + ys = xs. Therefore, we need to
+         rename [xs <-> zs]. *)
+      let xs, zs = if inverse then (zs, xs) else (xs, zs) in
       let qm_shift, qm_ubound = qm_bound in
       let bs_mod_m =
         List.init nb_limbs (fun i -> Z.pow base i %! modulus) |> List.rev

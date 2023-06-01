@@ -241,6 +241,7 @@ module type COMMON = sig
   (* See [lib_plompiler/gadget_mod_arith.ml] for documentation on mod_arith *)
   module Mod_arith : sig
     val add :
+      ?subtraction:bool ->
       label:string ->
       modulus:Z.t ->
       nb_limbs:int ->

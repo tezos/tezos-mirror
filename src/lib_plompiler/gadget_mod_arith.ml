@@ -132,7 +132,7 @@ module type MOD_ARITH = functor (L : LIB) -> sig
 
   val add : mod_int repr -> mod_int repr -> mod_int repr t
 
-  (* val sub : mod_int repr -> mod_int repr -> mod_int repr t *)
+  val sub : mod_int repr -> mod_int repr -> mod_int repr t
 
   (* val mul : mod_int repr -> mod_int repr -> mod_int repr t *)
 
@@ -345,6 +345,18 @@ functor
 
     let add =
       Mod_arith.add
+        ~subtraction:false
+        ~label
+        ~modulus
+        ~nb_limbs
+        ~base
+        ~moduli:moduli_add
+        ~qm_bound:(fst bounds_add)
+        ~ts_bounds:(snd bounds_add)
+
+    let sub =
+      Mod_arith.add
+        ~subtraction:true
         ~label
         ~modulus
         ~nb_limbs

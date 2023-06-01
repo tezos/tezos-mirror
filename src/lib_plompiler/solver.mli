@@ -156,6 +156,9 @@ type mod_arith_desc = {
   moduli : Z.t list;
   qm_bound : Z.t * Z.t;
   ts_bounds : (Z.t * Z.t) list;
+  (* specifies if we are doing the inverse operation, i.e. sub instead of add
+     or div instead of mul *)
+  inverse : bool;
   (* variables *)
   inp1 : int list;
   inp2 : int list;
