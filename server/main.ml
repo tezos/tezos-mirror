@@ -192,15 +192,15 @@ let get_summary db_pool =
 
 let get_head db_pool =
   let query =
-    Caqti_request.Infix.(Caqti_type.(unit ->! int32))
+    Caqti_request.Infix.(Caqti_type.(unit ->? int32))
       "SELECT MAX (level) FROM blocks"
   in
   with_caqti_error
     (Caqti_lwt.Pool.use
-       (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find query ())
+       (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find_opt query ())
        db_pool)
     (fun head_level ->
-      reply_public_json Data_encoding.(obj1 (req "level" int32)) head_level)
+      reply_public_json Data_encoding.(obj1 (opt "level" int32)) head_level)
 
 let maybe_create_tables db_pool =
   Caqti_lwt.Pool.use
