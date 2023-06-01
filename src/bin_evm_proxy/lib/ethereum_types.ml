@@ -231,12 +231,17 @@ type transaction_receipt = {
   contractAddress : address option;
 }
 
+let rope_to_bytes r = Rope.to_string r |> Bytes.of_string
+
+let decode_rope_block_hash h = decode_block_hash (rope_to_bytes h)
+
+let decode_rope_hash h = decode_hash (rope_to_bytes h)
+
+let decode_rope_address a = decode_address (rope_to_bytes a)
+
+let decode_rope_number n = decode_number (rope_to_bytes n)
+
 let transaction_receipt_from_rlp bytes =
-  let rope_to_bytes r = Rope.to_string r |> Bytes.of_string in
-  let decode_block_hash h = decode_block_hash (rope_to_bytes h) in
-  let decode_hash h = decode_hash (rope_to_bytes h) in
-  let decode_address a = decode_address (rope_to_bytes a) in
-  let decode_number n = decode_number (rope_to_bytes n) in
   match Rlp.decode (Rope.of_string bytes) with
   | Rlp.RlpList
       [
@@ -253,21 +258,23 @@ let transaction_receipt_from_rlp bytes =
         RlpData type_;
         RlpData status;
       ] ->
-      let hash = decode_hash hash in
-      let index = decode_number index in
-      let block_hash = decode_block_hash block_hash in
-      let block_number = decode_number block_number in
-      let from = decode_address from in
-      let to_ = if Rope.is_empty to_ then None else Some (decode_address to_) in
-      let cumulative_gas_used = decode_number cumulative_gas_used in
-      let effective_gas_price = decode_number effective_gas_price in
-      let gas_used = decode_number gas_used in
+      let hash = decode_rope_hash hash in
+      let index = decode_rope_number index in
+      let block_hash = decode_rope_block_hash block_hash in
+      let block_number = decode_rope_number block_number in
+      let from = decode_rope_address from in
+      let to_ =
+        if Rope.is_empty to_ then None else Some (decode_rope_address to_)
+      in
+      let cumulative_gas_used = decode_rope_number cumulative_gas_used in
+      let effective_gas_price = decode_rope_number effective_gas_price in
+      let gas_used = decode_rope_number gas_used in
       let contract_address =
         if Rope.is_empty contract_address then None
-        else Some (decode_address contract_address)
+        else Some (decode_rope_address contract_address)
       in
-      let type_ = decode_number type_ in
-      let status = decode_number status in
+      let type_ = decode_rope_number type_ in
+      let status = decode_rope_number status in
       {
         transactionHash = hash;
         transactionIndex = index;
@@ -378,6 +385,60 @@ type transaction_object = {
   r : hash;
   s : hash;
 }
+
+let transaction_object_from_rlp bytes =
+  match Rlp.decode (Rope.of_string bytes) with
+  | Rlp.RlpList
+      [
+        RlpData block_hash;
+        RlpData block_number;
+        RlpData from;
+        RlpData gas_used;
+        RlpData gas_price;
+        RlpData hash;
+        RlpData input;
+        RlpData nonce;
+        RlpData to_;
+        RlpData index;
+        RlpData value;
+        RlpData v;
+        RlpData r;
+        RlpData s;
+      ] ->
+      let block_hash = decode_rope_block_hash block_hash in
+      let block_number = decode_rope_number block_number in
+
+      let from = decode_rope_address from in
+      let gas = decode_rope_number gas_used in
+      let gas_price = decode_rope_number gas_price in
+      let hash = decode_rope_hash hash in
+      let input = decode_rope_hash input in
+      let nonce = decode_rope_number nonce in
+      let to_ =
+        if Rope.is_empty to_ then None else Some (decode_rope_address to_)
+      in
+      let index = decode_rope_number index in
+      let value = decode_rope_number value in
+      let v = decode_rope_number v in
+      let r = decode_rope_hash r in
+      let s = decode_rope_hash s in
+      {
+        blockHash = Some block_hash;
+        blockNumber = Some block_number;
+        from;
+        gas;
+        gasPrice = gas_price;
+        hash;
+        input;
+        nonce;
+        to_;
+        transactionIndex = index;
+        value;
+        v;
+        r;
+        s;
+      }
+  | _ -> raise (Invalid_argument "Expected a RlpList of 14 elements")
 
 let transaction_object_encoding =
   let open Data_encoding in

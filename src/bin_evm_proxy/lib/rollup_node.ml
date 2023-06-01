@@ -159,34 +159,7 @@ module Durable_storage_path = struct
   module Transaction_object = struct
     let objects = "/evm/transactions_objects"
 
-    let object_field tx_hash field =
-      Format.sprintf "%s/%s/%s" objects tx_hash field
-
-    let block_hash tx_hash = object_field tx_hash "block_hash"
-
-    let block_number tx_hash = object_field tx_hash "block_number"
-
-    let from tx_hash = object_field tx_hash "from"
-
-    let gas_used tx_hash = object_field tx_hash "gas_used"
-
-    let gas_price tx_hash = object_field tx_hash "gas_price"
-
-    let input tx_hash = object_field tx_hash "input"
-
-    let nonce tx_hash = object_field tx_hash "nonce"
-
-    let to_ tx_hash = object_field tx_hash "to"
-
-    let index tx_hash = object_field tx_hash "index"
-
-    let value tx_hash = object_field tx_hash "value"
-
-    let v tx_hash = object_field tx_hash "v"
-
-    let r tx_hash = object_field tx_hash "r"
-
-    let s tx_hash = object_field tx_hash "r"
+    let object_ tx_hash = objects ^ "/" ^ tx_hash
   end
 end
 
@@ -368,108 +341,19 @@ module RPC = struct
           (Ethereum_types.transaction_receipt_from_rlp (Bytes.to_string bytes))
     | None -> None
 
-  let transaction_object base (Hash tx_hash as hash) =
+  let transaction_object base (Hash tx_hash) =
     let open Lwt_result_syntax in
-    let* block_hash_opt =
+    let+ bytes =
       inspect_durable_and_decode_opt
         base
-        (Durable_storage_path.Transaction_object.block_hash tx_hash)
-        decode_block_hash
+        (Durable_storage_path.Transaction_object.object_ tx_hash)
+        Fun.id
     in
-    match block_hash_opt with
-    | None ->
-        (* If the transaction has no block hash, it was not mined. *)
-        return_none
-    | Some block_hash ->
-        let* block_number =
-          inspect_durable_and_decode
-            base
-            (Durable_storage_path.Transaction_object.block_number tx_hash)
-            decode_number
-        in
-        let* from =
-          inspect_durable_and_decode
-            base
-            (Durable_storage_path.Transaction_object.from tx_hash)
-            decode_address
-        in
-        let* gas_used =
-          inspect_durable_and_decode
-            base
-            (Durable_storage_path.Transaction_object.gas_used tx_hash)
-            decode_number
-        in
-        let* gas_price =
-          inspect_durable_and_decode
-            base
-            (Durable_storage_path.Transaction_object.gas_price tx_hash)
-            decode_number
-        in
-        let* input =
-          inspect_durable_and_decode_opt
-            base
-            (Durable_storage_path.Transaction_object.input tx_hash)
-            decode_hash
-        in
-        let* nonce =
-          inspect_durable_and_decode
-            base
-            (Durable_storage_path.Transaction_object.nonce tx_hash)
-            decode_number
-        in
-        let* to_ =
-          inspect_durable_and_decode_opt
-            base
-            (Durable_storage_path.Transaction_object.to_ tx_hash)
-            decode_address
-        in
-        let* index =
-          inspect_durable_and_decode
-            base
-            (Durable_storage_path.Transaction_object.index tx_hash)
-            decode_number
-        in
-        let* value =
-          inspect_durable_and_decode
-            base
-            (Durable_storage_path.Transaction_object.value tx_hash)
-            decode_number
-        in
-        let* v =
-          inspect_durable_and_decode
-            base
-            (Durable_storage_path.Transaction_object.v tx_hash)
-            decode_number
-        in
-        let* r =
-          inspect_durable_and_decode
-            base
-            (Durable_storage_path.Transaction_object.r tx_hash)
-            decode_hash
-        in
-        let* s =
-          inspect_durable_and_decode
-            base
-            (Durable_storage_path.Transaction_object.s tx_hash)
-            decode_hash
-        in
-        return_some
-          {
-            blockHash = Some block_hash;
-            blockNumber = Some block_number;
-            from;
-            gas = gas_used;
-            gasPrice = gas_price;
-            hash;
-            input = Option.value ~default:(Hash "") input;
-            nonce;
-            to_;
-            transactionIndex = index;
-            value;
-            v;
-            r;
-            s;
-          }
+    match bytes with
+    | Some bytes ->
+        Some
+          (Ethereum_types.transaction_object_from_rlp (Bytes.to_string bytes))
+    | None -> None
 
   let transactions ~full_transaction_object ~number base =
     let open Lwt_result_syntax in
