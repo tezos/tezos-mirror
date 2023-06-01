@@ -94,6 +94,21 @@ struct TransactionLayerData {
     /// Whether the current transaction is static or not, ie, if the
     /// transaction is allowed to update durable storage.
     pub is_static: bool,
+    /// The log records gathered in this layer of transactions and any
+    /// committed sub layers.
+    pub logs: Vec<Log>,
+}
+
+impl TransactionLayerData {
+    /// Create the data associated with one layer of transactions -
+    /// one Ethereum transaction context. It initially has no log
+    /// records.
+    pub fn new(is_static: bool) -> Self {
+        TransactionLayerData {
+            is_static,
+            logs: vec![],
+        }
+    }
 }
 
 /// The implementation of the SputnikVM [Handler] trait
@@ -587,7 +602,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
 
         self.transaction_data
-            .push(TransactionLayerData { is_static });
+            .push(TransactionLayerData::new(self.is_static() || is_static));
 
         self.evm_account_storage
             .begin_transaction(self.host)
@@ -636,14 +651,18 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .commit_transaction(self.host)
             .map_err(EthereumError::from)?;
 
-        let _ = self.transaction_data.pop();
-
-        Ok(ExecutionOutcome {
-            gas_used: self.gas_used(),
-            is_success: true,
-            new_address,
-            logs: vec![],
-        })
+        if let Some(last_layer) = self.transaction_data.pop() {
+            Ok(ExecutionOutcome {
+                gas_used: self.gas_used(),
+                is_success: true,
+                new_address,
+                logs: last_layer.logs,
+            })
+        } else {
+            Err(EthereumError::InconsistentState(Cow::from(
+                "The transaction data stack is empty when committing the initial transaction"
+            )))
+        }
     }
 
     /// Rollback of initial transaction
@@ -778,9 +797,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             return Err(EthereumError::InconsistentTransactionStack(0, false, true));
         }
 
-        self.transaction_data.push(TransactionLayerData {
-            is_static: self.is_static() || is_static,
-        });
+        self.transaction_data
+            .push(TransactionLayerData::new(self.is_static() || is_static));
 
         self.evm_account_storage
             .begin_transaction(self.host)
@@ -805,11 +823,27 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             current_depth
         );
 
-        let _ = self.transaction_data.pop();
-
         self.evm_account_storage
             .commit_transaction(self.host)
-            .map_err(EthereumError::from)
+            .map_err(EthereumError::from)?;
+
+        if let Some(mut committed_data) = self.transaction_data.pop() {
+            if let Some(top_layer) = self.transaction_data.last_mut() {
+                top_layer
+                    .logs
+                    .try_reserve_exact(committed_data.logs.len())?;
+                top_layer.logs.append(&mut committed_data.logs);
+                Ok(())
+            } else {
+                Err(EthereumError::InconsistentState(Cow::from(
+                    "The transaction data stack is empty",
+                )))
+            }
+        } else {
+            Err(EthereumError::InconsistentState(Cow::from(
+                "The transaction data stack is empty at commit",
+            )))
+        }
     }
 
     /// Rollback an intermediate transaction
@@ -1011,8 +1045,16 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         topics: Vec<H256>,
         data: Vec<u8>,
     ) -> Result<(), ExitError> {
-        // TODO: issue: https://gitlab.com/tezos/tezos/-/issues/4870
-        Ok(()) // STUB until issue above has been fixed
+        if let Some(top_data) = self.transaction_data.last_mut() {
+            top_data.logs.push(Log {
+                address,
+                topics,
+                data,
+            });
+            Ok(())
+        } else {
+            Err(ExitError::Other(Cow::from("No transaction data for log")))
+        }
     }
 
     fn mark_delete(&mut self, address: H160, target: H160) -> Result<(), ExitError> {
