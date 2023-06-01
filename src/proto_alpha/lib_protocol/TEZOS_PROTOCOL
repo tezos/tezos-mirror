@@ -134,6 +134,7 @@
 
         "Contract_delegate_storage",
         "Stake_storage",
+        "Unstaked_frozen_deposits_storage",
         "Frozen_deposits_storage",
         "Contract_storage",
         "Token",
