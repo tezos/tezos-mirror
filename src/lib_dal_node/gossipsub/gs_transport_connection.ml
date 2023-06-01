@@ -261,12 +261,9 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
           P2p.find_connection_by_peer_id p2p_layer peer
           |> Option.iter_s (P2p.disconnect p2p_layer)
       | Connect {px; origin} -> try_connect p2p_layer px_cache ~px ~origin
-      | Forget {px = _; origin = _} ->
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5647
-
-             Handle Disconnect, Connect, Forget and Kick directives from GS *)
-          let () = ignore PX_cache.drop in
-          assert false
+      | Forget {px; origin} ->
+          let _p : P2p_point.Id.t option = PX_cache.drop px_cache ~px ~origin in
+          return_unit
       | Kick {peer} ->
           P2p.pool p2p_layer
           |> Option.iter_s (fun pool -> P2p_pool.Peers.ban pool peer)
