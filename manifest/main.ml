@@ -6041,6 +6041,7 @@ let hash = Protocol.hash
                available in Nairobi and earlier. *)
             dac |> if_some |> if_ N.(number >= 018) |> open_;
             octez_dac_lib |> if_ N.(number >= 018) |> open_;
+            octez_dac_client_lib |> if_ N.(number >= 018) |> open_;
             octez_shell_services |> open_;
             octez_sc_rollup |> if_some |> open_;
             octez_sc_rollup_layer2 |> if_some |> open_;
