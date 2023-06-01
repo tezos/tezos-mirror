@@ -394,6 +394,15 @@ module Contract = struct
       end)
       (Deposits_repr)
 
+  module Unstaked_frozen_deposits =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["unstaked_frozen_deposits"]
+         end))
+         (Make_index (Cycle_repr.Index))
+      (Deposits_repr)
+
   module Frozen_deposits_limit =
     Indexed_context.Make_map
       (Registered)
