@@ -2368,6 +2368,9 @@ module Make (C : AUTOMATON_CONFIG) :
     let pp_connections =
       Fmt.Dump.iter_bindings Peer.Map.iter Fmt.nop Peer.pp pp_connection
 
+    let pp_scores =
+      Fmt.Dump.iter_bindings Peer.Map.iter Fmt.nop Peer.pp Score.pp_value
+
     (* re-export printers *)
     let pp_peer_map = pp_peer_map
 

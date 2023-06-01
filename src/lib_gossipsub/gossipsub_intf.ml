@@ -181,7 +181,7 @@ type ('topic, 'span) score_limits = {
       (** P7: The weight of the score associated to the behaviour penalty. This
           parameter must be negative. *)
   behaviour_penalty_threshold : float;
-      (** The threshold on the behaviour penalty
+      (** P7: The threshold on the behaviour penalty
           counter above which we start penalizing the peer. *)
   behaviour_penalty_decay : float;
       (** P7: The score is multiplied by a factor of [behaviour_penalty_decay] every [score_cleanup_ticks] heartbeat.
@@ -934,6 +934,8 @@ module type AUTOMATON = sig
     val pp_connection : connection Fmt.t
 
     val pp_connections : connection Peer.Map.t Fmt.t
+
+    val pp_scores : Score.value Peer.Map.t Fmt.t
 
     val pp_peer_map : 'a Fmt.t -> 'a Peer.Map.t Fmt.t
 
