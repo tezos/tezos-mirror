@@ -245,6 +245,11 @@ let cycle_end ctxt last_cycle =
   Delegate_sampler.clear_outdated_sampling_data ctxt ~new_cycle >>=? fun ctxt ->
   update_activity ctxt last_cycle >>=? fun (ctxt, deactivated_delegates) ->
   Adaptive_inflation_storage.update_stored_rewards_at_cycle_end ctxt ~new_cycle
+  >>=? fun ctxt ->
+  Unstaked_frozen_deposits_storage
+  .squash_unslashable_unstaked_frozen_deposits_at_cycle_end
+    ctxt
+    ~last_cycle
   >>=? fun ctxt -> return (ctxt, balance_updates, deactivated_delegates)
 
 let init_first_cycles ctxt ~origin =
