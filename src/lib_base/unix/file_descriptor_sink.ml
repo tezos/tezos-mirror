@@ -132,7 +132,7 @@ let make_with_pp_short pp wrapped_event =
     let ms = mod_float (time *. 1000.) 1000. in
     Format.fprintf
       fmt
-      "%s %2d %02d:%02d:%02d.%03.0f"
+      "%s %02d %02d:%02d:%02d.%03.0f"
       month_string
       tm.Unix.tm_mday
       tm.Unix.tm_hour
