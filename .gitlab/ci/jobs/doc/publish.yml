@@ -12,6 +12,9 @@ publish:documentation:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
   stage: doc
+  # Make the publish_documentation run in the beginning of the master
+  # pipeline to ensure it has time to run before the next merge.
+  needs: []
   before_script:
     - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
     - echo "${CI_KH}" > ~/.ssh/known_hosts
