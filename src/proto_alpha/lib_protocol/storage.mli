@@ -205,6 +205,13 @@ module Contract : sig
        and type value = Staking_pseudotoken_repr.t
        and type t := Raw_context.t
 
+  (** Share of the contract's delegate frozen deposits the contract owns. *)
+  module Costaking_pseudotokens :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Staking_pseudotoken_repr.t
+       and type t := Raw_context.t
+
   (** If there is a value, the frozen balance for the contract won't
      exceed it (starting in preserved_cycles + 1). *)
   module Frozen_deposits_limit :
