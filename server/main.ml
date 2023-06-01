@@ -159,26 +159,36 @@ let level_mempool =
 
 let get_summery_query =
   Caqti_request.Infix.(
-    Caqti_type.(unit ->! tup3 int32 int32 Sql_requests.Type.time_protocol))
-    "SELECT level, round, timestamp FROM blocks ORDER BY level, round LIMIT 1"
+    Caqti_type.(unit ->? tup3 int32 int32 Sql_requests.Type.time_protocol))
+    "SELECT level, round, timestamp FROM blocks ORDER BY level DESC, round \
+     DESC LIMIT 1"
 
 let get_summary db_pool =
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
-  let* max_level, round, timestamp =
+  let* out =
     Caqti_lwt.Pool.use
-      (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find get_summery_query ())
+      (fun (module Db : Caqti_lwt.CONNECTION) ->
+        Db.find_opt get_summery_query ())
       db_pool
   in
-  return
-    (Format.asprintf
-       "<!DOCTYPE html><html><head><title>Teztale \
-        status</title></head><body><h1>Teztale status</h1><p>Highest recorded \
-        block is level %li round %li (%a)</p><p><a \
-        href=\"visualization/\">Vizualize data</a></p></body></html>"
-       max_level
-       round
-       Tezos_base.Time.Protocol.pp_hum
-       timestamp)
+  match out with
+  | Some (max_level, round, timestamp) ->
+      return
+        (Format.asprintf
+           "<!DOCTYPE html><html><head><title>Teztale \
+            status</title></head><body><h1>Teztale status</h1><p>Highest \
+            recorded block is level %li round %li (%a)</p><p><a \
+            href=\"visualization/\">Vizualize data</a></p></body></html>"
+           max_level
+           round
+           Tezos_base.Time.Protocol.pp_hum
+           timestamp)
+  | None ->
+      return
+        "<!DOCTYPE html><html><head><title>Teztale \
+         status</title></head><body><h1>Teztale status</h1><p>No registered \
+         block yet.</p><p><a href=\"visualization/\">Vizualize \
+         data</a></p></body></html>"
 
 let get_head db_pool =
   let query =
