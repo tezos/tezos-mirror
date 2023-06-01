@@ -1103,13 +1103,13 @@ ECC.test_edwards_add_optimized:
 Constraints: 9
 
 Bytes.test_constant:
-Constraints: 24
+Constraints: 18
 
 Bytes.test_constant_optimized:
 Constraints: 8
 
 Bytes.test_constant:
-Constraints: 24
+Constraints: 18
 
 Bytes.test_constant_optimized:
 Constraints: 8
@@ -1685,16 +1685,16 @@ Blake.test_mixing_optimized:
 Constraints: 1999
 
 Blake.test_compression:
-Constraints: 87808
+Constraints: 87458
 
 Blake.test_compression_optimized:
 Constraints: 86945
 
 Blake.test_blake2s:
-Constraints: 174377
+Constraints: 173418
 
 Blake.test_blake2s_optimized:
-Constraints: 173313
+Constraints: 173160
 
 Poseidon.test_poseidon:
 Constraints: 273
@@ -1805,28 +1805,28 @@ SHA256.test_sum1_optimized:
 Constraints: 96
 
 SHA256.test_padding:
-Constraints: 1536
+Constraints: 1050
 
 SHA256.test_padding_optimized:
 Constraints: 536
 
 SHA256.test_initial_hash:
-Constraints: 320
+Constraints: 66
 
 SHA256.test_initial_hash_optimized:
 Constraints: 32
 
 SHA256.test_digestabc:
-Constraints: 259416
+Constraints: 127506
 
 SHA256.test_digestabc_optimized:
-Constraints: 129856
+Constraints: 126970
 
 SHA256.test_digestabcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq:
-Constraints: 518064
+Constraints: 254898
 
 SHA256.test_digestabcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq_optimized:
-Constraints: 259056
+Constraints: 253938
 
 Anemoi.test_round.valid:
 Constraints: 20
@@ -2081,85 +2081,85 @@ ModArith.test_mod_sub_optimized:
 Constraints: 5
 
 ModArith.test_mod_neg:
-Constraints: 8
+Constraints: 6
 
 ModArith.test_mod_neg_optimized:
-Constraints: 8
+Constraints: 6
 
 ModArith.test_mod_neg:
-Constraints: 8
+Constraints: 6
 
 ModArith.test_mod_neg_optimized:
-Constraints: 8
+Constraints: 6
 
 ModArith.test_mod_neg:
-Constraints: 8
+Constraints: 6
 
 ModArith.test_mod_neg_optimized:
-Constraints: 8
+Constraints: 6
 
 ModArith.test_mod_neg:
-Constraints: 8
+Constraints: 6
 
 ModArith.test_mod_neg_optimized:
-Constraints: 8
+Constraints: 6
 
 ModArith.test_mod_neg:
-Constraints: 8
+Constraints: 6
 
 ModArith.test_mod_neg_optimized:
-Constraints: 8
+Constraints: 6
 
 ModArith.test_mod_neg:
-Constraints: 8
+Constraints: 6
 
 ModArith.test_mod_neg_optimized:
-Constraints: 8
+Constraints: 6
 
 ModArith.test_mod_neg:
-Constraints: 8
+Constraints: 6
 
 ModArith.test_mod_neg_optimized:
-Constraints: 8
+Constraints: 6
 
 ModArith.test_mod_constant:
-Constraints: 6
+Constraints: 4
 
 ModArith.test_mod_constant_optimized:
 Constraints: 3
 
 ModArith.test_mod_constant:
-Constraints: 6
+Constraints: 5
 
 ModArith.test_mod_constant_optimized:
 Constraints: 3
 
 ModArith.test_mod_constant:
-Constraints: 6
+Constraints: 4
 
 ModArith.test_mod_constant_optimized:
 Constraints: 3
 
 ModArith.test_mod_constant:
-Constraints: 6
+Constraints: 5
 
 ModArith.test_mod_constant_optimized:
 Constraints: 3
 
 ModArith.test_mod_constant:
-Constraints: 6
+Constraints: 5
 
 ModArith.test_mod_constant_optimized:
 Constraints: 3
 
 ModArith.test_mod_constant:
-Constraints: 6
+Constraints: 5
 
 ModArith.test_mod_constant_optimized:
 Constraints: 3
 
 ModArith.test_mod_constant:
-Constraints: 6
+Constraints: 5
 
 ModArith.test_mod_constant_optimized:
 Constraints: 3
@@ -2711,7 +2711,7 @@ Encoding.test_foo_optimized:
 Constraints: 6
 
 Encoding.test_assertion:
-Constraints: 4
+Constraints: 3
 
 Encoding.test_assertion_optimized:
 Constraints: 2
