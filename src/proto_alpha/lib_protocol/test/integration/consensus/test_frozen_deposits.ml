@@ -362,16 +362,14 @@ let test_deposits_after_stake_removal () =
      max_slashing_period] are baked (-1 because we already baked a cycle) *)
   loop b (constants.preserved_cycles + constants.max_slashing_period - 1)
   >>=? fun b ->
-  (* after preserved cycles + max_slashing_period, the frozen_deposits for account1
-     reflects the decrease in account1's active stake. *)
+  (* and still after preserved cycles + max_slashing_period, the frozen_deposits
+     for account1 won't reflect the decrease in account1's active stake
+     without manual staking. *)
   Context.Delegate.current_frozen_deposits (B b) account1
   >>=? fun frozen_deposits_1 ->
-  Assert.equal_tez
-    ~loc:__LOC__
-    frozen_deposits_1
-    Test_tez.(initial_frozen_deposits_1 /! 2L)
+  Assert.equal_tez ~loc:__LOC__ frozen_deposits_1 initial_frozen_deposits_1
   >>=? fun () ->
-  (* but account2's frozen deposits aren't increased automatically *)
+  (* similarly account2's frozen deposits aren't increased automatically *)
   Context.Delegate.current_frozen_deposits (B b) account2
   >>=? fun frozen_deposits_2 ->
   Assert.equal_tez ~loc:__LOC__ frozen_deposits_2 initial_frozen_deposits_2
