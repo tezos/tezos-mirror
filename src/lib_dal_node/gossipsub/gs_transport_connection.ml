@@ -225,16 +225,27 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer =
                     __FUNCTION__
                     (Printexc.to_string exc)) ;
               return_unit)
-      | Disconnect {peer = _}
-      | Connect {px = _; origin = _}
-      | Forget {px = _; origin = _}
+      | Disconnect {peer = _} ->
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5647
+
+             Handle Disconnect, Connect, Forget and Kick directives from GS *)
+          assert false
+      | Connect {px = _; origin = _} ->
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5647
+
+             Handle Disconnect, Connect, Forget and Kick directives from GS *)
+          let () = ignore PX_cache.drop in
+          assert false
+      | Forget {px = _; origin = _} ->
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5647
+
+             Handle Disconnect, Connect, Forget and Kick directives from GS *)
+          let () = ignore PX_cache.drop in
+          assert false
       | Kick {peer = _} ->
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5647
 
-             Handle Disconnect, Connect, Forget and Kick directives from GS.
-
-             Plug PX_cache.drop in Connect (MR !8801). *)
-          let () = ignore PX_cache.drop in
+             Handle Disconnect, Connect, Forget and Kick directives from GS *)
           assert false
     in
     loop output_stream
