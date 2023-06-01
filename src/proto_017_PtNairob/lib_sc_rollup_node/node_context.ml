@@ -281,7 +281,7 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
     mode l1_ctxt ~proto_level
     Configuration.(
       {
-        sc_rollup_address = rollup_address;
+        sc_rollup_address;
         sc_rollup_node_operators = operators;
         mode = operating_mode;
         fee_parameters;
@@ -309,11 +309,13 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
   let* context =
     Context.load mode (Configuration.default_context_dir data_dir)
   in
-  let* () = Context.Rollup.check_or_set_address mode context rollup_address in
+  let* () =
+    Context.Rollup.check_or_set_address mode context sc_rollup_address
+  in
   let publisher = Configuration.Operator_purpose_map.find Publish operators in
   let rollup_address =
     (* Convert to protocol rollup address *)
-    Sc_rollup_proto_types.Address.of_octez rollup_address
+    Sc_rollup_proto_types.Address.of_octez sc_rollup_address
   in
   let* protocol_constants = retrieve_constants cctxt
   and* lcc = get_last_cemented_commitment cctxt rollup_address
@@ -326,7 +328,11 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
   and* genesis_info =
     RPC.Sc_rollup.genesis_info cctxt (cctxt#chain, cctxt#block) rollup_address
   in
-  let*! () = Event.rollup_exists ~addr:rollup_address ~kind in
+  let*! () =
+    Event.rollup_exists
+      ~addr:sc_rollup_address
+      ~kind:(Sc_rollup_proto_types.Kind.to_octez kind)
+  in
   let*! () =
     if dal_cctxt = None && protocol_constants.parametric.dal.feature_enable then
       Event.warn_dal_enabled_no_node ()

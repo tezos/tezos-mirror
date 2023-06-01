@@ -318,7 +318,11 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
   and* genesis_info =
     RPC.Sc_rollup.genesis_info cctxt (cctxt#chain, cctxt#block) rollup_address
   in
-  let*! () = Event.rollup_exists ~addr:rollup_address ~kind in
+  let*! () =
+    Event.rollup_exists
+      ~addr:rollup_address
+      ~kind:(Sc_rollup_proto_types.Kind.to_octez kind)
+  in
   let*! () =
     if dal_cctxt = None && protocol_constants.parametric.dal.feature_enable then
       Event.warn_dal_enabled_no_node ()

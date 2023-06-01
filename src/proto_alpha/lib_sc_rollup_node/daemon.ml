@@ -772,7 +772,7 @@ let run
         ())
       configuration.sc_rollup_node_operators
   in
-  let*! () = Event.waiting_first_block () in
+  let*! () = Event.waiting_first_block Protocol.hash in
   let* l1_ctxt =
     Layer1.start
       ~name:"sc_rollup_node"
@@ -786,7 +786,7 @@ let run
   let* predecessor =
     Layer1.fetch_tezos_shell_header l1_ctxt head.header.predecessor
   in
-  let*! () = Event.received_first_block head.hash in
+  let*! () = Event.received_first_block head.hash Protocol.hash in
   let* node_ctxt =
     Node_context.init
       cctxt
