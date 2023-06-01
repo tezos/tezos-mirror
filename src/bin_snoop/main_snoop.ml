@@ -530,25 +530,16 @@ let codegen_all_cmd solution_fn regexp codegen_options =
        ~exclusions:String.Set.empty
 
 let codegen_for_a_solution solution codegen_options ~exclusions =
-  let ( let* ) = Option.bind in
-
   let found_codegen_models =
-    let get_codegen_from_bench (bench_name, (module Bench : Benchmark.S)) =
-      (* The inference model must match. *)
-      let* _model =
-        List.assoc_opt
-          ~equal:( = )
-          solution.Codegen.inference_model_name
-          Bench.models
-      in
-      (* We assume a benchmark has up to one codegen model, *)
-      let find_codegen name =
-        let* model = Registration.find_model name in
-        Some (name, model)
-      in
-      find_codegen bench_name
-    in
-    List.filter_map get_codegen_from_bench (Registration.all_benchmarks ())
+    (* They include builtin/TIMER_LATENCY. *)
+    List.filter
+      Registration.(
+        fun (_, {from; _}) ->
+          List.exists
+            (fun {local_model_name; _} ->
+              solution.Codegen.inference_model_name = local_model_name)
+            from)
+      (Registration.all_models ())
   in
 
   let fvs_of_codegen_model model =
