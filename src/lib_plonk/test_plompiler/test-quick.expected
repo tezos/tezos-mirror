@@ -1528,82 +1528,82 @@ Constraints: 5030
 MerkleNarity.test_merkle_pos_optimized:
 Constraints: 1318
 
-AddMod.test_mod_add:
+ModArith.test_mod_add:
 Constraints: 5
 
-AddMod.test_mod_add_optimized:
+ModArith.test_mod_add_optimized:
 Constraints: 5
 
-AddMod.test_mod_add:
+ModArith.test_mod_add:
 Constraints: 5
 
-AddMod.test_mod_add_optimized:
+ModArith.test_mod_add_optimized:
 Constraints: 5
 
-AddMod.test_mod_add:
+ModArith.test_mod_add:
 Constraints: 5
 
-AddMod.test_mod_add_optimized:
+ModArith.test_mod_add_optimized:
 Constraints: 5
 
-AddMod.test_mod_add:
+ModArith.test_mod_add:
 Constraints: 5
 
-AddMod.test_mod_add_optimized:
+ModArith.test_mod_add_optimized:
 Constraints: 5
 
-AddMod.test_mod_add:
+ModArith.test_mod_add:
 Constraints: 5
 
-AddMod.test_mod_add_optimized:
+ModArith.test_mod_add_optimized:
 Constraints: 5
 
-AddMod.test_mod_add:
+ModArith.test_mod_add:
 Constraints: 5
 
-AddMod.test_mod_add_optimized:
+ModArith.test_mod_add_optimized:
 Constraints: 5
 
-AddMod.test_mod_add:
+ModArith.test_mod_add:
 Constraints: 5
 
-AddMod.test_mod_add_optimized:
+ModArith.test_mod_add_optimized:
 Constraints: 5
 
-AddMod.test_mod_add:
+ModArith.test_mod_add:
 Constraints: 5
 
-AddMod.test_mod_add_optimized:
+ModArith.test_mod_add_optimized:
 Constraints: 5
 
-AddMod.test_mod_add:
+ModArith.test_mod_add:
 Constraints: 5
 
-AddMod.test_mod_add_optimized:
+ModArith.test_mod_add_optimized:
 Constraints: 5
 
-AddMod.test_mod_add:
+ModArith.test_mod_add:
 Constraints: 5
 
-AddMod.test_mod_add_optimized:
+ModArith.test_mod_add_optimized:
 Constraints: 5
 
-AddMod.test_mod_add:
+ModArith.test_mod_add:
 Constraints: 11
 
-AddMod.test_mod_add_optimized:
+ModArith.test_mod_add_optimized:
 Constraints: 11
 
-AddMod.test_mod_add:
+ModArith.test_mod_add:
 Constraints: 9
 
-AddMod.test_mod_add_optimized:
+ModArith.test_mod_add_optimized:
 Constraints: 9
 
-AddMod.test_mod_add:
+ModArith.test_mod_add:
 Constraints: 9
 
-AddMod.test_mod_add_optimized:
+ModArith.test_mod_add_optimized:
 Constraints: 9
 
 Edwards.test_add:

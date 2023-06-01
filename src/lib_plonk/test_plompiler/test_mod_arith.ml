@@ -29,7 +29,7 @@ module Helpers = Plonk_test.Helpers.Make (Plonk.Main_protocol)
 
 open Plonk_test.Helpers.Utils (LibCircuit)
 
-module AddMod (L : LIB) = struct
+module ModArith (L : LIB) = struct
   module ModArith = ArithMod25519 (L)
   open L
 
@@ -53,49 +53,44 @@ module AddMod (L : LIB) = struct
 
   let ( ! ) = Z.of_int
 
+  let name_suffix valid = if valid then "" else " (negative)"
+
   let tests_mod_add =
     let m = ModArith.modulus in
     let r = random_mod_int ~modulus:m () in
     let r' = random_mod_int ~modulus:m () in
     List.map
-      (fun (xs, expected) ->
-        test ~valid:true ~name:"AddMod.test_mod_add" (add_circuit ~expected xs))
+      (fun (xs, expected, valid) ->
+        let name = "ModArith.test_mod_add" ^ name_suffix valid in
+        test ~valid ~name (add_circuit ~expected xs))
       [
-        ([!10; !(-7)], !3);
-        ([!15; !5], !20);
-        ([!0; !0], !0);
-        ([m; m], !0);
-        ([!0; r], r);
-        ([r; !0], r);
-        ([r; r'], Z.(r + r'));
-        ([r; Z.neg r], !0);
-        ([m; r], r);
-        ([Z.(m - r + one); r], !1);
-        ([!1; !1; !1; !1; !1], !5);
-        ([m; m; m; m], m);
-        (Z.[m + !1; m + !2; m + !3; m + !4], !10);
+        ([!10; !(-7)], !3, true);
+        ([!15; !5], !20, true);
+        ([!0; !0], !0, true);
+        ([m; m], !0, true);
+        ([!0; r], r, true);
+        ([r; !0], r, true);
+        ([r; r'], Z.(r + r'), true);
+        ([r; Z.neg r], !0, true);
+        ([m; r], r, true);
+        ([Z.(m - r + one); r], !1, true);
+        ([!1; !1; !1; !1; !1], !5, true);
+        ([m; m; m; m], m, true);
+        (Z.[m + !1; m + !2; m + !3; m + !4], !10, true);
+        ([!0; m], !1, false);
+        ([!(-1); !2], !0, false);
       ]
 
-  let negative_tests_mod_add =
-    let modulus = ModArith.modulus in
-    List.map
-      (fun (xs, expected) ->
-        test
-          ~valid:false
-          ~name:"AddMod.test_mod_add (negative)"
-          (add_circuit ~expected xs))
-      [([!0; modulus], !1); ([!(-1); !2], !0)]
-
-  let tests = tests_mod_add @ negative_tests_mod_add
+  let tests = tests_mod_add
 end
 
 open Plonk_test.Helpers
 
 let tests =
   [
-    Alcotest.test_case "ModAdd" `Quick (to_test (module AddMod : Test));
+    Alcotest.test_case "ModArith" `Quick (to_test (module ModArith : Test));
     Alcotest.test_case
-      "ModAdd plonk"
+      "ModArith plonk"
       `Slow
-      (to_test ~plonk:(module Plonk.Main_protocol) (module AddMod : Test));
+      (to_test ~plonk:(module Plonk.Main_protocol) (module ModArith : Test));
   ]
