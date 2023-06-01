@@ -74,6 +74,10 @@ Node
   ``endorsement``, ``preendorsement``, ``double_endorsement_evidence``, and
   ``double_preendorsement_evidence`` are still accepted. (MR :gl:`!8746`)
 
+- Simplified the peer to peer messages at head switch. The node now
+  systematically broadcasts only its new head (instead of sometime
+  broadcasting a sparse history of the chain).
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
