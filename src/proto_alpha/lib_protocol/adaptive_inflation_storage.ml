@@ -30,6 +30,10 @@ let default_reward = Q.one
 (* Default bonus value *)
 let default_bonus = 0L
 
+let reward_ratio_min = Q.(5 // 1000)
+
+let reward_ratio_max = Q.(1 // 10)
+
 (* Order of magnitude of the total supply in mutez
    Approximately 2^50 *)
 let bonus_unit = 1_000_000_000_000_000L
@@ -63,6 +67,18 @@ let load_reward_coeff ctxt ~cycle =
   in
   return ctxt
 
+let compute_reward_coeff_ratio =
+  let q_400 = Q.of_int 400 in
+  fun ~stake_ratio ~bonus ->
+    let q_bonus = Q.(div (of_int64 bonus) (of_int64 bonus_unit)) in
+    let inv_f = Q.(mul (mul stake_ratio stake_ratio) q_400) in
+    let f = Q.inv inv_f (* f = 1/400 * (1/x)^2 = yearly inflation rate *) in
+    let f = Q.add f q_bonus in
+    (* f is truncated so that 0.5% <= f <= 10% *)
+    let f = Q.(min f reward_ratio_max) in
+    let f = Q.(max f reward_ratio_min) in
+    f
+
 let compute_bonus ~total_supply ~total_frozen_stake ~previous_bonus =
   ignore total_supply ;
   ignore total_frozen_stake ;
@@ -70,26 +86,19 @@ let compute_bonus ~total_supply ~total_frozen_stake ~previous_bonus =
   default_bonus
 
 let compute_coeff =
-  let q_400 = Q.of_int 400 in
   let q_min_per_year = Q.of_int 525600 in
   fun ~base_total_rewards_per_minute ~total_supply ~total_frozen_stake ~bonus ->
     let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
     let q_total_frozen_stake =
       Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
     in
+    let stake_ratio =
+      Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
+    in
     let q_base_total_rewards_per_minute =
       Tez_repr.to_mutez base_total_rewards_per_minute |> Q.of_int64
     in
-    let q_bonus = Q.(div (of_int64 bonus) (of_int64 bonus_unit)) in
-    let x =
-      Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
-    in
-    let inv_f = Q.(mul (mul x x) q_400) in
-    let f = Q.inv inv_f (* f = 1/400 * (1/x)^2 = yearly inflation rate *) in
-    let f = Q.add f q_bonus in
-    (* f is truncated so that 0.5% <= f <= 10% *)
-    let f = Q.(min f (1 // 10)) in
-    let f = Q.(max f (5 // 1000)) in
+    let f = compute_reward_coeff_ratio ~stake_ratio ~bonus in
     let f = Q.div f q_min_per_year (* = inflation per minute *) in
     let f = Q.mul f q_total_supply (* = rewards per minute *) in
     Q.div f q_base_total_rewards_per_minute
