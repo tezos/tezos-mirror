@@ -44,6 +44,7 @@ type error +=
   | Invalid_transfer_to_sc_rollup
   | Invalid_sender of Destination.t
   | Invalid_staking_destination of public_key_hash
+  | Staking_for_nondelegate_while_costaking_disabled
 
 let () =
   register_error_kind
@@ -235,7 +236,24 @@ let () =
         pkh)
     Data_encoding.(obj1 (req "destination" Contract.implicit_encoding))
     (function Invalid_staking_destination pkh -> Some pkh | _ -> None)
-    (fun pkh -> Invalid_staking_destination pkh)
+    (fun pkh -> Invalid_staking_destination pkh) ;
+  let staking_for_nondelegate_while_costaking_disabled_description =
+    "As long as co-staking is not enabled, staking and unstaking operations \
+     are only allowed from delegates."
+  in
+  register_error_kind
+    `Permanent
+    ~id:"operations.staking_for_nondelegate_while_costaking_disabled"
+    ~title:"Staking for a non-delegate while co-staking is disabled"
+    ~description:staking_for_nondelegate_while_costaking_disabled_description
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        staking_for_nondelegate_while_costaking_disabled_description)
+    Data_encoding.unit
+    (function
+      | Staking_for_nondelegate_while_costaking_disabled -> Some () | _ -> None)
+    (fun () -> Staking_for_nondelegate_while_costaking_disabled)
 
 open Apply_results
 open Apply_operation_result
@@ -297,7 +315,8 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
     (Invalid_staking_destination destination)
   >>?= fun () ->
   Contract.is_delegate ctxt sender >>=? fun is_delegate ->
-  error_unless is_delegate (Invalid_staking_destination sender) >>?= fun () ->
+  error_unless is_delegate Staking_for_nondelegate_while_costaking_disabled
+  >>?= fun () ->
   let delegate = sender in
   Token.transfer
     ctxt
