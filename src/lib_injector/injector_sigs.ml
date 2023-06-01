@@ -242,6 +242,9 @@ module type PROTOCOL_CLIENT = sig
       block following [block_header], with respect to the current time. *)
   val time_until_next_block :
     state -> Tezos_base.Block_header.shell_header option -> Ptime.span
+
+  (** Run protocol specific checks for injector configuration/state. *)
+  val checks : state -> unit tzresult
 end
 
 (** Output signature for functor {!Injector_functor.Make}. *)
