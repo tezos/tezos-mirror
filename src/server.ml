@@ -493,11 +493,13 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
 
   (* Promise a running RPC server. *)
 
-  let launch ?(host = "::") server ?(callback = resto_callback server) mode =
+  let launch ?(host = "::") server ?(conn_closed = ignore)
+      ?(callback = resto_callback server) mode =
     Conduit_lwt_unix.init ~src:host () >>= fun ctx ->
     let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
     server.worker <-
-      (let conn_closed (_, con) =
+      (let conn_closed ((_, con) as c) =
+         let () = conn_closed c in
          let con_string = Connection.to_string con in
          Log.debug "connection closed %s" con_string ;
          try ConnectionMap.find con server.streams () with Not_found -> ()

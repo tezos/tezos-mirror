@@ -112,12 +112,19 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
      ]} *)
   val resto_callback : server -> callback
 
-  (** [launch server callback listening_protocol] starts the given resto
-      [server] initiating the listening loop using the [listening_protocol].
-      Each query will be treated using the given [callback] http handler.*)
+  (** [launch server ?conn_closed ?callback listening_protocol] starts
+     the given resto [server] initiating the listening loop using the
+     [listening_protocol].
+
+      @param [callback] overwrites (if given) the default handler of
+     resto each http query will be treated by.
+
+      @param [conn_closed] is an optional function that is called when
+     a connection is closed. *)
   val launch :
     ?host:string ->
     server ->
+    ?conn_closed:(Cohttp_lwt_unix.Server.conn -> unit) ->
     ?callback:callback ->
     Conduit_lwt_unix.server ->
     unit Lwt.t
