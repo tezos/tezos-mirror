@@ -218,9 +218,7 @@ module Delegate : sig
   val voting_info : t -> public_key_hash -> Vote.delegate_info tzresult Lwt.t
 
   val consensus_key :
-    t ->
-    public_key_hash ->
-    (public_key_hash * (Cycle.t * public_key_hash) list) tzresult Lwt.t
+    t -> public_key_hash -> Delegate_services.consensus_keys_info tzresult Lwt.t
 
   val participation :
     t -> public_key_hash -> Delegate.participation_info tzresult Lwt.t

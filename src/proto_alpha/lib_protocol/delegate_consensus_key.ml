@@ -155,7 +155,8 @@ let pending_updates ctxt delegate =
   let updates =
     List.sort (fun (c1, _) (c2, _) -> Cycle_repr.compare c1 c2) updates
   in
-  return (List.map (fun (c, pk) -> (c, Signature.Public_key.hash pk)) updates)
+  return
+    (List.map (fun (c, pk) -> (c, Signature.Public_key.hash pk, pk)) updates)
 
 let raw_active_pubkey_for_cycle ctxt delegate cycle =
   let open Lwt_result_syntax in
