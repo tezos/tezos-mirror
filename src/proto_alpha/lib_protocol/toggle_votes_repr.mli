@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Tocqueville Group, Inc. <contact@tezos.com>            *)
+(* Copyright (c) 2022-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,39 +24,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+(** Options available for toggle per-block votes *)
 
-type unsigned_block = {
-  unsigned_block_header : Block_header.t;
-  operations : Tezos_base.Operation.t list list;
+type toggle_vote = Toggle_vote_on | Toggle_vote_off | Toggle_vote_pass
+
+type toggle_votes = {
+  liquidity_baking_vote : toggle_vote;
+  adaptive_inflation_vote : toggle_vote;
 }
 
-type simulation_kind =
-  | Filter of Operation_pool.Prioritized.t
-  | Apply of {
-      ordered_pool : Operation_pool.ordered_pool;
-      payload_hash : Block_payload_hash.t;
-    }
+val liquidity_baking_vote_encoding : toggle_vote Data_encoding.encoding
 
-type simulation_mode = Local of Context.index | Node
+val adaptive_inflation_vote_encoding : toggle_vote Data_encoding.encoding
 
-val forge :
-  #Protocol_client_context.full ->
-  chain_id:Chain_id.t ->
-  pred_info:Baking_state.block_info ->
-  pred_resulting_context_hash:Context_hash.t ->
-  pred_live_blocks:Block_hash.Set.t ->
-  timestamp:Time.Protocol.t ->
-  round:Round.t ->
-  liquidity_baking_toggle_vote:Toggle_votes.toggle_vote ->
-  adaptive_inflation_vote:Toggle_votes.toggle_vote ->
-  user_activated_upgrades:User_activated.upgrades ->
-  Baking_configuration.fees_config ->
-  force_apply:bool ->
-  seed_nonce_hash:Nonce_hash.t option ->
-  payload_round:Round.t ->
-  Baking_state.validation_mode ->
-  simulation_kind ->
-  Constants.Parametric.t ->
-  unsigned_block tzresult Lwt.t
+val toggle_votes_encoding : toggle_votes Data_encoding.encoding
+
+(** [compute_new_ema ~toggle_vote old_ema] returns the value [new_ema] of the
+    exponential moving average [old_ema] updated by the vote [toggle_vote].
+
+    It is updated as follows:
+    - if [toggle_vote] is [Toggle_vote_pass] then [new_ema] = [old_ema],
+    - if [toggle_vote] is [Toggle_vote_off], then [new_ema] = (1999 * ema[n] // 2000) + 1,000,000,
+    - if [toggle_vote] is [Toggle_vote_on], then [new_ema] = (1999 * ema[n] // 2000).
+
+    The multiplication is performed in [Z.t] to avoid overflows, division is
+    rounded toward 1,000,000,000 (the middle of the interval).
+    *)
+val compute_new_ema : toggle_vote:toggle_vote -> Toggle_EMA.t -> Toggle_EMA.t

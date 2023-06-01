@@ -415,7 +415,12 @@ let init chain_id ctxt block_header =
       ({
          payload_hash = Block_payload_hash.zero;
          payload_round = Alpha_context.Round.zero;
-         liquidity_baking_toggle_vote = Alpha_context.Liquidity_baking.LB_pass;
+         toggle_votes =
+           {
+             liquidity_baking_vote = Alpha_context.Toggle_votes.Toggle_vote_pass;
+             adaptive_inflation_vote =
+               Alpha_context.Toggle_votes.Toggle_vote_pass;
+           };
          seed_nonce_hash = None;
          proof_of_work_nonce =
            Bytes.make Constants_repr.proof_of_work_nonce_size '0';

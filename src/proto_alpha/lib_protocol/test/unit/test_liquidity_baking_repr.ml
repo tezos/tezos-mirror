@@ -33,19 +33,17 @@
 
 open Protocol
 
-let ema_of_int32 ema =
-  Liquidity_baking_repr.Toggle_EMA.of_int32 ema >|= Environment.wrap_tzresult
+let ema_of_int32 ema = Toggle_EMA.of_int32 ema >|= Environment.wrap_tzresult
 
-let ema_to_int32 = Liquidity_baking_repr.Toggle_EMA.to_int32
+let ema_to_int32 = Toggle_EMA.to_int32
 
 let compute_new_ema ~toggle_vote ema =
-  Liquidity_baking_repr.compute_new_ema ~toggle_vote ema |> ema_to_int32
+  Toggle_votes_repr.compute_new_ema ~toggle_vote ema |> ema_to_int32
 
 (* Folds compute_new_ema on a list of votes *)
 let compute_new_ema_n toggle_votes initial_ema =
   List.fold_left
-    (fun ema toggle_vote ->
-      Liquidity_baking_repr.compute_new_ema ~toggle_vote ema)
+    (fun ema toggle_vote -> Toggle_votes_repr.compute_new_ema ~toggle_vote ema)
     initial_ema
     toggle_votes
   |> ema_to_int32
@@ -98,7 +96,7 @@ let test_ema_pass () =
       ema_of_int32 old_ema >>=? fun ema ->
       Assert.equal_int32
         ~loc:__LOC__
-        (compute_new_ema ~toggle_vote:LB_pass ema)
+        (compute_new_ema ~toggle_vote:Toggle_vote_pass ema)
         old_ema)
     ema_range
 
@@ -107,7 +105,7 @@ let test_ema_in_bound_off () =
   List.iter_es
     (fun old_ema ->
       ema_of_int32 old_ema >>=? fun ema ->
-      let new_ema = compute_new_ema ~toggle_vote:LB_off ema in
+      let new_ema = compute_new_ema ~toggle_vote:Toggle_vote_off ema in
       Assert.leq_int32 ~loc:__LOC__ 0l new_ema >>=? fun () ->
       Assert.leq_int32 ~loc:__LOC__ new_ema 2_000_000_000l)
     ema_range
@@ -121,7 +119,7 @@ let test_ema_increases_off () =
       Assert.lt_int32
         ~loc:__LOC__
         old_ema
-        (compute_new_ema ~toggle_vote:LB_off ema))
+        (compute_new_ema ~toggle_vote:Toggle_vote_off ema))
     (List.filter (fun ema -> Compare.Int32.(ema < 1_999_999_000l)) ema_range)
 
 (* Test that the increase in EMA caused by an Off vote is bounded by 1,000,000 *)
@@ -131,7 +129,7 @@ let test_ema_increases_off_bound () =
       ema_of_int32 old_ema >>=? fun ema ->
       Assert.leq_int32
         ~loc:__LOC__
-        (Int32.sub (compute_new_ema ~toggle_vote:LB_off ema) old_ema)
+        (Int32.sub (compute_new_ema ~toggle_vote:Toggle_vote_off ema) old_ema)
         1_000_000l)
     ema_range
 
@@ -140,7 +138,7 @@ let test_ema_in_bound_on () =
   List.iter_es
     (fun old_ema ->
       ema_of_int32 old_ema >>=? fun ema ->
-      let new_ema = compute_new_ema ~toggle_vote:LB_on ema in
+      let new_ema = compute_new_ema ~toggle_vote:Toggle_vote_on ema in
       Assert.leq_int32 ~loc:__LOC__ 0l new_ema >>=? fun () ->
       Assert.leq_int32 ~loc:__LOC__ new_ema 2_000_000_000l)
     ema_range
@@ -153,7 +151,7 @@ let test_ema_decreases_on () =
       ema_of_int32 old_ema >>=? fun ema ->
       Assert.lt_int32
         ~loc:__LOC__
-        (compute_new_ema ~toggle_vote:LB_on ema)
+        (compute_new_ema ~toggle_vote:Toggle_vote_on ema)
         old_ema)
     (List.filter (fun ema -> Compare.Int32.(ema > 1000l)) ema_range)
 
@@ -164,36 +162,44 @@ let test_ema_decreases_on_bound () =
       ema_of_int32 old_ema >>=? fun ema ->
       Assert.leq_int32
         ~loc:__LOC__
-        (Int32.sub (compute_new_ema ~toggle_vote:LB_on ema) old_ema)
+        (Int32.sub (compute_new_ema ~toggle_vote:Toggle_vote_on ema) old_ema)
         1_000_000l)
     ema_range
 
 (* Test that 1385 Off votes are needed to reach the threshold from 0. *)
 let test_ema_many_off () =
-  let open Liquidity_baking_repr in
+  let open Toggle_votes_repr in
   ema_of_int32 0l >>=? fun initial_ema ->
   Assert.leq_int32
     ~loc:__LOC__
-    (compute_new_ema_n (Stdlib.List.init 1385 (fun _ -> LB_off)) initial_ema)
+    (compute_new_ema_n
+       (Stdlib.List.init 1385 (fun _ -> Toggle_vote_off))
+       initial_ema)
     1_000_000_000l
   >>=? fun () ->
   Assert.leq_int32
     ~loc:__LOC__
     1_000_000_000l
-    (compute_new_ema_n (Stdlib.List.init 1386 (fun _ -> LB_off)) initial_ema)
+    (compute_new_ema_n
+       (Stdlib.List.init 1386 (fun _ -> Toggle_vote_off))
+       initial_ema)
 
 (* Test that 1385 On votes are needed to reach the threshold from the max value of the EMA (2,000,000,000). *)
 let test_ema_many_on () =
-  let open Liquidity_baking_repr in
+  let open Toggle_votes_repr in
   ema_of_int32 2_000_000_000l >>=? fun initial_ema ->
   Assert.leq_int32
     ~loc:__LOC__
     1_000_000_000l
-    (compute_new_ema_n (Stdlib.List.init 1385 (fun _ -> LB_on)) initial_ema)
+    (compute_new_ema_n
+       (Stdlib.List.init 1385 (fun _ -> Toggle_vote_on))
+       initial_ema)
   >>=? fun () ->
   Assert.leq_int32
     ~loc:__LOC__
-    (compute_new_ema_n (Stdlib.List.init 1386 (fun _ -> LB_on)) initial_ema)
+    (compute_new_ema_n
+       (Stdlib.List.init 1386 (fun _ -> Toggle_vote_on))
+       initial_ema)
     1_000_000_000l
 
 (* Test that the EMA update function is symmetric:
@@ -207,8 +213,10 @@ let test_ema_symmetry () =
       let opposite_ema = Int32.(sub 2_000_000_000l ema) in
       ema_of_int32 ema >>=? fun ema ->
       ema_of_int32 opposite_ema >>=? fun opposite_ema ->
-      let new_ema = compute_new_ema ~toggle_vote:LB_on ema in
-      let new_opposite_ema = compute_new_ema ~toggle_vote:LB_off opposite_ema in
+      let new_ema = compute_new_ema ~toggle_vote:Toggle_vote_on ema in
+      let new_opposite_ema =
+        compute_new_ema ~toggle_vote:Toggle_vote_off opposite_ema
+      in
       Assert.equal_int32
         ~loc:__LOC__
         Int32.(add new_ema new_opposite_ema)

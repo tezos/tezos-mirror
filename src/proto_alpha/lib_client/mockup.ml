@@ -518,7 +518,11 @@ let mem_init :
         seed_nonce_hash = None;
         proof_of_work_nonce;
         (* following Baking_configuration.toggle_votes in lib_delegate *)
-        liquidity_baking_toggle_vote = Liquidity_baking.LB_pass;
+        toggle_votes =
+          {
+            liquidity_baking_vote = Toggle_votes.Toggle_vote_pass;
+            adaptive_inflation_vote = Toggle_votes.Toggle_vote_pass;
+          };
       }
     in
     let unsigned_bytes =

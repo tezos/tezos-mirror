@@ -796,8 +796,16 @@ module Actions = struct
       ~level:Notice
       ~msg:"Voting {value} for liquidity baking toggle vote"
       ( "value",
-        Protocol.Alpha_context.Liquidity_baking
-        .liquidity_baking_toggle_vote_encoding )
+        Protocol.Alpha_context.Toggle_votes.liquidity_baking_vote_encoding )
+
+  let vote_for_adaptive_inflation =
+    declare_1
+      ~section
+      ~name:"vote_for_adaptive_inflation"
+      ~level:Notice
+      ~msg:"Voting {value} for adaptive inflation vote"
+      ( "value",
+        Protocol.Alpha_context.Toggle_votes.adaptive_inflation_vote_encoding )
 
   let no_dal_node =
     declare_0
@@ -993,15 +1001,15 @@ module Nonces = struct
       ()
 end
 
-module Liquidity_baking = struct
+module Per_block_votes = struct
   include Internal_event.Simple
 
-  let reading_per_block =
+  let reading_per_block_votes =
     declare_1
       ~section
-      ~name:"reading_per_block"
+      ~name:"reading_per_block_votes"
       ~level:Notice
-      ~msg:"reading liquidity baking vote file: {path}"
+      ~msg:"reading votes file: {path}"
       ("path", Data_encoding.string)
 
   let liquidity_baking_toggle_vote =
@@ -1011,8 +1019,7 @@ module Liquidity_baking = struct
       ~level:Notice
       ~msg:"liquidity baking toggle vote = {value}"
       ( "value",
-        Protocol.Alpha_context.Liquidity_baking
-        .liquidity_baking_toggle_vote_encoding )
+        Protocol.Alpha_context.Toggle_votes.liquidity_baking_vote_encoding )
 
   let per_block_vote_file_fail =
     declare_1
@@ -1022,6 +1029,15 @@ module Liquidity_baking = struct
       ~msg:"Error reading the block vote file: {errors}"
       ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
+
+  let adaptive_inflation_vote =
+    declare_1
+      ~section
+      ~name:"adaptive_inflation_vote"
+      ~level:Notice
+      ~msg:"adaptive inflation vote = {value}"
+      ( "value",
+        Protocol.Alpha_context.Toggle_votes.adaptive_inflation_vote_encoding )
 end
 
 module Selection = struct

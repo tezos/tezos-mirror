@@ -13,6 +13,7 @@
   "proof_of_work_nonce": "101895ca00000000",
   "seed_nonce_hash": "nceUFoeQDgkJCmzdMWh19ZjBYqQD3N9fe6bXQ1ZsUKKvMn7iun5Z3",
   "liquidity_baking_toggle_vote": "off",
+  "adaptive_inflation_vote": "on",
   "signature": "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ",
   "payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG",
   "payload_round":0

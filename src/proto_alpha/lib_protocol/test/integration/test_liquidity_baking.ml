@@ -124,8 +124,8 @@ let liquidity_baking_subsidies n () =
   >>=? fun () -> return_unit
 
 (* Test that subsidy shuts off at correct level alternating baking
-   blocks with liquidity_baking_toggle_vote set to [LB_on], [LB_off], and [LB_pass] followed by [bake_after_toggle] blocks with it set to [LB_pass]. *)
-(* Expected level is roughly 2*(log(1-1/(2*p)) / log(0.999)) where [p] is the proportion [LB_off / (LB_on + LB_off)]. *)
+   blocks with liquidity_baking_toggle_vote set to [Toggle_vote_on], [Toggle_vote_off], and [Toggle_vote_pass] followed by [bake_after_toggle] blocks with it set to [Toggle_vote_pass]. *)
+(* Expected level is roughly 2*(log(1-1/(2*p)) / log(0.999)) where [p] is the proportion [Toggle_vote_off / (Toggle_vote_on + Toggle_vote_off)]. *)
 let liquidity_baking_toggle ~n_vote_on ~n_vote_off ~n_vote_pass expected_level
     bake_after () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
@@ -136,18 +136,21 @@ let liquidity_baking_toggle ~n_vote_on ~n_vote_off ~n_vote_pass expected_level
   >>=? fun liquidity_baking_subsidy ->
   let rec bake_stopping blk i =
     if i < expected_level then
-      Block.bake_n ~liquidity_baking_toggle_vote:LB_on n_vote_on blk
+      Block.bake_n ~liquidity_baking_toggle_vote:Toggle_vote_on n_vote_on blk
       >>=? fun blk ->
-      Block.bake_n ~liquidity_baking_toggle_vote:LB_off n_vote_off blk
+      Block.bake_n ~liquidity_baking_toggle_vote:Toggle_vote_off n_vote_off blk
       >>=? fun blk ->
-      Block.bake_n ~liquidity_baking_toggle_vote:LB_pass n_vote_pass blk
+      Block.bake_n
+        ~liquidity_baking_toggle_vote:Toggle_vote_pass
+        n_vote_pass
+        blk
       >>=? fun blk ->
       bake_stopping blk (i + n_vote_on + n_vote_off + n_vote_pass)
     else return blk
   in
   bake_stopping blk 0 >>=? fun blk ->
   Context.Contract.balance (B blk) liquidity_baking >>=? fun balance ->
-  Block.bake_n ~liquidity_baking_toggle_vote:LB_pass bake_after blk
+  Block.bake_n ~liquidity_baking_toggle_vote:Toggle_vote_pass bake_after blk
   >>=? fun blk ->
   Assert.balance_is ~loc:__LOC__ (B blk) liquidity_baking balance >>=? fun () ->
   liquidity_baking_subsidy *? Int64.of_int (expected_level - 1)
@@ -160,19 +163,19 @@ let liquidity_baking_toggle ~n_vote_on ~n_vote_off ~n_vote_pass expected_level
     expected_final_balance
   >>=? fun () -> return_unit
 
-(* 100% of blocks have liquidity_baking_toggle_vote = LB_off *)
+(* 100% of blocks have liquidity_baking_toggle_vote = Toggle_vote_off *)
 let liquidity_baking_toggle_100 n () =
   liquidity_baking_toggle ~n_vote_on:0 ~n_vote_off:1 ~n_vote_pass:0 1386 n ()
 
-(* 80% of blocks have liquidity_baking_toggle_vote = LB_off *)
+(* 80% of blocks have liquidity_baking_toggle_vote = Toggle_vote_off *)
 let liquidity_baking_toggle_80 n () =
   liquidity_baking_toggle ~n_vote_on:1 ~n_vote_off:4 ~n_vote_pass:0 1963 n ()
 
-(* 60% of blocks have liquidity_baking_toggle_vote = LB_off *)
+(* 60% of blocks have liquidity_baking_toggle_vote = Toggle_vote_off *)
 let liquidity_baking_toggle_60 n () =
   liquidity_baking_toggle ~n_vote_on:2 ~n_vote_off:3 ~n_vote_pass:0 3583 n ()
 
-(* 50% of blocks have liquidity_baking_toggle_vote = LB_off.
+(* 50% of blocks have liquidity_baking_toggle_vote = Toggle_vote_off.
    Subsidy should not be stopped.
    Bakes until 100 blocks after the test sunset level of 4096 used in previous protocols. *)
 let liquidity_baking_toggle_50 () =
@@ -184,9 +187,10 @@ let liquidity_baking_toggle_50 () =
   >>=? fun liquidity_baking_subsidy ->
   let rec bake_stopping blk i =
     if i < 4196 then
-      Block.bake ~liquidity_baking_toggle_vote:LB_on blk >>=? fun blk ->
-      Block.bake ~liquidity_baking_toggle_vote:LB_off blk >>=? fun blk ->
-      bake_stopping blk (i + 2)
+      Block.bake ~liquidity_baking_toggle_vote:Toggle_vote_on blk
+      >>=? fun blk ->
+      Block.bake ~liquidity_baking_toggle_vote:Toggle_vote_off blk
+      >>=? fun blk -> bake_stopping blk (i + 2)
     else return blk
   in
   bake_stopping blk 0 >>=? fun blk ->
@@ -202,24 +206,28 @@ let liquidity_baking_toggle_50 () =
     expected_final_balance
   >>=? fun () -> return_unit
 
-(* Test that the subsidy can restart if LB_on votes regain majority.
-   Bake n_votes with LB_off, check that the subsidy is paused, bake
-   n_votes with LB_on, check that the subsidy flows.
+(* Test that the subsidy can restart if Toggle_vote_on votes regain majority.
+   Bake n_votes with Toggle_vote_off, check that the subsidy is paused, bake
+   n_votes with Toggle_vote_on, check that the subsidy flows.
 *)
 let liquidity_baking_restart n_votes n () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   let liquidity_baking = Alpha_context.Contract.Originated liquidity_baking in
-  Block.bake_n ~liquidity_baking_toggle_vote:LB_off n_votes blk >>=? fun blk ->
+  Block.bake_n ~liquidity_baking_toggle_vote:Toggle_vote_off n_votes blk
+  >>=? fun blk ->
   Context.Contract.balance (B blk) liquidity_baking
   >>=? fun balance_when_paused ->
-  Block.bake_n ~liquidity_baking_toggle_vote:LB_pass n blk >>=? fun blk ->
+  Block.bake_n ~liquidity_baking_toggle_vote:Toggle_vote_pass n blk
+  >>=? fun blk ->
   Assert.balance_is ~loc:__LOC__ (B blk) liquidity_baking balance_when_paused
   >>=? fun () ->
-  Block.bake_n ~liquidity_baking_toggle_vote:LB_on n_votes blk >>=? fun blk ->
+  Block.bake_n ~liquidity_baking_toggle_vote:Toggle_vote_on n_votes blk
+  >>=? fun blk ->
   Context.Contract.balance (B blk) liquidity_baking
   >>=? fun balance_when_restarted ->
-  Block.bake_n ~liquidity_baking_toggle_vote:LB_pass n blk >>=? fun blk ->
+  Block.bake_n ~liquidity_baking_toggle_vote:Toggle_vote_pass n blk
+  >>=? fun blk ->
   Context.get_liquidity_baking_subsidy (B blk)
   >>=? fun liquidity_baking_subsidy ->
   liquidity_baking_subsidy *? Int64.of_int n >>?= fun expected_balance ->
@@ -237,9 +245,9 @@ let liquidity_baking_toggle_ema n_vote_on n_vote_off level bake_after
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   let rec bake_escaping blk i =
     if i < level then
-      Block.bake_n ~liquidity_baking_toggle_vote:LB_on n_vote_on blk
+      Block.bake_n ~liquidity_baking_toggle_vote:Toggle_vote_on n_vote_on blk
       >>=? fun blk ->
-      Block.bake_n ~liquidity_baking_toggle_vote:LB_off n_vote_off blk
+      Block.bake_n ~liquidity_baking_toggle_vote:Toggle_vote_off n_vote_off blk
       >>=? fun blk -> bake_escaping blk (i + n_vote_on + n_vote_off)
     else return blk
   in
@@ -249,8 +257,7 @@ let liquidity_baking_toggle_ema n_vote_on n_vote_off level bake_after
   >>=? fun (_blk, toggle_ema) ->
   Assert.leq_int
     ~loc:__LOC__
-    (toggle_ema |> Alpha_context.Liquidity_baking.Toggle_EMA.to_int32
-   |> Int32.to_int)
+    (toggle_ema |> Alpha_context.Toggle_EMA.to_int32 |> Int32.to_int)
     expected_toggle_ema
   >>=? fun () -> return_unit
 
@@ -441,48 +448,48 @@ let tests =
       `Quick
       (liquidity_baking_subsidies 64);
     Tztest.tztest
-      "liquidity baking toggle vote with 100% of bakers voting LB_off baking \
-       one block longer"
+      "liquidity baking toggle vote with 100% of bakers voting Toggle_vote_off \
+       baking one block longer"
       `Quick
       (liquidity_baking_toggle_100 1);
     Tztest.tztest
-      "liquidity baking toggle vote with 100% of bakers voting LB_off baking \
-       two blocks longer"
+      "liquidity baking toggle vote with 100% of bakers voting Toggle_vote_off \
+       baking two blocks longer"
       `Quick
       (liquidity_baking_toggle_100 2);
     Tztest.tztest
-      "liquidity baking toggle vote with 100% of bakers voting LB_off baking \
-       100 blocks longer"
+      "liquidity baking toggle vote with 100% of bakers voting Toggle_vote_off \
+       baking 100 blocks longer"
       `Quick
       (liquidity_baking_toggle_100 100);
     Tztest.tztest
-      "liquidity baking toggle vote with 80% of bakers voting LB_off baking \
-       one block longer"
+      "liquidity baking toggle vote with 80% of bakers voting Toggle_vote_off \
+       baking one block longer"
       `Quick
       (liquidity_baking_toggle_80 1);
     Tztest.tztest
-      "liquidity baking toggle vote with 80% of bakers voting LB_off baking \
-       two blocks longer"
+      "liquidity baking toggle vote with 80% of bakers voting Toggle_vote_off \
+       baking two blocks longer"
       `Quick
       (liquidity_baking_toggle_80 2);
     Tztest.tztest
-      "liquidity baking toggle vote with 80% of bakers voting LB_off baking \
-       100 blocks longer"
+      "liquidity baking toggle vote with 80% of bakers voting Toggle_vote_off \
+       baking 100 blocks longer"
       `Quick
       (liquidity_baking_toggle_80 100);
     Tztest.tztest
-      "liquidity baking toggle vote with 60% of bakers voting LB_off baking \
-       one block longer"
+      "liquidity baking toggle vote with 60% of bakers voting Toggle_vote_off \
+       baking one block longer"
       `Quick
       (liquidity_baking_toggle_60 1);
     Tztest.tztest
-      "liquidity baking toggle vote with 60% of bakers voting LB_off baking \
-       two blocks longer"
+      "liquidity baking toggle vote with 60% of bakers voting Toggle_vote_off \
+       baking two blocks longer"
       `Quick
       (liquidity_baking_toggle_60 2);
     Tztest.tztest
-      "liquidity baking toggle vote with 60% of bakers voting LB_off baking \
-       100 blocks longer"
+      "liquidity baking toggle vote with 60% of bakers voting Toggle_vote_off \
+       baking 100 blocks longer"
       `Quick
       (liquidity_baking_toggle_60 100);
     Tztest.tztest
@@ -497,7 +504,7 @@ let tests =
       (liquidity_baking_restart 2000 1);
     Tztest.tztest
       "liquidity baking toggle ema in block metadata is zero with no bakers \
-       voting LB_off."
+       voting Toggle_vote_off."
       `Quick
       liquidity_baking_toggle_ema_zero;
     Tztest.tztest

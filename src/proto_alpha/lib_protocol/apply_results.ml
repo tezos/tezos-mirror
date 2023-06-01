@@ -2654,7 +2654,8 @@ type block_metadata = {
   consumed_gas : Gas.Arith.fp;
   deactivated : Signature.Public_key_hash.t list;
   balance_updates : Receipt.balance_updates;
-  liquidity_baking_toggle_ema : Liquidity_baking.Toggle_EMA.t;
+  liquidity_baking_toggle_ema : Toggle_EMA.t;
+  adaptive_inflation_toggle_ema : Toggle_EMA.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
   dal_attestation : Dal.Attestation.t option;
 }
@@ -2674,6 +2675,7 @@ let block_metadata_encoding =
               deactivated;
               balance_updates;
               liquidity_baking_toggle_ema;
+              adaptive_inflation_toggle_ema;
               implicit_operations_results;
               dal_attestation;
             } ->
@@ -2685,6 +2687,7 @@ let block_metadata_encoding =
              deactivated,
              balance_updates,
              liquidity_baking_toggle_ema,
+             adaptive_inflation_toggle_ema,
              implicit_operations_results ),
            (proposer_active_key, baker_active_key, consumed_gas, dal_attestation)
          ))
@@ -2696,6 +2699,7 @@ let block_metadata_encoding =
                 deactivated,
                 balance_updates,
                 liquidity_baking_toggle_ema,
+                adaptive_inflation_toggle_ema,
                 implicit_operations_results ),
               ( proposer_active_key,
                 baker_active_key,
@@ -2711,11 +2715,12 @@ let block_metadata_encoding =
            deactivated;
            balance_updates;
            liquidity_baking_toggle_ema;
+           adaptive_inflation_toggle_ema;
            implicit_operations_results;
            dal_attestation;
          })
        (merge_objs
-          (obj9
+          (obj10
              (req "proposer" Signature.Public_key_hash.encoding)
              (req "baker" Signature.Public_key_hash.encoding)
              (req "level_info" Level.encoding)
@@ -2723,9 +2728,8 @@ let block_metadata_encoding =
              (req "nonce_hash" (option Nonce_hash.encoding))
              (req "deactivated" (list Signature.Public_key_hash.encoding))
              (dft "balance_updates" Receipt.balance_updates_encoding [])
-             (req
-                "liquidity_baking_toggle_ema"
-                Liquidity_baking.Toggle_EMA.encoding)
+             (req "liquidity_baking_toggle_ema" Toggle_EMA.encoding)
+             (req "adaptive_inflation_toggle_ema" Toggle_EMA.encoding)
              (req
                 "implicit_operations_results"
                 (list successful_manager_operation_result_encoding)))

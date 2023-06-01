@@ -93,6 +93,9 @@ Baker
   data directory when searching an existing file. The previous
   semantics, which looks for this file in the current working
   directory, takes predecence.
+- Bakers are now required to set their votes for the adoption of the
+  adaptive inflation feature. They may use the per block votes file,
+  or CLI option ``--adaptive-inflation-vote``.
 
 Accuser
 -------
