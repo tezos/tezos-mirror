@@ -19,7 +19,7 @@ use tezos_ethereum::transaction::{TransactionHash, TransactionObject};
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::runtime::Runtime;
 
-use primitive_types::{H160, U256};
+use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::transaction::{
     TransactionReceipt, TransactionStatus, TransactionType,
@@ -31,6 +31,21 @@ struct TransactionReceiptInfo {
     execution_outcome: Option<ExecutionOutcome>,
     caller: H160,
     to: Option<H160>,
+}
+
+struct TransactionObjectInfo {
+    from: H160,
+    gas_used: U256,
+    gas_price: U256,
+    hash: TransactionHash,
+    input: Vec<u8>,
+    nonce: U256,
+    to: Option<H160>,
+    index: u32,
+    value: U256,
+    v: U256,
+    r: H256,
+    s: H256,
 }
 
 fn make_receipt_info(
@@ -103,13 +118,13 @@ fn make_receipt(
 }
 
 #[inline(always)]
-fn make_object(
+fn make_object_info(
     transaction: Transaction,
     from: H160,
     index: u32,
     gas_used: U256,
-) -> TransactionObject {
-    TransactionObject {
+) -> TransactionObjectInfo {
+    TransactionObjectInfo {
         from,
         gas_used,
         gas_price: transaction.tx.gas_price,
@@ -133,6 +148,32 @@ fn make_receipts(
     receipt_infos
         .into_iter()
         .map(|receipt_info| make_receipt(block, receipt_info, &mut cumulative_gas_used))
+        .collect()
+}
+
+fn make_objects(
+    object_infos: Vec<TransactionObjectInfo>,
+    block_hash: &H256,
+    block_number: &U256,
+) -> Vec<TransactionObject> {
+    object_infos
+        .into_iter()
+        .map(|object_info| TransactionObject {
+            block_hash: *block_hash,
+            block_number: *block_number,
+            from: object_info.from,
+            gas_used: object_info.gas_used,
+            gas_price: object_info.gas_price,
+            hash: object_info.hash,
+            input: object_info.input,
+            nonce: object_info.nonce,
+            to: object_info.to,
+            index: object_info.index,
+            value: object_info.value,
+            v: object_info.v,
+            r: object_info.r,
+            s: object_info.s,
+        })
         .collect()
 }
 
@@ -172,7 +213,7 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
     for proposal in queue.proposals {
         let mut valid_txs = Vec::new();
         let mut receipts_infos = Vec::new();
-        let mut objects = Vec::new();
+        let mut object_infos = Vec::new();
         let mut skip_shift = 0;
         let transactions = proposal.transactions;
 
@@ -237,8 +278,9 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
                 Some(execution_outcome) => execution_outcome.gas_used.into(),
                 None => U256::zero(),
             };
-            let object = make_object(transaction, caller, index - skip_shift, gas_used);
-            objects.push(object);
+            let object_info =
+                make_object_info(transaction, caller, index - skip_shift, gas_used);
+            object_infos.push(object_info);
             receipts_infos.push(receipt_info)
         }
 
@@ -251,7 +293,10 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
         // Note that this is not efficient nor "properly" implemented. This
         // is a temporary hack to answer to third-party tools that asks
         // for transaction objects.
-        storage::store_transaction_objects(host, &new_block, &objects)?;
+        storage::store_transaction_objects(
+            host,
+            &make_objects(object_infos, &new_block.hash, &new_block.number),
+        )?;
         current_block = new_block;
     }
     Ok(())
