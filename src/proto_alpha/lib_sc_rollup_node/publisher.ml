@@ -92,7 +92,7 @@ let build_commitment (node_ctxt : _ Node_context.t)
     (prev_commitment : Octez_smart_rollup.Commitment.Hash.t)
     ~prev_commitment_level ~inbox_level ctxt =
   let open Lwt_result_syntax in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! pvm_state = PVM.State.find ctxt in
   let*? pvm_state =
     match pvm_state with
@@ -124,7 +124,7 @@ let build_commitment (node_ctxt : _ Node_context.t)
 
 let genesis_commitment (node_ctxt : _ Node_context.t) ctxt =
   let open Lwt_result_syntax in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! pvm_state = PVM.State.find ctxt in
   let*? pvm_state =
     match pvm_state with

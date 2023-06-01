@@ -46,7 +46,6 @@ type 'a t = {
   injector_retention_period : int;
   block_finality_time : int;
   kind : Kind.t;
-  pvm : (module Pvm.S);
   fee_parameters : Configuration.fee_parameters;
   protocol_constants : Rollup_constants.protocol_constants;
   proto_level : int;
@@ -123,10 +122,6 @@ let make_kernel_logger ?log_kernel_debug_file data_dir =
     Lwt_unix.openfile path Lwt_unix.[O_WRONLY; O_CREAT; O_APPEND] 0o0644
   in
   Lwt_io.of_fd ~close:(fun () -> Lwt_unix.close fd) ~mode:Lwt_io.Output fd
-
-let pvm_of_kind : Kind.t -> (module Pvm.S) = function
-  | Example_arith -> (module Arith_pvm)
-  | Wasm_2_0_0 -> (module Wasm_2_0_0_pvm)
 
 let init (cctxt : #Client_context.full) ~data_dir ?log_kernel_debug_file mode
     l1_ctxt (protocol_constants : Rollup_constants.protocol_constants)
@@ -208,7 +203,6 @@ let init (cctxt : #Client_context.full) ~data_dir ?log_kernel_debug_file mode
       lcc = Reference.new_ lcc;
       lpc = Reference.new_ lpc;
       kind;
-      pvm = pvm_of_kind kind;
       injector_retention_period = 0;
       block_finality_time = 2;
       fee_parameters;
@@ -967,7 +961,6 @@ module Internal_for_tests = struct
         lcc;
         lpc;
         kind;
-        pvm = pvm_of_kind kind;
         injector_retention_period = 0;
         block_finality_time = 2;
         fee_parameters = Configuration.default_fee_parameters;

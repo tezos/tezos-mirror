@@ -72,7 +72,7 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
   match node_ctxt.boot_sector_file with
   | None -> get_boot_sector block_hash node_ctxt
   | Some boot_sector_file ->
-      let module PVM = (val node_ctxt.pvm) in
+      let module PVM = (val Pvm.of_kind node_ctxt.kind) in
       let*! boot_sector = Lwt_utils_unix.read_file boot_sector_file in
       let*? boot_sector =
         Option.value_e
@@ -88,7 +88,7 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
 let genesis_state block_hash node_ctxt ctxt =
   let open Lwt_result_syntax in
   let* boot_sector = get_boot_sector block_hash node_ctxt in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! initial_state = PVM.initial_state ~empty:(PVM.State.empty ()) in
   let*! genesis_state = PVM.install_boot_sector initial_state boot_sector in
   let*! ctxt = PVM.State.set ctxt genesis_state in
@@ -126,7 +126,7 @@ let transition_pvm node_ctxt ctxt predecessor Layer1.{hash = _; _}
        } =
     Delayed_write_monad.apply node_ctxt eval_result
   in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! ctxt = PVM.State.set ctxt state in
   let*! initial_tick = PVM.get_tick predecessor_state in
   (* Produce events. *)
@@ -181,7 +181,7 @@ let start_state_of_block node_ctxt (block : Sc_rollup_block.t) =
          block.header.inbox_witness)
   in
   let inbox_level = Octez_smart_rollup.Inbox.inbox_level inbox in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! tick = PVM.get_tick state in
   let*! state_hash = PVM.state_hash state in
   let messages =

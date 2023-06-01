@@ -146,7 +146,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
       |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
       |> Sc_rollup.is_reveal_enabled_predicate
     in
-    let module PVM = (val node_ctxt.pvm) in
+    let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let metadata = metadata node_ctxt in
     let dal_attestation_lag =
       node_ctxt.protocol_constants.dal.attestation_lag
@@ -324,7 +324,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
       ~fuel ~failing_ticks state input =
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
-    let module PVM = (val node_ctxt.pvm) in
+    let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let>* res =
       eval_until_input
         node_ctxt
@@ -440,7 +440,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
       eval_result Node_context.delayed_write tzresult Lwt.t =
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
-    let module PVM = (val node_ctxt.pvm) in
+    let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     (* Obtain inbox and its messages for this block. *)
     let inbox_level = Octez_smart_rollup.Inbox.inbox_level inbox in
     let*! initial_tick = PVM.get_tick state in
@@ -483,7 +483,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
       } =
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
-    let module PVM = (val node_ctxt.pvm) in
+    let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let>* state, remaining_fuel, num_messages, remaining_messages =
       match messages with
       | [] ->

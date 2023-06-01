@@ -120,7 +120,7 @@ let page_membership_proof params page_index slot_data =
 let page_info_from_pvm_state (node_ctxt : _ Node_context.t) ~dal_attestation_lag
     (dal_params : Dal.parameters) start_state =
   let open Lwt_result_syntax in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5871
      Use constants for correct protocol. *)
   let is_reveal_enabled =
@@ -169,7 +169,7 @@ let metadata (node_ctxt : _ Node_context.t) =
 
 let generate_proof (node_ctxt : _ Node_context.t) game start_state =
   let open Lwt_result_syntax in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let snapshot = game.inbox_snapshot in
   (* NOTE: [snapshot_level_int32] below refers to the level of the snapshotted
      inbox (from the skip list) which also matches [game.start_level - 1]. *)
@@ -362,7 +362,7 @@ let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level ok
   let our_stop_chunk =
     Sc_rollup.Dissection_chunk.{state_hash = our_state_hash; tick = our_tick}
   in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let* dissection =
     Game_helpers.make_dissection
       ~state_of_tick

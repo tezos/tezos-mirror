@@ -567,9 +567,9 @@ let install_finalizer (daemon_components : (module Daemon_components.S))
   let* () = Event.shutdown_node exit_status in
   Tezos_base_unix.Internal_event_unix.close ()
 
-let check_initial_state_hash {Node_context.cctxt; rollup_address; pvm; _} =
+let check_initial_state_hash {Node_context.cctxt; rollup_address; kind; _} =
   let open Lwt_result_syntax in
-  let module PVM = (val pvm) in
+  let module PVM = (val Pvm.of_kind kind) in
   let* l1_reference_initial_state_hash =
     RPC.Sc_rollup.initial_pvm_state_hash
       (new Protocol_client_context.wrap_full cctxt)

@@ -91,7 +91,7 @@ let simulate_messages_no_checks (node_ctxt : Node_context.ro)
        info_per_level = _;
      } as sim) messages =
   let open Lwt_result_syntax in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! state_hash = PVM.state_hash state in
   let*! tick = PVM.get_tick state in
   let eval_state =

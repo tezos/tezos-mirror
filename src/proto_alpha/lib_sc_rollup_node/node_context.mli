@@ -61,7 +61,6 @@ type 'a t = {
   block_finality_time : int;
       (** Deterministic block finality time for the layer 1 protocol. *)
   kind : Kind.t;  (** Kind of the smart rollup. *)
-  pvm : (module Pvm.S);  (** The PVM used by the smart rollup.  *)
   fee_parameters : Configuration.fee_parameters;
       (** Fee parameters to use when injecting operations in layer 1. *)
   protocol_constants : Rollup_constants.protocol_constants;
