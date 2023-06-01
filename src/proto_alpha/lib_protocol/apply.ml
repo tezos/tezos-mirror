@@ -43,7 +43,7 @@ type error +=
   | Multiple_revelation
   | Invalid_transfer_to_sc_rollup
   | Invalid_sender of Destination.t
-  | Invalid_staking_destination of public_key_hash
+  | Invalid_self_transaction_destination
   | Staking_for_nondelegate_while_costaking_disabled
 
 let () =
@@ -220,23 +220,21 @@ let () =
     Data_encoding.(obj1 (req "contract" Destination.encoding))
     (function Invalid_sender c -> Some c | _ -> None)
     (fun c -> Invalid_sender c) ;
+  let invalid_self_transaction_destination_description =
+    "A pseudo-transaction destination must equal its sender."
+  in
   register_error_kind
     `Permanent
-    ~id:"operations.invalid_staking_destination"
-    ~title:"Invalid destination for a stake operation"
-    ~description:
-      "The transaction destination must be a registered delegate. Additionally \
-       it must equal the operation source for now."
-    ~pp:(fun ppf pkh ->
-      Format.fprintf
+    ~id:"operations.invalid_self_transaction_destination"
+    ~title:"Invalid destination for a pseudo-transaction"
+    ~description:invalid_self_transaction_destination_description
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
         ppf
-        "Invalid destination (%a) for this stake operation. Only registered \
-         delegate are allowed."
-        Signature.Public_key_hash.pp
-        pkh)
-    Data_encoding.(obj1 (req "destination" Contract.implicit_encoding))
-    (function Invalid_staking_destination pkh -> Some pkh | _ -> None)
-    (fun pkh -> Invalid_staking_destination pkh) ;
+        invalid_self_transaction_destination_description)
+    Data_encoding.unit
+    (function Invalid_self_transaction_destination -> Some () | _ -> None)
+    (fun () -> Invalid_self_transaction_destination) ;
   let staking_for_nondelegate_while_costaking_disabled_description =
     "As long as co-staking is not enabled, staking and unstaking operations \
      are only allowed from delegates."
@@ -312,7 +310,7 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
   error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
   error_unless
     Signature.Public_key_hash.(sender = destination)
-    (Invalid_staking_destination destination)
+    Invalid_self_transaction_destination
   >>?= fun () ->
   Contract.is_delegate ctxt sender >>=? fun is_delegate ->
   error_unless is_delegate Staking_for_nondelegate_while_costaking_disabled
