@@ -645,7 +645,7 @@ module Test_remove_peer = struct
                 msg
                 pp_limits
                 GS.Introspection.(limits v)
-                (pp_trace ~pp_state ~pp_state':pp_state ())
+                (pp_trace ~pp_state ())
                 trace)
     in
     QCheck2.Test.check_exn ~rand:rng test ;

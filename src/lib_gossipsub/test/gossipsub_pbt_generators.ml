@@ -124,19 +124,26 @@ struct
 
   let pp_output fmtr (O o) = GS.pp_output fmtr o
 
-  let pp_trace ?pp_state ?pp_state' ?pp_output () fmtr trace =
+  let pp_trace ?pp_state ?pp_output () fmtr trace =
     let open Format in
-    let pp fmtr (Transition {time; input; state; state'; output}) =
-      fprintf fmtr "[%a] " GS.Time.pp time ;
-      Option.iter (fun pp -> fprintf fmtr "%a => " pp state) pp_state ;
+    let pp fmtr (Transition {time; input; state; state' = _; output}) =
+      Option.iter (fun pp -> fprintf fmtr "%a@," pp state) pp_state ;
+      fprintf fmtr "[%a] => " GS.Time.pp time ;
       pp_input fmtr input ;
-      Option.iter (fun pp -> fprintf fmtr " / %a" pp (O output)) pp_output ;
-      Option.iter (fun pp -> fprintf fmtr " => %a" pp state') pp_state'
+      Option.iter (fun pp -> fprintf fmtr " / %a" pp (O output)) pp_output
+    in
+    let pp_last_state fmtr trace =
+      match List.hd (List.rev trace) with
+      | None -> ()
+      | Some (Transition {state'; _}) ->
+          Option.iter (fun pp -> fprintf fmtr "%a@," pp state') pp_state
     in
     fprintf
       fmtr
-      "%a"
+      "%a@;%a"
       (pp_print_list ~pp_sep:(fun fmtr () -> fprintf fmtr "@,") pp)
+      trace
+      pp_last_state
       trace
 
   let add_peer ~gen_peer ~gen_direct ~gen_outbound =

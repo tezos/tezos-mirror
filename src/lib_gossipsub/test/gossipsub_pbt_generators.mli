@@ -87,7 +87,6 @@ val pp_output : Format.formatter -> output -> unit
 
 val pp_trace :
   ?pp_state:(Format.formatter -> state -> unit) ->
-  ?pp_state':(Format.formatter -> state -> unit) ->
   ?pp_output:(Format.formatter -> output -> unit) ->
   unit ->
   Format.formatter ->
