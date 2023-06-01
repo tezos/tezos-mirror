@@ -169,7 +169,7 @@ let nth_block ~full_transaction_object _n =
   in
   return (block tx)
 
-let transaction_receipt _tx_hash = return (transaction_receipt ())
+let transaction_receipt _tx_hash = return (Some (transaction_receipt ()))
 
 let transaction_object _tx_hash = return (Some transaction_object)
 

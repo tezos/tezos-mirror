@@ -122,10 +122,7 @@ let dispatch_input
         let* nonce = Rollup_node_rpc.nonce address in
         return (Get_transaction_count.Output (Ok nonce))
     | Get_transaction_receipt.Input (Some tx_hash) ->
-        let* receipt =
-          let*! res = Rollup_node_rpc.transaction_receipt tx_hash in
-          match res with Ok x -> return_some x | Error _ -> return_none
-        in
+        let* receipt = Rollup_node_rpc.transaction_receipt tx_hash in
         return (Get_transaction_receipt.Output (Ok receipt))
     | Get_transaction_by_hash.Input (Some tx_hash) ->
         let* transaction_object = Rollup_node_rpc.transaction_object tx_hash in

@@ -355,12 +355,16 @@ module RPC = struct
   let transaction_receipt base (Hash tx_hash) =
     let open Lwt_result_syntax in
     let+ bytes =
-      inspect_durable_and_decode
+      inspect_durable_and_decode_opt
         base
         (Durable_storage_path.Transaction_receipt.receipt tx_hash)
         Fun.id
     in
-    Ethereum_types.transaction_receipt_from_rlp (Bytes.to_string bytes)
+    match bytes with
+    | Some bytes ->
+        Some
+          (Ethereum_types.transaction_receipt_from_rlp (Bytes.to_string bytes))
+    | None -> None
 
   let transaction_object base (Hash tx_hash as hash) =
     let open Lwt_result_syntax in
@@ -569,7 +573,8 @@ module type S = sig
     full_transaction_object:bool -> Z.t -> Ethereum_types.block tzresult Lwt.t
 
   val transaction_receipt :
-    Ethereum_types.hash -> Ethereum_types.transaction_receipt tzresult Lwt.t
+    Ethereum_types.hash ->
+    Ethereum_types.transaction_receipt option tzresult Lwt.t
 
   val transaction_object :
     Ethereum_types.hash ->

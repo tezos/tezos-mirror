@@ -84,7 +84,8 @@ module type S = sig
 
   (** [transaction_receipt tx_hash] returns the receipt of [tx_hash]. *)
   val transaction_receipt :
-    Ethereum_types.hash -> Ethereum_types.transaction_receipt tzresult Lwt.t
+    Ethereum_types.hash ->
+    Ethereum_types.transaction_receipt option tzresult Lwt.t
 
   (** [transaction_object tx_hash] returns the informations of [tx_hash]. *)
   val transaction_object :
