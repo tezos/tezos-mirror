@@ -109,6 +109,13 @@ let ( >* ) m f =
   let* Unit = m in
   f
 
+let fmap : ('a -> 'b) -> 'a t -> 'b t =
+ fun f m ->
+  let* m in
+  ret (f m)
+
+let ( <$> ) m f = fmap f m
+
 let rec foldM f e l =
   match l with
   | [] -> ret e

@@ -124,6 +124,8 @@ module type COMMON = sig
 
   val ( >* ) : unit repr t -> 'a t -> 'a t
 
+  val ( <$> ) : 'a t -> ('a -> 'b) -> 'b t
+
   (* Add a boolean check *)
   val with_bool_check : bool repr t -> unit repr t
 

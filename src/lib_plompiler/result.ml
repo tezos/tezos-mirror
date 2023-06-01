@@ -52,6 +52,10 @@ let ( >* ) m f =
   let* U = m in
   f
 
+let ( <$> ) m f =
+  let* m in
+  ret (f m)
+
 let rec mapM f ls =
   match ls with
   | [] -> ret @@ []
