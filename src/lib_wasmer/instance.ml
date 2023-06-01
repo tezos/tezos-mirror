@@ -41,9 +41,6 @@ module Resolver = Map.Make (struct
     | r, _, _ -> r
 end)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4026
-   Ensure that ownership and lifetime of [Types.Instance.t] is respected.
-*)
 type t = {
   module_ : Module.t;
   instance : Types.Instance.t Ctypes.ptr;

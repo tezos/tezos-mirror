@@ -37,13 +37,7 @@ module Resolver = Map.Make (struct
     | r, _ -> r
 end)
 
-type t = {
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4026
-     Ensure that ownership and lifetime of each [Types.Extern.t] is respected.
-  *)
-  resolved : Types.Extern.t Ctypes.ptr Resolver.t;
-  clean : unit -> unit;
-}
+type t = {resolved : Types.Extern.t Ctypes.ptr Resolver.t; clean : unit -> unit}
 
 let from_instance inst =
   let exports_vec = Module.exports inst.Instance.module_ in

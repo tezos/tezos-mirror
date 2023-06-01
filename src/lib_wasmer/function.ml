@@ -26,11 +26,7 @@
 open Api
 open Vectors
 
-type owned =
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4026
-     Ensure that ownership and lifetime of [Types.Func.t] is respected.
-  *)
-  Types.Func.t Ctypes.ptr
+type owned = Types.Func.t Ctypes.ptr
 
 let call_with_inputs params f inputs =
   let rec go : type f r. (f, r) Function_type.params -> f -> int -> r =
