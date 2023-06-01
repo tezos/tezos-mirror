@@ -70,7 +70,16 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
   let punishing_amount =
     Tez_repr.(min frozen_deposits.current_amount punish_value)
   in
-  let reward, amount_to_burn = Tez_repr.div2_sub punishing_amount in
+  let staking_over_baking_limit =
+    Constants_storage.adaptive_inflation_staking_over_baking_limit ctxt
+  in
+  let staking_over_baking_limit_plus_two =
+    Int64.add (Int64.of_int staking_over_baking_limit) 2L
+  in
+  let*? reward =
+    Tez_repr.(punishing_amount /? staking_over_baking_limit_plus_two)
+  in
+  let*? amount_to_burn = Tez_repr.(punishing_amount -? reward) in
   let should_forbid =
     Tez_repr.(punishing_amount = frozen_deposits.current_amount)
   in

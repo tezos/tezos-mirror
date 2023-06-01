@@ -121,17 +121,11 @@ end = struct
   let expected_success _loc baker pred bbad d1 d2 =
     (* same preendorsers in case denunciation succeeds*)
     Assert.equal_pkh ~loc:__LOC__ d1 d2 >>=? fun () ->
-    Context.get_constants (B pred)
-    >>=? fun Constants.
-               {
-                 parametric =
-                   {
-                     percentage_of_frozen_deposits_slashed_per_double_endorsement =
-                       p;
-                     _;
-                   };
-                 _;
-               } ->
+    Context.get_constants (B pred) >>=? fun constants ->
+    let p =
+      constants.parametric
+        .percentage_of_frozen_deposits_slashed_per_double_endorsement
+    in
     (* let's bake the block on top of pred without denunciating d1 *)
     bake ~policy:(By_account baker) pred >>=? fun bgood ->
     (* Checking what the endorser lost *)
@@ -143,8 +137,14 @@ end = struct
     let diff_end_bal = Test_tez.(bal_good -! bal_bad) in
     (* amount lost due to denunciation *)
     let lost_deposit = Test_tez.(frozen_deposit *! Int64.of_int p /! 100L) in
-    (* have of the lost deposts will be earned by the baker *)
-    let denun_reward = Test_tez.(lost_deposit /! 2L) in
+    (* some of the lost deposits (depending on co-staking constants) will be earned by the baker *)
+    let divider =
+      Int64.add
+        2L
+        (Int64.of_int
+           constants.parametric.adaptive_inflation.staking_over_baking_limit)
+    in
+    let denun_reward = Test_tez.(lost_deposit /! divider) in
     (* if the baker is the endorser, he'll only loose half of the deposits *)
     let expected_endo_loss =
       if Signature.Public_key_hash.equal baker d1 then

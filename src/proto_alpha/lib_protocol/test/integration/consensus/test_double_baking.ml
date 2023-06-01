@@ -257,7 +257,12 @@ let test_payload_producer_gets_evidence_rewards () =
      and so it receives the reward for the evidence included in [b']
      (besides the reward for proposing the payload). *)
   Context.Delegate.full_balance (B b1) baker2 >>=? fun full_balance ->
-  let evidence_reward = Test_tez.(slashed_amount /! 2L) in
+  let divider =
+    Int64.add
+      2L
+      (Int64.of_int c.parametric.adaptive_inflation.staking_over_baking_limit)
+  in
+  let evidence_reward = Test_tez.(slashed_amount /! divider) in
   let expected_reward =
     Test_tez.(baking_reward_fixed_portion +! evidence_reward)
   in
