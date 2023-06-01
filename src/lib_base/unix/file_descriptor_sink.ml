@@ -337,7 +337,7 @@ end) : Internal_event.SINK with type t = t = struct
                   match Internal_event.Level.of_string lvl with
                   | Some l ->
                       (* establish default for all sections *)
-                      (Internal_event.Section.empty, Some l) :: pairs
+                      pairs @ [(Internal_event.Section.empty, Some l)]
                   | None ->
                       Format.kasprintf
                         Stdlib.failwith
