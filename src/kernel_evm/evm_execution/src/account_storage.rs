@@ -111,7 +111,7 @@ impl From<OwnedPath> for EthereumAccount {
 }
 
 /// Path where Ethereum accounts are stored
-const ACCOUNTS_PATH: RefPath = RefPath::assert_from(b"/eth_accounts");
+const EVM_ACCOUNTS_PATH: RefPath = RefPath::assert_from(b"/evm/eth_accounts");
 
 /// Path where an account nonce is stored. This should be prefixed with the path to
 /// where the account is stored for the world state or for the current transaction.
@@ -500,7 +500,8 @@ pub type EthereumAccountStorage = Storage<EthereumAccount>;
 /// Get the storage API for accessing the Ethereum World State and do transactions
 /// on it.
 pub fn init_account_storage() -> Result<EthereumAccountStorage, AccountStorageError> {
-    Storage::<EthereumAccount>::init(&ACCOUNTS_PATH).map_err(AccountStorageError::from)
+    Storage::<EthereumAccount>::init(&EVM_ACCOUNTS_PATH)
+        .map_err(AccountStorageError::from)
 }
 
 #[cfg(test)]

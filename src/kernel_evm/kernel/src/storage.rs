@@ -25,11 +25,12 @@ const SMART_ROLLUP_ADDRESS: RefPath =
 
 const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/evm/blocks/current");
 const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/evm/blocks");
-const EVM_BLOCKS_NUMBER: RefPath = RefPath::assert_from(b"/number");
-const EVM_BLOCKS_HASH: RefPath = RefPath::assert_from(b"/hash");
-const EVM_BLOCKS_TRANSACTIONS: RefPath = RefPath::assert_from(b"/transactions");
+const BLOCKS_NUMBER: RefPath = RefPath::assert_from(b"/number");
+const BLOCKS_HASH: RefPath = RefPath::assert_from(b"/hash");
+const BLOCKS_TRANSACTIONS: RefPath = RefPath::assert_from(b"/transactions");
 
-const TRANSACTIONS_RECEIPTS: RefPath = RefPath::assert_from(b"/transactions_receipts");
+const EVM_TRANSACTIONS_RECEIPTS: RefPath =
+    RefPath::assert_from(b"/evm/transactions_receipts");
 const TRANSACTION_RECEIPT_HASH: RefPath = RefPath::assert_from(b"/hash");
 const TRANSACTION_RECEIPT_INDEX: RefPath = RefPath::assert_from(b"/index");
 const TRANSACTION_RECEIPT_BLOCK_HASH: RefPath = RefPath::assert_from(b"/block_hash");
@@ -43,7 +44,8 @@ const TRANSACTION_CUMULATIVE_GAS_USED: RefPath =
 const TRANSACTION_RECEIPT_TYPE: RefPath = RefPath::assert_from(b"/type");
 const TRANSACTION_RECEIPT_STATUS: RefPath = RefPath::assert_from(b"/status");
 
-const TRANSACTIONS_OBJECTS: RefPath = RefPath::assert_from(b"/transactions_objects");
+const EVM_TRANSACTIONS_OBJECTS: RefPath =
+    RefPath::assert_from(b"/evm/transactions_objects");
 const TRANSACTION_OBJECT_BLOCK_HASH: RefPath = RefPath::assert_from(b"/block_hash");
 const TRANSACTION_OBJECT_BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/block_number");
 const TRANSACTION_OBJECT_FROM: RefPath = RefPath::assert_from(b"/from");
@@ -158,18 +160,18 @@ pub fn receipt_path(receipt_hash: &TransactionHash) -> Result<OwnedPath, Error> 
     let hash = hex::encode(receipt_hash);
     let raw_receipt_path: Vec<u8> = format!("/{}", &hash).into();
     let receipt_path = OwnedPath::try_from(raw_receipt_path)?;
-    concat(&TRANSACTIONS_RECEIPTS, &receipt_path).map_err(Error::from)
+    concat(&EVM_TRANSACTIONS_RECEIPTS, &receipt_path).map_err(Error::from)
 }
 
 pub fn object_path(object_hash: &TransactionHash) -> Result<OwnedPath, Error> {
     let hash = hex::encode(object_hash);
     let raw_object_path: Vec<u8> = format!("/{}", &hash).into();
     let object_path = OwnedPath::try_from(raw_object_path)?;
-    concat(&TRANSACTIONS_OBJECTS, &object_path).map_err(Error::from)
+    concat(&EVM_TRANSACTIONS_OBJECTS, &object_path).map_err(Error::from)
 }
 
 pub fn read_current_block_number<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
-    let path = concat(&EVM_CURRENT_BLOCK, &EVM_BLOCKS_NUMBER)?;
+    let path = concat(&EVM_CURRENT_BLOCK, &BLOCKS_NUMBER)?;
     let mut buffer = [0_u8; 8];
     store_read_slice(host, &path, &mut buffer, 8)?;
     Ok(U256::from_little_endian(&buffer))
@@ -179,7 +181,7 @@ fn read_nth_block_transactions<Host: Runtime>(
     host: &mut Host,
     block_path: &OwnedPath,
 ) -> Result<Vec<TransactionHash>, Error> {
-    let path = concat(block_path, &EVM_BLOCKS_TRANSACTIONS)?;
+    let path = concat(block_path, &BLOCKS_TRANSACTIONS)?;
 
     let transactions_bytes =
         store_read_empty_safe(host, &path, 0, MAX_TRANSACTION_HASHES)?;
@@ -224,7 +226,7 @@ fn store_block_number<Host: Runtime>(
     block_path: &OwnedPath,
     block_number: U256,
 ) -> Result<(), Error> {
-    let path = concat(block_path, &EVM_BLOCKS_NUMBER)?;
+    let path = concat(block_path, &BLOCKS_NUMBER)?;
     let mut le_block_number: [u8; 32] = [0; 32];
     block_number.to_little_endian(&mut le_block_number);
     host.store_write(&path, &le_block_number, 0)
@@ -236,7 +238,7 @@ fn store_block_hash<Host: Runtime>(
     block_path: &OwnedPath,
     block_hash: &H256,
 ) -> Result<(), Error> {
-    let path = concat(block_path, &EVM_BLOCKS_HASH)?;
+    let path = concat(block_path, &BLOCKS_HASH)?;
     host.store_write(&path, block_hash.as_bytes(), 0)
         .map_err(Error::from)
 }
@@ -246,7 +248,7 @@ fn store_block_transactions<Host: Runtime>(
     block_path: &OwnedPath,
     block_transactions: &[TransactionHash],
 ) -> Result<(), Error> {
-    let path = concat(block_path, &EVM_BLOCKS_TRANSACTIONS)?;
+    let path = concat(block_path, &BLOCKS_TRANSACTIONS)?;
     let block_transactions = &block_transactions.concat()[..];
     host.store_write(&path, block_transactions, 0)
         .map_err(Error::from)
