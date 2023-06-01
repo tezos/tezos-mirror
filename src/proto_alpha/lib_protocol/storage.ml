@@ -436,6 +436,14 @@ module Contract = struct
       end)
       (Unstake_request)
 
+  module Frozen_deposits_pseudotokens =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["frozen_deposits_pseudotokens"]
+      end)
+      (Staking_pseudotoken_repr)
+
   module Frozen_deposits_limit =
     Indexed_context.Make_map
       (Registered)

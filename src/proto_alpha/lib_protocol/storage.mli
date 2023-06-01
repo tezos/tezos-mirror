@@ -197,6 +197,14 @@ module Contract : sig
        and type value = Unstake_request.t
        and type t := Raw_context.t
 
+  (** The sum of all pseudotokens owned by costakers (the delegate included)
+      corresponding to shares of the {!Frozen_deposits} current amount. *)
+  module Frozen_deposits_pseudotokens :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Staking_pseudotoken_repr.t
+       and type t := Raw_context.t
+
   (** If there is a value, the frozen balance for the contract won't
      exceed it (starting in preserved_cycles + 1). *)
   module Frozen_deposits_limit :
