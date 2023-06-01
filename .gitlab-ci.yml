@@ -28,7 +28,7 @@ build:
   script:
     - git clone --depth 1 --branch $OCTEZ_BRANCH https://gitlab.com/tezos/tezos.git
     - opam-2.1 install -y --deps-only tezos/opam/virtual/octez-deps.opam
-    - opam-2.1 install -y caqti-lwt caqti-driver-sqlite3
+    - opam-2.1 install -y caqti-lwt caqti-dynload caqti-driver-sqlite3 caqti-driver-postgresql
     - dune build archiver/main.exe server/main.exe
   artifacts:
     name: binaries-${ARCH}-${OCTEZ_BRANCH}
