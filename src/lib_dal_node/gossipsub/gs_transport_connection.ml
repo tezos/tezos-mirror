@@ -189,10 +189,42 @@ let unwrap_p2p_message p2p_layer ~from_peer px_cache =
   | I.Message_with_header {message; topic; message_id} ->
       Message_with_header {message; topic; message_id}
 
+let try_connect p2p_layer px_cache ~px ~origin =
+  let open Lwt_syntax in
+  (* If there is some [point] associated to [px] and advertised by [origin]
+     on the [px_cache], we will try to connect to it. *)
+  match PX_cache.drop px_cache ~px ~origin with
+  | Some point ->
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5799
+
+         We may have an issues as described by the following scenario:
+         - A legit pair [(point, peer)] is already known by P2P, but the remote
+         peer is disconnected for some reason;
+         - Some (malicious) peer advertises a fake px [(point, peer')], where
+         [peer'] is not the real peer id associated to the [point];
+         - We try to connect to [point], setting at the same time that [peer']
+         is the expected peer id for this point;
+         - The connection fails, but the old (correct) association [(point,
+         peer)] is lost.
+
+         We may want to revert [peer'] association to [point]. But we sill have
+         an issue in case [(point, peer)] is actually the fake info and [(point,
+         peer')] the legit association but the node is disconnected when trying
+         to connect to it.
+
+         This implementation will be hardened once we add the notion of "signed
+         records" found, e.g., in Rust version, to check that the advertised
+         (peer, point) pair alongside a timestamp are not faked. *)
+      let* (_ : _ P2p.connection tzresult) =
+        P2p.connect ~expected_peer_id:px p2p_layer point
+      in
+      return_unit
+  | _ -> return_unit
+
 (** This handler pops and processes the items put by the worker in the p2p
     output stream. The out messages are sent to the corresponding peers and the
     directives to the P2P layer to connect or disconnect peers are handled. *)
-let gs_worker_p2p_output_handler gs_worker p2p_layer =
+let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
   let open Lwt_syntax in
   let rec loop output_stream =
     let* p2p_output = Worker.Stream.pop output_stream in
@@ -230,12 +262,7 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer =
 
              Handle Disconnect, Connect, Forget and Kick directives from GS *)
           assert false
-      | Connect {px = _; origin = _} ->
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5647
-
-             Handle Disconnect, Connect, Forget and Kick directives from GS *)
-          let () = ignore PX_cache.drop in
-          assert false
+      | Connect {px; origin} -> try_connect p2p_layer px_cache ~px ~origin
       | Forget {px = _; origin = _} ->
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5647
 
@@ -306,7 +333,7 @@ let activate gs_worker p2p_layer ~app_messages_callback =
   let () = disconnections_handler gs_worker |> P2p.on_disconnection p2p_layer in
   Lwt.join
     [
-      gs_worker_p2p_output_handler gs_worker p2p_layer;
+      gs_worker_p2p_output_handler gs_worker p2p_layer px_cache;
       transport_layer_inputs_handler gs_worker p2p_layer px_cache;
       app_messages_handler gs_worker ~app_messages_callback;
     ]
