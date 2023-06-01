@@ -346,7 +346,13 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
            Either your witness is too short, or some indexes are greater than \
            the witness size."
 
-    let blind ~pp ~nb_extra_blinds f_map =
+    let blind ~pp f_map =
+      let nb_extra_blinds =
+        List.fold_left
+          (fun acc e -> max acc (List.length e))
+          0
+          pp.common_pp.eval_points
+      in
       let blind_list_map l =
         List.map
           (fun unblinded ->
@@ -384,7 +390,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         |> SMap.filter (fun _ x -> x <> ([], []))
         |> SMap.to_pair
       in
-      let rc_map, rc_blinds = blind ~pp ~nb_extra_blinds:3 rc_map in
+      let rc_map, rc_blinds = blind ~pp rc_map in
       let all_rc_z = SMap.Aggregation.gather_maps ?shifts_map rc_map in
 
       let wires_list_map =
@@ -431,19 +437,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                (SMap.map (Evaluations.interpolation_fft pp.common_pp.domain)))
             wires_list_map
         in
-        blind
-          ~pp
-          ~nb_extra_blinds:
-            (SMap.fold
-               (fun _ {gates; _} ->
-                 Int.max
-                   (SMap.fold
-                      (fun _ -> Int.max)
-                      (Gates.aggregate_blinds ~gates)
-                      0))
-               pp.circuits_map
-               0)
-          f_wires
+        blind ~pp f_wires
       in
       (* all wire-polynomials gathered in a map *)
       let all_f_wires = SMap.Aggregation.gather_maps ?shifts_map f_wires in

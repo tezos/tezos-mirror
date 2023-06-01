@@ -67,12 +67,6 @@ module AddWeierstrass : Base_sig = struct
       let y = Scalar.(sub (lambda * sub a x) ag) in
       Scalar.[sub x c; sub y cg]
 
-  let blinds =
-    SMap.of_list
-      [
-        (wire_name 0, [|1; 1|]); (wire_name 1, [|1; 1|]); (wire_name 2, [|1; 1|]);
-      ]
-
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain :
       prover_identities =
    fun evaluations ->
@@ -84,7 +78,7 @@ module AddWeierstrass : Base_sig = struct
     let domain_size = Domain.length domain in
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
     let ({q; wires} : witness) =
-      get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
+      get_evaluations ~q_label ~prefix ~prefix_common evaluations
     in
     let a = wires.(0) in
     let b = wires.(1) in
@@ -175,7 +169,7 @@ module AddWeierstrass : Base_sig = struct
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
     let {q; wires; wires_g} =
-      get_answers ~q_label ~blinds ~prefix ~prefix_common answers
+      get_answers ~gx:true ~q_label ~prefix ~prefix_common answers
     in
     let a, b, c = (wires.(0), wires.(1), wires.(2)) in
     let ag, bg, cg = (wires_g.(0), wires_g.(1), wires_g.(2)) in
@@ -284,19 +278,13 @@ module AddEdwards : Base_sig = struct
       in
       Scalar.[rx' + negate rx; ry' + negate ry]
 
-  let blinds =
-    SMap.of_list
-      [
-        (wire_name 0, [|1; 1|]); (wire_name 1, [|1; 1|]); (wire_name 2, [|1; 1|]);
-      ]
-
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain :
       prover_identities =
    fun evaluations ->
     let domain_size = Domain.length domain in
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
     let ({q; wires} : witness) =
-      get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
+      get_evaluations ~q_label ~prefix ~prefix_common evaluations
     in
     let s = q in
     let p = wires.(0) in
@@ -403,7 +391,7 @@ module AddEdwards : Base_sig = struct
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
     let {q; wires; wires_g} =
-      get_answers ~q_label ~blinds ~prefix ~prefix_common answers
+      get_answers ~gx:true ~q_label ~prefix ~prefix_common answers
     in
     let px, py = (wires.(0), wires_g.(0)) in
     let qx, qy = (wires.(1), wires_g.(1)) in
@@ -537,21 +525,11 @@ module ConditionalAddEdwards : Base_sig = struct
       in
       Scalar.[rx' + negate rx; ry' + negate ry]
 
-  let blinds =
-    SMap.of_list
-      [
-        (wire_name 0, [|1; 0|]);
-        (wire_name 1, [|1; 0|]);
-        (wire_name 2, [|1; 0|]);
-        (wire_name 3, [|1; 1|]);
-        (wire_name 4, [|1; 1|]);
-      ]
-
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain evaluations =
     let domain_size = Domain.length domain in
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
     let ({q; wires} : witness) =
-      get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
+      get_evaluations ~q_label ~prefix ~prefix_common evaluations
     in
     let b = wires.(0) in
     let qx, qy = (wires.(1), wires.(2)) in
@@ -683,7 +661,7 @@ module ConditionalAddEdwards : Base_sig = struct
   let verifier_identities ~prefix_common ~prefix ~public:_ ~generator:_
       ~size_domain:_ _ answers =
     let {q; wires; wires_g} =
-      get_answers ~q_label ~blinds ~prefix ~prefix_common answers
+      get_answers ~gx:true ~q_label ~prefix ~prefix_common answers
     in
     let b = wires.(0) in
     let qx, qy = (wires.(1), wires.(2)) in
