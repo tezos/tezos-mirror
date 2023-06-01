@@ -229,6 +229,38 @@ let on_new_head state head =
   (* Forget failing messages *)
   List.iter (Message_queue.remove state.messages) failing
 
+(** Maximum size of an L2 batch in bytes that can fit in an operation of the
+    protocol. *)
+let protocol_max_batch_size =
+  let open Protocol in
+  let open Alpha_context in
+  let empty_message_op : _ Operation.t =
+    let open Operation in
+    {
+      shell = {branch = Block_hash.zero};
+      protocol_data =
+        {
+          signature = Some Signature.zero;
+          contents =
+            Single
+              (Manager_operation
+                 {
+                   source = Signature.Public_key_hash.zero;
+                   fee = Tez.of_mutez_exn Int64.max_int;
+                   counter = Manager_counter.Internal_for_tests.of_int max_int;
+                   gas_limit =
+                     Gas.Arith.integral_of_int_exn ((max_int - 1) / 1000);
+                   storage_limit = Z.of_int max_int;
+                   operation = Sc_rollup_add_messages {messages = [""]};
+                 });
+        };
+    }
+  in
+  Protocol.Constants_repr.max_operation_data_length
+  - Data_encoding.Binary.length
+      Operation.encoding_with_legacy_attestation_name
+      (Operation.pack empty_message_op)
+
 let init_batcher_state node_ctxt ~signer (conf : Configuration.batcher) =
   let open Lwt_syntax in
   let conf =
@@ -238,9 +270,7 @@ let init_batcher_state node_ctxt ~signer (conf : Configuration.batcher) =
       min_batch_size = conf.min_batch_size;
       max_batch_elements = conf.max_batch_elements;
       max_batch_size =
-        Option.value
-          conf.max_batch_size
-          ~default:Node_context.protocol_max_batch_size;
+        Option.value conf.max_batch_size ~default:protocol_max_batch_size;
     }
   in
   return
@@ -329,8 +359,17 @@ let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
+let check_batcher_config Configuration.{max_batch_size; _} =
+  match max_batch_size with
+  | Some m when m > protocol_max_batch_size ->
+      error_with
+        "batcher.max_batch_size must be smaller than %d"
+        protocol_max_batch_size
+  | _ -> Ok ()
+
 let init conf ~signer node_ctxt =
   let open Lwt_result_syntax in
+  let*? () = check_batcher_config conf in
   let node_ctxt = Node_context.readonly node_ctxt in
   let+ worker =
     Worker.launch table () {node_ctxt; signer; conf} (module Handlers)

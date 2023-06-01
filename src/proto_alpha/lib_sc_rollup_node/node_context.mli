@@ -126,10 +126,6 @@ val is_loser : _ t -> bool
 val get_fee_parameter :
   _ t -> Configuration.purpose -> Injector_sigs.fee_parameter
 
-(** Maximum size of an L2 batch in bytes that can fit in an operation of the
-    protocol. *)
-val protocol_max_batch_size : int
-
 (** [init cctxt ~data_dir mode l1_ctxt constants genesis_info ~proto_level
     configuration] initializes the rollup representation. The rollup origination
     level and kind are fetched via an RPC call to the layer1 node that [cctxt]
