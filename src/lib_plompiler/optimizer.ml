@@ -408,17 +408,22 @@ let combine_pseudo_blocks ~scope ~perfectly pseudo_blocks =
   combine_quadratic ~scope ~join:try_both_ways pseudo_blocks
 
 let linear_combination ~this ~next qc =
-  let pad = List.init (nb_wires_arch - List.length this) (fun _ -> 0) in
-  let wires = List.map snd this @ pad in
-
   let combine l1 l2 = List.combine (list_sub (List.length l2) l1) l2 in
-  let this_sels = combine CS.this_constr_linear_selectors (List.map fst this) in
-  let next_sels = combine CS.next_constr_linear_selectors (List.map fst next) in
+  let pad = List.init (nb_wires_arch - List.length this) (fun _ -> 0) in
+  (* Combining with reversed linear-selectors will leave the a-wire (w0) free
+     when possible. This allows for future combinations with e.g. boolean
+     constraints, that only use the a-wire. In general, it is beneficial to
+     leave the first wires free, as they are the most used by custom gates. *)
+  let wires = List.map snd this @ pad |> List.rev in
+  let this_constr_sels = List.rev CS.this_constr_linear_selectors in
+  let next_constr_sels = List.rev CS.next_constr_linear_selectors in
+  let this_sels = combine this_constr_sels (List.map fst this) in
+  let next_sels = combine next_constr_sels (List.map fst next) in
   CS.mk_linear_constr (wires, (("qc", qc) :: this_sels) @ next_sels)
 
 let dummy_linear_combination terms =
   let pad = List.init (nb_wires_arch - List.length terms) (fun _ -> 0) in
-  CS.mk_linear_constr (List.map snd terms @ pad, [])
+  CS.mk_linear_constr (List.map snd terms @ pad |> List.rev, [])
 
 (** Given a pseudo block, i.e., a list of pseudo constraints, transform it into
     a block. Thanks to the invariant that the pc_head of a pseudo constraint
