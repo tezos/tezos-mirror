@@ -348,68 +348,8 @@ module RPC = struct
         raise
         @@ Invalid_block_structure "Unexpected [None] value for [block.hash]"
 
-  let transactions ~full_transaction_object ~number base =
-    let open Lwt_result_syntax in
-    if full_transaction_object then
-      failwith "Full transaction objects are not supported yet"
-    else
-      let key_transactions = Durable_storage_path.Block.transactions number in
-      let+ transactions_answer =
-        call_service ~base durable_state_value () {key = key_transactions} ()
-      in
-      match transactions_answer with
-      | Some bytes ->
-          let chunks = chunks bytes Ethereum_types.transaction_hash_size in
-          List.map (fun bytes -> Hash Hex.(of_string bytes |> show)) chunks
-      | None ->
-          raise
-          @@ Invalid_block_structure
-               "Unexpected [None] value for [block.transactions]"
-
-  let block ~full_transaction_object ~number base =
-    let open Lwt_result_syntax in
-    let* transactions = transactions ~full_transaction_object ~number base in
-    let* level = block_number base number in
-    let* hash = block_hash base number in
-    return
-      {
-        number = Some level;
-        hash = Some hash;
-        parent = Ethereum_types.Block_hash "";
-        nonce = Ethereum_types.Hash "";
-        sha3Uncles = Ethereum_types.Hash "";
-        logsBloom = None;
-        transactionRoot = Ethereum_types.Hash "";
-        stateRoot = Ethereum_types.Hash "";
-        receiptRoot = Ethereum_types.Hash "";
-        (* We need the following dummy value otherwise eth-cli will complain
-           that miner's address is not a valid Ethereum address. *)
-        miner = Ethereum_types.Hash "6471A723296395CF1Dcc568941AFFd7A390f94CE";
-        difficulty = Ethereum_types.Qty Z.zero;
-        totalDifficulty = Ethereum_types.Qty Z.zero;
-        extraData = "";
-        size = Ethereum_types.Qty Z.zero;
-        gasLimit = Ethereum_types.Qty Z.zero;
-        gasUsed = Ethereum_types.Qty Z.zero;
-        timestamp = Ethereum_types.Qty Z.zero;
-        transactions;
-        uncles = [];
-      }
-
-  let current_block base ~full_transaction_object =
-    block
-      ~full_transaction_object
-      ~number:Durable_storage_path.Block.Current
-      base
-
   let current_block_number base () =
     block_number base Durable_storage_path.Block.Current
-
-  let nth_block base ~full_transaction_object n =
-    block
-      ~full_transaction_object
-      ~number:Durable_storage_path.Block.(Nth n)
-      base
 
   let inspect_durable_and_decode_opt base key decode =
     let open Lwt_result_syntax in
@@ -605,6 +545,85 @@ module RPC = struct
             r;
             s;
           }
+
+  let transactions ~full_transaction_object ~number base =
+    let open Lwt_result_syntax in
+    let* (Block_height block_number) = block_number base number in
+    let key_transactions =
+      Durable_storage_path.Block.transactions (Nth block_number)
+    in
+    let* transactions_answer =
+      call_service ~base durable_state_value () {key = key_transactions} ()
+    in
+    match transactions_answer with
+    | Some bytes ->
+        let chunks = chunks bytes Ethereum_types.transaction_hash_size in
+        if full_transaction_object then
+          let+ objects =
+            List.filter_map_es
+              (fun bytes ->
+                transaction_object base (Hash Hex.(of_string bytes |> show)))
+              chunks
+          in
+          TxFull objects
+        else
+          let hashes =
+            List.map (fun bytes -> Hash Hex.(of_string bytes |> show)) chunks
+          in
+          return (TxHash hashes)
+    | None ->
+        raise
+        @@ Invalid_block_structure
+             "Unexpected [None] value for [block.transactions]"
+
+  let block ~full_transaction_object ~number base =
+    let open Lwt_result_syntax in
+    let* transactions = transactions ~full_transaction_object ~number base in
+    let* (Ethereum_types.Block_height level_z as level) =
+      block_number base number
+    in
+    let* hash = block_hash base number in
+    let* parent =
+      if Z.zero = level_z then
+        return (Ethereum_types.Block_hash (String.make 64 'a'))
+      else block_hash base (Nth (Z.pred level_z))
+    in
+    return
+      {
+        number = Some level;
+        hash = Some hash;
+        parent;
+        nonce = Ethereum_types.Hash (String.make 16 'a');
+        sha3Uncles = Ethereum_types.Hash (String.make 64 'a');
+        logsBloom = Some (Ethereum_types.Hash (String.make 512 'a'));
+        transactionRoot = Ethereum_types.Hash (String.make 64 'a');
+        stateRoot = Ethereum_types.Hash (String.make 64 'a');
+        receiptRoot = Ethereum_types.Hash (String.make 64 'a');
+        (* We need the following dummy value otherwise eth-cli will complain
+           that miner's address is not a valid Ethereum address. *)
+        miner = Ethereum_types.Hash "6471A723296395CF1Dcc568941AFFd7A390f94CE";
+        difficulty = Ethereum_types.Qty Z.zero;
+        totalDifficulty = Ethereum_types.Qty Z.zero;
+        extraData = "";
+        size = Ethereum_types.Qty Z.zero;
+        gasLimit = Ethereum_types.Qty Z.zero;
+        gasUsed = Ethereum_types.Qty Z.zero;
+        timestamp = Ethereum_types.Qty Z.zero;
+        transactions;
+        uncles = [];
+      }
+
+  let current_block base ~full_transaction_object =
+    block
+      ~full_transaction_object
+      ~number:Durable_storage_path.Block.Current
+      base
+
+  let nth_block base ~full_transaction_object n =
+    block
+      ~full_transaction_object
+      ~number:Durable_storage_path.Block.(Nth n)
+      base
 
   let txpool _ () =
     Lwt.return_ok {pending = AddressMap.empty; queued = AddressMap.empty}

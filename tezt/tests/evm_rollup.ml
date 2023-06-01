@@ -279,7 +279,13 @@ let test_rpc_getBlockByNumber =
         Eth_account.bootstrap_accounts
       |> to_list)
   in
-  Check.(block.transactions = expected_transactions)
+  let transactions =
+    match block.transactions with
+    | Empty -> Test.fail "Genesis block shouldn't be empty"
+    | Hash l -> l
+    | Full _ -> Test.fail "Expected only transaction hashes"
+  in
+  Check.(transactions = expected_transactions)
     (Check.list Check.string)
     ~error_msg:"Unexpected list of transactions, should be %%R, but got %%L" ;
   unit
@@ -597,6 +603,44 @@ let test_simulate =
         ~error_msg:"The simulation should advance one L2 block" ;
       unit)
 
+let test_full_blocks =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "full_blocks"]
+    ~title:
+      "Check `evm_getBlockByNumber` with full blocks returns the correct \
+       informations"
+  @@ fun protocol ->
+  let* {evm_proxy_server; _} = setup_past_genesis protocol in
+  let* genesis_block =
+    Evm_proxy_server.(
+      call_evm_rpc
+        evm_proxy_server
+        {
+          method_ = "eth_getBlockByNumber";
+          parameters = `A [`String "0x0"; `Bool true];
+        })
+  in
+  let block =
+    genesis_block |> Evm_proxy_server.extract_result |> Block.of_json
+  in
+  let transactions =
+    match block.Block.transactions with
+    | Empty -> Test.fail "Genesis block contains at least 3 transactions."
+    | Hash _ -> Test.fail "Expected full transactions, got hashes"
+    | Full txs -> txs
+  in
+  List.iter
+    (fun tx ->
+      let index = tx.Transaction.transactionIndex |> Int32.to_int in
+      Check.(
+        (tx.Transaction.hash
+       = Eth_account.bootstrap_accounts.(index).genesis_mint_tx)
+          string)
+        ~error_msg:"Expected transaction hash %R, but got %L")
+    transactions ;
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -611,6 +655,7 @@ let register_evm_proxy_server ~protocols =
   test_l2_deploy protocols ;
   test_rpc_txpool_content protocols ;
   test_rpc_web3_clientVersion protocols ;
-  test_simulate protocols
+  test_simulate protocols ;
+  test_full_blocks protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols

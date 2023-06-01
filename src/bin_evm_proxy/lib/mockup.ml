@@ -72,7 +72,7 @@ let transaction_hash =
 let block_hash =
   Block_hash "d28d009fef5019bd9b353d7d9d881bde4870d3c5e418b1faf05fd9f7540994d8"
 
-let block () =
+let block transactions =
   {
     number = Some (block_height ());
     hash = Some block_hash;
@@ -91,7 +91,7 @@ let block () =
     gasLimit = qty_f @@ Z.of_int 1111111;
     gasUsed = qty_f Z.zero;
     timestamp = qty_f Z.zero;
-    transactions = [transaction_hash];
+    transactions;
     uncles = [];
   }
 
@@ -153,11 +153,21 @@ let inject_raw_transaction ~smart_rollup_address:_ _tx =
   incr transaction_counter ;
   return transaction_hash
 
-let current_block ~full_transaction_object:_ = return (block ())
+let current_block ~full_transaction_object =
+  let txs =
+    if full_transaction_object then TxFull [transaction_object]
+    else TxHash [transaction_hash]
+  in
+  return (block txs)
 
 let current_block_number () = return (block_height ())
 
-let nth_block ~full_transaction_object:_ _n = return (block ())
+let nth_block ~full_transaction_object _n =
+  let tx =
+    if full_transaction_object then TxFull [transaction_object]
+    else TxHash [transaction_hash]
+  in
+  return (block tx)
 
 let transaction_receipt _tx_hash = return (transaction_receipt ())
 

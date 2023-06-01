@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Blocks can contain either only hashes or full transaction objects. As the
+    empty list case cannot be discriminated between the two types, `Empty` acts
+    as a wildcard for the empty transaction list. *)
+type transactions =
+  | Hash of string list
+  | Full of Transaction.transaction_object list
+  | Empty
+
 (** Simplified Ethereum block representation. *)
 type t = {
   number : int32;
@@ -42,7 +50,7 @@ type t = {
   gasLimit : int32;
   gasUsed : int32;
   timestamp : int32;
-  transactions : string list;
+  transactions : transactions;
   uncles : string list;
 }
 
