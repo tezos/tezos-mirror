@@ -81,7 +81,31 @@ module ModArith (L : LIB) = struct
         ([!(-1); !2], !0, false);
       ]
 
-  let tests = tests_mod_add
+  let const_circuit ~expected x () =
+    let* z_exp = ModArith.input_mod_int ~kind:`Public expected in
+    let* z = ModArith.constant x in
+    assert_equal z z_exp
+
+  let tests_mod_constant =
+    let m = ModArith.modulus in
+    List.map
+      (fun (x, expected, valid) ->
+        let name = "ModArith.test_mod_constant" ^ name_suffix valid in
+        test ~valid ~name (const_circuit ~expected x))
+      [
+        (!0, !0, true);
+        (!1, !1, true);
+        (m, !0, true);
+        (Z.(m + !1), !1, true);
+        (Z.((!2 * m) + !2), !2, true);
+        (Z.(!3 * (m + !2)), !6, true);
+        (!(-1), Z.(m - !1), true);
+        (!0, !1, false);
+        (m, !1, false);
+        (!(-2), Z.(m - !1), false);
+      ]
+
+  let tests = tests_mod_add @ tests_mod_constant
 end
 
 open Plonk_test.Helpers

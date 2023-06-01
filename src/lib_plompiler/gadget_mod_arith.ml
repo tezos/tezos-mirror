@@ -120,7 +120,11 @@ module type MOD_ARITH = functor (L : LIB) -> sig
 
   val input_mod_int : ?kind:input_kind -> Z.t -> mod_int repr t
 
-  (* val constant_mod_int : Z.t -> mod_int repr t *)
+  val constant : Z.t -> mod_int repr t
+
+  val zero : mod_int repr t
+
+  val one : mod_int repr t
 
   (* val assert_equal : mod_int repr -> mod_int repr -> unit repr t *)
 
@@ -332,6 +336,12 @@ functor
       (* Assert well-formedness: range-check all limbs in [0, base) *)
       assert (Utils.is_power_of_2 Params.base) ;
       iterM (Num.range_check ~nb_bits:(Z.log2 Params.base)) (of_list i) >* ret i
+
+    let constant n = mapM constant_scalar @@ scalar_limbs_of_z n <$> to_list
+
+    let zero = constant Z.zero
+
+    let one = constant Z.one
 
     let add =
       Mod_arith.add
