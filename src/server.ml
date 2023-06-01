@@ -343,15 +343,20 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
 
   let create_stream server con to_string s =
     let con_string = Connection.to_string con in
-    let running = ref true in
+    let stopped, stopper =
+      (* [wait] makes uncancelable promises *)
+      Lwt.wait ()
+    in
     let stream =
       Lwt_stream.from (fun () ->
-          if not !running then Lwt.return None
-          else s.Resto_directory.Answer.next () >|= Option.map to_string)
+          let elt = s.Resto_directory.Answer.next () in
+          (* [pick] will cancel [elt] if [stopped] resolves,
+             [pick] will effectlessly attempt to cancel [stopped] if [elt] resolves *)
+          Lwt.pick [stopped; elt] >|= Option.map to_string)
     in
     let shutdown () =
       Log.log_info "streamed connection closed %s" con_string ;
-      running := false ;
+      Lwt.wakeup_later stopper None ;
       s.shutdown () ;
       server.streams <- ConnectionMap.remove con server.streams
     in
