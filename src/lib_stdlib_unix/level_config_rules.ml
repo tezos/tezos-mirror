@@ -63,6 +63,7 @@ let parse_rules s =
               raise Incorrect_log_rules_missing_pattern
           | [`Text _; `Delim _] | [`Text _; `Delim _; `Text ""] ->
               raise Incorrect_log_rules_missing_level
+          | [`Text "*"; `Delim _; `Text level] -> ("", level)
           | [`Text pattern; `Delim _; `Text level] -> (pattern, level)
           | [`Text level] -> ("", level)
           | _ -> raise Incorrect_log_rules_syntax
