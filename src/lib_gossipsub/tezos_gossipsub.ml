@@ -1381,7 +1381,7 @@ module Make (C : AUTOMATON_CONFIG) :
         (to_prune, peers)
       in
 
-      let opportunistic_grafting topic peers =
+      let opportunistic_grafting topic peers to_prune =
         if Int64.rem heartbeat_ticks opportunistic_graft_ticks = 0L then
           let num_peers = List.length peers in
           if num_peers > 1 then
@@ -1410,8 +1410,13 @@ module Make (C : AUTOMATON_CONFIG) :
                 let in_mesh = Peer.Set.mem peer peers_set in
                 let backed_off = exists_backoff topic peer backoff in
                 let above_median = Score.(score > median_score) in
+                let pruned =
+                  match Peer.Map.find peer to_prune with
+                  | None -> false
+                  | Some topics -> Topic.Set.mem topic topics
+                in
                 (not in_mesh) && (not backed_off) && (not connection.direct)
-                && above_median
+                && above_median && not pruned
               in
               select_connections_peers
                 connections
@@ -1577,26 +1582,9 @@ module Make (C : AUTOMATON_CONFIG) :
         in
 
         (* Attempt opportunistic grafting. *)
-        let to_graft, to_prune =
-          let peers_to_graft = opportunistic_grafting topic peers in
-          let to_graft = add_to_peers_topic_set to_graft topic peers_to_graft in
-          (* Do not actually prune the [peers_to_graft]. *)
-          let to_prune =
-            List.fold_left
-              (fun to_prune peer_to_graft ->
-                Peer.Map.update
-                  peer_to_graft
-                  (function
-                    | None -> None
-                    | Some topicset ->
-                        let topicset = Topic.Set.remove topic topicset in
-                        if Topic.Set.is_empty topicset then None
-                        else Some topicset)
-                  to_prune)
-              to_prune
-              peers_to_graft
-          in
-          (to_graft, to_prune)
+        let to_graft =
+          let peers_to_graft = opportunistic_grafting topic peers to_prune in
+          add_to_peers_topic_set to_graft topic peers_to_graft
         in
 
         (`To_prune to_prune, `To_graft to_graft, noPX_peers)
