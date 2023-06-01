@@ -25,6 +25,7 @@
         "Slot_repr",
         "Tez_repr",
         "Deposits_repr",
+        "Staking_pseudotoken_repr",
         "Period_repr",
         "Time_repr",
         "Ratio_repr",

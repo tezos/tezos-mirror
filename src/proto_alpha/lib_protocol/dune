@@ -53,6 +53,7 @@
   Slot_repr
   Tez_repr
   Deposits_repr
+  Staking_pseudotoken_repr
   Period_repr
   Time_repr
   Ratio_repr
@@ -315,6 +316,7 @@
   slot_repr.ml slot_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
+  staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
   time_repr.ml time_repr.mli
   ratio_repr.ml ratio_repr.mli
@@ -582,6 +584,7 @@
   slot_repr.ml slot_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
+  staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
   time_repr.ml time_repr.mli
   ratio_repr.ml ratio_repr.mli
@@ -833,6 +836,7 @@
   slot_repr.ml slot_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
+  staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
   time_repr.ml time_repr.mli
   ratio_repr.ml ratio_repr.mli
