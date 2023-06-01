@@ -666,11 +666,18 @@ module Auto_build = struct
     let (module Bench) = Registration.find_benchmark_exn bench_name in
     (* override [measure_options] for intercept and TIMER_LATENCY *)
     let measure_options =
-      match Namespace.basename bench_name with
-      | "intercept" -> {measure_options with Measure.bench_number = 1}
-      | "TIMER_LATENCY" ->
-          {measure_options with bench_number = 1; nsamples = 10000}
-      | _ -> measure_options
+      match Namespace.to_list bench_name with
+      | ["."; "interpreter"; "N_IOpen_chest"; "intercept"] ->
+          (* Timings of [IOpen_chest] are highly affected by hidden randomness
+             of [puzzle].  We need multiple [bench_number] to avoid this effect.
+          *)
+          {measure_options with Measure.bench_number = 100; nsamples = 100}
+      | _ -> (
+          match Namespace.basename bench_name with
+          | "intercept" -> {measure_options with Measure.bench_number = 1}
+          | "TIMER_LATENCY" ->
+              {measure_options with bench_number = 1; nsamples = 10000}
+          | _ -> measure_options)
     in
     let save_file =
       Filename.concat outdir (Namespace.to_filename bench_name ^ ".workload")
