@@ -45,6 +45,7 @@ type error +=
   | Invalid_sender of Destination.t
   | Invalid_self_transaction_destination
   | Staking_for_nondelegate_while_costaking_disabled
+  | Invalid_nonzero_transaction_amount of Tez.t
 
 let () =
   register_error_kind
@@ -251,7 +252,22 @@ let () =
     Data_encoding.unit
     (function
       | Staking_for_nondelegate_while_costaking_disabled -> Some () | _ -> None)
-    (fun () -> Staking_for_nondelegate_while_costaking_disabled)
+    (fun () -> Staking_for_nondelegate_while_costaking_disabled) ;
+  register_error_kind
+    `Permanent
+    ~id:"operations.invalid_nonzero_transaction_amount"
+    ~title:"Invalid non-zero transaction amount"
+    ~description:"A transaction expected a zero-amount but got non-zero."
+    ~pp:(fun ppf amount ->
+      Format.fprintf
+        ppf
+        "A transaction expected a zero-amount but got %a."
+        Tez.pp
+        amount)
+    Data_encoding.(obj1 (req "amount" Tez.encoding))
+    (function
+      | Invalid_nonzero_transaction_amount amount -> Some amount | _ -> None)
+    (fun amount -> Invalid_nonzero_transaction_amount amount)
 
 open Apply_results
 open Apply_operation_result
@@ -336,6 +352,33 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
         storage_size = Z.zero;
         paid_storage_size_diff = Z.zero;
         allocated_destination_contract;
+      }
+  in
+  return (ctxt, result, [])
+
+let apply_finalize_unstake ~ctxt ~sender ~amount ~destination ~before_operation
+    =
+  error_when Tez.(amount <> zero) (Invalid_nonzero_transaction_amount amount)
+  >>?= fun () ->
+  error_unless
+    Signature.Public_key_hash.(sender = destination)
+    Invalid_self_transaction_destination
+  >>?= fun () ->
+  let contract = Contract.Implicit sender in
+  Contract.allocated ctxt contract >>= fun already_allocated ->
+  Staking.finalize_unstake ctxt sender >>=? fun (ctxt, balance_updates) ->
+  let result =
+    Transaction_to_contract_result
+      {
+        storage = None;
+        lazy_storage_diff = None;
+        balance_updates;
+        ticket_receipt = [];
+        originated_contracts = [];
+        consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+        storage_size = Z.zero;
+        paid_storage_size_diff = Z.zero;
+        allocated_destination_contract = not already_allocated;
       }
   in
   return (ctxt, result, [])
@@ -825,8 +868,16 @@ let apply_manager_operation :
             ~amount
             ~destination:pkh
             ~before_operation:ctxt_before_op
-      | ("default" | "stake"), _ ->
-          (* Only allow [Unit] parameter to implicit accounts' default and stake entrypoints. *)
+      | "finalize_unstake", Prim (_, D_Unit, [], _) ->
+          apply_finalize_unstake
+            ~ctxt
+            ~sender:source
+            ~amount
+            ~destination:pkh
+            ~before_operation:ctxt_before_op
+      | ("default" | "stake" | "finalize_unstake"), _ ->
+          (* Only allow [Unit] parameter to implicit accounts' default, stake,
+             and finalize_unstake entrypoints. *)
           tzfail (Script_interpreter.Bad_contract_parameter source_contract)
       | _ -> tzfail (Script_tc_errors.No_such_entrypoint entrypoint))
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
