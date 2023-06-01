@@ -22,3 +22,9 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(** Pseudotoken used in staking.
+    It represents a share of the total frozen deposits of a baker. *)
+type t
+
+val encoding : t Data_encoding.t

@@ -22,3 +22,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(* A pseudotoken is not a Tez but it behaves similarly so let's reuse its operations. *)
+
+include Tez_repr
