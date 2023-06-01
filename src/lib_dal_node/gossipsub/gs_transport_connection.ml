@@ -267,11 +267,9 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
              Handle Disconnect, Connect, Forget and Kick directives from GS *)
           let () = ignore PX_cache.drop in
           assert false
-      | Kick {peer = _} ->
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5647
-
-             Handle Disconnect, Connect, Forget and Kick directives from GS *)
-          assert false
+      | Kick {peer} ->
+          P2p.pool p2p_layer
+          |> Option.iter_s (fun pool -> P2p_pool.Peers.ban pool peer)
     in
     loop output_stream
   in
