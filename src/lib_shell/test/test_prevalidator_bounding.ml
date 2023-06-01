@@ -278,6 +278,10 @@ let make_op oph ~size ~weight =
     default_raw_op
     data
 
+let copy_op_with_size op size = make_op op.hash ~size ~weight:(weight op)
+
+let copy_op_with_weight op weight = make_op op.hash ~size:op.size ~weight
+
 let op_gen ~may_exceed_max_total_bytes =
   let open QCheck2.Gen in
   let* oph = oph_gen in
@@ -411,7 +415,7 @@ let () =
   assert (state == empty) ;
   (* Add an operation to the empty state. *)
   let state, replacements =
-    WithExceptions.Option.get ~loc:__LOC__ (add_operation empty config op)
+    WithExceptions.Result.get_ok ~loc:__LOC__ (add_operation empty config op)
   in
   (* Check that the state contains a single operation which is [op].
      Then the other fields are correct thanks to [check_invariants]. *)
@@ -422,16 +426,14 @@ let () =
   (* Removing the added operation goes back to an empty state. *)
   let state = remove_operation state op.hash in
   assert (state = empty) ;
-  (* Adding an operation larger than the max_total_bytes fails. *)
-  let over_max_op =
-    make_op op.hash ~size:(config.max_total_bytes + 1) ~weight:(weight op)
-  in
-  assert (Option.is_none (add_operation empty config over_max_op)) ;
+  (* Adding an operation larger than the max_total_bytes fails.
+     Moreover, there is no returned op_to_overtake, since the
+     operation can never be added to the state no matter its weight. *)
+  let over_max_op = copy_op_with_size op (config.max_total_bytes + 1) in
+  assert (add_operation empty config over_max_op = Error None) ;
   (* Adding an operation with exactly the max_total_bytes succeeds. *)
-  let max_op =
-    make_op op.hash ~size:config.max_total_bytes ~weight:(weight op)
-  in
-  assert (Option.is_some (add_operation empty config max_op)) ;
+  let max_op = copy_op_with_size op config.max_total_bytes in
+  assert (Result.is_ok (add_operation empty config max_op)) ;
   unit
 
 (** Return the cardinal and total size of all operations in opset that
@@ -477,26 +479,41 @@ let check_successful_add ?expected_nb_replacements ~state_before ~state
         ~error_msg:"Expected %L replacements but got %R.")
     expected_nb_replacements
 
+let check_failed_add state op ~op_to_overtake =
+  (* Failure to add an operation should only happen when removing all
+     operations that are smaller is not enough to make room for it. *)
+  let nb_smaller, size_smaller = nb_and_size_smaller op state.opset in
+  assert (
+    state.cardinal - nb_smaller + 1 > config_for_tests.max_operations
+    || state.total_bytes - size_smaller + op.size
+       > config_for_tests.max_total_bytes) ;
+  (* Moreover, op with a revised weight should be accepted by
+     the state if and only if it exceeds op_to_overtake. *)
+  match op_to_overtake with
+  | Some op_to_overtake ->
+      let weight_to_overtake = weight op_to_overtake in
+      let op_lighter = copy_op_with_weight op (weight_to_overtake - 1) in
+      assert (Result.is_error (add_operation state config_for_tests op_lighter)) ;
+      let op_heavier = copy_op_with_weight op (weight_to_overtake + 1) in
+      assert (Result.is_ok (add_operation state config_for_tests op_heavier))
+      (* (We don't test with exactly the same weight as op_to_overtake,
+          because then the hashes would be used as a tie-breaker.) *)
+  | None ->
+      (* If op_to_overtake is None then the operation cannot be added, no
+         matter its weight. We test with a weight much higher than all
+         weights in the state (see [weight_gen]). *)
+      let op_heaviest = copy_op_with_weight op 10_000 in
+      assert (Result.is_error (add_operation state config_for_tests op_heaviest))
+
 (* Preconditions:
    - [state_before] verifies the state invariants
    - [op] is not in [state_before] *)
 let check_add_fresh state_before op =
   assert (not (Operation_hash.Map.mem op.hash state_before.ophmap)) ;
   match add_operation state_before config_for_tests op with
-  | Some (state, replacements) ->
-      (* The new operation has been successfully added. *)
+  | Ok (state, replacements) ->
       check_successful_add ~state_before ~state ~replacements op
-  | None ->
-      (* The new operation could not be added. This should only happen
-         when removing all operations that are smaller is not enough to
-         make room for it. *)
-      let nb_smaller, size_smaller =
-        nb_and_size_smaller op state_before.opset
-      in
-      assert (
-        state_before.cardinal - nb_smaller + 1 > config_for_tests.max_operations
-        || state_before.total_bytes - size_smaller + op.size
-           > config_for_tests.max_total_bytes)
+  | Error op_to_overtake -> check_failed_add state_before op ~op_to_overtake
 
 (* Preconditions:
    - [state_before] verifies the state invariants
@@ -506,7 +523,7 @@ let check_add_present state_before op =
   let res = add_operation state_before config_for_tests op in
   (* add_operation should return the same state (physical equality
      intended) and an empty list of replacements. *)
-  let state, replacements = WithExceptions.Option.get ~loc:__LOC__ res in
+  let state, replacements = WithExceptions.Result.get_ok ~loc:__LOC__ res in
   assert (state == state_before) ;
   assert (List.is_empty replacements)
 
@@ -572,13 +589,20 @@ let () =
 
 let check_add_fails ~__LOC__ state op =
   Log.debug "Check failure: add op %a to %a" pp_op op pp_state state ;
-  if Option.is_some (add_operation state config_for_tests op) then
-    Test.fail "%s: add_operation unexpectedly succeeded." __LOC__
+  match add_operation state config_for_tests op with
+  | Ok _ -> Test.fail "%s: add_operation unexpectedly succeeded." __LOC__
+  | Error op_to_overtake -> (
+      try check_failed_add state op ~op_to_overtake
+      with exn ->
+        Test.fail
+          "%s: Problem while checking failure of add_operation:\n%s"
+          __LOC__
+          (Printexc.to_string exn))
 
 let add_successfully ~__LOC__ ~expected_nb_replacements state_before op =
   Log.debug "Check success: add op %a to %a" pp_op op pp_state state_before ;
   let ((state, replacements) as res) =
-    WithExceptions.Option.get ~loc:__LOC__
+    WithExceptions.Result.get_ok ~loc:__LOC__
     @@ add_operation state_before config_for_tests op
   in
   (try

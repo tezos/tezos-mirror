@@ -132,6 +132,11 @@ module Error_msg = struct
 
   let rejected_by_full_mempool =
     rex
-      "The mempool is full and operation (.*) does not have enough fees to \
-       replace existing operations"
+      "Operation (.*) has been rejected because the mempool is full. This \
+       specific operation would need a total fee of at least (.*) mutez to be \
+       considered and propagated by the mempool of this particular node right \
+       now. Note that if the node receives operations with a better fee over \
+       gas limit ratio in the future, the operation may be rejected even with \
+       the indicated fee, or it may be successfully injected but removed at a \
+       later date."
 end
