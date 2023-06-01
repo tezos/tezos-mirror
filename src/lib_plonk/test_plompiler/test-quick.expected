@@ -1654,6 +1654,48 @@ Constraints: 5
 ModArith.test_mod_sub_optimized:
 Constraints: 5
 
+ModArith.test_mod_neg:
+Constraints: 8
+
+ModArith.test_mod_neg_optimized:
+Constraints: 7
+
+ModArith.test_mod_neg:
+Constraints: 8
+
+ModArith.test_mod_neg_optimized:
+Constraints: 7
+
+ModArith.test_mod_neg:
+Constraints: 8
+
+ModArith.test_mod_neg_optimized:
+Constraints: 7
+
+ModArith.test_mod_neg:
+Constraints: 8
+
+ModArith.test_mod_neg_optimized:
+Constraints: 7
+
+ModArith.test_mod_neg:
+Constraints: 8
+
+ModArith.test_mod_neg_optimized:
+Constraints: 7
+
+ModArith.test_mod_neg:
+Constraints: 8
+
+ModArith.test_mod_neg_optimized:
+Constraints: 7
+
+ModArith.test_mod_neg:
+Constraints: 8
+
+ModArith.test_mod_neg_optimized:
+Constraints: 7
+
 ModArith.test_mod_constant:
 Constraints: 6
 

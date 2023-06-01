@@ -138,7 +138,7 @@ module type MOD_ARITH = functor (L : LIB) -> sig
 
   (* val div : mod_int repr -> mod_int repr -> mod_int repr t *)
 
-  (* val neg : mod_int repr -> mod_int repr t *)
+  val neg : mod_int repr -> mod_int repr t
 
   (* val inv : mod_int repr -> mod_int repr t *)
 end
@@ -364,6 +364,10 @@ functor
         ~moduli:moduli_add
         ~qm_bound:(fst bounds_add)
         ~ts_bounds:(snd bounds_add)
+
+    let neg xs =
+      let* zs = zero in
+      sub zs xs
   end
 
 module ArithMod25519 = Make (struct
