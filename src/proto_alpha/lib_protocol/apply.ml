@@ -288,16 +288,17 @@ let apply_transaction_to_implicit ~ctxt ~sender ~amount ~pkh ~before_operation =
   in
   return (ctxt, result, [])
 
-let apply_stake ~ctxt ~sender ~amount ~delegate ~before_operation =
-  let contract = Contract.Implicit delegate in
+let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
+  let contract = Contract.Implicit destination in
   (* Staking of zero is forbidden. *)
   error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
   error_unless
-    Signature.Public_key_hash.(sender = delegate)
-    (Invalid_staking_destination delegate)
+    Signature.Public_key_hash.(sender = destination)
+    (Invalid_staking_destination destination)
   >>?= fun () ->
-  Contract.is_delegate ctxt delegate >>=? fun is_delegate ->
-  error_unless is_delegate (Invalid_staking_destination delegate) >>?= fun () ->
+  Contract.is_delegate ctxt sender >>=? fun is_delegate ->
+  error_unless is_delegate (Invalid_staking_destination sender) >>?= fun () ->
+  let delegate = sender in
   Token.transfer
     ctxt
     (`Contract (Contract.Implicit sender))
@@ -805,7 +806,7 @@ let apply_manager_operation :
             ~ctxt
             ~sender:source
             ~amount
-            ~delegate:pkh
+            ~destination:pkh
             ~before_operation:ctxt_before_op
       | ("default" | "stake"), _ ->
           (* Only allow [Unit] parameter to implicit accounts' default and stake entrypoints. *)
