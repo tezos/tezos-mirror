@@ -208,7 +208,10 @@ _`Fee`
     users pay fees to bakers for including their operation_\ s in block_\ s.
     For example, fees are paid to a baker for operations such as a transaction_ or a revelation of a public key.
 
-   See also `burn`_.
+    Currently, only :ref:`manager operations<manager_operations_nairobi>`
+    require collecting fees from its sender account_.
+
+    See also `burn`_.
 
 .. _def_gas_nairobi:
 
