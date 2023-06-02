@@ -67,6 +67,7 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
   let updated_slashed = set slashed in
   let delegate_contract = Contract_repr.Implicit delegate in
   let slashing_percentage = get_percentage ctxt in
+  let preserved_cycles = Constants_storage.preserved_cycles ctxt in
   let staking_over_baking_limit =
     Constants_storage.adaptive_inflation_staking_over_baking_limit ctxt
   in
@@ -96,6 +97,25 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
     if should_forbid then Delegate_storage.forbid_delegate ctxt delegate
     else Lwt.return ctxt
   in
+  let* unstaked =
+    let oldest_slashable_cycle =
+      Cycle_repr.sub level.cycle preserved_cycles
+      |> Option.value ~default:Cycle_repr.root
+    in
+    let slashable_cycles =
+      Cycle_repr.(oldest_slashable_cycle ---> level.cycle)
+    in
+    List.rev_map_es
+      (fun cycle ->
+        let* frozen_deposits =
+          Unstaked_frozen_deposits_storage.get ctxt delegate cycle
+        in
+        let*? _should_forbid, reward_and_burn =
+          compute_reward_and_burn frozen_deposits
+        in
+        return (cycle, reward_and_burn))
+      slashable_cycles
+  in
   let*! ctxt =
     Storage.Slashed_deposits.add
       (ctxt, level.cycle)
@@ -115,7 +135,7 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
   let*! ctxt =
     Storage.Contract.Slashed_deposits.add ctxt delegate_contract slash_history
   in
-  return (ctxt, {staked; unstaked = []})
+  return (ctxt, {staked; unstaked})
 
 let punish_double_endorsing =
   let get Storage.{for_double_endorsing; _} = for_double_endorsing in
