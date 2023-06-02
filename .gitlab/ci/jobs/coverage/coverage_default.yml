@@ -19,6 +19,7 @@ unified_coverage:
   script:
     - . ./scripts/version.sh # sets COVERAGE_OUTPUT
     # On the project default branch, we fetch coverage from the last merged MR
+    - mkdir -p _coverage_report
     - dune exec scripts/ci/download_coverage/download.exe -- -a from=last-merged-pipeline --info --log-file _coverage_report/download_coverage.log
     - ./scripts/ci/report_coverage.sh
   # This job will fail if coverage is not found, but that is not
