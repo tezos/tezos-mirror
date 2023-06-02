@@ -1108,6 +1108,15 @@ module Cycle = struct
         let encoding = Sampler.encoding Raw_context.consensus_pk_encoding
       end)
 
+  (* Unit = 1_000_000_000_000_000L, defined in [adaptive_inflation_storage.ml] *)
+  module Reward_bonus =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["reward_bonus"]
+      end)
+      (Encoding.Int64)
+
   module Reward_coeff =
     Indexed_context.Make_map
       (Registered)
@@ -1248,6 +1257,7 @@ module Stake = struct
 end
 
 module Delegate_sampler_state = Cycle.Delegate_sampler_state
+module Reward_bonus = Cycle.Reward_bonus
 module Reward_coeff = Cycle.Reward_coeff
 
 (** Votes *)
