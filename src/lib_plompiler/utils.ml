@@ -170,7 +170,11 @@ let mod_add_limbs ~modulus ~base xs ys =
   let x = z_of_limbs ~base xs in
   let y = z_of_limbs ~base ys in
   let z = Z.((x + y) %! modulus) in
+  let z = if z < Z.zero then Z.(z + modulus) else z in
   z_to_limbs ~len:nb_limbs ~base z
+
+let mod_sub_limbs ~modulus ~base xs ys =
+  mod_add_limbs ~modulus ~base xs (List.map Z.neg ys)
 
 let rec transpose = function
   | [] | [] :: _ -> []

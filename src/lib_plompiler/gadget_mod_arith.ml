@@ -120,7 +120,11 @@ module type MOD_ARITH = functor (L : LIB) -> sig
 
   val input_mod_int : ?kind:input_kind -> Z.t -> mod_int repr t
 
-  (* val constant_mod_int : Z.t -> mod_int repr t *)
+  val constant : Z.t -> mod_int repr t
+
+  val zero : mod_int repr t
+
+  val one : mod_int repr t
 
   (* val assert_equal : mod_int repr -> mod_int repr -> unit repr t *)
 
@@ -128,13 +132,13 @@ module type MOD_ARITH = functor (L : LIB) -> sig
 
   val add : mod_int repr -> mod_int repr -> mod_int repr t
 
-  (* val sub : mod_int repr -> mod_int repr -> mod_int repr t *)
+  val sub : mod_int repr -> mod_int repr -> mod_int repr t
 
   (* val mul : mod_int repr -> mod_int repr -> mod_int repr t *)
 
   (* val div : mod_int repr -> mod_int repr -> mod_int repr t *)
 
-  (* val neg : mod_int repr -> mod_int repr t *)
+  val neg : mod_int repr -> mod_int repr t
 
   (* val inv : mod_int repr -> mod_int repr t *)
 end
@@ -333,8 +337,15 @@ functor
       assert (Utils.is_power_of_2 Params.base) ;
       iterM (Num.range_check ~nb_bits:(Z.log2 Params.base)) (of_list i) >* ret i
 
+    let constant n = mapM constant_scalar @@ scalar_limbs_of_z n <$> to_list
+
+    let zero = constant Z.zero
+
+    let one = constant Z.one
+
     let add =
       Mod_arith.add
+        ~subtraction:false
         ~label
         ~modulus
         ~nb_limbs
@@ -342,6 +353,21 @@ functor
         ~moduli:moduli_add
         ~qm_bound:(fst bounds_add)
         ~ts_bounds:(snd bounds_add)
+
+    let sub =
+      Mod_arith.add
+        ~subtraction:true
+        ~label
+        ~modulus
+        ~nb_limbs
+        ~base
+        ~moduli:moduli_add
+        ~qm_bound:(fst bounds_add)
+        ~ts_bounds:(snd bounds_add)
+
+    let neg xs =
+      let* zs = zero in
+      sub zs xs
   end
 
 module ArithMod25519 = Make (struct

@@ -52,6 +52,10 @@ let ( >* ) m f =
   let* U = m in
   f
 
+let ( <$> ) m f =
+  let* m in
+  ret (f m)
+
 let rec mapM f ls =
   match ls with
   | [] -> ret @@ []
@@ -347,11 +351,14 @@ module Ecc = struct
 end
 
 module Mod_arith = struct
-  let add ~label:_ ~modulus ~nb_limbs:_ ~base ~moduli:_ ~qm_bound:_ ~ts_bounds:_
-      x y =
+  let add ?(subtraction = false) ~label:_ ~modulus ~nb_limbs:_ ~base ~moduli:_
+      ~qm_bound:_ ~ts_bounds:_ x y =
     let xs = List.map (fun s -> of_s s |> S.to_z) (of_list x) in
     let ys = List.map (fun s -> of_s s |> S.to_z) (of_list y) in
-    let zs = Utils.mod_add_limbs ~modulus ~base xs ys in
+    let zs =
+      if subtraction then Utils.mod_sub_limbs ~modulus ~base xs ys
+      else Utils.mod_add_limbs ~modulus ~base xs ys
+    in
     let z = List.map (fun z -> S.of_z z |> to_s) zs |> to_list in
     ret z
 end

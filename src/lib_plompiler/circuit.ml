@@ -109,6 +109,13 @@ let ( >* ) m f =
   let* Unit = m in
   f
 
+let fmap : ('a -> 'b) -> 'a t -> 'b t =
+ fun f m ->
+  let* m in
+  ret (f m)
+
+let ( <$> ) m f = fmap f m
+
 let rec foldM f e l =
   match l with
   | [] -> ret e
@@ -969,8 +976,8 @@ module Mod_arith = struct
   (* Refer to [lib_plompiler/gadget_mod_arith.ml] for documentation on
      modular arithmetic and details about all parameters:
      [modulus], [nb_limbs], [base], [moduli], [qm_bound] and [ts_bounds] *)
-  let add ~label ~modulus ~nb_limbs ~base ~moduli ~qm_bound ~ts_bounds (List xs)
-      (List ys) =
+  let add ?(subtraction = false) ~label ~modulus ~nb_limbs ~base ~moduli
+      ~qm_bound ~ts_bounds (List xs) (List ys) =
     (* This is just a sanity check, inputs are assumed to be well-formed,
        in particular, their limb values are in the range [0, base) *)
     assert (List.compare_length_with xs nb_limbs = 0) ;
@@ -980,8 +987,9 @@ module Mod_arith = struct
     let qm_ubound = snd qm_bound in
     let ts_ubounds = List.map snd ts_bounds in
     assert (List.for_all Utils.is_power_of_2 (base :: qm_ubound :: ts_ubounds)) ;
+    let label_suffix = if subtraction then "sub" else "add" in
     (* Create the corresponding constraints *)
-    with_label ~label:"Mod_arith.add"
+    with_label ~label:("Mod_arith." ^ label_suffix)
     @@ let* zs = fresh @@ Dummy.list nb_limbs Dummy.scalar in
        let* qm = fresh Dummy.scalar in
        let* ts = fresh @@ Dummy.list (List.length moduli) Dummy.scalar in
@@ -993,12 +1001,18 @@ module Mod_arith = struct
        let qm = unscalar qm in
        let ts = List.map unscalar scalar_ts in
        let gate =
+         (* Substracions zs = xs - ys are modeled as additions xs = zs + ys.
+            Thus, we swap inp1 (xs) and out (zs) when subtraction = true. *)
+         let left_row1 = if subtraction then out else inp1 in
+         let left_row2 = if subtraction then inp1 else out in
          [|
            CS.new_constraint
-             ~wires:(inp1 @ inp2)
+             ~wires:(left_row1 @ inp2)
              ~q_mod_add:[(label, one)]
-             "mod_arith-add.1";
-           CS.new_constraint ~wires:(out @ [qm] @ ts) "mod_arith-add.2";
+             ("mod_arith-" ^ label_suffix ^ ".1");
+           CS.new_constraint
+             ~wires:(left_row2 @ [qm] @ ts)
+             ("mod_arith-" ^ label_suffix ^ ".2");
          |]
        in
        let solver =
@@ -1015,6 +1029,7 @@ module Mod_arith = struct
              out;
              qm;
              ts;
+             inverse = subtraction;
            }
        in
        (* The output is not assumed to be well-formed, we need to enforce this

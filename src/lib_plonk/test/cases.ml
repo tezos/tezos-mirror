@@ -487,8 +487,9 @@ module Range_Checks = struct
 end
 
 module Mod_Arith = struct
-  let add_mod_25519 ?(valid = true) case_name ~x ~y ~z ~qm ~tj =
-    let name = "add_mod_2^255-19." ^ case_name in
+  let add_mod_25519 ?(valid = true) ?(sub = false) case_name ~x ~y ~z ~qm ~tj =
+    let prefix = if sub then "sub" else "add" in
+    let name = prefix ^ "_mod_2^255-19." ^ case_name in
     (* addition mod 2^255-19, we have;
         |moduli| = [base] = [2^85]
         qm_shift := -1
@@ -501,6 +502,7 @@ module Mod_Arith = struct
     let xs = Plompiler.Utils.z_to_limbs ~len:3 ~base x in
     let ys = Plompiler.Utils.z_to_limbs ~len:3 ~base y in
     let zs = Plompiler.Utils.z_to_limbs ~len:3 ~base z in
+    let xs, zs = if sub then (zs, xs) else (xs, zs) in
     let witness =
       (Z.zero :: xs) @ ys @ [qm; tj] @ zs
       |> List.map Scalar.of_z |> Array.of_list
@@ -524,6 +526,7 @@ module Mod_Arith = struct
     let ( ! ) = Z.of_int in
     let m = Z.(shift_left one 255 - of_int 19) in
     let tj = !32767 in
+    let sub = true in
     [
       add_mod_25519 "no_wrap_around" ~x:!5 ~y:!6 ~z:!11 ~qm:!1 ~tj;
       add_mod_25519 "wrap_around" ~x:Z.(m - !1) ~y:!2 ~z:!1 ~qm:!2 ~tj;
@@ -531,6 +534,9 @@ module Mod_Arith = struct
       add_mod_25519 ~valid:false "invalid" ~x:!0 ~y:!1 ~z:!2 ~qm:!1 ~tj;
       add_mod_25519 ~valid:false "invalid qm" ~x:!1 ~y:!2 ~z:!3 ~qm:!0 ~tj;
       add_mod_25519 ~valid:false "invalid tj" ~x:!1 ~y:!2 ~z:!3 ~qm:!1 ~tj:!0;
+      add_mod_25519 "no_wrap_around" ~sub ~x:!8 ~y:!2 ~z:!6 ~qm:!1 ~tj;
+      add_mod_25519 "wrap_around" ~sub ~x:!8 ~y:Z.(m - !2) ~z:!10 ~qm:!2 ~tj;
+      add_mod_25519 ~valid:false ~sub "invalid" ~x:!0 ~y:!1 ~z:!1 ~qm:!1 ~tj;
     ]
 
   let list = mod_add_tests
