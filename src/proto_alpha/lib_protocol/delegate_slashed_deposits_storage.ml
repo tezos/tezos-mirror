@@ -74,19 +74,24 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
     Int64.add (Int64.of_int staking_over_baking_limit) 2L
   in
   let* frozen_deposits = Frozen_deposits_storage.get ctxt delegate_contract in
-  let punish_value =
-    Tez_repr.(
-      div_exn (mul_exn frozen_deposits.initial_amount slashing_percentage) 100)
+  let compute_reward_and_burn (frozen_deposits : Deposits_repr.t) =
+    let open Result_syntax in
+    let punish_value =
+      Tez_repr.(
+        div_exn (mul_exn frozen_deposits.initial_amount slashing_percentage) 100)
+    in
+    let should_forbid, punishing_amount =
+      if Tez_repr.(punish_value >= frozen_deposits.current_amount) then
+        (true, frozen_deposits.current_amount)
+      else (false, punish_value)
+    in
+    let* reward =
+      Tez_repr.(punishing_amount /? staking_over_baking_limit_plus_two)
+    in
+    let+ amount_to_burn = Tez_repr.(punishing_amount -? reward) in
+    (should_forbid, {reward; amount_to_burn})
   in
-  let should_forbid, punishing_amount =
-    if Tez_repr.(punish_value >= frozen_deposits.current_amount) then
-      (true, frozen_deposits.current_amount)
-    else (false, punish_value)
-  in
-  let*? reward =
-    Tez_repr.(punishing_amount /? staking_over_baking_limit_plus_two)
-  in
-  let*? amount_to_burn = Tez_repr.(punishing_amount -? reward) in
+  let*? should_forbid, staked = compute_reward_and_burn frozen_deposits in
   let*! ctxt =
     if should_forbid then Delegate_storage.forbid_delegate ctxt delegate
     else Lwt.return ctxt
@@ -110,7 +115,7 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
   let*! ctxt =
     Storage.Contract.Slashed_deposits.add ctxt delegate_contract slash_history
   in
-  return (ctxt, {staked = {reward; amount_to_burn}; unstaked = []})
+  return (ctxt, {staked; unstaked = []})
 
 let punish_double_endorsing =
   let get Storage.{for_double_endorsing; _} = for_double_endorsing in
