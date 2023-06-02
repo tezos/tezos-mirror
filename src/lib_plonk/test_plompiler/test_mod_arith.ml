@@ -223,9 +223,37 @@ module ModArith (L : LIB) = struct
         (r, !0, !0, false);
       ]
 
+  let inv_circuit ~expected x () =
+    let* z_exp = ModArith.input_mod_int ~kind:`Public expected in
+    let* x = ModArith.input_mod_int x in
+    let* z = ModArith.inv x in
+    assert_equal z z_exp
+
+  let tests_mod_inv =
+    let m = ModArith.modulus in
+    let r = random_mod_int ~modulus:m () in
+    let inverse r =
+      let d, u, _v = Z.gcdext r m in
+      assert (Z.(d = one)) ;
+      u
+    in
+    List.map
+      (fun (x, expected, valid) ->
+        let name = "ModArith.test_mod_inv" ^ name_suffix valid in
+        test ~valid ~name (inv_circuit ~expected x))
+      [
+        (!1, !1, true);
+        (!(-1), !(-1), true);
+        (Z.(m - !1), !(-1), true);
+        (r, inverse r, true);
+        (!1, !(-1), false);
+        (!1, !2, false);
+        (!0, !0, false);
+      ]
+
   let tests =
     tests_mod_add @ tests_mod_sub @ tests_mod_neg @ tests_mod_constant
-    @ tests_mod_mul @ tests_mod_div
+    @ tests_mod_mul @ tests_mod_div @ tests_mod_inv
 end
 
 open Plonk_test.Helpers

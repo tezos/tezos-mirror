@@ -2314,6 +2314,30 @@ Constraints: 9
 ModArith.test_mod_div_optimized:
 Constraints: 9
 
+ModArith.test_mod_inv:
+Constraints: 7
+
+ModArith.test_mod_inv_optimized:
+Constraints: 7
+
+ModArith.test_mod_inv:
+Constraints: 7
+
+ModArith.test_mod_inv_optimized:
+Constraints: 7
+
+ModArith.test_mod_inv:
+Constraints: 7
+
+ModArith.test_mod_inv_optimized:
+Constraints: 7
+
+ModArith.test_mod_inv:
+Constraints: 7
+
+ModArith.test_mod_inv_optimized:
+Constraints: 7
+
 Edwards.test_add:
 Constraints: 4
 

@@ -157,7 +157,9 @@ module type MOD_ARITH = functor (L : LIB) -> sig
 
   val neg : mod_int repr -> mod_int repr t
 
-  (* val inv : mod_int repr -> mod_int repr t *)
+  (* Inversion of a non-invertible value (mod [modulus]) will make
+     the circuit unsatisfiable *)
+  val inv : mod_int repr -> mod_int repr t
 end
 
 (* Checks that the parameters are sound for implementing modular arithmetic,
@@ -609,6 +611,23 @@ functor
     let neg xs =
       let* zs = zero in
       sub zs xs
+
+    let inv xs =
+      let* os = one in
+      (* We do not need to assert that [x <> 0], because the equation
+         enforced by [Mod_arith.mul] will be [1 = z * x], which is
+         unsatisfiable if [x = 0], because we are in an integral domain. *)
+      Mod_arith.mul
+        ~division:true
+        ~label
+        ~modulus
+        ~nb_limbs
+        ~base
+        ~moduli:moduli_mul
+        ~qm_bound:(fst bounds_mul)
+        ~ts_bounds:(snd bounds_mul)
+        os
+        xs
   end
 
 module ArithMod25519 = Make (struct
