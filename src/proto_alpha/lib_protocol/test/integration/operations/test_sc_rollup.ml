@@ -2286,6 +2286,7 @@ let play_conflict_with_timeout block (p1, p1_pkh) p2_pkh rollup =
       rollup
       game_index
   in
+  let* () = assert_game_exists incr rollup game_index ~exists:false in
   Incremental.finalize_block incr
 
 (** Test that timeout a player during the final move ends the game if
@@ -2294,6 +2295,76 @@ let test_timeout_during_final_move () =
   let open Lwt_result_syntax in
   let* block, (p1, p1_pkh), (_p2, p2_pkh), rollup = init_with_conflict () in
   let* _block = play_conflict_until_draw block (p1, p1_pkh) p2_pkh rollup in
+  return_unit
+
+(** Test that timeout a player during the final move ends the game if
+    the other player played. *)
+let test_draw_with_parallel_game () =
+  let open Lwt_result_syntax in
+  let* block, (account1, account2, account3) = context_init Context.T3 in
+  let pkh1 = Account.pkh_of_contract_exn account1 in
+  let pkh2 = Account.pkh_of_contract_exn account2 in
+  let pkh3 = Account.pkh_of_contract_exn account3 in
+  let* block, rollup = sc_originate block account1 in
+  let compressed_state =
+    Sc_rollup.State_hash.context_hash_to_state_hash
+      (Context_hash.hash_string ["first"])
+  in
+  let* commitment1 =
+    dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup
+  in
+  let compressed_state =
+    Sc_rollup.State_hash.context_hash_to_state_hash
+      (Context_hash.hash_string ["second"])
+  in
+  let* commitment2 =
+    dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup
+  in
+  let compressed_state =
+    Sc_rollup.State_hash.context_hash_to_state_hash
+      (Context_hash.hash_string ["third"])
+  in
+  let* commitment3 =
+    dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup
+  in
+  let* block = add_publish ~rollup block account1 commitment1 in
+  let* block = add_publish ~rollup block account2 commitment2 in
+  let* block = add_publish ~rollup block account3 commitment3 in
+  let* block =
+    start_game block rollup (account1, commitment1) (pkh2, commitment2)
+  in
+  let* block =
+    start_game block rollup (account3, commitment3) (pkh2, commitment2)
+  in
+  let* block =
+    start_game block rollup (account3, commitment3) (pkh1, commitment1)
+  in
+  let* block = play_conflict_with_timeout block (account1, pkh1) pkh2 rollup in
+  let* block = play_conflict_with_timeout block (account3, pkh3) pkh2 rollup in
+
+  (* [pkh1] and [pkh3] were both slashed, any move in their game will
+     result in a draw. *)
+  let* incr = Incremental.begin_construction block in
+  let* incr =
+    let* refutation =
+      let choice = Sc_rollup.Tick.initial in
+      dumb_proof ~choice
+    in
+    let* final_move_op =
+      Op.sc_rollup_refute (B block) account3 rollup pkh1 refutation
+    in
+    Incremental.add_operation incr final_move_op
+  in
+  let expected_game_status : Sc_rollup.Game.status = Ended Draw in
+  let game_index = Sc_rollup.Game.Index.make pkh1 pkh3 in
+  let* () =
+    assert_refute_result
+      ~game_status:expected_game_status
+      incr
+      rollup
+      game_index
+  in
+  let* () = assert_game_exists incr rollup game_index ~exists:false in
   return_unit
 
 (** Test that playing a dissection during a final move is rejected. *)
@@ -3475,6 +3546,10 @@ let tests =
       "Timeout during the final move can end the game in a draw situation"
       `Quick
       test_timeout_during_final_move;
+    Tztest.tztest
+      "Multiple draw in parallel game are valid"
+      `Quick
+      test_draw_with_parallel_game;
     Tztest.tztest
       "Cannot play a dissection when the final move has started"
       `Quick
