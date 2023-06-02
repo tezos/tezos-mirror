@@ -348,29 +348,33 @@ let resulting_context_hash block_store ~fetch_expect_predecessor_context key =
     let* v_opt = t in
     match v_opt with None -> return_none | Some v -> k v
   in
-  Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
-      (* Resolve the hash *)
-      let*? adjusted_hash = get_hash block_store key in
-      if Block_hash.equal block_store.genesis_block.hash adjusted_hash then
-        return_some (Block_repr.context block_store.genesis_block)
-      else
-        (* First look in the floating stores *)
-        let*! resulting_context_opt =
+  (* Resolve the hash *)
+  let*? adjusted_hash = get_hash block_store key in
+  if Block_hash.equal block_store.genesis_block.hash adjusted_hash then
+    return_some (Block_repr.context block_store.genesis_block)
+  else
+    (* First look in the floating stores *)
+    let*! resulting_context_opt =
+      Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
           List.find_map_s
             (fun store ->
               Floating_block_store.find_resulting_context_hash
                 store
                 adjusted_hash)
             (block_store.rw_floating_block_store
-           :: block_store.ro_floating_block_stores)
-        in
-        match resulting_context_opt with
-        | Some resulting_context_hash -> return_some resulting_context_hash
-        | None ->
-            (* If not found, look at the context of the direct
-               successor of the looked up block in the cemented store. *)
+           :: block_store.ro_floating_block_stores))
+    in
+    match resulting_context_opt with
+    | Some resulting_context_hash -> return_some resulting_context_hash
+    | None ->
+        (* [fetch_expect_predecessor_context] takes a lock on the
+           chain_data: we make sure not to lock the [merge_scheduler]
+           to prevent a data-race locking up the store. *)
+        let* expect_predecessor = fetch_expect_predecessor_context () in
+        (* If not found, look at the context of the direct
+           successor of the looked up block in the cemented store. *)
+        Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
             let cemented_store = block_store.cemented_store in
-            let* expect_predecessor = fetch_expect_predecessor_context () in
             if expect_predecessor then
               let*? block_level =
                 return
