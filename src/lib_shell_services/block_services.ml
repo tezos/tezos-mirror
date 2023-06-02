@@ -1009,7 +1009,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
     module Mempool = struct
       type t = {
-        applied : (Operation_hash.t * Next_proto.operation) list;
+        validated : (Operation_hash.t * Next_proto.operation) list;
         refused : (Next_proto.operation * error list) Operation_hash.Map.t;
         outdated : (Next_proto.operation * error list) Operation_hash.Map.t;
         branch_refused :
@@ -1022,27 +1022,27 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       let version_0_encoding =
         conv
           (fun {
-                 applied;
+                 validated;
                  refused;
                  outdated;
                  branch_refused;
                  branch_delayed;
                  unprocessed;
                } ->
-            ( applied,
+            ( validated,
               refused,
               outdated,
               branch_refused,
               branch_delayed,
               unprocessed ))
-          (fun ( applied,
+          (fun ( validated,
                  refused,
                  outdated,
                  branch_refused,
                  branch_delayed,
                  unprocessed ) ->
             {
-              applied;
+              validated;
               refused;
               outdated;
               branch_refused;
@@ -1120,27 +1120,27 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         in
         conv
           (fun {
-                 applied;
+                 validated;
                  refused;
                  outdated;
                  branch_refused;
                  branch_delayed;
                  unprocessed;
                } ->
-            ( applied,
+            ( validated,
               refused,
               outdated,
               branch_refused,
               branch_delayed,
               unprocessed ))
-          (fun ( applied,
+          (fun ( validated,
                  refused,
                  outdated,
                  branch_refused,
                  branch_delayed,
                  unprocessed ) ->
             {
-              applied;
+              validated;
               refused;
               outdated;
               branch_refused;
@@ -1181,6 +1181,9 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                          next_operation_encoding)))))
 
       let version_2_encoding = version_1_encoding ~use_legacy_name:false
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5720
+         This RPC still uses the old term "applied", whereas the
+         mempool now only validates operations. *)
 
       let version_1_encoding = version_1_encoding ~use_legacy_name:true
 
@@ -1217,7 +1220,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         query
           (fun
             version
-            applied
+            validated
             refused
             outdated
             branch_refused
@@ -1227,7 +1230,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             object
               method version = version
 
-              method applied = applied
+              method validated = validated
 
               method refused = refused
 
@@ -1245,11 +1248,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              default_pending_operations_version
              (fun t -> t#version)
         |+ field
+           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5720
+              This RPC still uses the old term "applied", whereas the
+              mempool now only validates operations. *)
              ~descr:"Include applied operations (true by default)"
              "applied"
              Tezos_rpc.Arg.bool
              true
-             (fun t -> t#applied)
+             (fun t -> t#validated)
         |+ field
              ~descr:"Include refused operations (true by default)"
              "refused"
@@ -1353,7 +1359,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         let open Tezos_rpc.Query in
         query
           (fun
-            applied
+            validated
             refused
             outdated
             branch_refused
@@ -1361,7 +1367,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             validation_passes
           ->
             object
-              method applied = applied
+              method validated = validated
 
               method refused = refused
 
@@ -1374,11 +1380,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
               method validation_passes = validation_passes
             end)
         |+ field
+           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5720
+              This RPC still uses the old term "applied", whereas the
+              mempool now only validates operations. *)
              ~descr:"Include applied operations (set by default)"
              "applied"
              Tezos_rpc.Arg.bool
              true
-             (fun t -> t#applied)
+             (fun t -> t#validated)
         |+ field
              ~descr:"Include refused operations"
              "refused"
@@ -1719,7 +1728,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
   module Mempool = struct
     type t = S.Mempool.t = {
-      applied : (Operation_hash.t * Next_proto.operation) list;
+      validated : (Operation_hash.t * Next_proto.operation) list;
       refused : (Next_proto.operation * error list) Operation_hash.Map.t;
       outdated : (Next_proto.operation * error list) Operation_hash.Map.t;
       branch_refused : (Next_proto.operation * error list) Operation_hash.Map.t;
@@ -1731,7 +1740,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
     let pending_operations ctxt ?(chain = `Main)
         ?(version = S.Mempool.default_pending_operations_version)
-        ?(applied = true) ?(branch_delayed = true) ?(branch_refused = true)
+        ?(validated = true) ?(branch_delayed = true) ?(branch_refused = true)
         ?(refused = true) ?(outdated = true) ?(validation_passes = []) () =
       let open Lwt_result_syntax in
       let* v =
@@ -1742,7 +1751,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           (object
              method version = version
 
-             method applied = applied
+             method validated = validated
 
              method refused = refused
 
@@ -1772,7 +1781,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       let s = S.Mempool.unban_all_operations (mempool_path chain_path) in
       Tezos_rpc.Context.make_call1 s ctxt chain () ()
 
-    let monitor_operations ctxt ?(chain = `Main) ?(applied = true)
+    let monitor_operations ctxt ?(chain = `Main) ?(validated = true)
         ?(branch_delayed = true) ?(branch_refused = false) ?(refused = false)
         ?(outdated = false) ?(validation_passes = []) () =
       let s = S.Mempool.monitor_operations (mempool_path chain_path) in
@@ -1781,7 +1790,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         ctxt
         ((), chain)
         (object
-           method applied = applied
+           method validated = validated
 
            method refused = refused
 

@@ -1206,7 +1206,7 @@ let pending_applied_operations_of_source (cctxt : #full) chain src :
                  Contents_list contents :: acc
              | _ -> acc)
            []
-           ops.Alpha_block_services.Mempool.applied
+           ops.Alpha_block_services.Mempool.validated
 
 (* Given the gas and fee of an applied operation in the mempool, and the
    estimated gas of a new operation to inject, this function returns

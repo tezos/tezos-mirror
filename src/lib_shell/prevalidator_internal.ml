@@ -975,7 +975,7 @@ module Make
           (Proto_services.S.Mempool.pending_operations Tezos_rpc.Path.open_root)
           (fun pv params () ->
             let validated =
-              if params#applied then
+              if params#validated then
                 Classification.Sized_map.to_map
                   pv.shell.classification.validated
                 |> Operation_hash.Map.to_seq
@@ -1034,7 +1034,7 @@ module Make
             in
             let pending_operations =
               {
-                Proto_services.Mempool.applied = validated;
+                Proto_services.Mempool.validated;
                 refused;
                 outdated;
                 branch_refused;
@@ -1061,7 +1061,7 @@ module Make
             in
             (* First call : retrieve the current set of op from the mempool *)
             let validated_seq =
-              if params#applied then
+              if params#validated then
                 Classification.Sized_map.to_map
                   pv.shell.classification.validated
                 |> Operation_hash.Map.to_seq
@@ -1110,7 +1110,7 @@ module Make
             in
             let current_mempool = ref (Some current_mempool) in
             let filter_result = function
-              | `Validated -> params#applied
+              | `Validated -> params#validated
               | `Refused _ -> params#refused
               | `Outdated _ -> params#outdated
               | `Branch_refused _ -> params#branch_refused
