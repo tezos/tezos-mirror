@@ -3,7 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::inbox::{read_inbox, Transaction};
+use crate::inbox::read_inbox;
+use crate::inbox::Transaction;
 use crate::Error;
 use tezos_smart_rollup_host::runtime::Runtime;
 

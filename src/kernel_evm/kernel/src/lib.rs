@@ -18,6 +18,7 @@ mod blueprint;
 mod error;
 mod genesis;
 mod inbox;
+mod parsing;
 mod simulation;
 mod storage;
 
