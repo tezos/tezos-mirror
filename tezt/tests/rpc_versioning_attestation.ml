@@ -75,6 +75,21 @@ let check_kind json kind =
   if not (String.equal json_kind kind) then
     Test.fail ~__LOC__ "Operation should have %s kind, got: %s" kind json_kind
 
+let use_legacy_name_from_version = function `Old -> true | `New -> false
+
+let check_version ~version ~check ~rpc ~name ~data client =
+  let* t =
+    RPC.Client.call client
+    @@ rpc ~version:(match version with `Old -> "0" | `New -> "1") data
+  in
+  return (check t name)
+
+let check_unknown_version ~rpc ~data client =
+  let version = "2" in
+  let*? p = RPC.Client.spawn client @@ rpc ~version data in
+  let msg = rex "Failed to parse argument 'version'" in
+  Process.check_error ~msg p
+
 let create_consensus_op ?slot ?level ?round ?block_payload_hash ~use_legacy_name
     ~signer ~kind client =
   let consensus_name =
@@ -334,12 +349,12 @@ module Forge = struct
 end
 
 module Parse = struct
-  let parse_operations_rpc ~version raw =
+  let rpc ~version raw =
     RPC.post_chain_block_helpers_parse_operations
       ~version
       (`A [JSON.unannotate raw])
 
-  let check_parsed_kind kind json =
+  let check_parsed_kind json kind =
     check_kind JSON.(json |> as_list |> List.hd) kind
 
   let create_raw_op ~protocol op client =
@@ -353,21 +368,6 @@ module Parse = struct
       ~name:(Protocol.encoding_prefix protocol ^ "." ^ "operation.raw")
       h1
 
-  let check_version ~use_legacy_name name raw client =
-    let* t =
-      RPC.Client.call client
-      @@ parse_operations_rpc
-           ~version:(if use_legacy_name then "0" else "1")
-           raw
-    in
-    return (check_parsed_kind name t)
-
-  let check_unknown_version raw client =
-    let version = "2" in
-    let*? p = RPC.Client.spawn client @@ parse_operations_rpc ~version raw in
-    let msg = rex (sf "Failed to parse argument 'version'") in
-    Process.check_error ~msg p
-
   let test_parse kind protocol =
     let* _node, client = Client.init_with_protocol ~protocol `Client () in
     let signer = Constant.bootstrap1 in
@@ -377,14 +377,24 @@ module Parse = struct
     in
     let* raw = create_raw_op ~protocol consensus_op client in
 
-    let check_version ~use_legacy_name =
-      let name = Operation.Consensus.kind_to_string kind use_legacy_name in
-      check_version ~use_legacy_name name raw client
+    let check_version ~version =
+      let name =
+        Operation.Consensus.kind_to_string
+          kind
+          (use_legacy_name_from_version version)
+      in
+      check_version
+        ~version
+        ~check:check_parsed_kind
+        ~rpc
+        ~name
+        ~data:raw
+        client
     in
 
-    let* () = check_version ~use_legacy_name:true in
-    let* () = check_version ~use_legacy_name:false in
-    check_unknown_version raw client
+    let* () = check_version ~version:`Old in
+    let* () = check_version ~version:`New in
+    check_unknown_version ~rpc ~data:raw client
 
   let test_parse_consensus =
     register_test
@@ -413,16 +423,24 @@ module Parse = struct
     in
     let* raw = create_raw_double_consensus_evidence () in
 
-    let check_version ~use_legacy_name =
+    let check_version ~version =
       let name =
-        Operation.Anonymous.kind_to_string double_evidence_kind use_legacy_name
+        Operation.Anonymous.kind_to_string
+          double_evidence_kind
+          (use_legacy_name_from_version version)
       in
-      check_version ~use_legacy_name name raw client
+      check_version
+        ~version
+        ~check:check_parsed_kind
+        ~rpc
+        ~name
+        ~data:raw
+        client
     in
 
-    let* () = check_version ~use_legacy_name:true in
-    let* () = check_version ~use_legacy_name:false in
-    check_unknown_version raw client
+    let* () = check_version ~version:`Old in
+    let* () = check_version ~version:`New in
+    check_unknown_version ~rpc ~data:raw client
 
   let test_parse_double_consensus_evidence =
     register_test
@@ -562,11 +580,13 @@ end
 module Run_Simulate = struct
   type rpc = Run | Simulate
 
-  let get_rpc rpc op =
+  let get_rpc rpc ?version op =
     match rpc with
-    | Run -> RPC.post_chain_block_helpers_scripts_run_operation (Data op)
+    | Run ->
+        RPC.post_chain_block_helpers_scripts_run_operation ?version (Data op)
     | Simulate ->
         RPC.post_chain_block_helpers_scripts_simulate_operation
+          ?version
           ~data:(Data op)
           ()
 
@@ -637,26 +657,37 @@ module Run_Simulate = struct
     let* node, client = Client.init_with_protocol ~protocol `Client () in
     let* () = Client.bake_for_and_wait ~node client in
 
-    let call_and_check_error ~use_legacy_name =
+    let call_and_check_versions ~use_legacy_name_in_input =
       Log.info
         "Create a %s operation and call %s "
         (Operation.Anonymous.kind_to_string
            double_evidence_kind
-           use_legacy_name)
+           use_legacy_name_in_input)
         (get_rpc_name rpc) ;
 
       let* consensus_op =
         create_double_consensus_evidence
-          ~use_legacy_name
+          ~use_legacy_name:use_legacy_name_in_input
           ~double_evidence_kind
           client
       in
       let* op_json = Operation.make_run_operation_input consensus_op client in
-      let* _ = RPC.Client.call client @@ get_rpc rpc op_json in
-      unit
+
+      let rpc ~version data = get_rpc rpc ~version data in
+      let check_version ~version =
+        let name =
+          Operation.Anonymous.kind_to_string
+            double_evidence_kind
+            (use_legacy_name_from_version version)
+        in
+        check_version ~version ~check:check_kind ~name ~rpc ~data:op_json client
+      in
+      let* () = check_version ~version:`Old in
+      let* () = check_version ~version:`New in
+      check_unknown_version ~rpc ~data:op_json client
     in
-    let* () = call_and_check_error ~use_legacy_name:true in
-    call_and_check_error ~use_legacy_name:false
+    let* () = call_and_check_versions ~use_legacy_name_in_input:true in
+    call_and_check_versions ~use_legacy_name_in_input:false
 
   let test_run_operation_double_consensus_evidence =
     register_test
