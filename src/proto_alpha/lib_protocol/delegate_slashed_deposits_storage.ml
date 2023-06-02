@@ -78,16 +78,15 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
     Tez_repr.(
       div_exn (mul_exn frozen_deposits.initial_amount slashing_percentage) 100)
   in
-  let punishing_amount =
-    Tez_repr.(min frozen_deposits.current_amount punish_value)
+  let should_forbid, punishing_amount =
+    if Tez_repr.(punish_value >= frozen_deposits.current_amount) then
+      (true, frozen_deposits.current_amount)
+    else (false, punish_value)
   in
   let*? reward =
     Tez_repr.(punishing_amount /? staking_over_baking_limit_plus_two)
   in
   let*? amount_to_burn = Tez_repr.(punishing_amount -? reward) in
-  let should_forbid =
-    Tez_repr.(punishing_amount = frozen_deposits.current_amount)
-  in
   let*! ctxt =
     if should_forbid then Delegate_storage.forbid_delegate ctxt delegate
     else Lwt.return ctxt
