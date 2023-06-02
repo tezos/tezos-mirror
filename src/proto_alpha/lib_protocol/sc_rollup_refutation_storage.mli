@@ -44,6 +44,14 @@ val get_ongoing_games_for_staker :
   tzresult
   Lwt.t
 
+(** [get_game ctxt rollup stakers] returns the [game] between
+    [stakers.alice] and [stakers.bob]. *)
+val find_game :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Sc_rollup_game_repr.Index.t ->
+  (Raw_context.t * Sc_rollup_game_repr.t option) tzresult Lwt.t
+
 (** A conflict between a staker and an [other] staker. The conflict is
    about the commitment that follows the [parent_commitment]:
    [their_commitment] and [our_commitment] are distinct, hence in

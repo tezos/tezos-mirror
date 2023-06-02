@@ -206,19 +206,22 @@ let get_conflict_point ctxt rollup staker1 staker2 =
     current_level
     commitment_period
 
-let get_game ctxt rollup stakers =
+let find_game ctxt rollup stakers =
   let open Lwt_result_syntax in
   let open Sc_rollup_game_repr.Index in
   let* ctxt, game_index =
     Store.Game.find ((ctxt, rollup), stakers.alice) stakers.bob
   in
   match game_index with
+  | None -> return (ctxt, None)
+  | Some game_hash -> Store.Game_info.find (ctxt, rollup) game_hash
+
+let get_game ctxt rollup stakers =
+  let open Lwt_result_syntax in
+  let* ctxt, game = find_game ctxt rollup stakers in
+  match game with
   | None -> tzfail Sc_rollup_no_game
-  | Some game_hash -> (
-      let* ctxt, game = Store.Game_info.find (ctxt, rollup) game_hash in
-      match game with
-      | Some game -> return (game, ctxt)
-      | None -> tzfail Sc_rollup_no_game)
+  | Some game -> return (game, ctxt)
 
 let create_game ctxt rollup stakers game =
   let open Lwt_result_syntax in
