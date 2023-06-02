@@ -562,10 +562,10 @@ let apply_game_result ctxt rollup (stakers : Sc_rollup_game_repr.Index.t)
     | Draw ->
         let* ctxt = remove_game ctxt rollup stakers in
         let* ctxt, balances_updates_alice =
-          Stake_storage.remove_staker ctxt rollup stakers.alice
+          remove_if_staker_is_still_there ctxt rollup stakers.alice
         in
         let* ctxt, balances_updates_bob =
-          Stake_storage.remove_staker ctxt rollup stakers.bob
+          remove_if_staker_is_still_there ctxt rollup stakers.bob
         in
         return (ctxt, balances_updates_alice @ balances_updates_bob)
   in
