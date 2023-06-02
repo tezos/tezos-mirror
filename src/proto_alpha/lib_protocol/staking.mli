@@ -38,3 +38,13 @@ val finalize_unstake :
   context ->
   public_key_hash ->
   (context * Receipt.balance_updates) tzresult Lwt.t
+
+(** [punish_delegate ctxt delegate level mistake ~rewarded] slashes [delegate]
+    for a [mistake] at [level] and rewards [rewarded]. *)
+val punish_delegate :
+  context ->
+  public_key_hash ->
+  Level.t ->
+  [`Double_baking | `Double_endorsing] ->
+  rewarded:Contract.t ->
+  (context * Receipt.balance_updates) tzresult Lwt.t

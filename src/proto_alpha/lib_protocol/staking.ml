@@ -45,3 +45,23 @@ let finalize_unstake ctxt pkh =
       (ctxt, new_balance_updates @ balance_updates))
     (ctxt, [])
     finalizable
+
+let punish_delegate ctxt delegate level mistake ~rewarded =
+  let open Lwt_result_syntax in
+  let punish =
+    match mistake with
+    | `Double_baking -> Delegate.punish_double_baking
+    | `Double_endorsing -> Delegate.punish_double_endorsing
+  in
+  let* ctxt, {reward; amount_to_burn} = punish ctxt delegate level in
+  let* ctxt, punish_balance_updates =
+    Token.transfer
+      ctxt
+      (`Frozen_deposits delegate)
+      `Double_signing_punishments
+      amount_to_burn
+  in
+  let+ ctxt, reward_balance_updates =
+    Token.transfer ctxt (`Frozen_deposits delegate) (`Contract rewarded) reward
+  in
+  (ctxt, reward_balance_updates @ punish_balance_updates)
