@@ -52,21 +52,7 @@ let hash_of_block ?cache (rpc_context : #Tezos_rpc.Context.simple)
         cache ;
       return hash
 
-type mode =
-  | Light_client of Light.sources
-  | Proxy_client
-  | Proxy_server of {
-      sleep : float -> unit Lwt.t;
-      sym_block_caching_time : Ptime.span option;
-      on_disk_proxy_builder :
-        (Context_hash.t ->
-        Tezos_protocol_environment.Proxy_delegate.t tzresult Lwt.t)
-        option;
-    }
-
-let to_client_server_mode = function
-  | Light_client _ | Proxy_client -> Proxy.Client
-  | Proxy_server _ -> Proxy.Server
+type mode = Light_client of Light.sources | Proxy_client
 
 let get_protocols ?expected_protocol rpc_context chain block =
   let open Lwt_result_syntax in
@@ -119,11 +105,8 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
   let block_hash_cache =
     (* We consider that the duration of a run of a client command is
        below the time between blocks so that aliases (`head`, levels,
-       ...) don't change. Obviously, this assumption is incorrect in
-       a long living proxy server. *)
-    match mode with
-    | Proxy_server _ -> None
-    | Light_client _ | Proxy_client -> Some (Stdlib.Hashtbl.create 17)
+       ...) don't change. *)
+    Some (Stdlib.Hashtbl.create 17)
   in
   let make proxy_env chain block =
     match mode with
@@ -142,26 +125,13 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
             in
             let module M = Proxy_getter.Make (C) (P_RPC) in
             Lwt.return (module M : Proxy_getter.M))
-    | Proxy_client | Proxy_server {on_disk_proxy_builder = None; _} ->
+    | Proxy_client ->
         Proxy_getter.Of_rpc
           (fun (module P_RPC : Proxy_proto.PROTO_RPC) ->
             let module M = Proxy_getter.MakeProxy (P_RPC) in
             Lwt.return (module M : Proxy_getter.M))
-    | Proxy_server {on_disk_proxy_builder = Some f; _} ->
-        Proxy_getter.Of_data_dir f
   in
-  (* proxy_server case: given that a new block arrives every minute,
-     make the cache keep blocks from approximately the last hour.
-     Starting at protocol G, blocks may arrive faster than one per minute.
-     We can either forward the protocol's constants here, or do an
-     RPC call to obtain the exact value.
-     Anyway we're safe, having an appromixation here is fine. *)
-  let envs_cache =
-    Env_cache_lwt.create
-      (match mode with
-      | Proxy_server _ -> 64
-      | Proxy_client | Light_client _ -> 16)
-  in
+  let envs_cache = Env_cache_lwt.create 16 in
   let get_env_rpc_context chain block =
     let open Lwt_result_syntax in
     let* block_hash =
@@ -196,7 +166,6 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
           printer = Some printer;
           proxy_builder = make (module Proxy_environment) chain block_key;
           rpc_context;
-          mode = to_client_server_mode mode;
           chain;
           block = block_key;
         }
@@ -224,36 +193,22 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
     let open Lwt_syntax in
     let* res = get_env_rpc_context chain block in
     match res with
-    | Error trace -> (
+    | Error trace ->
         (* proto_directory expects a unit Directory.t Lwt.t, and we
            can't give it a unit tzresult Directory.t Lwt.t, hence
            we throw an exception instead if we can't make the
            directory.
 
-           This happens notably in the proxy server case when a
-           request is made for a block baked on a protocol differing
-           from the protocol the proxy server is currently running on.
-
-           In the proxy server case, we'd prefer to return a 404
-           instead of a 500. Luckily, Resto handles the [Not_found]
-           exception specially and returns a 404, which our
-           query-forwarding middleware (see
-           Tezos_rpc_http.RPC_middleware) can then turn into a redirect
-           to the node.
-
            In the client cases, we throw an exception (which Resto
            turns into a 500) and print the trace. *)
-        match mode with
-        | Proxy_server _ -> raise Not_found
-        | Light_client _ | Proxy_client ->
-            let* () =
-              printer#warning
-                "Error while building RPC directory (perhaps a protocol \
-                 version mismatch between block and client?): %a"
-                Error_monad.pp_print_trace
-                trace
-            in
-            raise (Rpc_dir_creation_failure trace))
+        let* () =
+          printer#warning
+            "Error while building RPC directory (perhaps a protocol version \
+             mismatch between block and client?): %a"
+            Error_monad.pp_print_trace
+            trace
+        in
+        raise (Rpc_dir_creation_failure trace)
     | Ok res -> Lwt.return res
   in
   let proto_directory =

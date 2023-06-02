@@ -32,18 +32,12 @@
 
 module Local = Tezos_context_memory.Context
 
-(** Whether [octez-client] or [tezos-proxy-server] is running. *)
-type mode =
-  | Client  (** Mode when [octez-client] executes *)
-  | Server  (** Mode when [tezos-proxy-server] executes *)
-
 (** A dumb container, used to perform RPC calls concerning a specific
     chain and block. In other words this container is used to perform
     RPC calls of the form [/chains/<chain>/blocks/<block>] where the <...>
     received the value of the corresponding field of this record. *)
 type proxy_getter_input = {
   rpc_context : Tezos_rpc.Context.simple;  (** How to perform RPC calls *)
-  mode : mode;  (** Whether [octez-client] or [tezos-proxy-server] is running *)
   chain : Tezos_shell_services.Block_services.chain;
       (** The chain involved in the RPC call *)
   block : Tezos_shell_services.Block_services.block;
