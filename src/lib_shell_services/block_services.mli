@@ -406,8 +406,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       unprocessed : Next_proto.operation Operation_hash.Map.t;
     }
 
-    type version = Version_0 | Version_1
-
+    type version = Version_0 | Version_1 | Version_2
 
     (** Call RPC GET /chains/[chain]/mempool/pending_operations
 
