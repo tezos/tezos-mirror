@@ -8,7 +8,7 @@ use storage::{read_chain_id, store_chain_id};
 use tezos_ethereum::block::L2Block;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_entrypoint::kernel_entry;
-use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 use crate::safe_storage::{SafeStorage, TMP_PATH};
@@ -100,6 +100,25 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
 
 const EVM_PATH: RefPath = RefPath::assert_from(b"/evm");
 
+const ERRORS_PATH: RefPath = RefPath::assert_from(b"/errors");
+
+fn log_error<Host: Runtime>(host: &mut Host, err: &Error) -> Result<(), Error> {
+    let current_level = storage::read_current_block_number(host).unwrap_or_default();
+    let err_msg = format!("Error during block {}: {:?}", current_level, err);
+
+    let nb_errors = host.store_count_subkeys(&ERRORS_PATH)?;
+    let raw_error_path: Vec<u8> = format!("/{}", nb_errors + 1).into();
+    let error_path = OwnedPath::try_from(raw_error_path)?;
+    let error_path = concat(&ERRORS_PATH, &error_path)?;
+
+    evm_execution::account_storage::store_write_all(
+        host,
+        &error_path,
+        err_msg.as_bytes(),
+    )?;
+    Ok(())
+}
+
 pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
     // In order to setup the temporary directory, we need to move something
     // from /evm to /tmp, so /evm must be non empty, this only happen
@@ -121,6 +140,7 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
             .promote(&EVM_PATH)
             .expect("The kernel failed to promote the temporary directory"),
         Err(e) => {
+            log_error(host.0, &e).expect("The kernel failed to write the error");
             debug_msg!(host, "The kernel produced an error: {:?}\n", e);
             debug_msg!(
                 host,
