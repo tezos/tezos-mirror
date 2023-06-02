@@ -52,6 +52,7 @@
   Michelson_v1_primitives
   Slot_repr
   Tez_repr
+  Deposits_repr
   Period_repr
   Time_repr
   Ratio_repr
@@ -308,6 +309,7 @@
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   tez_repr.ml tez_repr.mli
+  deposits_repr.ml deposits_repr.mli
   period_repr.ml period_repr.mli
   time_repr.ml time_repr.mli
   ratio_repr.ml ratio_repr.mli
@@ -569,6 +571,7 @@
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   tez_repr.ml tez_repr.mli
+  deposits_repr.ml deposits_repr.mli
   period_repr.ml period_repr.mli
   time_repr.ml time_repr.mli
   ratio_repr.ml ratio_repr.mli
@@ -814,6 +817,7 @@
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   tez_repr.ml tez_repr.mli
+  deposits_repr.ml deposits_repr.mli
   period_repr.ml period_repr.mli
   time_repr.ml time_repr.mli
   ratio_repr.ml ratio_repr.mli

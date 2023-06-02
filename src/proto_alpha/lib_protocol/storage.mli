@@ -49,8 +49,6 @@ end
 
 module Block_round : Simple_single_data_storage with type value = Round_repr.t
 
-type deposits = {initial_amount : Tez_repr.t; current_amount : Tez_repr.t}
-
 type missed_endorsements_info = {remaining_slots : int; missed_levels : int}
 
 module Slashed_deposits_history : sig
@@ -167,7 +165,7 @@ module Contract : sig
   module Frozen_deposits :
     Indexed_data_storage
       with type key = Contract_repr.t
-       and type value = deposits
+       and type value = Deposits_repr.t
        and type t := Raw_context.t
 
   (** If there is a value, the frozen balance for the contract won't

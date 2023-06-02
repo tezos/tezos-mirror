@@ -24,6 +24,7 @@
         "Michelson_v1_primitives",
         "Slot_repr",
         "Tez_repr",
+        "Deposits_repr",
         "Period_repr",
         "Time_repr",
         "Ratio_repr",

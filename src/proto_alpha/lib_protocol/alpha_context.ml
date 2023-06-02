@@ -482,7 +482,7 @@ module Delegate = struct
   include Delegate_slashed_deposits_storage
   include Delegate_cycles
 
-  type deposits = Storage.deposits = {
+  type deposits = Deposits_repr.t = {
     initial_amount : Tez.t;
     current_amount : Tez.t;
   }

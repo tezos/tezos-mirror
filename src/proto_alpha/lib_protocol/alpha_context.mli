@@ -2084,7 +2084,7 @@ module Consensus_key : sig
   val pkh : pk -> t
 end
 
-(** This module re-exports definitions from {!Delegate_storage},
+(** This module re-exports definitions from {!Deposits_repr}, {!Delegate_storage},
    {!Delegate_consensus_key}, {!Delegate_missed_endorsements_storage},
    {!Delegate_slashed_deposits_storage}, {!Delegate_cycles},
    {!Delegate_rewards}. *)
