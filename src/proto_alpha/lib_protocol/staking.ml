@@ -53,17 +53,24 @@ let punish_delegate ctxt delegate level mistake ~rewarded =
     | `Double_baking -> Delegate.punish_double_baking
     | `Double_endorsing -> Delegate.punish_double_endorsing
   in
-  let* ctxt, {staked = {reward; amount_to_burn}; unstaked = _} =
-    punish ctxt delegate level
+  let* ctxt, {staked; unstaked} = punish ctxt delegate level in
+  let init_to_burn_to_reward =
+    let Delegate.{amount_to_burn; reward} = staked in
+    let giver = `Frozen_deposits delegate in
+    ([(giver, amount_to_burn)], [(giver, reward)])
+  in
+  let to_burn, to_reward =
+    List.fold_left
+      (fun (to_burn, to_reward) (cycle, Delegate.{amount_to_burn; reward}) ->
+        let giver = `Unstaked_frozen_deposits (delegate, cycle) in
+        ((giver, amount_to_burn) :: to_burn, (giver, reward) :: to_reward))
+      init_to_burn_to_reward
+      unstaked
   in
   let* ctxt, punish_balance_updates =
-    Token.transfer
-      ctxt
-      (`Frozen_deposits delegate)
-      `Double_signing_punishments
-      amount_to_burn
+    Token.transfer_n ctxt to_burn `Double_signing_punishments
   in
   let+ ctxt, reward_balance_updates =
-    Token.transfer ctxt (`Frozen_deposits delegate) (`Contract rewarded) reward
+    Token.transfer_n ctxt to_reward (`Contract rewarded)
   in
   (ctxt, reward_balance_updates @ punish_balance_updates)
