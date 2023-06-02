@@ -159,7 +159,45 @@ module ModArith (L : LIB) = struct
         (!(-2), Z.(m - !1), false);
       ]
 
-  let tests = tests_mod_add @ tests_mod_sub @ tests_mod_neg @ tests_mod_constant
+  let mul_circuit ~expected xs () =
+    let* z_exp = ModArith.input_mod_int ~kind:`Public expected in
+    let* xs = L.mapM ModArith.input_mod_int xs in
+    let* z = L.foldM ModArith.mul (List.hd xs) (List.tl xs) in
+    assert_equal z z_exp
+
+  let tests_mod_mul =
+    let m = ModArith.modulus in
+    let r = random_mod_int ~modulus:m () in
+    let r' = random_mod_int ~modulus:m () in
+    List.map
+      (fun (xs, expected, valid) ->
+        let name = "ModArith.test_mod_mul" ^ name_suffix valid in
+        test ~valid ~name (mul_circuit ~expected xs))
+      [
+        ([!3; !5], !15, true);
+        ([r; r'], Z.(r * r' %! m), true);
+        ([!0; !1], !0, true);
+        ([!1; !0], !0, true);
+        ([m; !1], !0, true);
+        ([!1; m], !0, true);
+        ([m; m], !0, true);
+        ([!1; !1], !1, true);
+        ([!1; r], r, true);
+        ([!(-1); r], Z.neg r, true);
+        ([!1; !2; !3], !6, true);
+        ([!1; !2; !3; !4], !24, true);
+        ([!1; !2; !3; !4; !5], !120, true);
+        ([Z.(m - r); Z.neg r], Z.(r * r), true);
+        ([!1; !1; !1; !1; !1], !1, true);
+        ([m; !2], !1, false);
+        ([!0; !1], !1, false);
+        ([!1; !0], !1, false);
+        ([!(-1); !2], !2, false);
+      ]
+
+  let tests =
+    tests_mod_add @ tests_mod_sub @ tests_mod_neg @ tests_mod_constant
+    @ tests_mod_mul
 end
 
 open Plonk_test.Helpers
