@@ -606,15 +606,10 @@ module Term = struct
     in
     Arg.(value & flag & info ~docs ~doc ["disable-mempool"])
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5767
+     Remove this flag in Octez V19. *)
   let disable_mempool_precheck =
-    let doc =
-      "If set to [true], the node's prevalidator will fully execute operations \
-       before gossiping valid operations over the network. Default value is \
-       [false], in which case the node's prevalidator only performs a fast \
-       check over operations before gossiping them. If set to [true], this \
-       option can slow down your node and should be used for testing or \
-       debugging purposes."
-    in
+    let doc = "DEPRECATED. This flag no longer does anything." in
     Arg.(value & flag & info ~docs ~doc ["disable-mempool-precheck"])
 
   let enable_testchain =
