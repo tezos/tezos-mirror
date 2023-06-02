@@ -35,3 +35,16 @@ let encoding =
        (req "actual_amount" Tez_repr.encoding))
 
 let zero = {initial_amount = Tez_repr.zero; current_amount = Tez_repr.zero}
+
+let ( +? ) {initial_amount; current_amount} inc =
+  let open Result_syntax in
+  let* initial_amount = Tez_repr.(initial_amount +? inc) in
+  let+ current_amount = Tez_repr.(current_amount +? inc) in
+  {initial_amount; current_amount}
+
+let ( ++? ) {initial_amount = i1; current_amount = c1}
+    {initial_amount = i2; current_amount = c2} =
+  let open Result_syntax in
+  let* initial_amount = Tez_repr.(i1 +? i2) in
+  let+ current_amount = Tez_repr.(c1 +? c2) in
+  {initial_amount; current_amount}

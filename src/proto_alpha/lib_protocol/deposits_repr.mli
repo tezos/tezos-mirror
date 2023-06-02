@@ -46,3 +46,7 @@ type t = {initial_amount : Tez_repr.t; current_amount : Tez_repr.t}
 val encoding : t Data_encoding.t
 
 val zero : t
+
+val ( +? ) : t -> Tez_repr.t -> t tzresult
+
+val ( ++? ) : t -> t -> t tzresult
