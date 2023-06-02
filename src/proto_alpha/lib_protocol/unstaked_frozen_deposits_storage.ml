@@ -23,10 +23,63 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Internal = struct
+  let get ctxt contract ~normalized_cycle =
+    let open Lwt_result_syntax in
+    let+ balance_opt =
+      Storage.Contract.Unstaked_frozen_deposits.find
+        (ctxt, contract)
+        normalized_cycle
+    in
+    Option.value balance_opt ~default:Deposits_repr.zero
+
+  let update_balance ~f ctxt contract ~normalized_cycle =
+    let open Lwt_result_syntax in
+    let* frozen_deposits = get ctxt contract ~normalized_cycle in
+    let*? new_deposits = f frozen_deposits in
+    let*! ctxt =
+      Storage.Contract.Unstaked_frozen_deposits.add
+        (ctxt, contract)
+        normalized_cycle
+        new_deposits
+    in
+    return ctxt
+end
+
 let unslashable_cycle ctxt ~cycle =
   let preserved_cycles = Constants_storage.preserved_cycles ctxt in
   let max_slashing_period = Constants_storage.max_slashing_period ctxt in
   Cycle_repr.sub cycle (preserved_cycles + max_slashing_period - 1)
+
+let normalized_cycle ctxt ~cycle =
+  let current_cycle = (Raw_context.current_level ctxt).cycle in
+  assert (Cycle_repr.(cycle <= current_cycle)) ;
+  match unslashable_cycle ctxt ~cycle:current_cycle with
+  | None -> cycle
+  | Some unslashable_cycle -> Cycle_repr.max cycle unslashable_cycle
+
+let balance ctxt delegate cycle =
+  let open Lwt_result_syntax in
+  let contract = Contract_repr.Implicit delegate in
+  let normalized_cycle = normalized_cycle ctxt ~cycle in
+  let+ frozen_deposits = Internal.get ctxt contract ~normalized_cycle in
+  frozen_deposits.current_amount
+
+let credit_only_call_from_token ctxt delegate cycle amount =
+  let contract = Contract_repr.Implicit delegate in
+  let normalized_cycle = normalized_cycle ctxt ~cycle in
+  let f deposits = Deposits_repr.(deposits +? amount) in
+  Internal.update_balance ~f ctxt contract ~normalized_cycle
+
+let spend_only_call_from_token ctxt delegate cycle amount =
+  let contract = Contract_repr.Implicit delegate in
+  let normalized_cycle = normalized_cycle ctxt ~cycle in
+  let f Deposits_repr.{initial_amount; current_amount} =
+    let open Result_syntax in
+    let+ current_amount = Tez_repr.(current_amount -? amount) in
+    Deposits_repr.{initial_amount; current_amount}
+  in
+  Internal.update_balance ~f ctxt contract ~normalized_cycle
 
 let squash_unstaked_frozen_deposits ctxt ~from_cycle ~into_cycle ~delegate =
   let open Lwt_result_syntax in
