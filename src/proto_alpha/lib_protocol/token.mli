@@ -62,6 +62,8 @@ type container =
         be revealed to unlock the funds *)
   | `Frozen_deposits of Signature.Public_key_hash.t
     (** Frozen tokens of a delegate for consensus security deposits *)
+  | `Unstaked_frozen_deposits of Signature.Public_key_hash.t * Cycle_repr.t
+    (** Frozen tokens of a delegate that have been unstaked at the given cycle. *)
   | `Block_fees  (** Current block's fees collection *)
   | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t
     (** Frozen tokens of a contract for bond deposits (currently used by rollups) *)

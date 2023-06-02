@@ -27,6 +27,7 @@ type container =
   [ `Contract of Contract_repr.t
   | `Collected_commitments of Blinded_public_key_hash.t
   | `Frozen_deposits of Signature.Public_key_hash.t
+  | `Unstaked_frozen_deposits of Signature.Public_key_hash.t * Cycle_repr.t
   | `Block_fees
   | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t ]
 
@@ -61,7 +62,8 @@ let allocated ctxt stored =
   | `Collected_commitments bpkh ->
       Commitment_storage.exists ctxt bpkh >|= fun allocated ->
       ok (ctxt, allocated)
-  | `Frozen_deposits _ | `Block_fees -> return (ctxt, true)
+  | `Frozen_deposits _ | `Unstaked_frozen_deposits _ | `Block_fees ->
+      return (ctxt, true)
   | `Frozen_bonds (contract, bond_id) ->
       Contract_storage.bond_allocated ctxt contract bond_id
 
@@ -77,6 +79,9 @@ let balance ctxt stored =
       let contract = Contract_repr.Implicit delegate in
       Frozen_deposits_storage.get ctxt contract >|=? fun frozen_deposits ->
       (ctxt, frozen_deposits.current_amount)
+  | `Unstaked_frozen_deposits (delegate, cycle) ->
+      Unstaked_frozen_deposits_storage.balance ctxt delegate cycle
+      >|=? fun balance -> (ctxt, balance)
   | `Block_fees -> return (ctxt, Raw_context.get_collected_fees ctxt)
   | `Frozen_bonds (contract, bond_id) ->
       Contract_storage.find_bond ctxt contract bond_id
@@ -116,6 +121,13 @@ let credit ctxt receiver amount origin =
             delegate
             amount
           >|=? fun ctxt -> (ctxt, Deposits delegate)
+      | `Unstaked_frozen_deposits (delegate, cycle) ->
+          Unstaked_frozen_deposits_storage.credit_only_call_from_token
+            ctxt
+            delegate
+            cycle
+            amount
+          >|=? fun ctxt -> (ctxt, Unstaked_deposits (delegate, cycle))
       | `Block_fees ->
           Raw_context.credit_collected_fees_only_call_from_token ctxt amount
           >>?= fun ctxt -> return (ctxt, Block_fees)
@@ -166,6 +178,13 @@ let spend ctxt giver amount origin =
             delegate
             amount
           >|=? fun ctxt -> (ctxt, Deposits delegate)
+      | `Unstaked_frozen_deposits (delegate, cycle) ->
+          Unstaked_frozen_deposits_storage.spend_only_call_from_token
+            ctxt
+            delegate
+            cycle
+            amount
+          >|=? fun ctxt -> (ctxt, Unstaked_deposits (delegate, cycle))
       | `Block_fees ->
           Raw_context.spend_collected_fees_only_call_from_token ctxt amount
           >>?= fun ctxt -> return (ctxt, Block_fees)
