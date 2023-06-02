@@ -79,7 +79,7 @@ functor
       We'll start by defining encodings for points and lines.
     *)
 
-    open Encodings (L)
+    open Encodings
 
     (** [point] is type of the high-level OCaml representation *)
     type point = {x : int; y : int; z : int}

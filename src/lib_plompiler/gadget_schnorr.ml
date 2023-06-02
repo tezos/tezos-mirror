@@ -132,7 +132,7 @@ struct
   module V : functor (L : LIB) -> sig
     open L
     open MakeAffine(Curve)(L)
-    open Encoding.Encodings(L)
+    open Encodings
 
     (* TODO make abstract once compression is done with encodings *)
     type pk = point
@@ -169,7 +169,7 @@ struct
 
       type pk = point
 
-      open Encoding.Encodings (L)
+      open Encodings
 
       let point_encoding : (Curve.t, pk repr, pk) encoding =
         let curve_base_to_s c = Lang_core.S.of_z @@ Curve.Base.to_z c in

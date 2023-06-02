@@ -249,7 +249,7 @@ module Benchmark (L : LIB) = struct
       (fst @@ List.hd values)
       (List.tl values)
 
-  open Encodings (L)
+  open Encodings
 
   type curve_t_u = (scalar * scalar) repr
 

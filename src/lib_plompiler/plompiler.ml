@@ -84,6 +84,5 @@ module Utils = Utils
 module Linear_algebra = Linear_algebra
 module Optimizer = Optimizer
 module Solver = Solver
-module Encodings = Encoding.Encodings
 module Bounded = Bounded
 module Csir = Csir
