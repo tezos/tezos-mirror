@@ -56,6 +56,8 @@ module type FILTER = sig
 
     val conflict_handler : config -> Proto.Mempool.conflict_handler
 
+    val find_manager : Proto.operation -> Signature.Public_key_hash.t option
+
     val fee_needed_to_overtake :
       op_to_overtake:Proto.operation ->
       candidate_op:Proto.operation ->
@@ -93,6 +95,8 @@ module No_filter (Proto : Registered_protocol.T) :
       if Proto.compare_operations existing_operation new_operation < 0 then
         `Replace
       else `Keep
+
+    let find_manager _ = None
 
     let fee_needed_to_overtake ~op_to_overtake:_ ~candidate_op:_ = None
   end

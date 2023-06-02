@@ -103,6 +103,11 @@ val pre_filter :
     able to call {!Protocol.Alpha_context.Operation.compare}). *)
 val conflict_handler : config -> Protocol.Mempool.conflict_handler
 
+(** If the operation is a manager operation, return its source,
+    otherwise return [None]. *)
+val find_manager :
+  Protocol.Alpha_context.packed_operation -> Signature.Public_key_hash.t option
+
 (** Compute the minimal fee (expressed in mutez) that [candidate_op] would
     need to have in order to be strictly greater than [op_to_overtake]
     according to {!Protocol.Alpha_context.Operation.compare}, when both
