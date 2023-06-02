@@ -862,6 +862,8 @@ module type AUTOMATON = sig
       val get_message_for_peer :
         Peer.t -> Message_id.t -> t -> (t * Message.t * int) option
 
+      val seen_message : Message_id.t -> t -> bool
+
       module Internal_for_tests : sig
         val get_access_counters : t -> (Message_id.t * int Peer.Map.t) Seq.t
       end
@@ -910,6 +912,17 @@ module type AUTOMATON = sig
 
     (** [get_fanout_peers topic state] returns the fanout peers of [topic]. *)
     val get_fanout_peers : Topic.t -> view -> Peer.t list
+
+    (** [get_peer_score peer view] returns the score of [peer]. *)
+    val get_peer_score : Peer.t -> view -> Score.value
+
+    (** [get_peer_ihave_per_heartbeat peer view] returns
+        the number of IHaves received from [peer] since the last heartbeat. *)
+    val get_peer_ihave_per_heartbeat : Peer.t -> view -> int
+
+    (** [get_peer_iwant_per_heartbeat peer view] returns
+        the number of IWants sent to [peer] since the last heartbeat. *)
+    val get_peer_iwant_per_heartbeat : Peer.t -> view -> int
 
     val limits : view -> limits
 

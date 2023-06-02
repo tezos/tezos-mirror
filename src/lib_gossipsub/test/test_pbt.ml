@@ -45,8 +45,8 @@ module Basic_fragments = struct
   let prune_backoff = Milliseconds.Span.of_int_s 10
 
   let add_then_remove_peer ~gen_peer : t =
-    of_input_gen (add_peer ~gen_peer) @@ fun ap ->
-    [I.add_peer ap; I.remove_peer {peer = ap.peer}]
+    of_input_gen (add_peer ~gen_peer ~gen_direct:M.bool ~gen_outbound:M.bool)
+    @@ fun ap -> [I.add_peer ap; I.remove_peer {peer = ap.peer}]
 
   let join_then_leave_topic ~gen_topic : t =
     of_input_gen (join ~gen_topic) @@ fun jp ->
@@ -67,17 +67,65 @@ module Basic_fragments = struct
 
   let heartbeat : t = of_list [I.heartbeat]
 
+  let ihave ~gen_peer ~gen_topic ~gen_message_id ~gen_msg_count : t =
+    of_input_gen
+      (ihave ~gen_peer ~gen_topic ~gen_message_id ~gen_msg_count)
+      (fun ihave -> [I.ihave ihave])
+
+  let iwant ~gen_peer ~gen_message_id ~gen_msg_count =
+    of_input_gen (iwant ~gen_peer ~gen_message_id ~gen_msg_count) (fun iwant ->
+        [I.iwant iwant])
+
+  let receive_message ~gen_peer ~gen_topic ~gen_message_id ~gen_message : t =
+    of_input_gen
+      (receive_message ~gen_peer ~gen_topic ~gen_message_id ~gen_message)
+      (fun receive_message -> [I.receive_message receive_message])
+
+  let publish_message ~gen_topic ~gen_message_id ~gen_message : t =
+    of_input_gen
+      (publish_message ~gen_topic ~gen_message_id ~gen_message)
+      (fun publish_message -> [I.publish_message publish_message])
+
+  (** [add_distinct_peers_and_subscribe ~all_peers ~gen_direct ~gen_outbound ~topics_to_subscribe]
+      returns [add_peer] inputs for peers [all_peers] using generators [gen_direct] and [gen_outbound]
+      followed by [subscribe] inputs for all topics in [topics_to_subscribe] for all [all_peers]. *)
+  let add_distinct_peers_and_subscribe ~all_peers ~gen_direct ~gen_outbound
+      ~topics_to_subscribe =
+    let many_peer_gens =
+      all_peers
+      |> List.map (fun peer_id ->
+             let open M in
+             let+ add_peer =
+               add_peer ~gen_peer:(M.return peer_id) ~gen_direct ~gen_outbound
+             in
+             (peer_id, add_peer))
+      |> M.flatten_l
+    in
+    of_input_gen many_peer_gens @@ fun peers ->
+    let peer_ids, add_peers = List.split peers in
+    let add_peer_inputs =
+      List.map (fun add_peer -> I.add_peer add_peer) add_peers
+    in
+    let subscribe_inputs =
+      peer_ids
+      |> List.map (fun peer_id ->
+             List.map
+               (fun topic -> I.subscribe GS.{topic; peer = peer_id})
+               topics_to_subscribe)
+      |> List.flatten
+    in
+    add_peer_inputs @ subscribe_inputs
+
   (* This creates a list of [count] [add_peer;graft] with distinct peers
      such that exactly [count_outbound] of them are [outbound] peers. *)
   let add_distinct_peers_and_graft count count_outbound topic =
     assert (count_outbound <= count) ;
     let many_peer_gens =
       List.init ~when_negative_length:() count (fun i ->
-          let open M in
-          let+ ap = add_peer ~gen_peer:(M.return i) in
           (* Setting [direct=false] otherwise the peers won't be grafted. *)
-          if i < count_outbound then {ap with direct = false; outbound = true}
-          else ap)
+          let gen_direct = M.return false in
+          let gen_outbound = M.return (i < count_outbound) in
+          add_peer ~gen_peer:(M.return i) ~gen_direct ~gen_outbound)
       |> WithExceptions.Result.get_ok ~loc:__LOC__
       |> M.flatten_l
     in
@@ -85,6 +133,17 @@ module Basic_fragments = struct
     List.map (fun ap -> [I.add_peer ap; I.graft {topic; peer = ap.peer}]) peers
     |> List.flatten
 end
+
+let dump_trace_and_fail ~__LOC__ prefix limits pp_state msg =
+  let open Gossipsub_pbt_generators in
+  Tezt.Test.fail
+    ~__LOC__
+    "Limits:@;%a@;Dumping trace until failure:@;@[<hov>%a@]@;%s@;"
+    pp_limits
+    limits
+    (pp_trace ~pp_output ~pp_state ())
+    prefix
+    msg
 
 module Test_message_cache = struct
   module L = Message_cache
@@ -485,15 +544,11 @@ module Test_remove_peer = struct
         repeat_at_most 10 @@ join_then_leave_topic ~gen_topic;
         repeat_at_most 10 heartbeat;
         repeat_at_most 100 tick;
-        of_input_gen
-          (ihave ~gen_peer ~gen_topic ~gen_message_id ~gen_msg_count)
-          (fun ihave -> [I.ihave ihave])
-        |> repeat_at_most 5;
-        of_input_gen
-          (iwant ~gen_peer ~gen_message_id ~gen_msg_count)
-          (fun iwant -> [I.iwant iwant])
-        |> repeat_at_most 5;
-        graft_then_prune_wait_and_clean () |> repeat_at_most 10;
+        repeat_at_most
+          5
+          (ihave ~gen_peer ~gen_topic ~gen_message_id ~gen_msg_count);
+        repeat_at_most 5 (iwant ~gen_peer ~gen_message_id ~gen_msg_count);
+        repeat_at_most 10 (graft_then_prune_wait_and_clean ());
       ]
     @% heartbeat
 
@@ -709,8 +764,6 @@ module Test_peers_below_degree_high = struct
     @% add_distinct_peers_and_graft peer_count count_outbound topic
     @% heartbeat
 
-  let pp_output fmtr (O o) = GS.pp_output fmtr o
-
   (* A generator that should satisfy [Tezos_gossipsub.check_limits]. *)
   let limit_generator (default_limits : (_, _, _, _) limits) =
     let open M in
@@ -808,7 +861,303 @@ module Test_peers_below_degree_high = struct
     unit
 end
 
+(** Check that when handling IHaves we:
+    1. Don't send IWants to peers with negative score.
+    2. Don't send more than [max_sent_iwant_per_heartbeat] IWants per heartbeat per peer.
+    3. Don't respond to more than [max_recv_ihave_per_heartbeat] IHaves per heartbeat per peer.
+    4. Only send IWants for messages we haven't seen.
+    5. Don't send IWants for topics we have not joined.
+    6. Correctly update IWant/IHave counters. *)
+module Test_handle_ihave = struct
+  open Gossipsub_pbt_generators
+
+  let pp_state fmtr state =
+    let v = GS.Introspection.view state in
+    Fmt.Dump.record
+      Fmt.Dump.
+        [
+          field
+            "ihave_per_heartbeat"
+            (fun v -> v.GS.Introspection.ihave_per_heartbeat)
+            (GS.Introspection.pp_peer_map Format.pp_print_int);
+          field
+            "iwant_per_heartbeat"
+            (fun v -> v.GS.Introspection.iwant_per_heartbeat)
+            (GS.Introspection.pp_peer_map Format.pp_print_int);
+        ]
+      fmtr
+      v
+
+  let predicate
+      {
+        max_sent_iwant_per_heartbeat;
+        max_recv_ihave_per_heartbeat;
+        gossip_threshold;
+        _;
+      } (Transition {time = _; input; state; state'; output} : transition) () =
+    let open Result_syntax in
+    match input with
+    | Ihave {peer; topic; message_ids = _} ->
+        let open GS.Introspection in
+        let gossip_threshold = GS.Score.of_float gossip_threshold in
+        let v = view state in
+        let sent_iwant_count = get_peer_iwant_per_heartbeat peer v in
+        let recv_ihave_count = get_peer_ihave_per_heartbeat peer v in
+        let iwant_message_ids =
+          match output with
+          | Message_requested_message_ids iwant_message_ids -> iwant_message_ids
+          | _ -> []
+        in
+        let iwant_size = List.length iwant_message_ids in
+        (* 1. Don't send IWants to peers with negative score. *)
+        let score = GS.Introspection.get_peer_score peer v in
+        let* () =
+          if GS.Score.(score < gossip_threshold) && iwant_size != 0 then
+            fail @@ `negative_score score
+          else return_unit
+        in
+        (* 2. Don't send more than [max_sent_iwant_per_heartbeat] IWants per heartbeat per peer. *)
+        let updated_sent_iwant_count = sent_iwant_count + iwant_size in
+        let* () =
+          if updated_sent_iwant_count > max_sent_iwant_per_heartbeat then
+            fail
+            @@ `too_many_iwants_sent
+                 (peer, updated_sent_iwant_count, max_sent_iwant_per_heartbeat)
+          else return_unit
+        in
+        (* 3. Don't respond to more than [max_recv_ihave_per_heartbeat] IHaves per heartbeat per peer. *)
+        let updated_recv_ihave_count = recv_ihave_count + 1 in
+        let* () =
+          if
+            updated_recv_ihave_count > max_recv_ihave_per_heartbeat
+            && iwant_size != 0
+          then
+            fail
+            @@ `too_many_ihaves_received
+                 (peer, updated_recv_ihave_count, max_recv_ihave_per_heartbeat)
+          else return_unit
+        in
+        (* 4. Only send IWants for messages we haven't seen. *)
+        let* () =
+          List.iter_e
+            (fun message_id ->
+              if Message_cache.seen_message message_id v.message_cache then
+                fail @@ `sending_iwant_for_seen_message (peer, message_id)
+              else return_unit)
+            iwant_message_ids
+        in
+        (* 5. Don't send IWants for topics we have not joined. *)
+        let* () =
+          if (not @@ has_joined topic v) && iwant_size != 0 then
+            fail @@ `sending_iwant_for_topic_not_joined (peer, topic)
+          else return_unit
+        in
+        (* 6. Correctly update IWant/IHave counters. *)
+        let* () =
+          let v' = view state' in
+          let sent_iwant_count' =
+            GS.Introspection.get_peer_iwant_per_heartbeat peer v'
+          in
+          let recv_ihave_count' =
+            GS.Introspection.get_peer_ihave_per_heartbeat peer v'
+          in
+          if GS.Score.(score < gossip_threshold) then
+            (* We do not expect counter update if peer has negative score. *)
+            if
+              sent_iwant_count = sent_iwant_count'
+              && recv_ihave_count = recv_ihave_count'
+            then return_unit
+            else fail `counter_updated_when_negative_score
+          else if updated_sent_iwant_count != sent_iwant_count' then
+            fail
+            @@ `sent_iwant_count_not_updated_correctly
+                 (updated_sent_iwant_count, sent_iwant_count')
+          else if updated_recv_ihave_count != recv_ihave_count' then
+            fail
+            @@ `recv_ihave_count_not_updated_correctly
+                 (updated_recv_ihave_count, recv_ihave_count')
+          else return_unit
+        in
+        return_unit
+    | _ -> return_unit
+
+  let test rng _limits parameters =
+    Tezt_core.Test.register
+      ~__FILE__
+      ~title:"Gossipsub: Handle IHaves"
+      ~tags:["gossipsub"; "ihave"; "iwant"]
+    @@ fun () ->
+    let scenario =
+      let open M in
+      let total_ticks = 100 in
+      let* limits =
+        let* max_sent_iwant_per_heartbeat = int_range 1 100 in
+        let* max_recv_ihave_per_heartbeat = int_range 1 10 in
+        (* [mesh_message_deliveries_activation] controls when p3 is activated and starts
+           applying negative scores to peers that don't send us enough messages.
+           If it is too low, all peers will have negative scores early on in the test.
+           If it is too high, no peer will have negative scores during the test.
+           So we set it somewhere between [total_ticks / 3] and [total_ticks / 2] *)
+        let* mesh_message_deliveries_activation =
+          int_range (total_ticks / 3) (total_ticks / 2)
+        in
+        return
+          {
+            (Default_limits.default_limits
+               ~mesh_message_deliveries_activation:
+                 (Some mesh_message_deliveries_activation)
+               ())
+            with
+            max_sent_iwant_per_heartbeat;
+            max_recv_ihave_per_heartbeat;
+          }
+      in
+      let state = GS.make rng limits parameters in
+      let* scenario =
+        let open Fragment in
+        let open Basic_fragments in
+        let open M in
+        (* We separate peers that publish messages and peers that don't.
+           This is to ensure that some subset of peers will have a negative score
+           at some point due to P3. *)
+        let* publishing_peer_count = M.int_range 1 5 in
+        let+ not_publishing_peer_count = M.int_range 1 5 in
+        let publishing_peers = range 0 publishing_peer_count in
+        let not_publishing_peers = range 0 not_publishing_peer_count in
+        let all_peers = publishing_peers @ not_publishing_peers in
+        let gen_all_peer = M.oneofl all_peers in
+        let gen_publishing_peers = M.oneofl publishing_peers in
+        let joined_topics =
+          ["topicA"; "topicB"; "topicC"; "topicD"; "topicE"]
+        in
+        let not_joined_topics = ["topicF"] in
+        let all_topics = joined_topics @ not_joined_topics in
+        let gen_topic = M.oneofl all_topics in
+        let gen_message_id = M.int_range 1 100 in
+        let gen_msg_count = M.int_range 1 5 in
+        let gen_message = M.string in
+        of_list (List.map (fun topic -> I.join {topic}) joined_topics)
+        @% add_distinct_peers_and_subscribe
+             ~all_peers
+             ~topics_to_subscribe:all_topics
+             ~gen_outbound:M.bool
+             ~gen_direct:(M.return false)
+        @% interleave
+             [
+               repeat_at_most total_ticks (heartbeat @% tick);
+               repeat_at_most
+                 100
+                 (ihave
+                    ~gen_peer:gen_all_peer
+                    ~gen_topic
+                    ~gen_message_id
+                    ~gen_msg_count);
+               repeat_at_most
+                 50
+                 (receive_message
+                    ~gen_peer:gen_publishing_peers
+                    ~gen_topic
+                    ~gen_message_id
+                    ~gen_message);
+               repeat_at_most
+                 10
+                 (publish_message ~gen_topic ~gen_message_id ~gen_message);
+             ]
+      in
+      let+ trace = run state scenario in
+      (trace, limits)
+    in
+    let test =
+      QCheck2.Test.make ~count:100 ~name:"Gossipsub: iwant_checks" scenario
+      @@ fun (trace, limits) ->
+      match check_fold (predicate limits) () trace with
+      | Ok () -> true
+      | Error (e, prefix) -> (
+          match e with
+          | `negative_score score ->
+              let msg =
+                Format.asprintf
+                  "Sending IWant to a peer with negative score %a"
+                  GS.Score.pp_value
+                  score
+              in
+              dump_trace_and_fail ~__LOC__ prefix limits pp_state msg
+          | `too_many_iwants_sent
+              (peer, iwant_count, max_sent_iwant_per_heartbeat) ->
+              let msg =
+                Format.asprintf
+                  "Too many IWants were sent: Peer = %a, IWant count = %d, \
+                   max_sent_iwant_per_heartbeat = %d"
+                  Peer.pp
+                  peer
+                  iwant_count
+                  max_sent_iwant_per_heartbeat
+              in
+              dump_trace_and_fail ~__LOC__ prefix limits pp_state msg
+          | `too_many_ihaves_received
+              (peer, ihave_count, max_recv_ihave_per_heartbeat) ->
+              let msg =
+                Format.asprintf
+                  "Too many IHaves were received: Peer = %a, IHave count = %d, \
+                   max_recv_ihave_per_heartbeat = %d"
+                  Peer.pp
+                  peer
+                  ihave_count
+                  max_recv_ihave_per_heartbeat
+              in
+              dump_trace_and_fail ~__LOC__ prefix limits pp_state msg
+          | `sending_iwant_for_seen_message (peer, message_id) ->
+              let msg =
+                Format.asprintf
+                  "Sending IWant for a seen message: Peer = %a, message_id = %d"
+                  Peer.pp
+                  peer
+                  message_id
+              in
+              dump_trace_and_fail ~__LOC__ prefix limits pp_state msg
+          | `sending_iwant_for_topic_not_joined (peer, topic) ->
+              let msg =
+                Format.asprintf
+                  "Sending IWant for a topic we have not joined: Peer = %a, \
+                   topic = %a"
+                  Peer.pp
+                  peer
+                  Topic.pp
+                  topic
+              in
+              dump_trace_and_fail ~__LOC__ prefix limits pp_state msg
+          | `sent_iwant_count_not_updated_correctly
+              (expected_count, actual_count) ->
+              let msg =
+                Format.asprintf
+                  "Sent IWant count not updated correctly. Expected %d got %d"
+                  expected_count
+                  actual_count
+              in
+              dump_trace_and_fail ~__LOC__ prefix limits pp_state msg
+          | `counter_updated_when_negative_score ->
+              let msg =
+                "We should not update IWant/IHave counters when the peer has \
+                 negative score."
+              in
+              dump_trace_and_fail ~__LOC__ prefix limits pp_state msg
+          | `recv_ihave_count_not_updated_correctly
+              (expected_count, actual_count) ->
+              let msg =
+                Format.asprintf
+                  "Received IHave count not updated correctly. Expected %d got \
+                   %d"
+                  expected_count
+                  actual_count
+              in
+              dump_trace_and_fail ~__LOC__ prefix limits pp_state msg)
+    in
+    QCheck2.Test.check_exn ~rand:rng test ;
+    unit
+end
+
 let register rng limits parameters =
   Test_remove_peer.test rng limits parameters ;
   Test_message_cache.test rng ;
-  Test_peers_below_degree_high.test rng limits parameters
+  Test_peers_below_degree_high.test rng limits parameters ;
+  Test_handle_ihave.test rng limits parameters

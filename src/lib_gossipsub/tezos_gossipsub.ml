@@ -2330,6 +2330,25 @@ module Make (C : AUTOMATON_CONFIG) :
       | None -> []
       | Some fanout_peers -> Peer.Set.elements fanout_peers.peers
 
+    let get_peer_score peer {scores; _} =
+      match Peer.Map.find peer scores with
+      | None -> Score.zero
+      | Some score -> Score.value score
+
+    let get_peer_ihave_per_heartbeat peer {ihave_per_heartbeat; _} =
+      match Peer.Map.find peer ihave_per_heartbeat with
+      | None ->
+          (* Return 0 as this happens when no IHaves have been received from [peer]. *)
+          0
+      | Some count -> count
+
+    let get_peer_iwant_per_heartbeat peer {iwant_per_heartbeat; _} =
+      match Peer.Map.find peer iwant_per_heartbeat with
+      | None ->
+          (* Return 0 as this happens when no IWants have been sent to [peer]. *)
+          0
+      | Some count -> count
+
     let limits state = state.limits
 
     let has_joined topic {mesh; _} = Topic.Map.mem topic mesh

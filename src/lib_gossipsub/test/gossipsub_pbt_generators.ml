@@ -113,6 +113,8 @@ struct
     | Unsubscribe unsubscribe ->
         fprintf fmtr "Unsubscribe %a" GS.pp_unsubscribe unsubscribe
 
+  let pp_output fmtr (O o) = GS.pp_output fmtr o
+
   let pp_trace ?pp_state ?pp_state' ?pp_output () fmtr trace =
     let open Format in
     let pp fmtr (Transition {time; input; state; state'; output}) =
@@ -128,8 +130,10 @@ struct
       (pp_print_list ~pp_sep:(fun fmtr () -> fprintf fmtr "@,") pp)
       trace
 
-  let add_peer ~gen_peer =
-    let+ direct = bool and+ outbound = bool and+ peer = gen_peer in
+  let add_peer ~gen_peer ~gen_direct ~gen_outbound =
+    let+ direct = gen_direct
+    and+ outbound = gen_outbound
+    and+ peer = gen_peer in
     ({direct; outbound; peer} : GS.add_peer)
 
   let remove_peer ~gen_peer =
