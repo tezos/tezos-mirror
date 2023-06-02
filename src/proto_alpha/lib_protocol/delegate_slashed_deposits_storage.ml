@@ -66,20 +66,20 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
   assert (Compare.Bool.(get slashed = false)) ;
   let updated_slashed = set slashed in
   let delegate_contract = Contract_repr.Implicit delegate in
-  let* frozen_deposits = Frozen_deposits_storage.get ctxt delegate_contract in
   let slashing_percentage = get_percentage ctxt in
+  let staking_over_baking_limit =
+    Constants_storage.adaptive_inflation_staking_over_baking_limit ctxt
+  in
+  let staking_over_baking_limit_plus_two =
+    Int64.add (Int64.of_int staking_over_baking_limit) 2L
+  in
+  let* frozen_deposits = Frozen_deposits_storage.get ctxt delegate_contract in
   let punish_value =
     Tez_repr.(
       div_exn (mul_exn frozen_deposits.initial_amount slashing_percentage) 100)
   in
   let punishing_amount =
     Tez_repr.(min frozen_deposits.current_amount punish_value)
-  in
-  let staking_over_baking_limit =
-    Constants_storage.adaptive_inflation_staking_over_baking_limit ctxt
-  in
-  let staking_over_baking_limit_plus_two =
-    Int64.add (Int64.of_int staking_over_baking_limit) 2L
   in
   let*? reward =
     Tez_repr.(punishing_amount /? staking_over_baking_limit_plus_two)
