@@ -615,6 +615,7 @@ end
 
 module Token = Token
 module Cache = Cache_repr
+module Unstake_requests = Unstake_requests_storage
 
 module Internal_for_tests = struct
   let to_raw x = x
