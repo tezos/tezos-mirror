@@ -112,7 +112,7 @@ redirectcheck: html
 # - on each other protocol including alpha, also checking label defs (option -l)
 xrefscheck:
 	$(CHECKXREFS) mumbai
-	$(CHECKXREFS) nairobi
+	$(CHECKXREFS) -l nairobi
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
