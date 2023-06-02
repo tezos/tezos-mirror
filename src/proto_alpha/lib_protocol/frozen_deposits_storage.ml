@@ -23,15 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let zero : Deposits_repr.t =
-  {initial_amount = Tez_repr.zero; current_amount = Tez_repr.zero}
-
 let get ctxt delegate =
   let open Lwt_result_syntax in
   let+ frozen_deposits_opt =
     Storage.Contract.Frozen_deposits.find ctxt delegate
   in
-  Option.value ~default:zero frozen_deposits_opt
+  Option.value ~default:Deposits_repr.zero frozen_deposits_opt
 
 let update_balance ctxt delegate f amount =
   let open Lwt_result_syntax in

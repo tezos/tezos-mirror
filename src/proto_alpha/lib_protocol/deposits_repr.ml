@@ -33,3 +33,5 @@ let encoding =
     (obj2
        (req "initial_amount" Tez_repr.encoding)
        (req "actual_amount" Tez_repr.encoding))
+
+let zero = {initial_amount = Tez_repr.zero; current_amount = Tez_repr.zero}
