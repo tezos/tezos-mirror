@@ -1016,7 +1016,7 @@ module Mod_arith = struct
     assert (List.compare_length_with xs nb_limbs = 0) ;
     assert (List.compare_length_with ys nb_limbs = 0) ;
     (* Assert that all bounds are compatible with our range-check protocol,
-       which is design to check membership in intervals of the form [0, 2^k) *)
+       which is designed to check membership in intervals of the form [0, 2^k) *)
     let qm_ubound = snd qm_bound in
     let ts_ubounds = List.map snd ts_bounds in
     assert (List.for_all Utils.is_power_of_2 (base :: qm_ubound :: ts_ubounds)) ;

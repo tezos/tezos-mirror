@@ -40,6 +40,12 @@ module ModArith (L : LIB) = struct
   let random_mod_int ~modulus () =
     Z.rem (Z.of_bits @@ random_bits (128 + Z.log2 modulus)) modulus
 
+  let ( ! ) = Z.of_int
+
+  let ( %! ) = Z.rem
+
+  let name_suffix valid = if valid then "" else " (negative)"
+
   let add_circuit ~expected xs () =
     let* z_exp = ModArith.input_mod_int ~kind:`Public expected in
     let* xs = L.mapM ModArith.input_mod_int xs in
@@ -50,10 +56,6 @@ module ModArith (L : LIB) = struct
        equal assertion for mod_int that ensures that the mod_ints we
        compare are both in canonical form. *)
     assert_equal z z_exp
-
-  let ( ! ) = Z.of_int
-
-  let name_suffix valid = if valid then "" else " (negative)"
 
   let tests_mod_add =
     let m = ModArith.modulus in

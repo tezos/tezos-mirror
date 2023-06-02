@@ -90,7 +90,7 @@ module Make_ModAdd (MOD_ARITH : Plompiler__Gadget_mod_arith.MOD_ARITH) :
     in
     (xs, ys, zs, qm, t_infos)
 
-  let equations ~q:q_mod_arith ~wires ~wires_g ?precomputed_advice:_ () =
+  let equations ~q:q_mod_add ~wires ~wires_g ?precomputed_advice:_ () =
     (* z = (x + y) mod m
        let k := nb_limbs and n := |moduli|
 
@@ -121,7 +121,7 @@ module Make_ModAdd (MOD_ARITH : Plompiler__Gadget_mod_arith.MOD_ARITH) :
           + negate (of_z Z.(qm_shift * M.modulus %! mj))
           + negate ((tj + of_z tj_shift) * of_z mj)
         in
-        Scalar.(q_mod_arith * id_mj))
+        Scalar.(q_mod_add * id_mj))
       (Scalar.order :: M.moduli_add)
       (None :: t_infos)
 
@@ -133,7 +133,7 @@ module Make_ModAdd (MOD_ARITH : Plompiler__Gadget_mod_arith.MOD_ARITH) :
     let ({q; wires} : witness) =
       get_evaluations ~q_label ~prefix ~prefix_common evaluations
     in
-    let q_mod_arith = q in
+    let q_mod_add = q in
     (* Note that in the prover we do not have wires_g, so we will need to
        compose qm & ts with gX *)
     let xs, ys, _zs, qm, t_infos = get_values wires wires in
@@ -187,7 +187,7 @@ module Make_ModAdd (MOD_ARITH : Plompiler__Gadget_mod_arith.MOD_ARITH) :
             (List.combine xs ys)
         in
         let identity =
-          Evaluations.mul_c ~res:ids.(i) ~evaluations:[q_mod_arith; id_mj] ()
+          Evaluations.mul_c ~res:ids.(i) ~evaluations:[q_mod_add; id_mj] ()
         in
         (prefix @@ q_label ^ "." ^ string_of_int i, identity))
       ((Scalar.order, None) :: List.combine M.moduli_add t_infos)
@@ -204,7 +204,7 @@ module Make_ModAdd (MOD_ARITH : Plompiler__Gadget_mod_arith.MOD_ARITH) :
       (equations ~q ~wires ~wires_g ())
     |> SMap.of_list
 
-  let cs ~q:q_mod_arith ~wires ~wires_g ?precomputed_advice:_ () =
+  let cs ~q:q_mod_add ~wires ~wires_g ?precomputed_advice:_ () =
     (* z = (x + y) mod m
        let k := nb_limbs and n := |moduli|
 
@@ -247,7 +247,7 @@ module Make_ModAdd (MOD_ARITH : Plompiler__Gadget_mod_arith.MOD_ARITH) :
           in
           Num.add_list ~qc ~coeffs (to_list vars)
         in
-        Num.mul q_mod_arith id_mj)
+        Num.mul q_mod_add id_mj)
       (Scalar.order :: M.moduli_add)
       (None :: t_infos)
 end
