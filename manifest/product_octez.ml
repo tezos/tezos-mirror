@@ -4029,7 +4029,6 @@ let octez_proxy =
         octez_protocol_environment;
         octez_rpc;
         octez_shell_services;
-        octez_context_memory;
         uri;
       ]
 

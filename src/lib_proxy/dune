@@ -14,7 +14,6 @@
   octez-proto-libs.protocol-environment
   octez-libs.rpc
   octez-shell-libs.shell-services
-  octez-libs.tezos-context.memory
   uri)
  (flags
   (:standard)
