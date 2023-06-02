@@ -25,6 +25,20 @@
 
 open Error_monad
 
+type error += Handshake_failure
+
+let () =
+  register_error_kind
+    `Temporary
+    ~id:"handshake_failure"
+    ~title:"Handshake failure"
+    ~description:"Handshake failed"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Hanshake failed: cannot validate magic bytes")
+    Data_encoding.empty
+    (function Handshake_failure -> Some () | _ -> None)
+    (fun () -> Handshake_failure)
+
 type addr =
   | Unix of string
   | Tcp of string * string * Unix.getaddrinfo_option list
@@ -207,3 +221,14 @@ let recv ?timeout fd encoding =
   | Ok (read_len, message) ->
       if read_len <> len then tzfail (Decoding_error Extra_bytes)
       else return message
+
+let handshake socket magic_bytes =
+  let open Lwt_result_syntax in
+  let* () = send socket Data_encoding.Variable.bytes magic_bytes in
+  let* magic = recv socket Data_encoding.Variable.bytes in
+  fail_unless (Bytes.equal magic magic_bytes) Handshake_failure
+
+let get_temporary_socket_dir () =
+  match Sys.getenv_opt "XDG_RUNTIME_DIR" with
+  | Some xdg_runtime_dir when xdg_runtime_dir <> "" -> xdg_runtime_dir
+  | Some _ | None -> Filename.get_temp_dir_name ()
