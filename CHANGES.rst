@@ -79,6 +79,9 @@ Node
   systematically broadcasts only its new head (instead of sometime
   broadcasting a sparse history of the chain).
 
+- Fixed a bug where the node could freeze when an old block was
+  requested during a store merge. (MR :gl:`!8952`)`
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
