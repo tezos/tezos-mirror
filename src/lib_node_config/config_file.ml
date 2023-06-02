@@ -841,8 +841,6 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       Option.is_none default_p2p.limits.maintenance_idle_time)
     ?(disable_p2p_swap = Option.is_none default_p2p.limits.swap_linger)
     ?(disable_mempool = default_p2p.disable_mempool)
-    ?(disable_mempool_precheck =
-      Shell_limits.default_limits.prevalidator_limits.disable_precheck)
     ?(enable_testchain = default_p2p.enable_testchain) ?(cors_origins = [])
     ?(cors_headers = []) ?rpc_tls ?log_output ?synchronisation_threshold
     ?history_mode ?network ?latency cfg =
@@ -940,13 +938,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
                   cfg.shell.block_validator_limits.operation_metadata_size_limit
                 operation_metadata_size_limit;
           };
-        prevalidator_limits =
-          {
-            cfg.shell.prevalidator_limits with
-            disable_precheck =
-              cfg.shell.prevalidator_limits.disable_precheck
-              || disable_mempool_precheck;
-          };
+        prevalidator_limits = cfg.shell.prevalidator_limits;
         chain_validator_limits =
           (let synchronisation : synchronisation_limits =
              {

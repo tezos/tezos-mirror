@@ -124,7 +124,6 @@ val update :
   ?disable_p2p_maintenance:bool ->
   ?disable_p2p_swap:bool ->
   ?disable_mempool:bool ->
-  ?disable_mempool_precheck:bool ->
   ?enable_testchain:bool ->
   ?cors_origins:string list ->
   ?cors_headers:string list ->

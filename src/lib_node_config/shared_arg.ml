@@ -854,7 +854,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     disable_p2p_maintenance;
     disable_p2p_swap;
     disable_mempool;
-    disable_mempool_precheck;
+    disable_mempool_precheck = _;
     enable_testchain;
     rpc_listen_addrs;
     rpc_tls;
@@ -1017,7 +1017,6 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ~disable_p2p_maintenance
     ~disable_p2p_swap
     ~disable_mempool
-    ~disable_mempool_precheck
     ~enable_testchain
     ~cors_origins
     ~cors_headers
