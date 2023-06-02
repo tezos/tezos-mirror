@@ -37,7 +37,9 @@ let already_slashed_for_double_baking ctxt delegate (level : Level_repr.t) =
   | None -> return_false
   | Some slashed -> return slashed.for_double_baking
 
-type punishing_amounts = {reward : Tez_repr.t; amount_to_burn : Tez_repr.t}
+type reward_and_burn = {reward : Tez_repr.t; amount_to_burn : Tez_repr.t}
+
+type punishing_amounts = reward_and_burn
 
 (** [punish_double_signing ~get ~set ~get_percentage ctxt delegate level] record
     in the context that the given [delegate] has now been slashed for the
