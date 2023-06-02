@@ -182,7 +182,7 @@ module Types = struct
 
     open V (L)
 
-    open Encodings (L)
+    open L.Encodings
 
     let op_code_encoding ~safety =
       Bounded_e.encoding ~safety Bound.bound_op_code
@@ -259,7 +259,7 @@ end
 module V (L : LIB) = struct
   open L
   module E = Types.Encodings (L)
-  module Encodings = Encodings (L)
+  module Encodings = L.Encodings
   open Encodings
 
   open Types.V (L)
