@@ -99,10 +99,7 @@ module Make_impl (PC : Polynomial_commitment.S) = struct
     let domain = Domain.build_power_of_two (Z.log2up (Z.of_int (s_deg + 1))) in
     let s = Evaluations.interpolation_fft domain s_eval in
     let t, rem = Poly.division_xn s n Scalar.(negate one) in
-    if Poly.is_zero rem then (
-      let splits = split_t n t nb_of_t_chunks in
-      assert (SMap.for_all (fun _k v -> Poly.degree v < n) splits) ;
-      splits)
+    if Poly.is_zero rem then split_t n t nb_of_t_chunks
     else raise @@ Poly.Rest_not_null "T is not divisible by Zh"
 
   let eval_and_batch_ids (alpha, x) pc_answers identities =
