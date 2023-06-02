@@ -131,6 +131,11 @@ Node
   begins with ``Error while validating injected operation`` instead of
   ``Error while applying operation``. (MR :gl:`!8857`)
 
+- Updated the description of the ``ban_operation`` RPC to better
+  reflect its behavior, which is unchanged. (More precisely, removed
+  the "reverting its effect if it was applied" part since operations
+  are never applied.) (MR :gl:`!8857`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.

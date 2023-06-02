@@ -1327,11 +1327,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       let ban_operation path =
         Tezos_rpc.Service.post_service
           ~description:
-            "Remove an operation from the mempool if present, reverting its \
-             effect if it was applied. Add it to the set of banned operations \
-             to prevent it from being fetched/processed/injected in the \
-             future. Note: If the baker has already received the operation, \
-             then it's necessary to restart it to flush the operation from it."
+            "Remove an operation from the mempool if present. Also add it to \
+             the set of banned operations to prevent it from being \
+             fetched/processed/injected in the future. Note: If the baker has \
+             already received the operation, then it's necessary to restart it \
+             to flush the operation from it."
           ~query:Tezos_rpc.Query.empty
           ~input:Operation_hash.encoding
           ~output:unit
