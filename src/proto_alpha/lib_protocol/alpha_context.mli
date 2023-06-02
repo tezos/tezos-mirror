@@ -2026,6 +2026,7 @@ module Receipt : sig
     | Contract of Contract.t
     | Block_fees
     | Deposits of public_key_hash
+    | Unstaked_deposits of public_key_hash * Cycle.t
     | Nonce_revelation_rewards
     | Endorsing_rewards
     | Baking_rewards
