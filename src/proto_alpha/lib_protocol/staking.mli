@@ -22,3 +22,19 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+open Alpha_context
+
+(** [finalize_unstake ctxt pkh] performs the finalization of all unstake
+    requests from [pkh] that can be finalized.
+    An unstake request can be finalized if it is old enough, specifically the
+    requested amount must not be at stake anymore and must not be slashable
+    anymore, i.e. after [preserved_cycles + max_slashing_period] after the
+    request.
+    Amounts are transferred from the [pkh]'s delegate (at request time) unstaked
+    frozen deposits to [pkh]'s spendable balance, minus slashing the requested
+    stake undergone in between. *)
+val finalize_unstake :
+  context ->
+  public_key_hash ->
+  (context * Receipt.balance_updates) tzresult Lwt.t

@@ -22,3 +22,26 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Alpha_context
+
+let finalize_unstake ctxt pkh =
+  let open Lwt_result_syntax in
+  let contract = Contract.Implicit pkh in
+  let* ctxt, finalizable =
+    Unstake_requests
+    .prepare_finalize_unstake_and_save_remaining_unfinalizable_requests
+      ctxt
+      contract
+  in
+  List.fold_left_es
+    (fun (ctxt, balance_updates) (delegate, cycle, amount) ->
+      let+ ctxt, new_balance_updates =
+        Token.transfer
+          ctxt
+          (`Unstaked_frozen_deposits (delegate, cycle))
+          (`Contract contract)
+          amount
+      in
+      (ctxt, new_balance_updates @ balance_updates))
+    (ctxt, [])
+    finalizable
