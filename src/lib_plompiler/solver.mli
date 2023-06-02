@@ -185,6 +185,7 @@ type solver_desc =
   | AnemoiDoubleRound of anemoi_double_desc
   | AnemoiCustom of anemoi_custom_desc
   | Mod_Add of mod_arith_desc
+  | Mod_Mul of mod_arith_desc
   | Updater of Optimizer.trace_info
 
 type solvers

@@ -217,6 +217,29 @@ let mod_add_limbs ~modulus ~base xs ys =
 let mod_sub_limbs ~modulus ~base xs ys =
   mod_add_limbs ~modulus ~base xs (List.map Z.neg ys)
 
+(* [mod_mul_limbs ~modulus ~base xs ys] returns the result of multiplying [xs]
+   by [ys] modulo [modulus], where the inputs and the output are in big-endian
+   form in base [base].
+   It performs modular division instead if the optional argument [division] is
+   set to true. *)
+let mod_mul_limbs ?(division = false) ~modulus ~base xs ys =
+  let nb_limbs = List.length xs in
+  assert (List.compare_length_with ys nb_limbs = 0) ;
+  let x = z_of_limbs ~base xs in
+  let y = z_of_limbs ~base ys in
+  let y =
+    if division then
+      let _d, y_inv, _v = Z.gcdext y modulus in
+      y_inv
+    else y
+  in
+  let z = Z.(x * y %! modulus) in
+  let z = if z < Z.zero then Z.(z + modulus) else z in
+  z_to_limbs ~len:nb_limbs ~base z
+
+let mod_div_limbs ~modulus ~base xs ys =
+  mod_mul_limbs ~division:true ~modulus ~base xs ys
+
 let rec transpose = function
   | [] | [] :: _ -> []
   | rows -> List.(map hd rows :: (transpose @@ map tl rows))

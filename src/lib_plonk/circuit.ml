@@ -72,6 +72,7 @@ module Circuit : sig
     ?qcond_swap:Scalar.t list ->
     ?q_anemoi:Scalar.t list ->
     ?q_mod_add:(string * Scalar.t list) list ->
+    ?q_mod_mul:(string * Scalar.t list) list ->
     ?q_plookup:Scalar.t list ->
     ?q_table:Scalar.t list ->
     ?precomputed_advice:Scalar.t list SMap.t ->
@@ -116,8 +117,8 @@ end = struct
   let make_gates ?(qc = []) ?(linear = []) ?(linear_g = []) ?(qm = [])
       ?(qx2b = []) ?(qx5a = []) ?(qx5c = []) ?(qecc_ws_add = [])
       ?(qecc_ed_add = []) ?(qecc_ed_cond_add = []) ?(qbool = [])
-      ?(qcond_swap = []) ?(q_anemoi = []) ?(q_mod_add = []) ?(q_plookup = [])
-      ?(q_table = []) ?(precomputed_advice = SMap.empty) () =
+      ?(qcond_swap = []) ?(q_anemoi = []) ?(q_mod_add = []) ?(q_mod_mul = [])
+      ?(q_plookup = []) ?(q_table = []) ?(precomputed_advice = SMap.empty) () =
     if q_anemoi <> [] && SMap.(is_empty precomputed_advice) then
       failwith "Make_gates : q_anemoi must come with advice selectors." ;
     (* Filtering and mapping selectors with labels. *)
@@ -137,6 +138,7 @@ end = struct
         ~qcond_swap
         ~q_anemoi
         ~q_mod_add
+        ~q_mod_mul
         ~q_plookup
         ()
     in

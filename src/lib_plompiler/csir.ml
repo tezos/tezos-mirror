@@ -172,7 +172,7 @@ let table_registry = Tables.add "or" table_or Tables.empty
 module CS = struct
   let q_list ?q_table ~qc ~linear ~linear_g ~qm ~qx2b ~qx5a ~qx5c ~qecc_ws_add
       ~qecc_ed_add ~qecc_ed_cond_add ~qbool ~qcond_swap ~q_anemoi ~q_mod_add
-      ~q_plookup () =
+      ~q_mod_mul ~q_plookup () =
     let base =
       [
         ("qc", qc);
@@ -189,6 +189,7 @@ module CS = struct
         ("q_plookup", q_plookup);
       ]
       @ List.map (fun (label, q) -> ("q_mod_add_" ^ label, q)) q_mod_add
+      @ List.map (fun (label, q) -> ("q_mod_mul_" ^ label, q)) q_mod_mul
       @ List.map (fun (i, q) -> (linear_selector_name i, q)) linear
       @ List.map
           (fun (i, q) -> (linear_selector_name i |> add_next_wire_suffix, q))
@@ -233,7 +234,16 @@ module CS = struct
            (fun label ->
              (label, [ThisConstr; NextConstr] @ List.init 6 (fun i -> Wire i)))
              (* We list all the labels defined in the MOD_ARITH instantiations
-                at the end of [lib_plompiler/gadget_mod_arith.ml] *)
+                at the end of [lib_plompiler/gadget_mod_arith.ml] for which we
+                want to enable addition. *)
+           ["25519"])
+      ~q_mod_mul:
+        (List.map
+           (fun label ->
+             (label, [ThisConstr; NextConstr] @ List.init 6 (fun i -> Wire i)))
+             (* We list all the labels defined in the MOD_ARITH instantiations
+                at the end of [lib_plompiler/gadget_mod_arith.ml] for which we
+                want to enable multiplication. *)
            ["25519"])
       ~q_plookup:[ThisConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
       ~q_table:[ThisConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
@@ -269,8 +279,8 @@ module CS = struct
 
   let new_constraint ~wires ?qc ?(linear = []) ?(linear_g = []) ?qm ?qx2b ?qx5a
       ?qx5c ?qecc_ws_add ?qecc_ed_add ?qecc_ed_cond_add ?qbool ?qcond_swap
-      ?q_anemoi ?(q_mod_add = []) ?q_plookup ?q_table ?(precomputed_advice = [])
-      ?(labels = []) label =
+      ?q_anemoi ?(q_mod_add = []) ?(q_mod_mul = []) ?q_plookup ?q_table
+      ?(precomputed_advice = []) ?(labels = []) label =
     let sels =
       List.filter_map
         (fun (l, x) -> Option.bind x (fun c -> Some (l, c)))
@@ -289,6 +299,7 @@ module CS = struct
            ~qcond_swap
            ~q_anemoi
            ~q_mod_add:(List.map (fun (i, x) -> (i, Some x)) q_mod_add)
+           ~q_mod_mul:(List.map (fun (i, x) -> (i, Some x)) q_mod_mul)
            ~q_plookup
            ~q_table
            ())

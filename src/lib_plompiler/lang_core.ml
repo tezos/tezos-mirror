@@ -261,6 +261,19 @@ module type COMMON = sig
       scalar list repr ->
       scalar list repr ->
       scalar list repr t
+
+    val mul :
+      ?division:bool ->
+      label:string ->
+      modulus:Z.t ->
+      nb_limbs:int ->
+      base:Z.t ->
+      moduli:Z.t list ->
+      qm_bound:Z.t * Z.t ->
+      ts_bounds:(Z.t * Z.t) list ->
+      scalar list repr ->
+      scalar list repr ->
+      scalar list repr t
   end
 
   module Poseidon : sig

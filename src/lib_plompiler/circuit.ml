@@ -1077,6 +1077,80 @@ module Mod_arith = struct
             ts_ubounds
             scalar_ts
        >* append gate ~solver >* ret zs
+
+  (* This function is also used for division, since we implement division
+     [z = x / y] as a multiplication [x = z * y]. However, one must be careful,
+     as this does not prevent "division by 0", i.e., when [y = 0], constraint
+     [x = z * y] is satisfiable for [x = 0]. Therefore, in the gadget for
+     division we will need to explicitly assert that [y <> 0]. *)
+  let mul ?(division = false) ~label ~modulus ~nb_limbs ~base ~moduli ~qm_bound
+      ~ts_bounds (List xs) (List ys) =
+    (* This is just a sanity check, inputs are assumed to be well-formed,
+       in particular, their limb values are in the range [0, base) *)
+    assert (List.compare_length_with xs nb_limbs = 0) ;
+    assert (List.compare_length_with ys nb_limbs = 0) ;
+    (* Assert that all bounds are compatible with our range-check protocol,
+       which is designed to check membership in intervals of the form [0, 2^k) *)
+    let qm_ubound = snd qm_bound in
+    let ts_ubounds = List.map snd ts_bounds in
+    assert (List.for_all Utils.is_power_of_2 (base :: qm_ubound :: ts_ubounds)) ;
+    let label_suffix = if division then "div" else "mul" in
+    (* Create the corresponding constraints *)
+    with_label ~label:("Mod_arith." ^ label_suffix)
+    @@ let* zs = fresh @@ Dummy.list nb_limbs Dummy.scalar in
+       let* qm = fresh Dummy.scalar in
+       let* ts = fresh @@ Dummy.list (List.length moduli) Dummy.scalar in
+       let inp1 = List.map unscalar xs in
+       let inp2 = List.map unscalar ys in
+       let out = List.map unscalar (of_list zs) in
+       let scalar_qm = qm in
+       let scalar_ts = of_list ts in
+       let qm = unscalar qm in
+       let ts = List.map unscalar scalar_ts in
+       let gate =
+         (* Divisions zs = xs / ys are modeled as multiplications xs = zs * ys.
+            Thus, we swap inp1 (xs) and out (zs) when division = true. *)
+         let left_row1 = if division then out else inp1 in
+         let left_row2 = if division then inp1 else out in
+         [|
+           CS.new_constraint
+             ~wires:(left_row1 @ inp2)
+             ~q_mod_mul:[(label, one)]
+             ("mod_arith-" ^ label_suffix ^ ".1");
+           CS.new_constraint
+             ~wires:(left_row2 @ [qm] @ ts)
+             ("mod_arith-" ^ label_suffix ^ ".2");
+         |]
+       in
+       let solver =
+         Mod_Mul
+           {
+             modulus;
+             base;
+             nb_limbs;
+             moduli;
+             qm_bound;
+             ts_bounds;
+             inp1;
+             inp2;
+             out;
+             qm;
+             ts;
+             inverse = division;
+           }
+       in
+       (* The output is not assumed to be well-formed, we need to enforce this
+          with constraints. In particular, we need to range-check every limb
+          in the output in the range [0, base). *)
+       iterM (Num.range_check ~nb_bits:(Z.log2 base)) (of_list zs)
+       (* qm needs to be range-checked in the interval [0, qm_ubound) *)
+       >* Num.range_check ~nb_bits:(Z.log2 qm_ubound) scalar_qm
+          (* every tj needs to be range-checked in the interval [0, tj_ubound) *)
+       >* iter2M
+            (fun tj_ubound tj -> Num.range_check ~nb_bits:(Z.log2 tj_ubound) tj)
+            ts_ubounds
+            scalar_ts
+       >* append gate ~solver >* ret zs
 end
 
 module Poseidon = struct
