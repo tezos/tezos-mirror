@@ -916,6 +916,14 @@ module type AUTOMATON = sig
     (** [get_peer_score peer view] returns the score of [peer]. *)
     val get_peer_score : Peer.t -> view -> Score.value
 
+    (** [get_peer_ihave_per_heartbeat peer view] returns
+        the number of IHaves received from [peer] since the last heartbeat. *)
+    val get_peer_ihave_per_heartbeat : Peer.t -> view -> int
+
+    (** [get_peer_iwant_per_heartbeat peer view] returns
+        the number of IWants sent to [peer] since the last heartbeat. *)
+    val get_peer_iwant_per_heartbeat : Peer.t -> view -> int
+
     val limits : view -> limits
 
     (** [has_joined topic view] returns true if and only if the automaton is
