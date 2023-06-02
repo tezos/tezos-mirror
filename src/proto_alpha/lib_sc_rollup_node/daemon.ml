@@ -256,7 +256,7 @@ let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
 let process_l1_block_operations node_ctxt (head : Layer1.header) =
   let open Lwt_result_syntax in
   let* block =
-    Layer1.fetch_tezos_block node_ctxt.Node_context.cctxt head.hash
+    Layer1.fetch_tezos_block node_ctxt.Node_context.l1_ctxt head.hash
   in
   let apply (type kind) accu ~source (operation : kind manager_operation) result
       =
@@ -328,8 +328,10 @@ let exit_after_proto_migration node_ctxt ?predecessor head =
       let*! _ = Lwt_exit.exit_and_wait 0 in
       return_unit
 
-let rec process_head (node_ctxt : _ Node_context.t) (head : Layer1.header) =
+let rec process_head (node_ctxt : _ Node_context.t) ~catching_up
+    (head : Layer1.header) =
   let open Lwt_result_syntax in
+  let start_timestamp = Time.System.now () in
   let* already_processed = Node_context.is_processed node_ctxt head.hash in
   unless (already_processed || before_origination node_ctxt head) @@ fun () ->
   let*! () = Daemon_event.head_processing head.hash head.level in
@@ -341,7 +343,7 @@ let rec process_head (node_ctxt : _ Node_context.t) (head : Layer1.header) =
       return_unit
   | Some predecessor ->
       let* () = exit_on_other_proto node_ctxt ~predecessor head in
-      let* () = process_head node_ctxt predecessor in
+      let* () = process_head node_ctxt ~catching_up:true predecessor in
       let* ctxt = previous_context node_ctxt ~predecessor in
       let* () =
         Node_context.save_level
@@ -370,6 +372,10 @@ let rec process_head (node_ctxt : _ Node_context.t) (head : Layer1.header) =
       let*! context_hash = Context.commit ctxt in
       let* commitment_hash =
         Publisher.process_head node_ctxt ~predecessor:predecessor.hash head ctxt
+      in
+      let* () =
+        unless (catching_up && Option.is_none commitment_hash) @@ fun () ->
+        Inbox.same_as_layer_1 node_ctxt head.hash inbox
       in
       let level = Raw_level.of_int32_exn head.level in
       let* previous_commitment_hash =
@@ -402,7 +408,11 @@ let rec process_head (node_ctxt : _ Node_context.t) (head : Layer1.header) =
           Int32.(sub head.level (of_int node_ctxt.block_finality_time))
       in
       let* () = Node_context.save_l2_head node_ctxt l2_block in
-      let*! () = Daemon_event.new_head_processed head.hash head.level in
+      let stop_timestamp = Time.System.now () in
+      let process_time = Ptime.diff stop_timestamp start_timestamp in
+      let*! () =
+        Daemon_event.new_head_processed head.hash head.level process_time
+      in
       return_unit
 
 (* [on_layer_1_head node_ctxt head] processes a new head from the L1. It
@@ -455,15 +465,20 @@ let on_layer_1_head node_ctxt (head : Layer1.header) =
   let get_header Layer1.{hash; level} =
     if Block_hash.equal hash head.hash then return head
     else
-      let+ header = Layer1.fetch_tezos_shell_header node_ctxt.cctxt hash in
+      let+ header = Layer1.fetch_tezos_shell_header node_ctxt.l1_ctxt hash in
       {Layer1.hash; level; header}
+  in
+  let new_chain_prefetching =
+    Layer1.make_prefetching_schedule node_ctxt.l1_ctxt reorg.new_chain
   in
   let* () =
     List.iter_es
-      (fun block ->
+      (fun (block, to_prefetch) ->
+        Layer1.prefetch_tezos_blocks node_ctxt.l1_ctxt to_prefetch ;
         let* header = get_header block in
-        process_head node_ctxt header)
-      reorg.new_chain
+        let catching_up = block.level < head.level in
+        process_head node_ctxt ~catching_up header)
+      new_chain_prefetching
   in
   let* () = Publisher.publish_commitments () in
   let* () = Publisher.cement_commitments () in
@@ -682,16 +697,20 @@ let run ~data_dir ?log_kernel_debug_file (configuration : Configuration.t)
       configuration.sc_rollup_node_operators
   in
   let*! () = Event.waiting_first_block () in
-  let*! l1_ctxt =
+  let* l1_ctxt =
     Layer1.start
       ~name:"sc_rollup_node"
       ~reconnection_delay:configuration.reconnection_delay
+      ~l1_blocks_cache_size:configuration.l1_blocks_cache_size
       ~protocols:[Protocol.hash]
+      ?prefetch_blocks:configuration.prefetch_blocks
       cctxt
   in
-  let*! head, {shell = {predecessor; _}; _} = Layer1.wait_first l1_ctxt in
-  let* predecessor = Layer1.fetch_tezos_shell_header cctxt predecessor in
-  let*! () = Event.received_first_block head in
+  let*! head = Layer1.wait_first l1_ctxt in
+  let* predecessor =
+    Layer1.fetch_tezos_shell_header l1_ctxt head.header.predecessor
+  in
+  let*! () = Event.received_first_block head.hash in
   let* node_ctxt =
     Node_context.init
       cctxt

@@ -66,7 +66,9 @@ type t = {
   dac_timeout : Z.t option;
   batcher : batcher;
   injector : injector;
+  l1_blocks_cache_size : int;
   l2_blocks_cache_size : int;
+  prefetch_blocks : int option;
   log_kernel_debug : bool;
 }
 
@@ -223,6 +225,8 @@ let default_injector =
 
 let max_injector_retention_period =
   5 * 8192 (* Preserved cycles (5) for mainnet *)
+
+let default_l1_blocks_cache_size = 64
 
 let default_l2_blocks_cache_size = 64
 
@@ -546,7 +550,9 @@ let encoding : t Data_encoding.t =
            dac_timeout;
            batcher;
            injector;
+           l1_blocks_cache_size;
            l2_blocks_cache_size;
+           prefetch_blocks;
            log_kernel_debug;
          } ->
       ( ( sc_rollup_address,
@@ -564,7 +570,9 @@ let encoding : t Data_encoding.t =
           dac_timeout,
           batcher,
           injector,
+          l1_blocks_cache_size,
           l2_blocks_cache_size,
+          prefetch_blocks,
           log_kernel_debug ) ))
     (fun ( ( sc_rollup_address,
              boot_sector_file,
@@ -581,7 +589,9 @@ let encoding : t Data_encoding.t =
              dac_timeout,
              batcher,
              injector,
+             l1_blocks_cache_size,
              l2_blocks_cache_size,
+             prefetch_blocks,
              log_kernel_debug ) ) ->
       {
         sc_rollup_address;
@@ -599,7 +609,9 @@ let encoding : t Data_encoding.t =
         dac_timeout;
         batcher;
         injector;
+        l1_blocks_cache_size;
         l2_blocks_cache_size;
+        prefetch_blocks;
         log_kernel_debug;
       })
     (merge_objs
@@ -641,13 +653,15 @@ let encoding : t Data_encoding.t =
                 test only!)"
              Loser_mode.encoding
              Loser_mode.no_failures))
-       (obj7
+       (obj9
           (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
           (opt "dac-observer-client" Tezos_rpc.Encoding.uri_encoding)
           (opt "dac-timeout" Data_encoding.z)
           (dft "batcher" batcher_encoding default_batcher)
           (dft "injector" injector_encoding default_injector)
+          (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
           (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
+          (opt "prefetch_blocks" int31)
           (dft "log-kernel-debug" Data_encoding.bool false)))
 
 let check_mode config =

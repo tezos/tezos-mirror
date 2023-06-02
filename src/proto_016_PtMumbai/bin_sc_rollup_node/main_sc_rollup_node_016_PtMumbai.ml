@@ -313,7 +313,9 @@ let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
           injection_ttl =
             Option.value ~default:default_injector.injection_ttl injection_ttl;
         };
+      l1_blocks_cache_size = Configuration.default_l1_blocks_cache_size;
       l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size;
+      prefetch_blocks = None;
       log_kernel_debug;
     }
   in

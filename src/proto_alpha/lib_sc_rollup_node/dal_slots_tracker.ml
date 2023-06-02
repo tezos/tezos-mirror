@@ -84,7 +84,7 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
       return None
   | Some published_block_hash ->
       let* {metadata; _} =
-        Layer1.fetch_tezos_block node_ctxt.Node_context.cctxt hash
+        Layer1.fetch_tezos_block node_ctxt.Node_context.l1_ctxt hash
       in
       let*? metadata =
         Option.to_result

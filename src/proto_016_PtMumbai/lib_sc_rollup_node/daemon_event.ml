@@ -38,13 +38,17 @@ module Simple = struct
       ("level", Data_encoding.int32)
 
   let new_head_processed =
-    declare_2
+    declare_3
       ~section
       ~name:"sc_rollup_node_layer_1_new_head_processed"
-      ~msg:"Finished processing layer 1 head {hash} at level {level}"
+      ~msg:
+        "Finished processing layer 1 head {hash} at level {level} in \
+         {process_time}"
       ~level:Notice
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
+      ("process_time", Time.System.Span.encoding)
+      ~pp3:Ptime.Span.pp
 
   let processing_heads_iteration =
     declare_3
@@ -122,8 +126,8 @@ end
 
 let head_processing hash level = Simple.(emit head_processing (hash, level))
 
-let new_head_processed hash level =
-  Simple.(emit new_head_processed (hash, level))
+let new_head_processed hash level process_time =
+  Simple.(emit new_head_processed (hash, level, process_time))
 
 let new_heads_iteration event = function
   | oldest :: rest ->

@@ -460,13 +460,13 @@ let hash_of_level node_ctxt level =
   | Some h -> return h
   | None -> failwith "Cannot retrieve hash of level %ld" level
 
-let level_of_hash {cctxt; store; _} hash =
+let level_of_hash {l1_ctxt; store; _} hash =
   let open Lwt_result_syntax in
   let* l2_header = Store.L2_blocks.header store.l2_blocks hash in
   match l2_header with
   | Some {level; _} -> return (Raw_level.to_int32 level)
   | None ->
-      let+ {level; _} = Layer1.fetch_tezos_shell_header cctxt hash in
+      let+ {level; _} = Layer1.fetch_tezos_shell_header l1_ctxt hash in
       level
 
 let save_level {store; _} Layer1.{hash; level} =
@@ -563,7 +563,7 @@ let get_predecessor node_ctxt (hash, level) =
 
 let header_of_hash node_ctxt hash =
   let open Lwt_result_syntax in
-  let+ header = Layer1.fetch_tezos_shell_header node_ctxt.cctxt hash in
+  let+ header = Layer1.fetch_tezos_shell_header node_ctxt.l1_ctxt hash in
   {Layer1.hash; level = header.level; header}
 
 let header_of_head node_ctxt Layer1.{hash; level = _} =
