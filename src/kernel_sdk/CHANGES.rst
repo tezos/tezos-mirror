@@ -60,3 +60,5 @@ SDK
 
 Installer client
 ----------------
+
+- Installer now reboots following successful upgrade, rather than proceeding directly to the next level.
