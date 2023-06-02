@@ -1151,6 +1151,44 @@ module Mod_arith = struct
             ts_ubounds
             scalar_ts
        >* append gate ~solver >* ret zs
+
+  (* In order to show that [x] is non-zero, we exhibit a value [r] such that
+     [x * r = 1]. This is a characterization of non-zero elements when
+     [modulus] is prime. More generally, when modulus is a prime power
+     [modulus = p^k], [x] is non-zero iff there exists [r] such that
+     [x * r = p^(k-1)]. For other moduli, this algorithm could be generalized
+     when the prime factorization of [modulus] is known. *)
+  let assert_non_zero ~label ~modulus ~is_prime ~nb_limbs ~base ~moduli
+      ~qm_bound ~ts_bounds xs =
+    (* For now we focus on the case when the modulus is prime, this allows us
+       to characterize non-zero elements as elements which have an inverse. *)
+    if not is_prime then
+      raise
+      @@ Failure
+           (Format.sprintf
+              "assert_non_zero: this function does not support arbitrary \
+               moduli yet; for now, the modulus is required to be prime; %s is \
+               composite."
+              (Z.to_string modulus)) ;
+    let* o = Num.constant S.one in
+    let* z = Num.constant S.zero in
+    let one =
+      o :: List.init (nb_limbs - 1) (Fun.const z) |> List.rev |> to_list
+    in
+    let* _ =
+      mul
+        ~division:true
+        ~label
+        ~modulus
+        ~nb_limbs
+        ~base
+        ~moduli
+        ~qm_bound
+        ~ts_bounds
+        one
+        xs
+    in
+    ret unit
 end
 
 module Poseidon = struct

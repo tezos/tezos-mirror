@@ -578,6 +578,7 @@ module Mod_Arith = struct
     (* The correct t1, t2 when there is no wrap-around: *)
     let t1 = Z.of_string "1237940039285380274899123616" in
     let t2 = Z.of_string "1237940039285380274899123649" in
+    let div = true in
     [
       mul_mod_25519 "no_wrap_around" ~x:!7 ~y:!13 ~z:!91 ~qm:!1 ~t1 ~t2;
       mul_mod_25519
@@ -616,6 +617,26 @@ module Mod_Arith = struct
         ~qm:!1
         ~t1
         ~t2:!0;
+      mul_mod_25519 "no_wrap_around" ~div ~x:!9009 ~y:!9 ~z:!1001 ~qm:!1 ~t1 ~t2;
+      mul_mod_25519
+        "wrap_around"
+        ~div
+        ~x:!8
+        ~y:Z.(m - !2)
+        ~z:Z.(m - !4)
+        ~qm:(Z.of_string "116056878683004400771792870")
+        ~t1:(Z.of_string "2630622583481433084160638332")
+        ~t2:(Z.of_string "3559077612945468290334981461");
+      mul_mod_25519
+        "invalid"
+        ~valid:false
+        ~div
+        ~x:!10
+        ~y:!2
+        ~z:!3
+        ~qm:!1
+        ~t1
+        ~t2;
     ]
 
   let list = mod_add_tests @ mod_mul_tests

@@ -150,7 +150,10 @@ module type MOD_ARITH = functor (L : LIB) -> sig
 
   val mul : mod_int repr -> mod_int repr -> mod_int repr t
 
-  (* val div : mod_int repr -> mod_int repr -> mod_int repr t *)
+  (* Division of [x] by [y] will make the circuit unsatisfiable
+     if there does not exist [z] such that [x = z * y (mod modulus)]
+     or if [y = 0] *)
+  val div : mod_int repr -> mod_int repr -> mod_int repr t
 
   val neg : mod_int repr -> mod_int repr t
 
@@ -514,6 +517,8 @@ functor
 
     let nb_limbs = Utils.min_nb_limbs ~modulus ~base
 
+    let is_prime = not (Z.probab_prime modulus 50 = 0)
+
     let bounds_add =
       check_addition_parameters ~modulus ~base ~nb_limbs ~moduli:moduli_add
 
@@ -574,6 +579,32 @@ functor
         ~moduli:moduli_mul
         ~qm_bound:(fst bounds_mul)
         ~ts_bounds:(snd bounds_mul)
+
+    let div xs ys =
+      let moduli = moduli_mul in
+      let qm_bound = fst bounds_mul in
+      let ts_bounds = snd bounds_mul in
+      Mod_arith.assert_non_zero
+        ~label
+        ~modulus
+        ~is_prime
+        ~nb_limbs
+        ~base
+        ~moduli
+        ~qm_bound
+        ~ts_bounds
+        ys
+      >* Mod_arith.mul
+           ~division:true
+           ~label
+           ~modulus
+           ~nb_limbs
+           ~base
+           ~moduli
+           ~qm_bound
+           ~ts_bounds
+           xs
+           ys
 
     let neg xs =
       let* zs = zero in

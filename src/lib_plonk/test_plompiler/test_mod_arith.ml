@@ -195,9 +195,37 @@ module ModArith (L : LIB) = struct
         ([!(-1); !2], !2, false);
       ]
 
+  let div_circuit ~expected x y () =
+    let* z_exp = ModArith.input_mod_int ~kind:`Public expected in
+    let* x = ModArith.input_mod_int x in
+    let* y = ModArith.input_mod_int y in
+    let* z = ModArith.div x y in
+    assert_equal z z_exp
+
+  let tests_mod_div =
+    let m = ModArith.modulus in
+    let r = random_mod_int ~modulus:m () in
+    List.map
+      (fun (x, y, expected, valid) ->
+        let name = "ModArith.test_mod_div" ^ name_suffix valid in
+        test ~valid ~name (div_circuit ~expected x y))
+      [
+        (r, !1, r, true);
+        (r, r, !1, true);
+        (Z.(r * r), r, r, true);
+        (!10, !(-2), !(-5), true);
+        (!91, !13, !7, true);
+        (m, r, !0, true);
+        (m, !1, m, true);
+        (r, !(-1), Z.neg r, true);
+        (r, !2, r, false);
+        (!0, !1, !1, false);
+        (r, !0, !0, false);
+      ]
+
   let tests =
     tests_mod_add @ tests_mod_sub @ tests_mod_neg @ tests_mod_constant
-    @ tests_mod_mul
+    @ tests_mod_mul @ tests_mod_div
 end
 
 open Plonk_test.Helpers
