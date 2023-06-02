@@ -17,27 +17,46 @@ use rlp::{Decodable, DecoderError, Rlp};
 use tezos_ethereum::rlp_helpers::{decode_field, decode_option, next};
 use tezos_smart_rollup_debug::Runtime;
 
-// INTERNAL/SIMPLE/RLP_ENCODED_SIMULATION
+// SIMULATION/SIMPLE/RLP_ENCODED_SIMULATION
 pub const SIMULATION_SIMPLE_TAG: u8 = 1;
-// INTERNAL/CREATE/NUM_CHUNKS 2B
+// SIMULATION/CREATE/NUM_CHUNKS 2B
 pub const SIMULATION_CREATE_TAG: u8 = 2;
-// INTERNAL/CHUNK/NUM 2B/CHUNK
+// SIMULATION/CHUNK/NUM 2B/CHUNK
 pub const SIMULATION_CHUNK_TAG: u8 = 3;
 
-// https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_call
+/// Container for eth_call data, used in messages sent by the rollup node
+/// simulation.
+///
+/// They are transmitted in RLP encoded form, in messages of the form\
+/// `\parsing::SIMULATION_TAG \SIMULATION_SIMPLE_TAG \<rlp encoded Simulation>`\
+/// or in chunks if they are bigger than what the inbox can receive, with a
+/// first message giving the number of chunks\
+/// `\parsing::SIMULATION_TAG \SIMULATION_CREATE_TAG \XXXX`
+/// where `XXXX` is 2 bytes containing the number of chunks, followed by the
+/// chunks:\
+/// `\parsing::SIMULATION_TAG \SIMULATION_CHUNK_TAG \XXXX \<bytes>`\
+/// where `XXXX` is the number of the chunk over 2 bytes, and the rest is a
+/// chunk of the rlp encoded simulation.
+///
+/// Ethereum doc: https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_call
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Simulation {
-    /// (optional) The address the transaction is sent from.
+    /// (optional) The address the transaction is sent from.\
+    /// Encoding: 20 bytes or empty (0x80)
     pub from: Option<H160>,
-    /// The address the transaction is directed to.
+    /// The address the transaction is directed to.\
+    /// Encoding: 20 bytes
     pub to: H160,
     /// (optional) Integer of the gas provided for the transaction execution.
     /// eth_call consumes zero gas, but this parameter may be needed by some
-    /// executions.
+    /// executions.\
+    /// Encoding: big endian
     pub gas: Option<u64>,
-    /// (optional) Integer of the gasPrice used for each paid gas
+    /// (optional) Integer of the gasPrice used for each paid gas\
+    /// Encoding: big endian
     pub gas_price: Option<u64>,
-    /// (optional) Integer of the value sent with this transaction (in Wei)
+    /// (optional) Integer of the value sent with this transaction (in Wei)\
+    /// Encoding: big endian
     pub value: Option<U256>,
     /// (optional) Hash of the method signature and encoded parameters.
     pub data: Vec<u8>,
@@ -140,7 +159,7 @@ impl Input {
     }
 
     // Internal custom message structure :
-    // INTERNAL_TAG 1B / MESSAGE_TAG 1B / DATA
+    // SIMULATION_TAG 1B / MESSAGE_TAG 1B / DATA
     fn parse(input: &[u8]) -> Self {
         if input.len() <= 3 {
             return Self::Unparsable;
