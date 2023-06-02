@@ -73,7 +73,6 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
   let staking_over_baking_limit_plus_two =
     Int64.add (Int64.of_int staking_over_baking_limit) 2L
   in
-  let* frozen_deposits = Frozen_deposits_storage.get ctxt delegate_contract in
   let compute_reward_and_burn (frozen_deposits : Deposits_repr.t) =
     let open Result_syntax in
     let punish_value =
@@ -91,6 +90,7 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
     let+ amount_to_burn = Tez_repr.(punishing_amount -? reward) in
     (should_forbid, {reward; amount_to_burn})
   in
+  let* frozen_deposits = Frozen_deposits_storage.get ctxt delegate_contract in
   let*? should_forbid, staked = compute_reward_and_burn frozen_deposits in
   let*! ctxt =
     if should_forbid then Delegate_storage.forbid_delegate ctxt delegate
