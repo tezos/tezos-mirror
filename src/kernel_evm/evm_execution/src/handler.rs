@@ -43,6 +43,10 @@ const MAXIMUM_TRANSACTION_DEPTH: usize = 1024_usize;
 ///
 /// A failed transaction will not refund gas. SputnikVM even treats some kinds of failure,
 /// eg, logging during static call, as out-of-gas.
+///
+/// A _reverted_ transaction will refund gas, as execution continues as normal. It will
+/// rollback transaction effect in the reverted sub-transaction, and it _can_ return data
+/// (like as if it the call ended with a RETURN opcode).
 #[derive(Debug, Eq, PartialEq)]
 pub struct ExecutionOutcome {
     /// How much gas was used for processing an entire transaction.
@@ -1922,6 +1926,78 @@ mod test {
                 assert_eq!(get_balance(&mut handler, &caller), U256::from(99_u32));
                 assert_eq!(get_balance(&mut handler, &address), U256::zero());
                 assert_eq!(handler.gas_used(), 0);
+            }
+            Err(err) => {
+                panic!("Unexpected error: {:?}", err);
+            }
+        }
+    }
+
+    #[test]
+    fn revert_can_return_a_value() {
+        let mut mock_runtime = MockHost::default();
+        let block = BlockConstants::first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::london();
+        let gas_limit = 1000_u64;
+        let caller = H160::from_low_u64_be(523_u64);
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            gas_limit,
+        );
+
+        let address = H160::from_low_u64_be(210_u64);
+        let input = vec![0_u8];
+        let gas_limit: Option<u64> = None;
+        let transaction_context = TransactionContext::new(caller, address, U256::zero());
+        let transfer: Option<Transfer> = None;
+
+        let code: Vec<u8> = vec![
+            Opcode::PUSH8.as_u8(), // push value of return data
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            Opcode::PUSH1.as_u8(), // push address of return data
+            0,
+            Opcode::MSTORE.as_u8(), // store return data in memory
+            Opcode::PUSH1.as_u8(),  // push size of return data
+            8,
+            Opcode::PUSH1.as_u8(), // push offset in memory of return data
+            24,
+            Opcode::REVERT.as_u8(),
+        ];
+
+        set_code(&mut handler, &address, code);
+        set_balance(&mut handler, &caller, U256::from(99_u32));
+
+        let result = handler.execute_call(
+            address,
+            transfer,
+            input,
+            gas_limit,
+            transaction_context,
+        );
+
+        match result {
+            Ok(result) => {
+                let expected_result = (
+                    ExitReason::Revert(ExitRevert::Reverted),
+                    None,
+                    vec![0, 1, 2, 3, 4, 5, 6, 7],
+                );
+                assert_eq!(expected_result, result);
             }
             Err(err) => {
                 panic!("Unexpected error: {:?}", err);

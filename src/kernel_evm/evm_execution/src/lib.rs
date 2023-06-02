@@ -99,6 +99,12 @@ impl From<ExitError> for EthereumError {
 }
 
 /// Execute an Ethereum Transaction
+///
+/// The function returns `Err` only if something is wrong with the kernel and/or the
+/// rollup node. If the transaction ends by executing STOP, RETURN or SUICIDE, then this is
+/// a _success_ (by Ethereum definition). Note that a REVERT instruction _can_ return
+/// data even though it will mean rollback of the transaction effect. This is also true
+/// for sub-transactions, ie, REVERT can _always_ return data.
 #[allow(clippy::too_many_arguments)]
 pub fn run_transaction<'a, Host>(
     host: &'a mut Host,
