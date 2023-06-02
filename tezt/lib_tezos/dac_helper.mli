@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,7 +28,7 @@
 
 (* Repr for different kinds of scenarios that tezt tests can run against. *)
 module Scenarios : sig
-  (* Components for full DAC infrastructure. *)
+  (** Components for full DAC infrastructure. *)
   type full = {
     protocol : Protocol.t;
     node : Node.t;
@@ -62,8 +63,7 @@ val with_legacy_dac_node :
 (** Initializes a a Coordinator Dac node. DAC Committee of size [committee_size]
     will be generated and pre-configured in the legacy node. An additional
     [custom_committee_members] can be provided to configure fixed members of the
-    committee (useful for testing).
-*)
+    committee (useful for testing). *)
 val with_coordinator_node :
   ?name:string ->
   ?sc_rollup_node:Sc_rollup_node.t ->
@@ -106,8 +106,7 @@ val with_observer :
   'b Lwt.t
 
 (** Initializes a new [Sc_rollup] with empty boot sector, attached to
-    an [Sc_rollup_node].
-*)
+    an [Sc_rollup_node]. *)
 val with_fresh_rollup :
   ?pvm_name:string ->
   protocol:Protocol.t ->
@@ -118,8 +117,7 @@ val with_fresh_rollup :
   'a Lwt.t
 
 (** Initalizes a scenario with full DAC infrastruture. See [Scenarios.full] for
-    components.
-*)
+    components. *)
 val scenario_with_full_dac_infrastructure :
   ?tags:string list ->
   ?pvm_name:string ->
@@ -192,3 +190,54 @@ val scenario_with_layer1_legacy_and_rollup_nodes :
   unit Lwt.t) ->
   Protocol.t list ->
   unit
+
+(** This module is syntactix sugar to call DAC RPC endpoints. *)
+module Call_endpoint : sig
+  module V0 : sig
+    (** Call GET v0/preimage/page_hash for the provided [page_hash]. *)
+    val get_preimage : Dac_node.t -> string -> string Lwt.t
+
+    (** Call POST v0/store_preimage with provided payload and pagination_scheme. *)
+    val post_store_preimage :
+      Dac_node.t ->
+      payload:string ->
+      pagination_scheme:string ->
+      (string * string) Lwt.t
+
+    (** Call GET v0/verify_signature for the provided payload. *)
+    val get_verify_signature : Dac_node.t -> string -> bool Lwt.t
+
+    (** Call PUT v0/dac_member_signature for the provided [hex_root_hash],
+        [dac_member_pkh] and [signature]. *)
+    val put_dac_member_signature :
+      Dac_node.t ->
+      hex_root_hash:Hex.t ->
+      dac_member_pkh:string ->
+      signature:Tezos_crypto.Aggregate_signature.signature ->
+      unit Lwt.t
+
+    (** Call GET /v0/missing_page for the provided [hex_root_hash]. *)
+
+    val get_missing_page : Dac_node.t -> hex_root_hash:Hex.t -> string Lwt.t
+
+    (** Call GET /v0/certificate for the provided [hex_root_hash]. *)
+    val get_certificate :
+      Dac_node.t -> hex_root_hash:Hex.t -> (int * string * string * int) Lwt.t
+
+    module Coordinator : sig
+      (** Call POST /v0/preimage for the provided payload. *)
+      val post_preimage : Dac_node.t -> payload:string -> string Lwt.t
+    end
+  end
+
+  module V1 : sig
+    (** Call GET /v1/pages for the provided [page_hash]. *)
+    val get_pages : Dac_node.t -> string -> string Lwt.t
+  end
+
+  (** Call GET /health/live. *)
+  val get_health_live : Dac_node.t -> bool Lwt.t
+
+  (** Call GET /health/ready. *)
+  val get_health_ready : Dac_node.t -> bool Lwt.t
+end
