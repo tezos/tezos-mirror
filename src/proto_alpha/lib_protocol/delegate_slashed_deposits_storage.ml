@@ -39,7 +39,10 @@ let already_slashed_for_double_baking ctxt delegate (level : Level_repr.t) =
 
 type reward_and_burn = {reward : Tez_repr.t; amount_to_burn : Tez_repr.t}
 
-type punishing_amounts = reward_and_burn
+type punishing_amounts = {
+  staked : reward_and_burn;
+  unstaked : (Cycle_repr.t * reward_and_burn) list;
+}
 
 (** [punish_double_signing ~get ~set ~get_percentage ctxt delegate level] record
     in the context that the given [delegate] has now been slashed for the
@@ -108,7 +111,7 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
   let*! ctxt =
     Storage.Contract.Slashed_deposits.add ctxt delegate_contract slash_history
   in
-  return (ctxt, {reward; amount_to_burn})
+  return (ctxt, {staked = {reward; amount_to_burn}; unstaked = []})
 
 let punish_double_endorsing =
   let get Storage.{for_double_endorsing; _} = for_double_endorsing in

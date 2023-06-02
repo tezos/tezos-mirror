@@ -53,7 +53,9 @@ let punish_delegate ctxt delegate level mistake ~rewarded =
     | `Double_baking -> Delegate.punish_double_baking
     | `Double_endorsing -> Delegate.punish_double_endorsing
   in
-  let* ctxt, {reward; amount_to_burn} = punish ctxt delegate level in
+  let* ctxt, {staked = {reward; amount_to_burn}; unstaked = _} =
+    punish ctxt delegate level
+  in
   let* ctxt, punish_balance_updates =
     Token.transfer
       ctxt

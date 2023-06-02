@@ -2140,7 +2140,10 @@ module Delegate : sig
 
   type reward_and_burn = {reward : Tez.t; amount_to_burn : Tez.t}
 
-  type punishing_amounts = reward_and_burn
+  type punishing_amounts = {
+    staked : reward_and_burn;
+    unstaked : (Cycle.t * reward_and_burn) list;
+  }
 
   val punish_double_endorsing :
     context ->
