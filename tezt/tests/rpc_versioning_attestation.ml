@@ -405,6 +405,53 @@ module Parse = struct
     test_parse_double_preconsensus_evidence protocols
 end
 
+module Mempool = struct
+  let test_pending_operations_consensus kind protocol =
+    let* _node, client = Client.init_with_protocol ~protocol `Client () in
+    let signer = Constant.bootstrap1 in
+
+    let* consensus_op =
+      create_consensus_op ~use_legacy_name:true ~signer ~kind client
+    in
+    let* (`OpHash _) =
+      Operation.inject ~force:true ~request:`Inject consensus_op client
+    in
+
+    let check_mempool ~use_legacy_name =
+      let* mempool_json =
+        RPC.Client.call client
+        @@ RPC.get_chain_mempool_pending_operations
+             ~version:(if use_legacy_name then "1" else "2")
+             ()
+      in
+      return
+        (check_kind
+           JSON.(mempool_json |-> "refused" |> as_list |> List.hd)
+           (Operation.Consensus.kind_to_string kind use_legacy_name))
+    in
+    let* () = check_mempool ~use_legacy_name:true in
+    check_mempool ~use_legacy_name:false
+
+  let test_pending_consensus =
+    register_test
+      ~title:"Pending consensus operations"
+      ~additionnal_tags:["mempool"; "pending"; "operations"; "consensus"]
+    @@ fun protocol ->
+    test_pending_operations_consensus Operation.Attestation protocol
+
+  let test_pending_preconsensus =
+    register_test
+      ~title:"Pending pre-consensus operations"
+      ~additionnal_tags:["mempool"; "pending"; "operations"; "consensus"; "pre"]
+    @@ fun protocol ->
+    test_pending_operations_consensus Operation.Preattestation protocol
+
+  let register ~protocols =
+    test_pending_consensus protocols ;
+    test_pending_preconsensus protocols
+end
+
 let register ~protocols =
   Forge.register ~protocols ;
-  Parse.register ~protocols
+  Parse.register ~protocols ;
+  Mempool.register ~protocols
