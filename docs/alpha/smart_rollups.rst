@@ -205,10 +205,10 @@ Starting from the rollup origination level, levels are partitioned
 into **commitment periods** of 60 consecutive blocks.
 
 A **commitment** claims that the interpretation of all inbox messages
-published during a given commitment period and applied on the state of
-a parent commitment led to a given new state by performing a given
+published during a given commitment period, and applied on the state of
+a parent commitment, led to a given new state by performing a given
 number of execution steps of the PVM. Execution steps are called
-**ticks** in the smart rollups terminology. A commitment must be
+**ticks** in Smart Rollups terminology. A commitment must be
 published on the Layer 1 after each commitment period to have the rollup
 progress. A commitment is always based on a parent commitment (except
 for the genesis commitment that is automatically published at
@@ -280,8 +280,8 @@ given step is PVM-dependent. During the final phase, the stakers must
 provide a proof that they correctly interpreted this conflicting tick.
 
 The Layer 1 PVM then determines whether these proofs are valid. There
-are only two possible outcomes: either one of the stakers has provided
-a valid proof, then that staker wins the game, and is rewarded with half of the
+are only two possible outcomes: either one of the stakers, that we dub *S* in the sequel, has provided
+a valid proof, then *S* wins the game, and is rewarded with half of the
 opponent's deposit (the other half being burnt); or, both stakers have
 provided an invalid proof and they both lose their deposit. In the
 end, at most one stake will be kept in the commitment tree. When a
@@ -298,8 +298,8 @@ two players can last at most 2 weeks.
 
 There is no timeout for starting a refutation game after having
 published a concurrent commitment. However, assuming the existence of
-an honest participant, that participant will start the refutation game with all
-concurrent stakers to avoid the rollup being stuck.
+an honest participant *H*, then *H* will start the refutation game with all
+concurrent stakers to avoid the rollup getting stuck.
 
 Workflows
 ---------
@@ -366,12 +366,12 @@ In case you do not already have an implicit account, you can generate one with:
    octez-client gen keys "${ACCOUNT_NAME}"
    octez-client show address "${ACCOUNT_NAME}"
 
-Then, the ``${OPERATOR_ADDR}`` can be set to the hash value (``tz1...``) returned. 
+Then, the ``${OPERATOR_ADDR}`` can be set to the hash value (``tz1...``) returned.
 
 Finally, you need to check that your balance is greater than 10,000
 tez to make sure that staking is possible. In case your balance is not
-sufficient, you can get test tokens for the ``tz1`` address from :ref:`a faucet <faucet>`, 
-after your node gets synchronized with Dailynet. 
+sufficient, you can get test tokens for the ``tz1`` address from :ref:`a faucet <faucet>`,
+after your node gets synchronized with Dailynet.
 
 
 .. code:: sh
@@ -620,8 +620,8 @@ originated a Layer 1 smart contract as follows:
      running 'parameter string; storage string; code {CAR; NIL operation; PAIR};' \
      --init '""' --burn-cap 0.4
 
-and that this contract is identified by an address ``${CONTRACT}`` 
-(a ``KT1...`` address), then one can encode an 
+and that this contract is identified by an address ``${CONTRACT}``
+(a ``KT1...`` address), then one can encode an
 outbox transaction using the Octez rollup client as follows:
 
 .. code:: sh
@@ -1382,7 +1382,7 @@ evaluate the WASM PVM without relying on any node and network:
 
   octez-smart-rollup-wasm-debugger "${WASM_FILE}" --inputs "${JSON_INPUTS}" --rollup "${SOR_ADDR}"
 
-``octez-smart-rollup-wasm-debugger`` takes as its argument the WASM kernel to be debugged, either a ``.wasm`` file (the binary
+``octez-smart-rollup-wasm-debugger`` takes the target WASM kernel to be debugged as argument, either as a ``.wasm`` file (the binary
 representation of WebAssembly modules) or as a ``.wast`` file (its textual
 representation), and actually parses and typechecks the kernel before
 giving it to the PVM.
