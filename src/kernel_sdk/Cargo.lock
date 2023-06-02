@@ -301,12 +301,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ed25519-compact"
-version = "2.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a3d382e8464107391c8706b4c14b087808ecb909f6c15c34114bc42e53a9e4c"
-
-[[package]]
 name = "ed25519-dalek"
 version = "2.0.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1256,7 +1250,7 @@ dependencies = [
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-storage",
- "tezos_crypto_rs 0.5.0",
+ "tezos_crypto_rs",
  "tezos_data_encoding",
 ]
 
@@ -1286,7 +1280,7 @@ dependencies = [
  "proptest",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
- "tezos_crypto_rs 0.5.0",
+ "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_data_encoding_derive",
  "thiserror",
@@ -1310,7 +1304,7 @@ version = "0.1.0"
 dependencies = [
  "mockall",
  "tezos-smart-rollup-core",
- "tezos_crypto_rs 0.5.0",
+ "tezos_crypto_rs",
  "tezos_data_encoding",
  "thiserror",
 ]
@@ -1345,7 +1339,7 @@ dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
- "tezos_crypto_rs 0.4.4",
+ "tezos_crypto_rs",
  "tezos_data_encoding",
  "thiserror",
 ]
@@ -1358,7 +1352,7 @@ dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
- "tezos_crypto_rs 0.5.0",
+ "tezos_crypto_rs",
  "tezos_data_encoding",
 ]
 
@@ -1379,31 +1373,6 @@ dependencies = [
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
  "thiserror",
-]
-
-[[package]]
-name = "tezos_crypto_rs"
-version = "0.4.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "451933adf818795c3a9b926c8e29ff3ca6cb12c067e6db4e0c1e583163df1f1c"
-dependencies = [
- "anyhow",
- "base58",
- "blst",
- "byteorder 1.4.3",
- "cryptoxide",
- "ed25519-compact",
- "hex",
- "libsecp256k1",
- "num-bigint",
- "num-traits",
- "p256",
- "rand 0.7.3",
- "serde",
- "strum",
- "strum_macros",
- "thiserror",
- "zeroize",
 ]
 
 [[package]]
@@ -1445,7 +1414,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "serde",
- "tezos_crypto_rs 0.5.0",
+ "tezos_crypto_rs",
  "tezos_data_encoding_derive",
  "thiserror",
 ]
