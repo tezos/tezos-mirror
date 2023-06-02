@@ -88,6 +88,12 @@ Node
   ``preattestation``, ``double_attestation_evidence`` and
   ``double_preattestation_evidence`` kinds in the JSON result. (MR :gl:`!8840`)
 
+- Added version ``2`` to RPC ``POST ../mempool/pending_operations``. It can be
+  used by calling the RPC with the parameter ``?version=2`` (default version is
+  still ``1``). Version ``2`` allows the RPC to output ``attestation``,
+  ``preattestation``, ``double_attestation_evidence`` and
+  ``double_preattestation_evidence`` kinds in the JSON result. (MR :gl:`!8960`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
