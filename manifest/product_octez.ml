@@ -4109,29 +4109,6 @@ let _octez_proxy_tests =
         uri;
       ]
 
-let octez_proxy_server_config =
-  public_lib
-    "tezos-proxy-server-config"
-    ~path:"src/lib_proxy_server_config"
-    ~synopsis:"Tezos: proxy server configuration"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_stdlib_unix; uri]
-
-let _octez_proxy_server_config_tests =
-  tezt
-    ["test_proxy_server_config"]
-    ~path:"src/lib_proxy_server_config/test"
-    ~opam:"tezos-proxy-server-config"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
-        octez_proxy_server_config;
-        octez_test_helpers |> open_;
-        qcheck_alcotest;
-        alcotezt;
-        uri;
-      ]
-
 let octez_client_base_unix =
   octez_shell_lib
     "client-base-unix"
@@ -7742,36 +7719,6 @@ let _octez_codec =
              in
              if link then Protocol.client protocol else None);
          ])
-    ~linkall:true
-
-let _octez_proxy_server =
-  public_exe
-    "octez-proxy-server"
-    ~path:"src/bin_proxy_server"
-    ~internal_name:"main_proxy_server"
-    ~synopsis:"Octez: `octez-proxy-server` binary"
-    ~release_status:Released
-    ~with_macos_security_framework:true
-    ~deps:
-      ([
-         octez_base |> open_ ~m:"TzPervasives" |> open_;
-         octez_base_unix;
-         octez_stdlib_unix |> open_;
-         octez_rpc;
-         cmdliner;
-         lwt_exit;
-         lwt_unix;
-         octez_proxy;
-         octez_proxy_server_config;
-         octez_rpc_http_client_unix;
-         octez_rpc_http_server;
-         octez_shell_services;
-         (* TODO: use context_ops ~kind:`Disk instead of shell_context *)
-         octez_shell_context;
-         octez_version_value;
-         uri;
-       ]
-      @ Protocol.all_optionally [Protocol.client; Protocol.plugin])
     ~linkall:true
 
 let _octez_snoop =

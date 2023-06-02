@@ -34,7 +34,7 @@ octez-protocol-009-PsFLoren-libs	all	3
 octez-protocol-010-PtGRANAD-libs	all	3
 octez-protocol-011-PtHangz2-libs	all	3
 octez-protocol-012-Psithaca-libs	all	3
-octez-protocol-013-PtJakart-libs	all	4
+octez-protocol-013-PtJakart-libs	all	3
 octez-protocol-014-PtKathma-libs	all	4
 octez-protocol-015-PtLimaPt-libs	all	4
 octez-protocol-016-PtMumbai-libs	all	2
@@ -45,7 +45,6 @@ octez-protocol-020-PsParisC-libs	all	2
 octez-protocol-021-PsquebeC-libs	all	2
 octez-protocol-alpha-libs	all	2
 octez-protocol-compiler	exec	6
-octez-proxy-server	exec	1
 octez-riscv-api	all	7
 octez-riscv-pvm	all	6
 octez-rpc-process	all	4
@@ -54,7 +53,7 @@ octez-shell-libs	all	6
 octez-signer	exec	4
 octez-smart-rollup-node	exec	1
 octez-smart-rollup-node-Proxford	all	2
-octez-smart-rollup-node-PsParisC	all	2
+octez-smart-rollup-node-PsParisC	all	1
 octez-smart-rollup-node-PsquebeC	all	2
 octez-smart-rollup-node-PtNairob	all	2
 octez-smart-rollup-node-PtParisB	all	2
@@ -63,20 +62,20 @@ octez-smart-rollup-node-lib	all	2
 octez-smart-rollup-wasm-debugger	exec	1
 octez-smart-rollup-wasm-debugger-lib	all	2
 octez-smart-rollup-wasm-debugger-plugin	all	7
-octez-version	exec	7
+octez-version	exec	6
 tezos-benchmark	all	7
 tezos-client-demo-counter	all	4
 tezos-client-genesis	all	4
 tezos-dac-client-lib	all	4
 tezos-dac-lib	all	4
-tezos-dac-node-lib	all	3
+tezos-dac-node-lib	all	2
 tezos-dal-node-lib	all	4
 tezos-dal-node-services	all	7
 tezos-openapi	all	7
 tezos-protocol-000-Ps9mPmXa	all	4
 tezos-protocol-001-PtCJ7pwo	all	4
 tezos-protocol-002-PsYLVpVv	all	4
-tezos-protocol-003-PsddFKi3	all	5
+tezos-protocol-003-PsddFKi3	all	4
 tezos-protocol-004-Pt24m4xi	all	5
 tezos-protocol-005-PsBABY5H	all	5
 tezos-protocol-005-PsBabyM1	all	5
@@ -91,7 +90,7 @@ tezos-protocol-012-Psithaca	all	5
 tezos-protocol-013-PtJakart	all	5
 tezos-protocol-014-PtKathma	all	5
 tezos-protocol-015-PtLimaPt	all	5
-tezos-protocol-016-PtMumbai	all	6
+tezos-protocol-016-PtMumbai	all	5
 tezos-protocol-017-PtNairob	all	6
 tezos-protocol-018-Proxford	all	6
 tezos-protocol-019-PtParisB	all	6
@@ -101,5 +100,4 @@ tezos-protocol-alpha	all	6
 tezos-protocol-demo-counter	all	6
 tezos-protocol-demo-noops	all	6
 tezos-protocol-genesis	all	6
-tezos-proxy-server-config	all	7
 tezt-tezos	all	7

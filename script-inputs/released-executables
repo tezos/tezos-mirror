@@ -5,7 +5,6 @@ octez-dac-client
 octez-dac-node
 octez-dal-node
 octez-signer
-octez-proxy-server
 octez-codec
 octez-client
 octez-admin-client
