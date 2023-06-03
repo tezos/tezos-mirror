@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,12 +27,18 @@
 module Benchmark_base = Benchmark
 
 module Benchmark = struct
+  type group = Benchmark_base.group = Standalone | Group of string | Generic
+
   module type S = sig
     val name : Namespace.t
 
     val info : string
 
     val module_filename : string
+
+    val generated_code_destination : string option
+
+    val group : group
 
     val tags : string list
 
@@ -48,8 +55,6 @@ module Benchmark = struct
     val workload_to_vector : workload -> Sparse_vec.String.t
 
     val model : name:Namespace.t -> workload Model.t
-
-    val generated_code_destination : string option
 
     val create_benchmark :
       rng_state:Random.State.t -> config -> workload Generator.benchmark
@@ -74,7 +79,13 @@ module Registration = struct
           Bench.generated_code_destination
 
       let models =
-        [(Namespace.(cons name "model" |> to_string), Bench.model ~name)]
+        [
+          ( (match Bench.group with
+            | Generic -> "*"
+            | Group g -> g
+            | Standalone -> Namespace.(cons Bench.name "model" |> to_string)),
+            Bench.model ~name );
+        ]
 
       let create_benchmarks ~rng_state ~bench_num config =
         List.repeat bench_num (fun () ->
@@ -86,7 +97,14 @@ end
 module Model = struct
   include Model
 
+  type 'workload t = 'workload Model.t
+
   let make ~name ~conv ~model = make ~conv ~model:(model name)
+
+  let unknown_const1 ?const name =
+    let ns s = Free_variable.of_namespace (Namespace.cons name s) in
+    let const = Option.value ~default:(ns "const") const in
+    unknown_const1 ~name ~const
 
   let affine ?intercept ?coeff name =
     let ns s = Free_variable.of_namespace (Namespace.cons name s) in

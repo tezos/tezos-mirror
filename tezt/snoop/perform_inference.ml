@@ -41,8 +41,8 @@ let models =
     "cache/CACHE_UPDATE/model";
     "ir_size_model";
     "carbonated_map";
-    "size_collect_tickets_step_model";
-    "size_has_tickets_model";
+    "tickets/COLLECT_TICKETS_STEP/model";
+    "tickets/TYPE_HAS_TICKETS/model";
     "compare_tickets";
     "list_key_values";
     "skip_list/next/model";

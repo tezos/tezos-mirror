@@ -68,6 +68,20 @@ module type S = sig
   include Generator.S with type config := config and type workload := workload
 end
 
+(** Some benchmarks depend on others, and some are for generic parameters that
+    most benchmarks depend on. We need this information in order to correctly
+    infer the values of parameters after a benchmark run; the user provides it
+    with a group.
+
+    * [Standalone]: benchmarks that don't depend on others (except generic
+      ones). This is the value to use if you're not sure whether you should
+      group your benchmark.
+    * [Group]: benchmarks that belong to the given inference group. Note that
+      setting a benchmark with a group that is referenced only in this benchmark
+      will produce the same inference results as with [Standalone].
+    * [Generic]: for generic parameters only. *)
+type group = Standalone | Group of string | Generic
+
 type t = (module S)
 
 type ('cfg, 'workload) poly =
