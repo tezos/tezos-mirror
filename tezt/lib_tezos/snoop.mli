@@ -132,7 +132,7 @@ type tag =
   | Io
   | Misc
   | Builtin
-  | Gtoc
+  | Global_constants
   | Cache
   | Carbonated_map
   | Tickets
@@ -140,6 +140,9 @@ type tag =
   | Skip_list
   | Sc_rollup
   | Shell
+  | Apply
+  | Example
+  | Micheline
 
 type list_mode = All | Any | Exactly
 

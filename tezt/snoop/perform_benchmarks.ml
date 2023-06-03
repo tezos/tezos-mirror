@@ -54,6 +54,14 @@ let range min max = Ezjsonm.(dict [("min", int min); ("max", int max)])
 let bench_name_to_file_name bench_name =
   String.split_on_char '/' bench_name |> String.concat "__"
 
+let sapling_benchmark_config =
+  let open Ezjsonm in
+  let sapling_parameters =
+    let dir = Files.(working_dir // sapling_data_dir) in
+    dict [("sapling_txs_file", string dir); ("seed", `Null)]
+  in
+  dict [("sapling", sapling_parameters)]
+
 let interpreter_benchmark_config =
   let open Ezjsonm in
   let sampler_parameters =
@@ -256,7 +264,9 @@ let perform_encoding_benchmarks snoop proto =
   perform_benchmarks patches snoop benches
 
 let perform_global_constants_benchmarks snoop =
-  let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Gtoc] snoop) in
+  let* benches =
+    Snoop.(list_benchmarks ~mode:All ~tags:[Global_constants] snoop)
+  in
   perform_benchmarks [] snoop benches
 
 let perform_cache_benchmarks snoop =
@@ -295,6 +305,24 @@ let perform_sc_rollup_benchmarks snoop proto =
   in
   perform_benchmarks [] snoop benches
 
+let perform_shell_micheline_benchmarks snoop =
+  let* benches =
+    Snoop.(list_benchmarks ~mode:All ~tags:[Shell; Micheline] snoop)
+  in
+  perform_benchmarks [] snoop benches
+
+let perform_sapling_benchmarks snoop =
+  let patches =
+    [
+      ( rex ".*",
+        fun () ->
+          return (Patched_config sapling_benchmark_config, No_parameter_override)
+      );
+    ]
+  in
+  let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Sapling] snoop) in
+  perform_benchmarks patches snoop benches
+
 let main protocol =
   Log.info "Entering Perform_inference.main" ;
   let snoop = Snoop.create () in
@@ -308,4 +336,6 @@ let main protocol =
   let* () = perform_big_map_benchmarks snoop protocol in
   let* () = perform_skip_list_benchmarks snoop protocol in
   let* () = perform_carbonated_map_benchmarks snoop protocol in
-  perform_sc_rollup_benchmarks snoop protocol
+  let* () = perform_sc_rollup_benchmarks snoop protocol in
+  let* () = perform_shell_micheline_benchmarks snoop in
+  perform_sapling_benchmarks snoop
