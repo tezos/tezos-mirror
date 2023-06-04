@@ -138,7 +138,7 @@ let hash_to_bytes (Hash h) = Hex.to_bytes_exn (`Hex h) |> Bytes.to_string
 
 let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
 
-let empty_hash = Hash "0x"
+let empty_hash = Hash ""
 
 type transaction_log = {
   address : address;
@@ -581,16 +581,18 @@ let call_encoding =
   let open Data_encoding in
   conv
     (fun {from; to_; gas; gasPrice; value; data} ->
-      (from, to_, gas, gasPrice, value, data))
+      (from, Some to_, gas, gasPrice, value, data))
     (fun (from, to_, gas, gasPrice, value, data) ->
-      {from; to_; gas; gasPrice; value; data})
+      {from; to_ = Option.join to_; gas; gasPrice; value; data})
     (obj6
        (opt "from" address_encoding)
-       (opt "to" address_encoding)
+       (opt "to" (option address_encoding))
+       (* `call` is also used for estimateGas, which allows all fields to be
+          empty, hence `to` can be `null` or absent. *)
        (opt "gas" quantity_encoding)
        (opt "gasPrice" quantity_encoding)
        (opt "value" quantity_encoding)
-       (req "data" (option hash_encoding)))
+       (opt "data" hash_encoding))
 
 (** The txpool encoding can be found in
     https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-txpool#txpool-content.

@@ -67,7 +67,7 @@ let transaction_count () = qty_f @@ Z.of_int !transaction_counter
 (* Transaction's hash must be an alphanumeric 66 utf8 byte
    hex (chars: a-fA-F) string *)
 let transaction_hash =
-  hash_f @@ "f837c23ac7150b486be21fc00e3e2ad118e12bec1e2bca401b999f544eabc402"
+  hash_f @@ "0xf837c23ac7150b486be21fc00e3e2ad118e12bec1e2bca401b999f544eabc402"
 
 let block_hash =
   Block_hash "d28d009fef5019bd9b353d7d9d881bde4870d3c5e418b1faf05fd9f7540994d8"
@@ -76,14 +76,14 @@ let block transactions =
   {
     number = Some (block_height ());
     hash = Some block_hash;
-    parent = Block_hash (String.make 32 'a');
-    nonce = hash_f @@ String.make 8 'a';
-    sha3Uncles = hash_f @@ String.make 32 'a';
-    logsBloom = Some (hash_f @@ String.make 256 'a');
-    transactionRoot = hash_f @@ String.make 32 'a';
-    stateRoot = hash_f @@ String.make 32 'a';
-    receiptRoot = hash_f @@ String.make 32 'a';
-    miner = hash_f @@ String.make 20 'b';
+    parent = Block_hash (String.make 64 'a');
+    nonce = hash_f @@ String.make 16 'a';
+    sha3Uncles = hash_f @@ String.make 64 'a';
+    logsBloom = Some (hash_f @@ String.make 512 'a');
+    transactionRoot = hash_f @@ String.make 64 'a';
+    stateRoot = hash_f @@ String.make 64 'a';
+    receiptRoot = hash_f @@ String.make 64 'a';
+    miner = hash_f @@ String.make 40 'b';
     difficulty = qty_f Z.one;
     totalDifficulty = qty_f Z.one;
     extraData = "";
@@ -115,7 +115,7 @@ let transaction_receipt () =
     effectiveGasPrice = gas_price;
     gasUsed = gas_price;
     logs = [];
-    logsBloom = hash_f @@ String.make 256 'a';
+    logsBloom = hash_f @@ String.make 512 'a';
     type_ = qty_f Z.zero;
     status = qty_f Z.one;
   }
