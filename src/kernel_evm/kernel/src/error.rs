@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 use core::str::Utf8Error;
+use evm_execution::EthereumError;
 use primitive_types::U256;
 use rlp::DecoderError;
 use tezos_smart_rollup_host::path::{OwnedPath, PathError};
@@ -32,6 +33,7 @@ pub enum Error {
     Transfer(TransferError),
     Storage(StorageError),
     InvalidConversion,
+    Simulation(EthereumError),
 }
 
 impl From<PathError> for Error {

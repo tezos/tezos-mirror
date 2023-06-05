@@ -61,6 +61,8 @@ const TRANSACTION_OBJECT_V: RefPath = RefPath::assert_from(b"/v");
 const TRANSACTION_OBJECT_R: RefPath = RefPath::assert_from(b"/r");
 const TRANSACTION_OBJECT_S: RefPath = RefPath::assert_from(b"/s");
 
+pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result");
+
 /// The size of an address. Size in bytes.
 const ADDRESS_SIZE: usize = 20;
 /// The size of a 256 bit hash. Size in bytes.
@@ -303,6 +305,17 @@ pub fn store_current_block<Host: Runtime>(
             Err(e)
         }
     }
+}
+
+pub fn store_simulation_result<Host: Runtime>(
+    host: &mut Host,
+    result: Option<Vec<u8>>,
+) -> Result<(), Error> {
+    if let Some(result) = result {
+        host.store_write(&SIMULATION_RESULT, &result, 0)
+            .map_err(Error::from)?;
+    }
+    Ok(())
 }
 
 // TODO: This store a transaction receipt with multiple subkeys, it could

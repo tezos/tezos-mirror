@@ -238,7 +238,6 @@ mod tests {
     use super::*;
     use crate::blueprint::Blueprint;
     use crate::genesis;
-    use crate::inbox::Transaction;
     use crate::storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
     };
