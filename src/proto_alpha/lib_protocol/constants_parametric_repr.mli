@@ -183,7 +183,7 @@ type t = {
   (* in centile of a percentage *)
   quorum_max : int32;
   min_proposal_quorum : int32;
-  liquidity_baking_toggle_ema_threshold : int32;
+  liquidity_baking_toggle_ema_threshold : int64;
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
   delay_increment_per_round : Period_repr.t;

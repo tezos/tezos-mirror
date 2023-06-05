@@ -875,7 +875,7 @@ module Constants : sig
       quorum_min : int32;
       quorum_max : int32;
       min_proposal_quorum : int32;
-      liquidity_baking_toggle_ema_threshold : int32;
+      liquidity_baking_toggle_ema_threshold : int64;
       max_operations_time_to_live : int;
       minimal_block_delay : Period.t;
       delay_increment_per_round : Period.t;
@@ -952,7 +952,7 @@ module Constants : sig
 
   val min_proposal_quorum : context -> int32
 
-  val liquidity_baking_toggle_ema_threshold : context -> int32
+  val liquidity_baking_toggle_ema_threshold : context -> int64
 
   val minimal_block_delay : context -> Period.t
 
@@ -4692,7 +4692,7 @@ module Toggle_EMA : sig
 
   val zero : t
 
-  val to_int32 : t -> Int32.t
+  val to_int64 : t -> Int64.t
 
   val encoding : t Data_encoding.t
 end

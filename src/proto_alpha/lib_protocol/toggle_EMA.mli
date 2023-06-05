@@ -24,21 +24,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Exponential moving average of toggle votes. Represented as an int32 between
+(** Exponential moving average of toggle votes. Represented as an int64 between
     0 and 2,000,000,000. It is an exponential moving average of the "off" votes
     over a window of the most recent 2000 blocks that did not vote "pass". *)
 
 type t
 
-val of_int32 : Int32.t -> t tzresult Lwt.t
+val of_int64 : Int64.t -> t tzresult Lwt.t
 
 val zero : t
 
-val to_int32 : t -> Int32.t
+val to_int64 : t -> Int64.t
 
 val encoding : t Data_encoding.t
 
-val ( < ) : t -> Int32.t -> bool
+val ( < ) : t -> Int64.t -> bool
 
 val update_ema_off : t -> t
 

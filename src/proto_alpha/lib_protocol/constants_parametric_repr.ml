@@ -158,7 +158,7 @@ type t = {
   quorum_min : int32;
   quorum_max : int32;
   min_proposal_quorum : int32;
-  liquidity_baking_toggle_ema_threshold : int32;
+  liquidity_baking_toggle_ema_threshold : int64;
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
   delay_increment_per_round : Period_repr.t;
@@ -545,7 +545,7 @@ let encoding =
              (obj8
                 (req "quorum_max" int32)
                 (req "min_proposal_quorum" int32)
-                (req "liquidity_baking_toggle_ema_threshold" int32)
+                (req "liquidity_baking_toggle_ema_threshold" int64)
                 (req "max_operations_time_to_live" int16)
                 (req "minimal_block_delay" Period_repr.encoding)
                 (req "delay_increment_per_round" Period_repr.encoding)

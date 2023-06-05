@@ -693,7 +693,7 @@ module Liquidity_baking : sig
     The liquidity baking subsidy is not sent to the CPMM if this EMA is above
     the threshold set in constants. **)
   module Toggle_ema :
-    Single_data_storage with type t := Raw_context.t and type value = Int32.t
+    Single_data_storage with type t := Raw_context.t and type value = Int64.t
 
   (** Constant product market maker contract that receives liquidity baking subsidy. **)
   module Cpmm_address :
