@@ -28,11 +28,7 @@
 open Api
 open Utils
 
-type t =
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4026
-     Ensure that ownership and lifetime of [Types.Store.t] is respected.
-  *)
-  Types.Store.t Ctypes.ptr
+type t = Types.Store.t Ctypes.ptr
 
 let create engine =
   let store = Functions.Store.new_ engine in

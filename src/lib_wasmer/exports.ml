@@ -37,11 +37,7 @@ module Resolver = Map.Make (struct
     | r, _ -> r
 end)
 
-type t =
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4026
-     Ensure that ownership and lifetime of each [Types.Extern.t] is respected.
-  *)
-  Types.Extern.t Ctypes.ptr Resolver.t
+type t = {resolved : Types.Extern.t Ctypes.ptr Resolver.t; clean : unit -> unit}
 
 let from_instance inst =
   let exports_vec = Module.exports inst.Instance.module_ in
@@ -62,9 +58,14 @@ let from_instance inst =
   (* The exports vector is consumed in read-only or copying fashion, therefore
      there are no references to it at this point. We can clean it up. *)
   Functions.Exporttype_vec.delete (Ctypes.addr exports_vec) ;
-  resolved
+  let clean () =
+    (* This function shall be called when the user no longer needs to interact
+       with the instance exports. Only then may we free the extern objects. *)
+    Functions.Extern_vec.delete (Ctypes.addr externs_vec)
+  in
+  {resolved; clean}
 
-let delete = Resolver.iter (fun _ extern -> Functions.Extern.delete extern)
+let delete exports = exports.clean ()
 
 exception Export_not_found of {name : string; kind : Unsigned.uint8}
 
@@ -80,7 +81,7 @@ let () =
 
 let fn exports name typ =
   let kind = Types.Externkind.func in
-  let extern = Resolver.find_opt (name, kind) exports in
+  let extern = Resolver.find_opt (name, kind) exports.resolved in
   let extern =
     match extern with
     | None -> raise (Export_not_found {name; kind})
@@ -117,12 +118,12 @@ let mem_of_extern extern =
 
 let mem exports name =
   let kind = Types.Externkind.memory in
-  let extern = Resolver.find (name, kind) exports in
+  let extern = Resolver.find (name, kind) exports.resolved in
   mem_of_extern extern
 
 let mem0 exports =
   let _, extern =
-    Resolver.bindings exports
+    Resolver.bindings exports.resolved
     |> List.find (fun ((_, kind), extern) -> kind = Types.Externkind.memory)
   in
   mem_of_extern extern

@@ -380,6 +380,8 @@ module Functions (S : FOREIGN) = struct
       foreign
         "wasm_trap_message"
         (ptr Types.Trap.t @-> ptr Types.Message.t @-> returning void)
+
+    let delete = foreign "wasm_trap_delete" (ptr Types.Trap.t @-> returning void)
   end
 
   (** Functions with the [wasm_externtype_] prefix *)
