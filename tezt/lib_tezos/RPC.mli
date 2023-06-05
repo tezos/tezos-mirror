@@ -519,6 +519,20 @@ val post_chain_block_helpers_forge_operations :
 val post_chain_block_helpers_forge_block_header :
   ?chain:string -> ?block:string -> data:data -> unit -> JSON.t t
 
+(** RPC: [POST /chains/<chain>/blocks/<block>/helpers/parse/operations]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+    [check_signature] defaults to [true].
+*)
+val post_chain_block_helpers_parse_operations :
+  ?chain:string ->
+  ?block:string ->
+  ?check_signature:bool ->
+  ?version:string ->
+  JSON.u ->
+  JSON.t t
+
 (** RPC: [POST /chains/<chain>/blocks/<block>/helpers/scripts/simulate_operation]
 
     [chain] defaults to ["main"].
