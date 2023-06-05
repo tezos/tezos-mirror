@@ -92,23 +92,21 @@ let () =
   List.iter
     (fun name ->
       Printf.printf "%s," name ;
-      let current_min = ref None in
-      let current_max = ref None in
-      let all_values = ref [] in
-      Array.iter
-        (fun (table, _file_name) ->
-          let value =
-            match List.assoc_opt name table with
-            | None -> ""
-            | Some value ->
-                let v = read_num value in
-                current_min := lift min !current_min v ;
-                current_max := lift max !current_max v ;
-                value
-          in
-          all_values := value :: !all_values)
-        tables ;
-      (match (!current_min, !current_max) with
+      let current_min, current_max, all_values =
+        Array.fold_left
+          (fun (current_min, current_max, all_values) (table, _file_name) ->
+            let current_min, current_max, value =
+              match List.assoc_opt name table with
+              | None -> (current_min, current_max, "")
+              | Some value ->
+                  let v = read_num value in
+                  (lift min current_min v, lift max current_max v, value)
+            in
+            (current_min, current_max, value :: all_values))
+          (None, None, [])
+          tables
+      in
+      (match (current_min, current_max) with
       | Some final_min, Some final_max ->
           let diff = final_max -. final_min in
           let change =
@@ -133,7 +131,7 @@ let () =
           if change > 20. && ((not is_const) || diff > 2.) then
             Printf.eprintf "%f%% regression for %s.\n" change name
       | _, _ -> Printf.printf ",,,,,") ;
-      List.iter (Printf.printf ",%s") !all_values ;
+      List.iter (Printf.printf ",%s") all_values ;
       Printf.printf "\n")
     all_param_names ;
 
