@@ -4287,6 +4287,8 @@ module Protocol : sig
 
   val benchmarks_proto_exn : t -> target
 
+  val octez_sc_rollup_layer2 : t -> target option
+
   val baking_exn : t -> target
 
   val genesis : t
@@ -4402,12 +4404,13 @@ end = struct
     parameters : target option;
     benchmarks_proto : target option;
     baking : target option;
+    octez_sc_rollup_layer2 : target option;
   }
 
   let make ?client ?client_commands ?client_commands_registration
       ?baking_commands_registration ?plugin ?plugin_registerer ?dal ?dac
-      ?test_helpers ?parameters ?benchmarks_proto ?baking ~status ~name ~main
-      ~embedded () =
+      ?test_helpers ?parameters ?benchmarks_proto ?octez_sc_rollup_layer2
+      ?baking ~status ~name ~main ~embedded () =
     {
       status;
       name;
@@ -4425,6 +4428,7 @@ end = struct
       parameters;
       benchmarks_proto;
       baking;
+      octez_sc_rollup_layer2;
     }
 
   let all_rev : t list ref = ref []
@@ -4482,6 +4486,8 @@ end = struct
   let benchmarks_proto_exn p = mandatory "benchmarks_proto" p p.benchmarks_proto
 
   let baking_exn p = mandatory "baking" p p.baking
+
+  let octez_sc_rollup_layer2 p = p.octez_sc_rollup_layer2
 
   (* N as in "protocol number in the Alpha family". *)
   module N = struct
@@ -6396,6 +6402,7 @@ let hash = Protocol.hash
          ?parameters
          ?benchmarks_proto
          ?baking
+         ?octez_sc_rollup_layer2
          ()
 
   let active = register_alpha_family Active
@@ -7355,6 +7362,23 @@ let evm_proxy_lib =
         lwt_exit;
         rlp;
         rope;
+      ]
+
+let _octez_scoru_sequencer =
+  private_lib
+    "octez_smart_rollup_sequencer"
+    ~path:"src/lib_scoru_sequencer"
+    ~opam:"octez-smart-rollup-sequencer"
+    ~synopsis:"Sequencer library for smart contract rollup"
+    ~deps:
+      [
+        octez_base |> open_ |> open_ ~m:"TzPervasives"
+        |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+        Protocol.(octez_sc_rollup_layer2 alpha |> if_some |> open_);
+        Protocol.(main alpha) |> open_;
+        octez_rpc;
+        octez_rpc_http;
+        octez_rpc_http_server;
       ]
 
 let _evm_proxy =
