@@ -249,6 +249,7 @@
         "Delegate_services",
         "Voting_services",
         "Dal_services",
+	"Adaptive_inflation_services",
         "Alpha_services",
 
         "Main"
