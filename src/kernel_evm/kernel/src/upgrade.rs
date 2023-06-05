@@ -128,6 +128,11 @@ pub fn upgrade_kernel<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::OsString;
+    use std::fs;
+    use std::path::Path;
+    use tezos_smart_rollup_encoding::dac::{prepare_preimages, PreimageHash};
+    use tezos_smart_rollup_mock::MockHost;
 
     #[test]
     // Check if a random message signed by the dictator key is correctly decoded
@@ -150,5 +155,34 @@ mod tests {
             preimage_hash,
         )
         .expect("The upgrade signature check from the dictator failed.");
+    }
+
+    fn preliminary_upgrade(host: &mut MockHost) -> (PreimageHash, Vec<u8>) {
+        let upgrade_to = OsString::from("tests/resources/debug_kernel.wasm");
+        let upgrade_to = Path::new(&upgrade_to);
+
+        // Preimages preparation
+
+        let original_kernel = fs::read(upgrade_to).unwrap();
+        let save_preimages = |_hash: PreimageHash, preimage: Vec<u8>| {
+            host.set_preimage(preimage);
+        };
+        (
+            prepare_preimages(&original_kernel, save_preimages).unwrap(),
+            original_kernel,
+        )
+    }
+
+    #[test]
+    // Test if we manage to upgrade the kernel from the actual one to
+    // the debug kernel one from `tests/resources/debug_kernel.wasm`.
+    fn test_kernel_upgrade() {
+        let mut host = MockHost::default();
+        let (root_hash, original_kernel) = preliminary_upgrade(&mut host);
+        upgrade_kernel(&mut host, root_hash.into())
+            .expect("Kernel upgrade must succeed.");
+
+        let boot_kernel = host.store_read_all(&KERNEL_BOOT_PATH).unwrap();
+        assert_eq!(original_kernel, boot_kernel);
     }
 }
