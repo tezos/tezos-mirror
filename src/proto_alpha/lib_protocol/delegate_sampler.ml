@@ -154,11 +154,7 @@ let load_sampler_for_cycle ctxt cycle =
 let get_stakes_for_selected_index ctxt index =
   let open Lwt_result_syntax in
   let delegation_over_baking_limit =
-    Constants_storage.delegation_over_baking_limit ctxt
-  in
-  let delegation_over_baking_limit_plus_1 = delegation_over_baking_limit + 1 in
-  let delegation_over_baking_limit_plus_1_int64 =
-    Int64.of_int delegation_over_baking_limit_plus_1
+    Int64.of_int (Constants_storage.delegation_over_baking_limit ctxt)
   in
   Stake_storage.fold_snapshot
     ctxt
@@ -175,22 +171,18 @@ let get_stakes_for_selected_index ctxt index =
       let frozen_deposits_limit =
         match frozen_deposits_limit with Some fdp -> fdp | None -> max_mutez
       in
-      let available_to_freeze =
-        min frozen_deposits.current_amount frozen_deposits_limit
-      in
-      let total_stake_for_cycle =
-        match
-          available_to_freeze *? delegation_over_baking_limit_plus_1_int64
-        with
-        | Ok max_allowed_stake -> min max_allowed_stake staking_balance
-        | Error _max_allowed_stake_overflows -> staking_balance
-      in
-      let frozen =
-        div_exn total_stake_for_cycle delegation_over_baking_limit_plus_1
+      let frozen = min frozen_deposits.current_amount frozen_deposits_limit in
+      (* This subtraction may result in a negative value if tez were frozen
+         after the snapshot. This is fine, they are then taken into account as
+         frozen stake rather than delegated. *)
+      let available_delegated =
+        sub_opt staking_balance frozen |> Option.value ~default:zero
       in
       let delegated =
-        (* This subtraction cannot result in a negative value. *)
-        sub_opt total_stake_for_cycle frozen |> Option.value ~default:zero
+        match frozen *? delegation_over_baking_limit with
+        | Ok max_allowed_delegated ->
+            min max_allowed_delegated available_delegated
+        | Error _max_allowed_delegated_overflows -> available_delegated
       in
       let stake_for_cycle = Stake_repr.make ~frozen ~delegated in
       let*? total_stake = Stake_repr.(total_stake +? stake_for_cycle) in
