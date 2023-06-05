@@ -42,6 +42,10 @@ DEV_EXECUTABLES := octez-protocol-compiler octez-snoop
 
 ALL_EXECUTABLES := $(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES) $(DEV_EXECUTABLES)
 
+# Set of Dune targets to build, in addition to OCTEZ_EXECUTABLES, in
+# the `build` target's Dune invocation.
+BUILD_EXTRA :=
+
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifndef TEZOS_WITHOUT_OPAM
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
@@ -178,6 +182,7 @@ ifeq (${OCTEZ_EXECUTABLES},)
 endif
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) \
 		$(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) \
+		$(BUILD_EXTRA) \
 		@copy-parameters
 	@mkdir -p $(OCTEZ_BIN_DIR)/
 	@cp -f $(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) $(OCTEZ_BIN_DIR)/

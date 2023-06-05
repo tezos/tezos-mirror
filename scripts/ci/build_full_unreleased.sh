@@ -19,18 +19,16 @@ fi
 diff poetry.lock /home/tezos/poetry.lock
 diff pyproject.toml /home/tezos/pyproject.toml
 
-# 2. Actually build
-make
+# 2. Actually build.
+#    Also build the tps evaluation tool which is not part of the default build,
+#    and the tezt main entrypoint for integration tests, by adding them to the `BUILD_EXTRA` target.
+#    NOTE: Making one call to `dune build` a lot of times `dune` would
+#    otherwise need to reconstruct its rules. Do not split this
+#    invocation.
+#    NOTE: We add $COVERAGE_OPTIONS to all dune build commands to
+#    enable reuse of build artifacts.
+make BUILD_EXTRA="src/bin_tps_evaluation tezt/tests/main.exe"
 
-# 3. Also build the tps evaluation tool which is not part of the default build,
-#    and the tezt main entrypoint for integration tests.
-#    NOTE: Making one call to `dune build` instead of two saves a lot
-#    of times `dune` would otherwise need to reconstruct its rules. Do
-#    not split this invocation into two.
-#    NOTE: We add $COVERAGE_OPTIONS to all dune build commands to enable reuse of
-#    build artifacts.
-# shellcheck disable=SC2086
-dune build ${COVERAGE_OPTIONS} src/bin_tps_evaluation tezt/tests/main.exe
 
-# 4. clean-up caches before uploading the cache
+# 3. clean-up caches before uploading the cache
 opam clean
