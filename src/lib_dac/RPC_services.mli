@@ -72,7 +72,7 @@ module V0 : sig
       unit * Dac_plugin.raw_hash,
       unit,
       unit,
-      Certificate_repr.t option )
+      Certificate_repr.t )
     Tezos_rpc.Service.service
 
   (** "GET v0/serialized_certificates" endpoint returns the binary encoded DAC 

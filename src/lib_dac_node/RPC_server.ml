@@ -88,12 +88,12 @@ module V0 = struct
       Monitor_services.V0.S.root_hashes
       (fun () () () -> RPC_handlers.V0.handle_monitor_root_hashes hash_streamer)
 
-  let register_get_certificate node_store dac_plugin =
+  let register_get_certificate node_store =
     add_service
       Tezos_rpc.Directory.register1
       RPC_services.V0.get_certificate
       (fun root_hash () () ->
-        RPC_handlers.V0.handle_get_certificate dac_plugin node_store root_hash)
+        RPC_handlers.V0.handle_get_certificate node_store root_hash)
 
   let register_get_serialized_certificate node_store dac_plugin =
     add_service
@@ -170,8 +170,8 @@ module V0 = struct
            dac_plugin
            rw_store
            page_store
-      |> register_get_certificate rw_store dac_plugin
       |> register_get_serialized_certificate rw_store dac_plugin
+      |> register_get_certificate rw_store
   end
 
   module Committee_member = struct
@@ -239,8 +239,8 @@ module V0 = struct
            dac_plugin
            rw_store
            page_store
-      |> register_get_certificate rw_store dac_plugin
       |> register_get_serialized_certificate rw_store dac_plugin
+      |> register_get_certificate rw_store
   end
 end
 

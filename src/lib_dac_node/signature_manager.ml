@@ -264,6 +264,7 @@ let update_aggregate_sig_store node_store dac_members_pk_opt root_hash =
   let* signatures, witnesses =
     compute_signatures_with_witnesses rev_indexed_signature
   in
+  let raw_root_hash = Dac_plugin.hash_to_raw root_hash in
   let final_signature =
     Tezos_crypto.Aggregate_signature.aggregate_signature_opt signatures
   in
@@ -276,8 +277,9 @@ let update_aggregate_sig_store node_store dac_members_pk_opt root_hash =
       let* () =
         Store.Certificate_store.add
           node_store
-          root_hash
-          Store.{aggregate_signature; witnesses}
+          raw_root_hash
+          Certificate_repr.(
+            V0 (V0.make raw_root_hash aggregate_signature witnesses))
       in
       return @@ (aggregate_signature, witnesses)
 

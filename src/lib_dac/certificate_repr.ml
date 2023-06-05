@@ -84,10 +84,8 @@ module V0 = struct
       witnesses : Z.t;
     }
 
-    (** This encoding is protocol dependant because the SDK Kernel
-        needs the provided [root_hash] to be 33 bytes long.
-        This specific encoding should not be on DAC side,
-        but this is the easiest/faster way to handle it. *)
+    (** This encoding is protocol dependant. It should not be on 
+        DAC side, but this is the easiest/faster way to handle it. *)
     let certificate_client_encoding root_hash_encoding =
       let untagged =
         Data_encoding.(
@@ -136,7 +134,7 @@ let encoding =
     [
       case
         ~title:"certificate_repr_V0"
-        Json_only
+        (Tag 0)
         V0.encoding
         (function V0 s -> Some s)
         (fun s -> V0 s);
