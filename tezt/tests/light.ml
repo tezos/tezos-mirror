@@ -182,9 +182,7 @@ module NoUselessRpc = struct
       |> Process.check_and_read_stderr
     in
     let lines = String.split_on_char '\n' stderr in
-    let rpc_path_regexp =
-      Re.Str.regexp {|.*light_mode: API call: do_rpc \(.*\)|}
-    in
+    let rpc_path_regexp = Re.Str.regexp {|.*: API call: do_rpc \(.*\)|} in
     let extract_rpc_path line =
       (* Groups are 1-based (0 is for the whole match). *)
       if Re.Str.string_match rpc_path_regexp line 0 then
