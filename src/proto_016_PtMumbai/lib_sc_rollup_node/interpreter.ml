@@ -121,18 +121,23 @@ let transition_pvm node_ctxt ctxt predecessor Layer1.{hash = _; _}
 (** [process_head node_ctxt ctxt ~predecessor head] runs the PVM for the given
     head. *)
 let process_head (node_ctxt : _ Node_context.t) ctxt
-    ~(predecessor : Layer1.header) (head : Layer1.header) inbox_messages =
+    ~(predecessor : Layer1.header) (head : Layer1.header) (inbox, inbox_messages)
+    =
   let open Lwt_result_syntax in
   let first_inbox_level =
     Raw_level.to_int32 node_ctxt.genesis_info.level |> Int32.succ
   in
   if head.Layer1.level >= first_inbox_level then
+    let*? inbox_messages =
+      List.map_e Sc_rollup.Inbox_message.serialize inbox_messages
+      |> Environment.wrap_tzresult
+    in
     transition_pvm
       node_ctxt
       ctxt
       (Layer1.head_of_header predecessor)
       (Layer1.head_of_header head)
-      inbox_messages
+      (inbox, inbox_messages)
   else if head.Layer1.level = Raw_level.to_int32 node_ctxt.genesis_info.level
   then
     let* ctxt, state = genesis_state head.hash node_ctxt ctxt in
@@ -168,6 +173,10 @@ let start_state_of_block node_ctxt (block : Sc_rollup_block.t) =
     :: Internal (Info_per_level {predecessor; predecessor_timestamp})
     :: messages
     @ [Internal End_of_level]
+  in
+  let*? messages =
+    List.map_e Sc_rollup.Inbox_message.serialize messages
+    |> Environment.wrap_tzresult
   in
   return
     Fueled_pvm.Accounted.
