@@ -31,9 +31,9 @@ open Helpers
 module P = struct
   (* https://github.com/dusk-network/jubjub/blob/052ac22bc69403171ad1e32c3332b7510891419a/src/lib.rs#L121 *)
 
-  module A = Mec.Curve.Jubjub.AffineEdwards
   module Schnorr = Plompiler.Schnorr (Plompiler.Anemoi128)
   module P = Schnorr.P
+  module A = Schnorr.Curve
 
   let test_vanilla_schnorr () =
     let sk = A.Scalar.random () in
@@ -55,7 +55,7 @@ module Schnorr (L : LIB) = struct
 
   module Schnorr = Plompiler.Schnorr (Plompiler.Anemoi128)
   module Sc = Schnorr.V (L)
-  module A = Mec.Curve.Jubjub.AffineEdwards
+  module A = Schnorr.Curve
 
   let test_circuit_verify g pk msg signature () =
     let* g = input ~kind:`Public g in
@@ -82,7 +82,7 @@ module Schnorr (L : LIB) = struct
     @@ A.Scalar.to_z @@ A.Scalar.random ()
 
   let tests =
-    let g = Sc.pk_encoding.input Sc.g in
+    let g = Sc.pk_encoding.input A.one in
     let msg = Input.scalar msg in
     [
       test

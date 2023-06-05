@@ -26,77 +26,33 @@
 open Lang_core
 open Lang_stdlib
 
-module type CURVE_PARAMETERS = sig
-  val a : S.t
-
-  val d : S.t
-
-  val scalar_order : Z.t
-
-  val base_order : Z.t
-end
-
-let zero = S.zero
-
 let one = S.one
-
-let two = S.add one one
 
 let mone = S.negate one
 
-module type AFFINE = functor (L : LIB) -> sig
-  open L
-
-  type point = scalar * scalar
-
-  val input_point : ?kind:input_kind -> S.t * S.t -> point repr t
-
-  val is_on_curve : point repr -> bool repr t
-
-  (** Also checks that the point is on the curve (but not necessarily in the
-      subgroup). *)
-  val from_coordinates : scalar repr -> scalar repr -> point repr t
-
-  val unsafe_from_coordinates : scalar repr -> scalar repr -> point repr t
-
-  val get_u_coordinate : point repr -> scalar repr
-
-  val get_v_coordinate : point repr -> scalar repr
-
-  (** The identity element of the curve (0, 1). *)
-  val id : S.t * S.t
-
-  val add : point repr -> point repr -> point repr t
-
-  val cond_add : point repr -> point repr -> bool repr -> point repr t
-
-  val double : point repr -> point repr t
-
-  val scalar_mul : bool list repr -> point repr -> point repr t
-
-  val scalar_order : Z.t
-
-  val base_order : Z.t
-
-  val multi_scalar_mul : bool list list repr -> point list repr -> point repr t
-end
-
-module MakeAffine (Params : CURVE_PARAMETERS) : AFFINE =
+module MakeAffine (Curve : Mec.CurveSig.AffineEdwardsT) :
+  Affine_curve_intf.EDWARDS =
 functor
   (L : LIB)
   ->
   struct
-    include Params
+    module L = L
     open L
 
     type point = scalar * scalar
 
+    let scalar_order = Curve.Scalar.order
+
+    let base_order = Curve.Base.order
+
+    let param_d = Curve.(d |> Base.to_z) |> S.of_z
+
     let input_point ?(kind = `Private) (u, v) =
       Input.(pair (scalar u) (scalar v)) |> input ~kind
 
-    let get_u_coordinate p = of_pair p |> fst
+    let get_x_coordinate p = of_pair p |> fst
 
-    let get_v_coordinate p = of_pair p |> snd
+    let get_y_coordinate p = of_pair p |> snd
 
     let id = (S.zero, S.one)
 
@@ -104,27 +60,37 @@ functor
     let is_on_curve p =
       with_label ~label:"Edwards.is_on_curve"
       @@
-      let u, v = of_pair p in
-      let* u2 = Num.square u in
-      let* v2 = Num.square v in
-      (* x_l = u^2 *)
-      (* x_r = v^2 *)
-      (* -1 * u^2 + 1 * v^2 - d * u^2 v^2 -  1  = 0  *)
+      let x, y = of_pair p in
+      let* x2 = Num.square x in
+      let* y2 = Num.square y in
+      (* x_l = x^2 *)
+      (* x_r = y^2 *)
+      (* -1 * x^2 + 1 * y^2 - d * x^2 y^2 -  1  = 0  *)
       (*  |         |         |              |    |  *)
       (*  ql        qr        qm             qc   qo *)
-      let qm = S.(negate Params.d) in
-      (* The last wire is multiplied by 0 so we can put any value, we chose u here. *)
-      let* o = Num.custom ~qc:mone ~ql:mone ~qr:one ~qm u2 v2 in
+      let qm = S.negate param_d in
+      let* o = Num.custom ~qc:mone ~ql:mone ~qr:one ~qm x2 y2 in
       Num.is_zero o
 
-    let from_coordinates u v =
+    (* 1 constraint *)
+    let assert_is_on_curve p =
+      with_label ~label:"Edwards.is_on_curve"
+      @@
+      let x, y = of_pair p in
+      let* x2 = Num.square x in
+      let* y2 = Num.square y in
+      let qm = S.negate param_d in
+      (* The last wire is multiplied by 0 so we can put any value, we chose x here. *)
+      Num.assert_custom ~qc:mone ~ql:mone ~qr:one ~qm x2 y2 x
+
+    let from_coordinates x y =
       with_label ~label:"Edwards.from_coordinates"
       @@
-      let p = pair u v in
+      let p = pair x y in
       with_bool_check (is_on_curve p) >* ret p
 
-    let unsafe_from_coordinates u v =
-      with_label ~label:"Edwards.unsafe_from_coordinates" (pair u v |> ret)
+    let unsafe_from_coordinates x y =
+      with_label ~label:"Edwards.unsafe_from_coordinates" (pair x y |> ret)
 
     (* P1:(u1, v1) + P2:(u2, v2) = P3:(u3, v3)
        2 constraints
@@ -142,12 +108,12 @@ functor
     let point_or_zero point b =
       with_label ~label:"Edwards.point_or_zero"
       @@
-      let p_u = get_u_coordinate point in
-      let p_v = get_v_coordinate point in
+      let p_x = get_x_coordinate point in
+      let p_y = get_y_coordinate point in
       (* if b = 1, return (p_u, p_v); otherwise the zero point (0, 1) *)
       let b = scalar_of_bool b in
-      let* u = Num.mul b p_u in
-      let* v = Num.custom ~qr:mone ~qc:one ~qm:one p_v b in
+      let* u = Num.mul b p_x in
+      let* v = Num.custom ~qr:mone ~qc:one ~qm:one p_y b in
       ret @@ pair u v
 
     let scalar_mul s p =
@@ -190,19 +156,3 @@ functor
         init
         List.(map to_list (tl ls))
   end
-
-module Jubjub = MakeAffine (struct
-  let a = mone
-
-  let d =
-    S.of_string
-      "19257038036680949359750312669786877991949435402254120286184196891950884077233"
-
-  let scalar_order =
-    Z.of_string
-      "6554484396890773809930967563523245729705921265872317281365359162392183254199"
-
-  let base_order =
-    Z.of_string
-      "52435875175126190479447740508185965837690552500527637822603658699938581184513"
-end)

@@ -3534,7 +3534,7 @@ Constraints: 867
 
 Schnorr.test_circuit_verify:
 Proof size: 3.83 KB
-Proof hash: 3c7fc08f8a1895fe519b54fe85785823d6739c9c76c306dd60098ee5e207fa13
+Proof hash: b22fd22b804df8482b5f762d7d76574d4f3749870a0ee9d49596f5b1aa1b2133
 Prover_pp hash: dbb63b10afdcf9397134e34c8ffbc2df9123a1333d914725669908b9c3cb73d9
 Verifier_pp hash: fe5f15bffb423f09c06be39fa98f773552f1716af1bf563e8226d13991ffa694
 
@@ -5264,13 +5264,13 @@ Weierstrass.test_scalar_mul:
 Constraints: 4067
 
 Weierstrass.test_scalar_mul_optimized:
-Constraints: 3810
+Constraints: 3811
 
 Weierstrass.test_scalar_mul:
 Constraints: 4067
 
 Weierstrass.test_scalar_mul_optimized:
-Constraints: 3810
+Constraints: 3811
 
 Weierstrass.is_on_curve_circuit:
 Constraints: 4
@@ -5576,25 +5576,25 @@ Weierstrass.test_scalar_mul:
 Constraints: 4067
 
 Weierstrass.test_scalar_mul_optimized:
-Constraints: 3810
+Constraints: 3811
 
 Weierstrass.test_scalar_mul:
 Proof size: 2.99 KB
-Proof hash: 5679d84fb4b587073727958c2f689912049b209e99e672efedf3fe8d363354f7
-Prover_pp hash: de9fb0476f5873db6703dfa509b648ddd0bb1ed20cd3a7fc705d6938eaac5928
-Verifier_pp hash: b3ec83c24adcd977bbf23bcf05d0badc2668a04324fda6a86dc0db599c8f7d89
+Proof hash: 90e695ccbfcd2451464d71246c9a5354cc7aa9de53a40b51ad1515b9eefaa20f
+Prover_pp hash: 21dac9386e54528f6992f33d13ed46e764b4887a7eb89278d3ffb523c805a6f8
+Verifier_pp hash: ad0360ffe89378a4843bb089e6f1753042013f1b9a99f01d21817b01a9063b70
 
 Weierstrass.test_scalar_mul:
 Constraints: 4067
 
 Weierstrass.test_scalar_mul_optimized:
-Constraints: 3810
+Constraints: 3811
 
 Weierstrass.test_scalar_mul:
 Proof size: 2.99 KB
-Proof hash: eb8a7825b3dfd553899e592dc2f798fb9232085e5dc377d9acb349c083342c20
-Prover_pp hash: de9fb0476f5873db6703dfa509b648ddd0bb1ed20cd3a7fc705d6938eaac5928
-Verifier_pp hash: b3ec83c24adcd977bbf23bcf05d0badc2668a04324fda6a86dc0db599c8f7d89
+Proof hash: fb7b949e4b365d04fb320669ddaf3470689b3bf1bd310cfa2561c2e08b0ddd3f
+Prover_pp hash: 21dac9386e54528f6992f33d13ed46e764b4887a7eb89278d3ffb523c805a6f8
+Verifier_pp hash: ad0360ffe89378a4843bb089e6f1753042013f1b9a99f01d21817b01a9063b70
 
 Weierstrass.is_on_curve_circuit:
 Constraints: 4

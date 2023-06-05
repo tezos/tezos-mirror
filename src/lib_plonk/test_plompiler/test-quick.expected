@@ -2156,13 +2156,13 @@ Weierstrass.test_scalar_mul:
 Constraints: 4067
 
 Weierstrass.test_scalar_mul_optimized:
-Constraints: 3810
+Constraints: 3811
 
 Weierstrass.test_scalar_mul:
 Constraints: 4067
 
 Weierstrass.test_scalar_mul_optimized:
-Constraints: 3810
+Constraints: 3811
 
 Weierstrass.is_on_curve_circuit:
 Constraints: 4

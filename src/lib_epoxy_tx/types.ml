@@ -369,8 +369,7 @@ module Encodings (L : LIB) = struct
 
   open V (L)
 
-  open Encodings (L)
-
+  open L.Encodings
   module Anemoi = Anemoi128.V
   module Plompiler_Curve = JubjubEdwards (L)
   module Plompiler_Hash = Anemoi (L)

@@ -95,7 +95,7 @@ module P = struct
     let leaves, ticket_tree = empty_ticket_tree start_pos in
     let tickets_root = Merkle.root ticket_tree in
     ( {
-        pk = Schnorr.g;
+        pk = Curve.one;
         tez_balance = Bounded.make ~bound:Bound.max_balance Z.zero;
         cnt = Bounded.make ~bound:Bound.max_counter Z.zero;
         tickets_root;
@@ -445,7 +445,7 @@ module P = struct
             in
             check_src && check_dst
           in
-          let check_dst_pk = dst_account.pk <> Schnorr.g in
+          let check_dst_pk = dst_account.pk <> Curve.one in
           let check_price = Z.(zero = Bounded.v header.price.amount) in
 
           let valid =
@@ -601,7 +601,7 @@ module P = struct
           let next_empty_account, next_empty_leaves, next_empty_tree =
             get_account (dst_index + 1) s.accounts
           in
-          let check_next_is_empty = next_empty_account.pk = Schnorr.g in
+          let check_next_is_empty = next_empty_account.pk = Curve.one in
           let check_rollup_id = rollup_id = header.rollup_id in
           let check_signature =
             Schnorr.verify ~compressed:true ~msg ~pk ~signature ()
@@ -721,7 +721,7 @@ module P = struct
             Bounded.v header.price.amount = Bounded.v amount.amount
             && header.price.id = amount.id
           in
-          let check_dst_pk = dst_account.pk <> Schnorr.g in
+          let check_dst_pk = dst_account.pk <> Curve.one in
 
           let valid =
             check_counter && check_dst_pk && check_balances && check_ticket_ids
@@ -1203,7 +1203,7 @@ module V (L : LIB) = struct
       input @@ Encodings.account_tree_el_encoding.input operator
     in
     let* generator =
-      Plompiler_Curve.(input_point @@ affine_to_point Schnorr.g)
+      Plompiler_Curve.(input_point @@ affine_to_point Curve.one)
     in
     let fees = Encodings.((amount_encoding ~safety).decode) fees in
     let operator = Encodings.account_tree_el_encoding.decode operator in
@@ -1596,7 +1596,7 @@ module V (L : LIB) = struct
         let* tx_s = input @@ Encodings.(transfer_storage_encoding.input) tx_s in
         let tx_s = Encodings.(transfer_storage_encoding.decode) tx_s in
         let* generator =
-          Plompiler_Curve.(input_point @@ affine_to_point Schnorr.g)
+          Plompiler_Curve.(input_point @@ affine_to_point Curve.one)
         in
         let* root_next, next_pos_next, computed_fee =
           transfer_circuit
@@ -1620,7 +1620,7 @@ module V (L : LIB) = struct
         let* tx_s = input @@ Encodings.(create_storage_encoding.input) tx_s in
         let tx_s = Encodings.(create_storage_encoding.decode) tx_s in
         let* generator =
-          Plompiler_Curve.(input_point @@ affine_to_point Schnorr.g)
+          Plompiler_Curve.(input_point @@ affine_to_point Curve.one)
         in
         Num.assert_eq_const (coerce tx.header.op_code) (expected_op_code t)
         >* let* dst_account_before_s = hash_account tx_s.dst.account.before in
@@ -1712,7 +1712,7 @@ module V (L : LIB) = struct
         let* tx_s = input @@ Encodings.(credit_storage_encoding.input) tx_s in
         let tx_s = Encodings.(credit_storage_encoding.decode) tx_s in
         let* generator =
-          Plompiler_Curve.(input_point @@ affine_to_point Schnorr.g)
+          Plompiler_Curve.(input_point @@ affine_to_point Curve.one)
         in
 
         assert_equal old_next_pos new_next_pos
@@ -1836,7 +1836,7 @@ module V (L : LIB) = struct
         let* tx_s = input @@ Encodings.(debit_storage_encoding.input) tx_s in
         let tx_s = Encodings.(debit_storage_encoding.decode) tx_s in
         let* generator =
-          Plompiler_Curve.(input_point @@ affine_to_point Schnorr.g)
+          Plompiler_Curve.(input_point @@ affine_to_point Curve.one)
         in
 
         assert_equal old_next_pos new_next_pos
@@ -1982,7 +1982,7 @@ module V (L : LIB) = struct
     in
     let ops_s = List.map Encodings.(transfer_storage_encoding.decode) ops_s in
     let* generator =
-      Plompiler_Curve.(input_point @@ affine_to_point Schnorr.g)
+      Plompiler_Curve.(input_point @@ affine_to_point Curve.one)
     in
     let op_code = S.zero in
     let* z = constant_scalar S.zero in
