@@ -623,3 +623,28 @@ let conflicting_stakers_uncarbonated ctxt rollup staker =
       | Error _ -> return conflicts)
     []
     stakers
+
+let migrate_clean_refutation_games ctxt =
+  let open Lwt_result_syntax in
+  let remove_unstaked_games rollup =
+    List.fold_left_es
+      (fun ctxt (Sc_rollup_game_repr.Index.{alice; bob} as stakers) ->
+        let* ctxt, alice_active =
+          Sc_rollup_staker_index_storage.is_staker ctxt rollup alice
+        in
+        let* ctxt, bob_active =
+          Sc_rollup_staker_index_storage.is_staker ctxt rollup bob
+        in
+        if (not alice_active) && not bob_active then
+          remove_game ctxt rollup stakers
+        else return ctxt)
+  in
+  let* rollups = Sc_rollup_storage.list_unaccounted ctxt in
+  List.fold_left_es
+    (fun ctxt rollup ->
+      let*! players =
+        Storage.Sc_rollup.Game_info.keys_unaccounted (ctxt, rollup)
+      in
+      remove_unstaked_games rollup ctxt players)
+    ctxt
+    rollups
