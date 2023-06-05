@@ -150,9 +150,7 @@ let empty_rpc_directory : unit Tezos_rpc.Directory.t =
           unprocessed = Operation_hash.Map.empty;
         }
       in
-      Block_services.Empty.Mempool.pending_operations_version_dispatcher
-        ~version:params#version
-        pending_operations)
+      Tezos_rpc.Answer.return (params#version, pending_operations))
 
 let rpc_directory : t option Tezos_rpc.Directory.t =
   Tezos_rpc.Directory.register_dynamic_directory

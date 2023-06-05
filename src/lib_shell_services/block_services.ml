@@ -1156,8 +1156,24 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       (* This encoding should be always the one by default. *)
       let encoding = version_1_encoding
 
-      (* If you change this value, also change [encoding]. *)
-      let default_pending_operations_version = 1
+      type version = Version_0 | Version_1
+
+      let string_of_version = function Version_0 -> "0" | Version_1 -> "1"
+
+      let version_of_string = function
+        | "0" -> Ok Version_0
+        | "1" -> Ok Version_1
+        | _ -> Error "Cannot parse version (supported versions \"0\" and \"1\")"
+
+      let default_pending_operations_version = Version_1
+
+      let version_arg =
+        let open Tezos_rpc.Arg in
+        make
+          ~name:"version"
+          ~destruct:version_of_string
+          ~construct:string_of_version
+          ()
 
       let pending_query =
         let open Tezos_rpc.Query in
@@ -1188,7 +1204,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             end)
         |+ field
              "version"
-             Tezos_rpc.Arg.int
+             version_arg
              default_pending_operations_version
              (fun t -> t#version)
         |+ field
@@ -1229,12 +1245,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              (fun t -> t#validation_passes)
         |> seal
 
-      (* If you update this datatype, please update also [supported_version]. *)
-      type t_with_version = Version_0 of t | Version_1 of t
-
-      (* This value should be consistent with [t_with_version]. *)
-      let supported_version = [0; 1]
-
       let pending_operations_encoding =
         union
           [
@@ -1243,29 +1253,18 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
               (Tag 1)
               version_1_encoding
               (function
-                | Version_1 pending_operations -> Some pending_operations
-                | Version_0 _ -> None)
-              (fun pending_operations -> Version_1 pending_operations);
+                | Version_1, pending_operations -> Some pending_operations
+                | Version_0, _ -> None)
+              (fun pending_operations -> (Version_1, pending_operations));
             case
               ~title:"old_encoding_pending_operations"
               Json_only
               version_0_encoding
               (function
-                | Version_0 pending_operations -> Some pending_operations
-                | Version_1 _ -> None)
-              (fun pending_operations -> Version_0 pending_operations);
+                | Version_0, pending_operations -> Some pending_operations
+                | Version_1, _ -> None)
+              (fun pending_operations -> (Version_0, pending_operations));
           ]
-
-      let pending_operations_version_dispatcher ~version pending_operations =
-        if version = 0 then
-          Tezos_rpc.Answer.return (Version_0 pending_operations)
-        else if version = 1 then
-          Tezos_rpc.Answer.return (Version_1 pending_operations)
-        else
-          Tezos_rpc.Answer.fail
-            (Tezos_rpc.Error.bad_version
-               ~given:version
-               ~supported:supported_version)
 
       let pending_operations path =
         Tezos_rpc.Service.get_service
@@ -1683,12 +1682,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       unprocessed : Next_proto.operation Operation_hash.Map.t;
     }
 
-    type t_with_version = S.Mempool.t_with_version =
-      | Version_0 of t
-      | Version_1 of t
-
-    let pending_operations_version_dispatcher =
-      S.Mempool.pending_operations_version_dispatcher
+    type version = S.Mempool.version = Version_0 | Version_1
 
     let pending_operations ctxt ?(chain = `Main)
         ?(version = S.Mempool.default_pending_operations_version)
@@ -1718,8 +1712,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ()
       in
       match v with
-      | Version_1 pending_operations | Version_0 pending_operations ->
-          return pending_operations
+      | (Version_1 | Version_0), pending_operations -> return pending_operations
 
     let ban_operation ctxt ?(chain = `Main) op_hash =
       let s = S.Mempool.ban_operation (mempool_path chain_path) in
