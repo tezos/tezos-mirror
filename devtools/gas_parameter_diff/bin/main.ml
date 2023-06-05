@@ -93,18 +93,19 @@ let () =
       Printf.printf "%s," name ;
       let current_min = ref None in
       let current_max = ref None in
+      let all_values = ref [] in
       Array.iter
         (fun (table, _file_name) ->
           let value = List.assoc_opt name table in
           (match value with
-          | None -> ()
+          | None -> all_values := !all_values @ [""]
           | Some value ->
               let v = read_num value in
-              Printf.printf "%s" value ;
               current_min := lift min !current_min v ;
-              current_max := lift max !current_max v) ;
-          Printf.printf ",")
+              current_max := lift max !current_max v ;
+              all_values := !all_values @ [value]))
         tables ;
+      List.iter (Printf.printf "%s,") !all_values ;
       match (!current_min, !current_max) with
       | Some final_min, Some final_max ->
           let diff = final_max -. final_min in
