@@ -150,10 +150,12 @@ let on_batch state = produce_batches state ~only_full:false
 
 let simulate node_ctxt simulation_ctxt (messages : L2_message.t list) =
   let open Lwt_result_syntax in
-  let ext_messages =
-    List.map
-      (fun m -> Sc_rollup.Inbox_message.External (L2_message.content m))
+  let*? ext_messages =
+    List.map_e
+      (fun m ->
+        Sc_rollup.Inbox_message.(serialize (External (L2_message.content m))))
       messages
+    |> Environment.wrap_tzresult
   in
   let+ simulation_ctxt, _ticks =
     Simulation.simulate_messages node_ctxt simulation_ctxt ext_messages
