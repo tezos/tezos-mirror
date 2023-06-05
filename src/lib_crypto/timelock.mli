@@ -71,7 +71,7 @@ type vdf_proof
 type ciphertext
 
 (** Tuple of the RSA group comprising the locked and unlocked values as well as
-    (Wesolowski) proof that the unlocked value indeed correspond to the locked
+    a (Wesolowski) proof that the unlocked value indeed corresponds to the locked
     one. *)
 type vdf_tuple = {
   locked_value : locked_value;
@@ -80,7 +80,7 @@ type vdf_tuple = {
 }
 
 (** Proof that the opening of a value is the claimed value.
-    It is concretely an optional vdf_tuple and a member of the RSA
+    It is concretely a vdf_tuple and a member of the RSA
     group. *)
 type timelock_proof = {vdf_tuple : vdf_tuple; nonce : Z.t}
 
@@ -166,7 +166,7 @@ type opening_result = Correct of Bytes.t | Bogus_opening
 val open_chest : chest -> chest_key -> time:int -> opening_result
 
 (** Gives the size of the underlying plaintext in a chest in bytes.
-    Used for gas accounting*)
+    Used for gas accounting *)
 val get_plaintext_size : chest -> int
 
 module Internal_for_tests : sig
@@ -194,7 +194,7 @@ end
     The [payload] corresponds to the message to timelock while the [time]
     corresponds to the difficulty in opening the chest. Beware, it does not
     correspond to a duration per se but to the number of iteration needed.
-    The optional [precomputed_path] is a local path where to read or write some
+    The optional [precomputation_path] is a local path where to read or write some
     auxiliary information to generate the chest quickly. *)
 val create_chest_and_chest_key :
   ?precompute_path:string option ->
@@ -203,8 +203,7 @@ val create_chest_and_chest_key :
   unit ->
   chest * chest_key
 
-(** High level function which unlock the value and create the time-lock
-    proof. *)
+(** High level function to unlock the value and create a proof. *)
 val create_chest_key : chest -> time:int -> chest_key
 
 (**  ----- !!!!! Do not use for wallets: the RNG is not safe !!!!----
