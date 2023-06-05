@@ -52,7 +52,7 @@ module V0 : sig
         with the correct encoding. [Dac_plugin.t] is needed to provide 
         the correct encoding related to the correct protocol. *)
     val serialize_certificate :
-      Dac_plugin.t ->
+      Dac_plugin.hash Data_encoding.t ->
       root_hash:Dac_plugin.hash ->
       aggregate_signature:Tezos_crypto.Aggregate_signature.signature ->
       witnesses:Z.t ->

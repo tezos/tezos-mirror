@@ -88,7 +88,7 @@ module V0 = struct
         needs the provided [root_hash] to be 33 bytes long.
         This specific encoding should not be on DAC side,
         but this is the easiest/faster way to handle it. *)
-    let certificate_client_encoding ((module Plugin) : Dac_plugin.t) =
+    let certificate_client_encoding root_hash_encoding =
       let untagged =
         Data_encoding.(
           conv
@@ -97,7 +97,7 @@ module V0 = struct
             (fun (root_hash, aggregate_signature, witnesses) ->
               {root_hash; aggregate_signature; witnesses})
             (obj3
-               (req "root_hash" Plugin.encoding)
+               (req "root_hash" root_hash_encoding)
                (req
                   "aggregate_signature"
                   Tezos_crypto.Aggregate_signature.encoding)
@@ -115,11 +115,11 @@ module V0 = struct
               (fun certificate -> certificate);
           ])
 
-    let serialize_certificate dac_plugin ~root_hash ~aggregate_signature
+    let serialize_certificate root_hash_encoding ~root_hash ~aggregate_signature
         ~witnesses =
       let bytes_as_result =
         Data_encoding.Binary.to_bytes
-          (certificate_client_encoding dac_plugin)
+          (certificate_client_encoding root_hash_encoding)
           {root_hash; aggregate_signature; witnesses}
       in
       match bytes_as_result with
