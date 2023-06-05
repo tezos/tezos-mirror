@@ -69,6 +69,9 @@ Node
 - Fixed an issue where a node lagging behind would end up freezing and
   never be able to catch up.
 
+- Fixed a bug where the node could freeze when an old block was
+  requested during a store merge. (MR :gl:`!8952`)`
+
 Client
 ------
 
