@@ -83,9 +83,9 @@ let () =
   let all_param_names = Array.fold_left merge_params [] tables in
 
   (* Output the title line *)
-  Printf.printf "," ;
-  Array.iter (fun (_table, file_name) -> Printf.printf "%s," file_name) tables ;
-  Printf.printf ",MIN,MAX,DIFF,CHANGE (%%)\n" ;
+  Printf.printf ",,MIN,MAX,DIFF,CHANGE (%%)," ;
+  Array.iter (fun (_table, file_name) -> Printf.printf ",%s" file_name) tables ;
+  Printf.printf "\n" ;
 
   (* Output the content lines *)
   List.iter
@@ -107,8 +107,7 @@ let () =
           in
           all_values := !all_values @ [value])
         tables ;
-      List.iter (Printf.printf "%s,") !all_values ;
-      match (!current_min, !current_max) with
+      (match (!current_min, !current_max) with
       | Some final_min, Some final_max ->
           let diff = final_max -. final_min in
           let change =
@@ -116,7 +115,7 @@ let () =
             if divisor = 0. then (* in that case all values are null *) 0.
             else 100. *. diff /. divisor
           in
-          Printf.printf ",%f,%f,%f,%f\n" final_min final_max diff change ;
+          Printf.printf ",%f,%f,%f,%f," final_min final_max diff change ;
           (* For  small values (let's say lower than 10ns), a 20% evolution
              amounts to a maximum of 2ns. That's not much. So in this case,
              let's require a change by more than 2ns.
@@ -132,7 +131,9 @@ let () =
           in
           if change > 20. && ((not is_const) || diff > 2.) then
             Printf.eprintf "%f%% regression for %s.\n" change name
-      | _, _ -> Printf.printf ",,,,\n")
+      | _, _ -> Printf.printf ",,,,,") ;
+      List.iter (Printf.printf ",%s") !all_values ;
+      Printf.printf "\n")
     all_param_names ;
 
   (* Report parameters disappearing or appearing between the last two files. *)
