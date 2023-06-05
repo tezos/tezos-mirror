@@ -15,6 +15,8 @@ Environment Version
 This protocol requires a different protocol environment version than Nairobi.
 It requires protocol environment V10, compared to V9 for Nairobi.
 
+- Simplify the timelock ``opening_result`` type in the environment as we do not deal with ``Bogus_cipher`` any longer. (MR :gl:`!8404`)
+
 Adaptive Inflation
 ------------------
 
@@ -53,6 +55,10 @@ Adaptive Inflation (ongoing)
 ----------------------------
 
 - Introduce feature flag for Adaptive Inflation. (MR :gl:`!8566`)
+
+- Add parameter ``staking_over_baking_limit`` as the limit of co-staked tokens over the baked tokens for a given baker. (MR :gl:`!8744`)
+
+- Add parameter ``max_costaking_baker_count`` to limit the number of bakers an account can co-stake to. (MR :gl:`!8766`)
 
 When the feature flag is enabled, the following extra changes happen:
 
@@ -114,6 +120,16 @@ Bug Fixes
 Minor Changes
 -------------
 
+- Improve the error for implicit account type check. (MR :gl:`!7714`)
+
+- Remove infinite source ``Double_signing_evidence_rewards`` and take reward from the punishment instead. (MR :gl:`!7758`)
+
+- Remove zero tickets from a big map of a mainnet contract during migration. (MR :gl:`!8111`)
+
+- Add a ``Stake`` operation, implemented as an entrypoint of external operations to implicit accounts, for delegates only. (MR :gl:`!8120`)
+
+- Add a Total supply counter in the storage. (MRs :gl:`!8732`, :gl:`!8739`)
+
 Internal
 --------
 
@@ -162,6 +178,18 @@ Internal
 - Consensus: optimized validation of attestations by maintaining a set
   of forbidden delegates instead of checking through an I/O that the
   delegate has a sufficient frozen deposit. (MR :gl:`!8722`)
+
+- Refactor punishing transfers to be closer to each other. (MR :gl:`!7759`)
+
+- Remove almost all transaction rollup logic from the protocol. (MR :gl:`!8466`)
+
+- Fix encoding names for rewards. (MR :gl:`!8716`)
+
+- Use ``pair`` type instead of ``*``` for Michelson pairs. (MR :gl:`!8720`)
+
+- Add new function ``of_list`` to build a Merkle list. (MR :gl:`!8853`)
+
+- Improve some aspects in the PlonK code. (MR :gl:`!8730`)
 
 - Store a history of percentages of slashed deposits. (MR :gl:`!8828`)
 
