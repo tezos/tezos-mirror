@@ -50,6 +50,9 @@ type _ input =
   | Leave : GS.leave -> [`Leave] input (* case 10 *)
   | Subscribe : GS.subscribe -> [`Subscribe] input (* case 11 *)
   | Unsubscribe : GS.unsubscribe -> [`Unsubscribe] input (* case 12 *)
+  | Set_application_score :
+      GS.set_application_score
+      -> [`Set_application_score] input (* case 13 *)
 
 (** Existentially packed input. *)
 type ex_input = I : _ input -> ex_input
@@ -84,7 +87,6 @@ val pp_output : Format.formatter -> output -> unit
 
 val pp_trace :
   ?pp_state:(Format.formatter -> state -> unit) ->
-  ?pp_state':(Format.formatter -> state -> unit) ->
   ?pp_output:(Format.formatter -> output -> unit) ->
   unit ->
   Format.formatter ->
@@ -141,6 +143,9 @@ val subscribe : gen_topic:Topic.t t -> gen_peer:Peer.t t -> GS.subscribe t
 
 val unsubscribe : gen_topic:Topic.t t -> gen_peer:Peer.t t -> GS.unsubscribe t
 
+val set_application_score :
+  gen_peer:Peer.t t -> gen_score:Float.t t -> GS.set_application_score t
+
 (** Existentially pack an input. *)
 module I : sig
   val add_peer : add_peer -> ex_input
@@ -168,6 +173,8 @@ module I : sig
   val unsubscribe : unsubscribe -> ex_input
 
   val heartbeat : ex_input
+
+  val set_application_score : set_application_score -> ex_input
 end
 
 (** We fuzz the automaton by composing basic sequences of inputs, called {e fragments}.

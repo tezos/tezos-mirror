@@ -204,6 +204,7 @@ let pp_score_limits =
     record
       [
         field "topics" (fun sp -> sp.topics) pp_topic_score_limits;
+        field "app_specific_weight" (fun sp -> sp.app_specific_weight) Fmt.float;
         field
           "behaviour_penalty_weight"
           (fun sp -> sp.behaviour_penalty_weight)
@@ -212,6 +213,11 @@ let pp_score_limits =
           "behaviour_penalty_threshold"
           (fun sp -> sp.behaviour_penalty_threshold)
           Fmt.float;
+        field
+          "behaviour_penalty_decay"
+          (fun sp -> sp.behaviour_penalty_decay)
+          Fmt.float;
+        field "decay_zero" (fun sp -> sp.decay_zero) Fmt.float;
       ])
 
 let pp_limits fmtr

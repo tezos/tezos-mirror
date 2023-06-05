@@ -68,6 +68,9 @@ struct
     | Leave : GS.leave -> [`Leave] input (* case 10 *)
     | Subscribe : GS.subscribe -> [`Subscribe] input (* case 11 *)
     | Unsubscribe : GS.unsubscribe -> [`Unsubscribe] input (* case 12 *)
+    | Set_application_score :
+        GS.set_application_score
+        -> [`Set_application_score] input (* case 13 *)
 
   type ex_input = I : _ input -> ex_input
 
@@ -112,22 +115,35 @@ struct
         fprintf fmtr "Subscribe %a" GS.pp_subscribe subscribe
     | Unsubscribe unsubscribe ->
         fprintf fmtr "Unsubscribe %a" GS.pp_unsubscribe unsubscribe
+    | Set_application_score set_application_score ->
+        fprintf
+          fmtr
+          "Set_application_score %a"
+          GS.pp_set_application_score
+          set_application_score
 
   let pp_output fmtr (O o) = GS.pp_output fmtr o
 
-  let pp_trace ?pp_state ?pp_state' ?pp_output () fmtr trace =
+  let pp_trace ?pp_state ?pp_output () fmtr trace =
     let open Format in
-    let pp fmtr (Transition {time; input; state; state'; output}) =
-      fprintf fmtr "[%a] " GS.Time.pp time ;
-      Option.iter (fun pp -> fprintf fmtr "%a => " pp state) pp_state ;
+    let pp fmtr (Transition {time; input; state; state' = _; output}) =
+      Option.iter (fun pp -> fprintf fmtr "%a@," pp state) pp_state ;
+      fprintf fmtr "[%a] => " GS.Time.pp time ;
       pp_input fmtr input ;
-      Option.iter (fun pp -> fprintf fmtr " / %a" pp (O output)) pp_output ;
-      Option.iter (fun pp -> fprintf fmtr " => %a" pp state') pp_state'
+      Option.iter (fun pp -> fprintf fmtr " / %a" pp (O output)) pp_output
+    in
+    let pp_last_state fmtr trace =
+      match List.hd (List.rev trace) with
+      | None -> ()
+      | Some (Transition {state'; _}) ->
+          Option.iter (fun pp -> fprintf fmtr "%a@," pp state') pp_state
     in
     fprintf
       fmtr
-      "%a"
+      "%a@;%a"
       (pp_print_list ~pp_sep:(fun fmtr () -> fprintf fmtr "@,") pp)
+      trace
+      pp_last_state
       trace
 
   let add_peer ~gen_peer ~gen_direct ~gen_outbound =
@@ -195,6 +211,10 @@ struct
     let+ topic = gen_topic and+ peer = gen_peer in
     ({topic; peer} : GS.unsubscribe)
 
+  let set_application_score ~gen_peer ~gen_score =
+    let+ peer = gen_peer and+ score = gen_score in
+    ({peer; score} : GS.set_application_score)
+
   let input (I i) = Input i
 
   module I = struct
@@ -225,6 +245,8 @@ struct
     let unsubscribe x = Unsubscribe x |> i
 
     let heartbeat = i Heartbeat
+
+    let set_application_score x = Set_application_score x |> i
   end
 
   let dispatch : type a. a input -> GS.state -> GS.state * a GS.output =
@@ -243,6 +265,7 @@ struct
     | Leave m -> GS.leave m state
     | Subscribe m -> GS.handle_subscribe m state
     | Unsubscribe m -> GS.handle_unsubscribe m state
+    | Set_application_score m -> GS.set_application_score m state
 
   (** A fragment is a sequence of events encoding a basic interaction with
       the gossipsub automaton. Fragments support sequential and parallel
