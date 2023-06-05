@@ -68,30 +68,29 @@ let max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle =
   List.fold_left_es
     (fun (maxima, delegates_to_remove) (cycle : Cycle_repr.t) ->
       Stake_storage.get_selected_distribution ctxt cycle
-      >>=? fun active_stakes ->
-      Lwt.return
-      @@ List.fold_left_e
-           (fun (maxima, delegates_to_remove) (delegate, stake) ->
-             Stake_repr.total stake >|? fun stake ->
-             let maxima =
-               Signature.Public_key_hash.Map.update
-                 delegate
-                 (function
-                   | None -> Some stake
-                   | Some maximum -> Some (Tez_repr.max maximum stake))
-                 maxima
-             in
-             let delegates_to_remove =
-               Signature.Public_key_hash.Set.remove delegate delegates_to_remove
-             in
-             (maxima, delegates_to_remove))
-           (maxima, delegates_to_remove)
-           active_stakes)
+      >|=? fun active_stakes ->
+      List.fold_left
+        (fun (maxima, delegates_to_remove)
+             (delegate, Stake_repr.{frozen; delegated = _}) ->
+          let maxima =
+            Signature.Public_key_hash.Map.update
+              delegate
+              (function
+                | None -> Some frozen
+                | Some maximum -> Some (Tez_repr.max maximum frozen))
+              maxima
+          in
+          let delegates_to_remove =
+            Signature.Public_key_hash.Set.remove delegate delegates_to_remove
+          in
+          (maxima, delegates_to_remove))
+        (maxima, delegates_to_remove)
+        active_stakes)
     (Signature.Public_key_hash.Map.empty, cleared_cycle_delegates)
     cycles
 
-let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
-    ~balance_updates =
+let unfreeze_exceeding_deposits ?(origin = Receipt_repr.Block_application) ctxt
+    ~new_cycle ~balance_updates =
   Delegate_storage.reset_forbidden_delegates ctxt >>= fun ctxt ->
   let max_slashable_period = Constants_storage.max_slashing_period ctxt in
   (* We want to be able to slash for at most [max_slashable_period] *)
@@ -110,17 +109,8 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
   let to_cycle = Cycle_repr.(add new_cycle preserved_cycles) in
   max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle
   >>=? fun (maxima, delegates_to_remove) ->
-  let delegation_over_baking_limit =
-    Constants_storage.delegation_over_baking_limit ctxt
-  in
   Signature.Public_key_hash.Map.fold_es
-    (fun delegate maximum_stake (ctxt, balance_updates) ->
-      let maximum_stake_to_be_deposited =
-        Tez_repr.div_exn maximum_stake (delegation_over_baking_limit + 1)
-      in
-      (* Here we make sure to preserve the following invariant :
-         maximum_stake_to_be_deposited <= frozen_deposits + balance
-         See select_distribution_for_cycle *)
+    (fun delegate maximum_stake_to_be_deposited (ctxt, balance_updates) ->
       let delegate_contract = Contract_repr.Implicit delegate in
       Frozen_deposits_storage.update_initial_amount
         ctxt
@@ -139,39 +129,9 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
           (`Contract delegate_contract)
           to_reimburse
         >|=? fun (ctxt, bupds) -> (ctxt, bupds @ balance_updates)
-      else if Tez_repr.(current_amount < maximum_stake_to_be_deposited) then
-        Tez_repr.(maximum_stake_to_be_deposited -? current_amount)
-        >>?= fun desired_to_freeze ->
-        Delegate_storage.spendable_balance ctxt delegate >>=? fun balance ->
-        (* In case the delegate hasn't been slashed in this cycle,
-           the following invariant holds:
-           maximum_stake_to_be_deposited <= frozen_deposits + balance
-           See select_distribution_for_cycle
-
-           If the delegate has been slashed during the cycle, the invariant
-           above doesn't necessarily hold. In this case, we freeze the max
-           we can for the delegate. *)
-        let to_freeze = Tez_repr.(min balance desired_to_freeze) in
-        if Tez_repr.(to_freeze > zero) then
-          Token.transfer
-            ~origin
-            ctxt
-            (`Contract delegate_contract)
-            (`Frozen_deposits delegate)
-            to_freeze
-          >>=? fun (ctxt, bupds) -> return (ctxt, bupds @ balance_updates)
-        else
-          (* If the delegate cannot freeze any deposit and its current
-             deposit will remain at zero then we add the delegate to
-             the forbidden set. *)
-          (if Tez_repr.(current_amount = zero) then
-           Delegate_storage.forbid_delegate ctxt delegate
-          else Lwt.return ctxt)
-          >>= fun ctxt -> return (ctxt, balance_updates)
-      else if
-        (* => (current_amount = maximum_stake_to_be_deposited) *)
-        Tez_repr.(current_amount = zero)
-      then
+      else if Tez_repr.(current_amount = zero) then
+        (* If the delegate's current deposit remains at zero then we add it to
+           the forbidden set. *)
         Delegate_storage.forbid_delegate ctxt delegate >>= fun ctxt ->
         return (ctxt, balance_updates)
       else return (ctxt, balance_updates))
@@ -279,7 +239,7 @@ let cycle_end ctxt last_cycle =
   >>= fun ctxt ->
   distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces
   >>=? fun (ctxt, balance_updates) ->
-  freeze_deposits ctxt ~new_cycle ~balance_updates
+  unfreeze_exceeding_deposits ctxt ~new_cycle ~balance_updates
   >>=? fun (ctxt, balance_updates) ->
   Stake_storage.clear_at_cycle_end ctxt ~new_cycle >>=? fun ctxt ->
   Delegate_sampler.clear_outdated_sampling_data ctxt ~new_cycle >>=? fun ctxt ->
@@ -300,4 +260,4 @@ let init_first_cycles ctxt ~origin =
     Misc.(0 --> preserved)
   >>=? fun ctxt ->
   let cycle = (Raw_context.current_level ctxt).cycle in
-  freeze_deposits ~origin ~new_cycle:cycle ~balance_updates:[] ctxt
+  unfreeze_exceeding_deposits ~origin ~new_cycle:cycle ~balance_updates:[] ctxt

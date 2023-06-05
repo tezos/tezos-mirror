@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Stake of a delegate. *)
-type t
+type t = private {frozen : Tez_repr.t; delegated : Tez_repr.t}
 
 val zero : t
 
