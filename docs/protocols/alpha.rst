@@ -17,14 +17,6 @@ It requires protocol environment V10, compared to V9 for Nairobi.
 
 - Simplify the timelock ``opening_result`` type in the environment as we do not deal with ``Bogus_cipher`` any longer. (MR :gl:`!8404`)
 
-Adaptive Inflation
-------------------
-
-- This protocol asks the bakers to set their votes for the adoption of
-  the adaptive inflation feature. They may use the per-block votes
-  file, or CLI option ``--adaptive-inflation-vote``. If they do
-  not vote for the adaptive inflation feature, the vote defaults to
-  "pass" (unlike for the liquidity baking vote, which is mandatory).
 
 Smart Rollups
 -------------
@@ -53,6 +45,12 @@ Data Availability Layer (ongoing)
 
 Adaptive Inflation (ongoing)
 ----------------------------
+
+- This protocol asks the bakers to set their votes for the adoption of
+  the adaptive inflation feature. They may use the per-block votes
+  file, or CLI option ``--adaptive-inflation-vote``. If they do
+  not vote for the adaptive inflation feature, the vote defaults to
+  "pass" (unlike for the liquidity baking vote, which is mandatory).
 
 - Introduce feature flag for Adaptive Inflation. (MR :gl:`!8566`)
 
