@@ -25,6 +25,54 @@
 
 open Alpha_context
 
+type expected_rewards = {
+  baking_reward_fixed_portion : Tez.t;
+  baking_reward_bonus_per_slot : Tez.t;
+  endorsing_reward_per_slot : Tez.t;
+  liquidity_baking_subsidy : Tez.t;
+  seed_nonce_revelation_tip : Tez.t;
+  vdf_revelation_tip : Tez.t;
+}
+
+let expected_rewards_encoding : expected_rewards Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {
+           baking_reward_fixed_portion;
+           baking_reward_bonus_per_slot;
+           endorsing_reward_per_slot;
+           liquidity_baking_subsidy;
+           seed_nonce_revelation_tip;
+           vdf_revelation_tip;
+         } ->
+      ( baking_reward_fixed_portion,
+        baking_reward_bonus_per_slot,
+        endorsing_reward_per_slot,
+        liquidity_baking_subsidy,
+        seed_nonce_revelation_tip,
+        vdf_revelation_tip ))
+    (fun ( baking_reward_fixed_portion,
+           baking_reward_bonus_per_slot,
+           endorsing_reward_per_slot,
+           liquidity_baking_subsidy,
+           seed_nonce_revelation_tip,
+           vdf_revelation_tip ) ->
+      {
+        baking_reward_fixed_portion;
+        baking_reward_bonus_per_slot;
+        endorsing_reward_per_slot;
+        liquidity_baking_subsidy;
+        seed_nonce_revelation_tip;
+        vdf_revelation_tip;
+      })
+    (obj6
+       (req "baking_reward_fixed_portion" Tez.encoding)
+       (req "baking_reward_bonus_per_slot" Tez.encoding)
+       (req "endorsing_reward_per_slot" Tez.encoding)
+       (req "liquidity_baking_subsidy" Tez.encoding)
+       (req "seed_nonce_revelation_tip" Tez.encoding)
+       (req "vdf_revelation_tip" Tez.encoding))
+
 module S = struct
   open Data_encoding
 
@@ -86,6 +134,13 @@ module S = struct
       ~query:RPC_query.empty
       ~output:(Data_encoding.option Cycle.encoding)
       RPC_path.(context_path / "adaptive_inflation_launch_cycle")
+
+  let expected_rewards =
+    RPC_service.get_service
+      ~description:"Returns the expected rewards for the provided block"
+      ~query:RPC_query.empty
+      ~output:expected_rewards_encoding
+      RPC_path.(path / "expected_rewards")
 end
 
 let q_to_float_string q =
@@ -123,6 +178,17 @@ let current_yearly_rate_value ~formatter ctxt =
   let f = Q.(mul f (100 // 1)) in
   return (formatter f)
 
+let collect_expected_rewards ~ctxt =
+  let open Alpha_context.Delegate.Rewards in
+  {
+    baking_reward_fixed_portion = baking_reward_fixed_portion ctxt;
+    baking_reward_bonus_per_slot = baking_reward_bonus_per_slot ctxt;
+    endorsing_reward_per_slot = endorsing_reward_per_slot ctxt;
+    liquidity_baking_subsidy = liquidity_baking_subsidy ctxt;
+    seed_nonce_revelation_tip = seed_nonce_revelation_tip ctxt;
+    vdf_revelation_tip = vdf_revelation_tip ctxt;
+  }
+
 let register () =
   let open Services_registration in
   let open Lwt_result_syntax in
@@ -139,7 +205,9 @@ let register () =
       let* f = current_rewards_per_minute ctxt in
       return (Tez.of_mutez_exn (Q.to_int64 f))) ;
   register0 ~chunked:false S.launch_cycle (fun ctxt () () ->
-      Adaptive_inflation.launch_cycle ctxt)
+      Adaptive_inflation.launch_cycle ctxt) ;
+  register0 ~chunked:false S.expected_rewards (fun ctxt () () ->
+      return @@ collect_expected_rewards ~ctxt)
 
 let total_supply ctxt block =
   RPC_context.make_call0 S.total_supply ctxt block () ()
@@ -158,3 +226,6 @@ let current_rewards_per_minute ctxt block =
 
 let launch_cycle ctxt block =
   RPC_context.make_call0 S.launch_cycle ctxt block () ()
+
+let expected_rewards ctxt block =
+  RPC_context.make_call0 S.expected_rewards ctxt block () ()
