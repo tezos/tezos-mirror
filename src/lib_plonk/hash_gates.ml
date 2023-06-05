@@ -183,23 +183,13 @@ module AnemoiDouble : Base_sig = struct
       let ids34 = round_identities ~kx:kx2 ~ky:ky2 (x1, y1) (x2, y2) in
       ids12 @ ids34
 
-  let blinds =
-    SMap.of_list
-      [
-        (wire_name 0, [|0; 0|]);
-        (wire_name 1, [|1; 0|]);
-        (wire_name 2, [|1; 0|]);
-        (wire_name 3, [|1; 1|]);
-        (wire_name 4, [|1; 1|]);
-      ]
-
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain :
       prover_identities =
    fun evaluations ->
     let domain_size = Domain.length domain in
     let buffers, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
     let ({q; wires} : witness) =
-      get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
+      get_evaluations ~q_label ~prefix ~prefix_common evaluations
     in
     let selector = q in
     let x1, y1 = (wires.(1), wires.(2)) in
@@ -249,7 +239,7 @@ module AnemoiDouble : Base_sig = struct
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
     let {q; wires; wires_g} =
-      get_answers ~q_label ~blinds ~prefix ~prefix_common answers
+      get_answers ~gx:true ~q_label ~prefix ~prefix_common answers
     in
     let x0 = wires.(3) in
     let y0 = wires.(4) in

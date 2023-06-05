@@ -75,9 +75,6 @@ module Make_ModAdd (MOD_ARITH : Plompiler__Gadget_mod_arith.MOD_ARITH) :
 
   let gx_composition = true
 
-  let blinds =
-    List.init nb_used_wires (fun i -> (wire_name i, [|1; 1|])) |> SMap.of_list
-
   let polynomials_degree =
     (q_label, 2) :: List.init nb_used_wires (fun i -> (wire_name i, 2))
     |> SMap.of_list
@@ -134,7 +131,7 @@ module Make_ModAdd (MOD_ARITH : Plompiler__Gadget_mod_arith.MOD_ARITH) :
     let domain_size = Domain.length domain in
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
     let ({q; wires} : witness) =
-      get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
+      get_evaluations ~q_label ~prefix ~prefix_common evaluations
     in
     let q_mod_arith = q in
     (* Note that in the prover we do not have wires_g, so we will need to
@@ -200,7 +197,7 @@ module Make_ModAdd (MOD_ARITH : Plompiler__Gadget_mod_arith.MOD_ARITH) :
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
     let {q; wires; wires_g} =
-      get_answers ~q_label ~blinds ~prefix ~prefix_common answers
+      get_answers ~gx:true ~q_label ~prefix ~prefix_common answers
     in
     List.mapi
       (fun i id -> (prefix @@ q_label ^ "." ^ string_of_int i, id))
