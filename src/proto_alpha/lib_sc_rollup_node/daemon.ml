@@ -415,6 +415,7 @@ let rec process_head (daemon_components : (module Daemon_components.S))
       let*! () =
         Daemon_event.new_head_processed head.hash head.level process_time
       in
+      Metrics.Inbox.set_process_time process_time ;
       return_unit
 
 (* [on_layer_1_head node_ctxt head] processes a new head from the L1. It
