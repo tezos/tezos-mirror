@@ -38,3 +38,19 @@ val load_reward_coeff : Raw_context.t -> Raw_context.t tzresult Lwt.t
     access. *)
 val update_stored_rewards_at_cycle_end :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+
+(** [init_ema ctxt] adds into the context an adaptive inflation vote EMA at 0 *)
+val init_ema : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
+(** [activate ctxt ~cycle] adds into the context the cycle at which
+    the adaptive inflation feature gets activated. If this function is
+    never called, then the context does not contain the cycle for the
+    feature activation, which implies the feature is inactive.
+
+    In practice, it means that you may call
+    [Storage.Adaptive_inflation.Activation.find ctxt] to get the value
+    of the cycle at which the feature is activated, and if that call
+    returns [None], then it means the feature has not been
+    voted to be activated (yet). *)
+val activate :
+  Raw_context.t -> cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t

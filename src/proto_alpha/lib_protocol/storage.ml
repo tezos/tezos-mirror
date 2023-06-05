@@ -1616,6 +1616,22 @@ module Liquidity_baking = struct
       end)
 end
 
+module Adaptive_inflation = struct
+  module Launch_ema =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["adaptive_inflation_ema"]
+      end)
+      (Encoding.Int64)
+
+  module Activation =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["adaptive_inflation_launch_cycle"]
+      end)
+      (Cycle_repr)
+end
+
 module Ticket_balance = struct
   module Name = struct
     let name = ["ticket_balance"]
