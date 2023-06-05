@@ -84,7 +84,8 @@ let () =
 
   (* Output the title line *)
   Printf.printf ",,MIN,MAX,DIFF,CHANGE (%%)," ;
-  Array.iter (fun (_table, file_name) -> Printf.printf ",%s" file_name) tables ;
+  Array.to_list tables |> List.rev
+  |> List.iter (fun (_table, file_name) -> Printf.printf ",%s" file_name) ;
   Printf.printf "\n" ;
 
   (* Output the content lines *)
@@ -105,7 +106,7 @@ let () =
                 current_max := lift max !current_max v ;
                 value
           in
-          all_values := !all_values @ [value])
+          all_values := value :: !all_values)
         tables ;
       (match (!current_min, !current_max) with
       | Some final_min, Some final_max ->
