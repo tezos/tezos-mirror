@@ -12,7 +12,7 @@ Tezos :doc:`governance <voting>`.
 
 If one does not have enough stake to participate on its own or does not want to
 set up the needed infrastructure, (s)he can use :ref:`delegation
-<delegating_coins>`. Therefore, in Tezos, it is the :ref:`delegates<Delegate>`
+<delegating_coins>`. Therefore, in Tezos, it is the :ref:`delegates<def_delegate_nairobi>`
 that may participate in consensus.
 However, at each level, not all delegates necessarily participate, and their participation weight may differ.
 The selection of the delegates' participation rights at a level is done by running a
@@ -27,16 +27,16 @@ be predicted too much in advance.
 Delegation
 ----------
 
-A *delegate* is any :ref:`implicit account <Implicit account>` registered as
+A *delegate* is any :ref:`implicit account <def_implicit_account_nairobi>` registered as
 such. This is done by *self-delegating*, that is, emitting a delegation
 operation (see below) in which the specified delegate is the same as the
 operation emitter (its signer). Note that ``tz4`` accounts cannot be registered
 as delegates.
 
-Any :ref:`account <Account>` (implicit or originated) can specify a delegate
+Any :ref:`account <def_account_nairobi>` (implicit or originated) can specify a delegate
 through a delegation operation.  Any account can change or revoke its delegate
 at any time, again through a delegation operation. However, the change only
-becomes effective after ``PRESERVED_CYCLES + 2`` :ref:`cycles <Cycle>`.  The
+becomes effective after ``PRESERVED_CYCLES + 2`` :ref:`cycles <def_cycle_nairobi>`.  The
 value ``PRESERVED_CYCLES`` is a :ref:`protocol constant
 <protocol_constants_nairobi>`.
 
@@ -102,7 +102,7 @@ Stake snapshots
 
 Before turning to the rights selection mechanism, we first introduce a new
 terminology, *stake snapshot*, to denote the stake distribution for a given block,
-as stored in the :ref:`context<context>`.
+as stored in the :ref:`context<def_context_nairobi>`.
 Stake snapshots are taken (and stored) every ``BLOCKS_PER_STAKE_SNAPSHOT`` levels.
 More precisely, a snapshot is taken at a level if and only if its cycle
 position modulo ``BLOCKS_PER_STAKE_SNAPSHOT`` is ``BLOCKS_PER_STAKE_SNAPSHOT - 1``.

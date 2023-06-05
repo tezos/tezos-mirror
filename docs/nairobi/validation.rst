@@ -30,7 +30,7 @@ From a higher-level, *abstract* perspective, the validation system in
 the Tezos protocol implements this business logic in a functional,
 state-passing machine where:
 
-- Its state is given by the :ref:`context<Context>`, the internal
+- Its state is given by the :ref:`context<def_context_nairobi>`, the internal
   representation of the state of the Tezos ledger at a given blockchain
   level. For instance, the context contains the information of all
   activated accounts and contracts, and their balances. More
@@ -223,8 +223,8 @@ The first step in the process is to decide whether a candidate block
 is *well-formed*, that is, that it has the expected "shape" of a valid
 block under the current Tezos economic protocol. Given a block
 candidate, the block validation process will then verify that the
-candidate block declares consistent :ref:`level<Level>`,
-:ref:`round<Round>`, and timestamp values; that it carries a valid
+candidate block declares consistent :ref:`level<def_level_nairobi>`,
+:ref:`round<def_round_nairobi>`, and timestamp values; that it carries a valid
 signature, etc. At this step, the block validation process will also
 initialize the data-structures required for subsequent steps.
 
