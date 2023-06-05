@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-
 (* Conveniences to construct RPC directory
    against a subcontext of the Node_context *)
 
@@ -33,13 +31,15 @@ module type PARAM = sig
 
   type context
 
-  val context_of_prefix : Node_context.rw -> prefix -> context tzresult Lwt.t
+  type subcontext
+
+  val context_of_prefix : context -> prefix -> subcontext tzresult Lwt.t
 end
 
 module Make_directory (S : PARAM) = struct
   open S
 
-  let directory : context tzresult Tezos_rpc.Directory.t ref =
+  let directory : subcontext tzresult Tezos_rpc.Directory.t ref =
     ref Tezos_rpc.Directory.empty
 
   let register service f =
@@ -63,33 +63,4 @@ module Make_directory (S : PARAM) = struct
     |> Tezos_rpc.Directory.map (fun prefix ->
            context_of_prefix node_ctxt prefix)
     |> Tezos_rpc.Directory.prefix prefix
-end
-
-module Block_directory_helpers = struct
-  let get_head store =
-    let open Lwt_result_syntax in
-    let* head = Node_context.last_processed_head_opt store in
-    match head with
-    | None -> failwith "No head"
-    | Some {header = {block_hash; _}; _} -> return block_hash
-
-  let get_finalized node_ctxt =
-    let open Lwt_result_syntax in
-    let* level = Node_context.get_finalized_level node_ctxt in
-    Node_context.hash_of_level node_ctxt level
-
-  let get_last_cemented (node_ctxt : _ Node_context.t) =
-    protect @@ fun () ->
-    let lcc = Reference.get node_ctxt.lcc in
-    Node_context.hash_of_level
-      node_ctxt
-      (Alpha_context.Raw_level.to_int32 lcc.level)
-
-  let block_of_prefix node_ctxt block =
-    match block with
-    | `Head -> get_head node_ctxt
-    | `Hash b -> return b
-    | `Level l -> Node_context.hash_of_level node_ctxt l
-    | `Finalized -> get_finalized node_ctxt
-    | `Cemented -> get_last_cemented node_ctxt
 end

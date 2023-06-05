@@ -24,8 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+open Protocol.Alpha_context
 
 (* We distinguish RPC endpoints served by the rollup node into `global` and
    `local`. The difference between the two lies in whether the responses
@@ -423,6 +422,71 @@ module Arg = struct
       ()
 end
 
+module Query = struct
+  let outbox_proof_query =
+    let open Tezos_rpc.Query in
+    let open Sc_rollup in
+    let invalid_message e =
+      raise
+        (Invalid
+           (Format.asprintf
+              "Invalid message (%a)"
+              Environment.Error_monad.pp_trace
+              e))
+    in
+    query (fun outbox_level message_index serialized_outbox_message ->
+        let req name f = function
+          | None ->
+              raise
+                (Invalid (Format.sprintf "Query parameter %s is required" name))
+          | Some arg -> f arg
+        in
+        let outbox_level =
+          req "outbox_level" Raw_level.of_int32_exn outbox_level
+        in
+        let message_index = req "message_index" Z.of_int64 message_index in
+        let message =
+          req
+            "serialized_outbox_message"
+            (fun s -> Outbox.Message.(unsafe_of_string s |> deserialize))
+            serialized_outbox_message
+        in
+        match message with
+        | Error e -> invalid_message e
+        | Ok message -> {outbox_level; message_index; message})
+    |+ opt_field "outbox_level" Tezos_rpc.Arg.int32 (fun o ->
+           Some (Raw_level.to_int32 o.outbox_level))
+    |+ opt_field "message_index" Tezos_rpc.Arg.int64 (fun o ->
+           Some (Z.to_int64 o.message_index))
+    |+ opt_field "serialized_outbox_message" Tezos_rpc.Arg.string (fun o ->
+           match Outbox.Message.serialize o.message with
+           | Ok message -> Some (Outbox.Message.unsafe_to_string message)
+           | Error e -> invalid_message e)
+    |> seal
+
+  type key_query = {key : string}
+
+  let key_query : key_query Tezos_rpc.Query.t =
+    let open Tezos_rpc.Query in
+    query (fun key -> {key})
+    |+ field "key" Tezos_rpc.Arg.string "" (fun t -> t.key)
+    |> seal
+
+  let outbox_level_query =
+    let open Tezos_rpc.Query in
+    query (fun outbox_level ->
+        let req name f = function
+          | None ->
+              raise
+                (Invalid (Format.sprintf "Query parameter %s is required" name))
+          | Some arg -> f arg
+        in
+        req "outbox_level" Raw_level.of_int32_exn outbox_level)
+    |+ opt_field "outbox_level" Tezos_rpc.Arg.int32 (fun o ->
+           Some (Raw_level.to_int32 o))
+    |> seal
+end
+
 module type PREFIX = sig
   type prefix
 
@@ -496,52 +560,10 @@ module Global = struct
       let prefix = open_root / "helpers"
     end)
 
-    let outbox_proof_query =
-      let open Tezos_rpc.Query in
-      let open Sc_rollup in
-      let invalid_message e =
-        raise
-          (Invalid
-             (Format.asprintf
-                "Invalid message (%a)"
-                Environment.Error_monad.pp_trace
-                e))
-      in
-      query (fun outbox_level message_index serialized_outbox_message ->
-          let req name f = function
-            | None ->
-                raise
-                  (Invalid
-                     (Format.sprintf "Query parameter %s is required" name))
-            | Some arg -> f arg
-          in
-          let outbox_level =
-            req "outbox_level" Raw_level.of_int32_exn outbox_level
-          in
-          let message_index = req "message_index" Z.of_int64 message_index in
-          let message =
-            req
-              "serialized_outbox_message"
-              (fun s -> Outbox.Message.(unsafe_of_string s |> deserialize))
-              serialized_outbox_message
-          in
-          match message with
-          | Error e -> invalid_message e
-          | Ok message -> {outbox_level; message_index; message})
-      |+ opt_field "outbox_level" Tezos_rpc.Arg.int32 (fun o ->
-             Some (Raw_level.to_int32 o.outbox_level))
-      |+ opt_field "message_index" Tezos_rpc.Arg.int64 (fun o ->
-             Some (Z.to_int64 o.message_index))
-      |+ opt_field "serialized_outbox_message" Tezos_rpc.Arg.string (fun o ->
-             match Outbox.Message.serialize o.message with
-             | Ok message -> Some (Outbox.Message.unsafe_to_string message)
-             | Error e -> invalid_message e)
-      |> seal
-
     let outbox_proof =
       Tezos_rpc.Service.get_service
         ~description:"Generate serialized output proof for some outbox message"
-        ~query:outbox_proof_query
+        ~query:Query.outbox_proof_query
         ~output:
           Data_encoding.(
             obj2
@@ -622,33 +644,22 @@ module Global = struct
         ~output:(Data_encoding.option Raw_level.encoding)
         (path / "state_current_level")
 
-    type state_value_query = {key : string}
-
-    let state_value_query : state_value_query Tezos_rpc.Query.t =
-      let open Tezos_rpc.Query in
-      query (fun key -> {key})
-      |+ field "key" Tezos_rpc.Arg.string "" (fun t -> t.key)
-      |> seal
-
     let state_value =
       Tezos_rpc.Service.get_service
         ~description:"Retrieve value from key is PVM state of specified block"
-        ~query:state_value_query
+        ~query:Query.key_query
         ~output:Data_encoding.bytes
         (path / "state")
 
-    let durable_state_value (pvm_kind : Protocol.Alpha_context.Sc_rollup.Kind.t)
-        =
+    let durable_state_value (pvm_kind : Sc_rollup.Kind.t) =
       Tezos_rpc.Service.get_service
         ~description:
           "Retrieve value by key from PVM durable storage. PVM state is taken \
            with respect to the specified block level. Value returned in hex \
            format."
-        ~query:state_value_query
+        ~query:Query.key_query
         ~output:Data_encoding.(option bytes)
-        (path / "durable"
-        / Protocol.Alpha_context.Sc_rollup.Kind.to_string pvm_kind
-        / "value")
+        (path / "durable" / Sc_rollup.Kind.to_string pvm_kind / "value")
 
     let durable_state_length
         (pvm_kind : Protocol.Alpha_context.Sc_rollup.Kind.t) =
@@ -657,23 +668,18 @@ module Global = struct
           "Retrieve number of bytes in raw representation of value by key from \
            PVM durable storage. PVM state is taken with respect to the \
            specified block level."
-        ~query:state_value_query
+        ~query:Query.key_query
         ~output:Data_encoding.(option int64)
-        (path / "durable"
-        / Protocol.Alpha_context.Sc_rollup.Kind.to_string pvm_kind
-        / "length")
+        (path / "durable" / Sc_rollup.Kind.to_string pvm_kind / "length")
 
-    let durable_state_subkeys
-        (pvm_kind : Protocol.Alpha_context.Sc_rollup.Kind.t) =
+    let durable_state_subkeys (pvm_kind : Sc_rollup.Kind.t) =
       Tezos_rpc.Service.get_service
         ~description:
           "Retrieve subkeys of the specified key from PVM durable storage. PVM \
            state is taken with respect to the specified block level."
-        ~query:state_value_query
+        ~query:Query.key_query
         ~output:Data_encoding.(list string)
-        (path / "durable"
-        / Protocol.Alpha_context.Sc_rollup.Kind.to_string pvm_kind
-        / "subkeys")
+        (path / "durable" / Sc_rollup.Kind.to_string pvm_kind / "subkeys")
 
     let status =
       Tezos_rpc.Service.get_service
@@ -682,25 +688,10 @@ module Global = struct
         ~output:Data_encoding.string
         (path / "status")
 
-    let outbox_level_query =
-      let open Tezos_rpc.Query in
-      query (fun outbox_level ->
-          let req name f = function
-            | None ->
-                raise
-                  (Invalid
-                     (Format.sprintf "Query parameter %s is required" name))
-            | Some arg -> f arg
-          in
-          req "outbox_level" Raw_level.of_int32_exn outbox_level)
-      |+ opt_field "outbox_level" Tezos_rpc.Arg.int32 (fun o ->
-             Some (Raw_level.to_int32 o))
-      |> seal
-
     let outbox =
       Tezos_rpc.Service.get_service
         ~description:"Outbox at block for a given outbox level"
-        ~query:outbox_level_query
+        ~query:Query.outbox_level_query
         ~output:Data_encoding.(list Sc_rollup.output_encoding)
         (path / "outbox")
 

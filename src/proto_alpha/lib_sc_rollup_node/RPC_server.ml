@@ -56,7 +56,9 @@ let get_dal_processed_slots node_ctxt block =
 module Global_directory = Make_directory (struct
   include Sc_rollup_services.Global
 
-  type context = Node_context.ro
+  type context = Node_context.rw
+
+  type subcontext = Node_context.ro
 
   let context_of_prefix node_ctxt () = return (Node_context.readonly node_ctxt)
 end)
@@ -68,13 +70,19 @@ module Proof_helpers_directory = Make_directory (struct
      commit on disk to generate the proofs. *)
   type context = Node_context.rw
 
+  (* The context needs to be accessed with write permissions because we need to
+     commit on disk to generate the proofs. *)
+  type subcontext = Node_context.rw
+
   let context_of_prefix node_ctxt () = return node_ctxt
 end)
 
 module Local_directory = Make_directory (struct
   include Sc_rollup_services.Local
 
-  type context = Node_context.ro
+  type context = Node_context.rw
+
+  type subcontext = Node_context.ro
 
   let context_of_prefix node_ctxt () = return (Node_context.readonly node_ctxt)
 end)
@@ -82,7 +90,9 @@ end)
 module Block_directory = Make_directory (struct
   include Sc_rollup_services.Global.Block
 
-  type context = Node_context.ro * Block_hash.t
+  type context = Node_context.rw
+
+  type subcontext = Node_context.ro * Block_hash.t
 
   let context_of_prefix node_ctxt (((), block) : prefix) =
     let open Lwt_result_syntax in
@@ -93,7 +103,9 @@ end)
 module Outbox_directory = Make_directory (struct
   include Sc_rollup_services.Global.Block.Outbox
 
-  type context = Node_context.ro * Block_hash.t * Alpha_context.Raw_level.t
+  type context = Node_context.rw
+
+  type subcontext = Node_context.ro * Block_hash.t * Alpha_context.Raw_level.t
 
   let context_of_prefix node_ctxt (((), block), level) =
     let open Lwt_result_syntax in
