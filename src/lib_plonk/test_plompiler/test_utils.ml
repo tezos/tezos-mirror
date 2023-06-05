@@ -28,11 +28,10 @@ let test_bitlist () =
     (fun (le, input, output) ->
       let input = Bytes.of_string input in
       let output =
-        List.map
-          (fun n -> match n with 0 -> false | 1 -> true | _ -> assert false)
-          output
+        List.map (function 0 -> false | 1 -> true | _ -> assert false) output
       in
-      assert (Plompiler.Utils.bitlist ~le input = output))
+      assert (Plompiler.Utils.bitlist ~le input = output) ;
+      assert (Plompiler.Utils.of_bitlist ~le output = input))
     [
       (false, "", []);
       (false, "\001", [1; 0; 0; 0; 0; 0; 0; 0]);

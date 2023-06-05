@@ -105,21 +105,42 @@ module type LIB = sig
 
     val input_bytes : ?le:bool -> bytes -> bl Input.t
 
+    val constant : ?le:bool -> bytes -> bl repr t
+
+    val constant_uint32 : ?le:bool -> Stdint.uint32 -> bl repr t
+
+    (* length in bits *)
+    val length : bl repr -> int
+
+    val concat : bl repr array -> bl repr
+
     val add : ?ignore_carry:bool -> bl repr -> bl repr -> bl repr t
 
     val xor : bl repr -> bl repr -> bl repr t
 
+    val not : bl repr -> bl repr t
+
+    val band : bl repr -> bl repr -> bl repr t
+
+    (* [rotate_left bl 1] shifts the bits left by 1 position, so each bit is more
+       significant. The most significant bit becomes the least significant
+       i.e. it is "rotated".
+       [rotate_left bl (length bl) = bl] *)
+    val rotate_left : bl repr -> int -> bl repr
+
     val rotate_right : bl repr -> int -> bl repr
+
+    (* [shift_left bl 1] shifts all bits left by 1 position, so each bit is more
+       significant. The most signigicant bit is lost and the least significant
+       bit is set to zero. More precisely, if we interpret the [bl] as an integer
+       [shift_left bl i = bl * 2^i mod 2^{length a}] *)
+    val shift_left : bl repr -> int -> bl repr t
+
+    val shift_right : bl repr -> int -> bl repr t
   end
 
   val add2 :
     (scalar * scalar) repr -> (scalar * scalar) repr -> (scalar * scalar) repr t
-
-  val constant_bool : bool -> bool repr t
-
-  val constant_bytes : ?le:bool -> bytes -> Bytes.bl repr t
-
-  val constant_uint32 : ?le:bool -> Stdint.uint32 -> Bytes.bl repr t
 
   module Encodings : sig
     (**
@@ -422,12 +443,13 @@ module Lib (C : COMMON) = struct
     include Bool
 
     let full_adder a b c_in =
-      let* a_xor_b = xor a b in
-      let* a_xor_b_xor_c = xor a_xor_b c_in in
-      let* a_xor_b_and_c = band a_xor_b c_in in
-      let* a_and_b = band a b in
-      let* c = bor a_xor_b_and_c a_and_b in
-      ret (pair a_xor_b_xor_c c)
+      with_label ~label:"Bool.full_adder"
+      @@ let* a_xor_b = xor a b in
+         let* a_xor_b_xor_c = xor a_xor_b c_in in
+         let* a_xor_b_and_c = band a_xor_b c_in in
+         let* a_and_b = band a b in
+         let* c = bor a_xor_b_and_c a_and_b in
+         ret (pair a_xor_b_xor_c c)
   end
 
   module Num = struct
@@ -437,7 +459,7 @@ module Lib (C : COMMON) = struct
 
     let pow x n_list =
       let* init =
-        let* left = constant_scalar S.one in
+        let* left = Num.one in
         ret (left, x)
       in
       let* res, _acc =
@@ -464,7 +486,7 @@ module Lib (C : COMMON) = struct
           let* res = Num.add ~qc ~ql ~qr x1 x2 in
           fold2M (fun acc x ql -> Num.add ~ql x acc) res xs qs
       | [x], [ql] -> Num.add_constant ~ql qc x
-      | [], [] -> constant_scalar qc
+      | [], [] -> Num.constant qc
       | _, _ -> assert false
 
     let mul_list l =
@@ -475,7 +497,7 @@ module Lib (C : COMMON) = struct
     (* Evaluates P(X) = \sum_i bᵢ Xⁱ at 2 with Horner's method:
        P(2) = b₀ + 2 (b₁+ 2 (b₂ + 2(…))). *)
     let scalar_of_bytes b =
-      let* zero = constant_scalar S.zero in
+      let* zero = Num.zero in
       foldM
         (fun acc b -> add acc (scalar_of_bool b) ~ql:S.(one + one) ~qr:S.one)
         zero
@@ -592,7 +614,49 @@ module Lib (C : COMMON) = struct
 
     let input_bytes ?le b = input_bitlist @@ Utils.bitlist ?le b
 
-    let add ?(ignore_carry = false) a b =
+    let constant ?(le = false) b =
+      let bl = Utils.bitlist ~le b in
+      let* ws =
+        foldM
+          (fun ws bit ->
+            let* w = Bool.constant bit in
+            ret (w :: ws))
+          []
+          bl
+      in
+      ret @@ to_list @@ List.rev ws
+
+    let constant_uint32 ?(le = false) u32 =
+      let b = Stdlib.Bytes.create 4 in
+      Stdint.Uint32.to_bytes_big_endian u32 b 0 ;
+      constant ~le b
+
+    let length b = List.length (of_list b)
+
+    let concat : bl repr array -> bl repr =
+     fun bs ->
+      let bs = Array.to_list bs in
+      let bs = List.rev bs in
+      let bs = List.map of_list bs in
+      let bs = List.concat bs in
+      to_list bs
+
+    let check_args_length name a b =
+      let la = length a in
+      let lb = length b in
+      if la != lb then
+        raise
+          (Invalid_argument
+             (Format.sprintf
+                "%s arguments of different lengths %i %i"
+                name
+                la
+                lb))
+
+    let add ?(ignore_carry = true) a b =
+      check_args_length "Bytes.add" a b ;
+      with_label ~label:"Bytes.add"
+      @@
       let ha, ta = (List.hd (of_list a), List.tl (of_list a)) in
       let hb, tb = (List.hd (of_list b), List.tl (of_list b)) in
       let* a_xor_b = Bool.xor ha hb in
@@ -610,7 +674,17 @@ module Lib (C : COMMON) = struct
       ret @@ to_list @@ List.rev (if ignore_carry then res else carry :: res)
 
     let xor a b =
+      check_args_length "Bytes.xor" a b ;
       let* l = map2M Bool.xor (of_list a) (of_list b) in
+      ret @@ to_list l
+
+    let not a =
+      let* l = mapM Bool.bnot (of_list a) in
+      ret @@ to_list l
+
+    let band a b =
+      check_args_length "Bytes.band" a b ;
+      let* l = map2M Bool.band (of_list a) (of_list b) in
       ret @@ to_list l
 
     let rotate_right a i =
@@ -629,6 +703,27 @@ module Lib (C : COMMON) = struct
       in
       let head, tail = split_n i (of_list a) in
       to_list @@ tail @ head
+
+    let rotate_left a i = rotate_right a (length a - i)
+
+    let shift_left a i =
+      let* zero = Bool.constant false in
+      let l = of_list a in
+      let length = List.length l - i in
+      assert (length >= 0) ;
+      let res =
+        List.init i (fun _ -> zero) @ List.filteri (fun j _x -> j < length) l
+      in
+      ret @@ to_list res
+
+    let shift_right a i =
+      let* zero = Bool.constant false in
+      let l = of_list a in
+      assert (List.compare_length_with l i >= 0) ;
+      let res =
+        List.filteri (fun j _x -> j >= i) l @ List.init i (fun _ -> zero)
+      in
+      ret @@ to_list res
   end
 
   let add2 p1 p2 =
@@ -637,27 +732,6 @@ module Lib (C : COMMON) = struct
     let* x3 = Num.add x1 x2 in
     let* y3 = Num.add y1 y2 in
     ret (pair x3 y3)
-
-  let constant_bool b =
-    let* bit = constant_scalar (if b then S.one else S.zero) in
-    ret @@ unsafe_bool_of_scalar bit
-
-  let constant_bytes ?(le = false) b =
-    let bl = Utils.bitlist ~le b in
-    let* ws =
-      foldM
-        (fun ws bit ->
-          let* w = constant_bool bit in
-          ret (w :: ws))
-        []
-        bl
-    in
-    ret @@ to_list @@ List.rev ws
-
-  let constant_uint32 ?(le = false) u32 =
-    let b = Stdlib.Bytes.create 4 in
-    Stdint.Uint32.to_bytes_big_endian u32 b 0 ;
-    constant_bytes ~le b
 
   module Encodings = struct
     type ('oh, 'u, 'p) encoding = {

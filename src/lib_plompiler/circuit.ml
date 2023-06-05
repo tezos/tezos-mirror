@@ -141,7 +141,13 @@ let rec iterM f l =
       let* _ = f x in
       iterM f xs
 
-let iter2M f ls rs = iterM (fun (a, b) -> f a b) (List.combine ls rs)
+let iter2M f ls rs =
+  let lrs =
+    try List.combine ls rs
+    with Invalid_argument _ ->
+      failwith "iter2M: inputs are of different length"
+  in
+  iterM (fun (a, b) -> f a b) lrs
 
 let with_bool_check : bool repr t -> unit repr t =
  fun c s ->
@@ -264,6 +270,8 @@ let with_label ~label m s =
   let s' = {s with labels = label :: s.labels} in
   let s'', a = m s' in
   ({s'' with labels = s.labels}, a)
+
+let debug _ _ = ret Unit
 
 let add_solver : solver:Solver.solver_desc -> unit repr t =
  fun ~solver s -> ({s with solver = Solver.append_solver solver s.solver}, Unit)
@@ -491,18 +499,6 @@ let deserialize : type a. S.t array -> a Input.t -> a Input.t =
   in
   fun a (w, check) -> (fst @@ aux a w 0, check)
 
-let constant_scalar s =
-  let*& o = fresh Dummy.scalar in
-  append
-    [|
-      CS.new_constraint
-        ~wires:[0; 0; o]
-        ~qc:s
-        ~linear:[(wqo, mone)]
-        "constant_scalar";
-    |]
-  >* ret (Scalar o)
-
 let scalar_of_bool (Bool b) = Scalar b
 
 let unsafe_bool_of_scalar (Scalar b) = Bool b
@@ -670,15 +666,35 @@ module Num = struct
     in
     let solver = Pow5 {a = l; c = o} in
     append gate ~solver >* ret @@ Scalar o
+
+  let constant s =
+    let*& o = fresh Dummy.scalar in
+    append
+      [|
+        CS.new_constraint
+          ~wires:[0; 0; o]
+          ~qc:s
+          ~linear:[(wqo, mone)]
+          "constant_scalar";
+      |]
+    >* ret (Scalar o)
+
+  let zero = constant S.zero
+
+  let one = constant S.one
 end
 
 module Bool = struct
-  include Num
+  type nonrec scalar = scalar
 
-  let constant_bool : bool -> bool repr t =
+  type nonrec 'a repr = 'a repr
+
+  type nonrec 'a t = 'a t
+
+  let constant : bool -> bool repr t =
    fun b ->
     let s = if b then S.one else S.zero in
-    let* (Scalar s) = constant_scalar s in
+    let* (Scalar s) = Num.constant s in
     ret (Bool s)
 
   let assert_true (Bool bit) =
@@ -816,13 +832,13 @@ module Bool = struct
   let is_eq_const l s =
     with_label ~label:"Bool.is_eq_const"
     @@ let* diff = Num.add_constant ~ql:S.mone s l in
-       is_zero diff
+       Num.is_zero diff
 
   let band_list l =
     with_label ~label:"Bool.band_list"
     @@
     match l with
-    | [] -> constant_bool true
+    | [] -> constant true
     | hd :: tl ->
         let* sum =
           foldM Num.add (scalar_of_bool hd) (List.map scalar_of_bool tl)
@@ -857,7 +873,7 @@ let equal : type a. a repr -> a repr -> bool repr t =
     let open Bool in
     let open Num in
     match (a, b) with
-    | Unit, Unit -> constant_bool true
+    | Unit, Unit -> Bool.constant true
     | Bool a, Bool b ->
         let* s = sub (Scalar a) (Scalar b) in
         is_zero s
@@ -870,7 +886,7 @@ let equal : type a. a repr -> a repr -> bool repr t =
         band le re
     | List ls, List rs ->
         let lrs = List.map2 pair ls rs in
-        let* acc = constant_bool true in
+        let* acc = Bool.constant true in
         foldM
           (fun acc (Pair (l, r)) ->
             let* e = aux l r in

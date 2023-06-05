@@ -143,9 +143,9 @@ module Make (L : LIB) = struct
   let digest : ?input_length:int -> scalar list repr -> scalar repr t =
    fun ?input_length:_ inputs ->
     match of_list inputs with
-    | [] -> constant_scalar (AnemoiPerm.jive128_1 S.zero S.zero)
+    | [] -> Num.constant (AnemoiPerm.jive128_1 S.zero S.zero)
     | [x] ->
-        let* zero = constant_scalar S.zero in
+        let* zero = Num.zero in
         compress_19_5 zero x
     | x :: rest -> foldM compress_19_5 x rest
 end

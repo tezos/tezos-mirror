@@ -474,6 +474,16 @@ module Plompiler_Helpers = struct
               info.name
               Array.(concat cs.cs |> length) ;
 
+            let res = LibResult.get_result (result ()) in
+            let serialized_res = LibResult.serialize res in
+            let out_size = Array.length serialized_res in
+            let trace_out =
+              Array.sub
+                private_inputs
+                (Array.length private_inputs - out_size)
+                out_size
+            in
+
             assert (CS.sat cs.cs cs.tables private_inputs) ;
             let cs, private_inputs =
               if optimize then (
@@ -493,15 +503,6 @@ module Plompiler_Helpers = struct
               Plompiler.Utils.dump_label_traces
                 (info.name ^ "_opt_flamegraph")
                 cs.cs ;
-            let res = LibResult.get_result (result ()) in
-            let serialized_res = LibResult.serialize res in
-            let out_size = Array.length serialized_res in
-            let trace_out =
-              Array.sub
-                private_inputs
-                (Array.length private_inputs - out_size)
-                out_size
-            in
             (* Compare values obtained from Result and Circuit interpreters *)
             assert (Array.for_all2 S.( = ) serialized_res trace_out) ;
             match plonk with

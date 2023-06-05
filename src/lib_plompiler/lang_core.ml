@@ -32,6 +32,12 @@ module type NUM = sig
 
   type 'a t
 
+  val constant : S.t -> scalar repr t
+
+  val zero : scalar repr t
+
+  val one : scalar repr t
+
   val range_check : nb_bits:int -> scalar repr -> unit repr t
 
   val custom :
@@ -102,7 +108,7 @@ module type BOOL = sig
 
   val assert_false : bool repr -> unit repr t
 
-  val constant_bool : bool -> bool repr t
+  val constant : bool -> bool repr t
 
   val band_list : bool repr list -> bool repr t
 end
@@ -198,8 +204,6 @@ module type COMMON = sig
 
   val equal : 'a repr -> 'a repr -> bool repr t
 
-  val constant_scalar : S.t -> scalar repr t
-
   (** Returns a list of Boolean variables representing the little endian
     bit decomposition of the given scalar (with the least significant bit
     on the head). *)
@@ -207,6 +211,11 @@ module type COMMON = sig
     ?shift:Z.t -> nb_bits:int -> scalar repr -> bool list repr t
 
   val with_label : label:string -> 'a t -> 'a t
+
+  (** Prints on stdout the prefix string and the repr. It works only when
+      running the Result interpreter, it has no effect in the Circuit
+      interpreter. *)
+  val debug : string -> 'a repr -> unit repr t
 
   module Num :
     NUM

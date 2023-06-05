@@ -725,7 +725,8 @@ let inline_renamings ~nb_inputs ~range_checked gates =
     IMap.filter ( <> ) renaming |> IMap.bindings |> List.map fst
   in
   let rename i = Option.value ~default:i @@ IMap.find_opt i renaming in
-  (List.map (CS.rename_wires ~rename) gates, free_wires)
+  let map f l = (* avoid stack overflows *) List.rev_map f l |> List.rev in
+  (map (CS.rename_wires ~rename) gates, free_wires)
 
 (* We remove all constraints of the form [a * x - a * x = 0], which may
    be the result of having renamed some variables *)

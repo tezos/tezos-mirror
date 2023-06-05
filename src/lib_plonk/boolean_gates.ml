@@ -198,26 +198,25 @@ module CondSwap : Base_sig = struct
     let u = wires.(3) in
     let v = wires.(4) in
     let open L in
-    let open Num in
-    let* bit_times_x = mul bit x in
-    let* bit_times_y = mul bit y in
+    let* bit_times_x = Num.mul bit x in
+    let* bit_times_y = Num.mul bit y in
     (* id1 = qbool · [(1 - b) · x + b · y - u] *)
     let* id1 =
       let* all =
-        add_list
+        Num.add_list
           ~coeffs:[one; mone; one; mone]
           (to_list [x; bit_times_x; bit_times_y; u])
       in
-      mul qbool all
+      Num.mul qbool all
     in
     (* id1 = qbool · [b · x + (1 - b) · y - v] *)
     let* id2 =
       let* all =
-        add_list
+        Num.add_list
           ~coeffs:[one; one; mone; mone]
           (to_list [bit_times_x; y; bit_times_y; v])
       in
-      mul qbool all
+      Num.mul qbool all
     in
     ret [id1; id2]
 end

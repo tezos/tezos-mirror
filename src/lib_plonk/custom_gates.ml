@@ -373,7 +373,7 @@ module Aggregator = struct
     let n_inv = Scalar.(inverse_exn (negate n)) in
     let g_inv = Scalar.inverse_exn generator in
     match pi_list with
-    | [] -> constant_scalar Scalar.zero
+    | [] -> Num.zero
     | hd :: tl_pi ->
         (* negate because we want -PI(x) *)
         let* left_term = mul_by_constant n_inv zs in

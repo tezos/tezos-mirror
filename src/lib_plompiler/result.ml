@@ -180,8 +180,6 @@ let rec foldM f e l =
 
 let scalar_of_bool (B b) = if b then S (X S.one) else S (X S.zero)
 
-let constant_scalar x = ret @@ Input.s x
-
 let unsafe_bool_of_scalar (S (X s)) = if S.(eq s one) then B true else B false
 
 module Num = struct
@@ -258,10 +256,20 @@ module Num = struct
   let pow5 sl =
     let l = of_s sl in
     ret @@ S (X S.(pow l (Z.of_int 5)))
+
+  let constant : S.t -> scalar repr t = fun s -> ret (S (X s))
+
+  let zero = constant S.zero
+
+  let one = constant S.one
 end
 
 module Bool = struct
-  include Num
+  type nonrec scalar = scalar
+
+  type nonrec 'a repr = 'a repr
+
+  type nonrec 'a t = 'a t
 
   let s_of_b b = if b then X S.one else X S.zero
 
@@ -273,7 +281,7 @@ module Bool = struct
     assert (not b) ;
     ret U
 
-  let constant_bool : bool -> bool repr t = fun b -> ret (B b)
+  let constant : bool -> bool repr t = fun b -> ret (B b)
 
   let band (B l) (B r) = ret @@ B (l && r)
 
@@ -462,6 +470,22 @@ let init_state = []
 let with_label ~label t =
   ignore label ;
   t
+
+let rec repr_to_string : type a. a repr -> string = function
+  | U -> "()"
+  | S (X s) -> S.string_of_scalar s
+  | B b -> if b then "T" else "F"
+  | P (a, b) -> "(" ^ repr_to_string a ^ "," ^ repr_to_string b ^ ")"
+  | L (B _ :: _ as bs) ->
+      (* special case to print bytes in hex *)
+      let bs = List.map (fun (B b) -> if b then true else false) bs in
+      let bs = Utils.of_bitlist bs in
+      Utils.hex_of_bytes bs
+  | L l -> String.concat ";" (List.map repr_to_string l)
+
+let debug s x =
+  Format.printf "%s: %s\n%!" s (repr_to_string x) ;
+  ret unit
 
 let get_result : 'a repr t -> 'a Input.t =
  fun m ->
