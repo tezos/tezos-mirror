@@ -23,57 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type group = Standalone | Group of string | Generic
+(** Load a JSON file *)
+val load_json : string -> (Data_encoding.json, exn) result
 
-type 'config parameters = {bench_number : int; config : 'config}
+(** [make_progress_printer ppf total message] returns a progress monitor printer
+    with an internal counter starting from [1]. Each call of the printer
+    accumulates the counter and prints a progress monitor line like
+    ["Message 12/300"].
+*)
+val make_progress_printer : Format.formatter -> int -> string -> unit -> unit
 
-(* The module type of benchmarks *)
-module type S = sig
-  val name : Namespace.t
-
-  val info : string
-
-  val module_filename : string
-
-  val generated_code_destination : string option
-
-  val tags : string list
-
-  type config
-
-  val default_config : config
-
-  val config_encoding : config Data_encoding.t
-
-  type workload
-
-  val workload_encoding : workload Data_encoding.t
-
-  val workload_to_vector : workload -> Sparse_vec.String.t
-
-  val models : (string * workload Model.t) list
-
-  include Generator.S with type config := config and type workload := workload
-end
-
-type t = (module S)
-
-type ('cfg, 'workload) poly =
-  (module S with type config = 'cfg and type workload = 'workload)
-
-type packed = Ex : ('cfg, 'workload) poly -> packed
-
-let name ((module B) : t) = B.name
-
-let info ((module B) : t) = B.info
-
-let tags ((module B) : t) = B.tags
-
-let ex_unpack : t -> packed = fun (module Bench) -> Ex ((module Bench) : _ poly)
-
-let get_free_variable_set (module Bench : S) =
-  List.fold_left
-    (fun acc (_, model) ->
-      Free_variable.Set.union acc @@ Model.get_free_variable_set_of_t model)
-    Free_variable.Set.empty
-    Bench.models
+(** Data encoding of OCaml [int], using [Data-encoding.int64] *)
+val int_encoding : int Data_encoding.t

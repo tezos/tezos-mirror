@@ -25,14 +25,14 @@
 
 open Tezos_benchmark
 
-(** Helper for Ezjsonm.t alcotest print and equality test *)
-let ezjson_t : Ezjsonm.t Alcotest.testable =
+(** Helper for Data_encoding.json alcotest print and equality test *)
+let json_t : Data_encoding.json Alcotest.testable =
   (module struct
-    type t = Ezjsonm.t
+    type t = Data_encoding.json
 
     let equal = ( = )
 
-    let pp ppf x = Format.pp_print_string ppf (Ezjsonm.to_string x)
+    let pp = Data_encoding.Json.pp
   end)
 
 let exn_t : exn Alcotest.testable =
@@ -51,7 +51,7 @@ let load_missing_json_err () =
     @@ Sys_error (Printf.sprintf "%s: No such file or directory" file)
   in
   let actual () = Benchmark_helpers.load_json file in
-  let result_t = Alcotest.result ezjson_t exn_t in
+  let result_t = Alcotest.result json_t exn_t in
   Alcotest.(check result_t) "missing file returns Error " (actual ()) expected
 
 let tests =

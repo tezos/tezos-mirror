@@ -23,57 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type group = Standalone | Group of string | Generic
+(** Save and load tables as CSV files.
 
-type 'config parameters = {bench_number : int; config : 'config}
+    Note that this module does not support the full specification of CSV
+    but covers only the specific format used in Snoop.
+*)
 
-(* The module type of benchmarks *)
-module type S = sig
-  val name : Namespace.t
+(** The type of table.  A list of rows. Each row must have the same number of
+    columns *)
+type csv = string list list
 
-  val info : string
+(** Horizontally concat tables. The Tables must have the same number of rows. *)
+val concat : ?check_disjoint_headers:bool -> csv -> csv -> csv
 
-  val module_filename : string
+(** Save a table to a CSV file *)
+val export :
+  filename:string -> ?separator:char -> ?linebreak:char -> csv -> unit
 
-  val generated_code_destination : string option
+(** Print a table as CSV to stdout *)
+val export_stdout : ?separator:char -> ?linebreak:char -> csv -> unit
 
-  val tags : string list
+(** Load a CSV file *)
+val import : filename:string -> ?separator:char -> unit -> csv
 
-  type config
-
-  val default_config : config
-
-  val config_encoding : config Data_encoding.t
-
-  type workload
-
-  val workload_encoding : workload Data_encoding.t
-
-  val workload_to_vector : workload -> Sparse_vec.String.t
-
-  val models : (string * workload Model.t) list
-
-  include Generator.S with type config := config and type workload := workload
-end
-
-type t = (module S)
-
-type ('cfg, 'workload) poly =
-  (module S with type config = 'cfg and type workload = 'workload)
-
-type packed = Ex : ('cfg, 'workload) poly -> packed
-
-let name ((module B) : t) = B.name
-
-let info ((module B) : t) = B.info
-
-let tags ((module B) : t) = B.tags
-
-let ex_unpack : t -> packed = fun (module Bench) -> Ex ((module Bench) : _ poly)
-
-let get_free_variable_set (module Bench : S) =
-  List.fold_left
-    (fun acc (_, model) ->
-      Free_variable.Set.union acc @@ Model.get_free_variable_set_of_t model)
-    Free_variable.Set.empty
-    Bench.models
+(** Extend the CSV file with the given columns *)
+val append_columns :
+  filename:string -> ?separator:char -> ?linebreak:char -> csv -> unit

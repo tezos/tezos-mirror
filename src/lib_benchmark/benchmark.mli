@@ -23,37 +23,67 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Some benchmarks depend on others, and some are for generic parameters that
+    most benchmarks depend on. We need this information in order to correctly
+    infer the values of parameters after a benchmark run; the user provides it
+    with a group.
+
+    * [Standalone]: benchmarks that don't depend on others (except generic
+      ones). This is the value to use if you're not sure whether you should
+      group your benchmark.
+    * [Group]: benchmarks that belong to the given inference group. Note that
+      setting a benchmark with a group that is referenced only in this benchmark
+      will produce the same inference results as with [Standalone].
+    * [Generic]: for generic parameters only. *)
 type group = Standalone | Group of string | Generic
 
+(** Benchmark parameters. *)
 type 'config parameters = {bench_number : int; config : 'config}
 
-(* The module type of benchmarks *)
+(** The module type of benchmarks *)
 module type S = sig
+  (** Name of the benchmark *)
   val name : Namespace.t
 
+  (** Description of the benchmark *)
   val info : string
 
+  (** File where the benchmark module is defined *)
   val module_filename : string
 
+  (** Destination of generated code *)
   val generated_code_destination : string option
 
+  (** Tags of the benchmark *)
   val tags : string list
 
+  (** Configuration of the benchmark (eg sampling parameters, paths, etc) *)
   type config
 
+  (** Default configuration of the benchmark *)
   val default_config : config
 
+  (** Configuration encoding *)
   val config_encoding : config Data_encoding.t
 
+  (** Benchmark workload *)
   type workload
 
+  (** Workload encoding *)
   val workload_encoding : workload Data_encoding.t
 
+  (** Optional conversion to vector, for report generation purposes *)
   val workload_to_vector : workload -> Sparse_vec.String.t
 
+  (** Cost models, with a given local name (string) for reference *)
   val models : (string * workload Model.t) list
 
-  include Generator.S with type config := config and type workload := workload
+  (** Benchmark generator *)
+  val create_benchmarks :
+    rng_state:Random.State.t ->
+    bench_num:int ->
+    config ->
+    (unit -> workload Generator.benchmark) list
 end
 
 type t = (module S)
@@ -63,17 +93,16 @@ type ('cfg, 'workload) poly =
 
 type packed = Ex : ('cfg, 'workload) poly -> packed
 
-let name ((module B) : t) = B.name
+val ex_unpack : t -> packed
 
-let info ((module B) : t) = B.info
+(** Get the name of a benchmark *)
+val name : t -> Namespace.t
 
-let tags ((module B) : t) = B.tags
+(** Get the description of a benchmark *)
+val info : t -> string
 
-let ex_unpack : t -> packed = fun (module Bench) -> Ex ((module Bench) : _ poly)
+(** Get the tags of a benchmark *)
+val tags : t -> string list
 
-let get_free_variable_set (module Bench : S) =
-  List.fold_left
-    (fun acc (_, model) ->
-      Free_variable.Set.union acc @@ Model.get_free_variable_set_of_t model)
-    Free_variable.Set.empty
-    Bench.models
+(** Returns the free variables occur in the models of the benchmark. *)
+val get_free_variable_set : (module S) -> Free_variable.Set.t
