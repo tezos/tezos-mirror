@@ -570,11 +570,96 @@ module Mempool = struct
       Operation.Anonymous.Double_preattestation_evidence
       protocol
 
+  let monitor_mempool node ~use_legacy_name =
+    let monitor_operations_url =
+      RPC.(
+        make_uri
+          node
+          (get_chain_mempool_monitor_operations
+             ~refused:true
+             ~version:(if use_legacy_name then "0" else "1")
+             ())
+        |> Uri.to_string)
+    in
+    RPC.Curl.get monitor_operations_url
+
+  let check_monitor_mempool p name =
+    let* s = Process.check_and_read_stdout p in
+    try
+      let _ = Str.search_forward (Str.regexp name) s 0 in
+      unit
+    with Not_found -> Test.fail ~__LOC__ "Kind %s not found in %s" name s
+
+  let check_invalid_monitor_mempool_version node =
+    let monitor_operations_url =
+      RPC.(
+        make_uri
+          node
+          (get_chain_mempool_monitor_operations ~refused:true ~version:"2" ())
+        |> Uri.to_string)
+    in
+    let*? p = RPC.Curl.get monitor_operations_url in
+    let* s = Process.check_and_read_stdout p in
+    try
+      let _ =
+        Str.(
+          search_forward
+            (regexp
+               "Failed to parse the query string: Failed to parse argument \
+                \'version\'"))
+          s
+          0
+      in
+      unit
+    with Not_found ->
+      Test.fail
+        ~__LOC__
+        {|RPC call should have return: Failed to parse the query string: Failed to parse argument \'version\' ..|}
+
+  let test_monitor_operations_consensus kind protocol =
+    let* node, client = Client.init_with_protocol ~protocol `Client () in
+    let signer = Constant.bootstrap1 in
+
+    let*? p_legacy = monitor_mempool node ~use_legacy_name:true in
+    let*? p = monitor_mempool node ~use_legacy_name:false in
+
+    let* consensus_op =
+      create_consensus_op ~use_legacy_name:true ~signer ~kind client
+    in
+    let* (`OpHash _) =
+      Operation.inject ~force:true ~request:`Inject consensus_op client
+    in
+    let* () = Client.bake_for_and_wait ~node client in
+
+    let check_monitor_mempool p ~use_legacy_name =
+      let name = Operation.Consensus.kind_to_string kind use_legacy_name in
+      check_monitor_mempool p name
+    in
+    let* () = check_monitor_mempool p_legacy ~use_legacy_name:true in
+    let* () = check_monitor_mempool p ~use_legacy_name:false in
+    check_invalid_monitor_mempool_version node
+
+  let test_monitor_consensus =
+    register_test
+      ~title:"Monitor consensus operations"
+      ~additionnal_tags:["mempool"; "monitor"; "operations"; "consensus"]
+    @@ fun protocol ->
+    test_monitor_operations_consensus Operation.Attestation protocol
+
+  let test_monitor_preconsensus =
+    register_test
+      ~title:"Monitor pre-consensus operations"
+      ~additionnal_tags:["mempool"; "monitor"; "operations"; "consensus"; "pre"]
+    @@ fun protocol ->
+    test_monitor_operations_consensus Operation.Preattestation protocol
+
   let register ~protocols =
     test_pending_consensus protocols ;
     test_pending_preconsensus protocols ;
     test_pending_double_consensus_evidence protocols ;
-    test_pending_double_preconsensus_evidence protocols
+    test_pending_double_preconsensus_evidence protocols ;
+    test_monitor_consensus protocols ;
+    test_monitor_preconsensus protocols
 end
 
 module Run_Simulate = struct
