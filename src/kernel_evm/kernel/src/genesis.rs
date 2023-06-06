@@ -173,7 +173,6 @@ fn store_genesis_transaction_receipt<Host: Runtime>(
     };
 
     let receipt_path = receipt_path(&receipt.hash)?;
-    storage::store_transaction_receipt(&receipt_path, host, &receipt)?;
     storage::store_transaction_receipt(&receipt_path, host, &receipt)
 }
 
@@ -280,7 +279,7 @@ mod tests {
             let object_path = storage::object_path(&transaction).unwrap();
             assert_eq!(host.store_has(&object_path), Ok(Some(ValueType::Subtree)));
             let receipt_path = storage::receipt_path(&transaction).unwrap();
-            assert_eq!(host.store_has(&receipt_path), Ok(Some(ValueType::Subtree)));
+            assert_eq!(host.store_has(&receipt_path), Ok(Some(ValueType::Value)));
         }
     }
 }

@@ -140,6 +140,14 @@ let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
 
 let empty_hash = Hash ""
 
+let decode_block_hash bytes = Block_hash Hex.(of_bytes bytes |> show)
+
+let decode_address bytes = Address Hex.(of_bytes bytes |> show)
+
+let decode_number bytes = Bytes.to_string bytes |> Z.of_bits |> quantity_of_z
+
+let decode_hash bytes = Hash Hex.(of_bytes bytes |> show)
+
 type transaction_log = {
   address : address;
   topics : hash list;
@@ -222,6 +230,61 @@ type transaction_receipt = {
   status : quantity;
   contractAddress : address option;
 }
+
+let transaction_receipt_from_rlp bytes =
+  let rope_to_bytes r = Rope.to_string r |> Bytes.of_string in
+  let decode_block_hash h = decode_block_hash (rope_to_bytes h) in
+  let decode_hash h = decode_hash (rope_to_bytes h) in
+  let decode_address a = decode_address (rope_to_bytes a) in
+  let decode_number n = decode_number (rope_to_bytes n) in
+  match Rlp.decode (Rope.of_string bytes) with
+  | Rlp.RlpList
+      [
+        RlpData hash;
+        RlpData index;
+        RlpData block_hash;
+        RlpData block_number;
+        RlpData from;
+        RlpData to_;
+        RlpData cumulative_gas_used;
+        RlpData effective_gas_price;
+        RlpData gas_used;
+        RlpData contract_address;
+        RlpData type_;
+        RlpData status;
+      ] ->
+      let hash = decode_hash hash in
+      let index = decode_number index in
+      let block_hash = decode_block_hash block_hash in
+      let block_number = decode_number block_number in
+      let from = decode_address from in
+      let to_ = if Rope.is_empty to_ then None else Some (decode_address to_) in
+      let cumulative_gas_used = decode_number cumulative_gas_used in
+      let effective_gas_price = decode_number effective_gas_price in
+      let gas_used = decode_number gas_used in
+      let contract_address =
+        if Rope.is_empty contract_address then None
+        else Some (decode_address contract_address)
+      in
+      let type_ = decode_number type_ in
+      let status = decode_number status in
+      {
+        transactionHash = hash;
+        transactionIndex = index;
+        blockHash = block_hash;
+        blockNumber = block_number;
+        from;
+        to_;
+        cumulativeGasUsed = cumulative_gas_used;
+        effectiveGasPrice = effective_gas_price;
+        gasUsed = gas_used;
+        logs = [];
+        logsBloom = Hash (String.make 256 'a');
+        type_;
+        status;
+        contractAddress = contract_address;
+      }
+  | _ -> raise (Invalid_argument "Expected a RlpList of 12 elements")
 
 let transaction_receipt_encoding =
   let open Data_encoding in

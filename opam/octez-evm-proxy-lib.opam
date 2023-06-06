@@ -16,6 +16,7 @@ depends: [
   "tezos-version"
   "lwt-exit"
   "rlp" { >= "0.1" }
+  "rope" { >= "0.6.2" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

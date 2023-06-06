@@ -151,23 +151,7 @@ module Durable_storage_path = struct
   module Transaction_receipt = struct
     let receipts = "/evm/transactions_receipts"
 
-    let receipt_field tx_hash field = receipts ^ "/" ^ tx_hash ^ "/" ^ field
-
-    let block_hash tx_hash = receipt_field tx_hash "block_hash"
-
-    let block_number tx_hash = receipt_field tx_hash "block_number"
-
-    let from tx_hash = receipt_field tx_hash "from"
-
-    let to_ tx_hash = receipt_field tx_hash "to"
-
-    let index tx_hash = receipt_field tx_hash "index"
-
-    let status tx_hash = receipt_field tx_hash "status"
-
-    let type_ tx_hash = receipt_field tx_hash "type"
-
-    let contract_address tx_hash = receipt_field tx_hash "contract_address"
+    let receipt tx_hash = receipts ^ "/" ^ tx_hash
   end
 
   module Transaction_object = struct
@@ -368,85 +352,19 @@ module RPC = struct
     let* res_opt = inspect_durable_and_decode_opt base key decode in
     match res_opt with Some res -> return res | None -> failwith "null"
 
-  let decode_block_hash bytes =
-    Block_hash (Bytes.to_string bytes |> Hex.of_string |> Hex.show)
-
-  let decode_address bytes =
-    Address (Bytes.to_string bytes |> Hex.of_string |> Hex.show)
-
-  let decode_number bytes =
-    Bytes.to_string bytes |> Z.of_bits |> Ethereum_types.quantity_of_z
-
-  let decode_hash bytes =
-    Hash (Bytes.to_string bytes |> Hex.of_string |> Hex.show)
-
   let transaction_receipt base (Hash tx_hash) =
     let open Lwt_result_syntax in
-    let* block_hash =
-      inspect_durable_and_decode
-        base
-        (Durable_storage_path.Transaction_receipt.block_hash tx_hash)
-        decode_block_hash
-    in
-    let* block_number =
-      inspect_durable_and_decode
-        base
-        (Durable_storage_path.Transaction_receipt.block_number tx_hash)
-        decode_number
-    in
-    let* from =
-      inspect_durable_and_decode
-        base
-        (Durable_storage_path.Transaction_receipt.from tx_hash)
-        decode_address
-    in
-    (* This can be none *)
-    let* to_ =
+    let+ bytes =
       inspect_durable_and_decode_opt
         base
-        (Durable_storage_path.Transaction_receipt.to_ tx_hash)
-        decode_address
+        (Durable_storage_path.Transaction_receipt.receipt tx_hash)
+        Fun.id
     in
-    let* index =
-      inspect_durable_and_decode
-        base
-        (Durable_storage_path.Transaction_receipt.index tx_hash)
-        decode_number
-    in
-    let* status =
-      inspect_durable_and_decode
-        base
-        (Durable_storage_path.Transaction_receipt.status tx_hash)
-        decode_number
-    in
-    let* contract_address =
-      inspect_durable_and_decode_opt
-        base
-        (Durable_storage_path.Transaction_receipt.contract_address tx_hash)
-        decode_address
-    in
-    let+ type_ =
-      inspect_durable_and_decode
-        base
-        (Durable_storage_path.Transaction_receipt.type_ tx_hash)
-        decode_number
-    in
-    {
-      transactionHash = Hash tx_hash;
-      transactionIndex = index;
-      blockHash = block_hash;
-      blockNumber = block_number;
-      from;
-      to_;
-      cumulativeGasUsed = Ethereum_types.quantity_of_z Z.zero;
-      effectiveGasPrice = Ethereum_types.quantity_of_z Z.zero;
-      gasUsed = Ethereum_types.quantity_of_z Z.zero;
-      logs = [];
-      logsBloom = Hash (String.make 256 'a');
-      type_;
-      status;
-      contractAddress = contract_address;
-    }
+    match bytes with
+    | Some bytes ->
+        Some
+          (Ethereum_types.transaction_receipt_from_rlp (Bytes.to_string bytes))
+    | None -> None
 
   let transaction_object base (Hash tx_hash as hash) =
     let open Lwt_result_syntax in
@@ -655,7 +573,8 @@ module type S = sig
     full_transaction_object:bool -> Z.t -> Ethereum_types.block tzresult Lwt.t
 
   val transaction_receipt :
-    Ethereum_types.hash -> Ethereum_types.transaction_receipt tzresult Lwt.t
+    Ethereum_types.hash ->
+    Ethereum_types.transaction_receipt option tzresult Lwt.t
 
   val transaction_object :
     Ethereum_types.hash ->
