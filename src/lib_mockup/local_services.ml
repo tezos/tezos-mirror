@@ -383,9 +383,7 @@ module Make (E : MENV) = struct
         match pending_operations with
         | Error errs -> Tezos_rpc.Answer.fail errs
         | Ok pending_operations ->
-            E.Block_services.Mempool.pending_operations_version_dispatcher
-              ~version:params#version
-              pending_operations)
+            Tezos_rpc.Answer.return (params#version, pending_operations))
 
   let shell_header () =
     Directory.prefix

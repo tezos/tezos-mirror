@@ -406,10 +406,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       unprocessed : Next_proto.operation Operation_hash.Map.t;
     }
 
-    type t_with_version
-
-    val pending_operations_version_dispatcher :
-      version:int -> t -> t_with_version Tezos_rpc.Answer.t Lwt.t
+    type version = Version_0 | Version_1 | Version_2
 
     (** Call RPC GET /chains/[chain]/mempool/pending_operations
 
@@ -423,7 +420,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     val pending_operations :
       #simple ->
       ?chain:chain ->
-      ?version:int ->
+      ?version:version ->
       ?applied:bool ->
       ?branch_delayed:bool ->
       ?branch_refused:bool ->
@@ -728,7 +725,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ( [`GET],
           'a,
           'b,
-          < version : int
+          < version : Mempool.version
           ; applied : bool
           ; branch_delayed : bool
           ; branch_refused : bool
@@ -736,7 +733,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           ; outdated : bool
           ; validation_passes : int list >,
           unit,
-          Mempool.t_with_version )
+          Mempool.version * Mempool.t )
         Tezos_rpc.Service.t
 
       (** Define RPC POST /chains/[chain]/mempool/ban_operation *)

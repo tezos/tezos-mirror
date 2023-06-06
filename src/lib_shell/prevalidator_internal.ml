@@ -1071,9 +1071,7 @@ module Make
                 unprocessed;
               }
             in
-            Proto_services.Mempool.pending_operations_version_dispatcher
-              ~version:params#version
-              pending_operations) ;
+            Tezos_rpc.Answer.return (params#version, pending_operations)) ;
       dir :=
         Tezos_rpc.Directory.register
           !dir
