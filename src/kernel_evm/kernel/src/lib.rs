@@ -4,9 +4,10 @@
 // SPDX-License-Identifier: MIT
 
 use primitive_types::U256;
-use storage::{read_chain_id, store_chain_id};
+use storage::{read_chain_id, read_last_info_per_level_timestamp, store_chain_id};
 use tezos_ethereum::block::L2Block;
 use tezos_smart_rollup_debug::debug_msg;
+use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_entrypoint::kernel_entry;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -30,6 +31,16 @@ mod storage;
 /// The chain id will need to be unique when the EVM rollup is deployed in
 /// production.
 pub const CHAIN_ID: u32 = 1337;
+
+/// Returns the current timestamp for the execution. Based on the last
+/// info per level read (or default timestamp if it was not set), plus the
+/// artifical block time of 8 seconds.
+pub fn current_timestamp<Host: Runtime>(host: &mut Host) -> Timestamp {
+    let timestamp =
+        read_last_info_per_level_timestamp(host).unwrap_or_else(|_| Timestamp::from(0));
+    let seconds = timestamp.i64() + 8i64;
+    Timestamp::from(seconds)
+}
 
 pub fn stage_one<Host: Runtime>(
     host: &mut Host,
@@ -91,10 +102,9 @@ fn genesis_initialisation<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
 pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     let smart_rollup_address = retrieve_smart_rollup_address(host)?;
     let chain_id = retrieve_chain_id(host)?;
-    genesis_initialisation(host)?;
-
     let queue = stage_one(host, smart_rollup_address, chain_id)?;
 
+    genesis_initialisation(host)?;
     stage_two(host, queue)
 }
 

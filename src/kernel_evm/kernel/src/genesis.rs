@@ -7,9 +7,9 @@ use std::str::FromStr;
 
 use crate::error::Error;
 use crate::error::StorageError::{GenesisAccountInitialisation, Path};
-use crate::storage;
 use crate::storage::receipt_path;
-use crate::L2Block;
+use crate::storage::{self};
+use crate::{current_timestamp, L2Block};
 use evm_execution::account_storage::account_path;
 use evm_execution::account_storage::init_account_storage;
 use evm_execution::account_storage::AccountStorageError;
@@ -208,7 +208,8 @@ pub fn init_block<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     let transaction_hashes = bootstrap_genesis_accounts(host)?;
 
     // Produce and store genesis' block
-    let genesis_block = L2Block::new(GENESIS_LEVEL, transaction_hashes);
+    let timestamp = current_timestamp(host);
+    let genesis_block = L2Block::new(GENESIS_LEVEL, transaction_hashes, timestamp);
     storage::store_current_block(host, &genesis_block)?;
     store_genesis_transactions(host, genesis_block)?;
 

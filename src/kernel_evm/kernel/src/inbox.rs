@@ -7,6 +7,7 @@ use tezos_smart_rollup_host::runtime::Runtime;
 
 use crate::parsing::{Input, InputResult, MAX_SIZE_PER_CHUNK};
 use crate::simulation;
+use crate::storage::store_last_info_per_level_timestamp;
 use crate::Error;
 
 use tezos_ethereum::transaction::TransactionHash;
@@ -81,6 +82,9 @@ pub fn read_inbox<Host: Runtime>(
                 // discarded.
                 simulation::start_simulation_mode(host)?;
                 return Ok(Vec::new());
+            }
+            InputResult::Input(Input::Info(info)) => {
+                store_last_info_per_level_timestamp(host, info.predecessor_timestamp)?;
             }
         }
     }

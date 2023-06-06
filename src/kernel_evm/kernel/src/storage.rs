@@ -6,6 +6,7 @@
 use hex::ToHex;
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_debug::debug_msg;
+use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 
@@ -26,9 +27,10 @@ const SMART_ROLLUP_ADDRESS: RefPath =
 
 const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/blocks/current");
 const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/blocks");
-const BLOCKS_NUMBER: RefPath = RefPath::assert_from(b"/number");
-const BLOCKS_HASH: RefPath = RefPath::assert_from(b"/hash");
-const BLOCKS_TRANSACTIONS: RefPath = RefPath::assert_from(b"/transactions");
+const BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/number");
+const BLOCK_HASH: RefPath = RefPath::assert_from(b"/hash");
+const BLOCK_TRANSACTIONS: RefPath = RefPath::assert_from(b"/transactions");
+const BLOCK_TIMESTAMP: RefPath = RefPath::assert_from(b"/timestamp");
 
 const EVM_TRANSACTIONS_RECEIPTS: RefPath =
     RefPath::assert_from(b"/transactions_receipts");
@@ -36,6 +38,9 @@ const EVM_TRANSACTIONS_RECEIPTS: RefPath =
 const EVM_TRANSACTIONS_OBJECTS: RefPath = RefPath::assert_from(b"/transactions_objects");
 
 const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/chain_id");
+
+const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
+    RefPath::assert_from(b"/evm/info_per_level/timestamp");
 
 pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result");
 
@@ -149,7 +154,7 @@ pub fn object_path(object_hash: &TransactionHash) -> Result<OwnedPath, Error> {
 }
 
 pub fn read_current_block_number<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
-    let path = concat(&EVM_CURRENT_BLOCK, &BLOCKS_NUMBER)?;
+    let path = concat(&EVM_CURRENT_BLOCK, &BLOCK_NUMBER)?;
     let mut buffer = [0_u8; 8];
     store_read_slice(host, &path, &mut buffer, 8)?;
     Ok(U256::from_little_endian(&buffer))
@@ -159,7 +164,7 @@ fn read_nth_block_transactions<Host: Runtime>(
     host: &mut Host,
     block_path: &OwnedPath,
 ) -> Result<Vec<TransactionHash>, Error> {
-    let path = concat(block_path, &BLOCKS_TRANSACTIONS)?;
+    let path = concat(block_path, &BLOCK_TRANSACTIONS)?;
 
     let transactions_bytes =
         store_read_empty_safe(host, &path, 0, MAX_TRANSACTION_HASHES)?;
@@ -172,12 +177,20 @@ fn read_nth_block_transactions<Host: Runtime>(
         .collect::<Vec<TransactionHash>>())
 }
 
+fn read_nth_block_timestamp<Host: Runtime>(
+    host: &mut Host,
+    block_path: &OwnedPath,
+) -> Result<Timestamp, Error> {
+    let path = concat(block_path, &BLOCK_TIMESTAMP)?;
+    read_timestamp_path(host, &path)
+}
+
 fn read_current_block_nodebug<Host: Runtime>(host: &mut Host) -> Result<L2Block, Error> {
     let number = read_current_block_number(host)?;
     let block_path = block_path(number)?;
     let transactions = read_nth_block_transactions(host, &block_path)?;
-
-    Ok(L2Block::new(number, transactions))
+    let timestamp = read_nth_block_timestamp(host, &block_path)?;
+    Ok(L2Block::new(number, transactions, timestamp))
 }
 
 pub fn read_current_block<Host: Runtime>(host: &mut Host) -> Result<L2Block, Error> {
@@ -204,7 +217,7 @@ fn store_block_number<Host: Runtime>(
     block_path: &OwnedPath,
     block_number: U256,
 ) -> Result<(), Error> {
-    let path = concat(block_path, &BLOCKS_NUMBER)?;
+    let path = concat(block_path, &BLOCK_NUMBER)?;
     let mut le_block_number: [u8; 32] = [0; 32];
     block_number.to_little_endian(&mut le_block_number);
     host.store_write(&path, &le_block_number, 0)
@@ -216,7 +229,7 @@ fn store_block_hash<Host: Runtime>(
     block_path: &OwnedPath,
     block_hash: &H256,
 ) -> Result<(), Error> {
-    let path = concat(block_path, &BLOCKS_HASH)?;
+    let path = concat(block_path, &BLOCK_HASH)?;
     host.store_write(&path, block_hash.as_bytes(), 0)
         .map_err(Error::from)
 }
@@ -226,10 +239,19 @@ fn store_block_transactions<Host: Runtime>(
     block_path: &OwnedPath,
     block_transactions: &[TransactionHash],
 ) -> Result<(), Error> {
-    let path = concat(block_path, &BLOCKS_TRANSACTIONS)?;
+    let path = concat(block_path, &BLOCK_TRANSACTIONS)?;
     let block_transactions = &block_transactions.concat()[..];
     host.store_write(&path, block_transactions, 0)
         .map_err(Error::from)
+}
+
+fn store_block_timestamp<Host: Runtime>(
+    host: &mut Host,
+    block_path: &OwnedPath,
+    timestamp: &Timestamp,
+) -> Result<(), Error> {
+    let path = concat(block_path, &BLOCK_TIMESTAMP)?;
+    store_timestamp_path(host, &path, timestamp)
 }
 
 fn store_block<Host: Runtime>(
@@ -239,7 +261,8 @@ fn store_block<Host: Runtime>(
 ) -> Result<(), Error> {
     store_block_number(host, block_path, block.number)?;
     store_block_hash(host, block_path, &block.hash)?;
-    store_block_transactions(host, block_path, &block.transactions)
+    store_block_transactions(host, block_path, &block.transactions)?;
+    store_block_timestamp(host, block_path, &block.timestamp)
 }
 
 pub fn store_block_by_number<Host: Runtime>(
@@ -523,6 +546,38 @@ pub fn store_chain_id<Host: Runtime>(
 
 pub fn read_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     read_u256(host, &EVM_CHAIN_ID.into())
+}
+
+pub fn store_timestamp_path<Host: Runtime>(
+    host: &mut Host,
+    path: &OwnedPath,
+    timestamp: &Timestamp,
+) -> Result<(), Error> {
+    host.store_write(path, &timestamp.i64().to_le_bytes(), 0)?;
+    Ok(())
+}
+
+pub fn store_last_info_per_level_timestamp<Host: Runtime>(
+    host: &mut Host,
+    timestamp: Timestamp,
+) -> Result<(), Error> {
+    store_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into(), &timestamp)
+}
+
+pub fn read_timestamp_path<Host: Runtime>(
+    host: &mut Host,
+    path: &OwnedPath,
+) -> Result<Timestamp, Error> {
+    let mut buffer = [0u8; 8];
+    store_read_slice(host, path, &mut buffer, 8)?;
+    let timestamp_as_i64 = i64::from_le_bytes(buffer);
+    Ok(timestamp_as_i64.into())
+}
+
+pub fn read_last_info_per_level_timestamp<Host: Runtime>(
+    host: &mut Host,
+) -> Result<Timestamp, Error> {
+    read_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into())
 }
 
 pub(crate) mod internal_for_tests {

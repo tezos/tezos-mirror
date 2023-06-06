@@ -8,7 +8,10 @@ use crate::inbox::Transaction;
 use tezos_ethereum::{
     signatures::EthereumTransactionCommon, transaction::TransactionHash,
 };
-use tezos_smart_rollup_encoding::{inbox::InboxMessage, michelson::MichelsonUnit};
+use tezos_smart_rollup_encoding::{
+    inbox::{InboxMessage, InfoPerLevel, InternalInboxMessage},
+    michelson::MichelsonUnit,
+};
 use tezos_smart_rollup_host::input::Message;
 
 /// On an option, either the value, or if `None`, interrupt and return the
@@ -63,6 +66,7 @@ pub enum Input {
         data: Vec<u8>,
     },
     Simulation,
+    Info(InfoPerLevel),
 }
 
 #[derive(Debug, PartialEq, Default)]
@@ -160,6 +164,9 @@ impl InputResult {
             Ok((_remaing, message)) => match message {
                 InboxMessage::External(message) => {
                     Self::parse_external(message, &smart_rollup_address)
+                }
+                InboxMessage::Internal(InternalInboxMessage::InfoPerLevel(info)) => {
+                    InputResult::Input(Input::Info(info))
                 }
                 InboxMessage::Internal(_) => InputResult::Unparsable,
             },
