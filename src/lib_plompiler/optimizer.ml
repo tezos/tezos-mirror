@@ -101,6 +101,7 @@ open Optimizer_helpers
     4. Transform pseudo blocks to actual blocks (also considering the non-linear
     computations that were left aside) and join blocks that operate on
     independent wires together. *)
+let list_map f l = (* avoid stack overflows *) List.rev_map f l |> List.rev
 
 let nb_wires_arch = Csir.nb_wires_arch
 
@@ -648,12 +649,12 @@ let add_boolean_checks ~boolean_vars gates =
     else constr
   in
   (* First try to add them on existing constraints, through the qbool selector *)
-  let gates = List.map (fun gate -> Array.map shared_a gate) gates in
+  let gates = list_map (fun gate -> Array.map shared_a gate) gates in
   (* Then, try to use constraints that do not use the a wire *)
-  let gates = List.map (fun gate -> Array.mapi (unused_a ~gate) gate) gates in
+  let gates = list_map (fun gate -> Array.mapi (unused_a ~gate) gate) gates in
   (* Finally, add manual constraints for the remaining boolean variables *)
   let new_bool_gates =
-    List.map CS.mk_bool_constr (ISet.to_seq !bool_vars_map |> List.of_seq)
+    list_map CS.mk_bool_constr (ISet.to_seq !bool_vars_map |> List.of_seq)
     |> Array.of_list
   in
   List.rev (new_bool_gates :: gates)
@@ -735,8 +736,7 @@ let inline_renamings ~nb_inputs ~range_checked gates =
     IMap.filter ( <> ) renaming |> IMap.bindings |> List.map fst
   in
   let rename i = Option.value ~default:i @@ IMap.find_opt i renaming in
-  let map f l = (* avoid stack overflows *) List.rev_map f l |> List.rev in
-  (map (CS.rename_wires ~rename) gates, free_wires)
+  (list_map (CS.rename_wires ~rename) gates, free_wires)
 
 (* We remove all constraints of the form [a * x - a * x = 0], which may
    be the result of having renamed some variables *)
