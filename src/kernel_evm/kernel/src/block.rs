@@ -16,6 +16,7 @@ use evm_execution::account_storage::EthereumAccountStorage;
 use evm_execution::handler::ExecutionOutcome;
 use evm_execution::{precompiles, run_transaction};
 use tezos_ethereum::transaction::{TransactionHash, TransactionObject};
+use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 use primitive_types::{H160, U256};
@@ -172,6 +173,7 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
         let mut valid_txs = Vec::new();
         let mut receipts_infos = Vec::new();
         let mut objects = Vec::new();
+        let mut skip_shift = 0;
         let transactions = proposal.transactions;
 
         for (transaction, index) in transactions.into_iter().zip(0u32..) {
@@ -179,7 +181,29 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
                 .tx
                 .caller()
                 .map_err(|_| Error::Transfer(InvalidCallerAddress))?;
-            check_nonce(host, transaction.tx.nonce, caller, &mut evm_account_storage)?;
+            match check_nonce(
+                host,
+                transaction.tx.nonce,
+                caller,
+                &mut evm_account_storage,
+            ) {
+                Err(Error::Transfer(InvalidNonce { expected, actual })) =>
+                // Because the proposal's state is unclear, and we do not have a sequencer,
+                // for now in order to avoid a user with bad intention messing every proposal
+                // we ignore transaction with invalid nonce in order to process other valid
+                // transactions from the current proposal.
+                {
+                    debug_msg!(
+                        host,
+                        "Transaction ignored because nonce is incorrect, {} was expected, but got {}.",
+                        expected,
+                        actual
+                    );
+                    skip_shift += 1;
+                    continue;
+                }
+                check_nonce_outcome => check_nonce_outcome,
+            }?;
             let receipt_info = match run_transaction(
                 host,
                 &current_block.constants(),
@@ -195,7 +219,7 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
                     valid_txs.push(transaction.tx_hash);
                     make_receipt_info(
                         transaction.tx_hash,
-                        index,
+                        index - skip_shift,
                         Some(outcome),
                         caller,
                         transaction.tx.to,
@@ -203,7 +227,7 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
                 }
                 Err(_) => make_receipt_info(
                     transaction.tx_hash,
-                    index,
+                    index - skip_shift,
                     None,
                     caller,
                     transaction.tx.to,
@@ -213,7 +237,7 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
                 Some(execution_outcome) => execution_outcome.gas_used.into(),
                 None => U256::zero(),
             };
-            let object = make_object(transaction, caller, index, gas_used);
+            let object = make_object(transaction, caller, index - skip_shift, gas_used);
             objects.push(object);
             receipts_infos.push(receipt_info)
         }
@@ -689,9 +713,15 @@ mod tests {
             U256::from(10000000000000000000u64),
         );
 
-        match produce(&mut host, queue) {
-            Err(Error::Transfer(InvalidNonce { .. })) => (),
-            _ => panic!("An error should be thrown because of a replay attack attempt."),
-        }
+        produce(&mut host, queue).expect("The block production failed.");
+
+        let dest_address =
+            H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
+        let sender_balance = get_balance(&mut host, &mut evm_account_storage, &sender);
+        let dest_balance =
+            get_balance(&mut host, &mut evm_account_storage, &dest_address);
+
+        assert_eq!(sender_balance, U256::from(9999999999500000000u64));
+        assert_eq!(dest_balance, U256::from(500000000u64))
     }
 }
