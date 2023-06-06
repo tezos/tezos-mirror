@@ -29,6 +29,8 @@ exception Benchmark_not_found of Namespace.t
 
 exception Model_not_found of Namespace.t
 
+exception Local_model_not_found of String.t
+
 exception Parameter_not_found of Free_variable.t
 
 (*---------------------------------------------------------------------------*)
@@ -42,6 +44,7 @@ and local_model_info = {bench_name : Namespace.t; local_model_name : string}
 
 type parameter_info = Namespace.t list
 
+type local_model_benchmark_names = Namespace.Set.t
 (*---------------------------------------------------------------------------*)
 (* Table initialization *)
 
@@ -50,6 +53,11 @@ let bench_table : benchmark_info Name_table.t = Name_table.create 51
 (* An abstract model name maps to a model, and a list of (bench * aggregated model)
    names that refer to it *)
 let model_table : model_info Name_table.t = Name_table.create 51
+
+(* An abstract local model name maps to a set of benchmark names that refer to
+   it *)
+let local_model_table : local_model_benchmark_names String.Hashtbl.t =
+  String.Hashtbl.create 51
 
 (* A parameter name maps to the list of abstract models that contain it *)
 let parameter_table : parameter_info Name_table.t = Name_table.create 51
@@ -74,6 +82,19 @@ let register_param_from_model (model : Model.packed_model) =
 
 let register_model (type a) bench_name local_model_name (model : a Model.t) :
     unit =
+  let register_local_model bench_name local_model_name : unit =
+    match String.Hashtbl.find_opt local_model_table local_model_name with
+    | None ->
+        String.Hashtbl.add
+          local_model_table
+          local_model_name
+          (Namespace.Set.singleton bench_name)
+    | Some bench_names ->
+        String.Hashtbl.replace
+          local_model_table
+          local_model_name
+          (Namespace.Set.add bench_name bench_names)
+  in
   (* We assume that models with the same name are the same model *)
   let register_packed_model = function
     | Model.Model m as model -> (
@@ -82,6 +103,7 @@ let register_model (type a) bench_name local_model_name (model : a Model.t) :
         match Name_table.find_opt model_table name with
         | None ->
             register_param_from_model model ;
+            register_local_model bench_name local_model_name ;
             Name_table.add
               model_table
               name
@@ -166,9 +188,8 @@ let all_parameters () =
   |> List.map (fun (a, b) -> (Free_variable.of_namespace a, b))
 
 let all_local_model_names () =
-  all_benchmarks ()
-  |> List.map (fun (_, (module B : Benchmark.S)) -> List.map fst B.models)
-  |> List.flatten
+  String.Hashtbl.to_seq_keys local_model_table
+  |> List.of_seq
   |> List.filter (fun s -> not (String.equal s "*"))
   |> List.sort_uniq String.compare
 
@@ -227,6 +248,20 @@ let find_model_exn name =
   | None ->
       Format.eprintf "No model named %a found.@." Namespace.pp name ;
       raise (Model_not_found name)
+  | Some m -> m
+
+let find_local_model name =
+  String.Hashtbl.find local_model_table name
+  |> Option.map (fun benches -> Namespace.Set.to_seq benches |> List.of_seq)
+
+let find_local_model_exn name =
+  match find_local_model name with
+  | None ->
+      Format.eprintf
+        "No local model named %a found.@."
+        Format.pp_print_string
+        name ;
+      raise (Local_model_not_found name)
   | Some m -> m
 
 let find_models_in_namespace = find_in_namespace model_table

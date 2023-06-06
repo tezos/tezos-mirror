@@ -30,6 +30,8 @@ exception Benchmark_not_found of Namespace.t
 
 exception Model_not_found of Namespace.t
 
+exception Local_model_not_found of String.t
+
 exception Parameter_not_found of Free_variable.t
 
 (** Types of the registered informations for each kind of item.
@@ -127,8 +129,16 @@ val find_benchmarks_in_namespace :
 val find_model : Namespace.t -> model_info option
 
 (** [find_model_exn s] returns [(name,m)] with [name = s] if the model of [m] is
-    named [name] and has been registered, else raises the exception {! Model_not_found s} *)
+    named [name] and has been registered, else raises the exception {! Local_model_not_found s} *)
 val find_model_exn : Namespace.t -> model_info
+
+(** [find_local_model s] returns the list of benchmark names whose local model
+    name is [s], if the latter has been registered, else returns [None] *)
+val find_local_model : String.t -> Namespace.t list option
+
+(** [find_local_model s] returns the list of benchmark names whose local model
+    name is [s], if the latter has been registered, else raises the exception {! Model_not_found s} *)
+val find_local_model_exn : String.t -> Namespace.t list
 
 (** [find_models_in_namespace s] returns all registered models which name
     has [s] as a parent namespace. *)

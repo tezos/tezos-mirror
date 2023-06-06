@@ -1530,7 +1530,7 @@ module Display_info_cmd = struct
     bold_block
       fmt
       "Benchmarks"
-      (Format.pp_print_list (fun fmt name -> Format.fprintf fmt "%s" name))
+      (Format.pp_print_list Namespace.pp)
       benchmark_names
 
   let pp_fancy_parameter fmt (s, l) =
@@ -1552,22 +1552,7 @@ module Display_info_cmd = struct
     Lwt.return_ok ()
 
   let display_local_model_handler () local_model_name () =
-    let local_models = Registration.all_local_model_names () in
-    let () =
-      if not (List.mem ~equal:String.equal local_model_name local_models) then (
-        Format.eprintf "No local model named %s found.@." local_model_name ;
-        exit 1)
-    in
-    let all_benchmarks =
-      Registration.all_models ()
-      |> List.concat_map (fun (_, {Registration.from; model = _}) -> from)
-      |> List.filter_map
-           (fun {Registration.bench_name; local_model_name = name} ->
-             if String.equal local_model_name name then
-               Some (Namespace.to_string bench_name)
-             else None)
-      |> List.sort_uniq String.compare
-    in
+    let all_benchmarks = Registration.find_local_model_exn local_model_name in
     Format.printf
       "@.%a@."
       pp_fancy_local_model
