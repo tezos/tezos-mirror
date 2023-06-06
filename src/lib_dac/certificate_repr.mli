@@ -42,6 +42,22 @@ module V0 : sig
     Tezos_crypto.Aggregate_signature.signature ->
     Z.t ->
     t
+
+  (** All the following functions are related to the Protocol.
+      They are used only by the `command_handlers` module
+      exposing CLI commands for Kernel SDK. *)
+  module Protocol_dependant : sig
+    (** Serialize the provided [Dac_plugin.hash], 
+        [Tezos_crypto.Aggregate_signature.signature] and [Z.t] 
+        with the correct encoding. [Dac_plugin.t] is needed to provide 
+        the correct encoding related to the correct protocol. *)
+    val serialize_certificate :
+      Dac_plugin.hash Data_encoding.t ->
+      root_hash:Dac_plugin.hash ->
+      aggregate_signature:Tezos_crypto.Aggregate_signature.signature ->
+      witnesses:Z.t ->
+      Bytes.t
+  end
 end
 
 type t = V0 of V0.t

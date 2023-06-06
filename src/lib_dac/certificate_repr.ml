@@ -74,6 +74,58 @@ module V0 = struct
     (* Equivalent to Bitset.diff expected_witnesses witnesses. *)
     let missing_witnesses = Z.logand expected_witnesses (Z.lognot witnesses) in
     Z.(equal missing_witnesses zero)
+
+  module Protocol_dependant = struct
+    (** Very similar to V0.t but using a [root_hash] related to the
+        active protocol. *)
+    type t = {
+      root_hash : Dac_plugin.hash;
+      aggregate_signature : Tezos_crypto.Aggregate_signature.signature;
+      witnesses : Z.t;
+    }
+
+    (** This encoding is protocol dependant because the SDK Kernel
+        needs the provided [root_hash] to be 33 bytes long.
+        This specific encoding should not be on DAC side,
+        but this is the easiest/faster way to handle it. *)
+    let certificate_client_encoding root_hash_encoding =
+      let untagged =
+        Data_encoding.(
+          conv
+            (fun {root_hash; aggregate_signature; witnesses} ->
+              (root_hash, aggregate_signature, witnesses))
+            (fun (root_hash, aggregate_signature, witnesses) ->
+              {root_hash; aggregate_signature; witnesses})
+            (obj3
+               (req "root_hash" root_hash_encoding)
+               (req
+                  "aggregate_signature"
+                  Tezos_crypto.Aggregate_signature.encoding)
+               (req "witnesses" z)))
+      in
+      Data_encoding.(
+        union
+          ~tag_size:`Uint8
+          [
+            case
+              ~title:"certificate_V0"
+              (Tag version)
+              untagged
+              (fun certificate -> Some certificate)
+              (fun certificate -> certificate);
+          ])
+
+    let serialize_certificate root_hash_encoding ~root_hash ~aggregate_signature
+        ~witnesses =
+      let bytes_as_result =
+        Data_encoding.Binary.to_bytes
+          (certificate_client_encoding root_hash_encoding)
+          {root_hash; aggregate_signature; witnesses}
+      in
+      match bytes_as_result with
+      | Ok serialized_certificate -> serialized_certificate
+      | Error _ -> Stdlib.failwith "Error while serializing the certificate"
+  end
 end
 
 type t = V0 of V0.t

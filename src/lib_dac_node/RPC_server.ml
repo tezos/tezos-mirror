@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2022-2023 Trili Tech <contact@trili.tech>                   *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2023 Marigold  <contact@marigold.dev>                      *)
+(* Copyright (c) 2023 Marigold  <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -95,6 +95,16 @@ module V0 = struct
       (fun root_hash () () ->
         RPC_handlers.V0.handle_get_certificate dac_plugin node_store root_hash)
 
+  let register_get_serialized_certificate node_store dac_plugin =
+    add_service
+      Tezos_rpc.Directory.register1
+      RPC_services.V0.get_serialized_certificate
+      (fun root_hash () () ->
+        RPC_handlers.V0.handle_get_serialized_certificate
+          dac_plugin
+          node_store
+          root_hash)
+
   module Coordinator = struct
     let register_monitor_certificate dac_plugin ro_node_store
         certificate_streamers committee_members dir =
@@ -161,6 +171,7 @@ module V0 = struct
            rw_store
            page_store
       |> register_get_certificate rw_store dac_plugin
+      |> register_get_serialized_certificate rw_store dac_plugin
   end
 
   module Committee_member = struct
@@ -229,6 +240,7 @@ module V0 = struct
            rw_store
            page_store
       |> register_get_certificate rw_store dac_plugin
+      |> register_get_serialized_certificate rw_store dac_plugin
   end
 end
 

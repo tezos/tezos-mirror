@@ -67,6 +67,11 @@ module V0 : sig
   val get_certificate :
     hex_root_hash:Hex.t -> (Dac_node.t, int * string * string * int) RPC_core.t
 
+  (** [get_serialized_certificate ~hex_root_hash] fetches the DAC certificate for the 
+      provided [hex_root_hash] with SDK kernel compatible [root_hash] encoding. *)
+  val get_serialized_certificate :
+    hex_root_hash:Hex.t -> (Dac_node.t, string) RPC_core.t
+
   module Coordinator : sig
     (** [post_preimage ~payload] sends a [payload] to the DAC [Coordinator] via
         a POST RPC call to v0/preimage. It returns a hex encoded root page hash,

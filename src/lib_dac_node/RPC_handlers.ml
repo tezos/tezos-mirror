@@ -162,12 +162,28 @@ module V0 = struct
   let handle_get_certificate dac_plugin node_store raw_root_hash =
     let open Lwt_result_syntax in
     let*? root_hash = Dac_plugin.raw_to_hash dac_plugin raw_root_hash in
-
     let+ value_opt = Store.Certificate_store.find node_store root_hash in
     Option.map
       (fun Store.{aggregate_signature; witnesses} ->
         Certificate_repr.(
           V0 (V0.make raw_root_hash aggregate_signature witnesses)))
+      value_opt
+
+  let handle_get_serialized_certificate dac_plugin node_store raw_root_hash =
+    let open Lwt_result_syntax in
+    let ((module Plugin) : Dac_plugin.t) = dac_plugin in
+    let*? root_hash = Dac_plugin.raw_to_hash dac_plugin raw_root_hash in
+    let* value_opt = Store.Certificate_store.find node_store root_hash in
+    Option.map_es
+      (fun Store.{aggregate_signature; witnesses} ->
+        let serialized_certificate =
+          Certificate_repr.V0.Protocol_dependant.serialize_certificate
+            Plugin.encoding
+            ~root_hash
+            ~aggregate_signature
+            ~witnesses
+        in
+        return @@ String.of_bytes serialized_certificate)
       value_opt
 
   module Coordinator = struct

@@ -78,6 +78,13 @@ module V0 = struct
       ()
       ()
 
+  let get_serialized_certificate (cctxt : #cctxt) ~root_page_hash =
+    cctxt#call_service
+      RPC_services.V0.get_serialized_certificate
+      ((), root_page_hash)
+      ()
+      ()
+
   let monitor_certificate (cctxt : #cctxt) ~root_hash =
     Monitor_services.V0.certificate cctxt root_hash
 
