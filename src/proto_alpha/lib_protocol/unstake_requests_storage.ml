@@ -101,3 +101,15 @@ let prepare_finalize_unstake ctxt contract =
               {delegate; requests = unfinalizable_requests}
           in
           return_some {finalizable; unfinalizable})
+
+let prepare_finalize_unstake_and_save_remaining_unfinalizable_requests ctxt
+    contract =
+  let open Lwt_result_syntax in
+  let* prepared_opt = prepare_finalize_unstake ctxt contract in
+  match prepared_opt with
+  | None -> return (ctxt, [])
+  | Some {finalizable; unfinalizable} ->
+      let+ ctxt =
+        Storage.Contract.Unstake_requests.update ctxt contract unfinalizable
+      in
+      (ctxt, finalizable)

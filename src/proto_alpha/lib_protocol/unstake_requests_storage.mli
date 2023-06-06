@@ -48,3 +48,11 @@ val prepare_finalize_unstake :
   Raw_context.t ->
   Contract_repr.t ->
   prepared_finalize_unstake option tzresult Lwt.t
+
+(** [prepare_finalize_unstake_and_save_remaining_unfinalizable_requests ctxt contract]
+    calls [prepare_finalize_unstake], saves the remaining [unfinalizable]
+    requests and returns the [finalizable] ones. *)
+val prepare_finalize_unstake_and_save_remaining_unfinalizable_requests :
+  Raw_context.t ->
+  Contract_repr.t ->
+  (Raw_context.t * finalizable) tzresult Lwt.t
