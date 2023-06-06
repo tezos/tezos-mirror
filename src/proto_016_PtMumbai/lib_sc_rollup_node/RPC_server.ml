@@ -227,9 +227,6 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
       ~reveal_map
       Layer1.{hash = block; level}
   in
-  let messages =
-    List.map (fun m -> Sc_rollup.Inbox_message.External m) messages
-  in
   let* sim, num_ticks_0 = Simulation.simulate_messages node_ctxt sim messages in
   let* {state; inbox_level; _}, num_ticks_end =
     Simulation.end_simulation node_ctxt sim
@@ -381,6 +378,9 @@ let () =
 let () =
   Block_directory.register0 Sc_rollup_services.Global.Block.simulate
   @@ fun (node_ctxt, block) () {messages; reveal_pages; insight_requests} ->
+  let messages =
+    List.map Alpha_context.Sc_rollup.Inbox_message.unsafe_of_string messages
+  in
   simulate_messages node_ctxt block ~reveal_pages ~insight_requests messages
 
 let () =

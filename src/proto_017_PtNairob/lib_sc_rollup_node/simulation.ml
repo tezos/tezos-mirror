@@ -124,14 +124,22 @@ let simulate_messages (node_ctxt : Node_context.ro) sim messages =
       (sim.level_position = End)
       (Exn (Failure "Level for simulation is ended"))
   in
-  let messages =
+  let*? messages =
+    let open Result_syntax in
     if sim.level_position = Start then
       let {predecessor_timestamp; predecessor} = sim.info_per_level in
       let open Sc_rollup.Inbox_message in
-      Internal Start_of_level
-      :: Internal (Info_per_level {predecessor_timestamp; predecessor})
-      :: messages
-    else messages
+      let* internals =
+        List.map_e
+          serialize
+          [
+            Internal Start_of_level;
+            Internal (Info_per_level {predecessor_timestamp; predecessor});
+          ]
+        |> Environment.wrap_tzresult
+      in
+      return (internals @ messages)
+    else return messages
   in
   let+ sim, num_ticks = simulate_messages_no_checks node_ctxt sim messages in
   ({sim with level_position = Middle}, num_ticks)
@@ -143,10 +151,10 @@ let end_simulation node_ctxt sim =
       (sim.level_position = End)
       (Exn (Failure "Level for simulation is ended"))
   in
-  let+ sim, num_ticks =
-    simulate_messages_no_checks
-      node_ctxt
-      sim
-      [Sc_rollup.Inbox_message.Internal End_of_level]
+  let*? eol =
+    Sc_rollup.Inbox_message.serialize
+      (Sc_rollup.Inbox_message.Internal End_of_level)
+    |> Environment.wrap_tzresult
   in
+  let+ sim, num_ticks = simulate_messages_no_checks node_ctxt sim [eol] in
   ({sim with level_position = End}, num_ticks)

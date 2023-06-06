@@ -153,6 +153,11 @@ Smart Rollup node
 - Fixed issue where rollup node believed it disagreed with L1 regarding cemented
   commitments (MR :gl:`!8615`).
 
+- **Breaking Change** Made the simulation RPC take serialized inbox messages
+  as inputs instead of external message payloads. It can be used to simulate
+  internal messages as well. It means that previously used format of inputs
+  needs to be adapted, i.e. they need to be wrapped in external messages. (MR :gl:`!8888`).
+
 Smart Rollup client
 -------------------
 
