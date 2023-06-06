@@ -298,9 +298,8 @@ end = struct
   let sat_rc (cs : Plompiler.LibCircuit.cs_result) trace =
     let consts = Array.concat cs.cs in
     List.for_all
-      (fun (wire_name, l) ->
-        (* [wire_name] is the name of the current wire that has to be range-checked. *)
-        let k = int_of_wire_name wire_name in
+      (* [k] is the current wire (defined by its index) that has to be range-checked. *)
+        (fun (k, l) ->
         (* [i] corresponds to the position in the wire that has to be range checked. *)
         List.for_all
           (fun (i, nb_bits) ->
@@ -439,7 +438,12 @@ end = struct
     |> fun (wires, selectors, advice, _) ->
     let gates = SMap.union_disjoint selectors advice in
     let tables = List.map Table.to_list cs.tables in
-    let range_checks = SMap.of_list cs.range_checks in
+    let range_checks =
+      List.fold_left
+        (fun acc (w, rc) -> SMap.add (Plompiler.Csir.wire_name w) rc acc)
+        SMap.empty
+        cs.range_checks
+    in
     make
       ~wires
       ~gates

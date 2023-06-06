@@ -49,7 +49,8 @@ module LibCircuit : sig
     public_input_size : int;
     input_com_sizes : int list;
     tables : Csir.Table.t list;
-    range_checks : (string * (int * int) list) list;
+    (* index of wire * (index in wire * bound) *)
+    range_checks : (int * (int * int) list) list;
     solver : Solver.t;
   }
   [@@deriving repr]
