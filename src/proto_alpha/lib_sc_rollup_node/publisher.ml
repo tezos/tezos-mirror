@@ -271,7 +271,11 @@ let publish_commitment (node_ctxt : _ Node_context.t) ~source
     (commitment : Sc_rollup.Commitment.t) =
   let open Lwt_result_syntax in
   let publish_operation =
-    L1_operation.Publish {rollup = node_ctxt.rollup_address; commitment}
+    L1_operation.Publish
+      {
+        rollup = node_ctxt.rollup_address;
+        commitment = Sc_rollup_proto_types.Commitment.to_octez commitment;
+      }
   in
   let*! () =
     Commitment_event.publish_commitment
@@ -400,10 +404,11 @@ let cementable_commitments (node_ctxt : _ Node_context.t) =
       in
       if green_light then return cementable else return_nil
 
-let cement_commitment (node_ctxt : _ Node_context.t) ~source =
+let cement_commitment (node_ctxt : _ Node_context.t) ~source commitment =
   let open Lwt_result_syntax in
+  let commitment = Sc_rollup_proto_types.Commitment_hash.to_octez commitment in
   let cement_operation =
-    L1_operation.Cement {rollup = node_ctxt.rollup_address}
+    L1_operation.Cement {rollup = node_ctxt.rollup_address; commitment}
   in
   let* _hash = Injector.add_pending_operation ~source cement_operation in
   return_unit
@@ -417,9 +422,7 @@ let on_cement_commitments (node_ctxt : state) =
       return_unit
   | Some source ->
       let* cementable_commitments = cementable_commitments node_ctxt in
-      List.iter_es
-        (fun _cementable_commitment -> cement_commitment node_ctxt ~source)
-        cementable_commitments
+      List.iter_es (cement_commitment node_ctxt ~source) cementable_commitments
 
 module Types = struct
   type nonrec state = state

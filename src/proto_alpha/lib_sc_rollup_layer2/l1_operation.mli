@@ -23,28 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
+open Octez_smart_rollup
 
 (** L1 operations produced (and injected) by the rollup node. *)
 type t =
   | Add_messages of {messages : string list}
-  | Cement of {rollup : Sc_rollup.t}
-  | Publish of {rollup : Sc_rollup.t; commitment : Sc_rollup.Commitment.t}
+  | Cement of {rollup : Address.t; commitment : Commitment.Hash.t}
+  | Publish of {rollup : Address.t; commitment : Commitment.t}
   | Refute of {
-      rollup : Sc_rollup.t;
-      opponent : Sc_rollup.Staker.t;
-      refutation : Sc_rollup.Game.refutation;
+      rollup : Address.t;
+      opponent : Signature.Public_key_hash.t;
+      refutation : Game.refutation;
     }
-  | Timeout of {rollup : Sc_rollup.t; stakers : Sc_rollup.Game.Index.t}
+  | Timeout of {rollup : Address.t; stakers : Game.index}
 
 (** Encoding for L1 operations (used by injector for on-disk persistence). *)
 val encoding : t Data_encoding.t
 
 (** Manager operation for a given L1 operation. *)
-val to_manager_operation : t -> packed_manager_operation
+val to_manager_operation : t -> Protocol.Alpha_context.packed_manager_operation
 
 (** L1 operation corresponding to a manager operation if any. *)
-val of_manager_operation : 'a manager_operation -> t option
+val of_manager_operation :
+  'a Protocol.Alpha_context.manager_operation -> t option
 
 (** Pretty printer (human readable) for L1 operations. *)
 val pp : Format.formatter -> t -> unit
