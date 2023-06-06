@@ -22,6 +22,7 @@ pub fn read_input<Host: Runtime>(
     smart_rollup_address: [u8; 20],
 ) -> Result<InputResult, Error> {
     let input = host.read_input()?;
+
     match input {
         Some(input) => Ok(InputResult::parse(input, smart_rollup_address)),
         None => Ok(InputResult::NoInput),
