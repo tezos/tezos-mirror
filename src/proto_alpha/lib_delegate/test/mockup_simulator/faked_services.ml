@@ -188,7 +188,10 @@ module Make (Hooks : Mocked_services_hooks) = struct
     @@ Directory.register
          Directory.empty
          Mockup.M.Block_services.S.Operations.operations
-         (fun (((), _chain), block) _ () -> Hooks.operations block)
+         (fun (((), _chain), block) q () ->
+           let open Lwt_result_syntax in
+           let* ops = Hooks.operations block in
+           return (q#version, ops))
 
   let hash =
     Directory.prefix
