@@ -93,6 +93,7 @@
   src_lib_shell_test_tezt_lib
   src_lib_scoru_wasm_test_tezt_lib
   src_lib_scoru_wasm_fast_test_tezt_lib
+  src_lib_scoru_sequencer_test_tezt_lib
   src_lib_sapling_test_tezt_lib
   src_lib_rpc_http_test_tezt_lib
   src_lib_requester_test_tezt_lib
