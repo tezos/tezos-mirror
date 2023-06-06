@@ -66,6 +66,14 @@ module Slashed_deposits_history : sig
   val add : Cycle_repr.t -> slashed_percentage -> t -> t
 end
 
+module Unstake_request : sig
+  type request = Cycle_repr.t * Tez_repr.t
+
+  type requests = request list
+
+  type t = {delegate : Signature.Public_key_hash.t; requests : requests}
+end
+
 module Contract : sig
   (** Storage from this submodule must only be accessed through the
       module `Contract`. *)
@@ -181,6 +189,13 @@ module Contract : sig
       with type key = Cycle_repr.t
        and type value = Deposits_repr.t
        and type t := Raw_context.t * Contract_repr.t
+
+  (** The contract's unstake requests that haven't been finalized yet. *)
+  module Unstake_requests :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Unstake_request.t
+       and type t := Raw_context.t
 
   (** If there is a value, the frozen balance for the contract won't
      exceed it (starting in preserved_cycles + 1). *)

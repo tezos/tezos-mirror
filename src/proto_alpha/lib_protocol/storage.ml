@@ -181,6 +181,31 @@ module Slashed_deposits_history = struct
     loop [] history
 end
 
+module Unstake_request = struct
+  type request = Cycle_repr.t * Tez_repr.t
+
+  type requests = request list
+
+  type t = {delegate : Signature.Public_key_hash.t; requests : requests}
+
+  let request_encoding =
+    let open Data_encoding in
+    obj2
+      (req "cycle" Cycle_repr.encoding)
+      (req "requested_amount" Tez_repr.encoding)
+
+  let requests_encoding = Data_encoding.list request_encoding
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {delegate; requests} -> (delegate, requests))
+      (fun (delegate, requests) -> {delegate; requests})
+      (obj2
+         (req "delegate" Contract_repr.implicit_encoding)
+         (req "requests" requests_encoding))
+end
+
 module Contract = struct
   module Raw_context =
     Make_subcontext (Registered) (Raw_context)
@@ -402,6 +427,14 @@ module Contract = struct
          end))
          (Make_index (Cycle_repr.Index))
       (Deposits_repr)
+
+  module Unstake_requests =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["unstake_requests"]
+      end)
+      (Unstake_request)
 
   module Frozen_deposits_limit =
     Indexed_context.Make_map
