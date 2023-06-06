@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,43 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get ctxt delegate =
-  let open Lwt_result_syntax in
-  let+ frozen_deposits_opt =
-    Storage.Contract.Frozen_deposits.find ctxt delegate
-  in
-  Option.value ~default:Deposits_repr.zero frozen_deposits_opt
+(** Type representing frozen deposits for a cycle.
 
-let update_balance ctxt delegate f amount =
-  let open Lwt_result_syntax in
-  let delegate_contract = Contract_repr.Implicit delegate in
-  let* frozen_deposits = get ctxt delegate_contract in
-  let*? new_amount = f frozen_deposits.current_amount amount in
-  let*! ctxt =
-    Storage.Contract.Frozen_deposits.add
-      ctxt
-      delegate_contract
-      {frozen_deposits with current_amount = new_amount}
-  in
-  return ctxt
+    It is used both for frozen deposits and unstaked frozen deposits with
+    slightly different behaviours.
 
-let credit_only_call_from_token ctxt delegate amount =
-  let open Lwt_result_syntax in
-  let* ctxt = update_balance ctxt delegate Tez_repr.( +? ) amount in
-  Stake_storage.add_stake ctxt delegate amount
+    [initial_amount] is the amount on which slashing should be based.
+    [current_amount] is the current amount after slashing has happened. 
 
-let spend_only_call_from_token ctxt delegate amount =
-  let open Lwt_result_syntax in
-  let* ctxt = update_balance ctxt delegate Tez_repr.( -? ) amount in
-  Stake_storage.remove_stake ctxt delegate amount
+    For frozen deposits, a single record is maintained with the invariant
+    [initial_amount = current_amount] at the beginning of a cycle.
 
-let update_initial_amount ctxt delegate_contract deposits_cap =
-  let open Lwt_result_syntax in
-  let* frozen_deposits = get ctxt delegate_contract in
-  let*! ctxt =
-    Storage.Contract.Frozen_deposits.add
-      ctxt
-      delegate_contract
-      {frozen_deposits with initial_amount = deposits_cap}
-  in
-  return ctxt
+    For unstaked frozen deposits, there is a record per cycle. 
+    The values of all unslashable cycles are squashed together at cycle ends.
+    The [initial_amount] may be increased during the current cycle only, when
+    an unstake is requested.
+
+    TODO #5788: possibly rename fields
+*)
+type t = {initial_amount : Tez_repr.t; current_amount : Tez_repr.t}
+
+val encoding : t Data_encoding.t
+
+val zero : t
+
+val ( +? ) : t -> Tez_repr.t -> t tzresult
+
+val ( ++? ) : t -> t -> t tzresult

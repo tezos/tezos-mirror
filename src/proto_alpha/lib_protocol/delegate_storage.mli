@@ -119,9 +119,7 @@ val set_frozen_deposits_limit :
     rewards and fees are not frozen, but simply credited at the right
     moment.  *)
 val frozen_deposits :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Storage.deposits tzresult Lwt.t
+  Raw_context.t -> Signature.Public_key_hash.t -> Deposits_repr.t tzresult Lwt.t
 
 val spendable_balance :
   Raw_context.t -> Signature.public_key_hash -> Tez_repr.tez tzresult Lwt.t

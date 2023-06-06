@@ -2026,6 +2026,7 @@ module Receipt : sig
     | Contract of Contract.t
     | Block_fees
     | Deposits of public_key_hash
+    | Unstaked_deposits of public_key_hash * Cycle.t
     | Nonce_revelation_rewards
     | Endorsing_rewards
     | Baking_rewards
@@ -2083,7 +2084,7 @@ module Consensus_key : sig
   val pkh : pk -> t
 end
 
-(** This module re-exports definitions from {!Delegate_storage},
+(** This module re-exports definitions from {!Deposits_repr}, {!Delegate_storage},
    {!Delegate_consensus_key}, {!Delegate_missed_endorsements_storage},
    {!Delegate_slashed_deposits_storage}, {!Delegate_cycles},
    {!Delegate_rewards}. *)
@@ -4779,6 +4780,7 @@ module Token : sig
     [ `Contract of Contract.t
     | `Collected_commitments of Blinded_public_key_hash.t
     | `Frozen_deposits of public_key_hash
+    | `Unstaked_frozen_deposits of public_key_hash * Cycle.t
     | `Block_fees
     | `Frozen_bonds of Contract.t * Bond_id.t ]
 

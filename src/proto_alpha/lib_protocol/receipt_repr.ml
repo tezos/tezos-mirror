@@ -28,6 +28,7 @@ type balance =
   | Contract of Contract_repr.t
   | Block_fees
   | Deposits of Signature.Public_key_hash.t
+  | Unstaked_deposits of Signature.Public_key_hash.t * Cycle_repr.t
   | Nonce_revelation_rewards
   | Endorsing_rewards
   | Baking_rewards
@@ -234,6 +235,17 @@ let balance_encoding =
            (function
              | Sc_rollup_refutation_rewards -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Sc_rollup_refutation_rewards);
+         case
+           (Tag 26)
+           ~title:"Unstaked_deposits"
+           (obj4
+              (req "kind" (constant "freezer"))
+              (req "category" (constant "unstaked_deposits"))
+              (req "delegate" Signature.Public_key_hash.encoding)
+              (req "cycle" Cycle_repr.encoding))
+           (function
+             | Unstaked_deposits (d, c) -> Some ((), (), d, c) | _ -> None)
+           (fun ((), (), d, c) -> Unstaked_deposits (d, c));
        ]
 
 let is_not_zero c = not (Compare.Int.equal c 0)
@@ -242,6 +254,9 @@ let compare_balance ba bb =
   match (ba, bb) with
   | Contract ca, Contract cb -> Contract_repr.compare ca cb
   | Deposits pkha, Deposits pkhb -> Signature.Public_key_hash.compare pkha pkhb
+  | Unstaked_deposits (pkha, ca), Unstaked_deposits (pkhb, cb) ->
+      Compare.or_else (Signature.Public_key_hash.compare pkha pkhb) (fun () ->
+          Cycle_repr.compare ca cb)
   | Lost_endorsing_rewards (pkha, pa, ra), Lost_endorsing_rewards (pkhb, pb, rb)
     ->
       let c = Signature.Public_key_hash.compare pkha pkhb in
@@ -260,23 +275,24 @@ let compare_balance ba bb =
         | Contract _ -> 0
         | Block_fees -> 1
         | Deposits _ -> 2
-        | Nonce_revelation_rewards -> 3
-        | Endorsing_rewards -> 4
-        | Baking_rewards -> 5
-        | Baking_bonuses -> 6
-        | Storage_fees -> 7
-        | Double_signing_punishments -> 8
-        | Lost_endorsing_rewards _ -> 9
-        | Liquidity_baking_subsidies -> 10
-        | Burned -> 11
-        | Commitments _ -> 12
-        | Bootstrap -> 13
-        | Invoice -> 14
-        | Initial_commitments -> 15
-        | Minted -> 16
-        | Frozen_bonds _ -> 17
-        | Sc_rollup_refutation_punishments -> 18
-        | Sc_rollup_refutation_rewards -> 19
+        | Unstaked_deposits _ -> 3
+        | Nonce_revelation_rewards -> 4
+        | Endorsing_rewards -> 5
+        | Baking_rewards -> 6
+        | Baking_bonuses -> 7
+        | Storage_fees -> 8
+        | Double_signing_punishments -> 9
+        | Lost_endorsing_rewards _ -> 10
+        | Liquidity_baking_subsidies -> 11
+        | Burned -> 12
+        | Commitments _ -> 13
+        | Bootstrap -> 14
+        | Invoice -> 15
+        | Initial_commitments -> 16
+        | Minted -> 17
+        | Frozen_bonds _ -> 18
+        | Sc_rollup_refutation_punishments -> 19
+        | Sc_rollup_refutation_rewards -> 20
         (* don't forget to add parameterized cases in the first part of the function *)
       in
       Compare.Int.compare (index ba) (index bb)

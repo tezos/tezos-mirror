@@ -49,8 +49,6 @@ end
 
 module Block_round : Simple_single_data_storage with type value = Round_repr.t
 
-type deposits = {initial_amount : Tez_repr.t; current_amount : Tez_repr.t}
-
 type missed_endorsements_info = {remaining_slots : int; missed_levels : int}
 
 module Slashed_deposits_history : sig
@@ -167,8 +165,22 @@ module Contract : sig
   module Frozen_deposits :
     Indexed_data_storage
       with type key = Contract_repr.t
-       and type value = deposits
+       and type value = Deposits_repr.t
        and type t := Raw_context.t
+
+  (** Tez that were part of {!Frozen_deposits} but have been requested to be
+      unstaked by a costaker.
+      They won't be part of the stake for future distributions.
+      For cycles [current_cycle - preserved_cycles - max_slashing_period + 1] to
+      [current_cycle] they are still slashable.
+      For cycle [current_cycle - preserved_cycles - max_slashing_period] they are
+      not slashable anymore and hence any other older cycles must be squashed
+      into this one at cycle end. *)
+  module Unstaked_frozen_deposits :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value = Deposits_repr.t
+       and type t := Raw_context.t * Contract_repr.t
 
   (** If there is a value, the frozen balance for the contract won't
      exceed it (starting in preserved_cycles + 1). *)

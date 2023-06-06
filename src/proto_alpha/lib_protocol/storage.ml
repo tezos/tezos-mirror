@@ -140,21 +140,6 @@ end
 
 (** Contracts handling *)
 
-type deposits = {initial_amount : Tez_repr.t; current_amount : Tez_repr.t}
-
-module Deposits = struct
-  type t = deposits
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {initial_amount; current_amount} -> (initial_amount, current_amount))
-      (fun (initial_amount, current_amount) -> {initial_amount; current_amount})
-      (obj2
-         (req "initial_amount" Tez_repr.encoding)
-         (req "actual_amount" Tez_repr.encoding))
-end
-
 type missed_endorsements_info = {remaining_slots : int; missed_levels : int}
 
 module Missed_endorsements_info = struct
@@ -407,7 +392,16 @@ module Contract = struct
       (struct
         let name = ["frozen_deposits"]
       end)
-      (Deposits)
+      (Deposits_repr)
+
+  module Unstaked_frozen_deposits =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["unstaked_frozen_deposits"]
+         end))
+         (Make_index (Cycle_repr.Index))
+      (Deposits_repr)
 
   module Frozen_deposits_limit =
     Indexed_context.Make_map

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,43 +23,47 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get ctxt delegate =
-  let open Lwt_result_syntax in
-  let+ frozen_deposits_opt =
-    Storage.Contract.Frozen_deposits.find ctxt delegate
-  in
-  Option.value ~default:Deposits_repr.zero frozen_deposits_opt
+(** Simple abstraction from low-level storage to handle unstaked frozen deposits.
 
-let update_balance ctxt delegate f amount =
-  let open Lwt_result_syntax in
-  let delegate_contract = Contract_repr.Implicit delegate in
-  let* frozen_deposits = get ctxt delegate_contract in
-  let*? new_amount = f frozen_deposits.current_amount amount in
-  let*! ctxt =
-    Storage.Contract.Frozen_deposits.add
-      ctxt
-      delegate_contract
-      {frozen_deposits with current_amount = new_amount}
-  in
-  return ctxt
+    This module is responsible for maintaining the
+    {!Storage.Contract.Unstaked_frozen_deposits} table. *)
 
-let credit_only_call_from_token ctxt delegate amount =
-  let open Lwt_result_syntax in
-  let* ctxt = update_balance ctxt delegate Tez_repr.( +? ) amount in
-  Stake_storage.add_stake ctxt delegate amount
+(** [balance ctxt delegate cycle] returns the amount of unstaked frozen deposits
+    for [delegate] at [cycle].
+    If [cycle] is an unslashable cycle, the returned amount is the squashed
+    amount of all the unslashable cycles. *)
+val balance :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Cycle_repr.t ->
+  Tez_repr.t tzresult Lwt.t
 
-let spend_only_call_from_token ctxt delegate amount =
-  let open Lwt_result_syntax in
-  let* ctxt = update_balance ctxt delegate Tez_repr.( -? ) amount in
-  Stake_storage.remove_stake ctxt delegate amount
+(** [credit_only_call_from_token ctxt delegate cycle amount] credits the
+    unstaked frozen deposits for [delegate] at [cycle] by [amount].
+    If [cycle] is an unslashable cycle, the credited cycle is the last
+    unslashable cycle. *)
+val credit_only_call_from_token :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Cycle_repr.t ->
+  Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t
 
-let update_initial_amount ctxt delegate_contract deposits_cap =
-  let open Lwt_result_syntax in
-  let* frozen_deposits = get ctxt delegate_contract in
-  let*! ctxt =
-    Storage.Contract.Frozen_deposits.add
-      ctxt
-      delegate_contract
-      {frozen_deposits with initial_amount = deposits_cap}
-  in
-  return ctxt
+(** [spend_only_call_from_token ctxt delegate cycle amount] spends [amount]
+    from the unstaked frozen deposits for [delegate] at [cycle].
+    If [cycle] is an unslashable cycle, the amount is spent from the last
+    unslashable cycle.
+    The function returns the error [Subtraction_underflow] if the balance is
+    too low. *)
+val spend_only_call_from_token :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Cycle_repr.t ->
+  Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t
+
+(** Squash the unstaked frozen deposits that are unslashable.
+    This function must be called at cycle end.
+    This function iterates over all registered delegates. *)
+val squash_unslashable_unstaked_frozen_deposits_at_cycle_end :
+  Raw_context.t -> last_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t

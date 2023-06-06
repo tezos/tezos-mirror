@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,43 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get ctxt delegate =
-  let open Lwt_result_syntax in
-  let+ frozen_deposits_opt =
-    Storage.Contract.Frozen_deposits.find ctxt delegate
-  in
-  Option.value ~default:Deposits_repr.zero frozen_deposits_opt
+type t = {initial_amount : Tez_repr.t; current_amount : Tez_repr.t}
 
-let update_balance ctxt delegate f amount =
-  let open Lwt_result_syntax in
-  let delegate_contract = Contract_repr.Implicit delegate in
-  let* frozen_deposits = get ctxt delegate_contract in
-  let*? new_amount = f frozen_deposits.current_amount amount in
-  let*! ctxt =
-    Storage.Contract.Frozen_deposits.add
-      ctxt
-      delegate_contract
-      {frozen_deposits with current_amount = new_amount}
-  in
-  return ctxt
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun {initial_amount; current_amount} -> (initial_amount, current_amount))
+    (fun (initial_amount, current_amount) -> {initial_amount; current_amount})
+    (obj2
+       (req "initial_amount" Tez_repr.encoding)
+       (req "actual_amount" Tez_repr.encoding))
 
-let credit_only_call_from_token ctxt delegate amount =
-  let open Lwt_result_syntax in
-  let* ctxt = update_balance ctxt delegate Tez_repr.( +? ) amount in
-  Stake_storage.add_stake ctxt delegate amount
+let zero = {initial_amount = Tez_repr.zero; current_amount = Tez_repr.zero}
 
-let spend_only_call_from_token ctxt delegate amount =
-  let open Lwt_result_syntax in
-  let* ctxt = update_balance ctxt delegate Tez_repr.( -? ) amount in
-  Stake_storage.remove_stake ctxt delegate amount
+let ( +? ) {initial_amount; current_amount} inc =
+  let open Result_syntax in
+  let* initial_amount = Tez_repr.(initial_amount +? inc) in
+  let+ current_amount = Tez_repr.(current_amount +? inc) in
+  {initial_amount; current_amount}
 
-let update_initial_amount ctxt delegate_contract deposits_cap =
-  let open Lwt_result_syntax in
-  let* frozen_deposits = get ctxt delegate_contract in
-  let*! ctxt =
-    Storage.Contract.Frozen_deposits.add
-      ctxt
-      delegate_contract
-      {frozen_deposits with initial_amount = deposits_cap}
-  in
-  return ctxt
+let ( ++? ) {initial_amount = i1; current_amount = c1}
+    {initial_amount = i2; current_amount = c2} =
+  let open Result_syntax in
+  let* initial_amount = Tez_repr.(i1 +? i2) in
+  let+ current_amount = Tez_repr.(c1 +? c2) in
+  {initial_amount; current_amount}

@@ -346,6 +346,13 @@ let pp_balance_updates ppf balance_updates =
           | Contract c -> Format.asprintf "%a" Contract.pp c
           | Block_fees -> "payload fees(the block proposer)"
           | Deposits pkh -> Format.asprintf "deposits(%a)" pp_baker pkh
+          | Unstaked_deposits (pkh, cycle) ->
+              Format.asprintf
+                "unstaked_deposits(%a,%a)"
+                pp_baker
+                pkh
+                Cycle.pp
+                cycle
           | Nonce_revelation_rewards -> "nonce revelation rewards"
           | Endorsing_rewards -> "endorsing rewards"
           | Baking_rewards -> "baking rewards"

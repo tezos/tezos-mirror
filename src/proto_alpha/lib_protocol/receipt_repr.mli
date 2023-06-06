@@ -29,6 +29,7 @@ type balance =
   | Contract of Contract_repr.t
   | Block_fees
   | Deposits of Signature.Public_key_hash.t
+  | Unstaked_deposits of Signature.Public_key_hash.t * Cycle_repr.t
   | Nonce_revelation_rewards
   | Endorsing_rewards
   | Baking_rewards
