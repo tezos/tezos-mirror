@@ -25,11 +25,6 @@
 
 open Ethereum_types
 
-let u16_to_bytes n =
-  let bytes = Bytes.make 2 'a' in
-  Bytes.set_uint16_le bytes 0 n ;
-  Bytes.to_string bytes
-
 (* The hard limit is 4096 but it needs to add the external message tag. *)
 let max_input_size = 4095
 
@@ -45,7 +40,7 @@ let encode_transaction ~smart_rollup_address kind =
     match kind with
     | Simple data -> "\000" ^ data
     | NewChunked (hash, len) ->
-        let number_of_chunks_bytes = u16_to_bytes len in
+        let number_of_chunks_bytes = Ethereum_types.u16_to_bytes len in
         "\001" ^ hash ^ number_of_chunks_bytes
     | Chunk data -> "\002" ^ data
   in
@@ -74,7 +69,9 @@ let make_evm_inbox_transactions tx_raw =
     let* chunks = String.chunk_bytes size_per_chunk (Bytes.of_string tx_raw) in
     let new_chunk_transaction = NewChunked (tx_hash, List.length chunks) in
     let chunks =
-      List.mapi (fun i chunk -> Chunk (tx_hash ^ u16_to_bytes i ^ chunk)) chunks
+      List.mapi
+        (fun i chunk -> Chunk (tx_hash ^ Ethereum_types.u16_to_bytes i ^ chunk))
+        chunks
     in
     return (tx_hash, new_chunk_transaction :: chunks)
 
