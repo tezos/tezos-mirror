@@ -1771,6 +1771,8 @@ module Contract : sig
   (** See {!Contract_delegate_storage.is_delegate}. *)
   val is_delegate : context -> public_key_hash -> bool tzresult Lwt.t
 
+  val get_total_supply : context -> Tez.t tzresult Lwt.t
+
   module Legacy_big_map_diff : sig
     type item = private
       | Update of {

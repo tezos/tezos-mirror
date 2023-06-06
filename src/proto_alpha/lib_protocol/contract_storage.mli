@@ -325,3 +325,5 @@ val simulate_spending :
   amount:Tez_repr.t ->
   Signature.public_key_hash ->
   (Tez_repr.t * bool) tzresult Lwt.t
+
+val get_total_supply : Raw_context.t -> Tez_repr.t tzresult Lwt.t

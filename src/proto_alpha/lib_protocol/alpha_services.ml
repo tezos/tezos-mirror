@@ -220,6 +220,7 @@ module Constants = Constants_services
 module Delegate = Delegate_services
 module Voting = Voting_services
 module Sapling = Sapling_services
+module Adaptive_inflation = Adaptive_inflation_services
 
 module Liquidity_baking = struct
   module S = struct
@@ -308,4 +309,5 @@ let register () =
   Voting.register () ;
   Sapling.register () ;
   Liquidity_baking.register () ;
-  Cache.register ()
+  Cache.register () ;
+  Adaptive_inflation.register ()

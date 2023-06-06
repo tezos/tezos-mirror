@@ -779,3 +779,5 @@ let simulate_spending ctxt ~balance ~amount source =
       should_keep_empty_implicit_contract ctxt contract
   in
   return (new_balance, still_allocated)
+
+let get_total_supply ctxt = Storage.Contract.Total_supply.get ctxt
