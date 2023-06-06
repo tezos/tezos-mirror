@@ -1066,60 +1066,13 @@ comprehensive description of the Sapling protocol.
 Operations on tickets
 ~~~~~~~~~~~~~~~~~~~~~
 
-The following operations deal with tickets. Tickets are a way for smart-contracts
-to authenticate data with respect to a Tezos address. This authentication can
-then be used to build composable permission systems. For a high-level explanation of
-tickets in Tezos, see :doc:`Tickets <tickets>`.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-A contract can create a ticket from a value and an amount. The ticket, when
-inspected reveals the value, the amount, and the address of the ticketer (the contract that created the ticket). It is
-impossible for a contract to “forge” a ticket that appears to have been created
-by another ticketer.
-
-The amount is a meta-data that can be used to implement UTXOs.
-
-Tickets cannot be duplicated using the ``DUP`` instruction.
-
-For example, a ticket could represent a Non Fungible Token (NFT) or a Unspent
-Transaction Output (UTXO) which can then be passed around and behave like a value.
-This process can happen without the need to interact with a centralized NFT contract,
-simplifying the code.
-
-- ``TICKET``: Create a ticket with the given content and amount. The ticketer is the address
-  of ``SELF``. The resulting value is ``NONE`` if the amount is zero.
-
-::
-
-   :: 'a : nat : 'S -> option ticket 'a : 'S
-
-Type ``'a`` must be comparable (the ``COMPARE`` primitive must be defined over it).
-
-- ``READ_TICKET``: Retrieve the information stored in a ticket. Also return the ticket.
-
-::
-
-   :: ticket 'a : 'S -> pair address 'a nat : ticket 'a : 'S
-
+- ``TICKET``: Create a ticket with the given content and amount (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-TICKET>`__).
+- ``READ_TICKET``: Retrieve the information stored in a ticket (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-READ_TICKET>`__).
 - ``SPLIT_TICKET``: Delete the given ticket and create two tickets with the
-  same content and ticketer as the original, but with the new provided amounts.
-  (This can be used to easily implement UTXOs.)
-  Return None iff the ticket's original amount is not equal to the sum of the
-  provided amounts, or one of the provided amounts is zero.
-
-::
-
-   :: ticket 'a : (pair nat nat) : 'S ->
-   option (pair (ticket 'a) (ticket 'a)) : 'S
-
-- ``JOIN_TICKETS``: The inverse of ``SPLIT_TICKET``. Delete the given tickets and create a ticket with an amount equal to the
-  sum of the amounts of the input tickets.
-  (This can be used to consolidate UTXOs.)
-  Return None iff the input tickets have a different ticketer or content.
-
-::
-
-   :: (pair (ticket 'a) (ticket 'a)) : 'S ->
-   option (ticket 'a) : 'S
+  same content and ticketer as the original, but with the new provided amounts (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SPLIT_TICKET>`__).
+- ``JOIN_TICKETS``: The inverse of ``SPLIT_TICKET`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-JOIN_TICKETS>`__).
 
 Operations on timelock
 ~~~~~~~~~~~~~~~~~~~~~~
