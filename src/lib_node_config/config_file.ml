@@ -654,6 +654,8 @@ let rpc : rpc Data_encoding.t =
           Media_type.Command_line.encoding
           default_rpc.media_type))
 
+let rpc_encoding = rpc
+
 let encoding =
   let open Data_encoding in
   conv
