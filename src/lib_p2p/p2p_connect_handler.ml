@@ -625,7 +625,7 @@ let fail_unless_disconnected_point point_info =
   | Requested _ | Accepted _ -> tzfail P2p_errors.Pending_connection
   | Running _ -> tzfail P2p_errors.Connected
 
-let connect ?timeout t point =
+let connect ?trusted ?expected_peer_id ?timeout t point =
   let open Lwt_result_syntax in
   let* () =
     fail_when
@@ -640,7 +640,9 @@ let connect ?timeout t point =
   in
   let canceler = Lwt_canceler.create () in
   with_timeout ~canceler (Systime_os.sleep timeout) (fun canceler ->
-      let point_info = P2p_pool.register_point t.pool point in
+      let point_info =
+        P2p_pool.register_point ?trusted ?expected_peer_id t.pool point
+      in
       let ((addr, port) as point) = P2p_point_state.Info.point point_info in
       let* () =
         fail_unless
