@@ -125,6 +125,7 @@ module type T = sig
        and type Wasm_2_0_0.input_request =
         Tezos_scoru_wasm.Wasm_pvm_state.input_request
        and type Wasm_2_0_0.info = Tezos_scoru_wasm.Wasm_pvm_state.info
+       and module Skip_list = Tezos_base.Skip_list
        and type Smart_rollup.Address.t =
         Tezos_crypto.Hashed.Smart_rollup_address.t
        and type Smart_rollup.Commitment_hash.t =
@@ -1491,6 +1492,8 @@ struct
           Ok false
       | Ok () -> Ok true
   end
+
+  module Skip_list = Skip_list
 
   module Smart_rollup = struct
     module Address = Tezos_crypto.Hashed.Smart_rollup_address
