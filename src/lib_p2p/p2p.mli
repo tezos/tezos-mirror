@@ -225,10 +225,15 @@ val get_peer_metadata :
 val set_peer_metadata :
   ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> 'peer_meta -> unit
 
-(** [connect net ?timeout point] attempts to establish a connection to [point]
-   within an optional duration [timeout]. *)
+(** [connect net ?trusted ?expected_peer_id ?timeout point] attempts to
+    establish a connection to [point] within an optional duration [timeout]. The
+    optional arguments [trusted] and [expected_peer_id] can be used to specify
+    whether the connection should be trusted and to provide the expected remote
+    peer's id, respectively. *)
 val connect :
   ('msg, 'peer_meta, 'conn_meta) net ->
+  ?trusted:bool ->
+  ?expected_peer_id:P2p_peer.Id.t ->
   ?timeout:Ptime.span ->
   P2p_point.Id.t ->
   ('msg, 'peer_meta, 'conn_meta) connection tzresult Lwt.t
