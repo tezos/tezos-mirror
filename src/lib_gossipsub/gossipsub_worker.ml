@@ -95,7 +95,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Out_message of {to_peer : Peer.t; p2p_message : p2p_message}
     | Disconnect of {peer : Peer.t}
     | Kick of {peer : Peer.t}
-    | Connect of {peer : Peer.t}
+    | Connect of {px : Peer.t; origin : Peer.t}
+    | Forget of {px : Peer.t; origin : Peer.t}
 
   type app_output = message_with_header
 
@@ -337,25 +338,30 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       automaton removes that peer from the given topic's mesh. It also filters
       the given collection of alternative peers to connect to. The worker then
       asks the P2P part to connect to those peeers. *)
-  let handle_prune ~emit_p2p_output = function
+  let handle_prune ~emit_p2p_output ~from_peer input_px = function
     | ( gstate,
         ( GS.Prune_topic_not_tracked | Peer_not_in_mesh
         | Ignore_PX_score_too_low _ | No_PX ) ) ->
+        send_p2p_output
+          ~emit_p2p_output
+          ~mk_output:(fun to_peer -> Forget {px = to_peer; origin = from_peer})
+          input_px ;
         gstate
     | gstate, GS.PX peers ->
         send_p2p_output
           ~emit_p2p_output
-          ~mk_output:(fun to_peer -> Connect {peer = to_peer})
+          ~mk_output:(fun to_peer -> Connect {px = to_peer; origin = from_peer})
           (Peer.Set.to_seq peers) ;
-        gstate
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5425
+        (* Forget peers that were filtered out by the automaton. *)
+        send_p2p_output
+          ~emit_p2p_output
+          ~mk_output:(fun to_peer -> Forget {px = to_peer; origin = from_peer})
+          (Peer.Set.to_seq @@ Peer.Set.(diff (of_seq input_px) peers)) ;
 
-     The automaton doesn't filter out the alternative peers we are already
-     connected to. *)
+        gstate
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5426
 
-     The automaton doesn't filter out the alternative peers we are already
-     connected to. *)
+     Add more verification/attacks protections as done in Rust. *)
 
   (** On a [Heartbeat] events, the worker sends graft and prune messages
       following the automaton's output. It also sends [IHave] messages (computed
@@ -439,7 +445,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         |> handle_iwant ~emit_p2p_output iwant
     | Prune {topic; px; backoff} ->
         let prune : GS.prune = {peer = from_peer; topic; px; backoff} in
-        GS.handle_prune prune gossip_state |> handle_prune ~emit_p2p_output
+        GS.handle_prune prune gossip_state
+        |> handle_prune ~emit_p2p_output ~from_peer px
 
   (** Handling events received from P2P layer. *)
   let apply_p2p_event ~emit_p2p_output ~emit_app_output gossip_state = function
@@ -631,10 +638,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         pp_message_with_header fmt message_with_header
 
   let pp_p2p_output fmt = function
-    | Disconnect {peer} ->
-        Format.fprintf fmt "Disconnect{topic=%a}" Peer.pp peer
-    | Kick {peer} -> Format.fprintf fmt "Kick{topic=%a}" Peer.pp peer
-    | Connect {peer} -> Format.fprintf fmt "Connect{topic=%a}" Peer.pp peer
+    | Disconnect {peer} -> Format.fprintf fmt "Disconnect{peer=%a}" Peer.pp peer
+    | Kick {peer} -> Format.fprintf fmt "Kick{peer=%a}" Peer.pp peer
+    | Connect {px; origin} ->
+        Format.fprintf fmt "Connect{px=%a; origin=%a}" Peer.pp px Peer.pp origin
+    | Forget {px; origin} ->
+        Format.fprintf fmt "Forget{px=%a; origin=%a}" Peer.pp px Peer.pp origin
     | Out_message {to_peer; p2p_message} ->
         Format.fprintf
           fmt

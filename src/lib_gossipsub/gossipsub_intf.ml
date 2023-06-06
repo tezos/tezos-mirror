@@ -1037,9 +1037,17 @@ module type WORKER = sig
       P2P layer. *)
   type p2p_output =
     | Out_message of {to_peer : GS.Peer.t; p2p_message : p2p_message}
+        (** Emit the given [p2p_message] to the remote peer [to_peer]. *)
     | Disconnect of {peer : GS.Peer.t}
+        (** End the connection with the peer [peer]. *)
     | Kick of {peer : GS.Peer.t}
-    | Connect of {peer : GS.Peer.t}
+        (** Kick the peer [peer]: the peer is disconnected and blacklisted.*)
+    | Connect of {px : GS.Peer.t; origin : GS.Peer.t}
+        (** Inform the p2p_output messages processor that we want to connect to
+            the peer [px] advertised by some other peer [origin]. *)
+    | Forget of {px : GS.Peer.t; origin : GS.Peer.t}
+        (** Inform the p2p_output messages processor that we don't want to
+            connect to the peer [px] advertised by some other peer [origin]. *)
 
   (** The application layer will be advertised about full messages it's
       interested in. *)

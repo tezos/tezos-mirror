@@ -2519,6 +2519,7 @@ type event_with_topic =
   | Subscribe of peer_id
   | Unsubscribe of peer_id
   | Graft of peer_id
+  | Prune of peer_id
   | Join
   | Leave
 
@@ -2526,6 +2527,7 @@ let event_with_topic_to_string = function
   | Subscribe _ -> "subscribe"
   | Unsubscribe _ -> "unsubscribe"
   | Graft _ -> "graft"
+  | Prune _ -> "prune"
   | Join -> "join"
   | Leave -> "leave"
 
@@ -2547,7 +2549,8 @@ let check_events_with_topic ~event_with_topic dal_node ~num_slots expected_pkh =
       match event_with_topic with
       | Subscribe expected_peer
       | Unsubscribe expected_peer
-      | Graft expected_peer ->
+      | Graft expected_peer
+      | Prune expected_peer ->
           let*?? () =
             check_expected
               expected_peer
@@ -2632,6 +2635,73 @@ let check_events_with_message ~event_with_message dal_node ~from_shard ~to_shard
             (sf "Shard_index %d already seen. Invariant broken" shard_index)) ;
       seen.(index) <- true ;
       let () = remaining := !remaining - 1 in
+      if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
+      else None)
+
+type event_with_message_id = IHave of {pkh : string; slot_index : int} | IWant
+
+let event_with_message_id_to_string = function
+  | IHave _ -> "ihave"
+  | IWant -> "iwant"
+
+(** This function monitors the Gossipsub worker events whose name is given by
+    [event_with_message_id]. It's somehow similar to function
+    {!check_events_with_message}, but for IHave and IWant messages' events. *)
+let check_events_with_message_id ~event_with_message_id dal_node ~from_shard
+    ~to_shard ~expected_commitment ~expected_level ~expected_pkh ~expected_slot
+    ~expected_peer =
+  let remaining = ref (to_shard - from_shard + 1) in
+  let seen = Array.make !remaining false in
+  let get_shard_indices_of_messages event =
+    let*?? () =
+      check_expected expected_peer JSON.(event |-> "peer" |> as_string)
+    in
+    let*?? () =
+      match event_with_message_id with
+      | IWant -> Some ()
+      | IHave {pkh; slot_index} ->
+          let topic = JSON.(event |-> "topic") in
+          let*?? () = check_expected pkh expected_pkh in
+          let*?? () = check_expected pkh JSON.(topic |-> "pkh" |> as_string) in
+          check_expected slot_index JSON.(topic |-> "slot_index" |> as_int)
+    in
+    let message_ids = JSON.(event |-> "message_ids" |> as_list) in
+    Option.some
+    @@ List.map
+         (fun id ->
+           let level = JSON.(id |-> "level" |> as_int) in
+           let slot_index = JSON.(id |-> "slot_index" |> as_int) in
+           let shard_index = JSON.(id |-> "shard_index" |> as_int) in
+           let pkh = JSON.(id |-> "pkh" |> as_string) in
+           let commitment = JSON.(id |-> "commitment" |> as_string) in
+           let*?? () = check_expected expected_pkh pkh in
+           let*?? () = check_expected expected_level level in
+           let*?? () = check_expected expected_slot slot_index in
+           let*?? () = check_expected expected_commitment commitment in
+           Some shard_index)
+         message_ids
+  in
+  wait_for_gossipsub_worker_event
+    ~name:(event_with_message_id_to_string event_with_message_id)
+    dal_node
+    (fun event ->
+      let*?? shard_indices = get_shard_indices_of_messages event in
+      List.iter
+        (fun shard_index_opt ->
+          match shard_index_opt with
+          | None -> ()
+          | Some shard_index ->
+              let index = shard_index - from_shard in
+              Check.(
+                (seen.(index) = false)
+                  bool
+                  ~error_msg:
+                    (sf
+                       "Shard_index %d already seen. Invariant broken"
+                       shard_index)) ;
+              seen.(index) <- true ;
+              decr remaining)
+        shard_indices ;
       if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
       else None)
 
@@ -2835,7 +2905,7 @@ let test_dal_node_join_topic _protocol _parameters _cryptobox _node client
 
    The [expect_app_notification] flag is used to tell whether we should wait for
    the application layer of the second DAL node to be notified with received messages.
-   In case we don't expect the application layer to be notified (e.g. messages are invalid), 
+   In case we don't expect the application layer to be notified (e.g. messages are invalid),
    set to [false].
 
    The [is_first_slot_attestable] flag is used to tell whether the first slot
@@ -2955,24 +3025,25 @@ let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
     ~expect_app_notification:true
     ~is_first_slot_attestable:true
 
+(* Create a DAL node whose DAL parameters are not compatible with those in
+   [parameters]. For that, the redundancy_factor field is multiplied by 2. *)
+let make_invalid_dal_node protocol parameters =
+  (* Create another L1 node with different DAL parameters. *)
+  let* node2, client2, _xdal_parameters2 =
+    let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
+    let parameters =
+      dal_enable_param (Some true)
+      @ redundancy_factor_param (Some (2 * crypto_params.redundancy_factor))
+    in
+    setup_node ~protocol ~parameters ()
+  in
+  (* Create a second DAL node with node2 and client2 as argument (so different
+     DAL parameters compared to dal_node1. *)
+  let dal_node2 = Dal_node.create ~node:node2 ~client:client2 () in
+  return dal_node2
+
 let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
     node client dal_node1 =
-  (* Create a non-compatible DAL node. *)
-  let mk_dal_node2 protocol parameters =
-    (* Create another L1 node with different DAL parameters. *)
-    let* node2, client2, _xdal_parameters2 =
-      let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
-      let parameters =
-        dal_enable_param (Some true)
-        @ redundancy_factor_param (Some (2 * crypto_params.redundancy_factor))
-      in
-      setup_node ~protocol ~parameters ()
-    in
-    (* Create a second DAL node with node2 and client2 as argument (so different
-       DAL parameters compared to dal_node1. *)
-    let dal_node2 = Dal_node.create ~node:node2 ~client:client2 () in
-    return dal_node2
-  in
   (* Messages are invalid, so the app layer is not notified. *)
   let expect_app_notification = false in
   (* The first slot published by [generic_gs_messages_exchange] is not
@@ -2986,9 +3057,141 @@ let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
     node
     client
     dal_node1
-    ~mk_dal_node2
+    ~mk_dal_node2:make_invalid_dal_node
     ~expect_app_notification
     ~is_first_slot_attestable
+
+let test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
+    dal_node1 =
+  let rec repeat_i n f =
+    if n <= 0 then unit
+    else
+      let* () = f n in
+      repeat_i (n - 1) f
+  in
+  let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
+  let slot_size = crypto_params.slot_size in
+  let slot_content = generate_dummy_slot slot_size in
+
+  (* Inject as much slots as possible with available bootstrap accounts.
+     The goal is to continuously send invalid messages from dal_node1 to dal_node2,
+     thus lowering the score of dal_node1 to the point where it becomes negative. *)
+  let* () =
+    let num_slots =
+      min
+        (Array.length Account.Bootstrap.keys)
+        parameters.Rollup.Dal.Parameters.number_of_slots
+    in
+    repeat_i num_slots (fun i ->
+        let slot_index = i - 1 in
+        let account = Account.Bootstrap.keys.(slot_index) in
+        let* _slot_index, _slot_commitment =
+          publish_and_store_slot
+            ~with_proof:true
+            node
+            client
+            dal_node1
+            ~slot_size
+            account
+            slot_index
+            slot_content
+        in
+        unit)
+  in
+
+  (* Create another (invalid) DAL node *)
+  let* dal_node2 = make_invalid_dal_node protocol parameters in
+  let* _config_file = Dal_node.init_config dal_node2 in
+
+  (* Connect the nodes *)
+  let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
+
+  let* params = Rollup.Dal.Parameters.from_client client in
+  let num_slots = params.number_of_slots in
+  let account1 = Constant.bootstrap1 in
+  let pkh1 = account1.public_key_hash in
+
+  (* The two nodes join the same topics *)
+  let* () = nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 in
+
+  let peer_id1 =
+    JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
+  in
+  let peer_id2 =
+    JSON.(Dal_node.read_identity dal_node2 |-> "peer_id" |> as_string)
+  in
+  (* Once a block is baked and shards injected into GS, we expect dal_node1 to
+     be pruned by dal_node2 because its score will become negative due to
+     invalid messages. *)
+  let event_waiter_prune =
+    check_events_with_topic
+      ~event_with_topic:(Prune peer_id2)
+      dal_node1
+      ~num_slots
+      pkh1
+  in
+
+  (* We bake a block and wait for the prune events. *)
+  let* () = Client.bake_for_and_wait client in
+  let* () = event_waiter_prune in
+
+  (* Now, we'll inject a new slot for the next published_level in
+     dal_node1. Since it's pruned, dal_node2 will be notified via IHave
+     messages, to which it will respond by IWant messages. *)
+  let* slot_index, commitment =
+    publish_and_store_slot
+      ~with_proof:true
+      node
+      client
+      dal_node1
+      ~slot_size
+      account1
+      0
+      slot_content
+  in
+
+  let publish_level = Node.get_level node + 1 in
+  let attested_level = publish_level + parameters.attestation_lag in
+  let* committee = Rollup.Dal.Committee.at_level node ~level:attested_level in
+
+  let Rollup.Dal.Committee.{attestor; first_shard_index; power} =
+    match
+      List.find
+        (fun Rollup.Dal.Committee.{attestor; _} -> attestor = pkh1)
+        committee
+    with
+    | {attestor; first_shard_index; power} ->
+        {attestor; first_shard_index; power}
+    | exception Not_found ->
+        Test.fail "Should not happen as %s is part of the committee" pkh1
+  in
+  let iwant_events_waiter =
+    check_events_with_message_id
+      ~event_with_message_id:IWant
+      dal_node1
+      ~from_shard:first_shard_index
+      ~to_shard:(first_shard_index + power - 1)
+      ~expected_commitment:commitment
+      ~expected_level:publish_level
+      ~expected_pkh:attestor
+      ~expected_slot:slot_index
+      ~expected_peer:peer_id2
+  in
+  let ihave_events_waiter =
+    check_events_with_message_id
+      ~event_with_message_id:(IHave {pkh = pkh1; slot_index = 0})
+      dal_node2
+      ~from_shard:first_shard_index
+      ~to_shard:(first_shard_index + power - 1)
+      ~expected_commitment:commitment
+      ~expected_level:publish_level
+      ~expected_pkh:attestor
+      ~expected_slot:slot_index
+      ~expected_peer:peer_id1
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* () = iwant_events_waiter and* () = ihave_events_waiter in
+  unit
 
 let register ~protocols =
   (* Tests with Layer1 node only *)
@@ -3099,6 +3302,11 @@ let register ~protocols =
     ~tags:["gossipsub"]
     "GS invalid messages exchange"
     test_dal_node_gs_invalid_messages_exchange
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["gossipsub"]
+    "GS prune due to negative score, ihave and iwant"
+    test_gs_prune_ihave_and_iwant
     protocols ;
 
   (* Tests with all nodes *)

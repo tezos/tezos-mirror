@@ -36,15 +36,20 @@
     calling {!P2p.create}.
 *)
 
+(** Peers exchanged via PX. [point] represents the (address, port) pair of the
+    exchanged peer, while [peer] represents the cryptographic identity of the
+    peer. *)
+type px_peer = {point : P2p_point.Id.t; peer : P2p_peer.Id.t}
+
 (** Without piggybacking, {!p2p_message} is almost identical to
     {!Gs_interface.p2p_message}, except that for the [Prune] case,
-    {!P2p_peer.Id.t} elements in [px] are replaced by their {!P2p_point.Id.t}
+    {!P2p_peer.Id.t} elements in [px] are augmented by their {!P2p_point.Id.t}
     counterpart. *)
 type p2p_message =
   | Graft of {topic : Gs_interface.topic}
   | Prune of {
       topic : Gs_interface.topic;
-      px : P2p_point.Id.t Seq.t;
+      px : px_peer Seq.t;
       backoff : Gs_interface.Span.t;
     }
   | IHave of {

@@ -28,11 +28,13 @@
 
    Version this type to ease future migrations. *)
 module P2p_message_V1 = struct
+  type px_peer = {point : P2p_point.Id.t; peer : P2p_peer.Id.t}
+
   type p2p_message =
     | Graft of {topic : Gs_interface.topic}
     | Prune of {
         topic : Gs_interface.topic;
-        px : P2p_point.Id.t Seq.t;
+        px : px_peer Seq.t;
         backoff : Gs_interface.Span.t;
       }
     | IHave of {
@@ -47,6 +49,15 @@ module P2p_message_V1 = struct
         topic : Gs_interface.topic;
         message_id : Gs_interface.message_id;
       }
+
+  let px_peer_encoding =
+    let open Data_encoding in
+    conv
+      (fun {point; peer} -> (point, peer))
+      (fun (point, peer) -> {point; peer})
+      (obj2
+         (req "point" P2p_point.Id.encoding)
+         (req "peer" P2p_peer.Id.encoding))
 
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5564
 
@@ -71,7 +82,7 @@ module P2p_message_V1 = struct
         (obj4
            (req "kind" (constant "prune"))
            (req "topic" Gs_interface.topic_encoding)
-           (req "px" (list P2p_point.Id.encoding))
+           (req "px" (list px_peer_encoding))
            (req "backoff" Gs_interface.span_encoding))
         (function
           | Prune {topic; px; backoff} ->
