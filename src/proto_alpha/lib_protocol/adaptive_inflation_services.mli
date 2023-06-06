@@ -26,6 +26,7 @@
 open Alpha_context
 
 type expected_rewards = {
+  cycle : Cycle.t;
   baking_reward_fixed_portion : Tez.t;
   baking_reward_bonus_per_slot : Tez.t;
   endorsing_reward_per_slot : Tez.t;
@@ -53,7 +54,9 @@ val current_rewards_per_minute :
 val launch_cycle :
   'a #RPC_context.simple -> 'a -> Cycle.t option shell_tzresult Lwt.t
 
+(** Returns the list of expected rewards for the current cycle and for the next
+    [preserved_cycles] cycles. *)
 val expected_rewards :
-  'a #RPC_context.simple -> 'a -> expected_rewards shell_tzresult Lwt.t
+  'a #RPC_context.simple -> 'a -> expected_rewards list shell_tzresult Lwt.t
 
 val register : unit -> unit
