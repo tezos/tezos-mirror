@@ -24,7 +24,13 @@
   -open Tezos_error_monad
   -open Tezos_test_helpers
   -open Octez_alcotezt)
- (modules test_bounded test_time test_protocol test_p2p_addr test_sized))
+ (modules
+  test_bounded
+  test_time
+  test_protocol
+  test_p2p_addr
+  test_sized
+  test_skip_list))
 
 (executable
  (name main)
