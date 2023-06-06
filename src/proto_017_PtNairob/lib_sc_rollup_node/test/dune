@@ -26,7 +26,7 @@
   -open Octez_smart_rollup_node_PtNairob
   -open Octez_alcotezt
   -open Octez_smart_rollup_node_PtNairob_test_helpers)
- (modules canary))
+ (modules canary test_octez_conversions))
 
 (executable
  (name main)
