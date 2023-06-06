@@ -94,6 +94,9 @@ module type S = sig
 
   (** [txpool ()] returns the pending and queued transactions. *)
   val txpool : unit -> Ethereum_types.txpool tzresult Lwt.t
+
+  (** [chain_id ()] returns chain id defined by the rollup. *)
+  val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
 end
 
 (** Instantiate a module of type {!S} that communicates with a rollup

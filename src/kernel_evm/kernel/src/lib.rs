@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use primitive_types::U256;
+use storage::{read_chain_id, store_chain_id};
 use tezos_ethereum::block::L2Block;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_entrypoint::kernel_entry;
@@ -22,11 +23,16 @@ mod parsing;
 mod simulation;
 mod storage;
 
+/// The chain id will need to be unique when the EVM rollup is deployed in
+/// production.
+pub const CHAIN_ID: u32 = 1337;
+
 pub fn stage_one<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
+    chain_id: U256,
 ) -> Result<Queue, Error> {
-    let queue = fetch(host, smart_rollup_address)?;
+    let queue = fetch(host, smart_rollup_address, chain_id)?;
 
     for (i, blueprint) in queue.proposals.iter().enumerate() {
         debug_msg!(
@@ -59,6 +65,17 @@ fn retrieve_smart_rollup_address<Host: Runtime>(
     }
 }
 
+fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
+    match read_chain_id(host) {
+        Ok(chain_id) => Ok(chain_id),
+        Err(_) => {
+            let chain_id = U256::from(CHAIN_ID);
+            store_chain_id(host, chain_id)?;
+            Ok(chain_id)
+        }
+    }
+}
+
 fn genesis_initialisation<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     let block_path = storage::block_path(U256::zero())?;
     match Runtime::store_has(host, &block_path) {
@@ -69,9 +86,10 @@ fn genesis_initialisation<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
 
 pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     let smart_rollup_address = retrieve_smart_rollup_address(host)?;
+    let chain_id = retrieve_chain_id(host)?;
     genesis_initialisation(host)?;
 
-    let queue = stage_one(host, smart_rollup_address)?;
+    let queue = stage_one(host, smart_rollup_address, chain_id)?;
 
     stage_two(host, queue)
 }
