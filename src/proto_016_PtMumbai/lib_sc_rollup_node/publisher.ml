@@ -271,7 +271,11 @@ let publish_commitment (node_ctxt : _ Node_context.t) ~source
     (commitment : Sc_rollup.Commitment.t) =
   let open Lwt_result_syntax in
   let publish_operation =
-    L1_operation.Publish {rollup = node_ctxt.rollup_address; commitment}
+    L1_operation.Publish
+      {
+        rollup = Sc_rollup_proto_types.Address.to_octez node_ctxt.rollup_address;
+        commitment = Sc_rollup_proto_types.Commitment.to_octez commitment;
+      }
   in
   let*! () =
     Commitment_event.publish_commitment
@@ -404,7 +408,11 @@ let cement_commitment (node_ctxt : _ Node_context.t) ~source commitment_hash =
   let open Lwt_result_syntax in
   let cement_operation =
     L1_operation.Cement
-      {rollup = node_ctxt.rollup_address; commitment = commitment_hash}
+      {
+        rollup = Sc_rollup_proto_types.Address.to_octez node_ctxt.rollup_address;
+        commitment =
+          Sc_rollup_proto_types.Commitment_hash.to_octez commitment_hash;
+      }
   in
   let* _hash = Injector.add_pending_operation ~source cement_operation in
   return_unit

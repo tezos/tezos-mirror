@@ -294,8 +294,7 @@ let init (cctxt : Protocol_client_context.full) ~data_dir ?log_kernel_debug_file
   let*? () = check_config configuration in
   let rollup_address =
     (* Convert to protocol rollup address *)
-    Tezos_crypto.Hashed.Smart_rollup_address.to_bytes rollup_address
-    |> Protocol.Alpha_context.Sc_rollup.Address.of_bytes_exn
+    Sc_rollup_proto_types.Address.of_octez rollup_address
   in
   let* lockfile = lock ~data_dir in
   let* () =
