@@ -155,19 +155,27 @@ functor
      fun msg ->
       with_label ~label:"Sha2.padding"
       @@
-      (* TODO generalize to other versions *)
       let l = Bytes.length msg in
       let k =
-        let k = (448 - (l + 1)) mod 512 in
-        if k > 0 then k else k + 512
+        let k = (V.block_size - (2 * V.word_size) - (l + 1)) mod V.block_size in
+        if k > 0 then k else k + V.block_size
       in
       let* padding =
         let bitlist = List.(init k (Fun.const false) @ [true]) in
         Bytes.constant @@ Utils.of_bitlist bitlist
       in
       let* binary_l =
-        Z.of_int l |> Z.to_bits |> Stdlib.Bytes.of_string
-        |> Bytes.constant ~le:true
+        let ocaml_bytes = Z.of_int l |> Z.to_bits |> Stdlib.Bytes.of_string in
+        let ocaml_bytes =
+          let len = Stdlib.Bytes.length ocaml_bytes in
+          let len_padded = V.word_size / 4 in
+          if len = len_padded then ocaml_bytes
+          else
+            let bytes_padded = Stdlib.Bytes.make len_padded '\000' in
+            Stdlib.Bytes.blit ocaml_bytes 0 bytes_padded 0 len ;
+            bytes_padded
+        in
+        Bytes.constant ~le:true ocaml_bytes
       in
       ret @@ Bytes.concat [|msg; padding; binary_l|]
 

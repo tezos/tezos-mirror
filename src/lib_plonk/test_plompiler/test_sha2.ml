@@ -28,7 +28,7 @@ open Plonk_test
 module CS = Plonk.Circuit
 open Helpers
 
-module Internal : Test =
+module Internal_sha256 : Test =
 functor
   (L : LIB)
   ->
@@ -180,7 +180,7 @@ functor
       @ tests_sum1 @ tests_padding @ tests_initial_hash
   end
 
-module External : Test =
+module External_sha256 : Test =
 functor
   (L : LIB)
   ->
@@ -190,23 +190,23 @@ functor
 
     open Utils (L)
 
-    module H = Plompiler.Gadget.Sha256 (L)
+    module H256 = Plompiler.Gadget.Sha256 (L)
 
     let bytes_of_hex = Plompiler.Utils.bytes_of_hex
 
-    let test_digest i o () =
+    let test_digest_sha256 i o () =
       let* i = input ~kind:`Public i in
       let* o = input o in
-      let* o' = H.digest i in
+      let* o' = H256.digest i in
       assert_equal o o'
 
-    let tests_digest =
+    let tests_digest_sha256 =
       List.map
         (fun (i, o) ->
           let name = "SHA256.test_digest" ^ i in
           let i = input_bytes @@ Stdlib.Bytes.of_string i in
           let o = input_bytes @@ bytes_of_hex (String.concat "" o) in
-          test ~valid:true ~name ~flamegraph:true @@ test_digest i o)
+          test ~valid:true ~name ~flamegraph:false @@ test_digest_sha256 i o)
         [
           ( "abc",
             [
@@ -232,23 +232,97 @@ functor
             ] );
         ]
 
-    let tests = tests_digest
+    let tests = tests_digest_sha256
+  end
+
+module External_sha512 : Test =
+functor
+  (L : LIB)
+  ->
+  struct
+    open L
+    open Bytes
+
+    open Utils (L)
+
+    module H512 = Plompiler.Gadget.Sha512 (L)
+
+    let bytes_of_hex = Plompiler.Utils.bytes_of_hex
+
+    let test_digest_sha512 i o () =
+      let* i = input ~kind:`Public i in
+      let* o = input o in
+      let* o' = H512.digest i in
+      assert_equal o o'
+
+    let tests_digest_sha512 =
+      List.map
+        (fun (i, o) ->
+          let name = "SHA512.test_digest" ^ i in
+          let i = input_bytes @@ Stdlib.Bytes.of_string i in
+          let o = input_bytes @@ bytes_of_hex (String.concat "" o) in
+          test ~valid:true ~name ~flamegraph:false @@ test_digest_sha512 i o)
+        [
+          ( "abc",
+            [
+              "DDAF35A1";
+              "93617ABA";
+              "CC417349";
+              "AE204131";
+              "12E6FA4E";
+              "89A97EA2";
+              "0A9EEEE6";
+              "4B55D39A";
+              "2192992A";
+              "274FC1A8";
+              "36BA3C23";
+              "A3FEEBBD";
+              "454D4423";
+              "643CE80E";
+              "2A9AC94F";
+              "A54CA49F";
+            ] );
+          ( "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
+            [
+              "8E959B75";
+              "DAE313DA";
+              "8CF4F728";
+              "14FC143F";
+              "8F7779C6";
+              "EB9F7FA1";
+              "7299AEAD";
+              "B6889018";
+              "501D289E";
+              "4900F7E4";
+              "331B99DE";
+              "C4B5433A";
+              "C7D329EE";
+              "B6DD2654";
+              "5E96E55B";
+              "874BE909";
+            ] );
+        ]
+
+    let tests = tests_digest_sha512
   end
 
 let tests =
-  let both =
+  let sha256 =
     [
-      ("Internal", (module Internal : Test));
-      ("External", (module External : Test));
+      ("Internal_sha256", (module Internal_sha256 : Test));
+      ("External_sha256", (module External_sha256 : Test));
     ]
   in
+  let sha512 = [("External_sha512", (module External_sha512 : Test))] in
   (* This test uses plonk and it is marked quick so that it
      is always run by the CI *)
-  List.map (fun (name, m) -> Alcotest.test_case name `Quick (to_test m)) both
+  List.map
+    (fun (name, m) -> Alcotest.test_case name `Quick (to_test m))
+    (sha256 @ sha512)
   @ List.map
       (fun (name, m) ->
         Alcotest.test_case
           (name ^ " plonk")
           `Slow
           (to_test ~plonk:(module Plonk.Main_protocol) m))
-      both
+      sha256
