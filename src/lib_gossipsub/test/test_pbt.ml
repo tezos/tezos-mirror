@@ -1161,7 +1161,7 @@ module Test_opportunistic_grafting = struct
 
   (* This test checks opportunistic grafting as follows:
      1. Subscribe many distinct peers to some unique topic.
-        Partition this set in two, two times:
+        Partition the set of peers in two, two times:
         - one in the mesh (of cardinal higher than [degree_high]), one outside
         - one with a low score, one with a high score; the score is controlled
           through P5, the app specific scoring; the low score is below
