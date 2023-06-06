@@ -145,6 +145,7 @@ type adaptive_inflation = {
     int;
   max_costaking_baker_count :
     (* Maximal number of bakers an account can costake to. *) int;
+  staking_over_delegation_edge : (* Weight of staking over delegation. *) int;
 }
 
 type reward_weights = {
