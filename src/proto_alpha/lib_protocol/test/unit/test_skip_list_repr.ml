@@ -42,7 +42,7 @@ module TestNat (Parameters : sig
 end) =
 struct
   open Parameters
-  include Skip_list_repr.Make (Parameters)
+  include Skip_list.Make (Parameters)
 
   (* This represents cells of skip lists whose content are even
      numbers from {!val:initial_value} and increase 2 by 2. *)
@@ -536,7 +536,7 @@ let test_skip_list_proof_size () =
 
   *)
   let largest_proof basis =
-    let module M = Skip_list_repr.Make (struct
+    let module M = Skip_list.Make (struct
       let basis = basis
     end) in
     let cell_encoding = M.encoding H.encoding H.encoding in

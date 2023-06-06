@@ -2928,7 +2928,7 @@ module Sc_rollup : sig
   val pp_input_request : Format.formatter -> input_request -> unit
 
   module Inbox : sig
-    module Skip_list : Skip_list_repr.S
+    module Skip_list : Skip_list.S
 
     module Hash : S.HASH with type t = Smart_rollup.Inbox_hash.t
 

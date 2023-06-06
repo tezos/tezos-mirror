@@ -288,7 +288,7 @@ module History = struct
       (fun () -> Add_element_in_slots_skip_list_violates_ordering)
 
   module Skip_list = struct
-    include Skip_list_repr.Make (Skip_list_parameters)
+    include Skip_list.Make (Skip_list_parameters)
 
     (** All confirmed DAL slots will be stored in a skip list, where only the
         last cell is remembered in the L1 context. The skip list is used in
