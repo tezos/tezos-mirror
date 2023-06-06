@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+# SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -7,7 +8,7 @@ all: build check test
 
 .PHONY: build
 build:
-	@cargo build --release
+	@cargo build --release --target wasm32-unknown-unknown --example sequenced_kernel
 
 .PHONY: check
 check:
