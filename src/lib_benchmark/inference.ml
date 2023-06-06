@@ -28,7 +28,7 @@ open Costlang
 open Maths
 module NMap = Stats.Finbij.Make (Free_variable)
 
-type constrnt = Full of (Costlang.affine * measure)
+type constrnt = Full of Costlang.affine * measure
 
 and measure = Measure of vector
 
