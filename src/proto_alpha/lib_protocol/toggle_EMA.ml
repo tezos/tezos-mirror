@@ -24,29 +24,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Exponential moving average of toggle votes. Represented as an int32 between
+(** Exponential moving average of toggle votes. Represented as an int64 between
     0 and 2,000,000,000. It is an exponential moving average of the "off" votes
     over a window of the most recent 2000 blocks that did not vote "pass". *)
 
-(* The exponential moving average is represented as an Int32 between 0l and 2_000_000_000l *)
-type t = Int32.t (* Invariant 0 <= ema <= 2_000_000_000l *)
+(* The exponential moving average is represented as an Int64 between 0L and 2_000_000_000L *)
+type t = Int64.t (* Invariant 0 <= ema <= 2_000_000_000L *)
 
 (* This error is not registered because we don't expect it to be
    raised. *)
-type error += Toggle_ema_out_of_bound of Int32.t
+type error += Toggle_ema_out_of_bound of Int64.t
 
-let check_bounds x = Compare.Int32.(0l <= x && x <= 2_000_000_000l)
+let check_bounds x = Compare.Int64.(0L <= x && x <= 2_000_000_000L)
 
-let of_int32 (x : Int32.t) : t tzresult Lwt.t =
+let of_int64 (x : Int64.t) : t tzresult Lwt.t =
   if check_bounds x then return x else tzfail @@ Toggle_ema_out_of_bound x
 
-let zero : t = Int32.zero
+let zero : t = Int64.zero
 
 (* The conv_with_guard combinator of Data_encoding expects a (_, string) result. *)
-let of_int32_for_encoding x =
+let of_int64_for_encoding x =
   if check_bounds x then Ok x else Error "out of bounds"
 
-let to_int32 (ema : t) : Int32.t = ema
+let to_int64 (ema : t) : Int64.t = ema
 
 (* We perform the computations in Z to avoid overflows. *)
 
@@ -67,14 +67,14 @@ let recenter f ema = Z.(add z_1_000_000_000 (f (sub ema z_1_000_000_000)))
 let z_500_000 = Z.of_int 500_000
 
 let update_ema_off (ema : t) : t =
-  let ema = Z.of_int32 ema in
-  recenter (fun ema -> Z.add (attenuate ema) z_500_000) ema |> Z.to_int32
+  let ema = Z.of_int64 ema in
+  recenter (fun ema -> Z.add (attenuate ema) z_500_000) ema |> Z.to_int64
 
 let update_ema_on (ema : t) : t =
-  let ema = Z.of_int32 ema in
-  recenter (fun ema -> Z.sub (attenuate ema) z_500_000) ema |> Z.to_int32
+  let ema = Z.of_int64 ema in
+  recenter (fun ema -> Z.sub (attenuate ema) z_500_000) ema |> Z.to_int64
 
-let ( < ) : t -> Int32.t -> bool = Compare.Int32.( < )
+let ( < ) : t -> Int64.t -> bool = Compare.Int64.( < )
 
 let encoding : t Data_encoding.t =
-  Data_encoding.(conv_with_guard to_int32 of_int32_for_encoding int32)
+  Data_encoding.(conv_with_guard to_int64 of_int64_for_encoding int64)

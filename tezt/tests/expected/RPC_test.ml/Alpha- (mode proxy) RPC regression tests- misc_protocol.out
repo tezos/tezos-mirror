@@ -24,7 +24,7 @@
       "seed_nonce_revelation_tip_weight": 1, "vdf_revelation_tip_weight": 1 },
   "cost_per_byte": "250", "hard_storage_limit_per_operation": "60000",
   "quorum_min": 2000, "quorum_max": 7000, "min_proposal_quorum": 500,
-  "liquidity_baking_toggle_ema_threshold": 1000000000,
+  "liquidity_baking_toggle_ema_threshold": "1000000000",
   "max_operations_time_to_live": 240, "minimal_block_delay": "1",
   "delay_increment_per_round": "1", "consensus_committee_size": 256,
   "consensus_threshold": 0,
