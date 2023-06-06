@@ -409,6 +409,23 @@ module Scripts = struct
         ~query:RPC_query.empty
         RPC_path.(path / "normalize_type")
 
+    let operations_encodings =
+      union
+        [
+          case
+            ~title:"operations_encoding"
+            (Tag 0)
+            Operation.encoding
+            Option.some
+            Fun.id;
+          case
+            ~title:"operations_encoding_with_legacy_attestation_name"
+            Json_only
+            Operation.encoding_with_legacy_attestation_name
+            Option.some
+            Fun.id;
+        ]
+
     let run_operation =
       RPC_service.post_service
         ~description:
@@ -419,7 +436,7 @@ module Scripts = struct
         ~query:RPC_query.empty
         ~input:
           (obj2
-             (req "operation" Operation.encoding_with_legacy_attestation_name)
+             (req "operation" operations_encodings)
              (req "chain_id" Chain_id.encoding))
         ~output:
           Apply_results
@@ -454,7 +471,7 @@ module Scripts = struct
         ~input:
           (obj4
              (opt "blocks_before_activation" int32)
-             (req "operation" Operation.encoding_with_legacy_attestation_name)
+             (req "operation" operations_encodings)
              (req "chain_id" Chain_id.encoding)
              (dft "latency" int16 default_operation_inclusion_latency))
         ~output:

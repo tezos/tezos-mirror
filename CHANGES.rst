@@ -94,6 +94,13 @@ Node
   ``preattestation``, ``double_attestation_evidence`` and
   ``double_preattestation_evidence`` kinds in the JSON result. (MR :gl:`!8960`)
 
+- RPCs ``/helpers/scripts/run_operation`` and
+  ``/helpers/scripts/simulate_operation`` can now take JSON formatted operations
+  with ``double_attestation_evidence`` and ``double_preattestation_evidence``
+  kinds. Even though consensus operations are not supported by the RPCs,
+  ``attestation`` and ``preattestation`` are accepted in the input JSON. (MR
+  :gl:`!8768`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
