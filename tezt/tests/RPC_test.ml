@@ -404,6 +404,39 @@ let test_delegates_on_registered_alpha ~contracts ?endpoint client =
 
   unit
 
+let test_adaptive_inflation_on_alpha ?endpoint client =
+  Log.info "Test adaptive inflation parameters retrieval" ;
+
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_total_supply ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_total_frozen_stake ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_inflation_current_yearly_rate ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_inflation_current_yearly_rate_exact ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_inflation_rewards_per_minute ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_adaptive_inflation_launch_cycle ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_inflation_expected_rewards ()
+  in
+  unit
+
 let test_delegates_on_registered_hangzhou ~contracts ?endpoint client =
   Log.info "Test implicit baker contract" ;
 
@@ -581,6 +614,10 @@ let test_delegates _test_mode_tag _protocol ?endpoint client =
   let* contracts = get_contracts ?endpoint client in
   let* () = test_delegates_on_registered_alpha ~contracts ?endpoint client in
   test_delegates_on_unregistered_alpha ~contracts ?endpoint client
+
+(* Test the adaptive inflation RPC. *)
+let test_adaptive_inflation _test_mode_tag _protocol ?endpoint client =
+  test_adaptive_inflation_on_alpha ?endpoint client
 
 (* Test the votes RPC. *)
 let test_votes _test_mode_tag _protocol ?endpoint client =
@@ -1481,6 +1518,10 @@ let register protocols =
       "delegates"
       ~test_function:test_delegates
       ~parameter_overrides:consensus_threshold ;
+    check_rpc_regression
+      "adaptive_inflation"
+      ~supports:Protocol.(From_protocol (number Nairobi + 1))
+      ~test_function:test_adaptive_inflation ;
     check_rpc_regression
       "votes"
       ~test_function:test_votes

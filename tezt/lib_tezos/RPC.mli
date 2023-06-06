@@ -1011,6 +1011,55 @@ val get_chain_block_context_delegate_voting_info :
 val get_chain_block_context_delegate_voting_power :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/total_supply]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_total_supply :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/total_frozen_stake]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_total_frozen_stake :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/inflation/current_yearly_rate]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_inflation_current_yearly_rate :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/inflation/current_yearly_rate_exact]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_inflation_current_yearly_rate_exact :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/inflation/rewards_per_minute]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_inflation_rewards_per_minute :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/adaptive_inflation_launch_cycle]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_adaptive_inflation_launch_cycle :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/inflation/expected_rewards]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_inflation_expected_rewards :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
 (** Call RPC
    /chains/[chain]/blocks/[block]/context/dal/confirmed_slot_headers_history.
    [chain] defaults to ["main"].  [block] defaults to ["head"]. *)

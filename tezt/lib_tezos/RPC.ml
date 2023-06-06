@@ -1232,6 +1232,91 @@ let get_chain_block_context_delegate_voting_power ?(chain = "main")
     ]
     Fun.id
 
+let get_chain_block_context_total_supply ?(chain = "main") ?(block = "head") ()
+    =
+  make GET ["chains"; chain; "blocks"; block; "context"; "total_supply"] Fun.id
+
+let get_chain_block_context_total_frozen_stake ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "total_frozen_stake"]
+    Fun.id
+
+let get_chain_block_context_inflation_current_yearly_rate ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "inflation";
+      "current_yearly_rate";
+    ]
+    Fun.id
+
+let get_chain_block_context_inflation_current_yearly_rate_exact
+    ?(chain = "main") ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "inflation";
+      "current_yearly_rate_exact";
+    ]
+    Fun.id
+
+let get_chain_block_context_inflation_rewards_per_minute ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "inflation";
+      "rewards_per_minute";
+    ]
+    Fun.id
+
+let get_chain_block_context_adaptive_inflation_launch_cycle ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "adaptive_inflation_launch_cycle";
+    ]
+    Fun.id
+
+let get_chain_block_context_inflation_expected_rewards ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "inflation";
+      "expected_rewards";
+    ]
+    Fun.id
+
 let get_chain_block_context_dal_confirmed_slot_headers_history ?(chain = "main")
     ?(block = "head") () =
   make
