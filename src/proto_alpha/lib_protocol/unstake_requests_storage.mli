@@ -28,9 +28,12 @@
     This module is responsible for maintaining the
     {!Storage.Contract.Unstake_requests} table. *)
 
+type finalizable =
+  (Signature.Public_key_hash.t * Cycle_repr.t * Tez_repr.t) list
+
 type prepared_finalize_unstake = {
-  finalizable : (Signature.Public_key_hash.t * Cycle_repr.t * Tez_repr.t) list;
-  unfinalizable : Signature.Public_key_hash.t * (Cycle_repr.t * Tez_repr.t) list;
+  finalizable : finalizable;
+  unfinalizable : Storage.Unstake_request.t;
 }
 
 (** [prepare_finalize_unstake ctxt contract] preprocesses a [finalize_unstake]

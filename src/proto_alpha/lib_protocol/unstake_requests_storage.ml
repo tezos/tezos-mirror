@@ -23,9 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type finalizable =
+  (Signature.Public_key_hash.t * Cycle_repr.t * Tez_repr.t) list
+
 type prepared_finalize_unstake = {
-  finalizable : (Signature.Public_key_hash.t * Cycle_repr.t * Tez_repr.t) list;
-  unfinalizable : Signature.Public_key_hash.t * (Cycle_repr.t * Tez_repr.t) list;
+  finalizable : finalizable;
+  unfinalizable : Storage.Unstake_request.t;
 }
 
 let z100 = Z.of_int 100
@@ -77,7 +80,7 @@ let prepare_finalize_unstake ctxt contract =
           let slashing_history =
             Option.value slashing_history_opt ~default:[]
           in
-          let finalizable, unfinalizable =
+          let finalizable, unfinalizable_requests =
             List.partition_map
               (fun request ->
                 let request_cycle, request_amount = request in
@@ -93,5 +96,8 @@ let prepare_finalize_unstake ctxt contract =
                 else Right request)
               requests
           in
-          let unfinalizable = (delegate, unfinalizable) in
+          let unfinalizable =
+            Storage.Unstake_request.
+              {delegate; requests = unfinalizable_requests}
+          in
           return_some {finalizable; unfinalizable})
