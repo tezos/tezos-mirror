@@ -151,6 +151,44 @@ let initialize_total_supply_for_o ctxt =
     ctxt
     (Tez_repr.of_mutez_exn 940_000_000_000_000L)
 
+(** Migration of the context field storing the Liquidity Baking
+    EMA. The key of the field is renamed from
+    "liquidity_baking_escape_ema" to "liquidity_baking_toggle_ema" and
+    it is now stored on an int64 instead of an int32. *)
+let migrate_liquidity_baking_ema ctxt =
+  let legacy_key = ["liquidity_baking_escape_ema"] in
+  let get_and_remove_legacy_field ctxt =
+    Raw_context.get ctxt legacy_key >>=? fun ema_bytes ->
+    Raw_context.remove_existing ctxt legacy_key >>=? fun ctxt ->
+    return (ctxt, ema_bytes)
+  in
+  (get_and_remove_legacy_field ctxt >|= function
+   | Ok (ctxt, ema_bytes) -> (
+       match
+         Data_encoding.Binary.of_bytes_opt Data_encoding.int32 ema_bytes
+       with
+       | Some ema_i32 -> (ctxt, ema_i32)
+       | None ->
+           Logging.log
+             Logging.Error
+             "Migration of Liquidity Baking EMA: decoding error, the field %S \
+              was expected to be an int32 but it is %a. Defaulting to 0."
+             (String.concat "/" legacy_key)
+             Hex.pp
+             (Hex.of_bytes ema_bytes) ;
+           (ctxt, 0l))
+   | Error trace ->
+       Logging.log
+         Logging.Error
+         "%a@.Migration of Liquidity Baking EMA: the key %S was not found in \
+          context so defaulting to 0."
+         pp_trace
+         trace
+         (String.concat "/" legacy_key) ;
+       (ctxt, 0l))
+  >>= fun (ctxt, ema_i32) ->
+  Storage.Liquidity_baking.Toggle_ema.init ctxt (Int64.of_int32 ema_i32)
+
 let prepare_first_block _chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
@@ -232,7 +270,8 @@ let prepare_first_block _chain_id ctxt ~typecheck_smart_contract
       migrate_stake_distribution_for_o ctxt >>=? fun ctxt ->
       initialize_total_supply_for_o ctxt >>= fun ctxt ->
       Remove_zero_amount_ticket_migration_for_o.remove_zero_ticket_entries ctxt
-      >>= fun ctxt -> return (ctxt, []))
+      >>= fun ctxt ->
+      migrate_liquidity_baking_ema ctxt >>=? fun ctxt -> return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   List.fold_left_es patch_script ctxt Legacy_script_patches.addresses_to_patch
   >>=? fun ctxt ->
