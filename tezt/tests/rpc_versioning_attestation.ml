@@ -653,13 +653,72 @@ module Mempool = struct
     @@ fun protocol ->
     test_monitor_operations_consensus Operation.Preattestation protocol
 
+  let test_monitor_operations_double_consensus_evidence double_evidence_kind
+      protocol =
+    let* node, client = Client.init_with_protocol ~protocol `Client () in
+    let* () = Client.bake_for_and_wait ~node client in
+
+    let*? p_legacy = monitor_mempool node ~use_legacy_name:true in
+    let*? p = monitor_mempool node ~use_legacy_name:false in
+
+    let* consensus_op =
+      create_double_consensus_evidence
+        ~use_legacy_name:true
+        ~double_evidence_kind
+        client
+    in
+    let* (`OpHash _) =
+      Operation.inject ~force:true ~request:`Inject consensus_op client
+    in
+    let* () = Client.bake_for_and_wait ~node client in
+
+    let check_monitor_mempool p ~use_legacy_name =
+      let name =
+        Operation.Anonymous.kind_to_string double_evidence_kind use_legacy_name
+      in
+      check_monitor_mempool p name
+    in
+    let* () = check_monitor_mempool p_legacy ~use_legacy_name:true in
+    let* () = check_monitor_mempool p ~use_legacy_name:false in
+    check_invalid_monitor_mempool_version node
+
+  let test_monitor_double_consensus_evidence =
+    register_test
+      ~title:"Monitor double consensus evidence operations"
+      ~additionnal_tags:
+        ["mempool"; "monitor"; "operations"; "double"; "consensus"; "evidence"]
+    @@ fun protocol ->
+    test_monitor_operations_double_consensus_evidence
+      Operation.Anonymous.Double_attestation_evidence
+      protocol
+
+  let test_monitor_double_preconsensus_evidence =
+    register_test
+      ~title:"Monitor double pre-consensus evidence operations"
+      ~additionnal_tags:
+        [
+          "mempool";
+          "monitor";
+          "operations";
+          "double";
+          "consensus";
+          "pre";
+          "evidence";
+        ]
+    @@ fun protocol ->
+    test_monitor_operations_double_consensus_evidence
+      Operation.Anonymous.Double_preattestation_evidence
+      protocol
+
   let register ~protocols =
     test_pending_consensus protocols ;
     test_pending_preconsensus protocols ;
     test_pending_double_consensus_evidence protocols ;
     test_pending_double_preconsensus_evidence protocols ;
     test_monitor_consensus protocols ;
-    test_monitor_preconsensus protocols
+    test_monitor_preconsensus protocols ;
+    test_monitor_double_consensus_evidence protocols ;
+    test_monitor_double_preconsensus_evidence protocols
 end
 
 module Run_Simulate = struct
