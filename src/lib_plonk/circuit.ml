@@ -382,9 +382,7 @@ end = struct
           (fun i gate ->
             (* Printf.printf "\n\nGate %i: %s" i
                   (Plompiler.Csir.CS.to_string_gate gate); *)
-            let b = sat_gate identities gate trace cs.tables in
-            if b then ()
-            else
+            if not @@ sat_gate identities gate trace cs.tables then
               (* just to exit the iter *)
               raise
                 (Constraint_not_satisfied
