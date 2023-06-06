@@ -27,4 +27,7 @@ open Alpha_context
 
 val total_supply : 'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
 
+val total_frozen_stake :
+  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
+
 val register : unit -> unit
