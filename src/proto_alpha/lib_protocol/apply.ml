@@ -330,35 +330,36 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
       Signature.Public_key_hash.(sender = destination)
       Invalid_self_transaction_destination
   in
-  let* is_delegate = Contract.is_delegate ctxt sender in
-  let*? () =
-    error_unless is_delegate Staking_for_nondelegate_while_costaking_disabled
-  in
-  let delegate = sender in
-  let* ctxt, balance_updates =
-    Token.transfer
-      ctxt
-      (`Contract (Contract.Implicit sender))
-      (`Frozen_deposits delegate)
-      amount
-  in
-  (* Since [delegate] is an already existing delegate, it is already allocated. *)
-  let allocated_destination_contract = false in
-  let result =
-    Transaction_to_contract_result
-      {
-        storage = None;
-        lazy_storage_diff = None;
-        balance_updates;
-        ticket_receipt = [];
-        originated_contracts = [];
-        consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-        storage_size = Z.zero;
-        paid_storage_size_diff = Z.zero;
-        allocated_destination_contract;
-      }
-  in
-  return (ctxt, result, [])
+  let* delegate_opt = Contract.Delegate.find ctxt contract in
+  match delegate_opt with
+  | None -> tzfail Staking_for_nondelegate_while_costaking_disabled
+  | Some delegate when Signature.Public_key_hash.(delegate <> sender) ->
+      tzfail Staking_for_nondelegate_while_costaking_disabled
+  | Some delegate ->
+      let* ctxt, balance_updates =
+        Token.transfer
+          ctxt
+          (`Contract (Contract.Implicit sender))
+          (`Frozen_deposits delegate)
+          amount
+      in
+      (* Since [delegate] is an already existing delegate, it is already allocated. *)
+      let allocated_destination_contract = false in
+      let result =
+        Transaction_to_contract_result
+          {
+            storage = None;
+            lazy_storage_diff = None;
+            balance_updates;
+            ticket_receipt = [];
+            originated_contracts = [];
+            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            storage_size = Z.zero;
+            paid_storage_size_diff = Z.zero;
+            allocated_destination_contract;
+          }
+      in
+      return (ctxt, result, [])
 
 let apply_finalize_unstake ~ctxt ~sender ~amount ~destination ~before_operation
     =
