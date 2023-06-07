@@ -26,3 +26,7 @@
 (* A pseudotoken is not a Tez but it behaves similarly so let's reuse its operations. *)
 
 include Tez_repr
+
+let of_int64_exn = of_mutez_exn
+
+let to_int64 = to_mutez

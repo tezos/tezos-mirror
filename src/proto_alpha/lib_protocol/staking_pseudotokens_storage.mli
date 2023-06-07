@@ -26,3 +26,14 @@
 (** This module is responsible for maintaining the
     {!Storage.Contract.Frozen_deposits_pseudotokens} and
     {!Storage.Contract.Costaking_pseudotokens} tables. *)
+
+(** [credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount]
+    increases [delegate]'s stake pseudotokens by an amount [pa] corresponding to
+    [tez_amount] multiplied by the current rate of the delegate's frozen
+    deposits pseudotokens per tez.
+    The function also returns [pa]. *)
+val credit_frozen_deposits_pseudotokens_for_tez_amount :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Tez_repr.t ->
+  (Raw_context.t * Staking_pseudotoken_repr.t) tzresult Lwt.t
