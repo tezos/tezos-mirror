@@ -29,6 +29,8 @@ type t
 
 val encoding : t Data_encoding.t
 
+val zero : t
+
 val of_int64_exn : int64 -> t
 
 val to_int64 : t -> int64

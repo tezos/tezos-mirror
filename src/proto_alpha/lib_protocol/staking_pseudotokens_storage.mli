@@ -40,3 +40,11 @@ val credit_frozen_deposits_pseudotokens_for_tez_amount :
   Signature.Public_key_hash.t ->
   Tez_repr.t ->
   (Raw_context.t * Staking_pseudotoken_repr.t) tzresult Lwt.t
+
+(** [credit_costaking_pseudotokens ctxt contract p_amount] increases
+    [contract]'s costaking pseudotokens balance by [p_amount]. *)
+val credit_costaking_pseudotokens :
+  Raw_context.t ->
+  Contract_repr.t ->
+  Staking_pseudotoken_repr.t ->
+  Raw_context.t tzresult Lwt.t
