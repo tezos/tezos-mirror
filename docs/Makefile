@@ -6,13 +6,14 @@ SPHINXBUILD   = poetry run sphinx-build
 SOURCEDIR     = .
 TMPDOCDIR     = /tmp/octezdoc
 BUILDDIR      = _build
-TOPBUILDDIR   = ../_build/default
+TOPBUILDDIR   = ../_build
+TOPBUILDDIR_ABS  = $(abspath $(CURDIR)/$(TOPBUILDDIR))
 
 DOCGENDIR     = doc_gen
 DOCERRORDIR   = $(DOCGENDIR)/errors
-P2PDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/p2p_doc.exe
-RPCDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/rpc_doc.exe
-ERRDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCERRORDIR)/error_doc.exe
+P2PDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/p2p_doc.exe
+RPCDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/rpc_doc.exe
+ERRDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCERRORDIR)/error_doc.exe
 
 NAMED_PROTOS  = mumbai nairobi
 PROTOCOLS     = $(NAMED_PROTOS) alpha
@@ -86,12 +87,14 @@ odoc-lite: docexes
 	  --exclude="src/proto_0*" \
 		../src ../tezt ../vendors ../dune ../dune-project $(TMPDOCDIR)/
 	patch -d $(TMPDOCDIR) -p1 <odoc_protocols.patch
-	@echo "Running odoc, outputs messages to $(TMPDOCDIR)/odoc.log"
-	cd $(TMPDOCDIR); ODOC_WARN_ERROR=true dune build @doc >odoc.log 2>&1; \
-	  RESULT=$$?; (grep '^Error:' odoc.log || true); exit $$RESULT
-	@rm -rf _build/api/odoc
-	@mkdir -p _build/api
-	@cp -r $(TMPDOCDIR)/_build/default/_doc _build/api/odoc
+	@echo "Running odoc in $(TMPDOCDIR), with build directory $(TOPBUILDDIR_ABS) and outputs in $(TMPDOCDIR)/odoc.log"
+	ODOC_WARN_ERROR=true dune build @doc --build-dir=$(TOPBUILDDIR_ABS) --root=$(TMPDOCDIR) >$(TMPDOCDIR)/odoc.log 2>&1; \
+		RESULT=$$?; \
+		(grep '^Error:' $(TMPDOCDIR)/odoc.log || true) ; \
+		exit $$RESULT
+	rm -rf $(CURDIR)/_build/api/odoc
+	mkdir -p $(CURDIR)/_build/api
+	cp -r $(TOPBUILDDIR_ABS)/default/_doc $(CURDIR)/_build/api/odoc
 
 .PHONY: linkcheck
 linkcheck: html
