@@ -238,10 +238,26 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty =
     in
     validate_untyped_parameters_ty ctxt parameters_ty
   in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5693
-     Provide a gas model for this snippet *)
+  let boot_sector_size_in_bytes = String.length boot_sector in
+  let*? ctxt =
+    match kind with
+    | Sc_rollup.Kind.Wasm_2_0_0 | Example_arith ->
+        (*
+
+           We do not really care about the precision of the gas model
+           when it comes to the [Example_arith] PVM, so we use the
+           WASM PVM model for both cases.
+
+           As you can convince yourself by code inspection, the cost
+           of [Sc_rollup.genesis_state_hash_of] is dominated by the
+           installation of the boot sector.
+
+        *)
+        Gas.consume ctxt
+        @@ Sc_rollup_costs.cost_install_boot_sector_in_wasm_pvm
+             ~boot_sector_size_in_bytes
+  in
   let*! genesis_hash = Sc_rollup.genesis_state_hash_of kind ~boot_sector in
-  (* End of TODO *)
   let genesis_commitment =
     Sc_rollup.Commitment.genesis_commitment
       ~genesis_state_hash:genesis_hash
