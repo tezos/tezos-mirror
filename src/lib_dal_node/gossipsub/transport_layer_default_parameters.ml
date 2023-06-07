@@ -35,8 +35,9 @@ module P2p_limits = struct
 
   let greylist_timeout = Time.System.Span.of_seconds_exn 86400. (* one day *)
 
-  let maintenance_idle_time = Some (Time.System.Span.of_seconds_exn 120.)
-  (* two minutes *)
+  (* [maintenance_idle_time] is set to [None] to disable the internal maintenance
+     mechanism of Octez-p2p. *)
+  let maintenance_idle_time = None
 
   let min_connections = 10
 
