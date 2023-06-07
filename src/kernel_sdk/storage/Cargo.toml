@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-smart-rollup-storage"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["TriliTech <contact@trili.tech>"]
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "Higher-level transactional account view over Tezos Smart Rollup durable storage."
+keywords = ["tezos", "smart", "rollup"]
+categories = ["database", "wasm"]
+
+[dependencies]
+thiserror = "1.0"
+
+[dependencies.tezos-smart-rollup-core]
+path = "../core"
+version = "0.1.0"
+default-features = false
+
+[dependencies.tezos-smart-rollup-host]
+path = "../host"
+version = "0.1.0"
+default-features = false
+
+[dependencies.tezos-smart-rollup-debug]
+path = "../debug"
+version = "0.1.0"
+
+[dependencies.tezos-smart-rollup-encoding]
+path = "../encoding"
+version = "0.1.0"
+
+[dev-dependencies.tezos-smart-rollup-core]
+path = "../core"
+version = "0.1.0"
+features = ["testing"]
+
+[dev-dependencies.tezos-smart-rollup-mock]
+path = "../mock"
+version = "0.1.0"
+
+[features]
+default = ["tezos-smart-rollup-host/default"]

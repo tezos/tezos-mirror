@@ -44,12 +44,11 @@ let inject_block cctxt ?(force = false) ~chain signed_block_header operations =
 
 let inject_operation cctxt ~chain operation =
   let encoded_op =
-    Data_encoding.Binary.to_bytes_exn Operation.encoding operation
+    Data_encoding.Binary.to_bytes_exn
+      Operation.encoding_with_legacy_attestation_name
+      operation
   in
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4875
-     `Shell_services.Injection.operation` should be used instead once
-     the needed changes in the protocol are in place. *)
-  Shell_services.Injection.private_operation cctxt ~async:true ~chain encoded_op
+  Shell_services.Injection.operation cctxt ~async:true ~chain encoded_op
 
 let preapply_block cctxt ~chain ~head ~timestamp ~protocol_data operations =
   Block_services.Helpers.Preapply.block
@@ -83,14 +82,20 @@ let info_of_header_and_ops ~in_protocol block_hash block_header operations =
   let* round =
     Environment.wrap_tzresult @@ Fitness.round_from_raw shell.fitness
   in
-  let payload_hash, payload_round, prequorum, quorum, payload =
+  let payload_hash, payload_round, prequorum, quorum, dal_attestations, payload
+      =
     if not in_protocol then
       (* The first block in the protocol is baked using the previous
          protocol, the encodings might change. The baker's logic is to
          consider final the first block of a new protocol and not
          endorse it. Therefore, we do not need to have the correct
          values here. *)
-      (dummy_payload_hash, Round.zero, None, [], Operation_pool.empty_payload)
+      ( dummy_payload_hash,
+        Round.zero,
+        None,
+        [],
+        [],
+        Operation_pool.empty_payload )
     else
       let payload_hash, payload_round =
         match
@@ -102,13 +107,13 @@ let info_of_header_and_ops ~in_protocol block_hash block_header operations =
             (payload_hash, payload_round)
         | None -> assert false
       in
-      let preendorsements, quorum, payload =
+      let preendorsements, quorum, dal_attestations, payload =
         WithExceptions.Option.get
           ~loc:__LOC__
           (Operation_pool.extract_operations_of_list_list operations)
       in
       let prequorum = Option.bind preendorsements extract_prequorum in
-      (payload_hash, payload_round, prequorum, quorum, payload)
+      (payload_hash, payload_round, prequorum, quorum, dal_attestations, payload)
   in
   return
     {
@@ -119,6 +124,7 @@ let info_of_header_and_ops ~in_protocol block_hash block_header operations =
       round;
       prequorum;
       quorum;
+      dal_attestations;
       payload;
     }
 
@@ -151,7 +157,7 @@ let compute_block_info cctxt ~in_protocol ?operations ~chain block_hash
         let parse_op (raw_op : Tezos_base.Operation.t) =
           let protocol_data =
             Data_encoding.Binary.of_bytes_exn
-              Operation.protocol_data_encoding
+              Operation.protocol_data_encoding_with_legacy_attestation_name
               raw_op.proto
           in
           {shell = raw_op.shell; protocol_data}
@@ -282,3 +288,11 @@ let await_protocol_activation cctxt ~chain () =
   Lwt_stream.get block_stream >>= fun _ ->
   stop () ;
   return_unit
+
+let get_attestable_slots dal_node_rpc_ctxt pkh ~level =
+  Tezos_rpc.Context.make_call
+    Tezos_dal_node_services.Services.get_attestable_slots
+    dal_node_rpc_ctxt
+    (((), pkh), level)
+    ()
+    ()

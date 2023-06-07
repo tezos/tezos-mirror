@@ -727,12 +727,26 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
         in
         gas_patching_stats_list rest need_patching gas_consumed
   in
+  let gas_limit_per_patched_op =
+    let need_gas_patching, gas_consumed =
+      gas_patching_stats_list annotated_contents 0 Gas.Arith.zero
+    in
+    if need_gas_patching = 0 then hard_gas_limit_per_operation
+    else
+      let remaining_gas = Gas.Arith.sub hard_gas_limit_per_block gas_consumed in
+      let average_per_operation_gas =
+        Gas.Arith.integral_exn
+        @@ Z.div
+             (Gas.Arith.integral_to_z remaining_gas)
+             (Z.of_int need_gas_patching)
+      in
+      Gas.Arith.min hard_gas_limit_per_operation average_per_operation_gas
+  in
   let may_need_patching_single :
       type kind.
-      Gas.Arith.integral ->
       kind Annotated_manager_operation.t ->
       kind Annotated_manager_operation.t option =
-   fun gas_limit_per_patched_op op ->
+   fun op ->
     match op with
     | Manager_info c ->
         let needs_patching =
@@ -758,18 +772,16 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             (Manager_info
                {c with gas_limit; storage_limit; fee = Limit.known fee})
   in
-  let may_need_patching gas_limit_per_patched_op ops =
+  let may_need_patching ops =
     let rec loop :
         type kind.
         kind Annotated_manager_operation.annotated_list ->
         kind Annotated_manager_operation.annotated_list option = function
       | Single_manager annotated_op ->
           Option.map (fun op -> Annotated_manager_operation.Single_manager op)
-          @@ may_need_patching_single gas_limit_per_patched_op annotated_op
+          @@ may_need_patching_single annotated_op
       | Cons_manager (annotated_op, rest) -> (
-          let annotated_op_opt =
-            may_need_patching_single gas_limit_per_patched_op annotated_op
-          in
+          let annotated_op_opt = may_need_patching_single annotated_op in
           let rest_opt = loop rest in
           match (annotated_op_opt, rest_opt) with
           | None, None -> None
@@ -846,12 +858,12 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
          Lwt.return (estimated_gas_single result) >>= fun gas ->
          match gas with
          | Error _ when force ->
-             (* When doing a simulation, set gas to hard limit so as to not change
-                the error. When force injecting a failing operation, set gas to
-                zero to not pay fees for this operation. *)
+             (* When doing a simulation, set gas to the maximum possible value
+                so as to not change the error. When force injecting a failing
+                operation, set gas to zero to not pay fees for this
+                operation. *)
              let gas =
-               if simulation then hard_gas_limit_per_operation
-               else Gas.Arith.zero
+               if simulation then gas_limit_per_patched_op else Gas.Arith.zero
              in
              return
                (Annotated_manager_operation.set_gas_limit (Limit.known gas) op)
@@ -944,22 +956,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
         return (Cons (op, rest))
     | _ -> assert false
   in
-  let gas_limit_per_patched_op =
-    let need_gas_patching, gas_consumed =
-      gas_patching_stats_list annotated_contents 0 Gas.Arith.zero
-    in
-    if need_gas_patching = 0 then hard_gas_limit_per_operation
-    else
-      let remaining_gas = Gas.Arith.sub hard_gas_limit_per_block gas_consumed in
-      let average_per_operation_gas =
-        Gas.Arith.integral_exn
-        @@ Z.div
-             (Gas.Arith.integral_to_z remaining_gas)
-             (Z.of_int need_gas_patching)
-      in
-      Gas.Arith.min hard_gas_limit_per_operation average_per_operation_gas
-  in
-  match may_need_patching gas_limit_per_patched_op annotated_contents with
+  match may_need_patching annotated_contents with
   | Some annotated_for_simulation ->
       Lwt.return
         (Annotated_manager_operation.manager_list_from_annotated

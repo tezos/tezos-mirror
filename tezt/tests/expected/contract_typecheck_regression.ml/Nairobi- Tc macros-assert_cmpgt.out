@@ -1,0 +1,21 @@
+
+./octez-client --protocol PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/macros/assert_cmpgt.tz --details
+Well typed
+Gas remaining: 1039991.596 units remaining
+{ parameter (pair int int) ;
+  storage unit ;
+  code { CAR
+         /* [ pair int int ] */ ;
+         DUP
+         /* [ pair int int : pair int int ] */ ;
+         CAR
+         /* [ int : pair int int ] */ ;
+         DIP { CDR /* [ int ] */ }
+         /* [ int : int ] */ ;
+         ASSERT_CMPGT ;
+         UNIT
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

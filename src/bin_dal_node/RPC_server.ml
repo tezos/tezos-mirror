@@ -27,106 +27,125 @@
 open Tezos_rpc_http
 open Tezos_rpc_http_server
 
+let call_handler1 ctxt handler = handler (Node_context.get_store ctxt)
+
+let call_handler2 ctxt handler =
+  let open Lwt_result_syntax in
+  let*? ready_ctxt = Node_context.get_ready ctxt in
+  let store = Node_context.get_store ctxt in
+  handler store ready_ctxt
+
 module Slots_handlers = struct
-  let call_handler handler ctxt =
-    let open Lwt_result_syntax in
-    let*? {cryptobox; _} = Node_context.get_ready ctxt in
-    let store = Node_context.get_store ctxt in
-    handler store cryptobox
+  let to_option_tzresult r =
+    Errors.to_option_tzresult
+      ~none:(function `Not_found -> true | _ -> false)
+      r
 
   let post_commitment ctxt () slot =
-    call_handler (fun store -> Slot_manager.add_commitment store slot) ctxt
+    call_handler2 ctxt (fun store {cryptobox; _} ->
+        Slot_manager.add_commitment store slot cryptobox |> Errors.to_tzresult)
 
   let patch_commitment ctxt commitment () slot_id =
-    call_handler
-      (fun store cryptobox ->
-        let open Lwt_result_syntax in
-        let*! r =
-          Slot_manager.associate_slot_id_with_commitment
-            store
-            cryptobox
-            commitment
-            slot_id
-        in
-        match r with Ok () -> return_some () | Error `Not_found -> return_none)
-      ctxt
+    call_handler2 ctxt (fun store {cryptobox; _} ->
+        Slot_manager.associate_slot_id_with_commitment
+          store
+          cryptobox
+          commitment
+          slot_id
+        |> to_option_tzresult)
 
   let get_commitment_slot ctxt commitment () () =
-    call_handler
-      (fun store cryptobox ->
-        let open Lwt_result_syntax in
-        let*! r = Slot_manager.get_commitment_slot store cryptobox commitment in
-        match r with Ok s -> return_some s | Error `Not_found -> return_none)
-      ctxt
+    call_handler2 ctxt (fun store {cryptobox; _} ->
+        Slot_manager.get_commitment_slot store cryptobox commitment
+        |> to_option_tzresult)
 
   let get_commitment_proof ctxt commitment () () =
-    call_handler
-      (fun store cryptobox ->
+    call_handler2 ctxt (fun store {cryptobox; _} ->
         let open Lwt_result_syntax in
         (* This handler may be costly: We need to recompute the
            polynomial and then compute the proof. *)
-        let*! slot =
+        let* slot =
           Slot_manager.get_commitment_slot store cryptobox commitment
+          |> to_option_tzresult
         in
         match slot with
-        | Error `Not_found -> return_none
-        | Ok slot -> (
+        | None -> return_none
+        | Some slot -> (
             match Cryptobox.polynomial_from_slot cryptobox slot with
             | Error _ ->
                 (* Storage consistency ensures we can always compute the
                    polynomial from the slot. *)
                 assert false
-            | Ok polynomial ->
-                return_some (Cryptobox.prove_commitment cryptobox polynomial)))
-      ctxt
+            | Ok polynomial -> (
+                match Cryptobox.prove_commitment cryptobox polynomial with
+                (* [polynomial] was produced with the parameters from
+                   [cryptobox], thus we can always compute the proof from
+                   [polynomial]. *)
+                | Error _ -> assert false
+                | Ok proof -> return_some proof)))
+
+  let put_commitment_shards ctxt commitment () with_proof =
+    call_handler2 ctxt (fun store {cryptobox; _} ->
+        Slot_manager.add_commitment_shards store cryptobox commitment with_proof
+        |> Errors.to_option_tzresult)
 
   let get_commitment_by_published_level_and_index ctxt level slot_index () () =
-    call_handler
-      (fun store _cryptobox ->
-        let open Lwt_result_syntax in
-        let*! r =
-          Slot_manager.get_commitment_by_published_level_and_index
-            ~level
-            ~slot_index
-            store
-        in
-        match r with
-        | Ok s -> return_some s
-        | Error (Ok `Not_found) -> return_none
-        | Error (Error e) -> fail e)
-      ctxt
+    call_handler1 ctxt (fun store ->
+        Slot_manager.get_commitment_by_published_level_and_index
+          ~level
+          ~slot_index
+          store
+        |> to_option_tzresult)
 
   let get_commitment_headers ctxt commitment (slot_level, slot_index) () =
-    call_handler
-      (fun store _cryptobox ->
+    call_handler1 ctxt (fun store ->
         Slot_manager.get_commitment_headers
           commitment
           ?slot_level
           ?slot_index
-          store)
-      ctxt
+          store
+        |> Errors.to_tzresult)
 
   let get_published_level_headers ctxt published_level header_status () =
-    call_handler
-      (fun store _cryptobox ->
+    call_handler1 ctxt (fun store ->
         Slot_manager.get_published_level_headers
           ~published_level
           ?header_status
-          store)
-      ctxt
+          store
+        |> Errors.to_tzresult)
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4338
+
+     Re-consider this implementation/interface when the issue above is
+     tackeled. *)
+  let monitor_shards ctxt () () () =
+    call_handler1 ctxt (fun store ->
+        let stream, stopper = Store.open_shards_stream store in
+        let shutdown () = Lwt_watcher.shutdown stopper in
+        let next () = Lwt_stream.get stream in
+        Tezos_rpc.Answer.return_stream {next; shutdown})
 end
 
 module Profile_handlers = struct
   let patch_profile ctxt () profile =
-    let store = Node_context.get_store ctxt in
-    Profile_manager.add_profile store profile
+    call_handler1 ctxt (fun store -> Profile_manager.add_profile store profile)
 
   let get_profiles ctxt () () =
-    let store = Node_context.get_store ctxt in
-    Profile_manager.get_profiles store
+    call_handler1 ctxt (fun store ->
+        Profile_manager.get_profiles store |> Errors.to_tzresult)
 
   let get_assigned_shard_indices ctxt pkh level () () =
-    Node_context.fetch_assigned_shard_indicies ctxt ~level ~pkh
+    Node_context.fetch_assigned_shard_indices ctxt ~level ~pkh
+
+  let get_attestable_slots ctxt pkh attested_level () () =
+    call_handler2 ctxt (fun store {proto_parameters; _} ->
+        Profile_manager.get_attestable_slots
+          ctxt
+          store
+          proto_parameters
+          pkh
+          ~attested_level
+        |> Errors.to_tzresult)
 end
 
 let add_service registerer service handler directory =
@@ -153,6 +172,10 @@ let register_new :
        Services.get_commitment_proof
        (Slots_handlers.get_commitment_proof ctxt)
   |> add_service
+       Tezos_rpc.Directory.opt_register1
+       Services.put_commitment_shards
+       (Slots_handlers.put_commitment_shards ctxt)
+  |> add_service
        Tezos_rpc.Directory.opt_register2
        Services.get_commitment_by_published_level_and_index
        (Slots_handlers.get_commitment_by_published_level_and_index ctxt)
@@ -176,42 +199,28 @@ let register_new :
        Tezos_rpc.Directory.register1
        Services.get_published_level_headers
        (Slots_handlers.get_published_level_headers ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register2
+       Services.get_attestable_slots
+       (Profile_handlers.get_attestable_slots ctxt)
+  |> add_service
+       Tezos_rpc.Directory.gen_register
+       Services.monitor_shards
+       (Slots_handlers.monitor_shards ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in
-  Tezos_rpc.Directory.empty |> register_split_slot ctxt
-  |> register_show_slot ctxt |> register_shard ctxt |> register_shards ctxt
+  Tezos_rpc.Directory.empty |> register_shard ctxt |> register_shards ctxt
   |> register_show_slot_pages ctxt
-  |> register_monitor_slot_headers ctxt
 
 let register ctxt = register_new ctxt (register_legacy ctxt)
 
 let merge dir plugin_dir = Tezos_rpc.Directory.merge dir plugin_dir
 
-let start configuration cctxt ctxt dac_pks_opt dac_sk_uris =
+let start configuration ctxt =
   let open Lwt_syntax in
-  let Configuration.
-        {rpc_addr; rpc_port; dac = {reveal_data_dir; threshold; _}; _} =
-    configuration
-  in
+  let Configuration.{rpc_addr; rpc_port; _} = configuration in
   let dir = register ctxt in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4558
-     Rename "plugin" prefix to "dac".
-  *)
-  let plugin_prefix = Tezos_rpc.Path.(open_root / "plugin") in
-  let dir =
-    Tezos_rpc.Directory.register_dynamic_directory dir plugin_prefix (fun () ->
-        match Node_context.get_status ctxt with
-        | Ready {dac_plugin = (module Dac_plugin); _} ->
-            Lwt.return
-              (Dac_plugin.RPC.rpc_services
-                 ~reveal_data_dir
-                 cctxt
-                 dac_pks_opt
-                 dac_sk_uris
-                 threshold)
-        | Starting -> Lwt.return Tezos_rpc.Directory.empty)
-  in
   let rpc_addr = P2p_addr.of_string_exn rpc_addr in
   let host = Ipaddr.V6.to_string rpc_addr in
   let node = `TCP (`Port rpc_port) in
@@ -239,3 +248,6 @@ let install_finalizer rpc_server =
   let* () = shutdown rpc_server in
   let* () = Event.(emit shutdown_node exit_status) in
   Tezos_base_unix.Internal_event_unix.close ()
+
+let monitor_shards_rpc ctxt =
+  Tezos_rpc.Context.make_streamed_call Services.monitor_shards ctxt () () ()

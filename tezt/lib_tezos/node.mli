@@ -74,6 +74,8 @@ type argument =
   | Sync_latency of int  (** [--sync-latency] *)
   | Connections of int  (** [--connections] *)
   | Private_mode  (** [--private-mode] *)
+  | Disable_p2p_maintenance  (** [--disable-p2p-maintenance] *)
+  | Disable_p2p_swap  (** [--disable-p2p-swap] *)
   | Peer of string  (** [--peer] *)
   | No_bootstrap_peers  (** [--no-bootstrap-peers] *)
   | Disable_operations_precheck  (** [--disable-mempool-precheck] *)
@@ -82,6 +84,7 @@ type argument =
   | Metrics_addr of string  (** [--metrics-addr] *)
   | Cors_origin of string  (** [--cors-origin] *)
   | Disable_mempool  (** [--disable-mempool] *)
+  | Version  (** [--version] *)
 
 (** A TLS configuration for the node: paths to a [.crt] and a [.key] file.
 
@@ -165,6 +168,10 @@ val get_peers : t -> string list
     where [<PORT>] is the P2P port and [<ID>] is the identity of [peer]. *)
 val add_peer_with_id : t -> t -> unit Lwt.t
 
+(** Removes the file peers.json that is at the root of data-dir.
+    This file contains the list of peers known by the node. *)
+val remove_peers_json_file : t -> unit
+
 (** Get the P2P point and id for a node.
 
     Return ["<ADDRESS>:<PORT>#<ID>"] where [<PORT>] is the P2P
@@ -184,6 +191,10 @@ val point_and_id : ?from:t -> t -> string Lwt.t
     being the runner of [from] and [runner] is the runner of the node.
     In other words it is the address where [from] can contact [node]. *)
 val point : ?from:t -> t -> string * int
+
+(** Same as [point] but returns a string representation of the point
+    ["<ADDRESS>:<PORT>"]. *)
+val point_str : ?from:t -> t -> string
 
 (** See [Daemon.Make.name] *)
 val name : t -> string
@@ -343,6 +354,13 @@ val spawn_snapshot_export :
   string ->
   Process.t
 
+(** Run [octez-node snapshot info]. *)
+val snapshot_info : ?json:bool -> t -> string -> unit Lwt.t
+
+(** Same as [snapshot_info], but do not wait for the process to
+    exit. *)
+val spawn_snapshot_info : ?json:bool -> t -> string -> Process.t
+
 (** Run [octez-node snapshot import]. *)
 val snapshot_import : ?reconstruct:bool -> t -> string -> unit Lwt.t
 
@@ -376,6 +394,7 @@ val spawn_reconstruct : t -> Process.t
     for a more precise semantic.
  *)
 val run :
+  ?patch_config:(JSON.t -> JSON.t) ->
   ?on_terminate:(Unix.process_status -> unit) ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
@@ -427,7 +446,10 @@ val wait_for_level : t -> int -> int Lwt.t
     Returns [0] if the node is not running or if no [head_increment] or
     [branch_switch] event was received yet. This makes this function equivalent
     to [wait_for_level node 0] except that it does not actually wait for the
-    level to be known. *)
+    level to be known.
+
+    Note that, as the node's status is updated only on head
+    increments, this value is wrong just after a snapshot import. *)
 val get_level : t -> int
 
 (** Wait for the node to read its identity.
@@ -449,6 +471,18 @@ val wait_for_full :
 
 (** See [Daemon.Make.wait_for]. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+
+(** Wait for a node to receive a given number of connections.
+
+    [wait_for_connections node n] waits until [node] receives [n]
+    ["connection"] Chain validator events. *)
+val wait_for_connections : t -> int -> unit Lwt.t
+
+(** Wait for a node to receive a given number of disconnections.
+
+    [wait_for_disconnections node n] waits until [node] receives
+    [n] ["disconnection"] Chain validator events. *)
+val wait_for_disconnections : t -> int -> unit Lwt.t
 
 (** Raw events. *)
 type event = {name : string; value : JSON.t; timestamp : float}
@@ -511,3 +545,6 @@ val send_raw_data : t -> data:string -> unit Lwt.t
 
 (** [upgrade_storage node] upprades the given [node] storage. *)
 val upgrade_storage : t -> unit Lwt.t
+
+(** Run [octez-node --version] and return the node's version. *)
+val get_version : t -> string Lwt.t

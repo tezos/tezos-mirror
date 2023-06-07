@@ -16,6 +16,7 @@ or available only on test networks, is given in the
 :package-api:`OCaml Documentation
 <tezos-protocol-016-PtMumbai/Tezos_raw_protocol_016_PtMumbai/Operation_repr/index.html>`.
 
+.. _validation_passes:
 .. _validation_passes_mumbai:
 
 Validation Passes
@@ -47,6 +48,7 @@ The current protocol implementation enforces the following invariant:
 In the sequel, we describe the different classes of operations, and
 the different kinds of operations belonging to each class.
 
+.. _consensus_operations:
 .. _consensus_operations_mumbai:
 
 Consensus Operations
@@ -67,6 +69,7 @@ phases required to agree on the next block.
   for which a preendorsement quorum certificate (PQC) has been
   observed.
 
+.. _voting_operations:
 .. _voting_operations_mumbai:
 
 Voting Operations
@@ -82,13 +85,14 @@ voting operations:
 
 - The ``Ballot`` operation enables delegates to participate in the
   Exploration and Promotion periods. Delegates use this operation to
-  vote for (``Yay``), against (``Nay``), or to side with the majority
+  vote for (``Yea``), against (``Nay``), or to side with the majority
   (``Pass``), when examining a protocol amendment proposal.
 
 Further details on each operation's implementation and semantics are
 provided in the dedicated entry for :ref:`on-chain
 governance<voting_operations_mumbai>`.
 
+.. _anonymous_operations:
 .. _anonymous_operations_mumbai:
 
 Anonymous Operations
@@ -152,6 +156,7 @@ account. This operation is used as a deterrent to ensure that a
 delegate secures its consensus key as much as its manager (or main)
 key.
 
+.. _manager_operations:
 .. _manager_operations_mumbai:
 
 Manager Operations
@@ -198,18 +203,51 @@ manager operations are the only fee-paying and
 
 Moreover, all operations necessary to implement Tezos' *enshrined*
 Layer 2 solutions into the economic protocol are also manager
-operations:
+operations.
 
-.. FIXME tezos/tezos#3916: expand documentation of TORU operations.
+In particular, :doc:`smart rollups <smart_rollups>` maintenance is
+handled with dedicated manager operations.
 
-- :doc:`Transaction Optimistic Rollups<transaction_rollups>` are
-  implemented using the following manager operations:
-  ``Tx_rollup_origination``, ``Tx_rollup_submit_batch``,
-  ``Tx_rollup_commit``, ``Tx_rollup_return_bond``,
-  ``Tx_rollup_finalize_commitment``, ``Tx_rollup_remove_commitment``,
-  ``Tx_rollup_rejection``, ``Tx_rollup_rejection``,
-  ``Transfer_ticket``.
+- The ``Smart_rollup_originate`` operation is used to originate, that
+  is, to deploy smart rollups in the Tezos blockchain.
+- The ``Smart_rollup_add_messages`` operation is used to add messages
+  to the inbox shared by all the smart rollups originated in the Tezos
+  blockchain. These messages are interpreted by the smart rollups
+  according to their specific semantics.
+- The ``Smart_rollup_publish`` operation is used to regularly declare
+  what is the new state of a given smart rollup in a so-called
+  “commitment”. To publish commitments, an implicit account has to
+  own at least ꜩ 10,000, which are frozen as long as at least one of
+  their commitments is disputable.
+- The ``Smart_rollup_cement`` operation is used to cement a
+  commitment, if the following requirements are met: it has been
+  published for long enough, and there is no concurrent commitment for
+  the same state update. Once a commitment is cemented, it cannot be
+  disputed anymore.
+- The ``Smart_rollup_recover_bond`` operation is used by an implicit
+  account to unfreeze their ꜩ 10,000. This operation only succeeds if
+  and only if all the commitments published by the implicit account
+  have been cemented.
+- The ``Smart_rollup_refute`` operation is used to start or pursue a
+  dispute. A dispute is resolved on the Tezos blockchain through a
+  so-called refutation game, where two players seek to prove the
+  correctness of their respective commitment. The game consists in a
+  dissection phase, where the two players narrow down their
+  disagreement to a single execution step, and a resolution, where the
+  players provide a proof sustaining their claims. The looser of a
+  dispute looses their frozen bond: half of it is burned, and the
+  winner receives the other half in compensation.
+- The ``Smart_rollup_timeout`` operation is used to put an end to a
+  dispute if one of the two players takes too much time to send their
+  next move (with a ``Smart_rollup_refute`` operation). It is not
+  necessary to be one of the players to send this operation.
+- The ``Smart_rollup_execute_outbox_message`` operation is used to
+  enact a transaction from a smart rollup to a smart contract, as
+  authorized by a cemented commitment. The targeted smart contract can
+  determine if it is called by a smart rollup using the ``SENDER``
+  Michelson instruction.
 
+.. _manager_operations_batches:
 .. _manager_operations_batches_mumbai:
 
 Manager Operation Batches

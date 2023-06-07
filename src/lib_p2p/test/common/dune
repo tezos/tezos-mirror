@@ -1,0 +1,22 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_p2p_test_common)
+ (package tezos-p2p)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-base.unix
+  tezos-stdlib-unix
+  tezos-stdlib
+  tezos-p2p
+  tezos-p2p-services)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base_unix
+  -open Tezos_stdlib_unix
+  -open Tezos_stdlib
+  -open Tezos_p2p
+  -open Tezos_p2p_services))

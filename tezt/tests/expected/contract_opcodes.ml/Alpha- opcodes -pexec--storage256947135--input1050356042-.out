@@ -1,0 +1,47 @@
+
+./octez-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/pexec.tz on storage 14 and input 38 --level 1 --trace-stack
+storage
+  52
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (just consumed gas: 9.021)
+    [ (Pair 38 14) ]
+  - location: 7 (just consumed gas: 0.010)
+    [ { UNPAIR ; ADD }
+      (Pair 38 14) ]
+  - location: 15 (just consumed gas: 0.010)
+    [ (Pair 38 14)
+      { UNPAIR ; ADD } ]
+  - location: 16 (just consumed gas: 0.010)
+    [ 38
+      14
+      { UNPAIR ; ADD } ]
+  - location: 17 (just consumed gas: 0)
+    [ 14
+      { UNPAIR ; ADD } ]
+  - location: 19 (just consumed gas: 0.401)
+    [ { PUSH nat 14 ; PAIR ; { UNPAIR ; ADD } } ]
+  - location: 17 (just consumed gas: 0.025)
+    [ 38
+      { PUSH nat 14 ; PAIR ; { UNPAIR ; ADD } } ]
+  - location: 12 (just consumed gas: 0.010)
+    [ 14
+      38 ]
+  - location: 12 (just consumed gas: 0.010)
+    [ (Pair 14 38) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ 14
+      38 ]
+  - location: 14 (just consumed gas: 0.035)
+    [ 52 ]
+  - location: 20 (just consumed gas: 0.025)
+    [ 52 ]
+  - location: 21 (just consumed gas: 0.010)
+    [ {}
+      52 ]
+  - location: 23 (just consumed gas: 0.010)
+    [ (Pair {} 52) ]
+

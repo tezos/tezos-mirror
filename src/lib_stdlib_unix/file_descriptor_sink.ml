@@ -25,8 +25,19 @@
 
 open Error_monad
 
+type current = {day : int * int * int; fd : Lwt_unix.file_descr}
+
+type rotating = {
+  rights : int;
+  days_kept : int;
+  base_path : string;
+  current : current ref;
+}
+
+type output = Static of Lwt_unix.file_descr | Rotating of rotating
+
 type t = {
-  output : Lwt_unix.file_descr;
+  output : output;
   format : [`One_per_line | `Netstring | `Pp];
   (* Hopefully temporary hack to handle event which are emitted with
      the non-cooperative log functions in `Legacy_logging`: *)
@@ -76,11 +87,34 @@ end) : Internal_event.SINK with type t = t = struct
     | `Stdout -> "file-descriptor-stdout"
     | `Stderr -> "file-descriptor-stderr"
 
+  let fail_parsing uri fmt =
+    Format.kasprintf (failwith "Parsing URI: %s: %s" (Uri.to_string uri)) fmt
+
+  let day_of_the_year ts =
+    let today =
+      match Ptime.of_float_s ts with Some s -> s | None -> Ptime.min
+    in
+    let (y, m, d), _ = Ptime.to_date_time today in
+    (y, m, d)
+
+  let string_of_day_of_the_year (y, m, d) = Format.sprintf "%d%02d%02d" y m d
+
+  let check_file_format_with_date base_filename s =
+    let name_no_ext = Filename.remove_extension base_filename in
+    let ext = Filename.extension base_filename in
+    let open Re.Perl in
+    let re_ext = "(." ^ ext ^ ")?" in
+    let re_date = "-\\d{4}\\d{2}\\d{2}" in
+    let re = compile @@ re (name_no_ext ^ re_date ^ re_ext) in
+    Re.execp re s
+
+  let filename_insert_before_ext ~path s =
+    let ext = Filename.extension path in
+    let chopped = if ext = "" then path else Filename.chop_extension path in
+    Format.asprintf "%s-%s%s" chopped s ext
+
   let configure uri =
     let open Lwt_result_syntax in
-    let fail_parsing fmt =
-      Format.kasprintf (failwith "Parsing URI: %s: %s" (Uri.to_string uri)) fmt
-    in
     let section_prefixes =
       let all =
         List.filter_map
@@ -95,7 +129,7 @@ end) : Internal_event.SINK with type t = t = struct
       | Some l, None -> (
           match Internal_event.Level.of_string l with
           | Some l -> return (`Level_at_least l)
-          | None -> fail_parsing "Wrong level: %S" l)
+          | None -> fail_parsing uri "Wrong level: %S" l)
       | base_level, Some l -> (
           try
             let sections =
@@ -148,18 +182,27 @@ end) : Internal_event.SINK with type t = t = struct
                         lvl)
             in
             return (`Per_section_prefix sections)
-          with Failure s -> fail_parsing "%s" s)
+          with Failure s -> fail_parsing uri "%s" s)
     in
     let* format =
       match Uri.get_query_param uri "format" with
       | Some "netstring" -> return `Netstring
       | Some "pp" -> return `Pp
       | None | Some "one-per-line" -> return `One_per_line
-      | Some other -> fail_parsing "Unknown format: %S" other
+      | Some other -> fail_parsing uri "Unknown format: %S" other
     in
     let* output =
       match K.kind with
-      | `Path -> (
+      | `Path ->
+          let* rotate =
+            match Uri.get_query_param uri "daily-logs" with
+            | Some n -> (
+                match int_of_string_opt n with
+                | Some n -> return_some n
+                | None ->
+                    fail_parsing uri "daily-logs should be an integer : %S" n)
+            | None -> return_none
+          in
           let flag name =
             match Uri.get_query_param uri name with
             | Some "true" -> true
@@ -174,43 +217,136 @@ end) : Internal_event.SINK with type t = t = struct
                 | Some i -> return i
                 | None ->
                     fail_parsing
+                      uri
                       "Access-rights parameter should be an integer: %S"
                       n)
             | None -> return 0o600
           in
-          match Uri.path uri with
-          | "" | "/" -> fail_parsing "Missing path configuration."
-          | path ->
-              let fixed_path =
-                if with_pid then
-                  let ext = Filename.extension path in
-                  let chopped =
-                    if ext = "" then path else Filename.chop_extension path
-                  in
-                  Format.asprintf "%s-%d%s" chopped (Unix.getpid ()) ext
-                else path
-              in
-              protect (fun () ->
-                  Lwt_result.ok
-                  @@ Lwt_unix.(
-                       let flags =
-                         [O_WRONLY; O_CREAT]
-                         @ if fresh then [O_TRUNC] else [O_APPEND]
-                       in
-                       openfile fixed_path flags rights)))
-      | `Stdout -> return Lwt_unix.stdout
-      | `Stderr -> return Lwt_unix.stderr
+          let* path =
+            match Uri.path uri with
+            | "" | "/" -> fail_parsing uri "Missing path configuration."
+            | path -> return path
+          in
+          let allow_create_dir = flag "create-dirs" in
+          let*! () =
+            if allow_create_dir then
+              Lwt_utils_unix.create_dir (Filename.dirname path)
+            else Lwt.return_unit
+          in
+          let open Lwt_result_syntax in
+          let time_ext, rotation =
+            match rotate with
+            | Some days_kept ->
+                let today = day_of_the_year (Unix.gettimeofday ()) in
+                (string_of_day_of_the_year today, Some (days_kept, today))
+            | None -> ("", None)
+          in
+          let base_path =
+            if with_pid then
+              filename_insert_before_ext ~path (string_of_int (Unix.getpid ()))
+            else path
+          in
+          let fixed_path =
+            if rotate <> None then filename_insert_before_ext ~path time_ext
+            else base_path
+          in
+          protect (fun () ->
+              Lwt_result.ok
+              @@ Lwt_unix.(
+                   let flags =
+                     [O_WRONLY; O_CREAT]
+                     @ if fresh then [O_TRUNC] else [O_APPEND]
+                   in
+                   let*! fd = openfile fixed_path flags rights in
+                   match rotation with
+                   | Some (days_kept, cur_day) ->
+                       Lwt.return
+                         (Rotating
+                            {
+                              rights;
+                              base_path;
+                              days_kept;
+                              current = ref {fd; day = cur_day};
+                            })
+                   | None -> Lwt.return (Static fd)))
+      | `Stdout -> return (Static Lwt_unix.stdout)
+      | `Stderr -> return (Static Lwt_unix.stderr)
     in
     let t = {output; lwt_bad_citizen_hack = ref []; filter; format} in
     return t
 
   let write_mutex = Lwt_mutex.create ()
 
-  let output_one output to_write =
-    protect (fun () ->
-        Lwt_result.ok
-        @@ Lwt_mutex.with_lock write_mutex (fun () ->
-               Lwt_utils_unix.write_string output to_write))
+  let list_rotation_files base_path =
+    let open Lwt_syntax in
+    let dirname = Filename.dirname base_path in
+    let base_filename = Filename.basename base_path in
+    let file_stream = Lwt_unix.files_of_directory dirname in
+    let rec explore acc =
+      let* filename = Lwt_stream.get file_stream in
+      match filename with
+      | None -> Lwt.return acc
+      | Some filename ->
+          if check_file_format_with_date base_filename filename then
+            explore (filename :: acc)
+          else explore acc
+    in
+    explore []
+
+  let remove_older_files dirname n_kept base_path =
+    let open Lwt_syntax in
+    let* files = list_rotation_files base_path in
+    let sorted = List.sort (fun x y -> -compare x y) files in
+    List.iteri_s
+      (fun i file ->
+        if i >= n_kept then Lwt_unix.unlink (Filename.concat dirname file)
+        else Lwt.return_unit)
+      sorted
+
+  let output_one_with_rotation {rights; base_path; current; days_kept} now
+      to_write =
+    let open Lwt_result_syntax in
+    let {day; fd} = !current in
+    let today = day_of_the_year now in
+    let should_rotate_output = day <> today in
+    let* () =
+      Lwt_mutex.with_lock write_mutex (fun () ->
+          let* output =
+            if not should_rotate_output then return fd
+            else
+              let*! () = Lwt_unix.close fd in
+              let path =
+                filename_insert_before_ext
+                  ~path:base_path
+                  (string_of_day_of_the_year today)
+              in
+              let* fd =
+                protect (fun () ->
+                    Lwt_result.ok
+                    @@ Lwt_unix.(
+                         let flags = [O_WRONLY; O_CREAT; O_APPEND] in
+                         openfile path flags rights))
+              in
+              current := {fd; day = today} ;
+              return fd
+          in
+          Lwt_result.ok @@ Lwt_utils_unix.write_string output to_write)
+    in
+    let*! () =
+      if should_rotate_output then
+        remove_older_files (Filename.dirname base_path) days_kept base_path
+      else Lwt.return_unit
+    in
+    return_unit
+
+  let output_one now output to_write =
+    match output with
+    | Static output ->
+        protect (fun () ->
+            Lwt_result.ok
+            @@ Lwt_mutex.with_lock write_mutex (fun () ->
+                   Lwt_utils_unix.write_string output to_write))
+    | Rotating output -> output_one_with_rotation output now to_write
 
   let should_handle (type a) ?(section = Internal_event.Section.empty)
       {filter; _} m =
@@ -244,14 +380,9 @@ end) : Internal_event.SINK with type t = t = struct
       in
       match format with
       | `Pp ->
-          let s =
-            String.map
-              (function '\n' -> ' ' | c -> c)
-              (Format.asprintf "%a" (M.pp ~short:false) event)
-          in
           (* See https://tools.ietf.org/html/rfc5424#section-6 *)
           Format.asprintf
-            "%a [%s%s] %s\n"
+            "%a [%s.%s] %a\n"
             (Ptime.pp_rfc3339 ~frac_s:3 ())
             (match Ptime.of_float_s wrapped_event.time_stamp with
             | Some s -> s
@@ -259,14 +390,15 @@ end) : Internal_event.SINK with type t = t = struct
             (Internal_event.Section.to_string_list wrapped_event.section
             |> String.concat ".")
             M.name
-            s
+            (M.pp ~all_fields:true ~block:false)
+            event
       | `One_per_line -> Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
       | `Netstring ->
           let bytes = Ezjsonm.value_to_string ~minify:true (json ()) in
           Format.asprintf "%d:%s," (String.length bytes) bytes
     in
     lwt_bad_citizen_hack := to_write :: !lwt_bad_citizen_hack ;
-    let*! r = output_one output to_write in
+    let*! r = output_one now output to_write in
     match r with
     | Error [Exn (Unix.Unix_error (Unix.EBADF, _, _))] ->
         (* The file descriptor was closed before the event arrived,
@@ -282,11 +414,18 @@ end) : Internal_event.SINK with type t = t = struct
     let open Lwt_result_syntax in
     let* () =
       List.iter_es
-        (fun event_string -> output_one output event_string)
+        (fun event_string ->
+          let now = Unix.gettimeofday () in
+          output_one now output event_string)
         !lwt_bad_citizen_hack
     in
     match K.kind with
-    | `Path -> Lwt_result.ok @@ Lwt_unix.close output
+    | `Path -> (
+        match output with
+        | Rotating output ->
+            let*! () = Lwt_unix.close !(output.current).fd in
+            return_unit
+        | Static output -> Lwt_result.ok @@ Lwt_unix.close output)
     | `Stdout | `Stderr -> return_unit
 end
 

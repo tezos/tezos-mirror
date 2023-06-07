@@ -1,0 +1,30 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_smart_rollup_node_PtNairob_test_helpers)
+ (package tezos-sc-rollup-node-test)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-017-PtNairob
+  tezos-protocol-017-PtNairob.parameters
+  tezos-client-017-PtNairob
+  tezos-test-helpers
+  qcheck-alcotest
+  qcheck-core
+  logs.lwt
+  tezos-smart-rollup-layer2-017-PtNairob
+  octez_smart_rollup_node_PtNairob
+  octez-alcotezt)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_017_PtNairob
+  -open Tezos_protocol_017_PtNairob_parameters
+  -open Tezos_client_017_PtNairob
+  -open Tezos_test_helpers
+  -open Tezos_smart_rollup_layer2_017_PtNairob
+  -open Octez_smart_rollup_node_PtNairob
+  -open Octez_alcotezt))

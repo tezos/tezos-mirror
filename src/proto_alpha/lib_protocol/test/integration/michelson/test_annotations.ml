@@ -27,7 +27,7 @@
     -------
     Component:  Protocol (Michelson annotations)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                -- test "^annotations$"
+                  -- --file test_annotations.ml
     Subject:    This module tests that Michelson annotations are properly handled.
 *)
 
@@ -92,8 +92,6 @@ let get_address_from_storage inc factory_addr =
   match factory_storage with
   | Some {entrypoint; _} when not (Entrypoint.is_default entrypoint) ->
       failwith "Did not expect non-default entrypoint"
-  | Some {destination = Tx_rollup _; _} ->
-      failwith "Did not expect non-contract address"
   | Some {destination = Contract (Implicit _); _} ->
       failwith "Did not expect implict account"
   | Some {destination = Contract (Originated addr); entrypoint = _it_is_default}
@@ -138,3 +136,7 @@ let tests =
       `Quick
       test_internal_origination;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("annotations", tests)]
+  |> Lwt_main.run

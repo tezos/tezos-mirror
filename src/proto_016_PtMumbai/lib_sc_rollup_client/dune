@@ -1,0 +1,28 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_smart_rollup_client_PtMumbai)
+ (package octez-smart-rollup-client-PtMumbai)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-016-PtMumbai
+  tezos-client-commands
+  tezos-client-base
+  tezos-client-base-unix
+  tezos-client-016-PtMumbai
+  tezos-smart-rollup-016-PtMumbai
+  tezos-smart-rollup-layer2-016-PtMumbai)
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_016_PtMumbai
+  -open Tezos_client_commands
+  -open Tezos_client_base
+  -open Tezos_client_base_unix
+  -open Tezos_client_016_PtMumbai
+  -open Tezos_smart_rollup_016_PtMumbai
+  -open Tezos_smart_rollup_layer2_016_PtMumbai))

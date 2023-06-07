@@ -314,8 +314,8 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
 
 let directory_parameter =
   Tezos_clic.parameter (fun _ p ->
-      if not (Sys.file_exists p && Sys.is_directory p) then
-        failwith "Directory doesn't exist: '%s'" p
+      Lwt_utils_unix.dir_exists p >>= fun exists ->
+      if not exists then failwith "Directory doesn't exist: '%s'" p
       else return p)
 
 let per_block_vote_file_arg =
@@ -325,6 +325,69 @@ let per_block_vote_file_arg =
     ~long:"votefile"
     ~placeholder:"filename"
     (Tezos_clic.parameter (fun _ s -> return s))
+
+type baking_mode = Local of {local_data_dir_path : string} | Remote
+
+let baker_args =
+  Tezos_clic.args9
+    pidfile_arg
+    minimal_fees_arg
+    minimal_nanotez_per_gas_unit_arg
+    minimal_nanotez_per_byte_arg
+    force_apply_switch_arg
+    keep_alive_arg
+    liquidity_baking_toggle_vote_arg
+    per_block_vote_file_arg
+    operations_arg
+
+let run_baker
+    ( pidfile,
+      minimal_fees,
+      minimal_nanotez_per_gas_unit,
+      minimal_nanotez_per_byte,
+      force_apply,
+      keep_alive,
+      liquidity_baking_toggle_vote,
+      per_block_vote_file,
+      extra_operations ) baking_mode sources cctxt =
+  let per_block_vote_file_or_default =
+    match per_block_vote_file with
+    | None -> Baking_configuration.default_per_block_vote_file
+    | Some arg -> arg
+  in
+  (* We don't let the user run the baker without providing some
+     option (CLI, file path, or file in default location) for
+     the toggle vote. *)
+  Liquidity_baking_vote_file.read_liquidity_baking_toggle_vote_on_startup
+    ~default:liquidity_baking_toggle_vote
+    ~per_block_vote_file:per_block_vote_file_or_default
+  >>=? fun (liquidity_baking_toggle_vote, vote_file_present) ->
+  let per_block_vote_file =
+    match (per_block_vote_file, vote_file_present) with
+    | Some _, _ | None, true -> Some per_block_vote_file_or_default
+    | None, false -> None
+  in
+  may_lock_pidfile pidfile @@ fun () ->
+  get_delegates cctxt sources >>=? fun delegates ->
+  let context_path =
+    match baking_mode with
+    | Local {local_data_dir_path} ->
+        Some Filename.Infix.(local_data_dir_path // "context")
+    | Remote -> None
+  in
+  Client_daemon.Baker.run
+    cctxt
+    ~minimal_fees
+    ~minimal_nanotez_per_gas_unit
+    ~minimal_nanotez_per_byte
+    ~liquidity_baking_toggle_vote
+    ?per_block_vote_file
+    ?extra_operations
+    ~force_apply
+    ?context_path
+    ~chain:cctxt#chain
+    ~keep_alive
+    delegates
 
 let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
   let open Tezos_clic in
@@ -338,65 +401,24 @@ let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
     command
       ~group
       ~desc:"Launch the baker daemon."
-      (args9
-         pidfile_arg
-         minimal_fees_arg
-         minimal_nanotez_per_gas_unit_arg
-         minimal_nanotez_per_byte_arg
-         force_apply_switch_arg
-         keep_alive_arg
-         liquidity_baking_toggle_vote_arg
-         per_block_vote_file_arg
-         operations_arg)
+      baker_args
       (prefixes ["run"; "with"; "local"; "node"]
       @@ param
            ~name:"node_data_path"
            ~desc:"Path to the node data directory (e.g. $HOME/.tezos-node)"
            directory_parameter
       @@ sources_param)
-      (fun ( pidfile,
-             minimal_fees,
-             minimal_nanotez_per_gas_unit,
-             minimal_nanotez_per_byte,
-             force_apply,
-             keep_alive,
-             liquidity_baking_toggle_vote,
-             per_block_vote_file,
-             extra_operations )
-           node_data_path
-           sources
-           cctxt ->
-        let per_block_vote_file_or_default =
-          match per_block_vote_file with
-          | None -> Baking_configuration.default_per_block_vote_file
-          | Some arg -> arg
-        in
-        (* We don't let the user run the baker without providing some option (CLI, file path, or file in default location) for the toggle vote. *)
-        Liquidity_baking_vote_file.read_liquidity_baking_toggle_vote_on_startup
-          ~default:liquidity_baking_toggle_vote
-          ~per_block_vote_file:per_block_vote_file_or_default
-        >>=? fun (liquidity_baking_toggle_vote, vote_file_present) ->
-        let per_block_vote_file =
-          match (per_block_vote_file, vote_file_present) with
-          | Some _, _ | None, true -> Some per_block_vote_file_or_default
-          | None, false -> None
-        in
-        may_lock_pidfile pidfile @@ fun () ->
-        get_delegates cctxt sources >>=? fun delegates ->
-        let context_path = Filename.Infix.(node_data_path // "context") in
-        Client_daemon.Baker.run
-          cctxt
-          ~minimal_fees
-          ~minimal_nanotez_per_gas_unit
-          ~minimal_nanotez_per_byte
-          ~liquidity_baking_toggle_vote
-          ?per_block_vote_file
-          ?extra_operations
-          ~force_apply
-          ~chain:cctxt#chain
-          ~context_path
-          ~keep_alive
-          delegates);
+      (fun args local_data_dir_path sources cctxt ->
+        let baking_mode = Local {local_data_dir_path} in
+        run_baker args baking_mode sources cctxt);
+    command
+      ~group
+      ~desc:"Launch the baker daemon using RPCs only."
+      baker_args
+      (prefixes ["run"; "remotely"] @@ sources_param)
+      (fun args sources cctxt ->
+        let baking_mode = Remote in
+        run_baker args baking_mode sources cctxt);
     command
       ~group
       ~desc:"Launch the VDF daemon"

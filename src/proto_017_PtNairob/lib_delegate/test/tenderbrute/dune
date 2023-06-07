@@ -1,0 +1,24 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name tenderbrute_main)
+ (libraries
+  tezos-base
+  tezos-client-base
+  tezos-client-017-PtNairob
+  tezos-protocol-017-PtNairob
+  tezos-baking-017-PtNairob.tenderbrute)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_base
+  -open Tezos_client_base
+  -open Tezos_client_017_PtNairob
+  -open Tezos_protocol_017_PtNairob
+  -open Tenderbrute_017_PtNairob))

@@ -90,9 +90,10 @@ module type T = sig
         ('m, 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t
        and type Error_monad.shell_tztrace = Error_monad.tztrace
        and type 'a Error_monad.shell_tzresult = ('a, Error_monad.tztrace) result
-       and type Timelock.chest = Tezos_crypto.Timelock.chest
-       and type Timelock.chest_key = Tezos_crypto.Timelock.chest_key
-       and type Timelock.opening_result = Tezos_crypto.Timelock.opening_result
+       and type Timelock.chest = Tezos_crypto.Timelock_legacy.chest
+       and type Timelock.chest_key = Tezos_crypto.Timelock_legacy.chest_key
+       and type Timelock.opening_result =
+        Tezos_crypto.Timelock_legacy.opening_result
        and module Sapling = Tezos_sapling.Core.Validator
        and type Bls_signature.pk = Bls12_381_signature.MinPk.pk
        and type Bls_signature.signature = Bls12_381_signature.MinPk.signature
@@ -181,7 +182,7 @@ struct
 
   module Compare = Compare
   module Either = Either
-  module Seq = Tezos_error_monad.TzLwtreslib.Seq
+  module Seq = Tezos_protocol_environment_structs.V6.Seq
   module List = Tezos_error_monad.TzLwtreslib.List
   module Char = Char
   module Bytes = Bytes
@@ -275,7 +276,7 @@ struct
   module Secp256k1 = Signature.Secp256k1
   module P256 = Signature.P256
   module Signature = Signature.V0
-  module Timelock = Tezos_crypto.Timelock
+  module Timelock = Tezos_crypto.Timelock_legacy
   module Vdf = Class_group_vdf.Vdf_self_contained
 
   module S = struct
@@ -1054,7 +1055,7 @@ struct
     module Make
         (Tree : Context.TREE with type key = string list and type value = bytes) =
     struct
-      type Tezos_lazy_containers.Lazy_map.tree += PVM_tree of Tree.tree
+      type Tezos_tree_encoding.tree_instance += PVM_tree of Tree.tree
 
       module Wasm = Tezos_scoru_wasm.Wasm_pvm.Make (struct
         include Tree
@@ -1294,7 +1295,8 @@ struct
     let acceptable_pass op =
       match acceptable_passes op with [n] -> Some n | _ -> None
 
-    (* Fake mempool *)
+    (* Fake mempool that can be successfully initialized but cannot
+       accept any operations. *)
     module Mempool = struct
       type t = unit
 
@@ -1329,7 +1331,11 @@ struct
       let encoding = Data_encoding.unit
 
       let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
-        Lwt.return_ok ((), Unchanged)
+        let msg =
+          "The mempool cannot accept any operations because it does not \
+           support the current protocol."
+        in
+        Lwt.return_error (Validation_error [Exn (Failure msg)])
 
       let remove_operation () _ = ()
 

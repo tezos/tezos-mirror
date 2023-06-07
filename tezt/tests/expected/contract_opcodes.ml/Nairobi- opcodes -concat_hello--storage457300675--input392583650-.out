@@ -1,0 +1,35 @@
+
+./octez-client --protocol PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/concat_hello.tz on storage '{}' and input '{ "test1" ; "test2" }' --level 1 --trace-stack
+storage
+  { "Hello test1" ; "Hello test2" }
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (just consumed gas: 6.769)
+    [ (Pair { "test1" ; "test2" } {}) ]
+  - location: 9 (just consumed gas: 0.010)
+    [ { "test1" ; "test2" } ]
+  - location: 10 (just consumed gas: 0)
+    [ "test1" ]
+  - location: 12 (just consumed gas: 0.010)
+    [ "Hello "
+      "test1" ]
+  - location: 15 (just consumed gas: 0.050)
+    [ "Hello test1" ]
+  - location: 10 (just consumed gas: 0.015)
+    [ "test2" ]
+  - location: 12 (just consumed gas: 0.010)
+    [ "Hello "
+      "test2" ]
+  - location: 15 (just consumed gas: 0.050)
+    [ "Hello test2" ]
+  - location: 10 (just consumed gas: 0.015)
+    [ { "Hello test1" ; "Hello test2" } ]
+  - location: 16 (just consumed gas: 0.010)
+    [ {}
+      { "Hello test1" ; "Hello test2" } ]
+  - location: 18 (just consumed gas: 0.010)
+    [ (Pair {} { "Hello test1" ; "Hello test2" }) ]
+

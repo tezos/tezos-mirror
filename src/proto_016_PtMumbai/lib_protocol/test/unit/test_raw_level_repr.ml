@@ -29,8 +29,8 @@ open Tztest
 (** Testing
     -------
     Component:    Raw_level_repr
-    Invocation:   dune exec ./src/proto_alpha/lib_protocol/test/unit/main.exe \
-                  -- test '^\[Unit\] Raw_level_repr.ml$'
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_raw_level_repr.ml
     Dependencies: --
     Subject:      To test the modules (including the top-level)
                   in raw_level_repr.ml as individual units, particularly
@@ -174,3 +174,7 @@ let skipped_tests =
       `Quick
       Test_raw_level_repr.test_skip_succ;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("raw_level_repr", tests)]
+  |> Lwt_main.run

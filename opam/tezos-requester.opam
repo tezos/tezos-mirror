@@ -13,10 +13,11 @@ depends: [
   "tezos-base"
   "tezos-stdlib-unix"
   "lwt-watcher" { = "0.2" }
+  "tezt" { with-test & >= "3.1.0" }
   "tezos-test-helpers" {with-test}
   "tezos-base-test-helpers" {with-test}
   "tezos-stdlib" {with-test}
-  "alcotest-lwt" { with-test & >= "1.5.0" }
+  "octez-alcotezt" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
 ]
 build: [

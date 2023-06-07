@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    stdlib
-    Invocation:   dune build @src/lib_stdlib/test/runtest
+    Invocation:   dune exec src/lib_stdlib/test-unix/main.exe \
+                  -- --file test_circular_buffer.ml
     Subject:      On circular buffer
 *)
 
@@ -112,7 +113,7 @@ module Constant = struct
     Array.iteri
       (fun i data ->
         ignore
-          (let* data = data in
+          (let* data in
            let _ = Buff.read data circular_buffer ~into:buff ~offset:0 in
            assert (
              Bytes.sub buff 0 (Buff.length data)
@@ -130,7 +131,7 @@ module Constant = struct
     Array.iter
       (fun (i, data) ->
         ignore
-          (let* data = data in
+          (let* data in
            let max_iter = 10 in
            let rec exhaust data offset iter =
              let length = Buff.length data in
@@ -359,7 +360,7 @@ let wrap n f =
 
 let () =
   Alcotest.run
-    ~argv:[|""|]
+    ~__FILE__
     "tezos-stdlib"
     (List.map
        (fun (run, descr) ->

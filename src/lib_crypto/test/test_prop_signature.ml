@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Crypto
-    Invocation:   dune build @src/lib_crypto/runtest
+    Invocation:   dune exec src/lib_crypto/test/main.exe
     Subject:      Property-tests over the interface S.SIGNATURE and its
                   instantiations.
 *)
@@ -191,4 +191,4 @@ let () =
         (P256, "P256");
         (Bls, "Bls");
       ]
-  |> Alcotest.run "tezos-crypto-prop-signature"
+  |> Alcotest.run ~__FILE__ "tezos-crypto-prop-signature"

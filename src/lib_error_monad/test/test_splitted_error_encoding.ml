@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Error Monad
-    Invocation:   dune build @src/lib_error_monad/runtest
+    Invocation:   dune exec src/lib_error_monad/test/main.exe \
+                  -- --file test_splitted_error_encoding.ml
     Subject:      On the wrapping of error_encoding in a splitted.
 *)
 
@@ -104,4 +105,4 @@ let tests =
     Alcotest.test_case "registered" `Quick test_registered;
   ]
 
-let () = Alcotest.run "splitted" [("splitted", tests)]
+let () = Alcotest.run ~__FILE__ "splitted" [("splitted", tests)]

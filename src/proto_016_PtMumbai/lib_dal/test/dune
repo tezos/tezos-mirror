@@ -1,28 +1,48 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name main)
+(library
+ (name src_proto_016_PtMumbai_lib_dal_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-dal-016-PtMumbai
   tezos-protocol-016-PtMumbai
   tezos-base-test-helpers
   tezos-016-PtMumbai-test-helpers
-  alcotest-lwt)
- (link_flags
-  (:standard)
-  (:include %{workspace_root}/macos-link-flags.sexp))
+  octez-alcotezt)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_dal_016_PtMumbai
   -open Tezos_protocol_016_PtMumbai
   -open Tezos_base_test_helpers
-  -open Tezos_016_PtMumbai_test_helpers))
+  -open Tezos_016_PtMumbai_test_helpers
+  -open Octez_alcotezt)
+ (modules test_dal_slot_frame_encoding test_dac_pages_encoding test_helpers))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_proto_016_PtMumbai_lib_dal_test_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-dal-016-PtMumbai)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

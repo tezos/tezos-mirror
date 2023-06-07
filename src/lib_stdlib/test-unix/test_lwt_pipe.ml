@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Stdlib
-    Invocation:   dune exec src/lib_stdlib/test-unix/test_lwt_pipe.exe
+    Invocation:   dune exec src/lib_stdlib/test-unix/main.exe \
+                  -- --file test_lwt_pipe.ml
     Subject:      Lwt_pipe
 *)
 
@@ -312,6 +313,7 @@ let with_timeout t f () =
 let () =
   Lwt_main.run
   @@ Alcotest_lwt.run
+       ~__FILE__
        "Lwt_pipe"
        [
          ( "Bounded",

@@ -1,21 +1,39 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name main)
+(library
+ (name src_lib_lazy_containers_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-lazy-containers
   qcheck-core
   qcheck-alcotest
-  alcotest
-  lwt.unix)
+  lwt.unix
+  octez-alcotezt)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -open Tezos_lazy_containers))
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_lazy_containers
+  -open Octez_alcotezt)
+ (modules chunked_byte_vector_tests lazy_vector_tests))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_lazy_containers_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-lazy-containers-tests)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 
-(include_subdirs no)
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

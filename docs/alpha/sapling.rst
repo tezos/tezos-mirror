@@ -27,21 +27,21 @@ Keys
 ~~~~
 
 Sapling offers a rich set of keys, each allowing different operations.
-A `spending key` allows to spend tokens so if it is lost or
+A *spending key* allows to spend tokens so if it is lost or
 compromised the tokens could remain locked or be stolen.
-From a spending key it is possible to derive a corresponding `viewing
-key` which allows to view all incoming and outgoing transactions.
+From a spending key it is possible to derive a corresponding *viewing
+key* which allows to view all incoming and outgoing transactions.
 The viewing key allows the owner of the tokens to check their balance
 and transaction history so if compromised there is a complete loss of
 privacy.
 On the other hand a viewing key can willingly be shared with a third
 party, for example with an auditor for regulatory compliance purposes.
 
-A viewing key can also derive several diversified `addresses`.
+A viewing key can also derive several diversified addresses.
 An address can be used to receive funds, much like the address of an
 implicit account.
 
-Additionally `proving keys` can be used to allow the creation of proofs,
+Additionally *proving keys* can be used to allow the creation of proofs,
 thus revealing private information, without being able to spend funds.
 They are useful for example in case the spending key is stored in a
 hardware wallet but we'd like to use our laptop to craft the
@@ -56,23 +56,23 @@ Shielded transactions
 
 Transactions use Bitcoin's UTXO model with the important difference that each
 input and output, instead of containing an amount and an address,
-are just cryptographic `commitments`.
+are just cryptographic *commitments*.
 In order to avoid double spends, it's important to be able to check
 that a commitment has not already been spent. In Bitcoin we just need to
 check if an output is also later used as an input to verify if it's
 already spent. In Sapling however we can't know because inputs are not
 linked to outputs.
 For this reason for each input of a transaction, the owner must also
-publish a `nullifier`, which invalidates it. The nullifier can only be
+publish a *nullifier*, which invalidates it. The nullifier can only be
 produced by the owner of a commitment and it's deterministic so that
 everybody can check that it hasn't been already published.
 Note however that it is not possible to infer which commitment has
 been nullified.
 Transactions of this form are privacy preserving and are referred to
-as `shielded`, because they reveal neither the amount, the sender nor
+as *shielded*, because they reveal neither the amount, the sender nor
 the receiver.
 
-The existing set of transactions is referred to as the `shielded pool`.
+The existing set of transactions is referred to as the *shielded pool*.
 Unlike Bitcoin, where everybody can compute the set of unspent
 outputs of every user, in Sapling only the owner of a viewing key can
 find their outputs and verify that they are not already spent.
@@ -87,7 +87,7 @@ corresponding output.
 This data is encrypted under a symmetric key resulting from a
 Diffie-Hellman key exchange using the recipient address and an
 ephemeral key.
-In principle this `ciphertext` can be transmitted off-chain as it's
+In principle this *ciphertext* can be transmitted off-chain as it's
 not needed to verify the integrity of the pool. For convenience, in
 Tezos, it is stored together with the commitment and the nullifier on
 chain.
@@ -113,26 +113,26 @@ to mint and to have more in inputs than outputs to burn.
 Preventing Malleability
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-A Sapling transaction contains a `bound_data` field with arbitrary
+A Sapling transaction contains a ``bound_data`` field with arbitrary
 bytes that gets signed by the user's Sapling key.
 This field can be used to bind the transaction to another
 application's logic.
 For example during an unshield operation it is important to include in
-the `bound_data` the Tezos account that will receive the unshielded
+the ``bound_data`` the Tezos account that will receive the unshielded
 tokens.
-Without any `bound_data`, a Sapling unshield operation authorizes any
+Without any ``bound_data``, a Sapling unshield operation authorizes any
 party that submits it to claim the unshielded tokens. An adversary can
 intercept the Tezos operation containing the unshield and resubmit it
 using its own Tezos account.
 This malleability attack is prevented by including the recipient Tezos
-account in the `bound_data`, which is signed by the owner of the
+account in the ``bound_data``, which is signed by the owner of the
 Sapling keys, and that can be used by the Smart Contract to transfer
 the tokens.
 
 **All Smart Contracts managing a Sapling shielded pool must include a
 `bound_data` field in their unshield operations.**
 
-Note that the `bound_data` field is not encrypted and could leak
+Note that the ``bound_data`` field is not encrypted and could leak
 information about a transaction, therefore for a transfer (e.g. an
 operation with balance 0) it should be left empty.
 This is not a concern for shielding and unshielding which are already
@@ -203,13 +203,13 @@ Tezos integration
 Michelson: verify update
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-We introduce two new Michelson types `sapling_state` and
-`sapling_transaction`, and two instructions called
-`SAPLING_VERIFY_UPDATE` and `SAPLING_EMPTY_STATE`
+We introduce two new Michelson types ``sapling_state`` and
+``sapling_transaction``, and two instructions called
+``SAPLING_VERIFY_UPDATE`` and ``SAPLING_EMPTY_STATE``
 (see the :doc:`Michelson reference<michelson>`
 for more details).
-`SAPLING_EMPTY_STATE` pushes an empty `sapling_state` on the stack.
-`SAPLING_VERIFY_UPDATE` takes a transaction and a state and
+``SAPLING_EMPTY_STATE`` pushes an empty ``sapling_state`` on the stack.
+``SAPLING_VERIFY_UPDATE`` takes a transaction and a state and
 returns an
 option type which is Some (bound_data, balance and updated
 state) if the transaction is correct, None otherwise.
@@ -321,14 +321,14 @@ Gas evaluation is not yet done.
 RPCs
 ~~~~
 
-There are two Sapling RPCs under the prefix `context/sapling`.
-`get_size` returns a pair with the size of the set of commitments
+There are two Sapling RPCs under the prefix ``context/sapling``.
+``get_size`` returns a pair with the size of the set of commitments
 and the size of the set of nullifiers.
-`get_diff` takes two optional starting offsets `cm_from` and `nf_from`
+``get_diff`` takes two optional starting offsets ``cm_from`` and ``nf_from``
 and returns the sapling state that was added from the offsets to the
 current size. In particular it returns three lists, commitments,
-ciphertexts from position `cm_from` up to the last one added and
-nullifiers, from `nf_from` to the last one added.
+ciphertexts from position ``cm_from`` up to the last one added and
+nullifiers, from ``nf_from`` to the last one added.
 Additionally it returns the last computed root of the merkle tree so
 that a client updating its tree using the diff can verify the
 correctness of the result.
@@ -355,7 +355,7 @@ hierarchical deterministic wallets. As usual, in this case it is
 important to note the derivation path of the key to be able to recover
 it in case of loss.
 At the moment there is no hardware wallet support, keys are stored in
-`~/.tezos-client/sapling_keys` by default encrypted with a password.
+``~/.tezos-client/sapling_keys`` by default encrypted with a password.
 **Users should take care to backup this file.**
 
 The client can also derive addresses from viewing keys.
@@ -403,28 +403,28 @@ Code base
 ~~~~~~~~~
 
 The current code-base is organized in three main components.
-There is a core library called `lib_sapling` which binds `librustzcash`,
+There is a core library called ``lib_sapling`` which binds ``librustzcash``,
 adds all the data structures necessary to run the sapling
 protocol and includes a simple client and baker.
-Under the protocol directory there is a `lib_client_sapling` library
+Under the protocol directory there is a ``lib_client_sapling`` library
 which implements a full client capable of handling Sapling keys and
 forging transactions.
 Lastly in the protocol there is a efficient implementation of the
-Sapling storage, in the spirit of `big_map`s, and the integration of
-`SAPLING_VERIFY_UPDATE` in the Michelson interpreter.
+Sapling storage, in the spirit of ``big_map``\ s, and the integration of
+``SAPLING_VERIFY_UPDATE`` in the Michelson interpreter.
 
 Protocol
 ^^^^^^^^
 
 In order to export the Sapling library to the protocol we first need
 to expose it through the environment that sandboxes the protocol.
-The changes under `src/lib_protocol_environment` are simple but very
+The changes under :src:`src/lib_protocol_environment` are simple but very
 relevant as any change of the environment requires a manual update of the
 Tezos node. These changes are part of version V1 of the environment
 while protocols 000 to 006 depends on version V0.
 
 There are two main changes to Tezos' economic protocol, the storage
-for Sapling and the addition of `SAPLING_VERIFY_UPDATE` to the
+for Sapling and the addition of ``SAPLING_VERIFY_UPDATE`` to the
 Michelson interpreter.
 
 Given that the storage of a Sapling contract can be substantially
@@ -434,13 +434,13 @@ be entirely deserialized and modified in memory but only a diff of the
 changes is kept by the interpreter and applied at the end of each
 smart contract call.
 
-In the Michelson interpreter two new types are added, `sapling_state` and
-`sapling_transaction`, and the instruction `SAPLING_VERIFY_UPDATE`.
+In the Michelson interpreter two new types are added, ``sapling_state`` and
+``sapling_transaction``, and the instruction ``SAPLING_VERIFY_UPDATE``.
 
 Client
 ^^^^^^
 
-Under `lib_client_sapling` there is the client integration
+Under ``lib_client_sapling`` there is the client integration
 with the support for Sapling keys and forging of transactions.
 The main difference from the existing Octez client is the need for the
 Sapling client to keep an additional state, for each contract.
@@ -455,7 +455,7 @@ The update is done using the RPCs to recover the new updates since the
 last known position.
 
 The state of all sapling contracts is stored in
-`~/.tezos-client/sapling_states`. This file can be regenerated from
+``~/.tezos-client/sapling_states``. This file can be regenerated from
 the chain in case of loss. However disclosure of this file will reveal
 the balance and the unspent outputs of all viewing keys.
 

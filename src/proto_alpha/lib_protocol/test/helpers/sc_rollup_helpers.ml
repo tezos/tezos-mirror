@@ -122,28 +122,11 @@ module Wasm_pvm :
       Tezos_context_memory.Context.Proof.t =
   Sc_rollup.Wasm_2_0_0PVM.Make (Environment.Wasm_2_0_0.Make) (In_memory_context)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4386
-   Extracted and adapted from {!Tezos_context_memory}. *)
-let make_empty_context ?(root = "/tmp") () =
-  let open Lwt_syntax in
-  let context_promise =
-    let+ index = Tezos_context_memory.Context_binary.init root in
-    Tezos_context_memory.Context_binary.empty index
-  in
-  match Lwt.state context_promise with
-  | Lwt.Return result -> result
-  | Lwt.Fail exn -> raise exn
-  | Lwt.Sleep ->
-      (* The in-memory context should never block *)
-      assert false
+let make_empty_context = Tezos_context_memory.Context_binary.make_empty_context
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4386
-   Extracted and adapted from {!Tezos_context_memory}. *)
-let make_empty_tree =
-  let dummy_context = make_empty_context ~root:"dummy" () in
-  fun () -> Tezos_context_memory.Context_binary.Tree.empty dummy_context
+let make_empty_tree = Tezos_context_memory.Context_binary.make_empty_tree
 
-let origination_proof ~boot_sector = function
+let compute_origination_proof ~boot_sector = function
   | Sc_rollup.Kind.Example_arith ->
       let open Lwt_syntax in
       let context = make_empty_context () in
@@ -167,7 +150,7 @@ let origination_proof ~boot_sector = function
     about the arity of its trees. *)
 let wrong_arith_origination_proof ~alter_binary_bit ~boot_sector =
   let open Lwt_syntax in
-  let context = Tezos_context_memory.make_empty_context () in
+  let context = Tezos_context_memory.Context.make_empty_context () in
   let+ proof = Wrong_arith_pvm.produce_origination_proof context boot_sector in
   let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
   let proof =
@@ -187,7 +170,7 @@ let wrap_origination_proof ~kind ~boot_sector proof_string_opt :
   let open Lwt_result_syntax in
   match proof_string_opt with
   | None ->
-      let*! origination_proof = origination_proof ~boot_sector kind in
+      let*! origination_proof = compute_origination_proof ~boot_sector kind in
       return origination_proof
   | Some proof_string -> return proof_string
 
@@ -229,9 +212,9 @@ let genesis_commitment_raw ~boot_sector ~origination_level kind =
   in
   return res
 
-(** {2. Inbox message helpers.} *)
+(** {2 Inbox message helpers.} *)
 
-(** {1. Above [Alpha_context].} *)
+(** {1 Above [Alpha_context].} *)
 
 let message_serialize msg =
   WithExceptions.Result.get_ok
@@ -265,6 +248,13 @@ let make_info_per_level ~inbox_level ~predecessor_timestamp ~predecessor =
       (Info_per_level {predecessor_timestamp; predecessor})
   in
   make_input ~inbox_level ~message_counter:Z.one payload
+
+let make_protocol_migration ~inbox_level =
+  let payload =
+    make_internal_inbox_message
+      Sc_rollup.Inbox_message.protocol_migration_internal_message
+  in
+  make_input ~inbox_level ~message_counter:Z.(succ one) payload
 
 (** Message is the combination of a [message] and its associated [input].
 
@@ -343,12 +333,16 @@ let strs_to_inputs inbox_level messages =
     messages
 
 (** Transform the list of all inputs the PVM should read. *)
-let make_inputs predecessor_timestamp predecessor messages inbox_level =
+let make_inputs ~first_block predecessor_timestamp predecessor messages
+    inbox_level =
   (* SOL is at index 0. *)
   let sol = make_sol ~inbox_level in
   (* Info_per_level is at index 1. *)
   let info_per_level =
     make_info_per_level ~inbox_level ~predecessor_timestamp ~predecessor
+  in
+  let mig =
+    if first_block then [make_protocol_migration ~inbox_level] else []
   in
   (* External inputs start at index 2. *)
   let external_inputs =
@@ -356,28 +350,52 @@ let make_inputs predecessor_timestamp predecessor messages inbox_level =
       (fun i message ->
         make_external_input
           ~inbox_level
-          ~message_counter:(Z.of_int (2 + i))
+          ~message_counter:(Z.of_int (2 + List.length mig + i))
           message)
       messages
   in
   (* EOL is after SOL/Info_per_level and all external inputs, therefore,
      at index [2 + List.length messages]. *)
   let eol =
-    let message_counter = Z.of_int (2 + List.length messages) in
+    let message_counter =
+      Z.of_int (2 + List.length mig + List.length messages)
+    in
     make_eol ~inbox_level ~message_counter
   in
-  [sol; info_per_level] @ external_inputs @ [eol]
+  [sol; info_per_level] @ mig @ external_inputs @ [eol]
+
+let predecessor_timestamp_and_hash_from_level level =
+  let level_int64 = Int64.of_int32 @@ Raw_level.to_int32 level in
+  let predecessor_timestamp = Time.Protocol.of_seconds level_int64 in
+  let hash = Block_hash.hash_string [Int64.to_string level_int64] in
+  (predecessor_timestamp, hash)
 
 (** Wrap messages, predecessor_timestamp and predecessor of a level into a
     [payloads_per_level] .*)
-let wrap_messages ?(predecessor_timestamp = Timestamp.of_seconds 0L)
-    ?(predecessor = Block_hash.zero) level messages : payloads_per_level =
+let wrap_messages level
+    ?(pred_info = predecessor_timestamp_and_hash_from_level level) messages :
+    payloads_per_level =
+  let predecessor_timestamp, predecessor = pred_info in
   let payloads = List.map make_external_inbox_message messages in
-  let inputs = make_inputs predecessor_timestamp predecessor messages level in
+  let inputs =
+    make_inputs
+      ~first_block:(level = Raw_level.root || level = Raw_level.(succ root))
+      predecessor_timestamp
+      predecessor
+      messages
+      level
+  in
   {payloads; predecessor_timestamp; predecessor; messages; level; inputs}
 
-let make_empty_level ?predecessor_timestamp ?predecessor level =
-  wrap_messages ?predecessor_timestamp ?predecessor level []
+(** An empty inbox level is a SOL,IPL and EOL. *)
+let make_empty_level ?pred_info inbox_level =
+  wrap_messages ?pred_info inbox_level []
+
+let gen_messages ?pred_info inbox_level gen_message =
+  let open QCheck2.Gen in
+  let* input = gen_message in
+  let* inputs = small_list gen_message in
+  return (wrap_messages ?pred_info inbox_level (input :: inputs))
 
 let gen_payloads_for_levels ~start_level ~max_level gen_message =
   let open QCheck2.Gen in
@@ -394,19 +412,13 @@ let gen_payloads_for_levels ~start_level ~max_level gen_message =
         let* empty_level = bool in
         let* level_messages =
           if empty_level then return (make_empty_level inbox_level)
-          else
-            let* messages =
-              let* input = gen_message in
-              let* inputs = small_list gen_message in
-              return (input :: inputs)
-            in
-            return (wrap_messages inbox_level messages)
+          else gen_messages inbox_level gen_message
         in
         aux (level_messages :: acc) (n - 1)
   in
   aux [] (max_level - start_level)
 
-(** {1. Below [Alpha_context].} *)
+(** {1 Below [Alpha_context].} *)
 
 let message_serialize_repr msg =
   WithExceptions.Result.get_ok
@@ -471,7 +483,7 @@ let pp_message_repr fmt {input_repr; message_repr} =
     | `Message msg -> msg
     | `EOL -> "EOL")
 
-(** An empty inbox level is a SOL and EOL. *)
+(** An empty inbox level is a SOL,IPL and EOL. *)
 let make_empty_level_repr inbox_level =
   let sol = {input_repr = make_sol_repr ~inbox_level; message_repr = `SOL} in
   let eol =
@@ -550,66 +562,6 @@ let get_payloads_history payloads_histories witness =
 
 let get_history history i = Sc_rollup.Inbox.History.find i history |> Lwt.return
 
-let fill_inbox ~inbox history payloads_histories payloads_per_levels =
-  let open Result_syntax in
-  let rec aux payloads_histories history inbox = function
-    | [] -> return (payloads_histories, history, inbox)
-    | ({
-         payloads = _;
-         predecessor_timestamp;
-         predecessor;
-         messages;
-         level = _;
-         inputs = _;
-       } :
-        payloads_per_level)
-      :: rst ->
-        let messages =
-          List.map
-            (fun message -> Sc_rollup.Inbox_message.External message)
-            messages
-        in
-        let* payloads_history, history, inbox, witness, _messages =
-          Environment.wrap_tzresult
-          @@ Sc_rollup.Inbox.add_all_messages
-               ~predecessor_timestamp
-               ~predecessor
-               history
-               inbox
-               messages
-        in
-        (* Store in the history this archived level. *)
-        let witness_hash =
-          Sc_rollup.Inbox_merkelized_payload_hashes.hash witness
-        in
-        let payloads_histories =
-          Payloads_histories.add
-            witness_hash
-            payloads_history
-            payloads_histories
-        in
-        aux payloads_histories history inbox rst
-  in
-  aux payloads_histories history inbox payloads_per_levels
-
-let construct_inbox ?(inbox_creation_level = Raw_level.(root))
-    ?(with_histories = true) ?(predecessor_timestamp = Time.Protocol.epoch)
-    ?(predecessor = Block_hash.zero) payloads_per_levels =
-  let inbox =
-    WithExceptions.Result.get_ok ~loc:__LOC__
-    @@ Environment.wrap_tzresult
-    @@ Sc_rollup.Inbox.genesis
-         ~predecessor_timestamp
-         ~predecessor
-         inbox_creation_level
-  in
-  let history =
-    let capacity = if with_histories then 10000L else 0L in
-    Sc_rollup.Inbox.History.empty ~capacity
-  in
-  let payloads_histories = Payloads_histories.empty in
-  fill_inbox ~inbox history payloads_histories payloads_per_levels
-
 let inbox_message_of_input input =
   match input with Sc_rollup.Inbox_message x -> Some x | _ -> None
 
@@ -648,15 +600,274 @@ let list_of_inputs_from_list_of_messages
     payloads_per_levels
 
 let dumb_init level =
-  WithExceptions.Result.get_ok ~loc:__LOC__
-  @@ Sc_rollup.Inbox.genesis
-       ~predecessor_timestamp:Time.Protocol.epoch
-       ~predecessor:Block_hash.zero
-       level
+  Sc_rollup.Inbox.genesis
+    ~predecessor_timestamp:Time.Protocol.epoch
+    ~predecessor:Block_hash.zero
+    level
 
 let dumb_init_repr level =
-  WithExceptions.Result.get_ok ~loc:__LOC__
-  @@ Sc_rollup_inbox_repr.genesis
-       ~predecessor_timestamp:Time.Protocol.epoch
-       ~predecessor:Block_hash.zero
-       level
+  Sc_rollup_inbox_repr.genesis
+    ~protocol_migration_message:
+      Raw_context.protocol_migration_serialized_message
+    ~predecessor_timestamp:Time.Protocol.epoch
+    ~predecessor:Block_hash.zero
+    level
+
+let origination_op ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    ?origination_proof ?(boot_sector = "") ?(parameters_ty = "unit") ctxt src
+    kind =
+  let open Lwt_result_syntax in
+  let*! origination_proof =
+    match origination_proof with
+    | Some origination_proof -> Lwt.return origination_proof
+    | None -> compute_origination_proof ~boot_sector kind
+  in
+  Op.sc_rollup_origination
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ctxt
+    src
+    kind
+    ~boot_sector
+    ~parameters_ty:(Script.lazy_expr @@ Expr.from_string parameters_ty)
+    ~origination_proof
+
+let latest_level_proof inbox =
+  Sc_rollup.Inbox.Internal_for_tests.level_proof_of_history_proof
+  @@ Sc_rollup.Inbox.old_levels_messages inbox
+
+let latest_level_proof_hash inbox = (latest_level_proof inbox).hash
+
+module Node_inbox = struct
+  type t = {
+    inbox : Sc_rollup.Inbox.t;
+    history : Sc_rollup.Inbox.History.t;
+    payloads_histories : payloads_histories;
+  }
+
+  let new_inbox ?(genesis_predecessor_timestamp = Time.Protocol.epoch)
+      ?(genesis_predecessor = Block_hash.zero)
+      ?(inbox_creation_level = Raw_level.root) () =
+    let open Result_syntax in
+    let inbox =
+      Sc_rollup.Inbox.genesis
+        ~predecessor_timestamp:genesis_predecessor_timestamp
+        ~predecessor:genesis_predecessor
+        inbox_creation_level
+    in
+    let history = Sc_rollup.Inbox.History.empty ~capacity:10000L in
+    let payloads_histories = Payloads_histories.empty in
+    return {inbox; history; payloads_histories}
+
+  let fill_inbox ~inbox_creation_level node_inbox payloads_per_levels =
+    let open Result_syntax in
+    let rec aux {inbox; history; payloads_histories} = function
+      | [] -> return {inbox; history; payloads_histories}
+      | ({
+           payloads = _;
+           predecessor_timestamp;
+           predecessor;
+           messages;
+           level;
+           inputs = _;
+         } :
+          payloads_per_level)
+        :: rst ->
+          let messages =
+            List.map
+              (fun message -> Sc_rollup.Inbox_message.External message)
+              messages
+          in
+          let* payloads_history, history, inbox, witness, _messages =
+            Environment.wrap_tzresult
+            @@ Sc_rollup.Inbox.add_all_messages
+                 ~first_block:
+                   Raw_level.(equal (succ inbox_creation_level) level)
+                 ~predecessor_timestamp
+                 ~predecessor
+                 history
+                 inbox
+                 messages
+          in
+          (* Store in the history this archived level. *)
+          let witness_hash =
+            Sc_rollup.Inbox_merkelized_payload_hashes.hash witness
+          in
+          let payloads_histories =
+            Payloads_histories.add
+              witness_hash
+              payloads_history
+              payloads_histories
+          in
+          aux {inbox; history; payloads_histories} rst
+    in
+    aux node_inbox payloads_per_levels
+
+  let construct_inbox ?(inbox_creation_level = Raw_level.root)
+      ?genesis_predecessor_timestamp ?genesis_predecessor payloads_per_levels =
+    let open Result_syntax in
+    let* node_inbox =
+      new_inbox
+        ?genesis_predecessor_timestamp
+        ?genesis_predecessor
+        ~inbox_creation_level
+        ()
+    in
+    fill_inbox ~inbox_creation_level node_inbox payloads_per_levels
+
+  let get_history history hash =
+    Lwt.return @@ Sc_rollup.Inbox.History.find hash history
+
+  let produce_proof {payloads_histories; history; _} inbox_snapshot
+      (level, message_counter) =
+    Lwt.map Environment.wrap_tzresult
+    @@ Sc_rollup.Inbox.produce_proof
+         ~get_payloads_history:(get_payloads_history payloads_histories)
+         ~get_history:(get_history history)
+         inbox_snapshot
+         (level, message_counter)
+
+  let produce_and_expose_proof node_inbox node_inbox_snapshot
+      (level, message_counter) =
+    let open Lwt_result_syntax in
+    let* proof, input =
+      produce_proof node_inbox node_inbox_snapshot (level, message_counter)
+    in
+    let exposed_proof = Sc_rollup.Inbox.Internal_for_tests.expose_proof proof in
+    return (exposed_proof, input)
+
+  let produce_payloads_proof {payloads_histories; _}
+      (head_cell_hash : Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t)
+      message_counter =
+    Lwt.map Environment.wrap_tzresult
+    @@ Sc_rollup.Inbox.Internal_for_tests.produce_payloads_proof
+         (get_payloads_history payloads_histories)
+         head_cell_hash
+         ~index:message_counter
+
+  let produce_inclusion_proof {history; _} inbox_snapshot level =
+    Lwt.map Environment.wrap_tzresult
+    @@ Sc_rollup.Inbox.Internal_for_tests.produce_inclusion_proof
+         (get_history history)
+         inbox_snapshot
+         level
+end
+
+module Protocol_inbox = struct
+  let new_inbox ?(genesis_predecessor_timestamp = Time.Protocol.epoch)
+      ?(genesis_predecessor = Block_hash.zero)
+      ?(inbox_creation_level = Raw_level.root) () =
+    Sc_rollup.Inbox.genesis
+      ~predecessor_timestamp:genesis_predecessor_timestamp
+      ~predecessor:genesis_predecessor
+      inbox_creation_level
+
+  let fill_inbox ~inbox_creation_level inbox payloads_per_levels =
+    let open Result_syntax in
+    let rec aux inbox = function
+      | [] -> return inbox
+      | ({
+           payloads = _;
+           predecessor_timestamp;
+           predecessor;
+           messages;
+           level;
+           inputs = _;
+         } :
+          payloads_per_level)
+        :: rst ->
+          let payloads =
+            List.map
+              (fun message -> Sc_rollup.Inbox_message.(External message))
+              messages
+          in
+          let* _, _, inbox, _, _ =
+            Environment.wrap_tzresult
+            @@ Sc_rollup.Inbox.add_all_messages
+                 ~first_block:
+                   Raw_level.(equal (succ inbox_creation_level) level)
+                 ~predecessor_timestamp
+                 ~predecessor
+                 (Sc_rollup.Inbox.History.empty ~capacity:1000L)
+                 inbox
+                 payloads
+          in
+          aux inbox rst
+    in
+    aux inbox payloads_per_levels
+
+  let add_new_level ?pred_info inbox messages =
+    let next_level = Raw_level.succ @@ Sc_rollup.Inbox.inbox_level inbox in
+    let messages_per_level = wrap_messages ?pred_info next_level messages in
+    fill_inbox inbox [messages_per_level]
+
+  let add_new_empty_level ?pred_info inbox =
+    let next_level = Raw_level.succ @@ Sc_rollup.Inbox.inbox_level inbox in
+    let empty_level = [make_empty_level ?pred_info next_level] in
+    fill_inbox inbox empty_level
+
+  let construct_inbox ?(inbox_creation_level = Raw_level.root)
+      ?genesis_predecessor_timestamp ?genesis_predecessor payloads_per_levels =
+    let inbox =
+      new_inbox
+        ?genesis_predecessor_timestamp
+        ?genesis_predecessor
+        ~inbox_creation_level
+        ()
+    in
+    fill_inbox ~inbox_creation_level inbox payloads_per_levels
+end
+
+let construct_node_and_protocol_inbox ?inbox_creation_level
+    ?genesis_predecessor_timestamp ?genesis_predecessor payloads_per_levels =
+  let open Result_syntax in
+  let* node_inbox =
+    Node_inbox.construct_inbox
+      ?inbox_creation_level
+      ?genesis_predecessor_timestamp
+      ?genesis_predecessor
+      payloads_per_levels
+  in
+  let* protocol_inbox =
+    Protocol_inbox.construct_inbox
+      ?inbox_creation_level
+      ?genesis_predecessor_timestamp
+      ?genesis_predecessor
+      payloads_per_levels
+  in
+  return (node_inbox, protocol_inbox)
+
+module Protocol_inbox_with_ctxt = struct
+  let fill_inbox block list_of_messages contract =
+    let open Lwt_result_syntax in
+    let* block, list_of_messages =
+      List.fold_left_map_es
+        (fun (block : Block.t) ({messages; _} as messages_per_level) ->
+          let predecessor = block.hash in
+          let predecessor_timestamp = block.header.shell.timestamp in
+
+          let* block =
+            match messages with
+            | [] ->
+                let* block = Block.bake block in
+                return block
+            | messages ->
+                let* operation_add_message =
+                  Op.sc_rollup_add_messages (B block) contract messages
+                in
+                let* block =
+                  Block.bake ~operation:operation_add_message block
+                in
+                return block
+          in
+
+          return
+            (block, {messages_per_level with predecessor; predecessor_timestamp}))
+        block
+        list_of_messages
+    in
+    return (block, list_of_messages)
+end

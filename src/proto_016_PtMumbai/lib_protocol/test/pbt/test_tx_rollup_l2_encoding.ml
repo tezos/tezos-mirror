@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/test_tx_rollup_l2_encoding.exe
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/pbt/main.exe \
+                  -- --file test_tx_rollup_l2_encoding.ml
     Subject:      Tx rollup l2 encoding
 *)
 
@@ -278,10 +278,11 @@ let test_quantity ~count =
 let () =
   let qcheck_wrap = qcheck_wrap ~rand:(Random.State.make_self_init ()) in
   Alcotest.run
-    "Compact_encoding"
+    ~__FILE__
+    (Protocol.name ^ ": Compact_encoding")
     [
-      ("quantity", qcheck_wrap [test_quantity ~count:100_000]);
-      ( "roundtrip",
+      (": quantity", qcheck_wrap [test_quantity ~count:100_000]);
+      ( ": roundtrip",
         qcheck_wrap
           [
             test_roundtrip

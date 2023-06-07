@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type protocol = Nairobi | Proto_alpha
+
 (** [internal_message_kind] represent an internal message in a inbox. *)
 type internal_message_kind =
   | Transfer (* Generic internal message. *)
@@ -32,6 +34,7 @@ type internal_message_kind =
   | Info_per_level
       (** Internal message containing the timestamp of the current block and the
           hash of the previous block. *)
+  | Protocol_migration of protocol
 
 (** A type representing messages from Layer 1 to Layer 2. Internal ones are
     originated from Layer 1 smart-contracts and external ones are messages from

@@ -25,25 +25,29 @@
 
 (** See [src/lib_context/tezos_context.ml] for some information. *)
 
+module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
+  include Context.Make (Encoding)
+
+  let make_empty_context ?(root = "/tmp") () =
+    let open Lwt_syntax in
+    let context_promise =
+      let+ index = init root in
+      empty index
+    in
+    match Lwt.state context_promise with
+    | Lwt.Return result -> result
+    | Lwt.Fail exn -> raise exn
+    | Lwt.Sleep ->
+        (* The in-memory context should never block *)
+        assert false
+
+  let make_empty_tree =
+    let dummy_context = make_empty_context ~root:"dummy" () in
+    fun () -> Tree.empty dummy_context
+end
+
 (** Variant of [Tezos_context.Context_binary] purely in-memory. *)
-module Context_binary = Context.Make (Tezos_context_encoding.Context_binary)
+module Context_binary = Make (Tezos_context_encoding.Context_binary)
 
 (** Variant of [Tezos_context.Context] purely in-memory. *)
-module Context = Context.Make (Tezos_context_encoding.Context)
-
-let make_empty_context ?(root = "/tmp") () =
-  let open Lwt_syntax in
-  let context_promise =
-    let+ index = Context.init root in
-    Context.empty index
-  in
-  match Lwt.state context_promise with
-  | Lwt.Return result -> result
-  | Lwt.Fail exn -> raise exn
-  | Lwt.Sleep ->
-      (* The in-memory context should never block *)
-      assert false
-
-let make_empty_tree =
-  let dummy_context = make_empty_context ~root:"dummy" () in
-  fun () -> Context.Tree.empty dummy_context
+module Context = Make (Tezos_context_encoding.Context)

@@ -184,6 +184,7 @@ let select_commands ctxt {chain; block; protocol; _} =
     @ Client_helpers_commands.commands ()
     @ Mockup_commands.commands ()
     @ Tezos_proxy.Proxy_commands.commands ()
+    @ Client_smart_rollup_commands.commands ()
     @ commands_for_version)
 
 let () = Client_main_run.run (module Client_config) ~select_commands

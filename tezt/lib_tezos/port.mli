@@ -25,9 +25,5 @@
 
 (** Network port management. *)
 
-(** Get a fresh, unused port.
-
-    Warning: this function does not guarantee that the given port is
-    not already in use by another process. And if your test needs
-    more than 1000 ports, ports will start to be reused. *)
+(** Get a fresh, unused port. *)
 val fresh : unit -> int

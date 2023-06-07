@@ -36,7 +36,7 @@ val no_write : 'a -> ('a, _) t
 
 (** [delay_write v write] returns a delayed write version of [v] with the
     [write] function to be called later. *)
-val delay_write : 'a -> ('store -> unit Lwt.t) -> ('a, 'store) t
+val delay_write : 'a -> ('store -> unit tzresult Lwt.t) -> ('a, 'store) t
 
 (** [map f dw] returns the delayed write [dw] where [f] is applied to the
     encapsulated value. *)
@@ -55,7 +55,7 @@ val bind : ('a -> ('b, 'store) t) -> ('a, 'store) t -> ('b, 'store) t
 
 (** [apply node_ctxt dw] applies the write effects on the context [node_ctxt]
     and returns the encapsulated value. *)
-val apply : 'store -> ('a, 'store) t -> 'a Lwt.t
+val apply : 'store -> ('a, 'store) t -> 'a tzresult Lwt.t
 
 (** [ignore dw] ignores the write effects and returns the encapsulated value. *)
 val ignore : ('a, _) t -> 'a

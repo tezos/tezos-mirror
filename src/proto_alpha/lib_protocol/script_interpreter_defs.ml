@@ -293,7 +293,8 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IDrop _ -> Interp_costs.drop
   | IDup _ -> Interp_costs.dup
   | ISwap _ -> Interp_costs.swap
-  | IConst _ -> Interp_costs.const
+  | IPush _ -> Interp_costs.push
+  | IUnit _ -> Interp_costs.unit
   | ICons_some _ -> Interp_costs.cons_some
   | ICons_none _ -> Interp_costs.cons_none
   | IIf_none _ -> Interp_costs.if_none
@@ -469,7 +470,7 @@ let rec kundip :
  fun w accu stack k ->
   match w with
   | KPrefix (loc, ty, w) ->
-      let k = IConst (loc, ty, accu, k) in
+      let k = IPush (loc, ty, accu, k) in
       let accu, stack = stack in
       kundip w accu stack k
   | KRest -> (accu, stack, k)
@@ -514,7 +515,7 @@ let apply ctxt gas capture_ty capture lam =
                 kbef = arg_stack_ty;
                 kaft = descr.kaft;
                 kinstr =
-                  IConst
+                  IPush
                     ( descr.kloc,
                       capture_ty,
                       capture,
@@ -553,7 +554,7 @@ let apply ctxt gas capture_ty capture lam =
                 kbef = arg_stack_ty;
                 kaft = descr.kaft;
                 kinstr =
-                  IConst
+                  IPush
                     ( descr.kloc,
                       capture_ty,
                       capture,
@@ -566,39 +567,6 @@ let apply ctxt gas capture_ty capture lam =
   lam' >>=? fun (lam', ctxt) ->
   let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
   return (lam', ctxt, gas)
-
-let make_transaction_to_tx_rollup (type t) ctxt ~destination ~amount
-    ~(parameters_ty : ((t ticket, tx_rollup_l2_address) pair, _) ty) ~parameters
-    =
-  (* The entrypoints of a transaction rollup are polymorphic wrt. the
-     tickets it can process. However, two Michelson values can have
-     the same Micheline representation, but different types. What
-     this means is that when we start the execution of a transaction
-     rollup, the type of its argument is lost if we just give it the
-     values provided by the Michelson script.
-
-     To address this issue, we instrument a transfer to a transaction
-     rollup to inject the exact type of the entrypoint as used by
-     the smart contract. This allows the transaction rollup to extract
-     the type of the ticket. *)
-  error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
-  >>?= fun () ->
-  let (Pair_t (Ticket_t (tp, _), _, _, _)) = parameters_ty in
-  unparse_data ctxt Optimized parameters_ty parameters
-  >>=? fun (unparsed_parameters, ctxt) ->
-  Lwt.return
-    ( Script_ir_unparser.unparse_ty ~loc:Micheline.dummy_location ctxt tp
-    >>? fun (ty, ctxt) ->
-      let unparsed_parameters =
-        Micheline.Seq
-          (Micheline.dummy_location, [Micheline.root unparsed_parameters; ty])
-      in
-      Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-      >|? fun ctxt ->
-      let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
-      ( Transaction_to_tx_rollup
-          {destination; parameters_ty; parameters; unparsed_parameters},
-        ctxt ) )
 
 let make_transaction_to_sc_rollup ctxt ~destination ~amount ~entrypoint
     ~parameters_ty ~parameters =
@@ -628,7 +596,7 @@ let emit_event (type t tc) (ctxt, sc) gas ~(event_type : (t, tc) ty)
   let operation = Event {ty = unparsed_ty; tag; unparsed_data} in
   let iop =
     {
-      source = Destination.Contract (Contract.Originated sc.self);
+      sender = Destination.Contract (Contract.Originated sc.self);
       operation;
       nonce;
     }
@@ -700,14 +668,6 @@ let transfer (type t) (ctxt, sc) gas amount location
           },
         lazy_storage_diff,
         ctxt )
-  | Typed_tx_rollup {arg_ty = parameters_ty; tx_rollup = destination} ->
-      make_transaction_to_tx_rollup
-        ctxt
-        ~destination
-        ~amount
-        ~parameters_ty
-        ~parameters
-      >|=? fun (operation, ctxt) -> (operation, None, ctxt)
   | Typed_sc_rollup
       {arg_ty = parameters_ty; sc_rollup = destination; entrypoint} ->
       make_transaction_to_sc_rollup
@@ -730,7 +690,7 @@ let transfer (type t) (ctxt, sc) gas amount location
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop =
     {
-      source = Destination.Contract (Contract.Originated sc.self);
+      sender = Destination.Contract (Contract.Originated sc.self);
       operation;
       nonce;
     }
@@ -773,8 +733,8 @@ let create_contract (ctxt, sc) gas storage_type code delegate credit init =
       }
   in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
-  let source = Destination.Contract (Contract.Originated sc.self) in
-  let piop = Internal_operation {source; operation; nonce} in
+  let sender = Destination.Contract (Contract.Originated sc.self) in
+  let piop = Internal_operation {sender; operation; nonce} in
   let res = {piop; lazy_storage_diff} in
   let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
   return (res, preorigination, ctxt, gas)
@@ -905,7 +865,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g) kloop_in_left_type =
   ('c, 'd, 'e, 'f) continuation ->
   ('a, 'g, 'c, 'd) kinstr ->
   ('b, 'g, 'e, 'f) continuation ->
-  ('a, 'b) union ->
+  ('a, 'b) or_ ->
   'g ->
   ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 

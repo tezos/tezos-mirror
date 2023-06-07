@@ -154,11 +154,7 @@ type step_kont =
 
 type buffers = {input : input_inst; output : output_inst}
 
-type config = {
-  step_kont : step_kont;
-  host_funcs : Host_funcs.registry;
-  stack_size_limit : int;
-}
+type config = {step_kont : step_kont; stack_size_limit : int}
 
 type ('a, 'b, 'acc) fold_right2_kont = {
   acc : 'acc;
@@ -239,6 +235,7 @@ exception Missing_memory_0_export
     @raise Invalid_argument if called with [IK_Stop]. There is no
     transition from the terminal state. *)
 val init_step :
+  stack_size_limit:int ->
   filter_exports:bool ->
   ?check_module_exports:memory_export_rules ->
   module_reg:module_reg ->
@@ -250,6 +247,7 @@ val init_step :
   init_kont Lwt.t
 
 val init :
+  ?stack_size_limit:int ->
   module_reg:module_reg ->
   self:module_key ->
   buffers ->
@@ -259,6 +257,7 @@ val init :
   module_inst Lwt.t (* raises Link, Trap *)
 
 val invoke :
+  ?stack_size_limit:int ->
   module_reg:module_reg ->
   caller:module_key ->
   ?input:Input_buffer.t ->
@@ -273,6 +272,7 @@ val invoke :
 val step :
   ?init:bool ->
   ?durable:Durable_storage.t ->
+  host_funcs:Host_funcs.registry ->
   module_reg ->
   config ->
   buffers ->
@@ -313,7 +313,7 @@ val reveal_step :
   config Lwt.t
 
 val config :
-  Host_funcs.registry ->
+  stack_size_limit:int ->
   ?frame_arity:int32 (* The number of values returned by the computation *) ->
   module_key ->
   value Vector.t ->

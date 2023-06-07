@@ -272,7 +272,9 @@ behavior. Notable changes however are as follows:
   obtain a quorum, is rewarded with a bonus.
 * Endorsing rewards are shared equally among all validators. Participation above
   a minimal threshold per cycle is however required.
-* Deposits are no longer frozen and unfrozen, instead a percentage of the active stake is always locked.
+* Deposits are no longer frozen and unfrozen, instead a percentage of the active
+  stake is always locked. A delegate with an empty deposit cannot bake nor
+  (pre)endorse.
 * Validators are rewarded instantaneously for baking blocks and including extra endorsements, and not at the end of the cycle like in Emmy*.
 * At the end of a cycle ``c``, the following actions happen:
 
@@ -389,6 +391,10 @@ evidence is rewarded half of the slashed amount.
 The evidence for double signing at a given level can be collected by any
 :ref:`accuser<Accuser>` and included as an *accusation* operation in a block
 for a period of ``MAX_SLASHING_PERIOD``.
+
+If a delegates' deposit is smaller than the slashed amount, the deposit is
+simply emptied, which leads to the delegate losing its baking and endorsing
+rights for the rest of the cycle.
 
 We note that selfish baking is not an issue in Tenderbake: say we are at round
 ``r`` and the validator which is proposer at round ``r+1`` does not (pre)endorse

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-smart-rollup-panic-hook"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["TriliTech <contact@trili.tech>"]
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "Hook for capturing kernel panics & printing to debug log."
+keywords = ["tezos", "smart", "rollup"]
+categories = ["no-std", "no-std::no-alloc", "api-bindings", "wasm"]
+
+[dependencies.tezos-smart-rollup-core]
+path = "../core"
+version = "0.1.0"
+
+[features]
+default = ["abort", "debug"]
+abort = []
+debug = []

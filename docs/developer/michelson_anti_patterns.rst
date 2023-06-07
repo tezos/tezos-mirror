@@ -8,9 +8,54 @@ mistakes that you can make when writing or interacting with contracts on
 the Tezos blockchain and alternative ways to write code that avoid these
 problems.
 
-Note: We are currently reworking the concurrency model of Michelson (how
-and when sub-transactions are made), so that some of these patterns will
-be prevented by the language itself.
+This list is not exhaustive and will never be. The following resources
+partially complement it:
+
+- https://opentezos.com/smart-contracts/avoiding-flaws/
+- https://ligolang.org/docs/tutorials/security/
+- https://github.com/InferenceAG/TezosSmartContractDetails
+- https://medium.com/protofire-blog/recommendations-to-enhance-security-of-tezos-smart-contracts-d14c0e53a6d3
+
+Storing unbounded data
+----------------------
+
+The gas costs for serializing and deserializing a contract storage are
+proportional to its size. Contracts allowing arbitrary users to add
+data, or allowing authenticated users to add data of unbounded size, are vulnerable to malicious users increasing the storage size to
+make legitimate interactions with the contract consume a lot of gas or
+even deadlocking the contract.
+
+Possible issues:
+~~~~~~~~~~~~~~~~
+
+- Malicious users may increase the storage size by adding large chunks
+  of data.
+
+- Even if each account can only store a bounded amount of data, a
+  malicious user may create many accounts to bypass the limit.
+
+Alternatives/Solutions:
+~~~~~~~~~~~~~~~~~~~~~~~
+
+- Store unbounded data offchain. When some data is not required for
+  the execution of a smart contract, the contract does not need to
+  store it. Typically, in most cases there is no need to store the full
+  contents of an NFT in a smart contract, but rather some metadata or pointer.
+  Even when some data is genuinely required, it can often be
+  replaced in storage by its hash and revealed by the user when
+  it is required for the contract execution.
+
+- Store user data in big maps. Since big map are lazy data structures,
+  instead of deserializing the full content of a stored big map before
+  the execution, deserialization happens during the execution and only
+  for the accessed keys. The size of the part of a big map which is
+  not accessed during the execution has no impact on the gas costs of
+  the execution (with two exceptions: transferring or deleting a complete big map
+  containing tickets leads to an update of the ticket table which is
+  linear in the number of keys). By storing user data under a big map
+  whose keys are linked to the user addresses having added each key, it is possible to
+  guarantee that the gas costs for legitimate users is not impacted by
+  the interactions of malicious users.
 
 Refunding to a list of contracts
 --------------------------------

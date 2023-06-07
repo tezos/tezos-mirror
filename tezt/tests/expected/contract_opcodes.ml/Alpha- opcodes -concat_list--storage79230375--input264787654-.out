@@ -1,0 +1,96 @@
+
+./octez-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/concat_list.tz on storage '""' and input '{ "a" ; "b" ; "c" }' --level 1 --trace-stack
+storage
+  "abc"
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (just consumed gas: 10.864)
+    [ (Pair { "a" ; "b" ; "c" } "") ]
+  - location: 8 (just consumed gas: 0.010)
+    [ { "a" ; "b" ; "c" } ]
+  - location: 9 (just consumed gas: 0.010)
+    [ ""
+      { "a" ; "b" ; "c" } ]
+  - location: 12 (just consumed gas: 0.010)
+    [ { "a" ; "b" ; "c" }
+      "" ]
+  - location: 13 (just consumed gas: 0)
+    [ "a"
+      "" ]
+  - location: 15 (just consumed gas: 0.010)
+    [ ""
+      "a" ]
+  - location: 16 (just consumed gas: 0)
+    [ "a" ]
+  - location: 18 (just consumed gas: 0.010)
+    [ {}
+      "a" ]
+  - location: 20 (just consumed gas: 0.010)
+    [ "a"
+      {} ]
+  - location: 21 (just consumed gas: 0.010)
+    [ { "a" } ]
+  - location: 16 (just consumed gas: 0.025)
+    [ ""
+      { "a" } ]
+  - location: 22 (just consumed gas: 0.010)
+    [ { "" ; "a" } ]
+  - location: 23 (just consumed gas: 0.120)
+    [ "a" ]
+  - location: 13 (just consumed gas: 0.015)
+    [ "b"
+      "a" ]
+  - location: 15 (just consumed gas: 0.010)
+    [ "a"
+      "b" ]
+  - location: 16 (just consumed gas: 0)
+    [ "b" ]
+  - location: 18 (just consumed gas: 0.010)
+    [ {}
+      "b" ]
+  - location: 20 (just consumed gas: 0.010)
+    [ "b"
+      {} ]
+  - location: 21 (just consumed gas: 0.010)
+    [ { "b" } ]
+  - location: 16 (just consumed gas: 0.025)
+    [ "a"
+      { "b" } ]
+  - location: 22 (just consumed gas: 0.010)
+    [ { "a" ; "b" } ]
+  - location: 23 (just consumed gas: 0.121)
+    [ "ab" ]
+  - location: 13 (just consumed gas: 0.015)
+    [ "c"
+      "ab" ]
+  - location: 15 (just consumed gas: 0.010)
+    [ "ab"
+      "c" ]
+  - location: 16 (just consumed gas: 0)
+    [ "c" ]
+  - location: 18 (just consumed gas: 0.010)
+    [ {}
+      "c" ]
+  - location: 20 (just consumed gas: 0.010)
+    [ "c"
+      {} ]
+  - location: 21 (just consumed gas: 0.010)
+    [ { "c" } ]
+  - location: 16 (just consumed gas: 0.025)
+    [ "ab"
+      { "c" } ]
+  - location: 22 (just consumed gas: 0.010)
+    [ { "ab" ; "c" } ]
+  - location: 23 (just consumed gas: 0.121)
+    [ "abc" ]
+  - location: 13 (just consumed gas: 0.015)
+    [ "abc" ]
+  - location: 24 (just consumed gas: 0.010)
+    [ {}
+      "abc" ]
+  - location: 26 (just consumed gas: 0.010)
+    [ (Pair {} "abc") ]
+

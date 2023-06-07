@@ -1,3 +1,11 @@
+(* Testing
+   -------
+   Component:    WebAssembly
+   Invocation:   dune exec src/lib_webassembly/tests/main.exe \
+                  -- --file smallint.ml
+   Subject:      Test small ints
+*)
+
 (* Simple, non-exhaustive tests for small ints (i8, i16). *)
 
 let s32max = 0x7fffffffl
@@ -116,4 +124,6 @@ let check () =
     assert_equal 15l (I16.popcnt s16max) ;
     assert_equal 7l (I8.popcnt s8max)
 
-let tests = [Alcotest.test_case "Check_smallint" `Quick check]
+let tests = [("Smallint", [Alcotest.test_case "Check_smallint" `Quick check])]
+
+let () = Alcotest.run ~__FILE__ "WebAssembly reference interpreter tests" tests

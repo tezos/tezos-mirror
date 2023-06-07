@@ -42,6 +42,11 @@ let sample_in_interval ~range:{min; max} state =
   if max - min >= 0 then min + Random.State.int state (max - min + 1)
   else invalid_arg "Base_samplers.sample_in_interval"
 
+let sample_float_in_interval ~min ~max state =
+  let diff = max -. min in
+  if diff > 0. then min +. Random.State.float state diff
+  else invalid_arg "Base_samplers.sample_float_in_interval"
+
 let uniform_bool = Random.State.bool
 
 let uniform_byte state = Char.chr (Random.State.int state 256)

@@ -1,0 +1,97 @@
+# This contract emulates a time constrained "guess who" game using timelocks.
+# The goal of the game if for the challenger to guess which value was stored by
+# the game initiator. The challenger only has one guess, and must submit it
+# within 10 blocks of the game initialization.
+#
+# More particularly, the game relies on a timelock primitive using a difficulty
+# set to 1_000 and a hardwritten threshold for guessing of 10 blocks. Beware,
+# this contract is for education purpose only to demonstrate the use of
+# timelock. In particular, the contract may not be secure, the game can be
+# reinitialised at any time and the timelock difficulty and threshold values
+# were chosen arbitrarily.
+#
+# Its storage consists of 4 values: the level and timelock chest, in which the
+# value to guess is stored, set up at the game's initialization, the guess
+# written in bytes, and the message to know the game status and result.
+#
+# The game unfolds as such:
+# 1) Initilialising the game with a timelock chest:
+# User A publishes a timelock chest to start a game, the contract
+# initializes the storage's level to the current level and the guess and
+# message to a hardcoded value (0xA0).
+# 2) Submitting the guess:
+# User B publishes a guess, the guess is saved if and only if the current
+# level is lower than the contract's plus 10 blocks (else the game is blocked
+# but the contract can be reinitialised with a new timelock chest at anytime),
+# we also update the message to another hardcoded value (0xB0).
+# Note the guess can be updated several times and that no verification is made
+# on who is sending it.
+# 3) Revealing the time-locked value:
+# Finally, user A (or B) submits a chest_key. If the timelock opening is
+# successful, the contract compares the guess to the timelock message. If the
+# bytes are equal, the message is updated to 0x00 else 0x01. If the opening
+# fails, the message is updated to 0x10.
+
+storage (pair (nat %level) chest (bytes %guess) (bytes %result));
+parameter ( or (chest %initialize_game) (or (bytes %guess) (chest_key %finish_game)));
+code { UNPAIR 5;
+       IF_LEFT { # If we receive a chest,
+                 # we reinitialise the storage
+                 # with the new chest and current level.
+                 DIP {DROP 4};
+                 PUSH bytes 0xA0;
+                 DUP;
+                 PAIR;
+                 SWAP;
+                 LEVEL;
+                 PAIR 3}
+               { IF_LEFT { # If we receive a guess,
+                           SWAP;
+                           DUP;
+                           PUSH nat 10;
+                           ADD;
+                           LEVEL;
+                           COMPARE;
+                           LE;
+                           IF { # we store the guess if current level < stored level + 10
+                                DIP 2 {PUSH bytes 0xB0};
+                                DIP {PAIR; SWAP; PAIR};
+                                PAIR;
+                                DIP {DROP 2};
+                              }
+                              { # else we keep the storage unchanged.
+                                SWAP;
+                                DROP;
+                                PAIR 4};
+                          }
+                         { # If we receive a chest_key,
+                           # we open the chest.
+                           DIP 4 {DROP};
+                           DUP 3;
+                           SWAP;
+                           DIP 2 {PUSH nat 1000};
+                           OPEN_CHEST;
+                           IF_LEFT { # If the chest opens successfully,
+                                     # we compare the guess with the locked value.
+                                     DUP 4;
+                                     COMPARE;
+                                     EQ;
+                                     IF { # If they are equal we store 0x00
+                                          PUSH bytes 0x00}
+                                        { # else we store 0x01
+                                          PUSH bytes 0x01}}
+                                   { IF { # We store 0x11 for the first type of failure
+                                          PUSH bytes 0x11}
+                                        { # We store 0x10 for the second type of failure
+                                          PUSH bytes 0x10}};
+                           DIG 3;
+                           PAIR;
+                           DIG 2;
+                           PAIR;
+                           DIG 1;
+                           PAIR;
+                          };
+               };
+       NIL operation;
+       PAIR;
+     }

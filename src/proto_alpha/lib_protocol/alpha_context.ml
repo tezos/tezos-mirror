@@ -61,7 +61,17 @@ module Sc_rollup = struct
   include Sc_rollup_PVM_sig
   module ArithPVM = Sc_rollup_arith
   module Wasm_2_0_0PVM = Sc_rollup_wasm.V2_0_0
-  module Inbox_message = Sc_rollup_inbox_message_repr
+
+  module Inbox_message = struct
+    include Sc_rollup_inbox_message_repr
+
+    let protocol_migration_internal_message =
+      Raw_context.protocol_migration_internal_message
+
+    let protocol_migration_serialized_message =
+      Raw_context.protocol_migration_serialized_message
+  end
+
   module Inbox_merkelized_payload_hashes =
     Sc_rollup_inbox_merkelized_payload_hashes_repr
 
@@ -73,6 +83,18 @@ module Sc_rollup = struct
   module Inbox = struct
     include Sc_rollup_inbox_repr
     include Sc_rollup_inbox_storage
+
+    let genesis =
+      genesis
+        ~protocol_migration_message:
+          Inbox_message.protocol_migration_serialized_message
+
+    let add_all_messages ~first_block =
+      add_all_messages
+        ~protocol_migration_message:
+          (if first_block then
+           Some Inbox_message.protocol_migration_internal_message
+          else None)
 
     module Internal_for_tests = struct
       include Sc_rollup_inbox_repr.Internal_for_tests
@@ -166,6 +188,9 @@ module Operation = struct
   type packed = packed_operation
 
   let unsigned_encoding = unsigned_operation_encoding
+
+  let unsigned_encoding_with_legacy_attestation_name =
+    unsigned_operation_encoding_with_legacy_attestation_name
 
   include Operation_repr
 end
@@ -536,6 +561,8 @@ module Stake_distribution = struct
   let baking_rights_owner = Delegate_sampler.baking_rights_owner
 
   let slot_owner = Delegate_sampler.slot_owner
+
+  let load_sampler_for_cycle = Delegate_sampler.load_sampler_for_cycle
 end
 
 module Nonce = Nonce_storage
@@ -573,17 +600,6 @@ module Consensus = struct
   let store_endorsement_branch ctxt branch =
     let ctxt = set_endorsement_branch ctxt branch in
     Storage.Tenderbake.Endorsement_branch.add ctxt branch
-
-  let load_grand_parent_branch ctxt =
-    Storage.Tenderbake.Grand_parent_branch.find ctxt >>=? function
-    | Some grand_parent_branch ->
-        Raw_context.Consensus.set_grand_parent_branch ctxt grand_parent_branch
-        |> return
-    | None -> return ctxt
-
-  let store_grand_parent_branch ctxt branch =
-    let ctxt = set_grand_parent_branch ctxt branch in
-    Storage.Tenderbake.Grand_parent_branch.add ctxt branch
 end
 
 let prepare_first_block = Init_storage.prepare_first_block
@@ -592,7 +608,6 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
   Init_storage.prepare ctxt ~level ~predecessor_timestamp ~timestamp
   >>=? fun (ctxt, balance_updates, origination_results) ->
   Consensus.load_endorsement_branch ctxt >>=? fun ctxt ->
-  Consensus.load_grand_parent_branch ctxt >>=? fun ctxt ->
   return (ctxt, balance_updates, origination_results)
 
 let finalize ?commit_message:message c fitness =

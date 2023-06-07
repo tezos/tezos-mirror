@@ -49,6 +49,7 @@
   *)
 
 module Message = Distributed_db_message
+module Distributed_db_event = Distributed_db_event.Distributed_db_event
 
 type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 
@@ -123,7 +124,27 @@ let activate
     ({p2p; active_chains; protocol_db; disk; p2p_readers; _} as global_db)
     chain_store callback =
   let run_p2p_reader gid =
-    let register p2p_reader = P2p_peer.Table.add p2p_readers gid p2p_reader in
+    let register p2p_reader =
+      (match P2p_peer.Table.find p2p_readers gid with
+      | None -> ()
+      | Some old_p2p_reader ->
+          Distributed_db_event.(
+            emit__dont_wait__use_with_care multiple_p2p_reader)
+            gid ;
+          (* It is not expected to have exception raised by this function,
+             however to prevent future problems potential exceptions are
+             logged. *)
+          Lwt.dont_wait
+            (fun () -> P2p_reader.shutdown old_p2p_reader)
+            (fun exn ->
+              match exn with
+              | Out_of_memory | Stack_overflow -> raise exn
+              | _ ->
+                  Distributed_db_event.(
+                    emit__dont_wait__use_with_care p2p_reader_shutdown_failed)
+                    (gid, Printexc.to_string exn))) ;
+      P2p_peer.Table.add p2p_readers gid p2p_reader
+    in
     let unregister () = P2p_peer.Table.remove p2p_readers gid in
     P2p_reader.run ~register ~unregister p2p disk protocol_db active_chains gid
   in
@@ -426,7 +447,7 @@ module Request = struct
   let current_branch chain_db peer =
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
     let meta = P2p.get_peer_metadata chain_db.global_db.p2p peer in
-    Peer_metadata.incr meta (Sent_request Head) ;
+    Peer_metadata.incr meta (Sent_request Branch) ;
     try_send chain_db peer @@ Get_current_branch chain_id
 end
 

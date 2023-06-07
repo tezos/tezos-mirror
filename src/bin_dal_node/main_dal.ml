@@ -72,6 +72,19 @@ let rpc_port_arg =
     ~default
     int_parameter
 
+let listen_addr_arg =
+  let default = P2p_point.Id.to_string Configuration.default_listen_addr in
+  Tezos_clic.default_arg
+    ~long:"net-addr"
+    ~placeholder:"ADDR:PORT"
+    ~doc:
+      (Format.sprintf
+         "The TCP address and port at which this instance can be reached. \
+          Default value is %s"
+         default)
+    ~default
+    (Client_config.string_parameter ())
+
 let use_unsafe_srs_for_tests_arg =
   Tezos_clic.switch
     ~long:"use-unsafe-srs-for-tests"
@@ -86,10 +99,16 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure DAL node."
-    (args4 data_dir_arg rpc_addr_arg rpc_port_arg use_unsafe_srs_for_tests_arg)
+    (args5
+       data_dir_arg
+       rpc_addr_arg
+       rpc_port_arg
+       listen_addr_arg
+       use_unsafe_srs_for_tests_arg)
     (prefixes ["init-config"] stop)
-    (fun (data_dir, rpc_addr, rpc_port, use_unsafe_srs) cctxt ->
+    (fun (data_dir, rpc_addr, rpc_port, listen_addr, use_unsafe_srs) cctxt ->
       let open Configuration in
+      let listen_addr = P2p_point.Id.of_string_exn listen_addr in
       let config =
         {
           data_dir;
@@ -97,7 +116,8 @@ let config_init_command =
           rpc_port;
           use_unsafe_srs;
           neighbors = [];
-          dac = default_dac;
+          peers = [];
+          listen_addr;
         }
       in
       let* () = save config in
@@ -105,107 +125,6 @@ let config_init_command =
         cctxt#message "DAL node configuration written in %s" (filename config)
       in
       return ())
-
-(* DAC/FIXME: https://gitlab.com/tezos/tezos/-/issues/4125
-   Move the following commands to a dac node once we have one. *)
-module Dac_client = struct
-  let reveal_data_dir_arg =
-    Tezos_clic.arg
-      ~long:"reveal-data-dir"
-      ~placeholder:"reveal-data-dir"
-      ~doc:"The directory where reveal preimage pages are saved."
-      (Client_config.string_parameter ())
-
-  let threshold_arg =
-    Tezos_clic.arg
-      ~long:"threshold"
-      ~placeholder:"threshold"
-      ~doc:
-        "The number of signatures needed from the Data Availability Committee \
-         members to validate reveal data.)"
-      int_parameter
-
-  let tz4_address_parameter () =
-    Tezos_clic.parameter (fun _cctxt s ->
-        let open Lwt_result_syntax in
-        let*? bls_pkh = Signature.Bls.Public_key_hash.of_b58check s in
-        let pkh : Tezos_crypto.Aggregate_signature.public_key_hash =
-          Tezos_crypto.Aggregate_signature.Bls12_381 bls_pkh
-        in
-        return pkh)
-
-  let tz4_address_param ?(name = "public key hash")
-      ?(desc = "bls public key hash to use") =
-    let desc = String.concat "\n" [desc; "A tz4 address"] in
-    Tezos_clic.param ~name ~desc (tz4_address_parameter ())
-
-  (** Add an account alias as a member of the Data availability Committee in the
-    configuration of the Dal node. *)
-  let add_dac_alias_command =
-    let open Lwt_result_syntax in
-    let open Tezos_clic in
-    command
-      ~group
-      ~desc:"Add an account alias as Data Availability Committee member"
-      (args1 data_dir_arg)
-      (prefixes ["add"; "data"; "availability"; "committee"; "member"]
-      @@ tz4_address_param @@ stop)
-      (fun data_dir address cctxt ->
-        let open Configuration in
-        let* config = load ~data_dir in
-        let old_addresses = config.dac.addresses in
-        if
-          List.mem
-            ~equal:Tezos_crypto.Aggregate_signature.Public_key_hash.equal
-            address
-            old_addresses
-        then
-          let*! _ =
-            cctxt#message
-              "Alias is already listed as a DAC member %s"
-              (filename config)
-          in
-          return_unit
-        else
-          let addresses = old_addresses @ [address] in
-          let dac = {config.dac with addresses} in
-          let* () = save {config with dac} in
-          let*! _ =
-            cctxt#message
-              "DAC address added to configuration in %s"
-              (filename config)
-          in
-          return_unit)
-
-  (* DAC/TODO: https://gitlab.com/tezos/tezos/-/issues/4136
-     Add option to specify a list of addresses from a file. *)
-  let set_parameters_command =
-    let open Lwt_result_syntax in
-    let open Tezos_clic in
-    command
-      ~group
-      ~desc:"Configure DAC parameters."
-      (args3 data_dir_arg threshold_arg reveal_data_dir_arg)
-      (prefixes ["set"; "dac"; "parameters"] stop)
-      (fun (data_dir, threshold, reveal_data_dir) cctxt ->
-        let open Configuration in
-        let* config = load ~data_dir in
-        let threshold = Option.value threshold ~default:config.dac.threshold in
-        let reveal_data_dir =
-          Option.value reveal_data_dir ~default:config.dac.reveal_data_dir
-        in
-        let dac = {config.dac with threshold; reveal_data_dir} in
-        let config = {config with dac} in
-        let* () = save config in
-        let*! _ =
-          cctxt#message
-            "DAC parameters set for configuration in %s"
-            (filename config)
-        in
-        return ())
-
-  let commands = [add_dac_alias_command; set_parameters_command]
-end
 
 let run_command =
   let open Tezos_clic in
@@ -216,7 +135,7 @@ let run_command =
     (prefixes ["run"] @@ stop)
     (fun data_dir cctxt -> Daemon.run ~data_dir cctxt)
 
-let commands () = [run_command; config_init_command] @ Dac_client.commands
+let commands () = [run_command; config_init_command]
 
 let select_commands _ _ =
   let open Lwt_result_syntax in

@@ -1,0 +1,70 @@
+
+./octez-client --protocol PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/mini_scenarios/smart_rollup_mint_and_deposit_ticket_016.tz --details
+Well typed
+Gas remaining: 1039982.120 units remaining
+{ parameter
+    (pair (pair (contract %rollup (pair string (ticket string))) (string %rollup_account))
+          (pair (nat %ticket_amount) (string %ticket_content))) ;
+  storage unit ;
+  code { CAR
+         /* [ pair (pair (contract (pair string (ticket string))) string) nat string ] */ ;
+         DUP
+         /* [ pair (pair (contract (pair string (ticket string))) string) nat string
+            : pair (pair (contract (pair string (ticket string))) string) nat string ] */ ;
+         CAR
+         /* [ pair (contract (pair string (ticket string))) string
+            : pair (pair (contract (pair string (ticket string))) string) nat string ] */ ;
+         CAR
+         /* [ contract (pair string (ticket string))
+            : pair (pair (contract (pair string (ticket string))) string) nat string ] */ ;
+         PUSH mutez
+              0
+         /* [ mutez : contract (pair string (ticket string))
+            : pair (pair (contract (pair string (ticket string))) string) nat string ] */ ;
+         DUP 3
+         /* [ pair (pair (contract (pair string (ticket string))) string) nat string
+            : mutez : contract (pair string (ticket string))
+            : pair (pair (contract (pair string (ticket string))) string) nat string ] */ ;
+         CDR
+         /* [ pair nat string : mutez : contract (pair string (ticket string))
+            : pair (pair (contract (pair string (ticket string))) string) nat string ] */ ;
+         CAR
+         /* [ nat : mutez : contract (pair string (ticket string))
+            : pair (pair (contract (pair string (ticket string))) string) nat string ] */ ;
+         DUP 4
+         /* [ pair (pair (contract (pair string (ticket string))) string) nat string
+            : nat : mutez : contract (pair string (ticket string))
+            : pair (pair (contract (pair string (ticket string))) string) nat string ] */ ;
+         CDR
+         /* [ pair nat string : nat : mutez : contract (pair string (ticket string))
+            : pair (pair (contract (pair string (ticket string))) string) nat string ] */ ;
+         CDR
+         /* [ string : nat : mutez : contract (pair string (ticket string))
+            : pair (pair (contract (pair string (ticket string))) string) nat string ] */ ;
+         TICKET
+         /* [ option (ticket string) : mutez : contract (pair string (ticket string))
+            : pair (pair (contract (pair string (ticket string))) string) nat string ] */ ;
+         ASSERT_SOME ;
+         DIG 3
+         /* [ pair (pair (contract (pair string (ticket string))) string) nat string
+            : ticket string : mutez : contract (pair string (ticket string)) ] */ ;
+         CAR
+         /* [ pair (contract (pair string (ticket string))) string : ticket string
+            : mutez : contract (pair string (ticket string)) ] */ ;
+         CDR
+         /* [ string : ticket string : mutez : contract (pair string (ticket string)) ] */ ;
+         PAIR
+         /* [ pair string (ticket string) : mutez
+            : contract (pair string (ticket string)) ] */ ;
+         TRANSFER_TOKENS
+         /* [ operation ] */ ;
+         PUSH unit Unit
+         /* [ unit : operation ] */ ;
+         NIL operation
+         /* [ list operation : unit : operation ] */ ;
+         DIG 2
+         /* [ operation : list operation : unit ] */ ;
+         CONS
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

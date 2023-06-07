@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Block_services
-    Invocation:   dune build @src/lib_shell_services/test/runtest
+    Invocation:   dune exec src/lib_shell_services/test/main.exe \
+                  -- --file test_block_services.ml
     Subject:      Unit tests for [Block_services]
 *)
 
@@ -53,4 +54,5 @@ let tests : (string * _) list =
 
 let tests = List.map (fun (s, f) -> Alcotest.test_case s `Quick f) tests
 
-let () = Alcotest.run "tezos-lib-shell-services" [("block-services", tests)]
+let () =
+  Alcotest.run ~__FILE__ "tezos-lib-shell-services" [("block-services", tests)]

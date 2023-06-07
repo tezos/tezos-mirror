@@ -142,67 +142,56 @@ let test_run_proposals =
   in
   unit
 
-(** This test checks that the [run_operation] RPC used to allow
-    batches of manager operations containing different sources in
-    protocol versions before Kathmandu (014), but rejects them from
-    Kathmandu on. *)
-let test_batch_inconsistent_sources protocols =
-  let register_inconsistent_sources ~supports ~title
-      call_run_operation_and_check_response =
-    Protocol.register_test
-      ~__FILE__
-      ~supports
-      ~title
-      ~tags:(run_operation_tags @ ["manager"; "batch"; "inconsistent_sources"])
-      (fun protocol ->
-        Log.info "Initialize a node and a client." ;
-        let* node, client =
-          Client.init_with_protocol
-            ~nodes_args:[Synchronisation_threshold 0]
-            ~protocol
-            `Client
-            ()
-        in
-        let source1 = Constant.bootstrap1
-        and source2 = Constant.bootstrap2
-        and dest = Constant.bootstrap3 in
-        Log.info
-          "Increment [%s]'s counter so that the batch we craft below has \
-           consistent counters. To do this, we inject a transaction from this \
-           account and bake a block."
-          source2.alias ;
-        let* () =
-          Client.transfer
-            ~amount:Tez.one
-            ~giver:source2.alias
-            ~receiver:dest.alias
-            client
-        in
-        let* () = Client.bake_for_and_wait ~protocol ~node client in
-        Log.info
-          "Craft a batch containing an operation from [%s] and an operation \
-           from [%s]."
-          source1.alias
-          source2.alias ;
-        let manager_op1 =
-          Operation.Manager.(make ~source:source1 (transfer ~dest ()))
-        in
-        let manager_op2 =
-          Operation.Manager.(make ~source:source2 (transfer ~dest ()))
-        in
-        let* batch =
-          Operation.Manager.operation [manager_op1; manager_op2] client
-        in
-        let* batch_json = Operation.make_run_operation_input batch client in
-        Log.info
-          "Crafted batch: %s"
-          (Ezjsonm.value_to_string ~minify:false batch_json) ;
-        call_run_operation_and_check_response node batch_json)
-  in
-  register_inconsistent_sources
-    ~supports:(Protocol.From_protocol 014)
+(** This test checks that the [run_operation] RPC rejects batches of
+    manager operations containing different sources. *)
+let test_batch_inconsistent_sources =
+  Protocol.register_test
+    ~__FILE__
     ~title:"Run_operation inconsistent sources ko"
-    (fun node batch_json ->
+    ~tags:(run_operation_tags @ ["manager"; "batch"; "inconsistent_sources"])
+    (fun protocol ->
+      Log.info "Initialize a node and a client." ;
+      let* node, client =
+        Client.init_with_protocol
+          ~nodes_args:[Synchronisation_threshold 0]
+          ~protocol
+          `Client
+          ()
+      in
+      let source1 = Constant.bootstrap1
+      and source2 = Constant.bootstrap2
+      and dest = Constant.bootstrap3 in
+      Log.info
+        "Increment [%s]'s counter so that the batch we craft below has \
+         consistent counters. To do this, we inject a transaction from this \
+         account and bake a block."
+        source2.alias ;
+      let* () =
+        Client.transfer
+          ~amount:Tez.one
+          ~giver:source2.alias
+          ~receiver:dest.alias
+          client
+      in
+      let* () = Client.bake_for_and_wait ~protocol ~node client in
+      Log.info
+        "Craft a batch containing an operation from [%s] and an operation from \
+         [%s]."
+        source1.alias
+        source2.alias ;
+      let manager_op1 =
+        Operation.Manager.(make ~source:source1 (transfer ~dest ()))
+      in
+      let manager_op2 =
+        Operation.Manager.(make ~source:source2 (transfer ~dest ()))
+      in
+      let* batch =
+        Operation.Manager.operation [manager_op1; manager_op2] client
+      in
+      let* batch_json = Operation.make_run_operation_input batch client in
+      Log.info
+        "Crafted batch: %s"
+        (Ezjsonm.value_to_string ~minify:false batch_json) ;
       let expected_proto_error = "inconsistent_sources" in
       Log.info
         "Call the [run_operation] RPC on this batch, and check that it fails \
@@ -215,7 +204,6 @@ let test_batch_inconsistent_sources protocols =
       in
       check_response_contains_proto_error ~expected_proto_error response ;
       unit)
-    protocols
 
 (** This test calls the [run_operation] RPC on various operations with
     unexpected or inconsistent counters, and checks that the
@@ -621,11 +609,7 @@ let test_fail_inject_signed_arbitrary_operation =
      let* signature = Client.sign_message client ?branch message ~src in
      let* chain_id = RPC.Client.call client @@ RPC.get_chain_chain_id () in
      let* head_hash = RPC.Client.call client @@ RPC.get_chain_block_hash () in
-     let arbitrary =
-       match protocol with
-       | Protocol.Lima -> message
-       | Protocol.Mumbai | Protocol.Alpha -> Hex.(of_string message |> show)
-     in
+     let arbitrary = Hex.(of_string message |> show) in
      let (op_json : JSON.u) =
        `O
          [

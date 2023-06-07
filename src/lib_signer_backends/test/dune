@@ -1,9 +1,11 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test_encrypted)
+(library
+ (name src_lib_signer_backends_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-base.unix
   tezos-stdlib
@@ -11,20 +13,38 @@
   tezos-crypto
   tezos-client-base
   tezos-signer-backends
-  alcotest-lwt
+  octez-alcotezt
   uri)
- (link_flags
-  (:standard)
-  (:include %{workspace_root}/macos-link-flags.sexp))
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_stdlib
   -open Tezos_error_monad
   -open Tezos_error_monad.TzLwtreslib
   -open Tezos_client_base
-  -open Tezos_signer_backends))
+  -open Tezos_signer_backends
+  -open Octez_alcotezt)
+ (modules test_encrypted))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_signer_backends_test_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-signer-backends)
- (action (run %{dep:./test_encrypted.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

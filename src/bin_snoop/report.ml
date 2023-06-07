@@ -278,7 +278,7 @@ let workloads_table (type c t) ((module Bench) : (c, t) Benchmark.poly)
   let open Latex_syntax in
   let table = Hashtbl.create 41 in
   List.iter
-    (fun {Measure.workload; measures} ->
+    (fun {Measure.workload; measures; _} ->
       let qties = Hashtbl.find_opt table workload |> Option.value ~default:[] in
       Hashtbl.replace table workload (Maths.vector_to_array measures :: qties))
     workload_data ;
@@ -306,8 +306,8 @@ let model_table (type c t) ((module Bench) : (c, t) Benchmark.poly) =
     List.filter_map
       (fun (model_name, model) ->
         match model with
-        | Tezos_benchmark.Model.Preapplied _ -> None
-        | Tezos_benchmark.Model.Packaged {model; _} ->
+        | Tezos_benchmark.Model.Aggregate _ -> None
+        | Tezos_benchmark.Model.Abstract {model; _} ->
             let module M = (val model) in
             let module Model = M.Def (Pp_impl_abstract) in
             let printed = to_string Model.model in

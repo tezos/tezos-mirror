@@ -1,24 +1,43 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test_mockup_wallet)
+(library
+ (name src_lib_client_base_unix_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-mockup-commands
   tezos-client-base-unix
   tezos-base-test-helpers
-  alcotest
-  alcotest-lwt)
+  octez-alcotezt)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezos_base_test_helpers
+  -open Octez_alcotezt)
+ (modules test_mockup_wallet))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_client_base_unix_test_tezt_lib
+  tezt)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
- (flags
-  (:standard)
-  -open Tezos_base.TzPervasives
-  -open Tezos_base_test_helpers))
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-client-base-unix)
- (action (run %{dep:./test_mockup_wallet.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Stdlib
+   Invocation:   dune exec src/lib_lwt_result_stdlib/test/main.exe \
+                  -- --file test_list_basic_lwt.ml
+   Subject:      Test basic properties of lwt list
+*)
+
 open Support.Lib.Monad
 
 let assert_eq_s pa pb =
@@ -35,13 +43,13 @@ let assert_err e = e = Error ()
 
 let assert_err_s e =
   let open Lwt_syntax in
-  let* e = e in
+  let* e in
   assert (e = Error ()) ;
   return_unit
 
 let assert_err_p e =
   let open Lwt_syntax in
-  let* e = e in
+  let* e in
   assert (e = Error (Support.Test_trace.make ())) ;
   return_unit
 
@@ -345,6 +353,7 @@ end
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "list-basic-lwt"
     [
       ("init", Init.tests);

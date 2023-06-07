@@ -86,31 +86,26 @@ let may_handle_global state chain_id f =
 
 let find_pending_operations {peer_active_chains; _} h i =
   Chain_id.Table.to_seq_values peer_active_chains
-  |> Seq.filter (fun chain_db ->
+  |> Seq.find (fun chain_db ->
          Distributed_db_requester.Raw_operations.pending
            chain_db.operations_db
            (h, i))
-  |> Seq.first
 
 let find_pending_operation {peer_active_chains; _} h =
   Chain_id.Table.to_seq_values peer_active_chains
-  |> Seq.filter (fun chain_db ->
+  |> Seq.find (fun chain_db ->
          Distributed_db_requester.Raw_operation.pending chain_db.operation_db h)
-  |> Seq.first
 
 let read_operation state h =
-  (* Remember that seqs are lazy. The table is only traversed until a match is
-     found, the rest is not explored. *)
   let open Lwt_syntax in
   Seq_s.of_seq (Chain_id.Table.to_seq state.active_chains)
-  |> Seq_s.filter_map_s (fun (chain_id, chain_db) ->
+  |> Seq_s.S.find_map (fun (chain_id, chain_db) ->
          let+ v =
            Distributed_db_requester.Raw_operation.read_opt
              chain_db.operation_db
              h
          in
          Option.map (fun bh -> (chain_id, bh)) v)
-  |> Seq_s.first
 
 let read_block {disk; _} h =
   let open Lwt_syntax in
@@ -149,11 +144,10 @@ let read_predecessor_header {disk; _} h offset =
 
 let find_pending_block_header {peer_active_chains; _} h =
   Chain_id.Table.to_seq_values peer_active_chains
-  |> Seq.filter (fun chain_db ->
+  |> Seq.find (fun chain_db ->
          Distributed_db_requester.Raw_block_header.pending
            chain_db.block_header_db
            h)
-  |> Seq.first
 
 let deactivate gid chain_db =
   chain_db.callback.disconnection gid ;

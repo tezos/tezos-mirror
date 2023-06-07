@@ -1,9 +1,9 @@
 Protocol Jakarta
 ================
 
-**Important**: revision `PtJakarta...nGw` of protocol Jakarta contains
+**Important**: revision ``PtJakarta...nGw`` of protocol Jakarta contains
 `two critical bugs <https://research-development.nomadic-labs.com/we-found-two-bugs-in-torus-jakarta.html>`_
-that have been corrected in the latest version `PtJakart2...SqY`.
+that have been corrected in the latest version ``PtJakart2...SqY``.
 
 This page contains all the relevant information for protocol Jakarta
 (see :ref:`naming_convention`).
@@ -134,9 +134,9 @@ Breaking Changes
   destination. The default cases (implicit and smart contracts) are
   prefixed with the tag ``0``. (MR :gl:`!4205`)
 
-- The `consumed_gas` field in the encoding of operations becomes
-  **deprecated** in favour of `consumed_milligas`, which contains
-  a more precise readout for the same value. `consumed_milligas`
+- The ``consumed_gas`` field in the encoding of operations becomes
+  **deprecated** in favour of ``consumed_milligas``, which contains
+  a more precise readout for the same value. ``consumed_milligas``
   field was added to the encoding of block metadata for uniformity.
   (MR :gl:`!4388`)
 
@@ -155,7 +155,7 @@ Breaking Changes
   field ``rolls`` has been replaced by the field ``voting_power``. (MR :gl:`!4265`)
 
 - Encoding of transaction and origination operations no longer contains
-  deprecated `big_map_diff` field. `lazy_storage_diff` should be used
+  deprecated ``big_map_diff`` field. ``lazy_storage_diff`` should be used
   instead. (MR: :gl:`!4387`)
 
 - The JSON and binary encodings for Liquidity Baking Toggle Votes have
@@ -206,7 +206,7 @@ Breaking Changes
 Bug Fixes
 ---------
 
-- Expose `consumed_milligas` in the receipt of the `Register_global_constant`
+- Expose ``consumed_milligas`` in the receipt of the ``Register_global_constant``
   operation. (MR :gl:`!3981`)
 
 - Refuse operations with inconsistent counters. (MR :gl:`!4024`)

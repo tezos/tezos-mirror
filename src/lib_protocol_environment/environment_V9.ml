@@ -114,6 +114,7 @@ module type T = sig
        and type Dal.page_proof = Tezos_crypto_dal.Cryptobox.Verifier.page_proof
        and type Bounded.Non_negative_int32.t =
         Tezos_base.Bounded.Non_negative_int32.t
+       and type Wasm_2_0_0.version = Tezos_scoru_wasm.Wasm_pvm_state.version
        and type Wasm_2_0_0.input = Tezos_scoru_wasm.Wasm_pvm_state.input_info
        and type Wasm_2_0_0.output = Tezos_scoru_wasm.Wasm_pvm_state.output_info
        and type Wasm_2_0_0.reveal_hash =
@@ -205,7 +206,7 @@ struct
 
   module Compare = Compare
   module Either = Either
-  module Seq = Tezos_error_monad.TzLwtreslib.Seq
+  module Seq = Tezos_protocol_environment_structs.V9.Seq
   module List = Tezos_error_monad.TzLwtreslib.List
   module Array = Tezos_protocol_environment_structs.V9.Array
   module Char = Char
@@ -1126,10 +1127,14 @@ struct
       input_request : input_request;
     }
 
+    type version = Tezos_scoru_wasm.Wasm_pvm_state.version
+
+    let v1 = Tezos_scoru_wasm.Wasm_pvm_state.V1
+
     module Make
         (Tree : Context.TREE with type key = string list and type value = bytes) =
     struct
-      type Tezos_lazy_containers.Lazy_map.tree += PVM_tree of Tree.tree
+      type Tezos_tree_encoding.tree_instance += PVM_tree of Tree.tree
 
       include Tezos_scoru_wasm.Wasm_pvm.Make (struct
         include Tree
@@ -1446,5 +1451,16 @@ struct
 
   module Equality_witness = Environment_context.Equality_witness
   module Plonk = Tezos_protocol_environment_structs.V9.Plonk
-  module Dal = Tezos_crypto_dal.Cryptobox.Verifier
+
+  module Dal = struct
+    include Tezos_crypto_dal.Cryptobox.Verifier
+
+    let verify_page t commitment ~page_index page page_proof =
+      match verify_page t commitment ~page_index page page_proof with
+      | Error `Page_length_mismatch -> Error `Page_length_mismatch
+      | Error `Page_index_out_of_range -> Error `Segment_index_out_of_range
+      | Error (`Invalid_page | `Invalid_degree_strictly_less_than_expected _) ->
+          Ok false
+      | Ok () -> Ok true
+  end
 end

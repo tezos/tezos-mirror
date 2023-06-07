@@ -1297,7 +1297,7 @@ let () =
     (function Corrupted_store k -> Some k | _ -> None)
     (fun k -> Corrupted_store k)
 
-(* Storage upgrade errors *)
+(* Store upgrade errors *)
 type error +=
   | Cannot_find_chain_dir of string
   | V_3_0_upgrade_missing_floating_block of {

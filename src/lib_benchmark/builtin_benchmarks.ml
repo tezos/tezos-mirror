@@ -23,18 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Private module for internal benchmarks *)
+
 (* A "benchmark" for the timer itself. *)
 
-let ns = Namespace.make Namespace.root "builtin"
-
-let fv s = Free_variable.of_namespace (ns s)
-
-let timer_variable = fv "Timer_latency"
-
-let timer_model =
-  Model.make
-    ~conv:(fun () -> ())
-    ~model:(Model.unknown_const1 ~const:timer_variable)
+let ns = Builtin_models.ns
 
 module Timer_latency_bench : Benchmark.S = struct
   type config = unit
@@ -47,9 +40,13 @@ module Timer_latency_bench : Benchmark.S = struct
 
   let info = "Measuring timer latency"
 
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
+
   let tags = ["misc"; "builtin"]
 
-  let models = [("*", timer_model)]
+  let models = [("*", Model.(make ~conv:(fun () -> ()) ~model:Model.zero))]
 
   let workload_to_vector () = Sparse_vec.String.of_list [("timer_latency", 1.)]
 

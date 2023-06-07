@@ -49,8 +49,8 @@
     {2 Data: 1d, 2d, 3d}
 
     The library encapsulates 1d, 2d and 3d data points using the types
-    {!Plot.r1}, {!Plot.r2} and {!Plot.r3}.  Similarly named functions allow
-    to inject floating-point values into these types.
+    {!type-Plot.r1}, {!type-Plot.r2} and {!type-Plot.r3}.  Similarly named
+    functions allow to inject floating-point values into these types.
 
     As an example, we can write samplers for 2d and 3d normal variates with
     specified means:

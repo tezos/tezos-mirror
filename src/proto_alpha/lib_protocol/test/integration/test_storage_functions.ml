@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Context Storage
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/main.exe \
-                -- test "storage tests"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/main.exe \
+                -- --file test_storage_functions.ml
     Subject:    Test storage functions.
  *)
 
@@ -105,8 +104,8 @@ module Table =
 let test_fold_keys_unaccounted () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = Context.default_raw_context () in
-  let* ctxt, _ = wrap (Table.init ctxt 1) in
-  let* ctxt, _ = wrap (Table.init ctxt 2) in
+  let*@ ctxt, _ = Table.init ctxt 1 in
+  let*@ ctxt, _ = Table.init ctxt 2 in
   let*! items =
     Table.fold_keys_unaccounted
       ctxt
@@ -155,7 +154,7 @@ let test_length () =
     let*! tree = Raw_context.Tree.add_tree tree ["right"] tree_right in
     Raw_context.Tree.add tree ["file"] (Bytes.of_string "V6")
   in
-  let* ctxt = wrap @@ Raw_context.init_tree ctxt ["root"] tree in
+  let*@ ctxt = Raw_context.init_tree ctxt ["root"] tree in
   (* The root node contains 3 elements. *)
   let* () = assert_length ctxt ~loc:__LOC__ ["root"] 3 in
   (* The left branch contains 3 elements. *)
@@ -175,3 +174,7 @@ let tests =
       test_fold_keys_unaccounted;
     Tztest.tztest "length test" `Quick test_length;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("storage tests", tests)]
+  |> Lwt_main.run

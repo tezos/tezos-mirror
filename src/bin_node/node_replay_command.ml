@@ -66,11 +66,15 @@ module Event = struct
       ~pp2:Context_hash.pp
       ("replay_result", Context_hash.encoding)
 
-  let pp_json ppf json =
+  let pp_json_metadata ppf json =
     Format.fprintf
       ppf
       "%s"
-      (Data_encoding.Json.to_string ~newline:false ~minify:true json)
+      (Data_encoding.Json.to_string ~newline:true ~minify:false json)
+
+  let pp_json_metadata_opt ppf = function
+    | None -> Format.fprintf ppf "no metadata available"
+    | Some json -> pp_json_metadata ppf json
 
   let inconsistent_block_receipt =
     declare_2
@@ -80,25 +84,30 @@ module Event = struct
         "inconsistent block receipt - expected: {expected}, replay result: \
          {replay_result}"
       ~level:Error
-      ~pp1:pp_json
+      ~pp1:pp_json_metadata
       ("expected", Data_encoding.json)
-      ~pp2:pp_json
+      ~pp2:pp_json_metadata
       ("replay_result", Data_encoding.json)
 
   let inconsistent_operation_receipt =
-    declare_3
+    declare_5
       ~section
       ~name:"inconsistent_operation_receipt"
       ~msg:
-        "inconsistent operation receipt at {operation_index} - expected: \
-         {expected}, replay result: {replay_result}"
+        "inconsistent operation receipt at {operation_index}:\n\
+         expected {expected_hash}: {expected}\n\
+         replayed {result_hash}: {result}"
       ~level:Error
       ~pp1:(fun ppf (l, o) -> Format.fprintf ppf "(list %d, index %d)" l o)
       ("operation_index", Data_encoding.(tup2 int31 int31))
-      ~pp2:pp_json
-      ("expected", Data_encoding.json)
-      ~pp3:pp_json
-      ("replay_result", Data_encoding.json)
+      ~pp2:Operation_metadata_hash.pp
+      ("expected_hash", Operation_metadata_hash.encoding)
+      ~pp3:pp_json_metadata_opt
+      ("expected", Data_encoding.(obj1 (opt "receipt" json)))
+      ~pp4:Operation_metadata_hash.pp
+      ("result_hash", Operation_metadata_hash.encoding)
+      ~pp5:pp_json_metadata_opt
+      ("result", Data_encoding.(obj1 (opt "receipt" json)))
 
   let unexpected_receipts_layout =
     let pp_list_lengths fmt =
@@ -237,7 +246,15 @@ let replay_one_block strict main_chain_store validator_process block =
     let* metadata = Store.Block.get_block_metadata main_chain_store block in
     let expected_block_receipt_bytes = Store.Block.block_metadata metadata in
     let expected_operation_receipts =
-      Store.Block.operations_metadata metadata
+      let operation_metadata = Store.Block.operations_metadata metadata in
+      match Store.Block.operations_metadata_hashes block with
+      | None -> Block_validation.No_metadata_hash operation_metadata
+      | Some op_metadata_hash_ll ->
+          Metadata_hash
+            (Stdlib.List.map2
+               (fun l l' -> Stdlib.List.combine l l')
+               operation_metadata
+               op_metadata_hash_ll)
     in
     let operations = Store.Block.operations block in
     let header = Store.Block.header block in
@@ -293,19 +310,20 @@ let replay_one_block strict main_chain_store validator_process block =
     in
     (* Check that the operations metadata are equal.
        If not, decode and print them as Json to ease debugging. *)
-    let check_receipt exp got i j =
-      let equal a b =
-        match (a, b) with
-        | Block_validation.(Metadata a, Metadata b) -> Bytes.equal a b
-        | Too_large_metadata, Too_large_metadata -> true
-        | Metadata _, Too_large_metadata | Too_large_metadata, Metadata _ ->
-            false
+    let open Block_validation in
+    let check_receipt (exp_m, exp_mh) (got_m, got_mh) i j =
+      let equal_hash = Operation_metadata_hash.equal exp_mh got_mh in
+      let equal_content =
+        match (exp_m, got_m) with
+        | Metadata a, Metadata b -> Bytes.equal a b
+        | Too_large_metadata, Too_large_metadata
+        | Metadata _, Too_large_metadata
+        | Too_large_metadata, Metadata _ ->
+            true
       in
       (* Check that the operations metadata bytes are equal.
          If not, decode and print them as Json to ease debugging. *)
-      when_
-        (not (equal exp got))
-        (fun () ->
+      when_ ((not equal_hash) || not equal_content) (fun () ->
           let* protocol = Store.Block.protocol_hash main_chain_store block in
           let* (module Proto) = Registered_protocol.get_result protocol in
           let op =
@@ -316,43 +334,46 @@ let replay_one_block strict main_chain_store validator_process block =
             |> WithExceptions.Option.get ~loc:__LOC__
             |> fun {proto; _} -> proto
           in
-          let to_json receipt =
-            let receipt =
-              match receipt with
-              | Block_validation.Metadata receipt -> receipt
-              | Too_large_metadata -> Bytes.empty
-            in
+          let to_json metadata_bytes =
             Data_encoding.Json.construct
               Proto.operation_data_and_receipt_encoding
               Data_encoding.Binary.
                 ( of_bytes_exn Proto.operation_data_encoding op,
-                  of_bytes_exn Proto.operation_receipt_encoding receipt )
+                  of_bytes_exn Proto.operation_receipt_encoding metadata_bytes
+                )
           in
-          let exp = to_json exp in
-          let got = to_json got in
+          let exp_json_opt, got_json_opt =
+            match (exp_m, got_m) with
+            | Too_large_metadata, Metadata b -> (None, Some (to_json b))
+            | Metadata b, Too_large_metadata -> (Some (to_json b), None)
+            | Too_large_metadata, Too_large_metadata -> (None, None)
+            | Metadata b, Metadata b' -> (Some (to_json b), Some (to_json b'))
+          in
           let*! () =
             Event.(strict_emit ~strict inconsistent_operation_receipt)
-              ((i, j), exp, got)
+              ((i, j), exp_mh, exp_json_opt, got_mh, got_json_opt)
           in
           return_unit)
     in
-    receipts_iteri_2
-      ~when_different_lengths:(fun exp got ->
-        let*! () =
-          Event.(strict_emit ~strict unexpected_receipts_layout)
-            ( Store.Block.hash block,
-              List.(map length exp),
-              List.(map length got) )
-        in
-        return_unit)
-      expected_operation_receipts
-      (match result.ops_metadata with
-      | Block_validation.No_metadata_hash ops_metadata -> ops_metadata
-      | Block_validation.Metadata_hash ops_metadata ->
-          List.map (List.map fst) ops_metadata)
-      check_receipt
+    match (expected_operation_receipts, result.ops_metadata) with
+    | Metadata_hash expected, Metadata_hash result ->
+        receipts_iteri_2
+          ~when_different_lengths:(fun exp got ->
+            let*! () =
+              Event.(strict_emit ~strict unexpected_receipts_layout)
+                ( Store.Block.hash block,
+                  List.(map length exp),
+                  List.(map length got) )
+            in
+            return_unit)
+          expected
+          result
+          check_receipt
+    | No_metadata_hash _, _ | _, No_metadata_hash _ ->
+        (* Nothing to compare *) return_unit
 
-let replay ~singleprocess ~strict (config : Config_file.t) blocks =
+let replay ~internal_events ~singleprocess ~strict
+    ~operation_metadata_size_limit (config : Config_file.t) blocks =
   let open Lwt_result_syntax in
   let store_root = Data_version.store_dir config.data_dir in
   let context_root = Data_version.context_dir config.data_dir in
@@ -363,8 +384,7 @@ let replay ~singleprocess ~strict (config : Config_file.t) blocks =
       user_activated_upgrades = config.blockchain_network.user_activated_upgrades;
       user_activated_protocol_overrides =
         config.blockchain_network.user_activated_protocol_overrides;
-      operation_metadata_size_limit =
-        config.shell.block_validator_limits.operation_metadata_size_limit;
+      operation_metadata_size_limit;
     }
   in
   let readonly = true in
@@ -397,6 +417,7 @@ let replay ~singleprocess ~strict (config : Config_file.t) blocks =
                process_path = Sys.executable_name;
                sandbox_parameters = None;
                dal_config = Tezos_crypto_dal.Cryptobox.Config.default;
+               log_config = {lwt_log_sink_unix = config.log; internal_events};
              })
       in
       let commit_genesis =
@@ -429,7 +450,7 @@ let replay ~singleprocess ~strict (config : Config_file.t) blocks =
                   validator_process
                   (`Level starts)
               else
-                Seq.iter_es
+                Seq.ES.iter
                   (replay_one_block strict main_chain_store validator_process)
                   (Seq.unfold
                      (fun l ->
@@ -440,7 +461,8 @@ let replay ~singleprocess ~strict (config : Config_file.t) blocks =
       let*! () = Block_validator_process.close validator_process in
       Store.close_store store)
 
-let run ?verbosity ~singleprocess ~strict (config : Config_file.t) blocks =
+let run ?verbosity ~singleprocess ~strict ~operation_metadata_size_limit
+    (config : Config_file.t) blocks =
   let open Lwt_result_syntax in
   let* () =
     Data_version.ensure_data_dir
@@ -454,21 +476,29 @@ let run ?verbosity ~singleprocess ~strict (config : Config_file.t) blocks =
   @@ fun () ->
   (* Main loop *)
   let log_cfg =
-    match verbosity with
-    | None -> config.log
-    | Some default_level -> {config.log with default_level}
+    {
+      config.log with
+      default_level = Option.value verbosity ~default:config.log.default_level;
+    }
+  in
+  let internal_events =
+    Tezos_base_unix.Internal_event_unix.make_with_defaults ()
   in
   let*! () =
-    Tezos_base_unix.Internal_event_unix.init
-      ~lwt_log_sink:log_cfg
-      ~configuration:config.internal_events
-      ()
+    Tezos_base_unix.Internal_event_unix.init ~log_cfg ~internal_events ()
   in
   Updater.init (Data_version.protocol_dir config.data_dir) ;
   Lwt_exit.(
     wrap_and_exit
     @@ let*! res =
-         protect (fun () -> replay ~singleprocess ~strict config blocks)
+         protect (fun () ->
+             replay
+               ~internal_events
+               ~singleprocess
+               ~strict
+               ~operation_metadata_size_limit
+               config
+               blocks)
        in
        let*! () = Tezos_base_unix.Internal_event_unix.close () in
        Lwt.return res)
@@ -484,17 +514,34 @@ let check_data_dir dir =
          msg = Some (Format.sprintf "directory '%s' does not exists" dir);
        })
 
-let process verbosity singleprocess strict blocks args =
+let process verbosity singleprocess strict blocks data_dir config_file
+    operation_metadata_size_limit =
   let verbosity =
     let open Internal_event in
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
   in
   let run =
     let open Lwt_result_syntax in
-    let* data_dir = Shared_arg.read_data_dir args in
-    let* () = check_data_dir data_dir in
-    let* config = Shared_arg.read_and_patch_config_file args in
-    run ?verbosity ~singleprocess ~strict config blocks
+    let* config =
+      let* data_dir, config =
+        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+      in
+      return {config with data_dir}
+    in
+    let operation_metadata_size_limit =
+      Option.value
+        operation_metadata_size_limit
+        ~default:
+          config.shell.block_validator_limits.operation_metadata_size_limit
+    in
+    let* () = check_data_dir config.data_dir in
+    run
+      ?verbosity
+      ~singleprocess
+      ~strict
+      ~operation_metadata_size_limit
+      config
+      blocks
   in
   match Lwt_main.run run with
   | Ok () -> `Ok ()
@@ -575,7 +622,8 @@ module Term = struct
     Cmdliner.Term.(
       ret
         (const process $ verbosity $ singleprocess $ strict $ blocks
-       $ Shared_arg.Term.args))
+       $ Shared_arg.Term.data_dir $ Shared_arg.Term.config_file
+       $ Shared_arg.Term.operation_metadata_size_limit))
 end
 
 module Manpage = struct

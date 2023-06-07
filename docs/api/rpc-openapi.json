@@ -1,9 +1,9 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "Tezos RPC",
-    "description": "Tezos client RPC API.",
-    "version": "15.0"
+    "title": "Octez RPC",
+    "description": "The RPC API served by the Octez node.",
+    "version": "16.1"
   },
   "paths": {
     "/chains/{chain_id}": {
@@ -1109,21 +1109,7 @@
                               "$ref": "#/components/schemas/timespan.system"
                             },
                             "operation_metadata_size_limit": {
-                              "oneOf": [
-                                {
-                                  "title": "unlimited",
-                                  "type": "string",
-                                  "enum": [
-                                    "unlimited"
-                                  ]
-                                },
-                                {
-                                  "title": "limited",
-                                  "type": "integer",
-                                  "minimum": -1073741824,
-                                  "maximum": 1073741823
-                                }
-                              ]
+                              "$ref": "#/components/schemas/operation_metadata_size_limit"
                             }
                           }
                         },
@@ -1212,17 +1198,17 @@
                           ]
                         },
                         {
-                          "title": "kathmandunet",
-                          "type": "string",
-                          "enum": [
-                            "kathmandunet"
-                          ]
-                        },
-                        {
                           "title": "limanet",
                           "type": "string",
                           "enum": [
                             "limanet"
+                          ]
+                        },
+                        {
+                          "title": "mumbainet",
+                          "type": "string",
+                          "enum": [
+                            "mumbainet"
                           ]
                         },
                         {
@@ -1900,6 +1886,88 @@
         }
       }
     },
+    "/monitor/applied_blocks": {
+      "get": {
+        "description": "Monitor all blocks that are successfully applied and stored by the node, disregarding whether they were selected as the new head or not.",
+        "parameters": [
+          {
+            "name": "protocol",
+            "in": "query",
+            "description": "Protocol_hash (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "next_protocol",
+            "in": "query",
+            "description": "Protocol_hash (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chain",
+            "in": "query",
+            "description": "A chain identifier. This is either a chain hash in Base58Check notation or a one the predefined aliases: 'main', 'test'.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain_id": {
+                      "$ref": "#/components/schemas/Chain_id"
+                    },
+                    "hash": {
+                      "$ref": "#/components/schemas/block_hash"
+                    },
+                    "header": {
+                      "$ref": "#/components/schemas/block_header"
+                    },
+                    "operations": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/operation"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "chain_id",
+                    "hash",
+                    "header",
+                    "operations"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/monitor/bootstrapped": {
       "get": {
         "description": "Wait for the node to have synchronized its chain with a few peers (configured by the node's administrator), streaming head updates that happen during the bootstrapping process, and closing the stream at the end. If the node was already bootstrapped, returns the current head immediately.",
@@ -1990,7 +2058,7 @@
     },
     "/monitor/heads/{chain_id}": {
       "get": {
-        "description": "Monitor all blocks that are successfully validated by the node and selected as the new head of the given chain.",
+        "description": "Monitor all blocks that are successfully validated and applied by the node and selected as the new head of the given chain.",
         "parameters": [
           {
             "name": "chain_id",
@@ -2122,7 +2190,7 @@
     },
     "/monitor/valid_blocks": {
       "get": {
-        "description": "Monitor all blocks that are successfully validated by the node, disregarding whether they were selected as the new head or not.",
+        "description": "(Deprecated) Monitor all blocks that are successfully applied by the node, disregarding whether they were selected as the new head or not.",
         "parameters": [
           {
             "name": "protocol",
@@ -2215,6 +2283,88 @@
                     "fitness",
                     "context",
                     "protocol_data"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitor/validated_blocks": {
+      "get": {
+        "description": "Monitor all blocks that were successfully validated by the node but are not applied nor stored yet, disregarding whether they are going to be selected as the new head or not.",
+        "parameters": [
+          {
+            "name": "protocol",
+            "in": "query",
+            "description": "Protocol_hash (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "next_protocol",
+            "in": "query",
+            "description": "Protocol_hash (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chain",
+            "in": "query",
+            "description": "A chain identifier. This is either a chain hash in Base58Check notation or a one the predefined aliases: 'main', 'test'.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain_id": {
+                      "$ref": "#/components/schemas/Chain_id"
+                    },
+                    "hash": {
+                      "$ref": "#/components/schemas/block_hash"
+                    },
+                    "header": {
+                      "$ref": "#/components/schemas/block_header"
+                    },
+                    "operations": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/operation"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "chain_id",
+                    "hash",
+                    "header",
+                    "operations"
                   ]
                 }
               }
@@ -10267,6 +10417,27 @@
         "required": [
           "branch",
           "data"
+        ]
+      },
+      "operation_metadata_size_limit": {
+        "title": "operation_metadata_size_limit",
+        "description": "The operation metadata size limit",
+        "oneOf": [
+          {
+            "title": "unlimited",
+            "description": "The metadata size is unlimited.",
+            "type": "string",
+            "enum": [
+              "unlimited"
+            ]
+          },
+          {
+            "title": "limited",
+            "description": "The metadata size is limited to the given integer's value (in bytes).",
+            "type": "integer",
+            "minimum": -1073741824,
+            "maximum": 1073741823
+          }
         ]
       },
       "p2p_address": {

@@ -4,5 +4,11 @@ misc_checks:
   # These tests are not flaky at all so we overwrite the retry value
   needs: [trigger]
   retry: 1
+  before_script:
+    - . ./scripts/version.sh
+    # Load the environment poetry previously created in the docker image.
+    # Give access to the Python dependencies/executables
+    - . $HOME/.venv/bin/activate
   script:
     - make -C ${CI_PROJECT_DIR}/.gitlab/ci lint-misc-check
+    - scripts/check_wasm_pvm_regressions.sh check

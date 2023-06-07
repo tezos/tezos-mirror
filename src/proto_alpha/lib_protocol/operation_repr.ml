@@ -84,22 +84,6 @@ module Kind = struct
 
   type register_global_constant = Register_global_constant_kind
 
-  type tx_rollup_origination = Tx_rollup_origination_kind
-
-  type tx_rollup_submit_batch = Tx_rollup_submit_batch_kind
-
-  type tx_rollup_commit = Tx_rollup_commit_kind
-
-  type tx_rollup_return_bond = Tx_rollup_return_bond_kind
-
-  type tx_rollup_finalize_commitment = Tx_rollup_finalize_commitment_kind
-
-  type tx_rollup_remove_commitment = Tx_rollup_remove_commitment_kind
-
-  type tx_rollup_rejection = Tx_rollup_rejection_kind
-
-  type tx_rollup_dispatch_tickets = Tx_rollup_dispatch_tickets_kind
-
   type transfer_ticket = Transfer_ticket_kind
 
   type dal_publish_slot_header = Dal_publish_slot_header_kind
@@ -137,17 +121,6 @@ module Kind = struct
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Update_consensus_key_manager_kind : update_consensus_key manager
-    | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
-    | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
-    | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
-    | Tx_rollup_return_bond_manager_kind : tx_rollup_return_bond manager
-    | Tx_rollup_finalize_commitment_manager_kind
-        : tx_rollup_finalize_commitment manager
-    | Tx_rollup_remove_commitment_manager_kind
-        : tx_rollup_remove_commitment manager
-    | Tx_rollup_rejection_manager_kind : tx_rollup_rejection manager
-    | Tx_rollup_dispatch_tickets_manager_kind
-        : tx_rollup_dispatch_tickets manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
     | Dal_publish_slot_header_manager_kind : dal_publish_slot_header manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
@@ -367,52 +340,6 @@ and _ manager_operation =
   | Update_consensus_key :
       Signature.Public_key.t
       -> Kind.update_consensus_key manager_operation
-  | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
-  | Tx_rollup_submit_batch : {
-      tx_rollup : Tx_rollup_repr.t;
-      content : string;
-      burn_limit : Tez_repr.t option;
-    }
-      -> Kind.tx_rollup_submit_batch manager_operation
-  | Tx_rollup_commit : {
-      tx_rollup : Tx_rollup_repr.t;
-      commitment : Tx_rollup_commitment_repr.Full.t;
-    }
-      -> Kind.tx_rollup_commit manager_operation
-  | Tx_rollup_return_bond : {
-      tx_rollup : Tx_rollup_repr.t;
-    }
-      -> Kind.tx_rollup_return_bond manager_operation
-  | Tx_rollup_finalize_commitment : {
-      tx_rollup : Tx_rollup_repr.t;
-    }
-      -> Kind.tx_rollup_finalize_commitment manager_operation
-  | Tx_rollup_remove_commitment : {
-      tx_rollup : Tx_rollup_repr.t;
-    }
-      -> Kind.tx_rollup_remove_commitment manager_operation
-  | Tx_rollup_rejection : {
-      tx_rollup : Tx_rollup_repr.t;
-      level : Tx_rollup_level_repr.t;
-      message : Tx_rollup_message_repr.t;
-      message_position : int;
-      message_path : Tx_rollup_inbox_repr.Merkle.path;
-      message_result_hash : Tx_rollup_message_result_hash_repr.t;
-      message_result_path : Tx_rollup_commitment_repr.Merkle.path;
-      previous_message_result : Tx_rollup_message_result_repr.t;
-      previous_message_result_path : Tx_rollup_commitment_repr.Merkle.path;
-      proof : Tx_rollup_l2_proof.serialized;
-    }
-      -> Kind.tx_rollup_rejection manager_operation
-  | Tx_rollup_dispatch_tickets : {
-      tx_rollup : Tx_rollup_repr.t;
-      level : Tx_rollup_level_repr.t;
-      context_hash : Context_hash.t;
-      message_index : int;
-      message_result_path : Tx_rollup_commitment_repr.Merkle.path;
-      tickets_info : Tx_rollup_reveal_repr.t list;
-    }
-      -> Kind.tx_rollup_dispatch_tickets manager_operation
   | Transfer_ticket : {
       contents : Script_repr.lazy_expr;
       ty : Script_repr.lazy_expr;
@@ -496,16 +423,6 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Set_deposits_limit _ -> Kind.Set_deposits_limit_manager_kind
   | Increase_paid_storage _ -> Kind.Increase_paid_storage_manager_kind
   | Update_consensus_key _ -> Kind.Update_consensus_key_manager_kind
-  | Tx_rollup_origination -> Kind.Tx_rollup_origination_manager_kind
-  | Tx_rollup_submit_batch _ -> Kind.Tx_rollup_submit_batch_manager_kind
-  | Tx_rollup_commit _ -> Kind.Tx_rollup_commit_manager_kind
-  | Tx_rollup_return_bond _ -> Kind.Tx_rollup_return_bond_manager_kind
-  | Tx_rollup_finalize_commitment _ ->
-      Kind.Tx_rollup_finalize_commitment_manager_kind
-  | Tx_rollup_remove_commitment _ ->
-      Kind.Tx_rollup_remove_commitment_manager_kind
-  | Tx_rollup_rejection _ -> Kind.Tx_rollup_rejection_manager_kind
-  | Tx_rollup_dispatch_tickets _ -> Kind.Tx_rollup_dispatch_tickets_manager_kind
   | Transfer_ticket _ -> Kind.Transfer_ticket_manager_kind
   | Dal_publish_slot_header _ -> Kind.Dal_publish_slot_header_manager_kind
   | Sc_rollup_originate _ -> Kind.Sc_rollup_originate_manager_kind
@@ -596,6 +513,20 @@ let tx_rollup_operation_rejection_tag = tx_rollup_operation_tag_offset + 6
 let tx_rollup_operation_dispatch_tickets_tag =
   tx_rollup_operation_tag_offset + 7
 
+(** The following operation tags cannot be used again, it is checked
+    at compilation time. *)
+let tx_rollup_forbidden_operation_tags =
+  [
+    tx_rollup_operation_origination_tag;
+    tx_rollup_operation_submit_batch_tag;
+    tx_rollup_operation_commit_tag;
+    tx_rollup_operation_return_bond_tag;
+    tx_rollup_operation_finalize_commitment_tag;
+    tx_rollup_operation_remove_commitment_tag;
+    tx_rollup_operation_rejection_tag;
+    tx_rollup_operation_dispatch_tickets_tag;
+  ]
+
 let transfer_ticket_tag = tx_rollup_operation_tag_offset + 8
 
 let sc_rollup_operation_tag_offset = 200
@@ -631,8 +562,14 @@ let zk_rollup_operation_update_tag = zk_rollup_operation_tag_offset + 2
 module Encoding = struct
   open Data_encoding
 
-  (** These tags are reserved for future extensions: [fd] - [ff]. *)
-  let reserved_tag t = Compare.Int.(t >= 0xfd)
+  (** These tags can not be used yet for operations. *)
+  let reserved_tag t =
+    (* These tags are reserved for future extensions: [fd] - [ff]. *)
+    Compare.Int.(t >= 0xfd)
+    || (* These tags were used by old operations.
+          The operations have been removed in protocol proposal N, it can
+          be unblocked in the future (e.g. proposal O, P etc.). *)
+    List.exists (Compare.Int.equal t) tx_rollup_forbidden_operation_tags
 
   let signature_prefix_tag = 0xff
 
@@ -801,239 +738,6 @@ module Encoding = struct
           inj = (fun consensus_pk -> Update_consensus_key consensus_pk);
         }
 
-    let tx_rollup_origination_case =
-      MCase
-        {
-          tag = tx_rollup_operation_origination_tag;
-          name = "tx_rollup_origination";
-          encoding = obj1 (req "tx_rollup_origination" Data_encoding.unit);
-          select =
-            (function
-            | Manager (Tx_rollup_origination as op) -> Some op | _ -> None);
-          proj = (function Tx_rollup_origination -> ());
-          inj = (fun () -> Tx_rollup_origination);
-        }
-
-    let tx_rollup_submit_batch_case =
-      MCase
-        {
-          tag = tx_rollup_operation_submit_batch_tag;
-          name = "tx_rollup_submit_batch";
-          encoding =
-            obj3
-              (req "rollup" Tx_rollup_repr.encoding)
-              (req "content" (string Hex))
-              (opt "burn_limit" Tez_repr.encoding);
-          select =
-            (function
-            | Manager (Tx_rollup_submit_batch _ as op) -> Some op | _ -> None);
-          proj =
-            (function
-            | Tx_rollup_submit_batch {tx_rollup; content; burn_limit} ->
-                (tx_rollup, content, burn_limit));
-          inj =
-            (fun (tx_rollup, content, burn_limit) ->
-              Tx_rollup_submit_batch {tx_rollup; content; burn_limit});
-        }
-
-    let tx_rollup_commit_case =
-      MCase
-        {
-          tag = tx_rollup_operation_commit_tag;
-          name = "tx_rollup_commit";
-          encoding =
-            obj2
-              (req "rollup" Tx_rollup_repr.encoding)
-              (req "commitment" Tx_rollup_commitment_repr.Full.encoding);
-          select =
-            (function
-            | Manager (Tx_rollup_commit _ as op) -> Some op | _ -> None);
-          proj =
-            (function
-            | Tx_rollup_commit {tx_rollup; commitment} -> (tx_rollup, commitment));
-          inj =
-            (fun (tx_rollup, commitment) ->
-              Tx_rollup_commit {tx_rollup; commitment});
-        }
-
-    let tx_rollup_return_bond_case =
-      MCase
-        {
-          tag = tx_rollup_operation_return_bond_tag;
-          name = "tx_rollup_return_bond";
-          encoding = obj1 (req "rollup" Tx_rollup_repr.encoding);
-          select =
-            (function
-            | Manager (Tx_rollup_return_bond _ as op) -> Some op | _ -> None);
-          proj = (function Tx_rollup_return_bond {tx_rollup} -> tx_rollup);
-          inj = (fun tx_rollup -> Tx_rollup_return_bond {tx_rollup});
-        }
-
-    let tx_rollup_finalize_commitment_case =
-      MCase
-        {
-          tag = tx_rollup_operation_finalize_commitment_tag;
-          name = "tx_rollup_finalize_commitment";
-          encoding = obj1 (req "rollup" Tx_rollup_repr.encoding);
-          select =
-            (function
-            | Manager (Tx_rollup_finalize_commitment _ as op) -> Some op
-            | _ -> None);
-          proj =
-            (function Tx_rollup_finalize_commitment {tx_rollup} -> tx_rollup);
-          inj = (fun tx_rollup -> Tx_rollup_finalize_commitment {tx_rollup});
-        }
-
-    let tx_rollup_remove_commitment_case =
-      MCase
-        {
-          tag = tx_rollup_operation_remove_commitment_tag;
-          name = "tx_rollup_remove_commitment";
-          encoding = obj1 (req "rollup" Tx_rollup_repr.encoding);
-          select =
-            (function
-            | Manager (Tx_rollup_remove_commitment _ as op) -> Some op
-            | _ -> None);
-          proj =
-            (function Tx_rollup_remove_commitment {tx_rollup} -> tx_rollup);
-          inj = (fun tx_rollup -> Tx_rollup_remove_commitment {tx_rollup});
-        }
-
-    let tx_rollup_rejection_case =
-      MCase
-        {
-          tag = tx_rollup_operation_rejection_tag;
-          name = "tx_rollup_rejection";
-          encoding =
-            obj10
-              (req "rollup" Tx_rollup_repr.encoding)
-              (req "level" Tx_rollup_level_repr.encoding)
-              (req "message" Tx_rollup_message_repr.encoding)
-              (req "message_position" n)
-              (req "message_path" Tx_rollup_inbox_repr.Merkle.path_encoding)
-              (req
-                 "message_result_hash"
-                 Tx_rollup_message_result_hash_repr.encoding)
-              (req
-                 "message_result_path"
-                 Tx_rollup_commitment_repr.Merkle.path_encoding)
-              (req
-                 "previous_message_result"
-                 Tx_rollup_message_result_repr.encoding)
-              (req
-                 "previous_message_result_path"
-                 Tx_rollup_commitment_repr.Merkle.path_encoding)
-              (req "proof" Tx_rollup_l2_proof.serialized_encoding);
-          select =
-            (function
-            | Manager (Tx_rollup_rejection _ as op) -> Some op | _ -> None);
-          proj =
-            (function
-            | Tx_rollup_rejection
-                {
-                  tx_rollup;
-                  level;
-                  message;
-                  message_position;
-                  message_path;
-                  message_result_hash;
-                  message_result_path;
-                  previous_message_result;
-                  previous_message_result_path;
-                  proof;
-                } ->
-                ( tx_rollup,
-                  level,
-                  message,
-                  Z.of_int message_position,
-                  message_path,
-                  message_result_hash,
-                  message_result_path,
-                  previous_message_result,
-                  previous_message_result_path,
-                  proof ));
-          inj =
-            (fun ( tx_rollup,
-                   level,
-                   message,
-                   message_position,
-                   message_path,
-                   message_result_hash,
-                   message_result_path,
-                   previous_message_result,
-                   previous_message_result_path,
-                   proof ) ->
-              Tx_rollup_rejection
-                {
-                  tx_rollup;
-                  level;
-                  message;
-                  message_position = Z.to_int message_position;
-                  message_path;
-                  message_result_hash;
-                  message_result_path;
-                  previous_message_result;
-                  previous_message_result_path;
-                  proof;
-                });
-        }
-
-    let tx_rollup_dispatch_tickets_case =
-      MCase
-        {
-          tag = tx_rollup_operation_dispatch_tickets_tag;
-          name = "tx_rollup_dispatch_tickets";
-          encoding =
-            obj6
-              (req "tx_rollup" Tx_rollup_repr.encoding)
-              (req "level" Tx_rollup_level_repr.encoding)
-              (req "context_hash" Context_hash.encoding)
-              (req "message_index" int31)
-              (req
-                 "message_result_path"
-                 Tx_rollup_commitment_repr.Merkle.path_encoding)
-              (req
-                 "tickets_info"
-                 (Data_encoding.list Tx_rollup_reveal_repr.encoding));
-          select =
-            (function
-            | Manager (Tx_rollup_dispatch_tickets _ as op) -> Some op
-            | _ -> None);
-          proj =
-            (function
-            | Tx_rollup_dispatch_tickets
-                {
-                  tx_rollup;
-                  level;
-                  context_hash;
-                  message_index;
-                  message_result_path;
-                  tickets_info;
-                } ->
-                ( tx_rollup,
-                  level,
-                  context_hash,
-                  message_index,
-                  message_result_path,
-                  tickets_info ));
-          inj =
-            (fun ( tx_rollup,
-                   level,
-                   context_hash,
-                   message_index,
-                   message_result_path,
-                   tickets_info ) ->
-              Tx_rollup_dispatch_tickets
-                {
-                  tx_rollup;
-                  level;
-                  context_hash;
-                  message_index;
-                  message_result_path;
-                  tickets_info;
-                });
-        }
-
     let transfer_ticket_case =
       MCase
         {
@@ -1193,7 +897,12 @@ module Encoding = struct
           encoding =
             obj2
               (req "rollup" Sc_rollup_repr.encoding)
-              (req "commitment" Sc_rollup_commitment_repr.Hash.encoding);
+              (req
+                 ~description:
+                   "DEPRECATED: This field is not used anymore by the protocol \
+                    and will be removed in a future proposal."
+                 "commitment"
+                 Sc_rollup_commitment_repr.Hash.encoding);
           select =
             (function
             | Manager (Sc_rollup_cement _ as op) -> Some op | _ -> None);
@@ -1334,6 +1043,18 @@ module Encoding = struct
         inj = (fun preendorsement -> Preendorsement preendorsement);
       }
 
+  let preattestation_case =
+    Case
+      {
+        tag = 20;
+        name = "preattestation";
+        encoding = consensus_content_encoding;
+        select =
+          (function Contents (Preendorsement _ as op) -> Some op | _ -> None);
+        proj = (fun (Preendorsement preendorsement) -> preendorsement);
+        inj = (fun preendorsement -> Preendorsement preendorsement);
+      }
+
   let preendorsement_encoding =
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
@@ -1360,6 +1081,32 @@ module Encoding = struct
                   @@ union [make preendorsement_case]))
                (varopt "signature" Signature.encoding)))
 
+  let preattestation_encoding =
+    let make (Case {tag; name; encoding; select = _; proj; inj}) =
+      case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
+    in
+    let to_list : Kind.preendorsement contents_list -> _ = function
+      | Single o -> o
+    in
+    let of_list : Kind.preendorsement contents -> _ = function
+      | o -> Single o
+    in
+    def "inlined.preattestation"
+    @@ conv
+         (fun ({shell; protocol_data = {contents; signature}} : _ operation) ->
+           (shell, (contents, signature)))
+         (fun (shell, (contents, signature)) : _ operation ->
+           {shell; protocol_data = {contents; signature}})
+         (merge_objs
+            Operation.shell_header_encoding
+            (obj2
+               (req
+                  "operations"
+                  (conv to_list of_list
+                  @@ def "inlined.preattestation.contents"
+                  @@ union [make preattestation_case]))
+               (varopt "signature" Signature.encoding)))
+
   let endorsement_encoding =
     obj4
       (req "slot" Slot_repr.encoding)
@@ -1372,6 +1119,25 @@ module Encoding = struct
       {
         tag = 21;
         name = "endorsement";
+        encoding = endorsement_encoding;
+        select =
+          (function Contents (Endorsement _ as op) -> Some op | _ -> None);
+        proj =
+          (fun (Endorsement consensus_content) ->
+            ( consensus_content.slot,
+              consensus_content.level,
+              consensus_content.round,
+              consensus_content.block_payload_hash ));
+        inj =
+          (fun (slot, level, round, block_payload_hash) ->
+            Endorsement {slot; level; round; block_payload_hash});
+      }
+
+  let attestation_case =
+    Case
+      {
+        tag = 21;
+        name = "attestation";
         encoding = endorsement_encoding;
         select =
           (function Contents (Endorsement _ as op) -> Some op | _ -> None);
@@ -1406,6 +1172,28 @@ module Encoding = struct
                   (conv to_list of_list
                   @@ def "inlined.endorsement_mempool.contents"
                   @@ union [make endorsement_case]))
+               (varopt "signature" Signature.encoding)))
+
+  let attestation_encoding =
+    let make (Case {tag; name; encoding; select = _; proj; inj}) =
+      case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
+    in
+    let to_list : Kind.endorsement contents_list -> _ = fun (Single o) -> o in
+    let of_list : Kind.endorsement contents -> _ = fun o -> Single o in
+    def "inlined.attestation"
+    @@ conv
+         (fun ({shell; protocol_data = {contents; signature}} : _ operation) ->
+           (shell, (contents, signature)))
+         (fun (shell, (contents, signature)) : _ operation ->
+           {shell; protocol_data = {contents; signature}})
+         (merge_objs
+            Operation.shell_header_encoding
+            (obj2
+               (req
+                  "operations"
+                  (conv to_list of_list
+                  @@ def "inlined.attestation_mempool.contents"
+                  @@ union [make attestation_case]))
                (varopt "signature" Signature.encoding)))
 
   let dal_attestation_encoding =
@@ -1477,6 +1265,24 @@ module Encoding = struct
         inj = (fun (op1, op2) -> Double_preendorsement_evidence {op1; op2});
       }
 
+  let double_preattestation_evidence_case :
+      Kind.double_preendorsement_evidence case =
+    Case
+      {
+        tag = 7;
+        name = "double_preattestation_evidence";
+        encoding =
+          obj2
+            (req "op1" (dynamic_size preattestation_encoding))
+            (req "op2" (dynamic_size preattestation_encoding));
+        select =
+          (function
+          | Contents (Double_preendorsement_evidence _ as op) -> Some op
+          | _ -> None);
+        proj = (fun (Double_preendorsement_evidence {op1; op2}) -> (op1, op2));
+        inj = (fun (op1, op2) -> Double_preendorsement_evidence {op1; op2});
+      }
+
   let double_endorsement_evidence_case : Kind.double_endorsement_evidence case =
     Case
       {
@@ -1486,6 +1292,23 @@ module Encoding = struct
           obj2
             (req "op1" (dynamic_size endorsement_encoding))
             (req "op2" (dynamic_size endorsement_encoding));
+        select =
+          (function
+          | Contents (Double_endorsement_evidence _ as op) -> Some op
+          | _ -> None);
+        proj = (fun (Double_endorsement_evidence {op1; op2}) -> (op1, op2));
+        inj = (fun (op1, op2) -> Double_endorsement_evidence {op1; op2});
+      }
+
+  let double_attestation_evidence_case : Kind.double_endorsement_evidence case =
+    Case
+      {
+        tag = 2;
+        name = "double_attestation_evidence";
+        encoding =
+          obj2
+            (req "op1" (dynamic_size attestation_encoding))
+            (req "op2" (dynamic_size attestation_encoding));
         select =
           (function
           | Contents (Double_endorsement_evidence _ as op) -> Some op
@@ -1667,46 +1490,6 @@ module Encoding = struct
   let update_consensus_key_case =
     make_manager_case 114 Manager_operations.update_consensus_key_case
 
-  let tx_rollup_origination_case =
-    make_manager_case
-      tx_rollup_operation_tag_offset
-      Manager_operations.tx_rollup_origination_case
-
-  let tx_rollup_submit_batch_case =
-    make_manager_case
-      tx_rollup_operation_submit_batch_tag
-      Manager_operations.tx_rollup_submit_batch_case
-
-  let tx_rollup_commit_case =
-    make_manager_case
-      tx_rollup_operation_commit_tag
-      Manager_operations.tx_rollup_commit_case
-
-  let tx_rollup_return_bond_case =
-    make_manager_case
-      tx_rollup_operation_return_bond_tag
-      Manager_operations.tx_rollup_return_bond_case
-
-  let tx_rollup_finalize_commitment_case =
-    make_manager_case
-      tx_rollup_operation_finalize_commitment_tag
-      Manager_operations.tx_rollup_finalize_commitment_case
-
-  let tx_rollup_remove_commitment_case =
-    make_manager_case
-      tx_rollup_operation_remove_commitment_tag
-      Manager_operations.tx_rollup_remove_commitment_case
-
-  let tx_rollup_rejection_case =
-    make_manager_case
-      tx_rollup_operation_rejection_tag
-      Manager_operations.tx_rollup_rejection_case
-
-  let tx_rollup_dispatch_tickets_case =
-    make_manager_case
-      tx_rollup_operation_dispatch_tickets_tag
-      Manager_operations.tx_rollup_dispatch_tickets_case
-
   let transfer_ticket_case =
     make_manager_case
       transfer_ticket_tag
@@ -1774,15 +1557,11 @@ module Encoding = struct
 
   type packed_case = PCase : 'b case -> packed_case
 
-  let contents_cases =
+  let common_cases =
     [
-      PCase endorsement_case;
-      PCase preendorsement_case;
       PCase dal_attestation_case;
       PCase seed_nonce_revelation_case;
       PCase vdf_revelation_case;
-      PCase double_endorsement_evidence_case;
-      PCase double_preendorsement_evidence_case;
       PCase double_baking_evidence_case;
       PCase activate_account_case;
       PCase proposals_case;
@@ -1797,14 +1576,6 @@ module Encoding = struct
       PCase drain_delegate_case;
       PCase failing_noop_case;
       PCase register_global_constant_case;
-      PCase tx_rollup_origination_case;
-      PCase tx_rollup_submit_batch_case;
-      PCase tx_rollup_commit_case;
-      PCase tx_rollup_return_bond_case;
-      PCase tx_rollup_finalize_commitment_case;
-      PCase tx_rollup_remove_commitment_case;
-      PCase tx_rollup_rejection_case;
-      PCase tx_rollup_dispatch_tickets_case;
       PCase transfer_ticket_case;
       PCase dal_publish_slot_header_case;
       PCase sc_rollup_originate_case;
@@ -1820,6 +1591,16 @@ module Encoding = struct
       PCase zk_rollup_update_case;
     ]
 
+  let contents_cases =
+    PCase preattestation_case :: PCase attestation_case
+    :: PCase double_preattestation_evidence_case
+    :: PCase double_attestation_evidence_case :: common_cases
+
+  let contents_cases_with_legacy_attestation_name =
+    PCase preendorsement_case :: PCase endorsement_case
+    :: PCase double_preendorsement_evidence_case
+    :: PCase double_endorsement_evidence_case :: common_cases
+
   let contents_encoding =
     let make (PCase (Case {tag; name; encoding; select; proj; inj})) =
       assert (not @@ reserved_tag tag) ;
@@ -1832,8 +1613,27 @@ module Encoding = struct
     in
     def "operation.alpha.contents" @@ union (List.map make contents_cases)
 
+  let contents_encoding_with_legacy_attestation_name =
+    let make (PCase (Case {tag; name; encoding; select; proj; inj})) =
+      assert (not @@ reserved_tag tag) ;
+      case
+        (Tag tag)
+        name
+        encoding
+        (fun o -> match select o with None -> None | Some o -> Some (proj o))
+        (fun x -> Contents (inj x))
+    in
+    def "operation_with_legacy_attestation_name.alpha.contents"
+    @@ union (List.map make contents_cases_with_legacy_attestation_name)
+
   let contents_list_encoding =
     conv_with_guard to_list of_list_internal (Variable.list contents_encoding)
+
+  let contents_list_encoding_with_legacy_attestation_name =
+    conv_with_guard
+      to_list
+      of_list_internal
+      (Variable.list contents_encoding_with_legacy_attestation_name)
 
   let protocol_data_json_encoding =
     conv
@@ -1843,6 +1643,18 @@ module Encoding = struct
         Operation_data {contents; signature})
       (obj2
          (req "contents" (dynamic_size contents_list_encoding))
+         (opt "signature" Signature.encoding))
+
+  let protocol_data_json_encoding_with_legacy_attestation_name =
+    conv
+      (fun (Operation_data {contents; signature}) ->
+        (Contents_list contents, signature))
+      (fun (Contents_list contents, signature) ->
+        Operation_data {contents; signature})
+      (obj2
+         (req
+            "contents"
+            (dynamic_size contents_list_encoding_with_legacy_attestation_name))
          (opt "signature" Signature.encoding))
 
   type contents_or_signature_prefix =
@@ -1992,28 +1804,64 @@ module Encoding = struct
          ~json:protocol_data_json_encoding
          ~binary:protocol_data_binary_encoding
 
+  let protocol_data_encoding_with_legacy_attestation_name =
+    def "operation_with_legacy_attestation_name.alpha.contents_and_signature"
+    @@ splitted
+         ~json:protocol_data_json_encoding_with_legacy_attestation_name
+         ~binary:protocol_data_binary_encoding
+
   let operation_encoding =
     conv
       (fun {shell; protocol_data} -> (shell, protocol_data))
       (fun (shell, protocol_data) -> {shell; protocol_data})
       (merge_objs Operation.shell_header_encoding protocol_data_encoding)
 
+  let operation_encoding_with_legacy_attestation_name =
+    conv
+      (fun {shell; protocol_data} -> (shell, protocol_data))
+      (fun (shell, protocol_data) -> {shell; protocol_data})
+      (merge_objs
+         Operation.shell_header_encoding
+         protocol_data_encoding_with_legacy_attestation_name)
+
   let unsigned_operation_encoding =
     def "operation.alpha.unsigned_operation"
     @@ merge_objs
          Operation.shell_header_encoding
          (obj1 (req "contents" contents_list_encoding))
+
+  let unsigned_operation_encoding_with_legacy_attestation_name =
+    def "operation_with_legacy_attestation_name.alpha.unsigned_operation"
+    @@ merge_objs
+         Operation.shell_header_encoding
+         (obj1
+            (req "contents" contents_list_encoding_with_legacy_attestation_name))
 end
 
 let encoding = Encoding.operation_encoding
 
+let encoding_with_legacy_attestation_name =
+  Encoding.operation_encoding_with_legacy_attestation_name
+
 let contents_encoding = Encoding.contents_encoding
+
+let contents_encoding_with_legacy_attestation_name =
+  Encoding.contents_encoding_with_legacy_attestation_name
 
 let contents_list_encoding = Encoding.contents_list_encoding
 
+let contents_list_encoding_with_legacy_attestation_name =
+  Encoding.contents_list_encoding_with_legacy_attestation_name
+
 let protocol_data_encoding = Encoding.protocol_data_encoding
 
+let protocol_data_encoding_with_legacy_attestation_name =
+  Encoding.protocol_data_encoding_with_legacy_attestation_name
+
 let unsigned_operation_encoding = Encoding.unsigned_operation_encoding
+
+let unsigned_operation_encoding_with_legacy_attestation_name =
+  Encoding.unsigned_operation_encoding_with_legacy_attestation_name
 
 let raw ({shell; protocol_data} : _ operation) =
   let proto =
@@ -2107,50 +1955,41 @@ let () =
     (function Contents_list_error s -> Some s | _ -> None)
     (fun s -> Contents_list_error s)
 
-let check_signature (type kind) key chain_id
-    ({shell; protocol_data} : kind operation) =
-  let check ~watermark contents signature =
-    let unsigned_operation =
-      Data_encoding.Binary.to_bytes_exn
-        unsigned_operation_encoding
-        (shell, contents)
-    in
-    if Signature.check ~watermark key signature unsigned_operation then Ok ()
+let serialize_unsigned_operation (type kind)
+    ({shell; protocol_data} : kind operation) : bytes =
+  Data_encoding.Binary.to_bytes_exn
+    unsigned_operation_encoding
+    (shell, Contents_list protocol_data.contents)
+
+let unsigned_operation_length (type kind)
+    ({shell; protocol_data} : kind operation) : int =
+  Data_encoding.Binary.length
+    unsigned_operation_encoding
+    (shell, Contents_list protocol_data.contents)
+
+let check_signature (type kind) key chain_id (op : kind operation) =
+  let serialized_operation = serialize_unsigned_operation op in
+  let check ~watermark signature =
+    if Signature.check ~watermark key signature serialized_operation then Ok ()
     else error Invalid_signature
   in
-  match protocol_data.signature with
+  match op.protocol_data.signature with
   | None -> error Missing_signature
-  | Some signature -> (
-      match protocol_data.contents with
-      | Single (Preendorsement _) as contents ->
-          check
-            ~watermark:(to_watermark (Preendorsement chain_id))
-            (Contents_list contents)
-            signature
-      | Single (Endorsement _) as contents ->
-          check
-            ~watermark:(to_watermark (Endorsement chain_id))
-            (Contents_list contents)
-            signature
-      | Single (Dal_attestation _) as contents ->
-          check
-            ~watermark:(to_watermark (Dal_attestation chain_id))
-            (Contents_list contents)
-            signature
-      | Single
-          ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
-          | Vdf_revelation _ | Double_endorsement_evidence _
-          | Double_preendorsement_evidence _ | Double_baking_evidence _
-          | Activate_account _ | Drain_delegate _ | Manager_operation _ ) ->
-          check
-            ~watermark:Generic_operation
-            (Contents_list protocol_data.contents)
-            signature
-      | Cons (Manager_operation _, _ops) ->
-          check
-            ~watermark:Generic_operation
-            (Contents_list protocol_data.contents)
-            signature)
+  | Some signature ->
+      let watermark =
+        match op.protocol_data.contents with
+        | Single (Preendorsement _) -> to_watermark (Preendorsement chain_id)
+        | Single (Endorsement _) -> to_watermark (Endorsement chain_id)
+        | Single (Dal_attestation _) -> to_watermark (Dal_attestation chain_id)
+        | Single
+            ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
+            | Vdf_revelation _ | Double_endorsement_evidence _
+            | Double_preendorsement_evidence _ | Double_baking_evidence _
+            | Activate_account _ | Drain_delegate _ | Manager_operation _ ) ->
+            Generic_operation
+        | Cons (Manager_operation _, _ops) -> Generic_operation
+      in
+      check ~watermark signature
 
 let hash_raw = Operation.hash
 
@@ -2190,22 +2029,6 @@ let equal_manager_operation_kind :
   | Increase_paid_storage _, _ -> None
   | Update_consensus_key _, Update_consensus_key _ -> Some Eq
   | Update_consensus_key _, _ -> None
-  | Tx_rollup_origination, Tx_rollup_origination -> Some Eq
-  | Tx_rollup_origination, _ -> None
-  | Tx_rollup_submit_batch _, Tx_rollup_submit_batch _ -> Some Eq
-  | Tx_rollup_submit_batch _, _ -> None
-  | Tx_rollup_commit _, Tx_rollup_commit _ -> Some Eq
-  | Tx_rollup_commit _, _ -> None
-  | Tx_rollup_return_bond _, Tx_rollup_return_bond _ -> Some Eq
-  | Tx_rollup_return_bond _, _ -> None
-  | Tx_rollup_finalize_commitment _, Tx_rollup_finalize_commitment _ -> Some Eq
-  | Tx_rollup_finalize_commitment _, _ -> None
-  | Tx_rollup_remove_commitment _, Tx_rollup_remove_commitment _ -> Some Eq
-  | Tx_rollup_remove_commitment _, _ -> None
-  | Tx_rollup_rejection _, Tx_rollup_rejection _ -> Some Eq
-  | Tx_rollup_rejection _, _ -> None
-  | Tx_rollup_dispatch_tickets _, Tx_rollup_dispatch_tickets _ -> Some Eq
-  | Tx_rollup_dispatch_tickets _, _ -> None
   | Transfer_ticket _, Transfer_ticket _ -> Some Eq
   | Transfer_ticket _, _ -> None
   | Dal_publish_slot_header _, Dal_publish_slot_header _ -> Some Eq
@@ -2873,3 +2696,7 @@ let compare (oph1, op1) (oph2, op2) =
   else
     let cmp = compare_operation_weight (weight_of op1) (weight_of op2) in
     if Compare.Int.(cmp = 0) then cmp_h else cmp
+
+module Internal_for_benchmarking = struct
+  let serialize_unsigned_operation = serialize_unsigned_operation
+end

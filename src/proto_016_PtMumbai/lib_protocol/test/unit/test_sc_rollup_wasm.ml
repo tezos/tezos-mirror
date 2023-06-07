@@ -27,9 +27,8 @@
 (** Testing
     -------
     Component:    Rollup layer 1 logic
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/unit/main.exe \
-                  -- test "^\[Unit\] sc rollup wasm$"
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_sc_rollup_wasm.ml
     Subject:      Unit test for the Wasm PVM
 *)
 
@@ -235,7 +234,7 @@ let test_output () =
     match parsed.it with Script.Textual m -> m | _ -> assert false
   in
   let*! boot_sector = Encode.encode parsed in
-  let*! tree = Wasm.initial_state empty_tree in
+  let*! tree = Wasm.initial_state V0 empty_tree in
   let*! tree =
     Wasm.install_boot_sector
       ~ticks_per_snapshot:Sc_rollup_wasm.V2_0_0.ticks_per_snapshot
@@ -266,12 +265,14 @@ let test_output () =
     | None -> failwith "The PVM output buffer does not contain any outbox."
   in
   let*! last_outbox =
-    Tezos_webassembly_interpreter.Output_buffer.get_outbox
+    Tezos_webassembly_interpreter.Output_buffer.Internal_for_tests.get_outbox
       output
       last_outbox_level
   in
   let* end_of_level_message_index =
-    match Output_buffer.get_outbox_last_message_index last_outbox with
+    match
+      Output_buffer.Internal_for_tests.get_outbox_last_message_index last_outbox
+    with
     | Some index -> return index
     | None -> failwith "The PVM output buffer does not contain any outbox."
   in
@@ -311,5 +312,9 @@ let tests =
       test_initial_state_hash_wasm_pvm;
     Tztest.tztest "size of a rollup metadata" `Quick test_metadata_size;
     Tztest.tztest "l1 input kind" `Quick test_l1_input_kind;
-    Tztest.tztest "test output proofs" `Quick test_output;
+    Tztest.tztest "output proofs" `Quick test_output;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("sc rollup wasm", tests)]
+  |> Lwt_main.run

@@ -52,7 +52,6 @@ let ty_traverse_f =
     | Key_t -> ret_succ_adding accu base_basic
     | Timestamp_t -> ret_succ_adding accu base_basic
     | Address_t -> ret_succ_adding accu base_basic
-    | Tx_rollup_l2_address_t -> ret_succ_adding accu base_basic
     | Bool_t -> ret_succ_adding accu base_basic
     | Operation_t -> ret_succ_adding accu base_basic
     | Chain_id_t -> ret_succ_adding accu base_basic
@@ -64,7 +63,7 @@ let ty_traverse_f =
     | Chest_t -> ret_succ_adding accu base_basic
     | Pair_t (_ty1, _ty2, a, _) ->
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
-    | Union_t (_ty1, _ty2, a, _) ->
+    | Or_t (_ty1, _ty2, a, _) ->
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
     | Lambda_t (_ty1, _ty2, a) ->
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
@@ -153,9 +152,6 @@ let address_size addr =
   +! destination_size addr.destination
   +! Entrypoint.in_memory_size addr.entrypoint
 
-let tx_rollup_l2_address_size (tx : tx_rollup_l2_address) =
-  Tx_rollup_l2_address.Indexable.in_memory_size @@ Indexable.forget tx
-
 let view_signature_size (View_signature {name; input_ty; output_ty}) =
   ret_adding
     (ty_size input_ty ++ ty_size output_ty)
@@ -207,8 +203,6 @@ let contract_size : type t. t typed_contract -> nodes_and_size = function
       ret_adding
         (ty_size arg_ty)
         (h3w +! blake2b_hash_size +! Entrypoint.in_memory_size entrypoint)
-  | Typed_tx_rollup {arg_ty; tx_rollup} ->
-      ret_adding (ty_size arg_ty) (h2w +! Tx_rollup.in_memory_size tx_rollup)
   | Typed_sc_rollup {arg_ty; sc_rollup; entrypoint} ->
       ret_adding
         (ty_size arg_ty)
@@ -249,7 +243,7 @@ let chest_key_size _ =
   (*
      type chest_key = {
        unlocked_value : unlocked_value;
-       proof : time_lock_proof
+       proof : timelock_proof
      }
   *)
   let unlocked_value_size = 256 in
@@ -282,11 +276,9 @@ let rec value_size :
     | Key_t -> ret_succ_adding accu (public_key_size x)
     | Timestamp_t -> ret_succ_adding accu (timestamp_size x)
     | Address_t -> ret_succ_adding accu (address_size x)
-    | Tx_rollup_l2_address_t ->
-        ret_succ_adding accu (tx_rollup_l2_address_size x)
     | Bool_t -> ret_succ accu
     | Pair_t (_, _, _, _) -> ret_succ_adding accu h2w
-    | Union_t (_, _, _, _) -> ret_succ_adding accu h1w
+    | Or_t (_, _, _, _) -> ret_succ_adding accu h1w
     | Lambda_t (_, _, _) ->
         (lambda_size [@ocaml.tailcall]) ~count_lambda_nodes (ret_succ accu) x
     | Option_t (_, _, _) -> ret_succ_adding accu (option_size (fun _ -> !!0) x)
@@ -426,13 +418,14 @@ and kinstr_size :
     | IDrop (loc, k) -> ret_succ_adding accu (base1 loc k)
     | IDup (loc, k) -> ret_succ_adding accu (base1 loc k)
     | ISwap (loc, k) -> ret_succ_adding accu (base1 loc k)
-    | IConst (loc, ty, x, k) ->
+    | IPush (loc, ty, x, k) ->
         let accu = ret_succ_adding accu (base1 loc k +! (word_size *? 2)) in
         (value_size [@ocaml.tailcall])
           ~count_lambda_nodes
           (accu ++ ty_size ty)
           ty
           x
+    | IUnit (loc, k) -> ret_succ_adding accu (base1 loc k)
     | ICons_pair (loc, k) -> ret_succ_adding accu (base1 loc k)
     | ICar (loc, k) -> ret_succ_adding accu (base1 loc k)
     | ICdr (loc, k) -> ret_succ_adding accu (base1 loc k)

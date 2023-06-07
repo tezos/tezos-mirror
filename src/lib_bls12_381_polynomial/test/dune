@@ -1,0 +1,47 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_lib_bls12_381_polynomial_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  octez-alcotezt
+  qcheck-alcotest
+  octez-polynomial
+  bls12-381
+  octez-bls12-381-polynomial)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Octez_alcotezt)
+ (modules
+  test_main
+  helpers
+  test_coefficients
+  test_domains
+  test_evaluations
+  test_pbt
+  test_polynomial
+  test_srs))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_bls12_381_polynomial_test_tezt_lib
+  tezt)
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package octez-bls12-381-polynomial)
+ (deps srs_zcash_g1_5)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

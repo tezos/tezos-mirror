@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (Zk_rollup)
-    Invocation: cd src/proto_alpha/lib_protocol/test/unit && \
-                dune exec ./main.exe -- test "^\[Unit\] zk rollup storage$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+                  -- --file test_zk_rollup_storage.ml
     Subject:    On ZK Rollup storage
 *)
 
@@ -111,7 +111,7 @@ module Raw_context_tests = struct
     let open Lwt_result_syntax in
     let open Zk_rollup_account_repr in
     let* ctx, contract = initial_ctx () in
-    let public_parameters = Operator.public_parameters in
+    let _prover_pp, public_parameters = Lazy.force Operator.lazy_pp in
     let state = Operator.init_state in
     let state_length = Array.length state in
     let circuits_info = SMap.of_seq @@ Plonk.SMap.to_seq Operator.circuits in
@@ -389,9 +389,10 @@ let tests =
       "pending_list_get errors"
       `Quick
       Raw_context_tests.pending_list_errors;
-    Tztest.tztest "test_update" `Quick Raw_context_tests.test_update;
-    Tztest.tztest
-      "test_update errors"
-      `Quick
-      Raw_context_tests.test_update_errors;
+    Tztest.tztest "update" `Quick Raw_context_tests.test_update;
+    Tztest.tztest "update errors" `Quick Raw_context_tests.test_update_errors;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("zk rollup storage", tests)]
+  |> Lwt_main.run

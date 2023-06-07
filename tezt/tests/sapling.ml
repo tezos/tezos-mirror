@@ -807,34 +807,30 @@ let test_sapling_state_corruption =
     |> Process.check_error ~msg
   in
   Log.info "Make sure sapling state with id 0 exists" ;
-  let sapling_empty_state =
-    sf
-      "file:./tests_python/contracts_%s/opcodes/sapling_empty_state.tz"
-      (match protocol with
-      | Protocol.Alpha -> "alpha"
-      | _ -> sf "%03d" @@ Protocol.number protocol)
-  in
-  let* _address =
-    Client.originate_contract
+  let* _alias, _address =
+    Client.originate_contract_at
       ~burn_cap
-      ~alias:"sapling_empty_state"
-      ~prg:sapling_empty_state
       ~amount:Tez.zero
       ~src
       ~init:"{}"
       client
+      ["opcodes"; "sapling_empty_state"]
+      protocol
   in
   Log.info "Originate with id is forbidden" ;
   let msg = rex "Unexpected forged value" in
-  Client.spawn_originate_contract
-    ~burn_cap
-    ~alias:"sapling_empty_state2"
-    ~prg:sapling_empty_state
-    ~amount:Tez.zero
-    ~src
-    ~init:"0"
-    client
-  |> Process.check_error ~msg
+  let _alias, process =
+    Client.spawn_originate_contract_at
+      ~burn_cap
+      ~amount:Tez.zero
+      ~src
+      ~init:"0"
+      ~alias:"sapling_empty_state2"
+      client
+      ["opcodes"; "sapling_empty_state"]
+      protocol
+  in
+  process |> Process.check_error ~msg
 
 module Memo_size = struct
   let burn_cap = Tez.of_int 3

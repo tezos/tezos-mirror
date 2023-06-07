@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2022 TriliTech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+
+max_width=90
+newline_style="Unix"

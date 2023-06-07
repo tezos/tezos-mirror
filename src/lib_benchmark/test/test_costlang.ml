@@ -145,8 +145,8 @@ let tests =
     Test.tztest_assert "pp1" `Quick test_pp_1;
     Test.tztest_assert "pp2" `Quick test_pp_2;
     Test.tztest_assert "pp3" `Quick test_pp_3;
-    Test.tztest_assert "eval" `Quick test_eval1;
-    Test.tztest_assert "eval" `Quick test_eval2;
+    Test.tztest_assert "eval1" `Quick test_eval1;
+    Test.tztest_assert "eval2" `Quick test_eval2;
     Test.tztest_assert "eval_to_linear_comb" `Quick test_eval_to_lincomb;
     Test.tztest_assert
       "eval_to_linear_comb_fail"
@@ -155,4 +155,5 @@ let tests =
   ]
 
 let () =
-  Alcotest_lwt.run "tezos-benchmark" [("costlang", tests)] |> Lwt_main.run
+  Alcotest_lwt.run ~__FILE__ "tezos-benchmark" [("costlang", tests)]
+  |> Lwt_main.run

@@ -31,15 +31,6 @@
    Subject:      Test contract-related non-regressions
 *)
 
-let contract_path protocol kind contract =
-  sf
-    "tests_python/contracts_%s/%s/%s"
-    (match protocol with
-    | Protocol.Alpha -> "alpha"
-    | _ -> sf "%03d" @@ Protocol.number protocol)
-    kind
-    contract
-
 (* Normally "--base-dir" would appear in regression logs. However, since
    it is a different dir on every run, we need to mask it in regression
    logs so that it doesn't cause false differences. *)
@@ -52,16 +43,16 @@ let register262 =
     ~tags:["client"; "michelson"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* contract =
-    Client.originate_contract
+  let* _alias, contract =
+    Client.originate_contract_at
       ~hooks
       ~burn_cap:Tez.one
-      ~alias:"contract"
       ~amount:Tez.one
       ~src:Constant.bootstrap1.alias
-      ~prg:(sf "file:%s" @@ contract_path protocol "non_regression" "262_bug.tz")
       ~init:"Unit"
       client
+      ["non_regression"; "262_bug"]
+      protocol
   in
   let* balance = Client.get_balance_for ~account:contract client in
   Check.(balance = Tez.one)
@@ -87,7 +78,9 @@ let register843 =
      format before origination. *)
   let* client = Client.init_mockup ~protocol () in
   let addr = {|"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"|} in
-  let bug843 = contract_path protocol "non_regression" "843_bug.tz" in
+  let bug843 =
+    Michelson_script.(find ["non_regression"; "843_bug"] protocol |> path)
+  in
   let* contract1 =
     Client.originate_contract
       ~hooks

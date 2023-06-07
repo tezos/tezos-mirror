@@ -1,0 +1,23 @@
+
+./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/mini_scenarios/smart_rollup_receive_tickets_016.tz --details
+Well typed
+Gas remaining: 1039993.563 units remaining
+{ parameter (or (unit %burn_all_tickets) (ticket %receive_tickets string)) ;
+  storage (list (ticket string)) ;
+  code { UNPAIR
+         /* [ or unit (ticket string) : list (ticket string) ] */ ;
+         IF_LEFT
+           { DROP 2
+             /* [] */ ;
+             NIL (ticket string)
+             /* [ list (ticket string) ] */ ;
+             NIL operation
+             /* [ list operation : list (ticket string) ] */ ;
+             PAIR
+             /* [ pair (list operation) (list (ticket string)) ] */ }
+           { CONS
+             /* [ list (ticket string) ] */ ;
+             NIL operation
+             /* [ list operation : list (ticket string) ] */ ;
+             PAIR
+             /* [ pair (list operation) (list (ticket string)) ] */ } } }

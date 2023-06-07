@@ -48,9 +48,9 @@ tokens (and be the destinations of transactions).
 
 From Michelson, they are indistinguishable. A safe way to think about
 this is to consider that implicit accounts are smart contracts that
-always succeed to receive tokens, and does nothing else.
+always succeed in receiving tokens, and do nothing else.
 
-Finally, addresses prefixed with ``scr1`` identify smart rollups.
+Finally, addresses prefixed with ``sr1`` identify :doc:`smart rollups <./smart_rollups>`.
 
 Intra-transaction semantics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -623,600 +623,91 @@ A detailed description of the following instructions can be found in the `intera
 Operations on pairs and right combs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The type ``pair l r`` is the type of binary pairs composed of a left
-element of type ``l`` and a right element of type ``r``. A value of
-type ``pair l r`` is written ``Pair x y`` where ``x`` is a value of
-type ``l`` and ``y`` is a value of type ``r``.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-To build tuples of length greater than 2, right combs have specific
-optimized operations. For any ``n > 2``, the compact notations ``pair
-t{0} t{1} ... t{n-2} t{n-1}`` is provided for the type of right combs
-``pair t{0} (pair t{1} ... (pair t{n-2} t{n-1}) ...)``. Similarly, the
-compact notation ``Pair x{0} x{1} ... x{n-2} x{n-1}`` is provided for
-the right-comb value ``Pair x{0} (Pair x{1} ... (Pair x{n-2} x{n-1})
-...)``. Right-comb values can also be written using sequences; ``Pair
-x{0} x{1} ... x{n-2} x{n-1}`` can be written ``{x{0}; x{1}; ...; x{n-2}; x{n-1}}``.
-
--  ``PAIR``: Build a binary pair from the stack's top two elements.
-
-::
-
-    :: 'a : 'b : 'S   ->   pair 'a 'b : 'S
-
-    > PAIR / x : y : S  =>  Pair x y : S
-
--  ``PAIR n``: Fold ``n`` values on the top of the stack in a right comb.
-   ``PAIR 0`` and ``PAIR 1`` are rejected. ``PAIR 2`` is equivalent to ``PAIR``.
-
-::
-
-    PAIR 2 :: 'a : 'b : 'S   ->   pair 'a 'b : 'S
-    PAIR (k+1) :: 'x : 'S   ->   pair 'x 'y : 'T
-         iff PAIR k :: 'S   ->   'y : 'T
-
-    Or equivalently, for n >= 2,
-    PAIR n :: 'a{0} : ... : 'a{n-1} : 'A -> pair 'a{0} ...  'a{n-1} : 'A
-
-    > PAIR 2 / x : y : S  =>  Pair x y : S
-    > PAIR (k+1) / x : S  =>  Pair x y : T
-         iff PAIR k / S  =>  y : T
-
-    Or equivalently, for n >= 2,
-    > PAIR n / x{0} : ... : x{n-1} : S  =>  Pair x{0} ... x{n-1} : S
-
--  ``UNPAIR``: Split a pair into its components.
-
-::
-
-    :: pair 'a 'b : 'S   ->   'a : 'b : 'S
-
-    > UNPAIR / Pair a b : S  =>  a : b : S
-
-
--  ``UNPAIR n``: Unfold ``n`` values from a right comb on the top of the stack. ``UNPAIR 0`` and ``UNPAIR 1`` are rejected. ``UNPAIR 2`` is equivalent to ``UNPAIR``.
-
-::
-
-    UNPAIR 2 :: pair 'a 'b : 'A   ->   'a : 'b : 'A
-    UNPAIR (k+1) :: pair 'a 'b : 'A   ->   'a : 'B
-         iff UNPAIR k :: 'b : 'A   ->   'B
-
-    Or equivalently, for n >= 2,
-    UNPAIR n :: pair 'a{0} ... 'a{n-1} : S   ->   'a{0} : ... : 'a{n-1} : S
-
-    > UNPAIR 2 / Pair x y : S  =>  x : y : S
-    > UNPAIR (k+1) / Pair x y : SA  =>  x : SB
-         iff UNPAIR k / y : SA  =>  SB
-
-    Or equivalently, for n >= 2,
-    > UNPAIR n / Pair x{0} ... x{n-1} : S  =>  x{0} : ... : x{n-1} : S
-
--  ``CAR``: Access the left part of a pair.
-
-::
-
-    :: pair 'a _ : 'S   ->   'a : 'S
-
-    > CAR / Pair x _ : S  =>  x : S
-
--  ``CDR``: Access the right part of a pair.
-
-::
-
-    :: pair _ 'b : 'S   ->   'b : 'S
-
-    > CDR / Pair _ y : S  =>  y : S
-
-- ``GET k``: Access an element or a sub comb in a right comb.
-
-  The nodes of a right comb of size ``n`` are canonically numbered as follows:
-
-::
-
-         0
-       /   \
-     1       2
-           /   \
-         3       4
-               /   \
-             5       ...
-                          2n-2
-                        /      \
-                   2n-1          2n
-
-
-Or in plain English:
-
-  - The root is numbered with 0,
-  - The left child of the node numbered by ``k`` is numbered by ``k+1``, and
-  - The right child of the node numbered by ``k`` is numbered by ``k+2``.
-
-The ``GET k`` instruction accesses the node numbered by ``k``. In
-particular, for a comb of size ``n``, the ``n-1`` first elements are
-accessed by ``GET 1``, ``GET 3``, ..., and ``GET (2n-1)`` and the last
-element is accessed by ``GET (2n)``.
-
-::
-
-    GET 0 :: 'a : 'S   ->   'a : 'S
-    GET 1 :: pair 'x _ : 'S   ->   'x : 'S
-    GET (k+2) :: pair _ 'y : 'S   ->   'z : 'S
-         iff GET k :: 'y : 'S   ->   'z : 'S
-
-    Or equivalently,
-    GET 0 :: 'a : 'S   ->   'a : 'S
-    GET (2k) :: pair 'a{0} ... 'a{k-1} 'a{k} : 'S   ->   'a{k} : 'S
-    GET (2k+1) :: pair 'a{0} ... 'a{k} 'a{k+1} : 'S   ->   'a{k} : 'S
-
-    > GET 0 / x : S  =>  x : S
-    > GET 1 / Pair x _ : S  =>  x : S
-    > GET (k+2) / Pair _ y : S  =>  GET k / y : S
-
-    Or equivalently,
-    > GET 0 / x : S  =>  x : S
-    > GET (2k) / Pair x{0} ... x{k-1} x{k} : 'S   ->   x{k} : 'S
-    > GET (2k+1) / Pair x{0} ... x{k} x{k+1} : 'S   ->   x{k} : 'S
-
-
-- ``UPDATE k``: Update an element or a sub comb in a right comb. The topmost stack element is the new value to insert in the comb, the second stack element is the right comb to update. The meaning of ``k`` is the same as for the ``GET k`` instruction.
-
-::
-
-    UPDATE 0 :: 'a : 'b : 'S   ->   'a : 'S
-    UPDATE 1 :: 'a2 : pair 'a1 'b : 'S   ->   pair 'a2 'b : 'S
-    UPDATE (k+2) :: 'c : pair 'a 'b1 : 'S   ->   pair 'a 'b2 : 'S
-         iff UPDATE k :: 'c : 'b1 : 'S   ->   'b2 : 'S
-
-    Or equivalently,
-    UPDATE 0 :: 'a : 'b : 'S   ->   'a : 'S
-    UPDATE (2k) :: 'c : pair 'a{0} ... 'a{k-1} 'a{k} : 'S   ->   pair 'a{0} ... 'a{k-1} 'c : 'S
-    UPDATE (2k+1) :: 'c : pair 'a{0} ... 'a{k} 'a{k+1} : 'S   ->   pair 'a{0} ... 'a{k-1} 'c 'a{k+1} : 'S
-
-    > UPDATE 0 / x : _ : S  =>  x : S
-    > UPDATE 1 / x2 : Pair x1 y : S  =>  Pair x2 y : S
-    > UPDATE (k+2) / z : Pair x y1 : S  =>  Pair x y2 : S
-         iff UPDATE k / z : y1 : S  =>  y2 : S
-
-    Or equivalently,
-    > UPDATE 0 / x : _ : S  =>  x : S
-    > UPDATE (2k) / z : Pair x{0} ... x{k-1} x{k} : 'S  =>  Pair x{0} ... x{k-1} z : 'S
-    > UPDATE (2k+1) / z : Pair x{0} ... x{k-1} x{k} x{k+1} : 'S  =>  Pair x{0} ... x{k-1} z x{k+1} : 'S
-
--  ``COMPARE``: Lexicographic comparison.
-
-::
-
-    :: pair 'a 'b : pair 'a 'b : 'S   ->   int : 'S
-
-    > COMPARE / (Pair sa sb) : (Pair ta tb) : S  =>  -1 : S
-        iff COMPARE / sa : ta : S => -1 : S
-    > COMPARE / (Pair sa sb) : (Pair ta tb) : S  =>  1 : S
-        iff COMPARE / sa : ta : S => 1 : S
-    > COMPARE / (Pair sa sb) : (Pair ta tb) : S  =>  r : S
-        iff COMPARE / sa : ta : S => 0 : S
-            COMPARE / sb : tb : S => r : S
+-  ``PAIR``: Build a binary pair from the stack's top two elements (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-PAIR>`__).
+-  ``PAIR n``: Fold ``n`` values on the top of the stack in a right comb (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-PAIRN>`__).
+-  ``UNPAIR``: Split a pair into its components (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UNPAIR>`__).
+-  ``UNPAIR n``: Unfold ``n`` values from a right comb on the top of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UNPAIRN>`__).
+-  ``CAR``: Access the left part of a pair (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CAR>`__).
+-  ``CDR``: Access the right part of a pair (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CDR>`__).
+- ``GET k``: Access an element or a sub comb in a right comb (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GETN>`__).
+- ``UPDATE k``: Update an element or a sub comb in a right comb (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UPDATEN>`__).
+-  ``COMPARE``: Lexicographic comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 Operations on sets
 ~~~~~~~~~~~~~~~~~~
 
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
+
 -  ``EMPTY_SET 'elt``: Build a new, empty set for elements of a given
-   type.
-
-   The ``'elt`` type must be comparable (the ``COMPARE``
-   primitive must be defined over it).
-
-::
-
-    :: 'S   ->   set 'elt : 'S
-
-    > EMPTY_SET _ / S  =>  {} : S
-
--  ``MEM``: Check for the presence of an element in a set.
-
-::
-
-    :: 'elt : set 'elt : 'S   ->  bool : 'S
-
-    > MEM / x : {} : S  =>  false : S
-    > MEM / x : { hd ; <tl> } : S  =>  r : S
-        iff COMPARE / x : hd : []  =>  1 : []
-        where MEM / x : { <tl> } : S  =>  r : S
-    > MEM / x : { hd ; <tl> } : S  =>  true : S
-        iff COMPARE / x : hd : []  =>  0 : []
-    > MEM / x : { hd ; <tl> } : S  =>  false : S
-        iff COMPARE / x : hd : []  =>  -1 : []
-
+   type (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EMPTY_SET>`__).
+-  ``MEM``: Check for the presence of an element in a set (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MEM>`__).
 -  ``UPDATE``: Inserts or removes an element in a set, replacing a
-   previous value.
-
-::
-
-    :: 'elt : bool : set 'elt : 'S   ->   set 'elt : 'S
-
-    > UPDATE / x : false : {} : S  =>  {} : S
-    > UPDATE / x : true : {} : S  =>  { x } : S
-    > UPDATE / x : v : { hd ; <tl> } : S  =>  { hd ; <tl'> } : S
-        iff COMPARE / x : hd : []  =>  1 : []
-        where UPDATE / x : v : { <tl> } : S  =>  { <tl'> } : S
-    > UPDATE / x : false : { hd ; <tl> } : S  =>  { <tl> } : S
-        iff COMPARE / x : hd : []  =>  0 : []
-    > UPDATE / x : true : { hd ; <tl> } : S  =>  { hd ; <tl> } : S
-        iff COMPARE / x : hd : []  =>  0 : []
-    > UPDATE / x : false : { hd ; <tl> } : S  =>  { hd ; <tl> } : S
-        iff COMPARE / x : hd : []  =>  -1 : []
-    > UPDATE / x : true : { hd ; <tl> } : S  =>  { x ; hd ; <tl> } : S
-        iff COMPARE / x : hd : []  =>  -1 : []
-
--  ``ITER body``: Apply the body expression to each element of a set.
-   The body sequence has access to the stack.
-
-::
-
-    :: (set 'elt) : 'A   ->  'A
-       iff body :: [ 'elt : 'A -> 'A ]
-
-    > ITER body / {} : S  =>  S
-    > ITER body / { hd ; <tl> } : S  =>  ITER body / { <tl> } : S'
-       iff body / hd : S  =>  S'
-
-
--  ``SIZE``: Get the cardinality of the set.
-
-::
-
-    :: set 'elt : 'S -> nat : 'S
-
-    > SIZE / {} : S  =>  0 : S
-    > SIZE / { _ ; <tl> } : S  =>  1 + s : S
-        where SIZE / { <tl> } : S  =>  s : S
+   previous value (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UPDATE>`__).
+-  ``ITER body``: Apply the body expression to each element of a set (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ITER>`__).
+-  ``SIZE``: Get the cardinality of the set (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SIZE>`__).
 
 Operations on maps
 ~~~~~~~~~~~~~~~~~~
 
--  ``EMPTY_MAP 'key 'val``: Build a new, empty map from keys of a
-   given type to values of another given type.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-   The ``'key`` type must be comparable (the ``COMPARE`` primitive must
-   be defined over it).
-
-::
-
-    :: 'S -> map 'key 'val : 'S
-
-    > EMPTY_MAP _ _ / S  =>  {} : S
-
-
--  ``GET``: Access an element in a map, returns an optional value to be
-   checked with ``IF_SOME``.
-
-::
-
-    :: 'key : map 'key 'val : 'S   ->   option 'val : 'S
-
-    > GET / x : {} : S  =>  None : S
-    > GET / x : { Elt k v ; <tl> } : S  =>  opt_y : S
-        iff COMPARE / x : k : []  =>  1 : []
-        where GET / x : { <tl> } : S  =>  opt_y : S
-    > GET / x : { Elt k v ; <tl> } : S  =>  Some v : S
-        iff COMPARE / x : k : []  =>  0 : []
-    > GET / x : { Elt k v ; <tl> } : S  =>  None : S
-        iff COMPARE / x : k : []  =>  -1 : []
-
--  ``MEM``: Check for the presence of a binding for a key in a map.
-
-::
-
-    :: 'key : map 'key 'val : 'S   ->  bool : 'S
-
-    > MEM / x : {} : S  =>  false : S
-    > MEM / x : { Elt k v ; <tl> } : S  =>  r : S
-        iff COMPARE / x : k : []  =>  1 : []
-        where MEM / x : { <tl> } : S  =>  r : S
-    > MEM / x : { Elt k v ; <tl> } : S  =>  true : S
-        iff COMPARE / x : k : []  =>  0 : []
-    > MEM / x : { Elt k v ; <tl> } : S  =>  false : S
-        iff COMPARE / x : k : []  =>  -1 : []
-
--  ``UPDATE``: Assign or remove an element in a map.
-
-::
-
-    :: 'key : option 'val : map 'key 'val : 'S   ->   map 'key 'val : 'S
-
-    > UPDATE / x : None : {} : S  =>  {} : S
-    > UPDATE / x : Some y : {} : S  =>  { Elt x y } : S
-    > UPDATE / x : opt_y : { Elt k v ; <tl> } : S  =>  { Elt k v ; <tl'> } : S
-        iff COMPARE / x : k : []  =>  1 : []
-          where UPDATE / x : opt_y : { <tl> } : S  =>  { <tl'> } : S
-    > UPDATE / x : None : { Elt k v ; <tl> } : S  =>  { <tl> } : S
-        iff COMPARE / x : k : []  =>  0 : []
-    > UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  { Elt k y ; <tl> } : S
-        iff COMPARE / x : k : []  =>  0 : []
-    > UPDATE / x : None : { Elt k v ; <tl> } : S  =>  { Elt k v ; <tl> } : S
-        iff COMPARE / x : k : []  =>  -1 : []
-    > UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  { Elt x y ; Elt k v ; <tl> } : S
-        iff COMPARE / x : k : []  =>  -1 : []
-
--  ``GET_AND_UPDATE``: A combination of the ``GET`` and ``UPDATE`` instructions.
-
-::
-
-    :: 'key : option 'val : map 'key 'val : 'S   ->   option 'val : map 'key 'val : 'S
-
-This instruction is similar to ``UPDATE`` but it also returns the
-value that was previously stored in the ``map`` at the same key as
-``GET`` would.
-
-::
-
-    > GET_AND_UPDATE / x : None : {} : S  =>  None : {} : S
-    > GET_AND_UPDATE / x : Some y : {} : S  =>  None : { Elt x y } : S
-    > GET_AND_UPDATE / x : opt_y : { Elt k v ; <tl> } : S  =>  opt_y' : { Elt k v ; <tl'> } : S
-        iff COMPARE / x : k : []  =>  1 : []
-          where GET_AND_UPDATE / x : opt_y : { <tl> } : S  =>  opt_y' : { <tl'> } : S
-    > GET_AND_UPDATE / x : None : { Elt k v ; <tl> } : S  =>  Some v : { <tl> } : S
-        iff COMPARE / x : k : []  =>  0 : []
-    > GET_AND_UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  Some v : { Elt k y ; <tl> } : S
-        iff COMPARE / x : k : []  =>  0 : []
-    > GET_AND_UPDATE / x : None : { Elt k v ; <tl> } : S  =>  None : { Elt k v ; <tl> } : S
-        iff COMPARE / x : k : []  =>  -1 : []
-    > GET_AND_UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  None : { Elt x y ; Elt k v ; <tl> } : S
-        iff COMPARE / x : k : []  =>  -1 : []
-
--  ``MAP body``: Apply the body expression to each element of a map. The
-   body sequence has access to the stack.
-
-::
-
-    :: (map 'key 'val) : 'A   ->  (map 'key 'b) : 'A
-       iff   body :: [ (pair 'key 'val) : 'A -> 'b : 'A ]
-
-    > MAP body / {} : S  =>  {} : S
-    > MAP body / { Elt k v ; <tl> } : S  =>  { Elt k v' ; <tl'> } : S''
-        where body / Pair k v : S  =>  v' : S'
-        and MAP body / { <tl> } : S'  =>  { <tl'> } : S''
-
--  ``ITER body``: Apply the body expression to each element of a map.
-   The body sequence has access to the stack.
-
-::
-
-    :: (map 'elt 'val) : 'A   ->  'A
-       iff   body :: [ (pair 'elt 'val : 'A) -> 'A ]
-
-    > ITER body / {} : S  =>  S
-    > ITER body / { Elt k v ; <tl> } : S  =>  ITER body / { <tl> } : S'
-       iff body / (Pair k v) : S  =>  S'
-
--  ``SIZE``: Get the cardinality of the map.
-
-::
-
-    :: map 'key 'val : 'S -> nat : 'S
-
-    > SIZE / {} : S  =>  0 : S
-    > SIZE / { _ ; <tl> } : S  =>  1 + s : S
-        where  SIZE / { <tl> } : S  =>  s : S
+-  ``EMPTY_MAP 'key 'val``: Build a new, empty map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EMPTY_MAP>`__).
+-  ``GET``: Access an element in a map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GET>`__).
+-  ``MEM``: Check for the presence of a binding for a key in a map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MEM>`__).
+-  ``UPDATE``: Add, update, or remove an element in a map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UPDATE>`__).
+-  ``GET_AND_UPDATE``: A combination of the ``GET`` and ``UPDATE`` instructions (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GET_AND_UPDATE>`__).
+-  ``MAP body``: Apply the body expression to each element of a map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MAP>`__).
+-  ``ITER body``: Apply the body expression to each element of a map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ITER>`__).
+-  ``SIZE``: Get the cardinality of the map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SIZE>`__).
 
 
 Operations on ``big_maps``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 .. _OperationsOnBigMaps_alpha:
 
-Big maps have three possible representations. A map literal is always
-a valid representation for a big map. Big maps can also be represented
-by integers called big-map identifiers. Finally, big maps can be
-represented as pairs of a big-map identifier (an integer) and a
-big-map diff (written in the same syntax as a map whose values are
-options).
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-So for example, ``{ Elt "bar" True ; Elt "foo" False }``, ``42``, and
-``Pair 42 { Elt "foo" (Some False) }`` are all valid representations
-of type ``big_map string bool``.
-
-The behavior of big-map operations is the same as if they were normal
-maps, except that under the hood, the elements are loaded and
-deserialized on demand.
-
--  ``EMPTY_BIG_MAP 'key 'val``: Build a new, empty big map from keys of a
-   given type to values of another given type.
-
-   The ``'key`` type must be comparable (the ``COMPARE`` primitive must
-   be defined over it).
-
-::
-
-    :: 'S -> map 'key 'val : 'S
-
--  ``GET``: Access an element in a ``big_map``, returns an optional value to be
-   checked with ``IF_SOME``.
-
-::
-
-    :: 'key : big_map 'key 'val : 'S   ->   option 'val : 'S
-
--  ``MEM``: Check for the presence of an element in a ``big_map``.
-
-::
-
-    :: 'key : big_map 'key 'val : 'S   ->  bool : 'S
-
--  ``UPDATE``: Assign or remove an element in a ``big_map``.
-
-::
-
-    :: 'key : option 'val : big_map 'key 'val : 'S   ->   big_map 'key 'val : 'S
-
-
--  ``GET_AND_UPDATE``: A combination of the ``GET`` and ``UPDATE`` instructions.
-
-::
-
-    :: 'key : option 'val : big_map 'key 'val : 'S   ->   option 'val : big_map 'key 'val : 'S
-
-This instruction is similar to ``UPDATE`` but it also returns the
-value that was previously stored in the ``big_map`` at the same key as
-``GET`` would.
+-  ``EMPTY_BIG_MAP 'key 'val``: Build a new, empty big map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EMPTY_BIG_MAP>`__).
+-  ``GET``: Access an element in a ``big_map`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GET>`__).
+-  ``MEM``: Check for the presence of an element in a ``big_map`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MEM>`__).
+-  ``UPDATE``: Add, update, or remove an element in a ``big_map`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UPDATE>`__).
+-  ``GET_AND_UPDATE``: A combination of the ``GET`` and ``UPDATE`` instructions (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GET_AND_UPDATE>`__).
 
 
 Operations on optional values
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
--  ``SOME``: Pack a value as an optional value.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: 'a : 'S   ->   option 'a : 'S
-
-    > SOME / v : S  =>  (Some v) : S
-
--  ``NONE 'a``: The absent optional value.
-
-::
-
-    :: 'S   ->   option 'a : 'S
-
-    > NONE / S  =>  None : S
-
--  ``IF_NONE bt bf``: Inspect an optional value.
-
-::
-
-    :: option 'a : 'A   ->   'B
-       iff   bt :: [ 'A -> 'B]
-             bf :: [ 'a : 'A -> 'B]
-
-    > IF_NONE bt bf / (None) : S  =>  bt / S
-    > IF_NONE bt bf / (Some a) : S  =>  bf / a : S
-
--  ``COMPARE``: Optional values comparison
-
-::
-
-    :: option 'a : option 'a : 'S   ->   int : 'S
-
-    > COMPARE / None : None : S  =>  0 : S
-    > COMPARE / None : (Some _) : S  =>  -1 : S
-    > COMPARE / (Some _) : None : S  =>  1 : S
-    > COMPARE / (Some a) : (Some b) : S  =>  COMPARE / a : b : S
-
-- ``MAP body``: Apply the body expression to the value inside the option if there is one.
-
-::
-
-   :: option 'a : 'S -> option 'b : 'S
-      iff    body :: [ 'a : 'S -> 'b : 'S ]
-
-   > MAP body / None : S => None : S
-   > MAP body / (Some a) : S => (Some b) : S'
-      where body / a : S => b : S'
+-  ``SOME``: Pack a value as an optional value (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SOME>`__).
+-  ``NONE 'a``: The absent optional value (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NONE>`__).
+-  ``IF_NONE bt bf``: Inspect an optional value (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-IF_NONE>`__).
+-  ``COMPARE``: Optional values comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
+- ``MAP body``: Apply the body expression to the value inside the option if there is one (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MAP>`__).
 
 Operations on unions
 ~~~~~~~~~~~~~~~~~~~~
 
--  ``LEFT 'b``: Pack a value in a union (left case).
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: 'a : 'S   ->   or 'a 'b : 'S
-
-    > LEFT / v : S  =>  (Left v) : S
-
--  ``RIGHT 'a``: Pack a value in a union (right case).
-
-::
-
-    :: 'b : 'S   ->   or 'a 'b : 'S
-
-    > RIGHT / v : S  =>  (Right v) : S
-
--  ``IF_LEFT bt bf``: Inspect a value of a union.
-
-::
-
-    :: or 'a 'b : 'A   ->   'B
-       iff   bt :: [ 'a : 'A -> 'B]
-             bf :: [ 'b : 'A -> 'B]
-
-    > IF_LEFT bt bf / (Left a) : S  =>  bt / a : S
-    > IF_LEFT bt bf / (Right b) : S  =>  bf / b : S
-
--  ``COMPARE``: Unions comparison
-
-::
-
-    :: or 'a 'b : or 'a 'b : 'S   ->   int : 'S
-
-    > COMPARE / (Left a) : (Left b) : S  =>  COMPARE / a : b : S
-    > COMPARE / (Left _) : (Right _) : S  =>  -1 : S
-    > COMPARE / (Right _) : (Left _) : S  =>  1 : S
-    > COMPARE / (Right a) : (Right b) : S  =>  COMPARE / a : b : S
+-  ``LEFT 'b``: Pack a value in a union (left case) (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LEFT>`__).
+-  ``RIGHT 'a``: Pack a value in a union (right case) (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-RIGHT>`__).
+-  ``IF_LEFT bt bf``: Inspect a value of a union (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-IF_LEFT>`__).
+-  ``COMPARE``: Unions comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 Operations on lists
 ~~~~~~~~~~~~~~~~~~~
 
--  ``CONS``: Prepend an element to a list.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: 'a : list 'a : 'S   ->   list 'a : 'S
-
-    > CONS / a : { <l> } : S  =>  { a ; <l> } : S
-
--  ``NIL 'a``: The empty list.
-
-::
-
-    :: 'S   ->   list 'a : 'S
-
-    > NIL / S  =>  {} : S
-
--  ``IF_CONS bt bf``: Inspect a list.
-
-::
-
-    :: list 'a : 'A   ->   'B
-       iff   bt :: [ 'a : list 'a : 'A -> 'B]
-             bf :: [ 'A -> 'B]
-
-    > IF_CONS bt bf / { a ; <rest> } : S  =>  bt / a : { <rest> } : S
-    > IF_CONS bt bf / {} : S  =>  bf / S
-
--  ``MAP body``: Apply the body expression to each element of the list.
-   The body sequence has access to the stack.
-
-::
-
-    :: (list 'elt) : 'A   ->  (list 'b) : 'A
-       iff   body :: [ 'elt : 'A -> 'b : 'A ]
-
-    > MAP body / {} : S  =>  {} : S
-    > MAP body / { a ; <rest> } : S  =>  { b ; <rest'> } : S''
-        where body / a : S  =>  b : S'
-        and MAP body / { <rest> } : S'  =>  { <rest'> } : S''
-
--  ``SIZE``: Get the number of elements in the list.
-
-::
-
-    :: list 'elt : 'S -> nat : 'S
-
-    > SIZE / { _ ; <rest> } : S  =>  1 + s : S
-        where  SIZE / { <rest> } : S  =>  s : S
-    > SIZE / {} : S  =>  0 : S
-
-
--  ``ITER body``: Apply the body expression to each element of a list.
-   The body sequence has access to the stack.
-
-::
-
-    :: (list 'elt) : 'A   ->  'A
-         iff body :: [ 'elt : 'A -> 'A ]
-    > ITER body / {} : S  =>  S
-    > ITER body / { a ; <rest> } : S  =>  ITER body / { <rest> } : S'
-       iff body / a : S  =>  S'
-
+-  ``CONS``: Prepend an element to a list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CONS>`__).
+-  ``NIL 'a``: Push an empty list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NIL>`__).
+-  ``IF_CONS bt bf``: Inspect a list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-IF_CONS>`__).
+-  ``MAP body``: Apply the body expression to each element of the list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MAP>`__).
+-  ``SIZE``: Get the number of elements in the list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SIZE>`__).
+-  ``ITER body``: Iterate the body expression over each element of a list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ITER>`__).
 
 Domain specific data types
 --------------------------
@@ -1256,8 +747,6 @@ Domain specific data types
 -  ``chest_key``: used to open a chest, also contains a proof
    to check the correctness of the opening. see :doc:`Timelock <timelock>` .
 
-- ``tx_rollup_l2_address``: An address used to identify an account in a transaction rollup ledger. It is the hash of a BLS public key, used to authenticate layer-2 operations to transfer tickets from this account.
-
 
 Domain specific operations
 --------------------------
@@ -1265,310 +754,60 @@ Domain specific operations
 Operations on timestamps
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Timestamps can be obtained by the ``NOW`` operation, or retrieved from
-script parameters or globals.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
 -  ``ADD`` Increment / decrement a timestamp of the given number of
-   seconds.
-
-::
-
-    :: timestamp : int : 'S -> timestamp : 'S
-    :: int : timestamp : 'S -> timestamp : 'S
-
-    > ADD / seconds : nat (t) : S  =>  (seconds + t) : S
-    > ADD / nat (t) : seconds : S  =>  (t + seconds) : S
-
--  ``SUB`` Subtract a number of seconds from a timestamp.
-
-::
-
-    :: timestamp : int : 'S -> timestamp : 'S
-
-    > SUB / seconds : nat (t) : S  =>  (seconds - t) : S
-
--  ``SUB`` Subtract two timestamps.
-
-::
-
-    :: timestamp : timestamp : 'S -> int : 'S
-
-    > SUB / seconds(t1) : seconds(t2) : S  =>  (t1 - t2) : S
-
--  ``COMPARE``: Timestamp comparison.
-
-::
-
-    :: timestamp : timestamp : 'S   ->   int : 'S
-
-    > COMPARE / seconds(t1) : seconds(t2) : S  =>  -1 : S
-        iff t1 < t2
-    > COMPARE / seconds(t1) : seconds(t2) : S  =>  0 : S
-        iff t1 = t2
-    > COMPARE / seconds(t1) : seconds(t2) : S  =>  1 : S
-        iff t1 > t2
+   seconds (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ADD>`__).
+-  ``SUB`` Subtract a number of seconds from a timestamp (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SUB>`__).
+-  ``SUB`` Subtract two timestamps (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SUB>`__).
+-  ``COMPARE``: Timestamp comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 
 Operations on Mutez
 ~~~~~~~~~~~~~~~~~~~
 
-Mutez (micro-Tez) are internally represented by a 64 bit signed
-integers. There are restrictions to prevent creating a negative amount
-of mutez. Operations are limited to prevent overflow and mixing them
-with other numerical types by mistake. They are also mandatory checked
-for under/overflows.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
--  ``ADD``
-
-::
-
-    :: mutez : mutez : 'S   ->   mutez : 'S
-
-    > ADD / x : y : S  =>  [FAILED]   on overflow
-    > ADD / x : y : S  =>  (x + y) : S
-
--  ``SUB_MUTEZ``
-
-::
-
-    :: mutez : mutez : 'S   ->   option mutez : 'S
-
-    > SUB_MUTEZ / x : y : S  =>  None
-        iff   x < y
-    > SUB_MUTEZ / x : y : S  =>  Some (x - y) : S
-
--  ``MUL``
-
-::
-
-    :: mutez : nat : 'S   ->   mutez : 'S
-    :: nat : mutez : 'S   ->   mutez : 'S
-
-    > MUL / x : y : S  =>  [FAILED]   on overflow
-    > MUL / x : y : S  =>  (x * y) : S
-
--  ``EDIV``
-
-::
-
-    :: mutez : nat : 'S   ->   option (pair mutez mutez) : 'S
-    :: mutez : mutez : 'S   ->   option (pair nat mutez) : 'S
-
-    > EDIV / x : 0 : S  =>  None
-    > EDIV / x : y : S  =>  Some (Pair (x / y) (x % y)) : S
-        iff y <> 0
-
--  ``COMPARE``: Mutez comparison
-
-::
-
-   :: mutez : mutez : 'S -> int : 'S
-
-   > COMPARE / x : y : S  =>  -1 : S
-       iff x < y
-   > COMPARE / x : y : S  =>  0 : S
-       iff x = y
-   > COMPARE / x : y : S  =>  1 : S
-       iff x > y
+-  ``ADD`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ADD>`__).
+-  ``SUB_MUTEZ`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SUB_MUTEZ>`__).
+-  ``MUL`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MUL>`__).
+-  ``EDIV`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EDIV>`__).
+-  ``COMPARE``: Mutez comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 Operations on contracts
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
+
 -  ``CREATE_CONTRACT { storage 'g ; parameter 'p ; code ... }``:
-   Forge a new contract from a literal.
-
-::
-
-    :: option key_hash : mutez : 'g : 'S
-       -> operation : address : 'S
-
-Originate a contract based on a literal. The parameters are the
-optional delegate, the initial amount taken from the current
-contract, and the initial storage of the originated contract.
-The contract is returned as a first class value (to be dropped, passed
-as parameter or stored). The ``CONTRACT 'p`` instruction will fail
-until it is actually originated. Note that since ``tz4`` addresses
-cannot be registered as delegates, the origination operation will fail
-if the delegate is a ``tz4``.
-
--  ``TRANSFER_TOKENS``: Forge a transaction.
-
-::
-
-    :: 'p : mutez : contract 'p : 'S   ->   operation : 'S
-
-The parameter must be consistent with the one expected by the
-contract, unit for an account.
-
-.. _MichelsonSetDelegate_alpha:
-
--  ``SET_DELEGATE``: Set or withdraw the contract's delegation.
-
-::
-
-    :: option key_hash : 'S   ->   operation : 'S
-
-Using this instruction is the only way to modify the delegation of a
-smart contract. If the parameter is ``None`` then the delegation of the
-current contract is withdrawn; if it is ``Some kh`` where ``kh`` is the
-key hash of a registered delegate that is not the current delegate of
-the contract, then this operation sets the delegate of the contract to
-this registered delegate. The operation fails if ``kh`` is the current
-delegate of the contract or if ``kh`` is not a registered delegate.
-Note that ``tz4`` addresses cannot be registered as delegates.
-
+   Forge a new contract from a literal (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CREATE_CONTRACT>`__).
+-  ``TRANSFER_TOKENS``: Forge a transaction (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-TRANSFER_TOKENS>`__).
+-  ``SET_DELEGATE``: Set or withdraw the contract's delegation (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SET_DELEGATE>`__).
 -  ``BALANCE``: Push the current amount of mutez held by the executing
-   contract, including any mutez added by the calling transaction.
-
-::
-
-    :: 'S   ->   mutez : 'S
-
--  ``ADDRESS``: Cast the contract to its address.
-
-::
-
-    :: contract _ : 'S   ->   address : 'S
-
-    > ADDRESS / addr : S  =>  addr : S
-
--  ``CONTRACT 'p``: Cast the address to the given contract type if possible.
-
-::
-
-    :: address : 'S   ->   option (contract 'p) : 'S
-
-    > CONTRACT / addr : S  =>  Some addr : S
-        iff addr exists and is a contract of parameter type 'p
-    > CONTRACT / addr : S  =>  Some addr : S
-        iff 'p = unit and addr is an implicit contract
-    > CONTRACT / addr : S  =>  None : S
-        otherwise
-
+   contract, including any mutez added by the calling transaction (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-BALANCE>`__).
+-  ``ADDRESS``: Cast the contract to its address (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ADDRESS>`__).
+-  ``CONTRACT 'p``: Cast the address to the given contract type if possible (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CONTRACT>`__).
 -  ``SOURCE``: Push the contract that initiated the current
-   transaction, i.e. the contract that paid the fees and
-   storage cost, and whose manager signed the operation
-   that was sent on the blockchain. Note that since
-   ``TRANSFER_TOKENS`` instructions can be chained,
-   ``SOURCE`` and ``SENDER`` are not necessarily the same.
-
-::
-
-    :: 'S   ->   address : 'S
-
+   transaction (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SOURCE>`__).
 -  ``SENDER``: Push the contract that initiated the current
-   internal transaction. It may be the ``SOURCE``, but may
-   also be different if the source sent an order to an intermediate
-   smart contract, which then called the current contract.
-
-::
-
-    :: 'S   ->   address : 'S
-
--  ``SELF``: Push the current contract.
-
-::
-
-    :: 'S   ->   contract 'p : 'S
-       where   contract 'p is the type of the current contract
-
-Note that ``SELF`` is forbidden in lambdas because it cannot be
-type-checked; the type of the contract executing the lambda cannot be
-known at the point of type-checking the lambda's body.
-
--  ``SELF_ADDRESS``: Push the address of the current contract. This is
-   equivalent to ``SELF; ADDRESS`` except that it is allowed in
-   lambdas.
-
-::
-
-    :: 'S   ->   address : 'S
-
-Note that ``SELF_ADDRESS`` inside a lambda returns the address of the
-contract executing the lambda, which can be different from the address
-of the contract in which the ``SELF_ADDRESS`` instruction is written.
-
--  ``AMOUNT``: Push the amount of the current transaction.
-
-::
-
-    :: 'S   ->   mutez : 'S
-
--  ``IMPLICIT_ACCOUNT``: Return a default contract with the given
-   public/private key pair. Any funds deposited in this contract can
-   immediately be spent by the holder of the private key. This contract
-   cannot execute Michelson code and will always exist on the
-   blockchain.
-
-::
-
-    :: key_hash : 'S   ->   contract unit : 'S
-
-- ``VOTING_POWER``: Return the voting power of a given contract. This
-   voting power coincides with the weight of the contract in the
-   voting listings, which is calculated at the beginning of every
-   voting period. Currently the voting power is proportional to the
-   full staking balance of the contract, but this might change in
-   future version of the protocol and developers should not rely on
-   this. Hence, the value returned by ``VOTING_POWER`` should only be
-   considered relative to the one returned by ``TOTAL_VOTING_POWER``.
-
-::
-
-    :: key_hash : 'S   ->   nat : 'S
+   internal transaction (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SENDER>`__).
+-  ``SELF``: Push the current contract (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SELF>`__).
+-  ``SELF_ADDRESS``: Push the address of the current contract (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SELF_ADDRESS>`__).
+-  ``AMOUNT``: Push the amount of the current transaction (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-AMOUNT>`__).
+-  ``IMPLICIT_ACCOUNT``: Push on the stack the contract value corresponding to the implicit account of a public key hash (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-IMPLICIT_ACCOUNT>`__).
+- ``VOTING_POWER``: Push the voting power of a given contract (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-VOTING_POWER>`__).
 
 Special operations
 ~~~~~~~~~~~~~~~~~~
 
--  ``NOW``: Push the minimal injection time for the current block,
-   namely the block whose validation triggered this execution. The
-   minimal injection time is 60 seconds after the timestamp of the
-   predecessor block. This value does not change during the execution
-   of the contract.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: 'S   ->   timestamp : 'S
-
--  ``CHAIN_ID``: Push the chain identifier.
-
-::
-
-    :: 'S   ->   chain_id : 'S
-
--  ``COMPARE``: Chain identifier comparison
-
-::
-
-    :: chain_id : chain_id : 'S   ->   int : 'S
-
-    > COMPARE / x : y : S  =>  -1 : S
-        iff x < y
-    > COMPARE / x : y : S  =>  0 : S
-        iff x = y
-    > COMPARE / x : y : S  =>  1 : S
-        iff x > y
-
--  ``LEVEL``: Push the level of the current transaction's block.
-
-::
-
-    :: 'S   ->   nat : 'S
-
--  ``TOTAL_VOTING_POWER``: Return the total voting power of all contracts. The total
-   voting power coincides with the sum of the voting power of every contract in
-   the voting listings (as returned by ``VOTING_POWER``). The voting listings is calculated at the beginning of every
-   voting period.
-
-::
-
-    :: 'S   ->   nat : 'S
-
-- ``MIN_BLOCK_TIME``: Push the current minimal block time in seconds.
-
-::
-
-    :: 'S   ->   nat : 'S
+- ``NOW``: Push the estimated injection time for the current block (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__).
+- ``CHAIN_ID``: Push the chain identifier (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CHAIN_ID>`__).
+- ``COMPARE``: Chain identifier comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
+- ``LEVEL``: Push the level of the current transaction's block (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LEVEL>`__).
+- ``TOTAL_VOTING_POWER``: Push the total voting power of all contracts (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-TOTAL_VOTING_POWER>`__).
+- ``MIN_BLOCK_TIME``: Push the current minimal block time in seconds (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MIN_BLOCK_TIME>`__).
 
 Operations on bytes
 ~~~~~~~~~~~~~~~~~~~
@@ -1697,7 +936,7 @@ Bytes can be converted to natural numbers and integers.
 
 - ``NAT``: Convert ``bytes`` to type ``nat`` using big-endian encoding.
   The ``bytes`` are allowed to have leading zeros.
-  
+
 ::
 
     :: bytes : 'S   ->   nat : 'S
@@ -1707,14 +946,14 @@ Bytes can be converted to natural numbers and integers.
 
 - ``INT``: Convert ``bytes`` to type ``int`` using big-endian two's complement encoding.
   The ``bytes`` are allowed to have leading zeros for non-negative numbers and leading ones for negative numbers.
-  
+
 ::
 
     :: bytes : 'S   ->   int : 'S
 
     > INT / s : S  =>  z : S
         iff s is a big-endian encoding of integer z
-  
+
 - ``BYTES``: Convert a ``nat`` or an ``int`` to type ``bytes`` using big-endian encoding (and two's complement for ``int``).
 
 ::
@@ -1875,7 +1114,8 @@ Operations on tickets
 
 The following operations deal with tickets. Tickets are a way for smart-contracts
 to authenticate data with respect to a Tezos address. This authentication can
-then be used to build composable permission systems.
+then be used to build composable permission systems. For a high-level explanation of
+tickets in Tezos, see :doc:`Tickets <tickets>`.
 
 A contract can create a ticket from a value and an amount. The ticket, when
 inspected reveals the value, the amount, and the address of the ticketer (the contract that created the ticket). It is
@@ -1892,7 +1132,7 @@ This process can happen without the need to interact with a centralized NFT cont
 simplifying the code.
 
 - ``TICKET``: Create a ticket with the given content and amount. The ticketer is the address
-  of `SELF`. The resulting value is ``NONE`` if the amount is zero.
+  of ``SELF``. The resulting value is ``NONE`` if the amount is zero.
 
 ::
 
@@ -1954,8 +1194,8 @@ Events
     :: 'ty : 'S -> operation : 'S
 
 
-Removed instructions
-~~~~~~~~~~~~~~~~~~~~
+Removed instructions and types
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :doc:`../protocols/005_babylon` deprecated the following instructions. Because no smart
 contract used these on Mainnet before they got deprecated, they have been
@@ -1993,7 +1233,15 @@ parameter if the sender is the contract's manager.
 
     :: 'S   ->   nat : 'S
 
-.. _MichelsonViews_alpha:
+:doc:`../protocols/016_mumbai` deprecated the following
+type. Because no smart contract used it on Mainnet before it got
+deprecated, it has been removed. The Michelson type-checker will
+reject any contract using it.
+
+-  ``tx_rollup_l2_address``: An address used to identify an account in
+   a transaction rollup ledger. It is the hash of a BLS public key,
+   used to authenticate layer-2 operations to transfer tickets from
+   this account.
 
 Operations on views
 ~~~~~~~~~~~~~~~~~~~~
@@ -2193,7 +1441,7 @@ These macros are simply more convenient syntax for various common
 operations.
 
 -  ``P(\left=A|P(\left)(\right))(\right=I|P(\left)(\right))R``: A syntactic sugar
-   for building nested pairs. In the case of right combs, `PAIR n` is more efficient.
+   for building nested pairs. In the case of right combs, ``PAIR n`` is more efficient.
 
 ::
 
@@ -2274,7 +1522,7 @@ A typing rule can be inferred:
     > SET_CDR  =>  CAR ; PAIR
 
 -  ``SET_C[AD]+R``: A syntactic sugar for setting fields in nested
-   pairs. In the case of right combs, `UPDATE n` is more efficient.
+   pairs. In the case of right combs, ``UPDATE n`` is more efficient.
 
 ::
 
@@ -2335,7 +1583,7 @@ There are three kinds of constants:
    ``\"``. Unescaped line-breaks (both ``\n`` and ``\r``) cannot
    appear in a Michelson string. Moreover, the current version of
    Michelson restricts strings to be the printable subset of 7-bit
-   ASCII, namely characters with codes from within `[32, 126]` range,
+   ASCII, namely characters with codes from within ``[32, 126]`` range,
    plus the escaped characters mentioned above.
 3. Byte sequences in hexadecimal notation, prefixed with ``0x``.
 
@@ -2392,7 +1640,7 @@ data on the stack and to give additional type constraints. Except for
 a single exception specified just after, annotations are only here to
 add constraints, *i.e.* they cannot turn an otherwise rejected program
 into an accepted one. The notable exception to this rule is for
-entrypoints: the semantics of the `CONTRACT` and `SELF` instructions vary depending on
+entrypoints: the semantics of the ``CONTRACT`` and ``SELF`` instructions vary depending on
 their constructor annotations, and some contract origination may fail due
 to invalid entrypoint constructor annotations.
 
@@ -3450,7 +2698,6 @@ Full grammar
       | signature
       | timestamp
       | address
-      | tx_rollup_l2_address
       | option <comparable type>
       | or <comparable type> <comparable type>
       | pair <comparable type> <comparable type> ...

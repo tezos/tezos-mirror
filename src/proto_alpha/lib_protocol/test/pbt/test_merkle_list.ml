@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/test_merkle_list.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
+                  -- --file test_merkle_list.ml
     Subject:      Tx rollup l2 encoding
 *)
 
@@ -111,7 +111,8 @@ let test_check_path_wrong ~count =
 let () =
   let qcheck_wrap = qcheck_wrap ~rand:(Random.State.make_self_init ()) in
   Alcotest.run
-    "Merkle list"
+    ~__FILE__
+    Protocol.name
     [
       ( "scons_equiv",
         qcheck_wrap

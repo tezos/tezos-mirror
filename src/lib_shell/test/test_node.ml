@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Shell (Node)
-    Invocation:   dune exec src/lib_shell/test/test_shell.exe \
-                  -- test '^test node$'
+    Invocation:   dune exec src/lib_shell/test/main.exe \
+                  -- --file test_node.ml
     Dependencies: src/lib_shell/test/shell_test_helpers.ml
     Subject:      Unit tests for node. Currently only tests that
                   events are emitted.
@@ -49,6 +49,11 @@ let init_config (* (f : 'a -> unit -> unit Lwt.t) *) f test_dir switch () :
       user_activated_upgrades = [];
       user_activated_protocol_overrides = [];
       operation_metadata_size_limit = Unlimited;
+      external_validator_log_config =
+        {
+          lwt_log_sink_unix = Lwt_log_sink_unix.default_cfg;
+          internal_events = Tezos_base.Internal_event_config.lwt_log;
+        };
       data_dir = test_dir;
       store_root = test_dir // "store";
       context_root = test_dir // "context";
@@ -77,6 +82,7 @@ let default_p2p : P2p.config =
     proof_of_work_target = Tezos_crypto.Crypto_box.default_pow_target;
     trust_discovered_peers = false;
     reconnection_config = Point_reconnection_config.default;
+    disable_peer_discovery = false;
   }
 
 let default_p2p_limits =
@@ -135,7 +141,7 @@ let node_sandbox_initialization_events sandbox_parameters config _switch () =
       {
         level = Some Internal_event.Notice;
         section = Some section;
-        name = "shell-node";
+        name = "p2p-initialization";
       })
     (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth evs 0) ;
   (* End tests *)
@@ -169,7 +175,7 @@ let node_initialization_events _sandbox_parameters config _switch () =
       {
         level = Some Internal_event.Notice;
         section = Some section;
-        name = "shell-node";
+        name = "p2p-initialization";
       })
     (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth evs 0) ;
   Mock_sink.Pattern.(
@@ -177,7 +183,7 @@ let node_initialization_events _sandbox_parameters config _switch () =
       {
         level = Some Internal_event.Notice;
         section = Some section;
-        name = "shell-node";
+        name = "p2p-initialization";
       })
     (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth evs 1) ;
   (* End tests *)
@@ -226,3 +232,7 @@ let tests =
       `Quick
       (wrap node_initialization_events);
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "tezos-shell" [("test node", tests)]
+  |> Lwt_main.run

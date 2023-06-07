@@ -120,7 +120,6 @@ module Mock_all_unit :
 
   let set_log_message_consumer _ = ()
 
-  (* Fake mempool *)
   module Mempool = struct
     type t = unit
 

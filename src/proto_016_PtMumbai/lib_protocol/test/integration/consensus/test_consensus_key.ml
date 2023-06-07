@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (delegate_storage)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                -- test "^consensus key$"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/consensus/main.exe \
+                  -- --file test_consensus_key.ml
     Subject:    consistency of the [Drain_delegate] operation
  *)
 
@@ -233,72 +232,73 @@ let tests =
   Tztest.
     [
       tztest
-        "test drain delegate high balance, excluding ck, ck delegates"
+        "drain delegate high balance, excluding ck, ck delegates"
         `Quick
         (test_drain_delegate
            ~low_balance:false
            ~exclude_ck:true
            ~ck_delegates:true);
       tztest
-        "test drain delegate high balance, excluding ck, ck does not delegate"
+        "drain delegate high balance, excluding ck, ck does not delegate"
         `Quick
         (test_drain_delegate
            ~low_balance:false
            ~exclude_ck:true
            ~ck_delegates:false);
       tztest
-        "test drain delegate high balance, with ck, ck delegates"
+        "drain delegate high balance, with ck, ck delegates"
         `Quick
         (test_drain_delegate
            ~low_balance:false
            ~exclude_ck:false
            ~ck_delegates:true);
       tztest
-        "test drain delegate high balance, with ck, ck does not delegate"
+        "drain delegate high balance, with ck, ck does not delegate"
         `Quick
         (test_drain_delegate
            ~low_balance:false
            ~exclude_ck:false
            ~ck_delegates:false);
       tztest
-        "test drain delegate low balance, excluding ck, ck delegates"
+        "drain delegate low balance, excluding ck, ck delegates"
         `Quick
         (test_drain_delegate
            ~low_balance:true
            ~exclude_ck:true
            ~ck_delegates:true);
       tztest
-        "test drain delegate low balance, excluding ck, ck does not delegate"
+        "drain delegate low balance, excluding ck, ck does not delegate"
         `Quick
         (test_drain_delegate
            ~low_balance:true
            ~exclude_ck:true
            ~ck_delegates:false);
       tztest
-        "test drain delegate low balance, with ck, ck delegates"
+        "drain delegate low balance, with ck, ck delegates"
         `Quick
         (test_drain_delegate
            ~low_balance:true
            ~exclude_ck:false
            ~ck_delegates:true);
       tztest
-        "test drain delegate low balance, with ck, ck does not delegate"
+        "drain delegate low balance, with ck, ck does not delegate"
         `Quick
         (test_drain_delegate
            ~low_balance:true
            ~exclude_ck:false
            ~ck_delegates:false);
       tztest
-        "test empty drain delegate excluding ck"
+        "empty drain delegate excluding ck"
         `Quick
         (test_drain_empty_delegate ~exclude_ck:true);
       tztest
-        "test empty drain delegate with ck"
+        "empty drain delegate with ck"
         `Quick
         (test_drain_empty_delegate ~exclude_ck:false);
-      tztest "test tz4 consensus key" `Quick test_tz4_consensus_key;
-      tztest
-        "test endorsement with ck"
-        `Quick
-        test_endorsement_with_consensus_key;
+      tztest "tz4 consensus key" `Quick test_tz4_consensus_key;
+      tztest "endorsement with ck" `Quick test_endorsement_with_consensus_key;
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("consensus key", tests)]
+  |> Lwt_main.run

@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (Michelson)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                -- test "^lambda normalization"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_lambda_normalization.ml
     Subject:    Test that lambdas are normalized to optimized format at elaboration
 *)
 
@@ -232,7 +231,11 @@ let test_lambda_normalization () =
 let tests =
   [
     Tztest.tztest
-      "Test that lambdas are normalized to optimized format during elaboration"
+      "lambdas are normalized to optimized format during elaboration"
       `Quick
       test_lambda_normalization;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("lambda normalization", tests)]
+  |> Lwt_main.run

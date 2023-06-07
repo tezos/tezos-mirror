@@ -21,9 +21,9 @@
 /src/bin_codec               @raphael-proust
 /src/bin_node                @romain.nl
 /src/bin_openapi             @romain.nl
-/src/bin_snoop               @lrand
+/src/bin_snoop               @naih
 /src/lib_base                @raphael-proust
-/src/lib_benchmark           @lrand
+/src/lib_benchmark           @naih
 /src/lib_error_monad         @raphael-proust
 /src/lib_event_logging       @romain.nl
 /src/lib_lwt_result_stdlib   @raphael-proust
@@ -32,12 +32,12 @@
 /src/lib_openapi             @romain.nl @Killian-Delarue
 /src/lib_p2p*                @julien.t @vivienpe
 /src/lib_protocol_environment   @raphael-proust
-/src/lib_shell_benchmarks    @lrand
+/src/lib_shell_benchmarks    @naih
 /src/lib_stdlib              @raphael-proust
 /src/lib_stdlib_unix         @raphael-proust
 /src/lib_version             @romain.nl
-/src/proto_*/lib_benchmark   @lrand
-/src/proto_*/lib_benchmarks_proto @lrand
+/src/proto_*/lib_benchmark   @naih
+/src/proto_*/lib_benchmarks_proto @naih
 /src/proto_*/lib_protocol/sc_rollup_proof*         @sribaroud
 /src/proto_*/lib_protocol/sc_rollup_game*          @sribaroud
 /src/proto_*/lib_protocol/sc_rollup_inbox*         @sribaroud
@@ -47,8 +47,6 @@
 /src/lib_scoru_wasm          @lthms @ole.kruger @picdc
 
 /scripts                     @romain.nl
-
-/tests_python                @arvidnl
 
 /tezt/lib*                   @romain.nl
 /tezt/records                @romain.nl
@@ -61,10 +59,13 @@
 #
 # These users are, as members of the Octez Merge Team, permitted to act as authorities on any code.
 #
+# @ACoquerau = Albin Coquereau
+# @alocascio = Antonio Locascio
 # @andrea.cerone = Andrea Cerone
 # @arvidnl = Arvid Jakobsson
 # @bsall = Boubacar Sall
 # @camlspotter = Jun Furuse
+# @dianegalloiswong = Diane Gallois-Wong
 # @emturner = Emma Turner
 # @eugenz = Eugen Zalinescu
 # @hhugo1 = Hugo Heuzard
@@ -75,6 +76,7 @@
 # @Killian-Delarue = Killian Delarue
 # @klakplok = Benjamin Canou
 # @linoscope = Lin Oshitani
+# @lrand = Lucas Randazzo
 # @lthms = Thomas Letan
 # @mbouaziz = Mehdi Bouaziz
 # @mebsout = Alain Mebsout
@@ -97,7 +99,7 @@
 # @vect0r = Victor Allombert
 # @yrg = Yann Regis-Gianas
 #
-* @andrea.cerone @arvidnl @bsall @camlspotter @emturner @eugenz @hhugo1 @igarnier @iguerNL @jobjo @julien.t @Killian-Delarue @klakplok @linoscope @lthms @mbouaziz @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @picdc @pirbo @rafoo_ @raphael-proust @romain.nl @Saroupille @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @yrg
+* @ACoquereau @alocascio @andrea.cerone @arvidnl @bsall @camlspotter @dianegalloiswong @emturner @eugenz @hhugo1 @igarnier @iguerNL @jobjo @julien.t @Killian-Delarue @klakplok @linoscope @lrand @lthms @mbouaziz @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @picdc @pirbo @rafoo_ @raphael-proust @romain.nl @Saroupille @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @yrg
 
 # CODEOWNERS Owners
 #

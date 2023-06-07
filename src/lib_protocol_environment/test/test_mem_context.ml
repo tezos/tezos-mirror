@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol Environment
-    Invocation:   dune exec src/lib_protocol_environment/test/test.exe -- test "^mem_context$"
+    Invocation:   dune exec src/lib_protocol_environment/test/main.exe
     Dependencies: src/lib_protocol_environment/test/assert.ml
     Subject:      Low-level operations on memory contexts.
 *)
@@ -478,5 +478,5 @@ let tests =
       domain_tests
 
 let () =
-  Alcotest_lwt.run "tezos-shell-context" [("mem_context", tests)]
+  Alcotest_lwt.run ~__FILE__ "tezos-shell-context" [("mem_context", tests)]
   |> Lwt_main.run

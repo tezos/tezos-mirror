@@ -181,7 +181,8 @@ module V0toV7
 
   let init _chain_id c hd = init c hd
 
-  (* Fake mempool *)
+  (* Fake mempool that can be successfully initialized but cannot
+     accept any operations. *)
   module Mempool = struct
     type t = unit
 
@@ -216,7 +217,11 @@ module V0toV7
     let encoding = Data_encoding.unit
 
     let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
-      Lwt.return_ok ((), Unchanged)
+      let msg =
+        "The mempool cannot accept any operations because it does not support \
+         the current protocol."
+      in
+      Lwt.return_error (Validation_error [Exn (Failure msg)])
 
     let remove_operation () _ = ()
 

@@ -142,6 +142,8 @@ module Dune : sig
         This is important in particular for [runtest] rules, so that dune knows
         which tests to run when opam runs the tests for a package.
 
+      - [enabled_if] specifies the Dune [enabled_if] clause of this rule.
+
       The last [string] argument is the name of the alias.
       For instance, if this name is [abc], you can build the rule with [dune build @abc]. *)
   val alias_rule :
@@ -151,6 +153,7 @@ module Dune : sig
     ?action:s_expr ->
     ?locks:string ->
     ?package:string ->
+    ?enabled_if:s_expr ->
     string ->
     s_expr
 
@@ -174,6 +177,16 @@ module Dune : sig
 
       This causes the executed command to be run with [HOME=/tmp] in its environment. *)
   val setenv : string -> string -> s_expr -> s_expr
+
+  (** Make a [progn] user action construction, which allows executing more than
+      one command.
+
+      Example:
+        [~action:(progn [run_exe "main"; [S "diff?"; S "expected"; S "output"];])]
+      results in
+        [(action (progn (run %{exe:main.exe}) (diff? expected output)))]
+  *)
+  val progn : s_expr list -> s_expr
 
   (** Make a [(chdir %{workspace_root} ...)] stanza.
 
@@ -582,6 +595,13 @@ type with_test = Always | Never | Only_on_64_arch
     which is needed as a transitive dependency of a [Released] target. *)
 type release_status = Unreleased | Experimental | Released | Auto_opam
 
+(** Configure [bisect_ppx] instrumentation.
+
+    If [No], disable instrumentation. If [Yes], enable
+    instrumentation. If [With_sigterm], enable instrumentation and
+    install a sigterm handler. See {!maker} for more details. *)
+type bisect_ppx = No | Yes | With_sigterm
+
 (** Functions that build internal targets.
 
     The ['a] argument is instantiated by the relevant type for the name(s)
@@ -589,11 +609,14 @@ type release_status = Unreleased | Experimental | Released | Auto_opam
 
     - [all_modules_except]: short-hand for [~modules: (All_module_except ...)].
 
-    - [bisect_ppx]: if [true], the target's [dune] file is generated
-      with [(instrumentation (backend bisect_ppx))] for this target.
+    - [bisect_ppx]: if [Yes] (respectively [With_sigterm]), the target's [dune] file
+      is generated with [(instrumentation (backend bisect_ppx))] (respectively
+      [(instrumentation (backend bisect_ppx --bisect-sigterm))]) for this target.
       This makes it possible to compute coverage. It is recommended to set this
-      for all libraries and executables except those that are only used for tests
-      (and thus are never run by users).
+      to [Yes] for all libraries and executables except those that are only used for tests
+      (and thus are never run by users). It should be set to [With_sigterm] for test
+      executables that spawn sub-processes which are susceptible to termination
+      through sigterm in non-exceptional circumstances (e.g. Tezt entrypoints).
 
     - [time_measurement_ppx]: if [true], the target's [dune] file is generated
       with [(instrumentation (backend time_measurement_ppx))] for this target.
@@ -740,7 +763,7 @@ type release_status = Unreleased | Experimental | Released | Auto_opam
       macOS system. *)
 type 'a maker =
   ?all_modules_except:string list ->
-  ?bisect_ppx:bool ->
+  ?bisect_ppx:bisect_ppx ->
   ?c_library_flags:string list ->
   ?conflicts:target list ->
   ?deps:target list ->
@@ -869,7 +892,8 @@ val private_exes : string list maker
     - [alias]: if non-empty, an alias is set up for the given test, named [alias].
       Default is ["runtest"]. Note that for JS tests, ["_js"] is appended to this alias.
       Also note that if [alias] is non-empty, the target must belong to an opam package
-      (i.e. [~opam] must also be non-empty).
+      (i.e. [~opam] must also be non-empty). If given, the [enabled_if] and/or [locks]
+      clauses are added to this alias.
 
     - [dep_files]: a list of files to add as dependencies using [(deps (file ...))]
       in the [runtest] alias.
@@ -887,6 +911,8 @@ val test :
   ?dep_files:string list ->
   ?dep_globs:string list ->
   ?dep_globs_rec:string list ->
+  ?locks:string ->
+  ?enabled_if:Dune.s_expr ->
   string maker
 
 (** Same as {!test} but with several names, to define multiple tests at once. *)
@@ -895,6 +921,8 @@ val tests :
   ?dep_files:string list ->
   ?dep_globs:string list ->
   ?dep_globs_rec:string list ->
+  ?locks:string ->
+  ?enabled_if:Dune.s_expr ->
   string list maker
 
 (** Register a Tezt test.
@@ -919,7 +947,11 @@ val tests :
 
     The flag [with_macos_security_framework] has a default [false]. When set to
     [true], the [-ccopt "-framework Security"]flag is added at link time for
-    macOS system. *)
+    macOS system.
+
+    The function returns a target that is the local library created by tezt
+    to register all tests. This can be reused locally in the same module
+    to share code with other targets. *)
 val tezt :
   opam:string ->
   path:string ->
@@ -929,10 +961,16 @@ val tezt :
   ?exe_deps:target list ->
   ?js_deps:target list ->
   ?dep_globs:string list ->
+  ?dep_globs_rec:string list ->
+  ?dep_files:string list ->
   ?synopsis:string ->
+  ?opam_with_test:with_test ->
   ?with_macos_security_framework:bool ->
+  ?dune:Dune.s_expr ->
+  ?preprocess:preprocessor list ->
+  ?preprocessor_deps:preprocessor_dep list ->
   string list ->
-  unit
+  target
 
 (** Make an external vendored library, for use in internal target dependencies.
 
@@ -1126,27 +1164,35 @@ val name_for_errors : target -> string
 
     [default_profile] is the name of the profile to use for targets that
     were declared without [?profile]. See the documentation of the [?profile]
-    argument of type ['a maker]. *)
+    argument of type ['a maker].
+
+    Some checks are performed before generating:
+
+    - Check that there are no circular dependencies of opam packages.
+      If this check is not performed before [generate], generation may cause
+      a stack overflow.
+
+    - Check that the transitive closure of dependencies of a [js_compatible] target
+      is [js_compatible].
+
+    - Check that all targets of an opam package contain the same value for
+      [~opam_with_test]. *)
 val generate :
   make_tezt_exe:(target list -> target) ->
   default_profile:string ->
   add_to_meta_package:target list ->
   unit
 
-(** Run various checks.
+(** Run checks that should be performed after [generate].
 
-   1. Check that all [dune], [dune-project], [dune-workspace] and [.opam]
-   files are either generated or excluded. It is an error if a generated file is excluded.
-   You can use [exclude] to specify which files should be excluded. [exclude] is given a path relative to the [root]
-   directory and shall return [true] for excluded path.
+    - Check that all [dune], [dune-project], [dune-workspace] and [.opam] files
+      are either generated or excluded. It is an error if a generated file is excluded.
+      You can use [exclude] to specify which files should be excluded.
+      [exclude] is given a path relative to the [root] directory
+      and shall return [true] for excluded paths.
 
-   2. Check that the transitive closure of dependencies of a [js_compatible] target is [js_compatible].
-
-   3. Check that there are no circular dependencies of opam packages.
-
-   In case of errors, errors are printed and the process exits with exit code 1.
- *)
-val check : ?exclude:(string -> bool) -> unit -> unit
+    In case of errors, errors are printed and the process exits with exit code 1. *)
+val postcheck : ?exclude:(string -> bool) -> unit -> unit
 
 (** Generate dune-workspace file.
 

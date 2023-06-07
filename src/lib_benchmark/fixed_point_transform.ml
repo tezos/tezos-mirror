@@ -49,14 +49,12 @@ type fp_error = Bad_fpclass of Float.fpclass | Negative_or_zero_fp
 
 (* Handling codegen errors. *)
 type fixed_point_transform_error =
-  | Variable_not_found of Free_variable.t
-  | Model_not_found of string
   | Imprecise_integer_cast of float * float
   | Term_is_not_closed of Free_variable.t
 
 exception Bad_floating_point_number of fp_error
 
-exception Codegen_error of fixed_point_transform_error
+exception Fixed_point_transform_error of fixed_point_transform_error
 
 (* ------------------------------------------------------------------------- *)
 
@@ -74,14 +72,6 @@ let default_options =
 
 let pp_fixed_point_transform_error fmtr (err : fixed_point_transform_error) =
   match err with
-  | Variable_not_found s ->
-      Format.fprintf
-        fmtr
-        "Fixed_point_transform: Variable not found: %a"
-        Free_variable.pp
-        s
-  | Model_not_found s ->
-      Format.fprintf fmtr "Fixed_point_transform: Model not found: %s" s
   | Imprecise_integer_cast (f, p) ->
       Format.fprintf
         fmtr
@@ -156,7 +146,7 @@ let () =
             (Printf.sprintf
                "Fixed_point_transform: Bad floating point number: %s"
                s)
-      | Codegen_error err ->
+      | Fixed_point_transform_error err ->
           let s = Format.asprintf "%a" pp_fixed_point_transform_error err in
           Some s
       | _ -> None)
@@ -206,7 +196,7 @@ let cast_safely_to_int max_relative_error mode f : int =
   let fi = float_of_int i in
   let re = abs_float (f -. fi) /. abs_float f in
   if re > max_relative_error then
-    raise (Codegen_error (Imprecise_integer_cast (f, re)))
+    raise (Fixed_point_transform_error (Imprecise_integer_cast (f, re)))
   else i
 
 (* ------------------------------------------------------------------------- *)
@@ -415,7 +405,7 @@ end = struct
 
   let sqrt = lift_unop X.sqrt
 
-  let free ~name = raise (Codegen_error (Term_is_not_closed name))
+  let free ~name = raise (Fixed_point_transform_error (Term_is_not_closed name))
 
   let lt = lift_binop X.lt
 

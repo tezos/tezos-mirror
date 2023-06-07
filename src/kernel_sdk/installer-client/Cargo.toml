@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-smart-rollup-installer"
+version = "0.1.0"
+edition = "2021"
+authors = ["TriliTech <contact@trili.tech>"]
+include = ["src/", "installer.wasm", "README.md"]
+license = "MIT"
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "Installer client for Tezos Smart Rollups."
+keywords = ["tezos", "smart", "rollup", "installer"]
+categories = ["development-tools", "command-line-utilities"]
+
+[[bin]]
+name = "smart-rollup-installer"
+path = "src/main.rs"
+
+[dependencies.blst]
+version = "0.3.10"
+features = ["portable"]
+
+[dependencies.tezos-smart-rollup-encoding]
+path = "../encoding"
+version = "0.1.0"
+
+[dependencies.clap]
+version = "4.1"
+features = ["derive"]
+
+[dependencies.hex]
+version = "0.4"
+
+[dependencies.thiserror]
+version = "1.0"
+
+[dependencies.wasm-gen]
+version = "0.1.4"
+
+[dependencies.tezos-smart-rollup-installer-config]
+path = "../installer-config"
+
+[dependencies.tezos_data_encoding]
+version = "0.4"
+
+[dependencies.tezos-smart-rollup-host]
+path = "../host"
+
+# For tests
+[dev-dependencies]
+installer-kernel = { path = "../installer-kernel", default-features = false }
+tezos-smart-rollup = { path = "../sdk", default-features = false }
+tezos-smart-rollup-mock = { path = "../mock" }

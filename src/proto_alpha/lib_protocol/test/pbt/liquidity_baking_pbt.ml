@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    pbt for liquidity baking
-    Invocation:   [QCHECK_SEED=<seed>] dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/liquidity_baking_pbt.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
+                  -- --file liquidity_baking_pbt.ml
     Subject:      Test liquidity baking contracts using randomly generated inputs.
 *)
 
@@ -319,7 +319,8 @@ let economic_tests =
 let () =
   let open Qcheck2_helpers in
   Alcotest.run
-    "protocol > pbt > liquidity baking"
+    ~__FILE__
+    Protocol.name
     [
       ("Machines Cross-Validation", qcheck_wrap machine_validation_tests);
       ("Economic Properties", qcheck_wrap economic_tests);

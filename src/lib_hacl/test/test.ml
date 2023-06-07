@@ -1,15 +1,40 @@
-open Tezos_hacl
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
-let log_s = print_endline
+(** Testing
+    -------
+    Component:    Crypto
+    Invocation:   dune exec src/lib_hacl/test/main.exe
+    Subject:      Tests cryptobox primitives
+*)
+
+open Tezos_hacl
 
 let init_bytes len = Bytes.make len '\x00'
 
-let assert_failure f =
-  assert (
-    try
-      let _ = f () in
-      false
-    with _ -> true)
+let check msg b = Alcotest.(check bool) msg true b
 
 (* this from hacl-star test suite *)
 type 'a ed25519_test = {
@@ -259,38 +284,35 @@ let p256_tests =
   ]
 
 let test_ed25519 (v : Bytes.t ed25519_test) : unit =
-  log_s "Testing Ed25519" ;
   let pk1, sk1 = Hacl.Ed25519.keypair () in
   let pk2, _ = Hacl.Ed25519.keypair () in
-  assert (pk1 <> pk2) ;
-  log_s "[Ed25519.keypair] Success" ;
-  assert (pk1 = Hacl.Ed25519.neuterize sk1) ;
-  let pk = Option.get @@ Hacl.Ed25519.pk_of_bytes v.pk in
-  let sk = Option.get @@ Hacl.Ed25519.sk_of_bytes v.sk in
-  assert (pk = Hacl.Ed25519.neuterize sk) ;
-  log_s "[Ed25519.neuterize] Success" ;
+  check "[Ed25519.keypair]" (pk1 <> pk2) ;
+  check "[Ed25519.neuterize] 1/2" (pk1 = Hacl.Ed25519.neuterize sk1) ;
+  let pk = Stdlib.Option.get @@ Hacl.Ed25519.pk_of_bytes v.pk in
+  let sk = Stdlib.Option.get @@ Hacl.Ed25519.sk_of_bytes v.sk in
+  check "[Ed25519.neuterize] 2/2" (pk = Hacl.Ed25519.neuterize sk) ;
   let signature = Hacl.Ed25519.sign ~sk ~msg:v.msg in
-  assert (Bytes.compare signature v.expected_sig = 0) ;
-  log_s "[Ed25519.sign] Success" ;
-  assert (Hacl.Ed25519.verify ~pk ~msg:v.msg ~signature) ;
-  (* negative test *)
-  let random_pk = Option.get @@ Hacl.Ed25519.pk_of_bytes (Hacl.Rand.gen 32) in
-  assert (not (Hacl.Ed25519.verify ~pk:random_pk ~msg:v.msg ~signature)) ;
-  log_s "[Ed25519.verify] Success"
+  check "[Ed25519.sign]" (Bytes.compare signature v.expected_sig = 0) ;
+  check "[Ed25519.verify] 1/2" (Hacl.Ed25519.verify ~pk ~msg:v.msg ~signature) ;
+  let random_pk =
+    Stdlib.Option.get @@ Hacl.Ed25519.pk_of_bytes (Hacl.Rand.gen 32)
+  in
+  check
+    "[Ed25519.verify] 2/2"
+    (not (Hacl.Ed25519.verify ~pk:random_pk ~msg:v.msg ~signature))
 
 let test_p256 (v : Bytes.t p256_test) : unit =
-  log_s "Testing P256" ;
   let pk1, sk1 = Hacl.P256.keypair () in
   let pk2, _ = Hacl.P256.keypair () in
-  assert (pk1 <> pk2) ;
-  log_s "[P256.keypair] Success" ;
-  assert (pk1 = Hacl.P256.neuterize sk1) ;
-  let pk = Option.get @@ Hacl.P256.pk_of_bytes v.pk in
-  let pk_unsafe = Option.get @@ Hacl.P256.pk_of_bytes_without_validation v.pk in
-  assert (Hacl.P256.equal pk pk_unsafe) ;
-  let sk = Option.get @@ Hacl.P256.sk_of_bytes v.sk in
-  assert (pk = Hacl.P256.neuterize sk) ;
-  (* negative test for js_Hacl_P256_decompress_c and js_Hacl_P256_decompress_n *)
+  check "[P256.keypair]" (pk1 <> pk2) ;
+  check "[Hacl.P256.neuterize]" (pk1 = Hacl.P256.neuterize sk1) ;
+  let pk = Stdlib.Option.get @@ Hacl.P256.pk_of_bytes v.pk in
+  let pk_unsafe =
+    Stdlib.Option.get @@ Hacl.P256.pk_of_bytes_without_validation v.pk
+  in
+  check "[P256.pk_of_bytes_without_validation]" (Hacl.P256.equal pk pk_unsafe) ;
+  let sk = Stdlib.Option.get @@ Hacl.P256.sk_of_bytes v.sk in
+  check "[P256.neuterize] 1/2" (pk = Hacl.P256.neuterize sk) ;
   let invalid_pk_uncompressed = Bytes.copy v.pk in
   Bytes.set_int8 invalid_pk_uncompressed 0 7 ;
   assert (
@@ -300,75 +322,59 @@ let test_p256 (v : Bytes.t p256_test) : unit =
   assert (
     Option.is_none
       (Hacl.P256.pk_of_bytes_without_validation invalid_pk_compressed)) ;
-  (* negative test for js_Hacl_P256_valid_sk *)
   let invalid_sk = Bytes.make Hacl.P256.sk_size '\x00' in
-  assert (Option.is_none (Hacl.P256.sk_of_bytes invalid_sk)) ;
-  (* negative test for js_Hacl_P256_valid_pk *)
+  check "[P256.invalid_sk]" (Option.is_none (Hacl.P256.sk_of_bytes invalid_sk)) ;
   let invalid_pk = Bytes.make Hacl.P256.pk_size '\x00' in
-  assert (Option.is_none (Hacl.P256.pk_of_bytes invalid_pk)) ;
-  log_s "[P256.neuterize] Success" ;
+  check
+    "[P256.neuterize] 2/2"
+    (Option.is_none (Hacl.P256.pk_of_bytes invalid_pk)) ;
   let sk_bytes = Hacl.P256.to_bytes sk in
-  assert (sk_bytes = v.sk) ;
+  check "[P256.to_bytes] 1/3" (sk_bytes = v.sk) ;
   (* for to_bytes pk we cannot directly compare the output buffer with the input
-   * buffer because of_bytes takes a pk in either compressed or uncompressed form
-   * v.pk is in uncompressed form but to_bytes only outputs the pk in compressed
+     buffer because of_bytes takes a pk in either compressed or uncompressed form
+     v.pk is in uncompressed form but to_bytes only outputs the pk in compressed
      form; thus we only compare the relevant bytes *)
   let pk_bytes = Hacl.P256.to_bytes pk in
-  assert (Bytes.get_int8 pk_bytes 0 = 3) ;
-  assert (Bytes.sub pk_bytes 1 32 = Bytes.sub v.pk 1 32) ;
-  log_s "[P256.to_bytes] Success" ;
+  check "[P256.to_bytes] 2/3" (Bytes.get_int8 pk_bytes 0 = 3) ;
+  check "[P256.to_bytes] 3/3" (Bytes.sub pk_bytes 1 32 = Bytes.sub v.pk 1 32) ;
   let pk_bytes_blit = Bytes.create 33 in
   Hacl.P256.blit_to_bytes pk pk_bytes_blit ;
-  assert (pk_bytes_blit = pk_bytes) ;
-  log_s "[P256.blit_to_bytes] Success" ;
-  assert (Hacl.P256.verify ~pk ~msg:v.msg ~signature:v.expected_sig) ;
-  (* negative test *)
-  assert (not (Hacl.P256.verify ~pk ~msg:invalid_pk ~signature:v.expected_sig)) ;
-  log_s "[P256.verify] Success"
+  check "[P256.blit_to_bytes]" (pk_bytes_blit = pk_bytes) ;
+  check
+    "[P256.verify] 1/2"
+    (Hacl.P256.verify ~pk ~msg:v.msg ~signature:v.expected_sig) ;
+  check
+    "[P256.verify] 2/2"
+    (not (Hacl.P256.verify ~pk ~msg:invalid_pk ~signature:v.expected_sig))
 
 let test_curve25519 (v : Bytes.t curve25519_test) : unit =
-  log_s "Testing Curve25519" ;
   let sk = Hacl.Box.unsafe_sk_of_bytes v.sk in
   let pk = Hacl.Box.neuterize sk in
-  assert (Hacl.Box.unsafe_to_bytes pk = v.pk) ;
-  log_s "[Curve25519] Success"
+  check "[Curve25519]" (Hacl.Box.unsafe_to_bytes pk = v.pk)
 
 let test_blake2b (v : Bytes.t blake2_test) : unit =
-  log_s "Testing Blake2b" ;
   let digest =
     Hacl.Blake2b.direct ~key:v.key v.plaintext (Bytes.length v.expected)
   in
-  match digest with
-  | Hash d ->
-      assert (d = v.expected) ;
-      log_s "[Blake2b.blake2b] Success"
+  match digest with Hash d -> check "[Blake2b.blake2b]" (d = v.expected)
 
 let test_sha2_256 (v : Bytes.t hash_test) : unit =
-  log_s "Testing SHA2_256" ;
   let digest = Hacl.Hash.SHA256.digest v.plaintext in
-  assert (digest = v.expected) ;
-  log_s "[SHA2_256.hash] Success"
+  check "[SHA2_256.hash]" (digest = v.expected)
 
 let test_sha2_512 (v : Bytes.t hash_test) : unit =
-  log_s "Testing SHA2_512" ;
   let digest = Hacl.Hash.SHA512.digest v.plaintext in
-  assert (digest = v.expected) ;
-  log_s "[SHA2_512.hash] Success"
+  check "[SHA2_512.hash]" (digest = v.expected)
 
 let test_sha3_256 (v : Bytes.t hash_test) : unit =
-  log_s "Testing SHA3_256" ;
   let digest = Hacl.Hash.SHA3_256.digest v.plaintext in
-  assert (digest = v.expected) ;
-  log_s "[SHA3_256.hash] Success"
+  check "[SHA3_256.hash]" (digest = v.expected)
 
 let test_sha3_512 (v : Bytes.t hash_test) : unit =
-  log_s "Testing SHA3_512" ;
   let digest = Hacl.Hash.SHA3_512.digest v.plaintext in
-  assert (digest = v.expected) ;
-  log_s "[SHA3_512.hash] Success"
+  check "[SHA3_512.hash]" (digest = v.expected)
 
 let test_keccak () : unit =
-  log_s "Testing Keccak" ;
   (* from lib_crypto/test/hacl.ml *)
   let msg = Bytes.of_string "Longtemps, je me suis couche de bonne heure" in
   let expected =
@@ -376,97 +382,109 @@ let test_keccak () : unit =
       "\x9f\x3a\xfe\x7d\x35\xd9\xbb\xc4\xef\xd9\x82\x52\x35\x7e\x73\xe8\x5c\xe1\x23\x4a\x48\x60\x3a\x06\x3b\xb7\x07\x91\x74\xaa\xfa\x68"
   in
   let digest = Hacl.Hash.Keccak_256.digest msg in
-  assert (digest = expected) ;
-  log_s "[SHA3.keccak] Successs"
+  check "[SHA3.keccak]" (digest = expected)
 
 let test_hmac_sha256 (v : Bytes.t hmac_test) : unit =
-  log_s "Testing HMAC_SHA2_256" ;
   let tag = Hacl.Hash.SHA256.HMAC.digest ~key:v.key ~msg:v.data in
-  assert (tag = v.expected) ;
-  log_s "[HMAC_SHA2_256.digest] Success"
+  check "[HMAC_SHA2_256.digest] " (tag = v.expected)
 
 let test_hmac_sha512 (v : Bytes.t hmac_test) : unit =
-  log_s "Testing HMAC_SHA2_512" ;
   let tag = Hacl.Hash.SHA512.HMAC.digest ~key:v.key ~msg:v.data in
-  assert (tag = v.expected) ;
-  log_s "[HMAC_SHA2_512.digest] Success"
+  check "[HMAC_SHA2_512.digest]" (tag = v.expected)
 
 let test_secretbox (v : Bytes.t secretbox_test) : unit =
-  log_s (String.concat ": " ["Testing NaCl.Secretbox"; v.name]) ;
   let key = Hacl.Secretbox.unsafe_of_bytes v.key in
   let ct = init_bytes (Bytes.length v.pt + 16) in
   Hacl.Secretbox.secretbox ~key ~nonce:v.n ~msg:v.pt ~cmsg:ct ;
-  assert (ct = v.expected_ct) ;
-  log_s "[NaCl.secretbox] Success" ;
+  check ("[NaCl.Noalloc.Easy.secretbox] " ^ v.name) (ct = v.expected_ct) ;
   let pt = init_bytes (Bytes.length v.pt) in
   let b =
     Hacl.Secretbox.secretbox_open ~key ~nonce:v.n ~msg:pt ~cmsg:v.expected_ct
   in
-  assert (b && pt = v.pt) ;
-  (* negative test *)
-  assert (
-    not
-      (Hacl.Secretbox.secretbox_open
-         ~key:(Hacl.Secretbox.unsafe_of_bytes (Bytes.make 32 '\x00'))
-         ~nonce:v.n
-         ~msg:pt
-         ~cmsg:v.expected_ct)) ;
-  log_s "[NaCl.secretbox_open] Success"
+  check ("[NaCl.Noalloc.Easy.secretbox_open] 1/2 " ^ v.name) (b && pt = v.pt) ;
+  check
+    ("[NaCl.Noalloc.Easy.secretbox_open] 2/2 " ^ v.name)
+    (not
+       (Hacl.Secretbox.secretbox_open
+          ~key:(Hacl.Secretbox.unsafe_of_bytes (Bytes.make 32 '\x00'))
+          ~nonce:v.n
+          ~msg:pt
+          ~cmsg:v.expected_ct))
 
 let test_box (v : Bytes.t box_test) : unit =
-  log_s (String.concat ": " ["Testing NaCl.Box"; v.name]) ;
   let k =
     Hacl.Box.dh
       (Hacl.Box.unsafe_pk_of_bytes v.pk)
       (Hacl.Box.unsafe_sk_of_bytes v.sk)
   in
-  (* negative test *)
-  assert_failure (fun () ->
-      Hacl.Box.dh
-        (Hacl.Box.unsafe_pk_of_bytes (Bytes.make 32 '\x00'))
-        (Hacl.Box.unsafe_sk_of_bytes (Bytes.make 32 '\x00'))) ;
-
-  log_s "[NaCl.box_beforenm] Success" ;
+  Alcotest.check_raises
+    "[Hacl.Box.unsafe_sk_of_bytes 32]"
+    (Failure "Error computing box_beforenm")
+    (fun () ->
+      ignore
+        (Hacl.Box.dh
+           (Hacl.Box.unsafe_pk_of_bytes (Bytes.make 32 '\x00'))
+           (Hacl.Box.unsafe_sk_of_bytes (Bytes.make 32 '\x00')))) ;
   let cmsg = init_bytes (Bytes.length v.pt + 16) in
   Hacl.Box.box ~k ~nonce:v.n ~msg:v.pt ~cmsg ;
-  assert (cmsg = v.expected_ct) ;
-  log_s "[NaCl.box_easy_afternm] Success" ;
+  check ("[NaCl.Noalloc.Easy.box_afternm] " ^ v.name) (cmsg = v.expected_ct) ;
   let msg = init_bytes (Bytes.length v.pt) in
-  assert (Hacl.Box.box_open ~k ~nonce:v.n ~msg ~cmsg:v.expected_ct) ;
-  assert (msg = v.pt) ;
-  (* negative test *)
-  assert (
-    not
-      (Hacl.Box.box_open ~k ~nonce:(Hacl.Rand.gen 24) ~msg ~cmsg:v.expected_ct)) ;
-  log_s "[NaCl.box_open_easy_afternm] Success" ;
+  check
+    ("[NaCl.Noalloc.Easy.box_open_afternm] 1/3 " ^ v.name)
+    (Hacl.Box.box_open ~k ~nonce:v.n ~msg ~cmsg:v.expected_ct) ;
+  check ("[NaCl.Noalloc.Easy.box_open_afternm] 2/3 " ^ v.name) (msg = v.pt) ;
+  check
+    ("[NaCl.Noalloc.Easy.box_open_afternm] 3/3 " ^ v.name)
+    (not
+       (Hacl.Box.box_open ~k ~nonce:(Hacl.Rand.gen 24) ~msg ~cmsg:v.expected_ct)) ;
   let buf = Bytes.copy v.pt in
   let tag = init_bytes 16 in
   Hacl.Box.box_noalloc ~k ~nonce:v.n ~tag ~buf ;
   let combined_ct =
     Bytes.of_string @@ Bytes.to_string tag ^ Bytes.to_string buf
   in
-  assert (combined_ct = v.expected_ct) ;
-  log_s "[NaCl.box_detached_afternm] Success" ;
-  assert (Hacl.Box.box_open_noalloc ~k ~nonce:v.n ~tag ~buf) ;
-  assert (buf = v.pt) ;
-  (* negative test *)
-  assert (not (Hacl.Box.box_open_noalloc ~k ~nonce:(Hacl.Rand.gen 24) ~tag ~buf)) ;
-  log_s "[NaCl.box_open_detached_afternm] Success"
+  check
+    ("[NaCl.Noalloc.Detached.box_afternm] " ^ v.name)
+    (combined_ct = v.expected_ct) ;
+  check
+    ("[NaCl.Noalloc.Detached.box_open_afternm] 1/2" ^ v.name)
+    (Hacl.Box.box_open_noalloc ~k ~nonce:v.n ~tag ~buf) ;
+  check "" (buf = v.pt) ;
+  check
+    ("[NaCl.Noalloc.Detached.box_open_afternm] 2/2" ^ v.name)
+    (not (Hacl.Box.box_open_noalloc ~k ~nonce:(Hacl.Rand.gen 24) ~tag ~buf))
 
-let () =
-  let () = log_s "STARTING TESTS" in
-  List.iter test_ed25519 ed25519_tests ;
-  List.iter test_p256 p256_tests ;
-  List.iter test_curve25519 curve25519_tests ;
-  List.iter test_sha2_256 sha2_256_tests ;
-  List.iter test_sha2_512 sha2_512_tests ;
-  List.iter test_sha3_256 sha3_256_tests ;
-  List.iter test_sha3_512 sha3_512_tests ;
-  test_keccak () ;
-  List.iter test_hmac_sha256 hmac_sha256_tests ;
-  List.iter test_hmac_sha512 hmac_sha512_tests ;
-  List.iter test_blake2b blake2b_tests ;
-  List.iter test_secretbox secretbox_tests ;
-  List.iter test_box box_tests ;
-  let () = log_s "ENDING TESTS" in
-  ()
+let tests =
+  [
+    ("Testing Ed25519", `Quick, fun () -> List.iter test_ed25519 ed25519_tests);
+    ("Testing P256", `Quick, fun () -> List.iter test_p256 p256_tests);
+    ( "Testing Curve25519",
+      `Quick,
+      fun () -> List.iter test_curve25519 curve25519_tests );
+    ( "Testing SHA2_256",
+      `Quick,
+      fun () -> List.iter test_sha2_256 sha2_256_tests );
+    ( "Testing SHA2_512",
+      `Quick,
+      fun () -> List.iter test_sha2_512 sha2_512_tests );
+    ( "Testing SHA3_256",
+      `Quick,
+      fun () -> List.iter test_sha3_256 sha3_256_tests );
+    ( "Testing SHA3_512",
+      `Quick,
+      fun () -> List.iter test_sha3_512 sha3_512_tests );
+    ("Testing Keccak", `Quick, fun () -> test_keccak ());
+    ( "Testing HMAC_SHA2_256",
+      `Quick,
+      fun () -> List.iter test_hmac_sha256 hmac_sha256_tests );
+    ( "Testing HMAC_SHA2_512",
+      `Quick,
+      fun () -> List.iter test_hmac_sha512 hmac_sha512_tests );
+    ("Testing Blake2b", `Quick, fun () -> List.iter test_blake2b blake2b_tests);
+    ( "Testing NaCl.Secretbox",
+      `Quick,
+      fun () -> List.iter test_secretbox secretbox_tests );
+    ("Testing NaCl.Box", `Quick, fun () -> List.iter test_box box_tests);
+  ]
+
+let () = Alcotest.run ~__FILE__ "hacl-test" [("tests", tests)]

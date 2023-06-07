@@ -333,7 +333,7 @@ module Make (Rep : RepType) : S with type bits = Rep.t = struct
         (* Convert 64 bit float back to string to compare to input. *)
         let hex = String.contains s 'x' in
         let s' =
-          if not hex then Printf.sprintf "%.*g" (String.length s) z
+          if not hex then Format.sprintf "%.*g" (String.length s) z
           else
             let m =
               logor (logand bits 0xf_ffff_ffff_ffffL) 0x10_0000_0000_0000L
@@ -341,7 +341,7 @@ module Make (Rep : RepType) : S with type bits = Rep.t = struct
             (* Shift mantissa to match msb position in most significant hex digit *)
             let i = skip_zeroes (String.uppercase_ascii s) 0 in
             if i = String.length s then
-              Printf.sprintf "%.*g" (String.length s) z
+              Format.sprintf "%.*g" (String.length s) z
             else
               let sh =
                 match s.[i] with
@@ -350,7 +350,7 @@ module Make (Rep : RepType) : S with type bits = Rep.t = struct
                 | '4' .. '7' -> 2
                 | _ -> 3
               in
-              Printf.sprintf "%Lx" (shift_left m sh)
+              Format.sprintf "%Lx" (shift_left m sh)
         in
         (* - If mantissa became larger, float was rounded up to tie already;
          *   round-to-even might round up again: sub epsilon to round down.
@@ -429,11 +429,11 @@ module Make (Rep : RepType) : S with type bits = Rep.t = struct
         n
         (if s.[String.length s - 1] = '.' then s ^ "0" else s)
 
-  let to_string = to_string' (Printf.sprintf "%.17g") is_digit 3
+  let to_string = to_string' (Format.sprintf "%.17g") is_digit 3
 
   let to_hex_string x =
     if is_inf x then to_string x
-    else to_string' (Printf.sprintf "%h") is_hex_digit 4 x
+    else to_string' (Format.sprintf "%h") is_hex_digit 4 x
 
   let pp fmt x = Format.fprintf fmt "%s" @@ to_string x
 end

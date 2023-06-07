@@ -54,29 +54,31 @@ let main () =
       "micheline";
       "micheline_bytes";
       "encoding";
-      "Set_add";
-      "Set_elements";
-      "Script_expr_hash_of_b58check_opt";
-      "Global_constants_storage_expr_to_address_in_context";
-      "Global_constants_storage_expand_constant_branch";
-      "Global_constants_storage_expand_no_constant_branch";
-      "cache_model";
+      "global_constants_storage/Set_add/model";
+      "global_constants_storage/Set_elements/model";
+      "global_constants_storage/Script_expr_hash_of_b58check_opt/model";
+      "global_constants_storage/expr_to_address_in_context/model";
+      "global_constants_storage/expand_constant_branch/model";
+      "global_constants_storage/expand_no_constant_branch/model";
+      "cache/CACHE_UPDATE/model";
       "ir_size_model";
       "carbonated_map";
-      "tx_rollup";
       "size_collect_tickets_step_model";
       "size_has_tickets_model";
       "compare_tickets";
       "list_key_values";
-      "skip_list_next";
-      "skip_list_hash";
-      "verify_output_proof";
-      "deserialize_output_proof";
+      "skip_list/next/model";
+      "skip_list/hash_cell/model";
+      "sc_rollup/Sc_rollup_deserialize_output_proof_benchmark/model";
+      "sc_rollup/Sc_rollup_verify_output_proof_benchmark/model";
     ]
   in
   Lwt_list.iter_s
     (fun model_name ->
-      cleanup model_name ;
+      let saved_model_name =
+        String.split_on_char '/' model_name |> String.concat "__"
+      in
+      cleanup saved_model_name ;
       (* Python bindings tend to crash, hence the need to retry and resume inference midway,
          multiple times. When python bindings are removed, this needs to be removed as well
          See https://gitlab.com/tezos/tezos/-/issues/1523
@@ -86,9 +88,9 @@ let main () =
             ~model_name
             ~workload_data:Files.(working_dir // benchmark_results_dir)
             ~regression_method:Snoop.(Lasso {positive = true})
-            ~dump_csv:Files.(inference_root // solution_csv model_name)
-            ~solution:Files.(inference_root // solution_bin model_name)
-            ~report:Files.(inference_root // report_tex model_name)
-            ~graph:Files.(inference_root // dep_graph model_name)
+            ~dump_csv:Files.(inference_root // solution_csv saved_model_name)
+            ~solution:Files.(inference_root // solution_bin saved_model_name)
+            ~report:Files.(inference_root // report_tex saved_model_name)
+            ~graph:Files.(inference_root // dep_graph saved_model_name)
             snoop))
     models

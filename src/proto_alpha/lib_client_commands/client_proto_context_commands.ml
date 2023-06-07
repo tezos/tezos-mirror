@@ -33,6 +33,28 @@ open Client_proto_rollups
 open Client_keys
 open Client_proto_args
 
+let get_timelock_filename path prefix enc obj =
+  let add_path r n = r ^ "/" ^ n in
+  let bin = Data_encoding.Binary.to_bytes_exn enc obj in
+  let hex = Tezos_crypto.Blake2B.(hash_bytes [bin] |> to_hex) |> Hex.show in
+  let name = prefix ^ "_" ^ hex in
+  add_path path name
+
+let write_encoding filepath enc data =
+  let str = Data_encoding.Binary.to_string_exn enc data in
+  Lwt_utils_unix.create_file filepath str
+
+let read_encoding ?(buffer_size = 32768) path enc =
+  let open Lwt_result_syntax in
+  let*! file = Lwt_unix.(openfile path [O_RDONLY; O_NONBLOCK; O_CLOEXEC] 0) in
+  let buffer = Bytes.create buffer_size in
+  let*! nb_bytes_read = Lwt_unix.read file buffer 0 buffer_size in
+  let*! () = Lwt_unix.close file in
+  let buffer =
+    if nb_bytes_read = 0 then buffer else Bytes.sub buffer 0 nb_bytes_read
+  in
+  Data_encoding.Binary.of_bytes_exn enc buffer |> return
+
 let save_zk_rollup ~force (cctxt : #Client_context.full) alias_name rollup =
   let open Lwt_result_syntax in
   let* () = EpoxyAlias.add ~force cctxt alias_name rollup in
@@ -756,7 +778,8 @@ let commands_ro () =
             "%a"
             Data_encoding.Binary_schema.pp
             (Data_encoding.Binary.describe
-               Alpha_context.Operation.unsigned_encoding)
+               Alpha_context.Operation
+               .unsigned_encoding_with_legacy_attestation_name)
         in
         return_unit);
     command
@@ -2312,7 +2335,9 @@ let commands_rw () =
                 | Some hash -> Lwt_result_syntax.return hash))
       @@ param
            ~name:"ballot"
-           ~desc:"the ballot value (yea/yay, nay, or pass)"
+           ~desc:
+             "the ballot value (yea, nay, or pass; yay is a deprecated synonym \
+              for yea)"
            (parameter
               ~autocomplete:(fun _ ->
                 Lwt_result_syntax.return ["yea"; "nay"; "pass"])
@@ -2633,15 +2658,20 @@ let commands_rw () =
     command
       ~group
       ~desc:"Originate a new smart rollup."
-      (args7
+      (args8
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
          fee_parameter_args
          storage_limit_arg
-         counter_arg)
-      (prefixes ["originate"; "smart"; "rollup"; "from"]
+         counter_arg
+         (Client_keys.force_switch ()))
+      (prefixes ["originate"; "smart"; "rollup"]
+      @@ Smart_rollup_alias.Address.fresh_alias_param
+           ~name:"alias"
+           ~desc:"name of the new smart rollup"
+      @@ prefix "from"
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the account originating the smart rollup."
@@ -2669,7 +2699,9 @@ let commands_rw () =
              simulation,
              fee_parameter,
              storage_limit,
-             counter )
+             counter,
+             force )
+           alias
            source
            kind
            parameters_ty
@@ -2681,7 +2713,7 @@ let commands_rw () =
         let Michelson_v1_parser.{expanded; _} = parameters_ty in
         let parameters_ty = Script.lazy_expr expanded in
         let* boot_sector = boot_sector pvm in
-        let* _res =
+        let* _, _, res =
           sc_rollup_originate
             cctxt
             ~chain:cctxt#chain
@@ -2702,7 +2734,30 @@ let commands_rw () =
             ~parameters_ty
             ()
         in
-        return_unit);
+        match res with
+        | Apply_results.Manager_operation_result
+            {
+              operation_result =
+                Apply_operation_result.Applied
+                  (Apply_results.Sc_rollup_originate_result
+                    {address = rollup_address; _});
+              _;
+            } ->
+            let* alias =
+              Smart_rollup_alias.Address.of_fresh cctxt force alias
+            in
+            let* () =
+              Smart_rollup_alias.Address.add ~force cctxt alias rollup_address
+            in
+            let*! () =
+              cctxt#message
+                {|Smart rollup %a memorized as "%s"|}
+                Sc_rollup.Address.pp
+                rollup_address
+                alias
+            in
+            return_unit
+        | _ -> return_unit);
     command
       ~group
       ~desc:"Send one or more messages to a smart rollup."
@@ -2804,7 +2859,7 @@ let commands_rw () =
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["for"; "smart"; "rollup"]
-      @@ Sc_rollup_params.sc_rollup_address_param
+      @@ Smart_rollup_alias.Address.param
            ~desc:
              "The address of the smart rollup where the commitment will be \
               published."
@@ -2890,7 +2945,7 @@ let commands_rw () =
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["for"; "smart"; "rollup"]
-      @@ Sc_rollup_params.sc_rollup_address_param
+      @@ Smart_rollup_alias.Address.param
            ~desc:
              "The address of the smart rollup of which the commitment will be \
               cemented."
@@ -2941,7 +2996,7 @@ let commands_rw () =
          counter_arg
          fee_parameter_args)
       (prefixes ["timeout"; "dispute"; "on"; "smart"; "rollup"]
-      @@ Sc_rollup_params.sc_rollup_address_param
+      @@ Smart_rollup_alias.Address.param
            ~desc:
              "The address of the smart rollup where the staker of the dispute \
               has timed-out."
@@ -3049,7 +3104,7 @@ let commands_rw () =
          storage_limit_arg
          counter_arg)
       (prefixes ["execute"; "outbox"; "message"; "of"; "smart"; "rollup"]
-      @@ Sc_rollup_params.sc_rollup_address_param
+      @@ Smart_rollup_alias.Address.param
            ~desc:"The address of the smart rollup where the message resides."
       @@ prefix "from"
       @@ Client_keys.Public_key_hash.source_param
@@ -3119,7 +3174,7 @@ let commands_rw () =
            ~name:"staker"
            ~desc:"The implicit account that owns the frozen bond."
       @@ prefixes ["for"; "smart"; "rollup"]
-      @@ Sc_rollup_params.sc_rollup_address_param
+      @@ Smart_rollup_alias.Address.param
            ~desc:"The address of the smart rollup of the bond."
       @@ prefixes ["from"]
       @@ Client_keys.Public_key_hash.source_param
@@ -3158,6 +3213,137 @@ let commands_rw () =
             ~sc_rollup
             ~staker
             ()
+        in
+        return_unit);
+    command
+      ~group
+      ~desc:"Precompute timelock tuple."
+      (args1 timelock_locked_value_arg)
+      (prefixes ["timelock"; "precompute"]
+      @@ prefix "for"
+      @@ param ~name:"time" ~desc:" timelock difficulty" int_parameter
+      @@ prefix "in"
+      @@ param ~name:"file" ~desc:" updates dir" string_parameter
+      @@ stop)
+      (fun locked (time : int) (timelock_path : string) cctxt ->
+        let open Lwt_result_syntax in
+        let open Tezos_crypto.Timelock in
+        let* locked_value =
+          match locked with
+          | None -> return_none
+          | Some l ->
+              let locked_option = to_locked_value_opt l in
+              if Option.is_none locked_option then
+                let*! () =
+                  cctxt#warning
+                    "%s"
+                    "Locked value not in RSA group, using its residue."
+                in
+                return_some @@ to_locked_value_unsafe l
+              else return locked_option
+        in
+        let _ =
+          precompute_timelock
+            ~locked_value
+            ~precompute_path:(Some timelock_path)
+            ~time
+            ()
+        in
+        let*! () =
+          cctxt#message "%s" "Timelock tuple precomputed and saved locally."
+        in
+        return_unit);
+    command
+      ~group
+      ~desc:"Generate timelock chest."
+      no_options
+      (prefixes ["timelock"; "create"]
+      @@ prefix "for"
+      @@ param ~name:"time" ~desc:" timelock difficulty" int_parameter
+      @@ prefix "with"
+      @@ param ~name:"payload" ~desc:" timelock message" string_parameter
+      @@ prefix "in"
+      @@ param ~name:"file" ~desc:" updates dir" string_parameter
+      @@ stop)
+      (fun () (time : int) (payload : string) (timelock_path : string) cctxt ->
+        let open Lwt_result_syntax in
+        let open Tezos_crypto.Timelock in
+        let chest, chest_key =
+          create_chest_and_chest_key
+            ~precompute_path:(Some timelock_path)
+            ~payload:(Bytes.of_string payload)
+            ~time
+            ()
+        in
+        let chest_name =
+          get_timelock_filename timelock_path "time_chest" chest_encoding chest
+        in
+        let chest_key_name =
+          get_timelock_filename
+            timelock_path
+            "time_key_create"
+            chest_encoding
+            chest
+        in
+        let*! () = write_encoding chest_name chest_encoding chest in
+        let*! () = write_encoding chest_key_name chest_key_encoding chest_key in
+        let*! () =
+          cctxt#message "%s" "Timelock chest and chest_key computed."
+        in
+        return_unit);
+    command
+      ~group
+      ~desc:"Open timelock chest."
+      no_options
+      (prefixes ["timelock"; "open"]
+      @@ prefix "for"
+      @@ param ~name:"time" ~desc:" timelock difficulty" int_parameter
+      @@ prefix "chest"
+      @@ param ~name:"chest" ~desc:" timelock chest" string_parameter
+      @@ prefix "in"
+      @@ param ~name:"file" ~desc:" updates dir" string_parameter
+      @@ stop)
+      (fun () (time : int) (chest_path : string) (timelock_path : string) cctxt ->
+        let open Lwt_result_syntax in
+        let open Tezos_crypto.Timelock in
+        let* chest = read_encoding chest_path chest_encoding in
+        let chest_key = create_chest_key chest ~time in
+        let chest_key_name =
+          get_timelock_filename
+            timelock_path
+            "time_key_open"
+            chest_encoding
+            chest
+        in
+        let*! () = write_encoding chest_key_name chest_key_encoding chest_key in
+        let*! () = cctxt#message "%s" "Timelock chest_key computed." in
+        return_unit);
+    command
+      ~group
+      ~desc:"Verify timelock chest."
+      no_options
+      (prefixes ["timelock"; "verify"]
+      @@ prefix "for"
+      @@ param ~name:"time" ~desc:" timelock difficulty" int_parameter
+      @@ prefix "chest"
+      @@ param ~name:"chest" ~desc:" timelock chest" string_parameter
+      @@ prefix "chest_key"
+      @@ param ~name:"chest_key" ~desc:" timelock chest's key" string_parameter
+      @@ stop)
+      (fun () (time : int) (chest_path : string) (chest_key_path : string) cctxt ->
+        let open Lwt_result_syntax in
+        let open Tezos_crypto.Timelock in
+        let* chest = read_encoding chest_path chest_encoding in
+        let* chest_key = read_encoding chest_key_path chest_key_encoding in
+        let result = open_chest chest chest_key ~time in
+        let*! () =
+          match result with
+          | Correct msg ->
+              let m = Hex.of_bytes msg |> Hex.show in
+              cctxt#message "Timelock chest verified, message is: %s" m
+          | Bogus_opening ->
+              cctxt#error "Error opening: incorrect proof or unlocked value."
+          | Bogus_cipher -> cctxt#error "Error deciphering."
         in
         return_unit);
   ]

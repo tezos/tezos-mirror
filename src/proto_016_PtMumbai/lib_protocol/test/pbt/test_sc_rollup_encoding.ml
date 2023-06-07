@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/test_sc_rollup_encoding.exe
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/pbt/main.exe \
+                  -- --file test_sc_rollup_encoding.ml
     Subject:      SC rollup encoding
 *)
 
@@ -288,4 +288,8 @@ let tests =
     test_inbox_message;
   ]
 
-let () = Alcotest.run "SC rollup encoding" [("roundtrip", qcheck_wrap tests)]
+let () =
+  Alcotest.run
+    ~__FILE__
+    (Protocol.name ^ ": SC rollup encoding")
+    [(": roundtrip", qcheck_wrap tests)]

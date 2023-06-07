@@ -278,35 +278,35 @@ module V (L : LIB) = struct
     >* ret expected_new_state
 
   (** Circuit definition for one public operation *)
-  let predicate_op ?(public = true) ~old_state ~new_state ~fee ~exit_validity
+  let predicate_op ?(kind = `Public) ~old_state ~new_state ~fee ~exit_validity
       ~rollup_id op =
-    let* old_state = input ~public:true @@ Input.bool old_state in
-    let* new_state = input ~public:true @@ Input.bool new_state in
+    let* old_state = input ~kind:`Public @@ Input.bool old_state in
+    let* new_state = input ~kind:`Public @@ Input.bool new_state in
     let* (_fee : scalar repr) =
-      input ~public:true
+      input ~kind:`Public
       @@ E.((fee_encoding ~safety:Bounded_e.Unsafe).input) fee
     in
     let* (_exit_validity : bool repr) =
-      input ~public:true @@ Input.bool exit_validity
+      input ~kind:`Public @@ Input.bool exit_validity
     in
     let* rollup_id =
-      input ~public:true @@ E.(tezos_pkh_encoding.input) rollup_id
+      input ~kind:`Public @@ E.(tezos_pkh_encoding.input) rollup_id
     in
-    let* op = input ~public @@ E.op_encoding.input op in
+    let* op = input ~kind @@ E.op_encoding.input op in
     let op = E.op_encoding.decode op in
     let* expected_new_state = logic_op ~old_state ~rollup_id op in
     assert_equal expected_new_state new_state
 
   (** Circuit definition for a batch of private operations *)
   let predicate_batch ~old_state ~new_state ~fees ~rollup_id ops =
-    let* old_state = input ~public:true @@ Input.bool old_state in
-    let* new_state = input ~public:true @@ Input.bool new_state in
+    let* old_state = input ~kind:`Public @@ Input.bool old_state in
+    let* new_state = input ~kind:`Public @@ Input.bool new_state in
     let* (_fees : scalar repr) =
-      input ~public:true
+      input ~kind:`Public
       @@ E.((amount_encoding ~safety:Bounded_e.Unsafe).input) fees
     in
     let* rollup_id =
-      input ~public:true @@ E.(tezos_pkh_encoding.input) rollup_id
+      input ~kind:`Public @@ E.(tezos_pkh_encoding.input) rollup_id
     in
     let* ops = input @@ (Encodings.list_encoding E.op_encoding).input ops in
     let ops = (Encodings.list_encoding E.op_encoding).decode ops in
@@ -320,10 +320,10 @@ module V (L : LIB) = struct
 
   (** Fee circuit *)
   let predicate_fees ~old_state ~new_state ~fees =
-    let* old_state = input ~public:true @@ Input.bool old_state in
-    let* new_state = input ~public:true @@ Input.bool new_state in
+    let* old_state = input ~kind:`Public @@ Input.bool old_state in
+    let* new_state = input ~kind:`Public @@ Input.bool new_state in
     let* (_fees : scalar repr) =
-      input ~public:true
+      input ~kind:`Public
       @@ E.((amount_encoding ~safety:Bounded_e.Unsafe).input) fees
     in
     assert_equal old_state new_state
@@ -342,7 +342,10 @@ end) : sig
   val circuits : [`Public | `Private | `Fee] Plonk.SMap.t
 
   (** Commitment to the circuits  *)
-  val public_parameters : Plonk.Main_protocol.verifier_public_parameters
+  val lazy_pp :
+    (Plonk.Main_protocol.prover_public_parameters
+    * Plonk.Main_protocol.verifier_public_parameters)
+    lazy_t
 
   (** [craft_update state ~zk_rollup ?private_ops ?exit_validities public_ops]
       will apply first the [public_ops], then the [private_ops]. While doing so,
@@ -365,7 +368,7 @@ end) : sig
 
     val private_ops : Zk_rollup.Operation.t list list
 
-    val update_data : Zk_rollup.Update.t
+    val lazy_update_data : Zk_rollup.Update.t lazy_t
   end
 end = struct
   open Protocol.Alpha_context
@@ -374,9 +377,10 @@ end = struct
   module T = Types.P
   module VC = V (LibCircuit)
 
-  let srs =
-    let open Bls12_381_polynomial in
-    (Srs.generate_insecure 9 1, Srs.generate_insecure 1 1)
+  let lazy_srs =
+    lazy
+      (let open Octez_bls12_381_polynomial.Bls12_381_polynomial in
+      (Srs.generate_insecure 9 1, Srs.generate_insecure 1 1))
 
   let dummy_l1_dst =
     Hex.to_bytes_exn (`Hex "0002298c03ed7d454a101eb7022bc95f7e5f41ac78")
@@ -438,11 +442,13 @@ end = struct
   let circuits =
     SMap.(add "op" `Public @@ add batch_name `Private @@ add "fee" `Fee empty)
 
-  let prover_pp, public_parameters =
-    Plonk.Main_protocol.setup
-      ~zero_knowledge:false
-      (SMap.map (fun (a, b, _) -> (a, b)) circuit_map)
-      ~srs
+  let lazy_pp =
+    lazy
+      (let srs = Lazy.force lazy_srs in
+       Plonk.Main_protocol.setup
+         ~zero_knowledge:false
+         (SMap.map (fun (a, b, _) -> (a, b)) circuit_map)
+         ~srs)
 
   let insert s x m =
     match SMap.find_opt s m with
@@ -457,6 +463,7 @@ end = struct
       Zk_rollup.Operation.t list ->
       Zk_rollup.State.t * Zk_rollup.Update.t =
    fun s ~zk_rollup ?(private_ops = []) ?exit_validities pending ->
+    let prover_pp, public_parameters = Lazy.force lazy_pp in
     let s = of_proto_state s in
     let rev_inputs = SMap.empty in
     let exit_validities =
@@ -497,7 +504,7 @@ end = struct
             insert
               "op"
               Plonk.Main_protocol.
-                {public = public_inputs; witness = private_inputs}
+                {witness = private_inputs; input_commitments = []}
               rev_inputs,
             ("op", pi_to_send) :: rev_pending_pis ))
         (s, rev_inputs, [])
@@ -544,7 +551,7 @@ end = struct
               insert
                 batch_name
                 Plonk.Main_protocol.
-                  {public = public_inputs; witness = private_inputs}
+                  {witness = private_inputs; input_commitments = []}
                 rev_inputs,
               (batch_name, pi_to_send) :: rev_private_pis ))
           (s, rev_inputs, [])
@@ -563,7 +570,7 @@ end = struct
       let private_inputs = Solver.solve fee_solver public_inputs in
       ( insert
           "fee"
-          Plonk.Main_protocol.{public = public_inputs; witness = private_inputs}
+          Plonk.Main_protocol.{witness = private_inputs; input_commitments = []}
           rev_inputs,
         fee_pi )
     in
@@ -571,9 +578,7 @@ end = struct
 
     let proof = Plonk.Main_protocol.prove prover_pp ~inputs in
     let verifier_inputs =
-      Plonk.SMap.map
-        (List.map (fun Plonk.Main_protocol.{public; witness = _} -> public))
-        inputs
+      Plonk.Main_protocol.to_verifier_inputs prover_pp inputs
     in
     assert (
       Plonk.Main_protocol.verify public_parameters ~inputs:verifier_inputs proof) ;
@@ -616,15 +621,16 @@ end = struct
       @@ Stdlib.List.init Params.batch_size (fun i ->
              if i mod 2 = 0 then false_op else true_op)
 
-    let update_data =
-      snd
-      @@ craft_update
-           init_state
-           ~zk_rollup:
-             (Data_encoding.Binary.of_bytes_exn
-                Zk_rollup.Address.encoding
-                dummy_rollup_id)
-           ~private_ops
-           pending
+    let lazy_update_data =
+      lazy
+        (snd
+        @@ craft_update
+             init_state
+             ~zk_rollup:
+               (Data_encoding.Binary.of_bytes_exn
+                  Zk_rollup.Address.encoding
+                  dummy_rollup_id)
+             ~private_ops
+             pending)
   end
 end

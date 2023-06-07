@@ -31,8 +31,8 @@ opam switch create for_tezos $ocaml_version
 eval $(opam env)
 # [get system dependencies]
 # depext handling is done directly by opam 2.1 and later
-opam depext tezos
+opam depext octez
 # [install tezos]
-opam install -y tezos
+opam install -y octez
 # [test executables]
 octez-client --version

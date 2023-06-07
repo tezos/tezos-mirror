@@ -145,6 +145,10 @@ module List_key_values_benchmark_boilerplate = struct
 
   let info = "List key values"
 
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
+
   let config_encoding =
     let open Data_encoding in
     conv
@@ -171,9 +175,9 @@ module List_key_values_benchmark_boilerplate = struct
         Model.make
           ~conv:(fun {size} -> (size, ()))
           ~model:
-            (Model.affine_split_const
-               ~intercept1:Builtin_benchmarks.timer_variable
-               ~intercept2:(fv "list_key_values_intercept")
+            (Model.affine
+               ~name
+               ~intercept:(fv "list_key_values_intercept")
                ~coeff:(fv "list_key_values_step")) );
     ]
 end

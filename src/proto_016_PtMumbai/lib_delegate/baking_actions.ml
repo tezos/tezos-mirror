@@ -227,6 +227,11 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   } =
     block_to_bake
   in
+  Events.(
+    emit
+      prepare_forging_block
+      (Int32.succ predecessor.shell.level, round, delegate))
+  >>= fun () ->
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
   let simulation_mode = state.global_state.validation_mode in
@@ -421,12 +426,12 @@ let inject_preendorsements state ~preendorsements =
             Operation_data {contents; signature = Some signature}
           in
           let operation : Operation.packed = {shell; protocol_data} in
-          return_some (delegate, operation))
+          return_some (delegate, operation, level, round))
     preendorsements
   >>=? fun signed_operations ->
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
-    (fun (delegate, operation) ->
+    (fun (delegate, operation, level, round) ->
       protect
         ~on_error:(fun err ->
           Events.(emit failed_to_inject_preendorsement (delegate, err))
@@ -434,12 +439,12 @@ let inject_preendorsements state ~preendorsements =
         (fun () ->
           Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
           >>=? fun oph ->
-          Events.(emit preendorsement_injected (oph, delegate)) >>= fun () ->
-          return_unit))
+          Events.(emit preendorsement_injected (oph, delegate, level, round))
+          >>= fun () -> return_unit))
     signed_operations
   >>=? fun () ->
   (* Hackish way of registering injected preendorsements *)
-  let endorsements = List.map snd signed_operations in
+  let endorsements = List.map (fun (_, x, _, _) -> x) signed_operations in
   if endorsements = [] then return state
   else
     let new_level_state =
@@ -510,7 +515,7 @@ let sign_endorsements state endorsements =
             Operation_data {contents; signature = Some signature}
           in
           let operation : Operation.packed = {shell; protocol_data} in
-          return_some (delegate, operation))
+          return_some (delegate, operation, level, round))
     endorsements
 
 let inject_endorsements state ~endorsements =
@@ -519,7 +524,7 @@ let inject_endorsements state ~endorsements =
   sign_endorsements state endorsements >>=? fun signed_operations ->
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
-    (fun (delegate, operation) ->
+    (fun (delegate, operation, level, round) ->
       protect
         ~on_error:(fun err ->
           Events.(emit failed_to_inject_endorsement (delegate, err))
@@ -527,8 +532,8 @@ let inject_endorsements state ~endorsements =
         (fun () ->
           Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
           >>=? fun oph ->
-          Events.(emit endorsement_injected (oph, delegate)) >>= fun () ->
-          return_unit))
+          Events.(emit endorsement_injected (oph, delegate, level, round))
+          >>= fun () -> return_unit))
     signed_operations
 
 let prepare_waiting_for_quorum state =

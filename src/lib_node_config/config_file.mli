@@ -52,7 +52,7 @@ type t = {
   p2p : p2p;
   rpc : rpc;
   log : Lwt_log_sink_unix.cfg;
-  internal_events : Tezos_base.Internal_event_config.t;
+  internal_events : Tezos_base.Internal_event_config.t option;
   shell : Shell_limits.limits;
   blockchain_network : blockchain_network;
   metrics_addr : string list;
@@ -70,6 +70,7 @@ and p2p = {
   disable_mempool : bool;
   enable_testchain : bool;
   reconnection_config : Tezos_p2p_services.Point_reconnection_config.t;
+  disable_peer_discovery : bool;
 }
 
 and rpc = {
@@ -120,6 +121,8 @@ val update :
   ?metrics_addr:string list ->
   ?operation_metadata_size_limit:Shell_limits.operation_metadata_size_limit ->
   ?private_mode:bool ->
+  ?disable_p2p_maintenance:bool ->
+  ?disable_p2p_swap:bool ->
   ?disable_mempool:bool ->
   ?disable_mempool_precheck:bool ->
   ?enable_testchain:bool ->

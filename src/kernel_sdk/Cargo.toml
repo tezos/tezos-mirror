@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+#
+# SPDX-License-Identifier: MIT
+
+[workspace]
+
+members = [
+  # Kernel Dev
+  "core",
+  "host",
+  "debug",
+  "mock",
+  "encoding",
+  "storage",
+  "panic-hook",
+  "entrypoint",
+  "sdk",
+  # UX
+  "installer-kernel",
+  "installer-client",
+  "installer-config",
+]

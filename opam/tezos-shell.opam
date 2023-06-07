@@ -31,11 +31,12 @@ depends: [
   "tezos-validation"
   "tezos-version"
   "lwt-exit"
+  "tezt" { with-test & >= "3.1.0" }
   "tezos-base-test-helpers" {with-test}
   "tezos-embedded-protocol-demo-noops" {with-test}
   "tezos-event-logging-test-helpers" {with-test}
   "tezos-test-helpers" {with-test}
-  "alcotest-lwt" { with-test & >= "1.5.0" }
+  "octez-alcotezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]

@@ -11,6 +11,7 @@
   tezos-client-base
   tezos-protocol-environment
   tezos-protocol-genesis
+  tezos-protocol-genesis.lifted
   tezos-client-commands
   tezos-proxy
   tezos-stdlib-unix)

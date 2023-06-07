@@ -78,49 +78,20 @@ in more detail.
                     ..
                        MT: :ref:`Michelson unit tests <michelson_unit_tests>`.
 
-
-.. csv-table:: Testing frameworks and their applications in Octez. PT:
-               :ref:`Python testing and execution framework <pytest_section>`, EXP: :ref:`ppx_expect_section`, AT: :ref:`alcotest_section`, PBT: :ref:`property_based_test`, TZ: :ref:`tezt_section`, LTF: :ref:`long_tezt_section`
+.. csv-table:: Testing frameworks and their applications in Octez. EXP: :ref:`ppx_expect_section`, AT: :ref:`alcotezt_section`, QC: :ref:`property_based_test`, TZ: :ref:`tezt_section`, LTF: :ref:`long_tezt_section`
    :header: "Component","Unit","Property","Integration","System","Regression","Performance"
 
-   "Node",":ref:`AT <alcotest_section>`",":ref:`PBT <property_based_test>`",":ref:`AT <alcotest_section>`",":ref:`PT <pytest_section>`, :ref:`TZ <tezt_section>`","",":ref:`LTF <long_tezt_section>`"
-   "-- Protocol",":ref:`AT <alcotest_section>`, :ref:`EXP <ppx_expect_section>`",":ref:`PBT <property_based_test>`",""
-   "-- -- Michelson interpreter",":ref:`AT <alcotest_section>`","","",":ref:`PT <pytest_section>`",":ref:`PT <pytest_section>`"
-   "Client",":ref:`EXP <ppx_expect_section>`",":ref:`PBT <property_based_test>`","",":ref:`PT <pytest_section>`, :ref:`TZ <tezt_section>`","",":ref:`LTF <long_tezt_section>`"
-   "Networked nodes","--","",":ref:`PT <pytest_section>`","", ""
+   "Node",":ref:`AT <alcotezt_section>`",":ref:`QC <property_based_test>`",":ref:`AT <alcotezt_section>`",":ref:`TZ <tezt_section>`","",":ref:`LTF <long_tezt_section>`"
+   "-- Protocol",":ref:`AT <alcotezt_section>`, :ref:`EXP <ppx_expect_section>`",":ref:`QC <property_based_test>`",""
+   "-- -- Michelson interpreter",":ref:`AT <alcotezt_section>`","","",":ref:`TZ <tezt_section>`",":ref:`TZ <tezt_section>`"
+   "Client",":ref:`EXP <ppx_expect_section>`",":ref:`QC <property_based_test>`","",":ref:`TZ <tezt_section>`","",":ref:`LTF <long_tezt_section>`"
+   "Networked nodes","--","",":ref:`TZ <tezt_section>`","", ""
    "Endorser","","","",""
    "Baker","","","",""
 
 
 Testing frameworks
 ------------------
-
-.. _alcotest_section:
-
-Alcotest
-~~~~~~~~
-
-`Alcotest <https://github.com/mirage/alcotest>`_ is a library for unit
-and integration testing in OCaml. Alcotest is the primary tool in
-Octez for unit and integration testing of OCaml code.
-
-Typical use cases:
- - Verifying simple input-output specifications for functions with a
-   hard-coded set of input-output pairs.
- - OCaml integration tests.
-
-Example tests:
- - Unit tests for :src:`src/lib_requester`, in :src:`src/lib_requester/test/test_requester.ml`. To
-   execute them locally, run ``dune build @src/lib_requester/runtest`` in
-   the Octez root.
- - Integration tests for the P2P layer in the shell.  For instance
-   :src:`src/lib_p2p/test/test_p2p_pool.ml`. This test forks a set of
-   processes that exercise large parts of the P2P layer.  To execute
-   it locally, run ``dune build @runtest_p2p_pool`` in the Octez
-   root.
-
-References:
- - `Alcotest README <https://github.com/mirage/alcotest>`_.
 
 .. _ppx_expect_section:
 
@@ -167,58 +138,12 @@ References:
  - `QCheck README <https://github.com/c-cube/qcheck>`_
  - `QCheck module documentation <https://c-cube.github.io/qcheck/>`_
 
-.. _pytest_section:
-
-Python testing and execution framework
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The Octez project uses `pytest <https://docs.pytest.org/>`_, a Python testing
-framework, combined with :doc:`a Python wrapper <python_testing_framework>`
-around ``octez-node`` and ``octez-client``, to perform integration testing
-of the node, the client, networks of nodes and daemons such as the baker
-and endorser.
-
-
-We also use `pytest-regtest
-<https://pypi.org/project/pytest-regtest/>`_, a pytest plugin that
-enables regression testing.
-
-
-Typical use cases:
- - Testing the commands of ``octez-client``. This allows to test the
-   full chain: from client, to node RPC to the implementation of the
-   economic protocol.
- - Test networks of nodes, with daemons.
- - Detecting unintended changes in the output of a component, using
-   ``pytest-regtest``.
-
-Example tests:
- - Detecting unintended changes in the behavior of the node's Michelson
-   interpreter (in
-   :src:`tests_python/tests_alpha/test_contract_opcodes.py`).  To execute it
-   locally, run ``cd tests_python && poetry run pytest tests/test_contract_opcodes.py``
-   in the Octez root.
- - Setting up networks of nodes and ensuring their connection
-   (in :src:`tests_python/tests_alpha/test_p2p.py`).
-   To execute it locally, run ``cd tests_python && poetry run pytest tests/test_p2p.py`` in
-   the Octez root.
-
-References:
- - `Pytest Documentation <https://docs.pytest.org/en/stable/contents.html>`_
- - :doc:`python_testing_framework`
- - `pytest-regtest README <https://gitlab.com/uweschmitt/pytest-regtest>`_
- - `pytest-regtest pip package <https://pypi.org/project/pytest-regtest/>`_
- - :ref:`Section in Tezos Developer Documentation on pytest-regtest <pytest_regression_testing>`
-
 .. _tezt_section:
 
 Tezt
 ~~~~
 
-:doc:`Tezt <tezt>` is a system testing framework for Octez. It is
-intended as a replacement to `Flextesa <https://tezos.gitlab.io/flextesa/>`_ and as an OCaml-based alternative
-to :ref:`Python testing and execution framework
-<pytest_section>`. Like the latter, Tezt is also capable of regression
+:doc:`Tezt <tezt>` is a system testing framework for Octez. Tezt is capable of regression
 testing. Tezt focuses on tests that run in the CI, although it is also
 used for some manual tests (see the :src:`tezt/manual_tests`
 folder). Its main strengths are summarized in its :doc:`section in the
@@ -228,10 +153,12 @@ processes, and a set of Octez-specific modules for interacting with
 the Octez binaries: the client, baker, etc.
 
 Typical use cases:
- - In terms of use cases, Tezt is similar to the :ref:`Python testing and
-   execution framework <pytest_section>` and `Flextesa <https://tezos.gitlab.io/flextesa/>`_.
-   It can be used by authors that prefer OCaml
-   for writing system tests.
+ - Testing the commands of ``octez-client``. This allows to test the
+   full chain: from client, to node RPC to the implementation of the
+   economic protocol.
+ - Test networks of nodes, with daemons.
+ - Detecting unintended changes in the output of a component, using
+   regression tests.
 
 Example tests:
  - Testing baking (in :src:`tezt/tests/basic.ml`)
@@ -241,19 +168,79 @@ Example tests:
 
 References:
  - :doc:`Section in Tezos Developer Documentation on Tezt <tezt>`
- - `General API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt/index.html>`_
- - `Octez-specific API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt-tezos/index.html>`_
+ - `General API documentation <https://nomadic-labs.gitlab.io/tezt/dev/tezt/Tezt/index.html>`__
+ - :package-api:`Octez-specific API documentation <tezt-tezos/index.html>`
 
 .. _long_tezt_section:
 
 Long Tests and Performance regression Test Framework
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A library called `tezt-performance-regression`, which is a wrapper around Tezt, is used for tests that are too long to run in the CI and for performance testing. Those
+A library called ``tezt-performance-regression``, which is a wrapper around Tezt, is used for tests that are too long to run in the CI and for performance testing. Those
 tests are run on dedicated machines and can send data points to an
 `InfluxDB <https://github.com/influxdata/influxdb>`__ instance to produce
 graphs using `Grafana <https://github.com/grafana/grafana>`__ and/or
 detect performance regressions. See :doc:`long-tezts`.
+
+.. _alcotezt_section:
+
+Alcotezt
+~~~~~~~~
+
+Alcotezt is an :ref:`Alcotest <alcotest_section>`-compatible wrapper
+for :ref:`Tezt <tezt_section>`. With it, unit tests originally written
+for Alcotest (now deprecated) can be executed using Tezt instead. We are currently in
+the progress of migrating all Alcotests to Tezt, and we are using
+Alcotezt as a stop gap towards this goal. For new unit and integration
+testing suites, prefer using Tezt directly.
+
+Typical use cases:
+ - Conversion of pre-existing Alcotests to Tezt
+
+Example tests:
+ - Unit tests for :package:`tezos-clic`. To execute them locally, run ``dune build @src/lib_clic/runtest``.
+ - Unit tests for :package:`tezos-version`. To execute them locally, run ``dune build @src/lib_version/runtest``.
+
+See :doc:`alcotezt` for more information on how to convert tests to
+Alcotezt, and how to execute them.
+
+.. FIXME tezos/tezos#5090:
+
+   This passage should be removed when the alcotest dependency is
+   completely eliminated from the repo.
+
+.. _alcotest_section:
+
+Alcotest (usage deprecated)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+`Alcotest <https://github.com/mirage/alcotest>`_ is a library for unit
+and integration testing in OCaml. Alcotest was historically the
+primary tool in Octez for unit and integration testing of OCaml code.
+However, we are currently migrating to :doc:`Tezt <tezt>` for unit,
+integration and system testing. To ease migration from Alcotest to
+Tezt, the :ref:`Alcotezt <alcotezt_section>` wrapper was introduced.
+Alcotezt is briefly described above and in more detail in
+:doc:`alcotezt`. The below Alcotest description applies to tests that
+have not yet been converted to Alcotezt.
+
+Typical use cases:
+ - Verifying simple input-output specifications for functions with a
+   hard-coded set of input-output pairs.
+ - OCaml integration tests.
+
+Example tests:
+ - Unit tests for :src:`src/lib_requester`, in :src:`src/lib_requester/test/test_requester.ml`. To
+   execute them locally, run ``dune build @src/lib_requester/runtest`` in
+   the Octez root.
+ - Integration tests for the P2P layer in the shell.  For instance
+   :src:`src/lib_p2p/test/test_p2p_pool.ml`. This test forks a set of
+   processes that exercise large parts of the P2P layer.  To execute
+   it locally, run ``dune build @runtest_p2p_pool`` in the Octez
+   root.
+
+References:
+ - `Alcotest README <https://github.com/mirage/alcotest>`_.
 
 ..
    .. _michelson_unit_tests:
@@ -348,7 +335,7 @@ The helper ``./scripts/with_coverage.sh`` can also be used outside make commands
 ::
 
    ./scripts/with_coverage.sh dune runtest src/lib_shell/
-   ./scripts/with_coverage.sh poetry run pytest -s tests_python/tests_alpha/test_voting_full.py
+   ./scripts/with_coverage.sh dune exec tezt/tests/main.exe -f basic.ml
 
 However you launch the tests, the same commands are used to get the report
 (e.g. ``make coverage-report``).
@@ -433,7 +420,7 @@ To ensure that this process is not disrupted, one should follow these
 guidelines:
 
 For system test frameworks
-   System test frameworks, as :doc:`tezt` and :doc:`python_testing_framework`,
+   System test frameworks like :doc:`tezt`,
    run binaries e.g. ``octez-client`` and
    ``octez-node``. Typically, they do so with calls to ``exec`` so the
    resulting process does not inherit the signal handlers from the
@@ -508,20 +495,13 @@ runner parallelism while limiting the number of jobs per
 pipeline. The grain used varies slightly for different types of
 tests:
 
-Python integration and regression tests
-   Python tests are grouped in a number of batch jobs (chosen in :src:`.gitlab/ci/jobs/test/python_integration_tests.yml`). This number is
-   chosen to keep the duration of job each lower under 10 minutes on
-   average, and to accommodate the addition of new protocol test
-   suites.
-
 Tezt integration and regression tests
    Tezt tests are grouped in 3 batch jobs. New tests increases the
    size of the last batch.
 
 The OCaml package tests (Alcotest & QCheck)
-   The OCaml package tests are regrouped analogously to the ``pytest``\ s:
-   one job per protocol package, in addition to one job regrouping
-   tests for remaining packages.
+   The OCaml package tests are regrouped in a set of jobs per protocol package,
+   in addition to one job regrouping tests for remaining packages.
 
 Adding tests to the CI
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -531,23 +511,12 @@ the case for most automatic tests), you need to make sure that it is
 properly specified in the :src:`.gitlab-ci.yml` file. The procedure
 for doing this depends on the type of test you've added:
 
-Python integration and regression tests
-  New Pytest tests will be included automatically in the CI.
-  To rebalance the Pytest batches based on a previous pipeline,
-  run (from the root of the Octez repository):
-  ``cd tests_python && poetry run python ./scripts/jobs_fetch_reports.py <PROJECT_ID> <PIPELINE_ID> test-results.xml``
-  setting ``<PROJECT_ID>`` to a GitLab project id (e.g. ``3836952`` or `tezos/tezos <https://gitlab.com/tezos/tezos>`_)
-  and ``<PIPELINE_ID>`` to the id of a pipeline in this project for which integration tests have executed
-  (e.g. `391861162 <https://gitlab.com/tezos/tezos/-/pipelines/391861162>`_).
-  and then commit the resulting :src:`tests_python/test-results.xml`.
-
 Tezt integration and regression tests
   New Tezt tests will be included automatically in the CI.
   To rebalance the Tezt batches, run (from the root of the Octez repository):
   ``make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json``
 
 The OCaml package tests (Alcotest & QCheck)
-
   Any non-protocol tests located in a folder named ``src/**/test/`` will be
   picked up automatically by the CI. No intervention is necessary.
 
@@ -646,7 +615,7 @@ follow this convention:
     *)
 
 2. For each test in the unit test module, the function name shall
-   start with `test_` and one must add a small doc comment that
+   start with ``test_`` and one must add a small doc comment that
    explains what the test actually asserts (2-4 lines are
    enough). These lines should appear at the beginning of each test
    unit function that is called by e.g. ``Alcotest_lwt.test_case``. For

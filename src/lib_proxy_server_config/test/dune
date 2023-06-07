@@ -1,22 +1,42 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test_proxy_server_config)
+(library
+ (name src_lib_proxy_server_config_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-base.unix
   tezos-proxy-server-config
   tezos-test-helpers
   qcheck-alcotest
-  alcotest-lwt
+  octez-alcotezt
   uri)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
-  -open Tezos_test_helpers))
+  -open Tezos_test_helpers
+  -open Octez_alcotezt)
+ (modules test_proxy_server_config))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_proxy_server_config_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-proxy-server-config)
- (action (run %{dep:./test_proxy_server_config.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

@@ -177,9 +177,32 @@ let benchmark_from_kinstr_and_stack :
     Interpreter_workload.ir_sized_step list Generator.benchmark =
  fun ?amplification ctxt step_constants stack_kinstr ->
   let ctxt = Gas_helpers.set_limit ctxt in
+  let measure_allocation ~outdated_ctxt ~step_constants ~kinstr ~bef_top ~bef ()
+      =
+    let result =
+      Lwt_main.run
+      @@ Script_interpreter.Internals.step
+           (outdated_ctxt, step_constants)
+           (Local_gas_counter 9_999_999_999)
+           kinstr
+           bef_top
+           bef
+    in
+    Option.map (fun (stack_top, stack, _, _) ->
+        let size_after =
+          Obj.reachable_words (Obj.repr (stack_top, stack, bef_top, bef))
+        in
+        let size_before =
+          Obj.reachable_words (Obj.repr (bef_top, bef, bef_top, bef))
+        in
+
+        size_after - size_before)
+    @@ Result.to_option result
+  in
+
   match stack_kinstr with
   | Ex_stack_and_kinstr {stack = bef_top, bef; stack_type; kinstr} ->
-      let workload, closure =
+      let workload, closure, measure_allocation =
         match amplification with
         | None ->
             let workload =
@@ -194,8 +217,8 @@ let benchmark_from_kinstr_and_stack :
               Local_gas_counter.local_gas_counter_and_outdated_context ctxt
             in
             let closure () =
+              (* Lwt_main.run *)
               ignore
-                (* Lwt_main.run *)
                 (Script_interpreter.Internals.step
                    (outdated_ctxt, step_constants)
                    (Local_gas_counter 9_999_999_999)
@@ -203,7 +226,15 @@ let benchmark_from_kinstr_and_stack :
                    bef_top
                    bef)
             in
-            (workload, closure)
+            let measure_allocation =
+              measure_allocation
+                ~outdated_ctxt
+                ~step_constants
+                ~kinstr
+                ~bef_top
+                ~bef
+            in
+            (workload, closure, measure_allocation)
         | Some amplification_factor ->
             assert (amplification_factor > 0) ;
             let workload =
@@ -232,9 +263,17 @@ let benchmark_from_kinstr_and_stack :
                      bef)
               done
             in
-            (workload, closure)
+            let measure_allocation =
+              measure_allocation
+                ~outdated_ctxt
+                ~step_constants
+                ~kinstr
+                ~bef_top
+                ~bef
+            in
+            (workload, closure, measure_allocation)
       in
-      Generator.Plain {workload; closure}
+      Generator.PlainWithAllocation {workload; closure; measure_allocation}
 
 let make_benchmark :
     ?amplification:int ->
@@ -264,15 +303,17 @@ let make_benchmark :
     let models =
       (* [intercept = true] implies there's a benchmark with [intercept = false].
          No need to register the model twice. *)
-      Interpreter_model.make_model
-        ?amplification
-        (if intercept then None else Some (Instr_name name))
+      Interpreter_model.make_model ?amplification (Instr_name name)
 
     let info, name =
       info_and_name
         ~intercept
         ?salt
         (Interpreter_workload.string_of_instruction_name name)
+
+    let module_filename = __FILE__
+
+    let generated_code_destination = None
 
     let benchmark kinstr_and_stack_sampler ctxt step_constants () =
       let stack_instr = kinstr_and_stack_sampler () in
@@ -546,16 +587,17 @@ let make_continuation_benchmark :
 
     let tags = tags @ more_tags
 
-    let models =
-      Interpreter_model.make_model
-        ?amplification
-        (if intercept then None else Some (Cont_name name))
+    let models = Interpreter_model.make_model ?amplification (Cont_name name)
 
     let info, name =
       info_and_name
         ~intercept
         ?salt
         (Interpreter_workload.string_of_continuation_name name)
+
+    let module_filename = __FILE__
+
+    let generated_code_destination = None
 
     let benchmark cont_and_stack_sampler ctxt step_constants () =
       let stack_instr = cont_and_stack_sampler () in
@@ -652,6 +694,10 @@ module Registration_section = struct
 
       let info = "Benchmarking the cost of an empty loop"
 
+      let module_filename = __FILE__
+
+      let generated_code_destination = None
+
       let tags = [Tags.interpreter]
 
       type config = {max_iterations : int}
@@ -720,9 +766,17 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~amplification:100
-        ~name:Interpreter_workload.N_IConst
+        ~name:Interpreter_workload.N_IPush
         ~stack_type:(unit @$ unit @$ bot)
-        ~kinstr:(IConst (dummy_loc, unit, (), halt))
+        ~kinstr:(IPush (dummy_loc, unit, (), halt))
+        ()
+
+    let () =
+      simple_benchmark
+        ~amplification:100
+        ~name:Interpreter_workload.N_IUnit
+        ~stack_type:(unit @$ unit @$ bot)
+        ~kinstr:(IUnit (dummy_loc, halt))
         ()
 
     (* deep stack manipulation *)
@@ -1053,7 +1107,7 @@ module Registration_section = struct
         ()
   end
 
-  module Unions = struct
+  module Ors = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_ILeft
@@ -1071,7 +1125,7 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IIf_left
-        ~stack_type:(cunion unit unit @$ bot)
+        ~stack_type:(cor unit unit @$ bot)
         ~kinstr:
           (IIf_left
              {
@@ -1927,7 +1981,6 @@ module Registration_section = struct
     let () =
       simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IEdiv_teznat
-        ~intercept_stack:(Alpha_context.Tez.zero, (Script_int.zero_n, eos))
         ~stack_type:(mutez @$ nat @$ bot)
         ~kinstr:(IEdiv_teznat (dummy_loc, halt))
         ~stack_sampler:(fun cfg rng_state ->
@@ -1940,7 +1993,6 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IEdiv_tez
-        ~intercept_stack:(Alpha_context.Tez.zero, (Alpha_context.Tez.zero, eos))
         ~stack_type:(mutez @$ mutez @$ bot)
         ~kinstr:(IEdiv_tez (dummy_loc, halt))
         ()
@@ -1984,7 +2036,6 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IIs_nat
-        ~intercept_stack:(zero, eos)
         ~stack_type:(int @$ bot)
         ~kinstr:(IIs_nat (dummy_loc, halt))
         ()
@@ -2014,7 +2065,6 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IInt_nat
-        ~intercept_stack:(zero_n, eos)
         ~stack_type:(nat @$ bot)
         ~kinstr:(IInt_nat (dummy_loc, halt))
         ()
@@ -2170,9 +2220,9 @@ module Registration_section = struct
         ILoop ->
         either
         - IHalt (false on top of stack)
-        - IConst false ; IHalt (true on top of stack)
+        - IPush false ; IHalt (true on top of stack)
        *)
-      let push_false = IConst (dummy_loc, bool, false, halt) in
+      let push_false = IPush (dummy_loc, bool, false, halt) in
       simple_benchmark
         ~name:Interpreter_workload.N_ILoop
         ~stack_type:(bool @$ bot)
@@ -2188,7 +2238,7 @@ module Registration_section = struct
       let cons_r = ICons_right (dummy_loc, unit, halt) in
       simple_benchmark
         ~name:Interpreter_workload.N_ILoop_left
-        ~stack_type:(cunion unit unit @$ bot)
+        ~stack_type:(cor unit unit @$ bot)
         ~kinstr:(ILoop_left (dummy_loc, cons_r, halt))
         ()
 
@@ -2196,7 +2246,7 @@ module Registration_section = struct
       (*
         IDip ->
         IHalt ->
-        IConst ->
+        IPush ->
         IHalt
        *)
       simple_benchmark
@@ -2226,7 +2276,7 @@ module Registration_section = struct
           kaft = unit @$ bot;
           kinstr =
             IDrop
-              (dummy_loc, IDrop (dummy_loc, IConst (dummy_loc, unit, (), halt)));
+              (dummy_loc, IDrop (dummy_loc, IPush (dummy_loc, unit, (), halt)));
         }
       in
       LamRec (descr, Micheline.Int (dummy_loc, Z.zero))
@@ -2276,8 +2326,7 @@ module Registration_section = struct
             kaft = unit @$ bot;
             kinstr =
               IDrop
-                ( dummy_loc,
-                  IDrop (dummy_loc, IConst (dummy_loc, unit, (), halt)) );
+                (dummy_loc, IDrop (dummy_loc, IPush (dummy_loc, unit, (), halt)));
           }
         in
         LamRec (descr, Micheline.Int (dummy_loc, Z.zero))
@@ -2723,12 +2772,16 @@ module Registration_section = struct
 
         let info = info
 
+        let module_filename = __FILE__
+
+        let generated_code_destination = None
+
         include Default_config
         include Default_boilerplate
 
         let models =
           Interpreter_model.make_model
-            (Some (Instr_name Interpreter_workload.N_ISapling_verify_update))
+            (Instr_name Interpreter_workload.N_ISapling_verify_update)
 
         let stack_type =
           let spl_state = sapling_state memo_size in
@@ -3259,7 +3312,7 @@ module Registration_section = struct
           let open Alpha_context in
           let step_constants =
             {
-              source = Contract (Implicit Signature.Public_key_hash.zero);
+              sender = Contract (Implicit Signature.Public_key_hash.zero);
               payer = Signature.Public_key_hash.zero;
               self = Contract_hash.zero;
               amount = Tez.zero;
@@ -3284,7 +3337,7 @@ module Registration_section = struct
         ~amplification:100
         ~name:Interpreter_workload.N_KLoop_in
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
-          let cont = KLoop_in (IConst (dummy_loc, bool, false, halt), KNil) in
+          let cont = KLoop_in (IPush (dummy_loc, bool, false, halt), KNil) in
           let stack = (false, ((), eos)) in
           let stack_type = bool @$ unit @$ bot in
           fun () -> Ex_stack_and_cont {stack; cont; stack_type})
@@ -3303,7 +3356,7 @@ module Registration_section = struct
             KLoop_in_left (ICons_right (dummy_loc, unit, halt), KNil)
           in
           let stack = (R (), eos) in
-          let stack_type = cunion unit unit @$ bot in
+          let stack_type = cor unit unit @$ bot in
           fun () -> Ex_stack_and_cont {stack; cont; stack_type})
         ()
 

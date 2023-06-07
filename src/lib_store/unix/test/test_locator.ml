@@ -25,12 +25,11 @@
 
 (** Testing
     -------
-    Component:    Shell
-    Invocation:   dune exec src/lib_shell/test/test_locator.exe
+    Component: Store
+    Invocation:   dune exec src/lib_shell/test/main.exe \
+                  -- --file test_locator.ml
     Subject:      Checks operations on locators.
 *)
-
-(** Basic blocks *)
 
 module Assert = Assert
 
@@ -374,66 +373,6 @@ let compute_size_chain size_locator =
    chain 2 months 86k    covered by locator 120
 *)
 
-(** Test if the linear and exponential locator are the same and outputs
-    their timing.
-    Run the test with:
-    $ dune build @runtest_locator
-    Copy the output to a file timing.dat and plot it with:
-    $ generate_locator_plot.sh timing.dat
-*)
-let bench_locator base_dir =
-  let open Lwt_result_syntax in
-  let size_chain = 80000 in
-  (* timing locators with average over [runs] times *)
-  let runs = 10 in
-  let _ = Printf.printf "#runs %i\n" runs in
-  (* limit after which exp should go linear *)
-  let exp_limit = compute_size_chain 120 in
-  let _ = Printf.printf "#exp_limit %i\n" exp_limit in
-  (* size after which locator always reaches genesis *)
-  let locator_limit = compute_size_locator size_chain in
-  let _ = Printf.printf "#locator_limit %i\n" locator_limit in
-  let*! store = init_chain base_dir in
-  let chain_store = Store.main_chain_store store in
-  time1 (fun () -> make_empty_chain chain_store size_chain)
-  |> fun (res, t_chain) ->
-  let _ =
-    Printf.printf
-      "#size_chain %i built in %f sec\n#      size      exp       lins\n"
-      size_chain
-      t_chain
-  in
-  let*! head = res in
-  let check_locator max_size : unit tzresult Lwt.t =
-    let*! caboose, _ = Store.Chain.caboose chain_store in
-    let* block = Store.Block.read_block chain_store head in
-    time ~runs (fun () ->
-        Store.Chain.compute_locator chain_store ~max_size block seed)
-    |> fun (l_exp, t_exp) ->
-    time ~runs (fun () ->
-        compute_linear_locator chain_store ~caboose ~max_size block)
-    |> fun (l_lin, t_lin) ->
-    let*! {Block_locator.history = l_exp; _} = l_exp in
-    let*! {Block_locator.history = l_lin; _} = l_lin in
-    let _ = Printf.printf "%10i %f %f\n" max_size t_exp t_lin in
-    Lwt.return
-    @@ List.iter2
-         ~when_different_lengths:(TzTrace.make @@ Exn (Failure __LOC__))
-         (fun hn ho ->
-           if not (Block_hash.equal hn ho) then
-             Assert.fail_msg "Invalid locator %i" max_size)
-         l_exp
-         l_lin
-  in
-  let stop = locator_limit + 20 in
-  let rec loop size =
-    if size < stop then
-      let* _ = check_locator size in
-      loop (size + 5)
-    else return_unit
-  in
-  loop 1
-
 let test_protocol_locator base_dir =
   let open Lwt_result_syntax in
   let*! store = init_chain base_dir in
@@ -619,22 +558,5 @@ let tests =
     wrap "test protocol locator" test_protocol_locator;
   ]
 
-let bench = [wrap "bench locator" bench_locator]
-
-let tests =
-  tests
-  @
-  if Array.length Sys.argv > 1 then
-    match Sys.argv.(1) with "--bench" -> bench | _ -> []
-  else []
-
-let tests =
-  tests
-  @
-  if Array.length Sys.argv > 1 then
-    match Sys.argv.(1) with "--bench" -> bench | _ -> []
-  else []
-
 let () =
-  Alcotest_lwt.run ~argv:[|""|] "tezos-store" [("locator", tests)]
-  |> Lwt_main.run
+  Alcotest_lwt.run ~__FILE__ "tezos-store" [("locator", tests)] |> Lwt_main.run

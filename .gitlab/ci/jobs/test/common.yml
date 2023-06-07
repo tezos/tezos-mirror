@@ -10,9 +10,6 @@
   stage: test
   before_script:
     - . ./scripts/version.sh
-    # Load the environment poetry previously created in the docker image.
-    # Give access to the Python dependencies/executables
-    - . $HOME/.venv/bin/activate
   retry: 2
 
 # Merge coverage files after the execution
@@ -35,46 +32,10 @@
 .integration_template:
   extends:
     - .test_template
+    - .image_template__runtime_build_e2etest_dependencies_template
     - .template__coverage_files
-  dependencies: ["build_x86_64"]
+  dependencies: ["build_x86_64", "tezt:fetch-records"]
   # Start immediately after 'build_x86_64' and don't wait for
   # intermediate stages to succeed
-  needs: ["build_x86_64"]
+  needs: ["build_x86_64", "tezt:fetch-records"]
 
-# definition for the environment to run all integration tests
-# integration tests are run only on x86_64 architectures (for now)
-.pytest_template:
-  extends:
-    - .test_template
-  dependencies: ["build_x86_64"]
-  # Start immediately after 'build_x86_64' and don't wait for
-  # intermediate stages to succeed
-  needs: ["build_x86_64"]
-  before_script:
-    # Load the environment poetry previously created in the docker image.
-    # Give access to the Python dependencies/executables
-    - . $HOME/.venv/bin/activate
-    - mkdir tests_python/tmp
-    - cd tests_python
-
-
-.pytest_integration:
-  extends:
-    - .pytest_template
-    - .template__coverage_files
-  # the number of jobs have been choosen to give jobs of maximal
-  # length ~10 minutes and to accommodate the addition of new protocol
-  # test suites without increasing wall time of the test stage.
-  variables:
-    TESTS: ""
-  script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-pytest
-  artifacts:
-    paths:
-      - tests_python/tmp/
-      - tests_python/reports/*.xml
-      - $BISECT_FILE
-    reports:
-      junit: tests_python/reports/*.xml
-    expire_in: 7 day
-    when: always

@@ -34,6 +34,10 @@ module Inbox_add_message : Benchmark.S = struct
 
   let info = "Benchmark for Merkle.add_message"
 
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
+
   let tags = ["tx_rollup"; "merkle"; "inbox"; "add_message"]
 
   type config = {max_messages : int}
@@ -82,7 +86,8 @@ module Inbox_add_message : Benchmark.S = struct
     let conv (messages, _) = (List.length messages, ()) in
     [
       ( "tx_rollup",
-        Model.make ~conv ~model:(Model.logn ~coeff:(fv "n_message_coeff")) );
+        Model.make ~conv ~model:(Model.logn ~name ~coeff:(fv "n_message_coeff"))
+      );
     ]
 
   let create_benchmarks ~rng_state ~bench_num ({max_messages} : config) =
@@ -115,6 +120,10 @@ module Commitment_full_compact_bench : Benchmark.S = struct
 
   let info = "Benchmark for Tx_rollup_commitment_repr.Full.compact"
 
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
+
   let tags = ["tx_rollup"; "merkle"; "commitment"; "compact"]
 
   type config = {max_messages : int}
@@ -144,6 +153,7 @@ module Commitment_full_compact_bench : Benchmark.S = struct
           ~conv
           ~model:
             (Model.affine
+               ~name
                ~intercept:(fv "full_compact_bench_intercept")
                ~coeff:(fv "n_messages_coeff")) );
     ]
@@ -543,6 +553,10 @@ module Verify_proof_compute_bench : Benchmark.S = struct
 
   let info = "Benchmark for Tx_rollup.verify_proof"
 
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
+
   let tags = ["tx_rollup"; "merkle"; "verify"; "proof"]
 
   type config = {max_withdrawals : int}
@@ -580,6 +594,7 @@ module Verify_proof_compute_bench : Benchmark.S = struct
           ~conv
           ~model:
             (Model.bilinear
+               ~name
                ~coeff1:(fv "proof_size_coeff")
                ~coeff2:(fv "message_size_coeff")) );
     ]

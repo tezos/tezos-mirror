@@ -2344,7 +2344,9 @@ let commands_rw () =
                 | Some hash -> Lwt_result_syntax.return hash))
       @@ param
            ~name:"ballot"
-           ~desc:"the ballot value (yea/yay, nay, or pass)"
+           ~desc:
+             "the ballot value (yea, nay, or pass; yay is a deprecated synonym \
+              for yea)"
            (parameter
               ~autocomplete:(fun _ ->
                 Lwt_result_syntax.return ["yea"; "nay"; "pass"])
@@ -3233,15 +3235,20 @@ let commands_rw () =
     command
       ~group
       ~desc:"Originate a new smart rollup."
-      (args7
+      (args8
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
          fee_parameter_args
          storage_limit_arg
-         counter_arg)
-      (prefixes ["originate"; "smart"; "rollup"; "from"]
+         counter_arg
+         (Client_keys.force_switch ()))
+      (prefixes ["originate"; "smart"; "rollup"]
+      @@ SoruAlias.fresh_alias_param
+           ~name:"alias"
+           ~desc:"name of the new smart rollup"
+      @@ prefix "from"
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the account originating the smart rollup."
@@ -3269,7 +3276,9 @@ let commands_rw () =
              simulation,
              fee_parameter,
              storage_limit,
-             counter )
+             counter,
+             force )
+           alias
            source
            kind
            parameters_ty
@@ -3281,7 +3290,7 @@ let commands_rw () =
         let Michelson_v1_parser.{expanded; _} = parameters_ty in
         let parameters_ty = Script.lazy_expr expanded in
         let* boot_sector = boot_sector pvm in
-        let* _res =
+        let* _, _, res =
           sc_rollup_originate
             cctxt
             ~chain:cctxt#chain
@@ -3302,7 +3311,26 @@ let commands_rw () =
             ~parameters_ty
             ()
         in
-        return_unit);
+        match res with
+        | Apply_results.Manager_operation_result
+            {
+              operation_result =
+                Apply_operation_result.Applied
+                  (Apply_results.Sc_rollup_originate_result
+                    {address = rollup_address; _});
+              _;
+            } ->
+            let* alias = SoruAlias.of_fresh cctxt force alias in
+            let* () = SoruAlias.add ~force cctxt alias rollup_address in
+            let*! () =
+              cctxt#message
+                {|Smart rollup %a memorized as "%s"|}
+                Sc_rollup.Address.pp
+                rollup_address
+                alias
+            in
+            return_unit
+        | _ -> return_unit);
     command
       ~group
       ~desc:"Send one or more messages to a smart rollup."
@@ -3404,12 +3432,10 @@ let commands_rw () =
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["for"; "smart"; "rollup"]
-      @@ param
-           ~name:"smart_rollup_address"
+      @@ Sc_rollup_params.sc_rollup_address_param
            ~desc:
              "The address of the smart rollup where the commitment will be \
               published."
-           Sc_rollup_params.sc_rollup_address_parameter
       @@ prefixes ["with"; "compressed"; "state"]
       @@ param
            ~name:"compressed_state"
@@ -3492,12 +3518,10 @@ let commands_rw () =
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["for"; "smart"; "rollup"]
-      @@ param
-           ~name:"smart_rollup_address"
+      @@ Sc_rollup_params.sc_rollup_address_param
            ~desc:
              "The address of the smart rollup of which the commitment will be \
               cemented."
-           Sc_rollup_params.sc_rollup_address_parameter
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -3545,12 +3569,10 @@ let commands_rw () =
          counter_arg
          fee_parameter_args)
       (prefixes ["timeout"; "dispute"; "on"; "smart"; "rollup"]
-      @@ param
-           ~name:"smart_rollup_address"
+      @@ Sc_rollup_params.sc_rollup_address_param
            ~desc:
              "The address of the smart rollup where the staker of the dispute \
               has timed-out."
-           Sc_rollup_params.sc_rollup_address_parameter
       @@ prefixes ["with"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"staker1"
@@ -3655,10 +3677,8 @@ let commands_rw () =
          storage_limit_arg
          counter_arg)
       (prefixes ["execute"; "outbox"; "message"; "of"; "smart"; "rollup"]
-      @@ param
-           ~name:"smart_rollup_address"
+      @@ Sc_rollup_params.sc_rollup_address_param
            ~desc:"The address of the smart rollup where the message resides."
-           Sc_rollup_params.sc_rollup_address_parameter
       @@ prefix "from"
       @@ Client_keys.Public_key_hash.source_param
            ~name:"source"
@@ -3727,10 +3747,8 @@ let commands_rw () =
            ~name:"staker"
            ~desc:"The implicit account that owns the frozen bond."
       @@ prefixes ["for"; "smart"; "rollup"]
-      @@ Tezos_clic.param
-           ~name:"smart rollup address"
+      @@ Sc_rollup_params.sc_rollup_address_param
            ~desc:"The address of the smart rollup of the bond."
-           Sc_rollup_params.sc_rollup_address_parameter
       @@ prefixes ["from"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"

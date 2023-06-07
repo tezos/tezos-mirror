@@ -208,5 +208,9 @@ module Internal_for_tests : sig
 
   val mock_authenticated_connection : 'meta -> 'meta authenticated_connection
 
-  val mock : 'meta authenticated_connection -> ('msg, 'meta) t
+  val mock :
+    ?reader:(int * 'msg) tzresult Lwt_pipe.Maybe_bounded.t ->
+    ?writer:(bytes list * unit tzresult Lwt.u option) Lwt_pipe.Maybe_bounded.t ->
+    'meta authenticated_connection ->
+    ('msg, 'meta) t
 end

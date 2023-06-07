@@ -12,10 +12,12 @@ include:
   - .gitlab/ci/jobs/build/static_x86_64_experimental.yml
   - .gitlab/ci/jobs/build/arm64.yml
   - .gitlab/ci/jobs/build/x86_64.yml
+  - .gitlab/ci/jobs/build/kernels.yml
   - .gitlab/ci/jobs/build/get_contracts.yml
   - .gitlab/ci/jobs/doc/build_all.yml
   - .gitlab/ci/jobs/build/docker_amd64_test_manual.yml
   - .gitlab/ci/jobs/build/docker_arm64_test_manual.yml
+  - .gitlab/ci/jobs/build/tezt_fetch_records.yml
 
   # Stage: test
   - .gitlab/ci/jobs/test/check_precommit_hook.yml
@@ -26,12 +28,9 @@ include:
   - .gitlab/ci/jobs/test/unit.yml
   - .gitlab/ci/jobs/test/integration_compiler_rejections.yml
   - .gitlab/ci/jobs/test/check_scripts.yml
-  - .gitlab/ci/jobs/test/python_integration_tests.yml
-  - .gitlab/ci/jobs/test/integration_pytest_old_protocols.yml
   - .gitlab/ci/jobs/test/liquidity_baking_scripts-integrity.yml
   - .gitlab/ci/jobs/test/tezt.yml
   - .gitlab/ci/jobs/test/tezt_build_long.yml
-  - .gitlab/ci/jobs/test/tezt_self_tests.yml
 
   # Stage: test_coverage
   # Only run on merge requests that do not have the label `ci--no-coverage`

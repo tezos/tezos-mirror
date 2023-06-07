@@ -1,0 +1,95 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_proto_017_PtNairob_lib_protocol_test_unit_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  tezos-base
+  tezos-base-test-helpers
+  tezos-micheline
+  tezos-client-017-PtNairob
+  tezos-client-base
+  tezos-protocol-017-PtNairob.parameters
+  tezos-protocol-environment
+  tezos-stdlib-unix
+  tezos-protocol-017-PtNairob
+  tezos-test-helpers
+  tezos-017-PtNairob-test-helpers
+  octez-alcotezt
+  tezos-scoru-wasm-helpers
+  tezos-stdlib
+  tezos-crypto-dal
+  tezos-scoru-wasm
+  tezos-webassembly-interpreter-extra)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_base_test_helpers
+  -open Tezos_micheline
+  -open Tezos_client_017_PtNairob
+  -open Tezos_protocol_017_PtNairob_parameters
+  -open Tezos_protocol_017_PtNairob
+  -open Tezos_test_helpers
+  -open Tezos_017_PtNairob_test_helpers
+  -open Octez_alcotezt
+  -open Tezos_scoru_wasm_helpers
+  -open Tezos_stdlib
+  -open Tezos_crypto_dal
+  -open Tezos_webassembly_interpreter_extra)
+ (modules
+  test_bond_id_repr
+  test_consensus_key
+  test_contract_repr
+  test_destination_repr
+  test_fitness
+  test_fixed_point
+  test_gas_monad
+  test_global_constants_storage
+  test_level_module
+  test_liquidity_baking_repr
+  test_merkle_list
+  test_operation_repr
+  test_qty
+  test_receipt
+  test_round_repr
+  test_saturation
+  test_sc_rollup_arith
+  test_sc_rollup_game
+  test_sc_rollup_inbox
+  test_sc_rollup_management_protocol
+  test_sc_rollup_storage
+  test_skip_list_repr
+  test_tez_repr
+  test_time_repr
+  test_zk_rollup_storage
+  test_sc_rollup_inbox_legacy
+  test_sc_rollup_wasm
+  test_local_contexts
+  test_dal_slot_proof))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_proto_017_PtNairob_lib_protocol_test_unit_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-017-PtNairob-tests)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

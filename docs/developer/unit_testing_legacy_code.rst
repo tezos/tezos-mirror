@@ -19,7 +19,7 @@ In the rest of this page, "testable" means "unit-testable", for conciseness.
 Here "legacy" is a loose term, encompassing:
 
 - existing code written by other developers, not necessarily containing a right amount of built-in unit tests
-- code that is only tested by heavy/slow/high level tests, like :doc:`Tezt <tezt>` or :doc:`Python tests <python_testing_framework>` - this is often a symptom of code that is hard to unit-test
+- code that is only tested by heavy/slow/high level tests, like :doc:`Tezt <tezt>` - this is often a symptom of code that is hard to unit-test
 - tightly-coupled code (e.g. module ``A`` directly depends on functions of modules ``B``, ``C`` and ``D``, thus unit-testing ``A`` requires setting everything up for ``B``, ``C`` and ``D`` too, which not only makes unit testing harder, but is also complex and brittle)
 - code that calls system functions (e.g. ``Unix.chmod``, which requires modifying actual files on the filesystem, also making unit testing harder) or more generally any kind of side-effecting function
 

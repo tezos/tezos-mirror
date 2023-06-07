@@ -17,15 +17,17 @@ depends: [
   "tezos-rpc"
   "tezos-micheline"
   "tezos-event-logging"
-  "ptime" { >= "1.0.0" }
+  "ptime" { >= "1.1.0" }
   "ezjsonm" { >= "1.1.0" }
   "lwt" { >= "5.6.0" }
   "ipaddr" { >= "5.0.0" & < "6.0.0" }
   "uri" { >= "3.1.0" }
   "tezos-hacl"
   "tezos-stdlib-unix"
-  "qcheck-alcotest" { with-test & >= "0.20" }
+  "tezt" { with-test & >= "3.1.0" }
   "tezos-test-helpers" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.20" }
+  "octez-alcotezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]

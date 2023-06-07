@@ -23,20 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
-
-   This file is part of the test suite for the new mempool, which
-   uses features of the protocol that only exist since Lima.
-
-   When you modify this file, consider whether you should also change
-   the ones that test the legacy mempool for Kathmandu. They all
-   start with the "legacy" prefix and will be removed when Lima is
-   activated on Mainnet. *)
-
 (** Testing
     -------
     Component:    Shell_operation and others
-    Invocation:   dune exec src/lib_shell/test/test_shell_operation.exe
+    Invocation:   dune exec src/lib_shell/test/main.exe \
+                  -- --file test_shell_operation.ml
     Subject:      Unit tests for [Shell_operation], and for other
                   components e.g. [Requester] when the tests rely on
                   the operation representation provided by
@@ -263,6 +254,7 @@ let () =
       handle_branch_pairs
   in
   Alcotest.run
+    ~__FILE__
     "Shell_operation"
     [
       ( "Corner cases",

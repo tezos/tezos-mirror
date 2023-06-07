@@ -37,7 +37,7 @@ let () =
   let open Data_encoding in
   register_error_kind
     `Permanent
-    ~id:"test_failure"
+    ~id:(Protocol.name ^ "_test_failure")
     ~title:"Test failure"
     ~description:"Test failure."
     ~pp:(fun ppf e -> Format.fprintf ppf "Test failure: %s" e)
@@ -48,8 +48,7 @@ let () =
 let mk_cryptobox dal_params =
   let open Result_syntax in
   let parameters =
-    Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
-      ~slot_size:dal_params.S.slot_size
+    Cryptobox.Internal_for_tests.parameters_initialisation dal_params
   in
   let () = Cryptobox.Internal_for_tests.load_parameters parameters in
   match Cryptobox.make dal_params with
@@ -68,7 +67,7 @@ let derive_dal_parameters (reference : Cryptobox.parameters) ~redundancy_factor
 module Make (Parameters : sig
   val dal_parameters : Alpha_context.Constants.Parametric.dal
 
-  val cryptobox : Cryptobox.t
+  val cryptobox : Cryptobox.t Lazy.t
 end) =
 struct
   (* Some global constants. *)
@@ -91,6 +90,7 @@ struct
 
   let dal_mk_polynomial_from_slot slot_data =
     let open Result_syntax in
+    let cryptobox = Lazy.force cryptobox in
     match Cryptobox.polynomial_from_slot cryptobox slot_data with
     | Ok p -> return p
     | Error (`Slot_wrong_size s) ->
@@ -102,17 +102,26 @@ struct
 
   let dal_mk_prove_page polynomial page_id =
     let open Result_syntax in
+    let cryptobox = Lazy.force cryptobox in
     match Cryptobox.prove_page cryptobox polynomial page_id.P.page_index with
     | Ok p -> return p
-    | Error `Segment_index_out_of_range ->
-        fail [Test_failure "compute_proof_segment: Segment_index_out_of_range"]
+    | Error `Page_index_out_of_range ->
+        fail [Test_failure "compute_proof_segment: Page_index_out_of_range"]
+    | Error (`Invalid_degree_strictly_less_than_expected _ as commit_error) ->
+        fail [Test_failure (Cryptobox.string_of_commit_error commit_error)]
 
   let mk_slot ?(level = level_one) ?(index = S.Index.zero)
       ?(fill_function = fun _i -> 'x') () =
     let open Result_syntax in
     let slot_data = Bytes.init params.slot_size fill_function in
     let* polynomial = dal_mk_polynomial_from_slot slot_data in
-    let commitment = Cryptobox.commit cryptobox polynomial in
+    let cryptobox = Lazy.force cryptobox in
+    let* commitment =
+      match Cryptobox.commit cryptobox polynomial with
+      | Ok cm -> return cm
+      | Error (`Invalid_degree_strictly_less_than_expected _ as commit_error) ->
+          fail [Test_failure (Cryptobox.string_of_commit_error commit_error)]
+    in
     return
       ( slot_data,
         polynomial,

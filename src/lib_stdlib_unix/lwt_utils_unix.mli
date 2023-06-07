@@ -79,8 +79,16 @@ val write_bytes :
     kind is [S_DIR]). *)
 val is_directory : string -> bool Lwt.t
 
+(** [dir_exists] tests if the given [path] (or the target of the
+    symbolic link located at [path]) is an existing directory. [false]
+    is returned either if the target does not exist or if it is not a
+    directory. *)
+val dir_exists : string -> bool Lwt.t
+
 val remove_dir : string -> unit Lwt.t
 
+(** [create_dir ?perm dir] creates the directory at the path [dir] and
+    its parents recursively if they doesn't exist *)
 val create_dir : ?perm:int -> string -> unit Lwt.t
 
 (** [copy_dir ?perm src dst] copies the content of directory [src] in
@@ -174,7 +182,7 @@ val with_open_out :
   ('a, [`Open | `Close] io_error) result Lwt.t
 
 (** [with_atomic_open_out ?(overwrite=true) filename ?temp_dir f] is a
-   wrapper around [with_open_out] were it ensures that the data are
+   wrapper around [with_open_out] that ensures that the data are
    written onto [filename] in an atomic way.
 
    This function uses a temporary file stored in the [temp_dir]

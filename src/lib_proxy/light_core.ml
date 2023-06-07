@@ -73,7 +73,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
       let open Lwt_syntax in
       let+ repo = Store.Tree.make_repo () in
       let root =
-        Store.Tree.empty (Tezos_context_memory.make_empty_context ())
+        Store.Tree.empty (Tezos_context_memory.Context.make_empty_context ())
       in
       {repo; root}
 

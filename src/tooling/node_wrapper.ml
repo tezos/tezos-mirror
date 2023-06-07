@@ -24,7 +24,7 @@ let code_for_lib = function
   | "ocaml-bls12-381" ->
       {|
 (function () {
-  var loader = require('@dannywillems/ocaml-bls12-381');
+  var loader = require('@nomadic-labs/ocaml-bls12-381');
   return loader().then(function(loaded) {
     console.log('bls12-381 loaded');
     global._BLS12381 = loaded})

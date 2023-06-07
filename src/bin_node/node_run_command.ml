@@ -95,30 +95,6 @@ module Event = struct
       ~level:Notice
       ()
 
-  let read_identity =
-    declare_1
-      ~section
-      ~name:"read_identity"
-      ~msg:"read identity file"
-      ~level:Notice
-      ("peer_id", P2p_peer.Id.encoding)
-
-  let generating_identity =
-    declare_0
-      ~section
-      ~name:"generating_identity"
-      ~msg:"generating an identity file"
-      ~level:Notice
-      ()
-
-  let identity_generated =
-    declare_1
-      ~section
-      ~name:"identity_generated"
-      ~msg:"identity file generated"
-      ~level:Notice
-      ("peer_id", P2p_peer.Id.encoding)
-
   let disabled_config_validation =
     declare_0
       ~section
@@ -218,24 +194,27 @@ end
 open Filename.Infix
 
 let init_identity_file (config : Config_file.t) =
-  let open Lwt_result_syntax in
+  let check_data_dir ~data_dir =
+    let dummy_genesis =
+      {
+        Genesis.time = Time.Protocol.epoch;
+        block = Block_hash.zero;
+        protocol = Protocol_hash.zero;
+      }
+    in
+    Data_version.ensure_data_dir ~mode:Exists dummy_genesis data_dir
+  in
   let identity_file =
     config.data_dir // Data_version.default_identity_file_name
   in
-  if Sys.file_exists identity_file then
-    let* identity = Node_identity_file.read identity_file in
-    let*! () = Event.(emit read_identity) identity.peer_id in
-    return identity
-  else
-    let*! () = Event.(emit generating_identity) () in
-    let* identity =
-      Node_identity_file.generate identity_file config.p2p.expected_pow
-    in
-    let*! () = Event.(emit identity_generated) identity.peer_id in
-    return identity
+  Identity_file.init
+    ~check_data_dir
+    ~identity_file
+    ~expected_pow:config.p2p.expected_pow
 
 let init_node ?sandbox ?target ~identity ~singleprocess
-    ~force_history_mode_switch (config : Config_file.t) =
+    ~external_validator_log_config ~force_history_mode_switch
+    (config : Config_file.t) =
   let open Lwt_result_syntax in
   (* TODO "WARN" when pow is below our expectation. *)
   let*! () =
@@ -295,6 +274,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess
             proof_of_work_target =
               Tezos_crypto.Crypto_box.make_pow_target config.p2p.expected_pow;
             trust_discovered_peers = sandbox <> None;
+            disable_peer_discovery = config.p2p.disable_peer_discovery;
           }
         in
         return_some (p2p_config, config.p2p.limits)
@@ -328,6 +308,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess
         config.shell.block_validator_limits.operation_metadata_size_limit;
       patch_context;
       data_dir = config.data_dir;
+      external_validator_log_config;
       store_root = Data_version.store_dir config.data_dir;
       context_root = Data_version.context_dir config.data_dir;
       protocol_root = Data_version.protocol_dir config.data_dir;
@@ -506,15 +487,23 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   let open Lwt_result_syntax in
   (* Main loop *)
   let log_cfg =
-    match verbosity with
-    | None -> config.log
-    | Some default_level -> {config.log with default_level}
+    {
+      config.log with
+      default_level = Option.value verbosity ~default:config.log.default_level;
+    }
+  in
+  let internal_events =
+    Tezos_base_unix.Internal_event_unix.make_with_defaults
+      ~enable_default_daily_logs_at:
+        Filename.Infix.(config.data_dir // "daily_logs")
+      ?internal_events:config.internal_events
+      ()
   in
   let*! () =
-    Tezos_base_unix.Internal_event_unix.init
-      ~lwt_log_sink:log_cfg
-      ~configuration:config.internal_events
-      ()
+    Tezos_base_unix.Internal_event_unix.init ~log_cfg ~internal_events ()
+  in
+  let external_validator_log_config =
+    External_validation.{internal_events; lwt_log_sink_unix = log_cfg}
   in
   let*! () =
     Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings
@@ -543,6 +532,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     init_node
       ?sandbox
       ?target
+      ~external_validator_log_config
       ~identity
       ~singleprocess
       ~force_history_mode_switch
@@ -557,7 +547,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
         | _ -> Lwt.return_unit)
       node
   in
-  let*? node = node in
+  let*? node in
   let node_downer =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
         let*! () = Event.(emit shutting_down_node) () in

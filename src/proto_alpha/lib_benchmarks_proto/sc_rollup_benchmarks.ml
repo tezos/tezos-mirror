@@ -35,7 +35,7 @@ module Pvm_state_generator = struct
   module Context = Tezos_context_memory.Context_binary
 
   module Wasm_context = struct
-    type Tezos_lazy_containers.Lazy_map.tree += Tree of Context.tree
+    type Tezos_tree_encoding.tree_instance += Tree of Context.tree
 
     module Tree = struct
       include Context.Tree
@@ -154,7 +154,7 @@ module Pvm_state_generator = struct
           gen_tree
             (tree_depth - 1)
             (let rec kont' nb_subtrees acc_subtrees subtree =
-               let*! subtree = subtree in
+               let*! subtree in
                let acc_subtrees = subtree :: acc_subtrees in
                let nb_subtrees = nb_subtrees + 1 in
                if nb_subtrees = tree_branching_factor then
@@ -288,6 +288,10 @@ module Sc_rollup_verify_output_proof_benchmark = struct
 
   let info = "Estimating the cost of verifying an output proof"
 
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
+
   let tags = ["sc_rollup"]
 
   type config = {
@@ -416,19 +420,15 @@ module Sc_rollup_verify_output_proof_benchmark = struct
   let workload_to_vector {proof_length} =
     Sparse_vec.String.of_list [("proof_length", float_of_int proof_length)]
 
-  let verify_output_proof_model =
+  let model =
+    let open Benchmarks_proto in
     Model.make
       ~conv:(fun {proof_length} -> (proof_length, ()))
-      ~model:
-        (Model.affine
-           ~intercept:(Free_variable.of_string "const")
-           ~coeff:(Free_variable.of_string "proof_length"))
-
-  let models = [("verify_output_proof", verify_output_proof_model)]
+      ~model:Model.affine
 
   let pvm_state = ref None
 
-  let benchmark rng_state conf () =
+  let create_benchmark ~rng_state conf =
     let nb_output_buffer_levels = conf.nb_output_buffer_levels in
     let output_buffer_size = conf.output_buffer_size in
     let prepare_benchmark_scenario () =
@@ -483,14 +483,6 @@ module Sc_rollup_verify_output_proof_benchmark = struct
       ignore (Lwt_main.run @@ Full_Wasm.verify_output_proof output_proof)
     in
     Generator.Plain {workload; closure}
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (benchmark rng_state config)
-
-  let () =
-    Registration.register_for_codegen
-      (Namespace.basename name)
-      (Model.For_codegen verify_output_proof_model)
 end
 
 (** This benchmark estimates the cost of verifying an output proof for the
@@ -506,6 +498,10 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
   let name = ns "Sc_rollup_deserialize_output_proof_benchmark"
 
   let info = "Estimating the cost of deserializing an output proof"
+
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
 
   let tags = ["sc_rollup"]
 
@@ -565,19 +561,15 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
   let workload_to_vector {proof_length} =
     Sparse_vec.String.of_list [("proof_length", float_of_int proof_length)]
 
-  let verify_output_proof_model =
+  let model =
+    let open Benchmarks_proto in
     Model.make
       ~conv:(fun {proof_length} -> (proof_length, ()))
-      ~model:
-        (Model.affine
-           ~intercept:(Free_variable.of_string "const")
-           ~coeff:(Free_variable.of_string "proof_length"))
-
-  let models = [("deserialize_output_proof", verify_output_proof_model)]
+      ~model:Model.affine
 
   let pvm_state = ref None
 
-  let benchmark rng_state conf () =
+  let create_benchmark ~rng_state conf =
     let prepared_benchmark_scenario =
       let nb_output_buffer_levels = conf.nb_output_buffer_levels in
       let output_buffer_size = conf.output_buffer_size in
@@ -639,19 +631,12 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
            encoded_proof)
     in
     Generator.Plain {workload; closure}
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (benchmark rng_state config)
-
-  let () =
-    Registration.register_for_codegen
-      (Namespace.basename name)
-      (Model.For_codegen verify_output_proof_model)
 end
 
 let () =
-  Registration_helpers.register (module Sc_rollup_verify_output_proof_benchmark)
+  Benchmarks_proto.Registration.register
+    (module Sc_rollup_verify_output_proof_benchmark)
 
 let () =
-  Registration_helpers.register
+  Benchmarks_proto.Registration.register
     (module Sc_rollup_deserialize_output_proof_benchmark)

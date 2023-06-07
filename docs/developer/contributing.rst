@@ -182,7 +182,7 @@ You can refer to the following table that summarizes how assignee and
 When all discussions are resolved, and the MR has got at least two
 approvals from Octez Merge Team members, the developer should squash
 any fix-up commits that were applied (remembering to edit the commit
-message appropriately). Then anyone can assign the MR to the `Nomadic
+message appropriately). Then the developer (or anyone else when not possible) can assign the MR to the `Nomadic
 Marge-bot <https://gitlab.com/nomadic-margebot>`__, which will
 automatically rebase the branch on top of master and finally merge it.
 
@@ -208,7 +208,7 @@ While working on your branch to prepare a Merge Request, make sure you respect t
    commits later.
 -  We expect every commit to compile and pass tests.
    Obviously, we require tests to pass between each MR.
--  Follow the format of commit names, `<Component>: <message>`, with
+-  Follow the format of commit names, ``<Component>: <message>``, with
    message in indicative or imperative present mood e.g. ``Shell: fix
    bug #13`` rather than ``Shell: fixed bug #13``.
    Use multiline commit messages for important commits.
@@ -316,7 +316,6 @@ Therefore, when creating your MR, observe the following rules:
     be added before any push action is made on the MR.
 
     + ``ci--opam`` is for triggering the opam packaging tests pipeline.
-    + ``ci--extended-tests`` is for triggering the extended tests pipeline, including Python tests for the non-alpha protocols.
     + ``ci--docs`` is for testing some scripts in the documentation (e.g. Octez installation scenarios).
     + ``ci--docker`` is for publishing the Docker image of the MR.
     + ``ci--arm64`` is for building on the ARM64 architecture.
@@ -324,9 +323,9 @@ Therefore, when creating your MR, observe the following rules:
 - *MR Options*: When opening an MR you should probably tick the following
   options:
 
-  + `Delete source branch when merge request is accepted.`
+  + ``Delete source branch when merge request is accepted.``
     Helps keeping the repository clean of old branches.
-  + `Squash commits when merge request is accepted.`
+  + ``Squash commits when merge request is accepted.``
     Sometimes it's useful to have many small commits to ease the
     review and see the story of a branch, but they are not relevant
     for the history of the project. In this case they can be squashed
@@ -334,7 +333,7 @@ Therefore, when creating your MR, observe the following rules:
     should squash yourself all fix-up commits when all discussions are resolved,
     as described above in the :ref:`MR workflow <mr_workflow>`, in order
     to ease the reviewers' task.
-  + `Allow commits from members who can merge to the target branch.`
+  + ``Allow commits from members who can merge to the target branch.``
     This option is useful to allow members of the :doc:`Octez merge team <merge_team>`, who are
     not developers in your project, to commit to your branch.
     It helps to rebase and propose fixes.
@@ -552,12 +551,19 @@ Because of the amendment procedure that governs the protocol, the
 workflow for protocol development is significantly different from
 master.
 
-Before a proposal, a new directory, e.g. ``proto-005-PsBabyM1``, is
-created from ``proto_alpha`` where the development continues.
+Protocol snapshots
+~~~~~~~~~~~~~~~~~~
+
+Before a proposal, a new directory, e.g. ``proto-005-PsBabyM1/``, is
+created from ``proto_alpha/`` where the development continues.
+These directories are called *protocol snapshots*.
 
 The hash of each active or candidate protocol is computed from the directory
-``src/proto_0*/lib_protocol``, so every change in these directories
+``src/proto_0*/lib_protocol/``, so every change in these directories
 is forbidden.
+However, the protocol snapshots contain other subdirectories than the frozen ``lib_protocol/``, implementing protocol-dependent code. For instance, ``lib_client/`` implements commands in the Octez client that can invoke protocol-dependent functionalities, such as transfers between accounts.
+
+Thereby, if your MR changes code in the protocol snapshot directories (outside the frozen ``lib_protocol/``), you may consider patching the corresponding code for the other protocols as well (at least the ones which are still in use), when applicable.
 
 The Migration
 ~~~~~~~~~~~~~

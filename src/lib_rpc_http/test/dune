@@ -1,9 +1,11 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test_rpc_http)
+(library
+ (name src_lib_rpc_http_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-base.unix
   tezos-stdlib
@@ -12,16 +14,34 @@
   tezos-base-test-helpers
   tezos-rpc-http-server
   qcheck-alcotest
-  alcotest-lwt)
+  octez-alcotezt)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib
   -open Tezos_test_helpers
   -open Tezos_base_test_helpers
-  -open Tezos_rpc_http_server))
+  -open Tezos_rpc_http_server
+  -open Octez_alcotezt)
+ (modules test_rpc_http))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_rpc_http_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-rpc-http-server)
- (action (run %{dep:./test_rpc_http.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

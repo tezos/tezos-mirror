@@ -16,12 +16,12 @@ Protocol
 _`Accuser`
     When a delegate_ attempts `double signing`_ (or when it tries
     to abuse the network in another similar way), another delegate_ can make an
-    accusation, by providing evidence of the offense. The delegate_ making the accusation is called the accuser.\
+    accusation, by providing evidence of the offense. The delegate_ injecting the accusation in a newly baked block is called the accuser.\
 
     The accuser is awarded some funds from the security deposit of the accused.
 
-    When using :ref:`Octez <octez>`, accusations are handled by the
-    accuser daemon.
+    When using :ref:`Octez <octez>`, accusation operations are emitted by the
+    accuser daemon. Note that this daemon is not associated to a delegate: accusation operations are anonymous, and any delegate can include them in a block.
 
 _`Account`
     An account is an address managed by the protocol.
@@ -145,7 +145,7 @@ _`Implicit account`
     If *registered*, an `implicit account`_ can act as a delegate_.
 
     The address of an implicit account always starts with the
-    letters `tz` followed by `1`, `2`, `3`, or `4` (depending on the
+    letters ``tz`` followed by ``1``, ``2``, ``3``, or ``4`` (depending on the
     signature scheme) and finally the hash of the public key.
 
 _`Layer 1`
@@ -163,7 +163,7 @@ _`Layer 2`
     the security of the L1 chain backs those operations. In Tezos there are a number of layer 2 solutions,
     including :doc:`Smart Optimistic Rollups <smart_rollups>`,
     validity or ZK-Rollups `Epoxy <https://research-development.nomadic-labs.com/files/cryptography.html>`_ ,
-    zkChannels, and sidechains such as `Deku <https://www.marigold.dev/deku>`_.
+    zkChannels, and sidechains such as `Deku <https://deku.marigold.dev/>`_.
 
 _`Michelson`
     The built-in language used by a `smart contract`_.
@@ -237,6 +237,6 @@ _`Voting period`
 _`Voting listings`
     The list calculated at the beginning of each `voting period`_ that contains
     the staking balance (in number of mutez) of each delegate_ that owns more
-    than the `minimal stake`_ at that moment. For each delegate_, The voting listings
-    reflects the weight of the vote emitted by the delegate_ when amending the
+    than the `minimal stake`_ at that moment. For each delegate_, the voting listings
+    reflect the weight of the vote emitted by the delegate_ when amending the
     `economic protocol`_.

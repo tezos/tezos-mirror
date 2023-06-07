@@ -238,3 +238,21 @@ let request_error =
     ("view", Request.encoding)
     ("status", Worker_types.request_status_encoding)
     ("error", Error_monad.trace_encoding)
+
+let peer_disconnection =
+  declare_1
+    ~section
+    ~name:"peer_disconnection"
+    ~msg:"peer {peer} disconnected"
+    ~level:Notice
+    ("peer", P2p_peer.Id.encoding)
+    ~pp1:P2p_peer.Id.pp
+
+let insufficient_history =
+  declare_1
+    ~section
+    ~name:"insufficient_history"
+    ~msg:"disconnected from peer {peer}: insufficient history"
+    ~level:Notice
+    ("peer", P2p_peer.Id.encoding)
+    ~pp1:P2p_peer.Id.pp

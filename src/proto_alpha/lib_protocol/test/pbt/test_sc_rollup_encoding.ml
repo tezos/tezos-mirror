@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/test_sc_rollup_encoding.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
+                  -- --file test_sc_rollup_encoding.ml
     Subject:      SC rollup encoding
 *)
 
@@ -95,7 +95,7 @@ let gen_inbox level =
     Environment.wrap_tzresult
     @@
     let witness = Sc_rollup_inbox_repr.init_witness_no_history in
-    let* witness =
+    let witness =
       Sc_rollup_inbox_repr.add_info_per_level_no_history
         ~predecessor_timestamp:Time.Protocol.epoch
         ~predecessor:Block_hash.zero
@@ -109,7 +109,7 @@ let gen_inbox level =
     let* witness =
       Sc_rollup_inbox_repr.add_messages_no_history input_messages witness
     in
-    Sc_rollup_inbox_repr.finalize_inbox_level_no_history inbox witness
+    return (Sc_rollup_inbox_repr.finalize_inbox_level_no_history inbox witness)
   in
   return
   @@ (witness_and_inbox |> function
@@ -290,4 +290,8 @@ let tests =
     test_inbox_message;
   ]
 
-let () = Alcotest.run "SC rollup encoding" [("roundtrip", qcheck_wrap tests)]
+let () =
+  Alcotest.run
+    ~__FILE__
+    (Protocol.name ^ ": SC rollup encoding")
+    [(": roundtrip", qcheck_wrap tests)]

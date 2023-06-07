@@ -28,6 +28,9 @@
 (** The type used to describe a block pointer i.e. its hash and level. *)
 type block_descriptor = Block_hash.t * int32
 
+(** Equality function for {!block_descriptor}. *)
+val block_descriptor_equal : block_descriptor -> block_descriptor -> bool
+
 (** Encoding for {!block_descriptor}. *)
 val block_descriptor_encoding : block_descriptor Data_encoding.t
 
@@ -37,6 +40,9 @@ type chain_config = {
   genesis : Genesis.t;
   expiration : Time.Protocol.t option;
 }
+
+(** Equality function for {!chain_config}. *)
+val chain_config_equal : chain_config -> chain_config -> bool
 
 (** Encoding for {!chain_config}. *)
 val chain_config_encoding : chain_config Data_encoding.t
@@ -48,6 +54,9 @@ val pp_block_descriptor : Format.formatter -> block_descriptor -> unit
     the level and the errors encountered during validation. These
     values should be indexed by the block's hash. *)
 type invalid_block = {level : int32; errors : Error_monad.error list}
+
+(** Equality function on {!invalid_block}. Warning: uses polymorphic comparison on errors. *)
+val invalid_block_equal : invalid_block -> invalid_block -> bool
 
 (** Encoding for {!invalid_block}. *)
 val invalid_block_encoding : invalid_block Data_encoding.t
@@ -85,6 +94,9 @@ module Protocol_levels : sig
     expect_predecessor_context : bool;
   }
 
+  (** Equality on protocol levels maps. *)
+  val equal : protocol_info t -> protocol_info t -> bool
+
   (** Encoding for the protocol level's association map. *)
   val encoding : protocol_info t Data_encoding.t
 
@@ -107,6 +119,9 @@ module Protocol_levels : sig
     }
 
     include Map.S with type key = int
+
+    (** Equality on legacy protocol levels maps. *)
+    val equal : activation_block t -> activation_block t -> bool
 
     (** Encoding for the protocol level's association map. *)
     val encoding : activation_block t Data_encoding.t

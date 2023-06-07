@@ -116,6 +116,9 @@ let bigarray_copy (a : gen) =
 let to_numpy (mat : t) : Pytypes.pyobject =
   Numpy.of_bigarray (bigarray_copy (to_genarray mat))
 
+let to_numpy_vector vec =
+  Numpy.of_bigarray (bigarray_copy (Bigarray.genarray_of_array1 vec))
+
 let of_numpy (npy : Pytypes.pyobject) : t =
   let genmat = Numpy.to_bigarray Bigarray.Float64 Bigarray.c_layout npy in
   let genmat = bigarray_copy genmat in

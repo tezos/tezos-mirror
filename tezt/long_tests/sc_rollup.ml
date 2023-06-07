@@ -87,10 +87,10 @@ let regression_test ~executors ~__FILE__ ?(tags = []) title f =
 
 let setup ?commitment_period ?challenge_window ?timeout f ~protocol =
   let parameters =
-    make_parameter "sc_rollup_commitment_period_in_blocks" commitment_period
-    @ make_parameter "sc_rollup_challenge_window_in_blocks" challenge_window
-    @ make_parameter "sc_rollup_timeout_period_in_blocks" timeout
-    @ [(["sc_rollup_enable"], `Bool true)]
+    make_parameter "smart_rollup_commitment_period_in_blocks" commitment_period
+    @ make_parameter "smart_rollup_challenge_window_in_blocks" challenge_window
+    @ make_parameter "smart_rollup_timeout_period_in_blocks" timeout
+    @ [(["smart_rollup_enable"], `Bool true)]
   in
   let base = Either.right (protocol, None) in
   let* parameter_file = Protocol.write_parameter_file ~base parameters in
@@ -113,25 +113,21 @@ let send_message client msg =
   in
   Client.bake_for_and_wait client
 
-let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
-    ?(src = "bootstrap1") ?(kind = "arith") ?(parameters_ty = "string")
-    ~boot_sector client =
+let with_fresh_rollup ~protocol ?(kind = "arith") ~boot_sector f tezos_node
+    tezos_client operator =
   let* sc_rollup =
-    Client.Sc_rollup.(
-      originate ~hooks ~burn_cap ~src ~kind ~parameters_ty ~boot_sector client)
-  in
-  let* () = Client.bake_for_and_wait client in
-  return sc_rollup
-
-let with_fresh_rollup ?kind ~boot_sector f tezos_node tezos_client operator =
-  let* sc_rollup =
-    originate_sc_rollup ?kind ~boot_sector ~src:operator tezos_client
+    Sc_rollup_helpers.originate_sc_rollup
+      ~kind
+      ~boot_sector
+      ~src:operator
+      tezos_client
   in
   let sc_rollup_node =
     Sc_rollup_node.create
+      ~protocol
       Operator
       tezos_node
-      tezos_client
+      ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:operator
   in
   let* configuration_filename =
@@ -139,22 +135,9 @@ let with_fresh_rollup ?kind ~boot_sector f tezos_node tezos_client operator =
   in
   f sc_rollup sc_rollup_node configuration_filename
 
-(** This helper injects an SC rollup origination via octez-client. Then it
-    bakes to include the origination in a block. It returns the address of the
-    originated rollup *)
-let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
-    ?(src = "bootstrap1") ?(kind = "arith") ?(parameters_ty = "string")
-    ~boot_sector client =
-  let* sc_rollup =
-    Client.Sc_rollup.(
-      originate ~hooks ~burn_cap ~src ~kind ~parameters_ty ~boot_sector client)
-  in
-  let* () = Client.bake_for_and_wait client in
-  return sc_rollup
-
 let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
     ~internal ~kind =
-  let go ~internal client sc_rollup sc_rollup_node =
+  let go ~protocol ~internal client sc_rollup sc_rollup_node =
     let* genesis_info =
       RPC.Client.call ~hooks client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
@@ -162,8 +145,8 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
     in
     let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
-    let* () = Sc_rollup_node.run sc_rollup_node [] in
-    let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
+    let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+    let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
 
     let* level =
       Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level
@@ -211,7 +194,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
                 ~amount:Tez.zero
                 ~giver:Constant.bootstrap1.alias
                 ~receiver:forwarder
-                ~arg:(sf "Pair %S %S" sc_rollup message)
+                ~arg:(sf "Pair %S %S" message sc_rollup)
             in
             Client.bake_for_and_wait client
       in
@@ -280,10 +263,11 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
       (fun protocol ->
         setup ~protocol @@ fun node client ->
         with_fresh_rollup
+          ~protocol
           ~kind
           ~boot_sector
           (fun sc_rollup_address sc_rollup_node _filename ->
-            go ~internal:false client sc_rollup_address sc_rollup_node)
+            go ~protocol ~internal:false client sc_rollup_address sc_rollup_node)
           node
           client)
       protocols
@@ -295,10 +279,11 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
       (fun protocol ->
         setup ~protocol @@ fun node client ->
         with_fresh_rollup
+          ~protocol
           ~kind
           ~boot_sector
           (fun sc_rollup_address sc_rollup_node _filename ->
-            go ~internal:true client sc_rollup_address sc_rollup_node)
+            go ~protocol ~internal:true client sc_rollup_address sc_rollup_node)
           node
           client)
       protocols

@@ -69,6 +69,7 @@ let broadcast_bootstrap_msg t =
       match P2p_peer_state.get peer_info with
       | Running {data = conn; _} ->
           if not (P2p_conn.private_node conn) then (
+            Prometheus.Counter.inc_one P2p_metrics.Messages.bootstrap_sent ;
             ignore (P2p_conn.write_bootstrap conn) ;
             t.log (Bootstrap_sent {source = peer_id}))
       | _ -> ())
@@ -80,6 +81,7 @@ let send_swap_request t =
   | Some (proposed_point, proposed_peer_id, recipient) ->
       let recipient_peer_id = (P2p_conn.info recipient).peer_id in
       t.log (Swap_request_sent {source = recipient_peer_id}) ;
+      Prometheus.Counter.inc_one P2p_metrics.Messages.swap_request_sent ;
       ignore
         (P2p_conn.write_swap_request recipient proposed_point proposed_peer_id)
 
@@ -96,7 +98,7 @@ let classify pool private_mode start_time seen_points point pi =
         match P2p_point_state.Info.last_miss pi with
         | Some last
           when Time.System.(start_time < last)
-               || P2p_point_state.Info.can_reconnect ~now pi ->
+               || P2p_point_state.Info.cannot_reconnect_yet ~now pi ->
             `Seen
         | last -> `Candidate last)
     | _ -> `Seen
@@ -252,8 +254,6 @@ let rec do_maintain ~rng t =
   else (
     (* end of maintenance when enough users have been reached *)
     Lwt_condition.broadcast t.just_maintained () ;
-    let*! () = Events.(emit maintenance_ended) () in
-    t.log P2p_connection.P2p_event.Maintenance_ended ;
     return_unit)
 
 and too_few_connections ~rng t n_connected =
@@ -277,33 +277,56 @@ and too_many_connections ~rng t n_connected =
   let* () = List.iter_p P2p_conn.disconnect connections in
   do_maintain ~rng t
 
-let rec worker_loop ~rng t =
-  let open Lwt_syntax in
-  let* r =
+let rec worker_loop ~rng ~motive t =
+  let open Lwt_result_syntax in
+  let*! r =
     let n_connected = P2p_pool.active_connections t.pool in
     if
       n_connected < t.bounds.min_threshold
       || t.bounds.max_threshold < n_connected
-    then do_maintain ~rng t
+    then (
+      let*! () = Events.(emit maintenance_started) motive in
+      let maintenance_start = Time.System.now () in
+      let* () = do_maintain ~rng t in
+      let maintenance_duration =
+        Ptime.diff (Time.System.now ()) maintenance_start
+      in
+      let*! () = Events.(emit maintenance_ended) maintenance_duration in
+      t.log P2p_connection.P2p_event.Maintenance_ended ;
+      return Events.Last_maintenance)
     else (
       (if not t.config.private_mode then
        match t.debug_config with
        | Some {trigger_swap = false; _} -> ()
        | _ -> send_swap_request t) ;
       protect ~canceler:t.canceler (fun () ->
-          Lwt_result.ok
-          @@ Lwt.pick
-               [
-                 Systime_os.sleep t.config.maintenance_idle_time;
-                 Lwt_condition.wait t.please_maintain;
-                 (* when asked *)
-                 P2p_trigger.wait_too_few_connections t.triggers;
-                 (* limits *)
-                 P2p_trigger.wait_too_many_connections t.triggers;
-               ]))
+          let timer_promise =
+            let idle_time = t.config.maintenance_idle_time in
+            let*! () = Systime_os.sleep idle_time in
+            return (Events.Timer idle_time)
+          in
+          let external_event_promise =
+            let*! () = Lwt_condition.wait t.please_maintain in
+            return Events.External
+          in
+          let too_few_connections_promise =
+            let*! () = P2p_trigger.wait_too_few_connections t.triggers in
+            return Events.Too_few_connections
+          in
+          let too_many_connections_promise =
+            let*! () = P2p_trigger.wait_too_many_connections t.triggers in
+            return Events.Too_many_connections
+          in
+          Lwt.pick
+            [
+              timer_promise;
+              external_event_promise;
+              too_few_connections_promise;
+              too_many_connections_promise;
+            ]))
   in
   match r with
-  | Ok () -> worker_loop ~rng t
+  | Ok motive -> worker_loop ~rng ~motive t
   | Error (Canceled :: _) -> Lwt.return_unit
   | Error _ -> Lwt.return_unit
 
@@ -353,7 +376,7 @@ module Internal = struct
       Lwt_utils.worker
         "maintenance"
         ~on_event:Internal_event.Lwt_worker_logger.on_event
-        ~run:(fun () -> worker_loop ~rng t)
+        ~run:(fun () -> worker_loop ~rng ~motive:Events.Activation t)
         ~cancel:(fun () -> Error_monad.cancel_with_exceptions t.canceler) ;
     Option.iter P2p_discovery.activate t.discovery
 end

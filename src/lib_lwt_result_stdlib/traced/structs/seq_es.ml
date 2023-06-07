@@ -34,16 +34,14 @@ module Make
      and type 'a seq_s_t := 'a Seq_s.t = struct
   include Bare_structs.Seq_es
 
-  let nil_es = Lwt.return (Ok Nil)
-
   let rec of_seqe seq () =
     match seq () with
-    | Ok Seq_e.Nil -> nil_es
+    | Ok Seq_e.Nil -> Lwt.return_ok Nil
     | Ok (Seq_e.Cons (item, seq)) -> Lwt.return_ok (Cons (item, of_seqe seq))
     | Error _ as e -> Lwt.return e
 
   let rec of_seqs seq () =
     Lwt.bind (seq ()) @@ function
-    | Seq_s.Nil -> nil_es
+    | Seq_s.Nil -> Lwt.return_ok Nil
     | Seq_s.Cons (e, seq) -> Lwt.return_ok (Cons (e, of_seqs seq))
 end

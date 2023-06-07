@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Alpha_block_services = Block_services.Make (Protocol) (Protocol)
+module Lifted_protocol = Tezos_protocol_001_PtCJ7pwo_lifted.Lifted_protocol
+module Alpha_block_services =
+  Block_services.Make (Lifted_protocol) (Lifted_protocol)
 
 (** Client RPC context *)
 

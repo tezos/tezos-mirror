@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (transfer)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                -- test "^transfer$"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_transfer.ml
     Subject:    Quantities transfer between contracts.
 *)
 
@@ -894,3 +893,6 @@ let tests =
       `Quick
       test_storage_fees_and_internal_operation;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("transfer", tests)] |> Lwt_main.run

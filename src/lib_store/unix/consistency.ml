@@ -180,13 +180,17 @@ let check_consistency chain_dir genesis =
   let* protocol_levels_data =
     Stored_data.load (Naming.protocol_levels_file chain_dir)
   in
+
   let* _invalid_blocks_data =
     Stored_data.load (Naming.invalid_blocks_file chain_dir)
   in
+
   let* _forked_chains_data =
     Stored_data.load (Naming.forked_chains_file chain_dir)
   in
+
   let* _target_data = Stored_data.load (Naming.target_file chain_dir) in
+
   (* Open the store and try to read the blocks *)
   (* [~readonly:false] to recover from a potential interrupted merge *)
   let* block_store = Block_store.load chain_dir ~genesis_block ~readonly:true in
@@ -407,7 +411,7 @@ let lowest_cemented_metadata cemented_dir =
   | Some metadata_files ->
       let*! m =
         Seq_s.of_seq (Array.to_seq metadata_files)
-        |> Seq_s.filter_map_s
+        |> Seq_s.S.find_map
              (fun {Cemented_block_store.metadata_file; start_level; end_level}
              ->
                let*! lowest_metadata_entry =
@@ -424,7 +428,6 @@ let lowest_cemented_metadata cemented_dir =
                        emit warning_missing_metadata (start_level, end_level))
                in
                Lwt.return lowest_metadata_entry)
-        |> Seq_s.first
       in
       return m
   | None -> return_none

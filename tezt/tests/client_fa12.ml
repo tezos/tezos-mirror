@@ -30,17 +30,8 @@
    Subject:      Tests the client's FA1.2 commands
 *)
 
-let script_path ~protocol name =
-  sf
-    "tests_python/contracts_%s/%s"
-    (match protocol with
-    | Protocol.Alpha -> "alpha"
-    | _ -> sf "%03d" @@ Protocol.number protocol)
-    name
-
 type fa12_script = {
-  alias : string;
-  path : string;
+  name : string list;
   build_storage : Account.key -> string;
   mint_entrypoint : string;
   mint_arg : Account.key -> Tez.t -> string;
@@ -49,8 +40,7 @@ type fa12_script = {
 let fa12_scripts =
   [
     {
-      alias = "fa12_reference";
-      path = "mini_scenarios" // "fa12_reference.tz";
+      name = ["mini_scenarios"; "fa12_reference"];
       build_storage =
         (fun admin ->
           sf {|Pair {} (Pair "%s" (Pair False 0))|} admin.public_key_hash);
@@ -60,8 +50,7 @@ let fa12_scripts =
           sf {|(Pair "%s" %d)|} owner.public_key_hash (Tez.to_mutez amount));
     };
     {
-      alias = "lqt_fa12";
-      path = "mini_scenarios" // "lqt_fa12.mligo.tz";
+      name = ["mini_scenarios"; "lqt_fa12.mligo"];
       build_storage =
         (fun admin -> sf {|Pair {} {} "%s" 0|} admin.public_key_hash);
       mint_entrypoint = "mintOrBurn";
@@ -74,24 +63,28 @@ let fa12_scripts =
 let register_fa12_test ~title ?(tags = []) test_body protocols =
   fa12_scripts
   |> List.iter @@ fun fa12_script ->
+     let script_tag =
+       fa12_script.name |> List.rev |> List.hd
+       |> String.map (function '.' -> '_' | c -> c)
+     in
      Protocol.register_test
        ~__FILE__
-       ~title:(sf "test fa1.2, %s [%s]" title fa12_script.path)
-       ~tags:(["client"; "fa12"; fa12_script.alias] @ tags)
+       ~title:
+         (sf "test fa1.2, %s [%s]" title (String.concat "/" fa12_script.name))
+       ~tags:(["client"; "fa12"; script_tag] @ tags)
        (fun protocol ->
          let* client = Client.init_mockup ~protocol () in
-         let fa12_script_path = script_path ~protocol fa12_script.path in
          let admin = Account.Bootstrap.keys.(2) in
          let initial_storage = fa12_script.build_storage admin in
-         let* fa12_address =
-           Client.originate_contract
-             ~alias:fa12_script.alias
+         let* fa12_alias, fa12_address =
+           Client.originate_contract_at
              ~amount:Tez.zero
              ~src:Account.Bootstrap.keys.(0).public_key_hash
-             ~prg:fa12_script_path
              ~init:initial_storage
              ~burn_cap:(Tez.of_int 2)
              client
+             fa12_script.name
+             protocol
          in
          let initial_mint = Tez.of_mutez_int 20000 in
          let mint_arg =
@@ -118,12 +111,12 @@ let register_fa12_test ~title ?(tags = []) test_body protocols =
              ["mini_scenarios"; "nat_id"]
              protocol
          in
-         test_body protocol client fa12_script ~fa12_address ~viewer_address)
+         test_body protocol client ~fa12_address ~fa12_alias ~viewer_address)
        protocols
 
 let test_check_contract =
   register_fa12_test ~title:"check contract implements FA1.2 interface"
-  @@ fun _protocol client _fa12_script ~fa12_address ~viewer_address:_ ->
+  @@ fun _protocol client ~fa12_address ~fa12_alias:_ ~viewer_address:_ ->
   Client.check_contract_implements_fa1_2 ~contract:fa12_address client
 
 let test_check_contract_fail =
@@ -133,25 +126,24 @@ let test_check_contract_fail =
     ~tags:["client"; "fa12"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let not_fa12_script_path = script_path ~protocol "entrypoints/manager.tz" in
   let identity = Account.Bootstrap.keys.(2).public_key_hash in
   let init = sf {|"%s"|} identity in
-  let* not_fa12_address =
-    Client.originate_contract
-      ~alias:"manager"
+  let* _alias, not_fa12_address =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:not_fa12_script_path
       ~init
       ~burn_cap:(Tez.of_int 2)
       client
+      ["entrypoints"; "manager"]
+      protocol
   in
   Client.spawn_check_contract_implements_fa1_2 ~contract:not_fa12_address client
   |> Process.check_error ~msg:(rex "Not a supported FA1\\.2 contract")
 
 let test_get_balance_offchain =
   register_fa12_test ~title:"get balance offchain"
-  @@ fun _protocol client _fa12_script ~fa12_address ~viewer_address:_ ->
+  @@ fun _protocol client ~fa12_address ~fa12_alias:_ ~viewer_address:_ ->
   let* balance =
     Client.from_fa1_2_contract_get_balance
       ~contract:fa12_address
@@ -166,7 +158,7 @@ let test_get_balance_offchain =
 
 let test_get_allowance_offchain =
   register_fa12_test ~title:"get allowance offchain"
-  @@ fun _protocol client _fa12_script ~fa12_address ~viewer_address:_ ->
+  @@ fun _protocol client ~fa12_address ~fa12_alias:_ ~viewer_address:_ ->
   let* allowance =
     Client.from_fa1_2_contract_get_allowance
       ~contract:fa12_address
@@ -182,7 +174,7 @@ let test_get_allowance_offchain =
 
 let test_get_total_supply_offchain =
   register_fa12_test ~title:"get total_supply offchain"
-  @@ fun _protocol client _fa12_script ~fa12_address ~viewer_address:_ ->
+  @@ fun _protocol client ~fa12_address ~fa12_alias:_ ~viewer_address:_ ->
   let* total_supply =
     Client.from_fa1_2_contract_get_total_supply ~contract:fa12_address client
   in
@@ -203,7 +195,7 @@ let check_viewer ~__LOC__ ~error_msg client viewer_address expected =
 
 let test_get_balance_callback =
   register_fa12_test ~title:"get balance callback"
-  @@ fun _protocol client _fa12_script ~fa12_address ~viewer_address ->
+  @@ fun _protocol client ~fa12_address ~fa12_alias:_ ~viewer_address ->
   let* () =
     Client.from_fa1_2_contract_get_balance_callback
       ~contract:fa12_address
@@ -221,7 +213,7 @@ let test_get_balance_callback =
 
 let test_get_allowance_callback =
   register_fa12_test ~title:"get allowance callback"
-  @@ fun _protocol client _fa12_script ~fa12_address ~viewer_address ->
+  @@ fun _protocol client ~fa12_address ~fa12_alias:_ ~viewer_address ->
   let* () =
     Client.from_fa1_2_contract_get_allowance_callback
       ~contract:fa12_address
@@ -240,7 +232,7 @@ let test_get_allowance_callback =
 
 let test_get_total_supply_callback =
   register_fa12_test ~title:"get total_supply callback"
-  @@ fun _protocol client _fa12_script ~fa12_address ~viewer_address ->
+  @@ fun _protocol client ~fa12_address ~fa12_alias:_ ~viewer_address ->
   let* () =
     Client.from_fa1_2_contract_get_total_supply_callback
       ~contract:fa12_address
@@ -258,7 +250,7 @@ let test_get_total_supply_callback =
 
 let test_incremental =
   register_fa12_test ~title:"test incremental"
-  @@ fun _protocol client fa12_script ~fa12_address ~viewer_address:_ ->
+  @@ fun _protocol client ~fa12_address ~fa12_alias ~viewer_address:_ ->
   let burn_cap = Tez.one in
   let contract = fa12_address in
   let check_expected_balance ~__LOC__ from expected =
@@ -299,7 +291,7 @@ let test_incremental =
   Log.info "Test transfer not enough balance" ;
   let* () =
     let msg =
-      match fa12_script.alias with
+      match fa12_alias with
       | "fa12_reference" -> Some (rex "Not enough balance")
       | _ -> None
     in
@@ -332,7 +324,7 @@ let test_incremental =
   Log.info "Test unsafe allowance change" ;
   let* () =
     let msg =
-      match fa12_script.alias with
+      match fa12_alias with
       | "fa12_reference" -> Some (rex "Unsafe allowance change")
       | _ -> None
     in
@@ -368,7 +360,7 @@ let test_incremental =
   Log.info "Test transfer as not enough allowance" ;
   let* () =
     let msg =
-      match fa12_script.alias with
+      match fa12_alias with
       | "fa12_reference" -> Some (rex "Not enough allowance")
       | _ -> None
     in

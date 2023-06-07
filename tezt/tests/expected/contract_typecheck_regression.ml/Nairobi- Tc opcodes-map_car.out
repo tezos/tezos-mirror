@@ -1,0 +1,19 @@
+
+./octez-client --protocol PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/opcodes/map_car.tz --details
+Well typed
+Gas remaining: 1039991.063 units remaining
+{ parameter bool ;
+  storage (pair (bool %b) (nat %n)) ;
+  code { DUP
+         /* [ pair bool bool nat : pair bool bool nat ] */ ;
+         CAR
+         /* [ bool : pair bool bool nat ] */ ;
+         DIP { CDR /* [ pair bool nat ] */ }
+         /* [ bool : pair bool nat ] */ ;
+         SWAP
+         /* [ pair bool nat : bool ] */ ;
+         MAP_CAR @new_storage %b { AND /* [ bool ] */ } ;
+         NIL operation
+         /* [ list operation : pair bool nat ] */ ;
+         PAIR
+         /* [ pair (list operation) bool nat ] */ } }

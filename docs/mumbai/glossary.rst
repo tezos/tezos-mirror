@@ -159,11 +159,12 @@ _`Layer 2`
     including :doc:`TORUs (Transaction Optimistic Rollups) <transaction_rollups>`,
     `Smart Optimistic Rollups`_,
     validity or ZK-Rollups `Epoxy <https://research-development.nomadic-labs.com/files/cryptography.html>`_ ,
-    zkChannels, and sidechains such as `Deku <https://www.marigold.dev/deku>`_.
+    zkChannels, and sidechains such as `Deku <https://deku.marigold.dev/>`_.
 
 _`Michelson`
     The built-in language used by a `smart contract`_.
 
+.. _glossary_minimal_stake:
 .. _glossary_minimal_stake_mumbai:
 
 _`Minimal stake`
@@ -223,6 +224,6 @@ _`Voting period`
 _`Voting listings`
     The list calculated at the beginning of each `voting period`_ that contains
     the staking balance (in number of mutez) of each delegate_ that owns more
-    than one roll_ at that moment. For each delegate_, The voting listings
-    reflects the weight of the vote emitted by the delegate_ when amending the
+    than one roll_ at that moment. For each delegate_, the voting listings
+    reflect the weight of the vote emitted by the delegate_ when amending the
     `economic protocol`_.

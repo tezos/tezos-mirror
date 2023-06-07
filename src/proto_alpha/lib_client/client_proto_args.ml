@@ -142,6 +142,10 @@ let int_parameter =
   Tezos_clic.parameter (fun (cctxt : #Client_context.full) p ->
       try return (int_of_string p) with _ -> cctxt#error "Cannot read int")
 
+let z_parameter =
+  Tezos_clic.parameter (fun (cctxt : #Client_context.full) p ->
+      try return (Z.of_string p) with _ -> cctxt#error "Cannot read integer")
+
 let uri_parameter = Tezos_clic.parameter (fun _ x -> return (Uri.of_string x))
 
 let bytes_of_prefixed_string (cctxt : #Client_context.full) s =
@@ -255,6 +259,18 @@ let binary_encoded_parameter ~name encoding =
     | Some x -> return x
   in
   file_or_text_parameter ~from_text ()
+
+let micheline_parameter =
+  Tezos_clic.parameter (fun _ source ->
+      Lwt.return @@ Tezos_micheline.Micheline_parser.no_parsing_error
+      @@
+      let tokens, lexing_errors =
+        Tezos_micheline.Micheline_parser.tokenize source
+      in
+      let ast, parsing_errors =
+        Tezos_micheline.Micheline_parser.parse_expression tokens
+      in
+      ((ast, source), lexing_errors @ parsing_errors))
 
 let entrypoint_parameter =
   Tezos_clic.parameter (fun _ str ->
@@ -534,6 +550,13 @@ let max_priority_arg =
     (Tezos_clic.parameter (fun _ s ->
          try return (int_of_string s) with _ -> fail (Bad_max_priority s)))
 
+let timelock_locked_value_arg =
+  Tezos_clic.arg
+    ~long:"timelock-locked-valuec"
+    ~placeholder:"timelock-locked"
+    ~doc:"Timelock RSA group modulus"
+    string_parameter
+
 let default_minimal_fees =
   match Tez.of_mutez 100L with None -> assert false | Some t -> t
 
@@ -696,20 +719,6 @@ module Daemon = struct
 end
 
 module Sc_rollup_params = struct
-  let sc_rollup_address_parameter =
-    Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
-        match Alpha_context.Sc_rollup.Address.of_b58check_opt s with
-        | Some c -> return c
-        | None ->
-            cctxt#error
-              "Parameter '%s' is an invalid smart rollup address encoded in a \
-               base58 string."
-              s)
-
-  let sc_rollup_address_param ?(name = "smart rollup address")
-      ?(desc = "the address of the targeted smart rollup") next =
-    Tezos_clic.param ~name ~desc sc_rollup_address_parameter next
-
   let rollup_kind_parameter =
     Tezos_clic.parameter (fun (cctxt : #Client_context.full) name ->
         match Sc_rollup.Kind.of_string name with

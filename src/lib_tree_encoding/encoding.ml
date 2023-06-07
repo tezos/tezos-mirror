@@ -124,16 +124,18 @@ let scope key {encode} =
 let lazy_mapping to_key enc_value =
   {
     encode =
-      (fun backend (origin, bindings) prefix tree ->
+      (fun backend (origin_opt, bindings) prefix tree ->
         let open Lwt_syntax in
         let* tree =
-          match origin with
-          | Some origin ->
+          match origin_opt with
+          | Some (Tree.Wrapped_tree (origin, origin_backend)) ->
               Tree.add_tree
                 backend
                 tree
                 (prefix [])
-                (Tree.select backend origin)
+                (Tree.select backend @@ Tree.wrap origin_backend origin)
+              (* Will fetch a tree of the same type as backend or throw an error.
+                 Basically checking that origin's backend and encoding backeds are the same *)
           | None -> Tree.remove backend tree (prefix [])
         in
         List.fold_left_s

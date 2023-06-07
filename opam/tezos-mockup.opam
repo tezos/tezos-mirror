@@ -22,10 +22,11 @@ depends: [
   "tezos-rpc-http"
   "tezos-rpc-http-client"
   "tezos-mockup-registration"
+  "tezt" { with-test & >= "3.1.0" }
   "tezos-base-test-helpers" {with-test}
   "tezos-test-helpers" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
-  "alcotest-lwt" { with-test & >= "1.5.0" }
+  "octez-alcotezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]

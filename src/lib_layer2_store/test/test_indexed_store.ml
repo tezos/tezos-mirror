@@ -26,7 +26,8 @@
 (* Testing
    -------
    Component:  Layer-2 indexed store
-   Invocation: dune exec src/lib_layer2_store/test/test_indexed_store.exe -- -v
+   Invocation: dune exec src/lib_layer2_store/test/main.exe \
+                  -- --file test_indexed_store.ml
    Subject:    Test the indexed store
 *)
 
@@ -599,4 +600,8 @@ let () =
     (test_gen `Parallel)
     R.check_run
 
-let () = QCheck_base_runner.run_tests_main (List.rev !tests)
+let () =
+  Alcotest.run
+    ~__FILE__
+    "tezos-layer2-store"
+    [("indexed-store", List.map QCheck_alcotest.to_alcotest !tests)]

@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (frozen_deposits)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                -- test "^frozen deposits$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
+                  -- --file test_frozen_deposits.ml
     Subject:    consistency of frozen deposits and the [set_deposits_limit] operation
  *)
 
@@ -190,35 +189,6 @@ let test_set_limit balance_percentage () =
   Context.Delegate.current_frozen_deposits (B b) account1
   >>=? fun frozen_deposits ->
   Assert.equal_tez ~loc:__LOC__ frozen_deposits limit
-
-let test_set_too_high_limit () =
-  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
-  let (contract1, _account1), _ = get_first_2_accounts_contracts contracts in
-  let max_limit =
-    Tez.of_mutez_exn
-      Int64.(
-        add
-          (mul
-             (of_int constants.frozen_deposits_percentage)
-             Int64.(div max_int 100L))
-          1L)
-  in
-  let expect_apply_failure = function
-    | Environment.Ecoproto_error err :: _ ->
-        Assert.test_error_encodings err ;
-        let error_info =
-          Error_monad.find_info_of_error (Environment.wrap_tzerror err)
-        in
-        if error_info.title = "Set deposits limit to a too high value" then
-          return_unit
-        else failwith "unexpected error"
-    | _ -> failwith "should fail"
-  in
-  Incremental.begin_construction genesis >>=? fun b ->
-  Op.set_deposits_limit (B genesis) contract1 (Some max_limit)
-  >>=? fun operation ->
-  Incremental.add_operation ~expect_apply_failure b operation >>=? fun b ->
-  Incremental.finalize_block b >>=? fun (_ : Block.t) -> return_unit
 
 let test_unset_limit () =
   Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
@@ -682,10 +652,9 @@ let test_error_is_thrown_when_smaller_upper_bound_for_frozen_window () =
 let tests =
   Tztest.
     [
-      tztest "test invariants" `Quick test_invariants;
+      tztest "invariants" `Quick test_invariants;
       tztest "set deposits limit to 0%" `Quick (test_set_limit 0);
       tztest "set deposits limit to 5%" `Quick (test_set_limit 5);
-      tztest "set a too high deposits limit" `Quick test_set_too_high_limit;
       tztest "unset deposits limit" `Quick test_unset_limit;
       tztest
         "cannot bake with zero deposits"
@@ -704,15 +673,19 @@ let tests =
         `Quick
         test_frozen_deposits_with_delegation;
       tztest
-        "test frozen deposits with overdelegation"
+        "frozen deposits with overdelegation"
         `Quick
         test_frozen_deposits_with_overdelegation;
       tztest
-        "test set limit with overdelegation"
+        "set limit with overdelegation"
         `Quick
         test_set_limit_with_overdelegation;
       tztest
-        "test error is thrown when the frozen window is smaller"
+        "error is thrown when the frozen window is smaller"
         `Quick
         test_error_is_thrown_when_smaller_upper_bound_for_frozen_window;
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("frozen deposits", tests)]
+  |> Lwt_main.run

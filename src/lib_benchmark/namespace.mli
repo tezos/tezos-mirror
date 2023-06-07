@@ -43,14 +43,27 @@ val is_singleton : t -> bool
 
 val compare : t -> t -> int
 
+val hash : t -> int
+
 val to_string : t -> string
 
 val of_string : string -> t
+
+(** String representation without '/', usable for file names.
+    It is usable for Graphviz vertex names with [String.escaped].
+
+    Example:
+    [to_filename (of_string "foo/bar/gee.txt") = "foo__bar__gee.txt"]
+*)
+val to_filename : t -> string
 
 (** The type of namespace constructors, which represent intermediate namespaces.
     Given a [string], it returns a terminal namespace which is then used for benchmark names.
 *)
 type cons = string -> t
+
+(* Add a string at the end of a namespace *)
+val cons : t -> string -> t
 
 (** The basic constructor for namespaces, at the root of every other namespace.
     [root "bench"] would return the namespace ["bench"] for a benchmark *)
@@ -83,3 +96,5 @@ val pp_short : Format.formatter -> t -> unit
 module Hashtbl : Hashtbl.SeededS with type key = t
 
 module Set : Set.S with type elt = t
+
+module Map : Map.S with type key = t

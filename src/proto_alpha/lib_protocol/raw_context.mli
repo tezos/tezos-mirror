@@ -73,6 +73,15 @@ type t
 
 type root = t
 
+(** The internal message to be injected into the smart rollups’ shared
+    inbox when validating the very first block of this protocol. *)
+val protocol_migration_internal_message :
+  Sc_rollup_inbox_message_repr.internal_inbox_message
+
+(** Serialized version of {!protocol_migration_internal_message}. *)
+val protocol_migration_serialized_message :
+  Sc_rollup_inbox_message_repr.serialized
+
 (** Retrieves the state of the database and gives its abstract view.
     It also returns wether this is the first block validated
     with this version of the protocol. *)
@@ -83,7 +92,7 @@ val prepare :
   Context.t ->
   t tzresult Lwt.t
 
-type previous_protocol = Genesis of Parameters_repr.t | Lima_015
+type previous_protocol = Genesis of Parameters_repr.t | Nairobi_017
 
 val prepare_first_block :
   level:int32 ->
@@ -251,7 +260,10 @@ val record_dictator_proposal_seen : t -> t
 val dictator_proposal_seen : t -> bool
 
 (** [init_sampler_for_cycle ctxt cycle seed state] caches the seeded stake
-    sampler (a.k.a. [seed, state]) for [cycle] in memory for quick access. *)
+    sampler (a.k.a. [seed, state]) for [cycle] in memory for quick access.
+
+    @return [Error Sampler_already_set] if the sampler was already
+    cached. *)
 val init_sampler_for_cycle :
   t -> Cycle_repr.t -> Seed_repr.seed -> consensus_pk Sampler.t -> t tzresult
 
@@ -297,12 +309,15 @@ module type CONSENSUS = sig
   (** Returns a map where each endorser's pkh is associated to the
      list of its endorsing slots (in decreasing order) for a given
      level. *)
-  val allowed_endorsements : t -> (consensus_pk * int) slot_map
+  val allowed_endorsements : t -> (consensus_pk * int) slot_map option
 
   (** Returns a map where each endorser's pkh is associated to the
      list of its endorsing slots (in decreasing order) for a given
      level. *)
-  val allowed_preendorsements : t -> (consensus_pk * int) slot_map
+  val allowed_preendorsements : t -> (consensus_pk * int) slot_map option
+
+  (** Missing pre-computed map by first slot. This error should not happen. *)
+  type error += Slot_map_not_found of {loc : string}
 
   (** [endorsement power ctx] returns the endorsement power of the
      current block. *)
@@ -313,15 +328,9 @@ module type CONSENSUS = sig
      any consensus operation.  *)
   val initialize_consensus_operation :
     t ->
-    allowed_endorsements:(consensus_pk * int) slot_map ->
-    allowed_preendorsements:(consensus_pk * int) slot_map ->
+    allowed_endorsements:(consensus_pk * int) slot_map option ->
+    allowed_preendorsements:(consensus_pk * int) slot_map option ->
     t
-
-  (** [record_grand_parent_endorsement ctx pkh] records an
-      grand_parent_endorsement for the current block. This is only
-      useful for the partial construction mode. *)
-  val record_grand_parent_endorsement :
-    t -> Signature.Public_key_hash.t -> t tzresult
 
   (** [record_endorsement ctx ~initial_slot ~power] records an
      endorsement for the current block.
@@ -363,10 +372,6 @@ module type CONSENSUS = sig
   val set_endorsement_branch : t -> Block_hash.t * Block_payload_hash.t -> t
 
   val endorsement_branch : t -> (Block_hash.t * Block_payload_hash.t) option
-
-  val set_grand_parent_branch : t -> Block_hash.t * Block_payload_hash.t -> t
-
-  val grand_parent_branch : t -> (Block_hash.t * Block_payload_hash.t) option
 end
 
 module Consensus :

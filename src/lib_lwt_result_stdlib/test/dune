@@ -1,76 +1,52 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names
+(library
+ (name src_lib_lwt_result_stdlib_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  tezos-lwt-result-stdlib
+  tezos-lwt-result-stdlib.examples.traces
+  lwt.unix
+  octez-alcotezt
+  qcheck-alcotest
+  tezos-test-helpers)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_lwt_result_stdlib
+  -open Octez_alcotezt
+  -open Tezos_test_helpers)
+ (modules
+  support
+  traits_tiered
   test_hashtbl
   test_list_basic
   test_list_basic_lwt
   test_seq_basic
-  test_generic
-  test_fuzzing_seq
-  test_fuzzing_list
-  test_fuzzing_set
-  test_fuzzing_seq_tiered
-  test_fuzzing_option)
+  test_fuzzing_lib
+  test_fuzzing_list_against_stdlib
+  test_fuzzing_option_against_stdlib
+  test_fuzzing_set_against_stdlib
+  test_fuzzing_map_against_stdlib))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  tezos-lwt-result-stdlib
-  tezos-lwt-result-stdlib.examples.traces
-  lwt.unix
-  alcotest-lwt
-  qcheck-alcotest
-  tezos-test-helpers)
- (flags
-  (:standard)
-  -open Tezos_lwt_result_stdlib
-  -open Tezos_test_helpers))
+  src_lib_lwt_result_stdlib_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-lwt-result-stdlib)
- (action (run %{dep:./test_hashtbl.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest)
- (package tezos-lwt-result-stdlib)
- (action (run %{dep:./test_list_basic.exe})))
-
-(rule
- (alias runtest)
- (package tezos-lwt-result-stdlib)
- (action (run %{dep:./test_list_basic_lwt.exe})))
-
-(rule
- (alias runtest)
- (package tezos-lwt-result-stdlib)
- (action (run %{dep:./test_seq_basic.exe})))
-
-(rule
- (alias runtest)
- (package tezos-lwt-result-stdlib)
- (action (run %{dep:./test_generic.exe})))
-
-(rule
- (alias runtest)
- (package tezos-lwt-result-stdlib)
- (action (run %{dep:./test_fuzzing_seq.exe})))
-
-(rule
- (alias runtest)
- (package tezos-lwt-result-stdlib)
- (action (run %{dep:./test_fuzzing_list.exe})))
-
-(rule
- (alias runtest)
- (package tezos-lwt-result-stdlib)
- (action (run %{dep:./test_fuzzing_set.exe})))
-
-(rule
- (alias runtest)
- (package tezos-lwt-result-stdlib)
- (action (run %{dep:./test_fuzzing_seq_tiered.exe})))
-
-(rule
- (alias runtest)
- (package tezos-lwt-result-stdlib)
- (action (run %{dep:./test_fuzzing_option.exe})))
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

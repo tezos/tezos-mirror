@@ -945,7 +945,7 @@ let generic_commands group =
                             pp_print_cut ppf ())
                           (List.filter
                              (is_derivation_scheme_supported version)
-                             [Bip32_ed25519; Ed25519; Secp256k1; Secp256r1]) ;
+                             [Ed25519; Secp256k1; Secp256r1; Bip32_ed25519]) ;
                         pp_close_box ppf () ;
                         pp_print_newline ppf ())
                 in

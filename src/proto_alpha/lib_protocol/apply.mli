@@ -38,8 +38,6 @@ open Alpha_context
 type error +=
   | Internal_operation_replay of
       Apply_internal_results.packed_internal_operation
-  | Tx_rollup_feature_disabled
-  | Tx_rollup_invalid_transaction_ticket_amount
   | Sc_rollup_feature_disabled
   | Empty_transaction of Contract.t
 
@@ -61,10 +59,8 @@ type mode =
       predecessor_level : Level.t;
       predecessor_round : Round.t;
     }
-  | Partial_construction of {
-      predecessor_level : Raw_level.t;
-      predecessor_fitness : Fitness.raw;
-    }  (** This mode is mainly intended to be used by a mempool. *)
+  | Partial_construction of {predecessor_fitness : Fitness.raw}
+      (** This mode is mainly intended to be used by a mempool. *)
 
 type application_state = {
   ctxt : context;
@@ -111,7 +107,6 @@ val begin_partial_construction :
   Chain_id.t ->
   migration_balance_updates:Receipt.balance_updates ->
   migration_operation_results:Migration.origination_result list ->
-  predecessor_level:Raw_level.t ->
   predecessor_hash:Block_hash.t ->
   predecessor_fitness:Fitness.raw ->
   application_state tzresult Lwt.t
@@ -164,3 +159,7 @@ val finalize_block :
     so that it can be put into the cache. *)
 val value_of_key :
   context -> Context.Cache.key -> Context.Cache.value tzresult Lwt.t
+
+module Internal_for_benchmark : sig
+  val take_fees : context -> 'a Kind.manager contents_list -> unit
+end

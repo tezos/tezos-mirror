@@ -55,6 +55,12 @@
     - ["chmod=<INT>"] sets the access-rights of the file at creation
       time (default is [0o600], provided
       {{:https://en.wikipedia.org/wiki/Umask}[umask]} allows it).
+    - ["daily-logs=<INT>"] sets up a rotation for log files, keeping only the
+      last N days where N is the given parameter. It creates a file for each
+      day and and adds the day of the year with format ["yyyymmdd"] to the
+      path provided.
+    - ["create-dirs=true"] allows to create the directory where the log
+      files are stored and all its parents recursively if they don't exist.
 
     Examples:
 
@@ -80,6 +86,10 @@
     - [export TEZOS_EVENT_HOSTNAME="hostname"]
       The [hostname] will be used in the JSON representation of the event.
       By default, it is the hostname given by [Unix.gethostname ()].
+    - ["export TEZOS_EVENTS_CONFIG=file-descriptor-path:///tmp/node.log?daily-logs=5&section-prefix=:info"]
+      sets up log files with a rotation of 5 days and verbosity level [info] for
+      all logs. Files will be named [node-19700101.log] in an example of a file
+      produced in 1970, January, the 1st.
 
 *)
 

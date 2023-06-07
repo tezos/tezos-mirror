@@ -23,6 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Context
+   Invocation:   dune exec src/lib_context/test/main.exe \
+                  -- --file test_merkle_proof.ml
+   Subject:      Test merkle proof.
+*)
+
+open Tezos_context_disk
 open Context.Proof
 open Qcheck2_helpers
 open QCheck2
@@ -85,12 +94,12 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     let rec inode_tree (depth, width) =
       if depth <= 0 then
-        let+ hash = hash in
+        let+ hash in
         Blinded_inode hash
       else
         oneof
           [
-            (let+ hash = hash in
+            (let+ hash in
              Blinded_inode hash);
             (let* size = int_bound 3 in
              let size = size + 1 in
@@ -302,12 +311,12 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     let rec inode_tree (depth, width) =
       if depth <= 0 then
-        let+ hash = hash in
+        let+ hash in
         Blinded_inode hash
       else
         oneof
           [
-            (let+ hash = hash in
+            (let+ hash in
              Blinded_inode hash);
             (let* size = int_bound 3 in
              let size = size + 1 in
@@ -576,6 +585,7 @@ let () =
   let module Proof2_V2 =
     Proof2 (Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2) in
   Alcotest.run
+    ~__FILE__
     "test_merkle_proof"
     [
       ("sample32_v1", [("sample", `Quick, Proof32_V1.test_sample)]);

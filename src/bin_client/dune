@@ -95,12 +95,18 @@
   (select void_for_linking-tezos-protocol-plugin-014-PtKathma from
    (tezos-protocol-plugin-014-PtKathma -> void_for_linking-tezos-protocol-plugin-014-PtKathma.empty)
    (-> void_for_linking-tezos-protocol-plugin-014-PtKathma.empty))
-  tezos-client-015-PtLimaPt.commands-registration
-  tezos-baking-015-PtLimaPt-commands.registration
-  tezos-protocol-plugin-015-PtLimaPt
+  (select void_for_linking-tezos-client-015-PtLimaPt-commands-registration from
+   (tezos-client-015-PtLimaPt.commands-registration -> void_for_linking-tezos-client-015-PtLimaPt-commands-registration.empty)
+   (-> void_for_linking-tezos-client-015-PtLimaPt-commands-registration.empty))
+  (select void_for_linking-tezos-protocol-plugin-015-PtLimaPt from
+   (tezos-protocol-plugin-015-PtLimaPt -> void_for_linking-tezos-protocol-plugin-015-PtLimaPt.empty)
+   (-> void_for_linking-tezos-protocol-plugin-015-PtLimaPt.empty))
   tezos-client-016-PtMumbai.commands-registration
   tezos-baking-016-PtMumbai-commands.registration
   tezos-protocol-plugin-016-PtMumbai
+  tezos-client-017-PtNairob.commands-registration
+  tezos-baking-017-PtNairob-commands.registration
+  tezos-protocol-plugin-017-PtNairob
   (select void_for_linking-tezos-client-alpha-commands-registration from
    (tezos-client-alpha.commands-registration -> void_for_linking-tezos-client-alpha-commands-registration.empty)
    (-> void_for_linking-tezos-client-alpha-commands-registration.empty))
@@ -154,6 +160,8 @@
    (write-file void_for_linking-tezos-protocol-plugin-013-PtJakart.empty "")
    (write-file void_for_linking-tezos-client-014-PtKathma-commands-registration.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-014-PtKathma.empty "")
+   (write-file void_for_linking-tezos-client-015-PtLimaPt-commands-registration.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-015-PtLimaPt.empty "")
    (write-file void_for_linking-tezos-client-alpha-commands-registration.empty "")
    (write-file void_for_linking-tezos-baking-alpha-commands-registration.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-alpha.empty ""))))

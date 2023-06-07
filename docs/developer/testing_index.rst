@@ -22,17 +22,17 @@ It also includes tutorials for testing more specific parts such as protocol code
 .. toctree::
    :maxdepth: 2
 
-   python_testing_framework
-
-.. toctree::
-   :maxdepth: 2
-
    tezt
 
 .. toctree::
    :maxdepth: 2
 
    long-tezts
+
+.. toctree::
+   :maxdepth: 2
+
+   alcotezt
 
 .. toctree::
    :maxdepth: 2

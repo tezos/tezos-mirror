@@ -2,21 +2,25 @@
 ## Stage: run scripts to check they are working properly  ##
 ############################################################
 
-# Note: those two jobs actually probably don't need the build_x86_64 job
+# Note: this job actually probably doesn't need the build_x86_64 job
 # to have finished, but we don't want to start before build_x86_64 has finished either.
-script:prepare_migration_test:
-  extends: .test_template
-  needs: ["build_x86_64"]
-  before_script:
-    - make
-  script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci integration-test-prepare-migration-test
-
 script:snapshot_alpha_and_link:
   extends: .test_template
   needs: ["build_x86_64"]
   script:
     - make -C ${CI_PROJECT_DIR}/.gitlab/ci integration-test-snapshot-alpha-and-link
+  rules:
+    # We only need to run this if protocol Alpha or if the scripts changed.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - src/proto_alpha/**/*
+        - scripts/snapshot_alpha_and_link.sh
+        - scripts/snapshot_alpha.sh
+        - scripts/user_activated_upgrade.sh
+      when: on_success
+    # For safety, we also run it when margebot triggers the pipeline.
+    - if: '$GITLAB_USER_LOGIN == "nomadic-margebot"'
+      when: on_success
 
 script:test-gen-genesis:
   extends:
@@ -42,5 +46,10 @@ check_scripts_b58_prefix:
   extends:
     - .test_template
   needs: [trigger]
+  before_script:
+    - . ./scripts/version.sh
+    # Load the environment poetry previously created in the docker image.
+    # Give access to the Python dependencies/executables
+    - . $HOME/.venv/bin/activate
   script:
     - make  -C ${CI_PROJECT_DIR}/.gitlab/ci check-scripts-b58-prefix

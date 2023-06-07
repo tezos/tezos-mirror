@@ -56,6 +56,14 @@ type t = {
   private_mode : bool;
       (** enables the private mode, see
           https://tezos.gitlab.io/user/node-configuration.html#private-node *)
+  disable_p2p_maintenance : bool;
+      (** If [disable_p2p_maintenance] is [true] the p2p layer will not open or
+          close connections by itself. This flag is intended to be used for
+          testing and debugging. *)
+  disable_p2p_swap : bool;
+      (** If [disable_p2p_swap] is [true] the p2p layer will neither initiate a
+          swap of connections with its neighbors nor answer to a swap request.
+          This flag is intended to be used for testing and debugging. *)
   disable_mempool : bool;
   disable_mempool_precheck : bool;
       (** If [disable_mempool_precheck] is [true] operations are executed by
@@ -95,7 +103,16 @@ end
 
 val read_config_file : t -> Config_file.t tzresult Lwt.t
 
-val read_data_dir : t -> string tzresult Lwt.t
+(* Returns the [data_dir] and [config_file] from either [config_file]
+   (configuration file value) or [data_dir] (command line value), if
+   any. Otherwise, returns the default values. If both the
+   [config_file] and [data_dir] are given, the [data_dir] overrides
+   the value from the [config_file]. *)
+val resolve_data_dir_and_config_file :
+  ?data_dir:string ->
+  ?config_file:string ->
+  unit ->
+  (string * Config_file.t, tztrace) result Lwt.t
 
 (** Modify a node's network configuration.
 

@@ -32,4 +32,15 @@ val add_profile :
 
 (** [get_profiles node_store] returns the list of profiles that the node tracks *)
 val get_profiles :
-  Store.node_store -> Services.Types.profile list tzresult Lwt.t
+  Store.node_store ->
+  (Services.Types.profile list, Errors.decoding) result Lwt.t
+
+(** See {!Services.get_attestable_slots} *)
+val get_attestable_slots :
+  Node_context.t ->
+  Store.node_store ->
+  Dal_plugin.proto_parameters ->
+  Tezos_crypto.Signature.public_key_hash ->
+  attested_level:int32 ->
+  (Services.Types.attestable_slots, [Errors.decoding | Errors.other]) result
+  Lwt.t

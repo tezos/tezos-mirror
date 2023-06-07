@@ -1,0 +1,22 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name bls12_381_hash)
+ (public_name octez-bls12-381-hash)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  bls12-381)
+ (library_flags (:standard -linkall))
+ (foreign_stubs
+  (language c)
+  (names
+   caml_rescue_stubs
+   caml_anemoi_stubs
+   caml_poseidon_stubs
+   caml_griffin_stubs
+   rescue
+   anemoi
+   poseidon
+   griffin))
+ (c_library_flags (-Wall -Wextra :standard -lpthread)))

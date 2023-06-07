@@ -1,0 +1,38 @@
+
+./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/opcodes/amount_after_view.tz --details
+Well typed
+Gas remaining: 1039986.392 units remaining
+{ parameter address ;
+  storage mutez ;
+  code { CAR
+         /* [ address ] */ ;
+         DUP
+         /* [ address : address ] */ ;
+         PUSH nat 0
+         /* [ nat : address : address ] */ ;
+         VIEW "id" (pair nat nat)
+         /* [ option (pair nat nat) : address ] */ ;
+         ASSERT_SOME ;
+         DROP
+         /* [ address ] */ ;
+         CONTRACT nat
+         /* [ option (contract nat) ] */ ;
+         ASSERT_SOME ;
+         PUSH mutez 15000000
+         /* [ mutez : contract nat ] */ ;
+         PUSH nat 0
+         /* [ nat : mutez : contract nat ] */ ;
+         TRANSFER_TOKENS
+         /* [ operation ] */ ;
+         AMOUNT
+         /* [ mutez : operation ] */ ;
+         SWAP
+         /* [ operation : mutez ] */ ;
+         NIL operation
+         /* [ list operation : operation : mutez ] */ ;
+         SWAP
+         /* [ operation : list operation : mutez ] */ ;
+         CONS
+         /* [ list operation : mutez ] */ ;
+         PAIR
+         /* [ pair (list operation) mutez ] */ } }

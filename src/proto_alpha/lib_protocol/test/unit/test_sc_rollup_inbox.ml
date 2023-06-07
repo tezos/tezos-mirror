@@ -27,13 +27,16 @@
     -------
     Component:  Protocol (smart contract rollup inbox)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "^\[Unit\] sc rollup inbox$"
+                  -- --file test_sc_rollup_inbox.ml
     Subject:    These unit tests check the off-line inbox implementation for
                 smart contract rollups
 *)
+
 open Protocol
 
 let opt_get ~__LOC__ = WithExceptions.Option.get ~loc:__LOC__
+
+open Sc_rollup_helpers
 
 module Merkelized_payload_hashes =
   Alpha_context.Sc_rollup.Inbox_merkelized_payload_hashes
@@ -47,6 +50,30 @@ let assert_equal_payload ~__LOC__ found (expected : Message.serialized) =
     ~loc:__LOC__
     (Message.unsafe_to_string expected)
     (Message.unsafe_to_string found)
+
+let assert_equal_payload_option ~__LOC__ found expected =
+  Assert.equal
+    ~loc:__LOC__
+    (Option.equal (fun v1 v2 ->
+         String.equal
+           (Message.unsafe_to_string v1)
+           (Message.unsafe_to_string v2)))
+    "Input returned by the production is not the expected one"
+    (Format.pp_print_option
+       ~none:(fun fmt () -> Format.pp_print_string fmt "None")
+       (fun fmt v ->
+         Format.fprintf fmt "Some \"%S\"" (Message.unsafe_to_string v)))
+    found
+    expected
+
+let assert_inbox_message ~__LOC__ found expected =
+  Assert.equal
+    ~loc:__LOC__
+    (Option.equal Sc_rollup.inbox_message_equal)
+    "Input returns by the production is not the expected one"
+    (Format.pp_print_option Sc_rollup.pp_inbox_message)
+    found
+    expected
 
 let assert_equal_payload_hash ~__LOC__ found expected =
   Assert.equal
@@ -72,19 +99,44 @@ let assert_equal_merkelized_payload ~__LOC__ ~found ~expected =
   assert_merkelized_payload ~__LOC__ ~payload_hash ~index found
 
 let assert_merkelized_payload_proof_error ~__LOC__ expected_msg result =
-  Assert.error ~loc:__LOC__ result (function
+  Assert.error ~loc:__LOC__ (Environment.wrap_tzresult result) (function
       | Environment.Ecoproto_error
           (Sc_rollup_inbox_merkelized_payload_hashes_repr
            .Merkelized_payload_hashes_proof_error msg) ->
           expected_msg = msg
       | _ -> false)
 
-let assert_inbox_proof_error ?(loc = __LOC__) expected_msg result =
-  Assert.error ~loc result (function
+let verify_merkelized_payload_proof_fails ~__LOC__ expected_msg proof =
+  assert_merkelized_payload_proof_error ~__LOC__ expected_msg
+  @@ Merkelized_payload_hashes.verify_proof proof
+
+let assert_equal_history_proof ~__LOC__ found expected =
+  Assert.equal
+    ~loc:__LOC__
+    Inbox.equal_history_proof
+    "history_proof are not equal"
+    Inbox.pp_history_proof
+    expected
+    found
+
+let assert_inbox_proof_error ~__LOC__ expected_msg result =
+  Assert.error ~loc:__LOC__ (Environment.wrap_tzresult result) (function
       | Environment.Ecoproto_error (Sc_rollup_inbox_repr.Inbox_proof_error msg)
         ->
           expected_msg = msg
       | _ -> false)
+
+let verify_payloads_proof_fails ~__LOC__ expected_msg proof head_cell_hash
+    message_counter =
+  assert_inbox_proof_error ~__LOC__ expected_msg
+  @@ Inbox.Internal_for_tests.verify_payloads_proof
+       proof
+       head_cell_hash
+       message_counter
+
+let verify_inclusion_proof_fails ~__LOC__ expected_msg proof snapshot =
+  assert_inbox_proof_error ~__LOC__ expected_msg
+  @@ Inbox.Internal_for_tests.verify_inclusion_proof proof snapshot
 
 let gen_payload_size = QCheck2.Gen.(1 -- 10)
 
@@ -101,7 +153,7 @@ let gen_payloads ?(min_size = 2) ?(max_size = 50) () =
   let open QCheck2.Gen in
   list_size (min_size -- max_size) gen_payload
 
-let gen_z_index_of_payloads ?(max_index_offset = 0) payloads =
+let gen_index_of_payloads ?(max_index_offset = 0) payloads =
   let open QCheck2.Gen in
   let max_index = List.length payloads - 1 - max_index_offset in
   let+ index = 0 -- max_index in
@@ -110,56 +162,77 @@ let gen_z_index_of_payloads ?(max_index_offset = 0) payloads =
 let gen_payloads_and_index ?min_size ?max_size ?max_index_offset () =
   let open QCheck2.Gen in
   let* payloads = gen_payloads ?min_size ?max_size () in
-  let* index = gen_z_index_of_payloads ?max_index_offset payloads in
+  let* index = gen_index_of_payloads ?max_index_offset payloads in
   return (payloads, index)
 
-let gen_payloads_and_two_index =
-  let open QCheck2.Gen in
-  let* payloads = gen_payloads () in
-  let* index = gen_z_index_of_payloads payloads in
-  let* index' = gen_z_index_of_payloads payloads in
-  return (payloads, index, index')
+let gen_payloads_for_level ?(inbox_level = Raw_level.(succ root)) () =
+  gen_messages inbox_level gen_payload_string
 
-let gen_payloads_for_level ?(inbox_creation_level = 0) () =
+let gen_level ?(inbox_creation_level = 0) ~max_level () =
   let open QCheck2.Gen in
-  let* messages = small_list gen_payload_string in
-  let* level =
-    let+ level = inbox_creation_level + 1 -- 100_000 in
-    Raw_level.of_int32_exn (Int32.of_int level)
-  in
-  let+ predecessor_timestamp =
-    let+ seconds = 0 -- 1_000_000 in
-    Time.Protocol.of_seconds (Int64.of_int seconds)
-  in
-  let predecessor = Block_hash.zero in
-  Sc_rollup_helpers.wrap_messages
-    ~predecessor_timestamp
-    ~predecessor
-    level
-    messages
+  let+ int_level = inbox_creation_level -- max_level in
+  Raw_level.of_int32_exn (Int32.of_int int_level)
 
-let gen_payloads_for_levels ?(inbox_creation_level = 0) ~max_level () =
-  Sc_rollup_helpers.gen_payloads_for_levels
+let gen_payloads_and_level ?inbox_creation_level ?(max_level = 100_000) () =
+  let open QCheck2.Gen in
+  let* inbox_level = gen_level ?inbox_creation_level ~max_level () in
+  gen_payloads_for_level ~inbox_level ()
+
+let gen_payloads_and_level_and_index ?inbox_creation_level ?max_level () =
+  let open QCheck2.Gen in
+  let* payloads_for_level =
+    gen_payloads_and_level ?inbox_creation_level ?max_level ()
+  in
+  let* index = gen_index_of_payloads payloads_for_level.messages in
+  return (payloads_for_level, index)
+
+let gen_payloads_for_levels ?(inbox_creation_level = 0) ?(max_level = 15) () =
+  gen_payloads_for_levels
     ~start_level:(inbox_creation_level + 1)
     ~max_level
     gen_payload_string
 
-let gen_inclusion_proof_inputs ?(max_level = 15) () =
+let gen_payloads_for_levels_and_level ?inbox_creation_level ?max_level
+    ?(level_offset = 1) () =
   let open QCheck2.Gen in
-  let* payloads_per_levels = gen_payloads_for_levels ~max_level () in
-  let* index = 0 -- (List.length payloads_per_levels - 2) in
-  let level = Raw_level.of_int32_exn (Int32.of_int index) in
-  return (payloads_per_levels, level)
-
-let gen_proof_inputs ?(max_level = 4) () =
-  let open QCheck2.Gen in
-  let* payloads_per_levels = gen_payloads_for_levels ~max_level () in
-  let* level_index = 0 -- (List.length payloads_per_levels - 1) in
-  let payloads_at_level =
-    opt_get ~__LOC__ @@ List.nth payloads_per_levels level_index
+  let* payloads_for_levels =
+    gen_payloads_for_levels ?inbox_creation_level ?max_level ()
   in
-  let* counter = 0 -- (List.length payloads_at_level.inputs - 1) in
-  return (payloads_per_levels, payloads_at_level.level, Z.of_int counter)
+  let* payloads_index =
+    0 -- (List.length payloads_for_levels - 1 - level_offset)
+  in
+  let payloads =
+    opt_get ~__LOC__ @@ List.nth payloads_for_levels payloads_index
+  in
+  return (payloads_for_levels, payloads.level)
+
+let gen_level_and_index payloads_for_levels =
+  let open QCheck2.Gen in
+  let* payloads_index = 0 -- (List.length payloads_for_levels - 1) in
+  let payloads =
+    opt_get ~__LOC__ @@ List.nth payloads_for_levels payloads_index
+  in
+  let* index = gen_index_of_payloads payloads.Sc_rollup_helpers.inputs in
+  return (payloads.level, index)
+
+let gen_payloads_for_levels_and_level_and_index ?inbox_creation_level ?max_level
+    () =
+  let open QCheck2.Gen in
+  let* payloads_for_levels =
+    gen_payloads_for_levels ?inbox_creation_level ?max_level ()
+  in
+  let* level, index = gen_level_and_index payloads_for_levels in
+  return (payloads_for_levels, level, index)
+
+let gen_payloads_for_levels_and_two_levels_and_two_indexes ?inbox_creation_level
+    ?max_level () =
+  let open QCheck2.Gen in
+  let* payloads_for_levels =
+    gen_payloads_for_levels ?inbox_creation_level ?max_level ()
+  in
+  let* level, index = gen_level_and_index payloads_for_levels in
+  let* level', index' = gen_level_and_index payloads_for_levels in
+  return (payloads_for_levels, level, index, level', index')
 
 let fill_merkelized_payload history payloads =
   let open Lwt_result_syntax in
@@ -183,79 +256,8 @@ let construct_merkelized_payload_hashes payloads =
   let history = Merkelized_payload_hashes.History.empty ~capacity:1000L in
   fill_merkelized_payload history payloads
 
-module Node_inbox = struct
-  type t = {
-    inbox : Inbox.t;
-    history : Inbox.History.t;
-    payloads_histories : Sc_rollup_helpers.payloads_histories;
-  }
-
-  let new_inbox level =
-    {
-      inbox = Sc_rollup_helpers.dumb_init level;
-      history = Inbox.History.empty ~capacity:10000L;
-      payloads_histories = Sc_rollup_helpers.Payloads_histories.empty;
-    }
-
-  let fill_inbox inbox payloads_per_levels =
-    let open Result_syntax in
-    let* payloads_histories, history, inbox =
-      Sc_rollup_helpers.fill_inbox
-        ~inbox:inbox.inbox
-        inbox.history
-        inbox.payloads_histories
-        payloads_per_levels
-    in
-    return {inbox; payloads_histories; history}
-
-  let construct_inbox ~inbox_creation_level payloads_per_levels =
-    let open Result_syntax in
-    let* payloads_histories, history, inbox =
-      Sc_rollup_helpers.construct_inbox
-        ~inbox_creation_level
-        ~with_histories:true
-        payloads_per_levels
-    in
-    return {inbox; payloads_histories; history}
-end
-
-module Protocol_inbox = struct
-  let new_inbox level = Sc_rollup_helpers.dumb_init level
-
-  let fill_inbox inbox payloads_per_levels =
-    let open Result_syntax in
-    let* _level_tree_histories, _history, inbox =
-      Sc_rollup_helpers.fill_inbox
-        ~inbox
-        (Inbox.History.empty ~capacity:0L)
-        Sc_rollup_helpers.Payloads_histories.empty
-        payloads_per_levels
-    in
-    return inbox
-
-  let add_new_level inbox messages =
-    let next_level = Raw_level.succ @@ Sc_rollup.Inbox.inbox_level inbox in
-    let payloads_per_level =
-      Sc_rollup_helpers.wrap_messages next_level messages
-    in
-    fill_inbox inbox [payloads_per_level]
-
-  let add_new_empty_level inbox =
-    let next_level = Raw_level.succ @@ Sc_rollup.Inbox.inbox_level inbox in
-    let empty_level = [Sc_rollup_helpers.make_empty_level next_level] in
-    fill_inbox inbox empty_level
-
-  let construct_inbox ~inbox_creation_level payloads_per_levels =
-    let open Result_syntax in
-    let* _level_tree_histories, _history, inbox =
-      Sc_rollup_helpers.construct_inbox
-        ~inbox_creation_level
-        ~with_histories:false
-        payloads_per_levels
-    in
-    return inbox
-end
-
+(** The merkelized payload hashes history is correctly filled with all
+    values. *)
 let test_merkelized_payload_hashes_history payloads =
   let open Lwt_result_syntax in
   let nb_payloads = List.length payloads in
@@ -289,6 +291,7 @@ let test_merkelized_payload_hashes_history payloads =
         expected_payload_hash)
     payloads
 
+(** Produce a merkelized payload hashes proof and verify it's valid. *)
 let test_merkelized_payload_hashes_proof (payloads, index) =
   let open Lwt_result_syntax in
   let* history, merkelized_payload =
@@ -329,11 +332,16 @@ let test_merkelized_payload_hashes_proof (payloads, index) =
   in
   return_unit
 
+(** Verifying an empty merkelized payload hashes proof fails *)
+let test_empty_merkelized_payload_hashes_proof_fails () =
+  verify_merkelized_payload_proof_fails ~__LOC__ "proof is empty"
+  @@ Merkelized_payload_hashes.Internal_for_tests.make_proof []
+
 (* Test multiple cases of invalid proof. This test is more about testing the
    skip list than testing merkelized payload. But it was easier to test with a
    skip-list with hashes as pointer. *)
 let test_invalid_merkelized_payload_hashes_proof_fails (payloads, index) =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let make_proof = Merkelized_payload_hashes.Internal_for_tests.make_proof in
   let hd ~__LOC__ l = List.hd l |> opt_get ~__LOC__ in
   let tl ~__LOC__ l = List.tl l |> opt_get ~__LOC__ in
@@ -407,10 +415,7 @@ let test_invalid_merkelized_payload_hashes_proof_fails (payloads, index) =
     make_proof @@ prefix @ suffix
   in
   let assert_fails ~__LOC__ proof =
-    let res =
-      Environment.wrap_tzresult @@ Merkelized_payload_hashes.verify_proof proof
-    in
-    assert_merkelized_payload_proof_error ~__LOC__ "invalid inclusion proof" res
+    verify_merkelized_payload_proof_fails ~__LOC__ "invalid proof" proof
   in
   let* () = assert_fails ~__LOC__ proof_with_missing_cell in
   let* () = assert_fails ~__LOC__ proof_with_invalid_cell_in_path in
@@ -420,187 +425,377 @@ let test_invalid_merkelized_payload_hashes_proof_fails (payloads, index) =
   let* () = assert_fails ~__LOC__ proof_with_extra_step in
   return_unit
 
-let test_inclusion_proof_production (payloads_per_levels, level) =
+(** A node produces an inbox inclusion proof and the protocol verify it. *)
+let test_inclusion_proof_production (payloads_for_levels, level) =
   let open Lwt_result_wrap_syntax in
-  let inbox_creation_level = Raw_level.root in
-  let*? node_inbox =
-    Node_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
+  let*? node_inbox, proto_inbox =
+    construct_node_and_protocol_inbox
+      ~inbox_creation_level:Raw_level.root
+      payloads_for_levels
   in
   let node_inbox_snapshot = Inbox.old_levels_messages node_inbox.inbox in
   let* proof, node_old_level_messages =
-    wrap
-    @@ Inbox.Internal_for_tests.produce_inclusion_proof
-         (Sc_rollup_helpers.get_history node_inbox.history)
-         node_inbox_snapshot
-         level
-  in
-  let*? proto_inbox =
-    Protocol_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
+    Node_inbox.produce_inclusion_proof node_inbox node_inbox_snapshot level
   in
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
-  let*? found_old_levels_messages =
+  let*? verified_old_levels_messages =
     Environment.wrap_tzresult
-    @@ Inbox.verify_inclusion_proof proof proto_inbox_snapshot
+    @@ Inbox.Internal_for_tests.verify_inclusion_proof
+         proof
+         proto_inbox_snapshot
   in
-  Assert.equal
-    ~loc:__LOC__
-    Inbox.equal_history_proof
-    "snapshot is the same in the proto and node"
-    Inbox.pp_history_proof
+  assert_equal_history_proof
+    ~__LOC__
+    verified_old_levels_messages
     node_old_level_messages
-    found_old_levels_messages
 
-let test_inclusion_proof_verification (payloads_per_levels, level) =
+(** A node produces an inclusion proof and the protocol fails to verify it
+    against the snapshot of the next (empty) level. *)
+let test_inclusion_proof_verification (payloads_for_levels, level) =
   let open Lwt_result_wrap_syntax in
   let inbox_creation_level = Raw_level.root in
-  let*? node_inbox =
-    Node_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
+  let*? node_inbox, proto_inbox =
+    construct_node_and_protocol_inbox ~inbox_creation_level payloads_for_levels
   in
   let node_inbox_snapshot = Inbox.old_levels_messages node_inbox.inbox in
   let* proof, _node_old_level_messages =
-    wrap
-    @@ Inbox.Internal_for_tests.produce_inclusion_proof
-         (Sc_rollup_helpers.get_history node_inbox.history)
-         node_inbox_snapshot
-         level
+    Node_inbox.produce_inclusion_proof node_inbox node_inbox_snapshot level
   in
   let*? proto_inbox =
-    Protocol_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
+    Protocol_inbox.add_new_level ~inbox_creation_level proto_inbox []
   in
-  let*? proto_inbox = Protocol_inbox.add_new_empty_level proto_inbox in
   (* This snapshot is not the same one as node_inbox_snapshot because we
      added an empty level. *)
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
-  let result =
-    Environment.wrap_tzresult
-    @@ Inbox.verify_inclusion_proof proof proto_inbox_snapshot
-  in
-  assert_inbox_proof_error "invalid inclusion proof" result
+  verify_inclusion_proof_fails
+    ~__LOC__
+    "invalid inclusion proof"
+    proof
+    proto_inbox_snapshot
 
-let test_inbox_proof_production (payloads_per_levels, level, message_counter) =
-  let open Lwt_result_wrap_syntax in
-  let inbox_creation_level = Raw_level.root in
-  (* We begin with a Node inbox so we can produce a proof. *)
-  let exp_message =
-    Sc_rollup_helpers.first_after payloads_per_levels level message_counter
+(** The protocol fails to verify an empty inclusion proof. *)
+let test_empty_inclusion_proof_fails payloads =
+  let open Lwt_result_syntax in
+  let*? proto_inbox =
+    Protocol_inbox.construct_inbox
+      ~inbox_creation_level:Raw_level.root
+      [payloads]
   in
-  let*? node_inbox =
-    Node_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
+  let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
+  verify_inclusion_proof_fails
+    ~__LOC__
+    "inclusion proof is empty"
+    []
+    proto_inbox_snapshot
+
+(** A node produces an inbox payloads proof and the protocol verify it. *)
+let test_payloads_proof_production
+    ((payloads : payloads_per_level), message_counter) =
+  let open Lwt_result_syntax in
+  let payloads_for_levels = [payloads] in
+  let exp_message =
+    first_after payloads_for_levels payloads.level message_counter |> function
+    | Some {payload; _} -> Some payload
+    | None -> None
+  in
+  let*? node_inbox, proto_inbox =
+    construct_node_and_protocol_inbox
+      ~inbox_creation_level:Raw_level.root
+      payloads_for_levels
+  in
+  let node_head_cell_hash = latest_level_proof_hash node_inbox.inbox in
+  (* Produce a payloads proof using the {!Node_inbox}. *)
+  let* ({payload = proof_input; _} as proof) =
+    Node_inbox.produce_payloads_proof
+      node_inbox
+      node_head_cell_hash
+      message_counter
+  in
+  (* Verify the produced proof using the {!Protocol_inbox}. *)
+  let proto_head_cell_hash = latest_level_proof_hash proto_inbox in
+  let*? verified_input =
+    Environment.wrap_tzresult
+    @@ Inbox.Internal_for_tests.verify_payloads_proof
+         proof
+         proto_head_cell_hash
+         message_counter
+  in
+  let* () = assert_equal_payload_option ~__LOC__ proof_input verified_input in
+  assert_equal_payload_option ~__LOC__ exp_message verified_input
+
+(** A node produces a payloads proof and the protocol fails to verify it
+    against the snapshot of the next (empty) level. *)
+let test_payloads_proof_invalid_inbox_snapshot (payloads, message_counter) =
+  let open Lwt_result_syntax in
+  let inbox_creation_level = Raw_level.root in
+  let*? node_inbox, proto_inbox =
+    construct_node_and_protocol_inbox ~inbox_creation_level [payloads]
+  in
+  let* proof =
+    let node_head_cell_hash = latest_level_proof_hash node_inbox.inbox in
+    Node_inbox.produce_payloads_proof
+      node_inbox
+      node_head_cell_hash
+      message_counter
+  in
+  let*? proto_inbox =
+    Protocol_inbox.add_new_level ~inbox_creation_level proto_inbox []
+  in
+  (* As we added one level in the [proto_inbox], it is one level further than
+     the [node_inbox]. The proof will not match the history. *)
+  let head_cell_hash = latest_level_proof_hash proto_inbox in
+  verify_payloads_proof_fails
+    ~__LOC__
+    "message_proof does not match history"
+    proof
+    head_cell_hash
+    message_counter
+
+(** Fail to verify a payloads proof with an input when none is expected. *)
+let test_payloads_proof_no_payload_expected (payloads : payloads_per_level) =
+  let open Lwt_result_syntax in
+  let message_counter = Z.of_int (List.length payloads.inputs) in
+  let*? node_inbox, proto_inbox =
+    construct_node_and_protocol_inbox
+      ~inbox_creation_level:Raw_level.root
+      [payloads]
+  in
+  let* proof =
+    let node_head_cell_hash = latest_level_proof_hash node_inbox.inbox in
+    Node_inbox.produce_payloads_proof
+      node_inbox
+      node_head_cell_hash
+      message_counter
+  in
+  let invalid_proof =
+    let payload = Some (make_internal_inbox_message Start_of_level) in
+    Inbox.Internal_for_tests.{proof with payload}
+  in
+  let head_cell_hash = latest_level_proof_hash proto_inbox in
+  verify_payloads_proof_fails
+    ~__LOC__
+    "Payload provided but none expected"
+    invalid_proof
+    head_cell_hash
+    message_counter
+
+(** Fail to verify a payloads proof with no input when one is expected. *)
+let test_payloads_proof_payload_expected payloads =
+  let open Lwt_result_syntax in
+  let message_counter = Z.zero in
+  let*? node_inbox, proto_inbox =
+    construct_node_and_protocol_inbox
+      ~inbox_creation_level:Raw_level.root
+      [payloads]
+  in
+  let* proof =
+    let node_head_cell_hash = latest_level_proof_hash node_inbox.inbox in
+    Sc_rollup_helpers.Node_inbox.produce_payloads_proof
+      node_inbox
+      node_head_cell_hash
+      message_counter
+  in
+  let invalid_proof = Inbox.Internal_for_tests.{proof with payload = None} in
+  let head_cell_hash = latest_level_proof_hash proto_inbox in
+  verify_payloads_proof_fails
+    ~__LOC__
+    "Expected a payload but none provided in the proof"
+    invalid_proof
+    head_cell_hash
+    message_counter
+
+(** Fail to verify a payloads proof about another index. *)
+let test_payloads_proof_incorrect_proof payloads =
+  let open Lwt_result_syntax in
+  let*? node_inbox, proto_inbox =
+    construct_node_and_protocol_inbox
+      ~inbox_creation_level:Raw_level.root
+      [payloads]
+  in
+  let* proof =
+    let node_head_cell_hash = latest_level_proof_hash node_inbox.inbox in
+    Node_inbox.produce_payloads_proof node_inbox node_head_cell_hash Z.zero
+  in
+  let proof = Inbox.Internal_for_tests.{proof with payload = None} in
+  let head_cell_hash = latest_level_proof_hash proto_inbox in
+  let invalid_message_counter = Z.of_int (List.length payloads.inputs) in
+  verify_payloads_proof_fails
+    ~__LOC__
+    "Provided proof is about a unexpected payload"
+    proof
+    head_cell_hash
+    invalid_message_counter
+
+(** Fail to verify a payloads proof about another payload. *)
+let test_payloads_proof_incorrect_payload payloads =
+  let open Lwt_result_syntax in
+  let message_counter = Z.zero in
+  let*? node_inbox, proto_inbox =
+    construct_node_and_protocol_inbox
+      ~inbox_creation_level:Raw_level.root
+      [payloads]
+  in
+  let* proof =
+    let node_head_cell_hash = latest_level_proof_hash node_inbox.inbox in
+    Node_inbox.produce_payloads_proof
+      node_inbox
+      node_head_cell_hash
+      message_counter
+  in
+  let invalid_proof =
+    let payload = Some (make_internal_inbox_message End_of_level) in
+    Inbox.Internal_for_tests.{proof with payload}
+  in
+  let head_cell_hash = latest_level_proof_hash proto_inbox in
+  verify_payloads_proof_fails
+    ~__LOC__
+    "the payload provided does not match the payload's hash found in the \
+     message proof"
+    invalid_proof
+    head_cell_hash
+    message_counter
+
+(** Fail to verify a valid payloads proof for an invalid message counter. *)
+let test_payloads_proof_incorrect_index payloads =
+  let open Lwt_result_syntax in
+  let message_counter = Z.zero in
+  let*? node_inbox, proto_inbox =
+    construct_node_and_protocol_inbox
+      ~inbox_creation_level:Raw_level.root
+      [payloads]
+  in
+  let* proof =
+    let node_head_cell_hash = latest_level_proof_hash node_inbox.inbox in
+    Node_inbox.produce_payloads_proof
+      node_inbox
+      node_head_cell_hash
+      message_counter
+  in
+  let head_cell_hash = latest_level_proof_hash proto_inbox in
+  let invalid_message_counter = Z.succ message_counter in
+  verify_payloads_proof_fails
+    ~__LOC__
+    "found index in message_proof is incorrect"
+    proof
+    head_cell_hash
+    invalid_message_counter
+
+(** Fail to verify a payloads proof with an out of bound index. *)
+let test_payloads_proof_out_of_bound_index payloads =
+  let open Lwt_result_syntax in
+  let message_counter = Z.zero in
+  let*? node_inbox, proto_inbox =
+    construct_node_and_protocol_inbox
+      ~inbox_creation_level:Raw_level.root
+      [payloads]
+  in
+  let* proof =
+    let node_head_cell_hash = latest_level_proof_hash node_inbox.inbox in
+    Node_inbox.produce_payloads_proof
+      node_inbox
+      node_head_cell_hash
+      message_counter
+  in
+  let head_cell_hash = latest_level_proof_hash proto_inbox in
+  let invalid_message_counter =
+    Z.of_int @@ succ (List.length payloads.inputs)
+  in
+  verify_payloads_proof_fails
+    ~__LOC__
+    "Provided message counter is out of the valid range [0 -- (max_index + 1)]"
+    proof
+    head_cell_hash
+    invalid_message_counter
+
+(** Produce an inbox proof and verify it. *)
+let test_inbox_proof_production (payloads_for_levels, level, message_counter) =
+  let open Lwt_result_wrap_syntax in
+  let exp_message = first_after payloads_for_levels level message_counter in
+  let*? node_inbox, proto_inbox =
+    construct_node_and_protocol_inbox
+      ~inbox_creation_level:Raw_level.root
+      payloads_for_levels
   in
   let node_inbox_snapshot = Inbox.take_snapshot node_inbox.inbox in
-  let* proof, input =
-    wrap
-    @@ Inbox.produce_proof
-         ~get_payloads_history:
-           (Sc_rollup_helpers.get_payloads_history
-              node_inbox.payloads_histories)
-         ~get_history:(Sc_rollup_helpers.get_history node_inbox.history)
-         node_inbox_snapshot
-         (level, message_counter)
-  in
-  (* We now switch to a protocol inbox built from the same messages for
-     verification. *)
-  let*? proto_inbox =
-    Protocol_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
+  let* proof, input_of_produced_proof =
+    Node_inbox.produce_proof
+      node_inbox
+      node_inbox_snapshot
+      (level, message_counter)
   in
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
   let* () =
-    Assert.equal
-      ~loc:__LOC__
-      Inbox.equal_history_proof
-      "snapshot is the same in the proto and node"
-      Inbox.pp_history_proof
-      node_inbox_snapshot
-      proto_inbox_snapshot
+    assert_equal_history_proof ~__LOC__ node_inbox_snapshot proto_inbox_snapshot
   in
-  let*? v_input =
+  let*? input_in_proof =
     Environment.wrap_tzresult
     @@ Inbox.verify_proof (level, message_counter) proto_inbox_snapshot proof
   in
   let* () =
-    Assert.equal
-      ~loc:__LOC__
-      (Option.equal Sc_rollup.inbox_message_equal)
-      "Input returns by the production is the expected one."
-      (Format.pp_print_option Sc_rollup.pp_inbox_message)
-      input
-      v_input
+    assert_inbox_message ~__LOC__ input_of_produced_proof input_in_proof
   in
-  Assert.equal
-    ~loc:__LOC__
-    (Option.equal Sc_rollup.inbox_message_equal)
-    "Input returns by the verification is the expected one."
-    (Format.pp_print_option Sc_rollup.pp_inbox_message)
-    exp_message
-    v_input
+  assert_inbox_message ~__LOC__ exp_message input_in_proof
 
-let test_inbox_proof_verification (payloads_per_levels, level, message_counter)
-    =
+(** This test first produces two valid inbox proofs [proof1] and
+    [proof2] for two different levels [l1; l2], and message counters
+    [i1; i2]. Then combine the two proofs to create two invalid ones
+    [{proof1.inclusion_proof; proof2.payloads_prof}] and
+    [{proof2.inclusion_proof; proof1.payloads_prof}]. Both fail with
+    all combinations of levels [l1, l2] and messages counter [i1,
+    i2]. *)
+let test_invalid_inbox_proof_fails
+    (payloads_for_levels, level, message_counter, level', message_counter') =
+  QCheck2.assume
+    ((not (Raw_level.equal level level'))
+    && not (Z.equal message_counter message_counter')) ;
   let open Lwt_result_wrap_syntax in
-  let inbox_creation_level = Raw_level.root in
-  (* We begin with a Node inbox so we can produce a proof. *)
-  let*? node_inbox =
-    Node_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
+  let*? node_inbox, proto_inbox =
+    construct_node_and_protocol_inbox
+      ~inbox_creation_level:Raw_level.root
+      payloads_for_levels
   in
-  let get_payloads_history =
-    Sc_rollup_helpers.get_payloads_history node_inbox.payloads_histories
+  let node_inbox_snapshot = Inbox.take_snapshot node_inbox.inbox in
+  let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
+  assert (node_inbox_snapshot = proto_inbox_snapshot) ;
+  let* invalid_proof =
+    let* (inclusion_proof, _message_proof), _input =
+      Node_inbox.produce_and_expose_proof
+        node_inbox
+        node_inbox_snapshot
+        (level, message_counter)
+    in
+    let* (_inclusion_proof', message_proof'), _input =
+      Node_inbox.produce_and_expose_proof
+        node_inbox
+        node_inbox_snapshot
+        (level', message_counter')
+    in
+    return @@ Inbox.Internal_for_tests.make_proof inclusion_proof message_proof'
   in
-  let node_inbox_snapshot = Inbox.old_levels_messages node_inbox.inbox in
-  let* proof, _input =
-    wrap
-    @@ Inbox.produce_proof
-         ~get_payloads_history
-         ~get_history:(Sc_rollup_helpers.get_history node_inbox.history)
-         node_inbox_snapshot
+  let assert_fails ~__LOC__ (level, message_counter) =
+    assert_inbox_proof_error ~__LOC__ "message_proof does not match history"
+    @@ Inbox.verify_proof
          (level, message_counter)
+         proto_inbox_snapshot
+         invalid_proof
   in
-  (* We now switch to a protocol inbox built from the same messages for
-     verification. *)
-  let*? proto_inbox =
-    Protocol_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
-  in
-  let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
-  (* The proto and node inboxes are synchronized, we make sure the verification
-     refuses the invalid message index. *)
-  let invalid_message_counter =
-    if Z.(equal message_counter zero) then Z.succ message_counter
-    else Z.pred message_counter
-  in
-  let* () =
-    let result =
-      Environment.wrap_tzresult
-      @@ Inbox.verify_proof
-           (level, invalid_message_counter)
-           proto_inbox_snapshot
-           proof
-    in
-    assert_inbox_proof_error
-      ~loc:__LOC__
-      "found index in message_proof is incorrect"
-      result
-  in
-
-  (* We move the inbox one level forward so the inbox's inclusion proof fails. *)
-  let*? proto_inbox = Protocol_inbox.add_new_empty_level proto_inbox in
-  let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
-  let* () =
-    let result =
-      Environment.wrap_tzresult
-      @@ Inbox.verify_proof (level, message_counter) proto_inbox_snapshot proof
-    in
-    assert_inbox_proof_error ~loc:__LOC__ "invalid inclusion proof" result
-  in
-
+  let* () = assert_fails ~__LOC__ (level, message_counter) in
+  let* () = assert_fails ~__LOC__ (level', message_counter) in
+  let* () = assert_fails ~__LOC__ (level, message_counter') in
+  let* () = assert_fails ~__LOC__ (level', message_counter') in
   return_unit
 
+(** Verify that the inbox history is correctly filled by calling
+    {!Inbox.add_all_messages}. *)
 let test_messages_are_correctly_added_in_history
-    Sc_rollup_helpers.{predecessor_timestamp; predecessor; messages; _} =
+    {predecessor_timestamp; predecessor; messages; _} =
   let open Lwt_result_syntax in
-  let inbox = Sc_rollup_helpers.dumb_init Raw_level.root in
+  let inbox = dumb_init Raw_level.root in
   let messages = List.map (fun message -> Message.External message) messages in
   let*? payloads_history, _history, _inbox, witness, messages =
     Environment.wrap_tzresult
     @@ Inbox.add_all_messages
+         ~first_block:false
          ~predecessor_timestamp
          ~predecessor
          (Inbox.History.empty ~capacity:0L)
@@ -644,14 +839,20 @@ let merkelized_payload_hashes_tests =
   [
     Tztest.tztest_qcheck2
       ~count:1000
-      ~name:"Merkelized messages: Add messages then retrieve them from history."
+      ~name:
+        "Add payloads to merkelized payload hashes then retrieve them from \
+         history."
       (gen_payloads ())
       test_merkelized_payload_hashes_history;
     Tztest.tztest_qcheck2
       ~count:1000
-      ~name:"Merkelized messages: Produce proof and verify its validity."
+      ~name:"Produce a merkelized payload hashes proof and verify its validity."
       (gen_payloads_and_index ())
       test_merkelized_payload_hashes_proof;
+    Tztest.tztest
+      "Empty merkelized payload hashes proof fails."
+      `Quick
+      test_empty_merkelized_payload_hashes_proof_fails;
     Tztest.tztest_qcheck2
       ~count:1000
       ~name:"Invalid merkelized payload hashes proof fails."
@@ -668,23 +869,68 @@ let inbox_tests =
     Tztest.tztest_qcheck2
       ~count:1000
       ~name:"produce inclusion proof and verifies it."
-      (gen_inclusion_proof_inputs ())
+      (gen_payloads_for_levels_and_level ())
       test_inclusion_proof_production;
     Tztest.tztest_qcheck2
       ~count:1000
       ~name:"negative test of inclusion proof."
-      (gen_inclusion_proof_inputs ())
+      (gen_payloads_for_levels_and_level ())
       test_inclusion_proof_verification;
     Tztest.tztest_qcheck2
       ~count:1000
+      ~name:"verify empty inclusion proof fails."
+      (gen_payloads_and_level ())
+      test_empty_inclusion_proof_fails;
+    Tztest.tztest_qcheck2
+      ~count:1000
+      ~name:"produce payloads proof and verifies it."
+      (gen_payloads_and_level_and_index ())
+      test_payloads_proof_production;
+    Tztest.tztest_qcheck2
+      ~count:1000
+      ~name:"test to verify a proof not using the correct current level proof."
+      (gen_payloads_and_level_and_index ())
+      test_payloads_proof_invalid_inbox_snapshot;
+    Tztest.tztest_qcheck2
+      ~count:1000
+      ~name:"test to verify a proof without the payload."
+      (gen_payloads_and_level ())
+      test_payloads_proof_no_payload_expected;
+    Tztest.tztest_qcheck2
+      ~count:1000
+      ~name:"test to verify a proof with payload when none is expected."
+      (gen_payloads_and_level ())
+      test_payloads_proof_payload_expected;
+    Tztest.tztest_qcheck2
+      ~count:1000
+      ~name:"test to verify a proof with a proof for another payload."
+      (gen_payloads_and_level ())
+      test_payloads_proof_incorrect_proof;
+    Tztest.tztest_qcheck2
+      ~count:1000
+      ~name:"test to verify a proof with another payload."
+      (gen_payloads_and_level ())
+      test_payloads_proof_incorrect_payload;
+    Tztest.tztest_qcheck2
+      ~count:1000
+      ~name:"test to verify a proof with a payload with an incorrect index."
+      (gen_payloads_and_level ())
+      test_payloads_proof_incorrect_index;
+    Tztest.tztest_qcheck2
+      ~count:1000
+      ~name:"test to verify a proof with an out of bound index."
+      (gen_payloads_and_level ())
+      test_payloads_proof_out_of_bound_index;
+    Tztest.tztest_qcheck2
+      ~count:1000
       ~name:"produce inbox proof and verifies it."
-      (gen_proof_inputs ())
+      (gen_payloads_for_levels_and_level_and_index ())
       test_inbox_proof_production;
     Tztest.tztest_qcheck2
       ~count:1000
       ~name:"negative test of inbox proof."
-      (gen_proof_inputs ())
-      test_inbox_proof_verification;
+      (gen_payloads_for_levels_and_two_levels_and_two_indexes ())
+      test_invalid_inbox_proof_fails;
     Tztest.tztest_qcheck2
       ~count:1000
       ~name:"messages are correctly added in payloads history"
@@ -695,3 +941,7 @@ let inbox_tests =
 let tests =
   merkelized_payload_hashes_tests @ inbox_tests
   @ Test_sc_rollup_inbox_legacy.tests
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("sc rollup inbox", tests)]
+  |> Lwt_main.run

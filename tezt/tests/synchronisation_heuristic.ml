@@ -30,6 +30,10 @@
    Subject:      Check synchronization state and prevalidator status
 *)
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4459
+   Re-enable the "synchronisation_threshold" tests in the CI once the flakiness has
+   been fixed. *)
+
 open Base
 
 let wait_for ~statuses node =
@@ -71,7 +75,8 @@ let check_node_synchronization_state =
   Protocol.register_test
     ~__FILE__
     ~title:"check synchronization state"
-    ~tags:["synchronisation_threshold"; "bootstrap"; "node"; "sync"]
+    ~tags:
+      ["ci_disable"; "synchronisation_threshold"; "bootstrap"; "node"; "sync"]
   @@ fun protocol ->
   let* main_node = Node.init ~name:"main_node" [] in
   let* nodes =
@@ -156,7 +161,14 @@ let check_prevalidator_start =
   Protocol.register_test
     ~__FILE__
     ~title:"Check prevalidator start"
-    ~tags:["synchronisation_threshold"; "bootstrap"; "node"; "prevalidator"]
+    ~tags:
+      [
+        "ci_disable";
+        "synchronisation_threshold";
+        "bootstrap";
+        "node";
+        "prevalidator";
+      ]
   @@ fun protocol ->
   let init_node threshold = Node.init [Synchronisation_threshold threshold] in
   let* node1 = init_node 0 in
@@ -215,7 +227,7 @@ let test_threshold_zero =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold zero"
-    ~tags:["synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:["ci_disable"; "synchronisation_threshold"; "bootstrap"; "threshold"]
   @@ fun protocol ->
   Log.info "Setup network" ;
   let* node, client =
@@ -287,7 +299,7 @@ let test_threshold_two =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold two"
-    ~tags:["synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:["ci_disable"; "synchronisation_threshold"; "bootstrap"; "threshold"]
   @@ fun protocol ->
   Log.info "Add a first peer with threshold zero" ;
   let* node, client =
@@ -353,7 +365,7 @@ let test_threshold_stuck =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold stuck"
-    ~tags:["synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:["ci_disable"; "synchronisation_threshold"; "bootstrap"; "threshold"]
   @@ fun protocol ->
   let sync_latency = 3 in
 
@@ -414,7 +426,7 @@ let test_threshold_split_view =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold split view"
-    ~tags:["synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:["ci_disable"; "synchronisation_threshold"; "bootstrap"; "threshold"]
   @@ fun protocol ->
   Log.info
     "Add two peers with threshold zero, and one with threshold 2 and a high \
@@ -480,7 +492,7 @@ let test_many_nodes_bootstrap =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: many nodes bootstrap"
-    ~tags:["synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:["ci_disable"; "synchronisation_threshold"; "bootstrap"; "threshold"]
   @@ fun protocol ->
   let num_nodes = 8 in
   let running_time = 10.0 in

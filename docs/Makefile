@@ -4,7 +4,7 @@
 SPHINXOPTS    = -j auto -aE -n -W --keep-going
 SPHINXBUILD   = poetry run sphinx-build
 SOURCEDIR     = .
-TMPDOCDIR        = /tmp/octezdoc
+TMPDOCDIR     = /tmp/octezdoc
 BUILDDIR      = _build
 TOPBUILDDIR   = ../_build/default
 
@@ -14,17 +14,17 @@ P2PDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = lima mumbai
+NAMED_PROTOS  = mumbai nairobi
 PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
-lima_long     = PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW
 mumbai_long   = PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1
+nairobi_long  = PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-lima_short    = PtLimaPt
 mumbai_short  = PtMumbai
+nairobi_short = PtNairob
 alpha_short   = alpha
 
 SCRIPTSDIR    = scripts
@@ -48,11 +48,17 @@ full: odoc
 	@../octez-baker-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 %/octez-accuser.html:
 	@../octez-accuser-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
+%/octez-smart-rollup-node.html:
+	@../octez-smart-rollup-node-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
+%/octez-smart-rollup-client.html:
+	@../octez-smart-rollup-client-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 
 manuals: \
 	 $(PROTOCOLS:%=%/octez-client.html) \
 	 $(PROTOCOLS:%=%/octez-baker.html) \
-	 $(PROTOCOLS:%=%/octez-accuser.html)
+	 $(PROTOCOLS:%=%/octez-accuser.html) \
+	 $(PROTOCOLS:%=%/octez-smart-rollup-node.html) \
+	 $(PROTOCOLS:%=%/octez-smart-rollup-client.html)
 	# generic
 	@../octez-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-admin-client.html
 	@../octez-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-signer.html
@@ -60,6 +66,8 @@ manuals: \
 	@../octez-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-snoop.html
 	@../octez-node --help | grep -v '^Octez-node' | grep -v 'OCTEZ-NODE(1)' | \
 		./scripts/man2txt.py > api/octez-node.txt
+	@../octez-proxy-server --help | grep -v '^Octez-proxy-server' | grep -v 'OCTEZ-PROXY-SERVER(1)' | \
+		./scripts/man2txt.py > api/octez-proxy-server.txt
 
 # artificially depend on docexes to avoid concurrent dunes
 .PHONY: odoc
@@ -73,14 +81,17 @@ odoc-lite: docexes
 	rm -rf $(TMPDOCDIR)/
 	mkdir -p $(TMPDOCDIR)/
 	rsync --recursive --links --perms \
-	  --include="src/proto_015*" --include="src/proto_016*" \
+	  --include="src/proto_016*" \
+	  --include="src/proto_017*" \
 	  --exclude="src/proto_0*" \
 		../src ../tezt ../vendors ../dune ../dune-project $(TMPDOCDIR)/
 	# FIXME: https://gitlab.com/tezos/tezos/-/issues/2971
 	# The new version of odoc (2.1.0) is stricter than the old version (1.5.3),
 	# we temporarily deactivate the odoc checks.
 	# cd $(TMPDOCDIR); ODOC_WARN_ERROR=true dune build @doc
-	cd $(TMPDOCDIR); dune build @doc
+	@echo "Running odoc, outputs messages to $(TMPDOCDIR)/odoc.log"
+	cd $(TMPDOCDIR); dune build @doc >odoc.log 2>&1; \
+	  RESULT=$$?; (grep '^Error:' odoc.log || true); exit $$RESULT
 	@rm -rf _build/api/odoc
 	@mkdir -p _build/api
 	@cp -r $(TMPDOCDIR)/_build/default/_doc _build/api/odoc
@@ -103,17 +114,17 @@ redirectcheck: html
 # - on the active protocol using its numeric name (not the "active" symlink)
 # - on each other protocol including alpha, also checking label defs (option -l)
 xrefscheck:
-	$(CHECKXREFS) lima
-	$(CHECKXREFS) -l mumbai
+	$(CHECKXREFS) mumbai
+	$(CHECKXREFS) nairobi
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
 	scripts/test_doc_scripts.sh install-bin-bionic
 	scripts/test_doc_scripts.sh install-bin-focal
-	scripts/test_doc_scripts.sh install-bin-fedora34
+	scripts/test_doc_scripts.sh install-bin-fedora36
 	scripts/test_doc_scripts.sh install-bin-rc-bionic
 	scripts/test_doc_scripts.sh install-bin-rc-focal
-	scripts/test_doc_scripts.sh install-bin-rc-fedora34
+	scripts/test_doc_scripts.sh install-bin-rc-fedora36
 	scripts/test_doc_scripts.sh install-opam-scratch
 	scripts/test_doc_scripts.sh install-opam-bionic
 	scripts/test_doc_scripts.sh install-opam-focal
@@ -162,7 +173,7 @@ html: api/errors.rst developer/metrics.csv user/node-config.json \
 		rpc p2p manuals install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@ln -s active "$(BUILDDIR)/lima" || true
+	@ln -s active "$(BUILDDIR)/mumbai" || true
 
 # pylint does not support pyproject.toml configuration for now
 # It is configured by ./.pylint.rc
@@ -186,6 +197,10 @@ PYCODESTYLE_OPTIONS=\
 	--ignore=E121,E123,E126,E226,E24,E704,W503,E203,E231 \
 	--max-line-length=80
 
+TYPECHECK=poetry run mypy
+
+BLACK=poetry run black
+
 PYTHON_SRCS?=conf.py _extensions/*.py scripts/*.py
 
 pylint:
@@ -195,15 +210,26 @@ pylint:
 
 lint_black:
 	@echo "Running black formatter as style checker"
-	poetry run black --check $(PYTHON_SRCS)
+	$(BLACK) --check $(PYTHON_SRCS)
 
 pycodestyle:
 	@echo "Linting with pycodestyle version `poetry run pycodestyle --version` (`poetry run which pycodestyle`)"
 	$(PYCODESTYLE) $(PYCODESTYLE_OPTIONS) $(PYTHON_SRCS)
 
-lint: pylint pycodestyle lint_black
+typecheck:
+	@echo "Typechecking with mypy version `poetry run mypy --version`"
+	$(TYPECHECK) $(PYTHON_SRCS)
+
+lint: pylint pycodestyle lint_black typecheck
+
+# black options are set in pyproject.toml
+black:
+	@echo "Running black formatter"
+	$(BLACK) $(PYTHON_SRCS)
+
+fmt: black
 
 clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
-	@-rm -Rf api/octez-*.html api/octez-*.txt lima/octez-*.html mumbai/octez-*.html alpha/octez-*.html
+	@-rm -Rf api/octez-*.html api/octez-*.txt mumbai/octez-*.html nairobi/octez-*.html alpha/octez-*.html

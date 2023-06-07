@@ -26,17 +26,15 @@
 (** Testing
     -------
     Component:    Tree_encoding_decoding
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "^Debug$"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_debug.ml
     Subject:      Debug facilities tests for the tezos-scoru-wasm library
 *)
 
-open Tztest
 open Tezos_lazy_containers
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
 
-let write_debug ~debug ~init ~values memories =
+let write_debug ~version ~debug ~init ~values memories =
   let input = Input_buffer.alloc () in
   let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
   let memories =
@@ -53,32 +51,34 @@ let write_debug ~debug ~init ~values memories =
   Eval.invoke
     ~module_reg
     ~caller:module_key
-    (if debug then
-     Host_funcs.all_debug
-       ~write_debug:(Printer (fun str -> Lwt.return @@ Format.printf "%s" str))
-    else Host_funcs.all)
+    (Host_funcs.registry
+       ~version
+       ~write_debug:
+         (if debug then
+          Printer (fun str -> Lwt.return @@ Format.printf "%s" str)
+         else Noop))
     ~input
     ~init
     Host_funcs.Internal_for_tests.write_debug
     values
 
-let test_write_debug_ok () =
+let test_write_debug_ok ~version () =
   let open Lwt_syntax in
   let memories_ok =
     [Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l})]
   in
   let values = Values.[Num (I32 4l); Num (I32 10l)] in
   let* _, result_noop =
-    write_debug ~debug:false ~init:false ~values memories_ok
+    write_debug ~version ~debug:false ~init:false ~values memories_ok
   in
 
   let* _, result_alternative =
-    write_debug ~debug:true ~init:false ~values memories_ok
+    write_debug ~version ~debug:true ~init:false ~values memories_ok
   in
   assert (result_noop = result_alternative) ;
   return_ok_unit
 
-let test_write_debug_init () =
+let test_write_debug_init ~version () =
   let open Lwt_syntax in
   let memories =
     [Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l})]
@@ -87,20 +87,24 @@ let test_write_debug_init () =
   let* () =
     Lwt.catch
       (fun () ->
-        let* _, _ = write_debug ~debug:false ~init:true ~values memories in
+        let* _, _ =
+          write_debug ~version ~debug:false ~init:true ~values memories
+        in
         assert false)
       (function Eval.Crash _ -> Lwt.return_unit | _ -> assert false)
   in
   let* () =
     Lwt.catch
       (fun () ->
-        let* _, _ = write_debug ~debug:true ~init:true ~values memories in
+        let* _, _ =
+          write_debug ~version ~debug:true ~init:true ~values memories
+        in
         assert false)
       (function Eval.Crash _ -> Lwt.return_unit | _ -> assert false)
   in
   return_ok_unit
 
-let test_write_debug_too_many_memories () =
+let test_write_debug_too_many_memories ~version () =
   let open Lwt_syntax in
   let memories_two =
     [
@@ -112,20 +116,24 @@ let test_write_debug_too_many_memories () =
   let* () =
     Lwt.catch
       (fun () ->
-        let* _, _ = write_debug ~debug:false ~init:false ~values memories_two in
+        let* _, _ =
+          write_debug ~version ~debug:false ~init:false ~values memories_two
+        in
         assert false)
       (function Eval.Crash _ -> Lwt.return_unit | _ -> assert false)
   in
   let* () =
     Lwt.catch
       (fun () ->
-        let* _, _ = write_debug ~debug:false ~init:false ~values memories_two in
+        let* _, _ =
+          write_debug ~version ~debug:false ~init:false ~values memories_two
+        in
         assert false)
       (function Eval.Crash _ -> Lwt.return_unit | _ -> assert false)
   in
   return_ok_unit
 
-let test_write_debug_invalid_length () =
+let test_write_debug_invalid_length ~version () =
   let open Lwt_syntax in
   let memory = Memory.alloc (MemoryType Types.{min = 1l; max = Some 1l}) in
   let offset = 0l in
@@ -133,28 +141,32 @@ let test_write_debug_invalid_length () =
   assert (Memory.bound memory < Int64.of_int32 (Int32.add offset length)) ;
 
   let values = Values.[Num (I32 offset); Num (I32 length)] in
-  let* _, result_noop = write_debug ~debug:false ~init:false ~values [memory] in
+  let* _, result_noop =
+    write_debug ~version ~debug:false ~init:false ~values [memory]
+  in
 
   let* _, result_alternative =
-    write_debug ~debug:true ~init:false ~values [memory]
+    write_debug ~version ~debug:true ~init:false ~values [memory]
   in
   assert (result_noop = result_alternative) ;
   return_ok_unit
 
-let test_write_debug_invalid_offset () =
+let test_write_debug_invalid_offset ~version () =
   let open Lwt_syntax in
   let memory = Memory.alloc (MemoryType Types.{min = 1l; max = Some 1l}) in
   let offset = 100_000l in
   assert (Memory.bound memory < Int64.of_int32 offset) ;
   let values = Values.[Num (I32 offset); Num (I32 10l)] in
-  let* _, result_noop = write_debug ~debug:false ~init:false ~values [memory] in
+  let* _, result_noop =
+    write_debug ~version ~debug:false ~init:false ~values [memory]
+  in
   let* _, result_alternative =
-    write_debug ~debug:true ~init:false ~values [memory]
+    write_debug ~version ~debug:true ~init:false ~values [memory]
   in
   assert (result_noop = result_alternative) ;
   return_ok_unit
 
-let test_read_mem_outside_of_bounds () =
+let test_read_mem_outside_of_bounds ~version:_ () =
   let open Lwt_syntax in
   let check_read_mem_empty memory =
     let bound = Memory.bound memory |> I64.to_int_u |> I32.of_int_u in
@@ -228,24 +240,26 @@ let test_read_mem_outside_of_bounds () =
   return_ok_unit
 
 let tests =
-  [
-    tztest "debug on correct inputs and memory" `Quick test_write_debug_ok;
-    tztest
-      "debug on more than one memory"
-      `Quick
-      test_write_debug_too_many_memories;
-    tztest "debug during init" `Quick test_write_debug_init;
-    tztest
-      "debug with inputs outside of the memory"
-      `Quick
-      test_write_debug_invalid_length;
-    tztest
-      "debug with inputs outside of the memory"
-      `Quick
-      test_write_debug_invalid_offset;
-    tztest
-      "Check reading at invalid position of the memory doesn't fail and \
-       truncates if possible"
-      `Quick
-      test_read_mem_outside_of_bounds;
-  ]
+  Tztest_helper.tztests_with_pvm
+    ~versions:[V0; V1]
+    [
+      ("debug on correct inputs and memory", `Quick, test_write_debug_ok);
+      ( "debug on more than one memory",
+        `Quick,
+        test_write_debug_too_many_memories );
+      ("debug during init", `Quick, test_write_debug_init);
+      ( "debug with inputs outside of the memory (invalid length)",
+        `Quick,
+        test_write_debug_invalid_length );
+      ( "debug with inputs outside of the memory (invalid offset)",
+        `Quick,
+        test_write_debug_invalid_offset );
+      ( "Check reading at invalid position of the memory doesn't fail and \
+         truncates if possible",
+        `Quick,
+        test_read_mem_outside_of_bounds );
+    ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("Debug", tests)]
+  |> Lwt_main.run

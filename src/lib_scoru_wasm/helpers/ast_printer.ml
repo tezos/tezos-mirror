@@ -668,7 +668,7 @@ let pp_module_registry out reg =
   let reg = Instance.ModuleMap.snapshot reg in
   Instance.ModuleMap.Map.pp pp_module out reg
 
-let pp_config out Eval.{step_kont; host_funcs = _; stack_size_limit} =
+let pp_config out Eval.{step_kont; stack_size_limit} =
   Format.fprintf
     out
     "@[<v 2>{frame_kont = %a;@;budget = %i;@;}@]"

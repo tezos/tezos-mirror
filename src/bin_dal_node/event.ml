@@ -32,3 +32,20 @@ let stored_slot_content =
     ~msg:"Slot stored: commitment {commitment}"
     ~level:Notice
     ("commitment", Cryptobox.Commitment.encoding)
+
+let stored_slot_shards =
+  declare_2
+    ~section
+    ~name:"stored_slot_shards"
+    ~msg:"Slot stored: commitment {commitment}, shards {shards}"
+    ~level:Notice
+    ("commitment", Cryptobox.Commitment.encoding)
+    ("shards", Data_encoding.int31)
+
+let decoding_data_failed =
+  declare_1
+    ~section
+    ~name:"decoding_failed"
+    ~msg:"Error while decoding a {data_kind} value"
+    ~level:Warning
+    ("data_kind", Types.kind_encoding)

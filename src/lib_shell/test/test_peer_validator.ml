@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Peer_validator
-    Invocation:   dune exec src/lib_shell/test/test_peer_validator.exe
+    Invocation:   dune exec src/lib_shell/test/main.exe \
+                  -- --file test_peer_validator.ml
     Subject:      Unit tests for [Peer_validator]
 *)
 
@@ -93,7 +94,16 @@ let wrap
           chain_db
           Tezos_crypto.Crypto_box.Public_key_hash.zero
       in
-      f chain_db genesis_header pv)
+      let* () =
+        Lwt.finalize
+          (fun () -> f chain_db genesis_header pv)
+          (fun () ->
+            let*! () = Peer_validator.shutdown pv in
+            let*! () = Block_validator_process.close block_validator_processs in
+            let*! () = Block_validator.shutdown block_validator in
+            unit)
+      in
+      return_unit)
 
 (* This test ensure that [validate_new_head hash header] remove all
    entries of [hash] in the db if the fitness does not increase. *)
@@ -168,6 +178,7 @@ let test_validate_new_head_on_lower_fitness () =
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "Peer_validator"
     [
       ( "Validate_new_head",

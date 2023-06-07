@@ -431,7 +431,7 @@ The following sections describe the individual steps above in more detail.
 
 .. note::
 
-  Besides compiling the sources, it is recommended to also :ref:`install Python and some related tools <install_python>`, which are needed, among others, to build the documentation and execute some of the tests.
+  Besides compiling the sources, it is recommended to also :ref:`install Python and some related tools <install_python>`, which are needed, among others, to build the documentation and to use the Git :doc:`pre-commit hook <../developer/pre_commit_hook>`.
 
 .. _setup_rust:
 
@@ -583,8 +583,10 @@ You may also activate Bash autocompletion by executing::
 
 .. warning::
 
-  Note that if your shell is `zsh`, you may need extra configuration to customize shell
-  completion (refer to the `zsh` documentation).
+  Note that if your shell is ``zsh``, you may need extra configuration to customize shell
+  completion (refer to the ``zsh`` documentation).
+
+.. _update_from_sources:
 
 Update
 ~~~~~~

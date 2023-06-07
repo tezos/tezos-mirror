@@ -123,7 +123,6 @@ let rec validate_ty :
       | Bls12_381_fr_t -> (k [@ocaml.tailcall]) ()
       | Bool_t -> (k [@ocaml.tailcall]) ()
       | Never_t -> (k [@ocaml.tailcall]) ()
-      | Tx_rollup_l2_address_t -> (k [@ocaml.tailcall]) ()
       | Chain_id_t -> (k [@ocaml.tailcall]) ()
       (* Valid collection types. *)
       | Ticket_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
@@ -140,11 +139,11 @@ let rec validate_ty :
             no_entrypoints
             no_entrypoints
             k
-      | Union_t (ty1, ty2, _, _) ->
+      | Or_t (ty1, ty2, _, _) ->
           let entrypoints_l, entrypoints_r =
             match nested_entrypoints with
             | Entrypoints_None -> (no_entrypoints, no_entrypoints)
-            | Entrypoints_Union {left; right} -> (left, right)
+            | Entrypoints_Or {left; right} -> (left, right)
           in
           (validate_two_tys [@ocaml.tailcall])
             ty1
@@ -302,34 +301,8 @@ let to_transaction_operation ctxt rollup
   in
   return
     ( Script_typed_ir.Internal_operation
-        {source = Destination.Sc_rollup rollup; operation; nonce},
+        {sender = Destination.Sc_rollup rollup; operation; nonce},
       ctxt )
-
-(* Transfer some ticket-tokens from [source_destination] to [target_destination].
-   This operation fails in case the [source_destination]'s balance is lower than
-   amount. *)
-let transfer_ticket_token ctxt ~source_destination ~target_destination ~amount
-    ticket_token =
-  let open Lwt_result_syntax in
-  let* source_key_hash, ctxt =
-    Ticket_balance_key.of_ex_token ctxt ~owner:source_destination ticket_token
-  in
-  let* target_key_hash, ctxt =
-    Ticket_balance_key.of_ex_token ctxt ~owner:target_destination ticket_token
-  in
-  let* source_storage_diff, ctxt =
-    Ticket_balance.adjust_balance ctxt source_key_hash ~delta:(Z.neg amount)
-  in
-  let* target_storage_diff, ctxt =
-    Ticket_balance.adjust_balance ctxt target_key_hash ~delta:amount
-  in
-  (* Adjust the recorded paid-for storage space for the ticket-table. *)
-  let* storage_diff_to_pay, ctxt =
-    Ticket_balance.adjust_storage_space
-      ctxt
-      ~storage_diff:(Z.add source_storage_diff target_storage_diff)
-  in
-  return (storage_diff_to_pay, ctxt)
 
 let transfer_ticket_tokens ctxt ~source_destination ~acc_storage_diff
     {Ticket_operations_diff.ticket_token; total_amount = _; destinations} =
@@ -337,13 +310,13 @@ let transfer_ticket_tokens ctxt ~source_destination ~acc_storage_diff
   List.fold_left_es
     (fun (acc_storage_diff, ctxt)
          (target_destination, (amount : Script_typed_ir.ticket_amount)) ->
-      let* storage_diff, ctxt =
-        transfer_ticket_token
+      let* ctxt, storage_diff =
+        Ticket_transfer.transfer_ticket
           ctxt
-          ~source_destination
-          ~target_destination
-          ~amount:Script_int.(to_zint (amount :> n num))
+          ~sender:source_destination
+          ~dst:target_destination
           ticket_token
+          Ticket_amount.((amount :> t))
       in
       return (Z.(add acc_storage_diff storage_diff), ctxt))
     (acc_storage_diff, ctxt)

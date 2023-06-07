@@ -269,7 +269,7 @@ we want to keep the locations canonical and use the ``root`` function
 to obtain a plain node.
 
 
-The `Micheline_printer` module exports two pretty-printing functions
+The ``Micheline_printer`` module exports two pretty-printing functions
 based on the ``Format`` standard OCaml module: ``print_expr`` and
 ``print_expr_unwrapped``. The difference is that ``print_expr`` wraps
 its output in parentheses if it is a primitive application with at
@@ -277,7 +277,7 @@ least one argument. The input of these printing functions can be
 produced from a ``'p canonical`` by the ``printable`` function.
 
 
-The `Micheline_parser` module can be used to produce Micheline nodes
+The ``Micheline_parser`` module can be used to produce Micheline nodes
 from strings and files. It is done in two stages: tokenization (also
 known as lexing) and parsing. Tokenization is done by the ``tokenize``
 function that uses the ``uutf`` OCaml library to decode UTF-8

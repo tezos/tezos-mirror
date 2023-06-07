@@ -1,0 +1,78 @@
+
+./octez-client --protocol PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/attic/reservoir.tz --details
+Well typed
+Gas remaining: 1039969.237 units remaining
+{ parameter unit ;
+  storage (pair (pair (timestamp %T) (mutez %N)) (pair (address %A) (address %B))) ;
+  code { CDR
+         /* [ pair (pair timestamp mutez) address address ] */ ;
+         DUP
+         /* [ pair (pair timestamp mutez) address address
+            : pair (pair timestamp mutez) address address ] */ ;
+         CAAR %T ;
+         NOW
+         /* [ timestamp : timestamp : pair (pair timestamp mutez) address address ] */ ;
+         COMPARE
+         /* [ int : pair (pair timestamp mutez) address address ] */ ;
+         LE
+         /* [ bool : pair (pair timestamp mutez) address address ] */ ;
+         IF { DUP
+              /* [ pair (pair timestamp mutez) address address
+                 : pair (pair timestamp mutez) address address ] */ ;
+              CADR %N ;
+              BALANCE
+              /* [ mutez : mutez : pair (pair timestamp mutez) address address ] */ ;
+              COMPARE
+              /* [ int : pair (pair timestamp mutez) address address ] */ ;
+              LE
+              /* [ bool : pair (pair timestamp mutez) address address ] */ ;
+              IF { NIL operation
+                   /* [ list operation : pair (pair timestamp mutez) address address ] */ ;
+                   PAIR
+                   /* [ pair (list operation) (pair timestamp mutez) address address ] */ }
+                 { DUP
+                   /* [ pair (pair timestamp mutez) address address
+                      : pair (pair timestamp mutez) address address ] */ ;
+                   CDDR %B ;
+                   CONTRACT
+                     unit
+                   /* [ option (contract unit) : pair (pair timestamp mutez) address address ] */ ;
+                   ASSERT_SOME ;
+                   BALANCE
+                   /* [ mutez : contract unit : pair (pair timestamp mutez) address address ] */ ;
+                   UNIT
+                   /* [ unit : mutez : contract unit
+                      : pair (pair timestamp mutez) address address ] */ ;
+                   TRANSFER_TOKENS
+                   /* [ operation : pair (pair timestamp mutez) address address ] */ ;
+                   NIL operation
+                   /* [ list operation : operation : pair (pair timestamp mutez) address address ] */ ;
+                   SWAP
+                   /* [ operation : list operation : pair (pair timestamp mutez) address address ] */ ;
+                   CONS
+                   /* [ list operation : pair (pair timestamp mutez) address address ] */ ;
+                   PAIR
+                   /* [ pair (list operation) (pair timestamp mutez) address address ] */ } }
+            { DUP
+              /* [ pair (pair timestamp mutez) address address
+                 : pair (pair timestamp mutez) address address ] */ ;
+              CDAR %A ;
+              CONTRACT
+                unit
+              /* [ option (contract unit) : pair (pair timestamp mutez) address address ] */ ;
+              ASSERT_SOME ;
+              BALANCE
+              /* [ mutez : contract unit : pair (pair timestamp mutez) address address ] */ ;
+              UNIT
+              /* [ unit : mutez : contract unit
+                 : pair (pair timestamp mutez) address address ] */ ;
+              TRANSFER_TOKENS
+              /* [ operation : pair (pair timestamp mutez) address address ] */ ;
+              NIL operation
+              /* [ list operation : operation : pair (pair timestamp mutez) address address ] */ ;
+              SWAP
+              /* [ operation : list operation : pair (pair timestamp mutez) address address ] */ ;
+              CONS
+              /* [ list operation : pair (pair timestamp mutez) address address ] */ ;
+              PAIR
+              /* [ pair (list operation) (pair timestamp mutez) address address ] */ } } }

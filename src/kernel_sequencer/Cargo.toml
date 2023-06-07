@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "kernel_sequencer"
+version = "0.1.0"
+edition = "2021"
+description = "Sequencer framework for Tezos Smart Rollups"
+
+[dependencies.tezos-smart-rollup-host]
+path = "../kernel_sdk/host"

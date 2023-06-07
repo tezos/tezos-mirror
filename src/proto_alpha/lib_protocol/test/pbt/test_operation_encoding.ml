@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/test_operation_encoding.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
+                  -- --file test_operation_encoding.ml
     Subject:      Encoding for operations
 *)
 
@@ -43,7 +43,7 @@ let generate_operation =
 
 (** {2 Tests} *)
 
-let test_operation =
+let test_operation encoding =
   let open Alpha_context in
   let gen = generate_operation in
   let eq {shell = s1; protocol_data = Operation_data d1}
@@ -52,15 +52,20 @@ let test_operation =
     let o2 : _ Operation.t = {shell = s2; protocol_data = d2} in
     match Operation.equal o1 o2 with None -> false | Some Eq -> true
   in
-  test_roundtrip
-    ~count:2000
-    ~title:"Operation.t"
-    ~gen
-    ~eq
-    Alpha_context.Operation.encoding
+  test_roundtrip ~count:2000 ~title:"Operation.t" ~gen ~eq encoding
 
 let () =
   let qcheck_wrap = qcheck_wrap ~rand:(Random.State.make_self_init ()) in
   Alcotest.run
-    "Operation_encoding"
-    [("roundtrip", qcheck_wrap [test_operation])]
+    ~__FILE__
+    (Protocol.name ^ ": Operation_encoding")
+    [
+      ( "roundtrip",
+        qcheck_wrap [test_operation Alpha_context.Operation.encoding] );
+      ( "legacy : roundtrip",
+        qcheck_wrap
+          [
+            test_operation
+              Alpha_context.Operation.encoding_with_legacy_attestation_name;
+          ] );
+    ]

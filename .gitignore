@@ -51,8 +51,10 @@ __pycache__
 /tezos-smart-rollup-client-*
 /octez-smart-rollup-client-*
 /octez-smart-rollup-wasm-*
+/octez-evm-proxy-server
 /tezos-dal-node
 /octez-dal-node
+/octez-dac-node
 /octez-binaries
 
 /src/proto_*/parameters/*-parameters.json
@@ -87,3 +89,9 @@ __pycache__
 
 # Output of the update_opam_repo script
 opam_repo.patch
+
+# Rust
+target
+
+evm_kernel.wasm
+smart-rollup-installer

@@ -26,6 +26,7 @@
 
 type error +=
   | (* `Temporary *) Sc_rollup_disputed
+  | (* `Temporary *) Sc_rollup_no_valid_commitment_to_cement
   | (* `Temporary *) Sc_rollup_does_not_exist of Sc_rollup_repr.t
   | (* `Temporary *) Sc_rollup_no_conflict
   | (* `Temporary *) Sc_rollup_no_stakers
@@ -90,17 +91,14 @@ type error +=
       Sc_rollup_wrong_staker_for_conflict_commitment of
       Signature.public_key_hash * Sc_rollup_commitment_repr.Hash.t
   | (* `Permanent *)
-      Sc_rollup_invalid_commitment_to_cement of {
-      valid_candidate : Sc_rollup_commitment_repr.Hash.t;
-      invalid_candidate : Sc_rollup_commitment_repr.Hash.t;
-    }
-  | (* `Permanent *)
       Sc_rollup_commitment_too_old of {
       last_cemented_inbox_level : Raw_level_repr.t;
       commitment_inbox_level : Raw_level_repr.t;
     }
   | (* `Temporary *)
       Sc_rollup_no_commitment_to_cement of Raw_level_repr.t
+  | (* `Permanent *)
+      Sc_rollup_double_publish of Sc_rollup_commitment_repr.Hash.t
 
 let () =
   register_error_kind
@@ -245,6 +243,19 @@ let () =
     Data_encoding.unit
     (function Sc_rollup_add_zero_messages -> Some () | _ -> None)
     (fun () -> Sc_rollup_add_zero_messages) ;
+  let description =
+    "Attempted to cement a commitment but there is no valid commitment to \
+     cement."
+  in
+  register_error_kind
+    `Temporary
+    ~id:"smart_rollup_no_valid_commitment_to_cement"
+    ~title:"No valid commitment to cement"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.empty
+    (function Sc_rollup_no_valid_commitment_to_cement -> Some () | _ -> None)
+    (fun () -> Sc_rollup_no_valid_commitment_to_cement) ;
   let description = "Attempted to cement a disputed commitment." in
   register_error_kind
     `Temporary
@@ -620,35 +631,6 @@ let () =
       | _ -> None)
     (fun (staker, commitment) ->
       Sc_rollup_wrong_staker_for_conflict_commitment (staker, commitment)) ;
-  let description = "Given commitment cannot be cemented" in
-  register_error_kind
-    `Permanent
-    ~id:"smart_rollup_invalid_commitment_to_cement"
-    ~title:description
-    ~pp:(fun ppf (valid_candidate, invalid_candidate) ->
-      Format.fprintf
-        ppf
-        "The commitment %a cannot be cemented. %a is a valid candidate to \
-         cementation, but %a is not."
-        Sc_rollup_commitment_repr.Hash.pp
-        invalid_candidate
-        Sc_rollup_commitment_repr.Hash.pp
-        valid_candidate
-        Sc_rollup_commitment_repr.Hash.pp
-        invalid_candidate)
-    ~description
-    Data_encoding.(
-      obj2
-        (req "valid_candidate" Sc_rollup_commitment_repr.Hash.encoding)
-        (req "invalid_candidate" Sc_rollup_commitment_repr.Hash.encoding))
-    (function
-      | Sc_rollup_invalid_commitment_to_cement
-          {valid_candidate; invalid_candidate} ->
-          Some (valid_candidate, invalid_candidate)
-      | _ -> None)
-    (fun (valid_candidate, invalid_candidate) ->
-      Sc_rollup_invalid_commitment_to_cement
-        {valid_candidate; invalid_candidate}) ;
 
   let description = "Published commitment is too old" in
   register_error_kind
@@ -694,4 +676,21 @@ let () =
     (function
       | Sc_rollup_no_commitment_to_cement inbox_level -> Some inbox_level
       | _ -> None)
-    (fun inbox_level -> Sc_rollup_no_commitment_to_cement inbox_level)
+    (fun inbox_level -> Sc_rollup_no_commitment_to_cement inbox_level) ;
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_double_publish"
+    ~title:"The commitment was published twice by the operator"
+    ~pp:(fun ppf commitment_hash ->
+      Format.fprintf
+        ppf
+        "The operator publishing %a already published this commitment."
+        Sc_rollup_commitment_repr.Hash.pp
+        commitment_hash)
+    ~description
+    Data_encoding.(
+      obj1 (req "commitment_hash" Sc_rollup_commitment_repr.Hash.encoding))
+    (function
+      | Sc_rollup_double_publish commitment_hash -> Some commitment_hash
+      | _ -> None)
+    (fun commitment_hash -> Sc_rollup_double_publish commitment_hash)

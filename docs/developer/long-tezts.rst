@@ -115,14 +115,6 @@ significantly higher than usual. It also defines a graph of this time.
 This test and its graph are registered in
 :src:`tezt/long_tests/main.ml`.
 
-One-Shot Tests
---------------
-
-You may be interested in running some long tests using this framework
-on your own branch instead of ``master``.
-
-Check the documentation of the `PRT one-shot repository <https://gitlab.com/nomadic-labs/iac/terraform/tf-aws-performance-regression-oneshot-instance>`_
-
 Providing Large Data
 --------------------
 

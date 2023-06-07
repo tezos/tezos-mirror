@@ -15,7 +15,7 @@
  (action
   (write-file
    %{targets}
-   "module Name = struct let name = \"demo-counter\" end\ninclude Tezos_protocol_environment.V9.Make(Name)()\n")))
+   "module Name = struct let name = \"demo-counter\" end\ninclude Tezos_protocol_environment.V10.Make(Name)()\n")))
 
 (library
  (name tezos_raw_protocol_demo_counter)
@@ -88,6 +88,27 @@
   main.ml main.mli
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:octez-protocol-compiler} -no-hash-check -warn-error +a .)))
+
+(library
+ (name tezos_protocol_demo_counter_lifted)
+ (public_name tezos-protocol-demo-counter.lifted)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-demo-counter)
+ (flags
+  (:standard)
+  -nopervasives
+  -open Tezos_protocol_demo_counter)
+ (modules Lifted_protocol))
+
+(rule
+ (targets lifted_protocol.ml)
+ (action
+  (write-file
+   %{targets}
+   "\ninclude Environment.Lift (Protocol)\nlet hash = Protocol.hash\n")))
 
 (library
  (name tezos_protocol_demo_counter_functor)

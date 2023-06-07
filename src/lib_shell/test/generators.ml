@@ -23,16 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
-
-   This file is part of the test suite for the new mempool, which
-   uses features of the protocol that only exist since Lima.
-
-   When you modify this file, consider whether you should also change
-   the ones that test the legacy mempool for Kathmandu. They all
-   start with the "legacy" prefix and will be removed when Lima is
-   activated on Mainnet. *)
-
 open Prevalidator_classification
 open Shell_operation
 
@@ -50,11 +40,13 @@ let operation_mock_proto_gen =
   let* len_gen = frequencya [|(9, return 0); (1, 0 -- 31)|] in
   string_size ?gen:None len_gen
 
+let key_gen = QCheck2.Gen.(opt (string_size (0 -- 64)))
+
+let path_gen = QCheck2.Gen.(list_size (0 -- 10) (small_string ?gen:None))
+
 let block_hash_gen : Block_hash.t QCheck2.Gen.t =
   let open QCheck2.Gen in
-  let string_gen = QCheck2.Gen.small_string ?gen:None in
-  let+ key = opt (string_size (0 -- 64))
-  and+ path = list_size (0 -- 10) string_gen in
+  let+ key = key_gen and+ path = path_gen in
   Block_hash.hash_string ?key path
 
 (** A generator of operations.
@@ -294,3 +286,14 @@ let t_with_operation_gen = t_with_operation_gen_ ~can_be_full:true
 
 let t_with_operation_gen__cant_be_full =
   t_with_operation_gen_ ~can_be_full:false
+
+let operation_hash_gen =
+  let open QCheck2.Gen in
+  let+ key = key_gen and+ path = path_gen in
+  Operation_hash.hash_string ?key path
+
+(** Generate an operation hash that is not present as a key in the given map. *)
+let rec fresh_oph_gen ophmap =
+  let open QCheck2.Gen in
+  let* oph = operation_hash_gen in
+  if Operation_hash.Map.mem oph ophmap then fresh_oph_gen ophmap else return oph

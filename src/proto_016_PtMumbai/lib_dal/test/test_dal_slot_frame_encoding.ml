@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:  Dal_node Slot_frame_encoding
-    Invocation: dune exec src/proto_alpha/lib_dal/test/main.exe \
-      -- test "^\[Unit\] Slot_framing_protocol.ml$"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_dal/test/main.exe \
+                  -- --file test_dal_slot_frame_encoding.ml
     Subject:    Tests for the SCORU storage module
 *)
 
@@ -411,3 +411,10 @@ let tests =
       `Quick
       slot_frame_decoding_fails_if_wrong_version;
   ]
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    Protocol.name
+    [Test_helpers.Unit_test.spec "Slot_framing_protocol.ml" tests]
+  |> Lwt_main.run

@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "kernel-benchmark"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+evm-execution = { path = "../evm_execution" }
+tezos_ethereum = { path = "../ethereum" }
+
+nom = "6.1"
+thiserror = "1.0"
+hex = "0.4"
+rlp = "0.5.2"
+sha3 = { version = "0.10.6", default-features = false }
+
+tezos_data_encoding = "0.4"
+
+primitive-types = { version = "0.11.1", default-features = false }
+
+[dependencies.tezos-smart-rollup-core]
+path = "../../kernel_sdk/core"
+
+[dependencies.tezos-smart-rollup-host]
+path = "../../kernel_sdk/host"
+
+[dependencies.tezos-smart-rollup-debug]
+path = "../../kernel_sdk/debug"
+
+[dependencies.tezos-smart-rollup-encoding]
+path = "../../kernel_sdk/encoding"
+
+[dependencies.tezos-smart-rollup-entrypoint]
+path = "../../kernel_sdk/entrypoint"
+
+[features]
+default = ["evm_kernel_benchmark"]
+testing = []
+evm_kernel_benchmark = []

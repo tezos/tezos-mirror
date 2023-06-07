@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:    Rollup layer 1 logic
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                  -- test "^zk rollup$"
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_zk_rollup.ml
     Subject:      Test zk rollup
 *)
 
@@ -78,6 +77,7 @@ let check_proto_error e t = check_proto_error_f (( = ) e) t
 
 (* Check that originating a ZKRU fails when the feature flag is disabled. *)
 let test_disable_feature_flag () =
+  let _prover_pp, public_parameters = Lazy.force Operator.lazy_pp in
   let* b, contract =
     Context.init_with_constants1
       {
@@ -91,7 +91,7 @@ let test_disable_feature_flag () =
     Op.zk_rollup_origination
       (I i)
       contract
-      ~public_parameters:Operator.public_parameters
+      ~public_parameters
       ~circuits_info:(of_plonk_smap Operator.circuits)
       ~init_state:Operator.init_state
       ~nb_ops:1
@@ -121,6 +121,7 @@ let test_origination_fees () =
   let* ctxt, contracts = context_init 1 in
   let* constants = Context.get_constants (B ctxt) in
   let contract = Stdlib.List.hd contracts in
+  let _prover_pp, public_parameters = Lazy.force Operator.lazy_pp in
   let expected_size =
     (* TODO: create ZK constant *)
     let origination_size = constants.parametric.tx_rollup.origination_size in
@@ -129,7 +130,7 @@ let test_origination_fees () =
         {
           static =
             {
-              public_parameters = Operator.public_parameters;
+              public_parameters;
               state_length = 1;
               circuits_info = of_plonk_smap Operator.circuits;
               nb_ops = 1;
@@ -154,7 +155,7 @@ let test_origination_fees () =
     Op.zk_rollup_origination
       (B ctxt)
       contract
-      ~public_parameters:Operator.public_parameters
+      ~public_parameters
       ~circuits_info:(of_plonk_smap Operator.circuits)
       ~init_state:Operator.init_state
       ~nb_ops:1
@@ -172,11 +173,12 @@ let test_origination_fees () =
 let test_origination_negative_nb_ops () =
   let* ctxt, contracts = context_init 1 in
   let contract = Stdlib.List.hd contracts in
+  let _prover_pp, public_parameters = Lazy.force Operator.lazy_pp in
   let* operation, _rollup =
     Op.zk_rollup_origination
       (B ctxt)
       contract
-      ~public_parameters:Operator.public_parameters
+      ~public_parameters
       ~circuits_info:(of_plonk_smap Operator.circuits)
       ~init_state:Operator.init_state
       ~nb_ops:(-1)
@@ -195,11 +197,12 @@ let test_origination_negative_nb_ops () =
 let init_and_originate n =
   let* ctxt, contracts = context_init n in
   let contract = Stdlib.List.hd contracts in
+  let _prover_pp, public_parameters = Lazy.force Operator.lazy_pp in
   let* operation, rollup =
     Op.zk_rollup_origination
       (B ctxt)
       contract
-      ~public_parameters:Operator.public_parameters
+      ~public_parameters
       ~circuits_info:(of_plonk_smap Operator.circuits)
       ~init_state:Operator.init_state
       ~nb_ops:1
@@ -214,11 +217,12 @@ let no_ticket op = (op, None)
 let test_originate_two_rollups () =
   let* ctxt, contracts, zk_rollup1 = init_and_originate 1 in
   let contract = Stdlib.List.hd contracts in
+  let _prover_pp, public_parameters = Lazy.force Operator.lazy_pp in
   let* operation, zk_rollup2 =
     Op.zk_rollup_origination
       (B ctxt)
       contract
-      ~public_parameters:Operator.public_parameters
+      ~public_parameters
       ~circuits_info:(of_plonk_smap Operator.circuits)
       ~init_state:Operator.init_state
       ~nb_ops:1
@@ -846,6 +850,7 @@ let test_update_public_in_private () =
    the Protocol uses the actual [op] from the pending list as input.
 *)
 let test_update_for_another_rollup () =
+  let _prover_pp, public_parameters = Lazy.force Operator.lazy_pp in
   let* b, contracts, zk_rollup1, pkh = init_with_pending 3 in
   let contract0 = Stdlib.List.hd contracts in
   let contract1 = Stdlib.List.nth contracts 1 in
@@ -856,7 +861,7 @@ let test_update_for_another_rollup () =
     Op.zk_rollup_origination
       (I i)
       contract0
-      ~public_parameters:Operator.public_parameters
+      ~public_parameters
       ~circuits_info:(of_plonk_smap Operator.circuits)
       ~init_state:Operator.init_state
       ~nb_ops:1
@@ -1255,3 +1260,7 @@ let tests =
       `Quick
       test_valid_deposit_and_external_withdrawal;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("zk rollup", tests)]
+  |> Lwt_main.run

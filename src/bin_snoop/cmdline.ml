@@ -79,7 +79,7 @@ type infer_parameters_options = {
 (* Outcome of command-line parsing. *)
 
 type command =
-  | Benchmark of {bench_name : string; bench_opts : benchmark_options}
+  | Benchmark of {bench_name : Namespace.t; bench_opts : benchmark_options}
   | Infer of {
       model_name : string;
       workload_data : string;
@@ -88,7 +88,7 @@ type command =
     }
   | Codegen of {
       solution : string;
-      model_name : string;
+      model_name : Namespace.t;
       codegen_options : codegen_options;
     }
   | Codegen_all of {
@@ -96,7 +96,18 @@ type command =
       matching : string;
       codegen_options : codegen_options;
     }
-  | Codegen_inferred of {solution : string; codegen_options : codegen_options}
+  | Codegen_inferred of {
+      solution : string;
+      codegen_options : codegen_options;
+      exclusions : String.Set.t;
+    }
+  | Codegen_for_solutions of {
+      solutions : string list;
+      codegen_options : codegen_options;
+      exclusions : String.Set.t;
+    }
+  | Codegen_check_definitions of {files : string list}
+  | Solution_print of string list
   | No_command
 
 (* -------------------------------------------------------------------------- *)

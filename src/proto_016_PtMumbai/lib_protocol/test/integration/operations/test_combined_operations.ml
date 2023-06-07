@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (combined operations)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                -- test "^combined$"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_combined_operations.ml
     Subject:    Multiple operations can be grouped in one ensuring their
                 deterministic application.
 
@@ -409,3 +408,6 @@ let tests =
       `Quick
       test_inconsistent_counters;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("combined", tests)] |> Lwt_main.run

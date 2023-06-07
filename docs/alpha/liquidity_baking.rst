@@ -10,7 +10,7 @@ During activation of Granada protocol, a constant product market making (CPMM) M
 
 .. warning::
 
-   While the CPMM and LQT contract originations provide an ``Origination_result``, the LQT contract contains two big maps not included in a `lazy_storage_diff` field. Indexers and other tooling may need manual updates to include these.
+   While the CPMM and LQT contract originations provide an ``Origination_result``, the LQT contract contains two big maps not included in a ``lazy_storage_diff`` field. Indexers and other tooling may need manual updates to include these.
 
 The CPMM maintains a balance of ``a`` tez and ``b`` `tzBTC <https://tzbtc.io/>`_, where tzBTC is the `FA1.2 token <https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-7/tzip-7.md>`_  found at address ``KT1PWx2mnDueood7fEmfbBDKx1D9BAnnXitn``. The smart contract accepts deposits of ``da`` tez and returns ``db`` tzBTC (or vice versa) where the invariant ``(a + da * (1 - f - n)) * (b - db) = a b`` is preserved, and ``f`` and ``n`` are a fee and burn, set at 0.1% each. Calculations are done with precision of 1000, rounding down on division.
 

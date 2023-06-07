@@ -39,24 +39,24 @@ module Make (H : Stdlib.Hashtbl.HashedType) : S with type key = H.t = struct
   open Seq
   include Stdlib.Hashtbl.Make (H)
 
-  let iter_e f t = iter_e (fun (k, v) -> f k v) (to_seq t)
+  let iter_e f t = E.iter (fun (k, v) -> f k v) (to_seq t)
 
-  let iter_s f t = iter_s (fun (k, v) -> f k v) (to_seq t)
+  let iter_s f t = S.iter (fun (k, v) -> f k v) (to_seq t)
 
-  let iter_es f t = iter_es (fun (k, v) -> f k v) (to_seq t)
+  let iter_es f t = ES.iter (fun (k, v) -> f k v) (to_seq t)
 
   let iter_p f t = iter_p (fun (k, v) -> f k v) (to_seq t)
 
   let iter_ep f t = iter_ep (fun (k, v) -> f k v) (to_seq t)
 
   let fold_e f t init =
-    fold_left_e (fun acc (k, v) -> f k v acc) init (to_seq t)
+    E.fold_left (fun acc (k, v) -> f k v acc) init (to_seq t)
 
   let fold_s f t init =
-    fold_left_s (fun acc (k, v) -> f k v acc) init (to_seq t)
+    S.fold_left (fun acc (k, v) -> f k v acc) init (to_seq t)
 
   let fold_es f t init =
-    fold_left_es (fun acc (k, v) -> f k v acc) init (to_seq t)
+    ES.fold_left (fun acc (k, v) -> f k v acc) init (to_seq t)
 
   let find = find_opt
 
@@ -73,24 +73,24 @@ module MakeSeeded (H : Stdlib.Hashtbl.SeededHashedType) :
   open Seq
   include Stdlib.Hashtbl.MakeSeeded (H)
 
-  let iter_e f t = iter_e (fun (k, v) -> f k v) (to_seq t)
+  let iter_e f t = E.iter (fun (k, v) -> f k v) (to_seq t)
 
-  let iter_s f t = iter_s (fun (k, v) -> f k v) (to_seq t)
+  let iter_s f t = S.iter (fun (k, v) -> f k v) (to_seq t)
 
-  let iter_es f t = iter_es (fun (k, v) -> f k v) (to_seq t)
+  let iter_es f t = ES.iter (fun (k, v) -> f k v) (to_seq t)
 
   let iter_ep f t = iter_ep (fun (k, v) -> f k v) (to_seq t)
 
   let iter_p f t = iter_p (fun (k, v) -> f k v) (to_seq t)
 
   let fold_e f t init =
-    fold_left_e (fun acc (k, v) -> f k v acc) init (to_seq t)
+    E.fold_left (fun acc (k, v) -> f k v acc) init (to_seq t)
 
   let fold_s f t init =
-    fold_left_s (fun acc (k, v) -> f k v acc) init (to_seq t)
+    S.fold_left (fun acc (k, v) -> f k v acc) init (to_seq t)
 
   let fold_es f t init =
-    fold_left_es (fun acc (k, v) -> f k v acc) init (to_seq t)
+    ES.fold_left (fun acc (k, v) -> f k v acc) init (to_seq t)
 
   let find = find_opt
 
@@ -160,7 +160,7 @@ struct
   let mem t k = T.mem t k
 
   let iter_with_waiting_es f t =
-    iter_es
+    ES.iter
       (fun (k, p) ->
         let open Lwt_result_syntax in
         Lwt.try_bind
@@ -170,7 +170,7 @@ struct
       (T.to_seq t)
 
   let fold_with_waiting_es f t init =
-    fold_left_es
+    ES.fold_left
       (fun acc (k, p) ->
         let open Lwt_result_syntax in
         Lwt.try_bind

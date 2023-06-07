@@ -81,9 +81,9 @@ module Ticket_inspection = struct
     | Pair_ht :
         'a has_tickets * 'b has_tickets
         -> ('a, 'b) Script_typed_ir.pair has_tickets
-    | Union_ht :
+    | Or_ht :
         'a has_tickets * 'b has_tickets
-        -> ('a, 'b) Script_typed_ir.union has_tickets
+        -> ('a, 'b) Script_typed_ir.or_ has_tickets
     | Option_ht : 'a has_tickets -> 'a option has_tickets
     | List_ht : 'a has_tickets -> 'a Script_list.t has_tickets
     | Set_ht : 'k has_tickets -> 'k Script_typed_ir.set has_tickets
@@ -102,7 +102,7 @@ module Ticket_inspection = struct
      case.
 
      Note that in case tickets are made comparable, this function needs to change
-     so that constructors like [Union_t] and [Pair_t] are traversed
+     so that constructors like [Or_t] and [Pair_t] are traversed
      recursively.
   *)
   let has_tickets_of_comparable :
@@ -125,9 +125,8 @@ module Ticket_inspection = struct
     | Timestamp_t -> (k [@ocaml.tailcall]) False_ht
     | Chain_id_t -> (k [@ocaml.tailcall]) False_ht
     | Address_t -> (k [@ocaml.tailcall]) False_ht
-    | Tx_rollup_l2_address_t -> (k [@ocaml.tailcall]) False_ht
     | Pair_t (_, _, _, YesYes) -> (k [@ocaml.tailcall]) False_ht
-    | Union_t (_, _, _, YesYes) -> (k [@ocaml.tailcall]) False_ht
+    | Or_t (_, _, _, YesYes) -> (k [@ocaml.tailcall]) False_ht
     | Option_t (_, _, Yes) -> (k [@ocaml.tailcall]) False_ht
 
   (* Short circuit pairing of two [has_tickets] values.
@@ -163,7 +162,6 @@ module Ticket_inspection = struct
     | Key_t -> (k [@ocaml.tailcall]) False_ht
     | Timestamp_t -> (k [@ocaml.tailcall]) False_ht
     | Address_t -> (k [@ocaml.tailcall]) False_ht
-    | Tx_rollup_l2_address_t -> (k [@ocaml.tailcall]) False_ht
     | Bool_t -> (k [@ocaml.tailcall]) False_ht
     | Pair_t (ty1, ty2, _, _) ->
         (has_tickets_of_pair [@ocaml.tailcall])
@@ -171,11 +169,11 @@ module Ticket_inspection = struct
           ty2
           ~pair:(fun ht1 ht2 -> Pair_ht (ht1, ht2))
           k
-    | Union_t (ty1, ty2, _, _) ->
+    | Or_t (ty1, ty2, _, _) ->
         (has_tickets_of_pair [@ocaml.tailcall])
           ty1
           ty2
-          ~pair:(fun ht1 ht2 -> Union_ht (ht1, ht2))
+          ~pair:(fun ht1 ht2 -> Or_ht (ht1, ht2))
           k
     | Lambda_t (_, _, _) ->
         (* As of H, closures cannot contain tickets because APPLY requires
@@ -289,9 +287,8 @@ module Ticket_collection = struct
     | Timestamp_t -> (k [@ocaml.tailcall]) ctxt acc
     | Chain_id_t -> (k [@ocaml.tailcall]) ctxt acc
     | Address_t -> (k [@ocaml.tailcall]) ctxt acc
-    | Tx_rollup_l2_address_t -> (k [@ocaml.tailcall]) ctxt acc
     | Pair_t (_, _, _, YesYes) -> (k [@ocaml.tailcall]) ctxt acc
-    | Union_t (_, _, _, YesYes) -> (k [@ocaml.tailcall]) ctxt acc
+    | Or_t (_, _, _, YesYes) -> (k [@ocaml.tailcall]) ctxt acc
     | Option_t (_, _, Yes) -> (k [@ocaml.tailcall]) ctxt acc
 
   let tickets_of_set :
@@ -341,7 +338,7 @@ module Ticket_collection = struct
               r
               acc
               k)
-    | Union_ht (htyl, htyr), Union_t (tyl, tyr, _, _) -> (
+    | Or_ht (htyl, htyr), Or_t (tyl, tyr, _, _) -> (
         match x with
         | L v ->
             (tickets_of_value [@ocaml.tailcall])

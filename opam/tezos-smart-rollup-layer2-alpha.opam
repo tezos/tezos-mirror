@@ -13,7 +13,7 @@ depends: [
   "ppx_expect"
   "tezos-base"
   "tezos-protocol-alpha"
-  "tezos-injector-alpha"
+  "octez-injector"
 ]
 build: [
   ["rm" "-r" "vendors"]

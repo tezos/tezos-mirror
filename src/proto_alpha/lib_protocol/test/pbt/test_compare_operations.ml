@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol (Operation compare)
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/test_compare_operations.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
+                  -- --file test_compare_operations.ml
     Subject:      Valid operations Comparison
 *)
 
@@ -97,5 +97,6 @@ let tests = [test_compare_is_strorder]
 
 let () =
   Alcotest.run
-    "Compare operations"
+    ~__FILE__
+    Protocol.name
     [("Compare_operations", Qcheck2_helpers.qcheck_wrap tests)]

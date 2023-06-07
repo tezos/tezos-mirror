@@ -20,19 +20,19 @@
   tezos-stdlib-unix
   tezos-stdlib
   tezos_dal_node_lib
-  tezos_dal_node_services
+  tezos-dal-node-services
   tezos_layer2_store
   tezos-crypto-dal
+  tezos-store.unix
+  tezos-store.shared
   irmin-pack
   irmin-pack.unix
   irmin
   tezos-dal-016-PtMumbai
+  tezos-dal-017-PtNairob
   (select void_for_linking-tezos-dal-alpha from
    (tezos-dal-alpha -> void_for_linking-tezos-dal-alpha.empty)
-   (-> void_for_linking-tezos-dal-alpha.empty))
-  (select void_for_linking-tezos-dac-alpha from
-   (tezos-dac-alpha -> void_for_linking-tezos-dac-alpha.empty)
-   (-> void_for_linking-tezos-dac-alpha.empty)))
+   (-> void_for_linking-tezos-dal-alpha.empty)))
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -49,10 +49,8 @@
   -open Tezos_dal_node_lib
   -open Tezos_dal_node_services
   -open Tezos_layer2_store
-  -open Tezos_crypto_dal))
+  -open Tezos_crypto_dal
+  -open Tezos_store_unix
+  -open Tezos_store_shared))
 
-(rule
- (action
-  (progn
-   (write-file void_for_linking-tezos-dal-alpha.empty "")
-   (write-file void_for_linking-tezos-dac-alpha.empty ""))))
+(rule (action (progn (write-file void_for_linking-tezos-dal-alpha.empty ""))))

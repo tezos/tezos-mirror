@@ -29,6 +29,7 @@ the specification. The document also starts with a less formal
 explanation of the context: how Michelson code interacts with the
 blockchain.
 
+.. _address_prefixes:
 .. _address_prefixes_mumbai:
 
 Semantics of smart contracts and transactions
@@ -48,12 +49,12 @@ tokens (and be the destinations of transactions).
 
 From Michelson, they are indistinguishable. A safe way to think about
 this is to consider that implicit accounts are smart contracts that
-always succeed to receive tokens, and does nothing else.
+always succeed in receiving tokens, and do nothing else.
 
 Another kind of addresses, prefixed by ``txr1``, are related to
 :doc:`transaction rollups <./transaction_rollups>`.
 
-Finally, addresses prefixed with ``scr1`` identify smart rollups.
+Finally, addresses prefixed with ``sr1`` identify :doc:`smart rollups <./smart_rollups>`.
 
 Intra-transaction semantics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -310,6 +311,7 @@ The concrete language also has some syntax sugar to group some common
 sequences of operations as one. This is described in this specification
 using a simple regular expression style recursive instruction rewriting.
 
+.. _michelson_type_system:
 .. _michelson_type_system_mumbai:
 
 Introduction to the type system and notations
@@ -1224,6 +1226,7 @@ value that was previously stored in the ``map`` at the same key as
 
 Operations on ``big_maps``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _OperationsOnBigMaps:
 .. _OperationsOnBigMaps_mumbai:
 
 Big maps have three possible representations. A map literal is always
@@ -1623,6 +1626,7 @@ if the delegate is a ``tz4``.
 The parameter must be consistent with the one expected by the
 contract, unit for an account.
 
+.. _MichelsonSetDelegate:
 .. _MichelsonSetDelegate_mumbai:
 
 -  ``SET_DELEGATE``: Set or withdraw the contract's delegation.
@@ -1920,7 +1924,7 @@ Bytes can be converted to natural numbers and integers.
 
 - ``NAT``: Convert ``bytes`` to type ``nat`` using big-endian encoding.
   The ``bytes`` are allowed to have leading zeros.
-  
+
 ::
 
     :: bytes : 'S   ->   nat : 'S
@@ -1930,14 +1934,14 @@ Bytes can be converted to natural numbers and integers.
 
 - ``INT``: Convert ``bytes`` to type ``int`` using big-endian two's complement encoding.
   The ``bytes`` are allowed to have leading zeros for non-negative numbers and leading ones for negative numbers.
-  
+
 ::
 
     :: bytes : 'S   ->   int : 'S
 
     > INT / s : S  =>  z : S
         iff s is a big-endian encoding of integer z
-  
+
 - ``BYTES``: Convert a ``nat`` or an ``int`` to type ``bytes`` using big-endian encoding (and two's complement for ``int``).
 
 ::
@@ -2091,6 +2095,7 @@ comprehensive description of the Sapling protocol.
         with `sapling_state ms` being the empty state (ie. no one can spend tokens from it)
         with memo_size `ms`
 
+.. _MichelsonTickets:
 .. _MichelsonTickets_mumbai:
 
 Operations on tickets
@@ -2098,7 +2103,8 @@ Operations on tickets
 
 The following operations deal with tickets. Tickets are a way for smart-contracts
 to authenticate data with respect to a Tezos address. This authentication can
-then be used to build composable permission systems.
+then be used to build composable permission systems. For a high-level explanation of
+tickets in Tezos, see :doc: `Tickets <tickets>`.
 
 A contract can create a ticket from a value and an amount. The ticket, when
 inspected reveals the value, the amount, and the address of the ticketer (the contract that created the ticket). It is
@@ -2216,6 +2222,7 @@ parameter if the sender is the contract's manager.
 
     :: 'S   ->   nat : 'S
 
+.. _MichelsonViews:
 .. _MichelsonViews_mumbai:
 
 Operations on views
@@ -2530,6 +2537,7 @@ A typing rule can be inferred:
 
 Concrete syntax
 ---------------
+.. _ConcreteSyntax:
 .. _ConcreteSyntax_mumbai:
 
 The concrete language is very close to the formal notation of the
@@ -3083,6 +3091,7 @@ type (which can be changed). For instance the annotated typing rule for
 
 Special annotations
 ~~~~~~~~~~~~~~~~~~~
+.. _SpecialAnnotations:
 .. _SpecialAnnotations_mumbai:
 
 The special variable annotations ``@%`` and ``@%%`` can be used on instructions

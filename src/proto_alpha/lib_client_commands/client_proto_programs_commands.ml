@@ -271,7 +271,7 @@ let commands () =
       (fun ( trace_exec,
              amount,
              balance,
-             source,
+             sender,
              payer,
              self,
              no_print_source,
@@ -299,7 +299,7 @@ let commands () =
                 program;
                 storage;
                 shared_params =
-                  {input; unparsing_mode; now; level; source; payer; gas};
+                  {input; unparsing_mode; now; level; sender; payer; gas};
                 entrypoint;
                 self;
               }
@@ -317,7 +317,7 @@ let commands () =
                 program;
                 storage;
                 shared_params =
-                  {input; unparsing_mode; now; level; source; payer; gas};
+                  {input; unparsing_mode; now; level; sender; payer; gas};
                 entrypoint;
                 self;
               }
@@ -527,58 +527,60 @@ let commands () =
            expr_strings
            (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        if List.compare_length_with expr_strings 0 = 0 then
-          let*! () =
-            cctxt#warning "No scripts were specified on the command line"
-          in
-          return_unit
-        else
-          let* hash_name_rows =
-            List.mapi_ep
-              (fun i content_with_origin ->
-                let expr_string =
-                  Client_proto_args.content_of_file_or_text content_with_origin
+        match expr_strings with
+        | [] ->
+            let*! () =
+              cctxt#warning "No scripts were specified on the command line"
+            in
+            return_unit
+        | _ :: _ ->
+            let* hash_name_rows =
+              List.mapi_ep
+                (fun i content_with_origin ->
+                  let expr_string =
+                    Client_proto_args.content_of_file_or_text
+                      content_with_origin
+                  in
+                  let program =
+                    Michelson_v1_parser.parse_toplevel ~check expr_string
+                  in
+                  let*? program = Micheline_parser.no_parsing_error program in
+                  let code = program.expanded in
+                  let bytes =
+                    Data_encoding.Binary.to_bytes_exn
+                      Alpha_context.Script.expr_encoding
+                      code
+                  in
+                  let hash =
+                    Format.asprintf
+                      "%a"
+                      Script_expr_hash.pp
+                      (Script_expr_hash.hash_bytes [bytes])
+                  in
+                  let name =
+                    match content_with_origin with
+                    | Client_proto_args.File {path; _} -> path
+                    | Text _ -> "Literal script " ^ string_of_int (i + 1)
+                  in
+                  return (hash, name))
+                expr_strings
+            in
+            Tezos_clic_unix.Scriptable.output
+              scriptable
+              ~for_human:(fun () ->
+                let*! () =
+                  List.iter_s
+                    (fun (hash, name) ->
+                      if display_names then cctxt#answer "%s\t%s" hash name
+                      else cctxt#answer "%s" hash)
+                    hash_name_rows
                 in
-                let program =
-                  Michelson_v1_parser.parse_toplevel ~check expr_string
-                in
-                let*? program = Micheline_parser.no_parsing_error program in
-                let code = program.expanded in
-                let bytes =
-                  Data_encoding.Binary.to_bytes_exn
-                    Alpha_context.Script.expr_encoding
-                    code
-                in
-                let hash =
-                  Format.asprintf
-                    "%a"
-                    Script_expr_hash.pp
-                    (Script_expr_hash.hash_bytes [bytes])
-                in
-                let name =
-                  match content_with_origin with
-                  | Client_proto_args.File {path; _} -> path
-                  | Text _ -> "Literal script " ^ string_of_int (i + 1)
-                in
-                return (hash, name))
-              expr_strings
-          in
-          Tezos_clic_unix.Scriptable.output
-            scriptable
-            ~for_human:(fun () ->
-              let*! () =
-                List.iter_s
+                return_unit)
+              ~for_script:(fun () ->
+                List.map
                   (fun (hash, name) ->
-                    if display_names then cctxt#answer "%s\t%s" hash name
-                    else cctxt#answer "%s" hash)
-                  hash_name_rows
-              in
-              return_unit)
-            ~for_script:(fun () ->
-              List.map
-                (fun (hash, name) ->
-                  if display_names then [hash; name] else [hash])
-                hash_name_rows));
+                    if display_names then [hash; name] else [hash])
+                  hash_name_rows));
     command
       ~group
       ~desc:
@@ -685,6 +687,48 @@ let commands () =
                 errs
             in
             cctxt#error "ill-typed data expression");
+    command
+      ~group
+      ~desc:"Ask the node to normalize a typed Michelson stack."
+      (args2 (unparsing_mode_arg ~default:"Readable") legacy_switch)
+      (prefixes ["normalize"; "stack"]
+      @@ param
+           ~name:"stack"
+           ~desc:
+             "the stack to normalize, in the following format: {Stack_elt \
+              <ty_1> <val_1>; ...; Stack_elt <ty_n> <val_n>}, where each \
+              <val_i> is a Michelson value of type <ty_i>. The topmost element \
+              of the stack is <val_1>."
+           micheline_parameter
+      @@ stop)
+      (fun (unparsing_mode, legacy) (stack, source) cctxt ->
+        let open Lwt_result_syntax in
+        let*? stack = Michelson_v1_stack.parse_stack ~source stack in
+        let*! r =
+          Plugin.RPC.Scripts.normalize_stack
+            cctxt
+            (cctxt#chain, cctxt#block)
+            ~legacy
+            ~stack
+            ~unparsing_mode
+        in
+        match r with
+        | Ok expr ->
+            let*! () =
+              cctxt#message "%a" Michelson_v1_printer.print_typed_stack expr
+            in
+            return_unit
+        | Error errs ->
+            let*! () =
+              cctxt#warning
+                "%a"
+                (Michelson_v1_error_reporter.report_errors
+                   ~details:false
+                   ~show_source:false
+                   ?parsed:None)
+                errs
+            in
+            cctxt#error "ill-typed stack");
     command
       ~group
       ~desc:"Ask the node to normalize a type."
@@ -1053,7 +1097,7 @@ let commands () =
       @@ prefixes ["with"; "input"]
       @@ param ~name:"input" ~desc:"the input data" data_parameter
       @@ stop)
-      (fun (source, payer, gas, unparsing_mode, now, level)
+      (fun (sender, payer, gas, unparsing_mode, now, level)
            entrypoint
            contract
            input
@@ -1066,7 +1110,7 @@ let commands () =
             ~block:cctxt#block
             {
               shared_params =
-                {input; unparsing_mode; now; level; source; payer; gas};
+                {input; unparsing_mode; now; level; sender; payer; gas};
               contract;
               entrypoint;
             }
@@ -1090,7 +1134,7 @@ let commands () =
            ~name:"contract"
            ~desc:"the contract containing the view"
       @@ stop)
-      (fun (source, payer, gas, unlimited_gas, unparsing_mode, now, level)
+      (fun (sender, payer, gas, unlimited_gas, unparsing_mode, now, level)
            view
            contract
            cctxt ->
@@ -1106,7 +1150,7 @@ let commands () =
             ~block:cctxt#block
             {
               shared_params =
-                {input; unparsing_mode; now; level; source; payer; gas};
+                {input; unparsing_mode; now; level; sender; payer; gas};
               contract;
               view;
               unlimited_gas;
@@ -1136,7 +1180,7 @@ let commands () =
            ~desc:"the argument provided to the view"
            data_parameter
       @@ stop)
-      (fun (source, payer, gas, unlimited_gas, unparsing_mode, now, level)
+      (fun (sender, payer, gas, unlimited_gas, unparsing_mode, now, level)
            view
            contract
            input
@@ -1149,7 +1193,7 @@ let commands () =
             ~block:cctxt#block
             {
               shared_params =
-                {input; unparsing_mode; now; level; source; payer; gas};
+                {input; unparsing_mode; now; level; sender; payer; gas};
               contract;
               view;
               unlimited_gas;

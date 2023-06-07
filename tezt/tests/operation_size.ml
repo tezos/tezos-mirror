@@ -30,15 +30,6 @@
    Subject:      Tests handling oversized contract call arguments
 *)
 
-let contract_path protocol kind contract =
-  sf
-    "tests_python/contracts_%s/%s/%s"
-    (match protocol with
-    | Protocol.Alpha -> "alpha"
-    | _ -> sf "%03d" @@ Protocol.number protocol)
-    kind
-    contract
-
 let test_operation_size =
   Protocol.register_test
     ~__FILE__
@@ -57,26 +48,24 @@ let test_operation_size =
     Buffer.contents buf
   in
   let* _node, client = Client.init_with_protocol ~protocol `Client () in
-  let munch = "munch" in
-  let* _contract_address_munch =
-    Client.originate_contract
+  let* munch, _contract_address_munch =
+    Client.originate_contract_at
       ~burn_cap:Tez.one
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~alias:munch
-      ~prg:(contract_path protocol "opcodes" "munch.tz")
       client
+      ["opcodes"; "munch"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
-  let bytes = "bytes" in
-  let* _contract_address_bytes =
-    Client.originate_contract
+  let* bytes, _contract_address_bytes =
+    Client.originate_contract_at
       ~burn_cap:Tez.one
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~alias:bytes
-      ~prg:(contract_path protocol "opcodes" "bytes.tz")
       client
+      ["opcodes"; "bytes"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   let test (receiver, entrypoint, arg, expect_failure_message) =

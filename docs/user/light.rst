@@ -1,29 +1,33 @@
 Light mode
 ----------
 
-The ``octez-client`` described in
-:ref:`its own tutorial <howtouse_tezos_client>` forwards all RPCs to a node.
-This page describes the *light* mode, a mode where the client
-performs protocol RPCs locally; like the :doc:`proxy mode<proxy>`.
+The proxy mode, described in :doc:`a dedicated tutorial <./proxy>`,
+is an execution mode where the :ref:`Octez client <howtouse_tezos_client>`
+avoids some RPC calls to the node, especially computation-intensive RPCs.
+It does so by requesting the data it needs from the node using RPCs (that are not computation-intensive), and uses
+this data locally to perform computations by itself, whenever possible.
+
+This page describes the *light* mode, a variant of the proxy mode,
+where the client also
+performs RPCs locally whenever possible.
 However, contrary to the proxy mode, the light mode provides
-a high level of security. For that it obtains data from multiple
-(hopefully unrelated) endpoints and makes sure all endpoints send
-the same data, by using *Merkle proofs*. Such proofs make very hard
+a high level of security. For that, it obtains its data from multiple
+(hopefully unrelated) node endpoints, and makes sure that all endpoints send
+the same data, by using *Merkle proofs*. Such proofs make it very hard
 for unrelated endpoints to craft fake data.
 
 This mode is akin to a light client or *thin client* in Bitcoin terms.
 
 While the existing implementation of the light mode is entirely functional,
-it still has room for improvement, in particular communications over
-the network can be reduced. Users are encouraged to manifest themselves,
-so that enhancements to the light mode are made high priority: please
-submit issues `here on GitLab <https://gitlab.com/tezos/tezos/-/issues>`_.
+it still has room for improvement. For instance, communications over
+the network can be reduced. Users are encouraged to share their experience,
+by submitting issues `here on GitLab <https://gitlab.com/tezos/tezos/-/issues>`_.
 
 Executing commands in light mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The CLI interface of the client in light mode (the *light client* in short)
-is the same as the default client. To turn light mode ON, you must
+The CLI interface of the client in light mode (the *light client* for short)
+is the same as the default client. To turn the light mode on, you must
 pass two arguments to ``octez-client``:
 
 * ``--mode light``, and
@@ -37,7 +41,6 @@ The ``sources.json`` file contains:
   To avoid being surprised by the automatic addition of the default endpoint,
   it is recommended to supply option ``--endpoint`` whenever ``--sources`` is supplied,
   valued as one member of the ``uris`` field in ``--sources`` (e.g., the first member).
-  An automatic check makes sure this recommendation is ensured.
 * An optional ``min_agreement`` field, which must be a float from ``0.0`` (excluded) to ``1.0`` (included).
   This field specifies the ratio of endpoints that must agree for data
   to be accepted. The default value is ``1.0``, which means that
@@ -45,7 +48,7 @@ The ``sources.json`` file contains:
   endpoint is tolerated).
 
 
-Here is an example valid ``--sources`` file:
+Here is an example of a valid ``--sources`` file:
 
 ::
 
@@ -56,17 +59,12 @@ Here is an example valid ``--sources`` file:
       ]
     }
 
-Because computations done locally are protocol dependent, the light mode
-does not support all protocols. However, at any given time, it should
-support the protocol being developed (``alpha``) and the three most
-recent protocols. Execute ``octez-client list light protocols``
-to see the supported protocols.
-
-If ``--protocol`` is omitted when calling the light client, it
-tries to match the node's protocol. On the one hand, this is handy when
-testing. On the other hand, in a production environment, it is recommended
-to specify ``--protocol`` if the protocol is known, to avoid an extra
-RPC at **every** call ``octez-client --mode light ...``.
+Because computations done locally are protocol dependent, the light mode has to be configured for a specific protocol.
+However, the light mode does not support all protocols.
+Execute ``octez-client list light protocols`` to see the supported protocols.
+It is expected that, at any given time, it should support ``Alpha``,
+the current protocol of Mainnet, and the current protocol proposal on Mainnet at
+the time of release, if any.
 
 Examples with the sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -74,8 +72,9 @@ Examples with the sandbox
 In this section, we show examples of usage of the light mode when using
 the :doc:`sandboxed node<sandbox>`. For convenience we repeat
 instructions for the sandboxed mode here, but refer the reader to the
-sandboxed mode page for further details. In a terminal,
-start a sandboxed node:
+sandboxed mode page for further details.
+
+In a terminal, start a sandboxed node:
 
 ::
 
@@ -114,23 +113,26 @@ To avoid warnings being printed in upcoming commands (optional):
     $ export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=y
 
 The last step before being able to use the light client is to prepare
-the JSON file to pass to ``--sources``. In our scenario, this file
+the JSON file passed to ``--sources``. In our scenario, this file
 specifies the two endpoints to use:
 
 ::
 
     $ echo '{ "uris": [ "http://localhost:18731", "http://localhost:18732" ] }' > sources.json
 
-You're now ready to use the light client. For example, bake a block:
+You're now ready to use the light client. For example, bake a block (note that this command may take up to a few minutes to complete):
 
 ::
 
     $ octez-client --endpoint http://localhost:18731 --mode light --sources sources.json bake for bootstrap1
-    protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
     Apr  8 16:42:24.202 - alpha.baking.forge: found 0 valid operations (0 refused) for timestamp 2021-04-08T14:42:24.000-00:00 (fitness 01::0000000000000004)
     Injected block BMAHozsNCos2
 
-Well that doesn't seem very different from what the default client would return.
+As you may have noticed, the block is baked when the ``boostrap1`` baker has rights to bake, which explains the possible delay of up to a few minutes.
+If you are in a hurry, you may want to bake for any baker, by replacing ``bake for bootstrap1`` with ``bake for --minimal-timestamp``.
+We will use this option for the next times.
+
+Well, that doesn't seem very different from what the default client would return.
 Indeed, it's the same; that was the point! To see what the light client
 is doing differently, you may use the environment variable ``TEZOS_LOG``.
 Set it as follows:
@@ -147,13 +149,13 @@ keystrokes and the ``protocol of light mode unspecified`` warning:
 
 ::
 
-    $ alias light-client="octez-client --endpoint http://localhost:18731 --mode light --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --sources sources.json"
+    $ alias light-client="octez-client --endpoint http://localhost:18731 --mode light --sources sources.json"
 
 And then bake a new block:
 
 ::
 
-    $ light-client bake for bootstrap1
+    $ light-client bake for --minimal-timestamp
     Apr  8 16:49:28.172 - light_mode: light mode's core created for chain main and block head
     Apr  8 16:49:28.173 - light_mode: API call: do_rpc v1
     Apr  8 16:49:28.175 - light_mode: integrated data for key v1 from one endpoint, about to validate from 1 other
@@ -169,7 +171,7 @@ And then bake a new block:
     ...
     Injected block BMdbKufTymQJ
 
-Here's the meaning of these lines:
+Here is the meaning of these lines:
 
 * Line ``light mode's core created`` indicates that the light
   mode was initialized. It should be printed once per block being inspected.
@@ -180,7 +182,7 @@ Here's the meaning of these lines:
   to fetch Merkle proofs for this key from other endpoints.
 * Lines ``API call: get ...`` indicate that ``octez-client`` is requesting
   data from the light mode's cache. In this snippet, after the light mode
-  gathered data for key ``v1``; the client is requesting data for the children
+  gathered data for key ``v1``, the client is requesting data for the children
   keys ``v1;constants`` and ``v1;first_level`` (the ``;`` indicates  nesting).
   This example shows how the light mode sometimes batches requests, to avoid
   querying many keys in a row. Here it did a single request for ``v1`` instead
@@ -196,5 +198,5 @@ How to deploy to relieve nodes from some RPCs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Again, we refer to the corresponding section in the page of
-the proxy mode :doc:`proxy mode<proxy>`. The exact same recommendations
+the :doc:`proxy mode<proxy>`. The exact same recommendations
 apply for the light mode.

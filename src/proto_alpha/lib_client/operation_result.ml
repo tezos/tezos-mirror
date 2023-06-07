@@ -43,7 +43,7 @@ let pp_micheline_from_lazy_expr ppf expr =
   in
   pp_micheline_expr ppf expr
 
-let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
+let pp_internal_operation ppf (Internal_operation {operation; sender; _}) =
   (* For now, try to use the same format as in [pp_manager_operation_content]. *)
   Format.fprintf ppf "@[<v 2>Internal " ;
   (match operation with
@@ -55,7 +55,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
         Tez.pp
         amount
         Destination.pp
-        source
+        sender
         Destination.pp
         destination ;
       if not (Entrypoint.is_default entrypoint) then
@@ -71,7 +71,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
         ppf
         "Origination:@,From: %a@,Credit: %s%a"
         Destination.pp
-        source
+        sender
         tez_sym
         Tez.pp
         credit ;
@@ -99,7 +99,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
             Signature.Public_key_hash.pp
             delegate)
   | Delegation delegate_opt -> (
-      Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Destination.pp source ;
+      Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Destination.pp sender ;
       match delegate_opt with
       | None -> Format.pp_print_string ppf "nobody"
       | Some delegate -> Signature.Public_key_hash.pp ppf delegate)
@@ -108,7 +108,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
         ppf
         "Event:@,From: %a@,Type: %a"
         Destination.pp
-        source
+        sender
         pp_micheline_expr
         ty ;
       if not (Entrypoint.is_default tag) then
@@ -215,79 +215,6 @@ let pp_manager_operation_content (type kind) source ppf
         "Update_consensus_key:@,Public key hash: %a"
         Signature.Public_key_hash.pp
         (Signature.Public_key.hash pk)
-  | Tx_rollup_origination ->
-      Format.fprintf
-        ppf
-        "Transaction rollup origination:@,From: %a"
-        Contract.pp
-        source
-  | Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _} ->
-      Format.fprintf
-        ppf
-        "Transaction rollup transaction:@,\
-         Address:%a@,\
-         Message length: %d bytes@,\
-         From: %a"
-        Tx_rollup.pp
-        tx_rollup
-        (String.length content)
-        Contract.pp
-        source
-  | Tx_rollup_commit {tx_rollup; commitment} ->
-      Format.fprintf
-        ppf
-        "Transaction rollup commitment:@,\
-         Address: %a@,\
-         @[<v 2>Commitment:@,\
-         %a@]@,\
-         From: %a"
-        Tx_rollup.pp
-        tx_rollup
-        Tx_rollup_commitment.Full.pp
-        commitment
-        Contract.pp
-        source
-  | Tx_rollup_return_bond {tx_rollup} ->
-      Format.fprintf
-        ppf
-        "Transaction rollup recover commitment bond:@,Address: %a@,From: %a"
-        Tx_rollup.pp
-        tx_rollup
-        Contract.pp
-        source
-  | Tx_rollup_finalize_commitment {tx_rollup} ->
-      Format.fprintf
-        ppf
-        "Transaction rollup finalize commitment:@,Address: %a@,From: %a"
-        Tx_rollup.pp
-        tx_rollup
-        Contract.pp
-        source
-  | Tx_rollup_remove_commitment {tx_rollup; _} ->
-      Format.fprintf
-        ppf
-        "Transaction rollup remove commitment:@,Address: %a@,From: %a"
-        Tx_rollup.pp
-        tx_rollup
-        Contract.pp
-        source
-  | Tx_rollup_rejection {tx_rollup; _} ->
-      (* FIXME/TORU *)
-      Format.fprintf
-        ppf
-        "Transaction rollup rejection:@,Address: %a@,From: %a"
-        Tx_rollup.pp
-        tx_rollup
-        Contract.pp
-        source
-  | Tx_rollup_dispatch_tickets {tx_rollup; _} ->
-      Format.fprintf
-        ppf
-        "Transaction rollup dispatch tickets:@,Address: %a@,From: %a"
-        Tx_rollup.pp
-        tx_rollup
-        Contract.pp
-        source
   | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint} ->
       Format.fprintf
         ppf
@@ -627,12 +554,6 @@ let pp_transaction_result ppf = function
       pp_consumed_gas ppf consumed_gas ;
       pp_balance_updates ppf balance_updates ;
       pp_ticket_receipt ppf ticket_receipt
-  | Transaction_to_tx_rollup_result
-      {balance_updates; consumed_gas; ticket_hash; paid_storage_size_diff} ->
-      pp_consumed_gas ppf consumed_gas ;
-      pp_balance_updates ppf balance_updates ;
-      Format.fprintf ppf "@,Ticket hash: %a" Ticket_hash.pp ticket_hash ;
-      pp_paid_storage_size_diff ppf paid_storage_size_diff
   | Transaction_to_sc_rollup_result {consumed_gas; ticket_receipt} ->
       pp_consumed_gas ppf consumed_gas ;
       pp_ticket_receipt ppf ticket_receipt
@@ -678,60 +599,6 @@ let pp_manager_operation_contents_result ppf op_result =
     pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas
   in
-  let pp_tx_rollup_origination_result
-      (Tx_rollup_origination_result
-        {balance_updates; consumed_gas; originated_tx_rollup}) =
-    pp_balance_updates ppf balance_updates ;
-    pp_consumed_gas ppf consumed_gas ;
-    Format.fprintf
-      ppf
-      "@,Originated tx rollup: %a"
-      Tx_rollup.pp
-      originated_tx_rollup
-  in
-  let pp_tx_rollup_submit_batch_result
-      (Tx_rollup_submit_batch_result
-        {balance_updates; consumed_gas; paid_storage_size_diff}) =
-    pp_balance_updates ppf balance_updates ;
-    pp_consumed_gas ppf consumed_gas ;
-    pp_paid_storage_size_diff ppf paid_storage_size_diff
-  in
-  let pp_tx_rollup_commit_result
-      (Tx_rollup_commit_result {balance_updates; consumed_gas}) =
-    pp_balance_updates ppf balance_updates ;
-    pp_consumed_gas ppf consumed_gas
-  in
-  let pp_tx_rollup_return_bond_result
-      (Tx_rollup_return_bond_result {balance_updates; consumed_gas}) =
-    pp_balance_updates ppf balance_updates ;
-    pp_consumed_gas ppf consumed_gas
-  in
-  let pp_tx_rollup_finalize_commitment_result
-      (Tx_rollup_finalize_commitment_result
-        {balance_updates; consumed_gas; level}) =
-    pp_balance_updates ppf balance_updates ;
-    pp_consumed_gas ppf consumed_gas ;
-    Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level
-  in
-  let pp_tx_rollup_remove_commitment_result
-      (Tx_rollup_remove_commitment_result
-        {balance_updates; consumed_gas; level}) =
-    pp_balance_updates ppf balance_updates ;
-    pp_consumed_gas ppf consumed_gas ;
-    Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level
-  in
-  let pp_tx_rollup_rejection_result
-      (Tx_rollup_rejection_result {balance_updates; consumed_gas}) =
-    pp_balance_updates ppf balance_updates ;
-    pp_consumed_gas ppf consumed_gas
-  in
-  let pp_tx_rollup_dispatch_tickets_result
-      (Tx_rollup_dispatch_tickets_result
-        {balance_updates; consumed_gas; paid_storage_size_diff}) =
-    pp_paid_storage_size_diff ppf paid_storage_size_diff ;
-    pp_consumed_gas ppf consumed_gas ;
-    pp_balance_updates ppf balance_updates
-  in
   let pp_transfer_ticket_result
       (Transfer_ticket_result
         {balance_updates; ticket_receipt; consumed_gas; paid_storage_size_diff})
@@ -765,9 +632,15 @@ let pp_manager_operation_contents_result ppf op_result =
     pp_consumed_gas ppf consumed_gas
   in
   let pp_sc_rollup_cement_result
-      (Sc_rollup_cement_result {consumed_gas; inbox_level}) =
+      (Sc_rollup_cement_result {consumed_gas; inbox_level; commitment_hash}) =
     pp_consumed_gas ppf consumed_gas ;
-    Format.fprintf ppf "@,Inbox level: %a" Raw_level.pp inbox_level
+    Format.fprintf
+      ppf
+      "@,Inbox level: %a@,Commitment hash: %a"
+      Raw_level.pp
+      inbox_level
+      Sc_rollup.Commitment.Hash.pp
+      commitment_hash
   in
   let pp_sc_rollup_publish_result
       (Sc_rollup_publish_result
@@ -853,17 +726,6 @@ let pp_manager_operation_contents_result ppf op_result =
     | Set_deposits_limit_result _ -> "deposits limit modification"
     | Update_consensus_key_result _ -> "consensus key update"
     | Increase_paid_storage_result _ -> "paid storage increase"
-    | Tx_rollup_origination_result _ -> "transaction rollup origination"
-    | Tx_rollup_submit_batch_result _ -> "transaction rollup batch submission"
-    | Tx_rollup_commit_result _ -> "transaction rollup commitment"
-    | Tx_rollup_return_bond_result _ -> "transaction rollup bond retrieval"
-    | Tx_rollup_finalize_commitment_result _ ->
-        "transaction rollup commitment finalization"
-    | Tx_rollup_remove_commitment_result _ ->
-        "transaction rollup commitment removal"
-    | Tx_rollup_rejection_result _ -> "transaction rollup commitment rejection"
-    | Tx_rollup_dispatch_tickets_result _ ->
-        "transaction rollup tickets dispatch"
     | Transfer_ticket_result _ -> "tickets transfer"
     | Sc_rollup_originate_result _ -> "smart rollup origination"
     | Sc_rollup_add_messages_result _ -> "smart rollup messages submission"
@@ -894,18 +756,6 @@ let pp_manager_operation_contents_result ppf op_result =
     | Register_global_constant_result _ as op ->
         pp_register_global_constant_result op
     | Increase_paid_storage_result _ as op -> pp_increase_paid_storage_result op
-    | Tx_rollup_origination_result _ as op -> pp_tx_rollup_origination_result op
-    | Tx_rollup_submit_batch_result _ as op ->
-        pp_tx_rollup_submit_batch_result op
-    | Tx_rollup_commit_result _ as op -> pp_tx_rollup_commit_result op
-    | Tx_rollup_return_bond_result _ as op -> pp_tx_rollup_return_bond_result op
-    | Tx_rollup_finalize_commitment_result _ as op ->
-        pp_tx_rollup_finalize_commitment_result op
-    | Tx_rollup_remove_commitment_result _ as op ->
-        pp_tx_rollup_remove_commitment_result op
-    | Tx_rollup_rejection_result _ as op -> pp_tx_rollup_rejection_result op
-    | Tx_rollup_dispatch_tickets_result _ as op ->
-        pp_tx_rollup_dispatch_tickets_result op
     | Transfer_ticket_result _ as op -> pp_transfer_ticket_result op
     | Sc_rollup_originate_result _ as op -> pp_sc_rollup_originate_result op
     | Sc_rollup_add_messages_result _ as op ->

@@ -104,7 +104,7 @@ type ('arg, 'storage) code =
       entrypoints : 'arg Script_typed_ir.entrypoints;
       code_size : Cache_memory_helpers.sint;
           (** This is an over-approximation of the value size in memory, in
-         bytes, of the contract's static part, that is its source
+         bytes, of the contract's static part, that is its
          code. This includes the code of the contract as well as the code
          of the views. The storage size is not taken into account by this
          field as it has a dynamic size. *)
@@ -297,7 +297,7 @@ val parse_ty :
   (ex_ty * context) tzresult
 
 val parse_toplevel :
-  context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult Lwt.t
+  context -> Script.expr -> (toplevel * context) tzresult Lwt.t
 
 (** High-level function to typecheck a Michelson script. This function is not
     used for validating operations but only for the [typecheck_code] RPC.

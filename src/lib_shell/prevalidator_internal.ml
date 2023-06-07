@@ -24,16 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
-
-   This file is part of the implementation of the new mempool, which
-   uses features of the protocol that only exist since Lima.
-
-   When you modify this file, consider whether you should also change
-   the files that implement the legacy mempool for Kathmandu. They all
-   start with the "legacy" prefix and will be removed when Lima is
-   activated on Mainnet. *)
-
 open Prevalidator_internal_common
 open Prevalidator_worker_state
 open Shell_operation
@@ -376,20 +366,19 @@ module Make_s
       remove_from_advertisement old_hash shell.advertisement ;
     match Classification.remove old_hash shell.classification with
     | Some (op, _class) ->
-        [(op, (replacement_classification :> Classification.classification))]
+        Some (op, (replacement_classification :> Classification.classification))
     | None ->
         (* This case should not happen. *)
         shell.parameters.tools.chain_tools.clear_or_cancel old_hash ;
-        []
+        None
 
   (* Determine the classification of a given operation in the current
-     filter/validation states, i.e. whether it could be included in a
+     validation state, i.e. whether it could be included in a
      block on top of the current head, and if not, why. If yes, the
      operation is accumulated in the given [mempool].
 
      The function returns a tuple
-     [(filter_state, validation_state, mempool, to_handle)], where:
-     - [filter_state] is the (possibly) updated filter_state,
+     [(validation_state, mempool, to_handle)], where:
      - [validation_state] is the (possibly) updated validation_state,
      - [mempool] is the (possibly) updated mempool,
      - [to_handle] contains the given operation and its classification, and all
@@ -402,17 +391,14 @@ module Make_s
       * (protocol_operation operation * Classification.classification) trace)
       Lwt.t =
     let open Lwt_syntax in
-    let* v_state, op, classification, replacement =
+    let* v_state, op, classification, replacements =
       Prevalidation_t.add_operation validation_state filter_config op
     in
     let to_replace =
-      match replacement with
-      | None -> []
-      | Some (old_oph, replacement_classification) ->
-          reclassify_replaced_manager_op
-            old_oph
-            shell
-            replacement_classification
+      List.filter_map
+        (fun (replaced_oph, new_classification) ->
+          reclassify_replaced_manager_op replaced_oph shell new_classification)
+        replacements
     in
     let to_handle = (op, classification) :: to_replace in
     let mempool =
@@ -652,6 +638,7 @@ module Make_s
               in
               pv.shell.pending <-
                 Pending_ops.add parsed_op prio pv.shell.pending ;
+              let*! () = Events.(emit operation_injected) oph in
               return_unit)
             else if
               not
@@ -705,6 +692,7 @@ module Make_s
                   let*! v =
                     update_advertised_mempool_fields pv.shell delta_mempool
                   in
+                  let*! () = Events.(emit operation_injected) oph in
                   return v
               | Some
                   ( _h,
@@ -732,7 +720,7 @@ module Make_s
       let open Lwt_syntax in
       let may_fetch_operation = may_fetch_operation shell (Some peer) in
       let* () = List.iter_s may_fetch_operation mempool.Mempool.known_valid in
-      Seq.iter_s
+      Seq.S.iter
         may_fetch_operation
         (Operation_hash.Set.to_seq mempool.Mempool.pending)
 
@@ -847,9 +835,12 @@ module Make_s
               return_unit)
 
     let on_ban pv oph_to_ban =
+      let open Lwt_result_syntax in
       pv.shell.banned_operations <-
         Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
-      remove ~flush_if_prechecked:true pv oph_to_ban
+      let* res = remove ~flush_if_prechecked:true pv oph_to_ban in
+      let*! () = Events.(emit operation_banned) oph_to_ban in
+      return res
   end
 end
 
@@ -1387,7 +1378,7 @@ module Make
         }
       in
       let*! () =
-        Seq.iter_s
+        Seq.S.iter
           (may_fetch_operation pv.shell None)
           (Operation_hash.Set.to_seq fetching)
       in
@@ -1417,8 +1408,8 @@ module Make
     let on_completion _w r _ st =
       Prometheus.Counter.inc_one metrics.worker_counters.worker_completion_count ;
       match Request.view r with
-      | Request.View (Flush _) | View (Inject _) | View (Ban _) ->
-          Events.(emit request_completed_notice) (Request.view r, st)
+      | View (Inject _) | View (Ban _) | Request.View (Flush _) ->
+          Events.(emit request_completed_info) (Request.view r, st)
       | View (Notify _) | View Leftover | View (Arrived _) | View Advertise ->
           Events.(emit request_completed_debug) (Request.view r, st)
 

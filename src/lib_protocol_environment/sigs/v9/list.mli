@@ -180,28 +180,14 @@ val assoc : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> 'b option
     {!Stdlib.List}. *)
 val assoc_opt : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> 'b option
 
-(** [assq k kvs] is the same as [assoc ~equal:Stdlib.( == ) k kvs]: it uses
-    the physical equality. *)
-val assq : 'a -> ('a * 'b) list -> 'b option
-
-(** [assq_opt] is an alias for [assq] provided for compatibility with
-    {!Stdlib.List}. *)
-val assq_opt : 'a -> ('a * 'b) list -> 'b option
-
 (** [mem_assoc ~equal k l] is equivalent to
     [Option.is_some @@ assoc ~equal k l]. *)
 val mem_assoc : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> bool
-
-(** [mem_assq k l] is [mem_assoc ~equal:Stdlib.( == ) k l]. *)
-val mem_assq : 'a -> ('a * 'b) list -> bool
 
 (** [remove_assoc ~equal k l] is [l] without the first element [(k', _)] such
     that [equal k k']. *)
 val remove_assoc :
   equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> ('a * 'b) list
-
-(** [remove_assoq k l] is [remove_assoc ~equal:Stdlib.( == ) k l]. *)
-val remove_assq : 'a -> ('a * 'b) list -> ('a * 'b) list
 
 (** {3 Initialisation} *)
 
@@ -355,21 +341,6 @@ val fold_left2 :
   'b list ->
   'c list ->
   ('a, 'trace) result
-
-(** [fold_right2 ~when_different_lengths f xs ys init] is
-    [f x0 y0 (f x1 y1 (…))].
-
-    This function is not tail-recursive.
-
-    Note that unlike the left-to-right double-list traversors, [fold_right2]
-    only calls [f] if the lists are of the same length. *)
-val fold_right2 :
-  when_different_lengths:'trace ->
-  ('a -> 'b -> 'c -> 'c) ->
-  'a list ->
-  'b list ->
-  'c ->
-  ('c, 'trace) result
 
 (** [for_all2 ~when_different_lengths f xs ys] is
     [f x0 y0 && f x1 y1 && …].
@@ -984,23 +955,6 @@ val fold_left_i_es :
   'b list ->
   ('a, 'trace) result Lwt.t
 
-(** This function is not tail-recursive *)
-val fold_right : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
-
-(** This function is not tail-recursive *)
-val fold_right_e :
-  ('a -> 'b -> ('b, 'trace) result) -> 'a list -> 'b -> ('b, 'trace) result
-
-(** This function is not tail-recursive *)
-val fold_right_s : ('a -> 'b -> 'b Lwt.t) -> 'a list -> 'b -> 'b Lwt.t
-
-(** This function is not tail-recursive *)
-val fold_right_es :
-  ('a -> 'b -> ('b, 'trace) result Lwt.t) ->
-  'a list ->
-  'b ->
-  ('b, 'trace) result Lwt.t
-
 (** {3 Double-traversal variants}
 
     As mentioned above, there are no [_p] and [_ep] double-traversors. Use
@@ -1092,33 +1046,6 @@ val fold_left2_es :
   'b list ->
   'c list ->
   ('a, 'trace) result Lwt.t
-
-(** This function is not tail-recursive *)
-val fold_right2_e :
-  when_different_lengths:'trace ->
-  ('a -> 'b -> 'c -> ('c, 'trace) result) ->
-  'a list ->
-  'b list ->
-  'c ->
-  ('c, 'trace) result
-
-(** This function is not tail-recursive *)
-val fold_right2_s :
-  when_different_lengths:'trace ->
-  ('a -> 'b -> 'c -> 'c Lwt.t) ->
-  'a list ->
-  'b list ->
-  'c ->
-  ('c, 'trace) result Lwt.t
-
-(** This function is not tail-recursive *)
-val fold_right2_es :
-  when_different_lengths:'trace ->
-  ('a -> 'b -> 'c -> ('c, 'trace) result Lwt.t) ->
-  'a list ->
-  'b list ->
-  'c ->
-  ('c, 'trace) result Lwt.t
 
 (** {3 Scanning variants} *)
 

@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Migration (patched scripts)
-    Invocation:   cd src/proto_alpha/lib_protocol/test/integration/michelson
-                  dune exec ./main.exe -- test "^patched contracts$"
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_patched_contracts.ml
     Subject:      Migration
 *)
 
@@ -80,12 +80,14 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
     let open Micheline in
     map_node (fun _ -> ()) Michelson_v1_primitives.string_of_prim (root m)
 
+  let path = project_root // Filename.dirname __FILE__
+
   let contract_path ?(ext = "patched.tz") hash =
     Filename.concat "patched_contracts"
     @@ Format.asprintf "%a.%s" Script_expr_hash.pp hash ext
 
   let read_file ?ext hash =
-    let filename = contract_path ?ext hash in
+    let filename = path // contract_path ?ext hash in
     Lwt_io.(with_file ~mode:Input filename read)
 
   (* Test that the hashes of the scripts in ./patched_contract/<hash>.original.tz
@@ -154,7 +156,7 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
           current_code;
         |] )
     in
-    let*! actual_diff = Lwt_process.pread diff_cmd in
+    let*! actual_diff = Lwt_process.pread ~cwd:path diff_cmd in
     Alcotest.(check string) "same diff" expected_diff actual_diff ;
     return ()
 
@@ -212,3 +214,7 @@ let tests =
       let module Test = Legacy_patch_test (Patches) in
       List.concat_map Test.tests Patches.patches)
     test_modules
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("patched contracts", tests)]
+  |> Lwt_main.run

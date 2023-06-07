@@ -57,7 +57,7 @@ let set_ready accuser =
   trigger_ready accuser (Some ())
 
 let handle_raw_stdout accuser line =
-  if line =~ rex "^Accuser v.+ for .+ started.$" then set_ready accuser
+  if line =~ rex "^Waiting for protocol .+ to start...$" then set_ready accuser
 
 let create ~protocol ?name ?color ?event_pipe ?base_dir ?runner node =
   let name = match name with None -> fresh_name () | Some name -> name in

@@ -50,7 +50,7 @@ let set_checkpoint =
 let set_target =
   declare_1
     ~section
-    ~level:Info
+    ~level:Debug
     ~name:"set_target"
     ~msg:"the target was updated to {new_target}"
     ~pp1:pp_block_descriptor
@@ -167,7 +167,7 @@ let start_retreiving_cycles =
 let store_is_consistent =
   declare_0
     ~section
-    ~level:Info
+    ~level:Debug
     ~name:"store_is_consistent"
     ~msg:"the store is consistent"
     ()
@@ -262,7 +262,7 @@ let switch_history_mode =
 let inconsistent_store =
   declare_1
     ~section
-    ~level:Internal_event.Notice
+    ~level:Notice
     ~name:"inconsistent_store"
     ~msg:"the store is in an inconsistent state: {errs}"
     ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_trace)
@@ -271,7 +271,7 @@ let inconsistent_store =
 let fix_store =
   declare_0
     ~section
-    ~level:Internal_event.Notice
+    ~level:Notice
     ~name:"fix_store"
     ~msg:"attempting to restore the store's consistency..."
     ()
@@ -279,7 +279,7 @@ let fix_store =
 let fix_floating_stores =
   declare_0
     ~section
-    ~level:Internal_event.Notice
+    ~level:Notice
     ~name:"fix_floating_stores"
     ~msg:"the consistency of the floating stores was restored"
     ()
@@ -287,7 +287,7 @@ let fix_floating_stores =
 let fix_head =
   declare_2
     ~section
-    ~level:Internal_event.Notice
+    ~level:Notice
     ~name:"fix_head"
     ~msg:
       "updating head (previously {prev}) with the fittest block present in the \
@@ -308,7 +308,7 @@ let fix_cementing_highwatermark =
   in
   declare_2
     ~section
-    ~level:Internal_event.Notice
+    ~level:Notice
     ~name:"fix_cementing_highwatermark"
     ~msg:"updating cementing highwatermark (previously {prev}) with: {new}"
     ~pp1:pp_cemented_highwatermark
@@ -319,7 +319,7 @@ let fix_cementing_highwatermark =
 let fix_checkpoint =
   declare_2
     ~section
-    ~level:Internal_event.Notice
+    ~level:Notice
     ~name:"fix_checkpoint"
     ~msg:"updating checkpoint (previously {prev}) with: {new}"
     ~pp1:
@@ -333,7 +333,7 @@ let fix_checkpoint =
 let fix_savepoint =
   declare_2
     ~section
-    ~level:Internal_event.Notice
+    ~level:Notice
     ~name:"fix_savepoint"
     ~msg:
       "updating savepoint (previously {prev}) with the lowest block with \
@@ -349,7 +349,7 @@ let fix_savepoint =
 let fix_caboose =
   declare_2
     ~section
-    ~level:Internal_event.Notice
+    ~level:Notice
     ~name:"fix_caboose"
     ~msg:
       "updating caboose (previously {prev}) with the lowest block found in the \
@@ -365,7 +365,7 @@ let fix_caboose =
 let store_was_fixed =
   declare_0
     ~section
-    ~level:Internal_event.Notice
+    ~level:Notice
     ~name:"store_was_fixed"
     ~msg:"the store was successfully fixed!"
     ()
@@ -373,7 +373,7 @@ let store_was_fixed =
 let recover_merge =
   declare_0
     ~section
-    ~level:Internal_event.Notice
+    ~level:Notice
     ~name:"recovering_merge"
     ~msg:"recovering from an interrupted store merge"
     ()
@@ -381,7 +381,7 @@ let recover_merge =
 let restore_protocols_table =
   declare_0
     ~section
-    ~level:Internal_event.Notice
+    ~level:Notice
     ~name:"restore_protocols_table"
     ~msg:"restoring protocols table"
     ()
@@ -389,7 +389,7 @@ let restore_protocols_table =
 let restore_protocol_activation =
   declare_2
     ~section
-    ~level:Internal_event.Notice
+    ~level:Notice
     ~name:"restore_protocol_activation"
     ~msg:"protocol {protocol_level} ({protocol_hash}) was successfully restored"
     ("protocol_level", Data_encoding.int31)
@@ -399,7 +399,7 @@ let restore_protocol_activation =
 let update_protocol_table =
   declare_4
     ~section
-    ~level:Internal_event.Notice
+    ~level:Notice
     ~name:"update_protocol_table"
     ~msg:
       "the protocol table was updated: protocol {proto_hash} (level \
@@ -416,7 +416,7 @@ let update_protocol_table =
 let restore_history_mode =
   declare_1
     ~section
-    ~level:Internal_event.Notice
+    ~level:Notice
     ~name:"restore_history_mode"
     ~msg:
       "history mode was successfully restored to {history_mode}, based on the \
@@ -427,7 +427,7 @@ let restore_history_mode =
 let restore_inferred_history_mode =
   declare_1
     ~section
-    ~level:Internal_event.Notice
+    ~level:Notice
     ~name:"restore_inferred_history_mode"
     ~msg:
       "history mode was successfully restored to {history_mode}. Warning: this \
@@ -440,7 +440,7 @@ let restore_inferred_history_mode =
 (* Warning *)
 let warning_missing_metadata =
   declare_2
-    ~level:Internal_event.Warning
+    ~level:Warning
     ~section
     ~name:"missing_metadata"
     ~msg:
@@ -454,7 +454,7 @@ let warning_missing_metadata =
 let merge_error =
   declare_3
     ~section
-    ~level:Internal_event.Error
+    ~level:Error
     ~name:"merge_error"
     ~msg:"merge from {start} to {end} failed: {message}"
     ~pp1:pp_int32
@@ -467,7 +467,7 @@ let merge_error =
 let notify_merge_error =
   declare_1
     ~section
-    ~level:Internal_event.Error
+    ~level:Error
     ~name:"notify_merge_error"
     ~msg:
       "store merge has failed, restart the node to restore the consistency: \
@@ -476,18 +476,17 @@ let notify_merge_error =
     ("errs", Error_monad.trace_encoding)
 
 let upgrade_store_failed =
-  declare_1
+  declare_0
     ~section
-    ~level:Internal_event.Error
+    ~level:Error
     ~name:"upgrade_store_failed"
-    ~msg:"store upgrade failed, cleaning up temporary files: {errs}"
-    ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_trace)
-    ("errs", Error_monad.trace_encoding)
+    ~msg:"store upgrade failed, cleaning up temporary files"
+    ()
 
 let upgrade_store_started =
   declare_0
     ~section
-    ~level:Internal_event.Notice
+    ~level:Notice
     ~name:"upgrade_store_started"
     ~msg:"upgrading the store"
     ()

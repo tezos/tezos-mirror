@@ -30,8 +30,8 @@ open Lwt_result_syntax
 (** Testing
     -------
     Component:  Protocol (event logging)
-    Invocation: cd src/proto_alpha/lib_protocol/test/integration/michelson && \
-                dune exec ./main.exe -- test '^event logging$'
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_contract_event.ml
     Subject:  This module tests that the event logs can be written to the receipt
               in correct order and expected format.
 *)
@@ -60,10 +60,12 @@ let originate_contract file storage src b =
   let+ b = Incremental.finalize_block incr in
   (dst, b)
 
+let path = project_root // Filename.dirname __FILE__
+
 (** Run emit.tz and assert that both the order of events and data content are correct *)
 let contract_test () =
   let* b, src = Context.init1 ~consensus_threshold:0 () in
-  let* dst, b = originate_contract "contracts/emit.tz" "Unit" src b in
+  let* dst, b = originate_contract (path // "contracts/emit.tz") "Unit" src b in
   let fee = Test_tez.of_int 10 in
   let parameters = Script.unit_parameter in
   let* operation =
@@ -133,3 +135,7 @@ let tests =
       `Quick
       contract_test;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("event logging", tests)]
+  |> Lwt_main.run

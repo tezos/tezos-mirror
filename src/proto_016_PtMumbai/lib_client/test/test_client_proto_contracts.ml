@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Client
-    Invocation:   dune exec src/proto_alpha/lib_client/test/test_client_proto_contracts.exe
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_client/test/main.exe \
+                  -- --file test_client_proto_contracts.ml
     Subject:      Unit tests for Client_proto_contracts
 *)
 
@@ -89,7 +90,8 @@ let test_find_destination _ =
 
 let () =
   Alcotest_lwt.run
-    "tezos-lib-client-proto-contracts"
+    ~__FILE__
+    Protocol.name
     [
       ( "client_proto_contracts",
         [Tztest.tztest "test_find_destination" `Quick test_find_destination] );

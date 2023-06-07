@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (participation monitoring)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                -- test "^participation"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
+                  -- --file test_participation.ml
     Subject:    Participation monitoring in Tenderbake
 *)
 
@@ -194,12 +193,16 @@ let test_participation_rpc () =
 let tests =
   [
     Tztest.tztest
-      "test insufficient participation"
+      "insufficient participation"
       `Quick
       (test_participation ~sufficient_participation:false);
     Tztest.tztest
-      "test minimal participation"
+      "minimal participation"
       `Quick
       (test_participation ~sufficient_participation:true);
-    Tztest.tztest "test participation RPC" `Quick test_participation_rpc;
+    Tztest.tztest "participation RPC" `Quick test_participation_rpc;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("participation monitoring", tests)]
+  |> Lwt_main.run

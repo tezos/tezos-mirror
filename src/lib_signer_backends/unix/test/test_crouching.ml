@@ -1,7 +1,7 @@
 (** Testing
     -------
     Component:    Remote-signature Backends
-    Invocation:   dune build @src/lib_signer_backends/runtest
+    Invocation:   dune exec src/lib_signer_backends/unix/test/main.exe
     Subject:      On pseudo-unique names for Ledger Nano S devices.
 *)
 
@@ -16,4 +16,5 @@ let test_example () =
 
 let tests = [Alcotest.test_case "print_example" `Quick test_example]
 
-let () = Alcotest.run "tezos-signed-backends" [("ledger-names", tests)]
+let () =
+  Alcotest.run ~__FILE__ "tezos-signer-backends" [("ledger-names", tests)]

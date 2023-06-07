@@ -65,122 +65,6 @@ module Script_cache : sig
     JSON.t Lwt.t
 end
 
-module Tx_rollup : sig
-  (** Call RPC /chain/[chain]/blocks/[block]/context/tx_rollup/[tx_rollup_id]/state *)
-  val get_state :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    rollup:string ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/tx_rollup/[tx_rollup_id]/inbox/[level] *)
-  val get_inbox :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    rollup:string ->
-    level:int ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/tx_rollup/[rollup_hash]/commitment/[level] *)
-  val get_commitment :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    rollup:string ->
-    level:int ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/[rollup_hash]/pending_bonded_commitments *)
-  val get_pending_bonded_commitments :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    rollup:string ->
-    pkh:string ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  module Forge : sig
-    module Inbox : sig
-      val message_hash :
-        ?endpoint:Client.endpoint ->
-        ?hooks:Process.hooks ->
-        ?chain:string ->
-        ?block:string ->
-        data:Client.data ->
-        Client.t ->
-        JSON.t Runnable.process
-
-      val merkle_tree_hash :
-        ?endpoint:Client.endpoint ->
-        ?hooks:Process.hooks ->
-        ?chain:string ->
-        ?block:string ->
-        data:Client.data ->
-        Client.t ->
-        JSON.t Runnable.process
-
-      val merkle_tree_path :
-        ?endpoint:Client.endpoint ->
-        ?hooks:Process.hooks ->
-        ?chain:string ->
-        ?block:string ->
-        data:Client.data ->
-        Client.t ->
-        JSON.t Runnable.process
-    end
-
-    module Commitment : sig
-      val merkle_tree_hash :
-        ?endpoint:Client.endpoint ->
-        ?hooks:Process.hooks ->
-        ?chain:string ->
-        ?block:string ->
-        data:Client.data ->
-        Client.t ->
-        JSON.t Runnable.process
-
-      val merkle_tree_path :
-        ?endpoint:Client.endpoint ->
-        ?hooks:Process.hooks ->
-        ?chain:string ->
-        ?block:string ->
-        data:Client.data ->
-        Client.t ->
-        JSON.t Runnable.process
-
-      val message_result_hash :
-        ?endpoint:Client.endpoint ->
-        ?hooks:Process.hooks ->
-        ?chain:string ->
-        ?block:string ->
-        data:Client.data ->
-        Client.t ->
-        JSON.t Runnable.process
-    end
-
-    module Withdraw : sig
-      val withdraw_list_hash :
-        ?endpoint:Client.endpoint ->
-        ?hooks:Process.hooks ->
-        ?chain:string ->
-        ?block:string ->
-        data:Client.data ->
-        Client.t ->
-        JSON.t Runnable.process
-    end
-  end
-end
-
 val raw_bytes :
   ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
@@ -197,15 +81,22 @@ module Curl : sig
 
       Fails if [curl] is not found in path.
   *)
-  val get : ?args:string list -> string -> JSON.t Runnable.process
+  val get :
+    ?runner:Runner.t -> ?args:string list -> string -> JSON.t Runnable.process
 
   (** Same as [get] but does not parse the returned value *)
-  val get_raw : ?args:string list -> string -> string Runnable.process
+  val get_raw :
+    ?runner:Runner.t -> ?args:string list -> string -> string Runnable.process
 
   (** [post url data] returns a runnable posting [data] to [url] with curl.
 
       The response is parsed and returned as JSON.
 
       Fails if [curl] is not found in path. *)
-  val post : ?args:string list -> string -> JSON.t -> JSON.t Runnable.process
+  val post :
+    ?runner:Runner.t ->
+    ?args:string list ->
+    string ->
+    JSON.t ->
+    JSON.t Runnable.process
 end

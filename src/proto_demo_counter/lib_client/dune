@@ -10,7 +10,8 @@
   tezos-shell-services
   tezos-client-base
   tezos-client-commands
-  tezos-protocol-demo-counter)
+  tezos-protocol-demo-counter
+  tezos-protocol-demo-counter.lifted)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

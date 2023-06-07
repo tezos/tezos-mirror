@@ -23,12 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Lifted_protocol = struct
-  include Environment.Lift (Protocol)
-
-  let hash = Protocol.hash
-end
-
 module Alpha_block_services =
   Block_services.Make (Lifted_protocol) (Lifted_protocol)
 
@@ -179,22 +173,37 @@ let () =
        Protocol.Alpha_context.Receipt.balance_updates_encoding ;
   register ~pp:Protocol.Alpha_context.Level.pp_full
   @@ def "level" [] Protocol.Alpha_context.Level.encoding ;
-  register @@ def "operation" [] Protocol.Alpha_context.Operation.encoding ;
+  register
+  @@ def
+       "operation"
+       []
+       Protocol.Alpha_context.Operation.encoding_with_legacy_attestation_name ;
+  (* https://gitlab.com/tezos/tezos/-/issues/5528
+     We register legacy encoding, but only during the transition period until
+     the endorsement kind will be completely removed. *)
+  register
+  @@ def
+       "operation_with_attestation"
+       []
+       Protocol.Alpha_context.Operation.encoding ;
   register
   @@ def
        "operation"
        ["contents"]
-       Protocol.Alpha_context.Operation.contents_encoding ;
+       Protocol.Alpha_context.Operation
+       .contents_encoding_with_legacy_attestation_name ;
   register
   @@ def
        "operation"
        ["contents_list"]
-       Protocol.Alpha_context.Operation.contents_list_encoding ;
+       Protocol.Alpha_context.Operation
+       .contents_list_encoding_with_legacy_attestation_name ;
   register
   @@ def
        "operation"
        ["protocol_data"]
-       Protocol.Alpha_context.Operation.protocol_data_encoding ;
+       Protocol.Alpha_context.Operation
+       .protocol_data_encoding_with_legacy_attestation_name ;
   register
   @@ def "operation" ["raw"] Protocol.Alpha_context.Operation.raw_encoding ;
   register
@@ -205,6 +214,15 @@ let () =
   register
   @@ def
        "operation"
+       ["unsigned"]
+       Protocol.Alpha_context.Operation
+       .unsigned_encoding_with_legacy_attestation_name ;
+  (* https://gitlab.com/tezos/tezos/-/issues/5528
+     We register legacy encoding, but only during the transition period until
+     the endorsement kind will be completely removed. *)
+  register
+  @@ def
+       "operation_with_attestation"
        ["unsigned"]
        Protocol.Alpha_context.Operation.unsigned_encoding ;
   register ~pp:Protocol.Alpha_context.Period.pp

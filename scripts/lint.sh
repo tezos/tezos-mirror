@@ -13,6 +13,7 @@ Where <action> can be:
 * --check-scripts: check the .sh files
 * --check-redirects: check docs/_build/_redirects.
 * --check-coq-attributes: check the presence of coq attributes.
+* --check-rust-toolchain: check the contents of rust-toolchain files
 * --help: display this and return 0.
 EOF
 }
@@ -73,7 +74,7 @@ function shellcheck_script () {
 
 check_scripts () {
     # Gather scripts
-    scripts=$(find "${source_directories[@]}" tests_python/ scripts/ docs/ -name "*.sh" -type f -print)
+    scripts=$(find "${source_directories[@]}" scripts/ docs/ -name "*.sh" -type f -print)
     exit_code=0
 
     # Check scripts do not contain the tab character
@@ -150,6 +151,20 @@ check_redirects () {
     exit $exit_code
 }
 
+check_rust_toolchain_files () {
+    authorized_version=("1.66.0")
+
+    declare -a rust_toolchain_files
+    mapfile -t rust_toolchain_files <<< "$(find src/ -name rust-toolchain)"
+
+    for file in "${rust_toolchain_files[@]}"; do
+        if [[ ! "${authorized_version[*]}" =~ $(cat "${file}") ]]; then
+            say "in ${file}: version $(cat "${file}") is not authorized"
+            exit 1
+        fi
+    done
+}
+
 update_gitlab_ci_yml () {
     # Check that a rule is not defined twice, which would result in the first
     # one being ignored. Gitlab linter doesn't warn for it
@@ -204,6 +219,8 @@ case "$action" in
         action=check_redirects ;;
     "--check-coq-attributes" )
         action=check_coq_attributes ;;
+    "--check-rust-toolchain" )
+        action=check_rust_toolchain_files ;;
     "help" | "-help" | "--help" | "-h" )
         usage
         exit 0 ;;

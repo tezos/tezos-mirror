@@ -42,6 +42,7 @@ type config = {
   proof_of_work_target : Tezos_crypto.Crypto_box.pow_target;
   listening_port : P2p_addr.port option;
   advertised_port : P2p_addr.port option;
+  disable_peer_discovery : bool;
 }
 
 type ('msg, 'peer_meta, 'conn_meta) dependencies = {
@@ -172,6 +173,7 @@ let create_connection t p2p_conn id_point point_info peer_info
       ~canceler
       ~greylister
       ~callback:(Lazy.force t.answerer)
+      ~disable_peer_discovery:t.config.disable_peer_discovery
       negotiated_version
   in
   let conn_meta = P2p_socket.remote_metadata p2p_conn in
@@ -211,7 +213,17 @@ let create_connection t p2p_conn id_point point_info peer_info
       P2p_conn.close conn) ;
   List.iter (fun f -> f peer_id conn) t.new_connection_hook ;
   let* () =
-    if t.config.max_connections <= P2p_pool.active_connections t.pool then (
+    (* DISCLAIMER: A similar check is also performed in [P2p_worker] before
+       running the maintenance. Thus, it is important that both conditionals
+       be identical to maintain the maintainance triggering consitency.
+       If this comparison needs to be updated for some reason (for example
+       from a strict to a non strict one), please, consider updating also
+       the [P2p_worker]. *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5291
+       Improve invariant stability using a better encapsulation. *)
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5294
+       Stop triggering the maintainance while performing a connection swap. *)
+    if t.config.max_connections < P2p_pool.active_connections t.pool then (
       P2p_trigger.broadcast_too_many_connections t.triggers ;
       Events.(emit trigger_maintenance_too_many_connections)
         (P2p_pool.active_connections t.pool, t.config.max_connections))
@@ -250,7 +262,8 @@ let is_acceptable t connection_point_info peer_info incoming version =
     (* Point is acceptable, checking if peer is. *)
     match P2p_peer_state.get peer_info with
     | Accepted _
-    (* TODO: in some circumstances cancel and accept... *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4679
+       in some circumstances cancel and accept... *)
     | Running _ ->
         P2p_rejection.(rejecting Already_connected)
     (* All right, welcome ! *)
@@ -413,11 +426,13 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
       let*! () =
         Events.(emit authenticate_status ("nack", point, info.peer_id))
       in
-      let*! point_list =
-        (* Never send more than 100 points, you would be greylisted *)
-        P2p_pool.list_known_points ~ignore_private:true ~size:50 t.pool
+      let*! nack_point_list =
+        if t.config.disable_peer_discovery then Lwt.return []
+        else
+          (* Never send more than 100 points, you would be greylisted *)
+          P2p_pool.list_known_points ~ignore_private:true ~size:50 t.pool
       in
-      let*! () = P2p_socket.nack auth_conn motive point_list in
+      let*! () = P2p_socket.nack auth_conn motive nack_point_list in
       let () =
         if not incoming then
           let timestamp = Time.System.now () in
@@ -500,11 +515,13 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
                     Events.(emit connection_rejected_by_peers)
                       (point, info.peer_id, motive, points)
                   in
-                  P2p_pool.register_list_of_new_points
-                    ~medium:"Nack"
-                    ~source:info.peer_id
-                    t.pool
-                    points
+                  if t.config.disable_peer_discovery then Lwt.return_unit
+                  else
+                    P2p_pool.register_list_of_new_points
+                      ~medium:"Nack"
+                      ~source:info.peer_id
+                      t.pool
+                      points
               | _ -> Events.(emit connection_error) (point, err)
             in
             let*! () =
@@ -772,6 +789,7 @@ module Internal_for_tests = struct
     let proof_of_work_target = Tezos_crypto.Crypto_box.make_pow_target 0. in
     let listening_port = Some 9732 in
     let advertised_port = None in
+    let disable_peer_discovery = false in
     {
       incoming_app_message_queue_size;
       private_mode;
@@ -788,6 +806,7 @@ module Internal_for_tests = struct
       proof_of_work_target;
       listening_port;
       advertised_port;
+      disable_peer_discovery;
     }
 
   (** An encoding that typechecks for all types, but fails at runtime. This is a placeholder as most tests never go through

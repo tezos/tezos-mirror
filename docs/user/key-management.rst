@@ -48,7 +48,7 @@ Ledger Manager
 The preferred way to set up your Ledger is to install `Ledger
 Live
 <https://www.ledger.com/ledger-live/>`_.
-On Linux make sure you correctly set up your `udev` rules as explained
+On Linux make sure you correctly set up your ``udev`` rules as explained
 `here <https://github.com/obsidiansystems/ledger-app-tezos#udev-rules-linux-only>`_.
 Connect your Ledger, unlock it and go to the dashboard.
 In Ledger Live install ``Tezos Wallet`` from the applications list and open it on the
@@ -63,17 +63,17 @@ in the Tezos Wallet app)::
 
    ./octez-client list connected ledgers
 
-You can follow the instructions to import the Ledger encrypted private key and
+This will display some instructions to import the Ledger encrypted private key, and
 you can choose between the root or a derived address.
-We can confirm the addition by listing known addresses::
+We can follow the instructions and then confirm the addition by listing known addresses::
 
-   ./octez-client import secret key my_ledger ledger://tz1XXXXXXXXXX
+   ./octez-client import secret key my_ledger ledger://XXXXXXXXXX
    ./octez-client list known addresses
 
 Optional: we can check that our Ledger signs correctly using the
 following command and confirming on the device::
 
-   octez-client show ledger path ledger://tz1XXXXXXXXXX
+   octez-client show ledger ledger://XXXXXXXXXX --test-sign
 
 The address can now be used as any other with the exception that
 during an operation the device will prompt you to confirm when it's
@@ -83,7 +83,7 @@ time to sign an operation.
 Tezos Baking app
 ~~~~~~~~~~~~~~~~
 
-In Ledger Live (with Developer Mode enabled), there is also a `Tezos Baking`
+In Ledger Live (with Developer Mode enabled), there is also a ``Tezos Baking``
 app which allows a delegate to sign automatically (i.e., there is no need
 to manually sign every block or (pre-)endorsement).
 Of course, the application is restricted to only sign baking operations; it never signs a transfer, for example.
@@ -185,7 +185,7 @@ Every time the client on *vps* needs to sign an operation for
 
 However, with the above method, the address of the signer is hard-coded into the remote key value.
 Consequently, if we ever have to move the signer to another machine or access it using another protocol, we will have to change all the remote keys.
-A more flexible method is to only register a key as being remote, and separately supply the address of the signer using the `-R` option::
+A more flexible method is to only register a key as being remote, and separately supply the address of the signer using the ``-R`` option::
 
    vps~$ octez-client -R 'tcp://home:7732' import secret key alice remote:tz1abc...
    vps~$ octez-client -R 'tcp://home:7732' sign bytes 0x03 for alice

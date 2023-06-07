@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Shell (Validator)
-    Invocation:   dune exec src/lib_shell/test/test_shell.exe \
-                  -- test '^test validator$'
+    Invocation:   dune exec src/lib_shell/test/main.exe \
+                  -- --file test_validator.ml
     Subject:      Unit tests for validator. Currently only tests that
                   events are emitted.
 *)
@@ -149,3 +149,7 @@ let validator_events validator block_validator chain _switch () =
 
 let tests =
   [Alcotest_lwt.test_case "validator_events" `Quick (wrap validator_events)]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "tezos-shell" [("test validator", tests)]
+  |> Lwt_main.run

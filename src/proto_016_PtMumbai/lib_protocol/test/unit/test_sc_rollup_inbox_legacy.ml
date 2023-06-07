@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (smart contract rollup inbox)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "^\[Unit\] sc rollup inbox legacy$"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe 
     Subject:    These unit tests check the off-line inbox implementation for
                 smart contract rollups
 *)
@@ -417,7 +416,7 @@ let test_inclusion_proofs_depending_on_history_capacity
   in
   let proof s v =
     let open Lwt_result_syntax in
-    let*! v = v in
+    let*! v in
     match Environment.wrap_tzresult v with
     | Ok v -> return v
     | Error _ -> tzfail (err (s ^ ": Expecting some inclusion proof."))

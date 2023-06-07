@@ -112,16 +112,17 @@ module type EVENT_DEFINITION = sig
   val doc : string
 
   (* Pretty printer for log messages.
-     Some sinks output a short message; some output a more detailed message; and
-     some may output both. This function is called with [~short: true] when they
-     want short messages, and [~short: false] when they want detailed ones.
-     Short messages should contain information which is not available in the
-     event encoding, or that looks nice when inlined in the message. *)
-  val pp : short:bool -> Format.formatter -> t -> unit
+     - [~all_fields:true] allows to print remaining fields not referenced in the
+          event message after the message with the syntax
+          (<field_name> = <field_as_string>)
+     - [~block:true] wraps the message in an [hov2] to automatically cut lines
+          and add indentation.
+  *)
+  val pp : all_fields:bool -> block:bool -> Format.formatter -> t -> unit
 
   val encoding : t Data_encoding.t
 
-  (** Return the preferred {!level} for a given event instance. *)
+  (** Return the preferred {!type-level} for a given event instance. *)
   val level : level
 end
 

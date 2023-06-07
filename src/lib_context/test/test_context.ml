@@ -26,11 +26,35 @@
 (* Testing
    -------
    Component:    Context
-   Invocation:   dune build @src/lib_context/runtest
+   Invocation:   dune exec src/lib_context/test/main.exe \
+                  -- --file test_context.ml
    Subject:      On context features.
 *)
 
-module Assert_lib = Lib_test_extra.Assert_lib
+(** Module concerning assertions about raw trees i.e. values of type
+    [[< `Tree of 'a Tezos_base.TzPervasives.String.Map.t | `Value of bytes] as 'a] *)
+module Raw_Tree = struct
+  (** [equal loc msg rt0 rt1] checks that the raw tree [rt0] and [rt1] are equal.
+      Will fail with the message [msg] displaying the location [loc] otherwise *)
+  let equal ?loc ?msg r1 r2 =
+    let rec aux r1 r2 =
+      match (r1, r2) with
+      | `Value v1, `Value v2 ->
+          Assert.Bytes.equal ?loc ?msg v1 v2 ;
+          true
+      | `Tree t1, `Tree t2 ->
+          if not (Tezos_base.TzPervasives.String.Map.equal aux t1 t2) then
+            Assert.String.fail "<tree>" "<tree>" ?msg ?loc
+          else true
+      | `Tree _, `Value v ->
+          Assert.String.fail ?loc ?msg "<tree>" (Bytes.to_string v)
+      | `Value v, `Tree _ ->
+          Assert.String.fail ?loc ?msg (Bytes.to_string v) "<tree>"
+    in
+    let _b : bool = aux r1 r2 in
+    ()
+end
+
 module Assert = Assert
 
 let equal_context_hash ?loc ?msg l1 l2 =
@@ -119,16 +143,10 @@ struct
     block3b : Context_hash.t;
   }
 
-  type init_config = {indexing_strategy : [`Always | `Minimal]}
-
-  let wrap_context_init config f _ () =
+  let wrap_context_init f _ () =
     Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir ->
         let root = base_dir // "context" in
-        let* idx =
-          match config with
-          | None -> Context.init root
-          | Some {indexing_strategy} -> Context.init ~indexing_strategy root
-        in
+        let* idx = Context.init root in
         let*!! genesis =
           Context.commit_genesis
             idx
@@ -466,7 +484,7 @@ struct
         let c = String.Map.add "bar" (`Tree b) a in
         let d = String.Map.singleton "foo" (`Tree c) in
         let e = `Tree d in
-        Assert_lib.Raw_Tree.equal ~loc:__LOC__ e raw ;
+        Raw_Tree.equal ~loc:__LOC__ e raw ;
         Lwt.return ()
 
   let string n = String.make n 'a'
@@ -649,10 +667,8 @@ struct
 
   (******************************************************************************)
 
-  let tests : (string * (t -> unit Lwt.t) * init_config option) list =
-    let test ?config name f =
-      (Printf.sprintf "%s:%s" Tag.tag name, f, config)
-    in
+  let tests : (string * (t -> unit Lwt.t)) list =
+    let test name f = (Printf.sprintf "%s:%s" Tag.tag name, f) in
     [
       test "is_empty" test_is_empty;
       test "simple" test_simple;
@@ -677,8 +693,7 @@ struct
 
   let tests =
     List.map
-      (fun (s, f, config) ->
-        Alcotest_lwt.test_case s `Quick (wrap_context_init config f))
+      (fun (s, f) -> Alcotest_lwt.test_case s `Quick (wrap_context_init f))
       tests
 end
 
@@ -702,4 +717,9 @@ module Generic_memory =
     end)
     (Tezos_context_memory.Context)
 
-let tests = List.concat [Generic_disk.tests; Generic_memory.tests]
+let () =
+  Lwt_main.run
+    (Alcotest_lwt.run
+       ~__FILE__
+       "tezos-context"
+       [("context", List.concat [Generic_disk.tests; Generic_memory.tests])])

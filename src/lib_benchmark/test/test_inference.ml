@@ -57,13 +57,15 @@ module T () = struct
   (* ----------------------------------------------------------------------- *)
   (* Define the model we're going to use to fit *)
 
-  let fv_const = Free_variable.of_string "const"
+  let fv_const = Free_variable.of_string "test/const"
 
-  let fv_quad = Free_variable.of_string "quadratic_term"
+  let fv_quad = Free_variable.of_string "test/quadratic_term"
 
   let quadratic_affine =
     let open Model in
     let module M = struct
+      let name = Namespace.(make root "test") "quadratic_affine"
+
       type arg_type = int * unit
 
       module Def (X : Costlang.S) = struct
@@ -116,3 +118,7 @@ let test () =
   30.0 < T.const && T.const < 36.0 && T.quadratic_term =~ 0.042
 
 let tests = [Test.tztest_assert "regression" `Quick @@ test]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "tezos-benchmark" [("inference", tests)]
+  |> Lwt_main.run

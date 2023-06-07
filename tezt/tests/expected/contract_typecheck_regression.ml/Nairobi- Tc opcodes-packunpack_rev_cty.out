@@ -1,0 +1,611 @@
+
+./octez-client --protocol PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/opcodes/packunpack_rev_cty.tz --details
+Well typed
+Gas remaining: 1039875.178 units remaining
+{ parameter
+    (pair key
+          unit
+          signature
+          (option signature)
+          (list unit)
+          (set bool)
+          (pair int int)
+          (or key_hash timestamp)
+          (map int string)
+          (lambda string bytes)) ;
+  storage unit ;
+  code { CAR
+         /* [ pair key
+                 unit
+                 signature
+                 (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         DUP
+         /* [ pair key
+                 unit
+                 signature
+                 (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes)
+            : pair key
+                 unit
+                 signature
+                 (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         CAR
+         /* [ key
+            : pair key
+                 unit
+                 signature
+                 (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         DIP { UNPAIR
+               /* [ key
+                  : pair unit
+                       signature
+                       (option signature)
+                       (list unit)
+                       (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ }
+         /* [ key : key
+            : pair unit
+                 signature
+                 (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         PACK
+         /* [ bytes : key
+            : pair unit
+                 signature
+                 (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         DIP { PACK
+               /* [ bytes
+                  : pair unit
+                       signature
+                       (option signature)
+                       (list unit)
+                       (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ ;
+               UNPACK
+                 key
+               /* [ option key
+                  : pair unit
+                       signature
+                       (option signature)
+                       (list unit)
+                       (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ ;
+               ASSERT_SOME ;
+               PACK
+               /* [ bytes
+                  : pair unit
+                       signature
+                       (option signature)
+                       (list unit)
+                       (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ }
+         /* [ bytes : bytes
+            : pair unit
+                 signature
+                 (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         ASSERT_CMPEQ ;
+         DUP
+         /* [ pair unit
+                 signature
+                 (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes)
+            : pair unit
+                 signature
+                 (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         CAR
+         /* [ unit
+            : pair unit
+                 signature
+                 (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         DIP { UNPAIR
+               /* [ unit
+                  : pair signature
+                       (option signature)
+                       (list unit)
+                       (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ }
+         /* [ unit : unit
+            : pair signature
+                 (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         PACK
+         /* [ bytes : unit
+            : pair signature
+                 (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         DIP { PACK
+               /* [ bytes
+                  : pair signature
+                       (option signature)
+                       (list unit)
+                       (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ ;
+               UNPACK
+                 unit
+               /* [ option unit
+                  : pair signature
+                       (option signature)
+                       (list unit)
+                       (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ ;
+               ASSERT_SOME ;
+               PACK
+               /* [ bytes
+                  : pair signature
+                       (option signature)
+                       (list unit)
+                       (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ }
+         /* [ bytes : bytes
+            : pair signature
+                 (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         ASSERT_CMPEQ ;
+         DUP
+         /* [ pair signature
+                 (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes)
+            : pair signature
+                 (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         CAR
+         /* [ signature
+            : pair signature
+                 (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         DIP { UNPAIR
+               /* [ signature
+                  : pair (option signature)
+                       (list unit)
+                       (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ }
+         /* [ signature : signature
+            : pair (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         PACK
+         /* [ bytes : signature
+            : pair (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         DIP { PACK
+               /* [ bytes
+                  : pair (option signature)
+                       (list unit)
+                       (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ ;
+               UNPACK
+                 signature
+               /* [ option signature
+                  : pair (option signature)
+                       (list unit)
+                       (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ ;
+               ASSERT_SOME ;
+               PACK
+               /* [ bytes
+                  : pair (option signature)
+                       (list unit)
+                       (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ }
+         /* [ bytes : bytes
+            : pair (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         ASSERT_CMPEQ ;
+         DUP
+         /* [ pair (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes)
+            : pair (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         CAR
+         /* [ option signature
+            : pair (option signature)
+                 (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         DIP { UNPAIR
+               /* [ option signature
+                  : pair (list unit)
+                       (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ }
+         /* [ option signature : option signature
+            : pair (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         PACK
+         /* [ bytes : option signature
+            : pair (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         DIP { PACK
+               /* [ bytes
+                  : pair (list unit)
+                       (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ ;
+               UNPACK
+                 (option signature)
+               /* [ option (option signature)
+                  : pair (list unit)
+                       (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ ;
+               ASSERT_SOME ;
+               PACK
+               /* [ bytes
+                  : pair (list unit)
+                       (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ }
+         /* [ bytes : bytes
+            : pair (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         ASSERT_CMPEQ ;
+         DUP
+         /* [ pair (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes)
+            : pair (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         CAR
+         /* [ list unit
+            : pair (list unit)
+                 (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         DIP { UNPAIR
+               /* [ list unit
+                  : pair (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ }
+         /* [ list unit : list unit
+            : pair (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         PACK
+         /* [ bytes : list unit
+            : pair (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         DIP { PACK
+               /* [ bytes
+                  : pair (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ ;
+               UNPACK
+                 (list unit)
+               /* [ option (list unit)
+                  : pair (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ ;
+               ASSERT_SOME ;
+               PACK
+               /* [ bytes
+                  : pair (set bool)
+                       (pair int int)
+                       (or key_hash timestamp)
+                       (map int string)
+                       (lambda string bytes) ] */ }
+         /* [ bytes : bytes
+            : pair (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         ASSERT_CMPEQ ;
+         DUP
+         /* [ pair (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes)
+            : pair (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         CAR
+         /* [ set bool
+            : pair (set bool)
+                 (pair int int)
+                 (or key_hash timestamp)
+                 (map int string)
+                 (lambda string bytes) ] */ ;
+         DIP { UNPAIR
+               /* [ set bool
+                  : pair (pair int int) (or key_hash timestamp) (map int string) (lambda string bytes) ] */ }
+         /* [ set bool : set bool
+            : pair (pair int int) (or key_hash timestamp) (map int string) (lambda string bytes) ] */ ;
+         PACK
+         /* [ bytes : set bool
+            : pair (pair int int) (or key_hash timestamp) (map int string) (lambda string bytes) ] */ ;
+         DIP { PACK
+               /* [ bytes
+                  : pair (pair int int) (or key_hash timestamp) (map int string) (lambda string bytes) ] */ ;
+               UNPACK
+                 (set bool)
+               /* [ option (set bool)
+                  : pair (pair int int) (or key_hash timestamp) (map int string) (lambda string bytes) ] */ ;
+               ASSERT_SOME ;
+               PACK
+               /* [ bytes
+                  : pair (pair int int) (or key_hash timestamp) (map int string) (lambda string bytes) ] */ }
+         /* [ bytes : bytes
+            : pair (pair int int) (or key_hash timestamp) (map int string) (lambda string bytes) ] */ ;
+         ASSERT_CMPEQ ;
+         DUP
+         /* [ pair (pair int int) (or key_hash timestamp) (map int string) (lambda string bytes)
+            : pair (pair int int) (or key_hash timestamp) (map int string) (lambda string bytes) ] */ ;
+         CAR
+         /* [ pair int int
+            : pair (pair int int) (or key_hash timestamp) (map int string) (lambda string bytes) ] */ ;
+         DIP { UNPAIR
+               /* [ pair int int
+                  : pair (or key_hash timestamp) (map int string) (lambda string bytes) ] */ }
+         /* [ pair int int : pair int int
+            : pair (or key_hash timestamp) (map int string) (lambda string bytes) ] */ ;
+         PACK
+         /* [ bytes : pair int int
+            : pair (or key_hash timestamp) (map int string) (lambda string bytes) ] */ ;
+         DIP { PACK
+               /* [ bytes
+                  : pair (or key_hash timestamp) (map int string) (lambda string bytes) ] */ ;
+               UNPACK
+                 (pair int int)
+               /* [ option (pair int int)
+                  : pair (or key_hash timestamp) (map int string) (lambda string bytes) ] */ ;
+               ASSERT_SOME ;
+               PACK
+               /* [ bytes
+                  : pair (or key_hash timestamp) (map int string) (lambda string bytes) ] */ }
+         /* [ bytes : bytes
+            : pair (or key_hash timestamp) (map int string) (lambda string bytes) ] */ ;
+         ASSERT_CMPEQ ;
+         DUP
+         /* [ pair (or key_hash timestamp) (map int string) (lambda string bytes)
+            : pair (or key_hash timestamp) (map int string) (lambda string bytes) ] */ ;
+         CAR
+         /* [ or key_hash timestamp
+            : pair (or key_hash timestamp) (map int string) (lambda string bytes) ] */ ;
+         DIP { UNPAIR
+               /* [ or key_hash timestamp : pair (map int string) (lambda string bytes) ] */ }
+         /* [ or key_hash timestamp : or key_hash timestamp
+            : pair (map int string) (lambda string bytes) ] */ ;
+         PACK
+         /* [ bytes : or key_hash timestamp
+            : pair (map int string) (lambda string bytes) ] */ ;
+         DIP { PACK
+               /* [ bytes : pair (map int string) (lambda string bytes) ] */ ;
+               UNPACK
+                 (or key_hash timestamp)
+               /* [ option (or key_hash timestamp)
+                  : pair (map int string) (lambda string bytes) ] */ ;
+               ASSERT_SOME ;
+               PACK
+               /* [ bytes : pair (map int string) (lambda string bytes) ] */ }
+         /* [ bytes : bytes : pair (map int string) (lambda string bytes) ] */ ;
+         ASSERT_CMPEQ ;
+         DUP
+         /* [ pair (map int string) (lambda string bytes)
+            : pair (map int string) (lambda string bytes) ] */ ;
+         CAR
+         /* [ map int string : pair (map int string) (lambda string bytes) ] */ ;
+         DIP { UNPAIR /* [ map int string : lambda string bytes ] */ }
+         /* [ map int string : map int string : lambda string bytes ] */ ;
+         PACK
+         /* [ bytes : map int string : lambda string bytes ] */ ;
+         DIP { PACK
+               /* [ bytes : lambda string bytes ] */ ;
+               UNPACK (map int string)
+               /* [ option (map int string) : lambda string bytes ] */ ;
+               ASSERT_SOME ;
+               PACK
+               /* [ bytes : lambda string bytes ] */ }
+         /* [ bytes : bytes : lambda string bytes ] */ ;
+         ASSERT_CMPEQ ;
+         DUP
+         /* [ lambda string bytes : lambda string bytes ] */ ;
+         PACK
+         /* [ bytes : lambda string bytes ] */ ;
+         DIP { PACK
+               /* [ bytes ] */ ;
+               UNPACK (lambda string bytes)
+               /* [ option (lambda string bytes) ] */ ;
+               ASSERT_SOME ;
+               PACK
+               /* [ bytes ] */ }
+         /* [ bytes : bytes ] */ ;
+         ASSERT_CMPEQ ;
+         UNIT
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

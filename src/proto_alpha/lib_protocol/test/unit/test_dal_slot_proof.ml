@@ -27,7 +27,7 @@
     -------
     Component:  Protocol (dal slot proof)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "^\[Unit\] dal slot proof$"
+                  -- --file test_dal_slot_proof.ml
     Subject:    These unit tests check proof-related functions of Dal slots.
 *)
 
@@ -47,6 +47,7 @@ struct
     include Parameters
 
     let cryptobox =
+      Lazy.from_fun @@ fun () ->
       WithExceptions.Result.get_ok ~loc:__LOC__
       @@ Dal_helpers.mk_cryptobox Parameters.dal_parameters.cryptobox_parameters
   end)
@@ -438,3 +439,7 @@ let tests =
     let dal_parameters = constants_test.dal
   end) in
   Test.tests
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("dal slot proof", tests)]
+  |> Lwt_main.run

@@ -34,8 +34,6 @@ let compare_address {destination = destination1; entrypoint = entrypoint1}
   if Compare.Int.(lres = 0) then Entrypoint.compare entrypoint1 entrypoint2
   else lres
 
-let compare_tx_rollup_l2_address = Tx_rollup_l2_address.Indexable.compare_values
-
 type compare_comparable_cont =
   | Compare_comparable :
       'a comparable_ty * 'a * 'a * compare_comparable_cont
@@ -60,8 +58,6 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
     | Nat_t, x, y -> (apply [@tailcall]) (Script_int.compare x y) k
     | Timestamp_t, x, y -> (apply [@tailcall]) (Script_timestamp.compare x y) k
     | Address_t, x, y -> (apply [@tailcall]) (compare_address x y) k
-    | Tx_rollup_l2_address_t, x, y ->
-        (apply [@tailcall]) (compare_tx_rollup_l2_address x y) k
     | Bytes_t, x, y -> (apply [@tailcall]) (Compare.Bytes.compare x y) k
     | Chain_id_t, x, y -> (apply [@tailcall]) (Script_chain_id.compare x y) k
     | Pair_t (tl, tr, _, YesYes), (lx, rx), (ly, ry) ->
@@ -70,11 +66,11 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
           (Compare_comparable (tr, rx, ry, k))
           lx
           ly
-    | Union_t (tl, _, _, YesYes), L x, L y ->
+    | Or_t (tl, _, _, YesYes), L x, L y ->
         (compare_comparable [@tailcall]) tl k x y
-    | Union_t _, L _, R _ -> -1
-    | Union_t _, R _, L _ -> 1
-    | Union_t (_, tr, _, YesYes), R x, R y ->
+    | Or_t _, L _, R _ -> -1
+    | Or_t _, R _, L _ -> 1
+    | Or_t (_, tr, _, YesYes), R x, R y ->
         (compare_comparable [@tailcall]) tr k x y
     | Option_t _, None, None -> (apply [@tailcall]) 0 k
     | Option_t _, None, Some _ -> -1

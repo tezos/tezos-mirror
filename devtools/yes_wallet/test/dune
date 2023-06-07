@@ -9,14 +9,9 @@
   zarith
   zarith_stubs_js
   data-encoding
-  alcotest
-  alcotest-lwt
   lwt.unix
-  qcheck-alcotest
-  tezos-test-helpers
   ptime)
  (flags
   (:standard)
   -open Tezos_error_monad.TzLwtreslib
-  -open Data_encoding
-  -open Tezos_test_helpers))
+  -open Data_encoding))

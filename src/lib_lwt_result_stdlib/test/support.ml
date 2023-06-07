@@ -23,5 +23,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Test_trace = Traces.Full
+module Test_trace = Traces.Unit
 module Lib = Traced_structs.Structs.Make (Test_trace)

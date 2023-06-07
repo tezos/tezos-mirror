@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Migration (patched scripts)
-    Invocation:   cd src/proto_alpha/lib_protocol/test/integration/michelson
-                  dune exec ./main.exe -- test "^patched contracts$"
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_patched_contracts.ml
     Subject:      Migration
 *)
 
@@ -72,25 +72,26 @@ let script_hash_testable =
     included in the migration; and that the diff is correct. *)
 module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
   LEGACY_PATCH_TESTS with type t = Patches.t = struct
-  open Lwt_result_syntax
-
   type t = Patches.t
 
   let readable_micheline m =
     let open Micheline in
     map_node (fun _ -> ()) Michelson_v1_primitives.string_of_prim (root m)
 
+  let path = project_root // Filename.dirname __FILE__
+
   let contract_path ?(ext = "patched.tz") hash =
     Filename.concat "patched_contracts"
     @@ Format.asprintf "%a.%s" Script_expr_hash.pp hash ext
 
   let read_file ?ext hash =
-    let filename = contract_path ?ext hash in
+    let filename = path // contract_path ?ext hash in
     Lwt_io.(with_file ~mode:Input filename read)
 
   (* Test that the hashes of the scripts in ./patched_contract/<hash>.original.tz
      match hashes of the contracts being updated by the migration. *)
   let test_original_contract legacy_script_hash () =
+    let open Lwt_result_syntax in
     let*! code = read_file ~ext:"original.tz" legacy_script_hash in
     let michelson = Michelson_v1_parser.parse_toplevel ~check:true code in
     let*? prog = Micheline_parser.no_parsing_error michelson in
@@ -110,6 +111,7 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
      migration correspond to the content of the `./patched_contracts/<hash>.tz`
      files *)
   let test_patched_contract patch () =
+    let open Lwt_result_syntax in
     let*! expected_michelson = read_file @@ Patches.script_hash patch in
     let*? program =
       Micheline_parser.no_parsing_error
@@ -137,6 +139,7 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
      are the results of the `diff` command on the corresponding
      original and patched files *)
   let verify_diff legacy_script_hash () =
+    let open Lwt_result_syntax in
     let*! expected_diff = read_file ~ext:"diff" legacy_script_hash in
     let original_code = contract_path ~ext:"original.tz" legacy_script_hash in
     (* The other test asserts that this is indeed the patched code. *)
@@ -154,11 +157,12 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
           current_code;
         |] )
     in
-    let*! actual_diff = Lwt_process.pread diff_cmd in
+    let*! actual_diff = Lwt_process.pread ~cwd:path diff_cmd in
     Alcotest.(check string) "same diff" expected_diff actual_diff ;
     return ()
 
   let typecheck_patched_script code () =
+    let open Lwt_result_syntax in
     (* Number 3 below controls how many accounts should be
        created. This number shouldn't be too small or the context
        won't have enough at least [minimal_stake] tokens. *)
@@ -212,3 +216,7 @@ let tests =
       let module Test = Legacy_patch_test (Patches) in
       List.concat_map Test.tests Patches.patches)
     test_modules
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("patched contracts", tests)]
+  |> Lwt_main.run

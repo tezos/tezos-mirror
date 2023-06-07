@@ -68,14 +68,6 @@ let node_is_ready =
     ~level:Notice
     ()
 
-let dac_is_ready =
-  declare_0
-    ~section
-    ~name:"dac_is_ready"
-    ~msg:"The Data Availability Committee is ready"
-    ~level:Notice
-    ()
-
 let data_dir_not_found =
   declare_1
     ~section
@@ -85,15 +77,6 @@ let data_dir_not_found =
        init-config --data-dir={path} "
     ~level:Error
     ("path", Data_encoding.(string))
-
-let stored_slot_shards =
-  declare_2
-    ~section
-    ~name:"stored_slot_shards"
-    ~msg:"Slot stored: commitment {commitment}, shards {shards}"
-    ~level:Notice
-    ("commitment", Data_encoding.string)
-    ("shards", Data_encoding.int31)
 
 let fetched_slot =
   declare_2
@@ -122,12 +105,11 @@ let layer1_node_tracking_started =
     ()
 
 let protocol_plugin_resolved =
-  declare_2
+  declare_1
     ~section
     ~name:"dal_node_plugin_resolved"
-    ~msg:"Resolved plugin for {plugin_name} on protocol {proto_hash}"
+    ~msg:"Resolved plugin on protocol {proto_hash}"
     ~level:Notice
-    ("plugin_name", Data_encoding.string)
     ("proto_hash", Data_encoding.string)
 
 let daemon_error =
@@ -139,40 +121,8 @@ let daemon_error =
     ~pp1:Error_monad.pp_print_trace
     ("error", Error_monad.trace_encoding)
 
-let dac_threshold_not_reached =
-  declare_2
-    ~section
-    ~name:"dac_threshold_not_reached"
-    ~msg:
-      "Only {provided} out of {required} dac accounts are available for \
-       signing messages"
-    ~level:Warning
-    ("provided", Data_encoding.int31)
-    ("required", Data_encoding.int31)
-
-let dac_account_not_available =
-  declare_1
-    ~section
-    ~name:"dac_account_not_available"
-    ~msg:
-      "There is no account with public key {tz4_account} in the Tezos client \
-       wallet. This account won't be used for signing DAC root hash pages."
-    ~level:Warning
-    ("tz4_account", Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
-
-let dac_account_cannot_sign =
-  declare_1
-    ~section
-    ~name:"dac_account_cannot_sign"
-    ~msg:
-      "There is an account with public key {tz4_account} in the Tezos client \
-       wallet, but its secret key URI is not available. This account won't be \
-       used for signing DAC root hash pages."
-    ~level:Warning
-    ("tz4_account", Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
-
 let proto_short_hash_string hash =
   Format.asprintf "%a" Protocol_hash.pp_short hash
 
-let emit_protocol_plugin_resolved ~plugin_name hash =
-  emit protocol_plugin_resolved (plugin_name, proto_short_hash_string hash)
+let emit_protocol_plugin_resolved hash =
+  emit protocol_plugin_resolved @@ proto_short_hash_string hash

@@ -46,6 +46,8 @@ type argument =
   | Sync_latency of int
   | Connections of int
   | Private_mode
+  | Disable_p2p_maintenance
+  | Disable_p2p_swap
   | Peer of string
   | No_bootstrap_peers
   | Disable_operations_precheck
@@ -54,6 +56,7 @@ type argument =
   | Metrics_addr of string
   | Cors_origin of string
   | Disable_mempool
+  | Version
 
 let make_argument = function
   | Network x -> ["--network"; x]
@@ -72,6 +75,8 @@ let make_argument = function
   | Sync_latency x -> ["--sync-latency"; string_of_int x]
   | Connections x -> ["--connections"; string_of_int x]
   | Private_mode -> ["--private-mode"]
+  | Disable_p2p_maintenance -> ["--disable-p2p-maintenance"]
+  | Disable_p2p_swap -> ["--disable-p2p-swap"]
   | Peer x -> ["--peer"; x]
   | No_bootstrap_peers -> ["--no-bootstrap-peers"]
   | Disable_operations_precheck -> ["--disable-mempool-precheck"]
@@ -81,6 +86,7 @@ let make_argument = function
   | Metrics_addr metrics_addr -> ["--metrics-addr"; metrics_addr]
   | Cors_origin cors_origin -> ["--cors-origin"; cors_origin]
   | Disable_mempool -> ["--disable-mempool"]
+  | Version -> ["--version"]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
@@ -97,10 +103,13 @@ let is_redundant = function
   | Sync_latency _, Sync_latency _
   | Connections _, Connections _
   | Private_mode, Private_mode
+  | Disable_p2p_maintenance, Disable_p2p_maintenance
+  | Disable_p2p_swap, Disable_p2p_swap
   | No_bootstrap_peers, No_bootstrap_peers
   | Disable_operations_precheck, Disable_operations_precheck
   | Media_type _, Media_type _
-  | Metadata_size_limit _, Metadata_size_limit _ ->
+  | Metadata_size_limit _, Metadata_size_limit _
+  | Version, Version ->
       true
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
   | Peer peer1, Peer peer2 -> peer1 = peer2
@@ -113,6 +122,8 @@ let is_redundant = function
   | Sync_latency _, _
   | Connections _, _
   | Private_mode, _
+  | Disable_p2p_maintenance, _
+  | Disable_p2p_swap, _
   | No_bootstrap_peers, _
   | Disable_operations_precheck, _
   | Media_type _, _
@@ -120,7 +131,8 @@ let is_redundant = function
   | Peer _, _
   | Metrics_addr _, _
   | Cors_origin _, _
-  | Disable_mempool, _ ->
+  | Disable_mempool, _
+  | Version, _ ->
       false
 
 type 'a known = Unknown | Known of 'a
@@ -451,6 +463,14 @@ let snapshot_export ?history_mode ?export_level ?export_format node file =
   spawn_snapshot_export ?history_mode ?export_level ?export_format node file
   |> Process.check
 
+let spawn_snapshot_info ?(json = false) node file =
+  spawn_command
+    node
+    (["snapshot"; "info"] @ (if json then ["--json"] else []) @ [file])
+
+let snapshot_info ?json node file =
+  spawn_snapshot_info ?json node file |> Process.check
+
 let spawn_snapshot_import ?(reconstruct = false) node file =
   spawn_command
     node
@@ -536,6 +556,10 @@ let handle_event node {name; value; timestamp = _} =
               fname
       | None ->
           Log.error "Protocol compilation failed but cannot read the payload")
+  | "set_head.v0" -> (
+      match JSON.(value |> geti 1 |> as_int_opt) with
+      | None -> ()
+      | Some level -> update_level node level)
   | _ -> ()
 
 let check_event ?where node name promise =
@@ -587,7 +611,8 @@ let wait_for_identity node =
 let wait_for_request ~request node =
   let event_name =
     match request with
-    | `Flush | `Inject -> "request_completed_notice.v0"
+    | `Inject -> "request_completed_info.v0"
+    | `Flush -> "request_completed_info.v0"
     | `Notify | `Arrived -> "request_completed_debug.v0"
   in
   let request_str =
@@ -603,6 +628,30 @@ let wait_for_request ~request node =
     | Some _ | None -> None
   in
   wait_for node event_name filter
+
+let wait_for_connections node connections =
+  let counter = ref 0 in
+  let waiter, resolver = Lwt.task () in
+  on_event node (fun {name; _} ->
+      match name with
+      | "connection.v0" ->
+          incr counter ;
+          if !counter = connections then Lwt.wakeup resolver ()
+      | _ -> ()) ;
+  let* () = wait_for_ready node in
+  waiter
+
+let wait_for_disconnections node disconnections =
+  let counter = ref 0 in
+  let waiter, resolver = Lwt.task () in
+  on_event node (fun {name; _} ->
+      match name with
+      | "disconnection.v0" ->
+          incr counter ;
+          if !counter = disconnections then Lwt.wakeup resolver ()
+      | _ -> ()) ;
+  let* () = wait_for_ready node in
+  waiter
 
 let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
     ?event_pipe ?net_port ?advertised_net_port ?(rpc_host = "localhost")
@@ -661,20 +710,21 @@ let add_peer node peer =
   in
   add_argument node (Peer (address ^ string_of_int (net_port peer)))
 
-let point_and_id ?from node =
-  let from =
-    match from with None -> None | Some peer -> peer.persistent_state.runner
-  in
-  let address = Runner.address ?from node.persistent_state.runner ^ ":" in
-  let* id = wait_for_identity node in
-  Lwt.return (address ^ string_of_int (net_port node) ^ "#" ^ id)
-
 let point ?from node =
   let from =
     match from with None -> None | Some peer -> peer.persistent_state.runner
   in
   let address = Runner.address ?from node.persistent_state.runner in
   (address, net_port node)
+
+let point_str ?from node =
+  let addr, port = point ?from node in
+  addr ^ ":" ^ Int.to_string port
+
+let point_and_id ?from node =
+  let point = point_str ?from node in
+  let* id = wait_for_identity node in
+  Lwt.return (point ^ "#" ^ id)
 
 let add_peer_with_id node peer =
   let* peer = point_and_id ~from:node peer in
@@ -685,6 +735,11 @@ let get_peers node =
   List.filter_map
     (fun arg -> match arg with Peer s -> Some s | _ -> None)
     node.persistent_state.arguments
+
+let remove_peers_json_file node =
+  let filename = sf "%s/peers.json" (data_dir node) in
+  Log.info "Removing file %s" filename ;
+  Sys.remove filename
 
 (** [runlike_command_arguments node command arguments]
     evaluates in a list of strings containing all command
@@ -757,7 +812,13 @@ let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level
     arguments
     ~on_terminate
 
-let run ?on_terminate ?event_level ?event_sections_levels node arguments =
+let run ?patch_config ?on_terminate ?event_level ?event_sections_levels node
+    arguments =
+  let () =
+    match patch_config with
+    | None -> ()
+    | Some patch -> Config_file.update node patch
+  in
   let arguments = runlike_command_arguments node "run" arguments in
   do_runlike_command
     ?on_terminate
@@ -782,6 +843,12 @@ let replay ?on_terminate ?event_level ?event_sections_levels ?(strict = false)
 let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
     ?advertised_net_port ?rpc_host ?rpc_port ?rpc_tls ?event_level
     ?event_sections_levels ?patch_config ?snapshot arguments =
+  (* The single process argument does not exist in the configuration
+     file of the node. It is only known as a command-line option. As a
+     consequence, we filter Singleprocess from the list of arguments
+     passed to create, and we readd it if necessary when calling
+     run. *)
+  let single_process = List.mem Singleprocess arguments in
   let node =
     create
       ?runner
@@ -795,21 +862,19 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
       ?rpc_host
       ?rpc_port
       ?rpc_tls
-      arguments
+      (List.filter (fun x -> x <> Singleprocess) arguments)
   in
   let* () = identity_generate node in
   let* () = config_init node [] in
-  let () =
-    match patch_config with
-    | None -> ()
-    | Some patch -> Config_file.update node patch
-  in
   let* () =
     match snapshot with
     | Some (file, reconstruct) -> snapshot_import ~reconstruct node file
     | None -> unit
   in
-  let* () = run ?event_level ?event_sections_levels node [] in
+  let argument = if single_process then [Singleprocess] else [] in
+  let* () =
+    run ?patch_config ?event_level ?event_sections_levels node argument
+  in
   let* () = wait_for_ready node in
   return node
 
@@ -840,3 +905,10 @@ let upgrade_storage node =
     node
     ["upgrade"; "storage"; "--data-dir"; node.persistent_state.data_dir]
   |> Process.check
+
+let get_version node =
+  let version_flag = make_argument Version in
+  let* output =
+    spawn_command node version_flag |> Process.check_and_read_stdout
+  in
+  return @@ String.trim output

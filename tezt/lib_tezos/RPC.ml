@@ -55,9 +55,11 @@ let get_config = make GET ["config"] Fun.id
 let get_network_connections =
   make GET ["network"; "connections"] @@ fun json ->
   let decode_connection json =
-    let id_point = JSON.(json |-> "id_point") in
-    ( JSON.(id_point |-> "addr" |> as_string),
-      JSON.(id_point |-> "port" |> as_int) )
+    let open JSON in
+    let id_point = json |-> "id_point" in
+    ( id_point |-> "addr" |> as_string,
+      id_point |-> "port" |> as_int,
+      json |-> "peer_id" |> as_string )
   in
   List.map decode_connection (JSON.as_list json)
 
@@ -211,6 +213,13 @@ let get_network_points =
 
 let get_network_point point_id = make GET ["network"; "points"; point_id] Fun.id
 
+let patch_network_point point_id data =
+  make
+    PATCH
+    ["network"; "points"; point_id]
+    ~data:(Data (JSON.unannotate data))
+    ignore
+
 let get_network_point_ban point_id =
   make GET ["network"; "points"; point_id; "ban"] Fun.id
 
@@ -231,6 +240,9 @@ let get_network_stat = make GET ["network"; "stat"] Fun.id
 let get_network_version = make GET ["network"; "version"] Fun.id
 
 let get_network_versions = make GET ["network"; "versions"] Fun.id
+
+let put_network_points point =
+  make PUT ["network"; "points"; point] ~data:(Data (`O [])) Fun.id
 
 let get_version = make GET ["version"] Fun.id
 
@@ -486,6 +498,14 @@ let post_chain_block_helpers_forge_operations ?(chain = "main")
     ["chains"; chain; "blocks"; block; "helpers"; "forge"; "operations"]
     Fun.id
 
+let post_chain_block_helpers_forge_block_header ?(chain = "main")
+    ?(block = "head") ~data () =
+  make
+    ~data
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "forge_block_header"]
+    Fun.id
+
 let post_chain_block_helpers_scripts_simulate_operation ?(chain = "main")
     ?(block = "head") ~data () =
   make
@@ -616,6 +636,15 @@ let get_chain_block_helper_current_level ?(chain = "main") ?(block = "head")
   let cycle_position = JSON.(json |-> "cycle_position" |> as_int) in
   let expected_commitment = JSON.(json |-> "expected_commitment" |> as_bool) in
   {level; level_position; cycle; cycle_position; expected_commitment}
+
+let get_chain_block_helper_attestation_rights ?(chain = "main")
+    ?(block = "head") ?delegate () =
+  let query_string = Query_arg.opt "delegate" Fun.id delegate in
+  make
+    ~query_string
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "attestation_rights"]
+    Fun.id
 
 let get_chain_block_helper_endorsing_rights ?(chain = "main") ?(block = "head")
     ?delegate () =

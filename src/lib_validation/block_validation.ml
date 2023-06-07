@@ -85,6 +85,12 @@ let validation_store_encoding =
 
 type operation_metadata = Metadata of Bytes.t | Too_large_metadata
 
+let operation_metadata_equal m1 m2 =
+  match (m1, m2) with
+  | Metadata b1, Metadata b2 -> Bytes.equal b1 b2
+  | Too_large_metadata, Too_large_metadata -> true
+  | Metadata _, Too_large_metadata | Too_large_metadata, Metadata _ -> false
+
 let operation_metadata_encoding =
   let open Data_encoding in
   def
@@ -464,7 +470,7 @@ module Make (Proto : Registered_protocol.T) = struct
     let should_include_metadata_hashes =
       match proto_env_version with
       | Protocol.V0 -> false
-      | Protocol.(V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9) -> true
+      | Protocol.(V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10) -> true
     in
     let block_metadata =
       let metadata =
@@ -942,7 +948,7 @@ module Make (Proto : Registered_protocol.T) = struct
       Protocol.(
         match Proto.environment_version with
         | V0 -> false
-        | V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 -> true)
+        | V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10 -> true)
       && not is_from_genesis
     in
     let* context =

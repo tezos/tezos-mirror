@@ -1,5 +1,5 @@
 {
-    "expected_env_version": 9,
+    "expected_env_version": 10,
     "hash": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
     "modules": [
         "Misc",
@@ -93,7 +93,7 @@
         "Tx_rollup_state_repr",
 
         "Dal_errors_repr",
-        "Dal_operations_repr",	
+        "Dal_operations_repr",
 
         "Zk_rollup_scalar",
         "Zk_rollup_repr",
@@ -139,7 +139,6 @@
         "Seed_storage",
         "Contract_manager_storage",
         "Delegate_activation_storage",
-        "Frozen_deposits_storage",
         "Sapling_storage",
         "Lazy_storage_diff",
         "Commitment_storage",
@@ -150,6 +149,7 @@
 
         "Contract_delegate_storage",
         "Stake_storage",
+        "Frozen_deposits_storage",
         "Contract_storage",
         "Token",
         "Fees_storage",
@@ -198,13 +198,6 @@
         "Script_timestamp",
         "Script_bytes",
 
-        "Tx_rollup_l2_storage_sig",
-        "Tx_rollup_l2_context_sig",
-        "Tx_rollup_l2_context",
-        "Tx_rollup_l2_batch",
-        "Tx_rollup_l2_apply",
-        "Tx_rollup_l2_verifier",
-
         "Local_gas_counter",
         "Script_tc_errors",
         "Gas_monad",
@@ -222,6 +215,7 @@
         "Michelson_v1_gas_costs_generated",
         "Michelson_v1_gas_costs",
         "Michelson_v1_gas",
+        "Operation_costs",
         "Script_tc_context",
         "Ticket_token",
         "Ticket_receipt",
@@ -240,7 +234,6 @@
         "Ticket_balance_key",
         "Ticket_lazy_storage_diff",
 
-        "Tx_rollup_parameters",
         "Zk_rollup_parameters",
 
         "Ticket_token_map",
@@ -269,7 +262,6 @@
         "Contract_services",
         "Delegate_services",
         "Voting_services",
-        "Tx_rollup_services",
         "Dal_services",
         "Alpha_services",
 

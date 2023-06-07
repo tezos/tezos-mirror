@@ -1,0 +1,261 @@
+
+./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/bytes_of_int_016.tz on storage Unit and input Unit --level 1 --trace-stack
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (just consumed gas: 118.175)
+    [ (Pair Unit Unit) ]
+  - location: 7 (just consumed gas: 0.010)
+    [  ]
+  - location: 8 (just consumed gas: 0.010)
+    [ 0 ]
+  - location: 11 (just consumed gas: 0.090)
+    [ 0x ]
+  - location: 12 (just consumed gas: 0.010)
+    [ 0x
+      0x ]
+  - location: 17 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 18 (just consumed gas: 0.010)
+    [ True ]
+  - location: 19 (just consumed gas: 0)
+    [  ]
+  - location: 19 (just consumed gas: 0.015)
+    [  ]
+  - location: 25 (just consumed gas: 0.010)
+    [ 1 ]
+  - location: 28 (just consumed gas: 0.093)
+    [ 0x01 ]
+  - location: 29 (just consumed gas: 0.010)
+    [ 0x01
+      0x01 ]
+  - location: 34 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 35 (just consumed gas: 0.010)
+    [ True ]
+  - location: 36 (just consumed gas: 0)
+    [  ]
+  - location: 36 (just consumed gas: 0.015)
+    [  ]
+  - location: 42 (just consumed gas: 0.010)
+    [ 1193046 ]
+  - location: 45 (just consumed gas: 0.099)
+    [ 0x123456 ]
+  - location: 46 (just consumed gas: 0.010)
+    [ 0x123456
+      0x123456 ]
+  - location: 51 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 52 (just consumed gas: 0.010)
+    [ True ]
+  - location: 53 (just consumed gas: 0)
+    [  ]
+  - location: 53 (just consumed gas: 0.015)
+    [  ]
+  - location: 59 (just consumed gas: 0.010)
+    [ 0x123456 ]
+  - location: 62 (just consumed gas: 0.027)
+    [ 1193046 ]
+  - location: 63 (just consumed gas: 0.010)
+    [ 1193046
+      1193046 ]
+  - location: 68 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 69 (just consumed gas: 0.010)
+    [ True ]
+  - location: 70 (just consumed gas: 0)
+    [  ]
+  - location: 70 (just consumed gas: 0.015)
+    [  ]
+  - location: 76 (just consumed gas: 0.010)
+    [ 0x0000123456 ]
+  - location: 79 (just consumed gas: 0.032)
+    [ 1193046 ]
+  - location: 80 (just consumed gas: 0.010)
+    [ 1193046
+      1193046 ]
+  - location: 85 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 86 (just consumed gas: 0.010)
+    [ True ]
+  - location: 87 (just consumed gas: 0)
+    [  ]
+  - location: 87 (just consumed gas: 0.015)
+    [  ]
+  - location: 93 (just consumed gas: 0.010)
+    [ 0x ]
+  - location: 96 (just consumed gas: 0.020)
+    [ 0 ]
+  - location: 97 (just consumed gas: 0.010)
+    [ 0
+      0 ]
+  - location: 102 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 103 (just consumed gas: 0.010)
+    [ True ]
+  - location: 104 (just consumed gas: 0)
+    [  ]
+  - location: 104 (just consumed gas: 0.015)
+    [  ]
+  - location: 110 (just consumed gas: 0.010)
+    [ 0x0000 ]
+  - location: 113 (just consumed gas: 0.025)
+    [ 0 ]
+  - location: 114 (just consumed gas: 0.010)
+    [ 0
+      0 ]
+  - location: 119 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 120 (just consumed gas: 0.010)
+    [ True ]
+  - location: 121 (just consumed gas: 0)
+    [  ]
+  - location: 121 (just consumed gas: 0.015)
+    [  ]
+  - location: 127 (just consumed gas: 0.010)
+    [ -128 ]
+  - location: 130 (just consumed gas: 0.093)
+    [ 0x80 ]
+  - location: 131 (just consumed gas: 0.010)
+    [ 0x80
+      0x80 ]
+  - location: 136 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 137 (just consumed gas: 0.010)
+    [ True ]
+  - location: 138 (just consumed gas: 0)
+    [  ]
+  - location: 138 (just consumed gas: 0.015)
+    [  ]
+  - location: 144 (just consumed gas: 0.010)
+    [ -129 ]
+  - location: 147 (just consumed gas: 0.093)
+    [ 0xff7f ]
+  - location: 148 (just consumed gas: 0.010)
+    [ 0xff7f
+      0xff7f ]
+  - location: 153 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 154 (just consumed gas: 0.010)
+    [ True ]
+  - location: 155 (just consumed gas: 0)
+    [  ]
+  - location: 155 (just consumed gas: 0.015)
+    [  ]
+  - location: 161 (just consumed gas: 0.010)
+    [ -33024 ]
+  - location: 164 (just consumed gas: 0.096)
+    [ 0xff7f00 ]
+  - location: 165 (just consumed gas: 0.010)
+    [ 0xff7f00
+      0xff7f00 ]
+  - location: 170 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 171 (just consumed gas: 0.010)
+    [ True ]
+  - location: 172 (just consumed gas: 0)
+    [  ]
+  - location: 172 (just consumed gas: 0.015)
+    [  ]
+  - location: 178 (just consumed gas: 0.010)
+    [ -4294967296 ]
+  - location: 181 (just consumed gas: 0.105)
+    [ 0xff00000000 ]
+  - location: 182 (just consumed gas: 0.010)
+    [ 0xff00000000
+      0xff00000000 ]
+  - location: 187 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 188 (just consumed gas: 0.010)
+    [ True ]
+  - location: 189 (just consumed gas: 0)
+    [  ]
+  - location: 189 (just consumed gas: 0.015)
+    [  ]
+  - location: 195 (just consumed gas: 0.010)
+    [ 0x80 ]
+  - location: 198 (just consumed gas: 0.022)
+    [ -128 ]
+  - location: 199 (just consumed gas: 0.010)
+    [ -128
+      -128 ]
+  - location: 204 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 205 (just consumed gas: 0.010)
+    [ True ]
+  - location: 206 (just consumed gas: 0)
+    [  ]
+  - location: 206 (just consumed gas: 0.015)
+    [  ]
+  - location: 212 (just consumed gas: 0.010)
+    [ 0xff7f ]
+  - location: 215 (just consumed gas: 0.025)
+    [ -129 ]
+  - location: 216 (just consumed gas: 0.010)
+    [ -129
+      -129 ]
+  - location: 221 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 222 (just consumed gas: 0.010)
+    [ True ]
+  - location: 223 (just consumed gas: 0)
+    [  ]
+  - location: 223 (just consumed gas: 0.015)
+    [  ]
+  - location: 229 (just consumed gas: 0.010)
+    [ 0xff7f00 ]
+  - location: 232 (just consumed gas: 0.027)
+    [ -33024 ]
+  - location: 233 (just consumed gas: 0.010)
+    [ -33024
+      -33024 ]
+  - location: 238 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 239 (just consumed gas: 0.010)
+    [ True ]
+  - location: 240 (just consumed gas: 0)
+    [  ]
+  - location: 240 (just consumed gas: 0.015)
+    [  ]
+  - location: 246 (just consumed gas: 0.010)
+    [ 0xffffff7f00 ]
+  - location: 249 (just consumed gas: 0.032)
+    [ -33024 ]
+  - location: 250 (just consumed gas: 0.010)
+    [ -33024
+      -33024 ]
+  - location: 255 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 256 (just consumed gas: 0.010)
+    [ True ]
+  - location: 257 (just consumed gas: 0)
+    [  ]
+  - location: 257 (just consumed gas: 0.015)
+    [  ]
+  - location: 263 (just consumed gas: 0.010)
+    [ 0xff00000000 ]
+  - location: 266 (just consumed gas: 0.032)
+    [ -4294967296 ]
+  - location: 267 (just consumed gas: 0.010)
+    [ -4294967296
+      -4294967296 ]
+  - location: 272 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 273 (just consumed gas: 0.010)
+    [ True ]
+  - location: 274 (just consumed gas: 0)
+    [  ]
+  - location: 274 (just consumed gas: 0.015)
+    [  ]
+  - location: 280 (just consumed gas: 0.010)
+    [ Unit ]
+  - location: 281 (just consumed gas: 0.010)
+    [ {}
+      Unit ]
+  - location: 283 (just consumed gas: 0.010)
+    [ (Pair {} Unit) ]
+

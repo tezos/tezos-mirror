@@ -24,22 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
-
-   This file is part of the implementation of the new mempool, which
-   uses features of the protocol that only exist since Lima.
-
-   When you modify this file, consider whether you should also change
-   the files that implement the legacy mempool for Kathmandu. They all
-   start with the "legacy" prefix and will be removed when Lima is
-   activated on Mainnet. *)
-
 (** Create a prevalidator instance for a specific protocol
     ([Filter.Proto] where [module Filter : Shell_plugin.FILTER]).
-
-    The protocol must be Lima (environment V7) or a more recent
-    version. For Kathmandu and older protocols, use
-    {!Legacy_prevalidator_internal.make} instead.
 
     This function is wrapped in {!Prevalidator.create}. *)
 val make :

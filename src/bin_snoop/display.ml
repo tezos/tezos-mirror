@@ -237,7 +237,7 @@ let plot_scatter opts title input_columns outputs =
       Format.kasprintf
         Result.error
         "Display.plot_scatter (%s): empty scatter data"
-        title
+        (Str.global_replace (Str.regexp {|\\n|}) " " title)
   | [column] ->
       let plot = scatterplot_2d opts title column outputs in
       return [plot]
@@ -254,7 +254,7 @@ let plot_scatter opts title input_columns outputs =
               | [((dim1, _) as col1); ((dim2, _) as col2)] ->
                   let dim1 = underscore_to_dash dim1 in
                   let dim2 = underscore_to_dash dim2 in
-                  let title = Format.asprintf "%s (%s, %s)" title dim1 dim2 in
+                  let title = Format.asprintf "%s\\n(%s, %s)" title dim1 dim2 in
                   scatterplot_3d opts title col1 col2 outputs
               | cols ->
                   let len = List.length cols in
@@ -370,6 +370,27 @@ let column_to_array (m : Maths.matrix) =
 
 let vector_to_array = Maths.vector_to_array
 
+let scores_to_string =
+  let pp_tvalues =
+    Format.pp_print_list
+      ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
+      (fun fmt (v, f) ->
+        Format.fprintf
+          fmt
+          "%s = %.1f"
+          (Free_variable.to_namespace v
+          |> Namespace.basename |> underscore_to_dash)
+          f)
+  in
+  fun scores ->
+    let Inference.{r2_score; rmse_score; tvalues} = scores in
+    Format.asprintf
+      "R2-score = %s, RMSE-score = %.3f\\nT-values: %a"
+      (match r2_score with None -> "None" | Some f -> Format.sprintf "%3f" f)
+      rmse_score
+      pp_tvalues
+      tvalues
+
 let validator opts (problem : Inference.problem) (solution : Inference.solution)
     =
   let open Result_syntax in
@@ -398,7 +419,9 @@ let validator opts (problem : Inference.problem) (solution : Inference.solution)
       let* plots =
         plot_scatter
           opts
-          "Validation (chosen basis)"
+          (Format.sprintf
+             "Validation (chosen basis)\\n%s"
+             (scores_to_string solution.scores))
           columns
           [timings; predicted]
       in
@@ -465,7 +488,9 @@ let validator_empirical opts workload_data (problem : Inference.problem)
   let* plots =
     plot_scatter
       opts
-      "Validation (raw)"
+      (Format.sprintf
+         "Validation (raw)\\n%s"
+         (scores_to_string solution.scores))
       columns
       [timings; predicted |> Array.map (fun x -> [|x|])]
   in
@@ -513,7 +538,7 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
   in
   let workload_data =
     List.map
-      (fun {Measure.workload; measures} ->
+      (fun {Measure.workload; measures; _} ->
         (Bench.workload_to_vector workload, Maths.vector_to_array measures))
       measurement.workload_data
   in

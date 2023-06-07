@@ -14,10 +14,10 @@ trace
   - CAR (entry) @ location: 13
     [ (Pair 1 4 2 Unit)
       (Pair 1 4 2 Unit) ]
-    - log/CONST (exit) @ location: 13
+    - log/PUSH (exit) @ location: 13
       [ 1
         (Pair 1 4 2 Unit) ]
-  - CONST (entry) @ location: 14
+  - PUSH (entry) @ location: 14
     [ 1
       (Pair 1 4 2 Unit) ]
     - log/COMPARE (exit) @ location: 14
@@ -55,10 +55,10 @@ trace
   - GET (entry) @ location: 28
     [ (Pair 1 4 2 Unit)
       (Pair 1 4 2 Unit) ]
-    - log/CONST (exit) @ location: 28
+    - log/PUSH (exit) @ location: 28
       [ 1
         (Pair 1 4 2 Unit) ]
-  - CONST (entry) @ location: 30
+  - PUSH (entry) @ location: 30
     [ 1
       (Pair 1 4 2 Unit) ]
     - log/COMPARE (exit) @ location: 30
@@ -96,10 +96,10 @@ trace
   - GET (entry) @ location: 44
     [ (Pair 1 4 2 Unit)
       (Pair 1 4 2 Unit) ]
-    - log/CONST (exit) @ location: 44
+    - log/PUSH (exit) @ location: 44
       [ 4
         (Pair 1 4 2 Unit) ]
-  - CONST (entry) @ location: 46
+  - PUSH (entry) @ location: 46
     [ 4
       (Pair 1 4 2 Unit) ]
     - log/COMPARE (exit) @ location: 46
@@ -137,10 +137,10 @@ trace
   - GET (entry) @ location: 60
     [ (Pair 1 4 2 Unit)
       (Pair 1 4 2 Unit) ]
-    - log/CONST (exit) @ location: 60
+    - log/PUSH (exit) @ location: 60
       [ 2
         (Pair 1 4 2 Unit) ]
-  - CONST (entry) @ location: 62
+  - PUSH (entry) @ location: 62
     [ 2
       (Pair 1 4 2 Unit) ]
     - log/COMPARE (exit) @ location: 62
@@ -178,10 +178,10 @@ trace
   - GET (entry) @ location: 76
     [ (Pair 1 4 2 Unit)
       (Pair 1 4 2 Unit) ]
-    - log/CONST (exit) @ location: 76
+    - log/UNIT (exit) @ location: 76
       [ Unit
         (Pair 1 4 2 Unit) ]
-  - CONST (entry) @ location: 78
+  - UNIT (entry) @ location: 78
     [ Unit
       (Pair 1 4 2 Unit) ]
     - log/COMPARE (exit) @ location: 78
@@ -213,9 +213,9 @@ trace
       [ (Pair 1 4 2 Unit) ]
   - DROP (entry) @ location: 89
     [ (Pair 1 4 2 Unit) ]
-    - log/CONST (exit) @ location: 89
+    - log/UNIT (exit) @ location: 89
       [  ]
-  - CONST (entry) @ location: 90
+  - UNIT (entry) @ location: 90
     [  ]
     - log/NIL (exit) @ location: 90
       [ Unit ]

@@ -1,11 +1,8 @@
-parameter (pair address bytes) ;
+parameter (pair bytes (contract bytes)) ;
 storage unit ;
 code { UNPAIR ;
        DIP { NIL operation };
        UNPAIR ;
-       CONTRACT bytes ;
-       ASSERT_SOME;
-       SWAP;
        DIP { PUSH mutez 0 };
        TRANSFER_TOKENS;
        CONS;

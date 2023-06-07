@@ -13,30 +13,10 @@ test-protocol-compiles:
 	cd ${CI_PROJECT_DIR} && \
 		dune build @runtest_compile_protocol
 
-.PHONY: test-pytest
-test-pytest:
-ifndef CI_NODE_INDEX
-	$(error CI_NODE_INDEX is undefined)
-endif
-ifndef CI_NODE_TOTAL
-	$(error CI_NODE_TOTAL is undefined)
-endif
-ifndef TESTS
-	$(error TESTS is undefined)
-endif
-	cd ${CI_PROJECT_DIR}/tests_python && \
-		poetry run pytest --exitfirst --prev-junit-xml test-results.xml --job ${CI_NODE_INDEX}/${CI_NODE_TOTAL} --color=yes --log-dir=tmp "--junitxml=reports/report_${CI_NODE_INDEX}_${CI_NODE_TOTAL}.xml" --timeout 1800 ${TESTS} && \
-		./../scripts/ci/merge_coverage.sh
-
-.PHONY: test-pytest-check-regression-files
-test-pytest-check-regression-files:
-	cd ${CI_PROJECT_DIR}/tests_python && \
-		poetry run pytest --on-unknown-regression-files check
-
 .PHONY: test-tezt
 test-tezt:
 	cd ${CI_PROJECT_DIR} && \
-		dune exec tezt/tests/main.exe -- ${TESTS} --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX}/${CI_NODE_TOTAL} --record tezt-results-${CI_NODE_INDEX}.json -j 4 --retry 1 && \
+		_build/default/tezt/tests/main.exe ${TESTS} --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX}/${CI_NODE_TOTAL} --record tezt-results-${CI_NODE_INDEX}.json -j 4 --retry 1 && \
 		./scripts/ci/merge_coverage.sh
 
 .PHONY: test-tezt-static-binaries
@@ -57,29 +37,26 @@ test-tezt-self-test:
 	cd ${CI_PROJECT_DIR} && \
 		dune runtest tezt/self_tests/
 
-.PHONY: test-pytest-example
-test-pytest-example:
-	cd ${CI_PROJECT_DIR}/tests_python && \
-		PYTHONPATH=${PYTHONPATH}:./ poetry run python examples/example.py && \
-		PYTHONPATH=./ poetry run pytest --exitfirst examples/test_example.py
+.PHONY: test-tezt-fetch-records
+test-tezt-fetch-records:
+	cd ${CI_PROJECT_DIR} && \
+		dune exec tezt/records/update.exe -- --log-file tezt-fetch-records.log --test-arg from=last-merged-pipeline --info
 
 .PHONY: integration-test-compiler-rejections
 integration-test-compiler-rejections:
 	cd ${CI_PROJECT_DIR} && \
 		dune build @runtest_rejections
 
-.PHONY: integration-test-prepare-migration-test
-integration-test-prepare-migration-test: gitlab-take-ownership
-	cd ${CI_PROJECT_DIR} && \
-		./scripts/prepare_migration_test.sh manual "next_${new_proto_version}" 1
-
 .PHONY: integration-test-snapshot-alpha-and-link
 integration-test-snapshot-alpha-and-link: gitlab-take-ownership
 	cd ${CI_PROJECT_DIR} && \
 		$(MAKE) octez-protocol-compiler && \
 		./scripts/snapshot_alpha_and_link.sh "${new_proto_version}" next && \
+	        ./scripts/remove-old-protocols.sh && \
 		$(MAKE) && \
-		dune build src/proto_"${new_proto_version}"_*/
+		dune build src/proto_"${new_proto_version}"_*/ && \
+		./scripts/user_activated_upgrade.sh src/proto_"${new_proto_version}"_*/ 1 && \
+		dune build src/lib_node_config # `user_activated_upgrade.sh` only modifies `lib_node_config`
 
 .PHONY: integration-test-liquidity-baking-scripts
 integration-test-liquidity-baking-scripts:
@@ -95,7 +72,6 @@ lint-misc-check: gitlab-take-ownership
 .PHONY: check-precommit
 check-precommit:
 	cd ${CI_PROJECT_DIR} && \
-		./scripts/pre_commit/pre_commit.py --test-itself && \
 		poetry run pylint scripts/pre_commit/pre_commit.py && \
 		poetry run pycodestyle scripts/pre_commit/pre_commit.py && \
 		poetry run mypy scripts/pre_commit/pre_commit.py

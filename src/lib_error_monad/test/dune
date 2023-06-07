@@ -1,37 +1,65 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names test_registration test_splitted_error_encoding)
- (modes native js)
+(library
+ (name src_lib_error_monad_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-error-monad
   data-encoding
-  alcotest)
+  octez-alcotezt)
+ (js_of_ocaml)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_error_monad
+  -open Octez_alcotezt)
+ (modules test_registration test_splitted_error_encoding))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (modes native)
+ (libraries
+  src_lib_error_monad_test_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos-error-monad)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
+
+(executable
+ (name main_js)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (modes js)
+ (libraries
+  src_lib_error_monad_test_tezt_lib
+  tezt.js)
  (js_of_ocaml)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
- (flags
-  (:standard)
-  -open Tezos_error_monad))
-
-(rule
- (alias runtest)
- (package tezos-error-monad)
- (action (run %{dep:./test_registration.exe})))
-
-(rule
- (alias runtest)
- (package tezos-error-monad)
- (action (run %{dep:./test_splitted_error_encoding.exe})))
+ (modules main_js))
 
 (rule
  (alias runtest_js)
  (package tezos-error-monad)
- (action (run node %{dep:./test_registration.bc.js})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run node %{dep:./main_js.bc.js})))
 
 (rule
- (alias runtest_js)
- (package tezos-error-monad)
- (action (run node %{dep:./test_splitted_error_encoding.bc.js})))
+ (targets main_js.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt_js.Test.run ()"))))

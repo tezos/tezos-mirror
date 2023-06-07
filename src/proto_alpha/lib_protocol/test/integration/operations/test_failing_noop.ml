@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                  -- test "^failing_noop operation$"
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_failing_noop.ml
     Subject:      The Failing_noop operation was added bearing in mind the
                   possibility for the end user to sign arbitrary bytes,
                   encapsulate in the operation, with the absolute garanty that
@@ -49,3 +48,7 @@ let failing_noop_must_fail_when_injected () =
 
 let tests =
   [Tztest.tztest "injection fails" `Quick failing_noop_must_fail_when_injected]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("failing_noop operation", tests)]
+  |> Lwt_main.run

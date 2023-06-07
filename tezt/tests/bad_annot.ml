@@ -38,14 +38,14 @@ let test_bad_annot client protocol () =
      'a's at the end of the annotation) by the 0xff byte which is
      not a valid UTF8-encoding of a string *)
   let input = "0x05020000000e034f03420416000000042566ffff" in
-  let prg =
-    sf
-      "file:./tests_python/contracts_%s/non_regression/bad_annot_contract.tz"
-      (match protocol with
-      | Protocol.Alpha -> "alpha"
-      | _ -> sf "%03d" @@ Protocol.number protocol)
+  let* {storage; _} =
+    Client.run_script_at
+      ~storage:"None"
+      ~input
+      client
+      ["non_regression"; "bad_annot_contract"]
+      protocol
   in
-  let* storage = Client.run_script ~prg ~storage:"None" ~input client in
   Check.(
     ("None" = storage) ~__LOC__ string ~error_msg:"Expected result %R, got %L") ;
   unit

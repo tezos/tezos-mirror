@@ -770,7 +770,6 @@ module Block = struct
             Stored_data.update_with
               chain_state.invalid_blocks_data
               (fun invalid_blocks ->
-                Prometheus.Gauge.inc_one Store_metrics.metrics.invalid_blocks ;
                 Lwt.return
                   (Block_hash.Map.add hash {level; errors} invalid_blocks)))
       in
@@ -781,7 +780,6 @@ module Block = struct
         Stored_data.update_with
           chain_state.invalid_blocks_data
           (fun invalid_blocks ->
-            Prometheus.Gauge.dec_one Store_metrics.metrics.invalid_blocks ;
             Lwt.return (Block_hash.Map.remove hash invalid_blocks)))
 
   (** Accessors *)
@@ -1566,18 +1564,12 @@ module Chain = struct
             (* Remove potentially outdated invalid blocks if the
                checkpoint changed *)
             let* () =
-              Prometheus.Gauge.set Store_metrics.metrics.invalid_blocks 0. ;
               Stored_data.update_with
                 chain_state.invalid_blocks_data
                 (fun invalid_blocks ->
                   Lwt.return
                     (Block_hash.Map.filter
-                       (fun _k {level; _} ->
-                         if level > snd new_checkpoint then (
-                           Prometheus.Gauge.inc_one
-                             Store_metrics.metrics.invalid_blocks ;
-                           true)
-                         else false)
+                       (fun _k {level; _} -> level > snd new_checkpoint)
                        invalid_blocks))
             in
             write_checkpoint chain_state new_checkpoint
@@ -2074,10 +2066,10 @@ module Chain = struct
             let testchains_dir = Naming.testchains_dir chain_dir in
             let testchain_dir = Naming.chain_dir testchains_dir testchain_id in
             let testchain_dir_path = Naming.dir_path testchains_dir in
-            if
-              Sys.file_exists testchain_dir_path
-              && Sys.is_directory testchain_dir_path
-            then
+            let*! valid_testchain_dir_path =
+              Lwt_utils_unix.dir_exists testchain_dir_path
+            in
+            if valid_testchain_dir_path then
               let* o =
                 locked_load_testchain
                   chain_store
@@ -2489,24 +2481,34 @@ let load_store ?history_mode ?block_cache_limit store_dir ~context_index
       (Inconsistent_genesis
          {expected = stored_genesis.block; got = genesis.block})
   in
-  let* main_chain_store =
-    match history_mode with
-    | None -> return main_chain_store
-    | Some history_mode ->
-        let previous_history_mode = Chain.history_mode main_chain_store in
-        let* () =
-          fail_unless
-            (History_mode.equal history_mode previous_history_mode)
-            (Cannot_switch_history_mode
-               {previous_mode = previous_history_mode; next_mode = history_mode})
-        in
-        return main_chain_store
-  in
   global_store.main_chain_store <- Some main_chain_store ;
   return global_store
 
 let main_chain_store store =
   WithExceptions.Option.get ~loc:__LOC__ store.main_chain_store
+
+(* Checks that the history mode stored in the store's configuration
+   file (if any) is consistent with the one given (if any) to
+   initialize the store. *)
+let check_history_mode_consistency chain_dir history_mode =
+  let open Lwt_result_syntax in
+  match history_mode with
+  | None -> (* No hint, no need to check. *) return_unit
+  | Some history_mode ->
+      let chain_config_path = Naming.chain_config_file chain_dir in
+      let*! chain_config_path_exists =
+        Lwt_unix.file_exists (Naming.encoded_file_path chain_config_path)
+      in
+      if chain_config_path_exists then
+        let* chain_config_data = Stored_data.load chain_config_path in
+
+        let*! chain_config = Stored_data.get chain_config_data in
+        let stored_history_mode = chain_config.history_mode in
+        fail_unless
+          (History_mode.equal history_mode stored_history_mode)
+          (Cannot_switch_history_mode
+             {previous_mode = stored_history_mode; next_mode = history_mode})
+      else (* Store is not yet initialized. *) return_unit
 
 let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     ?block_cache_limit ~store_dir ~context_dir ~allow_testchains genesis =
@@ -2522,6 +2524,8 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
   in
   let store_dir = Naming.store_dir ~dir_path:store_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
+  let chain_dir = Naming.chain_dir store_dir chain_id in
+  let* () = check_history_mode_consistency chain_dir history_mode in
   let*! context_index, commit_genesis =
     match commit_genesis with
     | Some commit_genesis ->
@@ -2542,12 +2546,12 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
         in
         Lwt.return (context_index, commit_genesis)
   in
-  let chain_dir = Naming.chain_dir store_dir chain_id in
   let chain_dir_path = Naming.dir_path chain_dir in
+  let*! valid_chain_dir_path = Lwt_utils_unix.dir_exists chain_dir_path in
   (* FIXME should be checked with the store's consistency check
      (along with load_chain_state checks) *)
   let* store =
-    if Sys.file_exists chain_dir_path && Sys.is_directory chain_dir_path then
+    if valid_chain_dir_path then
       load_store
         ?history_mode
         ?block_cache_limit
@@ -2580,6 +2584,14 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     then Store_events.(emit context_gc_is_not_allowed) ()
     else Lwt.return_unit
   in
+  let invalid_blocks_collector () =
+    let*! invalid_blocks =
+      Shared.use main_chain_store.chain_state (fun state ->
+          Stored_data.get state.invalid_blocks_data)
+    in
+    Lwt.return @@ float_of_int @@ Block_hash.Map.cardinal invalid_blocks
+  in
+  Store_metrics.set_invalid_blocks_collector invalid_blocks_collector ;
   return store
 
 let close_store global_store =
@@ -2598,8 +2610,9 @@ let may_switch_history_mode ~store_dir ~context_dir genesis ~new_history_mode =
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
   let chain_dir = Naming.chain_dir store_dir chain_id in
   let chain_dir_path = Naming.dir_path chain_dir in
-  if not (Sys.file_exists chain_dir_path && Sys.is_directory chain_dir_path)
-  then (* Nothing to do, the store is not set *)
+  let*! valid_chain_dir_path = Lwt_utils_unix.dir_exists chain_dir_path in
+  if not valid_chain_dir_path then
+    (* Nothing to do, the store is not set *)
     return_unit
   else
     let*! context_index = Context.init ~readonly:false context_dir in
@@ -2981,7 +2994,7 @@ let v_3_0_upgrade ~store_dir genesis =
   in
   protect
     ~on_error:(fun err ->
-      let*! () = Store_events.(emit upgrade_store_failed) err in
+      let*! () = Store_events.(emit upgrade_store_failed) () in
       let*! () = List.iter_s (fun f -> f ()) !cleanups in
       Lwt.return_error err)
     (fun () ->
@@ -3061,17 +3074,17 @@ module Unsafe = struct
             (fun (_ : exn) -> Lwt.return_true)
         in
         let*! () =
-          if not is_locked then Lwt.return_unit
-          else
-            Animation.three_dots
-              ~progress_display_mode:Auto
-              ~msg:
-                "The storage is locked by a context prunning. Waiting for it \
-                 to finish before exporting the snapshot"
-            @@ fun () ->
-            Lwt.finalize
-              (fun () -> Lwt_unix.lockf fd Unix.F_RLOCK 0o644)
-              (fun () -> Lwt_unix.close fd)
+          Lwt.finalize
+            (fun () ->
+              if not is_locked then Lwt.return_unit
+              else
+                Animation.three_dots
+                  ~progress_display_mode:Auto
+                  ~msg:
+                    "The storage is locked by a context prunning. Waiting for \
+                     it to finish before exporting the snapshot"
+                @@ fun () -> Lwt_unix.lockf fd Unix.F_RLOCK 0o644)
+            (fun () -> Lwt_unix.close fd)
         in
         let* store =
           load_store
@@ -3086,7 +3099,10 @@ module Unsafe = struct
         let chain_store = main_chain_store store in
         Lwt.finalize
           (fun () -> locked_f chain_store)
-          (fun () -> close_store store))
+          (fun () ->
+            let*! () = may_unlock lockfile in
+            let*! () = Lwt_unix.close lockfile in
+            close_store store))
       ~on_error:(fun errs ->
         let*! () = may_unlock lockfile in
         Lwt.return (Error errs))

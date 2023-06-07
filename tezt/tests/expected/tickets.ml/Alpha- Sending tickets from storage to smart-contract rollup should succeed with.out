@@ -1,7 +1,7 @@
 
 ./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint mint
 Node is bootstrapped.
-Estimated gas: 3053.648 units (will add 100 for safety)
+Estimated gas: 2222.514 units (will add 100 for safety)
 Estimated storage: 221 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000577
+    Fee to the baker: ꜩ0.000494
     Expected counter: 3
-    Gas limit: 3154
+    Gas limit: 2323
     Storage limit: 241 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000577
-      payload fees(the block proposer) ....... +ꜩ0.000577
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000494
+      payload fees(the block proposer) ....... +ꜩ0.000494
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -26,30 +26,30 @@ This sequence of operations was run:
       Entrypoint: mint
       This transaction was successfully applied
       Updated storage:
-        { Pair 0x017a1d05251a570ed6e6e5af81f60883b857f8664500 (Pair "Ticket2" 1) ;
-          Pair 0x017a1d05251a570ed6e6e5af81f60883b857f8664500 (Pair "Ticket" 1) }
+        { Pair 0x017a22a4e42f88383dbb327d548e263b53f4f3b91100 (Pair "Ticket2" 1) ;
+          Pair 0x017a22a4e42f88383dbb327d548e263b53f4f3b91100 (Pair "Ticket" 1) }
       Storage size: 309 bytes
       Paid storage size diff: 221 bytes
-      Consumed gas: 3053.648
+      Consumed gas: 2222.481
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.05525
         storage fees ........................... +ꜩ0.05525
       Ticket updates:
         Ticketer: [CONTRACT_HASH]
         Content type: string
-        Content: "Ticket"
+        Content: "Ticket2"
         Account updates:
           [CONTRACT_HASH] ... +1
         Ticketer: [CONTRACT_HASH]
         Content type: string
-        Content: "Ticket2"
+        Content: "Ticket"
         Account updates:
           [CONTRACT_HASH] ... +1
 
 
 ./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint send --arg '"[SMART_ROLLUP_HASH]"'
 Node is bootstrapped.
-Estimated gas: 4872.137 units (will add 100 for safety)
+Estimated gas: 3142.041 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -60,13 +60,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000797
+    Fee to the baker: ꜩ0.000624
     Expected counter: 4
-    Gas limit: 4973
+    Gas limit: 3243
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000797
-      payload fees(the block proposer) ....... +ꜩ0.000797
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000624
+      payload fees(the block proposer) ....... +ꜩ0.000624
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -76,16 +76,16 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: {}
       Storage size: 220 bytes
-      Consumed gas: 3861.762
+      Consumed gas: 3032.033
       Ticket updates:
         Ticketer: [CONTRACT_HASH]
         Content type: string
-        Content: "Ticket"
+        Content: "Ticket2"
         Account updates:
           [CONTRACT_HASH] ... -1
         Ticketer: [CONTRACT_HASH]
         Content type: string
-        Content: "Ticket2"
+        Content: "Ticket"
         Account updates:
           [CONTRACT_HASH] ... -1
       Internal operations:
@@ -93,19 +93,19 @@ This sequence of operations was run:
           Amount: ꜩ0
           From: [CONTRACT_HASH]
           To: [SMART_ROLLUP_HASH]
-          Parameter: { Pair 0x017a1d05251a570ed6e6e5af81f60883b857f8664500 (Pair "Ticket2" 1) ;
-                       Pair 0x017a1d05251a570ed6e6e5af81f60883b857f8664500 (Pair "Ticket" 1) }
+          Parameter: { Pair 0x017a22a4e42f88383dbb327d548e263b53f4f3b91100 (Pair "Ticket2" 1) ;
+                       Pair 0x017a22a4e42f88383dbb327d548e263b53f4f3b91100 (Pair "Ticket" 1) }
           This transaction was successfully applied
-          Consumed gas: 1010.375
+          Consumed gas: 109.941
           Ticket updates:
             Ticketer: [CONTRACT_HASH]
             Content type: string
-            Content: "Ticket"
+            Content: "Ticket2"
             Account updates:
               [SMART_ROLLUP_HASH] ... +1
             Ticketer: [CONTRACT_HASH]
             Content type: string
-            Content: "Ticket2"
+            Content: "Ticket"
             Account updates:
               [SMART_ROLLUP_HASH] ... +1
 

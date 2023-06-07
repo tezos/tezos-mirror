@@ -3,10 +3,11 @@
 
 (env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
 
-(executables
- (names test_run test_prop_signature)
- (modes native js)
+(library
+ (name src_lib_crypto_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-stdlib
   tezos-crypto
   tezos-error-monad
@@ -14,34 +15,72 @@
   zarith_stubs_js
   tezos-hacl
   data-encoding
-  alcotest
+  octez-alcotezt
   qcheck-alcotest
   tezos-test-helpers)
  (js_of_ocaml)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_stdlib
   -open Tezos_crypto
   -open Tezos_error_monad.TzLwtreslib
   -open Data_encoding
-  -open Tezos_test_helpers))
+  -open Octez_alcotezt
+  -open Tezos_test_helpers)
+ (modules
+  test_run
+  test_prop_signature
+  roundtrips
+  key_encoding_vectors
+  test_base58
+  test_blake2b
+  test_crypto_box
+  test_deterministic_nonce
+  test_merkle
+  test_signature
+  test_signature_encodings
+  test_timelock_legacy
+  test_timelock
+  test_context_hash))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (modes native)
+ (libraries
+  src_lib_crypto_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-crypto)
- (action (run %{dep:./test_run.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest)
- (package tezos-crypto)
- (action (run %{dep:./test_prop_signature.exe})))
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
+
+(executable
+ (name main_js)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (modes js)
+ (libraries
+  src_lib_crypto_test_tezt_lib
+  tezt.js)
+ (js_of_ocaml)
+ (modules main_js))
 
 (rule
  (alias runtest_js)
  (package tezos-crypto)
- (action (run node %{dep:./test_run.bc.js})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run node %{dep:./main_js.bc.js})))
 
 (rule
- (alias runtest_js)
- (package tezos-crypto)
- (action (run node %{dep:./test_prop_signature.bc.js})))
+ (targets main_js.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt_js.Test.run ()"))))

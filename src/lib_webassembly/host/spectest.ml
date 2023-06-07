@@ -27,7 +27,7 @@ let table =
 let memory = Memory.alloc (MemoryType {min = 1l; max = Some 2l})
 
 let print_value v =
-  Printf.printf
+  Format.printf
     "%s : %s\n"
     (Values.string_of_value v)
     (Types.string_of_value_type (Values.type_of_value v))

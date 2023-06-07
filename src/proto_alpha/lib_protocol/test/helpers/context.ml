@@ -40,10 +40,6 @@ let level = function B b -> b.header.shell.level | I i -> Incremental.level i
 let get_level ctxt =
   level ctxt |> Raw_level.of_int32 |> Environment.wrap_tzresult
 
-let to_alpha_ctxt = function
-  | B b -> Block.to_alpha_ctxt b
-  | I i -> return (Incremental.alpha_ctxt i)
-
 let rpc_ctxt =
   object
     method call_proto_service0
@@ -259,6 +255,9 @@ module Vote = struct
   let get_protocol (b : Block.t) =
     Tezos_protocol_environment.Context.get_protocol b.context
 
+  let get_delegate_proposal_count ctxt pkh =
+    Alpha_services.Voting.delegate_proposal_count rpc_ctxt ctxt pkh
+
   let get_participation_ema (b : Block.t) =
     Environment.Context.find b.context ["votes"; "participation_ema"]
     >|= function
@@ -277,11 +276,6 @@ module Vote = struct
     current_proposals : Protocol_hash.t list;
     remaining_proposals : int;
   }
-
-  let get_delegate_proposal_count ctxt pkh =
-    to_alpha_ctxt ctxt >>=? fun alpha_ctxt ->
-    Vote.get_delegate_proposal_count alpha_ctxt pkh
-    >|= Environment.wrap_tzresult
 end
 
 module Contract = struct

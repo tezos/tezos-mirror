@@ -300,7 +300,7 @@ let headers_fetch_worker_loop pipeline =
     let number_of_steps = List.length steps in
     let*! () =
       Bootstrap_pipeline_event.(emit fetching_locator)
-        (locator_length, pipeline.peer_id, number_of_steps)
+        (locator_length, pipeline.peer_id)
     in
     match steps with
     | [] -> tzfail (Too_short_locator (sender_id, pipeline.locator))
@@ -486,7 +486,7 @@ let rec validation_worker_loop pipeline =
       Bootstrap_pipeline_event.(emit requesting_validation)
         (hash, pipeline.peer_id)
     in
-    let* operations = operations in
+    let* operations in
     let* () =
       protect ~canceler:pipeline.canceler (fun () ->
           let*! r =

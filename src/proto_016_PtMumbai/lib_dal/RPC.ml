@@ -173,7 +173,7 @@ module DAC = struct
     let open Dac_manager.Reveal_hash in
     let external_message =
       let open Option_syntax in
-      let* encoded_l1_message = encoded_l1_message in
+      let* encoded_l1_message in
       let* as_bytes = Hex.to_bytes @@ `Hex encoded_l1_message in
       External_message.of_bytes as_bytes
     in

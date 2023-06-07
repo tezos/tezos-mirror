@@ -23,25 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Several of the tests take the additional [SLOW_TEST] environment variable.
-   We group those tests in this here executable for simplicity. *)
+(** Testing
+    _______
+
+    Component: Store
+    Invocation: dune exec src/lib_store/unix/test/main.exe --file test.ml
+    Subject: Store tests ( snapshots, reconstruct, history_mode_switch )
+*)
 
 let () =
-  let speed =
-    try
-      let s = Sys.getenv "SLOW_TEST" in
-      match String.(trim (uncapitalize_ascii s)) with
-      | "true" | "1" | "yes" -> `Slow
-      | _ -> `Quick
-    with Not_found -> `Quick
-  in
   let open Lwt_syntax in
   Lwt_main.run
+    (* we init the internal event here once and for all modules *)
     (let* () = Tezos_base_unix.Internal_event_unix.init () in
      Alcotest_lwt.run
+       ~__FILE__
        "tezos-store"
        [
-         Test_snapshots.tests speed;
-         Test_reconstruct.tests speed;
-         Test_history_mode_switch.tests speed;
+         Test_snapshots.tests `Quick;
+         Test_reconstruct.tests `Quick;
+         Test_history_mode_switch.tests `Quick;
        ])

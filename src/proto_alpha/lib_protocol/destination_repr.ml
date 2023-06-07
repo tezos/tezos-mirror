@@ -27,7 +27,6 @@
 
 type t =
   | Contract of Contract_repr.t
-  | Tx_rollup of Tx_rollup_repr.t
   | Sc_rollup of Sc_rollup_repr.t
   | Zk_rollup of Zk_rollup_repr.t
 
@@ -43,7 +42,6 @@ include Compare.Make (struct
   let compare l1 l2 =
     match (l1, l2) with
     | Contract k1, Contract k2 -> Contract_repr.compare k1 k2
-    | Tx_rollup k1, Tx_rollup k2 -> Tx_rollup_repr.compare k1 k2
     | Sc_rollup k1, Sc_rollup k2 -> Sc_rollup_repr.Address.compare k1 k2
     | Zk_rollup k1, Zk_rollup k2 -> Zk_rollup_repr.Address.compare k1 k2
     (* This function is used by the Michelson interpreter to compare
@@ -55,15 +53,12 @@ include Compare.Make (struct
        modified when new constructors are added to [t]. *)
     | Contract _, _ -> -1
     | _, Contract _ -> 1
-    | Tx_rollup _, _ -> -1
-    | _, Tx_rollup _ -> 1
     | Sc_rollup _, _ -> -1
     | _, Sc_rollup _ -> 1
 end)
 
 let to_b58check = function
   | Contract k -> Contract_repr.to_b58check k
-  | Tx_rollup k -> Tx_rollup_repr.to_b58check k
   | Sc_rollup k -> Sc_rollup_repr.Address.to_b58check k
   | Zk_rollup k -> Zk_rollup_repr.Address.to_b58check k
 
@@ -88,7 +83,6 @@ let of_b58data data =
   in
   None
   |> decode_on_none Contract_repr.of_b58data (fun c -> Contract c)
-  |> decode_on_none Tx_rollup_repr.of_b58data (fun t -> Tx_rollup t)
   |> decode_on_none Sc_rollup_repr.Address.of_b58data (fun s -> Sc_rollup s)
   |> decode_on_none Zk_rollup_repr.Address.of_b58data (fun z -> Zk_rollup z)
 
@@ -101,6 +95,15 @@ let of_b58check s =
 
 let encoding =
   let open Data_encoding in
+  let case = function
+    | Tag tag ->
+        (* The tag was used by old variant. It have been removed in
+           protocol proposal O, it can be unblocked in the future. *)
+        let tx_rollup_address_reserved_tag = 2 in
+        assert (Compare.Int.(tag <> tx_rollup_address_reserved_tag)) ;
+        case (Tag tag)
+    | _ as c -> case c
+  in
   def
     "transaction_destination"
     ~title:"A destination of a transaction"
@@ -117,12 +120,6 @@ let encoding =
                (function Contract x -> Some x | _ -> None)
                (fun x -> Contract x)
             @ [
-                case
-                  (Tag 2)
-                  (Fixed.add_padding Tx_rollup_repr.encoding 1)
-                  ~title:"Tx_rollup"
-                  (function Tx_rollup k -> Some k | _ -> None)
-                  (fun k -> Tx_rollup k);
                 case
                   (Tag 3)
                   (Fixed.add_padding Sc_rollup_repr.Address.encoding 1)
@@ -150,7 +147,6 @@ let encoding =
 let pp : Format.formatter -> t -> unit =
  fun fmt -> function
   | Contract k -> Contract_repr.pp fmt k
-  | Tx_rollup k -> Tx_rollup_repr.pp fmt k
   | Sc_rollup k -> Sc_rollup_repr.pp fmt k
   | Zk_rollup k -> Zk_rollup_repr.Address.pp fmt k
 
@@ -158,6 +154,5 @@ let in_memory_size =
   let open Cache_memory_helpers in
   function
   | Contract k -> h1w +! Contract_repr.in_memory_size k
-  | Tx_rollup k -> h1w +! Tx_rollup_repr.in_memory_size k
   | Sc_rollup k -> h1w +! Sc_rollup_repr.in_memory_size k
   | Zk_rollup k -> h1w +! Zk_rollup_repr.in_memory_size k

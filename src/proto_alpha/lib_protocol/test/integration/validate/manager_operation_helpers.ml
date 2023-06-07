@@ -330,14 +330,13 @@ let delegation block source delegate =
 let originate_sc_rollup block rollup_account =
   let open Lwt_result_syntax in
   let rollup_contract = contract_of rollup_account in
+  let kind = Sc_rollup.Kind.Example_arith in
   let* rollup_origination, sc_rollup =
-    Op.sc_rollup_origination
+    Sc_rollup_helpers.origination_op
       ~force_reveal:true
       (B block)
       rollup_contract
-      Sc_rollup.Kind.Example_arith
-      ~boot_sector:""
-      ~parameters_ty:(Script.lazy_expr (Expr.from_string "1"))
+      kind
   in
   let+ block =
     Block.bake ~allow_manager_failures:true ~operation:rollup_origination block
@@ -351,12 +350,13 @@ end)
 let originate_zk_rollup block rollup_account =
   let open Lwt_result_syntax in
   let rollup_contract = contract_of rollup_account in
+  let _prover_pp, public_parameters = Lazy.force ZKOperator.lazy_pp in
   let* rollup_origination, zk_rollup =
     Op.zk_rollup_origination
       ~force_reveal:true
       (B block)
       rollup_contract
-      ~public_parameters:ZKOperator.public_parameters
+      ~public_parameters
       ~circuits_info:
         (Zk_rollup.Account.SMap.of_seq @@ Plonk.SMap.to_seq ZKOperator.circuits)
       ~init_state:ZKOperator.init_state
@@ -780,7 +780,8 @@ let mk_transfer_ticket (oinfos : operation_req) (infos : infos) =
 let mk_sc_rollup_origination (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in
   let+ op, _ =
-    Op.sc_rollup_origination
+    let kind = Sc_rollup.Kind.Example_arith in
+    Sc_rollup_helpers.origination_op
       ?fee:oinfos.fee
       ?gas_limit:oinfos.gas_limit
       ?counter:oinfos.counter
@@ -788,9 +789,7 @@ let mk_sc_rollup_origination (oinfos : operation_req) (infos : infos) =
       ?force_reveal:oinfos.force_reveal
       (B infos.ctxt.block)
       (contract_of (get_source infos))
-      Sc_rollup.Kind.Example_arith
-      ~boot_sector:""
-      ~parameters_ty:(Script.lazy_expr (Expr.from_string "1"))
+      kind
   in
   op
 
@@ -944,6 +943,7 @@ let mk_dal_publish_slot_header (oinfos : operation_req) (infos : infos) =
 
 let mk_zk_rollup_origination (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in
+  let _prover_pp, public_parameters = Lazy.force ZKOperator.lazy_pp in
   let* op, _ =
     Op.zk_rollup_origination
       ?fee:oinfos.fee
@@ -953,7 +953,7 @@ let mk_zk_rollup_origination (oinfos : operation_req) (infos : infos) =
       ?force_reveal:oinfos.force_reveal
       (B infos.ctxt.block)
       (contract_of (get_source infos))
-      ~public_parameters:ZKOperator.public_parameters
+      ~public_parameters
       ~circuits_info:
         (Zk_rollup.Account.SMap.of_seq @@ Plonk.SMap.to_seq ZKOperator.circuits)
       ~init_state:ZKOperator.init_state
@@ -985,6 +985,7 @@ let mk_zk_rollup_publish (oinfos : operation_req) (infos : infos) =
 let mk_zk_rollup_update (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in
   let* zk_rollup = zk_rollup_of infos.ctxt.zk_rollup in
+  let update = Lazy.force ZKOperator.Internal_for_tests.lazy_update_data in
   let* op =
     Op.zk_rollup_update
       ?fee:oinfos.fee
@@ -995,7 +996,7 @@ let mk_zk_rollup_update (oinfos : operation_req) (infos : infos) =
       (B infos.ctxt.block)
       (contract_of (get_source infos))
       ~zk_rollup
-      ~update:ZKOperator.Internal_for_tests.update_data
+      ~update
   in
   return op
 
@@ -1188,7 +1189,14 @@ let expected_witness witness probes ~mode ctxt =
 let observe ~mode ~deallocated ctxt_pre ctxt_post op =
   let open Lwt_result_syntax in
   let check_deallocated ctxt contract =
-    let* actxt = Context.to_alpha_ctxt ctxt in
+    let* actxt =
+      let+ i =
+        match ctxt with
+        | Context.B b -> Incremental.begin_construction b
+        | I i -> return i
+      in
+      Incremental.alpha_ctxt i
+    in
     let*! res = Contract.must_be_allocated actxt contract in
     match Environment.wrap_tzresult res with
     | Ok () ->

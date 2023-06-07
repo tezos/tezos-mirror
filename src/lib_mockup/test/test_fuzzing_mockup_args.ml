@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Mockup args library
-    Invocation:   dune build @src/lib_mockup/runtest
+    Invocation:   dune exec src/lib_mockup/test/main.exe \
+                  -- --file test_fuzzing_mockup_args.ml
     Subject:      Fuzzing tests of the Mockup args library
 *)
 
@@ -52,5 +53,6 @@ let test_prioritize_config_file =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Fuzzing_mockup_args"
     [("Chain_id.choose", qcheck_wrap [test_prioritize_config_file])]

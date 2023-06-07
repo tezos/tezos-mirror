@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (preendorsement)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                -- test "^preendorsement$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
+                 -- --file test_preendorsement.ml
 *)
 
 open Protocol
@@ -46,6 +45,15 @@ let init_genesis ?policy () =
 (*                      Tests                                   *)
 (****************************************************************)
 
+(** Test that the preendorsement's branch does not affect its
+    validity. *)
+let test_preendorsement_with_arbitrary_branch () =
+  Context.init1 () >>=? fun (genesis, _contract) ->
+  Block.bake genesis >>=? fun blk ->
+  Op.preendorsement ~branch:Block_hash.zero blk >>=? fun operation ->
+  Incremental.begin_construction ~mempool_mode:true blk >>=? fun inc ->
+  Incremental.validate_operation inc operation >>=? fun _inc -> return_unit
+
 (** Consensus operation for future level : apply a preendorsement with a level in the future *)
 let test_consensus_operation_preendorsement_for_future_level () =
   init_genesis () >>=? fun (_genesis, pred) ->
@@ -53,7 +61,6 @@ let test_consensus_operation_preendorsement_for_future_level () =
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:true
     ~endorsed_block:pred
     ~level
     ~error:(function
@@ -61,17 +68,17 @@ let test_consensus_operation_preendorsement_for_future_level () =
         when kind = Validate_errors.Consensus.Preendorsement ->
           true
       | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+    Preendorsement
+    Mempool
 
 (** Consensus operation for old level : apply a preendorsement with a level in the past *)
 let test_consensus_operation_preendorsement_for_old_level () =
-  init_genesis () >>=? fun (_genesis, pred) ->
+  init_genesis () >>=? fun (_genesis, grandparent) ->
+  Block.bake grandparent >>=? fun pred ->
   let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:true
     ~endorsed_block:pred
     ~level
     ~error:(function
@@ -79,8 +86,8 @@ let test_consensus_operation_preendorsement_for_old_level () =
         when kind = Validate_errors.Consensus.Preendorsement ->
           true
       | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+    Preendorsement
+    Mempool
 
 (** Consensus operation for future round : apply a preendorsement with a round in the future *)
 let test_consensus_operation_preendorsement_for_future_round () =
@@ -88,16 +95,10 @@ let test_consensus_operation_preendorsement_for_future_round () =
   Environment.wrap_tzresult (Round.of_int 21) >>?= fun round ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:true
     ~endorsed_block:pred
     ~round
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_future_round {kind; _}
-        when kind = Validate_errors.Consensus.Preendorsement ->
-          true
-      | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+    Preendorsement
+    Mempool
 
 (** Consensus operation for old round : apply a preendorsement with a round in the past *)
 let test_consensus_operation_preendorsement_for_old_round () =
@@ -105,45 +106,32 @@ let test_consensus_operation_preendorsement_for_old_round () =
   Environment.wrap_tzresult (Round.of_int 0) >>?= fun round ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:true
     ~endorsed_block:pred
     ~round
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_old_round {kind; _}
-        when kind = Validate_errors.Consensus.Preendorsement ->
-          true
-      | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+    Preendorsement
+    Mempool
 
 (** Consensus operation on competing proposal : apply a preendorsement on a competing proposal *)
 let test_consensus_operation_preendorsement_on_competing_proposal () =
   init_genesis () >>=? fun (_genesis, pred) ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:true
     ~endorsed_block:pred
     ~block_payload_hash:Block_payload_hash.zero
-    ~error:(function
-      | Validate_errors.Consensus.Wrong_payload_hash_for_consensus_operation
-          {kind; _}
-        when kind = Validate_errors.Consensus.Preendorsement ->
-          true
-      | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+    Preendorsement
+    Mempool
 
 (** Unexpected preendorsements in block : apply a preendorsement with an incorrect round *)
 let test_unexpected_preendorsements_in_blocks () =
   init_genesis () >>=? fun (_genesis, pred) ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:true
     ~endorsed_block:pred
     ~error:(function
       | Validate_errors.Consensus.Unexpected_preendorsement_in_block -> true
       | _ -> false)
-    ()
+    Preendorsement
+    Application
 
 (** Round too high : apply a preendorsement with a too high round *)
 let test_too_high_round () =
@@ -153,15 +141,14 @@ let test_too_high_round () =
   Environment.wrap_tzresult (Round.of_int 1) >>?= fun round ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~is_preendorsement:true
     ~endorsed_block:pred
     ~round
     ~level
     ~error:(function
       | Validate_errors.Consensus.Preendorsement_round_too_high _ -> true
       | _ -> false)
-    ~construction_mode:(pred, Some pred.header.protocol_data)
-    ()
+    Preendorsement
+    Construction
 
 (** Duplicate preendorsement : apply a preendorsement that has already been applied. *)
 let test_duplicate_preendorsement () =
@@ -207,6 +194,10 @@ let tests =
   AppMode.tests @ ConstrMode.tests
   @ [
       Tztest.tztest
+        "Preendorsement with arbitrary branch"
+        `Quick
+        test_preendorsement_with_arbitrary_branch;
+      Tztest.tztest
         "Preendorsement for future level"
         `Quick
         test_consensus_operation_preendorsement_for_future_level;
@@ -244,3 +235,7 @@ let tests =
         `Quick
         test_preendorsement_for_next_round;
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("preendorsement", tests)]
+  |> Lwt_main.run

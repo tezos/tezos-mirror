@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (temporary big maps)
-    Invocation: cd src/proto_alpha/lib_protocol/test/integration/michelson \
-                && dune exec ./main.exe -- test "^temp big maps$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_temp_big_maps.ml
     Subject:    On temporary big maps.
 *)
 
@@ -64,6 +64,8 @@ let call_the_contract b ~baker ~src contract param_left param_right =
   Incremental.add_operation incr operation >>=? fun incr ->
   Incremental.finalize_block incr
 
+let path = project_root // Filename.dirname __FILE__
+
 (** Originates the contract at contracts/temp_big_maps.tz and calls it with
     the pair [(param_left, param_right)].
     An action (originating, storing, passing, passing twice) is done on a big
@@ -73,7 +75,7 @@ let call_the_contract b ~baker ~src contract param_left param_right =
 let test_temp_big_maps_contract param_left param_right () =
   Contract_helpers.init () >>=? fun (b, baker, src, _src2) ->
   Contract_helpers.originate_contract
-    "contracts/temp_big_maps.tz"
+    (path // "contracts/temp_big_maps.tz")
     "{}"
     src
     b
@@ -99,3 +101,7 @@ let tests =
                (test_temp_big_maps_contract param_left param_right))
            param_right_values)
        param_left_values)
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("temp big maps", tests)]
+  |> Lwt_main.run

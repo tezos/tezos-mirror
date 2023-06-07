@@ -1,0 +1,10 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name polynomial)
+ (public_name octez-polynomial)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  bls12-381
+  zarith))

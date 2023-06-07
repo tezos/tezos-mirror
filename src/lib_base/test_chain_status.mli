@@ -36,6 +36,8 @@ type t =
       expiration : Time.Protocol.t;
     }
 
+val equal : t -> t -> bool
+
 val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit

@@ -26,7 +26,8 @@
 (* Testing
    -------
    Component:    Base, Protocol
-   Invocation:   dune build @src/lib_base/runtest
+   Invocation:   dune exec src/lib_base/test/main.exe \
+                  -- --file test_protocol.ml
    Subject:      Check the ordering of protocol versions
 *)
 
@@ -65,5 +66,6 @@ let env_v_comparison_checks =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Protocol"
     [("environment-version-comparison", env_v_comparison_checks)]

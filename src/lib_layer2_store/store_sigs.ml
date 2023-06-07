@@ -46,38 +46,41 @@ module type BACKEND = sig
       or both read and written. *)
   type +'a t
 
+  (** [name] is the name of the store. *)
+  val name : string
+
   (** [make_key_path path raw_key] constructs a new path from [path]
       and the [raw_key] key_path_representation. *)
   val make_key_path : path -> key_path_representation -> path
 
   (** [load location] loads the backend storage from [location]. *)
-  val load : 'a mode -> string -> 'a t Lwt.t
+  val load : 'a mode -> string -> 'a t tzresult Lwt.t
 
   (** [flush location] flushes to disk a sequence of changes to the data stored
       at [location]. *)
-  val flush : [> `Write] t -> unit
+  val flush : [> `Write] t -> unit tzresult
 
   (** [close t] closes the storage backend [t]. *)
-  val close : _ t -> unit Lwt.t
+  val close : _ t -> unit tzresult Lwt.t
 
   (** [set_exn t path b] sets the contents for the store [t] at [path] to the
       sequence of bytes [b]. The write operation can fail, in which case an
       exception is thrown. *)
-  val set_exn : [> `Write] t -> path -> bytes -> unit Lwt.t
+  val set : [> `Write] t -> path -> bytes -> unit tzresult Lwt.t
 
   (** [get t path] returns the contents for the store [t] at the location
       indicated by [path]. It can fail if [t] does not have any content
       stored at [path]. *)
-  val get : [> `Read] t -> path -> bytes Lwt.t
+  val get : [> `Read] t -> path -> bytes tzresult Lwt.t
 
   (** [mem t path] returns whether the storage backend [t] contains any
       data at the location indicated by [path]. *)
-  val mem : [> `Read] t -> path -> bool Lwt.t
+  val mem : [> `Read] t -> path -> bool tzresult Lwt.t
 
   (** [find t path] is the same as [get t path], except that an optional
       value is returned. This value is [None] if the backend storage [t]
       does not have any content stored at location [path]. *)
-  val find : [> `Read] t -> path -> bytes option Lwt.t
+  val find : [> `Read] t -> path -> bytes option tzresult Lwt.t
 
   (** [path_to_string] converts a path to a string. *)
   val path_to_string : path -> string
@@ -95,18 +98,18 @@ module type Mutable_value = sig
   type value
 
   (** [set store value] persists [value] for this [Mutable_value] on [store]. *)
-  val set : [> `Write] store -> value -> unit Lwt.t
+  val set : [> `Write] store -> value -> unit tzresult Lwt.t
 
   (** [get store] retrieves the value persisted in [store] for this
       [Mutable_value]. If the underlying storage backend fails to retrieve the
       contents of the mutable value by throwing an exception, then the
       exception is propagated by [get store].  *)
-  val get : [> `Read] store -> value Lwt.t
+  val get : [> `Read] store -> value tzresult Lwt.t
 
   (** [find store] returns an optional value containing the value persisted
         in [store] for this [Mutable_value]. If no value is persisted for the
         [Mutable_value], [None] is returned. *)
-  val find : [> `Read] store -> value option Lwt.t
+  val find : [> `Read] store -> value option tzresult Lwt.t
 end
 
 (** This module contains information about where to store and retrieve contents
@@ -154,27 +157,27 @@ module type Map = sig
 
   (** [mem store key] checks whether there is a binding of the map for key [key]
       in [store]. *)
-  val mem : [> `Read] store -> key -> bool Lwt.t
+  val mem : [> `Read] store -> key -> bool tzresult Lwt.t
 
   (** [get store key] retrieves from [store] the value associated with [key] in
       the map. It raises an error if such a value does not exist. *)
-  val get : [> `Read] store -> key -> value Lwt.t
+  val get : [> `Read] store -> key -> value tzresult Lwt.t
 
   (** [find store key] retrieves from [store] the value associated with [key]
       in the map. If the value exists it is returned as an optional value.
       Otherwise, [None] is returned. *)
-  val find : [> `Read] store -> key -> value option Lwt.t
+  val find : [> `Read] store -> key -> value option tzresult Lwt.t
 
   (** [find_with_default ~on_default store key] retrieves from [store] the
       value associated with [key] in the map.
       If the value exists it is returned as is.
       Otherwise, [on_default] is returned. *)
   val find_with_default :
-    [> `Read] store -> key -> on_default:(unit -> value) -> value Lwt.t
+    [> `Read] store -> key -> on_default:(unit -> value) -> value tzresult Lwt.t
 
   (** [add store key value] adds a binding from [key] to [value] to the map, and
       persists it to disk. *)
-  val add : [> `Write] store -> key -> value -> unit Lwt.t
+  val add : [> `Write] store -> key -> value -> unit tzresult Lwt.t
 end
 
 (** Generic module type for append-only maps to be persisted on disk. *)
@@ -184,7 +187,7 @@ module type Append_only_map = sig
   (** [add store key value] adds a binding from [key] to [value] to the map, and
       persists it to disk. If [key] already exists in the store, it must be
       bound to [value]. *)
-  val add : rw store -> key -> value -> unit Lwt.t
+  val add : rw store -> key -> value -> unit tzresult Lwt.t
 end
 
 (** [Nested_map] is a map where values are indexed by both a primary and
@@ -207,12 +210,6 @@ module type Nested_map = sig
       indexed by primary and secondary key. *)
   type value
 
-  (** [Get_failed {primary_key; secondary_key}] is an exception that is thrown
-      when trying to get the value for a non-existing binding for [primary_key]
-      and [secondary_key]. *)
-  exception
-    Get_failed of {primary_key : primary_key; secondary_key : secondary_key}
-
   (** [mem store ~primary_key ~secondary_key] returns whether there is a
       value for the nested map persisted on [store] for the nested map,
       indexed by [primary_key] and then by [secondary_key]. *)
@@ -220,17 +217,18 @@ module type Nested_map = sig
     [> `Read] store ->
     primary_key:primary_key ->
     secondary_key:secondary_key ->
-    bool Lwt.t
+    bool tzresult Lwt.t
 
   (** [get store ~primary_key ~secondary_key] retrieves from [store] the value
       of the nested map associated with [primary_key] and [secondary_key], if
-      any. If such a value does not exist, it raises the exception
-      [Get_failed {primary_key; secondary_key}]. *)
+      any. If such a value does not exist, it fails with error
+      [Store_errors.Cannot_read_key_from_store k], where [k] is the string
+      representation of the primary key. *)
   val get :
     [> `Read] store ->
     primary_key:primary_key ->
     secondary_key:secondary_key ->
-    value Lwt.t
+    value tzresult Lwt.t
 
   (** [find store ~primary_key ~secondary_key] is the same as
       [get store ~primary_key ~secondary_key], except that no error is thrown
@@ -241,7 +239,7 @@ module type Nested_map = sig
     [> `Read] store ->
     primary_key:primary_key ->
     secondary_key:secondary_key ->
-    value option Lwt.t
+    value option tzresult Lwt.t
 
   (** [list secondary_keys store ~primary_key] retrieves from [store] the list
       of bindings of the nested map that share the same [~primary_key]. For
@@ -249,19 +247,21 @@ module type Nested_map = sig
   val list_secondary_keys_with_values :
     [> `Read] store ->
     primary_key:primary_key ->
-    (secondary_key * value) list Lwt.t
+    (secondary_key * value) list tzresult Lwt.t
 
   (** [list_secondary_keys store ~primary_key] retrieves from [store]
       the list of secondary_keys for which a value indexed by both
       [primary_key] and secondary key is persisted on disk. *)
   val list_secondary_keys :
-    [> `Read] store -> primary_key:primary_key -> secondary_key list Lwt.t
+    [> `Read] store ->
+    primary_key:primary_key ->
+    secondary_key list tzresult Lwt.t
 
   (** [list_values store ~primary_key] retrieves from [store] the list of
       values for which a binding with primary key [primary_key] and
       arbitrary secondary key exists. *)
   val list_values :
-    [> `Read] store -> primary_key:primary_key -> value list Lwt.t
+    [> `Read] store -> primary_key:primary_key -> value list tzresult Lwt.t
 
   (** [add store ~primary_key ~secondary_key value] persists [value] to
       disk. The value is bound to the [primary_key] and [secondary_key].
@@ -271,7 +271,7 @@ module type Nested_map = sig
     primary_key:primary_key ->
     secondary_key:secondary_key ->
     value ->
-    unit Lwt.t
+    unit tzresult Lwt.t
 end
 
 (** [COMPARABLE_KEY] is a module type used to define secondary keys in nested

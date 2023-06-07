@@ -1,0 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name octez_smart_rollup_wasm_benchmark)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  octez_smart_rollup_wasm_benchmark_lib)
+ (preprocess (pps ppx_deriving.show))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))

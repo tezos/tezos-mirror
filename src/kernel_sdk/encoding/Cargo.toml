@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-smart-rollup-encoding"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["TriliTech <contact@trili.tech>"]
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "Data Encodings used by Tezos Smart Rollup kernels."
+keywords = ["tezos", "smart", "rollup"]
+categories = ["no-std", "no-std::no-alloc", "encoding", "wasm"]
+
+[dependencies]
+tezos_data_encoding = { version = "0.4", optional = true }
+tezos_data_encoding_derive = { version = "0.4", optional = true }
+nom = { version = "6.1", default-features = false }
+tezos_crypto_rs = { version = "0.4", default-features = false, optional = true }
+
+num-bigint = { version = "0.3", optional = true }
+num-traits = { version = "0.2.8", optional = true }
+time = { version = "0.3", features = [
+    "formatting",
+    "parsing",
+], optional = true }
+proptest = { version = "1.0", optional = true }
+hex = { version = "0.4.3", optional = true }
+thiserror = { version = "1.0", optional = true }
+
+[dependencies.tezos-smart-rollup-core]
+path = "../core"
+version = "0.1.0"
+default-features = false
+
+[dependencies.tezos-smart-rollup-host]
+path = "../host"
+version = "0.1.0"
+default-features = false
+
+[features]
+default = ["alloc", "tezos-encoding"]
+testing = ["crypto", "num-bigint", "num-traits", "proptest"]
+crypto = ["tezos_crypto_rs"]
+alloc = ["crypto", "thiserror", "hex", "num-traits", "num-bigint"]
+tezos-encoding = ["tezos_data_encoding", "tezos_data_encoding_derive", "time"]

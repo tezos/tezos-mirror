@@ -28,8 +28,7 @@ exception Status_already_ready
 type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
-  dal_plugin : (module Dal_plugin.T);
-  dac_plugin : (module Dac_plugin.T);
+  plugin : (module Dal_plugin.T);
 }
 
 type status = Ready of ready_ctxt | Starting
@@ -47,7 +46,10 @@ let init config store cctxt =
   let neighbors_cctxts =
     List.map
       (fun Configuration.{addr; port} ->
-        Dal_node_client.make_unix_cctxt ~addr ~port)
+        let endpoint =
+          Uri.of_string ("http://" ^ addr ^ ":" ^ string_of_int port)
+        in
+        Dal_node_client.make_unix_cctxt endpoint)
       config.Configuration.neighbors
   in
   {
@@ -60,10 +62,9 @@ let init config store cctxt =
       Committee_cache.create ~max_size:Constants.committee_cache_size;
   }
 
-let set_ready ctxt ~dal_plugin ~dac_plugin cryptobox proto_parameters =
+let set_ready ctxt plugin cryptobox proto_parameters =
   match ctxt.status with
-  | Starting ->
-      ctxt.status <- Ready {dac_plugin; dal_plugin; cryptobox; proto_parameters}
+  | Starting -> ctxt.status <- Ready {plugin; cryptobox; proto_parameters}
   | Ready _ -> raise Status_already_ready
 
 type error += Node_not_ready
@@ -98,14 +99,14 @@ let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
 
 let get_neighbors_cctxts ctxt = ctxt.neighbors_cctxts
 
-let fetch_assigned_shard_indicies ctxt ~level ~pkh =
+let fetch_assigned_shard_indices ctxt ~level ~pkh =
   let open Lwt_result_syntax in
   let {tezos_node_cctxt = cctxt; committee_cache = cache; _} = ctxt in
   let+ committee =
     match Committee_cache.find cache ~level with
     | Some committee -> return committee
     | None ->
-        let*? {dal_plugin = (module Plugin); _} = get_ready ctxt in
+        let*? {plugin = (module Plugin); _} = get_ready ctxt in
         let+ committee = Plugin.get_committee cctxt ~level in
         let committee =
           Tezos_crypto.Signature.Public_key_hash.Map.map

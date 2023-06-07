@@ -28,8 +28,8 @@
 (** Testing
     -------
     Component:  Protocol (tx rollup l2)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "tx rollup l2"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_tx_rollup_l2.ml
     Subject:    test the layer-2 implementation of transaction rollup
 *)
 
@@ -289,10 +289,11 @@ module Test_index (Index : S) = struct
   let tests =
     wrap_tztest_tests
       [
-        ("test set and get", test_set_and_get);
-        ("test associate fresh index", test_associate_fresh_index);
-        ("test associate same value twice", test_associate_value_twice);
-        ("test the limit of indexes", test_reach_too_many_l2);
+        (Index.name ^ ", test set and get", test_set_and_get);
+        (Index.name ^ ", test associate fresh index", test_associate_fresh_index);
+        ( Index.name ^ ", test associate same value twice",
+          test_associate_value_twice );
+        (Index.name ^ ", test the limit of indexes", test_reach_too_many_l2);
       ]
 end
 
@@ -560,12 +561,7 @@ module Test_batch_encodings = struct
     return_unit
 
   let tests =
-    [
-      tztest
-        "test layer-2 transaction encoding size"
-        `Quick
-        test_l2_transaction_size;
-    ]
+    [tztest "layer-2 transaction encoding size" `Quick test_l2_transaction_size]
 end
 
 let tests =
@@ -573,3 +569,7 @@ let tests =
   @ Test_Address_index.tests @ Test_Ticket_index.tests
   @ Test_Address_medata.tests @ Test_Ticket_ledger.tests
   @ Test_batch_encodings.tests
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("tx rollup l2", tests)]
+  |> Lwt_main.run

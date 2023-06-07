@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (Ticket_scanner)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                -- test "^ticket accounting"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_ticket_accounting.ml
     Subject:    Ticket scanner tests
 *)
 
@@ -1473,3 +1472,7 @@ let tests =
       `Quick
       test_ticket_token_map_of_list_with_duplicates;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("ticket accounting", tests)]
+  |> Lwt_main.run

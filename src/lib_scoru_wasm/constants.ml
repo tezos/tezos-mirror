@@ -64,3 +64,11 @@ let too_many_reboot_flag_key =
    kernel can do with a given inbox. *)
 let reboot_counter_key =
   Durable.key_of_string_exn "/readonly/kernel/env/reboot_counter"
+
+let version_key = Durable.key_of_string_exn "/readonly/wasm_version"
+
+let stack_size_limit = 300
+
+let nairobi_name = "nairobi_017"
+
+let proto_alpha_name = "alpha_current"

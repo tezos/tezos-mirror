@@ -28,7 +28,8 @@ open Utils.Infix
 (** Testing
     -------
     Component:    stdlib
-    Invocation:   dune build @src/lib_stdlib/test/runtest
+    Invocation:   dune exec src/lib_stdlib/test/main.exe \
+                  -- --file test_bits.ml
     Subject:      On fast numbits implementation
  *)
 
@@ -63,4 +64,4 @@ let tests =
     ("numbits_correct", `Slow, exhaustive_check);
   ]
 
-let () = Alcotest.run "stdlib" [("numbits", tests)]
+let () = Alcotest.run ~__FILE__ "stdlib" [("numbits", tests)]

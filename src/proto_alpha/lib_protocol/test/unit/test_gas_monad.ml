@@ -27,7 +27,7 @@
     -------
     Component:  Protocol Gas_monad
     Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-      -- test "^\[Unit\] gas monad$"
+                  -- --file test_gas_monad.ml
     Subject:    Tests for the gas monad module
 *)
 
@@ -196,17 +196,24 @@ let test_syntax_module () =
 
 let tests =
   [
-    Tztest.tztest "Test exhaustion" `Quick test_gas_exhaustion;
+    Tztest.tztest "exhaustion" `Quick test_gas_exhaustion;
     Tztest.tztest
-      "Test exhaustion before error"
+      "exhaustion before error"
       `Quick
       test_gas_exhaustion_before_error;
     Tztest.tztest
-      "Test successful result"
+      "successful result with remaining gas"
       `Quick
       test_successful_with_remaining_gas;
-    Tztest.tztest "Test successful result" `Quick test_successful_with_spare_gas;
-    Tztest.tztest "Test inner error" `Quick test_inner_error;
-    Tztest.tztest "Test unlimited" `Quick test_unlimited;
-    Tztest.tztest "Test syntax module" `Quick test_syntax_module;
+    Tztest.tztest
+      "successful result with spare gas"
+      `Quick
+      test_successful_with_spare_gas;
+    Tztest.tztest "inner error" `Quick test_inner_error;
+    Tztest.tztest "unlimited" `Quick test_unlimited;
+    Tztest.tztest "syntax module" `Quick test_syntax_module;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("gas monad", tests)]
+  |> Lwt_main.run

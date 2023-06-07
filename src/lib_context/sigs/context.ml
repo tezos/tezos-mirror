@@ -659,16 +659,12 @@ module type TEZOS_CONTEXT = sig
 
   (** Open or initialize a versioned store at a given path.
 
-      @param indexing_strategy determines whether newly-exported objects by
-      this store handle should also be added to the store's index. [`Minimal]
-      (the default) only adds objects to the index when they are {i commits},
-      whereas [`Always] indexes every object type. The indexing strategy used
-      for existing stores can be changed without issue (as only {i
-      newly}-exported objects are impacted). *)
+      The indexing_strategy, which determines whether newly-exported
+      objects by this store handle should also be added to the store's
+      index, is set to [`Minimal] by default. *)
   val init :
     ?patch_context:(context -> context tzresult Lwt.t) ->
     ?readonly:bool ->
-    ?indexing_strategy:[`Always | `Minimal] ->
     ?index_log_size:int ->
     string ->
     index Lwt.t
@@ -843,9 +839,10 @@ module type TEZOS_CONTEXT = sig
     context -> Operation_metadata_list_list_hash.t -> context Lwt.t
 end
 
-(** Functor `With_get_data` adds a `get_data` function to modules of signature `S`.
-    Note that the partially applied `get_data kind key` function has the correct
-    type to be provided to {produce,verify}_tree_proof, which is its intended goal. *)
+(** Functor [With_get_data] adds a [get_data] function to modules of signature [S].
+    Note that the partially applied [get_data kind key] function has the correct
+    type to be provided to [produce_tree_proof] and [verify_tree_proof] which is
+    its intended goal. *)
 module type Storelike = sig
   (* The type of keys in the store *)
   type key = string list

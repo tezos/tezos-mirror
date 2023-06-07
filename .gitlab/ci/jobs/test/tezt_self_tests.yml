@@ -1,7 +1,0 @@
-# Tests tezt itself
-tezt:self_tests:
-  extends:
-    - .build_template
-  stage: test
-  script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-tezt-self-test

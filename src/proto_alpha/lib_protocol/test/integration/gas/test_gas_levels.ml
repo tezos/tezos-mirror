@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (Gas levels)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/gas/main.exe \
-                -- test "^gas levels$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/gas/main.exe \
+                  -- --file test_gas_levels.ml
     Subject:    On gas consumption and exhaustion.
 *)
 
@@ -366,9 +365,12 @@ let bake_operations_with_gas block list_list_dst =
   bake_with_gas ~operations block >>=? fun (block, consumed_gas) ->
   return (block, consumed_gas, gas_limit_total)
 
+(* A sampler for gas limits, the returned value should always be high
+   enough to apply a simple manager operation but lower than the
+   operation gas limit. *)
 let basic_gas_sampler () =
   Alpha_context.Gas.Arith.integral_of_int_exn
-    (Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation + 100
+    (Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation + 1000
    + Random.int 900)
 
 let generic_test_block_one_origination contract gas_sampler structure =
@@ -396,10 +398,10 @@ let make_batch_test_block_one_origination name contract gas_sampler =
   let app_n = List.map (fun (x, y) -> (x ^ " with contract " ^ name, y)) in
   app_n
     [
-      ("Test bake one operation", test_one_operation);
-      ("Test bake one operation list", test_one_operation_list);
-      ("Test multiple single operations", test_many_single_operations);
-      ("Test both lists and single operations", test_mixed_operations);
+      ("bake one operation", test_one_operation);
+      ("bake one operation list", test_one_operation_list);
+      ("multiple single operations", test_many_single_operations);
+      ("both lists and single operations", test_mixed_operations);
     ]
 
 (** Tests the consumption of all gas in a block, should pass *)
@@ -504,11 +506,7 @@ let test_emptying_account_gas () =
   Block.bake ~operation:op1 b >>=? fun b ->
   Op.revelation ~fee:Tez.zero (B b) pk >>=? fun op2 ->
   Block.bake ~operation:op2 b >>=? fun b ->
-  let gas_limit =
-    Op.Custom_gas
-      (Gas.Arith.integral_of_int_exn
-         Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation)
-  in
+  let gas_limit = Op.Low in
   Op.delegation ~fee:amount ~gas_limit (B b) contract (Some bootstrap_pkh)
   >>=? fun op ->
   Incremental.begin_construction b >>=? fun i ->
@@ -556,9 +554,8 @@ let tests =
        ( "Detect when gas limit of operation list exceeds the hard gas limit \
           per block",
          test_malformed_block_max_limit_reached' );
-       ( "Test the gas consumption of various operations",
-         test_block_mixed_operations );
-       ("Test that emptying an account costs gas", test_emptying_account_gas);
+       ("the gas consumption of various operations", test_block_mixed_operations);
+       ("emptying an account costs gas", test_emptying_account_gas);
      ]
     @ make_batch_test_block_one_origination "nil" nil_contract basic_gas_sampler
     @ make_batch_test_block_one_origination
@@ -569,3 +566,7 @@ let tests =
         "infinite loop"
         loop_contract
         basic_gas_sampler)
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("gas levels", tests)]
+  |> Lwt_main.run

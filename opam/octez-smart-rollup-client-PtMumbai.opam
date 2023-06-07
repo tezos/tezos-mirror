@@ -11,22 +11,18 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "tezos-base"
-  "tezos-clic"
-  "tezos-client-base"
-  "tezos-client-016-PtMumbai"
-  "tezos-client-commands"
-  "tezos-stdlib-unix"
-  "tezos-client-base-unix"
-  "tezos-rpc-http"
-  "tezos-rpc-http-client-unix"
   "tezos-protocol-016-PtMumbai"
+  "tezos-client-commands"
+  "tezos-client-base"
+  "tezos-client-base-unix"
+  "tezos-client-016-PtMumbai"
   "tezos-smart-rollup-016-PtMumbai"
   "tezos-smart-rollup-layer2-016-PtMumbai"
-  "uri" { >= "3.1.0" }
+  "tezos-clic"
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: `octez-smart-rollup-client-alpha` client binary"
+synopsis: "Tezos/Protocol: Smart rollup client"

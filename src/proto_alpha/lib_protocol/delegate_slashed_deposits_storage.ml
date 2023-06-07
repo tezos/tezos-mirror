@@ -71,7 +71,6 @@ let punish_double_endorsing ctxt delegate (level : Level_repr.t) =
       `Double_signing_punishments
       amount_to_burn
   in
-  let* ctxt = Stake_storage.remove_stake ctxt delegate amount_to_burn in
   let*! ctxt =
     Storage.Slashed_deposits.add
       (ctxt, level.cycle)
@@ -107,7 +106,6 @@ let punish_double_baking ctxt delegate (level : Level_repr.t) =
       `Double_signing_punishments
       amount_to_burn
   in
-  let* ctxt = Stake_storage.remove_stake ctxt delegate amount_to_burn in
   let*! ctxt =
     Storage.Slashed_deposits.add
       (ctxt, level.cycle)

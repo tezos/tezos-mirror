@@ -1,0 +1,410 @@
+
+./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/contains_all.tz on storage None and input '(Pair { "B" ; "B" ; "asdf" ; "C" } { "B" ; "C" ; "asdf" })' --level 1 --trace-stack
+storage
+  (Some True)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 12 (just consumed gas: 32.931)
+    [ (Pair (Pair { "B" ; "B" ; "asdf" ; "C" } { "B" ; "C" ; "asdf" }) None) ]
+  - location: 12 (just consumed gas: 0.010)
+    [ (Pair { "B" ; "B" ; "asdf" ; "C" } { "B" ; "C" ; "asdf" }) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ (Pair { "B" ; "B" ; "asdf" ; "C" } { "B" ; "C" ; "asdf" })
+      (Pair { "B" ; "B" ; "asdf" ; "C" } { "B" ; "C" ; "asdf" }) ]
+  - location: 14 (just consumed gas: 0.010)
+    [ { "B" ; "B" ; "asdf" ; "C" }
+      (Pair { "B" ; "B" ; "asdf" ; "C" } { "B" ; "C" ; "asdf" }) ]
+  - location: 15 (just consumed gas: 0)
+    [ (Pair { "B" ; "B" ; "asdf" ; "C" } { "B" ; "C" ; "asdf" }) ]
+  - location: 17 (just consumed gas: 0.010)
+    [ { "B" ; "C" ; "asdf" } ]
+  - location: 15 (just consumed gas: 0.025)
+    [ { "B" ; "B" ; "asdf" ; "C" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 18 (just consumed gas: 0.300)
+    [ {}
+      { "B" ; "B" ; "asdf" ; "C" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 20 (just consumed gas: 0.010)
+    [ { "B" ; "B" ; "asdf" ; "C" }
+      {}
+      { "B" ; "C" ; "asdf" } ]
+  - location: 21 (just consumed gas: 0)
+    [ "B"
+      {}
+      { "B" ; "C" ; "asdf" } ]
+  - location: 23 (just consumed gas: 0.010)
+    [ (Pair "B" {})
+      { "B" ; "C" ; "asdf" } ]
+  - location: 24 (just consumed gas: 0.010)
+    [ (Pair "B" {})
+      (Pair "B" {})
+      { "B" ; "C" ; "asdf" } ]
+  - location: 25 (just consumed gas: 0.010)
+    [ "B"
+      (Pair "B" {})
+      { "B" ; "C" ; "asdf" } ]
+  - location: 26 (just consumed gas: 0)
+    [ (Pair "B" {})
+      { "B" ; "C" ; "asdf" } ]
+  - location: 28 (just consumed gas: 0.010)
+    [ {}
+      { "B" ; "C" ; "asdf" } ]
+  - location: 26 (just consumed gas: 0.025)
+    [ "B"
+      {}
+      { "B" ; "C" ; "asdf" } ]
+  - location: 29 (just consumed gas: 0.010)
+    [ True
+      "B"
+      {}
+      { "B" ; "C" ; "asdf" } ]
+  - location: 32 (just consumed gas: 0.010)
+    [ "B"
+      True
+      {}
+      { "B" ; "C" ; "asdf" } ]
+  - location: 33 (just consumed gas: 0.132)
+    [ { "B" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 21 (just consumed gas: 0.015)
+    [ "B"
+      { "B" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 23 (just consumed gas: 0.010)
+    [ (Pair "B" { "B" })
+      { "B" ; "C" ; "asdf" } ]
+  - location: 24 (just consumed gas: 0.010)
+    [ (Pair "B" { "B" })
+      (Pair "B" { "B" })
+      { "B" ; "C" ; "asdf" } ]
+  - location: 25 (just consumed gas: 0.010)
+    [ "B"
+      (Pair "B" { "B" })
+      { "B" ; "C" ; "asdf" } ]
+  - location: 26 (just consumed gas: 0)
+    [ (Pair "B" { "B" })
+      { "B" ; "C" ; "asdf" } ]
+  - location: 28 (just consumed gas: 0.010)
+    [ { "B" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 26 (just consumed gas: 0.025)
+    [ "B"
+      { "B" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 29 (just consumed gas: 0.010)
+    [ True
+      "B"
+      { "B" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 32 (just consumed gas: 0.010)
+    [ "B"
+      True
+      { "B" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 33 (just consumed gas: 0.134)
+    [ { "B" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 21 (just consumed gas: 0.015)
+    [ "asdf"
+      { "B" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 23 (just consumed gas: 0.010)
+    [ (Pair "asdf" { "B" })
+      { "B" ; "C" ; "asdf" } ]
+  - location: 24 (just consumed gas: 0.010)
+    [ (Pair "asdf" { "B" })
+      (Pair "asdf" { "B" })
+      { "B" ; "C" ; "asdf" } ]
+  - location: 25 (just consumed gas: 0.010)
+    [ "asdf"
+      (Pair "asdf" { "B" })
+      { "B" ; "C" ; "asdf" } ]
+  - location: 26 (just consumed gas: 0)
+    [ (Pair "asdf" { "B" })
+      { "B" ; "C" ; "asdf" } ]
+  - location: 28 (just consumed gas: 0.010)
+    [ { "B" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 26 (just consumed gas: 0.025)
+    [ "asdf"
+      { "B" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 29 (just consumed gas: 0.010)
+    [ True
+      "asdf"
+      { "B" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 32 (just consumed gas: 0.010)
+    [ "asdf"
+      True
+      { "B" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 33 (just consumed gas: 0.146)
+    [ { "B" ; "asdf" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 21 (just consumed gas: 0.015)
+    [ "C"
+      { "B" ; "asdf" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 23 (just consumed gas: 0.010)
+    [ (Pair "C" { "B" ; "asdf" })
+      { "B" ; "C" ; "asdf" } ]
+  - location: 24 (just consumed gas: 0.010)
+    [ (Pair "C" { "B" ; "asdf" })
+      (Pair "C" { "B" ; "asdf" })
+      { "B" ; "C" ; "asdf" } ]
+  - location: 25 (just consumed gas: 0.010)
+    [ "C"
+      (Pair "C" { "B" ; "asdf" })
+      { "B" ; "C" ; "asdf" } ]
+  - location: 26 (just consumed gas: 0)
+    [ (Pair "C" { "B" ; "asdf" })
+      { "B" ; "C" ; "asdf" } ]
+  - location: 28 (just consumed gas: 0.010)
+    [ { "B" ; "asdf" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 26 (just consumed gas: 0.025)
+    [ "C"
+      { "B" ; "asdf" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 29 (just consumed gas: 0.010)
+    [ True
+      "C"
+      { "B" ; "asdf" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 32 (just consumed gas: 0.010)
+    [ "C"
+      True
+      { "B" ; "asdf" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 33 (just consumed gas: 0.136)
+    [ { "B" ; "C" ; "asdf" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 21 (just consumed gas: 0.015)
+    [ { "B" ; "C" ; "asdf" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 34 (just consumed gas: 0.010)
+    [ True
+      { "B" ; "C" ; "asdf" }
+      { "B" ; "C" ; "asdf" } ]
+  - location: 37 (just consumed gas: 0.010)
+    [ { "B" ; "C" ; "asdf" }
+      True
+      { "B" ; "C" ; "asdf" } ]
+  - location: 38 (just consumed gas: 0.010)
+    [ (Pair { "B" ; "C" ; "asdf" } True)
+      { "B" ; "C" ; "asdf" } ]
+  - location: 39 (just consumed gas: 0.010)
+    [ { "B" ; "C" ; "asdf" }
+      (Pair { "B" ; "C" ; "asdf" } True) ]
+  - location: 40 (just consumed gas: 0)
+    [ "B"
+      (Pair { "B" ; "C" ; "asdf" } True) ]
+  - location: 42 (just consumed gas: 0.010)
+    [ (Pair "B" { "B" ; "C" ; "asdf" } True) ]
+  - location: 43 (just consumed gas: 0.010)
+    [ (Pair "B" { "B" ; "C" ; "asdf" } True)
+      (Pair "B" { "B" ; "C" ; "asdf" } True) ]
+  - location: 44 (just consumed gas: 0.010)
+    [ (Pair "B" { "B" ; "C" ; "asdf" } True)
+      (Pair "B" { "B" ; "C" ; "asdf" } True)
+      (Pair "B" { "B" ; "C" ; "asdf" } True) ]
+  - location: 45 (just consumed gas: 0.010)
+    [ "B"
+      (Pair "B" { "B" ; "C" ; "asdf" } True)
+      (Pair "B" { "B" ; "C" ; "asdf" } True) ]
+  - location: 46 (just consumed gas: 0)
+    [ (Pair "B" { "B" ; "C" ; "asdf" } True)
+      (Pair "B" { "B" ; "C" ; "asdf" } True) ]
+  - location: 49 (just consumed gas: 0.010)
+    [ (Pair { "B" ; "C" ; "asdf" } True)
+      (Pair "B" { "B" ; "C" ; "asdf" } True) ]
+  - location: 50 (just consumed gas: 0.010)
+    [ { "B" ; "C" ; "asdf" }
+      (Pair "B" { "B" ; "C" ; "asdf" } True) ]
+  - location: 51 (just consumed gas: 0)
+    [ (Pair "B" { "B" ; "C" ; "asdf" } True) ]
+  - location: 54 (just consumed gas: 0.010)
+    [ (Pair { "B" ; "C" ; "asdf" } True) ]
+  - location: 55 (just consumed gas: 0.010)
+    [ True ]
+  - location: 51 (just consumed gas: 0.025)
+    [ { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 56 (just consumed gas: 0.010)
+    [ { "B" ; "C" ; "asdf" }
+      { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 46 (just consumed gas: 0.025)
+    [ "B"
+      { "B" ; "C" ; "asdf" }
+      { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 57 (just consumed gas: 0.118)
+    [ True
+      { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 58 (just consumed gas: 0)
+    [ { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 60 (just consumed gas: 0.010)
+    [ True
+      { "B" ; "C" ; "asdf" } ]
+  - location: 58 (just consumed gas: 0.025)
+    [ True
+      True
+      { "B" ; "C" ; "asdf" } ]
+  - location: 61 (just consumed gas: 0.010)
+    [ True
+      { "B" ; "C" ; "asdf" } ]
+  - location: 62 (just consumed gas: 0.010)
+    [ { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 63 (just consumed gas: 0.010)
+    [ (Pair { "B" ; "C" ; "asdf" } True) ]
+  - location: 40 (just consumed gas: 0.015)
+    [ "C"
+      (Pair { "B" ; "C" ; "asdf" } True) ]
+  - location: 42 (just consumed gas: 0.010)
+    [ (Pair "C" { "B" ; "C" ; "asdf" } True) ]
+  - location: 43 (just consumed gas: 0.010)
+    [ (Pair "C" { "B" ; "C" ; "asdf" } True)
+      (Pair "C" { "B" ; "C" ; "asdf" } True) ]
+  - location: 44 (just consumed gas: 0.010)
+    [ (Pair "C" { "B" ; "C" ; "asdf" } True)
+      (Pair "C" { "B" ; "C" ; "asdf" } True)
+      (Pair "C" { "B" ; "C" ; "asdf" } True) ]
+  - location: 45 (just consumed gas: 0.010)
+    [ "C"
+      (Pair "C" { "B" ; "C" ; "asdf" } True)
+      (Pair "C" { "B" ; "C" ; "asdf" } True) ]
+  - location: 46 (just consumed gas: 0)
+    [ (Pair "C" { "B" ; "C" ; "asdf" } True)
+      (Pair "C" { "B" ; "C" ; "asdf" } True) ]
+  - location: 49 (just consumed gas: 0.010)
+    [ (Pair { "B" ; "C" ; "asdf" } True)
+      (Pair "C" { "B" ; "C" ; "asdf" } True) ]
+  - location: 50 (just consumed gas: 0.010)
+    [ { "B" ; "C" ; "asdf" }
+      (Pair "C" { "B" ; "C" ; "asdf" } True) ]
+  - location: 51 (just consumed gas: 0)
+    [ (Pair "C" { "B" ; "C" ; "asdf" } True) ]
+  - location: 54 (just consumed gas: 0.010)
+    [ (Pair { "B" ; "C" ; "asdf" } True) ]
+  - location: 55 (just consumed gas: 0.010)
+    [ True ]
+  - location: 51 (just consumed gas: 0.025)
+    [ { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 56 (just consumed gas: 0.010)
+    [ { "B" ; "C" ; "asdf" }
+      { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 46 (just consumed gas: 0.025)
+    [ "C"
+      { "B" ; "C" ; "asdf" }
+      { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 57 (just consumed gas: 0.118)
+    [ True
+      { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 58 (just consumed gas: 0)
+    [ { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 60 (just consumed gas: 0.010)
+    [ True
+      { "B" ; "C" ; "asdf" } ]
+  - location: 58 (just consumed gas: 0.025)
+    [ True
+      True
+      { "B" ; "C" ; "asdf" } ]
+  - location: 61 (just consumed gas: 0.010)
+    [ True
+      { "B" ; "C" ; "asdf" } ]
+  - location: 62 (just consumed gas: 0.010)
+    [ { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 63 (just consumed gas: 0.010)
+    [ (Pair { "B" ; "C" ; "asdf" } True) ]
+  - location: 40 (just consumed gas: 0.015)
+    [ "asdf"
+      (Pair { "B" ; "C" ; "asdf" } True) ]
+  - location: 42 (just consumed gas: 0.010)
+    [ (Pair "asdf" { "B" ; "C" ; "asdf" } True) ]
+  - location: 43 (just consumed gas: 0.010)
+    [ (Pair "asdf" { "B" ; "C" ; "asdf" } True)
+      (Pair "asdf" { "B" ; "C" ; "asdf" } True) ]
+  - location: 44 (just consumed gas: 0.010)
+    [ (Pair "asdf" { "B" ; "C" ; "asdf" } True)
+      (Pair "asdf" { "B" ; "C" ; "asdf" } True)
+      (Pair "asdf" { "B" ; "C" ; "asdf" } True) ]
+  - location: 45 (just consumed gas: 0.010)
+    [ "asdf"
+      (Pair "asdf" { "B" ; "C" ; "asdf" } True)
+      (Pair "asdf" { "B" ; "C" ; "asdf" } True) ]
+  - location: 46 (just consumed gas: 0)
+    [ (Pair "asdf" { "B" ; "C" ; "asdf" } True)
+      (Pair "asdf" { "B" ; "C" ; "asdf" } True) ]
+  - location: 49 (just consumed gas: 0.010)
+    [ (Pair { "B" ; "C" ; "asdf" } True)
+      (Pair "asdf" { "B" ; "C" ; "asdf" } True) ]
+  - location: 50 (just consumed gas: 0.010)
+    [ { "B" ; "C" ; "asdf" }
+      (Pair "asdf" { "B" ; "C" ; "asdf" } True) ]
+  - location: 51 (just consumed gas: 0)
+    [ (Pair "asdf" { "B" ; "C" ; "asdf" } True) ]
+  - location: 54 (just consumed gas: 0.010)
+    [ (Pair { "B" ; "C" ; "asdf" } True) ]
+  - location: 55 (just consumed gas: 0.010)
+    [ True ]
+  - location: 51 (just consumed gas: 0.025)
+    [ { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 56 (just consumed gas: 0.010)
+    [ { "B" ; "C" ; "asdf" }
+      { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 46 (just consumed gas: 0.025)
+    [ "asdf"
+      { "B" ; "C" ; "asdf" }
+      { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 57 (just consumed gas: 0.127)
+    [ True
+      { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 58 (just consumed gas: 0)
+    [ { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 60 (just consumed gas: 0.010)
+    [ True
+      { "B" ; "C" ; "asdf" } ]
+  - location: 58 (just consumed gas: 0.025)
+    [ True
+      True
+      { "B" ; "C" ; "asdf" } ]
+  - location: 61 (just consumed gas: 0.010)
+    [ True
+      { "B" ; "C" ; "asdf" } ]
+  - location: 62 (just consumed gas: 0.010)
+    [ { "B" ; "C" ; "asdf" }
+      True ]
+  - location: 63 (just consumed gas: 0.010)
+    [ (Pair { "B" ; "C" ; "asdf" } True) ]
+  - location: 40 (just consumed gas: 0.015)
+    [ (Pair { "B" ; "C" ; "asdf" } True) ]
+  - location: 64 (just consumed gas: 0.010)
+    [ True ]
+  - location: 65 (just consumed gas: 0.010)
+    [ (Some True) ]
+  - location: 66 (just consumed gas: 0.010)
+    [ {}
+      (Some True) ]
+  - location: 68 (just consumed gas: 0.010)
+    [ (Pair {} (Some True)) ]
+

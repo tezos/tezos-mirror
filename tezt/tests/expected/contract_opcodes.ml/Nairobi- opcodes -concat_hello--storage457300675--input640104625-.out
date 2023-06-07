@@ -1,0 +1,28 @@
+
+./octez-client --protocol PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/concat_hello.tz on storage '{}' and input '{ "World!" }' --level 1 --trace-stack
+storage
+  { "Hello World!" }
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (just consumed gas: 6.615)
+    [ (Pair { "World!" } {}) ]
+  - location: 9 (just consumed gas: 0.010)
+    [ { "World!" } ]
+  - location: 10 (just consumed gas: 0)
+    [ "World!" ]
+  - location: 12 (just consumed gas: 0.010)
+    [ "Hello "
+      "World!" ]
+  - location: 15 (just consumed gas: 0.051)
+    [ "Hello World!" ]
+  - location: 10 (just consumed gas: 0.015)
+    [ { "Hello World!" } ]
+  - location: 16 (just consumed gas: 0.010)
+    [ {}
+      { "Hello World!" } ]
+  - location: 18 (just consumed gas: 0.010)
+    [ (Pair {} { "Hello World!" }) ]
+

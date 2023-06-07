@@ -27,9 +27,8 @@
 (** Testing
     -------
     Component:    Rollup layer 1 logic
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/unit/main.exe \
-                  -- test "^\[Unit\] sc rollup wasm$"
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+                  -- --file test_sc_rollup_wasm.ml
     Subject:      Unit test for the Wasm PVM
 *)
 
@@ -235,7 +234,9 @@ let test_output () =
     match parsed.it with Script.Textual m -> m | _ -> assert false
   in
   let*! boot_sector = Encode.encode parsed in
-  let*! tree = Wasm.initial_state empty_tree in
+  let*! tree =
+    Wasm.initial_state Sc_rollup_wasm.V2_0_0.current_version empty_tree
+  in
   let*! tree =
     Wasm.install_boot_sector
       ~ticks_per_snapshot:Sc_rollup_wasm.V2_0_0.ticks_per_snapshot
@@ -266,12 +267,14 @@ let test_output () =
     | None -> failwith "The PVM output buffer does not contain any outbox."
   in
   let*! last_outbox =
-    Tezos_webassembly_interpreter.Output_buffer.get_outbox
+    Tezos_webassembly_interpreter.Output_buffer.Internal_for_tests.get_outbox
       output
       last_outbox_level
   in
   let* end_of_level_message_index =
-    match Output_buffer.get_outbox_last_message_index last_outbox with
+    match
+      Output_buffer.Internal_for_tests.get_outbox_last_message_index last_outbox
+    with
     | Some index -> return index
     | None -> failwith "The PVM output buffer does not contain any outbox."
   in
@@ -303,6 +306,38 @@ let test_output () =
       fail_unless valid (Exn (Failure "An output proof is not valid."))
   | Error _ -> failwith "Error during proof generation"
 
+(* When snapshoting a new protocol, to fix this test, the following
+   action should be done.
+
+     - In [src/lib_scoru_wasm/constants.ml], add a new variable before
+       [proto_alpha_name] using the name of the new protocol, and whose
+       value is [Raw_context.version_value].
+     - Update [src/lib_scoru_wasm/pvm_input_kind.ml] to add a new case
+       to the type [protocol], and update the functions
+       [protocol_from_raw] and [Internal_for_tests.proto_to_binary]
+       accordingly (by copy/pasting the [Proto_alpha] case and doing
+       the necessary renaming.
+     - Update [src/lib_scoru_wasm/wasm_vm.ml], more precisely the
+       [version_for_protocol] function, to take into account the new
+       protocol. The expected result is the same as for
+       [Proto_alpha]. *)
+let test_protocol_names () =
+  let open Alpha_context.Sc_rollup.Inbox_message in
+  let protocol_migration_message_str =
+    Data_encoding.Binary.to_string_exn
+      encoding
+      (Internal protocol_migration_internal_message)
+  in
+  let kind =
+    Tezos_scoru_wasm.Pvm_input_kind.from_raw_input
+      protocol_migration_message_str
+  in
+  assert (kind = Internal (Protocol_migration Proto_alpha)) ;
+  assert (
+    protocol_migration_internal_message
+    = Protocol_migration Tezos_scoru_wasm.Constants.proto_alpha_name) ;
+  Lwt_result_syntax.return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -311,5 +346,10 @@ let tests =
       test_initial_state_hash_wasm_pvm;
     Tztest.tztest "size of a rollup metadata" `Quick test_metadata_size;
     Tztest.tztest "l1 input kind" `Quick test_l1_input_kind;
-    Tztest.tztest "test output proofs" `Quick test_output;
+    Tztest.tztest "output proofs" `Quick test_output;
+    Tztest.tztest "protocol names consistency" `Quick test_protocol_names;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("sc rollup wasm", tests)]
+  |> Lwt_main.run

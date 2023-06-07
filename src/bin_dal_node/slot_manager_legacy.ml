@@ -27,25 +27,16 @@
 module Event = Event_legacy
 
 type error +=
-  | Splitting_failed of string
   | Merging_failed of string
-  | Invalid_slot_header of string * string
+  | Invalid_commitment of string * string
   | Missing_shards of {provided : int; required : int}
   | Illformed_shard
   | Slot_not_found
   | Illformed_pages
-  | Invalid_shards_slot_header_association
+  | Invalid_shards_commitment_association
+  | Invalid_degree_strictly_less_than_expected of {given : int; expected : int}
 
 let () =
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.split_failed"
-    ~title:"Split failed"
-    ~description:"Splitting the slot failed"
-    ~pp:(fun ppf msg -> Format.fprintf ppf "%s" msg)
-    Data_encoding.(obj1 (req "msg" string))
-    (function Splitting_failed parameter -> Some parameter | _ -> None)
-    (fun parameter -> Splitting_failed parameter) ;
   register_error_kind
     `Permanent
     ~id:"dal.node.merge_failed"
@@ -57,13 +48,13 @@ let () =
     (fun parameter -> Merging_failed parameter) ;
   register_error_kind
     `Permanent
-    ~id:"dal.node.invalid_slot_header"
-    ~title:"Invalid slot_header"
+    ~id:"dal.node.invalid_commitment"
+    ~title:"Invalid commitment"
     ~description:"The slot header is not valid"
     ~pp:(fun ppf (msg, com) -> Format.fprintf ppf "%s : %s" msg com)
     Data_encoding.(obj2 (req "msg" string) (req "com" string))
-    (function Invalid_slot_header (msg, com) -> Some (msg, com) | _ -> None)
-    (fun (msg, com) -> Invalid_slot_header (msg, com)) ;
+    (function Invalid_commitment (msg, com) -> Some (msg, com) | _ -> None)
+    (fun (msg, com) -> Invalid_commitment (msg, com)) ;
   register_error_kind
     `Permanent
     ~id:"dal.node.missing_shards"
@@ -110,86 +101,123 @@ let () =
     (fun () -> Illformed_pages) ;
   register_error_kind
     `Permanent
-    ~id:"dal.node.invalid_shards_slot_header_association"
+    ~id:"dal.node.invalid_shards_commitment_association"
     ~title:"Invalid shards with slot header association"
     ~description:"Shards commit to a different slot header."
     ~pp:(fun ppf () ->
       Format.fprintf ppf "Association between shards and slot header is invalid")
     Data_encoding.(unit)
-    (function Invalid_shards_slot_header_association -> Some () | _ -> None)
-    (fun () -> Invalid_shards_slot_header_association)
+    (function Invalid_shards_commitment_association -> Some () | _ -> None)
+    (fun () -> Invalid_shards_commitment_association) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.invalid_degree"
+    ~title:"Invalid degree"
+    ~description:"The degree of the polynomial is too high"
+    ~pp:(fun ppf (given, expected) ->
+      Cryptobox.pp_commit_error
+        ppf
+        (`Invalid_degree_strictly_less_than_expected
+          Cryptobox.{given; expected}))
+    Data_encoding.(obj2 (req "given" int31) (req "expected" int31))
+    (function
+      | Invalid_degree_strictly_less_than_expected {given; expected} ->
+          Some (given, expected)
+      | _ -> None)
+    (fun (given, expected) ->
+      Invalid_degree_strictly_less_than_expected {given; expected})
 
 type slot = bytes
-
-let save store watcher slot_header shards =
-  let open Lwt_result_syntax in
-  let* () = Shard_store.write_shards store slot_header shards in
-  let*! () =
-    let slot_header_b58 = Cryptobox.Commitment.to_b58check slot_header in
-    Event.(emit stored_slot_shards (slot_header_b58, Seq.length shards))
-  in
-  Lwt_watcher.notify watcher slot_header ;
-  return_unit
-
-let split_and_store watcher cryptobox store slot =
-  let r =
-    let open Result_syntax in
-    let* polynomial = Cryptobox.polynomial_from_slot cryptobox slot in
-    let commitment = Cryptobox.commit cryptobox polynomial in
-    let proof = Cryptobox.prove_commitment cryptobox polynomial in
-    return (polynomial, commitment, proof)
-  in
-  let open Lwt_result_syntax in
-  match r with
-  | Ok (polynomial, commitment, commitment_proof) ->
-      let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
-      let* () = save store watcher commitment shards in
-      Lwt.return_ok (commitment, commitment_proof)
-  | Error (`Slot_wrong_size msg) -> Lwt.return_error [Splitting_failed msg]
 
 let polynomial_from_shards cryptobox shards =
   match Cryptobox.polynomial_from_shards cryptobox shards with
   | Ok p -> Ok p
-  | Error (`Invert_zero msg | `Not_enough_shards msg) ->
+  | Error
+      ( `Not_enough_shards msg
+      | `Shard_index_out_of_range msg
+      | `Invalid_shard_length msg ) ->
       Error [Merging_failed msg]
 
-let save_shards store watcher cryptobox slot_header shards =
+let commit cryptobox polynomial =
+  match Cryptobox.commit cryptobox polynomial with
+  | Ok cm -> Ok cm
+  | Error
+      (`Invalid_degree_strictly_less_than_expected Cryptobox.{given; expected})
+    ->
+      Error [Invalid_degree_strictly_less_than_expected {given; expected}]
+
+let save_shards store cryptobox commitment shards =
   let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_shards cryptobox shards in
-  let rebuilt_slot_header = Cryptobox.commit cryptobox polynomial in
+  let*? rebuilt_commitment = commit cryptobox polynomial in
   let*? () =
-    if Cryptobox.Commitment.equal slot_header rebuilt_slot_header then Ok ()
-    else Result_syntax.fail [Invalid_shards_slot_header_association]
+    if Cryptobox.Commitment.equal commitment rebuilt_commitment then Ok ()
+    else Result_syntax.fail [Invalid_shards_commitment_association]
   in
-  save store watcher slot_header shards
+  Store.(
+    Shards.save_and_notify
+      store.shard_store
+      store.shards_watcher
+      commitment
+      shards)
+  |> Errors.to_tzresult
 
-let get_shard dal_constants store slot_header shard_id =
+let get_shard store commitment shard_id =
   let open Lwt_result_syntax in
-  let share_size = Cryptobox.encoded_share_size dal_constants in
-  let* r = Shard_store.read_shard ~share_size store slot_header shard_id in
-  return r
+  let* share = Store.Shards.read_value store (commitment, shard_id) in
+  return {Cryptobox.share; index = shard_id}
 
-let get_shards dal_constants store slot_header shard_ids =
+let with_commitment_as_seq commitment shards_indices =
+  Seq.map (fun index -> (commitment, index)) @@ List.to_seq shards_indices
+
+let rev_fetched_values_as seq f init =
+  Seq_s.E.fold_left
+    (fun acc ((_commitment, shard_id), v) ->
+      match v with
+      | Error err -> Error err
+      | Ok v -> Ok (f Cryptobox.{index = shard_id; share = v} acc))
+    init
+    seq
+
+let get_shards store commitment shard_ids =
   let open Lwt_result_syntax in
-  let share_size = Cryptobox.encoded_share_size dal_constants in
-  let* r =
-    Shard_store.read_shards_subset ~share_size store slot_header shard_ids
+  let res =
+    Store.Shards.read_values store
+    @@ with_commitment_as_seq commitment shard_ids
   in
-  return r
+  let* rev_list = rev_fetched_values_as res List.cons [] in
+  return @@ List.rev rev_list
 
-let get_slot cryptobox store slot_header =
+let get_slot cryptobox store commitment =
   let open Lwt_result_syntax in
-  let share_size = Cryptobox.encoded_share_size cryptobox in
-  let* shards = Shard_store.read_shards ~share_size store slot_header in
+  let {Cryptobox.number_of_shards; redundancy_factor; _} =
+    Cryptobox.parameters cryptobox
+  in
+  let minimal_number_of_shards =
+    assert (number_of_shards mod redundancy_factor = 0) ;
+    number_of_shards / redundancy_factor
+  in
+  let rec loop acc shard_id remaining =
+    if remaining <= 0 then return acc
+    else if shard_id >= number_of_shards then
+      let provided = minimal_number_of_shards - remaining in
+      tzfail @@ Missing_shards {provided; required = minimal_number_of_shards}
+    else
+      let*! res = get_shard store commitment shard_id in
+      match res with
+      | Ok res -> loop (Seq.cons res acc) (shard_id + 1) (remaining - 1)
+      | Error _ -> loop acc (shard_id + 1) remaining
+  in
+  let* shards = loop Seq.empty 0 minimal_number_of_shards in
   let*? polynomial = polynomial_from_shards cryptobox shards in
-  let slot = Cryptobox.polynomial_to_bytes cryptobox polynomial in
+  let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
   let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
   return slot
 
-let get_slot_pages cryptobox store slot_header =
+let get_slot_pages cryptobox store commitment =
   let open Lwt_result_syntax in
   let dal_parameters = Cryptobox.parameters cryptobox in
-  let* slot = get_slot cryptobox store slot_header in
+  let* slot = get_slot cryptobox store commitment in
   (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
      If this is not the case, we throw an `Illformed_pages` error.
   *)

@@ -625,26 +625,38 @@ module Actions = struct
       ("round", Round.encoding)
 
   let preendorsement_injected =
-    declare_2
+    declare_4
       ~section
       ~name:"preendorsement_injected"
       ~level:Notice
-      ~msg:"injected preendorsement {ophash} for {delegate}"
+      ~msg:
+        "injected preendorsement {ophash} for {delegate} for level {level}, \
+         round {round}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
       ~pp2:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp3:pp_int32
+      ("level", Data_encoding.int32)
+      ~pp4:Round.pp
+      ("round", Round.encoding)
 
   let endorsement_injected =
-    declare_2
+    declare_4
       ~section
       ~name:"endorsement_injected"
       ~level:Notice
-      ~msg:"injected endorsement {ophash} for {delegate}"
+      ~msg:
+        "injected endorsement {ophash} for {delegate} for level {level}, round \
+         {round}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
       ~pp2:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp3:pp_int32
+      ("level", Data_encoding.int32)
+      ~pp4:Round.pp
+      ("round", Round.encoding)
 
   let synchronizing_round =
     declare_1
@@ -654,6 +666,20 @@ module Actions = struct
       ~msg:"synchronizing round after block {block}"
       ~pp1:Block_hash.pp
       ("block", Block_hash.encoding)
+
+  let prepare_forging_block =
+    declare_3
+      ~section
+      ~name:"prepare_forging_block"
+      ~level:Debug
+      ~msg:
+        "prepare forging block at level {level}, round {round} for {delegate}"
+      ~pp1:pp_int32
+      ~pp2:Round.pp
+      ~pp3:Baking_state.pp_consensus_key_and_delegate
+      ("level", Data_encoding.int32)
+      ("round", Round.encoding)
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
   let forging_block =
     declare_3
@@ -761,7 +787,7 @@ module VDF = struct
       ~name:"vdf_revelation_injected"
       ~level:Notice
       ~msg:
-        "injected VDF revelation for cycle {cycle} (chain {chain} with \
+        "Injected VDF revelation for cycle {cycle} (chain {chain} with \
          operation {ophash})"
       ~pp1:pp_int32
       ("cycle", Data_encoding.int32)
@@ -770,31 +796,34 @@ module VDF = struct
       ~pp3:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
 
-  let vdf_daemon_start =
-    declare_1
-      ~section
-      ~level:Info
-      ~name:"vdf_daemon_start"
-      ~msg:"starting {worker} VDF daemon"
-      ("worker", Data_encoding.string)
-
   let vdf_daemon_error =
     declare_2
       ~section
-      ~level:Error
       ~name:"vdf_daemon_error"
+      ~level:Error
       ~msg:"{worker}: error while running VDF daemon: {errors}"
-      ~pp2:pp_print_top_error_of_trace
+      ~pp1:Format.pp_print_string
       ("worker", Data_encoding.string)
+      ~pp2:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
   let vdf_daemon_connection_lost =
     declare_1
       ~section
-      ~level:Error
       ~name:"vdf_daemon_connection_lost"
-      ~msg:"connection to node lost, VDF daemon {worker} exiting"
+      ~level:Error
+      ~msg:"Connection to node lost, VDF daemon {worker} exiting"
+      ~pp1:Format.pp_print_string
       ("worker", Data_encoding.string)
+
+  let vdf_daemon_cannot_kill_computation =
+    declare_1
+      ~section
+      ~name:"vdf_daemon_cannot_kill_computation"
+      ~level:Error
+      ~msg:"Error when killining running computation: {error}"
+      ~pp1:Format.pp_print_string
+      ("error", Data_encoding.string)
 
   let vdf_info =
     declare_1
@@ -802,6 +831,7 @@ module VDF = struct
       ~name:"vdf_internal"
       ~level:Notice
       ~msg:"{msg}"
+      ~pp1:Format.pp_print_string
       ("msg", Data_encoding.string)
 end
 

@@ -27,7 +27,7 @@
     -------
     Component:  Protocol (committee selection)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "^\[Unit\] fitness$"
+                  -- --file test_fitness.ml
     Subject:    test the fitness module
 *)
 
@@ -156,3 +156,6 @@ let tests =
       `Quick
       test_compare_all;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("fitness", tests)] |> Lwt_main.run

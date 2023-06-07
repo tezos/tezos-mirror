@@ -24,26 +24,6 @@
 (*****************************************************************************)
 open Tezos_crypto_dal
 
-let split_slot =
-  Tezos_rpc.Service.post_service
-    ~description:"Split and store a slot"
-    ~query:Tezos_rpc.Query.empty
-    ~input:Data_encoding.bytes
-    ~output:
-      Data_encoding.(
-        obj2
-          (req "commitment" string)
-          (req "proof" Cryptobox.Commitment_proof.encoding))
-    Tezos_rpc.Path.(open_root / "slot" / "split")
-
-let slot =
-  Tezos_rpc.Service.get_service
-    ~description:"Show content of a slot"
-    ~query:Tezos_rpc.Query.empty
-    ~output:Data_encoding.bytes
-    Tezos_rpc.Path.(
-      open_root / "slot" / "content" /: Cryptobox.Commitment.rpc_arg)
-
 let slot_pages =
   Tezos_rpc.Service.get_service
     ~description:"Fetch slot as list of pages"
@@ -70,11 +50,3 @@ let shards =
     ~output:(Data_encoding.list Cryptobox.shard_encoding)
     ~input:Data_encoding.(list int31)
     Tezos_rpc.Path.(open_root / "shards" /: Cryptobox.Commitment.rpc_arg)
-
-let monitor_slot_headers =
-  Tezos_rpc.Service.get_service
-    ~description:"Monitor stored slot headers"
-    ~query:Tezos_rpc.Query.empty
-    ~output:
-      Data_encoding.(obj1 (req "slot_header" Cryptobox.Commitment.encoding))
-    Tezos_rpc.Path.(open_root / "monitor_slot_headers")

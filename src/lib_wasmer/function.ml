@@ -65,6 +65,15 @@ let pack_outputs results r outputs =
 
 module Func_callback_maker = (val Types.Func_callback.m)
 
+let () =
+  (* The Ctypes library tries to detect leaked function pointers. However, this
+     does not work correctly for our use cases because we don't keep the
+     underlying function pointers on the OCaml side. Instead we pass them to
+     Wasmer where they will be kept. This means we mustn't prematurely free
+     function pointers just because they are no longer accessible from the
+     OCaml side. *)
+  Foreign.report_leaked_funptr := Fun.const ()
+
 let create : type f. Store.t -> f Function_type.t -> f -> owned * (unit -> unit)
     =
  fun store typ f ->

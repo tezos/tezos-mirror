@@ -148,7 +148,7 @@ matches of a pattern in a given term. The signature is the following:
     val uid : t -> int
   end
 
-The comments describing all these constructs can be found in `pattern.mli`.
+The comments describing all these constructs can be found in :src:`src/lib_benchmark/lib_micheline_rewriting/pattern.mli`.
 It is worth describing a subset of these functions here:
 
 - ``pattern_matches patt node`` returns true if and only if ``patt`` matches ``node``.

@@ -13,7 +13,7 @@ depends: [
   "ppx_expect"
   "tezos-base"
   "tezos-protocol-016-PtMumbai"
-  "tezos-injector-016-PtMumbai"
+  "octez-injector"
 ]
 build: [
   ["rm" "-r" "vendors"]

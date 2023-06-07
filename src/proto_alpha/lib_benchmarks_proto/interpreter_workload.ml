@@ -44,7 +44,8 @@ type instruction_name =
   | N_IDrop
   | N_IDup
   | N_ISwap
-  | N_IConst
+  | N_IPush
+  | N_IUnit
   (* pairs *)
   | N_ICons_pair
   | N_ICar
@@ -55,7 +56,7 @@ type instruction_name =
   | N_ICons_none
   | N_IIf_none
   | N_IOpt_map
-  (* unions *)
+  (* ors *)
   | N_ILeft
   | N_IRight
   | N_IIf_left
@@ -267,7 +268,8 @@ let string_of_instruction_name : instruction_name -> string =
   | N_IDrop -> "N_IDrop"
   | N_IDup -> "N_IDup"
   | N_ISwap -> "N_ISwap"
-  | N_IConst -> "N_IConst"
+  | N_IPush -> "N_IPush"
+  | N_IUnit -> "N_IUnit"
   | N_ICons_pair -> "N_ICons_pair"
   | N_ICar -> "N_ICar"
   | N_ICdr -> "N_ICdr"
@@ -499,7 +501,7 @@ let all_instructions =
     N_IDrop;
     N_IDup;
     N_ISwap;
-    N_IConst;
+    N_IPush;
     N_ICons_pair;
     N_ICar;
     N_ICdr;
@@ -666,6 +668,7 @@ let all_instructions =
     N_IAnd_bytes;
     N_IXor_bytes;
     N_INot_bytes;
+    N_IUnit;
   ]
 
 let all_continuations =
@@ -752,7 +755,9 @@ module Instructions = struct
 
   let swap = ir_sized_step N_ISwap nullary
 
-  let const = ir_sized_step N_IConst nullary
+  let push = ir_sized_step N_IPush nullary
+
+  let unit = ir_sized_step N_IUnit nullary
 
   let cons_pair = ir_sized_step N_ICons_pair nullary
 
@@ -902,12 +907,11 @@ module Instructions = struct
 
   let sub_tez_legacy _tez1 _tez2 = ir_sized_step N_ISub_tez_legacy nullary
 
-  let mul_teznat _tez nat = ir_sized_step N_IMul_teznat (unary "nat" nat)
+  let mul_teznat _tez _nat = ir_sized_step N_IMul_teznat nullary
 
-  let mul_nattez nat _tez = ir_sized_step N_IMul_nattez (unary "nat" nat)
+  let mul_nattez _nat _tez = ir_sized_step N_IMul_nattez nullary
 
-  let ediv_teznat tez nat =
-    ir_sized_step N_IEdiv_teznat (binary "tez" tez "nat" nat)
+  let ediv_teznat _tez _nat = ir_sized_step N_IEdiv_teznat nullary
 
   let ediv_tez _tez1 _tez2 = ir_sized_step N_IEdiv_tez nullary
 
@@ -1223,7 +1227,8 @@ let extract_ir_sized_step :
   | IDrop (_, _), _ -> Instructions.drop
   | IDup (_, _), _ -> Instructions.dup
   | ISwap (_, _), _ -> Instructions.swap
-  | IConst (_, _, _, _), _ -> Instructions.const
+  | IPush (_, _, _, _), _ -> Instructions.push
+  | IUnit (_, _), _ -> Instructions.unit
   | ICons_pair (_, _), _ -> Instructions.cons_pair
   | ICar (_, _), _ -> Instructions.car
   | ICdr (_, _), _ -> Instructions.cdr

@@ -23,20 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
-
-   This file is part of the test suite for the new mempool, which
-   uses features of the protocol that only exist since Lima.
-
-   When you modify this file, consider whether you should also change
-   the ones that test the legacy mempool for Kathmandu. They all
-   start with the "legacy" prefix and will be removed when Lima is
-   activated on Mainnet. *)
-
 (** Testing
     -------
     Component:    Shell (Prevalidator classification)
-    Invocation:   dune exec src/lib_shell/test/test_prevalidator_classification.exe
+    Invocation:   dune exec src/lib_shell/test/main.exe \
+                  -- --file test_prevalidator_classification.ml
     Subject:      Unit tests the Prevalidator classification APIs
 *)
 
@@ -823,6 +814,7 @@ let test_create_add_not_empty =
 let () =
   let mk_tests label tests = (label, qcheck_wrap tests) in
   Alcotest.run
+    ~__FILE__
     "Prevalidator_classification"
     [
       mk_tests

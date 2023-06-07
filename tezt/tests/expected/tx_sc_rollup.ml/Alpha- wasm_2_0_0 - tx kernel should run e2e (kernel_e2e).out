@@ -1,0 +1,233 @@
+
+./octez-client rpc get '/chains/main/blocks/head/context/smart_rollups/smart_rollup/[SMART_ROLLUP_HASH]/genesis_info'
+{ "level": 2,
+  "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
+
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1000 --arg 'Pair (Pair "[SMART_ROLLUP_HASH]" "[PUBLIC_KEY_HASH]") (Pair 450 "Hello, Ticket!")'
+Node is bootstrapped.
+Estimated gas: 2330.188 units (will add 100 for safety)
+Estimated storage: 67 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000607
+    Expected counter: 3
+    Gas limit: 2431
+    Storage limit: 87 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000607
+      payload fees(the block proposer) ....... +ꜩ0.000607
+    Transaction:
+      Amount: ꜩ0
+      From: [PUBLIC_KEY_HASH]
+      To: [CONTRACT_HASH]
+      Parameter: (Pair (Pair "[SMART_ROLLUP_HASH]" "[PUBLIC_KEY_HASH]")
+                       (Pair 450 "Hello, Ticket!"))
+      This transaction was successfully applied
+      Updated storage: Unit
+      Storage size: 205 bytes
+      Paid storage size diff: 67 bytes
+      Consumed gas: 2223.161
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ0.01675
+        storage fees ........................... +ꜩ0.01675
+      Internal operations:
+        Internal Transaction:
+          Amount: ꜩ0
+          From: [CONTRACT_HASH]
+          To: [SMART_ROLLUP_HASH]
+          Parameter: (Pair "[PUBLIC_KEY_HASH]"
+                           (Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 450)))
+          This transaction was successfully applied
+          Consumed gas: 106.960
+          Ticket updates:
+            Ticketer: [CONTRACT_HASH]
+            Content type: string
+            Content: "Hello, Ticket!"
+            Account updates:
+              [SMART_ROLLUP_HASH] ... +450
+
+
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-client --wait none send smart rollup message '[SMART_ROLLUP_EXTERNAL_MESSAGES]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 188.660 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000744
+    Expected counter: 1
+    Gas limit: 289
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000744
+      payload fees(the block proposer) ....... +ꜩ0.000744
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 188.593
+
+
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
+"209000000000"
+
+./octez-client --wait none send smart rollup message '[SMART_ROLLUP_EXTERNAL_MESSAGES]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 187.359 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.00071
+    Expected counter: 2
+    Gas limit: 288
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.00071
+      payload fees(the block proposer) ....... +ꜩ0.00071
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 187.293
+
+
+./octez-smart-rollup-client-alpha rpc get /global/block/12/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-alpha rpc get /global/block/12/total_ticks
+"550000000000"
+
+./octez-client --wait none execute outbox message of smart rollup '[SMART_ROLLUP_HASH]' from bootstrap1 for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof '[SMART_ROLLUP_BYTES]' --burn-cap 10
+Node is bootstrapped.
+Estimated gas: 9412.096 units (will add 100 for safety)
+Estimated storage: 230 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002312
+    Expected counter: 8
+    Gas limit: 9513
+    Storage limit: 250 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002312
+      payload fees(the block proposer) ....... +ꜩ0.002312
+    Smart rollup output message execution:
+      Address: [SMART_ROLLUP_HASH]
+      Cemented commitment: [SC_ROLLUP_COMMITMENT_HASH]
+      This smart output message execution was successfully applied
+      Paid storage size diff: 72 bytes
+      Consumed gas: 5085.533
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ0.018
+        storage fees ........................... +ꜩ0.018
+      Ticket updates:
+        Ticketer: [CONTRACT_HASH]
+        Content type: string
+        Content: "Hello, Ticket!"
+        Account updates:
+          [SMART_ROLLUP_HASH] ... -360
+      Internal operations:
+        Internal Transaction:
+          Amount: ꜩ0
+          From: [SMART_ROLLUP_HASH]
+          To: [CONTRACT_HASH]
+          Entrypoint: receive_tickets
+          Parameter: (Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 220))
+          This transaction was successfully applied
+          Updated storage:
+            { Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 220) }
+          Storage size: 175 bytes
+          Paid storage size diff: 53 bytes
+          Consumed gas: 1434.087
+          Balance updates:
+            [PUBLIC_KEY_HASH] ... -ꜩ0.01325
+            storage fees ........................... +ꜩ0.01325
+          Ticket updates:
+            Ticketer: [CONTRACT_HASH]
+            Content type: string
+            Content: "Hello, Ticket!"
+            Account updates:
+              [CONTRACT_HASH] ... +220
+        Internal Transaction:
+          Amount: ꜩ0
+          From: [SMART_ROLLUP_HASH]
+          To: [CONTRACT_HASH]
+          Entrypoint: receive_tickets
+          Parameter: (Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 100))
+          This transaction was successfully applied
+          Updated storage:
+            { Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 100) ;
+              Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 220) }
+          Storage size: 228 bytes
+          Paid storage size diff: 53 bytes
+          Consumed gas: 1442.314
+          Balance updates:
+            [PUBLIC_KEY_HASH] ... -ꜩ0.01325
+            storage fees ........................... +ꜩ0.01325
+          Ticket updates:
+            Ticketer: [CONTRACT_HASH]
+            Content type: string
+            Content: "Hello, Ticket!"
+            Account updates:
+              [CONTRACT_HASH] ... +100
+        Internal Transaction:
+          Amount: ꜩ0
+          From: [SMART_ROLLUP_HASH]
+          To: [CONTRACT_HASH]
+          Entrypoint: receive_tickets
+          Parameter: (Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 40))
+          This transaction was successfully applied
+          Updated storage:
+            { Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 40) ;
+              Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 100) ;
+              Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 220) }
+          Storage size: 280 bytes
+          Paid storage size diff: 52 bytes
+          Consumed gas: 1450.129
+          Balance updates:
+            [PUBLIC_KEY_HASH] ... -ꜩ0.013
+            storage fees ........................... +ꜩ0.013
+          Ticket updates:
+            Ticketer: [CONTRACT_HASH]
+            Content type: string
+            Content: "Hello, Ticket!"
+            Account updates:
+              [CONTRACT_HASH] ... +40
+

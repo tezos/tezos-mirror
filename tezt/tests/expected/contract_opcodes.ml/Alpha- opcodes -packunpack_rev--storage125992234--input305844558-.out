@@ -1,0 +1,845 @@
+
+./octez-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/packunpack_rev.tz on storage Unit and input '(Pair -1 (Pair 1 (Pair "foobar" (Pair 0x00AABBCC (Pair 1000 (Pair False (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"))))))))' --level 1 --trace-stack
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 16 (just consumed gas: 146.623)
+    [ (Pair (Pair -1
+                  1
+                  "foobar"
+                  0x00aabbcc
+                  1000
+                  False
+                  "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+                  "2019-09-09T08:35:33Z"
+                  "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
+            Unit) ]
+  - location: 16 (just consumed gas: 0.010)
+    [ (Pair -1
+            1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 17 (just consumed gas: 0.010)
+    [ (Pair -1
+            1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
+      (Pair -1
+            1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 18 (just consumed gas: 0.010)
+    [ -1
+      (Pair -1
+            1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 19 (just consumed gas: 0)
+    [ (Pair -1
+            1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 21 (just consumed gas: 0.010)
+    [ -1
+      (Pair 1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 19 (just consumed gas: 0.025)
+    [ -1
+      -1
+      (Pair 1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 22 (just consumed gas: 0.241)
+    [ 0x050041
+      -1
+      (Pair 1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 23 (just consumed gas: 0.421)
+    [ (Some -1)
+      -1
+      (Pair 1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 26 (just consumed gas: 0)
+    [ -1
+      -1
+      (Pair 1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 26 (just consumed gas: 0.015)
+    [ -1
+      -1
+      (Pair 1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 34 (just consumed gas: 0.035)
+    [ 0
+      (Pair 1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 35 (just consumed gas: 0.010)
+    [ True
+      (Pair 1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 36 (just consumed gas: 0)
+    [ (Pair 1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 36 (just consumed gas: 0.015)
+    [ (Pair 1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 42 (just consumed gas: 0.010)
+    [ (Pair 1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
+      (Pair 1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 43 (just consumed gas: 0.010)
+    [ 1
+      (Pair 1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 44 (just consumed gas: 0)
+    [ (Pair 1
+            "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 46 (just consumed gas: 0.010)
+    [ 1
+      (Pair "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 44 (just consumed gas: 0.025)
+    [ 1
+      1
+      (Pair "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 47 (just consumed gas: 0.241)
+    [ 0x050001
+      1
+      (Pair "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 48 (just consumed gas: 0.421)
+    [ (Some 1)
+      1
+      (Pair "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 51 (just consumed gas: 0)
+    [ 1
+      1
+      (Pair "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 51 (just consumed gas: 0.015)
+    [ 1
+      1
+      (Pair "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 59 (just consumed gas: 0.035)
+    [ 0
+      (Pair "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 60 (just consumed gas: 0.010)
+    [ True
+      (Pair "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 61 (just consumed gas: 0)
+    [ (Pair "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 61 (just consumed gas: 0.015)
+    [ (Pair "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 67 (just consumed gas: 0.010)
+    [ (Pair "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
+      (Pair "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 68 (just consumed gas: 0.010)
+    [ "foobar"
+      (Pair "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 69 (just consumed gas: 0)
+    [ (Pair "foobar"
+            0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 71 (just consumed gas: 0.010)
+    [ "foobar"
+      (Pair 0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 69 (just consumed gas: 0.025)
+    [ "foobar"
+      "foobar"
+      (Pair 0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 72 (just consumed gas: 0.276)
+    [ 0x050100000006666f6f626172
+      "foobar"
+      (Pair 0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 73 (just consumed gas: 0.680)
+    [ (Some "foobar")
+      "foobar"
+      (Pair 0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 76 (just consumed gas: 0)
+    [ "foobar"
+      "foobar"
+      (Pair 0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 76 (just consumed gas: 0.015)
+    [ "foobar"
+      "foobar"
+      (Pair 0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 84 (just consumed gas: 0.035)
+    [ 0
+      (Pair 0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 85 (just consumed gas: 0.010)
+    [ True
+      (Pair 0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 86 (just consumed gas: 0)
+    [ (Pair 0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 86 (just consumed gas: 0.015)
+    [ (Pair 0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 92 (just consumed gas: 0.010)
+    [ (Pair 0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
+      (Pair 0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 93 (just consumed gas: 0.010)
+    [ 0x00aabbcc
+      (Pair 0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 94 (just consumed gas: 0)
+    [ (Pair 0x00aabbcc
+            1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 96 (just consumed gas: 0.010)
+    [ 0x00aabbcc
+      (Pair 1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 94 (just consumed gas: 0.025)
+    [ 0x00aabbcc
+      0x00aabbcc
+      (Pair 1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 97 (just consumed gas: 0.256)
+    [ 0x050a0000000400aabbcc
+      0x00aabbcc
+      (Pair 1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 98 (just consumed gas: 0.565)
+    [ (Some 0x00aabbcc)
+      0x00aabbcc
+      (Pair 1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 101 (just consumed gas: 0)
+    [ 0x00aabbcc
+      0x00aabbcc
+      (Pair 1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 101 (just consumed gas: 0.015)
+    [ 0x00aabbcc
+      0x00aabbcc
+      (Pair 1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 109 (just consumed gas: 0.035)
+    [ 0
+      (Pair 1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 110 (just consumed gas: 0.010)
+    [ True
+      (Pair 1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 111 (just consumed gas: 0)
+    [ (Pair 1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 111 (just consumed gas: 0.015)
+    [ (Pair 1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 117 (just consumed gas: 0.010)
+    [ (Pair 1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
+      (Pair 1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 118 (just consumed gas: 0.010)
+    [ 1000
+      (Pair 1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 119 (just consumed gas: 0)
+    [ (Pair 1000
+            False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 121 (just consumed gas: 0.010)
+    [ 1000
+      (Pair False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 119 (just consumed gas: 0.025)
+    [ 1000
+      1000
+      (Pair False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 122 (just consumed gas: 0.266)
+    [ 0x0500a80f
+      1000
+      (Pair False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 123 (just consumed gas: 0.442)
+    [ (Some 1000)
+      1000
+      (Pair False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 126 (just consumed gas: 0)
+    [ 1000
+      1000
+      (Pair False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 126 (just consumed gas: 0.015)
+    [ 1000
+      1000
+      (Pair False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 134 (just consumed gas: 0.035)
+    [ 0
+      (Pair False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 135 (just consumed gas: 0.010)
+    [ True
+      (Pair False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 136 (just consumed gas: 0)
+    [ (Pair False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 136 (just consumed gas: 0.015)
+    [ (Pair False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 142 (just consumed gas: 0.010)
+    [ (Pair False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
+      (Pair False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 143 (just consumed gas: 0.010)
+    [ False
+      (Pair False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 144 (just consumed gas: 0)
+    [ (Pair False
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 146 (just consumed gas: 0.010)
+    [ False
+      (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 144 (just consumed gas: 0.025)
+    [ False
+      False
+      (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 147 (just consumed gas: 0.216)
+    [ 0x050303
+      False
+      (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 148 (just consumed gas: 0.421)
+    [ (Some False)
+      False
+      (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 151 (just consumed gas: 0)
+    [ False
+      False
+      (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 151 (just consumed gas: 0.015)
+    [ False
+      False
+      (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 159 (just consumed gas: 0.035)
+    [ 0
+      (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 160 (just consumed gas: 0.010)
+    [ True
+      (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 161 (just consumed gas: 0)
+    [ (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 161 (just consumed gas: 0.015)
+    [ (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 167 (just consumed gas: 0.010)
+    [ (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
+      (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 168 (just consumed gas: 0.010)
+    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+      (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 169 (just consumed gas: 0)
+    [ (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+            "2019-09-09T08:35:33Z"
+            "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 171 (just consumed gas: 0.010)
+    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+      (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 169 (just consumed gas: 0.025)
+    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+      (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 172 (just consumed gas: 0.506)
+    [ 0x050a0000001500bdfe3885e846fdea23c9acbe3bb1cfcca9c03e4a
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+      (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 173 (just consumed gas: 0.973)
+    [ (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+      (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 176 (just consumed gas: 0)
+    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+      (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 176 (just consumed gas: 0.015)
+    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+      (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 184 (just consumed gas: 0.036)
+    [ 0
+      (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 185 (just consumed gas: 0.010)
+    [ True
+      (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 186 (just consumed gas: 0)
+    [ (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 186 (just consumed gas: 0.015)
+    [ (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 192 (just consumed gas: 0.010)
+    [ (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
+      (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 193 (just consumed gas: 0.010)
+    [ "2019-09-09T08:35:33Z"
+      (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 194 (just consumed gas: 0)
+    [ (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 196 (just consumed gas: 0.010)
+    [ "2019-09-09T08:35:33Z"
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 194 (just consumed gas: 0.025)
+    [ "2019-09-09T08:35:33Z"
+      "2019-09-09T08:35:33Z"
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 197 (just consumed gas: 0.316)
+    [ 0x050095bbb0d70b
+      "2019-09-09T08:35:33Z"
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 198 (just consumed gas: 0.503)
+    [ (Some "2019-09-09T08:35:33Z")
+      "2019-09-09T08:35:33Z"
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 201 (just consumed gas: 0)
+    [ "2019-09-09T08:35:33Z"
+      "2019-09-09T08:35:33Z"
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 201 (just consumed gas: 0.015)
+    [ "2019-09-09T08:35:33Z"
+      "2019-09-09T08:35:33Z"
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 209 (just consumed gas: 0.035)
+    [ 0
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 210 (just consumed gas: 0.010)
+    [ True
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 211 (just consumed gas: 0)
+    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 211 (just consumed gas: 0.015)
+    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 217 (just consumed gas: 0.010)
+    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 218 (just consumed gas: 0.516)
+    [ 0x050a000000160000bdfe3885e846fdea23c9acbe3bb1cfcca9c03e4a
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 219 (just consumed gas: 0.994)
+    [ (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 222 (just consumed gas: 0)
+    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 222 (just consumed gas: 0.015)
+    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
+      "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 230 (just consumed gas: 0.036)
+    [ 0 ]
+  - location: 231 (just consumed gas: 0.010)
+    [ True ]
+  - location: 232 (just consumed gas: 0)
+    [  ]
+  - location: 232 (just consumed gas: 0.015)
+    [  ]
+  - location: 238 (just consumed gas: 0.010)
+    [ 0 ]
+  - location: 241 (just consumed gas: 0.216)
+    [ 0x050000 ]
+  - location: 242 (just consumed gas: 0.421)
+    [ (Some 0) ]
+  - location: 245 (just consumed gas: 0)
+    [ 0 ]
+  - location: 245 (just consumed gas: 0.015)
+    [ 0 ]
+  - location: 251 (just consumed gas: 0.010)
+    [  ]
+  - location: 252 (just consumed gas: 0.010)
+    [ -1 ]
+  - location: 255 (just consumed gas: 0.241)
+    [ 0x050041 ]
+  - location: 256 (just consumed gas: 96.321)
+    [ None ]
+  - location: 259 (just consumed gas: 0)
+    [  ]
+  - location: 259 (just consumed gas: 0.015)
+    [  ]
+  - location: 265 (just consumed gas: 0.010)
+    [ 0x ]
+  - location: 268 (just consumed gas: 0.260)
+    [ None ]
+  - location: 271 (just consumed gas: 0)
+    [  ]
+  - location: 271 (just consumed gas: 0.015)
+    [  ]
+  - location: 277 (just consumed gas: 0.010)
+    [ 0x04 ]
+  - location: 280 (just consumed gas: 0.280)
+    [ None ]
+  - location: 283 (just consumed gas: 0)
+    [  ]
+  - location: 283 (just consumed gas: 0.015)
+    [  ]
+  - location: 289 (just consumed gas: 0.010)
+    [ 0x05 ]
+  - location: 292 (just consumed gas: 0.280)
+    [ None ]
+  - location: 295 (just consumed gas: 0)
+    [  ]
+  - location: 295 (just consumed gas: 0.015)
+    [  ]
+  - location: 301 (just consumed gas: 0.010)
+    [ Unit ]
+  - location: 302 (just consumed gas: 0.010)
+    [ {}
+      Unit ]
+  - location: 304 (just consumed gas: 0.010)
+    [ (Pair {} Unit) ]
+

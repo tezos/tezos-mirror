@@ -50,14 +50,12 @@ let () =
       executable_name
   else ()
 
-module Hashtbl = Stdlib.Hashtbl
-
 (* ------------------------------------------------------------------------- *)
 (* Listing available models, solvers, benchmarks *)
 
 let list_all_models formatter =
   List.iter
-    (fun name -> Format.fprintf formatter "%s@." name)
+    (fun name -> Format.fprintf formatter "%a@." Namespace.pp name)
     (Registration.all_model_names ())
 
 let list_solvers formatter =
@@ -72,12 +70,12 @@ let list_benchmarks formatter list =
     list
 
 let list_all_benchmarks formatter =
-  list_benchmarks formatter (Registration.all_benchmarks ())
+  list_benchmarks formatter (Registration.all_benchmarks () |> List.map snd)
 
 (* -------------------------------------------------------------------------- *)
 (* Built-in commands implementations *)
 
-let benchmark_cmd (bench_pattern : string)
+let perform_benchmark (bench_pattern : Namespace.t)
     (bench_opts : Cmdline.benchmark_options) =
   let bench =
     try Registration.find_benchmark_exn bench_pattern
@@ -101,6 +99,9 @@ let benchmark_cmd (bench_pattern : string)
         ~options:bench_opts.options
         ~bench
         ~workload_data
+
+let benchmark_cmd bench_pattern bench_opts =
+  ignore @@ perform_benchmark bench_pattern bench_opts
 
 let is_constant_input (type a t) (bench : (a, t) Benchmark.poly) workload_data =
   let module Bench = (val bench) in
@@ -214,8 +215,10 @@ and infer_cmd_full_auto model_name workload_data solver
     | _ -> infer_opts.display
   in
   let solver = solver_of_string solver infer_opts in
-  let graph, measurements = Dep_graph.load_files model_name workload_files in
-  if Dep_graph.G.is_empty graph then (
+  let graph, measurements =
+    Dep_graph.load_workload_files ~model_name workload_files
+  in
+  if Dep_graph.Graph.is_empty graph then (
     Format.eprintf "Empty dependency graph.@." ;
     exit 1) ;
   Format.eprintf "Performing topological run@." ;
@@ -225,27 +228,25 @@ and infer_cmd_full_auto model_name workload_data solver
     | _ -> Some (Report.create_empty ~name:"Report")
   in
   let scores_list = [] in
-  Option.iter
-    (fun filename ->
-      let oc = open_out filename in
-      Dep_graph.D.output_graph oc graph ;
-      close_out oc)
-    infer_opts.dot_file ;
+  Option.iter (Dep_graph.Graph.save_graphviz graph) infer_opts.dot_file ;
   let map, scores_list, report =
-    Dep_graph.T.fold
-      (fun workload_file (overrides_map, scores_list, report) ->
-        Format.eprintf "Processing: %s@." workload_file ;
-        let measure = Hashtbl.find measurements workload_file in
+    Dep_graph.Graph.fold
+      (fun solved (overrides_map, scores_list, report) ->
+        Format.eprintf "Processing: %a@." Namespace.pp solved.name ;
+        let measure =
+          Stdlib.Option.get @@ Namespace.Hashtbl.find measurements solved.name
+        in
         let overrides var = Free_variable.Map.find var overrides_map in
         let (Measure.Measurement ((module Bench), m)) = measure in
         let model =
           match Dep_graph.find_model_or_generic model_name Bench.models with
           | None ->
               Format.eprintf
-                "No valid model (%s or generic) found in file %s. Availble \
-                 models:.@."
+                "No valid model (%s or generic) found in the workload %a. \
+                 Available models:.@."
                 model_name
-                workload_file ;
+                Namespace.pp
+                solved.name ;
               list_all_models Format.err_formatter ;
               exit 1
           | Some model -> model
@@ -274,12 +275,22 @@ and infer_cmd_full_auto model_name workload_data solver
         let overrides_map =
           List.fold_left
             (fun map (variable, solution) ->
-              Format.eprintf
-                "Adding solution %a := %f@."
-                Free_variable.pp
-                variable
-                solution ;
-              Free_variable.Map.add variable solution map)
+              if Free_variable.Set.mem variable solved.provides then (
+                Format.eprintf
+                  "Adding solution %a := %f@."
+                  Free_variable.pp
+                  variable
+                  solution ;
+                Free_variable.Map.add variable solution map)
+              else (
+                (* Ambiguity. It should be already resolved by [Dep_graph].
+                   We do not fail here but print a big warning. *)
+                Format.eprintf
+                  "WARNING: ignored another solution for %a = %f@."
+                  Free_variable.pp
+                  variable
+                  solution ;
+                map))
             overrides_map
             solution.mapping
         in
@@ -389,13 +400,13 @@ and get_all_workload_data_files directory =
   in
   loop []
 
-let codegen_cmd solution model_name codegen_options =
-  let sol = Codegen.load_solution solution in
+let codegen_cmd solution_fn model_name codegen_options =
+  let sol = Codegen.load_solution solution_fn in
   match Registration.find_model model_name with
   | None ->
-      Format.eprintf "Model %s not found, exiting@." model_name ;
+      Format.eprintf "Model %a not found, exiting@." Namespace.pp model_name ;
       exit 1
-  | Some model ->
+  | Some {Registration.model; _} ->
       let transform =
         match codegen_options with
         | Cmdline.No_transform ->
@@ -407,23 +418,24 @@ let codegen_cmd solution model_name codegen_options =
             let module Transform = Fixed_point_transform.Apply (P) in
             ((module Transform) : Costlang.transform)
       in
-      let name = Printf.sprintf "model_%s" model_name in
       let code =
-        match Codegen.codegen model sol transform name with
+        match Codegen.codegen model sol transform model_name with
         | exception e ->
             Format.eprintf
-              "Error in code generation for model %s, exiting@."
+              "Error in code generation for model %a, exiting@."
+              Namespace.pp
               model_name ;
             Format.eprintf "Exception caught: %s@." (Printexc.to_string e) ;
             exit 1
-        | None ->
-            Format.eprintf "Code generation failed. Bad model? Exiting.@." ;
-            exit 1
-        | Some s -> s
+        | s -> s
       in
-      Format.printf "%a@." Codegen.pp_model code
+      Format.printf "%a@." Codegen.pp_code code
 
-let generate_code_for_models sol models codegen_options =
+let generate_code_for_models sol models codegen_options ~exclusions =
+  (* The order of the models is pretty random.  It is better to sort them. *)
+  let models =
+    List.sort (fun (n1, _) (n2, _) -> Namespace.compare n1 n2) models
+  in
   let transform =
     match codegen_options with
     | Cmdline.No_transform -> ((module Costlang.Identity) : Costlang.transform)
@@ -434,37 +446,36 @@ let generate_code_for_models sol models codegen_options =
         let module Transform = Fixed_point_transform.Apply (P) in
         ((module Transform) : Costlang.transform)
   in
-  Codegen.codegen_module models sol transform
+  Codegen.codegen_models models sol transform ~exclusions
 
-let codegen_all_cmd solution regexp codegen_options =
+let codegen_all_cmd solution_fn regexp codegen_options =
   let () = Format.eprintf "regexp: %s@." regexp in
   let regexp = Str.regexp regexp in
-  let ok (name, _) = Str.string_match regexp name 0 in
-  let sol = Codegen.load_solution solution in
-  let models = List.filter ok (Registration.all_registered_models ()) in
-  let result = generate_code_for_models sol models codegen_options in
+  let ok (name, _) = Str.string_match regexp (Namespace.to_string name) 0 in
+  let sol = Codegen.load_solution solution_fn in
+  let models = List.filter ok (Registration.all_models ()) in
+  (* no support of exclusions for this command *)
+  let result =
+    Codegen.make_toplevel_module
+    @@ generate_code_for_models
+         sol
+         models
+         codegen_options
+         ~exclusions:String.Set.empty
+  in
   Codegen.pp_module Format.std_formatter result
 
 let fvs_of_codegen_model model =
-  let (Model.For_codegen model) = model in
-  match model with
-  | Model.Packaged {model; _} ->
-      let module Model = (val model) in
-      let module FV = Model.Def (Costlang.Free_variables) in
-      FV.model
-  | Model.Preapplied _ -> Free_variable.Set.empty
+  let (Model.Model model) = model in
+  let module Model = (val model) in
+  let module FV = Model.Def (Costlang.Free_variables) in
+  FV.model
 
-let codegen_infer_cmd solution codegen_options =
-  let solution = Codegen.load_solution solution in
-
+let codegen_for_a_solution solution_fn codegen_options ~exclusions =
+  let solution = Codegen.load_solution solution_fn in
   Format.eprintf "Inference model: %s@." solution.inference_model_name ;
 
-  let all_benchmarks =
-    Registration.Name_table.to_seq Registration.bench_table
-  in
-
   let ( let* ) = Option.bind in
-  let or_else m f = match m with Some x -> Some x | None -> f () in
 
   let found_codegen_models =
     let get_codegen_from_bench (bench_name, (module Bench : Benchmark.S)) =
@@ -473,19 +484,13 @@ let codegen_infer_cmd solution codegen_options =
         List.assoc_opt ~equal:( = ) solution.inference_model_name Bench.models
       in
       (* We assume a benchmark has up to one codegen model, *)
-      (* which has the same name as the benchmark and may be qualified with "__alpha" *)
-      let codegen_name = Namespace.basename bench_name in
-      let codegen_name_alpha = codegen_name ^ "__alpha" in
       let find_codegen name =
-        let* model =
-          Registration.String_table.find_opt Registration.codegen_table name
-        in
+        let* model = Registration.find_model name in
         Some (name, model)
       in
-      or_else (find_codegen codegen_name) (fun () ->
-          find_codegen codegen_name_alpha)
+      find_codegen bench_name
     in
-    Seq.filter_map get_codegen_from_bench all_benchmarks
+    List.filter_map get_codegen_from_bench (Registration.all_benchmarks ())
   in
 
   (* Model's free variables must be included in the solution's keys *)
@@ -496,33 +501,86 @@ let codegen_infer_cmd solution codegen_options =
         (fun fv -> Free_variable.Map.mem fv solution.map)
         fvs
     in
-    Seq.filter
-      (fun (model_name, model) ->
+    List.filter
+      (fun (model_name, {Registration.model; _}) ->
         let ok = model_fvs_included_in_sol model in
-        if not ok then Format.eprintf "Skipping model %s@." model_name ;
+        if not ok then
+          Format.eprintf "Skipping model %a@." Namespace.pp model_name ;
         ok)
       found_codegen_models
   in
+  generate_code_for_models solution codegen_models codegen_options ~exclusions
 
-  let generated_code =
-    generate_code_for_models
-      solution
-      (List.of_seq codegen_models)
-      codegen_options
+let codegen_inferred_cmd solution_fn codegen_options ~exclusions =
+  Codegen.pp_module Format.std_formatter
+  @@ Codegen.make_toplevel_module
+  @@ codegen_for_a_solution solution_fn codegen_options ~exclusions
+
+let codegen_for_solutions_cmd solution_fns codegen_options ~exclusions =
+  Codegen.pp_module Format.std_formatter
+  @@ Codegen.make_toplevel_module
+  @@ List.concat_map
+       (fun solution_fn ->
+         codegen_for_a_solution solution_fn codegen_options ~exclusions)
+       solution_fns
+
+let solution_print_cmd solution_fns =
+  List.iter
+    (fun solution_fn ->
+      let solution = Codegen.load_solution solution_fn in
+      Format.printf
+        "@[<2>%s:@ @[%a@]@]@."
+        solution_fn
+        Codegen.pp_solution
+        solution)
+    solution_fns
+
+let codegen_check_definitions_cmd files =
+  let map =
+    List.fold_left
+      (fun acc fn ->
+        match Codegen.Parser.get_cost_functions fn with
+        | Ok vs ->
+            Format.eprintf "%s have %d definitions@." fn (List.length vs) ;
+            List.fold_left
+              (fun acc v ->
+                String.Map.update
+                  v
+                  (fun old -> Some (fn :: Option.value ~default:[] old))
+                  acc)
+              acc
+              vs
+        | Error exn ->
+            Format.eprintf "%s: %s@." fn (Printexc.to_string exn) ;
+            exit 1)
+      String.Map.empty
+      files
   in
-  Codegen.pp_module Format.std_formatter generated_code
+  let fail =
+    String.Map.fold
+      (fun v fns fail ->
+        match fns with
+        | [] -> assert false (* impossible *)
+        | [_] -> fail
+        | fns ->
+            Format.(
+              eprintf
+                "@[<2>%s: defined in multiple modules:@ @[<v>%a@]@]@."
+                v
+                (pp_print_list pp_print_string)
+                fns) ;
+            true)
+      map
+      false
+  in
+  if fail then exit 1 ;
+  Format.eprintf "Good. No duplicated cost function definitions found@."
 
 (* -------------------------------------------------------------------------- *)
 (* Entrypoint *)
 
 (* Activate logging system. *)
-let () =
-  Lwt_main.run
-  @@ Tezos_base_unix.Internal_event_unix.(
-       init
-         ~lwt_log_sink:Lwt_log_sink_unix.default_cfg
-         ~configuration:Configuration.default)
-       ()
+let () = Lwt_main.run @@ Tezos_base_unix.Internal_event_unix.init ()
 
 let () =
   if Commands.list_solvers then list_solvers Format.std_formatter ;
@@ -533,14 +591,18 @@ let () =
   | None -> ()
   | Some outcome -> (
       match outcome with
-      | Cmdline.No_command -> exit 0
-      | Cmdline.Benchmark {bench_name; bench_opts} ->
+      | No_command -> exit 0
+      | Benchmark {bench_name; bench_opts} ->
           benchmark_cmd bench_name bench_opts
-      | Cmdline.Infer {model_name; workload_data; solver; infer_opts} ->
+      | Infer {model_name; workload_data; solver; infer_opts} ->
           infer_cmd model_name workload_data solver infer_opts
-      | Cmdline.Codegen {solution; model_name; codegen_options} ->
+      | Codegen {solution; model_name; codegen_options} ->
           codegen_cmd solution model_name codegen_options
-      | Cmdline.Codegen_all {solution; matching; codegen_options} ->
+      | Codegen_all {solution; matching; codegen_options} ->
           codegen_all_cmd solution matching codegen_options
-      | Cmdline.Codegen_inferred {solution; codegen_options} ->
-          codegen_infer_cmd solution codegen_options)
+      | Codegen_inferred {solution; codegen_options; exclusions} ->
+          codegen_inferred_cmd solution codegen_options ~exclusions
+      | Codegen_for_solutions {solutions; codegen_options; exclusions} ->
+          codegen_for_solutions_cmd solutions codegen_options ~exclusions
+      | Codegen_check_definitions {files} -> codegen_check_definitions_cmd files
+      | Solution_print solutions -> solution_print_cmd solutions)

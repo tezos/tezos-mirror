@@ -31,15 +31,6 @@
    Subject:      Tests for contract execution order.
 *)
 
-let contract_path protocol kind contract =
-  sf
-    "tests_python/contracts_%s/%s/%s"
-    (match protocol with
-    | Protocol.Alpha -> "alpha"
-    | _ -> sf "%03d" @@ Protocol.number protocol)
-    kind
-    contract
-
 type 'a tree = Leaf of 'a | Node of 'a tree list
 
 (* This test to verifies contract execution order.
@@ -69,39 +60,47 @@ let test_execution_ordering =
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let originate_storer () =
-    Client.originate_contract
-      ~alias:"storer"
-      ~amount:Tez.zero
-      ~src:Constant.bootstrap1.alias
-      ~prg:(contract_path protocol "mini_scenarios" "execution_order_storer.tz")
-      ~init:{|""|}
-      ~burn_cap:Tez.one
-      ~force:true
-      client
+    let* _alias, contract =
+      Client.originate_contract_at
+        ~amount:Tez.zero
+        ~src:Constant.bootstrap1.alias
+        ~init:{|""|}
+        ~burn_cap:Tez.one
+        ~force:true
+        client
+        ["mini_scenarios"; "execution_order_storer"]
+        protocol
+    in
+    return contract
   in
   let originate_appender ~storer ~argument =
-    Client.originate_contract
-      ~alias:(sf "appender-%s" argument)
-      ~amount:Tez.zero
-      ~src:Constant.bootstrap1.alias
-      ~prg:
-        (contract_path protocol "mini_scenarios" "execution_order_appender.tz")
-      ~init:(sf "Pair %S %S" storer argument)
-      ~burn_cap:Tez.one
-      ~force:true
-      client
+    let* _alias, contract =
+      Client.originate_contract_at
+        ~amount:Tez.zero
+        ~src:Constant.bootstrap1.alias
+        ~init:(sf "Pair %S %S" storer argument)
+        ~burn_cap:Tez.one
+        ~force:true
+        client
+        ["mini_scenarios"; "execution_order_appender"]
+        protocol
+    in
+    return contract
   in
   let originate_caller callees =
     let storage = sf "{%s}" (String.concat "; " (List.map (sf "%S") callees)) in
-    Client.originate_contract
-      ~alias:(sf "caller-%d" (Hashtbl.hash storage))
-      ~amount:Tez.zero
-      ~src:Constant.bootstrap1.alias
-      ~prg:(contract_path protocol "mini_scenarios" "execution_order_caller.tz")
-      ~init:storage
-      ~burn_cap:Tez.one
-      ~force:true
-      client
+    let* _alias, contract =
+      Client.originate_contract_at
+        ~amount:Tez.zero
+        ~src:Constant.bootstrap1.alias
+        ~init:storage
+        ~burn_cap:Tez.one
+        ~force:true
+        client
+        ["mini_scenarios"; "execution_order_caller"]
+        protocol
+    in
+    return contract
   in
   let* () =
     [

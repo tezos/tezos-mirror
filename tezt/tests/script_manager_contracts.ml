@@ -33,13 +33,6 @@
 let test_manager_contracts =
   Protocol.register_test ~__FILE__ ~title:"Manager" ~tags:["manager"]
   @@ fun protocol ->
-  let prefix =
-    sf
-      "tests_python/contracts_%s"
-      (match protocol with
-      | Protocol.Alpha -> "alpha"
-      | _ -> sf "%03d" @@ Protocol.number protocol)
-  in
   let* client = Client.init_mockup ~protocol () in
   let check_delegate ~__LOC__ src expected_delegate =
     let* delegate = Client.get_delegate ~src client in
@@ -62,7 +55,7 @@ let test_manager_contracts =
   let bootstrap1 = Constant.bootstrap1.alias in
   Log.info "Manager origination" ;
   let path =
-    Michelson_script.(find ~prefix ["entrypoints"; "manager"] protocol |> path)
+    Michelson_script.(find ["entrypoints"; "manager"] protocol |> path)
   in
   let pubkey = Constant.bootstrap2.public_key_hash in
   let* _contract =
@@ -89,7 +82,7 @@ let test_manager_contracts =
   Log.info "Delegatable origination" ;
   let path =
     Michelson_script.(
-      find ~prefix ["entrypoints"; "delegatable_target"] protocol |> path)
+      find ["entrypoints"; "delegatable_target"] protocol |> path)
   in
   let pubkey = Constant.bootstrap2.public_key_hash in
   let* _contract =
@@ -105,7 +98,7 @@ let test_manager_contracts =
   Log.info "Target with entrypoints origination" ;
   let path =
     Michelson_script.(
-      find ~prefix ["entrypoints"; "big_map_entrypoints"] protocol |> path)
+      find ["entrypoints"; "big_map_entrypoints"] protocol |> path)
   in
   let* _contract =
     Client.originate_contract
@@ -120,7 +113,7 @@ let test_manager_contracts =
   Log.info "Target without entrypoints origination" ;
   let path =
     Michelson_script.(
-      find ~prefix ["entrypoints"; "no_entrypoint_target"] protocol |> path)
+      find ["entrypoints"; "no_entrypoint_target"] protocol |> path)
   in
   let* _contract =
     Client.originate_contract
@@ -135,7 +128,7 @@ let test_manager_contracts =
   Log.info "Target without default origination" ;
   let path =
     Michelson_script.(
-      find ~prefix ["entrypoints"; "no_default_target"] protocol |> path)
+      find ["entrypoints"; "no_default_target"] protocol |> path)
   in
   let* _contract =
     Client.originate_contract
@@ -149,8 +142,7 @@ let test_manager_contracts =
   in
   Log.info "Target with root origination" ;
   let path =
-    Michelson_script.(
-      find ~prefix ["entrypoints"; "rooted_target"] protocol |> path)
+    Michelson_script.(find ["entrypoints"; "rooted_target"] protocol |> path)
   in
   let* _contract =
     Client.originate_contract
@@ -192,15 +184,16 @@ let test_manager_contracts =
     Client.get_balance_for ~account:"bootstrap2" client
   in
   let amount = Tez.of_mutez_int 10_001_000 in
+  let fee = Tez.of_mutez_int 0_000_475 in
   let* () =
     Client.transfer
       ~amount
       ~giver:"bootstrap2"
       ~receiver:"manager"
       ~gas_limit:((128 * 15450) + 108)
+      ~fee
       client
   in
-  let fee = Tez.of_mutez_int 0_000_475 in
   let* () = check_balance ~__LOC__ "manager" Tez.(balance + amount) in
   let* () =
     check_balance ~__LOC__ "bootstrap2" Tez.(balance_bootstrap - fee - amount)
@@ -215,10 +208,10 @@ let test_manager_contracts =
   let* () =
     Client.transfer
       ~amount
-      ~fee
       ~giver:"manager"
       ~receiver:"bootstrap2"
       ~gas_limit:((128 * 26350) + 12)
+      ~fee
       client
   in
   let* () = check_balance ~__LOC__ "manager" Tez.(balance - amount) in
@@ -232,15 +225,16 @@ let test_manager_contracts =
     Client.get_balance_for ~account:"bootstrap2" client
   in
   let amount = Tez.of_int 10 in
+  let fee = Tez.of_mutez_int 0_000_824 in
   let* () =
     Client.transfer
       ~amount
       ~giver:"manager"
       ~receiver:"manager2"
       ~gas_limit:((128 * 44950) + 112)
+      ~fee
       client
   in
-  let fee = Tez.of_mutez_int 0_000_824 in
   let* () = check_balance ~__LOC__ "manager" Tez.(balance - amount) in
   let* () = check_balance ~__LOC__ "manager2" Tez.(balance_dest + amount) in
   let* () = check_balance ~__LOC__ "bootstrap2" Tez.(balance_bootstrap - fee) in

@@ -50,6 +50,8 @@ type t = {
   discovery_addr : string option;
   rpc_listen_addrs : string list;
   private_mode : bool;
+  disable_p2p_maintenance : bool;
+  disable_p2p_swap : bool;
   disable_mempool : bool;
   disable_mempool_precheck : bool;
   enable_testchain : bool;
@@ -108,6 +110,37 @@ let () =
       | Network_http_error (status, body) -> Some (status, body) | _ -> None)
     (fun (status, body) -> Network_http_error (status, body))
 
+module Event = struct
+  include Internal_event.Simple
+
+  let section = ["node"; "main"]
+
+  let disabled_bootstrap_peers =
+    Internal_event.Simple.declare_0
+      ~section
+      ~name:"disabled_bootstrap_peers"
+      ~msg:"disabled bootstrap peers"
+      ()
+
+  let testchain_is_deprecated =
+    Internal_event.Simple.declare_0
+      ~section
+      ~level:Warning
+      ~name:"enable_testchain_is_deprecated"
+      ~msg:"The command-line option `--enable-testchain` is deprecated."
+      ()
+
+  let overriding_config_file_arg =
+    declare_1
+      ~section
+      ~name:"overriding_config_file_arg"
+      ~msg:
+        "the data directory from the --config-file argument was overridden by \
+         the given --data-dir path: {path}"
+      ~level:Warning
+      ("path", Data_encoding.string)
+end
+
 let decode_net_config source json =
   let open Result_syntax in
   match
@@ -150,11 +183,11 @@ let load_net_config =
 let wrap data_dir config_file network connections max_download_speed
     max_upload_speed binary_chunks_size peer_table_size listen_addr
     advertised_net_port discovery_addr peers no_bootstrap_peers
-    bootstrap_threshold private_mode disable_mempool disable_mempool_precheck
-    enable_testchain expected_pow rpc_listen_addrs rpc_tls cors_origins
-    cors_headers log_output history_mode synchronisation_threshold latency
-    disable_config_validation allow_all_rpc media_type metrics_addr
-    operation_metadata_size_limit =
+    bootstrap_threshold private_mode disable_p2p_maintenance disable_p2p_swap
+    disable_mempool disable_mempool_precheck enable_testchain expected_pow
+    rpc_listen_addrs rpc_tls cors_origins cors_headers log_output history_mode
+    synchronisation_threshold latency disable_config_validation allow_all_rpc
+    media_type metrics_addr operation_metadata_size_limit =
   let actual_data_dir =
     Option.value ~default:Config_file.default_data_dir data_dir
   in
@@ -183,6 +216,8 @@ let wrap data_dir config_file network connections max_download_speed
     discovery_addr;
     rpc_listen_addrs;
     private_mode;
+    disable_p2p_maintenance;
+    disable_p2p_swap;
     disable_mempool;
     disable_mempool_precheck;
     enable_testchain;
@@ -546,6 +581,23 @@ module Term = struct
     in
     Arg.(value & flag & info ~docs ~doc ["private-mode"])
 
+  let disable_p2p_maintenance =
+    let doc =
+      "Disable the p2p maintenance. This option should be used for testing \
+       purposes only. The node will not try to establish or close connections \
+       by itself. It will accept incoming connections, and outgoing connection \
+       can be initiated by using the RPC 'POST /network/connections'."
+    in
+    Arg.(value & flag & info ~docs ~doc ["disable-p2p-maintenance"])
+
+  let disable_p2p_swap =
+    let doc =
+      "Disable p2p connection swaps. This option should be used for testing \
+       purposes only. The node will neither try to initiate a swap of \
+       connections with one of its neighbor nor answer to a swap request."
+    in
+    Arg.(value & flag & info ~docs ~doc ["disable-p2p-swap"])
+
   let disable_mempool =
     let doc =
       "If set to [true], the node will not participate in the propagation of \
@@ -668,9 +720,10 @@ module Term = struct
     $ max_download_speed $ max_upload_speed $ binary_chunks_size
     $ peer_table_size $ listen_addr $ advertised_net_port $ discovery_addr
     $ peers $ no_bootstrap_peers $ bootstrap_threshold $ private_mode
-    $ disable_mempool $ disable_mempool_precheck $ enable_testchain
-    $ expected_pow $ rpc_listen_addrs $ rpc_tls $ cors_origins $ cors_headers
-    $ log_output $ history_mode $ synchronisation_threshold $ latency
+    $ disable_p2p_maintenance $ disable_p2p_swap $ disable_mempool
+    $ disable_mempool_precheck $ enable_testchain $ expected_pow
+    $ rpc_listen_addrs $ rpc_tls $ cors_origins $ cors_headers $ log_output
+    $ history_mode $ synchronisation_threshold $ latency
     $ disable_config_validation $ allow_all_rpc $ media_type $ metrics_addr
     $ operation_metadata_size_limit
 end
@@ -680,12 +733,44 @@ let read_config_file args =
   if Sys.file_exists args.config_file then Config_file.read args.config_file
   else return Config_file.default_config
 
-let read_data_dir args =
+let resolve_data_dir_and_config_file ?data_dir ?config_file () =
   let open Lwt_result_syntax in
-  let* cfg = read_config_file args in
-  let {data_dir; _} = args in
-  let data_dir = Option.value ~default:cfg.data_dir data_dir in
-  return data_dir
+  let config_file_arg = Option.is_some config_file in
+  let actual_data_dir =
+    Option.value ~default:Config_file.default_data_dir data_dir
+  in
+  let config_file =
+    Option.value
+      ~default:
+        Filename.Infix.(
+          actual_data_dir // Data_version.default_config_file_name)
+      config_file
+  in
+  let* node_config = Config_file.read config_file in
+  (* Returns true if the given paths are equal, after removing the
+     potential trailing slash. *)
+  let paths_equals p1 p2 =
+    let f x =
+      List.filter (fun s -> s <> String.empty) (String.split_on_char '/' x)
+    in
+    f p1 = f p2
+  in
+  let*! data_dir =
+    (* The --data-dir argument overrides the potentially given
+       configuration file. *)
+    match data_dir with
+    | Some data_dir ->
+        let*! () =
+          if
+            (not (paths_equals data_dir node_config.data_dir))
+            && config_file_arg
+          then Event.(emit overriding_config_file_arg) data_dir
+          else Lwt.return_unit
+        in
+        Lwt.return data_dir
+    | None -> Lwt.return node_config.data_dir
+  in
+  return (data_dir, node_config)
 
 type error +=
   | Network_configuration_mismatch of {
@@ -744,25 +829,6 @@ let () =
     (function Invalid_command_line_arguments x -> Some x | _ -> None)
     (fun explanation -> Invalid_command_line_arguments explanation)
 
-module Event = struct
-  include Internal_event.Simple
-
-  let disabled_bootstrap_peers =
-    Internal_event.Simple.declare_0
-      ~section:["node"; "main"]
-      ~name:"disabled_bootstrap_peers"
-      ~msg:"disabled bootstrap peers"
-      ()
-
-  let testchain_is_deprecated =
-    Internal_event.Simple.declare_0
-      ~section:["node"; "main"]
-      ~level:Warning
-      ~name:"enable_testchain_is_deprecated"
-      ~msg:"The command-line option `--enable-testchain` is deprecated."
-      ()
-end
-
 let patch_network ?(cfg = Config_file.default_config) blockchain_network =
   let open Lwt_result_syntax in
   return {cfg with blockchain_network}
@@ -785,6 +851,8 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     advertised_net_port;
     private_mode;
     discovery_addr;
+    disable_p2p_maintenance;
+    disable_p2p_swap;
     disable_mempool;
     disable_mempool_precheck;
     enable_testchain;
@@ -946,6 +1014,8 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ~metrics_addr
     ?operation_metadata_size_limit
     ~private_mode
+    ~disable_p2p_maintenance
+    ~disable_p2p_swap
     ~disable_mempool
     ~disable_mempool_precheck
     ~enable_testchain

@@ -1,15 +1,12 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names
-  test_sparse_vec
-  test_costlang
-  test_probe
-  test_measure
-  test_benchmark_helpers)
+(library
+ (name src_lib_benchmark_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
-  alcotest-lwt
+  tezt.core
+  octez-alcotezt
   tezos-base
   tezos-base.unix
   tezos-stdlib-unix
@@ -17,31 +14,35 @@
   tezos-crypto
   tezos-benchmark
   tezos-benchmark-examples)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -open Tezos_base.TzPervasives))
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Octez_alcotezt
+  -open Tezos_base.TzPervasives)
+ (modules
+  test
+  test_sparse_vec
+  test_costlang
+  test_probe
+  test_measure
+  test_benchmark_helpers))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_benchmark_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-benchmark-tests)
- (action (run %{dep:./test_sparse_vec.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest)
- (package tezos-benchmark-tests)
- (action (run %{dep:./test_costlang.exe})))
-
-(rule
- (alias runtest)
- (package tezos-benchmark-tests)
- (action (run %{dep:./test_probe.exe})))
-
-(rule
- (alias runtest)
- (package tezos-benchmark-tests)
- (action (run %{dep:./test_measure.exe})))
-
-(rule
- (alias runtest)
- (package tezos-benchmark-tests)
- (action (run %{dep:./test_benchmark_helpers.exe})))
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

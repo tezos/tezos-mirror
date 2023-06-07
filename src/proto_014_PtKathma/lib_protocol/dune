@@ -480,6 +480,27 @@
  (action (run %{bin:octez-protocol-compiler} -warn-error +a .)))
 
 (library
+ (name tezos_protocol_014_PtKathma_lifted)
+ (public_name tezos-protocol-014-PtKathma.lifted)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-014-PtKathma)
+ (flags
+  (:standard)
+  -nopervasives
+  -open Tezos_protocol_014_PtKathma)
+ (modules Lifted_protocol))
+
+(rule
+ (targets lifted_protocol.ml)
+ (action
+  (write-file
+   %{targets}
+   "\ninclude Environment.Lift (Protocol)\nlet hash = Protocol.hash\n")))
+
+(library
  (name tezos_protocol_014_PtKathma_functor)
  (libraries
   tezos-protocol-environment

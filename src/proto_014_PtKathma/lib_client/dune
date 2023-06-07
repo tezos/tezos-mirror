@@ -11,6 +11,7 @@
   tezos-shell-services
   tezos-client-base
   tezos-protocol-014-PtKathma
+  tezos-protocol-014-PtKathma.lifted
   tezos-mockup-registration
   tezos-proxy
   tezos-signer-backends

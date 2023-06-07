@@ -37,6 +37,7 @@ type options = {
 type 'workload timed_workload = {
   workload : 'workload;  (** Workload associated to the measurement *)
   measures : Maths.vector;  (** Collected measurements *)
+  allocated_words : int option;  (** Measured allocation in words *)
 }
 
 type 'workload workload_data = 'workload timed_workload list
@@ -100,13 +101,36 @@ let options_encoding =
          (seed, nsamples, bench_number, minor_heap_size, config_file))
        (fun (seed, nsamples, bench_number, minor_heap_size, config_file) ->
          {seed; nsamples; bench_number; minor_heap_size; config_file})
-       (tup5
-          (option Benchmark_helpers.int_encoding)
-          Benchmark_helpers.int_encoding
-          Benchmark_helpers.int_encoding
-          heap_size_encoding
-          (option string))
+       (obj5
+          (req "seed" (option Benchmark_helpers.int_encoding))
+          (req "samples_per_bench" Benchmark_helpers.int_encoding)
+          (req "bench_number" Benchmark_helpers.int_encoding)
+          (req "minor_heap_size" heap_size_encoding)
+          (req "config_file" (option string)))
 
+let rfc3339_encoding =
+  let of_tm tm =
+    let time_s, _ = Unix.mktime tm in
+    let ptime =
+      WithExceptions.Option.get ~loc:__LOC__ @@ Ptime.of_float_s @@ time_s
+    in
+    Ptime.to_rfc3339 ~tz_offset_s:0 ptime
+  in
+  let to_tm rfc3339_string =
+    Ptime.of_rfc3339 ~strict:true rfc3339_string
+    |> Ptime.rfc3339_error_to_msg
+    |> Result.map_error (function `Msg e -> e)
+    |> Result.map (fun (utc, _, _) ->
+           let seconds = Ptime.to_float_s utc in
+           Unix.gmtime seconds)
+  in
+  (* let strip_msg =  Result.map_error (fun `Msg s -> s) in *)
+  Data_encoding.conv_with_guard
+    (fun tm -> of_tm tm)
+    (fun str -> to_tm str)
+    Data_encoding.string
+
+(* Encoding for workload data files for compatabilty *)
 let unix_tm_encoding : Unix.tm Data_encoding.encoding =
   let to_tuple tm =
     let open Unix in
@@ -165,9 +189,14 @@ let vec_encoding : Maths.vector Data_encoding.t =
 let timed_workload_encoding workload_encoding =
   let open Data_encoding in
   conv
-    (fun {workload; measures} -> (workload, measures))
-    (fun (workload, measures) -> {workload; measures})
-    (obj2 (req "workload" workload_encoding) (req "measures" vec_encoding))
+    (fun {workload; measures; allocated_words} ->
+      (workload, measures, allocated_words))
+    (fun (workload, measures, allocated_words) ->
+      {workload; measures; allocated_words})
+    (obj3
+       (req "workload" workload_encoding)
+       (req "measures" vec_encoding)
+       (req "allocated_words" (option int31)))
 
 let workload_data_encoding workload_encoding =
   Data_encoding.list (timed_workload_encoding workload_encoding)
@@ -180,10 +209,10 @@ let measurement_encoding workload_encoding =
          (bench_opts, workload_data, date))
        (fun (bench_opts, workload_data, date) ->
          {bench_opts; workload_data; date})
-       (tup3
-          options_encoding
-          (workload_data_encoding workload_encoding)
-          unix_tm_encoding)
+       (obj3
+          (req "benchmark_options" options_encoding)
+          (req "workload_data" (workload_data_encoding workload_encoding))
+          (req "date" rfc3339_encoding))
 
 let serialized_workload_encoding =
   let open Data_encoding in
@@ -240,7 +269,7 @@ let save :
     options:options ->
     bench:(c, t) Benchmark.poly ->
     workload_data:t workload_data ->
-    unit =
+    packed_measurement =
  fun ~filename ~options ~bench ~workload_data ->
   let (module Bench) = bench in
   let date = Unix.gmtime (Unix.time ()) in
@@ -277,7 +306,28 @@ let save :
   let _nwritten =
     Lwt_main.run @@ Tezos_stdlib_unix.Lwt_utils_unix.create_file filename str
   in
-  ()
+  Measurement (bench, measurement)
+
+let packed_measurement_print_json measurement_packed output_path =
+  let (Measurement (bench, measurement)) = measurement_packed in
+  let module Bench = (val bench) in
+  let encoding_measurement = measurement_encoding Bench.workload_encoding in
+  let encoding =
+    Data_encoding.(
+      obj2
+        (req "benchmark_namespace" Namespace.encoding)
+        (req "measurement_data" encoding_measurement))
+  in
+  let data = Data_encoding.Json.construct encoding (Bench.name, measurement) in
+  let json = Data_encoding.Json.to_string data in
+  match output_path with
+  | Some output_path ->
+      Out_channel.with_open_text output_path (fun oc ->
+          Printf.fprintf oc "%s\n" json) ;
+      Format.eprintf
+        "Measure.packed_measurement_save_json: saved to %s@."
+        output_path
+  | None -> Printf.printf "%s\n" json
 
 let load : filename:string -> packed_measurement =
  fun ~filename ->
@@ -291,12 +341,10 @@ let load : filename:string -> packed_measurement =
   let str =
     Lwt_main.run @@ Tezos_stdlib_unix.Lwt_utils_unix.read_file filename
   in
-  Format.eprintf "Measure.load: loaded %s\n" filename ;
+  Format.eprintf "Measure.load: loaded %s@." filename ;
   match Data_encoding.Binary.of_string serialized_workload_encoding str with
   | Ok {bench_name; measurement_bytes} -> (
-      let bench =
-        Registration.find_benchmark_exn (Namespace.to_string bench_name)
-      in
+      let bench = Registration.find_benchmark_exn bench_name in
       match Benchmark.ex_unpack bench with
       | Ex ((module Bench) as bench) -> (
           match
@@ -318,7 +366,7 @@ let to_csv :
   let (module Bench) = bench in
   let lines =
     List.map
-      (fun {workload; measures} ->
+      (fun {workload; measures; _} ->
         (Bench.workload_to_vector workload, measures))
       workload_data
   in
@@ -396,6 +444,10 @@ module Time = struct
     = "caml_clock_gettime_byte" "caml_clock_gettime"
     [@@noalloc]
 
+  external clock_getres : unit -> (int64[@unboxed])
+    = "caml_clock_getres_byte" "caml_clock_getres"
+    [@@noalloc]
+
   let measure f =
     let bef = get_time_ns () in
     let _ = f () in
@@ -411,6 +463,17 @@ module Time = struct
     let dt = Int64.(to_float (sub aft bef)) in
     (dt, x)
     [@@inline always]
+
+  let check_timer_resolution () =
+    let ns = clock_getres () in
+    if ns = 1L then ()
+    else if ns = 0L then
+      Stdlib.failwith "Snoop: cannot work without a proper clock"
+    else
+      Format.eprintf
+        "WARNING: This machine's clock reslution is %Ldns, which is too large \
+         for Snoop benchmarks!@."
+        ns
 end
 
 let compute_empirical_timing_distribution :
@@ -450,6 +513,7 @@ let set_gc_increment () =
 
 let perform_benchmark (type c t) (options : options)
     (bench : (c, t) Benchmark.poly) : t workload_data =
+  Time.check_timer_resolution () ;
   let (module Bench) = bench in
   let config =
     Config.parse_config ~print:Stdlib.stderr bench options.config_file
@@ -479,16 +543,25 @@ let perform_benchmark (type c t) (options : options)
         progress () ;
         set_gc_increment () ;
         Gc.compact () ;
+        let measure_plain_benchmark workload closure measure_allocation =
+          let measures =
+            compute_empirical_timing_distribution
+              ~closure
+              ~nsamples:options.nsamples
+              ~buffer
+              ~index
+          in
+          let allocated_words =
+            Option.bind measure_allocation (fun f -> f ())
+          in
+          {workload; measures; allocated_words} :: workload_data
+        in
         match benchmark_fun () with
         | Generator.Plain {workload; closure} ->
-            let measures =
-              compute_empirical_timing_distribution
-                ~closure
-                ~nsamples:options.nsamples
-                ~buffer
-                ~index
-            in
-            {workload; measures} :: workload_data
+            measure_plain_benchmark workload closure None
+        | Generator.PlainWithAllocation {workload; closure; measure_allocation}
+          ->
+            measure_plain_benchmark workload closure (Some measure_allocation)
         | Generator.With_context {workload; closure; with_context} ->
             with_context (fun context ->
                 let measures =
@@ -498,7 +571,7 @@ let perform_benchmark (type c t) (options : options)
                     ~buffer
                     ~index
                 in
-                {workload; measures} :: workload_data)
+                {workload; measures; allocated_words = None} :: workload_data)
         | Generator.With_probe {workload; probe; closure} ->
             Tezos_stdlib.Utils.do_n_times options.nsamples (fun () ->
                 closure probe) ;
@@ -508,7 +581,7 @@ let perform_benchmark (type c t) (options : options)
                 let results = probe.Generator.get aspect in
                 let measures = Maths.vector_of_array (Array.of_list results) in
                 let workload = workload aspect in
-                {workload; measures} :: acc)
+                {workload; measures; allocated_words = None} :: acc)
               workload_data
               aspects)
       []
@@ -538,3 +611,20 @@ let make_timing_probe (type t) (module O : Compare.COMPARABLE with type t = t) =
       (fun () -> Stdlib.Hashtbl.to_seq_keys table |> Set.of_seq |> Set.elements);
     get = (fun aspect -> Stdlib.Hashtbl.find_all table aspect);
   }
+
+let get_free_variable_set measurement =
+  let (Measurement ((module Bench), m)) = measurement in
+  let open Free_variable.Set in
+  List.fold_left
+    (fun acc (_local_model_name, model) ->
+      let fvs =
+        List.fold_left
+          (fun acc {workload; _} ->
+            let fvs = Model.get_free_variable_set_applied model workload in
+            union fvs acc)
+          empty
+          m.workload_data
+      in
+      union acc fvs)
+    empty
+    Bench.models

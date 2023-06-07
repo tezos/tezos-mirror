@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_banned_peers
+    Invocation:   dune exec src/lib_p2p/test/test_p2p_banned_peers.exe
     Subject:      On banning peers and usage of Access Control Lists (ACL)
                   using sets and POSIX timestamps.
 *)
@@ -139,10 +139,10 @@ let () =
         f ())
   in
   Alcotest_lwt.run
-    ~argv:[|""|]
+    ~__FILE__
     "tezos-p2p"
     [
-      ( "p2p.peerset",
+      ( "p2p.banned",
         List.map
           wrap
           [
@@ -155,3 +155,5 @@ let () =
           ] );
     ]
   |> Lwt_main.run
+
+let () = Tezt.Test.run ()

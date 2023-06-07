@@ -8,7 +8,7 @@
  (libraries
   tezos-base
   tezos-protocol-016-PtMumbai
-  tezos-injector-016-PtMumbai)
+  octez-injector)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
@@ -16,4 +16,4 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_protocol_016_PtMumbai
-  -open Tezos_injector_016_PtMumbai))
+  -open Octez_injector))

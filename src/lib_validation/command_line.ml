@@ -71,9 +71,9 @@ let run () =
   let socket_dir, readonly = parse_args () in
   let main_promise = External_validator.main ?socket_dir ~readonly () in
   Stdlib.exit
-    (Lwt_main.run
-       (let open Lwt_syntax in
-       let* r = Lwt_exit.wrap_and_exit main_promise in
+    (let open Lwt_syntax in
+    Lwt_main.run
+      (let* r = Lwt_exit.wrap_and_exit main_promise in
        match r with
        | Ok () -> Lwt_exit.exit_and_wait 0
        | Error err ->

@@ -51,15 +51,6 @@ let rpc_ctxt =
     rpc_context
     Plugin.RPC.rpc_services
 
-let to_alpha_ctxt b =
-  Alpha_context.prepare
-    b.context
-    ~level:b.header.shell.level
-    ~predecessor_timestamp:b.header.shell.timestamp
-    ~timestamp:b.header.shell.timestamp
-  >|= Environment.wrap_tzresult
-  >>=? fun (ctxt, _balance_updates, _migration_results) -> return ctxt
-
 (******** Policies ***********)
 
 (* Policies are functions that take a block and return a tuple
@@ -157,18 +148,39 @@ module Forge = struct
   let default_proof_of_work_nonce =
     Bytes.create Constants.proof_of_work_nonce_size
 
-  let make_contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ~payload_hash ~payload_round
+  let rec naive_pow_miner ~proof_of_work_threshold shell header =
+    match
+      Hacl_star.Hacl.RandomBuffer.randombytes
+        ~size:Constants.proof_of_work_nonce_size
+    with
+    | Some proof_of_work_nonce ->
+        let cand = Block_header.{header with proof_of_work_nonce} in
+        if
+          Block_header.Proof_of_work.check_header_proof_of_work_stamp
+            shell
+            cand
+            proof_of_work_threshold
+        then return cand
+        else naive_pow_miner ~proof_of_work_threshold shell header
+    | None -> failwith "Impossible to gather randomness"
+
+  let make_contents
+      ?(proof_of_work_threshold =
+        Tezos_protocol_alpha_parameters.Default_parameters.constants_test
+          .proof_of_work_threshold) ~payload_hash ~payload_round
       ?(liquidity_baking_toggle_vote = Liquidity_baking.LB_pass)
-      ~seed_nonce_hash () =
-    Block_header.
-      {
-        payload_hash;
-        payload_round;
-        proof_of_work_nonce;
-        seed_nonce_hash;
-        liquidity_baking_toggle_vote;
-      }
+      ~seed_nonce_hash shell =
+    naive_pow_miner
+      ~proof_of_work_threshold
+      shell
+      Block_header.
+        {
+          payload_hash;
+          payload_round;
+          proof_of_work_nonce = default_proof_of_work_nonce;
+          seed_nonce_hash;
+          liquidity_baking_toggle_vote;
+        }
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash =
     Tezos_base.Block_header.
@@ -184,9 +196,16 @@ module Forge = struct
         context = Context_hash.zero;
       }
 
-  let set_seed_nonce_hash seed_nonce_hash
+  let set_seed_nonce_hash
+      ?(proof_of_work_threshold =
+        Tezos_protocol_alpha_parameters.Default_parameters.constants_test
+          .proof_of_work_threshold) seed_nonce_hash
       {baker; consensus_key; shell; contents} =
-    {baker; consensus_key; shell; contents = {contents with seed_nonce_hash}}
+    naive_pow_miner
+      ~proof_of_work_threshold
+      shell
+      {contents with seed_nonce_hash}
+    >|=? fun contents -> {baker; consensus_key; shell; contents}
 
   let set_baker baker ?(consensus_key = baker) header =
     {header with baker; consensus_key}
@@ -239,7 +258,7 @@ module Forge = struct
     (Plugin.RPC.current_level ~offset:1l rpc_ctxt pred >|=? function
      | {expected_commitment = true; _} -> Some (fst (Proto_Nonce.generate ()))
      | {expected_commitment = false; _} -> None)
-    >|=? fun seed_nonce_hash ->
+    >>=? fun seed_nonce_hash ->
     let hashes = List.map Operation.hash_packed operations in
     let operations_hash =
       Operation_list_list_hash.compute [Operation_list_hash.compute hashes]
@@ -266,28 +285,31 @@ module Forge = struct
         ~payload_round
         hashes
     in
-    let contents =
-      make_contents
-        ~seed_nonce_hash
-        ?liquidity_baking_toggle_vote
-        ~payload_hash
-        ~payload_round
-        ()
-    in
-    {baker = delegate; consensus_key; shell; contents}
+    make_contents
+      ~seed_nonce_hash
+      ?liquidity_baking_toggle_vote
+      ~payload_hash
+      ~payload_round
+      shell
+    >|=? fun contents -> {baker = delegate; consensus_key; shell; contents}
 
   (* compatibility only, needed by incremental *)
-  let contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ?seed_nonce_hash
+  let contents
+      ?(proof_of_work_threshold =
+        Tezos_protocol_alpha_parameters.Default_parameters.constants_test
+          .proof_of_work_threshold) ?seed_nonce_hash
       ?(liquidity_baking_toggle_vote = Liquidity_baking.LB_pass) ~payload_hash
-      ~payload_round () =
-    {
-      Block_header.proof_of_work_nonce;
-      seed_nonce_hash;
-      liquidity_baking_toggle_vote;
-      payload_hash;
-      payload_round;
-    }
+      ~payload_round shell_header =
+    naive_pow_miner
+      ~proof_of_work_threshold
+      shell_header
+      {
+        Block_header.proof_of_work_nonce = default_proof_of_work_nonce;
+        seed_nonce_hash;
+        liquidity_baking_toggle_vote;
+        payload_hash;
+        payload_round;
+      }
 end
 
 (********* Genesis creation *************)
@@ -417,13 +439,12 @@ let genesis_with_parameters parameters =
       ~fitness
       ~operations_hash:Operation_list_list_hash.zero
   in
-  let contents =
-    Forge.make_contents
-      ~payload_hash:Block_payload_hash.zero
-      ~payload_round:Round.zero
-      ~seed_nonce_hash:None
-      ()
-  in
+  Forge.make_contents
+    ~payload_hash:Block_payload_hash.zero
+    ~payload_round:Round.zero
+    ~seed_nonce_hash:None
+    shell
+  >>=? fun contents ->
   let open Tezos_protocol_alpha_parameters in
   let json = Default_parameters.json_of_parameters parameters in
   let proto_params =
@@ -621,14 +642,13 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     constants
     shell
     bootstrap_accounts
-  >|=? fun context ->
-  let contents =
-    Forge.make_contents
-      ~payload_hash:Block_payload_hash.zero
-      ~payload_round:Round.zero
-      ~seed_nonce_hash:None
-      ()
-  in
+  >>=? fun context ->
+  Forge.make_contents
+    ~payload_hash:Block_payload_hash.zero
+    ~payload_round:Round.zero
+    ~seed_nonce_hash:None
+    shell
+  >|=? fun contents ->
   {
     hash;
     header = {shell; protocol_data = {contents; signature = Signature.zero}};
@@ -756,7 +776,9 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
       (fun vstate op ->
         (if check_size then
          let operation_size =
-           Data_encoding.Binary.length Operation.encoding op
+           Data_encoding.Binary.length
+             Operation.encoding_with_legacy_attestation_name
+             op
          in
          if operation_size > Constants_repr.max_operation_data_length then
            raise
@@ -891,23 +913,16 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
               | Transaction_result (Transaction_to_sc_rollup_result _)
               | Reveal_result _ | Delegation_result _
               | Update_consensus_key_result _ | Set_deposits_limit_result _
-              | Tx_rollup_origination_result _ | Tx_rollup_submit_batch_result _
-              | Tx_rollup_commit_result _ | Tx_rollup_return_bond_result _
-              | Tx_rollup_finalize_commitment_result _
-              | Tx_rollup_remove_commitment_result _
-              | Tx_rollup_rejection_result _ | Transfer_ticket_result _
-              | Tx_rollup_dispatch_tickets_result _
-              | Dal_publish_slot_header_result _ | Sc_rollup_originate_result _
-              | Sc_rollup_add_messages_result _ | Sc_rollup_cement_result _
-              | Sc_rollup_publish_result _ | Sc_rollup_refute_result _
-              | Sc_rollup_timeout_result _
+              | Transfer_ticket_result _ | Dal_publish_slot_header_result _
+              | Sc_rollup_originate_result _ | Sc_rollup_add_messages_result _
+              | Sc_rollup_cement_result _ | Sc_rollup_publish_result _
+              | Sc_rollup_refute_result _ | Sc_rollup_timeout_result _
               | Sc_rollup_execute_outbox_message_result _
               | Sc_rollup_recover_bond_result _ | Zk_rollup_origination_result _
               | Zk_rollup_publish_result _ | Zk_rollup_update_result _ ->
                   balance_updates_rev
               | Transaction_result
                   ( Transaction_to_contract_result {balance_updates; _}
-                  | Transaction_to_tx_rollup_result {balance_updates; _}
                   | Transaction_to_zk_rollup_result {balance_updates; _} )
               | Origination_result {balance_updates; _}
               | Register_global_constant_result {balance_updates; _}
@@ -937,14 +952,6 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
             | Successful_manager_result (Register_global_constant_result _)
             | Successful_manager_result (Set_deposits_limit_result _)
             | Successful_manager_result (Increase_paid_storage_result _)
-            | Successful_manager_result (Tx_rollup_origination_result _)
-            | Successful_manager_result (Tx_rollup_submit_batch_result _)
-            | Successful_manager_result (Tx_rollup_commit_result _)
-            | Successful_manager_result (Tx_rollup_return_bond_result _)
-            | Successful_manager_result (Tx_rollup_finalize_commitment_result _)
-            | Successful_manager_result (Tx_rollup_remove_commitment_result _)
-            | Successful_manager_result (Tx_rollup_rejection_result _)
-            | Successful_manager_result (Tx_rollup_dispatch_tickets_result _)
             | Successful_manager_result (Transfer_ticket_result _)
             | Successful_manager_result (Dal_publish_slot_header_result _)
             | Successful_manager_result (Sc_rollup_originate_result _)

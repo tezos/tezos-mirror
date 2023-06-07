@@ -107,6 +107,11 @@ type config = {
       (** If [true], peers discovered on the local network will be trusted. *)
   reconnection_config : Point_reconnection_config.t;
       (** The reconnection delat configuration. *)
+  disable_peer_discovery : bool;
+      (** If set to [true], the p2p layer will not participate to the peer
+          discovery mechanism. The p2p layer will not be able to find new peers
+          to connect with. For more details, refers to field
+          {disable_peer_discovery} of {!type:P2p_connect_handler.config}.  *)
 }
 
 (** Type of a P2P layer instance *)
@@ -147,7 +152,7 @@ val activate : ('msg, 'peer_meta, 'conn_meta) net -> unit
 val peer_id : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t
 
 (** A maintenance operation : try and reach the ideal number of peers *)
-val maintain : ('msg, 'peer_meta, 'conn_meta) net -> unit Lwt.t
+val maintain : ('msg, 'peer_meta, 'conn_meta) net -> unit tzresult Lwt.t
 
 (** Voluntarily drop some peers and replace them by new buddies *)
 val roll : ('msg, 'peer_meta, 'conn_meta) net -> unit Lwt.t

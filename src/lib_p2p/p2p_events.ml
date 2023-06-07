@@ -117,22 +117,6 @@ module P2p_protocol = struct
       ~pp2:pp_print_top_error_of_trace
       ("trace", Error_monad.trace_encoding)
 
-  let swap_ack_received =
-    declare_1
-      ~section
-      ~name:"swap_ack_received"
-      ~msg:"swap ack received from {peer}"
-      ~level:Info
-      ("peer", P2p_peer.Id.encoding)
-
-  let swap_request_received =
-    declare_1
-      ~section
-      ~name:"swap_request_received"
-      ~msg:"swap request received from {peer}"
-      ~level:Info
-      ("peer", P2p_peer.Id.encoding)
-
   let swap_request_ignored =
     declare_1
       ~section
@@ -311,7 +295,7 @@ module P2p_connect_handler = struct
       ~msg:"new connection to {addr}:{port}#{peer}"
       ~level:Info
       ("addr", P2p_addr.encoding)
-      ("port", Data_encoding.option Data_encoding.int16)
+      ("port", Data_encoding.option Data_encoding.uint16)
       ("peer", P2p_peer.Id.encoding)
 
   let trigger_maintenance_too_many_connections =
@@ -344,6 +328,14 @@ module P2p_conn = struct
 
   let section = ["p2p"; "conn"]
 
+  let peer_discovery_disabled =
+    declare_0
+      ~section
+      ~name:"peer_discovery_disabled"
+      ~msg:"request for new peers interrupted because peer discovery disabled"
+      ~level:Warning
+      ()
+
   let unexpected_error =
     declare_1
       ~section
@@ -353,6 +345,26 @@ module P2p_conn = struct
       ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.trace_encoding)
 
+  let swap_ack_received =
+    declare_3
+      ~section
+      ~name:"swap_ack_received"
+      ~msg:"swap ack received from {emitter}"
+      ~level:Info
+      ("emitter", P2p_peer.Id.encoding)
+      ("proposed_point", P2p_point.Id.encoding)
+      ("proposed_peer", P2p_peer.Id.encoding)
+
+  let swap_request_received =
+    declare_3
+      ~section
+      ~name:"swap_request_received"
+      ~msg:"swap request received from {emitter}"
+      ~level:Info
+      ("emitter", P2p_peer.Id.encoding)
+      ("proposed_point", P2p_point.Id.encoding)
+      ("proposed_peer", P2p_peer.Id.encoding)
+
   let bytes_popped_from_queue =
     declare_2
       ~section
@@ -361,6 +373,31 @@ module P2p_conn = struct
       ~level:Debug
       ("bytes", Data_encoding.int31)
       ("peer", P2p_peer.Id.encoding)
+
+  let disconnect =
+    declare_1
+      ~section
+      ~name:"disconnect"
+      ~msg:"{peer} has been explicitly closed"
+      ~level:Debug
+      ("peer", P2p_peer.Id.encoding)
+
+  let bootstrap_received =
+    declare_1
+      ~section
+      ~name:"bootstrap_received"
+      ~msg:"bootstrap message received from {emitter}"
+      ~level:Debug
+      ("emitter", P2p_peer.Id.encoding)
+
+  let advertise_received =
+    declare_2
+      ~section
+      ~name:"advertise_received"
+      ~msg:"advertise message received from {emitter}"
+      ~level:Debug
+      ("emitter", P2p_peer.Id.encoding)
+      ("points", Data_encoding.list P2p_point.Id.encoding)
 end
 
 module P2p_fd = struct
@@ -448,13 +485,101 @@ module P2p_maintainance = struct
 
   let section = ["p2p"; "maintenance"]
 
+  type maintenance_trigger_motive =
+    | Activation
+    | Last_maintenance
+    | External
+    | Timer of Ptime.span
+    | Too_few_connections
+    | Too_many_connections
+
+  let motive_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"activation"
+          ~description:
+            "This maintenance step was triggered by its initial activation"
+          (Tag 0)
+          (obj1 (req "kind" (constant "activation")))
+          (function Activation -> Some () | _ -> None)
+          (fun () -> Activation);
+        case
+          ~title:"last_maintenance"
+          ~description:"This maintenance step was triggered by the previous one"
+          (Tag 1)
+          (obj1 (req "kind" (constant "last_maintenance")))
+          (function Last_maintenance -> Some () | _ -> None)
+          (fun () -> Last_maintenance);
+        case
+          ~title:"timer"
+          ~description:
+            "This maintenance step was triggered by periodically checks."
+          (Tag 2)
+          (obj2
+             (req "kind" (constant "timer"))
+             (req "idle_time" Time.System.Span.encoding))
+          (function Timer span -> Some ((), span) | _ -> None)
+          (fun ((), span) -> Timer span);
+        case
+          ~title:"external_event"
+          ~description:
+            "This maintenance step was triggered by an external event"
+          (Tag 3)
+          (obj1 (req "kind" (constant "external_event")))
+          (function External -> Some () | _ -> None)
+          (fun () -> External);
+        case
+          ~title:"too_few_connections"
+          ~description:
+            "This maintenance step was urgently triggered by a lack of \
+             connections"
+          (Tag 4)
+          (obj1 (req "kind" (constant "too_few_connections")))
+          (function Too_few_connections -> Some () | _ -> None)
+          (fun () -> Too_few_connections);
+        case
+          ~title:"too_many_connections"
+          ~description:
+            "This maintenance step was urgently triggered by an excess of \
+             connections"
+          (Tag 5)
+          (obj1 (req "kind" (constant "too_many_connections")))
+          (function Too_many_connections -> Some () | _ -> None)
+          (fun () -> Too_many_connections);
+      ]
+
+  let motive_pp fmt = function
+    | Activation -> Format.pp_print_string fmt "activation"
+    | Last_maintenance -> Format.pp_print_string fmt "last maintenance"
+    | External -> Format.pp_print_string fmt "external"
+    | Timer span ->
+        Format.fprintf
+          fmt
+          "periodically checks every %a."
+          Time.System.Span.pp_hum
+          span
+    | Too_few_connections -> Format.pp_print_string fmt "too few connections"
+    | Too_many_connections -> Format.pp_print_string fmt "too many connections"
+
+  let maintenance_started =
+    declare_1
+      ~section
+      ~name:"maintenance_started"
+      ~msg:"maintenance step started (triggered by:{motive})"
+      ~level:Info
+      ~pp1:motive_pp
+      ("motive", motive_encoding)
+
   let maintenance_ended =
-    declare_0
+    declare_1
       ~section
       ~name:"maintenance_ended"
-      ~msg:"maintenance step ended"
+      ~msg:"maintenance step ended after {duration}"
       ~level:Info
-      ()
+      ~pp1:Time.System.Span.pp_hum
+      ("duration", Time.System.Span.encoding)
 
   let too_few_connections =
     declare_1
@@ -840,6 +965,16 @@ module P2p = struct
 
   let section = ["p2p"]
 
+  let maintenance_disabled =
+    declare_0
+      ~section
+      ~name:"maintenance_disabled"
+      ~level:Warning
+      ~msg:
+        "the maintenance is disabled, this should be used for testing purposes \
+         only"
+      ()
+
   let activate_layer =
     declare_0
       ~section
@@ -849,7 +984,12 @@ module P2p = struct
       ()
 
   let activate_network =
-    declare_0 ~section ~name:"activate_network" ~level:Info ~msg:"activate" ()
+    declare_1
+      ~section
+      ~name:"activate_network"
+      ~level:Info
+      ~msg:"activate id {peer}"
+      ("peer", P2p_peer.Id.encoding)
 
   let message_read =
     declare_1

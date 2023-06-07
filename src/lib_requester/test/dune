@@ -1,9 +1,11 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names test_requester test_fuzzing_requester)
+(library
+ (name src_lib_requester_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-base.unix
   tezos-test-helpers
@@ -11,22 +13,35 @@
   tezos-stdlib
   tezos-stdlib-unix
   tezos-requester
-  alcotest-lwt
+  octez-alcotezt
   qcheck-alcotest)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_test_helpers
   -open Tezos_base_test_helpers
   -open Tezos_stdlib
-  -open Tezos_requester))
+  -open Tezos_requester
+  -open Octez_alcotezt)
+ (modules test_requester test_fuzzing_requester shared))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_requester_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-requester)
- (action (run %{dep:./test_requester.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest)
- (package tezos-requester)
- (action (run %{dep:./test_fuzzing_requester.exe})))
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

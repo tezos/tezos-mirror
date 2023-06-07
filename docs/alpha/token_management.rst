@@ -1,7 +1,7 @@
 Token transfers and balance updates
 ===================================
 
-This page describes the reporting of tokens transfers in block metadata, as a sequence of balance updates. They serve among others to the Octez client to derive and print the `Balance updates` sections of the receipts reported when operations are included in blocks.
+This page describes the reporting of tokens transfers in block metadata, as a sequence of balance updates. They serve among others to the Octez client to derive and print the ``Balance updates`` sections of the receipts reported when operations are included in blocks.
 
 Overview
 ~~~~~~~~

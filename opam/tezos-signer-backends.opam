@@ -18,14 +18,15 @@ depends: [
   "tezos-signer-services"
   "tezos-shell-services"
   "uri" { >= "3.1.0" }
-  "tezos-error-monad" {with-test}
-  "tezos-crypto" {with-test}
-  "alcotest-lwt" { with-test & >= "1.5.0" }
   "ocplib-endian"
   "fmt" { >= "0.8.7" }
   "tezos-clic"
   "tezos-stdlib-unix"
   "tezos-rpc-http-client-unix"
+  "tezt" { with-test & >= "3.1.0" }
+  "tezos-error-monad" {with-test}
+  "tezos-crypto" {with-test}
+  "octez-alcotezt" {with-test}
 ]
 depopts: [
   "ledgerwallet-tezos"

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,197 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Tx_rollup : sig
-  type range = Empty of int | Interval of int * int
-
-  type commitments_hashes = {message_hash : string; commitment_hash : string}
-
-  type state = {
-    finalized_commitments : range;
-    unfinalized_commitments : range;
-    uncommitted_inboxes : range;
-    tezos_head_level : int option;
-    commitment_newest_hash : string option;
-    burn_per_byte : int;
-    inbox_ema : int;
-    last_removed_commitment_hashes : commitments_hashes option;
-  }
-
-  type inbox = {inbox_length : int; cumulated_size : int; merkle_root : string}
-
-  type messages = {
-    count : int;
-    root : string;
-    last_message_result_hash : string;
-  }
-
-  type commitment = {
-    level : int;
-    messages : messages;
-    predecessor : string option;
-    inbox_merkle_root : string;
-  }
-
-  type submitted_commitment = {
-    commitment : commitment;
-    commitment_hash : string;
-    committer : string;
-    submitted_at : int;
-    finalized_at : int option;
-  }
-
-  type operation_content_payload = {
-    qty : Int64.t;
-    destination : string;
-    ticket : string;
-  }
-
-  type l2_transfer = [`Transfer of operation_content_payload]
-
-  type l2_withdraw = [`Withdraw of operation_content_payload]
-
-  type operation_content = [l2_transfer | l2_withdraw]
-
-  val operation_content_encoding : operation_content Data_encoding.t
-
-  type operation = {
-    signer : string;
-    counter : int64 option;
-    contents : operation_content list;
-  }
-
-  type deposit_content = {
-    sender : string;
-    destination : string;
-    ticket_hash : string;
-    amount : int64;
-  }
-
-  type deposit = [`Deposit of deposit_content]
-
-  type batch = [`Batch of Hex.t]
-
-  type message = [deposit | batch]
-
-  val json_of_message : message -> JSON.u
-
-  val make_batch : string -> [> batch]
-
-  val make_deposit :
-    sender:string ->
-    destination:string ->
-    ticket_hash:string ->
-    amount:int64 ->
-    [> deposit]
-
-  type withdraw = {claimer : string; ticket_hash : string; amount : int64}
-
-  val json_of_withdraw : withdraw -> JSON.u
-
-  type ticket_dispatch_info = {
-    contents : string;
-    ty : string;
-    ticketer : string;
-    amount : int64;
-    claimer : string;
-  }
-
-  val get_json_of_ticket_dispatch_info :
-    ticket_dispatch_info -> Client.t -> JSON.u Lwt.t
-
-  val get_state :
-    ?hooks:Process.hooks -> rollup:string -> Client.t -> state Runnable.process
-
-  val get_inbox :
-    ?hooks:Process.hooks ->
-    rollup:string ->
-    level:int ->
-    Client.t ->
-    inbox option Runnable.process
-
-  val get_commitment :
-    ?hooks:Process.hooks ->
-    ?block:string ->
-    rollup:string ->
-    level:int ->
-    Client.t ->
-    submitted_commitment option Runnable.process
-
-  val get_pending_bonded_commitments :
-    ?hooks:Process.hooks ->
-    ?block:string ->
-    rollup:string ->
-    pkh:string ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  val message_hash :
-    ?hooks:Process.hooks ->
-    message:message ->
-    Client.t ->
-    [> `Hash of string] Runnable.process
-
-  val inbox_merkle_tree_hash :
-    ?hooks:Process.hooks ->
-    message_hashes:[`Hash of string] list ->
-    Client.t ->
-    [> `Hash of string] Runnable.process
-
-  val inbox_merkle_tree_path :
-    ?hooks:Process.hooks ->
-    message_hashes:[`Hash of string] list ->
-    position:int ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  val commitment_merkle_tree_hash :
-    ?hooks:Process.hooks ->
-    message_result_hashes:[`Hash of string] list ->
-    Client.t ->
-    [> `Hash of string] Runnable.process
-
-  val commitment_merkle_tree_path :
-    ?hooks:Process.hooks ->
-    message_result_hashes:[`Hash of string] list ->
-    position:int ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  val withdraw_list_hash :
-    ?hooks:Process.hooks ->
-    withdrawals:withdraw list ->
-    Client.t ->
-    string Runnable.process
-
-  val message_result_hash :
-    ?hooks:Process.hooks ->
-    context_hash:string ->
-    withdraw_list_hash:string ->
-    Client.t ->
-    string Runnable.process
-
-  val compute_inbox_from_messages :
-    ?hooks:Process.hooks -> message list -> Client.t -> inbox Lwt.t
-
-  module Check : sig
-    val state : state Check.typ
-
-    val inbox : inbox Check.typ
-
-    val commitment : submitted_commitment Check.typ
-
-    val commitments_hashes : commitments_hashes Check.typ
-  end
-
-  module Parameters : sig
-    type t = {finality_period : int; withdraw_period : int}
-
-    val default : t
-
-    val parameter_file : ?parameters:t -> Protocol.t -> string Lwt.t
-  end
-end
-
 module Dal : sig
   module Cryptobox = Tezos_crypto_dal.Cryptobox
 
@@ -223,37 +33,36 @@ module Dal : sig
       cryptobox : Cryptobox.parameters;
       number_of_slots : int;
       attestation_lag : int;
+      attestation_threshold : int;
       blocks_per_epoch : int;
     }
 
     val parameter_file : Protocol.t -> string Lwt.t
 
     val from_client : Client.t -> t Lwt.t
+
+    (** [cryptobox_config_to_json config] returns the Json encoding of
+     the record {!type:Cryptobox.Config.t}. *)
+    val cryptobox_config_to_json : Cryptobox.Config.t -> JSON.t
   end
+
+  val endpoint : Dal_node.t -> string
 
   (** Abstract version of a slot to deal with messages content which
      are smaller than the expected size of a slot. *)
   type slot
 
-  (** [make_slot ?padding content client] produces a slot. If
-     [padding=true] (which is the default), then the content is padded
-     to reach the expected size given by the [slot_size] field of
-     {!type:Cryptobox.parameters}. [client] is used to get the
-     corresponding parameters (see {!val: Parameters.from_client}). *)
-  val make_slot : ?padding:bool -> string -> Client.t -> slot Lwt.t
+  (** [make_slot ?padding ~slot_size content] produces a slot. If [padding=true]
+      (which is the default), then the content is padded to reach the expected
+      size given by [slot_size] (which is usually obtained from
+      {!type:Cryptobox.parameters}). *)
+  val make_slot : ?padding:bool -> slot_size:int -> string -> slot
 
   (** [content_of_slot slot] retrieves the original content of a slot
      by removing the padding. *)
   val content_of_slot : slot -> string
 
   module RPC_legacy : sig
-    (** [split_slot data] posts [data] on slot/split; returns the
-        corresponding commitment and proof *)
-    val split_slot : slot -> (Dal_node.t, string * string) RPC_core.t
-
-    (** [slot_content slot_header] gets slot/content of [slot_header] *)
-    val slot_content : string -> (Dal_node.t, slot) RPC_core.t
-
     (** [slot_pages slot_header] gets slot/pages of [slot_header] *)
     val slot_pages : string -> (Dal_node.t, string list) RPC_core.t
 
@@ -266,23 +75,6 @@ module Dal : sig
         slot header *)
     val shards :
       slot_header:string -> int list -> (Dal_node.t, string list) RPC_core.t
-
-    (** [dac_store_preimage ~payload ~pagination_scheme] posts a [payload] to
-        dac/store_preimage using a given [pagination_scheme]. It returnst the
-        base58 encoded root page hash, and the raw bytes that can
-        be used as contents of a rollup message to trigger the request of
-        the payload in a Wasm rollup. *)
-    val dac_store_preimage :
-      payload:string ->
-      pagination_scheme:string ->
-      (Dal_node.t, string * string) RPC_core.t
-
-    (** [dac_verify_signature data] requests the dal node to verify
-         the signature of the external message [data] via
-         the plugin/dac/verify_signature endpoint. The DAC committee
-         of the dal node must be the same that was used to produce the
-         [data]. *)
-    val dac_verify_signature : string -> (Dal_node.t, bool) RPC_core.t
   end
 
   module RPC : sig
@@ -324,6 +116,13 @@ module Dal : sig
         content associated with the given commitment. *)
     val get_commitment_slot : commitment -> (Dal_node.t, slot) RPC_core.t
 
+    (** Call RPC "PUT /commitments/<commitment>/shards" to compute and store the
+        shards of the slot whose commitment is given, using the current DAL
+        parameters. Note that [with_proof], whose default value is [false], is
+        provided as input to the RPC. *)
+    val put_commitment_shards :
+      ?with_proof:bool -> commitment -> (Dal_node.t, unit) RPC_core.t
+
     type commitment_proof = string
 
     (** Call RPC "GET /commitments/<commitment>/proof" to get the proof
@@ -354,8 +153,10 @@ module Dal : sig
       commitment ->
       (Dal_node.t, slot_header list) RPC_core.t
 
-    (** Call RPC "GET /profile/<public_key_hash>/<level>/assigned-shard-indices" to
-        get shard ids assigned to the given public key hash at the given level. *)
+    (** Call RPC "GET
+        /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices"
+        to get shard ids assigned to the given public key hash at the given
+        level. *)
     val get_assigned_shard_indices :
       level:int -> pkh:string -> (Dal_node.t, int list) RPC_core.t
 
@@ -363,6 +164,23 @@ module Dal : sig
         headers with the given published level. *)
     val get_published_level_headers :
       ?status:string -> int -> (Dal_node.t, slot_header list) RPC_core.t
+
+    type slot_set = bool list
+
+    type attestable_slots = Not_in_committee | Attestable_slots of slot_set
+
+    (** Call RPC "GET
+        /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots" to
+        get the slots currently attestable by the given public key hash at the
+        given attested level. The result is either a [Not_in_committee] or a
+        [Attestable_slots flags], where [flags] is a boolean list of length
+        [num_slots]. A slot is attestable if it is published at level [level -
+        attestation_lag]) and all the shards assigned to the given attestor at
+        level [level] are available in the DAL node's store. *)
+    val get_attestable_slots :
+      attestor:Account.key ->
+      attested_level:int ->
+      (Dal_node.t, attestable_slots) RPC_core.t
   end
 
   val make :
@@ -370,7 +188,11 @@ module Dal : sig
 
   module Commitment : sig
     val dummy_commitment :
-      ?on_error:(string -> Cryptobox.commitment * Cryptobox.commitment_proof) ->
+      ?on_error:
+        ([ `Invalid_degree_strictly_less_than_expected of
+           (int, int) Cryptobox.error_container
+         | `Slot_wrong_size of slot ] ->
+        Cryptobox.commitment * Cryptobox.commitment_proof) ->
       Cryptobox.t ->
       string ->
       Cryptobox.commitment * Cryptobox.commitment_proof

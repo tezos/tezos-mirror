@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+# SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = 'evm_kernel'
+version = '0.1.0'
+edition = '2021'
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies.tezos-smart-rollup-core]
+path = "../../kernel_sdk/core"
+
+[dependencies.tezos-smart-rollup-host]
+path = "../../kernel_sdk/host"
+
+[dependencies.tezos-smart-rollup-panic-hook]
+path = "../../kernel_sdk/panic-hook"
+
+[dependencies.tezos-smart-rollup-entrypoint]
+path = "../../kernel_sdk/entrypoint"
+
+[dependencies.tezos-smart-rollup-debug]
+path = "../../kernel_sdk/debug"
+
+[dev-dependencies.tezos-smart-rollup-encoding]
+path = "../../kernel_sdk/encoding"
+
+[dev-dependencies.tezos-smart-rollup-mock]
+path = "../../kernel_sdk/mock"
+
+[dev-dependencies.tezos_data_encoding]
+tezos_data_encoding = "0.4"
+
+[dependencies]
+tezos_ethereum = { path = "../ethereum" }
+primitive-types = { version = "0.11.1", default-features = false }
+hex = "0.4"
+num-traits = "0.2.8"
+evm-execution = { path = "../evm_execution" }
+
+[features]
+default = ["panic-hook"]
+panic-hook = []

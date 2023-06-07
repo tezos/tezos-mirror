@@ -87,19 +87,18 @@ module Raw_consensus = struct
   type t = {
     current_endorsement_power : int;
         (** Number of endorsement slots recorded for the current block. *)
-    allowed_endorsements : (consensus_pk * int) Slot_repr.Map.t;
+    allowed_endorsements : (consensus_pk * int) Slot_repr.Map.t option;
         (** Endorsements rights for the current block. Only an endorsement
             for the lowest slot in the block can be recorded. The map
             associates to each initial slot the [pkh] associated to this
-            slot with its power. *)
-    allowed_preendorsements : (consensus_pk * int) Slot_repr.Map.t;
+            slot with its power. This is [None] only in mempool mode. *)
+    allowed_preendorsements : (consensus_pk * int) Slot_repr.Map.t option;
         (** Preendorsements rights for the current block. Only a preendorsement
             for the lowest slot in the block can be recorded. The map
             associates to each initial slot the [pkh] associated to this
-            slot with its power. *)
-    grand_parent_endorsements_seen : Signature.Public_key_hash.Set.t;
-        (** Record the endorsements already seen for the grand
-            parent. This only useful for the partial construction mode. *)
+            slot with its power. This is [None] only in mempool mode, or in
+            application mode when there is no locked round (so the block
+            cannot contain any preendorsements). *)
     endorsements_seen : Slot_repr.Set.t;
         (** Record the endorsements already seen. Only initial slots are indexed. *)
     preendorsements_seen : Slot_repr.Set.t;
@@ -111,7 +110,6 @@ module Raw_consensus = struct
         (** in block construction mode, record the round of preendorsements
             included in a block. *)
     endorsement_branch : (Block_hash.t * Block_payload_hash.t) option;
-    grand_parent_branch : (Block_hash.t * Block_payload_hash.t) option;
   }
 
   (** Invariant:
@@ -127,15 +125,13 @@ module Raw_consensus = struct
   let empty : t =
     {
       current_endorsement_power = 0;
-      allowed_endorsements = Slot_repr.Map.empty;
-      allowed_preendorsements = Slot_repr.Map.empty;
-      grand_parent_endorsements_seen = Signature.Public_key_hash.Set.empty;
+      allowed_endorsements = Some Slot_repr.Map.empty;
+      allowed_preendorsements = Some Slot_repr.Map.empty;
       endorsements_seen = Slot_repr.Set.empty;
       preendorsements_seen = Slot_repr.Set.empty;
       locked_round_evidence = None;
       preendorsements_quorum_round = None;
       endorsement_branch = None;
-      grand_parent_branch = None;
     }
 
   type error += Double_inclusion_of_consensus_operation
@@ -152,17 +148,6 @@ module Raw_consensus = struct
       (function
         | Double_inclusion_of_consensus_operation -> Some () | _ -> None)
       (fun () -> Double_inclusion_of_consensus_operation)
-
-  let record_grand_parent_endorsement t pkh =
-    error_when
-      (Signature.Public_key_hash.Set.mem pkh t.grand_parent_endorsements_seen)
-      Double_inclusion_of_consensus_operation
-    >|? fun () ->
-    {
-      t with
-      grand_parent_endorsements_seen =
-        Signature.Public_key_hash.Set.add pkh t.grand_parent_endorsements_seen;
-    }
 
   let record_endorsement t ~initial_slot ~power =
     error_when
@@ -214,13 +199,8 @@ module Raw_consensus = struct
 
   let endorsement_branch t = t.endorsement_branch
 
-  let grand_parent_branch t = t.grand_parent_branch
-
   let set_endorsement_branch t endorsement_branch =
     {t with endorsement_branch = Some endorsement_branch}
-
-  let set_grand_parent_branch t grand_parent_branch =
-    {t with grand_parent_branch = Some grand_parent_branch}
 end
 
 type dal_committee = {
@@ -667,6 +647,23 @@ let version_value = "alpha_current"
 
 let version = "v1"
 
+let protocol_migration_internal_message =
+  Sc_rollup_inbox_message_repr.Protocol_migration version_value
+
+let protocol_migration_serialized_message =
+  match
+    Sc_rollup_inbox_message_repr.serialize
+      (Internal protocol_migration_internal_message)
+  with
+  | Ok msg -> msg
+  | Error trace ->
+      Format.kasprintf
+        failwith
+        "%s: Could not serialize protocol message : %a"
+        __LOC__
+        pp_trace
+        trace
+
 let cycle_eras_key = [version; "cycle_eras"]
 
 let constants_key = [version; "constants"]
@@ -839,7 +836,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
       };
   }
 
-type previous_protocol = Genesis of Parameters_repr.t | Lima_015
+type previous_protocol = Genesis of Parameters_repr.t | Nairobi_017
 
 let check_and_update_protocol_version ctxt =
   (Context.find ctxt version_key >>= function
@@ -851,7 +848,7 @@ let check_and_update_protocol_version ctxt =
          failwith "Internal error: previously initialized context."
        else if Compare.String.(s = "genesis") then
          get_proto_param ctxt >|=? fun (param, ctxt) -> (Genesis param, ctxt)
-       else if Compare.String.(s = "lima_015") then return (Lima_015, ctxt)
+       else if Compare.String.(s = "nairobi_017") then return (Nairobi_017, ctxt)
        else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
   Context.add ctxt version_key (Bytes.of_string version_value) >|= fun ctxt ->
@@ -874,82 +871,6 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
             "Internal error: cannot parse previous protocol constants in \
              context."
       | Some constants -> Lwt.return constants)
-
-let update_block_time_related_constants (c : Constants_parametric_repr.t) =
-  let divide_period p =
-    Period_repr.of_seconds_exn
-      Int64.(div (add (Period_repr.to_seconds p) 1L) 2L)
-  in
-  let minimal_block_delay = divide_period c.minimal_block_delay in
-  let delay_increment_per_round = divide_period c.delay_increment_per_round in
-  let hard_gas_limit_per_block =
-    let two = Z.(succ one) in
-    Gas_limit_repr.Arith.(
-      integral_exn (Z.div (integral_to_z c.hard_gas_limit_per_block) two))
-  in
-  let Constants_repr.Generated.
-        {
-          consensus_threshold = _;
-          baking_reward_fixed_portion;
-          baking_reward_bonus_per_slot;
-          endorsing_reward_per_slot;
-          liquidity_baking_subsidy;
-        } =
-    Constants_repr.Generated.generate
-      ~consensus_committee_size:
-        c.Constants_parametric_repr.consensus_committee_size
-      ~blocks_per_minute:
-        {
-          numerator = 60;
-          denominator =
-            minimal_block_delay |> Period_repr.to_seconds |> Int64.to_int;
-        }
-  in
-  let double = Int32.mul 2l in
-  let blocks_per_cycle = double c.blocks_per_cycle in
-  let blocks_per_commitment = double c.blocks_per_commitment in
-  let nonce_revelation_threshold = double c.nonce_revelation_threshold in
-  let blocks_per_stake_snapshot = double c.blocks_per_stake_snapshot in
-  let max_operations_time_to_live = 2 * c.max_operations_time_to_live in
-  {
-    c with
-    blocks_per_cycle;
-    blocks_per_commitment;
-    nonce_revelation_threshold;
-    blocks_per_stake_snapshot;
-    max_operations_time_to_live;
-    minimal_block_delay;
-    delay_increment_per_round;
-    hard_gas_limit_per_block;
-    baking_reward_fixed_portion;
-    baking_reward_bonus_per_slot;
-    endorsing_reward_per_slot;
-    liquidity_baking_subsidy;
-  }
-
-let update_cycle_eras ctxt level ~prev_blocks_per_cycle ~blocks_per_cycle
-    ~blocks_per_commitment =
-  get_cycle_eras ctxt >>=? fun cycle_eras ->
-  let current_era = Level_repr.current_era cycle_eras in
-  let current_cycle =
-    let level_position =
-      Int32.sub level (Raw_level_repr.to_int32 current_era.first_level)
-    in
-    Cycle_repr.add
-      current_era.first_cycle
-      (Int32.to_int (Int32.div level_position prev_blocks_per_cycle))
-  in
-  let new_cycle_era =
-    Level_repr.
-      {
-        first_level = Raw_level_repr.of_int32_exn (Int32.succ level);
-        first_cycle = Cycle_repr.succ current_cycle;
-        blocks_per_cycle;
-        blocks_per_commitment;
-      }
-  in
-  Level_repr.add_cycle_era new_cycle_era cycle_eras >>?= fun new_cycle_eras ->
-  set_cycle_eras ctxt new_cycle_eras
 
 (* You should ensure that if the type `Constants_parametric_repr.t` is
    different from `Constants_parametric_previous_repr.t` or the value of these
@@ -978,12 +899,12 @@ let prepare_first_block ~level ~timestamp ctxt =
       Level_repr.create_cycle_eras [cycle_era] >>?= fun cycle_eras ->
       set_cycle_eras ctxt cycle_eras >>=? fun ctxt ->
       add_constants ctxt param.constants >|= ok
-  | Lima_015 ->
+  | Nairobi_017 ->
       get_previous_protocol_constants ctxt >>= fun c ->
       let tx_rollup =
         Constants_parametric_repr.
           {
-            enable = false;
+            enable = c.tx_rollup.enable;
             origination_size = c.tx_rollup.origination_size;
             hard_size_limit_per_inbox = c.tx_rollup.hard_size_limit_per_inbox;
             hard_size_limit_per_message =
@@ -1003,10 +924,10 @@ let prepare_first_block ~level ~timestamp ctxt =
       in
       let cryptobox_parameters =
         {
-          Dal.page_size = 4096;
-          number_of_shards = 2048;
-          slot_size = 1 lsl 20;
-          redundancy_factor = 16;
+          Dal.page_size = c.dal.cryptobox_parameters.page_size;
+          number_of_shards = c.dal.cryptobox_parameters.number_of_shards;
+          slot_size = c.dal.cryptobox_parameters.slot_size;
+          redundancy_factor = c.dal.cryptobox_parameters.redundancy_factor;
         }
       in
       let dal =
@@ -1014,31 +935,33 @@ let prepare_first_block ~level ~timestamp ctxt =
           {
             feature_enable = c.dal.feature_enable;
             number_of_slots = c.dal.number_of_slots;
-            attestation_lag = c.dal.endorsement_lag;
-            attestation_threshold = c.dal.availability_threshold;
-            blocks_per_epoch = 32l;
+            attestation_lag = c.dal.attestation_lag;
+            attestation_threshold = c.dal.attestation_threshold;
+            blocks_per_epoch = c.dal.blocks_per_epoch;
             cryptobox_parameters;
           }
       in
       let sc_rollup =
         Constants_parametric_repr.
           {
-            enable = true;
-            arith_pvm_enable = false;
+            enable = c.sc_rollup.enable;
+            arith_pvm_enable = c.sc_rollup.arith_pvm_enable;
             origination_size = c.sc_rollup.origination_size;
-            challenge_window_in_blocks = 80_640;
+            challenge_window_in_blocks = c.sc_rollup.challenge_window_in_blocks;
             stake_amount = c.sc_rollup.stake_amount;
-            commitment_period_in_blocks = 60;
-            max_lookahead_in_blocks = 172_800l;
-            max_active_outbox_levels = 80_640l;
+            commitment_period_in_blocks =
+              c.sc_rollup.commitment_period_in_blocks;
+            max_lookahead_in_blocks = c.sc_rollup.max_lookahead_in_blocks;
+            max_active_outbox_levels = c.sc_rollup.max_active_outbox_levels;
             max_outbox_messages_per_level =
               c.sc_rollup.max_outbox_messages_per_level;
             number_of_sections_in_dissection =
               c.sc_rollup.number_of_sections_in_dissection;
-            timeout_period_in_blocks = 40_320;
+            timeout_period_in_blocks = c.sc_rollup.timeout_period_in_blocks;
             max_number_of_stored_cemented_commitments =
               c.sc_rollup.max_number_of_stored_cemented_commitments;
-            max_number_of_parallel_games = 32;
+            max_number_of_parallel_games =
+              c.sc_rollup.max_number_of_parallel_games;
           }
       in
       let zk_rollup =
@@ -1100,20 +1023,6 @@ let prepare_first_block ~level ~timestamp ctxt =
             zk_rollup;
           }
       in
-      let block_time_is_at_least_15s =
-        Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay >= 15L)
-      in
-      (if block_time_is_at_least_15s then
-       let new_constants = update_block_time_related_constants constants in
-       update_cycle_eras
-         ctxt
-         level
-         ~prev_blocks_per_cycle:constants.blocks_per_cycle
-         ~blocks_per_cycle:new_constants.blocks_per_cycle
-         ~blocks_per_commitment:new_constants.blocks_per_commitment
-       >>=? fun ctxt -> return (ctxt, new_constants)
-      else return (ctxt, constants))
-      >>=? fun (ctxt, constants) ->
       add_constants ctxt constants >>= fun ctxt -> return ctxt)
   >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp
@@ -1421,20 +1330,19 @@ module type CONSENSUS = sig
 
   type consensus_pk
 
-  val allowed_endorsements : t -> (consensus_pk * int) slot_map
+  val allowed_endorsements : t -> (consensus_pk * int) slot_map option
 
-  val allowed_preendorsements : t -> (consensus_pk * int) slot_map
+  val allowed_preendorsements : t -> (consensus_pk * int) slot_map option
+
+  type error += Slot_map_not_found of {loc : string}
 
   val current_endorsement_power : t -> int
 
   val initialize_consensus_operation :
     t ->
-    allowed_endorsements:(consensus_pk * int) slot_map ->
-    allowed_preendorsements:(consensus_pk * int) slot_map ->
+    allowed_endorsements:(consensus_pk * int) slot_map option ->
+    allowed_preendorsements:(consensus_pk * int) slot_map option ->
     t
-
-  val record_grand_parent_endorsement :
-    t -> Signature.Public_key_hash.t -> t tzresult
 
   val record_endorsement : t -> initial_slot:slot -> power:int -> t tzresult
 
@@ -1452,10 +1360,6 @@ module type CONSENSUS = sig
   val set_endorsement_branch : t -> Block_hash.t * Block_payload_hash.t -> t
 
   val endorsement_branch : t -> (Block_hash.t * Block_payload_hash.t) option
-
-  val set_grand_parent_branch : t -> Block_hash.t * Block_payload_hash.t -> t
-
-  val grand_parent_branch : t -> (Block_hash.t * Block_payload_hash.t) option
 end
 
 module Consensus :
@@ -1496,10 +1400,6 @@ module Consensus :
          ~allowed_endorsements
          ~allowed_preendorsements)
 
-  let[@inline] record_grand_parent_endorsement ctxt pkh =
-    update_consensus_with_tzresult ctxt (fun ctxt ->
-        Raw_consensus.record_grand_parent_endorsement ctxt pkh)
-
   let[@inline] record_preendorsement ctxt ~initial_slot ~power round =
     update_consensus_with_tzresult
       ctxt
@@ -1524,12 +1424,17 @@ module Consensus :
     update_consensus_with ctxt (fun ctxt ->
         Raw_consensus.set_endorsement_branch ctxt branch)
 
-  let[@inline] grand_parent_branch ctxt =
-    Raw_consensus.grand_parent_branch ctxt.back.consensus
+  type error += Slot_map_not_found of {loc : string}
 
-  let[@inline] set_grand_parent_branch ctxt branch =
-    update_consensus_with ctxt (fun ctxt ->
-        Raw_consensus.set_grand_parent_branch ctxt branch)
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"raw_context.consensus.slot_map_not_found"
+      ~title:"Slot map not found"
+      ~description:"Pre-computed map by first slot not found."
+      Data_encoding.(obj1 (req "loc" (string Plain)))
+      (function Slot_map_not_found {loc} -> Some loc | _ -> None)
+      (fun loc -> Slot_map_not_found {loc})
 end
 
 module Tx_rollup = struct

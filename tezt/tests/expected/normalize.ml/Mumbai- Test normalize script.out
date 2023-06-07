@@ -1,5 +1,5 @@
 
-./octez-client --mode mockup normalize script file:./tests_python/contracts_016/opcodes/comb-literals.tz
+./octez-client --mode mockup normalize script michelson_test_scripts/opcodes/comb-literals.tz
 { parameter unit ;
   storage unit ;
   code { PUSH (list (pair nat nat nat nat))
@@ -9,7 +9,7 @@
          NIL operation ;
          PAIR } }
 
-./octez-client --mode mockup normalize script file:./tests_python/contracts_016/opcodes/comb-literals.tz --unparsing-mode Readable
+./octez-client --mode mockup normalize script michelson_test_scripts/opcodes/comb-literals.tz --unparsing-mode Readable
 { parameter unit ;
   storage unit ;
   code { PUSH (list (pair nat nat nat nat))
@@ -19,7 +19,7 @@
          NIL operation ;
          PAIR } }
 
-./octez-client --mode mockup normalize script file:./tests_python/contracts_016/opcodes/comb-literals.tz --unparsing-mode Optimized
+./octez-client --mode mockup normalize script michelson_test_scripts/opcodes/comb-literals.tz --unparsing-mode Optimized
 { parameter unit ;
   storage unit ;
   code { PUSH (list (pair nat nat nat nat))
@@ -29,7 +29,7 @@
          NIL operation ;
          PAIR } }
 
-./octez-client --mode mockup normalize script file:./tests_python/contracts_016/opcodes/comb-literals.tz --unparsing-mode Optimized_legacy
+./octez-client --mode mockup normalize script michelson_test_scripts/opcodes/comb-literals.tz --unparsing-mode Optimized_legacy
 { parameter unit ;
   storage unit ;
   code { PUSH (list (pair nat nat nat nat))

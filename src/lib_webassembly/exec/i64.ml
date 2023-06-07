@@ -5,7 +5,7 @@ include Ixx.Make (struct
 
   let bitwidth = 64
 
-  let to_hex_string = Printf.sprintf "%Lx"
+  let to_hex_string = Format.sprintf "%Lx"
 
   let of_int64 i = i
 

@@ -903,15 +903,29 @@ module Tx_rollup = struct
 end
 
 module Sc_rollup_params = struct
+  let convert_address sc_rollup_address =
+    sc_rollup_address
+    |> Data_encoding.Binary.to_bytes_exn
+         Tezos_crypto.Hashed.Smart_rollup_address.encoding
+    |> Data_encoding.Binary.of_bytes_exn Sc_rollup.Address.encoding
+
   let sc_rollup_address_parameter =
-    Tezos_clic.parameter (fun _ s ->
-        match Alpha_context.Sc_rollup.Address.of_b58check_opt s with
-        | Some c -> return c
-        | None ->
-            failwith
-              "Parameter '%s' is an invalid smart rollup address encoded in a \
-               base58 string."
-              s)
+    Tezos_clic.map_parameter
+      (Smart_rollup_alias.Address.parameter ())
+      ~f:convert_address
+
+  let sc_rollup_address_param ?(name = "smart rollup address")
+      ?(desc = "the address of the targeted smart rollup") next =
+    let desc =
+      String.concat
+        "\n"
+        [
+          desc;
+          "Can be an alias or a literal (autodetected in order).\n\
+           Use 'alias:name' or 'text:literal' to force.";
+        ]
+    in
+    Tezos_clic.param ~name ~desc sc_rollup_address_parameter next
 
   let rollup_kind_parameter =
     Tezos_clic.parameter (fun _ name ->

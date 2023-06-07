@@ -1,0 +1,25 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_gossipsub)
+ (public_name tezos-gossipsub)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  ringo
+  aches
+  fmt
+  tezos-error-monad
+  tezos-base
+  tezos-base.unix
+  tezos-stdlib-unix
+  tezos-stdlib
+  tezos-version)
+ (flags
+  (:standard)
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib
+  -open Tezos_base.TzPervasives
+  -open Tezos_base_unix
+  -open Tezos_stdlib_unix
+  -open Tezos_stdlib))

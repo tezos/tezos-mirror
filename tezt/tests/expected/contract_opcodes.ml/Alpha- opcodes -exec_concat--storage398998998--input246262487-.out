@@ -1,0 +1,48 @@
+
+./octez-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/exec_concat.tz on storage '"?"' and input '"test"' --level 1 --trace-stack
+storage
+  "test_abc"
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (just consumed gas: 10.941)
+    [ (Pair "test" "?") ]
+  - location: 7 (just consumed gas: 0.010)
+    [ "test" ]
+  - location: 8 (just consumed gas: 0.010)
+    [ { PUSH string "_abc" ; NIL string ; SWAP ; CONS ; SWAP ; CONS ; CONCAT }
+      "test" ]
+  - location: 22 (just consumed gas: 0.010)
+    [ "test"
+      { PUSH string "_abc" ; NIL string ; SWAP ; CONS ; SWAP ; CONS ; CONCAT } ]
+  - location: 12 (just consumed gas: 0.010)
+    [ "_abc"
+      "test" ]
+  - location: 15 (just consumed gas: 0.010)
+    [ {}
+      "_abc"
+      "test" ]
+  - location: 17 (just consumed gas: 0.010)
+    [ "_abc"
+      {}
+      "test" ]
+  - location: 18 (just consumed gas: 0.010)
+    [ { "_abc" }
+      "test" ]
+  - location: 19 (just consumed gas: 0.010)
+    [ "test"
+      { "_abc" } ]
+  - location: 20 (just consumed gas: 0.010)
+    [ { "test" ; "_abc" } ]
+  - location: 21 (just consumed gas: 0.124)
+    [ "test_abc" ]
+  - location: 23 (just consumed gas: 0.025)
+    [ "test_abc" ]
+  - location: 24 (just consumed gas: 0.010)
+    [ {}
+      "test_abc" ]
+  - location: 26 (just consumed gas: 0.010)
+    [ (Pair {} "test_abc") ]
+

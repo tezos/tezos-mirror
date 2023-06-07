@@ -1,42 +1,46 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names
-  test_lwt_pipe
-  test_circular_buffer
-  test_circular_buffer_fuzzy
-  test_hash_queue_lwt)
+(library
+ (name src_lib_stdlib_test_unix_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-stdlib
-  alcotest
-  alcotest-lwt
+  octez-alcotezt
   lwt_log
   bigstring
   lwt.unix
   tezos-test-helpers
   qcheck-alcotest)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_stdlib
-  -open Tezos_test_helpers))
+  -open Octez_alcotezt
+  -open Tezos_test_helpers)
+ (modules
+  test_lwt_pipe
+  test_circular_buffer
+  test_circular_buffer_fuzzy
+  test_hash_queue_lwt))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_stdlib_test_unix_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-stdlib)
- (action (run %{dep:./test_lwt_pipe.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest)
- (package tezos-stdlib)
- (action (run %{dep:./test_circular_buffer.exe})))
-
-(rule
- (alias runtest)
- (package tezos-stdlib)
- (action (run %{dep:./test_circular_buffer_fuzzy.exe})))
-
-(rule
- (alias runtest)
- (package tezos-stdlib)
- (action (run %{dep:./test_hash_queue_lwt.exe})))
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

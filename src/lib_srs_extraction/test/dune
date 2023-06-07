@@ -1,0 +1,82 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_lib_srs_extraction_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  octez-srs-extraction
+  octez-alcotezt)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Octez_srs_extraction
+  -open Octez_alcotezt)
+ (modules test_main))
+
+(rule
+ (alias runtest)
+ (package octez-srs-extraction)
+ (deps srs_zcash_g1_5 phase1radix2m5)
+ (action
+  (progn
+   (run
+    %{exe:../srs_extraction_main.exe}
+    extract
+    zcash
+    g1
+    phase1radix2m5
+    -o
+    srs_zcash_g1_5.generated)
+   (diff srs_zcash_g1_5.generated srs_zcash_g1_5))))
+
+(rule
+ (alias runtest)
+ (package octez-srs-extraction)
+ (deps srs_zcash_g2_5 phase1radix2m5)
+ (action
+  (progn
+   (run
+    %{exe:../srs_extraction_main.exe}
+    extract
+    zcash
+    g2
+    phase1radix2m5
+    -o
+    srs_zcash_g2_5.generated)
+   (diff srs_zcash_g2_5.generated srs_zcash_g2_5))))
+
+(rule
+ (alias runtest)
+ (package octez-srs-extraction)
+ (deps srs_zcash_g1_5 srs_zcash_g2_5)
+ (action (run ../srs_extraction_main.exe check srs_zcash_g1_5 srs_zcash_g2_5)))
+
+(rule
+ (alias runtest)
+ (package octez-srs-extraction)
+ (deps srs_filecoin_g1_6 srs_filecoin_g2_6)
+ (action
+  (run ../srs_extraction_main.exe check srs_filecoin_g1_6 srs_filecoin_g2_6)))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_srs_extraction_test_tezt_lib
+  tezt)
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package octez-srs-extraction)
+ (deps phase1radix2m5)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

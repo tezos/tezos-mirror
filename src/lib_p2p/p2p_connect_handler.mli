@@ -23,14 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4596
+   properly document this modules, including side-effects and
+   interaction with [P2p_pool]. *)
+
 (** This module manages incoming [accept] and outgoing connections [connect].
 
     [connect] and [accept] try to authenticate the remote point, and agree
     on protocol version. They ultimately returns a [P2p_conn.t] which provides
     the highest-level view of a connection in [lib_p2p].
-
-    TODO: properly document this modules, including side-effects and
-          interaction with [P2p_pool].
 
     Functions of this module can trigger two types of events. They can *log*
     [P2p_connection.P2p_event.t], and they can trigger condition variables
@@ -80,6 +81,11 @@ type config = {
       (** The TCP port on which the peer can be reached. *)
   advertised_port : P2p_addr.port option;
       (** The TCP port advertised to other peers, the default is listening_port. *)
+  disable_peer_discovery : bool;
+      (** If [True], point discovery is disabled. The connections will neither
+          send nor answer to Bootstrap and Advertise messages. It will send
+          Nack messages with empty list of points and not register points
+          received by Nack messages. *)
 }
 
 (** [create ?p2p_version config pool message_config socket_meta_config

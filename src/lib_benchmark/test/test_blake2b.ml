@@ -83,38 +83,33 @@ let solution =
 
 (* Code generation *)
 let () =
-  match measurement with
-  | Measure.Measurement ((module Bench), _) -> (
-      let model =
-        List.assoc ~equal:String.equal "blake2b" Bench.models
-        |> WithExceptions.Option.get ~loc:__LOC__
-      in
-      let solution =
-        Codegen.
-          {
-            inference_model_name = "blake2b";
-            map = Free_variable.Map.of_seq (List.to_seq solution.mapping);
-            scores_list = [];
-          }
-      in
-      (match
-         Codegen.codegen
-           (Model.For_codegen model)
-           solution
-           (module Costlang.Identity)
-           "blake2b_model"
-       with
-      | None -> assert false
-      | Some code -> Format.printf "%a@." Codegen.pp_model code) ;
-      let module FPT = Fixed_point_transform.Apply (struct
-        let options = {Fixed_point_transform.default_options with precision = 5}
-      end) in
-      match
-        Codegen.codegen
-          (Model.For_codegen model)
-          solution
-          (module FPT)
-          "blake2b_model_fixed_point"
-      with
-      | None -> assert false
-      | Some code -> Format.printf "%a@." Codegen.pp_model code)
+  let model = Blake2b.model_blake2b in
+  let solution =
+    Codegen.
+      {
+        inference_model_name = "blake2b";
+        map = Free_variable.Map.of_seq (List.to_seq solution.mapping);
+        scores_list = [];
+      }
+  in
+  (match
+     Codegen.codegen
+       (Model.Model model)
+       solution
+       (module Costlang.Identity)
+       (Namespace.of_string "blake2b_model")
+   with
+  | None -> assert false
+  | Some code -> Format.printf "%a@." Codegen.pp_code code) ;
+  let module FPT = Fixed_point_transform.Apply (struct
+    let options = {Fixed_point_transform.default_options with precision = 5}
+  end) in
+  match
+    Codegen.codegen
+      (Model.Model model)
+      solution
+      (module FPT)
+      (Namespace.of_string "blake2b_model_fixed_point")
+  with
+  | None -> assert false
+  | Some code -> Format.printf "%a@." Codegen.pp_code code

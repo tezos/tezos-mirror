@@ -26,12 +26,10 @@
 (** Testing
     -------
     Component:    Protocol (type-checking)
-    Invocation:   cd src/proto_alpha/lib_protocol/test/regression && \
-                  dune exec ./main.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/regression/main.exe
     Subject:      Type-checking
  *)
 
-open Lwt_result_syntax
 open Protocol
 open Alpha_context
 open Tezt
@@ -142,6 +140,7 @@ let pp_trace fmt = function
 
 let logger () :
     (unit -> trace_element list tzresult Lwt.t) * Script_typed_ir.logger =
+  let open Lwt_result_syntax in
   let open Script_typed_ir in
   let log : log_element list ref = ref [] in
   let logger =
@@ -185,6 +184,7 @@ let logger () :
    string in [mask] list is being replaced with asterisks. Thus processed
    log is captured as regression output. *)
 let with_logger f =
+  let open Lwt_result_syntax in
   let get_log, logger = logger () in
   let* () = f logger in
   let* log = get_log () in
@@ -204,6 +204,7 @@ let read_code filename =
   Contract_helpers.read_file filename
 
 let run_script transaction () =
+  let open Lwt_result_syntax in
   let script = read_code @@ filename transaction in
   let* parameter, ctxt =
     match transaction with

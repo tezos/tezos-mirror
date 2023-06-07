@@ -13,12 +13,11 @@
   tezos-micheline
   tezos-clic
   data-encoding
-  prbnmcn-cgrph
-  prbnmcn-dagger
-  prbnmcn-dagger-stats
+  prbnmcn-linalg
   prbnmcn-stats
   pringo
   pyml
+  ocamlgraph
   ocaml-migrate-parsetree)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
@@ -26,4 +25,5 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix)
+ (private_modules builtin_models builtin_benchmarks)
  (foreign_stubs (language c) (flags (:standard)) (names snoop_stubs)))

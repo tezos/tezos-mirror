@@ -27,18 +27,20 @@ open Tezos_webassembly_interpreter.Eval
 module Parser = Binary_parser_encodings
 open Tezos_tree_encoding
 open Kont_encodings
+open Tezos_lazy_containers
 
 let tag_encoding = value [] Data_encoding.string
 
-let lazy_vec_encoding enc = int32_lazy_vector (value [] Data_encoding.int32) enc
+let lazy_vec_encoding enc =
+  Lazy_vector.Int32Vector.encoding (value [] Data_encoding.int32) enc
 
-let eval_const_kont_encoding ~host_funcs =
+let eval_const_kont_encoding =
   tagged_union
     tag_encoding
     [
       case
         "EC_Next"
-        (Wasm_encoding.config_encoding ~host_funcs)
+        Wasm_encoding.config_encoding
         (function EC_Next c -> Some c | _ -> None)
         (fun c -> EC_Next c);
       case
@@ -48,15 +50,15 @@ let eval_const_kont_encoding ~host_funcs =
         (fun v -> EC_Stop v);
     ]
 
-let create_global_kont_encoding ~host_funcs =
+let create_global_kont_encoding =
   tup2
     ~flatten:true
     (value ["global_type"] Interpreter_encodings.Types.global_type_encoding)
-    (scope ["kont"] (eval_const_kont_encoding ~host_funcs))
+    (scope ["kont"] eval_const_kont_encoding)
 
-let create_elem_kont_encoding ~host_funcs =
+let create_elem_kont_encoding =
   tick_map_kont_encoding
-    (eval_const_kont_encoding ~host_funcs)
+    eval_const_kont_encoding
     (lazy_vec_encoding (value [] Interpreter_encodings.Ast.const_encoding))
     (lazy_vec_encoding Wasm_encoding.value_ref_encoding)
 
@@ -179,7 +181,7 @@ let exports_acc_encoding =
        (value ["exports-memory-0"] Data_encoding.bool)
        (scope ["exports"] Wasm_encoding.extern_map_encoding))
 
-let init_kont_encoding ~host_funcs =
+let init_kont_encoding =
   tagged_union tag_encoding
   @@ [
        case
@@ -219,7 +221,7 @@ let init_kont_encoding ~host_funcs =
   @ aggregate_cases
       "global"
       Global
-      (create_global_kont_encoding ~host_funcs)
+      create_global_kont_encoding
       (value [] Interpreter_encodings.Ast.global_encoding)
       Wasm_encoding.global_encoding
   @ aggregate_cases_either
@@ -253,7 +255,7 @@ let init_kont_encoding ~host_funcs =
            (scope
               ["kont"]
               (tick_map_kont_encoding
-                 (create_elem_kont_encoding ~host_funcs)
+                 create_elem_kont_encoding
                  (lazy_vec_encoding
                     Parser.(no_region_encoding Elem.elem_encoding))
                  (lazy_vec_encoding
@@ -314,7 +316,7 @@ let init_kont_encoding ~host_funcs =
         (function m, admin -> IK_Join_admin (m, admin));
       case
         "IK_Eval"
-        (scope ["config"] (Wasm_encoding.config_encoding ~host_funcs))
+        (scope ["config"] Wasm_encoding.config_encoding)
         (function IK_Eval config -> Some config | _ -> None)
         (function config -> IK_Eval config);
       case

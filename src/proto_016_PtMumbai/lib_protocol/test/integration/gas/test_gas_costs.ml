@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (gas costs)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/gas/main.exe \
-                -- test "^gas cost functions$"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/gas/main.exe \
+                  -- --file test_gas_costs.ml
     Subject:    Gas costs
                 Current limitations: for maps, sets & compare, we only test
                 integer comparable keys.
@@ -284,3 +283,7 @@ let tests =
       `Quick
       (test_cost_reprs_are_all_positive all_io_costs);
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("gas cost functions", tests)]
+  |> Lwt_main.run

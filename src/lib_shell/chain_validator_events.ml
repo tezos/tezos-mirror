@@ -115,22 +115,26 @@ let request_failure =
     ("errors", Error_monad.trace_encoding)
 
 let notify_head =
-  declare_1
+  declare_2
     ~section
     ~name:"notify_head"
-    ~msg:"notify_head from {peer_id}"
+    ~msg:"head {block_hash} from {peer_id} processed"
     ~level:Debug
-    ~pp1:P2p_peer.Id.pp
+    ~pp1:P2p_peer.Id.pp_short
+    ~pp2:Block_hash.pp_short
     ("peer_id", P2p_peer.Id.encoding)
+    ("block_hash", Block_hash.encoding)
 
 let notify_branch =
-  declare_1
+  declare_2
     ~section
     ~name:"notify_branch"
-    ~msg:"notify branch from {peer_id}"
+    ~msg:"branch up to {head_hash} from {peer_id} processed"
     ~level:Info
-    ~pp1:P2p_peer.Id.pp
+    ~pp1:P2p_peer.Id.pp_short
+    ~pp2:Block_hash.pp_short
     ("peer_id", P2p_peer.Id.encoding)
+    ("head_hash", Block_hash.encoding)
 
 let connection =
   declare_1
@@ -146,58 +150,62 @@ let disconnection =
     ~section
     ~name:"disconnection"
     ~msg:"disconnection of {peer_id}"
-    ~level:Notice
+    ~level:Info
     ~pp1:P2p_peer.Id.pp
     ("peer_id", P2p_peer.Id.encoding)
 
 let ignore_head =
-  declare_4
+  declare_2
     ~section
     ~name:"ignore_head"
-    ~msg:
-      "Current head is better than {view} (level {level}, timestamp \
-       {timestamp}, fitness {fitness}), we do not switch"
+    ~msg:"current head is better than {view} (level {level}), we do not switch"
     ~level:Notice
     ~pp1:Request.pp
     ~pp2:(fun fmt -> Format.fprintf fmt "%li")
-    ~pp3:Time.Protocol.pp_hum
-    ~pp4:Fitness.pp
     ("view", Request.encoding)
     ("level", Data_encoding.int32)
-    ("timestamp", Time.Protocol.encoding)
-    ("fitness", Fitness.encoding)
 
 let branch_switch =
-  declare_4
+  declare_2
     ~section
     ~name:"branch_switch"
-    ~msg:
-      "Update current head to {view} (level {level}, timestamp {timestamp}, \
-       fitness {fitness}), changing branch"
+    ~msg:"switch branch to {view} ({level})"
     ~level:Notice
     ~pp1:Request.pp
     ~pp2:(fun fmt -> Format.fprintf fmt "%li")
-    ~pp3:Time.Protocol.pp_hum
-    ~pp4:Fitness.pp
     ("view", Request.encoding)
     ("level", Data_encoding.int32)
-    ("timestamp", Time.Protocol.encoding)
-    ("fitness", Fitness.encoding)
 
 let head_increment =
-  declare_4
+  declare_2
     ~section
     ~name:"head_increment"
-    ~msg:
-      "Update current head to {view} (level {level}, timestamp {timestamp}, \
-       fitness {fitness}), same branch"
+    ~msg:"head is now {view} ({level})"
     ~level:Notice
     ~pp1:Request.pp
     ~pp2:(fun fmt -> Format.fprintf fmt "%li")
-    ~pp3:Time.Protocol.pp_hum
-    ~pp4:Fitness.pp
     ("view", Request.encoding)
     ("level", Data_encoding.int32)
+
+let bootstrap_head_increment =
+  declare_2
+    ~section
+    ~name:"bootstrap_time_remaining"
+    ~msg:"synchronizing: current head is {timediff} old (level: {level})"
+    ~level:Notice
+    ("level", Data_encoding.int32)
+    ~pp1:(fun fmt -> Format.fprintf fmt "%li")
+    ("timediff", Time.System.Span.encoding)
+    ~pp2:Time.System.Span.pp_hum
+
+let block_info =
+  declare_2
+    ~section
+    ~name:"block_info"
+    ~msg:"treated block has timestamp {timestamp} with fitness {fitness}"
+    ~level:Info
+    ~pp1:Time.Protocol.pp_hum
+    ~pp2:Fitness.pp
     ("timestamp", Time.Protocol.encoding)
     ("fitness", Fitness.encoding)
 

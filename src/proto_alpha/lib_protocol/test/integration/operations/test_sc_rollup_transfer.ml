@@ -26,21 +26,20 @@
 (** Testing
     -------
     Component:  Sc rollup L1/L2 communication
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                -- test "^sc rollup transfer$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_sc_rollup_transfer.ml
     Subject:    Test transfers from Michelson to smart contract rollups
 *)
 
 open Protocol
 open Alpha_context
-open Lwt_result_syntax
 
 (* Helpers *)
 
 exception Unexpected_error
 
 let check_proto_error ~loc ~exp f trace =
+  let open Lwt_result_syntax in
   let*? proto_trace =
     List.map_e
       (function
@@ -140,13 +139,15 @@ let contract_originate block account =
     ~storage:"Unit"
     block
 
-let context_init ty =
+let context_init parameters_ty =
+  let open Lwt_result_syntax in
   let* b, c = Test_sc_rollup.context_init T1 in
   let* contract, _script, b = contract_originate b c in
-  let* b, rollup = sc_originate b c ty in
+  let* b, rollup = sc_originate b c ~parameters_ty in
   return (b, c, contract, rollup)
 
 let transfer ?expect_apply_failure b ~from ~to_ ~param ~entrypoint =
+  let open Lwt_result_syntax in
   let parameters = Script.lazy_expr (Expr.from_string param) in
   let* op =
     Op.transaction
@@ -166,6 +167,7 @@ let transfer ?expect_apply_failure b ~from ~to_ ~param ~entrypoint =
 
 (* Test parsing a [contract] with a badly formatted sr1 address. *)
 let test_transfer_to_bad_sc_rollup_address () =
+  let open Lwt_result_syntax in
   let* b, c, contract, _rollup = context_init "unit" in
   let not_an_sc_rollup_address = {|"sr1Fq8fPi2NjhWUXtcXBggbL6zFjZctDamso"|} in
   let* (_b : Block.t) =
@@ -193,6 +195,7 @@ let test_transfer_to_bad_sc_rollup_address () =
 
 (* Now, the address is well-formatted but the rollup does not exist. *)
 let test_transfer_to_unknown_sc_rollup_address () =
+  let open Lwt_result_syntax in
   let* b, c, contract, _rollup = context_init "unit" in
   let unknown_sc_rollup_address = {|"sr1Fq8fPi2NjhWUXtcXBggbL6zFjZctGkmso"|} in
   let* (_b : Block.t) =
@@ -217,6 +220,7 @@ let test_transfer_to_unknown_sc_rollup_address () =
 
 (* Now, let's originate an sc rollup, use its address but with a wrong type. *)
 let test_transfer_to_wrongly_typed_sc_rollup () =
+  let open Lwt_result_syntax in
   let* b, c, contract, rollup = context_init "unit" in
   let param = Format.sprintf "%S" (Sc_rollup.Address.to_b58check rollup) in
   let* (_b : Block.t) =
@@ -241,6 +245,7 @@ let test_transfer_to_wrongly_typed_sc_rollup () =
 
 (* Use the correct type but with a non-zero amount. *)
 let test_transfer_non_zero_amount () =
+  let open Lwt_result_syntax in
   let* b, c, contract, rollup = context_init "int" in
   let param = Format.sprintf "%S" (Sc_rollup.Address.to_b58check rollup) in
   let* (_b : Block.t) =
@@ -264,6 +269,7 @@ let test_transfer_non_zero_amount () =
 
 (* Use the correct type through an entrypoint but with a non-zero amount. *)
 let test_transfer_non_zero_amount_via_entrypoint () =
+  let open Lwt_result_syntax in
   let* b, c, contract, rollup = context_init "int" in
   let param = Format.sprintf "%S" (Sc_rollup.Address.to_b58check rollup) in
   let* (_b : Block.t) =
@@ -287,6 +293,7 @@ let test_transfer_non_zero_amount_via_entrypoint () =
 
 (* Now, transfer with a zero-amount and check that the inbox has been updated correctly. *)
 let test_transfer_works () =
+  let open Lwt_result_syntax in
   let* b, c, contract, rollup = context_init "int" in
   let* inbox_before = Context.Sc_rollup.inbox (B b) in
   let* expected_inbox_after =
@@ -325,6 +332,7 @@ let test_transfer_works () =
 
 (* Transfer of zero-amount ticket fails. *)
 let test_transfer_zero_amount_ticket () =
+  let open Lwt_result_syntax in
   let* b, c, contract, rollup = context_init "ticket string" in
   let param = Format.sprintf "%S" (Sc_rollup.Address.to_b58check rollup) in
   let* (_b : Block.t) =
@@ -347,6 +355,7 @@ let test_transfer_zero_amount_ticket () =
 
 (* Transfer of a non-zero-amount ticket works and the balance table is correctly updated. *)
 let test_transfer_non_zero_amount_ticket () =
+  let open Lwt_result_syntax in
   let* b, c, contract, rollup = context_init "ticket string" in
   let param = Format.sprintf "%S" (Sc_rollup.Address.to_b58check rollup) in
   let* b =
@@ -418,3 +427,7 @@ let tests =
       `Quick
       test_transfer_non_zero_amount_ticket;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("sc rollup transfer", tests)]
+  |> Lwt_main.run

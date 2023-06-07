@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    Crypto
-    Invocation:   dune build @src/lib_crypto/runtest
+    Invocation:   dune exec src/lib_crypto/test-unix/main.exe
     Subject:      Roundtrips for functions built on the HACL* NaCl API.
 *)
 
@@ -48,4 +48,4 @@ let test_check_pow () =
 
 let tests_lwt = [("crypto_box", [("Check PoW", `Slow, test_check_pow)])]
 
-let () = Lwt_main.run @@ Alcotest_lwt.run "tezos-crypto-lwt" tests_lwt
+let () = Lwt_main.run @@ Alcotest_lwt.run ~__FILE__ "tezos-crypto-lwt" tests_lwt

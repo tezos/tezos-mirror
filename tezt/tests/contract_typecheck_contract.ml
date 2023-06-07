@@ -32,18 +32,6 @@
 
 let tags = ["client"; "contract"; "michelson"; "typechecking"]
 
-let contract_path ?kind protocol contract =
-  let protocol =
-    match protocol with
-    | Protocol.Alpha -> "alpha"
-    | _ -> sf "%03d" @@ Protocol.number protocol
-  in
-  let preamble = "tests_python" // sf "contracts_%s" protocol in
-  let contract = contract ^ ".tz" in
-  match kind with
-  | None -> preamble // contract
-  | Some kind -> preamble // kind // contract
-
 (** An address followed by an entrypoint typechecks at type address if 
   and only if the entrypoint is not "default". *)
 let check_address client address =
@@ -114,7 +102,7 @@ let check_contract_ok client address entrypoint typ =
       ~data:address_opt
       ~typ:(sf {|contract (%s)|} typ)
   in
-  let* (_storage : string) =
+  let* (_run_script_result : Client.run_script_result) =
     Client.run_script
       client
       ~prg:
@@ -166,7 +154,7 @@ let check_contract_ko client address entrypoint typ expected_error =
       ~typ:(sf "contract (%s)" typ)
     |> Process.check_error ~msg:(rex expected_error)
   in
-  let* (_storage : string) =
+  let* (_run_script_result : Client.run_script_result) =
     Client.run_script
       client
       ~prg:
@@ -238,14 +226,14 @@ let test_originated_no_default =
   Protocol.register_test ~__FILE__ ~title:"Test originated no default" ~tags
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* kt1 =
-    Client.originate_contract
-      client
+  let* _alias, kt1 =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
       ~burn_cap:Tez.one
-      ~alias:"simple_entrypoints"
-      ~prg:(contract_path protocol ~kind:"entrypoints" "simple_entrypoints")
+      client
+      ["entrypoints"; "simple_entrypoints"]
+      protocol
   in
   let root_type = {|or (unit %A) (or (string %B) (nat %C))|} in
   let a_type = "unit" in
@@ -273,15 +261,15 @@ let test_originated_with_default =
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let initial_storage = {|Pair "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" "" 0|} in
-  let* kt1 =
-    Client.originate_contract
-      client
+  let* _alias, kt1 =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
       ~init:initial_storage
       ~burn_cap:Tez.one
-      ~prg:(contract_path protocol ~kind:"entrypoints" "delegatable_target")
-      ~alias:"delegatable_target"
+      client
+      ["entrypoints"; "delegatable_target"]
+      protocol
   in
   let root_type =
     {|or (or (key_hash %set_delegate) (unit %remove_delegate)) (or %default string nat)|}

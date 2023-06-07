@@ -163,7 +163,7 @@ let tickets_of_origination ctxt ~preorigination ~storage_type ~storage =
   (Some {tickets; destination}, ctxt)
 
 let tickets_of_operation ctxt
-    (Script_typed_ir.Internal_operation {source = _; operation; nonce = _}) =
+    (Script_typed_ir.Internal_operation {sender = _; operation; nonce = _}) =
   match operation with
   | Transaction_to_implicit _ -> return (None, ctxt)
   | Transaction_to_implicit_with_ticket
@@ -196,18 +196,6 @@ let tickets_of_operation ctxt
         ~destination:(Destination.Contract (Originated destination))
         ~parameters_ty
         ~parameters
-  | Transaction_to_tx_rollup
-      {destination; unparsed_parameters = _; parameters_ty; parameters} ->
-      let Tx_rollup_parameters.{ex_ticket; l2_destination = _} =
-        Tx_rollup_parameters.get_deposit_parameters parameters_ty parameters
-      in
-      return
-        ( Some
-            {
-              destination = Destination.Tx_rollup destination;
-              tickets = [ex_ticket];
-            },
-          ctxt )
   | Transaction_to_sc_rollup
       {
         destination;

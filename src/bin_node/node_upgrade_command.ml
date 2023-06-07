@@ -57,17 +57,18 @@ module Term = struct
     & pos 0 (some (parser, printer)) None
     & info [] ~docv:"UPGRADE" ~doc
 
-  let process subcommand args status sandbox_file =
+  let process subcommand data_dir config_file status sandbox_file =
     let run =
       let open Lwt_result_syntax in
-      let*! () = Tezos_base_unix.Internal_event_unix.init () in
+      let*! () = Tezos_base_unix.Internal_event_unix.init_with_defaults () in
       match subcommand with
       | Storage -> (
-          let* config = Config_file.read args.Shared_arg.config_file in
-          (* Use the command-line argument data-dir if present: the
-             configuration data-dir may be inconsistent if the
-             directory was moved. *)
-          let data_dir = Option.value ~default:config.data_dir args.data_dir in
+          let* data_dir, config =
+            Shared_arg.resolve_data_dir_and_config_file
+              ?data_dir
+              ?config_file
+              ()
+          in
           let*! r =
             Lwt_lock_file.try_with_lock
               ~when_locked:(fun () ->
@@ -141,8 +142,8 @@ module Term = struct
   let term =
     Cmdliner.Term.(
       ret
-        (const process $ subcommand_arg $ Shared_arg.Term.args $ status
-       $ sandbox))
+        (const process $ subcommand_arg $ Shared_arg.Term.data_dir
+       $ Shared_arg.Term.config_file $ status $ sandbox))
 end
 
 module Manpage = struct

@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos_ethereum"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+evm = { version = "0.35.0", default-features = false }
+thiserror = "1.0"
+primitive-types = { version = "0.11.1", default-features = false }
+rlp = "0.5.2"
+hex = "0.4"
+sha3 = { version = "0.10.6", default-features = false }
+tezos_crypto_rs = { version = "0.4", default-features = false }
+libsecp256k1 = { version = "0.7", default-features = false, features = ["static-context", "hmac"] }
+
+[dependencies.tezos-smart-rollup-encoding]
+path = "../../kernel_sdk/encoding"
+

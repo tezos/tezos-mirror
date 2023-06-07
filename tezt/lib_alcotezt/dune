@@ -1,0 +1,10 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_alcotezt)
+ (public_name octez-alcotezt)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core)
+ (js_of_ocaml))

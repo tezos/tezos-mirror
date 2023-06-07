@@ -46,6 +46,10 @@ module Table : Hashtbl.S with type key = t
 
 module Map : Map.S with type key = t
 
-module Set : Set.S with type elt = t
+module Set : sig
+  include Set.S with type elt = t
+
+  val pp : Format.formatter -> t -> unit
+end
 
 module Sparse_vec : Sparse_vec.S with type basis = t

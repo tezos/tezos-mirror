@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Client
-    Invocation:   dune build @src/lib_proxy/runtest
+    Invocation:   dune exec src/lib_proxy/test/main.exe \
+                  -- --file test_proxy.ml
     Subject:      --mode proxy of the client
 *)
 
@@ -232,9 +233,10 @@ let test_split_key_triggers () =
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "tezos-proxy"
     [
-      ( "all",
+      ( "all tests",
         [
           Alcotest_lwt.test_case "RequestsTree" `Quick test_tree;
           Tztest.tztest "test do_rpc" `Quick test_do_rpc_no_longer_key;

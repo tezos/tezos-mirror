@@ -4,7 +4,6 @@
 # as JSON, and converts this JSON into an OpenAPI specification.
 # You must compile the node and the client before running it.
 #
-# This script is mimicked by tests_python/tests/test_openapi.py
 # When the python tests framework becomes a standalone library, this script
 # should be removed and replaced by a python script calling the test's core
 # logic.
@@ -17,9 +16,9 @@ tezos_node=./octez-node
 tezos_client=./octez-client
 
 # Protocol configuration.
-protocol_hash=PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW
-protocol_parameters=src/proto_015_PtLimaPt/parameters/sandbox-parameters.json
-protocol_name=lima
+protocol_hash=PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5
+protocol_parameters=src/proto_017_PtNairob/parameters/sandbox-parameters.json
+protocol_name=nairobi
 
 # Secret key to activate the protocol.
 activator_secret_key="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
@@ -36,7 +35,7 @@ proto_api_json=$tmp/proto-api.json
 mempool_api_json=$tmp/mempool-api.json
 
 # Generated files.
-openapi_json=docs/api/rpc-openapi.json
+openapi_json=docs/api/rpc-openapi-rc.json
 proto_openapi_json=docs/api/$protocol_name-openapi.json
 mempool_openapi_json=docs/api/$protocol_name-mempool-openapi.json
 

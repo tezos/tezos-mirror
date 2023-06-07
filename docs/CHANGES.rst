@@ -3,6 +3,417 @@
 Changelog
 '''''''''
 
+Version 17.0-beta1`
+===================
+
+Node
+----
+
+- **Breaking Change**: Shortened a few lib_shell log messages at the default level by
+   displaying only the completion time instead of the full status of the operation.
+
+- Added an option ``daily-logs`` to file-descriptor sinks, enabling
+  log rotation based on a daily frequency.
+
+- Fixed a bug manifested while reconstructing the storage after a snapshot import
+  that would result in wrong context hash mapping for some blocks.
+
+- Added an option ``create-dirs`` to file-descriptor sinks to allow
+  the node to create the log directory and its parents if they don't exist.
+
+- Added a default node configuration that enables disk logs as a
+  file-descriptor-sink in the data directory of the node with a 7 days rotation.
+
+- **Breaking Change**: Removed section in stdout logs lines
+
+- Removed the ``indexing-strategy`` option from the ``TEZOS_CONTEXT``
+  environment variable to prevent the usage of the ``always``
+  indexing strategy. For now, only the ``minimal`` indexing strategy
+  is allowed.
+
+- **Breaking Change** Removed the ``--network limanet``
+  built-in network alias.
+
+- Fixed a issue that may trigger unknown keys errors while reading the
+  context on a read-only instance.
+
+Baker
+-----
+
+- Consensus operations that do not use the minimal slot of the delegate are
+  not counted for the (pre)quorums. (MR :gl:`!8175`)
+
+- Consensus operations with identical consensus-related contents but different
+  ``branch`` fields are counted only once in the (pre)quorums. (MR :gl:`!8175`)
+
+- Improved efficiency to solve the anti-spam Proof-of-Work challenge.
+
+Accuser
+-------
+
+- Fixed a bug that made the accuser start without waiting for its
+  corresponding protocol.
+
+- The accuser now denounces double consensus operations that have the same
+  level, round, and delegate, but different slots. (MR :gl:`!8084`)
+
+Signer
+------
+
+- Reordered the display of ``octez-client list connected ledgers``
+  command. It is now ``Ed25519``, ``Secp256k1``, ``Secp256r1`` and
+  ``Bip32_ed25519``.
+
+Smart Rollup node
+-----------------
+
+- Fixed inverted logic for playing a timeout move in a refutation game (MR
+  :gl:`!7929`).
+
+- Stopped the node when the operator deposit is slashed (MR :gl:`!7579`).
+
+- Improved computations of refutation games’ dissections (MRs :gl:`!6948`,
+  :gl:`!7751`, :gl:`!8059`, :gl:`!8382`).
+
+- Improved WASM runtime performances (MR :gl:`!8252`).
+
+- Made the Fast Execution aware of the newly introduced WASM PVM versionning
+  (MR :gl:`!8079`).
+
+- Fixed UX issues related to the rollup node configuration (MRs :gl:`!8148`,
+  :gl:`!8254`, :gl:`!8156`).
+
+- Quality of life improvements in the Layer 1 injector (MRs :gl:`!7579`, :gl:`!7673`, :gl:`!7675`, :gl:`!7685`, :gl:`!7681`, :gl:`!7846`, :gl:`!8106`).
+
+- Fixed logs for kernel debug messages (MR :gl:`!7773`).
+
+- New argument ``--boot-sector-file`` to specify a path to the boot sector used
+  for the rollup. This is an optional argument that is required *only* if the
+  smart rollup was bootstrapped and not originated (MR :gl:`!8556`).
+
+Smart Rollup client
+-------------------
+
+- Fixed a JSON decoding error for the command ``get proof for message ...`` (MR
+  :gl:`!8000`).
+
+Smart Rollup WASM Debugger
+--------------------------
+
+- Let the user select the initial version of the WASM PVM (MR :gl:`!8078`).
+
+- Added commands to decode the contents of the memory and the durable storage
+  (MRs :gl:`!7464`, :gl:`!7709`, :gl:`!8303`).
+
+- Added the ``bench`` command (MR :gl:`!7551`).
+
+- Added commands to inspect the structure of the durable storage (MRs
+  :gl:`!7707`, :gl:`!8304`).
+
+
+Miscellaneous
+-------------
+
+- Removed binaries and mempool RPCs of Lima.
+
+Version 16.1
+============
+
+Baker
+-----
+
+- Fixed a bug where the baker could count a (pre)endorsement twice
+  while waiting for a (pre)quorum.
+
+- Fixed an implementation bug where upon observing a pre-quorum on an
+  earlier round, the baker would reach a state where it could not
+  endorse anymore. This could lead to a slow consensus scenario
+  affecting network liveness.
+
+Version 16.0
+============
+
+Node
+----
+
+- Updated the built-in network alias for Mumbainet (``--network mumbainet``).
+  The new alias matches the relaunch of Mumbainet with the protocol ``PtMumbai2``.
+
+
+Version 16.0-rc3
+================
+
+General
+-------
+
+- Fixed an issue that prevented building on MacOS.
+
+- Fixed an issue that caused the launch of Octez binaries to take several seconds (because of ``zcash`` initialization)
+
+Node
+----
+
+- Fixed a issue that might trigger unknown keys errors while reading the
+  context on a read-only instance.
+
+- Added an RPC ``POST
+  /chains/main/blocks/head/context/smart_rollups/all/origination_proof``
+  with input ``{"kind":"<smart rollup kind>", "kernel"="<smart rollup
+  kernel>"}`` to produce the origination proof needed to originate a
+  smart rollup.
+
+- Deprecated the RPC ``GET /monitor/valid_blocks`` and introduced
+  ``GET /monitor/validated_blocks`` and ``GET /monitor/applied_blocks``
+  respectively returning validated blocks which are not yet applied
+  nor stored, and applied blocks which are fully applied and stored by
+  the node. (MR :gl:`!7513`)
+
+- Replaced some "precheck" occurrences with "validate" in event and
+  error identifiers and messages. (MR :gl:`!7513`)
+
+- Document the usage of "Yay" as a deprecated synonym for "Yea", to encourage
+  using the correct value in the future. (MR :gl:`!7960`)
+
+Baker
+-----
+
+- Changed the baker default semantics so that it performs a light
+  validation of operations to classify them instead of fully applying
+  them. Hence, the block production is now more
+  time/cpu/disk-efficient. In this mode, application-dependent checks
+  are disabled. Setting the ``--force-apply`` flag on the command line
+  restores the previous behavior. (MR :gl:`!7490`)
+
+- **Breaking Change**: Disabled the verification of signature of
+  operations in the baker when baking a block. The baker must always
+  be provided operations with a valid signature, otherwise produced
+  blocks will be invalid and rejected by local nodes during their
+  injection. Default setups are not affected but external mempools
+  should make sure that their operations' signatures are correct.
+  (MR :gl:`!7490`)
+
+- Made the baker discard legacy or corrupted Tenderbake's saved
+  states in order to avoid unexpected crashes when the baker gets
+  updated, or when a new protocol's baker starts. (MR :gl:`!7640`)
+
+- Restored previous behaviour from :gl:`!7490` for blocks at round
+  greater than 0. Application-dependent checks are re-enabled for
+  re-proposal and fresh blocks at round greater than 0.
+
+- Reduced the preendorsement injection delay by making the baker
+  preendorse as soon as the node considers a block as valid instead of
+  waiting for the node to fully apply it. (MR :gl:`!7516`)
+
+- Baker injects preendorsement twice: once the block is considered as
+  valid by the node and once it is fully applied by the node. This is
+  a safety measure in case the early preendorsement is dropped by the
+  mempool. (MR :gl:`!7516`)
+
+
+Version 16.0-rc2
+================
+
+Node
+----
+
+- Fixed a bug raising an error when a context split was called on a
+  context that was created with Octez v13 (or earlier).
+
+- **Breaking Change**: disabled snapshot export support for storage
+  that was created with Octez v13 (or earlier).
+
+  After upgrading to v16, if you have the following warning message, you won't be able to restore an up-to-date storage, without using either a recent third-party snapshot or bootstrapping from scratch::
+
+    Warning: garbage collection is not fully enabled on this data directory: context cannot be garbage collected
+
+  Please refer to the :doc:`Snapshots entry<../user/snapshots>` for further detail.
+
+- Added the built-in network alias for Mumbainet (``--network mumbainet``).
+
+Docker Images
+-------------
+
+- Fixed ``entrypoint.sh`` which did not had the executable permission flag.
+
+- Updated Python version to 3.10.10.
+
+
+Version 16.0~rc1
+================
+
+General
+-------
+
+- **Breaking change**: Symbolic links from old-names ``tezos-*`` to new-names ``octez-*``
+  have been removed.
+  Old names are not supported anymore.
+
+Node
+----
+
+- Fixed a bug that caused snapshot import to ignore the data directory
+  of the configuration file when the configuration file was specified
+  from the command-line using ``--config-file``. Note that ``--data-dir``
+  can still be used to override the data directory location from the
+  configuration file, whether it is specified from the command-line or not.
+
+- Fixed a bug that caused the ``snapshot import`` command to fail when
+  used on data directories configured with an explicit number of
+  additional cycles.
+
+- Fixed an issue that could left a temporary directory if a snapshot
+  export was cancelled. Additionally, a cleanup now ensures the
+  absence of leftovers temporary directories when exporting a
+  snapshot.
+
+- Fixed an issue that could left a lock file if a snapshot import was
+  cancelled.
+
+- **Breaking change**: the default ``?version`` of the ``pending_operations``
+  RPC is now 1 instead of 0. Version 1 is more consistent as
+  ``branch_delayed``/``branch_refused``/``outdated``/``refused`` operations are
+  encoded like ``applied`` operations: the ``"hash"`` field is included in the
+  object instead of being separate in an array. The same change applies to
+  ``unprocessed`` operations, except that those do not contain the ``error``
+  field. More details can be found by calling the
+  ``describe/chains/main/mempool/pending_operations`` RPC. You can get back the
+  previous encoding with ``?version=0`` but note that version 0 is now
+  deprecated and may be removed starting from the next major release of Octez.
+  (MR :gl:`!6783`)
+
+- The ``pending_operations`` RPC can now be run in ``binary`` format when using
+  version ``1``. (MR :gl:`!6783`)
+
+- Removed the ``node_`` prefix in identifiers of the
+  ``config_validation`` and ``config_file`` events and errors.
+
+- Introduced a ``--json`` command line argument to the ``snapshot
+  info`` allowing to print snapshot information as JSON.
+
+- Removed the ``octez-validator`` executable, which was already part
+  of ``octez-node`` and that was already used internally (and that was
+  not usable on its own).
+
+- **Breaking change**: bumped the node's storage version to
+  ``3.0``. This new version changes the store's representation
+  required by the new protocol's semantics and the context's format to
+  improve the disk usage footprint while running a context
+  pruning. Upgrading to this new version is automatic and
+  irreversible. (MR :gl:`!6835` and :gl:`!6959`)
+
+- **Breaking change**: bumped the snapshot version to ``5``. This
+  version changes internal snapshot file representation to include
+  more information required by the new protocol's semantics and to
+  improve both import and export speed. Snapshots of version ``4``
+  exported with previous versions of Octez can still be
+  imported. Snapshots of version ``5`` are not backward compatible.
+  (MR :gl:`!6835` and :gl:`!6961`)
+
+- Upon receiving a new non-manager operation that conflicts with a
+  previously validated operation, the mempool may now replace the old
+  operation with the new one, depending on both operations' content
+  and hash. This behavior was already in place for manager operations,
+  and has simply be extended to non-manager operations. It should help
+  all mempools converge toward the same set of accepted operations,
+  regardless of the order in which the operations were
+  received. (MR :gl:`!6749`)
+
+- Changed the id and message of the error when the mempool rejects a
+  new operation because it already contains a preferred conflicting
+  operation. Changed the id and message of the error associated with
+  an operation that is removed from the mempool to make room for a
+  better conflicting operation. (MR :gl:`!6749`)
+
+- Fixed a minor bug that caused the mempool to accept a manager
+  operation that conflicts with an already present ``drain_delegate``
+  operation. (MR :gl:`!6749`)
+
+- Removed the compatibility with storage snapshots of version ``2``
+  and ``3``. These snapshot versions from Octez 12 cannot be imported
+  anymore.
+
+- Added optional query parameter ``validation_pass`` to RPCs ``GET
+  /chains/main/mempool/pending_operations`` and ``GET
+  /chains/<chain_id>/mempool/monitor_operation``. This new parameter causes the
+  RPC to only return operations for the given validation pass (``0`` for
+  consensus operations, ``1`` for voting operations, ``2`` for anonymous
+  operations, ``3`` for manager operations). If ``validation_pass`` is
+  unspecified, operations for all validation passes are returned, making this
+  extension backward-compatible. (MR :gl:`!6724`)
+
+- Fixed an issue where the node's RPC server would silently fail when
+  either the path to the certificate or to the key passed in the
+  node's ``--rpc-tls`` argument does not point to an existing
+  file. The node's ``run`` now fails immediately in this case. (MR
+  :gl:`!7323`)
+
+- Improved the disk usage footprint when running a context pruning.
+
+- **Breaking Changes:** Removed ``kathmandunet`` from the list of
+  known networks (for ``--network`` command-line argument).
+
+- Allowed symbolic links in the datadir (to split data over several places).
+
+Client
+------
+
+- Added command to get contract's balance of ticket with specified ticketer, content type, and content. Can be used for both implicit and originated contracts.
+  ``octez-client get ticket balance for <contract> with ticketer '<ticketer>' and type <type> and content <content>``. (MR :gl:`!6491`)
+
+- Added command to get the complete list of tickets owned by a given contract by scanning the contract's storage. Can only be used for originated contracts.
+  ``octez-client get all ticket balances for <contract>``. (MR :gl:`!6804`)
+
+Baker
+-----
+
+- **Breaking change**: modified the baker's persistent state. Once the
+  protocol "M" activates, the new baker will automatically overwrite
+  the existing persistent state to the new format. This implies that
+  previous bakers will fail to load this new state from disk unless
+  the user directly removes the file
+  ``<client-dir>/<chain_id>_baker_state``. On mainnet, this will have
+  no effect as when the new protocol activates, previous bakers will
+  be permanently idle. (MR :gl:`!6835`)
+
+- Fixed an issue where the baker would keep files opened longer than
+  necessary causing unexpected out of space errors making the baker
+  crash.
+
+Signer
+------
+
+- **Breaking change**: Versioning of signature module for protocol
+  specific support and future extensibility. Signatures length became
+  variable which changed their binary encoding. This breaks the
+  compatibility with octez-signer <= 15.1 in local and socket modes.
+
+Proxy Server
+------------
+
+- The proxy server can now serve endpoints about blocks of all known economic
+  protocols instead of only one chosen at boot time.
+
+Codec
+-----
+
+- Added the ``dump encoding <id>`` command to dump the description of a single
+  registered encoding.
+
+
+Rollups
+-------
+
+- Added Smart Rollups executables.
+  This includes ``octez-smart-rollup-node-PtMumbai``, ``octez-smart-rollup-client-PtMumbai``.
+
+- Released ``octez-smart-rollup-wasm-debugger`` as part of the Octez distribution (MR :gl:`!7295`).
+  See the smart rollups documentation for its functionalities and how to use it to test and debug kernels.
+
+Miscellaneous
+-------------
+
+- Removed binaries and mempool RPCs of Kathmandu.
+
 Version 15.1
 ============
 
@@ -113,8 +524,8 @@ Node
   backend. It is activated by default for all nodes running with a
   full or rolling history mode.
 
-- Add a `/chains/<chain>/blocks/<block>/merkle_tree_v2` RPC. This is an
-  evolution of the `../merkle_tree` RPC, using a simpler implementation of the
+- Add a ``/chains/<chain>/blocks/<block>/merkle_tree_v2`` RPC. This is an
+  evolution of the ``../merkle_tree`` RPC, using a simpler implementation of the
   Merkle tree/proof features that works with Irmin trees and proofs underneath
   instead of proof code internal to Octez, and is planned to eventually replace
   the old one in a future release.
@@ -154,8 +565,8 @@ Node
 Client
 ------
 
-- The light client (`tezos-client --mode light`) now uses the
-  `../block/<block_id>/merkle_tree_v2` RPC introduced in this version, removing
+- The light client (``tezos-client --mode light``) now uses the
+  ``../block/<block_id>/merkle_tree_v2`` RPC introduced in this version, removing
   a lot of delicate verification code and relying on Irmin instead. The client
   for this version will thus not work with older node versions that do not have
   this RPC.
@@ -792,7 +1203,7 @@ Node
 
 - Manager operations do no longer need to be executed before being
   propagated over the network. This feature will be available from
-  protocol `I`, provided the latter is activated. The aim is to
+  protocol ``I``, provided the latter is activated. The aim is to
   increase the throughput of transactions gossiped over the network,
   while reducing the load on the Octez node's prevalidator
   (aka the mempool).

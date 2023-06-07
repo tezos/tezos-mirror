@@ -167,8 +167,7 @@ module Proto = struct
       let open Lwt_result_syntax in
       let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
       let+ toplevel, updated_ctxt =
-        Lwt.map wrap_tzresult
-        @@ Script_ir_translator.parse_toplevel ctxt ~legacy:true expr
+        Lwt.map wrap_tzresult @@ Script_ir_translator.parse_toplevel ctxt expr
       in
       let consumed =
         (Alpha_context.Gas.consumed ~since:ctxt ~until:updated_ctxt :> int)
@@ -236,13 +235,13 @@ module Proto = struct
       | Big_map_t _ | Contract_t _ | Operation_t | Sapling_transaction_t _
       | Sapling_transaction_deprecated_t _ | Sapling_state_t _ | Never_t
       | Bls12_381_g1_t | Bls12_381_g2_t | Bls12_381_fr_t | Ticket_t _
-      | Chain_id_t | Chest_key_t | Chest_t | Tx_rollup_l2_address_t ->
+      | Chain_id_t | Chest_key_t | Chest_t ->
           []
       | Pair_t (t1, t2, _, _) ->
           let g1 = List.map (fun g (v, _) -> g v) @@ find_lambda_tys t1 in
           let g2 = List.map (fun g (_, v) -> g v) @@ find_lambda_tys t2 in
           g1 @ g2
-      | Union_t (t1, t2, _, _) ->
+      | Or_t (t1, t2, _, _) ->
           let g1 =
             List.map (fun g -> function L v -> g v | R _ -> [])
             @@ find_lambda_tys t1
@@ -298,6 +297,13 @@ module Proto = struct
     | _ -> false
 
   let code_storage_type ({storage_type; _} : Translator.toplevel) = storage_type
+
+  module Global_constants = struct
+    let expand ctxt (expr : Script.expr) =
+      let open Lwt_syntax in
+      let+ res = Global_constants_storage.expand ctxt expr in
+      match res with Error _ -> (ctxt, expr) | Ok x -> x
+  end
 end
 
 let () = Known_protocols.register (module Proto)

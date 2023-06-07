@@ -10,7 +10,8 @@
 (** Testing
     -------
     Component:    Remote-signature Backends
-    Invocation:   dune build @src/lib_signer_backends/runtest
+    Invocation:   dune exec src/lib_signer_backends/test/main.exe \
+                  -- --file test_encrypted.ml
     Subject:      On secret keys and URIs.
 *)
 
@@ -329,5 +330,5 @@ let tests =
   ]
 
 let () =
-  Alcotest_lwt.run "tezos-signer-backends" [("encrypted", tests)]
+  Alcotest_lwt.run ~__FILE__ "tezos-signer-backends" [("encrypted", tests)]
   |> Lwt_main.run

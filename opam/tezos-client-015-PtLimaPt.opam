@@ -22,11 +22,6 @@ depends: [
   "tezos-protocol-plugin-015-PtLimaPt"
   "tezos-rpc"
   "uri" { >= "3.1.0" }
-  "tezos-micheline" {with-test}
-  "tezos-base-test-helpers" {with-test}
-  "tezos-test-helpers" {with-test}
-  "alcotest-lwt" { with-test & >= "1.5.0" }
-  "qcheck-alcotest" { with-test & >= "0.20" }
   "tezos-stdlib-unix"
   "tezos-protocol-environment"
   "tezos-mockup"

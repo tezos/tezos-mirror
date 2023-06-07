@@ -37,7 +37,8 @@ module Operations_source = struct
       }
 
   let operations_encoding =
-    Data_encoding.(list (dynamic_size Operation.encoding))
+    Data_encoding.(
+      list (dynamic_size Operation.encoding_with_legacy_attestation_name))
 
   let retrieve = function
     | None -> Lwt.return_none
@@ -128,7 +129,6 @@ type action =
   | Inject_preendorsements of {
       preendorsements : (consensus_key_and_delegate * consensus_content) list;
     }
-  | Reinject_preendorsements of {preendorsements : packed_operation list}
   | Inject_endorsements of {
       endorsements : (consensus_key_and_delegate * consensus_content) list;
     }
@@ -160,7 +160,6 @@ let pp_action fmt = function
   | Update_to_level _ -> Format.fprintf fmt "update to level"
   | Synchronize_round _ -> Format.fprintf fmt "synchronize round"
   | Watch_proposal -> Format.fprintf fmt "watch proposal"
-  | Reinject_preendorsements _ -> Format.fprintf fmt "reinject preendorsements"
 
 let generate_seed_nonce_hash config delegate level =
   if level.Level.expected_commitment then
@@ -379,9 +378,10 @@ let inject_preendorsements state ~preendorsements =
     (fun (((consensus_key, _) as delegate), consensus_content) ->
       Events.(emit signing_preendorsement delegate) >>= fun () ->
       let shell =
+        (* The branch is the latest finalized block. *)
         {
           Tezos_base.Operation.branch =
-            state.level_state.latest_proposal.predecessor.hash;
+            state.level_state.latest_proposal.predecessor.shell.predecessor;
         }
       in
       let contents = Single (Preendorsement consensus_content) in
@@ -411,7 +411,7 @@ let inject_preendorsements state ~preendorsements =
        let watermark = Operation.(to_watermark (Preendorsement chain_id)) in
        let unsigned_operation_bytes =
          Data_encoding.Binary.to_bytes_exn
-           Operation.unsigned_encoding
+           Operation.unsigned_encoding_with_legacy_attestation_name
            unsigned_operation
        in
        Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
@@ -426,12 +426,12 @@ let inject_preendorsements state ~preendorsements =
             Operation_data {contents; signature = Some signature}
           in
           let operation : Operation.packed = {shell; protocol_data} in
-          return_some (delegate, operation))
+          return_some (delegate, operation, level, round))
     preendorsements
   >>=? fun signed_operations ->
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
-    (fun (delegate, operation) ->
+    (fun (delegate, operation, level, round) ->
       protect
         ~on_error:(fun err ->
           Events.(emit failed_to_inject_preendorsement (delegate, err))
@@ -439,19 +439,9 @@ let inject_preendorsements state ~preendorsements =
         (fun () ->
           Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
           >>=? fun oph ->
-          Events.(emit preendorsement_injected (oph, delegate)) >>= fun () ->
-          return_unit))
+          Events.(emit preendorsement_injected (oph, delegate, level, round))
+          >>= fun () -> return_unit))
     signed_operations
-  >>=? fun () ->
-  (* Hackish way of registering injected preendorsements *)
-  let endorsements = List.map snd signed_operations in
-  if endorsements = [] then return state
-  else
-    let new_level_state =
-      {state.level_state with injected_preendorsements = Some endorsements}
-    in
-    let new_state = {state with level_state = new_level_state} in
-    return new_state
 
 let sign_endorsements state endorsements =
   let cctxt = state.global_state.cctxt in
@@ -466,9 +456,10 @@ let sign_endorsements state endorsements =
     (fun (((consensus_key, _) as delegate), consensus_content) ->
       Events.(emit signing_endorsement delegate) >>= fun () ->
       let shell =
+        (* The branch is the latest finalized block. *)
         {
           Tezos_base.Operation.branch =
-            state.level_state.latest_proposal.predecessor.hash;
+            state.level_state.latest_proposal.predecessor.shell.predecessor;
         }
       in
       let contents =
@@ -501,7 +492,7 @@ let sign_endorsements state endorsements =
        let unsigned_operation = (shell, Contents_list contents) in
        let unsigned_operation_bytes =
          Data_encoding.Binary.to_bytes_exn
-           Operation.unsigned_encoding
+           Operation.unsigned_encoding_with_legacy_attestation_name
            unsigned_operation
        in
        Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
@@ -515,8 +506,48 @@ let sign_endorsements state endorsements =
             Operation_data {contents; signature = Some signature}
           in
           let operation : Operation.packed = {shell; protocol_data} in
-          return_some (delegate, operation))
+          return_some (delegate, operation, level, round))
     endorsements
+
+let sign_dal_attestations state attestations =
+  let cctxt = state.global_state.cctxt in
+  let chain_id = state.global_state.chain_id in
+  (* N.b. signing a lot of operations may take some time *)
+  (* Don't parallelize signatures: the signer might not be able to
+     handle concurrent requests *)
+  let shell =
+    {
+      Tezos_base.Operation.branch =
+        state.level_state.latest_proposal.predecessor.hash;
+    }
+  in
+  List.filter_map_es
+    (fun (((consensus_key, _) as delegate), consensus_content) ->
+      let watermark = Operation.(to_watermark (Dal_attestation chain_id)) in
+      let contents = Single (Dal_attestation consensus_content) in
+      let unsigned_operation = (shell, Contents_list contents) in
+      let unsigned_operation_bytes =
+        Data_encoding.Binary.to_bytes_exn
+          Operation.unsigned_encoding_with_legacy_attestation_name
+          unsigned_operation
+      in
+      Client_keys.sign
+        cctxt
+        ~watermark
+        consensus_key.secret_key_uri
+        unsigned_operation_bytes
+      >>= function
+      | Error err ->
+          Events.(emit skipping_attestation (delegate, err)) >>= fun () ->
+          return_none
+      | Ok signature ->
+          let protocol_data =
+            Operation_data {contents; signature = Some signature}
+          in
+          let operation : Operation.packed = {shell; protocol_data} in
+          return_some
+            (delegate, operation, consensus_content.Dal.Attestation.attestation))
+    attestations
 
 let inject_endorsements state ~endorsements =
   let cctxt = state.global_state.cctxt in
@@ -524,7 +555,7 @@ let inject_endorsements state ~endorsements =
   sign_endorsements state endorsements >>=? fun signed_operations ->
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
-    (fun (delegate, operation) ->
+    (fun (delegate, operation, level, round) ->
       protect
         ~on_error:(fun err ->
           Events.(emit failed_to_inject_endorsement (delegate, err))
@@ -532,22 +563,113 @@ let inject_endorsements state ~endorsements =
         (fun () ->
           Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
           >>=? fun oph ->
-          Events.(emit endorsement_injected (oph, delegate)) >>= fun () ->
-          return_unit))
+          Events.(emit endorsement_injected (oph, delegate, level, round))
+          >>= fun () -> return_unit))
     signed_operations
+
+let inject_dal_attestations state attestations =
+  let cctxt = state.global_state.cctxt in
+  let chain_id = state.global_state.chain_id in
+  sign_dal_attestations state attestations >>=? fun signed_operations ->
+  List.iter_ep
+    (fun (delegate, signed_operation, (attestation : Dal.Attestation.t)) ->
+      let encoded_op =
+        Data_encoding.Binary.to_bytes_exn
+          Operation.encoding_with_legacy_attestation_name
+          signed_operation
+      in
+      Shell_services.Injection.operation
+        cctxt
+        ~chain:(`Hash chain_id)
+        encoded_op
+      >>=? fun oph ->
+      let bitset_int = Bitset.to_z (attestation :> Bitset.t) in
+      Events.(emit attestation_injected (oph, delegate, bitset_int))
+      >>= fun () -> return_unit)
+    signed_operations
+
+let no_dal_node_warning_counter = ref 0
+
+let only_if_dal_feature_enabled state ~default_value f =
+  let open Constants in
+  let Parametric.{dal = {feature_enable; _}; _} =
+    state.global_state.constants.parametric
+  in
+  if feature_enable then
+    match state.global_state.dal_node_rpc_ctxt with
+    | None ->
+        incr no_dal_node_warning_counter ;
+        (if !no_dal_node_warning_counter mod 10 = 1 then
+         Events.(emit no_dal_node ())
+        else Lwt.return_unit)
+        >>= fun () -> return default_value
+    | Some ctxt -> f ctxt
+  else return default_value
+
+let get_dal_attestations state ~level =
+  only_if_dal_feature_enabled state ~default_value:[] (fun dal_node_rpc_ctxt ->
+      let delegates =
+        SlotMap.bindings state.level_state.delegate_slots.own_delegate_slots
+        |> List.map (fun (_slot, (consensus_key_and_delegate, _slots)) ->
+               consensus_key_and_delegate)
+        |> List.sort_uniq compare
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4666
+           This sorting can be avoided. *)
+      in
+      let signing_key delegate = (fst delegate).public_key_hash in
+      List.fold_left_es
+        (fun acc delegate ->
+          Node_rpc.get_attestable_slots
+            dal_node_rpc_ctxt
+            (signing_key delegate)
+            ~level
+          >>=? fun res ->
+          match res with
+          | Tezos_dal_node_services.Services.Types.Not_in_committee ->
+              return acc
+          | Attestable_slots attestation ->
+              return ((delegate, attestation) :: acc))
+        []
+        delegates
+      >>=? fun attestations ->
+      List.map
+        (fun (delegate, attestation_flags) ->
+          let attestation =
+            List.fold_left_i
+              (fun i acc flag ->
+                match Dal.Slot_index.of_int_opt i with
+                | Some index when flag -> Dal.Attestation.commit acc index
+                | None | Some _ -> acc)
+              Dal.Attestation.empty
+              attestation_flags
+          in
+          ( delegate,
+            Dal.Attestation.
+              {
+                attestor = signing_key delegate;
+                attestation;
+                level = Raw_level.of_int32_exn level;
+              } ))
+        attestations
+      |> return)
+
+let get_and_inject_dal_attestations state =
+  let level = Int32.succ state.level_state.current_level in
+  get_dal_attestations state ~level >>=? fun attestations ->
+  inject_dal_attestations state attestations
 
 let prepare_waiting_for_quorum state =
   let consensus_threshold =
     state.global_state.constants.parametric.consensus_threshold
   in
-  let get_consensus_operation_voting_power ~slot =
+  let get_slot_voting_power ~slot =
     match
       SlotMap.find slot state.level_state.delegate_slots.all_delegate_slots
     with
-    | None ->
-        (* cannot happen if the map is correctly populated *)
-        0
-    | Some {endorsing_power; _} -> endorsing_power
+    | Some {endorsing_power; first_slot} when Slot.equal slot first_slot ->
+        Some endorsing_power
+    | Some _ | None (* cannot happen if the map is correctly populated *) ->
+        None
   in
   let latest_proposal = state.level_state.latest_proposal.block in
   (* assert (latest_proposal.block.round = state.round_state.current_round) ; *)
@@ -558,28 +680,28 @@ let prepare_waiting_for_quorum state =
       payload_hash_watched = latest_proposal.payload_hash;
     }
   in
-  (consensus_threshold, get_consensus_operation_voting_power, candidate)
+  (consensus_threshold, get_slot_voting_power, candidate)
 
 let start_waiting_for_preendorsement_quorum state =
-  let consensus_threshold, get_preendorsement_voting_power, candidate =
+  let consensus_threshold, get_slot_voting_power, candidate =
     prepare_waiting_for_quorum state
   in
   let operation_worker = state.global_state.operation_worker in
   Operation_worker.monitor_preendorsement_quorum
     operation_worker
     ~consensus_threshold
-    ~get_preendorsement_voting_power
+    ~get_slot_voting_power
     candidate
 
 let start_waiting_for_endorsement_quorum state =
-  let consensus_threshold, get_endorsement_voting_power, candidate =
+  let consensus_threshold, get_slot_voting_power, candidate =
     prepare_waiting_for_quorum state
   in
   let operation_worker = state.global_state.operation_worker in
   Operation_worker.monitor_endorsement_quorum
     operation_worker
     ~consensus_threshold
-    ~get_endorsement_voting_power
+    ~get_slot_voting_power
     candidate
 
 let compute_round proposal round_durations =
@@ -621,16 +743,6 @@ let update_to_level state level_update =
   compute_new_state ~current_round ~delegate_slots ~next_level_delegate_slots
   >>= return
 
-let reinject_preendorsements state preendorsements =
-  let cctxt = state.global_state.cctxt in
-  let chain = `Hash state.global_state.chain_id in
-  List.iter_p
-    (fun operation ->
-      Node_rpc.inject_operation cctxt ~chain operation >>= fun _res ->
-      (* Ignore errors for now *)
-      Lwt.return_unit)
-    preendorsements
-
 let synchronize_round state {new_round_proposal; handle_proposal} =
   Events.(emit synchronizing_round new_round_proposal.predecessor.hash)
   >>= fun () ->
@@ -665,14 +777,19 @@ let rec perform_action ~state_recorder state (action : action) =
   | Inject_block {block_to_bake; updated_state} ->
       inject_block state ~state_recorder block_to_bake ~updated_state
   | Inject_preendorsements {preendorsements} ->
-      inject_preendorsements state ~preendorsements >>=? fun new_state ->
-      perform_action ~state_recorder new_state Watch_proposal
+      inject_preendorsements state ~preendorsements >>=? fun () ->
+      perform_action ~state_recorder state Watch_proposal
   | Inject_endorsements {endorsements} ->
       state_recorder ~new_state:state >>=? fun () ->
       inject_endorsements state ~endorsements >>=? fun () ->
       (* We wait for endorsements to trigger the [Quorum_reached]
          event *)
-      start_waiting_for_endorsement_quorum state >>= fun () -> return state
+      start_waiting_for_endorsement_quorum state >>= fun () ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4667
+         Also inject attestations for the migration block. *)
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4671
+         Don't inject multiple attestations? *)
+      get_and_inject_dal_attestations state >>=? fun () -> return state
   | Update_to_level level_update ->
       update_to_level state level_update >>=? fun (new_state, new_action) ->
       perform_action ~state_recorder new_state new_action
@@ -683,5 +800,3 @@ let rec perform_action ~state_recorder state (action : action) =
       (* We wait for preendorsements to trigger the
            [Prequorum_reached] event *)
       start_waiting_for_preendorsement_quorum state >>= fun () -> return state
-  | Reinject_preendorsements {preendorsements} ->
-      reinject_preendorsements state preendorsements >>= fun () -> return state

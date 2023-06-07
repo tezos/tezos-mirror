@@ -1,0 +1,41 @@
+
+./octez-client --protocol PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/get_map_value.tz on storage '(Pair None { Elt "hello" "hi" })' and input '"hello"' --level 1 --trace-stack
+storage
+  (Pair (Some "hi") { Elt "hello" "hi" })
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 12 (just consumed gas: 10.880)
+    [ (Pair "hello" None { Elt "hello" "hi" }) ]
+  - location: 12 (just consumed gas: 0.010)
+    [ (Pair "hello" None { Elt "hello" "hi" })
+      (Pair "hello" None { Elt "hello" "hi" }) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ "hello"
+      (Pair "hello" None { Elt "hello" "hi" }) ]
+  - location: 14 (just consumed gas: 0)
+    [ (Pair "hello" None { Elt "hello" "hi" }) ]
+  - location: 17 (just consumed gas: 0.010)
+    [ (Pair None { Elt "hello" "hi" }) ]
+  - location: 18 (just consumed gas: 0.010)
+    [ { Elt "hello" "hi" } ]
+  - location: 19 (just consumed gas: 0.010)
+    [ { Elt "hello" "hi" }
+      { Elt "hello" "hi" } ]
+  - location: 14 (just consumed gas: 0.025)
+    [ "hello"
+      { Elt "hello" "hi" }
+      { Elt "hello" "hi" } ]
+  - location: 20 (just consumed gas: 0.090)
+    [ (Some "hi")
+      { Elt "hello" "hi" } ]
+  - location: 21 (just consumed gas: 0.010)
+    [ (Pair (Some "hi") { Elt "hello" "hi" }) ]
+  - location: 22 (just consumed gas: 0.010)
+    [ {}
+      (Pair (Some "hi") { Elt "hello" "hi" }) ]
+  - location: 24 (just consumed gas: 0.010)
+    [ (Pair {} (Some "hi") { Elt "hello" "hi" }) ]
+

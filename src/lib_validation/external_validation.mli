@@ -24,6 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type log_config = {
+  lwt_log_sink_unix : Lwt_log_sink_unix.cfg;
+  internal_events : Tezos_base.Internal_event_config.t;
+}
+
 type parameters = {
   context_root : string;
   protocol_root : string;
@@ -33,10 +38,10 @@ type parameters = {
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
   dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
+  log_config : log_config;
 }
 
 type request =
-  | Init
   | Validate of {
       chain_id : Chain_id.t;
       block_header : Block_header.t;

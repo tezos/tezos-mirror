@@ -25,5 +25,4 @@
 
 (** [init_kont_encoding] tree-encoder for [init_kont] values. *)
 val init_kont_encoding :
-  host_funcs:Tezos_webassembly_interpreter.Host_funcs.registry ->
   Tezos_webassembly_interpreter.Eval.init_kont Tezos_tree_encoding.t

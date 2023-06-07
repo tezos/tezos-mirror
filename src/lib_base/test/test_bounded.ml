@@ -26,7 +26,8 @@
 (* Testing
    -------
    Component:    Base
-   Invocation:   dune exec src/lib_base/test/test_bounded.exe
+   Invocation:   dune exec src/lib_base/test/main.exe \
+                  -- --file test_bounded.ml
    Subject:      Test the [Bounded] module.
 *)
 
@@ -266,7 +267,7 @@ end = struct
     in
     let* ety = oneofl values in
     match ety with
-    | E (type a) (ty : a Bounded.Internal_for_tests.t) ->
+    | E ty ->
         let* (module S : S) = gen_from_ty ty in
         let* element = S.gen in
         return (E' {bounded = (module S); element})
@@ -419,6 +420,7 @@ let int32_checks =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Bounded"
     [
       ("Int32", int32_checks);

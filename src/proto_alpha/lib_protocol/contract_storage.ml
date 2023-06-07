@@ -667,17 +667,6 @@ let increase_paid_storage c contract_hash ~amount_in_bytes:storage_incr =
   let new_storage_space = Z.add already_paid_space storage_incr in
   Storage.Contract.Paid_storage_space.update c contract new_storage_space
 
-let update_balance ctxt contract f amount =
-  Storage.Contract.Spendable_balance.get ctxt contract >>=? fun balance ->
-  f balance amount >>?= fun new_balance ->
-  Storage.Contract.Spendable_balance.update ctxt contract new_balance
-
-let increase_balance_only_call_from_token ctxt contract amount =
-  update_balance ctxt contract Tez_repr.( +? ) amount
-
-let decrease_balance_only_call_from_token ctxt contract amount =
-  update_balance ctxt contract Tez_repr.( -? ) amount
-
 let get_frozen_bonds ctxt contract =
   Storage.Contract.Total_frozen_bonds.find ctxt contract
   >|=? Option.value ~default:Tez_repr.zero

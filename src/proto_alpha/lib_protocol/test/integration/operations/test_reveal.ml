@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (revelation)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                -- test "^revelation$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_reveal.ml
     Subject:    On the reveal operation.
 *)
 
@@ -747,3 +746,7 @@ let tests =
       `Quick
       test_valid_reveal_after_emptying_balance;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("revelation", tests)]
+  |> Lwt_main.run

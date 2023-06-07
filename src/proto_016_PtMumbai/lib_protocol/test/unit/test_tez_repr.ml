@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Tez_repr 
-    Invocation:   dune exec ./src/proto_alpha/lib_protocol/test/unit/main.exe -- test Tez_repr 
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_tez_repr.ml
     Dependencies: --
     Subject:      To test the modules (including the top-level)
                   in tez_repr.ml as individual units, particularly
@@ -180,10 +181,6 @@ let tests =
       `Quick
       Test_tez_repr.test_of_mutez_non_negative;
     tztest
-      "Tez.of_mutez: of non-negative ints"
-      `Quick
-      Test_tez_repr.test_of_mutez_non_negative;
-    tztest
       "Tez.of_mutez: of negative ints"
       `Quick
       Test_tez_repr.test_of_mutez_negative;
@@ -200,3 +197,7 @@ let tests =
       `Quick
       Test_tez_repr.test_data_encoding;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("Tez_repr.ml", tests)]
+  |> Lwt_main.run

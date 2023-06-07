@@ -27,9 +27,8 @@
 (** Testing
     -------
     Component:  Protocol (Ticket_scanner)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                -- test "^ticket lazy storage diff"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_ticket_lazy_storage_diff.ml
     Subject:    Ticket scanner tests
 *)
 
@@ -43,13 +42,12 @@ let string_list_of_ex_token_diffs ctxt token_diffs =
   let open Lwt_result_wrap_syntax in
   let accum (xs, ctxt)
       (Ticket_token.Ex_token {ticketer; contents_type; contents}, amount) =
-    let* x, ctxt =
-      wrap
-      @@ Script_ir_unparser.unparse_comparable_data
-           ctxt
-           Script_ir_unparser.Readable
-           contents_type
-           contents
+    let*@ x, ctxt =
+      Script_ir_unparser.unparse_comparable_data
+        ctxt
+        Script_ir_unparser.Readable
+        contents_type
+        contents
     in
     let str =
       Format.asprintf
@@ -68,14 +66,14 @@ let string_list_of_ex_token_diffs ctxt token_diffs =
 
 let make_ex_token ctxt ~ticketer ~type_exp ~content_exp =
   let open Lwt_result_wrap_syntax in
-  let* Script_ir_translator.Ex_comparable_ty contents_type, ctxt =
+  let*?@ Script_ir_translator.Ex_comparable_ty contents_type, ctxt =
     let node = Micheline.root @@ Expr.from_string type_exp in
-    wrap @@ Lwt.return @@ Script_ir_translator.parse_comparable_ty ctxt node
+    Script_ir_translator.parse_comparable_ty ctxt node
   in
-  let* ticketer = wrap @@ Lwt.return @@ Contract.of_b58check ticketer in
-  let* contents, ctxt =
+  let*@ ticketer = Lwt.return @@ Contract.of_b58check ticketer in
+  let*@ contents, ctxt =
     let node = Micheline.root @@ Expr.from_string content_exp in
-    wrap @@ Script_ir_translator.parse_comparable_data ctxt contents_type node
+    Script_ir_translator.parse_comparable_data ctxt contents_type node
   in
   return (Ticket_token.Ex_token {ticketer; contents_type; contents}, ctxt)
 
@@ -105,12 +103,11 @@ let updates_of_key_values ctxt key_values =
   let open Lwt_result_wrap_syntax in
   List.fold_right_es
     (fun (key, value) (kvs, ctxt) ->
-      let* key_hash, ctxt =
-        wrap
-          (Script_ir_translator.hash_comparable_data
-             ctxt
-             Script_typed_ir.int_t
-             (Script_int.of_int key))
+      let*@ key_hash, ctxt =
+        Script_ir_translator.hash_comparable_data
+          ctxt
+          Script_typed_ir.int_t
+          (Script_int.of_int key)
       in
       return
         ( {
@@ -141,7 +138,7 @@ let init () =
 
 let setup ctxt contract ~key_type ~value_type entries =
   let open Lwt_result_wrap_syntax in
-  let* ctxt, big_map_id = wrap @@ Big_map.fresh ~temporary:false ctxt in
+  let*@ ctxt, big_map_id = Big_map.fresh ~temporary:false ctxt in
   let key_type = Expr.from_string key_type in
   let value_type = Expr.from_string value_type in
   let* updates, ctxt = updates_of_key_values ctxt entries in
@@ -155,8 +152,8 @@ let new_big_map ctxt contract ~key_type ~value_type entries =
     @@ List.map (fun (k, v) -> (k, Some v)) entries
   in
   let storage = Expr.from_string "{}" in
-  let* ctxt =
-    wrap @@ Contract.update_script_storage ctxt contract storage (Some [alloc])
+  let*@ ctxt =
+    Contract.update_script_storage ctxt contract storage (Some [alloc])
   in
   return (big_map_id, ctxt)
 
@@ -185,7 +182,7 @@ let copy_diff ctxt contract ~key_type ~value_type ~existing_entries ~updates =
     new_big_map ctxt contract ~key_type ~value_type existing_entries
   in
   let* updates, ctxt = updates_of_key_values ctxt updates in
-  let* ctxt, new_big_map_id = wrap @@ Big_map.fresh ctxt ~temporary:false in
+  let*@ ctxt, new_big_map_id = Big_map.fresh ctxt ~temporary:false in
   return
     ( Lazy_storage.make
         Lazy_storage.Kind.Big_map
@@ -215,9 +212,8 @@ let test_allocate_new_empty () =
   let* diff, ctxt =
     alloc_diff ctxt contract ~key_type:"int" ~value_type:"ticket string" []
   in
-  let* diff, ctxt =
-    wrap
-      (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
+  let*@ diff, ctxt =
+    Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff]
   in
   assert_equal_balances ~loc:__LOC__ ctxt diff []
 
@@ -234,9 +230,8 @@ let test_allocate_new_no_tickets () =
       ~value_type:"string"
       [(1, {|"A"|}); (2, {|"B"|}); (3, {|"C"|})]
   in
-  let* diff, ctxt =
-    wrap
-      (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
+  let*@ diff, ctxt =
+    Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff]
   in
   assert_equal_balances ~loc:__LOC__ ctxt diff []
 
@@ -257,9 +252,8 @@ let test_allocate_new () =
         (3, {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 3|});
       ]
   in
-  let* diff, ctxt =
-    wrap
-      (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
+  let*@ diff, ctxt =
+    Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff]
   in
   assert_equal_balances
     ~loc:__LOC__
@@ -289,9 +283,8 @@ let test_remove_big_map () =
           (3, {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 3|});
         ]
   in
-  let* diff, ctxt =
-    wrap
-      (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
+  let*@ diff, ctxt =
+    Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff]
   in
   assert_equal_balances
     ~loc:__LOC__
@@ -322,9 +315,8 @@ let test_no_updates_to_existing_big_map () =
         ]
       ~updates:[]
   in
-  let* diff, ctxt =
-    wrap
-      (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
+  let*@ diff, ctxt =
+    Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff]
   in
   assert_equal_balances ~loc:__LOC__ ctxt diff []
 
@@ -356,9 +348,8 @@ let test_update_existing_big_map () =
           (4, Some {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "pink" 5|});
         ]
   in
-  let* diff, ctxt =
-    wrap
-      (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
+  let*@ diff, ctxt =
+    Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff]
   in
   assert_equal_balances
     ~loc:__LOC__
@@ -394,9 +385,8 @@ let test_update_same_key_multiple_times_existing_big_map () =
           (1, Some {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 1|});
         ]
   in
-  let* diff, ctxt =
-    wrap
-      (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
+  let*@ diff, ctxt =
+    Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff]
   in
   assert_equal_balances
     ~loc:__LOC__
@@ -432,9 +422,8 @@ let test_remove_same_key_multiple_times_existing_big_map () =
           (1, None);
         ]
   in
-  let* diff, ctxt =
-    wrap
-      (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
+  let*@ diff, ctxt =
+    Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff]
   in
   assert_equal_balances
     ~loc:__LOC__
@@ -469,9 +458,8 @@ let test_update_and_remove_same_key_multiple_times_existing_big_map () =
           (1, Some {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 1|});
         ]
   in
-  let* diff, ctxt =
-    wrap
-      (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
+  let*@ diff, ctxt =
+    Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff]
   in
   assert_equal_balances
     ~loc:__LOC__
@@ -503,9 +491,8 @@ let test_copy_big_map () =
         ]
       ~updates:[]
   in
-  let* diff, ctxt =
-    wrap
-      (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
+  let*@ diff, ctxt =
+    Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff]
   in
   assert_equal_balances
     ~loc:__LOC__
@@ -544,9 +531,8 @@ let test_copy_big_map_with_updates () =
           (4, Some {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "pink" 5|});
         ]
   in
-  let* diff, ctxt =
-    wrap
-      (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
+  let*@ diff, ctxt =
+    Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff]
   in
   assert_equal_balances
     ~loc:__LOC__
@@ -586,9 +572,8 @@ let test_copy_big_map_with_updates_to_same_key () =
           (1, None);
         ]
   in
-  let* diff, ctxt =
-    wrap
-      (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
+  let*@ diff, ctxt =
+    Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff]
   in
   assert_equal_balances
     ~loc:__LOC__
@@ -653,11 +638,10 @@ let test_mix_lazy_diffs () =
           (2, {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "black" 1|});
         ]
   in
-  let* diff, ctxt =
-    wrap
-      (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff
-         ctxt
-         [diff_copy; diff_existing; diff_remove])
+  let*@ diff, ctxt =
+    Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff
+      ctxt
+      [diff_copy; diff_existing; diff_remove]
   in
   assert_equal_balances
     ~loc:__LOC__
@@ -677,38 +661,36 @@ let test_mix_lazy_diffs () =
 
 let tests =
   [
-    Tztest.tztest "Test allocate new empty" `Quick test_allocate_new_empty;
-    Tztest.tztest "Test allocate new" `Quick test_allocate_new;
-    Tztest.tztest
-      "Test allocate new no tickets"
-      `Quick
-      test_allocate_new_no_tickets;
+    Tztest.tztest "allocate new empty" `Quick test_allocate_new_empty;
+    Tztest.tztest "allocate new" `Quick test_allocate_new;
+    Tztest.tztest "allocate new no tickets" `Quick test_allocate_new_no_tickets;
     Tztest.tztest "Remove" `Quick test_remove_big_map;
     Tztest.tztest
-      "Test no updates to existing"
+      "no updates to existing"
       `Quick
       test_no_updates_to_existing_big_map;
+    Tztest.tztest "update existing big-map" `Quick test_update_existing_big_map;
     Tztest.tztest
-      "Test update existing big-map"
-      `Quick
-      test_update_existing_big_map;
-    Tztest.tztest
-      "Test update same key multiple times on existing big-map"
+      "update same key multiple times on existing big-map"
       `Quick
       test_update_same_key_multiple_times_existing_big_map;
     Tztest.tztest
-      "Test remove same key multiple times on existing big-map"
+      "remove same key multiple times on existing big-map"
       `Quick
       test_remove_same_key_multiple_times_existing_big_map;
     Tztest.tztest
-      "Test update and remove same key multiple times on existing big-map"
+      "update and remove same key multiple times on existing big-map"
       `Quick
       test_update_and_remove_same_key_multiple_times_existing_big_map;
-    Tztest.tztest "Test copy" `Quick test_copy_big_map;
-    Tztest.tztest "Test copy with updates" `Quick test_copy_big_map_with_updates;
+    Tztest.tztest "copy" `Quick test_copy_big_map;
+    Tztest.tztest "copy with updates" `Quick test_copy_big_map_with_updates;
     Tztest.tztest
-      "Test copy with multiple updates to same key"
+      "copy with multiple updates to same key"
       `Quick
       test_copy_big_map_with_updates_to_same_key;
-    Tztest.tztest "Test mix lazy diffs" `Quick test_mix_lazy_diffs;
+    Tztest.tztest "mix lazy diffs" `Quick test_mix_lazy_diffs;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("ticket lazy storage diff", tests)]
+  |> Lwt_main.run

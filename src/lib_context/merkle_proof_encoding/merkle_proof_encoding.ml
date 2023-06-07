@@ -40,13 +40,7 @@ struct
 
   let length_field = req "length" (conv Int64.of_int Int64.to_int int64)
 
-  let step_encoding : step Data_encoding.t =
-    (* Context path name.  [bytes] must be used for JSON since we have no
-       charset specificaiton. *)
-    conv
-      Bytes.unsafe_of_string
-      Bytes.unsafe_to_string
-      (Bounded.bytes 255 (* 1 byte for the length *))
+  let step_encoding : step Data_encoding.t = Bounded.string' Hex 255
 
   let hash_encoding = Context_hash.encoding
 

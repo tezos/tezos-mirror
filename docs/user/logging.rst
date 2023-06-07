@@ -1,12 +1,18 @@
 Logging
 =======
 
-Logging features in Tezos allow to monitor its execution and be informed in real
-time about *events* of interest, such as errors, completion of certain steps,
+Logging features in Octez allow to monitor the execution of Octez binaries, informing in real
+time about events of interest, such as errors, completion of certain steps,
 etc. This is why various software components emit *events* throughout the
 codebase (see :doc:`../developer/event_logging_framework`), the logging
 framework dispatches them to an arbitrary number of (active) *sinks* which can
 filter print, store, or otherwise handle events.
+
+The logging framework can be configured with environment variables, which specify how events are mapped to sinks.
+Some Octez binaries provide additional configurations means.
+
+Events
+------
 
 Events have:
 
@@ -51,7 +57,8 @@ This sink is the one currently activated by default:
    ``TEZOS_LOG`` environment variable or the specific section in the
    node’s configuration file (see below).
 
-This sink can only output pretty-printed versions of the events.
+This sink can only output pretty-printed versions of the events, by default
+on standard output (stdout).
 
 File-Descriptor Sinks
 ~~~~~~~~~~~~~~~~~~~~~
@@ -106,6 +113,15 @@ Options available only for the ``file-descriptor-path://`` case:
 -  ``chmod=<int>`` sets the access-rights of the file at creation time
    (default is ``0o600``, provided
    `Umask <https://en.wikipedia.org/wiki/Umask>`__ allows it).
+- ``daily-logs=<int>`` sets up a rotation for log files, creating a file for
+  each day. The parameter is the number of days these logs should be kept, and
+  hence the number of files. The day of the year with format ["yyyymmdd"] is
+  added as a suffix to the filename, prefixed by a dash. We recomend not to put
+  your tezos logs in ``/var/log`` if you use this option, as you system would
+  use ``logrotate`` automatically.
+- ``create-dirs=<bool>`` when ``true`` allows to create the directory where
+  the log files are stored and all its parents recursively if they don't
+  exist.
 
 Examples:
 
@@ -122,6 +138,11 @@ Examples:
 -  ``file-descriptor-path:///the/path/to/write.log?section-prefix=rpc:debug&section-prefix=validator:debug&section-prefix=:none"``
    → Write only sections validator and rpc at debug level but exclude all
    other sections from the stream.
+- ``"file-descriptor-path:///tmp/node-logs/node.log?daily-logs=5&create-dirs=true&section-prefix=:info"``
+   sets up daily log files with a history of up to 5 days and verbosity level
+   ``info`` for all logs. Files will be named ``node-19700101.log`` in an
+   example of a file produced in 1970, January, the 1st. The log directory
+   ``node-logs`` will be automatically created if it doesn't exist.
 
 The format of the events is (usually minified):
 
@@ -139,7 +160,19 @@ Additionally, the ``"hostname"`` field can be customized with environment
 variable ``TEZOS_EVENT_HOSTNAME``; Its default value is the hostname of the
 device the node is running on.
 
+To store rotated logs, there is the ``daily-logs`` option to create logs files on
+a daily basis. However, it is also possible to use ``logrotate`` by putting the
+log file in ``/var/log/tezos/sink.log``, for exemple. The following
+configuration can then be put in ``/etc/logrotate.d/tezos/sink.log``:
 
+.. code::
+
+  /var/log/tezos/sink.log {
+          daily
+          copytruncate
+          rotate 4
+          compress
+  }
 
 File-Tree Sink
 ~~~~~~~~~~~~~~
@@ -176,8 +209,17 @@ where ``<section-dirname>`` is either ``no-section`` or
 Global Defaults
 ---------------
 
-By default, only the ``lwt-log://`` sinks are activated and configured to
-output events of level at least ``Notice``.
+By default, the Octez binaries generate **user logs** as follows:
+
+- ``lwt-log://`` sinks are activated by default and configured to
+  output events of level at least ``Notice``. Their goal is the stdout logging.
+
+The node and the baker additionally generate by default more detailed
+**internal logs** as follows:
+
+- A file-descriptor-sink is activated to store logs from last seven days with an
+  ``Info`` level. For the node, the path is ``<node-data-dir>/daily-logs/``. For
+  other tools, see the corresponding sections in this page.
 
 JSON Configuration Format
 -------------------------
@@ -201,7 +243,7 @@ Environment Variables
 ---------------------
 
 The logging framework can be configured with environment variables
-before starting the node. Those variables work on all the code using the
+before starting an Octez executable (e.g., the node). Those variables work on all the code using the
 ``tezos-stdlib-unix`` library as long as ``Internal_event_unix.init`` is
 called; this should include *all* the regular ``octez-*`` binaries.
 
@@ -237,6 +279,8 @@ environment variable, see :ref:`context_component`.
 
 Node-Specific Configuration
 ---------------------------
+
+The node supports some additional means to configure logging, besides environment variables.
 
 Configuration File
 ~~~~~~~~~~~~~~~~~~
@@ -281,15 +325,21 @@ events) this call adds a sink to suddenly start pretty-printing all
    octez-client rpc put /config/logging with \
      '{ "active_sinks": [ "file-descriptor-path:///tmp/rpclogs?section-prefix=rpc:debug&format=pp&fresh=true" ] }'
 
-Client and Baking Daemons
--------------------------
+Client and baker configuration
+------------------------------
 
-For now, ``octez-client``, ``octez-{baker,accuser}-*``, etc.
-can only be configured using the environment variables.
+Both ``octez-client`` and ``octez-{baker,accuser}-*`` can be configured either
+using environment variables or using ``internal-events`` in the client configuration
+file, with the file-descriptor sinks described above.
 
-There is one common option ``--log-requests`` which can be used to trace
+There is also one common option ``--log-requests`` which can be used to trace
 all the interactions with the node (but it does *not* use the logging
 framework).
+
+By default, the baker also generates internal logs, which are stored at
+``<client-base-dir>/logs/baker-<protocol-name>/*``. Hence, running two bakers
+(for two different accounts) using the same protocol with the same base
+directory is not recommended.
 
 Processing Structured Events
 ----------------------------

@@ -11,8 +11,8 @@
   tezos-store
   tezos-shell-context
   tezos-context
-  tezos-protocol-015-PtLimaPt
   tezos-protocol-016-PtMumbai
+  tezos-protocol-017-PtNairob
   tezos-protocol-alpha)
  (library_flags (:standard -linkall))
  (flags

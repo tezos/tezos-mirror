@@ -23,8 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tztest
+(** Testing
+    -------
+    Component:    Lib_scoru_wasm execution
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_hash_consistency.ml
+    Subject:      Tests execution for the tezos-scoru-wasm library
+*)
+
 open Wasm_utils
+open Tztest_helper
 module Context = Tezos_context_memory.Context_binary
 
 (* Test that one N-ticks executions(^1) and N one-tick executions(^2)
@@ -32,12 +39,18 @@ module Context = Tezos_context_memory.Context_binary
 
    (^1): Executing in one decoding-encoding loop N ticks.
    (^2): Executing one decoding-encoding loop per ticks. *)
-let test_execution_correspondance skip count () =
+let test_execution_correspondance ~version skip count () =
   test_with_kernel
     Kernels.unreachable_kernel
     (fun kernel ->
       let open Lwt_result_syntax in
-      let*! tree = initial_tree ~from_binary:true ~max_tick:40_000L kernel in
+      let*! tree =
+        initial_tree
+          ~version
+          ~from_binary:true
+          ~ticks_per_snapshot:40_000L
+          kernel
+      in
       let*! tree_snapshotted = eval_until_input_requested tree in
       let*! tree_with_dummy_input = set_empty_inbox_step 0l tree_snapshotted in
       let*! tree =
@@ -57,23 +70,28 @@ let test_execution_correspondance skip count () =
     ()
 
 let tests =
-  [
-    tztest
-      "Executions correspondence (ticks 0 to 1,000)"
-      `Quick
-      (* Parsing is way slower, so we limit ourselves to 1,000 ticks. *)
-      (test_execution_correspondance 0L 1_000L);
-    tztest
-      "Executions correspondence (ticks 10,000 to 11,000)"
-      `Quick
-      (* Parsing is way slower, so we limit ourselves to 1,000 ticks. *)
-      (test_execution_correspondance 10_000L 1_000L);
-    tztest
-      "Executions correspondence (ticks 20,000 to 25,000)"
-      `Quick
-      (test_execution_correspondance 20_000L 5_000L);
-    tztest
-      "Executions correspondence (ticks 30,000 to 35,000)"
-      `Quick
-      (test_execution_correspondance 30_000L 5_000L);
-  ]
+  tztests_with_pvm
+    ~versions:[V0; V1]
+    [
+      ( "Executions correspondence (ticks 0 to 1,000)",
+        `Quick,
+        (* Parsing is way slower, so we limit ourselves to 1,000 ticks. *)
+        test_execution_correspondance 0L 1_000L );
+      ( "Executions correspondence (ticks 10,000 to 11,000)",
+        `Quick,
+        (* Parsing is way slower, so we limit ourselves to 1,000 ticks. *)
+        test_execution_correspondance 10_000L 1_000L );
+      ( "Executions correspondence (ticks 20,000 to 25,000)",
+        `Quick,
+        test_execution_correspondance 20_000L 5_000L );
+      ( "Executions correspondence (ticks 30,000 to 35,000)",
+        `Quick,
+        test_execution_correspondance 30_000L 5_000L );
+    ]
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    "test lib scoru wasm"
+    [("Hash correspondence", tests)]
+  |> Lwt_main.run

@@ -10,10 +10,10 @@ trace
   - SWAP (entry) @ location: 8
     [ "[PUBLIC_KEY_HASH]"
       "[TIMESTAMP]" ]
-    - log/CONST (exit) @ location: 8
+    - log/PUSH (exit) @ location: 8
       [ "[TIMESTAMP]"
         "[PUBLIC_KEY_HASH]" ]
-  - CONST (entry) @ location: 9
+  - PUSH (entry) @ location: 9
     [ "[TIMESTAMP]"
       "[PUBLIC_KEY_HASH]" ]
     - log/ADD (exit) @ location: 9
@@ -59,14 +59,14 @@ trace
       [ "[PUBLIC_KEY_HASH]" ]
   - IMPLICIT_ACCOUNT (entry) @ location: 24
     [ "[PUBLIC_KEY_HASH]" ]
-    - log/CONST (exit) @ location: 24
+    - log/PUSH (exit) @ location: 24
       [ "[PUBLIC_KEY_HASH]" ]
-  - CONST (entry) @ location: 25
+  - PUSH (entry) @ location: 25
     [ "[PUBLIC_KEY_HASH]" ]
-    - log/CONST (exit) @ location: 25
+    - log/UNIT (exit) @ location: 25
       [ 1000000
         "[PUBLIC_KEY_HASH]" ]
-  - CONST (entry) @ location: 28
+  - UNIT (entry) @ location: 28
     [ 1000000
       "[PUBLIC_KEY_HASH]" ]
     - log/TRANSFER_TOKENS (exit) @ location: 28

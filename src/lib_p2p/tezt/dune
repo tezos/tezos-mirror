@@ -1,0 +1,51 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_lib_p2p_tezt_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  tezos-base
+  tezos-base.unix
+  tezos-stdlib-unix
+  tezos-stdlib
+  tezos-p2p
+  tezos-p2p-services
+  tezos-test-helpers
+  tezos-base-test-helpers
+  tezos-event-logging-test-helpers
+  tezos_p2p_test_common)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib_unix
+  -open Tezos_stdlib
+  -open Tezos_p2p
+  -open Tezos_p2p_services
+  -open Tezos_test_helpers
+  -open Tezos_base_test_helpers
+  -open Tezos_event_logging_test_helpers
+  -open Tezos_p2p_test_common)
+ (modules test_p2p_socket test_p2p_conn))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_p2p_tezt_tezt_lib
+  tezt)
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos-p2p)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

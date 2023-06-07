@@ -29,10 +29,10 @@ module Matrix = Linalg.Mat.Float
 (** Vectors with elements indexed by ints *)
 type vector = int Vector.t
 
-(** {Read-only} matrices with elements indexed by pairs (column, row) *)
+(** {e Read-only} matrices with elements indexed by pairs (column, row) *)
 type matrix = (int * int) Matrix.t
 
-(** {Write-only} matrices with elements indexed by pairs (column, row) *)
+(** {e Write-only} matrices with elements indexed by pairs (column, row) *)
 type out_matrix = (int * int) Matrix.out
 
 (** Number of elements of a vector *)

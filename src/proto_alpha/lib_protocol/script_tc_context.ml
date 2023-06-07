@@ -60,6 +60,9 @@ let check_not_in_view loc ~legacy tc_context prim =
      lambdas in views, because they could be returned to the caller, and then
      executed on his responsibility. *)
   | Toplevel _ | Data -> Result.return_unit
-  | View when is_in_lambda tc_context || legacy -> Result.return_unit
+  | View
+    when is_in_lambda tc_context
+         || legacy (* Legacy check introduced in Jakarta *) ->
+      Result.return_unit
   | View ->
       error Script_tc_errors.(Forbidden_instr_in_context (loc, View, prim))

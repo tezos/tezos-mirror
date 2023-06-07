@@ -1,23 +1,41 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test_rewriting)
+(library
+ (name src_lib_benchmark_lib_micheline_rewriting_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-micheline
   tezos-micheline-rewriting
   tezos-protocol-alpha
   tezos-error-monad
-  tezos-client-alpha
-  alcotest-lwt)
+  tezos-client-alpha)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_micheline)
+ (modules test_rewriting))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_benchmark_lib_micheline_rewriting_test_tezt_lib
+  tezt)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
- (flags
-  (:standard)
-  -open Tezos_micheline))
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-micheline-rewriting)
- (action (run %{dep:./test_rewriting.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

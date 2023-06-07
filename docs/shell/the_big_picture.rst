@@ -221,7 +221,7 @@ Three kinds of economic protocols are included in the main Octez repository.
     the genesis block. It accepts a single block, signed by an
     activator whose public key is hardcoded, and whose single action is to
     switch to a new protocol chosen by the activator.
-    The `master` branch contains additional variants of the genesis
+    The ``master`` branch contains additional variants of the genesis
     protocol, one for each of the existing :ref:`test
     networks<test-networks>`.
   - The active protocols. ``tezos-protocol-nnn-hhhhhhhh``
@@ -274,8 +274,8 @@ The tests are split into various packages, testing more and more
 elements while following the dependency chain. Use ``make test`` to
 run them.
 
- - :src:`tests_python/`:
-   end-to-end tests as python scripts that launch a local sandboxed node
+ - :src:`tezt/`:
+   end-to-end tests as Tezt tests that e.g. launch local sandboxed nodes
    and performs various tasks using the client
  - :package-name:`tezos-p2p`
    (in directory :src:`src/lib_p2p/test/`):
@@ -305,6 +305,8 @@ run them.
 
 The Final Executables
 ~~~~~~~~~~~~~~~~~~~~~
+
+The Octez executables are generated from packages such as the following ones (for the complete list of binaries, see :ref:`tezos_binaries`):
 
   - :package:`octez-node` provides the node launcher binary
     ``octez-node``. All the algorithmic being implemented in the

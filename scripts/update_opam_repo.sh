@@ -80,7 +80,7 @@ echo 'opam-version: "2.0"' > $dummy_opam
 # In addition "inotify" is a "{os = linux}" dependency that has to be
 # in the repo for irmin to be installable on linux but is not selected
 # by the solver.
-echo 'depends: [ "mirage-runtime" { >= "4.0.0" } "inotify" ]' >> $dummy_opam
+echo "depends: [ \"ocaml\" { = \"$ocaml_version\" } \"mirage-runtime\" { >= \"4.0.0\" } \"inotify\" ]" >> $dummy_opam
 echo 'conflicts:[' >> $dummy_opam
 grep -r "^flags: *\[ *avoid-version *\]" -l ./ | LC_COLLATE=C sort -u | while read -r f;
 do

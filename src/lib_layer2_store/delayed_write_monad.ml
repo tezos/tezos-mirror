@@ -23,7 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type ('a, 'store) t = {result : 'a; write : ('store -> unit Lwt.t) option}
+type ('a, 'store) t = {
+  result : 'a;
+  write : ('store -> unit tzresult Lwt.t) option;
+}
 
 let no_write result = {result; write = None}
 
@@ -37,7 +40,7 @@ let map_es f {result; write} =
   {result; write}
 
 let bind f {result; write = write1} =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let {result; write = write2} = f result in
   let write =
     match (write1, write2) with
@@ -52,7 +55,7 @@ let bind f {result; write = write1} =
   {result; write}
 
 let apply node_ctxt {result; write} =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let+ () =
     match write with None -> return_unit | Some write -> write node_ctxt
   in
@@ -63,7 +66,7 @@ let ignore {result; _} = result
 module Lwt_result_syntax = struct
   let bind f a =
     let open Lwt_result_syntax in
-    let* a = a in
+    let* a in
     let* b = f a.result in
     let write =
       match (a.write, b.write) with
@@ -72,7 +75,6 @@ module Lwt_result_syntax = struct
       | Some write1, Some write2 ->
           Some
             (fun node_ctxt ->
-              let open Lwt_syntax in
               let* () = write1 node_ctxt in
               write2 node_ctxt)
     in

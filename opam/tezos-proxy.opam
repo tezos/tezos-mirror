@@ -21,12 +21,14 @@ depends: [
   "tezos-context"
   "uri" { >= "3.1.0" }
   "tezos-mockup-proxy"
+  "tezt" { with-test & >= "3.1.0" }
   "tezos-stdlib-unix" {with-test}
   "tezos-base-test-helpers" {with-test}
   "tezos-test-helpers" {with-test}
-  "tezos-shell-services-test-helpers" {with-test}
+  "qcheck-core" {with-test}
+  "lwt" { with-test & >= "5.6.0" }
+  "octez-alcotezt" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
-  "alcotest-lwt" { with-test & >= "1.5.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]

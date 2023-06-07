@@ -39,9 +39,6 @@ type block = t
 
 val rpc_ctxt : t Environment.RPC_context.simple
 
-(** Build an alpha context using {!Alpha_context.prepare}. *)
-val to_alpha_ctxt : t -> Alpha_context.t tzresult Lwt.t
-
 (** Policies to select the next baker:
     - [By_round r] selects the baker at round [r]
     - [By_account pkh] selects the first slot for baker [pkh]
@@ -73,13 +70,13 @@ val get_round : block -> Round.t tzresult
 
 module Forge : sig
   val contents :
-    ?proof_of_work_nonce:Bytes.t ->
+    ?proof_of_work_threshold:Int64.t ->
     ?seed_nonce_hash:Nonce_hash.t ->
     ?liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
     payload_hash:Block_payload_hash.t ->
     payload_round:Round.t ->
-    unit ->
-    Block_header.contents
+    Block_header.shell_header ->
+    Block_header.contents tzresult Lwt.t
 
   type header
 
@@ -98,7 +95,11 @@ module Forge : sig
     header tzresult Lwt.t
 
   (** Sets uniquely seed_nonce_hash of a header *)
-  val set_seed_nonce_hash : Nonce_hash.t option -> header -> header
+  val set_seed_nonce_hash :
+    ?proof_of_work_threshold:int64 ->
+    Nonce_hash.t option ->
+    header ->
+    (header, tztrace) result Lwt.t
 
   (** Sets the baker that will sign the header to an arbitrary pkh *)
   val set_baker :

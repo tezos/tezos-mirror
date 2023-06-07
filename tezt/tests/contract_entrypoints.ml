@@ -31,15 +31,6 @@
    Subject:      Tests for the contract entrypoints
 *)
 
-let contract_path protocol kind contract =
-  sf
-    "tests_python/contracts_%s/%s/%s"
-    (match protocol with
-    | Protocol.Alpha -> "alpha"
-    | _ -> sf "%03d" @@ Protocol.number protocol)
-    kind
-    contract
-
 let extract_new_contract client_output =
   match client_output =~* rex "New contract ?(KT1\\w{33})" with
   | None ->
@@ -54,16 +45,15 @@ let extract_new_contract client_output =
    existence and type of the root entrypoint of the create contract. *)
 let test_create_contract_rootname_originate ~contract protocol =
   let* client = Client.init_mockup ~protocol () in
-  let prg = contract_path protocol "opcodes" contract in
-  let* contract_rootname =
-    Client.originate_contract
-      ~alias:contract
+  let* _alias, contract_rootname =
+    Client.originate_contract_at
       ~amount:(Tez.of_int 1000)
       ~src:Constant.bootstrap1.alias
-      ~prg
       ~init:"None"
       ~burn_cap:Tez.one
       client
+      ["opcodes"; contract]
+      protocol
   in
   let process =
     Client.spawn_transfer
@@ -92,7 +82,7 @@ let test_create_contract_rootname_originate ~contract protocol =
   unit
 
 let register_create_contract_rootname protocols =
-  ["create_contract_rootname.tz"; "create_contract_rootname_alt.tz"]
+  ["create_contract_rootname"; "create_contract_rootname_alt"]
   |> List.iter @@ fun contract ->
      Protocol.register_test
        ~__FILE__
@@ -104,16 +94,15 @@ let register_create_contract_rootname protocols =
 (* Test CONTRACT with/without entrypoint annotation on literal address
    parameters with/without entrypoint annotation *)
 let originate_simple_entrypoints client ~protocol =
-  let prg = contract_path protocol "entrypoints" "simple_entrypoints.tz" in
-  let* contract =
-    Client.originate_contract
-      ~alias:"simple_entrypoints"
+  let* _alias, contract =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap5"
-      ~prg
       ~init:"Unit"
       ~burn_cap:Tez.one
       client
+      ["entrypoints"; "simple_entrypoints"]
+      protocol
   in
   Lwt.return (client, contract)
 
@@ -131,11 +120,11 @@ code { CAR; CONTRACT %s %s;
 let test_simple_entrypoints client ~contract_annotation ~contract_type ~param
     ~expected_storage =
   let prg = script contract_annotation contract_type in
-  let* actual_storage =
+  let* {storage; _} =
     Client.run_script client ~prg ~storage:"None" ~input:param
   in
   Check.(
-    (actual_storage = expected_storage)
+    (storage = expected_storage)
       ~__LOC__
       string
       ~error_msg:"Expected results %R, got %L") ;

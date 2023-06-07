@@ -1,5 +1,5 @@
 
-./octez-client --mode mockup --wait none originate contract self_address_sender.tz transferring 0 from bootstrap1 running tests_python/contracts_016/mini_scenarios/self_address_sender.tz --init Unit --burn-cap 1
+./octez-client --mode mockup --wait none originate contract self_address_sender transferring 0 from bootstrap1 running michelson_test_scripts/mini_scenarios/self_address_sender.tz --init Unit --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 1422.112 units (will add 100 for safety)
 Estimated storage: 339 bytes added (will add 20 for safety)
@@ -47,9 +47,9 @@ This sequence of operations was run:
           storage fees ........................... +ꜩ0.06425
 
 New contract [CONTRACT_HASH] originated.
-Contract memorized as self_address_sender.tz.
+Contract memorized as self_address_sender.
 
-./octez-client --mode mockup --wait none originate contract self_address_receiver.tz transferring 0 from bootstrap1 running tests_python/contracts_016/mini_scenarios/self_address_receiver.tz --init Unit --burn-cap 1
+./octez-client --mode mockup --wait none originate contract self_address_receiver transferring 0 from bootstrap1 running michelson_test_scripts/mini_scenarios/self_address_receiver.tz --init Unit --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 1422.521 units (will add 100 for safety)
 Estimated storage: 340 bytes added (will add 20 for safety)
@@ -97,7 +97,7 @@ This sequence of operations was run:
           storage fees ........................... +ꜩ0.06425
 
 New contract [CONTRACT_HASH] originated.
-Contract memorized as self_address_receiver.tz.
+Contract memorized as self_address_receiver.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.

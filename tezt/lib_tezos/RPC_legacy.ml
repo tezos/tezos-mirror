@@ -49,162 +49,6 @@ module Script_cache = struct
     Client.rpc ?endpoint ?hooks GET path client
 end
 
-module Tx_rollup = struct
-  let sub_path ?(chain = "main") ?(block = "head") ~rollup sub =
-    ["chains"; chain; "blocks"; block; "context"; "tx_rollup"; rollup] @ sub
-
-  let get_state ?endpoint ?hooks ?chain ?block ~rollup client =
-    let path = sub_path ?chain ?block ~rollup ["state"] in
-    Client.Spawn.rpc ?endpoint ?hooks GET path client
-
-  let get_inbox ?endpoint ?hooks ?chain ?block ~rollup ~level client =
-    let path =
-      sub_path ?chain ?block ~rollup ["inbox"; Format.sprintf "%d" level]
-    in
-    Client.Spawn.rpc ?endpoint ?hooks GET path client
-
-  let get_commitment ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~rollup ~level client =
-    let path =
-      sub_path ~chain ~block ~rollup ["commitment"; Format.sprintf "%d" level]
-    in
-    Client.Spawn.rpc ?endpoint ?hooks GET path client
-
-  let get_pending_bonded_commitments ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") ~rollup ~pkh client =
-    let path =
-      sub_path ~chain ~block ~rollup ["pending_bonded_commitments"; pkh]
-    in
-    Client.Spawn.rpc ?endpoint ?hooks GET path client
-
-  module Forge = struct
-    module Inbox = struct
-      let message_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-          ~data client =
-        let path =
-          [
-            "chains";
-            chain;
-            "blocks";
-            block;
-            "helpers";
-            "forge";
-            "tx_rollup";
-            "inbox";
-            "message_hash";
-          ]
-        in
-        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
-
-      let merkle_tree_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-          ~data client =
-        let path =
-          [
-            "chains";
-            chain;
-            "blocks";
-            block;
-            "helpers";
-            "forge";
-            "tx_rollup";
-            "inbox";
-            "merkle_tree_hash";
-          ]
-        in
-        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
-
-      let merkle_tree_path ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-          ~data client =
-        let path =
-          [
-            "chains";
-            chain;
-            "blocks";
-            block;
-            "helpers";
-            "forge";
-            "tx_rollup";
-            "inbox";
-            "merkle_tree_path";
-          ]
-        in
-        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
-    end
-
-    module Commitment = struct
-      let merkle_tree_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-          ~data client =
-        let path =
-          [
-            "chains";
-            chain;
-            "blocks";
-            block;
-            "helpers";
-            "forge";
-            "tx_rollup";
-            "commitment";
-            "merkle_tree_hash";
-          ]
-        in
-        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
-
-      let merkle_tree_path ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-          ~data client =
-        let path =
-          [
-            "chains";
-            chain;
-            "blocks";
-            block;
-            "helpers";
-            "forge";
-            "tx_rollup";
-            "commitment";
-            "merkle_tree_path";
-          ]
-        in
-        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
-
-      let message_result_hash ?endpoint ?hooks ?(chain = "main")
-          ?(block = "head") ~data client =
-        let path =
-          [
-            "chains";
-            chain;
-            "blocks";
-            block;
-            "helpers";
-            "forge";
-            "tx_rollup";
-            "commitment";
-            "message_result_hash";
-          ]
-        in
-        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
-    end
-
-    module Withdraw = struct
-      let withdraw_list_hash ?endpoint ?hooks ?(chain = "main")
-          ?(block = "head") ~data client =
-        let path =
-          [
-            "chains";
-            chain;
-            "blocks";
-            block;
-            "helpers";
-            "forge";
-            "tx_rollup";
-            "withdraw";
-            "withdraw_list_hash";
-          ]
-        in
-        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
-    end
-  end
-end
-
 let raw_bytes ?endpoint ?hooks ?(chain = "main") ?(block = "head") ?(path = [])
     client =
   let path =
@@ -217,17 +61,18 @@ module Curl = struct
     let* output = Process.check_and_read_stdout process in
     return (JSON.parse ~origin:url output)
 
-  let get ?(args = []) url =
-    let process = Process.spawn "curl" (args @ ["-s"; url]) in
+  let get ?runner ?(args = []) url =
+    let process = Process.spawn ?runner "curl" (args @ ["-s"; url]) in
     Runnable.{value = process; run = parse url}
 
-  let get_raw ?(args = []) url =
-    let process = Process.spawn "curl" (args @ ["-s"; url]) in
+  let get_raw ?runner ?(args = []) url =
+    let process = Process.spawn ?runner "curl" (args @ ["-s"; url]) in
     Runnable.{value = process; run = Process.check_and_read_stdout}
 
-  let post ?(args = []) url data =
+  let post ?runner ?(args = []) url data =
     let process =
       Process.spawn
+        ?runner
         "curl"
         (args
         @ [

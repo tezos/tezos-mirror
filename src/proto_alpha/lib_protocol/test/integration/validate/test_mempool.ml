@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/validate/main.exe \
-                  -- test "^Mempool"
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/validate/main.exe \
+                  -- --file test_mempool.ml
     Subject:      Integration > Validate > Mempool mode
 *)
 
@@ -47,8 +46,7 @@ let extract_values ctxt (b : Block.t) =
   in
   let predecessor_round = Fitness.round fitness in
   let predecessor_hash = b.header.shell.predecessor in
-  let grandparent_round = Fitness.predecessor_round fitness in
-  (predecessor_level, predecessor_round, predecessor_hash, grandparent_round)
+  (predecessor_level, predecessor_round, predecessor_hash)
 
 let op_with_hash op = (Operation.hash_packed op, op)
 
@@ -98,9 +96,11 @@ let assert_operation_present_in_mempool ~__LOC__ mempool ophl =
 let test_simple () =
   let open Lwt_result_syntax in
   let* block, (c1, c2) = Context.init2 () in
-  let* ctxt = Block.to_alpha_ctxt block in
-  let predecessor_level, predecessor_round, predecessor_hash, grandparent_round
-      =
+  let* ctxt =
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
+  let predecessor_level, predecessor_round, predecessor_hash =
     extract_values ctxt block
   in
   let vs, mempool =
@@ -110,7 +110,6 @@ let test_simple () =
       ~predecessor_level
       ~predecessor_round
       ~predecessor_hash
-      ~grandparent_round
   in
   let* op1 = Op.transaction (B block) c1 c2 Tez.one_cent in
   let op1 = op_with_hash op1 in
@@ -130,9 +129,11 @@ let test_imcompatible_mempool () =
   let open Lwt_result_syntax in
   let* block, _ = Context.init1 ~consensus_threshold:0 () in
   let* block = Block.bake block in
-  let* ctxt = Block.to_alpha_ctxt block in
-  let predecessor_level, predecessor_round, predecessor_hash, grandparent_round
-      =
+  let* ctxt =
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
+  let predecessor_level, predecessor_round, predecessor_hash =
     extract_values ctxt block
   in
   let (_vs : Mempool.validation_info), mempool1 =
@@ -142,13 +143,14 @@ let test_imcompatible_mempool () =
       ~predecessor_level
       ~predecessor_round
       ~predecessor_hash
-      ~grandparent_round
   in
   (* Create a second mempool on a different block *)
   let* block2 = Block.bake block in
-  let* ctxt2 = Block.to_alpha_ctxt block2 in
-  let predecessor_level, predecessor_round, predecessor_hash2, grandparent_round
-      =
+  let* ctxt2 =
+    let+ incr = Incremental.begin_construction block2 in
+    Incremental.alpha_ctxt incr
+  in
+  let predecessor_level, predecessor_round, predecessor_hash2 =
     extract_values ctxt2 block2
   in
   let (_vs : Mempool.validation_info), mempool2 =
@@ -158,7 +160,6 @@ let test_imcompatible_mempool () =
       ~predecessor_level
       ~predecessor_round
       ~predecessor_hash:predecessor_hash2
-      ~grandparent_round
   in
   let () =
     match Mempool.merge mempool1 mempool2 with
@@ -175,9 +176,11 @@ let test_imcompatible_mempool () =
 let test_merge () =
   let open Lwt_result_syntax in
   let* block, (c1, c2) = Context.init2 () in
-  let* ctxt = Block.to_alpha_ctxt block in
-  let predecessor_level, predecessor_round, predecessor_hash, grandparent_round
-      =
+  let* ctxt =
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
+  let predecessor_level, predecessor_round, predecessor_hash =
     extract_values ctxt block
   in
   let vs, mempool_i =
@@ -187,7 +190,6 @@ let test_merge () =
       ~predecessor_level
       ~predecessor_round
       ~predecessor_hash
-      ~grandparent_round
   in
   (* Build two mempool with a conflicting operation and check that the
      merge fails and succeeds when a conflict handler is provided *)
@@ -267,9 +269,11 @@ let test_merge () =
 let test_add_invalid_operation () =
   let open Lwt_result_syntax in
   let* block, c1 = Context.init1 () in
-  let* ctxt = Block.to_alpha_ctxt block in
-  let predecessor_level, predecessor_round, predecessor_hash, grandparent_round
-      =
+  let* ctxt =
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
+  let predecessor_level, predecessor_round, predecessor_hash =
     extract_values ctxt block
   in
   let vs, mempool_i =
@@ -279,7 +283,6 @@ let test_add_invalid_operation () =
       ~predecessor_level
       ~predecessor_round
       ~predecessor_hash
-      ~grandparent_round
   in
   let* op1 = Op.transaction (B block) c1 c1 ~gas_limit:Zero Tez.one_cent in
   let op1 = op_with_hash op1 in
@@ -292,9 +295,11 @@ let test_add_invalid_operation () =
 let test_add_and_replace () =
   let open Lwt_result_syntax in
   let* block, (c1, c2) = Context.init2 () in
-  let* ctxt = Block.to_alpha_ctxt block in
-  let predecessor_level, predecessor_round, predecessor_hash, grandparent_round
-      =
+  let* ctxt =
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
+  let predecessor_level, predecessor_round, predecessor_hash =
     extract_values ctxt block
   in
   let info, mempool_i =
@@ -304,7 +309,6 @@ let test_add_and_replace () =
       ~predecessor_level
       ~predecessor_round
       ~predecessor_hash
-      ~grandparent_round
   in
   (* Try adding a conflicting operation using both handler strategy *)
   let* op1 = Op.transaction (B block) c1 c2 Tez.one_cent in
@@ -344,9 +348,11 @@ let test_add_and_replace () =
 let test_remove_operation () =
   let open Lwt_result_syntax in
   let* block, (c1, c2) = Context.init2 () in
-  let* ctxt = Block.to_alpha_ctxt block in
-  let predecessor_level, predecessor_round, predecessor_hash, grandparent_round
-      =
+  let* ctxt =
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
+  let predecessor_level, predecessor_round, predecessor_hash =
     extract_values ctxt block
   in
   let info, mempool_i =
@@ -356,7 +362,6 @@ let test_remove_operation () =
       ~predecessor_level
       ~predecessor_round
       ~predecessor_hash
-      ~grandparent_round
   in
   let* op1 = Op.transaction (B block) c1 c2 Tez.one_cent in
   let op1 = op_with_hash op1 in
@@ -385,3 +390,6 @@ let tests =
       test_add_and_replace;
     Tztest.tztest "remove operations" `Quick test_remove_operation;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("mempool", tests)] |> Lwt_main.run

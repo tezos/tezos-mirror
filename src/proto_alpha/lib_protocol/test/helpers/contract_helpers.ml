@@ -69,12 +69,12 @@ let default_self = fake_KT1
 
 let default_payer = Signature.Public_key_hash.zero
 
-let default_source = Contract.Implicit default_payer
+let default_sender = Contract.Implicit default_payer
 
 let default_step_constants =
   Script_interpreter.
     {
-      source = Contract default_source;
+      sender = Contract default_sender;
       payer = default_payer;
       self = default_self;
       amount = Tez.zero;

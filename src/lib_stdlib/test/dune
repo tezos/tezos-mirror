@@ -1,8 +1,26 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names
+(library
+ (name src_lib_stdlib_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  tezos-stdlib
+  octez-alcotezt
+  bigstring
+  tezos-test-helpers
+  qcheck-alcotest)
+ (js_of_ocaml)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_stdlib
+  -open Octez_alcotezt
+  -open Tezos_test_helpers)
+ (modules
   test_bits
   test_tzList
   test_bounded_heap
@@ -10,99 +28,50 @@
   test_fallbackArray
   test_functionalArray
   test_hash_queue
-  test_tzBytes)
- (modes native js)
+  test_tzBytes
+  test_arrays))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (modes native)
  (libraries
-  tezos-stdlib
-  alcotest
-  bigstring
-  tezos-test-helpers
-  qcheck-alcotest)
+  src_lib_stdlib_test_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
+
+(executable
+ (name main_js)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (modes js)
+ (libraries
+  src_lib_stdlib_test_tezt_lib
+  tezt.js)
  (js_of_ocaml)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
- (flags
-  (:standard)
-  -open Tezos_stdlib
-  -open Tezos_test_helpers))
-
-(rule
- (alias runtest)
- (package tezos-stdlib)
- (action (run %{dep:./test_bits.exe})))
-
-(rule
- (alias runtest)
- (package tezos-stdlib)
- (action (run %{dep:./test_tzList.exe})))
-
-(rule
- (alias runtest)
- (package tezos-stdlib)
- (action (run %{dep:./test_bounded_heap.exe})))
-
-(rule
- (alias runtest)
- (package tezos-stdlib)
- (action (run %{dep:./test_tzString.exe})))
-
-(rule
- (alias runtest)
- (package tezos-stdlib)
- (action (run %{dep:./test_fallbackArray.exe})))
-
-(rule
- (alias runtest)
- (package tezos-stdlib)
- (action (run %{dep:./test_functionalArray.exe})))
-
-(rule
- (alias runtest)
- (package tezos-stdlib)
- (action (run %{dep:./test_hash_queue.exe})))
-
-(rule
- (alias runtest)
- (package tezos-stdlib)
- (action (run %{dep:./test_tzBytes.exe})))
+ (modules main_js))
 
 (rule
  (alias runtest_js)
  (package tezos-stdlib)
- (action (run node %{dep:./test_bits.bc.js})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run node %{dep:./main_js.bc.js})))
 
 (rule
- (alias runtest_js)
- (package tezos-stdlib)
- (action (run node %{dep:./test_tzList.bc.js})))
-
-(rule
- (alias runtest_js)
- (package tezos-stdlib)
- (action (run node %{dep:./test_bounded_heap.bc.js})))
-
-(rule
- (alias runtest_js)
- (package tezos-stdlib)
- (action (run node %{dep:./test_tzString.bc.js})))
-
-(rule
- (alias runtest_js)
- (package tezos-stdlib)
- (action (run node %{dep:./test_fallbackArray.bc.js})))
-
-(rule
- (alias runtest_js)
- (package tezos-stdlib)
- (action (run node %{dep:./test_functionalArray.bc.js})))
-
-(rule
- (alias runtest_js)
- (package tezos-stdlib)
- (action (run node %{dep:./test_hash_queue.bc.js})))
-
-(rule
- (alias runtest_js)
- (package tezos-stdlib)
- (action (run node %{dep:./test_tzBytes.bc.js})))
+ (targets main_js.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt_js.Test.run ()"))))

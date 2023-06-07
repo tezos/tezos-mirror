@@ -60,7 +60,7 @@ type 'kind internal_operation_contents =
       -> Kind.event internal_operation_contents
 
 type 'kind internal_operation = {
-  source : Destination.t;
+  sender : Destination.t;
   operation : 'kind internal_operation_contents;
   nonce : int;
 }
@@ -87,12 +87,6 @@ type successful_transaction_result =
       storage_size : Z.t;
       paid_storage_size_diff : Z.t;
       allocated_destination_contract : bool;
-    }
-  | Transaction_to_tx_rollup_result of {
-      ticket_hash : Ticket_hash.t;
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-      paid_storage_size_diff : Z.t;
     }
   | Transaction_to_sc_rollup_result of {
       consumed_gas : Gas.Arith.fp;

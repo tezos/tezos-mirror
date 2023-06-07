@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:    Transfer_ticket logic
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                  -- test "^transfer ticket$"
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_transfer_ticket.ml
     Subject:      Test ticket transfers
 *)
 
@@ -110,14 +109,11 @@ let test_mint_deposit_withdraw_implicit_transfer () =
     >>=? fun operation -> Block.bake ~operation block
   in
   let make_ex_token ctxt ~ticketer ~ty ~content =
-    let* Script_ir_translator.Ex_comparable_ty cty, ctxt =
-      wrap @@ Lwt.return
-      @@ Script_ir_translator.parse_comparable_ty ctxt
-      @@ Micheline.root ty
+    let*?@ Script_ir_translator.Ex_comparable_ty cty, ctxt =
+      Script_ir_translator.parse_comparable_ty ctxt @@ Micheline.root ty
     in
-    let* contents, ctxt =
-      wrap
-      @@ Script_ir_translator.parse_comparable_data ctxt cty
+    let*@ contents, ctxt =
+      Script_ir_translator.parse_comparable_data ctxt cty
       @@ Micheline.root content
     in
     return
@@ -133,14 +129,10 @@ let test_mint_deposit_withdraw_implicit_transfer () =
       ~ty
       ~content:(Expr.from_string @@ string_of_int contents)
   in
-  let* key, ctxt =
-    wrap
-    @@ Ticket_balance_key.of_ex_token
-         ctxt
-         ~owner:(Contract another_account)
-         token
+  let*@ key, ctxt =
+    Ticket_balance_key.of_ex_token ctxt ~owner:(Contract another_account) token
   in
-  let* amount, _ = wrap @@ Ticket_balance.get_balance ctxt key in
+  let*@ amount, _ = Ticket_balance.get_balance ctxt key in
   match amount with
   | Some amount -> Assert.equal_int ~loc:__LOC__ (Z.to_int amount) 1
   | _ -> return_unit
@@ -253,14 +245,11 @@ let test_contract_as_ticket_transfer_destination () =
     >>=? fun operation -> Block.bake ~operation block
   in
   let make_ex_token ctxt ~ticketer ~ty ~content =
-    let* Script_ir_translator.Ex_comparable_ty cty, ctxt =
-      wrap @@ Lwt.return
-      @@ Script_ir_translator.parse_comparable_ty ctxt
-      @@ Micheline.root ty
+    let*?@ Script_ir_translator.Ex_comparable_ty cty, ctxt =
+      Script_ir_translator.parse_comparable_ty ctxt @@ Micheline.root ty
     in
-    let* contents, ctxt =
-      wrap
-      @@ Script_ir_translator.parse_comparable_data ctxt cty
+    let*@ contents, ctxt =
+      Script_ir_translator.parse_comparable_data ctxt cty
       @@ Micheline.root content
     in
     return
@@ -276,14 +265,10 @@ let test_contract_as_ticket_transfer_destination () =
       ~ty
       ~content:(Expr.from_string @@ string_of_int contents)
   in
-  let* key, ctxt =
-    wrap
-    @@ Ticket_balance_key.of_ex_token
-         ctxt
-         ~owner:(Contract another_account)
-         token
+  let*@ key, ctxt =
+    Ticket_balance_key.of_ex_token ctxt ~owner:(Contract another_account) token
   in
-  let* amount, _ = wrap @@ Ticket_balance.get_balance ctxt key in
+  let*@ amount, _ = Ticket_balance.get_balance ctxt key in
   let* () =
     match amount with
     | Some amount -> Assert.equal_int ~loc:__LOC__ (Z.to_int amount) 1
@@ -321,10 +306,10 @@ let test_contract_as_ticket_transfer_destination () =
       ~ty
       ~content:(Expr.from_string @@ string_of_int contents)
   in
-  let* key, ctxt =
-    wrap @@ Ticket_balance_key.of_ex_token ctxt ~owner:(Contract bag) token
+  let*@ key, ctxt =
+    Ticket_balance_key.of_ex_token ctxt ~owner:(Contract bag) token
   in
-  let* amount, _ = wrap @@ Ticket_balance.get_balance ctxt key in
+  let*@ amount, _ = Ticket_balance.get_balance ctxt key in
   match amount with
   | Some amount -> Assert.equal_int ~loc:__LOC__ (Z.to_int amount) 1
   | _ -> return_unit
@@ -332,11 +317,15 @@ let test_contract_as_ticket_transfer_destination () =
 let tests =
   [
     Tztest.tztest
-      "Test ticket transfer operations"
+      "ticket transfer operations"
       `Quick
       test_mint_deposit_withdraw_implicit_transfer;
     Tztest.tztest
-      "Test 'contract (ticket cty)' as transfer destination"
+      "'contract (ticket cty)' as transfer destination"
       `Quick
       test_contract_as_ticket_transfer_destination;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("transfer ticket", tests)]
+  |> Lwt_main.run

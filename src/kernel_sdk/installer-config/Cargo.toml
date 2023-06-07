@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-smart-rollup-installer-config"
+version = "0.1.0"
+edition = "2021"
+authors = ["TriliTech <contact@trili.tech>"]
+license = "MIT"
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "Installer configuration for installer kernel of Tezos Smart Rollups."
+keywords = ["tezos", "smart", "rollup", "installer", "config"]
+categories = [
+    "development-tools",
+    "parser-implementations",
+    "config",
+    "no-std::no-alloc",
+]
+
+[dependencies.tezos-smart-rollup-host]
+path = "../host"
+default-features = false
+
+[dependencies.tezos-smart-rollup-core]
+path = "../core"
+default-features = false
+
+[dependencies.nom]
+version = "6.1"
+default-features = false
+
+[dependencies.tezos_data_encoding]
+version = "0.4"
+optional = true
+
+[features]
+default = ["std"]
+std = ["alloc"]
+alloc = ["tezos_data_encoding", "tezos-smart-rollup-host/alloc"]
+testing = []

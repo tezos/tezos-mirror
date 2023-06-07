@@ -24,6 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    _______
+
+    Component: Store
+    Invocation: dune exec src/lib_store/unix/test/main.exe -- --match history_mode_switch
+    Subject: Store tests ( history_mode_switch )
+*)
+
 open Test_utils
 open History_mode
 
@@ -377,32 +385,34 @@ let make_tests speed parameters =
       ~json:(Default_parameters.json_of_parameters parameters)
   in
   let history_modes =
-    match speed with
-    | `Slow ->
-        [
-          Archive;
-          Full (Some {offset = 0});
-          Full (Some {offset = 3});
-          default_full;
-          Full (Some {offset = 7});
-          Full (Some {offset = 10});
-          Rolling (Some {offset = 0});
-          Rolling (Some {offset = 3});
-          default_rolling;
-          Rolling (Some {offset = 7});
-          Rolling (Some {offset = 10});
-          default;
-        ]
-    | `Quick ->
-        [
-          Archive;
-          Full (Some {offset = 0});
-          default_full;
-          Rolling (Some {offset = 0});
-          default_rolling;
-          Full (Some {offset = 5});
-          Rolling (Some {offset = 5});
-        ]
+    List.sort_uniq
+      compare
+      (match speed with
+      | `Slow ->
+          [
+            Archive;
+            Full (Some {offset = 0});
+            Full (Some {offset = 3});
+            default_full;
+            Full (Some {offset = 7});
+            Full (Some {offset = 10});
+            Rolling (Some {offset = 0});
+            Rolling (Some {offset = 3});
+            default_rolling;
+            Rolling (Some {offset = 7});
+            Rolling (Some {offset = 10});
+            default;
+          ]
+      | `Quick ->
+          [
+            Archive;
+            Full (Some {offset = 0});
+            default_full;
+            Rolling (Some {offset = 0});
+            default_rolling;
+            Full (Some {offset = 5});
+            Rolling (Some {offset = 5});
+          ])
   in
   let blocks_per_cycle = parameters.constants.blocks_per_cycle in
   let nb_blocks_to_bake = [9 * Int32.to_int blocks_per_cycle] in
@@ -424,6 +434,7 @@ let make_tests speed parameters =
       in
       Some
         (wrap_simple_store_init_test
+           ~speed
            ~with_gc:true
            ~keep_dir:false
            ~history_mode:from_hm
@@ -440,7 +451,7 @@ let make_tests speed parameters =
                  store )))
     permutations
 
-let make_test_drag _speed parameters =
+let make_test_drag speed parameters =
   let patch_context ctxt =
     Alpha_utils.patch_context
       ctxt
@@ -451,6 +462,7 @@ let make_test_drag _speed parameters =
   let test_descr = "Check savepoint drag with cycles bigger that max_op_ttl" in
   let from_hm = default_full in
   wrap_simple_store_init_test
+    ~speed
     ~with_gc:true
     ~keep_dir:false
     ~history_mode:from_hm

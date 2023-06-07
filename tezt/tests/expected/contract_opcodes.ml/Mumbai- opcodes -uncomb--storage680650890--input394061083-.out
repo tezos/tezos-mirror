@@ -1,0 +1,50 @@
+
+./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/uncomb.tz on storage 0 and input '(Pair 1 4 2)' --level 1 --trace-stack
+storage
+  142
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 10 (just consumed gas: 10.144)
+    [ (Pair (Pair 1 4 2) 0) ]
+  - location: 10 (just consumed gas: 0.010)
+    [ (Pair 1 4 2) ]
+  - location: 11 (just consumed gas: 0.037)
+    [ 1
+      4
+      2 ]
+  - location: 13 (just consumed gas: 0.010)
+    [ 100
+      1
+      4
+      2 ]
+  - location: 16 (just consumed gas: 0.059)
+    [ 100
+      4
+      2 ]
+  - location: 17 (just consumed gas: 0.010)
+    [ 4
+      100
+      2 ]
+  - location: 18 (just consumed gas: 0.010)
+    [ 10
+      4
+      100
+      2 ]
+  - location: 21 (just consumed gas: 0.059)
+    [ 40
+      100
+      2 ]
+  - location: 22 (just consumed gas: 0.035)
+    [ 140
+      2 ]
+  - location: 23 (just consumed gas: 0.035)
+    [ 142 ]
+  - location: 24 (just consumed gas: 0.010)
+    [ {}
+      142 ]
+  - location: 26 (just consumed gas: 0.010)
+    [ (Pair {} 142) ]
+

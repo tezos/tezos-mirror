@@ -2,5 +2,10 @@ check_precommit_hook:
   extends:
     - .test_template
   needs: [trigger]
+  before_script:
+    - . ./scripts/version.sh
+    # Load the environment poetry previously created in the docker image.
+    # Give access to the Python dependencies/executables
+    - . $HOME/.venv/bin/activate
   script:
     - make -C ${CI_PROJECT_DIR}/.gitlab/ci check-precommit

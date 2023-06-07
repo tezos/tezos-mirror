@@ -37,6 +37,10 @@ sequence:
 * 011 Hangzhou
 * 012 Ithaca
 * 013 Jakarta
+* 014 Kathmandu
+* 015 Lima
+* 016 Mumbai
+* 017 Nairobi
 * ...
 
 Due to the evolving nature of the in-use protocols, the above absolute protocol

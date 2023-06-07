@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:    Protocol (interpretation)
-    Dependencies: src/proto_alpha/lib_protocol/script_interpreter.ml
-    Invocation:   cd src/proto_alpha/lib_protocol/test/integration/michelson && \
-                  dune exec ./main.exe -- test "^interpretation$"
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_interpretation.ml
     Subject:      Interpretation of Michelson scripts
 *)
 
@@ -371,9 +370,11 @@ let test_store_and_reload path ~init_storage ~entrypoint_str_1 ~param_1
           (Expr.to_string real.storage))
     ~ko:fail_with_trace
 
+let path = project_root // Filename.dirname __FILE__
+
 let tests =
   [
-    Tztest.tztest "test bad contract error" `Quick test_bad_contract_parameter;
+    Tztest.tztest "bad contract error" `Quick test_bad_contract_parameter;
     Tztest.tztest "check robustness overflow error" `Slow test_stack_overflow;
     Tztest.tztest
       "check robustness overflow error in lwt"
@@ -383,29 +384,33 @@ let tests =
       "test multiplication no illegitimate overflow"
       `Quick
       test_multiplication_close_to_overflow_passes;
-    Tztest.tztest "test stack overflow error" `Slow test_stack_overflow;
+    Tztest.tztest "stack overflow error" `Slow test_stack_overflow;
     Tztest.tztest_qcheck2
-      ~name:"test map instr against options"
+      ~name:"map instr against options"
       QCheck2.Gen.(
         triple (opt small_signed_int) (opt small_signed_int) small_signed_int)
       Test_map_instr_on_options.test_mapping;
     Tztest.tztest
-      "test lambda_rec instruction"
+      "lambda_rec instruction"
       `Quick
-      (test_contract_success "./contracts/rec_fact.tz" "0" "5" "120");
+      (test_contract_success (path // "contracts/rec_fact.tz") "0" "5" "120");
     Tztest.tztest
-      "test lambda_rec instruction with apply"
+      "lambda_rec instruction with apply"
       `Quick
-      (test_contract_success "./contracts/rec_fact_apply.tz" "0" "5" "120");
+      (test_contract_success
+         (path // "contracts/rec_fact_apply.tz")
+         "0"
+         "5"
+         "120");
     Tztest.tztest
-      "test lambda_rec instruction with an infinite recursion"
+      "lambda_rec instruction with an infinite recursion"
       `Quick
-      (test_contract_fail "./contracts/omega.tz" "Unit" "Unit");
+      (test_contract_fail (path // "contracts/omega.tz") "Unit" "Unit");
     Tztest.tztest
-      "test lambda_rec instruction storage"
+      "lambda_rec instruction storage"
       `Quick
       (test_store_and_reload
-         "./contracts/rec_fact_store.tz"
+         (path // "contracts/rec_fact_store.tz")
          ~init_storage:"Left 0"
          ~entrypoint_str_1:"gen"
          ~param_1:"Unit"
@@ -421,10 +426,10 @@ let tests =
          ~param_2:"5"
          ~expected_storage_str_2:"Left 120");
     Tztest.tztest
-      "test lambda_rec instruction storage"
+      "lambda_rec instruction storage apply store"
       `Quick
       (test_store_and_reload
-         "./contracts/rec_fact_apply_store.tz"
+         (path // "contracts/rec_fact_apply_store.tz")
          ~init_storage:"Left 0"
          ~entrypoint_str_1:"gen"
          ~param_1:"Unit"
@@ -449,3 +454,7 @@ let tests =
          ~expected_storage_str_2:"Left 120");
   ]
   @ error_encoding_tests
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("interpretation", tests)]
+  |> Lwt_main.run

@@ -82,7 +82,7 @@ voting operations:
 
 - The ``Ballot`` operation enables delegates to participate in the
   Exploration and Promotion periods. Delegates use this operation to
-  vote for (``Yay``), against (``Nay``), or to side with the majority
+  vote for (``Yea``), against (``Nay``), or to side with the majority
   (``Pass``), when examining a protocol amendment proposal.
 
 Further details on each operation's implementation and semantics are
@@ -198,7 +198,49 @@ manager operations are the only fee-paying and
 
 Moreover, all operations necessary to implement Tezos' *enshrined*
 Layer 2 solutions into the economic protocol are also manager
-operations:
+operations.
+
+In particular, :doc:`smart rollups <smart_rollups>` maintenance is
+handled with dedicated manager operations.
+
+- The ``Smart_rollup_originate`` operation is used to originate, that
+  is, to deploy smart rollups in the Tezos blockchain.
+- The ``Smart_rollup_add_messages`` operation is used to add messages
+  to the inbox shared by all the smart rollups originated in the Tezos
+  blockchain. These messages are interpreted by the smart rollups
+  according to their specific semantics.
+- The ``Smart_rollup_publish`` operation is used to regularly declare
+  what is the new state of a given smart rollup in a so-called
+  “commitment”. To publish commitments, an implicit account has to
+  own at least ꜩ 10,000, which are frozen as long as at least one of
+  their commitments is disputable.
+- The ``Smart_rollup_cement`` operation is used to cement a
+  commitment, if the following requirements are met: it has been
+  published for long enough, and there is no concurrent commitment for
+  the same state update. Once a commitment is cemented, it cannot be
+  disputed anymore.
+- The ``Smart_rollup_recover_bond`` operation is used by an implicit
+  account to unfreeze their ꜩ 10,000. This operation only succeeds if
+  and only if all the commitments published by the implicit account
+  have been cemented.
+- The ``Smart_rollup_refute`` operation is used to start or pursue a
+  dispute. A dispute is resolved on the Tezos blockchain through a
+  so-called refutation game, where two players seek to prove the
+  correctness of their respective commitment. The game consists in a
+  dissection phase, where the two players narrow down their
+  disagreement to a single execution step, and a resolution, where the
+  players provide a proof sustaining their claims. The looser of a
+  dispute looses their frozen bond: half of it is burned, and the
+  winner receives the other half in compensation.
+- The ``Smart_rollup_timeout`` operation is used to put an end to a
+  dispute if one of the two players takes too much time to send their
+  next move (with a ``Smart_rollup_refute`` operation). It is not
+  necessary to be one of the players to send this operation.
+- The ``Smart_rollup_execute_outbox_message`` operation is used to
+  enact a transaction from a smart rollup to a smart contract, as
+  authorized by a cemented commitment. The targeted smart contract can
+  determine if it is called by a smart rollup using the ``SENDER``
+  Michelson instruction.
 
 .. _manager_operations_batches_alpha:
 

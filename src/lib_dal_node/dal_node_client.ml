@@ -39,8 +39,7 @@ class unix_cctxt ~rpc_config : cctxt =
            rpc_config.media_type)
   end
 
-let make_unix_cctxt ~addr ~port =
-  let endpoint = Uri.of_string ("http://" ^ addr ^ ":" ^ string_of_int port) in
+let make_unix_cctxt endpoint =
   let rpc_config =
     {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
   in
@@ -48,7 +47,8 @@ let make_unix_cctxt ~addr ~port =
 
 let call (cctxt : #cctxt) = cctxt#call_service
 
-let get_slot cctxt header = call cctxt Services.slot ((), header) () ()
+let get_slot cctxt header =
+  call cctxt Services.get_commitment_slot ((), header) () ()
 
 let get_shard cctxt header shard_index =
   call cctxt Services.shard (((), header), shard_index) () ()

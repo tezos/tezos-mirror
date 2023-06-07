@@ -70,51 +70,6 @@ type _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.update_consensus_key successful_manager_operation_result
-  | Tx_rollup_origination_result : {
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-      originated_tx_rollup : Tx_rollup.t;
-    }
-      -> Kind.tx_rollup_origination successful_manager_operation_result
-  | Tx_rollup_submit_batch_result : {
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-      paid_storage_size_diff : Z.t;
-    }
-      -> Kind.tx_rollup_submit_batch successful_manager_operation_result
-  | Tx_rollup_commit_result : {
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.tx_rollup_commit successful_manager_operation_result
-  | Tx_rollup_return_bond_result : {
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.tx_rollup_return_bond successful_manager_operation_result
-  | Tx_rollup_finalize_commitment_result : {
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-      level : Tx_rollup_level.t;
-    }
-      -> Kind.tx_rollup_finalize_commitment successful_manager_operation_result
-  | Tx_rollup_remove_commitment_result : {
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-      level : Tx_rollup_level.t;
-    }
-      -> Kind.tx_rollup_remove_commitment successful_manager_operation_result
-  | Tx_rollup_rejection_result : {
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.tx_rollup_rejection successful_manager_operation_result
-  | Tx_rollup_dispatch_tickets_result : {
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-      paid_storage_size_diff : Z.t;
-    }
-      -> Kind.tx_rollup_dispatch_tickets successful_manager_operation_result
   | Transfer_ticket_result : {
       balance_updates : Receipt.balance_updates;
       ticket_receipt : Ticket_receipt.t;
@@ -142,6 +97,7 @@ type _ successful_manager_operation_result =
   | Sc_rollup_cement_result : {
       consumed_gas : Gas.Arith.fp;
       inbox_level : Raw_level.t;
+      commitment_hash : Sc_rollup.Commitment.Hash.t;
     }
       -> Kind.sc_rollup_cement successful_manager_operation_result
   | Sc_rollup_publish_result : {
@@ -314,6 +270,15 @@ module Manager_result = struct
       ~inj:(fun consumed_gas -> Reveal_result {consumed_gas})
 
   let transaction_contract_variant_cases =
+    let case = function
+      | Tag tag ->
+          (* The tag was used by old variant. It have been removed in
+             protocol proposal O, it can be unblocked in the future. *)
+          let to_tx_rollup_reserved_tag = 1 in
+          assert (Compare.Int.(tag <> to_tx_rollup_reserved_tag)) ;
+          case (Tag tag)
+      | _ as c -> case c
+    in
     union
       [
         case
@@ -373,39 +338,6 @@ module Manager_result = struct
                 storage_size;
                 paid_storage_size_diff;
                 allocated_destination_contract;
-              });
-        case
-          ~title:"To_tx_rollup"
-          (Tag 1)
-          (obj4
-             (dft "balance_updates" Receipt.balance_updates_encoding [])
-             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-             (req "ticket_hash" Ticket_hash.encoding)
-             (req "paid_storage_size_diff" n))
-          (function
-            | Transaction_to_tx_rollup_result
-                {
-                  balance_updates;
-                  consumed_gas;
-                  ticket_hash;
-                  paid_storage_size_diff;
-                } ->
-                Some
-                  ( balance_updates,
-                    consumed_gas,
-                    ticket_hash,
-                    paid_storage_size_diff )
-            | _ -> None)
-          (fun ( balance_updates,
-                 consumed_gas,
-                 ticket_hash,
-                 paid_storage_size_diff ) ->
-            Transaction_to_tx_rollup_result
-              {
-                balance_updates;
-                consumed_gas;
-                ticket_hash;
-                paid_storage_size_diff;
               });
         case
           ~title:"To_smart_rollup"
@@ -571,178 +503,6 @@ module Manager_result = struct
             (balance_updates, consumed_gas))
       ~inj:(fun (balance_updates, consumed_gas) ->
         Increase_paid_storage_result {balance_updates; consumed_gas})
-
-  let tx_rollup_origination_case =
-    make
-      ~op_case:Operation.Encoding.Manager_operations.tx_rollup_origination_case
-      ~encoding:
-        Data_encoding.(
-          obj3
-            (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-            (req "originated_rollup" Tx_rollup.encoding))
-      ~select:(function
-        | Successful_manager_result (Tx_rollup_origination_result _ as op) ->
-            Some op
-        | _ -> None)
-      ~kind:Kind.Tx_rollup_origination_manager_kind
-      ~proj:(function
-        | Tx_rollup_origination_result
-            {balance_updates; consumed_gas; originated_tx_rollup} ->
-            (balance_updates, consumed_gas, originated_tx_rollup))
-      ~inj:(fun (balance_updates, consumed_gas, originated_tx_rollup) ->
-        Tx_rollup_origination_result
-          {balance_updates; consumed_gas; originated_tx_rollup})
-
-  let tx_rollup_submit_batch_case =
-    make
-      ~op_case:Operation.Encoding.Manager_operations.tx_rollup_submit_batch_case
-      ~encoding:
-        Data_encoding.(
-          obj3
-            (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-            (req "paid_storage_size_diff" n))
-      ~select:(function
-        | Successful_manager_result (Tx_rollup_submit_batch_result _ as op) ->
-            Some op
-        | _ -> None)
-      ~kind:Kind.Tx_rollup_submit_batch_manager_kind
-      ~proj:(function
-        | Tx_rollup_submit_batch_result
-            {balance_updates; consumed_gas; paid_storage_size_diff} ->
-            (balance_updates, consumed_gas, paid_storage_size_diff))
-      ~inj:(fun (balance_updates, consumed_gas, paid_storage_size_diff) ->
-        Tx_rollup_submit_batch_result
-          {balance_updates; consumed_gas; paid_storage_size_diff})
-
-  let tx_rollup_commit_case =
-    make
-      ~op_case:Operation.Encoding.Manager_operations.tx_rollup_commit_case
-      ~encoding:
-        Data_encoding.(
-          obj2
-            (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
-      ~select:(function
-        | Successful_manager_result (Tx_rollup_commit_result _ as op) -> Some op
-        | _ -> None)
-      ~kind:Kind.Tx_rollup_commit_manager_kind
-      ~proj:(function
-        | Tx_rollup_commit_result {balance_updates; consumed_gas} ->
-            (balance_updates, consumed_gas))
-      ~inj:(fun (balance_updates, consumed_gas) ->
-        Tx_rollup_commit_result {balance_updates; consumed_gas})
-
-  let tx_rollup_return_bond_case =
-    make
-      ~op_case:Operation.Encoding.Manager_operations.tx_rollup_return_bond_case
-      ~encoding:
-        Data_encoding.(
-          obj2
-            (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
-      ~select:(function
-        | Successful_manager_result (Tx_rollup_return_bond_result _ as op) ->
-            Some op
-        | _ -> None)
-      ~kind:Kind.Tx_rollup_return_bond_manager_kind
-      ~proj:(function
-        | Tx_rollup_return_bond_result {balance_updates; consumed_gas} ->
-            (balance_updates, consumed_gas))
-      ~inj:(fun (balance_updates, consumed_gas) ->
-        Tx_rollup_return_bond_result {balance_updates; consumed_gas})
-
-  let tx_rollup_finalize_commitment_case =
-    make
-      ~op_case:
-        Operation.Encoding.Manager_operations.tx_rollup_finalize_commitment_case
-      ~encoding:
-        Data_encoding.(
-          obj3
-            (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-            (req "level" Tx_rollup_level.encoding))
-      ~select:(function
-        | Successful_manager_result
-            (Tx_rollup_finalize_commitment_result _ as op) ->
-            Some op
-        | _ -> None)
-      ~kind:Kind.Tx_rollup_finalize_commitment_manager_kind
-      ~proj:(function
-        | Tx_rollup_finalize_commitment_result
-            {balance_updates; consumed_gas; level} ->
-            (balance_updates, consumed_gas, level))
-      ~inj:(fun (balance_updates, consumed_gas, level) ->
-        Tx_rollup_finalize_commitment_result
-          {balance_updates; consumed_gas; level})
-
-  let tx_rollup_remove_commitment_case =
-    make
-      ~op_case:
-        Operation.Encoding.Manager_operations.tx_rollup_remove_commitment_case
-      ~encoding:
-        Data_encoding.(
-          obj3
-            (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-            (req "level" Tx_rollup_level.encoding))
-      ~select:(function
-        | Successful_manager_result (Tx_rollup_remove_commitment_result _ as op)
-          ->
-            Some op
-        | _ -> None)
-      ~kind:Kind.Tx_rollup_remove_commitment_manager_kind
-      ~proj:(function
-        | Tx_rollup_remove_commitment_result
-            {balance_updates; consumed_gas; level} ->
-            (balance_updates, consumed_gas, level))
-      ~inj:(fun (balance_updates, consumed_gas, level) ->
-        Tx_rollup_remove_commitment_result
-          {balance_updates; consumed_gas; level})
-
-  let tx_rollup_rejection_case =
-    make
-      ~op_case:Operation.Encoding.Manager_operations.tx_rollup_rejection_case
-      ~encoding:
-        Data_encoding.(
-          obj2
-            (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
-      ~select:(function
-        | Successful_manager_result (Tx_rollup_rejection_result _ as op) ->
-            Some op
-        | _ -> None)
-      ~kind:Kind.Tx_rollup_rejection_manager_kind
-      ~proj:(function
-        | Tx_rollup_rejection_result {balance_updates; consumed_gas} ->
-            (balance_updates, consumed_gas))
-      ~inj:(fun (balance_updates, consumed_gas) ->
-        Tx_rollup_rejection_result {balance_updates; consumed_gas})
-
-  let tx_rollup_dispatch_tickets_case =
-    make
-      ~op_case:
-        Operation.Encoding.Manager_operations.tx_rollup_dispatch_tickets_case
-      ~encoding:
-        Data_encoding.(
-          obj3
-            (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-            (dft "paid_storage_size_diff" z Z.zero))
-      ~select:(function
-        | Successful_manager_result (Tx_rollup_dispatch_tickets_result _ as op)
-          ->
-            Some op
-        | _ -> None)
-      ~kind:Kind.Tx_rollup_dispatch_tickets_manager_kind
-      ~proj:(function
-        | Tx_rollup_dispatch_tickets_result
-            {balance_updates; consumed_gas; paid_storage_size_diff} ->
-            (balance_updates, consumed_gas, paid_storage_size_diff))
-      ~inj:(fun (balance_updates, consumed_gas, paid_storage_size_diff) ->
-        Tx_rollup_dispatch_tickets_result
-          {balance_updates; consumed_gas; paid_storage_size_diff})
 
   let transfer_ticket_case =
     make
@@ -932,18 +692,20 @@ module Manager_result = struct
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_cement_case
       ~encoding:
-        (obj2
+        (obj3
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-           (req "inbox_level" Raw_level.encoding))
+           (req "inbox_level" Raw_level.encoding)
+           (req "commitment_hash" Sc_rollup.Commitment.Hash.encoding))
       ~select:(function
         | Successful_manager_result (Sc_rollup_cement_result _ as op) -> Some op
         | _ -> None)
       ~proj:(function
-        | Sc_rollup_cement_result {consumed_gas; inbox_level} ->
-            (consumed_gas, inbox_level))
+        | Sc_rollup_cement_result {consumed_gas; inbox_level; commitment_hash}
+          ->
+            (consumed_gas, inbox_level, commitment_hash))
       ~kind:Kind.Sc_rollup_cement_manager_kind
-      ~inj:(fun (consumed_gas, inbox_level) ->
-        Sc_rollup_cement_result {consumed_gas; inbox_level})
+      ~inj:(fun (consumed_gas, inbox_level, commitment_hash) ->
+        Sc_rollup_cement_result {consumed_gas; inbox_level; commitment_hash})
 
   let sc_rollup_publish_case =
     make
@@ -1192,37 +954,6 @@ let equal_manager_kind :
       Kind.Increase_paid_storage_manager_kind ) ->
       Some Eq
   | Kind.Increase_paid_storage_manager_kind, _ -> None
-  | ( Kind.Tx_rollup_origination_manager_kind,
-      Kind.Tx_rollup_origination_manager_kind ) ->
-      Some Eq
-  | Kind.Tx_rollup_origination_manager_kind, _ -> None
-  | ( Kind.Tx_rollup_submit_batch_manager_kind,
-      Kind.Tx_rollup_submit_batch_manager_kind ) ->
-      Some Eq
-  | Kind.Tx_rollup_submit_batch_manager_kind, _ -> None
-  | Kind.Tx_rollup_commit_manager_kind, Kind.Tx_rollup_commit_manager_kind ->
-      Some Eq
-  | Kind.Tx_rollup_commit_manager_kind, _ -> None
-  | ( Kind.Tx_rollup_return_bond_manager_kind,
-      Kind.Tx_rollup_return_bond_manager_kind ) ->
-      Some Eq
-  | Kind.Tx_rollup_return_bond_manager_kind, _ -> None
-  | ( Kind.Tx_rollup_finalize_commitment_manager_kind,
-      Kind.Tx_rollup_finalize_commitment_manager_kind ) ->
-      Some Eq
-  | Kind.Tx_rollup_finalize_commitment_manager_kind, _ -> None
-  | ( Kind.Tx_rollup_remove_commitment_manager_kind,
-      Kind.Tx_rollup_remove_commitment_manager_kind ) ->
-      Some Eq
-  | Kind.Tx_rollup_remove_commitment_manager_kind, _ -> None
-  | Kind.Tx_rollup_rejection_manager_kind, Kind.Tx_rollup_rejection_manager_kind
-    ->
-      Some Eq
-  | Kind.Tx_rollup_rejection_manager_kind, _ -> None
-  | ( Kind.Tx_rollup_dispatch_tickets_manager_kind,
-      Kind.Tx_rollup_dispatch_tickets_manager_kind ) ->
-      Some Eq
-  | Kind.Tx_rollup_dispatch_tickets_manager_kind, _ -> None
   | Kind.Transfer_ticket_manager_kind, Kind.Transfer_ticket_manager_kind ->
       Some Eq
   | Kind.Transfer_ticket_manager_kind, _ -> None
@@ -1713,97 +1444,6 @@ module Encoding = struct
             Some (op, res)
         | _ -> None)
 
-  let tx_rollup_origination_case =
-    make_manager_case
-      Operation.Encoding.tx_rollup_origination_case
-      Manager_result.tx_rollup_origination_case
-      (function
-        | Contents_and_result
-            ( (Manager_operation {operation = Tx_rollup_origination; _} as op),
-              res ) ->
-            Some (op, res)
-        | _ -> None)
-
-  let tx_rollup_submit_batch_case =
-    make_manager_case
-      Operation.Encoding.tx_rollup_submit_batch_case
-      Manager_result.tx_rollup_submit_batch_case
-      (function
-        | Contents_and_result
-            ( (Manager_operation {operation = Tx_rollup_submit_batch _; _} as op),
-              res ) ->
-            Some (op, res)
-        | _ -> None)
-
-  let tx_rollup_commit_case =
-    make_manager_case
-      Operation.Encoding.tx_rollup_commit_case
-      Manager_result.tx_rollup_commit_case
-      (function
-        | Contents_and_result
-            ((Manager_operation {operation = Tx_rollup_commit _; _} as op), res)
-          ->
-            Some (op, res)
-        | _ -> None)
-
-  let tx_rollup_return_bond_case =
-    make_manager_case
-      Operation.Encoding.tx_rollup_return_bond_case
-      Manager_result.tx_rollup_return_bond_case
-      (function
-        | Contents_and_result
-            ( (Manager_operation {operation = Tx_rollup_return_bond _; _} as op),
-              res ) ->
-            Some (op, res)
-        | _ -> None)
-
-  let tx_rollup_finalize_commitment_case =
-    make_manager_case
-      Operation.Encoding.tx_rollup_finalize_commitment_case
-      Manager_result.tx_rollup_finalize_commitment_case
-      (function
-        | Contents_and_result
-            ( (Manager_operation {operation = Tx_rollup_finalize_commitment _; _}
-              as op),
-              res ) ->
-            Some (op, res)
-        | _ -> None)
-
-  let tx_rollup_remove_commitment_case =
-    make_manager_case
-      Operation.Encoding.tx_rollup_remove_commitment_case
-      Manager_result.tx_rollup_remove_commitment_case
-      (function
-        | Contents_and_result
-            ( (Manager_operation {operation = Tx_rollup_remove_commitment _; _}
-              as op),
-              res ) ->
-            Some (op, res)
-        | _ -> None)
-
-  let tx_rollup_rejection_case =
-    make_manager_case
-      Operation.Encoding.tx_rollup_rejection_case
-      Manager_result.tx_rollup_rejection_case
-      (function
-        | Contents_and_result
-            ( (Manager_operation {operation = Tx_rollup_rejection _; _} as op),
-              res ) ->
-            Some (op, res)
-        | _ -> None)
-
-  let tx_rollup_dispatch_tickets_case =
-    make_manager_case
-      Operation.Encoding.tx_rollup_dispatch_tickets_case
-      Manager_result.tx_rollup_dispatch_tickets_case
-      (function
-        | Contents_and_result
-            ( (Manager_operation {operation = Tx_rollup_dispatch_tickets _; _}
-              as op),
-              res ) ->
-            Some (op, res)
-        | _ -> None)
-
   let transfer_ticket_case =
     make_manager_case
       Operation.Encoding.transfer_ticket_case
@@ -1989,14 +1629,6 @@ let contents_result_encoding =
          make set_deposits_limit_case;
          make increase_paid_storage_case;
          make update_consensus_key_case;
-         make tx_rollup_origination_case;
-         make tx_rollup_submit_batch_case;
-         make tx_rollup_commit_case;
-         make tx_rollup_return_bond_case;
-         make tx_rollup_finalize_commitment_case;
-         make tx_rollup_remove_commitment_case;
-         make tx_rollup_rejection_case;
-         make tx_rollup_dispatch_tickets_case;
          make transfer_ticket_case;
          make dal_publish_slot_header_case;
          make sc_rollup_originate_case;
@@ -2056,16 +1688,8 @@ let contents_and_result_encoding =
          make increase_paid_storage_case;
          make update_consensus_key_case;
          make drain_delegate_case;
-         make tx_rollup_origination_case;
-         make tx_rollup_submit_batch_case;
-         make tx_rollup_commit_case;
-         make tx_rollup_return_bond_case;
-         make tx_rollup_finalize_commitment_case;
-         make tx_rollup_remove_commitment_case;
-         make tx_rollup_rejection_case;
          make transfer_ticket_case;
          make dal_publish_slot_header_case;
-         make tx_rollup_dispatch_tickets_case;
          make sc_rollup_originate_case;
          make sc_rollup_add_messages_case;
          make sc_rollup_cement_case;
@@ -2411,109 +2035,6 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Increase_paid_storage _; _}, _ -> None
-  | ( Manager_operation {operation = Tx_rollup_origination; _},
-      Manager_operation_result
-        {operation_result = Applied (Tx_rollup_origination_result _); _} ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_origination; _},
-      Manager_operation_result
-        {operation_result = Backtracked (Tx_rollup_origination_result _, _); _}
-    ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_origination; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Failed (Alpha_context.Kind.Tx_rollup_origination_manager_kind, _);
-          _;
-        } ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_origination; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Skipped Alpha_context.Kind.Tx_rollup_origination_manager_kind;
-          _;
-        } ) ->
-      Some Eq
-  | Manager_operation {operation = Tx_rollup_origination; _}, _ -> None
-  | ( Manager_operation {operation = Tx_rollup_submit_batch _; _},
-      Manager_operation_result
-        {operation_result = Applied (Tx_rollup_submit_batch_result _); _} ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_submit_batch _; _},
-      Manager_operation_result
-        {operation_result = Backtracked (Tx_rollup_submit_batch_result _, _); _}
-    ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_submit_batch _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Failed (Alpha_context.Kind.Tx_rollup_submit_batch_manager_kind, _);
-          _;
-        } ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_submit_batch _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Skipped Alpha_context.Kind.Tx_rollup_submit_batch_manager_kind;
-          _;
-        } ) ->
-      Some Eq
-  | Manager_operation {operation = Tx_rollup_submit_batch _; _}, _ -> None
-  | ( Manager_operation {operation = Tx_rollup_commit _; _},
-      Manager_operation_result
-        {operation_result = Applied (Tx_rollup_commit_result _); _} ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_commit _; _},
-      Manager_operation_result
-        {operation_result = Backtracked (Tx_rollup_commit_result _, _); _} ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_commit _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Failed (Alpha_context.Kind.Tx_rollup_commit_manager_kind, _);
-          _;
-        } ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_commit _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Skipped Alpha_context.Kind.Tx_rollup_commit_manager_kind;
-          _;
-        } ) ->
-      Some Eq
-  | Manager_operation {operation = Tx_rollup_commit _; _}, _ -> None
-  | ( Manager_operation {operation = Tx_rollup_return_bond _; _},
-      Manager_operation_result
-        {operation_result = Applied (Tx_rollup_return_bond_result _); _} ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_return_bond _; _},
-      Manager_operation_result
-        {operation_result = Backtracked (Tx_rollup_return_bond_result _, _); _}
-    ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_return_bond _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Failed (Alpha_context.Kind.Tx_rollup_return_bond_manager_kind, _);
-          _;
-        } ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_return_bond _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Skipped Alpha_context.Kind.Tx_rollup_return_bond_manager_kind;
-          _;
-        } ) ->
-      Some Eq
-  | Manager_operation {operation = Tx_rollup_return_bond _; _}, _ -> None
   | ( Manager_operation {operation = Sc_rollup_recover_bond _; _},
       Manager_operation_result
         {operation_result = Applied (Sc_rollup_recover_bond_result _); _} ) ->
@@ -2540,126 +2061,6 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Sc_rollup_recover_bond _; _}, _ -> None
-  | ( Manager_operation {operation = Tx_rollup_finalize_commitment _; _},
-      Manager_operation_result
-        {operation_result = Applied (Tx_rollup_finalize_commitment_result _); _}
-    ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_finalize_commitment _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Backtracked (Tx_rollup_finalize_commitment_result _, _);
-          _;
-        } ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_finalize_commitment _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Failed
-              (Alpha_context.Kind.Tx_rollup_finalize_commitment_manager_kind, _);
-          _;
-        } ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_finalize_commitment _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Skipped
-              Alpha_context.Kind.Tx_rollup_finalize_commitment_manager_kind;
-          _;
-        } ) ->
-      Some Eq
-  | Manager_operation {operation = Tx_rollup_finalize_commitment _; _}, _ ->
-      None
-  | ( Manager_operation {operation = Tx_rollup_remove_commitment _; _},
-      Manager_operation_result
-        {operation_result = Applied (Tx_rollup_remove_commitment_result _); _} )
-    ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_remove_commitment _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Backtracked (Tx_rollup_remove_commitment_result _, _);
-          _;
-        } ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_remove_commitment _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Failed
-              (Alpha_context.Kind.Tx_rollup_remove_commitment_manager_kind, _);
-          _;
-        } ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_remove_commitment _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Skipped Alpha_context.Kind.Tx_rollup_remove_commitment_manager_kind;
-          _;
-        } ) ->
-      Some Eq
-  | Manager_operation {operation = Tx_rollup_remove_commitment _; _}, _ -> None
-  | ( Manager_operation {operation = Tx_rollup_rejection _; _},
-      Manager_operation_result
-        {operation_result = Applied (Tx_rollup_rejection_result _); _} ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_rejection _; _},
-      Manager_operation_result
-        {operation_result = Backtracked (Tx_rollup_rejection_result _, _); _} )
-    ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_rejection _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Failed (Alpha_context.Kind.Tx_rollup_rejection_manager_kind, _);
-          _;
-        } ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_rejection _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Skipped Alpha_context.Kind.Tx_rollup_rejection_manager_kind;
-          _;
-        } ) ->
-      Some Eq
-  | Manager_operation {operation = Tx_rollup_rejection _; _}, _ -> None
-  | ( Manager_operation {operation = Tx_rollup_dispatch_tickets _; _},
-      Manager_operation_result
-        {operation_result = Applied (Tx_rollup_dispatch_tickets_result _); _} )
-    ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_dispatch_tickets _; _},
-      Manager_operation_result
-        {
-          operation_result = Backtracked (Tx_rollup_dispatch_tickets_result _, _);
-          _;
-        } ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_dispatch_tickets _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Failed
-              (Alpha_context.Kind.Tx_rollup_dispatch_tickets_manager_kind, _);
-          _;
-        } ) ->
-      Some Eq
-  | ( Manager_operation {operation = Tx_rollup_dispatch_tickets _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Skipped Alpha_context.Kind.Tx_rollup_dispatch_tickets_manager_kind;
-          _;
-        } ) ->
-      Some Eq
-  | Manager_operation {operation = Tx_rollup_dispatch_tickets _; _}, _ -> None
   | ( Manager_operation {operation = Transfer_ticket _; _},
       Manager_operation_result
         {operation_result = Applied (Transfer_ticket_result _); _} ) ->
@@ -3070,7 +2471,11 @@ let operation_data_and_metadata_encoding =
            (Tag 1)
            ~title:"Operation_without_metadata"
            (obj2
-              (req "contents" (dynamic_size Operation.contents_list_encoding))
+              (req
+                 "contents"
+                 (dynamic_size
+                    Operation
+                    .contents_list_encoding_with_legacy_attestation_name))
               (opt "signature" Signature.encoding))
            (function
              | Operation_data op, No_operation_metadata ->

@@ -70,6 +70,11 @@ Breaking Changes
 
 - Disable TORU. (MR :gl:`!7087`)
 
+Ticket User-experience
+----------------------
+
+- Allow implicit accounts to receive and send tickets. (MR :gl:`!6108`, :gl:`!6490`)
+
 RPC Changes
 -----------
 

@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (endorsement)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                -- test "^endorsement$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
+                  -- --file test_endorsement.ml
     Subject:    Endorsing a block adds an extra layer of confidence
                 to the Tezos' PoS algorithm. The block endorsing
                 operation must be included in the following block.
@@ -41,24 +40,117 @@ let init_genesis ?policy () =
   Context.init_n ~consensus_threshold:0 5 () >>=? fun (genesis, _contracts) ->
   Block.bake ?policy genesis >>=? fun b -> return (genesis, b)
 
-(** inject an endorsement and return the block with the endorsement and its
-   parent. *)
-let inject_the_first_endorsement () =
-  init_genesis () >>=? fun (_genesis, b) ->
-  Op.endorsement b >>=? fun operation ->
-  Block.bake ~operation b >>=? fun b' -> return (b', b)
+(** {1 Positive tests} *)
 
-(****************************************************************)
-(*                      Tests                                   *)
-(****************************************************************)
-
-(** Apply a single endorsement from the slot 0 endorser. *)
+(** Correct endorsement from the slot 0 endorser. *)
 let test_simple_endorsement () =
-  inject_the_first_endorsement () >>=? fun (_, _) -> return_unit
+  let open Lwt_result_syntax in
+  let* _genesis, endorsed_block = init_genesis () in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block
+    Endorsement
 
-(****************************************************************)
-(*  The following test scenarios are supposed to raise errors.  *)
-(****************************************************************)
+(** Test that the endorsement's branch does not affect its
+    validity. *)
+let test_arbitrary_branch () =
+  let open Lwt_result_syntax in
+  let* _genesis, endorsed_block = init_genesis () in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block
+    ~branch:Block_hash.zero
+    Endorsement
+
+(** Correct endorsement with a level and a round that are both
+    different from {!test_simple_endorsement}. *)
+let test_non_zero_round () =
+  let open Lwt_result_syntax in
+  let* _genesis, b = init_genesis () in
+  let* endorsed_block = Block.bake ~policy:(By_round 10) b in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block
+    Endorsement
+
+(** Fitness gap: this is a straightforward update from Emmy to Tenderbake,
+    that is, check that the level is incremented in a child block. *)
+let test_fitness_gap () =
+  let open Lwt_result_syntax in
+  let* _genesis, pred_b = init_genesis () in
+  let* operation = Op.endorsement pred_b in
+  let* b = Block.bake ~operation pred_b in
+  let fitness =
+    match Fitness.from_raw b.header.shell.fitness with
+    | Ok fitness -> fitness
+    | _ -> assert false
+  in
+  let pred_fitness =
+    match Fitness.from_raw pred_b.header.shell.fitness with
+    | Ok fitness -> fitness
+    | _ -> assert false
+  in
+  let level = Fitness.level fitness in
+  let pred_level = Fitness.level pred_fitness in
+  let level_diff =
+    Int32.sub (Raw_level.to_int32 level) (Raw_level.to_int32 pred_level)
+  in
+  Assert.equal_int32 ~loc:__LOC__ level_diff 1l
+
+(** Return a delegate and its second smallest slot for the level of [block]. *)
+let delegate_and_second_slot block =
+  let open Lwt_result_syntax in
+  let* endorsers = Context.get_endorsers (B block) in
+  let delegate, slots =
+    (* Find an endorser with more than 1 slot. *)
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (List.find_map
+         (fun {RPC.Validators.delegate; slots; _} ->
+           if Compare.List_length_with.(slots > 1) then Some (delegate, slots)
+           else None)
+         endorsers)
+  in
+  (* Check that the slots are sorted and have no duplicates. *)
+  let rec check_sorted = function
+    | [] | [_] -> true
+    | x :: (y :: _ as t) -> Slot.compare x y < 0 && check_sorted t
+  in
+  assert (check_sorted slots) ;
+  let slot =
+    match slots with [] | [_] -> assert false | _ :: slot :: _ -> slot
+  in
+  return (delegate, slot)
+
+(** Test that the mempool accepts endorsements with a non-normalized
+    slot (that is, a slot that belongs to the delegate but is not the
+    delegate's smallest slot) at all three allowed levels for
+    endorsements (and various rounds). *)
+let test_mempool_second_slot () =
+  let open Lwt_result_syntax in
+  let* _genesis, grandparent = init_genesis () in
+  let* predecessor = Block.bake grandparent ~policy:(By_round 3) in
+  let* future_block = Block.bake predecessor ~policy:(By_round 5) in
+  let check_non_smallest_slot_ok loc endorsed_block =
+    let* delegate, slot = delegate_and_second_slot endorsed_block in
+    Consensus_helpers.test_consensus_operation
+      ~loc
+      ~endorsed_block
+      ~predecessor
+      ~delegate
+      ~slot
+      Endorsement
+      Mempool
+  in
+  let* () = check_non_smallest_slot_ok __LOC__ grandparent in
+  let* () = check_non_smallest_slot_ok __LOC__ predecessor in
+  check_non_smallest_slot_ok __LOC__ future_block
+
+(** {1 Negative tests}
+
+    The following test scenarios are supposed to raise errors. *)
+
+(** {2 Wrong slot} *)
 
 (** Apply an endorsement with a negative slot. *)
 let test_negative_slot () =
@@ -76,265 +168,438 @@ let test_negative_slot () =
     (function
       | Data_encoding.Binary.Write_error _ -> return_unit | e -> Lwt.fail e)
 
-(** Apply an endorsement with a non-normalized slot (that is, not the smallest
-   possible). *)
-let test_non_normalized_slot () =
-  Context.init_n 5 () >>=? fun (genesis, _contracts) ->
-  Block.bake genesis >>=? fun b ->
-  Context.get_endorsers (B b) >>=? fun endorsers_list ->
-  (* find an endorsers with more than 1 slot *)
-  List.find_map
-    (function
-      | {Plugin.RPC.Validators.delegate; slots; _} ->
-          if Compare.List_length_with.(slots > 1) then Some (delegate, slots)
-          else None)
-    endorsers_list
-  |> function
-  | None -> assert false
-  | Some (delegate, slots) ->
-      let set_slots = Slot.Set.of_list slots in
-      (* no duplicated slots *)
-      Assert.equal_int
-        ~loc:__LOC__
-        (Slot.Set.cardinal set_slots)
-        (List.length slots)
-      >>=? fun () ->
-      (* the first slot should be the smallest slot *)
-      Assert.equal
-        ~loc:__LOC__
-        (fun x y -> Slot.compare x y = 0)
-        "the first slot is not the smallest"
-        Slot.pp
-        (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd slots)
-        (WithExceptions.Option.get ~loc:__LOC__ @@ Slot.Set.min_elt set_slots)
-      >>=? fun () ->
-      let slot =
-        match List.hd (List.rev slots) with None -> assert false | Some s -> s
-      in
-      Op.endorsement ~delegate ~slot b >>=? fun operation ->
-      let policy = Block.Excluding [delegate] in
-      Block.bake ~policy ~operation b >>= fun res ->
-      Assert.proto_error ~loc:__LOC__ res (function
-          | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
-              {kind}
-            when kind = Validate_errors.Consensus.Endorsement ->
-              true
-          | _ -> false)
+(** Endorsement with a non-normalized slot (that is, a slot that
+    belongs to the delegate but is not the delegate's smallest slot).
+    It should fail in application and construction modes, but be
+    accepted in mempool mode. *)
+let test_not_smallest_slot () =
+  let open Lwt_result_syntax in
+  let* _genesis, b = init_genesis () in
+  let* delegate, slot = delegate_and_second_slot b in
+  let error_wrong_slot = function
+    | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
+        {kind; _}
+      when kind = Validate_errors.Consensus.Endorsement ->
+        true
+    | _ -> false
+  in
+  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
+    ~loc:__LOC__
+    ~endorsed_block:b
+    ~delegate
+    ~slot
+    ~application_error:error_wrong_slot
+    ~construction_error:error_wrong_slot
+    ?mempool_error:None
+    Endorsement
 
-(** Wrong endorsement predecessor : apply an endorsement with an
-    incorrect block predecessor. *)
-let test_wrong_endorsement_predecessor () =
-  init_genesis () >>=? fun (_genesis, b) ->
-  Op.endorsement ~pred_branch:(Context.branch (B b)) b >>=? fun operation ->
-  Block.bake ~operation b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Consensus.Wrong_consensus_operation_branch {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
+let delegate_and_someone_elses_slot block =
+  let open Lwt_result_syntax in
+  let* endorsers = Context.get_endorsers (B block) in
+  let delegate, other_delegate_slot =
+    match endorsers with
+    | [] | [_] -> assert false (* at least two delegates with rights *)
+    | {delegate; _} :: {slots; _} :: _ ->
+        (delegate, WithExceptions.Option.get ~loc:__LOC__ (List.hd slots))
+  in
+  return (delegate, other_delegate_slot)
 
-(** Invalid_endorsement_level: apply an endorsement with an incorrect
-    level (i.e. the predecessor level). *)
-let test_invalid_endorsement_level () =
-  init_genesis () >>=? fun (genesis, b) ->
-  Context.get_level (B genesis) >>?= fun genesis_level ->
-  Op.endorsement ~level:genesis_level b >>=? fun operation ->
-  Block.bake ~operation b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
+(** Endorsement with a slot that does not belong to the delegate. *)
+let test_not_own_slot () =
+  let open Lwt_result_syntax in
+  let* _genesis, b = init_genesis () in
+  let* delegate, other_delegate_slot = delegate_and_someone_elses_slot b in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block:b
+    ~delegate
+    ~slot:other_delegate_slot
+    ~error:(function
+      | Alpha_context.Operation.Invalid_signature -> true | _ -> false)
+    Endorsement
 
-(** Duplicate endorsement : apply an endorsement that has already been applied. *)
-let test_duplicate_endorsement () =
-  init_genesis () >>=? fun (_genesis, b) ->
-  Incremental.begin_construction b >>=? fun inc ->
-  Op.endorsement b >>=? fun operation ->
-  Incremental.add_operation inc operation >>=? fun inc ->
-  Op.endorsement b >>=? fun operation ->
-  Incremental.add_operation inc operation >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
+(** In mempool mode, also test endorsements with a slot that does not
+    belong to the delegate for various allowed levels and rounds. *)
+let test_mempool_not_own_slot () =
+  let open Lwt_result_syntax in
+  let* _genesis, grandparent = init_genesis ~policy:(By_round 2) () in
+  let* predecessor = Block.bake grandparent ~policy:(By_round 1) in
+  let* future_block = Block.bake predecessor in
+  let check_not_own_slot_fails loc b =
+    let* delegate, other_delegate_slot = delegate_and_someone_elses_slot b in
+    Consensus_helpers.test_consensus_operation
+      ~loc
+      ~endorsed_block:b
+      ~delegate
+      ~slot:other_delegate_slot
+      ~error:(function
+        | Alpha_context.Operation.Invalid_signature -> true | _ -> false)
+      Endorsement
+      Mempool
+  in
+  let* () = check_not_own_slot_fails __LOC__ grandparent in
+  let* () = check_not_own_slot_fails __LOC__ predecessor in
+  check_not_own_slot_fails __LOC__ future_block
+
+(** {2 Wrong level} *)
+
+let error_old_level = function
+  | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
+    when kind = Validate_errors.Consensus.Endorsement ->
+      true
+  | _ -> false
+
+(** Endorsement that is one level too old, aka grandparent endorsement
+    (the endorsement is expected to point to the level of the
+    predecessor of the block/mempool containing the endorsement, but
+    instead it points to the grandparent's level).
+
+    This endorsement should fail in a block (application or
+    construction), but be accepted in mempool mode. *)
+let test_one_level_too_old () =
+  let open Lwt_result_syntax in
+  let* _genesis, grandparent = init_genesis () in
+  let* predecessor = Block.bake grandparent in
+  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
+    ~loc:__LOC__
+    ~endorsed_block:grandparent
+    ~predecessor
+    ~application_error:error_old_level
+    ~construction_error:error_old_level
+    ?mempool_error:None
+    Endorsement
+
+(** Endorsement that is two levels too old (pointing to the
+    great-grandparent instead of the predecessor). It should fail in
+    all modes. *)
+let test_two_levels_too_old () =
+  let open Lwt_result_syntax in
+  let* _genesis, greatgrandparent = init_genesis () in
+  let* grandparent = Block.bake greatgrandparent in
+  let* predecessor = Block.bake grandparent in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block:greatgrandparent
+    ~predecessor
+    ~error:error_old_level
+    Endorsement
+
+let error_future_level = function
+  | Validate_errors.Consensus.Consensus_operation_for_future_level {kind; _}
+    when kind = Validate_errors.Consensus.Endorsement ->
+      true
+  | _ -> false
+
+(** Endorsement that is one level in the future (pointing to the same
+    level as the block/mempool containing the endorsement instead of
+    its predecessor/head). It should fail in a block (application or
+    construction) but succeed in a mempool. *)
+let test_one_level_in_the_future () =
+  let open Lwt_result_syntax in
+  let* _genesis, predecessor = init_genesis () in
+  let* next_level_block = Block.bake predecessor in
+  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
+    ~loc:__LOC__
+    ~endorsed_block:next_level_block
+    ~predecessor
+    ~application_error:error_future_level
+    ~construction_error:error_future_level
+    ?mempool_error:None
+    Endorsement
+
+(** Endorsement that is two levels in the future. It should fail in
+    all modes. *)
+let test_two_levels_future () =
+  let open Lwt_result_syntax in
+  let* _genesis, predecessor = init_genesis () in
+  let* next_level_block = Block.bake predecessor in
+  let* after_next_level_block = Block.bake next_level_block in
+  Consensus_helpers.test_consensus_operation_all_modes
+    ~loc:__LOC__
+    ~endorsed_block:after_next_level_block
+    ~predecessor
+    ~error:error_future_level
+    Endorsement
+
+(** {2 Wrong round} *)
+
+let error_old_round = function
+  | Validate_errors.Consensus.Consensus_operation_for_old_round {kind; _}
+    when kind = Validate_errors.Consensus.Endorsement ->
+      true
+  | _ -> false
+
+(** Endorsement that is one round too old. It should fail in a block
+    (application or construction) but succeed in a mempool. *)
+let test_one_round_too_old () =
+  let open Lwt_result_syntax in
+  let* _genesis, b = init_genesis () in
+  let* round0_block = Block.bake b in
+  let* predecessor = Block.bake ~policy:(By_round 1) b in
+  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
+    ~loc:__LOC__
+    ~endorsed_block:round0_block
+    ~predecessor
+    ~application_error:error_old_round
+    ~construction_error:error_old_round
+    ?mempool_error:None
+    Endorsement
+
+(** Endorsement that is many rounds too old. It should fail in a block
+    (application or construction) but succeed in a mempool. *)
+let test_many_rounds_too_old () =
+  let open Lwt_result_syntax in
+  let* _genesis, b = init_genesis () in
+  let* round5_block = Block.bake ~policy:(By_round 5) b in
+  let* predecessor = Block.bake ~policy:(By_round 15) b in
+  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
+    ~loc:__LOC__
+    ~endorsed_block:round5_block
+    ~predecessor
+    ~application_error:error_old_round
+    ~construction_error:error_old_round
+    ?mempool_error:None
+    Endorsement
+
+let error_future_round = function
+  | Validate_errors.Consensus.Consensus_operation_for_future_round {kind; _}
+    when kind = Validate_errors.Consensus.Endorsement ->
+      true
+  | _ -> false
+
+(** Endorsement that is one round in the future. It should fail in a
+    block (application or construction) but succeed in a mempool. *)
+let test_one_round_in_the_future () =
+  let open Lwt_result_syntax in
+  let* _genesis, b = init_genesis () in
+  let* predecessor = Block.bake b in
+  let* round1_block = Block.bake ~policy:(By_round 1) b in
+  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
+    ~loc:__LOC__
+    ~endorsed_block:round1_block
+    ~predecessor
+    ~application_error:error_future_round
+    ~construction_error:error_future_round
+    ?mempool_error:None
+    Endorsement
+
+(** Endorsement that is many rounds in the future. It should fail in a
+    block (application or construction) but succeed in a mempool. *)
+let test_many_rounds_future () =
+  let open Lwt_result_syntax in
+  let* _genesis, b = init_genesis () in
+  let* predecessor = Block.bake ~policy:(By_round 5) b in
+  let* round15_block = Block.bake ~policy:(By_round 15) b in
+  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
+    ~loc:__LOC__
+    ~endorsed_block:round15_block
+    ~predecessor
+    ~application_error:error_future_round
+    ~construction_error:error_future_round
+    ?mempool_error:None
+    Endorsement
+
+(** {2 Wrong payload hash} *)
+
+(** Endorsement with an incorrect payload hash. It should fail in a
+    block (application or construction) but succeed in a mempool. *)
+let test_wrong_payload_hash () =
+  let open Lwt_result_syntax in
+  let* _genesis, endorsed_block = init_genesis () in
+  let error_wrong_payload_hash = function
+    | Validate_errors.Consensus.Wrong_payload_hash_for_consensus_operation
+        {kind; _}
+      when kind = Validate_errors.Consensus.Endorsement ->
+        true
+    | _ -> false
+  in
+  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
+    ~loc:__LOC__
+    ~endorsed_block
+    ~block_payload_hash:Block_payload_hash.zero
+    ~application_error:error_wrong_payload_hash
+    ~construction_error:error_wrong_payload_hash
+    ?mempool_error:None
+    Endorsement
+
+(** {1 Conflict tests}
+
+    Some positive and some negative tests. *)
+
+let assert_conflict_error ~loc res =
+  Assert.proto_error ~loc res (function
       | Validate_errors.Consensus.Conflicting_consensus_operation {kind; _}
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
 
-(** Consensus operation for future level : apply an endorsement with a level in the future *)
-let test_consensus_operation_endorsement_for_future_level () =
-  init_genesis () >>=? fun (_genesis, pred) ->
-  let raw_level = Raw_level.of_int32 (Int32.of_int 10) in
-  let level = match raw_level with Ok l -> l | Error _ -> assert false in
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~is_preendorsement:false
-    ~endorsed_block:pred
-    ~level
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_future_level {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+(** Test that endorsements conflict with:
+    - an identical endorsement, and
+    - an endorsement on the same block with a different branch.
 
-(** Consensus operation for old level : apply an endorsement one level in the past *)
-let test_consensus_operation_endorsement_for_predecessor_level () =
-  init_genesis () >>=? fun (_genesis, pred) ->
-  let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
-  let level = match raw_level with Ok l -> l | Error _ -> assert false in
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~is_preendorsement:false
-    ~endorsed_block:pred
-    ~level
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+    In mempool mode, also test that they conflict with an endorsement
+    on the same level and round but with a different payload hash
+    (such an endorsement is invalid in application and construction modes). *)
+let test_conflict () =
+  let open Lwt_result_syntax in
+  let* _genesis, b = init_genesis () in
+  let* op = Op.endorsement b in
+  let* op_different_branch = Op.endorsement ~branch:Block_hash.zero b in
+  (* Test in application and construction (aka baking) modes *)
+  let assert_conflict loc baking_mode tested_op =
+    Block.bake ~baking_mode ~operations:[op; tested_op] b
+    >>= assert_conflict_error ~loc
+  in
+  let* () = assert_conflict __LOC__ Application op in
+  let* () = assert_conflict __LOC__ Application op_different_branch in
+  let* () = assert_conflict __LOC__ Baking op in
+  let* () = assert_conflict __LOC__ Baking op_different_branch in
+  (* Test in mempool mode. *)
+  let* inc = Incremental.begin_construction ~mempool_mode:true b in
+  let* inc = Incremental.validate_operation inc op in
+  let assert_mempool_conflict loc tested_op =
+    Incremental.validate_operation inc tested_op >>= assert_conflict_error ~loc
+  in
+  let* () = assert_mempool_conflict __LOC__ op in
+  let* () = assert_mempool_conflict __LOC__ op_different_branch in
+  let* op_different_payload_hash =
+    Op.endorsement ~block_payload_hash:Block_payload_hash.zero b
+  in
+  let* () = assert_mempool_conflict __LOC__ op_different_payload_hash in
+  return_unit
 
-(** Consensus operation for old level : apply an endorsement with more than one level in the past *)
-let test_consensus_operation_endorsement_for_old_level () =
-  init_genesis () >>=? fun (genesis, pred) ->
-  Block.bake genesis >>=? fun _next_block ->
-  let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
-  let level = match raw_level with Ok l -> l | Error _ -> assert false in
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~is_preendorsement:false
-    ~endorsed_block:pred
-    ~level
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+(** In mempool mode, test that grandparent endorsements conflict with:
+    - an identical endorsement,
+    - an endorsement on the same block with a different branch, and
+    - an endorsement on the same block with a different payload hash.
 
-(** Consensus operation for future round : apply an endorsement with a round in the future *)
-let test_consensus_operation_endorsement_for_future_round () =
-  init_genesis () >>=? fun (_genesis, pred) ->
-  Environment.wrap_tzresult (Round.of_int 21) >>?= fun round ->
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~is_preendorsement:false
-    ~endorsed_block:pred
-    ~round
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_future_round {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+    This test would make no sense in application or construction modes,
+    since grandparent endorsements fail anyway (as can be observed in
+    {!test_one_level_too_old}). *)
+let test_grandparent_conflict () =
+  let open Lwt_result_syntax in
+  let* _genesis, grandparent = init_genesis () in
+  let* predecessor = Block.bake grandparent in
+  let* op = Op.endorsement grandparent in
+  let* op_different_branch =
+    Op.endorsement ~branch:Block_hash.zero grandparent
+  in
+  let* op_different_payload_hash =
+    Op.endorsement ~block_payload_hash:Block_payload_hash.zero grandparent
+  in
+  let* inc = Incremental.begin_construction ~mempool_mode:true predecessor in
+  let* inc = Incremental.validate_operation inc op in
+  let assert_conflict loc tested_op =
+    Incremental.validate_operation inc tested_op >>= assert_conflict_error ~loc
+  in
+  let* () = assert_conflict __LOC__ op in
+  let* () = assert_conflict __LOC__ op_different_branch in
+  let* () = assert_conflict __LOC__ op_different_payload_hash in
+  return_unit
 
-(** Consensus operation for old round : apply an endorsement with a round in the past *)
-let test_consensus_operation_endorsement_for_old_round () =
-  init_genesis ~policy:(By_round 10) () >>=? fun (_genesis, pred) ->
-  Environment.wrap_tzresult (Round.of_int 0) >>?= fun round ->
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~is_preendorsement:false
-    ~endorsed_block:pred
-    ~round
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_old_round {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+(** In mempool mode, test that endorsements with the same future level
+    and same non-zero round conflict. This is not tested in application
+    and construction modes since such endorsements would be invalid. *)
+let test_future_level_conflict () =
+  let open Lwt_result_syntax in
+  let* _genesis, predecessor = init_genesis () in
+  let* future_block = Block.bake ~policy:(By_round 10) predecessor in
+  let* op = Op.endorsement future_block in
+  let* op_different_branch =
+    Op.endorsement ~branch:Block_hash.zero future_block
+  in
+  let* op_different_payload_hash =
+    Op.endorsement ~block_payload_hash:Block_payload_hash.zero future_block
+  in
+  let* inc = Incremental.begin_construction ~mempool_mode:true predecessor in
+  let* inc = Incremental.validate_operation inc op in
+  let assert_conflict loc tested_op =
+    Incremental.validate_operation inc tested_op >>= assert_conflict_error ~loc
+  in
+  let* () = assert_conflict __LOC__ op in
+  let* () = assert_conflict __LOC__ op_different_branch in
+  let* () = assert_conflict __LOC__ op_different_payload_hash in
+  return_unit
 
-(** Consensus operation on competing proposal : apply an endorsement on a competing proposal *)
-let test_consensus_operation_endorsement_on_competing_proposal () =
-  init_genesis () >>=? fun (_genesis, pred) ->
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~is_preendorsement:false
-    ~endorsed_block:pred
-    ~block_payload_hash:Block_payload_hash.zero
-    ~error:(function
-      | Validate_errors.Consensus.Wrong_payload_hash_for_consensus_operation
-          {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    ~construction_mode:(pred, None)
-    ()
+(** In mempool mode, test that there is no conflict between an
+    endorsement and a preendorsement for the same slot (here the first
+    slot), same level, and same round. *)
+let test_no_conflict_with_preendorsement_mempool () =
+  let open Lwt_result_syntax in
+  let* _genesis, endorsed_block = init_genesis () in
+  let* op_endo = Op.endorsement endorsed_block in
+  let* op_preendo = Op.preendorsement endorsed_block in
+  let* inc = Incremental.begin_construction ~mempool_mode:true endorsed_block in
+  let* inc = Incremental.add_operation inc op_endo in
+  let* inc = Incremental.add_operation inc op_preendo in
+  let* _inc = Incremental.finalize_block inc in
+  return_unit
 
-(** Wrong round : apply an endorsement with an incorrect round *)
-let test_wrong_round () =
-  init_genesis () >>=? fun (_genesis, b) ->
-  Environment.wrap_tzresult (Round.of_int 2) >>?= fun round ->
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~is_preendorsement:false
-    ~endorsed_block:b
-    ~round
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_future_round {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    ()
+(** In application and construction (aka baking) modes, test that
+    there is no conflict between an endorsement and a preendorsement
+    for the same slot (here the first slot). Note that the operations
+    don't have the same level because the required levels for them to
+    be valid are different. *)
+let test_no_conflict_with_preendorsement_block () =
+  let open Lwt_result_syntax in
+  let* _genesis, predecessor = init_genesis () in
+  let* round0_block = Block.bake predecessor in
+  let* op_endo = Op.endorsement predecessor in
+  let* op_preendo = Op.preendorsement round0_block in
+  let bake_both_ops baking_mode =
+    Block.bake
+      ~baking_mode
+      ~payload_round:(Some Round.zero)
+      ~locked_round:(Some Round.zero)
+      ~policy:(By_round 1)
+      ~operations:[op_endo; op_preendo]
+      predecessor
+  in
+  let* (_ : Block.t) = bake_both_ops Application in
+  let* (_ : Block.t) = bake_both_ops Baking in
+  return_unit
 
-(** Wrong level : apply an endorsement with an incorrect level *)
-let test_wrong_level () =
-  init_genesis () >>=? fun (_genesis, b) ->
-  (* let context = Context.B genesis in*)
-  let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
-  let level = match raw_level with Ok l -> l | Error _ -> assert false in
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~is_preendorsement:false
-    ~endorsed_block:b
-    ~level
-    ~error:(function
-      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    ()
+(** In mempool mode, test that there is no conflict between
+    endorsements for the same slot (here the first slot) with various
+    allowed levels and rounds.
 
-(** Wrong payload hash : apply an endorsement with an incorrect payload hash *)
-let test_wrong_payload_hash () =
-  init_genesis () >>=? fun (_genesis, b) ->
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~is_preendorsement:false
-    ~endorsed_block:b
-    ~block_payload_hash:Block_payload_hash.zero
-    ~error:(function
-      | Validate_errors.Consensus.Wrong_payload_hash_for_consensus_operation
-          {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    ()
+    There are no similar tests in application and construction modes
+    because valid endorsements always have the same level and round. *)
+let test_no_conflict_various_levels_and_rounds () =
+  let open Lwt_result_syntax in
+  let* genesis, grandparent = init_genesis () in
+  let* predecessor = Block.bake grandparent in
+  let* future_block = Block.bake predecessor in
+  let* alt_grandparent = Block.bake ~policy:(By_round 1) genesis in
+  let* alt_predecessor = Block.bake ~policy:(By_round 1) grandparent in
+  let* alt_future = Block.bake ~policy:(By_round 10) alt_predecessor in
+  let* inc = Incremental.begin_construction ~mempool_mode:true predecessor in
+  let add_endorsement inc endorsed_block =
+    let* (op : packed_operation) = Op.endorsement endorsed_block in
+    let (Operation_data protocol_data) = op.protocol_data in
+    let content =
+      match protocol_data.contents with
+      | Single (Endorsement content) -> content
+      | _ -> assert false
+    in
+    Format.eprintf
+      "level: %ld, round: %ld@."
+      (Raw_level.to_int32 content.level)
+      (Round.to_int32 content.round) ;
+    Incremental.add_operation inc op
+  in
+  let* inc = add_endorsement inc grandparent in
+  let* inc = add_endorsement inc predecessor in
+  let* inc = add_endorsement inc future_block in
+  let* inc = add_endorsement inc alt_grandparent in
+  let* inc = add_endorsement inc alt_predecessor in
+  let* inc = add_endorsement inc alt_future in
+  let* _inc = Incremental.finalize_block inc in
+  return_unit
 
-let test_wrong_slot_used () =
-  init_genesis () >>=? fun (_genesis, b) ->
-  Context.get_endorser (B b) >>=? fun (_, slots) ->
-  (match slots with
-  | _x :: y :: _ -> return y
-  | _ -> failwith "Slots size should be at least of 2 ")
-  >>=? fun slot ->
-  Consensus_helpers.test_consensus_operation
-    ~loc:__LOC__
-    ~is_preendorsement:false
-    ~endorsed_block:b
-    ~slot
-    ~error:(function
-      | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
-          {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-    ()
+(** {1 Consensus threshold tests}
+
+    Both positive and negative tests. *)
 
 (** Check that:
     - a block with not enough endorsement cannot be baked;
@@ -368,207 +633,49 @@ let test_endorsement_threshold ~sufficient_threshold () =
   if sufficient_threshold then return_unit
   else Assert.proto_error_with_info ~loc:__LOC__ b "Not enough endorsements"
 
-(** Fitness gap: this is a straightforward update from Emmy to Tenderbake, that
-    is, check that the level is incremented in a child block. *)
-let test_fitness_gap () =
-  inject_the_first_endorsement () >>=? fun (b, pred_b) ->
-  let fitness =
-    match Fitness.from_raw b.header.shell.fitness with
-    | Ok fitness -> fitness
-    | _ -> assert false
-  in
-  let pred_fitness =
-    match Fitness.from_raw pred_b.header.shell.fitness with
-    | Ok fitness -> fitness
-    | _ -> assert false
-  in
-  let level = Fitness.level fitness in
-  let pred_level = Fitness.level pred_fitness in
-  let level_diff =
-    Int32.sub (Raw_level.to_int32 level) (Raw_level.to_int32 pred_level)
-  in
-  Assert.equal_int32 ~loc:__LOC__ level_diff 1l
-
-let test_preendorsement_endorsement_same_level () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
-  Block.bake genesis >>=? fun b1 ->
-  Incremental.begin_construction ~mempool_mode:true ~policy:(By_round 2) b1
-  >>=? fun i ->
-  Op.endorsement b1 >>=? fun op_endo ->
-  Incremental.add_operation i op_endo >>=? fun (_i : Incremental.t) ->
-  Op.preendorsement b1 >>=? fun op_preendo ->
-  Incremental.add_operation i op_preendo >>=? fun (_i : Incremental.t) ->
-  return_unit
-
-(** Test for endorsement injection with wrong slot in mempool mode. This
-    test is expected to fail *)
-let test_wrong_endorsement_slot_in_mempool_mode () =
-  Context.init_n ~consensus_threshold:1 5 () >>=? fun (genesis, _) ->
-  Block.bake genesis >>=? fun b1 ->
-  let module V = Plugin.RPC.Validators in
-  (Context.get_endorsers (B b1) >>=? function
-   | {V.slots = _ :: non_canonical_slot :: _; _} :: _ ->
-       (* we didn't use min slot for the injection. It's bad !*)
-       return (Some non_canonical_slot)
-   | _ -> assert false)
-  >>=? fun slot ->
-  Op.endorsement ?slot b1 >>=? fun endo ->
-  Incremental.begin_construction ~mempool_mode:true b1 >>=? fun i ->
-  Incremental.add_operation i endo >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation {kind}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-
-(** Endorsement for next level *)
-let test_endorsement_for_next_level () =
-  init_genesis () >>=? fun (genesis, _) ->
-  Consensus_helpers.test_consensus_op_for_next
-    ~genesis
-    ~kind:`Endorsement
-    ~next:`Level
-
-(** Endorsement for next round *)
-let test_endorsement_for_next_round () =
-  init_genesis () >>=? fun (genesis, _) ->
-  Consensus_helpers.test_consensus_op_for_next
-    ~genesis
-    ~kind:`Endorsement
-    ~next:`Round
-
-(** Endorsement of grandparent  *)
-let test_endorsement_grandparent () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
-  Block.bake genesis >>=? fun b_gp ->
-  Block.bake b_gp >>=? fun b ->
-  Incremental.begin_construction ~mempool_mode:true b >>=? fun i ->
-  (* Endorsement on grandparent *)
-  Op.endorsement b_gp >>=? fun op1 ->
-  (* Endorsement on parent *)
-  Op.endorsement b >>=? fun op2 ->
-  (* Both should be accepted by the mempool *)
-  Incremental.add_operation i op1 >>=? fun i ->
-  Incremental.add_operation i op2 >>=? fun (_i : Incremental.t) -> return_unit
-
-(** Double inclusion of grandparent endorsement *)
-let test_double_endorsement_grandparent () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
-  Block.bake genesis >>=? fun b_gp ->
-  Block.bake b_gp >>=? fun b ->
-  Incremental.begin_construction ~mempool_mode:true b >>=? fun i ->
-  (* Endorsement on grandparent *)
-  Op.endorsement b_gp >>=? fun op1 ->
-  (* Endorsement on parent *)
-  Op.endorsement b >>=? fun op2 ->
-  (* The first grand parent endorsement should be accepted by the
-     mempool but the second rejected. *)
-  Incremental.add_operation i op1 >>=? fun i ->
-  Incremental.add_operation i op1 >>= fun res ->
-  Assert.proto_error_with_info
-    ~loc:__LOC__
-    res
-    "Double inclusion of consensus operation"
-  >>=? fun () ->
-  Incremental.add_operation i op2 >>=? fun (_i : Incremental.t) -> return_unit
-
-(** Endorsement of grandparent on same slot as parent *)
-let test_endorsement_grandparent_same_slot () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
-  Block.bake genesis >>=? fun b_gp ->
-  Block.bake b_gp >>=? fun b ->
-  Incremental.begin_construction ~mempool_mode:true b >>=? fun i ->
-  (* Endorsement on parent *)
-  Consensus_helpers.delegate_of_first_slot (B b) >>=? fun (delegate, slot) ->
-  Op.endorsement ~delegate b >>=? fun op2 ->
-  (* Endorsement on grandparent *)
-  Consensus_helpers.delegate_of_slot slot (B b_gp) >>=? fun delegate ->
-  Op.endorsement ~delegate b_gp >>=? fun op1 ->
-  (* Both should be accepted by the mempool *)
-  Incremental.add_operation i op1 >>=? fun i ->
-  Incremental.add_operation i op2 >>=? fun (_i : Incremental.t) -> return_unit
-
-(** Endorsement of grandparent in application mode should be rejected *)
-let test_endorsement_grandparent_application () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
-  Block.bake genesis >>=? fun b_gp ->
-  Block.bake b_gp >>=? fun b ->
-  Op.endorsement b_gp >>=? fun operation ->
-  Block.bake ~operation b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-
-(** Endorsement of grandparent in full construction mode should be rejected *)
-let test_endorsement_grandparent_full_construction () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
-  Block.bake genesis >>=? fun b_gp ->
-  Block.bake b_gp >>=? fun b ->
-  Incremental.begin_construction b >>=? fun i ->
-  (* Endorsement on grandparent *)
-  Op.endorsement b_gp >>=? fun op1 ->
-  Incremental.add_operation i op1 >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
-          true
-      | _ -> false)
-
 let tests =
   [
+    (* Positive tests *)
     Tztest.tztest "Simple endorsement" `Quick test_simple_endorsement;
-    Tztest.tztest "Endorsement with slot -1" `Quick test_negative_slot;
-    Tztest.tztest
-      "Endorsement wrapped with non-normalized slot"
-      `Quick
-      test_non_normalized_slot;
+    Tztest.tztest "Arbitrary branch" `Quick test_arbitrary_branch;
+    Tztest.tztest "Non-zero round" `Quick test_non_zero_round;
     Tztest.tztest "Fitness gap" `Quick test_fitness_gap;
-    (* Fail scenarios *)
+    Tztest.tztest "Mempool: non-smallest slot" `Quick test_mempool_second_slot;
+    (* Negative tests *)
+    (* Wrong slot *)
+    Tztest.tztest "Endorsement with slot -1" `Quick test_negative_slot;
+    Tztest.tztest "Non-normalized slot" `Quick test_not_smallest_slot;
+    Tztest.tztest "Not own slot" `Quick test_not_own_slot;
+    Tztest.tztest "Mempool: not own slot" `Quick test_mempool_not_own_slot;
+    (* Wrong level *)
+    Tztest.tztest "One level too old" `Quick test_one_level_too_old;
+    Tztest.tztest "Two levels too old" `Quick test_two_levels_too_old;
+    Tztest.tztest "One level in the future" `Quick test_one_level_in_the_future;
+    Tztest.tztest "Two levels in the future" `Quick test_two_levels_future;
+    (* Wrong round *)
+    Tztest.tztest "One round too old" `Quick test_one_round_too_old;
+    Tztest.tztest "Many rounds too old" `Quick test_many_rounds_too_old;
+    Tztest.tztest "One round in the future" `Quick test_one_round_in_the_future;
+    Tztest.tztest "Many rounds in the future" `Quick test_many_rounds_future;
+    (* Wrong payload hash *)
+    Tztest.tztest "Wrong payload hash" `Quick test_wrong_payload_hash;
+    (* Conflict tests (some negative, some positive) *)
+    Tztest.tztest "Conflict" `Quick test_conflict;
+    Tztest.tztest "Grandparent conflict" `Quick test_grandparent_conflict;
+    Tztest.tztest "Future level conflict" `Quick test_future_level_conflict;
     Tztest.tztest
-      "Wrong endorsement predecessor"
+      "No conflict with preendorsement (mempool)"
       `Quick
-      test_wrong_endorsement_predecessor;
+      test_no_conflict_with_preendorsement_mempool;
     Tztest.tztest
-      "Invalid endorsement level"
+      "No conflict with preendorsement (block)"
       `Quick
-      test_invalid_endorsement_level;
-    Tztest.tztest "Duplicate endorsement" `Quick test_duplicate_endorsement;
+      test_no_conflict_with_preendorsement_block;
     Tztest.tztest
-      "Endorsement for future level"
+      "No conflict with various levels and rounds"
       `Quick
-      test_consensus_operation_endorsement_for_future_level;
-    Tztest.tztest
-      "Endorsement for predecessor level"
-      `Quick
-      test_consensus_operation_endorsement_for_old_level;
-    Tztest.tztest
-      "Endorsement for old level"
-      `Quick
-      test_consensus_operation_endorsement_for_old_level;
-    Tztest.tztest
-      "Endorsement for future round"
-      `Quick
-      test_consensus_operation_endorsement_for_future_round;
-    Tztest.tztest
-      "Endorsement for old round"
-      `Quick
-      test_consensus_operation_endorsement_for_old_round;
-    Tztest.tztest
-      "Endorsement on competing proposal"
-      `Quick
-      test_consensus_operation_endorsement_on_competing_proposal;
-    Tztest.tztest "Wrong level for consensus operation" `Quick test_wrong_level;
-    Tztest.tztest "Wrong round for consensus operation" `Quick test_wrong_round;
-    Tztest.tztest
-      "Wrong payload hash for consensus operation"
-      `Quick
-      test_wrong_payload_hash;
-    Tztest.tztest
-      "Wrong slot used for consensus operation"
-      `Quick
-      test_wrong_slot_used;
+      test_no_conflict_various_levels_and_rounds;
+    (* Consensus threshold tests (one positive and one negative) *)
     Tztest.tztest
       "sufficient endorsement threshold"
       `Quick
@@ -577,40 +684,8 @@ let tests =
       "insufficient endorsement threshold"
       `Quick
       (test_endorsement_threshold ~sufficient_threshold:false);
-    Tztest.tztest
-      "Endorsement/Preendorsement at same level"
-      `Quick
-      test_preendorsement_endorsement_same_level;
-    Tztest.tztest
-      "Wrong endorsement slot in mempool mode"
-      `Quick
-      test_wrong_endorsement_slot_in_mempool_mode;
-    Tztest.tztest
-      "Endorsement for next level"
-      `Quick
-      test_endorsement_for_next_level;
-    Tztest.tztest
-      "Endorsement for next round"
-      `Quick
-      test_endorsement_for_next_round;
-    Tztest.tztest
-      "Endorsement for grandparent"
-      `Quick
-      test_endorsement_grandparent;
-    Tztest.tztest
-      "Double endorsement of grandparent"
-      `Quick
-      test_double_endorsement_grandparent;
-    Tztest.tztest
-      "Endorsement for grandparent on same slot as parent"
-      `Quick
-      test_endorsement_grandparent_same_slot;
-    Tztest.tztest
-      "Endorsement for grandparent in application mode"
-      `Quick
-      test_endorsement_grandparent_application;
-    Tztest.tztest
-      "Endorsement for grandparent in full construction mode"
-      `Quick
-      test_endorsement_grandparent_full_construction;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("endorsement", tests)]
+  |> Lwt_main.run

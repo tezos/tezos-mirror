@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_buffer_reader
+    Invocation:   dune exec src/lib_p2p/test/test_p2p_buffer_reader.exe
     Subject:      Tests [P2p_buffer_reader]
 *)
 
@@ -342,6 +342,7 @@ let test_read_full_waits =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "P2p_buffer_reader"
     [
       ( "mk_buffer",
@@ -358,3 +359,5 @@ let () =
         :: qcheck_wrap [test_read_less_than_length; test_read_partial] );
       ("read_full", qcheck_wrap [test_read_full_basic; test_read_full_waits]);
     ]
+
+let () = Tezt.Test.run ()

@@ -673,7 +673,7 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
         let first_offset = preamble_length in
         (* Cursor is now at the beginning of the element section *)
         let*! _ =
-          Seq.fold_left_es
+          Seq.ES.fold_left
             (fun (i, current_offset) block_read ->
               let* block_hash, total_block_length, block_bytes = block_read in
               let pruned_block_length =

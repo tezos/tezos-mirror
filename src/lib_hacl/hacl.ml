@@ -397,21 +397,27 @@ module Ed25519 : SIGNATURE = struct
 end
 
 module P256 : SIGNATURE = struct
+  (* A public key is an elliptic curve point with 2 32-byte coordinates (x, y).
+     Internally we use 3 formats to represent public keys:
+     - "raw":          64 bytes, representing the concatenation of
+                       the 2 components. This is the representation used
+                       internally in HACL*.
+     - "compressed":   33 bytes, in which the first component is replaced by
+                       a single byte (either [\x02] or [\x03]). This is
+                       the representation used in [lib_crypto].
+     - "uncompressed": 65 bytes, same as "raw" but with one additional
+                       leading '\x04' byte, which identifies it as
+                       an uncompressed public key. This is the representation
+                       used by Ledger.
+     We bind the HACL* functions which convert between these representations.
+     More details about how they work can be found in Section 2.3.3 of
+     this document: http://www.secg.org/sec1-v2.pdf
+
+     Functions in this module manipulate raw keys, export compressed keys,
+     and import either compressed or uncompressed keys. *)
   type _ key = Sk : Bytes.t -> secret key | Pk : Bytes.t -> public key
 
   let size = 64
-
-  (* A public key is an elliptic curve point with 2 32-byte coordinates (x, y).
-   * Internally we use 3 formats to represent public keys:
-   * - "raw":          64 bytes, representing the concatenation of the 2 components
-   * - "compressed":   33 bytes, in which the first component is replaced by a single
-   *                   byte (either '\x02' or '\x03'). This is the default representation
-   *                   used throughout the interface.
-   * - "uncompressed": 65 bytes, same as "raw" but with one additional leading '\x04' byte,
-   *                   which identifies it as an uncompressed public key.
-   * We bind the HACL* functions which convert between these representations.
-   * More details about how they work can be found in Section 2.3.3 of this document:
-   * http://www.secg.org/sec1-v2.pdf *)
 
   let pk_size_raw = 64
 

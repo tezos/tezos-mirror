@@ -394,4 +394,4 @@ let tests =
     ("bench_batch_insertion", `Quick, bench_batch_insertion);
   ]
 
-let () = Alcotest.run "sapling" [("merkle", tests)]
+let () = Alcotest.run ~__FILE__ "sapling" [("merkle", tests)]

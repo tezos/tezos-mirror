@@ -24,7 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_lazy_containers
 include Tree
 
 exception Uninitialized_self_ref
@@ -33,6 +32,8 @@ type key = string list
 
 module E = Encoding
 module D = Decoding
+
+exception Key_not_found = D.Key_not_found
 
 type 'a encoding = 'a E.t
 
@@ -192,13 +193,36 @@ let value ?default key de =
   {encode = E.value key de; decode = D.value ?default key de}
 
 module Lazy_map_encoding = struct
+  module type Lazy_map_sig = sig
+    type key
+
+    type 'a t
+
+    type 'a producer = key -> 'a Lwt.t
+
+    module Map : Stdlib.Map.S with type key = key
+
+    val origin : 'a t -> wrapped_tree option
+
+    val string_of_key : key -> string
+
+    val loaded_bindings : 'a t -> (key * 'a option) list
+
+    val create :
+      ?values:'a Map.t ->
+      ?produce_value:'a producer ->
+      ?origin:wrapped_tree ->
+      unit ->
+      'a t
+  end
+
   module type S = sig
     type 'a map
 
     val lazy_map : 'a t -> 'a map t
   end
 
-  module Make (Map : Lazy_map.S) = struct
+  module Make (Map : Lazy_map_sig) = struct
     let lazy_map value =
       let to_key k = [Map.string_of_key k] in
       let encode =
@@ -217,71 +241,117 @@ module Lazy_map_encoding = struct
   end
 end
 
-module Make_lazy_vector_encoding (Vector : Tezos_lazy_containers.Lazy_vector.S) =
-struct
-  let lazy_vector with_key value =
-    let open Vector in
-    let to_key k = [string_of_key k] in
-    let encode =
-      E.contramap
-        (fun vector ->
-          ( (origin vector, loaded_bindings vector),
-            num_elements vector,
-            first_key vector ))
-        (E.tup3
-           (E.scope ["contents"] (E.lazy_mapping to_key value.encode))
-           (E.scope ["length"] with_key.encode)
-           (E.scope ["head"] with_key.encode))
-    in
-    let decode =
-      D.map
-        (fun ((origin, produce_value), len, head) ->
-          create ~produce_value ~first_key:head ?origin len)
-        (let open D.Syntax in
-        let+ x = D.scope ["contents"] (D.lazy_mapping to_key value.decode)
-        and+ y = D.scope ["length"] with_key.decode
-        and+ z = D.scope ["head"] with_key.decode in
-        (x, y, z))
-    in
-    {encode; decode}
+module Lazy_vector_encoding = struct
+  module type Lazy_vector_sig = sig
+    type 'a t
+
+    type key
+
+    type 'a producer = key -> 'a Lwt.t
+
+    module Map : Lazy_map_encoding.Lazy_map_sig with type key = key
+
+    val origin : 'a t -> wrapped_tree option
+
+    val string_of_key : key -> string
+
+    val loaded_bindings : 'a t -> (key * 'a option) list
+
+    val create :
+      ?first_key:key ->
+      ?values:'a Map.Map.t ->
+      ?produce_value:'a producer ->
+      ?origin:wrapped_tree ->
+      key ->
+      'a t
+
+    val num_elements : 'a t -> key
+
+    val first_key : 'a t -> key
+  end
+
+  module type S = sig
+    type 'a vector
+
+    type key
+
+    val lazy_vector : key t -> 'a t -> 'a vector t
+  end
+
+  module Make (Vector : Lazy_vector_sig) = struct
+    let lazy_vector with_key value =
+      let to_key k = [Vector.string_of_key k] in
+      let encode =
+        E.contramap
+          (fun vector ->
+            ( (Vector.origin vector, Vector.loaded_bindings vector),
+              Vector.num_elements vector,
+              Vector.first_key vector ))
+          (E.tup3
+             (E.scope ["contents"] (E.lazy_mapping to_key value.encode))
+             (E.scope ["length"] with_key.encode)
+             (E.scope ["head"] with_key.encode))
+      in
+      let decode =
+        D.map
+          (fun ((origin, produce_value), len, head) ->
+            Vector.create ~produce_value ~first_key:head ?origin len)
+          (let open D.Syntax in
+          let+ x = D.scope ["contents"] (D.lazy_mapping to_key value.decode)
+          and+ y = D.scope ["length"] with_key.decode
+          and+ z = D.scope ["head"] with_key.decode in
+          (x, y, z))
+      in
+      {encode; decode}
+  end
 end
 
-module Int_lazy_vector = Make_lazy_vector_encoding (Lazy_vector.IntVector)
-module Int32_lazy_vector = Make_lazy_vector_encoding (Lazy_vector.Int32Vector)
-module Int64_lazy_vector = Make_lazy_vector_encoding (Lazy_vector.Int64Vector)
-module Z_lazy_vector = Make_lazy_vector_encoding (Lazy_vector.ZVector)
+module CBV_encoding = struct
+  module type CBV_sig = sig
+    type t
 
-let int_lazy_vector = Int_lazy_vector.lazy_vector
+    type chunk
 
-let int32_lazy_vector = Int32_lazy_vector.lazy_vector
+    val origin : t -> wrapped_tree option
 
-let int64_lazy_vector = Int64_lazy_vector.lazy_vector
+    val loaded_chunks : t -> (int64 * chunk option) list
 
-let z_lazy_vector = Z_lazy_vector.lazy_vector
+    val length : t -> int64
 
-let chunk =
-  let open Chunked_byte_vector.Chunk in
-  conv of_bytes to_bytes (raw [])
+    val create :
+      ?origin:wrapped_tree -> ?get_chunk:(int64 -> chunk Lwt.t) -> int64 -> t
+  end
 
-let chunked_byte_vector =
-  let open Chunked_byte_vector in
-  let to_key k = [Int64.to_string k] in
-  let encode =
-    E.contramap
-      (fun vector -> ((origin vector, loaded_chunks vector), length vector))
-      (E.tup2
-         (E.scope ["contents"] @@ E.lazy_mapping to_key chunk.encode)
-         (E.value ["length"] Data_encoding.int64))
-  in
-  let decode =
-    D.map
-      (fun ((origin, get_chunk), len) -> create ?origin ~get_chunk len)
-      (let open D.Syntax in
-      let+ x = D.scope ["contents"] @@ D.lazy_mapping to_key chunk.decode
-      and+ y = D.value ["length"] Data_encoding.int64 in
-      (x, y))
-  in
-  {encode; decode}
+  module type S = sig
+    type cbv
+
+    type chunk
+
+    val cbv : chunk t -> cbv t
+  end
+
+  module Make (CBV : CBV_sig) = struct
+    let cbv chunk =
+      let to_key k = [Int64.to_string k] in
+      let encode =
+        E.contramap
+          (fun vector ->
+            ((CBV.origin vector, CBV.loaded_chunks vector), CBV.length vector))
+          (E.tup2
+             (E.scope ["contents"] @@ E.lazy_mapping to_key chunk.encode)
+             (E.value ["length"] Data_encoding.int64))
+      in
+      let decode =
+        D.map
+          (fun ((origin, get_chunk), len) -> CBV.create ?origin ~get_chunk len)
+          (let open D.Syntax in
+          let+ x = D.scope ["contents"] @@ D.lazy_mapping to_key chunk.decode
+          and+ y = D.value ["length"] Data_encoding.int64 in
+          (x, y))
+      in
+      {encode; decode}
+  end
+end
 
 type ('tag, 'a) case =
   | Case : {
@@ -370,9 +440,68 @@ let wrapped_tree : wrapped_tree t =
   {encode = E.wrapped_tree; decode = D.wrapped_tree}
 
 module Runner = struct
+  module type S = sig
+    type tree
+
+    val encode : 'a t -> 'a -> tree -> tree Lwt.t
+
+    val decode : 'a t -> tree -> 'a Lwt.t
+  end
+
   module Make (T : TREE) = struct
+    type tree = T.tree
+
     let encode {encode; _} value tree = E.run (module T) encode value tree
 
     let decode {decode; _} tree = D.run (module T) decode tree
+  end
+end
+
+module Encodings_util = struct
+  module type Bare_tezos_context_sig = sig
+    type t
+
+    type tree
+
+    type index
+
+    module Tree :
+      Tezos_context_sigs.Context.TREE
+        with type t := t
+         and type key := string list
+         and type value := bytes
+         and type tree := tree
+
+    val init :
+      ?patch_context:(t -> t tzresult Lwt.t) ->
+      ?readonly:bool ->
+      ?index_log_size:int ->
+      string ->
+      index Lwt.t
+
+    val empty : index -> t
+  end
+
+  (* TREE instance for Tezos context *)
+  module Make (Ctx : Bare_tezos_context_sig) = struct
+    type Tree.tree_instance += Tree of Ctx.tree
+
+    module Tree = struct
+      type tree = Ctx.tree
+
+      include Ctx.Tree
+
+      let select = function Tree t -> t | _ -> raise Incorrect_tree_type
+
+      let wrap t = Tree t
+    end
+
+    module Tree_encoding_runner = Runner.Make (Tree)
+
+    let empty_tree () =
+      let open Lwt_syntax in
+      let* index = Ctx.init "/tmp" in
+      let empty_store = Ctx.empty index in
+      return @@ Ctx.Tree.empty empty_store
   end
 end

@@ -26,10 +26,11 @@
 (** Testing
     -------
     Component:    stdlib
-    Invocation:   dune build @src/lib_stdlib/test/runtest
+    Invocation:   dune exec src/lib_stdlib/test/main.exe \
+                  -- --file test_functionalArray.ml
     Subject:      Functional arrays
  *)
 
 module Tests = Test_arrays.Make (FunctionalArray)
 
-let () = Alcotest.run "stdlib" [("FunctionalArray", Tests.tests)]
+let () = Alcotest.run ~__FILE__ "stdlib" [("FunctionalArray", Tests.tests)]

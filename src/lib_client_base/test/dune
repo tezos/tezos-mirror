@@ -3,37 +3,65 @@
 
 (env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
 
-(executables
- (names bip39_tests pbkdf_tests)
- (modes native js)
+(library
+ (name src_lib_client_base_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-client-base
-  alcotest)
+  octez-alcotezt)
+ (js_of_ocaml)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_client_base
+  -open Octez_alcotezt)
+ (modules bip39_tests pbkdf_tests))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (modes native)
+ (libraries
+  src_lib_client_base_test_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos-client-base)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
+
+(executable
+ (name main_js)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (modes js)
+ (libraries
+  src_lib_client_base_test_tezt_lib
+  tezt.js)
  (js_of_ocaml)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
- (flags
-  (:standard)
-  -open Tezos_client_base))
-
-(rule
- (alias runtest)
- (package tezos-client-base)
- (action (run %{dep:./bip39_tests.exe})))
-
-(rule
- (alias runtest)
- (package tezos-client-base)
- (action (run %{dep:./pbkdf_tests.exe})))
+ (modules main_js))
 
 (rule
  (alias runtest_js)
  (package tezos-client-base)
- (action (run node %{dep:./bip39_tests.bc.js})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run node %{dep:./main_js.bc.js})))
 
 (rule
- (alias runtest_js)
- (package tezos-client-base)
- (action (run node %{dep:./pbkdf_tests.bc.js})))
+ (targets main_js.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt_js.Test.run ()"))))

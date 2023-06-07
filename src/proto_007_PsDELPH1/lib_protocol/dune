@@ -221,6 +221,28 @@
    .)))
 
 (library
+ (name tezos_protocol_007_PsDELPH1_lifted)
+ (public_name tezos-protocol-007-PsDELPH1.lifted)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-007-PsDELPH1)
+ (flags
+  (:standard)
+  -w -6-7-9-16-29-32-51-68
+  -nopervasives
+  -open Tezos_protocol_007_PsDELPH1)
+ (modules Lifted_protocol))
+
+(rule
+ (targets lifted_protocol.ml)
+ (action
+  (write-file
+   %{targets}
+   "\ninclude Environment.Lift (Protocol)\nlet hash = Protocol.hash\n")))
+
+(library
  (name tezos_protocol_007_PsDELPH1_functor)
  (libraries
   tezos-protocol-environment

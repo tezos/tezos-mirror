@@ -38,6 +38,10 @@ module Apply_diff_bench : Benchmark.S = struct
 
   let info = "Benchmarking SAPLING_APPLY_DIFF"
 
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
+
   let tags = ["sapling"]
 
   let diff_from_tx (tx : Alpha_context.Sapling.transaction) =
@@ -76,6 +80,7 @@ module Apply_diff_bench : Benchmark.S = struct
       ~conv:(fun {nb_input; nb_output; _} -> (nb_input, (nb_output, ())))
       ~model:
         (Model.bilinear_affine
+           ~name
            ~intercept:(fv "apply_diff_const")
            ~coeff1:(fv "apply_diff_inputs")
            ~coeff2:(fv "apply_diff_outputs"))

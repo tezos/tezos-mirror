@@ -71,11 +71,14 @@ code { CAR ; DIP { NIL (list int) } ;
        DROP ; NIL operation ; PAIR }; 
 |}
 
-let test_originate_first_explosion client () =
+let test_originate_first_explosion client protocol () =
   let expected_msg =
     rex "Gas limit exceeded during typechecking or execution"
   in
   let* () = Client.typecheck_script ~script:first_explosion client in
+  let gas_limit =
+    match protocol with Protocol.Nairobi | Alpha -> 645 | Mumbai -> 1479
+  in
   let process =
     Client.spawn_originate_contract
       ~alias:"first_explosion"
@@ -84,13 +87,13 @@ let test_originate_first_explosion client () =
       ~prg:first_explosion
       ~init:"Unit"
       ~burn_cap:(Tez.of_int 10)
-      ~gas_limit:1461
+      ~gas_limit
       client
   in
   let* () = Process.check_error ~exit_code:1 ~msg:expected_msg process in
   unit
 
-let test_typecheck_script_big_type client () =
+let test_typecheck_script_big_type client _protocol () =
   let expected_msg = rex "type exceeded maximum type size" in
   let process =
     Client.spawn_typecheck_script ~script:first_explosion_bigtype client
@@ -98,7 +101,7 @@ let test_typecheck_script_big_type client () =
   let _ = Process.check_error ~exit_code:1 ~msg:expected_msg process in
   unit
 
-let test_run_script_second_explosion client () =
+let test_run_script_second_explosion client _protocol () =
   let* _storage =
     Client.run_script
       ~prg:second_explosion
@@ -108,7 +111,7 @@ let test_run_script_second_explosion client () =
   in
   unit
 
-let test_run_script_second_explosion_fail client () =
+let test_run_script_second_explosion_fail client _protocol () =
   let input =
     "{1;2;3;4;5;6;7;8;9;0;1;2;3;4;5;6;7;1;1;1;1;1;1;1;1;1;1;1"
     ^ ";1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1}"
@@ -133,7 +136,7 @@ let assert_typecheck_data_failure client ~data ~typ ~msg =
   let process = Client.spawn_typecheck_data ~data ~typ client in
   Process.check_error ~msg process
 
-let test_typecheck_map_dup_key client () =
+let test_typecheck_map_dup_key client _protocol () =
   let msg =
     rex
       ("Map literals cannot contain duplicate"
@@ -148,7 +151,7 @@ let test_typecheck_map_dup_key client () =
   in
   unit
 
-let test_typecheck_map_bad_ordering client () =
+let test_typecheck_map_bad_ordering client _protocol () =
   let msg =
     rex
       ("Keys in a map literal must be in strictly"
@@ -163,7 +166,7 @@ let test_typecheck_map_bad_ordering client () =
   in
   unit
 
-let test_typecheck_set_bad_ordering client () =
+let test_typecheck_set_bad_ordering client _protocol () =
   let msg =
     rex
       ("Values in a set literal must be in strictly"
@@ -178,7 +181,7 @@ let test_typecheck_set_bad_ordering client () =
   in
   unit
 
-let test_typecheck_set_no_duplicates client () =
+let test_typecheck_set_no_duplicates client _protocol () =
   let msg =
     rex
       ("Set literals cannot contain duplicate values,"
@@ -202,7 +205,7 @@ let register ~protocols =
         ~tags:["client"; "michelson"; "gas_bound"]
         (fun protocol ->
           let* client = Client.init_mockup ~protocol () in
-          test_function client ())
+          test_function client protocol ())
         protocols)
     [
       ("first explosion", test_originate_first_explosion);

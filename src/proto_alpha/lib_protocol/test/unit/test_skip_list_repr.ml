@@ -27,7 +27,7 @@
     -------
     Component:  Protocol (skip lists)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "^\[Unit\] skip list$"
+                  -- --file test_skip_list_repr.ml
     Subject:    Test skip list implementation
 *)
 
@@ -675,3 +675,7 @@ let tests =
       `Quick
       test_skip_list_proof_size;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("skip list", tests)]
+  |> Lwt_main.run

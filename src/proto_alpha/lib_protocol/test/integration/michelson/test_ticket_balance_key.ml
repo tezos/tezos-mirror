@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component: Protocol (Ticket_balance_key)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                -- test "^ticket balance key"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_ticket_balance_key.ml
     Subject: Ticket balance key hashing
 *)
 
@@ -43,18 +42,19 @@ let new_ctxt () =
 
 let make_contract ticketer =
   let open Lwt_result_wrap_syntax in
-  wrap @@ Lwt.return @@ Contract.of_b58check ticketer
+  let*?@ x = Contract.of_b58check ticketer in
+  return x
 
 let make_ex_token ctxt ~ticketer ~ty ~content =
   let open Lwt_result_wrap_syntax in
-  let* Script_ir_translator.Ex_comparable_ty cty, ctxt =
+  let*?@ Script_ir_translator.Ex_comparable_ty cty, ctxt =
     let node = Micheline.root @@ Expr.from_string ty in
-    wrap @@ Lwt.return @@ Script_ir_translator.parse_comparable_ty ctxt node
+    Script_ir_translator.parse_comparable_ty ctxt node
   in
   let* ticketer = make_contract ticketer in
-  let* contents, ctxt =
+  let*@ contents, ctxt =
     let node = Micheline.root @@ Expr.from_string content in
-    wrap @@ Script_ir_translator.parse_comparable_data ctxt cty node
+    Script_ir_translator.parse_comparable_data ctxt cty node
   in
   return (Ticket_token.Ex_token {contents_type = cty; ticketer; contents}, ctxt)
 
@@ -62,12 +62,11 @@ let make_key ctxt ~ticketer ~ty ~content ~owner =
   let open Lwt_result_wrap_syntax in
   let* ex_token, ctxt = make_ex_token ctxt ~ticketer ~ty ~content in
   let* owner = make_contract owner in
-  let* key, ctxt =
-    wrap
-    @@ Ticket_balance_key.of_ex_token
-         ctxt
-         ~owner:(Destination.Contract owner)
-         ex_token
+  let*@ key, ctxt =
+    Ticket_balance_key.of_ex_token
+      ctxt
+      ~owner:(Destination.Contract owner)
+      ex_token
   in
   return (key, ctxt)
 
@@ -427,30 +426,28 @@ let test_option_some () =
 
 let tests =
   [
-    Tztest.tztest "Test different ticketers" `Quick test_different_ticketers;
-    Tztest.tztest "Test different owners" `Quick test_different_owners;
-    Tztest.tztest "Test different content" `Quick test_different_content;
-    Tztest.tztest "Test different amounts" `Quick test_different_amounts;
-    Tztest.tztest "Test nat int" `Quick test_nat_int;
-    Tztest.tztest "Test nat mutez" `Quick test_nat_mutez;
-    Tztest.tztest "Test not bool" `Quick test_bool_nat;
-    Tztest.tztest "Test nat bytes" `Quick test_nat_bytes;
-    Tztest.tztest "Test string chain_id" `Quick test_string_chain_id;
-    Tztest.tztest "Test string key_hash" `Quick test_string_key_hash;
-    Tztest.tztest "Test string timestamp" `Quick test_string_timestamp;
-    Tztest.tztest "Test string address" `Quick test_string_address;
-    Tztest.tztest "Test string key" `Quick test_string_key;
-    Tztest.tztest "Test string signature" `Quick test_string_signature;
-    Tztest.tztest "Test annotations for pair" `Quick test_annotation_pair;
-    Tztest.tztest "Test annotations for or" `Quick test_annotation_or;
-    Tztest.tztest
-      "Test annotations for type alias"
-      `Quick
-      test_annotation_type_alias;
-    Tztest.tztest
-      "Test annotations for paired ors"
-      `Quick
-      test_annotation_pair_or;
-    Tztest.tztest "Test option none" `Quick test_option_none;
-    Tztest.tztest "Test option some" `Quick test_option_some;
+    Tztest.tztest "different ticketers" `Quick test_different_ticketers;
+    Tztest.tztest "different owners" `Quick test_different_owners;
+    Tztest.tztest "different content" `Quick test_different_content;
+    Tztest.tztest "different amounts" `Quick test_different_amounts;
+    Tztest.tztest "nat int" `Quick test_nat_int;
+    Tztest.tztest "nat mutez" `Quick test_nat_mutez;
+    Tztest.tztest "not bool" `Quick test_bool_nat;
+    Tztest.tztest "nat bytes" `Quick test_nat_bytes;
+    Tztest.tztest "string chain_id" `Quick test_string_chain_id;
+    Tztest.tztest "string key_hash" `Quick test_string_key_hash;
+    Tztest.tztest "string timestamp" `Quick test_string_timestamp;
+    Tztest.tztest "string address" `Quick test_string_address;
+    Tztest.tztest "string key" `Quick test_string_key;
+    Tztest.tztest "string signature" `Quick test_string_signature;
+    Tztest.tztest "annotations for pair" `Quick test_annotation_pair;
+    Tztest.tztest "annotations for or" `Quick test_annotation_or;
+    Tztest.tztest "annotations for type alias" `Quick test_annotation_type_alias;
+    Tztest.tztest "annotations for paired ors" `Quick test_annotation_pair_or;
+    Tztest.tztest "option none" `Quick test_option_none;
+    Tztest.tztest "option some" `Quick test_option_some;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("ticket balance key", tests)]
+  |> Lwt_main.run

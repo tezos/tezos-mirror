@@ -6,6 +6,8 @@ module Vk = Core.Raw.Viewing_key
 
 let ba_of_hex h = Hex.to_bytes_exn (`Hex h)
 
+let path filename = project_root // Filename.dirname __FILE__ // filename
+
 module Vector = struct
   type test_vector = {
     sk : Bytes.t;
@@ -55,7 +57,7 @@ module Vector = struct
       }
     in
     (* read file in memory skipping lines with # *)
-    let file = "vectors.csv" in
+    let file = path "vectors.csv" in
     let ic = open_in file in
     let rec read_lines ls =
       try
@@ -118,7 +120,7 @@ let vectors_zip32 =
     }
   in
   (* read file in memory skipping lines with # *)
-  let file = "vectors-zip32.csv" in
+  let file = path "vectors-zip32.csv" in
   let ic = open_in file in
   let rec read_lines ls =
     try

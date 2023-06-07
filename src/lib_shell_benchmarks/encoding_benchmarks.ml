@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,9 +23,13 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Benchmarks_shell
 
-open Encoding_benchmarks_helpers
+open Encoding_benchmarks_helpers.Make (struct
+  let file = __FILE__
 
+  let generated_code_destination = None
+end)
 (* ------------------------------------------------------------------------- *)
 
 module Make_elliptic_curve_encoding_benchmarks (A : sig
@@ -257,3 +262,125 @@ let chain_id_readable_decoding =
     ()
 
 let () = Registration.register chain_id_readable_decoding
+
+(** The following benchmarks are not used directly to define precise
+    gas models but the inferred gas constants may be used for
+    over-approximating other costs or simply as reference points. *)
+
+let nat_encoding =
+  make_encode_variable_size
+    ~name:"ENCODING_NAT"
+    ~encoding:Data_encoding.n
+    ~generator:(fun rng_state ->
+      let nbytes =
+        Base_samplers.sample_in_interval ~range:{min = 0; max = 32000} rng_state
+      in
+      let n = Base_samplers.uniform_nat ~nbytes rng_state in
+      (n, {bytes = nbytes}))
+    ()
+
+let () = Registration.register nat_encoding
+
+let nat_decoding =
+  make_decode_variable_size
+    ~name:"DECODING_NAT"
+    ~encoding:Data_encoding.n
+    ~generator:(fun rng_state ->
+      let nbytes =
+        Base_samplers.sample_in_interval ~range:{min = 0; max = 32000} rng_state
+      in
+      let n = Base_samplers.uniform_nat ~nbytes rng_state in
+      (n, {bytes = nbytes}))
+    ()
+
+let () = Registration.register nat_decoding
+
+let int_encoding =
+  make_encode_variable_size
+    ~name:"ENCODING_INT"
+    ~encoding:Data_encoding.z
+    ~generator:(fun rng_state ->
+      let nbytes =
+        Base_samplers.sample_in_interval ~range:{min = 0; max = 32000} rng_state
+      in
+      let n = Base_samplers.uniform_int ~nbytes rng_state in
+      (n, {bytes = nbytes}))
+    ()
+
+let () = Registration.register int_encoding
+
+let int_decoding =
+  make_decode_variable_size
+    ~name:"DECODING_INT"
+    ~encoding:Data_encoding.z
+    ~generator:(fun rng_state ->
+      let nbytes =
+        Base_samplers.sample_in_interval ~range:{min = 0; max = 32000} rng_state
+      in
+      let n = Base_samplers.uniform_int ~nbytes rng_state in
+      (n, {bytes = nbytes}))
+    ()
+
+let () = Registration.register int_decoding
+
+let string_encoding =
+  make_encode_variable_size
+    ~name:"ENCODING_STRING"
+    ~encoding:Data_encoding.string
+    ~generator:(fun rng_state ->
+      let nbytes =
+        Base_samplers.sample_in_interval ~range:{min = 0; max = 32000} rng_state
+      in
+      let s = Base_samplers.uniform_string ~nbytes rng_state in
+      (s, {bytes = nbytes}))
+    ()
+
+let () = Registration.register string_encoding
+
+let string_decoding =
+  make_decode_variable_size
+    ~name:"DECODING_STRING"
+    ~encoding:Data_encoding.string
+    ~generator:(fun rng_state ->
+      let nbytes =
+        Base_samplers.sample_in_interval ~range:{min = 0; max = 32000} rng_state
+      in
+      let s = Base_samplers.uniform_string ~nbytes rng_state in
+      (s, {bytes = nbytes}))
+    ()
+
+let () = Registration.register string_decoding
+
+let adversarial_string_list_encoding =
+  make_encode_variable_size
+    ~name:"ENCODING_STRING_LIST_ADVERSARIAL"
+    ~encoding:Data_encoding.(list string)
+    ~generator:(fun rng_state ->
+      let length =
+        Base_samplers.sample_in_interval ~range:{min = 0; max = 32000} rng_state
+      in
+      let l =
+        Stdlib.List.init length (fun _ ->
+            String.make 1 (Base_samplers.uniform_byte rng_state))
+      in
+      (l, {bytes = Data_encoding.(Binary.length (list string) l)}))
+    ()
+
+let () = Registration.register adversarial_string_list_encoding
+
+let adversarial_string_list_decoding =
+  make_decode_variable_size
+    ~name:"DECODING_STRING_LIST_ADVERSARIAL"
+    ~encoding:Data_encoding.(list string)
+    ~generator:(fun rng_state ->
+      let length =
+        Base_samplers.sample_in_interval ~range:{min = 0; max = 32000} rng_state
+      in
+      let l =
+        Stdlib.List.init length (fun _ ->
+            String.make 1 (Base_samplers.uniform_byte rng_state))
+      in
+      (l, {bytes = Data_encoding.(Binary.length (list string) l)}))
+    ()
+
+let () = Registration.register adversarial_string_list_decoding

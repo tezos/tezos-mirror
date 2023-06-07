@@ -1,0 +1,65 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_smart_rollup_node_PtMumbai)
+ (package octez-smart-rollup-node-PtMumbai)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-stdlib-unix
+  tezos-client-base
+  tezos-client-base-unix
+  tezos-client-016-PtMumbai
+  tezos-context.encoding
+  tezos-context.helpers
+  tezos-protocol-016-PtMumbai
+  tezos-protocol-plugin-016-PtMumbai
+  tezos-protocol-016-PtMumbai.parameters
+  tezos-rpc
+  tezos-rpc-http
+  tezos-rpc-http-server
+  tezos-workers
+  tezos-dal-node-services
+  tezos_dal_node_lib
+  tezos-shell-services
+  tezos-smart-rollup-016-PtMumbai
+  tezos-smart-rollup-layer2-016-PtMumbai
+  tezos-layer2-utils-016-PtMumbai
+  tezos_layer2_store
+  octez-crawler
+  tezos-tree-encoding
+  data-encoding
+  irmin-pack
+  irmin-pack.unix
+  irmin
+  aches
+  aches-lwt
+  octez-injector
+  octez-smart-rollup-node
+  tezos-scoru-wasm
+  tezos-scoru-wasm-fast
+  tezos-crypto-dal)
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_stdlib_unix
+  -open Tezos_client_base
+  -open Tezos_client_base_unix
+  -open Tezos_client_016_PtMumbai
+  -open Tezos_protocol_016_PtMumbai
+  -open Tezos_protocol_plugin_016_PtMumbai
+  -open Tezos_protocol_016_PtMumbai_parameters
+  -open Tezos_workers
+  -open Tezos_dal_node_lib
+  -open Tezos_shell_services
+  -open Tezos_smart_rollup_016_PtMumbai
+  -open Tezos_smart_rollup_layer2_016_PtMumbai
+  -open Tezos_layer2_utils_016_PtMumbai
+  -open Tezos_layer2_store
+  -open Octez_crawler
+  -open Octez_injector
+  -open Octez_smart_rollup_node
+  -open Tezos_crypto_dal))

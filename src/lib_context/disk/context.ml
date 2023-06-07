@@ -161,6 +161,21 @@ module Events = struct
 
   let section = ["node"; "context"; "disk"]
 
+  let init_context =
+    declare_3
+      ~section
+      ~level:Info
+      ~name:"init_context"
+      ~msg:
+        "initializing context (readonly: {readonly}, index_log_size: \
+         {index_log_size}, lru_size: {lru_size})"
+      ~pp1:Format.pp_print_bool
+      ("readonly", Data_encoding.bool)
+      ~pp2:Format.pp_print_int
+      ("index_log_size", Data_encoding.int31)
+      ~pp3:Format.pp_print_int
+      ("lru_size", Data_encoding.int31)
+
   let starting_gc =
     declare_1
       ~section
@@ -530,7 +545,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       ~uniq:`False
       ~contents
       tree
-      (Tezos_context_memory.make_empty_tree ())
+      (Tezos_context_memory.Context.make_empty_tree ())
 
   let to_memory_tree (ctxt : t) (key : string list) :
       Tezos_context_memory.Context.tree option Lwt.t =
@@ -771,19 +786,11 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   (*-- Initialisation ----------------------------------------------------------*)
 
-  let init ?patch_context ?(readonly = false)
-      ?(indexing_strategy : Tezos_context_helpers.Env.indexing_strategy option)
-      ?index_log_size:tbl_log_size root =
+  let init ?patch_context ?(readonly = false) ?index_log_size:tbl_log_size root
+      =
     let open Lwt_syntax in
-    let module I = Irmin_pack.Indexing_strategy in
-    let indexing_strategy : I.t =
-      Option.value
-        indexing_strategy
-        ~default:Tezos_context_helpers.Env.(v.indexing_strategy)
-      |> function
-      | `Always -> I.always
-      | `Minimal -> I.minimal
-    in
+    (* Forces the context to use the minimal indexing strategy. *)
+    let indexing_strategy = Irmin_pack.Indexing_strategy.minimal in
     let+ repo =
       let env = Tezos_context_helpers.Env.v in
       let index_log_size =
@@ -792,6 +799,9 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
           ~default:Tezos_context_helpers.Env.(env.index_log_size)
       in
       let lru_size = env.lru_size in
+      let* () =
+        Events.(emit init_context (readonly, index_log_size, lru_size))
+      in
       Store.Repo.v
         (Irmin_pack.config
            ~readonly
@@ -1066,19 +1076,12 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     type import = Snapshot.Import.process
 
     let v_import ?(in_memory = false) idx =
-      let indexing_strategy = Tezos_context_helpers.Env.v.indexing_strategy in
       let on_disk =
-        match indexing_strategy with
-        | `Always ->
-            Some `Reuse
-            (* reuse index when importing a snaphot with the always indexing
-               strategy. *)
-        | `Minimal ->
-            if in_memory then None
-            else
-              (* by default the import is using an on-disk index. *)
-              let index_on_disk = Filename.concat idx.path "index_snapshot" in
-              Some (`Path index_on_disk)
+        if in_memory then None
+        else
+          (* by default the import is using an on-disk index. *)
+          let index_on_disk = Filename.concat idx.path "index_snapshot" in
+          Some (`Path index_on_disk)
       in
       Snapshot.Import.v ?on_disk idx.repo
 
@@ -1118,7 +1121,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
         | None -> Lwt.return_some (Store.Tree.empty ())
         | Some sub_tree -> add_hash batch sub_tree [step] hash
       in
-      let* o = Seq_es.fold_left_s add (Some (Store.Tree.empty ())) l in
+      let* o = Seq_es.S.fold_left add (Some (Store.Tree.empty ())) l in
       match o with
       | None -> return_none
       | Some tree ->

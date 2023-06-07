@@ -11,10 +11,8 @@
     GIT_VERSION: "dev"
   script:
     - make -C ${CI_PROJECT_DIR}/.gitlab/ci  build-full-unreleased
-  cache:
-    key: "$CI_COMMIT_REF_SLUG"
-    paths:
-      - _build
+    - chmod +w ${CI_PROJECT_DIR}/octez-* _build/default/tezt/tests/main.exe _build/default/src/lib_protocol_compiler/bin/main_native.exe
+    - strip -s ${CI_PROJECT_DIR}/octez-* _build/default/tezt/tests/main.exe _build/default/src/lib_protocol_compiler/bin/main_native.exe
   artifacts:
     name: "build-$ARCH-$CI_COMMIT_REF_SLUG"
     paths:
@@ -22,6 +20,7 @@
       - tezos-*
       - src/proto_*/parameters/*.json
       - _build/default/src/lib_protocol_compiler/bin/main_native.exe
+      - _build/default/tezt/tests/main.exe
     expire_in: 1 day
     when: on_success
 

@@ -125,7 +125,7 @@ let blockchain_network_mainnet =
           "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1" );
       ]
     ~default_bootstrap_peers:
-      ["boot.tzbeta.net"; "boot.mainnet.oxheadhosted.com"]
+      ["boot.tzboot.net"; "boot.tzbeta.net"; "boot.mainnet.oxheadhosted.com"]
 
 let blockchain_network_ghostnet =
   make_blockchain_network
@@ -167,41 +167,6 @@ let blockchain_network_ghostnet =
         "ghostnet.kaml.fr";
         "ghostnet.stakenow.de:9733";
         "ghostnet.visualtez.com";
-      ]
-
-let blockchain_network_limanet =
-  make_blockchain_network
-    ~alias:"limanet"
-    {
-      time = Time.Protocol.of_notation_exn "2022-10-13T15:00:00Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BL3LAGwnWoNFM2H5ZA3Mbd622CVWMe8Kzfkksws4roKDD9WwBmf";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
-    }
-    ~genesis_parameters:
-      {
-        context_key = "sandbox_parameter";
-        values =
-          `O
-            [
-              ( "genesis_pubkey",
-                `String "edpkuYLienS3Xdt5c1vfRX1ibMxQuvfM67ByhJ9nmRYYKGAAoTq1UC"
-              );
-            ];
-      }
-    ~chain_name:"TEZOS_LIMANET_2022-10-13T15:00:00Z"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
-    ~user_activated_upgrades:
-      [(8192l, "PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW")]
-    ~default_bootstrap_peers:
-      [
-        "limanet.teztnets.xyz";
-        "limanet.boot.ecadinfra.com";
-        "limaboot.tzbeta.net";
-        "limanet.stakenow.de:9733";
       ]
 
 let blockchain_network_mumbainet =
@@ -331,7 +296,6 @@ let builtin_blockchain_networks_with_tags =
     (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
     (19, blockchain_network_ghostnet);
-    (21, blockchain_network_limanet);
     (22, blockchain_network_mumbainet);
   ]
   |> List.map (fun (tag, network) ->
@@ -382,7 +346,7 @@ type t = {
   p2p : p2p;
   rpc : rpc;
   log : Lwt_log_sink_unix.cfg;
-  internal_events : Internal_event_config.t;
+  internal_events : Internal_event_config.t option;
   shell : Shell_limits.limits;
   blockchain_network : blockchain_network;
   metrics_addr : string list;
@@ -400,6 +364,7 @@ and p2p = {
   disable_mempool : bool;
   enable_testchain : bool;
   reconnection_config : Tezos_p2p_services.Point_reconnection_config.t;
+  disable_peer_discovery : bool;
 }
 
 and rpc = {
@@ -425,6 +390,7 @@ let default_p2p =
     disable_mempool = false;
     enable_testchain = false;
     reconnection_config = Tezos_p2p_services.Point_reconnection_config.default;
+    disable_peer_discovery = false;
   }
 
 let default_rpc =
@@ -439,13 +405,19 @@ let default_rpc =
 
 let default_disable_config_validation = false
 
+let lwt_log_sink_default_cfg =
+  {
+    Lwt_log_sink_unix.default_cfg with
+    template = "$(date).$(milliseconds): $(message)";
+  }
+
 let default_config =
   {
     data_dir = default_data_dir;
     p2p = default_p2p;
     rpc = default_rpc;
-    log = Lwt_log_sink_unix.default_cfg;
-    internal_events = Internal_event_config.default;
+    log = lwt_log_sink_default_cfg;
+    internal_events = None;
     shell = Shell_limits.default_limits;
     blockchain_network = blockchain_network_mainnet;
     disable_config_validation = default_disable_config_validation;
@@ -467,27 +439,30 @@ let p2p =
            disable_mempool;
            enable_testchain;
            reconnection_config;
+           disable_peer_discovery;
          } ->
-      ( expected_pow,
-        bootstrap_peers,
-        listen_addr,
-        advertised_net_port,
-        discovery_addr,
-        private_mode,
-        limits,
-        disable_mempool,
-        enable_testchain,
-        reconnection_config ))
-    (fun ( expected_pow,
-           bootstrap_peers,
-           listen_addr,
-           advertised_net_port,
-           discovery_addr,
-           private_mode,
-           limits,
-           disable_mempool,
-           enable_testchain,
-           reconnection_config ) ->
+      ( ( expected_pow,
+          bootstrap_peers,
+          listen_addr,
+          advertised_net_port,
+          discovery_addr ),
+        ( private_mode,
+          limits,
+          disable_mempool,
+          enable_testchain,
+          reconnection_config,
+          disable_peer_discovery ) ))
+    (fun ( ( expected_pow,
+             bootstrap_peers,
+             listen_addr,
+             advertised_net_port,
+             discovery_addr ),
+           ( private_mode,
+             limits,
+             disable_mempool,
+             enable_testchain,
+             reconnection_config,
+             disable_peer_discovery ) ) ->
       {
         expected_pow;
         bootstrap_peers;
@@ -499,83 +474,98 @@ let p2p =
         disable_mempool;
         enable_testchain;
         reconnection_config;
+        disable_peer_discovery;
       })
-    (obj10
-       (dft
-          "expected-proof-of-work"
-          ~description:
-            "Floating point number between 0 and 256 that represents a \
-             difficulty, 24 signifies for example that at least 24 leading \
-             zeroes are expected in the hash."
-          float
-          default_p2p.expected_pow)
-       (opt
-          "bootstrap-peers"
-          ~description:
-            "List of hosts. Tezos can connect to both IPv6 and IPv4 hosts. If \
-             the port is not specified, default port 9732 will be assumed."
-          (list string))
-       (opt
-          "listen-addr"
-          ~description:
-            "Host to listen to. If the port is not specified, the default port \
-             9732 will be assumed."
-          string)
-       (opt
-          "advertised-net-port"
-          ~description:
-            "Alternative port advertised to other peers to connect to. If the \
-             port is not specified, the port from listen-addr will be assumed."
-          uint16)
-       (dft
-          "discovery-addr"
-          ~description:
-            "Host for local peer discovery. If the port is not specified, the \
-             default port 10732 will be assumed."
-          (option string)
-          default_p2p.discovery_addr)
-       (dft
-          "private-mode"
-          ~description:
-            "Specify if the node is in private mode or not. A node in private \
-             mode rejects incoming connections from untrusted peers and only \
-             opens outgoing connections to peers listed in 'bootstrap-peers' \
-             or provided with '--peer' option. Moreover, these peers will keep \
-             the identity and the address of the private node secret."
-          bool
-          false)
-       (dft
-          "limits"
-          ~description:"Network limits"
-          Tezos_p2p_services.P2p_limits.encoding
-          Tezos_p2p_services.P2p_limits.default)
-       (dft
-          "disable_mempool"
-          ~description:
-            "If set to [true], the node will not participate in the \
-             propagation of pending operations (mempool). Default value is \
-             [false]. It can be used to decrease the memory and computation \
-             footprints of the node."
-          bool
-          false)
-       (dft
-          "enable_testchain"
-          ~description:
-            "DEPRECATED. If set to [true], the node will spawn a testchain \
-             during the protocol's testing voting period. Default value is \
-             [false]. It is disabled to decrease the node storage usage and \
-             computation by dropping the validation of the test network \
-             blocks."
-          bool
-          false)
-       (let open Tezos_p2p_services.Point_reconnection_config in
-       dft
-         "greylisting_config"
-         ~description:
-           "The reconnection policy regulates the frequency with which the \
-            node tries to reconnect to an old known peer."
-         encoding
-         default))
+    (merge_objs
+       (obj5
+          (dft
+             "expected-proof-of-work"
+             ~description:
+               "Floating point number between 0 and 256 that represents a \
+                difficulty, 24 signifies for example that at least 24 leading \
+                zeroes are expected in the hash."
+             float
+             default_p2p.expected_pow)
+          (opt
+             "bootstrap-peers"
+             ~description:
+               "List of hosts. Tezos can connect to both IPv6 and IPv4 hosts. \
+                If the port is not specified, default port 9732 will be \
+                assumed."
+             (list string))
+          (opt
+             "listen-addr"
+             ~description:
+               "Host to listen to. If the port is not specified, the default \
+                port 9732 will be assumed."
+             string)
+          (opt
+             "advertised-net-port"
+             ~description:
+               "Alternative port advertised to other peers to connect to. If \
+                the port is not specified, the port from listen-addr will be \
+                assumed."
+             uint16)
+          (dft
+             "discovery-addr"
+             ~description:
+               "Host for local peer discovery. If the port is not specified, \
+                the default port 10732 will be assumed."
+             (option string)
+             default_p2p.discovery_addr))
+       (obj6
+          (dft
+             "private-mode"
+             ~description:
+               "Specify if the node is in private mode or not. A node in \
+                private mode rejects incoming connections from untrusted peers \
+                and only opens outgoing connections to peers listed in \
+                'bootstrap-peers' or provided with '--peer' option. Moreover, \
+                these peers will keep the identity and the address of the \
+                private node secret."
+             bool
+             default_p2p.private_mode)
+          (dft
+             "limits"
+             ~description:"Network limits"
+             Tezos_p2p_services.P2p_limits.encoding
+             Tezos_p2p_services.P2p_limits.default)
+          (dft
+             "disable_mempool"
+             ~description:
+               "If set to [true], the node will not participate in the \
+                propagation of pending operations (mempool). Default value is \
+                [false]. It can be used to decrease the memory and computation \
+                footprints of the node."
+             bool
+             default_p2p.disable_mempool)
+          (dft
+             "enable_testchain"
+             ~description:
+               "DEPRECATED. If set to [true], the node will spawn a testchain \
+                during the protocol's testing voting period. Default value is \
+                [false]. It is disabled to decrease the node storage usage and \
+                computation by dropping the validation of the test network \
+                blocks."
+             bool
+             default_p2p.enable_testchain)
+          (let open Tezos_p2p_services.Point_reconnection_config in
+          dft
+            "greylisting_config"
+            ~description:
+              "The reconnection policy regulates the frequency with which the \
+               node tries to reconnect to an old known peer."
+            encoding
+            default)
+          (dft
+             "disable_peer_discovery"
+             ~description:
+               "This field should be used for testing purpose only. If set to \
+                [true], the node will not participate to the peer discovery \
+                mechanism. The node will not be able to find new peers to \
+                connect with."
+             bool
+             default_p2p.disable_peer_discovery)))
 
 let rpc : rpc Data_encoding.t =
   let open Data_encoding in
@@ -729,12 +719,11 @@ let encoding =
           ~description:
             "Configuration of the Lwt-log sink (part of the logging framework)"
           Lwt_log_sink_unix.cfg_encoding
-          Lwt_log_sink_unix.default_cfg)
-       (dft
+          lwt_log_sink_default_cfg)
+       (opt
           "internal-events"
           ~description:"Configuration of the structured logging framework"
-          Internal_event_config.encoding
-          Internal_event_config.default)
+          Internal_event_config.encoding)
        (dft
           "shell"
           ~description:"Configuration of network parameters"
@@ -852,13 +841,17 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?binary_chunks_size ?peer_table_size ?expected_pow ?bootstrap_peers
     ?listen_addr ?advertised_net_port ?discovery_addr ?(rpc_listen_addrs = [])
     ?(allow_all_rpc = []) ?(media_type = Media_type.Command_line.Any)
-    ?(metrics_addr = []) ?operation_metadata_size_limit ?(private_mode = false)
-    ?(disable_mempool = false)
+    ?(metrics_addr = []) ?operation_metadata_size_limit
+    ?(private_mode = default_p2p.private_mode)
+    ?(disable_p2p_maintenance =
+      Option.is_none default_p2p.limits.maintenance_idle_time)
+    ?(disable_p2p_swap = Option.is_none default_p2p.limits.swap_linger)
+    ?(disable_mempool = default_p2p.disable_mempool)
     ?(disable_mempool_precheck =
       Shell_limits.default_limits.prevalidator_limits.disable_precheck)
-    ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
-    ?rpc_tls ?log_output ?synchronisation_threshold ?history_mode ?network
-    ?latency cfg =
+    ?(enable_testchain = default_p2p.enable_testchain) ?(cors_origins = [])
+    ?(cors_headers = []) ?rpc_tls ?log_output ?synchronisation_threshold
+    ?history_mode ?network ?latency cfg =
   let open Lwt_result_syntax in
   let disable_config_validation =
     cfg.disable_config_validation || disable_config_validation
@@ -897,6 +890,11 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       max_known_peer_ids =
         Option.either peer_table_size cfg.p2p.limits.max_known_peer_ids;
       binary_chunks_size = Option.map (fun x -> x lsl 10) binary_chunks_size;
+      maintenance_idle_time =
+        (if disable_p2p_maintenance then None
+        else cfg.p2p.limits.maintenance_idle_time);
+      swap_linger =
+        (if disable_p2p_swap then None else cfg.p2p.limits.swap_linger);
     }
   in
   let acl =
@@ -921,6 +919,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       disable_mempool = cfg.p2p.disable_mempool || disable_mempool;
       enable_testchain = cfg.p2p.enable_testchain || enable_testchain;
       reconnection_config = cfg.p2p.reconnection_config;
+      disable_peer_discovery = cfg.p2p.disable_peer_discovery;
     }
   and rpc : rpc =
     {

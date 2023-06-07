@@ -195,6 +195,10 @@ module Typechecking_data : Benchmark.S = struct
 
   let info = "Benchmarking typechecking of data"
 
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
+
   let typechecking_data_benchmark rng_state (node : Protocol.Script_repr.expr)
       (michelson_type : Script_repr.expr) =
     Lwt_main.run
@@ -266,6 +270,10 @@ module Unparsing_data : Benchmark.S = struct
   let name = ns "UNPARSING_DATA"
 
   let info = "Benchmarking unparsing of data"
+
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
 
   let unparsing_data_benchmark rng_state (node : Protocol.Script_repr.expr)
       (michelson_type : Protocol.Script_repr.expr) =
@@ -346,6 +354,10 @@ module Typechecking_code : Benchmark.S = struct
 
   let info = "Benchmarking typechecking of code"
 
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
+
   let typechecking_code_benchmark rng_state (node : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =
     Lwt_main.run
@@ -421,6 +433,10 @@ module Unparsing_code : Benchmark.S = struct
   let name = ns "UNPARSING_CODE"
 
   let info = "Benchmarking unparsing of code"
+
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
 
   let unparsing_code_benchmark rng_state (node : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =
@@ -502,6 +518,11 @@ let rec check_printable_ascii v i =
 
 let check_printable_benchmark =
   let open Tezos_shell_benchmarks.Encoding_benchmarks_helpers in
+  let open Tezos_shell_benchmarks.Encoding_benchmarks_helpers.Make (struct
+    let file = __FILE__
+
+    let generated_code_destination = None
+  end) in
   linear_shared
     ~name:"CHECK_PRINTABLE"
     ~generator:(fun rng_state ->
@@ -550,6 +571,10 @@ module Ty_eq : Benchmark.S = struct
 
   let info = "Benchmarking equating types"
 
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
+
   let tags = [Tags.translator]
 
   let intercept_var = fv (Format.asprintf "%s_const" (Namespace.basename name))
@@ -559,21 +584,17 @@ module Ty_eq : Benchmark.S = struct
   let size_model =
     Model.make
       ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
-      ~model:
-        (Model.affine_split_const
-           ~intercept1:Builtin_benchmarks.timer_variable
-           ~intercept2:intercept_var
-           ~coeff:coeff_var)
+      ~model:(Model.affine ~name ~intercept:intercept_var ~coeff:coeff_var)
 
   let codegen_model =
     Model.make
       ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
-      ~model:(Model.affine ~intercept:intercept_var ~coeff:coeff_var)
+      ~model:(Model.affine ~name ~intercept:intercept_var ~coeff:coeff_var)
 
   let () =
     Registration_helpers.register_for_codegen
       (Namespace.basename name)
-      (Model.For_codegen codegen_model)
+      codegen_model
 
   let models =
     [("size_translator_model", size_model); ("codegen", codegen_model)]
@@ -710,6 +731,10 @@ module Parse_type_benchmark : Benchmark.S = struct
 
   let info = "Benchmarking parse_ty"
 
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
+
   let make_bench rng_state config () =
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
       let ctxt = Gas_helpers.set_limit ctxt in
@@ -742,6 +767,7 @@ module Parse_type_benchmark : Benchmark.S = struct
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
       ~model:
         (Model.affine
+           ~name
            ~intercept:
              (fv (Format.asprintf "%s_const" (Namespace.basename name)))
            ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
@@ -760,6 +786,10 @@ module Unparse_type_benchmark : Benchmark.S = struct
   let name = ns "UNPARSE_TYPE"
 
   let info = "Benchmarking unparse_ty"
+
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
 
   let make_bench rng_state config () =
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
@@ -790,6 +820,7 @@ module Unparse_type_benchmark : Benchmark.S = struct
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
       ~model:
         (Model.affine
+           ~name
            ~intercept:
              (fv (Format.asprintf "%s_const" (Namespace.basename name)))
            ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
@@ -802,7 +833,7 @@ module Unparse_type_benchmark : Benchmark.S = struct
   let () =
     Registration_helpers.register_for_codegen
       (Namespace.basename name)
-      (Model.For_codegen size_model)
+      size_model
 end
 
 let () = Registration_helpers.register (module Unparse_type_benchmark)

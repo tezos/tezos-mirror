@@ -139,7 +139,7 @@ baking rights at higher rounds, like 2 in the example above.
 Inactive delegates
 ~~~~~~~~~~~~~~~~~~
 
-If a delegate doesn't show any sign of activity for `preserved_cycles`
+If a delegate doesn't show any sign of activity for ``preserved_cycles``
 it is marked **inactive** and its rights are removed.
 This mechanism is important to remove inactive delegates and reallocate
 their rights to the active ones so that the network is always working
@@ -169,7 +169,9 @@ accounts have the necessary rights.
 Let's launch the daemon pointing to the standard node directory and
 baking for user *bob*::
 
-   octez-baker-alpha run with local node ~/.tezos-node bob --liquidity-baking-toggle-vote pass
+   octez-baker-<PROTO_HASH> run with local node ~/.tezos-node bob --liquidity-baking-toggle-vote pass
+
+where ``PROTO_HASH`` is the short hash of the current protocol of the network you want to bake on.
 
 Note that the baker needs direct access to
 the node data directory for performance reasons (to reduce the number of RPC calls to the node).
@@ -183,15 +185,12 @@ Note that ``--liquidity-baking-toggle-vote`` must be placed
     If you are worried about the availability of your node when it is its turn to bake/endorse, there are other ways than duplicating your credentials (see the discussion in section :ref:`inactive_delegates`).
     **Never** use the same account on two daemons.
 
+However, it is safe (and actually necessary) to temporarily run two bakers just before a protocol activation: the baker for the protocol being replaced and the baker for the protocol to be activated.
+
 
 .. note::
 
    It is possible to bake and endorse using a dedicated :ref:`consensus_key` instead of the delegate's key.
-
-.. note::
-
-   In protocols before Ithaca, a separate daemon, the endorser, is responsible for emitting endorsements.
-   In these protocols, one needs to run the daemon ``octez-endorser-NNN-*`` to endorse.
 
 Accuser
 ~~~~~~~
@@ -221,14 +220,14 @@ If you are running the baker Docker image, you can watch the baker logs with
     docker ps
 
 If your container is running, its name will appear in the last column.
-For instance, if the name is ``mainnet_baker-PtLimaPt``, you can
+For instance, if the name is ``mainnet_baker-PtMumbai``, you can
 view recent logs with::
 
-    docker logs mainnet_baker-PtLimaPt
+    docker logs mainnet_baker-PtMumbai
 
 If you want to keep watching logs, use ``-f``::
 
-    docker logs mainnet_baker-PtLimaPt -f
+    docker logs mainnet_baker-PtMumbai -f
 
 This allows you to know if you baked.
 You should see lines such as::

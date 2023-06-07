@@ -1,7 +1,8 @@
 (** Testing
     -------
     Component:    Client Base
-    Invocation:   dune build @src/lib_client_base/runtest
+    Invocation:   dune exec src/lib_client_base/test/main.exe \
+                  -- --file pbkdf_tests.ml
     Subject:      On Password-Based Key Derivation Function 2 (PBKDF2)
                   when using hash functions SHA256 and SHA512.
 *)
@@ -66,4 +67,4 @@ let pbkdf2_tests =
     ("Test Case 13", `Quick, pbkdf2_test13);
   ]
 
-let () = Alcotest.run "PBKDF Tests" [("PBKDF2 tests", pbkdf2_tests)]
+let () = Alcotest.run ~__FILE__ "PBKDF Tests" [("PBKDF2 tests", pbkdf2_tests)]

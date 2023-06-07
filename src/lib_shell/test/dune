@@ -1,22 +1,11 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names
-  test_shell
-  test_synchronisation_heuristic_fuzzy
-  test_shell_operation
-  test_prevalidation_t
-  test_prevalidator_classification
-  test_prevalidator_classification_operations
-  test_prevalidator_pending_operations
-  legacy_test_prevalidation
-  legacy_test_prevalidation_t
-  legacy_test_prevalidator_classification
-  legacy_test_prevalidator_classification_operations
-  legacy_test_prevalidator_pending_operations
-  test_peer_validator)
+(library
+ (name src_lib_shell_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-base-test-helpers
   tezos-store
@@ -35,12 +24,12 @@
   tezos-validation
   tezos-event-logging-test-helpers
   tezos-test-helpers
-  alcotest-lwt)
- (link_flags
-  (:standard)
-  (:include %{workspace_root}/macos-link-flags.sexp))
+  octez-alcotezt)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_base_test_helpers
   -open Tezos_store
@@ -56,70 +45,42 @@
   -open Tezos_stdlib_unix
   -open Tezos_validation
   -open Tezos_event_logging_test_helpers
-  -open Tezos_test_helpers))
+  -open Tezos_test_helpers
+  -open Octez_alcotezt)
+ (modules
+  generators
+  generators_tree
+  shell_test_helpers
+  test_consensus_heuristic
+  test_node
+  test_peer_validator
+  test_prevalidation
+  test_prevalidator_classification
+  test_prevalidator_classification_operations
+  test_prevalidator_pending_operations
+  test_protocol_validator
+  test_shell_operation
+  test_synchronisation_heuristic
+  test_synchronisation_heuristic_fuzzy
+  test_validator))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_shell_test_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-shell)
- (action (run %{dep:./test_shell.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{dep:./test_synchronisation_heuristic_fuzzy.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{dep:./test_shell_operation.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{dep:./test_prevalidation_t.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{dep:./test_prevalidator_classification.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{dep:./test_prevalidator_classification_operations.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{dep:./test_prevalidator_pending_operations.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{dep:./legacy_test_prevalidation.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{dep:./legacy_test_prevalidation_t.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{dep:./legacy_test_prevalidator_classification.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action
-  (run %{dep:./legacy_test_prevalidator_classification_operations.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{dep:./legacy_test_prevalidator_pending_operations.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{dep:./test_peer_validator.exe})))
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

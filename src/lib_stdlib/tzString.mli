@@ -50,7 +50,7 @@ val split_no_empty : char -> ?limit:int -> string -> string list
     [error_on_partial_chunk] is set:
       {ul
         {li If [error_on_partial_chunk] is set, then the function returns
-        [Error error_on_partial_chunk],
+        [Error error_on_partial_chunk],}
         {li Otherwise, the function return the list of chunks, where the
         last chunk is a non-empty string of length less than [n].}
       }

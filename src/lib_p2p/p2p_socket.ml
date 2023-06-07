@@ -82,6 +82,10 @@ module Crypto = struct
     Bytes.blit msg 0 payload extrabytes msg_length ;
     P2p_io_scheduler.write ?canceler fd payload
 
+  (** Read and decypher data from the fd.
+
+      Returned buffer's size is lesser than [bufsize] - [tag_length].
+  *)
   let read_chunk ?canceler fd cryptobox_data =
     let open Lwt_result_syntax in
     let open P2p_buffer_reader in
@@ -868,14 +872,15 @@ module Internal_for_tests = struct
       (fun _ -> assert false)
       Data_encoding.unit
 
-  let mock conn =
+  let mock ?(reader = Lwt_pipe.Maybe_bounded.create ())
+      ?(writer = Lwt_pipe.Maybe_bounded.create ()) conn =
     let reader =
       Reader.
         {
           canceler = Lwt_canceler.create ();
           conn;
           encoding = make_crashing_encoding ();
-          messages = Lwt_pipe.Maybe_bounded.create ();
+          messages = reader;
           worker = Lwt.return_unit;
         }
     in
@@ -885,7 +890,7 @@ module Internal_for_tests = struct
           canceler = Lwt_canceler.create ();
           conn;
           encoding = make_crashing_encoding ();
-          messages = Lwt_pipe.Maybe_bounded.create ();
+          messages = writer;
           worker = Lwt.return_unit;
           binary_chunks_size = 0;
         }

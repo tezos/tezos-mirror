@@ -27,7 +27,7 @@ type t = {
   connection_timeout : Time.System.Span.t;
   authentication_timeout : Time.System.Span.t;
   greylist_timeout : Time.System.Span.t;
-  maintenance_idle_time : Time.System.Span.t;
+  maintenance_idle_time : Time.System.Span.t option;
   min_connections : int;
   expected_connections : int;
   max_connections : int;
@@ -46,7 +46,7 @@ type t = {
   peer_greylist_size : int;
   ip_greylist_size_in_kilobytes : int;
   ip_greylist_cleanup_delay : Time.System.Span.t;
-  swap_linger : Time.System.Span.t;
+  swap_linger : Time.System.Span.t option;
   binary_chunks_size : int option;
 }
 
@@ -57,7 +57,7 @@ let default =
     authentication_timeout = Time.System.Span.of_seconds_exn 5.;
     greylist_timeout;
     maintenance_idle_time =
-      Time.System.Span.of_seconds_exn 120. (* two minutes *);
+      Some (Time.System.Span.of_seconds_exn 120.) (* two minutes *);
     min_connections = 10;
     expected_connections = 50;
     max_connections = 100;
@@ -77,7 +77,7 @@ let default =
     ip_greylist_size_in_kilobytes =
       2 * 1024 (* two megabytes has shown good properties in simulation *);
     ip_greylist_cleanup_delay = greylist_timeout;
-    swap_linger = Time.System.Span.of_seconds_exn 30.;
+    swap_linger = Some (Time.System.Span.of_seconds_exn 30.);
     binary_chunks_size = None;
   }
 
@@ -244,7 +244,10 @@ let encoding : t Data_encoding.t =
                 "max-upload-speed"
                 ~description:"Max upload speeds in KiB/s."
                 int31)
-             (dft "swap-linger" Time.System.Span.encoding default.swap_linger))
+             (dft
+                "swap-linger"
+                (option Time.System.Span.encoding)
+                default.swap_linger))
           (obj8
              (opt "binary-chunks-size" uint8)
              (dft
@@ -291,6 +294,7 @@ let encoding : t Data_encoding.t =
              "maintenance-idle-time"
              ~description:
                "How long to wait at most, in seconds, before running a \
-                maintenance loop."
-             Time.System.Span.encoding
+                maintenance loop. If null -- decoding to None -- is provided \
+                then the maintenance is disabled."
+             (option Time.System.Span.encoding)
              default.maintenance_idle_time)))

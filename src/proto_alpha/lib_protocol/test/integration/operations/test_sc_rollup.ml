@@ -27,15 +27,13 @@
 (** Testing
     -------
     Component:    Rollup layer 1 logic
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                  -- test "^sc rollup$"
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_sc_rollup.ml
     Subject:      Test smart contract rollup
 *)
 
 open Protocol
 open Alpha_context
-open Lwt_result_syntax
 
 exception Sc_rollup_test_error of string
 
@@ -132,6 +130,7 @@ let assert_timeout_result ?game_status incr =
   assert_equal_game_status ?game_status actual_game_status
 
 let bake_timeout_period ?timeout_period_in_blocks block =
+  let open Lwt_result_syntax in
   let* timeout_period_in_blocks =
     match timeout_period_in_blocks with
     | Some v -> return v
@@ -176,13 +175,11 @@ let context_init ?(sc_rollup_challenge_window_in_blocks = 10)
     rollup when the feature flag is deactivated and checks that it
     fails. *)
 let test_disable_feature_flag () =
+  let open Lwt_result_syntax in
   let* b, contract = Context.init1 ~sc_rollup_enable:false () in
   let* i = Incremental.begin_construction b in
   let kind = Sc_rollup.Kind.Example_arith in
-  let* op, _ =
-    let parameters_ty = Script.lazy_expr @@ Expr.from_string "unit" in
-    Op.sc_rollup_origination (I i) contract kind ~boot_sector:"" ~parameters_ty
-  in
+  let* op, _ = Sc_rollup_helpers.origination_op (B b) contract kind in
   let expect_failure = function
     | Environment.Ecoproto_error
         (Validate_errors.Manager.Sc_rollup_feature_disabled as e)
@@ -198,13 +195,11 @@ let test_disable_feature_flag () =
     rollup when the Arith PVM feature flag is deactivated and checks that it
     fails. *)
 let test_disable_arith_pvm_feature_flag () =
+  let open Lwt_result_syntax in
   let* b, contract = Context.init1 ~sc_rollup_arith_pvm_enable:false () in
   let* i = Incremental.begin_construction b in
   let kind = Sc_rollup.Kind.Example_arith in
-  let* op, _ =
-    let parameters_ty = Script.lazy_expr @@ Expr.from_string "unit" in
-    Op.sc_rollup_origination (I i) contract kind ~boot_sector:"" ~parameters_ty
-  in
+  let* op, _ = Sc_rollup_helpers.origination_op (B b) contract kind in
   let expect_failure = function
     | Environment.Ecoproto_error
         (Validate_errors.Manager.Sc_rollup_arith_pvm_disabled as e)
@@ -217,17 +212,17 @@ let test_disable_arith_pvm_feature_flag () =
   return_unit
 
 (** Initializes the context and originates a SCORU. *)
-let sc_originate ?(boot_sector = "") ?origination_proof block contract
-    parameters_ty =
+let sc_originate ?boot_sector ?origination_proof ?parameters_ty block contract =
+  let open Lwt_result_syntax in
   let kind = Sc_rollup.Kind.Example_arith in
   let* operation, rollup =
-    Op.sc_rollup_origination
+    Sc_rollup_helpers.origination_op
+      ?boot_sector
       ?origination_proof
+      ?parameters_ty
       (B block)
       contract
       kind
-      ~boot_sector
-      ~parameters_ty:(Script.lazy_expr @@ Expr.from_string parameters_ty)
   in
   let* incr = Incremental.begin_construction block in
   let* incr = Incremental.add_operation incr operation in
@@ -235,14 +230,15 @@ let sc_originate ?(boot_sector = "") ?origination_proof block contract
   return (block, rollup)
 
 (** Initializes the context and originates a SCORU. *)
-let init_and_originate ?boot_sector ?origination_proof
-    ?sc_rollup_challenge_window_in_blocks tup parameters_ty =
+let init_and_originate ?boot_sector ?origination_proof ?parameters_ty
+    ?sc_rollup_challenge_window_in_blocks tup =
+  let open Lwt_result_syntax in
   let* block, contracts =
     context_init ?sc_rollup_challenge_window_in_blocks tup
   in
   let contract = Context.tup_hd tup contracts in
   let* block, rollup =
-    sc_originate ?boot_sector ?origination_proof block contract parameters_ty
+    sc_originate ?boot_sector ?origination_proof ?parameters_ty block contract
   in
   return (block, contracts, rollup)
 
@@ -252,6 +248,7 @@ let number_of_ticks_exn n =
   | None -> Stdlib.failwith "Bad Number_of_ticks"
 
 let next_inbox_level ?predecessor ctxt rollup =
+  let open Lwt_result_syntax in
   let* genesis_info = Context.Sc_rollup.genesis_info ctxt rollup in
   let+ constants = Context.get_constants ctxt in
   let commitment_freq =
@@ -267,6 +264,7 @@ let next_inbox_level ?predecessor ctxt rollup =
 
 let dummy_commitment ?predecessor ?compressed_state ?(number_of_ticks = 3000L)
     ?inbox_level ctxt rollup =
+  let open Lwt_result_syntax in
   let* genesis_info = Context.Sc_rollup.genesis_info ctxt rollup in
   let predecessor_hash =
     match predecessor with
@@ -298,14 +296,16 @@ let dummy_commitment ?predecessor ?compressed_state ?(number_of_ticks = 3000L)
 
 (* Bakes blocks to satisfy requirement of next_commitment.inbox_level <= current_level *)
 let bake_blocks_until_next_inbox_level ?predecessor block rollup =
+  let open Lwt_result_syntax in
   let* next_level = next_inbox_level ?predecessor (B block) rollup in
   Block.bake_until_level next_level block
 
 let bake_blocks_until_inbox_level block commitment =
   Block.bake_until_level commitment.Sc_rollup.Commitment.inbox_level block
 
-let publish_op_and_dummy_commitment ~src ?compressed_state ?predecessor rollup
-    block =
+let publish_op_and_dummy_commitment ~sender ?compressed_state ?predecessor
+    rollup block =
+  let open Lwt_result_syntax in
   let compressed_state =
     Option.map
       (fun s ->
@@ -316,7 +316,7 @@ let publish_op_and_dummy_commitment ~src ?compressed_state ?predecessor rollup
   let* commitment =
     dummy_commitment ?compressed_state ?predecessor (B block) rollup
   in
-  let* publish = Op.sc_rollup_publish (B block) src rollup commitment in
+  let* publish = Op.sc_rollup_publish (B block) sender rollup commitment in
   return (publish, commitment)
 
 (* Verify that parameters and unparsed parameters match. *)
@@ -324,30 +324,28 @@ let verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters =
   let open Lwt_result_wrap_syntax in
   let show exp = Expr.to_string @@ exp in
   let unparse ctxt parameters =
-    wrap
-      (Script_ir_translator.unparse_data
-         ctxt
-         Script_ir_unparser.Optimized
-         parameters_ty
-         parameters)
+    Script_ir_translator.unparse_data
+      ctxt
+      Script_ir_unparser.Optimized
+      parameters_ty
+      parameters
   in
-  let* unparsed_parameters, ctxt =
+  let*@ unparsed_parameters, ctxt =
     (* Make sure we can parse the unparsed-parameters with the given parameters
        type. *)
     let* parsed_unparsed_parameters, ctxt =
-      wrap
-        (Script_ir_translator.parse_data
-           ctxt
-           ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
-           ~allow_forged:true
-           parameters_ty
-           (Environment.Micheline.root unparsed_parameters))
+      Script_ir_translator.parse_data
+        ctxt
+        ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
+        ~allow_forged:true
+        parameters_ty
+        (Environment.Micheline.root unparsed_parameters)
     in
     (* Un-parse again to get back to Micheline. *)
     unparse ctxt parsed_unparsed_parameters
   in
   (* Un-parse the parsed parameters. *)
-  let* expected_unparsed_parameters, _ctxt = unparse ctxt parameters in
+  let*@ expected_unparsed_parameters, _ctxt = unparse ctxt parameters in
   (* Verify that both version match. *)
   Assert.equal_string
     ~loc:__LOC__
@@ -364,7 +362,7 @@ let verify_execute_outbox_message_operations incr rollup ~loc ~operations
     match op with
     | Script_typed_ir.Internal_operation
         {
-          source = op_source;
+          sender = op_sender;
           operation =
             Transaction_to_smart_contract
               {
@@ -383,20 +381,18 @@ let verify_execute_outbox_message_operations incr rollup ~loc ~operations
           verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters
         in
         let* () =
-          (* Check that the sources match. *)
+          (* Check that the senders match. *)
           Assert.equal_string
             ~loc
             (Destination.to_b58check (Sc_rollup rollup))
-            (Destination.to_b58check op_source)
+            (Destination.to_b58check op_sender)
         in
         (* Assert that the amount is 0. *)
         let* () = Assert.equal_tez ~loc amount Tez.zero in
         (* Load the arg-type and entrypoints of the destination script. *)
         let* ( Script_ir_translator.Ex_script (Script {arg_type; entrypoints; _}),
                ctxt ) =
-          let* ctxt, _cache_key, cached =
-            wrap @@ Script_cache.find ctxt destination
-          in
+          let*@ ctxt, _cache_key, cached = Script_cache.find ctxt destination in
           match cached with
           | Some (_script, ex_script) -> return (ex_script, ctxt)
           | None -> failwith "Could not load script at %s" loc
@@ -499,6 +495,7 @@ let string_ticket_token ticketer content =
        {ticketer; contents_type = Script_typed_ir.string_t; contents})
 
 let originate_contract incr ~script ~baker ~storage ~source_contract =
+  let open Lwt_result_syntax in
   let* block = Incremental.finalize_block incr in
   let* contract, _, block =
     Contract_helpers.originate_contract_from_string_hash
@@ -512,14 +509,13 @@ let originate_contract incr ~script ~baker ~storage ~source_contract =
   return (contract, incr)
 
 let hash_commitment incr commitment =
-  let open Lwt_result_wrap_syntax in
+  let open Result_syntax in
   let ctxt = Incremental.alpha_ctxt incr in
-  let+ ctxt, hash =
-    wrap @@ Lwt.return (Sc_rollup.Commitment.hash ctxt commitment)
-  in
+  let+ ctxt, hash = Sc_rollup.Commitment.hash ctxt commitment in
   (Incremental.set_alpha_ctxt incr ctxt, hash)
 
 let publish_commitment incr staker rollup commitment =
+  let open Lwt_result_syntax in
   let* incr =
     if
       (Incremental.header incr).Block_header.shell.level
@@ -537,12 +533,14 @@ let publish_commitment incr staker rollup commitment =
 let publish_commitments block staker rollup commitments =
   List.fold_left_es
     (fun block commitment ->
+      let open Lwt_result_syntax in
       let* incr = Incremental.begin_construction block in
       publish_commitment incr staker rollup commitment)
     block
     commitments
 
 let cement_commitment ?challenge_window_in_blocks block rollup staker hash =
+  let open Lwt_result_syntax in
   let* challenge_window_in_blocks =
     match challenge_window_in_blocks with
     | Some x -> return x
@@ -562,6 +560,7 @@ let cement_commitments ?challenge_window_in_blocks block rollup staker hashes =
     hashes
 
 let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
+  let open Lwt_result_wrap_syntax in
   let* block = publish_commitment incr originator rollup commitment in
   let* constants = Context.get_constants (B block) in
   let* block =
@@ -570,7 +569,7 @@ let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
   let* incr =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
   in
-  let* incr, hash = hash_commitment incr commitment in
+  let*?@ incr, hash = hash_commitment incr commitment in
   let* cement_op = Op.sc_rollup_cement (I incr) originator rollup hash in
   let* incr = Incremental.add_operation incr cement_op in
   let* block = Incremental.finalize_block incr in
@@ -580,6 +579,7 @@ let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
   return (hash, incr)
 
 let publish_and_cement_commitments incr ~baker ~originator rollup commitments =
+  let open Lwt_result_syntax in
   List.fold_left_es
     (fun incr commitment ->
       let* _hash, incr =
@@ -590,6 +590,7 @@ let publish_and_cement_commitments incr ~baker ~originator rollup commitments =
     commitments
 
 let publish_and_cement_dummy_commitment incr ~baker ~originator rollup =
+  let open Lwt_result_syntax in
   let* commitment = dummy_commitment (I incr) rollup in
   publish_and_cement_commitment incr ~baker ~originator rollup commitment
 
@@ -599,6 +600,7 @@ let publish_and_cement_dummy_commitment incr ~baker ~originator rollup =
 let publish_commitments_until_min_inbox_level incr rollup ~baker ~originator
     ~min_inbox_level ~cemented_commitment_hash ~cemented_commitment =
   let rec aux incr hash ({Sc_rollup.Commitment.inbox_level; _} as commitment) =
+    let open Lwt_result_syntax in
     let level = Raw_level.to_int32 inbox_level in
     if level >= Int32.of_int min_inbox_level then return (hash, incr)
     else
@@ -613,6 +615,7 @@ let publish_commitments_until_min_inbox_level incr rollup ~baker ~originator
   aux incr cemented_commitment_hash cemented_commitment
 
 let adjust_ticket_token_balance_of_rollup ctxt rollup ticket_token ~delta =
+  let open Lwt_result_syntax in
   let* incr =
     Context.(
       match ctxt with
@@ -634,21 +637,21 @@ let adjust_ticket_token_balance_of_rollup ctxt rollup ticket_token ~delta =
 let execute_outbox_message_without_proof_validation incr rollup
     ~cemented_commitment outbox_message =
   let open Lwt_result_wrap_syntax in
-  let* res, ctxt =
-    wrap
-      (Sc_rollup_operations.Internal_for_tests.execute_outbox_message
-         (Incremental.alpha_ctxt incr)
-         ~validate_and_decode_output_proof:
-           (fun ctxt ~cemented_commitment:_ _rollup ~output_proof:_ ->
-           return (outbox_message, ctxt))
-         rollup
-         ~cemented_commitment
-         ~output_proof:"Not used")
+  let*@ res, ctxt =
+    Sc_rollup_operations.Internal_for_tests.execute_outbox_message
+      (Incremental.alpha_ctxt incr)
+      ~validate_and_decode_output_proof:
+        (fun ctxt ~cemented_commitment:_ _rollup ~output_proof:_ ->
+        return (outbox_message, ctxt))
+      rollup
+      ~cemented_commitment
+      ~output_proof:"Not used"
   in
   return (res, Incremental.set_alpha_ctxt incr ctxt)
 
 let execute_outbox_message incr ~originator rollup ~output_proof
     ~commitment_hash =
+  let open Lwt_result_syntax in
   let* batch_op =
     Op.sc_rollup_execute_outbox_message
       (I incr)
@@ -664,11 +667,9 @@ let execute_outbox_message incr ~originator rollup ~output_proof
 let assert_ticket_token_balance ~loc incr token owner expected =
   let open Lwt_result_wrap_syntax in
   let ctxt = Incremental.alpha_ctxt incr in
-  let* balance, _ =
-    let* key_hash, ctxt =
-      wrap @@ Ticket_balance_key.of_ex_token ctxt ~owner token
-    in
-    wrap (Ticket_balance.get_balance ctxt key_hash)
+  let*@ balance, _ =
+    let* key_hash, ctxt = Ticket_balance_key.of_ex_token ctxt ~owner token in
+    Ticket_balance.get_balance ctxt key_hash
   in
   match (balance, expected) with
   | Some b, Some e -> Assert.equal_int ~loc (Z.to_int b) e
@@ -679,28 +680,29 @@ let assert_ticket_token_balance ~loc incr token owner expected =
 
 (** Assert that the computation fails with the given message. *)
 let assert_fails_with ~__LOC__ k expected_err =
+  let open Lwt_result_syntax in
   let*! res = k in
   Assert.proto_error ~loc:__LOC__ res (( = ) expected_err)
 
 type balances = {liquid : Tez.t; frozen : Tez.t}
 
 let balances ctxt contract =
+  let open Lwt_result_syntax in
   let* liquid = Context.Contract.balance ctxt contract in
   let* frozen = Context.Contract.frozen_bonds ctxt contract in
   return {liquid; frozen}
 
 let check_balances_evolution bal_before {liquid; frozen} ~action =
   let open Lwt_result_wrap_syntax in
-  let wret x = wrap @@ Lwt.return x in
   let* {liquid = expected_liquid; frozen = expected_frozen} =
     match action with
     | `Freeze amount ->
-        let* liquid = wret @@ Tez.( -? ) bal_before.liquid amount in
-        let* frozen = wret @@ Tez.( +? ) bal_before.frozen amount in
+        let*?@ liquid = Tez.( -? ) bal_before.liquid amount in
+        let*?@ frozen = Tez.( +? ) bal_before.frozen amount in
         return {liquid; frozen}
     | `Unfreeze amount ->
-        let* liquid = wret @@ Tez.( +? ) bal_before.liquid amount in
-        let* frozen = wret @@ Tez.( -? ) bal_before.frozen amount in
+        let*?@ liquid = Tez.( +? ) bal_before.liquid amount in
+        let*?@ frozen = Tez.( -? ) bal_before.frozen amount in
         return {liquid; frozen}
   in
   let* () = Assert.equal_tez ~loc:__LOC__ expected_liquid liquid in
@@ -709,6 +711,7 @@ let check_balances_evolution bal_before {liquid; frozen} ~action =
 
 (* Generates a list of cemented dummy commitments. *)
 let gen_commitments incr rollup ~predecessor ~num_commitments =
+  let open Lwt_result_syntax in
   let* constants = Context.get_constants (I incr) in
   let delta = constants.parametric.sc_rollup.commitment_period_in_blocks in
   let rec aux predecessor n acc =
@@ -733,6 +736,7 @@ let gen_commitments incr rollup ~predecessor ~num_commitments =
   aux predecessor num_commitments []
 
 let attempt_to_recover_bond i contract ?staker rollup =
+  let open Lwt_result_syntax in
   (* Recover its own bond by default. *)
   let staker =
     match staker with
@@ -762,6 +766,7 @@ let recover_bond_not_staked i contract rollup =
     Sc_rollup_errors.Sc_rollup_not_staked
 
 let recover_bond_with_success i contract rollup =
+  let open Lwt_result_syntax in
   let* bal_before = balances (I i) contract in
   let* b = attempt_to_recover_bond i contract rollup in
   let* bal_after = balances (B b) contract in
@@ -780,7 +785,8 @@ let recover_bond_with_success i contract rollup =
     The comitter tries to withdraw stake before and after cementing. Only the
     second attempt is expected to succeed. *)
 let test_publish_cement_and_recover_bond () =
-  let* block, contracts, rollup = init_and_originate Context.T2 "unit" in
+  let open Lwt_result_wrap_syntax in
+  let* block, contracts, rollup = init_and_originate Context.T2 in
   let _, contract = contracts in
   let* block = bake_blocks_until_next_inbox_level block rollup in
   let* i = Incremental.begin_construction block in
@@ -795,7 +801,7 @@ let test_publish_cement_and_recover_bond () =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
   let* i = Incremental.begin_construction b in
-  let* i, hash = hash_commitment i c in
+  let*?@ i, hash = hash_commitment i c in
   (* stake not on LCC *)
   let* () = recover_bond_not_lcc i contract rollup in
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
@@ -820,7 +826,8 @@ let test_publish_cement_and_recover_bond () =
     publishes two different commitments with the same staker. We check
     that the second publish fails. *)
 let test_publish_fails_on_double_stake () =
-  let* ctxt, contracts, rollup = init_and_originate Context.T2 "unit" in
+  let open Lwt_result_syntax in
+  let* ctxt, contracts, rollup = init_and_originate Context.T2 in
   let* ctxt = bake_blocks_until_next_inbox_level ctxt rollup in
   let _, contract = contracts in
   let* i = Incremental.begin_construction ctxt in
@@ -851,7 +858,8 @@ let test_publish_fails_on_double_stake () =
     cement one of the commitments; it checks that this fails because the
     commitment is contested. *)
 let test_cement_fails_on_conflict () =
-  let* ctxt, contracts, rollup = init_and_originate Context.T3 "unit" in
+  let open Lwt_result_wrap_syntax in
+  let* ctxt, contracts, rollup = init_and_originate Context.T3 in
   let* ctxt = bake_blocks_until_next_inbox_level ctxt rollup in
   let _, contract1, contract2 = contracts in
   let* i = Incremental.begin_construction ctxt in
@@ -873,7 +881,7 @@ let test_cement_fails_on_conflict () =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
   let* i = Incremental.begin_construction b in
-  let* i, hash = hash_commitment i commitment1 in
+  let*?@ i, hash = hash_commitment i commitment1 in
   let* cement_op = Op.sc_rollup_cement (I i) contract1 rollup hash in
   let expect_apply_failure = function
     | Environment.Ecoproto_error (Sc_rollup_errors.Sc_rollup_disputed as e) :: _
@@ -889,6 +897,7 @@ let test_cement_fails_on_conflict () =
 
 let commit_and_cement_after_n_bloc ?expect_apply_failure block contract rollup n
     =
+  let open Lwt_result_wrap_syntax in
   let* block = bake_blocks_until_next_inbox_level block rollup in
   let* i = Incremental.begin_construction block in
   let* commitment = dummy_commitment (I i) rollup in
@@ -898,7 +907,7 @@ let commit_and_cement_after_n_bloc ?expect_apply_failure block contract rollup n
   (* This pattern would add an additional block, so we decrement [n] by one. *)
   let* b = Block.bake_n (n - 1) b in
   let* i = Incremental.begin_construction b in
-  let* i, hash = hash_commitment i commitment in
+  let*?@ i, hash = hash_commitment i commitment in
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
   let* (_ : Incremental.t) =
     Incremental.add_operation ?expect_apply_failure i cement_op
@@ -910,8 +919,9 @@ let commit_and_cement_after_n_bloc ?expect_apply_failure block contract rollup n
     succeeds when the period is over. *)
 let test_challenge_window_period_boundaries () =
   let sc_rollup_challenge_window_in_blocks = 10 in
+  let open Lwt_result_syntax in
   let* ctxt, contract, rollup =
-    init_and_originate ~sc_rollup_challenge_window_in_blocks Context.T1 "unit"
+    init_and_originate ~sc_rollup_challenge_window_in_blocks Context.T1
   in
   (* Should fail because the waiting period is not strictly greater than the
      challenge window period. *)
@@ -945,12 +955,13 @@ let test_challenge_window_period_boundaries () =
 
 (** Test originating with bad type. *)
 let test_originating_with_invalid_types () =
+  let open Lwt_result_syntax in
   let* block, (contract, _, _) = context_init Context.T3 in
-  let assert_fails_for_type parameters_type =
+  let assert_fails_for_type parameters_ty =
     assert_fails
       ~loc:__LOC__
       ~error:Sc_rollup_operations.Sc_rollup_invalid_parameters_type
-      (sc_originate block contract parameters_type)
+      (sc_originate block contract ~parameters_ty)
   in
   (* Following types fail at validation time. *)
   let* () =
@@ -966,11 +977,14 @@ let test_originating_with_invalid_types () =
     |> List.iter_es assert_fails_for_type
   in
   (* Operation fails with a different error as it's not "passable". *)
-  assert_fails ~loc:__LOC__ (sc_originate block contract "operation")
+  assert_fails
+    ~loc:__LOC__
+    (sc_originate block contract ~parameters_ty:"operation")
 
 let test_originating_with_invalid_boot_sector_proof () =
+  let open Lwt_result_syntax in
   let*! origination_proof =
-    Sc_rollup_helpers.origination_proof
+    Sc_rollup_helpers.compute_origination_proof
       ~boot_sector:"a boot sector"
       Sc_rollup.Kind.Example_arith
   in
@@ -979,7 +993,6 @@ let test_originating_with_invalid_boot_sector_proof () =
       ~boot_sector:"another boot sector"
       ~origination_proof
       Context.T1
-      "unit"
   in
   match res with
   | Error
@@ -990,8 +1003,9 @@ let test_originating_with_invalid_boot_sector_proof () =
   | _ -> failwith "It should have failed with [Sc_rollup_proof_check]"
 
 let test_originating_with_invalid_kind_proof () =
+  let open Lwt_result_syntax in
   let*! origination_proof =
-    Sc_rollup_helpers.origination_proof
+    Sc_rollup_helpers.compute_origination_proof
       ~boot_sector:"a boot sector"
       Sc_rollup.Kind.Wasm_2_0_0
   in
@@ -1000,7 +1014,6 @@ let test_originating_with_invalid_kind_proof () =
       ~boot_sector:"a boot sector"
       ~origination_proof
       Context.T1
-      "unit"
   in
   match res with
   | Error
@@ -1011,6 +1024,7 @@ let test_originating_with_invalid_kind_proof () =
   | _ -> failwith "It should have failed with [Sc_rollup_proof_check]"
 
 let test_originating_with_random_proof () =
+  let open Lwt_result_syntax in
   let origination_proof =
     Data_encoding.Binary.(
       of_string_exn Sc_rollup.Proof.serialized_encoding
@@ -1021,7 +1035,6 @@ let test_originating_with_random_proof () =
       ~boot_sector:"some boot sector"
       ~origination_proof
       Context.T1
-      "unit"
   in
   match res with
   | Error
@@ -1043,7 +1056,6 @@ let test_originating_with_wrong_tree ~alter_binary_bit () =
       ~boot_sector:"some boot sector"
       ~origination_proof
       Context.T1
-      "unit"
   in
   match res with
   | Error
@@ -1062,10 +1074,10 @@ let test_originating_with_valid_type () =
   let open Lwt_result_wrap_syntax in
   let* block, contract = context_init Context.T1 in
   let assert_parameters_ty parameters_ty =
-    let* block, rollup = sc_originate block contract parameters_ty in
+    let* block, rollup = sc_originate block contract ~parameters_ty in
     let* incr = Incremental.begin_construction block in
     let ctxt = Incremental.alpha_ctxt incr in
-    let* expr, _ctxt = wrap @@ Sc_rollup.parameters_type ctxt rollup in
+    let*@ expr, _ctxt = Sc_rollup.parameters_type ctxt rollup in
     let expr = WithExceptions.Option.get ~loc:__LOC__ expr in
     let*? expr, _ctxt =
       Environment.wrap_tzresult
@@ -1136,10 +1148,13 @@ let mutez_receiver =
   |}
 
 let test_single_transaction_batch () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
-  let* block, rollup = sc_originate block originator "list (ticket string)" in
+  let* block, rollup =
+    sc_originate block originator ~parameters_ty:"list (ticket string)"
+  in
   let* incr = Incremental.begin_construction block in
   (* Originate a contract that accepts a pair of nat and ticket string input.  *)
   let* ticket_receiver, incr =
@@ -1206,10 +1221,13 @@ let test_single_transaction_batch () =
 (** Test that checks that an outbox message can be executed against all stored
     cemented commitments but not against an outdated one. *)
 let test_older_cemented_commitment () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
-  let* block, rollup = sc_originate block originator "list (ticket string)" in
+  let* block, rollup =
+    sc_originate block originator ~parameters_ty:"list (ticket string)"
+  in
   let* incr = Incremental.begin_construction block in
   (* Originate a contract that accepts a pair of nat and ticket string input.  *)
   let* ticket_receiver, incr =
@@ -1275,7 +1293,7 @@ let test_older_cemented_commitment () =
       (Some 1)
   in
   let* max_num_stored_cemented_commitments =
-    let* ctxt = Context.to_alpha_ctxt (I incr) in
+    let ctxt = Incremental.alpha_ctxt incr in
     return
     @@ Alpha_context.Constants.max_number_of_stored_cemented_commitments ctxt
   in
@@ -1318,10 +1336,13 @@ let test_older_cemented_commitment () =
   | _ -> failwith "Expected non-empty list of commitment hashes."
 
 let test_multi_transaction_batch () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
-  let* block, rollup = sc_originate block originator "list (ticket string)" in
+  let* block, rollup =
+    sc_originate block originator ~parameters_ty:"list (ticket string)"
+  in
   let* incr = Incremental.begin_construction block in
   (* Originate a contract that accepts a pair of nat and ticket string input. *)
   let* ticket_receiver, incr =
@@ -1410,9 +1431,12 @@ let test_multi_transaction_batch () =
 (** Test that executing an L2 to L1 transaction that involves an invalid
     parameter (mutez) fails. *)
 let test_transaction_with_invalid_type () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
-  let* block, rollup = sc_originate block originator "list (ticket string)" in
+  let* block, rollup =
+    sc_originate block originator ~parameters_ty:"list (ticket string)"
+  in
   let* incr = Incremental.begin_construction block in
   let* mutez_receiver, incr =
     originate_contract
@@ -1440,10 +1464,13 @@ let test_transaction_with_invalid_type () =
 
 (** Test that executing the same outbox message for the same twice fails. *)
 let test_execute_message_twice () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
-  let* block, rollup = sc_originate block originator "list (ticket string)" in
+  let* block, rollup =
+    sc_originate block originator ~parameters_ty:"list (ticket string)"
+  in
   let* incr = Incremental.begin_construction block in
   (* Originate a contract that accepts a pair of nat and ticket string input.  *)
   let* string_receiver, incr =
@@ -1491,10 +1518,13 @@ let test_execute_message_twice () =
 (** Verifies that it is not possible to execute the same message twice from
     different commitments. *)
 let test_execute_message_twice_different_cemented_commitments () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
-  let* block, rollup = sc_originate block originator "list (ticket string)" in
+  let* block, rollup =
+    sc_originate block originator ~parameters_ty:"list (ticket string)"
+  in
   let* incr = Incremental.begin_construction block in
   (* Originate a contract that accepts a pair of nat and ticket string input.  *)
   let* string_receiver, incr =
@@ -1547,10 +1577,13 @@ let test_execute_message_twice_different_cemented_commitments () =
        output)
 
 let test_zero_amount_ticket () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
-  let* block, rollup = sc_originate block originator "list (ticket string)" in
+  let* block, rollup =
+    sc_originate block originator ~parameters_ty:"list (ticket string)"
+  in
   let* incr = Incremental.begin_construction block in
   (* Originate a contract that accepts a pair of nat and ticket string input. *)
   let* ticket_receiver, incr =
@@ -1599,10 +1632,13 @@ let test_zero_amount_ticket () =
 (* Check that executing an outbox message fails when the inclusion proof in
    invalid. *)
 let test_invalid_output_proof () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
-  let* block, rollup = sc_originate block originator "list (ticket string)" in
+  let* block, rollup =
+    sc_originate block originator ~parameters_ty:"list (ticket string)"
+  in
   let* incr = Incremental.begin_construction block in
   (* Publish and cement a commitment. *)
   let* cemented_commitment, incr =
@@ -1619,10 +1655,13 @@ let test_invalid_output_proof () =
        ~commitment_hash:cemented_commitment)
 
 let test_execute_message_override_applied_messages_slot () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
-  let* block, rollup = sc_originate block originator "list (ticket string)" in
+  let* block, rollup =
+    sc_originate block originator ~parameters_ty:"list (ticket string)"
+  in
   let* incr = Incremental.begin_construction block in
   (* Originate a contract that accepts a pair of nat and ticket string input.  *)
   let* string_receiver, incr =
@@ -1753,10 +1792,13 @@ let test_execute_message_override_applied_messages_slot () =
 (** Test that a transaction fails if it attempts to transfer more tickets than
     allowed. *)
 let test_insufficient_ticket_balances () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
-  let* block, rollup = sc_originate block originator "list (ticket string)" in
+  let* block, rollup =
+    sc_originate block originator ~parameters_ty:"list (ticket string)"
+  in
   let* incr = Incremental.begin_construction block in
   (* Originate a contract that accepts a pair of nat and ticket string input. *)
   let* ticket_receiver, incr =
@@ -1826,6 +1868,7 @@ let test_insufficient_ticket_balances () =
        output)
 
 let test_inbox_max_number_of_messages_per_level () =
+  let open Lwt_result_syntax in
   let* block, (account1, account2) =
     (* set sort of unlimited gas or we are going to hit gas exhaustion. *)
     context_init
@@ -1834,7 +1877,7 @@ let test_inbox_max_number_of_messages_per_level () =
         (Gas.Arith.integral_of_int_exn Int.(max_int / 1000))
       Context.T2
   in
-  let* block, _rollup = sc_originate block account1 "unit" in
+  let* block, _rollup = sc_originate block account1 in
   let max_number_of_messages_per_level =
     Constants.sc_rollup_max_number_of_messages_per_level
   in
@@ -1866,11 +1909,13 @@ let test_inbox_max_number_of_messages_per_level () =
   return_unit
 
 let add_op block op =
+  let open Lwt_result_syntax in
   let* incr = Incremental.begin_construction block in
   let* incr = Incremental.add_operation incr op in
   Incremental.finalize_block incr
 
 let add_publish ~rollup block account commitment =
+  let open Lwt_result_syntax in
   let* publish = Op.sc_rollup_publish (B block) account rollup commitment in
   let* block = bake_blocks_until_inbox_level block commitment in
   add_op block publish
@@ -1878,6 +1923,7 @@ let add_publish ~rollup block account commitment =
 (** [test_number_of_parallel_games_bounded] checks that one cannot
     play an arbitrary number of games. *)
 let test_number_of_parallel_games_bounded () =
+  let open Lwt_result_syntax in
   let max_number_of_parallel_games =
     Context.default_test_constants.sc_rollup.max_number_of_parallel_games
   in
@@ -1887,7 +1933,7 @@ let test_number_of_parallel_games_bounded () =
       ~sc_rollup_challenge_window_in_blocks:100
       (Context.TList nb_accounts)
   in
-  let* block, rollup = sc_originate block (Stdlib.List.hd accounts) "unit" in
+  let* block, rollup = sc_originate block (Stdlib.List.hd accounts) in
   let* dummy_commitment = dummy_commitment (B block) rollup in
 
   let commitments =
@@ -1973,10 +2019,11 @@ let test_number_of_parallel_games_bounded () =
 - Test another account can timeout a late player.
 *)
 let test_timeout () =
+  let open Lwt_result_syntax in
   let* block, (account1, account2, account3) = context_init Context.T3 in
   let pkh1 = Account.pkh_of_contract_exn account1 in
   let pkh2 = Account.pkh_of_contract_exn account2 in
-  let* block, rollup = sc_originate block account1 "unit" in
+  let* block, rollup = sc_originate block account1 in
   let* constants = Context.get_constants (B block) in
   let Constants.Parametric.{timeout_period_in_blocks; _} =
     constants.parametric.sc_rollup
@@ -2102,7 +2149,7 @@ let init_with_conflict () =
   let* block, (account1, account2) = context_init Context.T2 in
   let pkh1 = Account.pkh_of_contract_exn account1 in
   let pkh2 = Account.pkh_of_contract_exn account2 in
-  let* block, rollup = sc_originate block account1 "unit" in
+  let* block, rollup = sc_originate block account1 in
   let compressed_state =
     Sc_rollup.State_hash.context_hash_to_state_hash
       (Context_hash.hash_string ["first"])
@@ -2169,6 +2216,7 @@ let dumb_proof ~choice =
 (** Test that two invalid proofs from the two players lead to a draw
     in the refutation game. *)
 let test_draw_with_two_invalid_moves () =
+  let open Lwt_result_syntax in
   let* block, (p1, p1_pkh), (p2, p2_pkh), rollup = init_with_conflict () in
 
   (* Player1 will play an invalid final move. *)
@@ -2228,6 +2276,7 @@ let test_draw_with_two_invalid_moves () =
 (** Test that timeout a player during the final move ends the game if
     the other player played. *)
 let test_timeout_during_final_move () =
+  let open Lwt_result_syntax in
   let* block, (p1, p1_pkh), (_p2, p2_pkh), rollup = init_with_conflict () in
 
   (* Player1 will play an invalid final move. *)
@@ -2259,6 +2308,7 @@ let test_timeout_during_final_move () =
 
 (** Test that playing a dissection during a final move is rejected. *)
 let test_dissection_during_final_move () =
+  let open Lwt_result_syntax in
   let* block, (p1, p1_pkh), (p2, p2_pkh), rollup = init_with_conflict () in
 
   (* Player1 will play an invalid final move. *)
@@ -2366,7 +2416,7 @@ let test_refute_set_input
   let* block, (p1, p2) = context_init Context.T2 in
   let pkh1 = Account.pkh_of_contract_exn p1 in
   let pkh2 = Account.pkh_of_contract_exn p2 in
-  let* block, rollup = sc_originate block p1 "unit" in
+  let* block, rollup = sc_originate block p1 in
   let* genesis_info = Context.Sc_rollup.genesis_info (B block) rollup in
   let* genesis_commitment =
     Context.Sc_rollup.commitment (B block) rollup genesis_info.commitment_hash
@@ -2469,6 +2519,7 @@ let test_refute_set_input
   assert_refute_result ~game_status:expected_game_status incr
 
 let test_refute_invalid_metadata () =
+  let open Lwt_result_syntax in
   let p1_info rollup (genesis_info : Sc_rollup.Commitment.genesis_info) =
     let metadata =
       Sc_rollup.Metadata.
@@ -2498,6 +2549,7 @@ let test_refute_invalid_metadata () =
     [Needs_reveal] state through an external message annoucing the [hash].
 *)
 let arith_state_before_reveal metadata hash =
+  let open Lwt_result_syntax in
   let*! context, state, _, _, _ = make_arith_state metadata in
   let input =
     Sc_rollup_helpers.make_external_input
@@ -2541,27 +2593,26 @@ let test_refute_invalid_reveal () =
   in
   test_refute_set_input p1_info p2_info make_state_before
 
-let full_history_inbox (predecessor_timestamp, predecessor)
+let full_history_inbox (genesis_predecessor_timestamp, genesis_predecessor)
     all_external_messages =
   let open Sc_rollup_helpers in
   let payloads_per_levels =
     List.map
-      (fun ((predecessor_timestamp, predecessor), level, external_messages) ->
-        wrap_messages
-          ~predecessor_timestamp
-          ~predecessor
-          level
-          external_messages)
+      (fun (pred_info, level, external_messages) ->
+        wrap_messages ~pred_info level external_messages)
       all_external_messages
   in
-  Sc_rollup_helpers.construct_inbox
-    ~predecessor_timestamp
-    ~predecessor
+  Sc_rollup_helpers.Node_inbox.construct_inbox
+    ~genesis_predecessor_timestamp
+    ~genesis_predecessor
     payloads_per_levels
 
 let input_included ~snapshot ~full_history_inbox (l, n) =
+  let open Lwt_result_syntax in
   let open Sc_rollup_helpers in
-  let payloads_histories, history, inbox = full_history_inbox in
+  let Sc_rollup_helpers.Node_inbox.{payloads_histories; history; inbox} =
+    full_history_inbox
+  in
   let history_proof = Sc_rollup.Inbox.old_levels_messages inbox in
   (* Create an inclusion proof of the inbox message at [(l, n)]. *)
   let* proof, _ =
@@ -2584,7 +2635,9 @@ let input_included ~snapshot ~full_history_inbox (l, n) =
 (** Test that the protocol adds a [SOL], [Info_per_level] and [EOL] for each
     Tezos level, even if no messages are added to the inbox. *)
 let test_automatically_added_internal_messages () =
-  let assert_input_included ~snapshot ~full_history_inbox (l, n) input =
+  let open Lwt_result_syntax in
+  let assert_input_included ~__LOC__ ~snapshot ~full_history_inbox (l, n) input
+      =
     let* input_verified = input_included ~snapshot ~full_history_inbox (l, n) in
     Assert.equal
       ~loc:__LOC__
@@ -2596,6 +2649,59 @@ let test_automatically_added_internal_messages () =
         | Some v -> Sc_rollup.pp_input ppf v)
       input_verified
       input
+  in
+
+  let assert_sol ~snapshot ~full_history_inbox ~inbox_level =
+    let sol = Sc_rollup_helpers.make_sol ~inbox_level in
+    assert_input_included
+      ~snapshot
+      ~full_history_inbox
+      (inbox_level, Z.zero)
+      (Some sol)
+  in
+
+  let assert_ipl ~snapshot ~full_history_inbox ~level_info ~inbox_level =
+    let predecessor_timestamp, predecessor = level_info in
+    let info_per_level =
+      Sc_rollup_helpers.make_info_per_level
+        ~inbox_level
+        ~predecessor_timestamp
+        ~predecessor
+    in
+    assert_input_included
+      ~snapshot
+      ~full_history_inbox
+      (inbox_level, Z.one)
+      (Some info_per_level)
+  in
+
+  let assert_protocol_migration ~snapshot ~full_history_inbox ~inbox_level =
+    let protocol_migration =
+      Sc_rollup_helpers.make_protocol_migration ~inbox_level
+    in
+    assert_input_included
+      ~snapshot
+      ~full_history_inbox
+      (inbox_level, Z.(succ one))
+      (Some protocol_migration)
+  in
+
+  let assert_eol ~snapshot ~full_history_inbox ~inbox_level ~message_counter =
+    let eol = Sc_rollup_helpers.make_eol ~inbox_level ~message_counter in
+    assert_input_included
+      ~snapshot
+      ~full_history_inbox
+      (inbox_level, message_counter)
+      (Some eol)
+  in
+
+  let assert_no_message ~snapshot ~full_history_inbox ~inbox_level
+      ~message_counter =
+    assert_input_included
+      ~snapshot
+      ~full_history_inbox
+      (inbox_level, message_counter)
+      None
   in
 
   let info_per_block (block : Block.t) =
@@ -2623,61 +2729,98 @@ let test_automatically_added_internal_messages () =
   let* inbox = Context.Sc_rollup.inbox (B block) in
   let snapshot = Sc_rollup.Inbox.take_snapshot inbox in
 
+  let level_zero = Raw_level.of_int32_exn 0l in
   let level_one = Raw_level.of_int32_exn 1l in
   let level_two = Raw_level.of_int32_exn 2l in
-  let*? ((_level_tree_histories, _history, inbox) as full_history_inbox) =
+  let*? ({inbox; _} as full_history_inbox) =
     full_history_inbox
       level_zero_info
       [(level_one_info, level_one, []); (level_two_info, level_two, ["foo"])]
   in
 
-  let level_two = Raw_level.of_int32_exn 2l in
-  (* Assert SOL is at position 0. *)
-  let sol = Sc_rollup_helpers.make_sol ~inbox_level:level_two in
+  (* Assertions about level 0. *)
   let* () =
-    assert_input_included
+    assert_sol ~__LOC__ ~snapshot ~full_history_inbox ~inbox_level:level_zero
+  in
+  let* () =
+    assert_ipl
+      ~__LOC__
       ~snapshot
       ~full_history_inbox
-      (level_two, Z.zero)
-      (Some sol)
+      ~inbox_level:level_zero
+      ~level_info:level_zero_info
+  in
+  let* () =
+    assert_protocol_migration
+      ~__LOC__
+      ~snapshot
+      ~full_history_inbox
+      ~inbox_level:level_zero
+  in
+  let* () =
+    assert_eol
+      ~__LOC__
+      ~snapshot
+      ~full_history_inbox
+      ~inbox_level:level_zero
+      ~message_counter:(Z.of_int 3)
   in
 
-  (* Assert Info_per_level is at position 1. *)
-  let predecessor_timestamp, predecessor = level_two_info in
-  let info_per_level =
-    Sc_rollup_helpers.make_info_per_level
+  (* Assertions about level 1. *)
+  let* () =
+    assert_sol ~__LOC__ ~snapshot ~full_history_inbox ~inbox_level:level_one
+  in
+  let* () =
+    assert_ipl
+      ~__LOC__
+      ~snapshot
+      ~full_history_inbox
+      ~inbox_level:level_one
+      ~level_info:level_one_info
+  in
+  let* () =
+    assert_protocol_migration
+      ~__LOC__
+      ~snapshot
+      ~full_history_inbox
+      ~inbox_level:level_zero
+  in
+  let* () =
+    assert_eol
+      ~__LOC__
+      ~snapshot
+      ~full_history_inbox
+      ~inbox_level:level_one
+      ~message_counter:(Z.of_int 3)
+  in
+
+  (* Assertions about level 2. *)
+  let* () =
+    assert_sol ~__LOC__ ~snapshot ~full_history_inbox ~inbox_level:level_two
+  in
+  let* () =
+    assert_ipl
+      ~__LOC__
+      ~snapshot
+      ~full_history_inbox
       ~inbox_level:level_two
-      ~predecessor_timestamp
-      ~predecessor
+      ~level_info:level_two_info
   in
   let* () =
-    assert_input_included
+    assert_eol
+      ~__LOC__
       ~snapshot
       ~full_history_inbox
-      (level_two, Z.one)
-      (Some info_per_level)
-  in
-
-  (* Assert EOL is at the end of inbox level. *)
-  let eol =
-    Sc_rollup_helpers.make_eol
       ~inbox_level:level_two
       ~message_counter:(Z.of_int 3)
   in
   let* () =
-    assert_input_included
+    assert_no_message
+      ~__LOC__
       ~snapshot
       ~full_history_inbox
-      (level_two, Z.of_int 3)
-      (Some eol)
-  in
-  (* Assert EOL was the last message of the inbox level. *)
-  let* () =
-    assert_input_included
-      ~snapshot
-      ~full_history_inbox
-      (level_two, Z.of_int 4)
-      None
+      ~inbox_level:level_two
+      ~message_counter:(Z.of_int 4)
   in
 
   (* Assert the computed inbox and protocol's inbox are equal. *)
@@ -2693,7 +2836,8 @@ let test_automatically_added_internal_messages () =
 (** With [Start_of_level] and [End_of_level] inbox messages in each inbox level,
     it's impossible to give a valid commitment with 0 ticks. *)
 let test_zero_tick_commitment_fails () =
-  let* ctxt, contract, rollup = init_and_originate Context.T1 "unit" in
+  let open Lwt_result_syntax in
+  let* ctxt, contract, rollup = init_and_originate Context.T1 in
   let* incr = Incremental.begin_construction ctxt in
   let* commitment = dummy_commitment (I incr) rollup in
   let commitment = {commitment with number_of_ticks = number_of_ticks_exn 0L} in
@@ -2724,10 +2868,7 @@ let test_curfew () =
   let open Lwt_result_syntax in
   let* block, (account1, account2, account3), rollup =
     (* sc_rollup_challenge_window_in_blocks should be at least commitment period *)
-    init_and_originate
-      ~sc_rollup_challenge_window_in_blocks:60
-      Context.T3
-      "unit"
+    init_and_originate ~sc_rollup_challenge_window_in_blocks:60 Context.T3
   in
   let* constants = Context.get_constants (B block) in
   let challenge_window =
@@ -2735,14 +2876,14 @@ let test_curfew () =
   in
   let* publish1, commitment1 =
     publish_op_and_dummy_commitment
-      ~src:account1
+      ~sender:account1
       ~compressed_state:"first"
       rollup
       block
   in
   let* publish2, commitment2 =
     publish_op_and_dummy_commitment
-      ~src:account2
+      ~sender:account2
       ~compressed_state:"second"
       rollup
       block
@@ -2753,21 +2894,21 @@ let test_curfew () =
 
   let* publish11, commitment11 =
     publish_op_and_dummy_commitment
-      ~src:account1
+      ~sender:account1
       ~predecessor:commitment1
       rollup
       block
   in
   let* publish21, commitment21 =
     publish_op_and_dummy_commitment
-      ~src:account2
+      ~sender:account2
       ~predecessor:commitment2
       rollup
       block
   in
   let* publish3, _commitment3 =
     publish_op_and_dummy_commitment
-      ~src:account3
+      ~sender:account3
       ~compressed_state:"third"
       rollup
       block
@@ -2776,21 +2917,21 @@ let test_curfew () =
   let* block = Block.bake ~operations:[publish11; publish21; publish3] block in
   let* publish111, commitment111 =
     publish_op_and_dummy_commitment
-      ~src:account1
+      ~sender:account1
       ~predecessor:commitment11
       rollup
       block
   in
   let* publish211, _commitment211 =
     publish_op_and_dummy_commitment
-      ~src:account2
+      ~sender:account2
       ~predecessor:commitment21
       rollup
       block
   in
   let* publish4, _commitment4 =
     publish_op_and_dummy_commitment
-      ~src:account3
+      ~sender:account3
       ~compressed_state:"fourth"
       rollup
       block
@@ -2816,7 +2957,7 @@ let test_curfew () =
     [inbox_level + challenge_window] is still possible. *)
 let test_curfew_period_is_started_only_after_first_publication () =
   let open Lwt_result_syntax in
-  let* block, account1, rollup = init_and_originate Context.T1 "unit" in
+  let* block, account1, rollup = init_and_originate Context.T1 in
   let* constants = Context.get_constants (B block) in
   let challenge_window =
     constants.parametric.sc_rollup.challenge_window_in_blocks
@@ -2832,7 +2973,8 @@ let test_curfew_period_is_started_only_after_first_publication () =
   return_unit
 
 let test_offline_staker_does_not_prevent_cementation () =
-  let* ctxt, contracts, rollup = init_and_originate Context.T2 "unit" in
+  let open Lwt_result_syntax in
+  let* ctxt, contracts, rollup = init_and_originate Context.T2 in
   let contract1, contract2 = contracts in
   let* ctxt = bake_blocks_until_next_inbox_level ctxt rollup in
   (* A publishes a commitment on C1. *)
@@ -2868,6 +3010,7 @@ let test_offline_staker_does_not_prevent_cementation () =
   return_unit
 
 let init_with_4_conflicts () =
+  let open Lwt_result_syntax in
   let dumb_compressed_state s =
     Sc_rollup.State_hash.context_hash_to_state_hash
       (Context_hash.hash_string [s])
@@ -2882,7 +3025,7 @@ let init_with_4_conflicts () =
   let pB_pkh = Account.pkh_of_contract_exn pB in
   let pC_pkh = Account.pkh_of_contract_exn pC in
   let pD_pkh = Account.pkh_of_contract_exn pD in
-  let* block, rollup = sc_originate block pA "unit" in
+  let* block, rollup = sc_originate block pA in
 
   (* The four players stake on a conflicting commitment. *)
   let* pA_commitment =
@@ -2928,7 +3071,11 @@ let init_with_4_conflicts () =
   return (block, rollup, (pA, pA_pkh), (pB, pB_pkh), (pC, pC_pkh), (pD, pD_pkh))
 
 let start_refutation_game_op block rollup (p1, p1_pkh) p2_pkh =
-  let* ctxt = Block.to_alpha_ctxt block in
+  let open Lwt_result_syntax in
+  let* ctxt =
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
   let* (p1_point, p2_point), _ctxt =
     Sc_rollup.Refutation_storage.Internal_for_tests.get_conflict_point
       ctxt
@@ -2949,6 +3096,7 @@ let start_refutation_game_op block rollup (p1, p1_pkh) p2_pkh =
 (** Test that when A plays against B, C, D and if A losts the game against
     one of them, the others can win against A for free. *)
 let test_winner_by_forfeit () =
+  let open Lwt_result_syntax in
   let* block, rollup, (pA, pA_pkh), (pB, pB_pkh), (pC, pC_pkh), (pD, pD_pkh) =
     init_with_4_conflicts ()
   in
@@ -3004,6 +3152,7 @@ let test_winner_by_forfeit () =
 (** Test the same property as in {!test_winner_by_forfeit} but where two
     players slashed eachother with a draw. *)
 let test_winner_by_forfeit_with_draw () =
+  let open Lwt_result_syntax in
   let* block, rollup, (pA, pA_pkh), (pB, pB_pkh), (pC, pC_pkh), (_pD, _pD_pkh) =
     init_with_4_conflicts ()
   in
@@ -3079,11 +3228,9 @@ let test_winner_by_forfeit_with_draw () =
   return_unit
 
 let test_conflict_point_on_a_branch () =
+  let open Lwt_result_syntax in
   let* block, (pA, pB), rollup =
-    init_and_originate
-      ~sc_rollup_challenge_window_in_blocks:1000
-      Context.T2
-      "unit"
+    init_and_originate ~sc_rollup_challenge_window_in_blocks:1000 Context.T2
   in
   let pA_pkh = Account.pkh_of_contract_exn pA in
   let pB_pkh = Account.pkh_of_contract_exn pB in
@@ -3113,7 +3260,10 @@ let test_conflict_point_on_a_branch () =
   let* ( ( {commitment = _; hash = conflict_pA_hash},
            {commitment = _; hash = conflict_pB_hash} ),
          _ctxt ) =
-    let* ctxt = Block.to_alpha_ctxt block in
+    let* ctxt =
+      let+ incr = Incremental.begin_construction block in
+      Incremental.alpha_ctxt incr
+    in
     Sc_rollup.Refutation_storage.Internal_for_tests.get_conflict_point
       ctxt
       rollup
@@ -3130,11 +3280,9 @@ let test_conflict_point_on_a_branch () =
   Assert.equal_bool ~loc:__LOC__ true expected_conflict
 
 let test_agreeing_stakers_cannot_play () =
+  let open Lwt_result_syntax in
   let* block, (pA, pB), rollup =
-    init_and_originate
-      ~sc_rollup_challenge_window_in_blocks:1000
-      Context.T2
-      "unit"
+    init_and_originate ~sc_rollup_challenge_window_in_blocks:1000 Context.T2
   in
   let pB_pkh = Account.pkh_of_contract_exn pB in
   (* pA stakes on a whole branch. *)
@@ -3173,11 +3321,9 @@ let test_agreeing_stakers_cannot_play () =
   return_unit
 
 let test_start_game_on_cemented_commitment () =
+  let open Lwt_result_syntax in
   let* block, (pA, pB), rollup =
-    init_and_originate
-      ~sc_rollup_challenge_window_in_blocks:1000
-      Context.T2
-      "unit"
+    init_and_originate ~sc_rollup_challenge_window_in_blocks:1000 Context.T2
   in
   let* constants = Context.get_constants (B block) in
   let pA_pkh = Account.pkh_of_contract_exn pA in
@@ -3341,13 +3487,13 @@ let tests =
       `Quick
       test_inbox_max_number_of_messages_per_level;
     Tztest.tztest
-      "Test that a player can't timeout another player before timeout period \
-       and related timeout value."
+      "a player can't timeout another player before timeout period and related \
+       timeout value."
       `Quick
       test_timeout;
     Tztest.tztest
-      "Test that a player cannot play more than max_number_of_parallel_games \
-       games in parallel."
+      "a player cannot play more than max_number_of_parallel_games games in \
+       parallel."
       `Quick
       test_number_of_parallel_games_bounded;
     Tztest.tztest
@@ -3371,17 +3517,17 @@ let tests =
       `Quick
       test_refute_invalid_reveal;
     Tztest.tztest
-      "Test that SOL/Info_per_level/EOL are added in the inbox"
+      "SOL/Info_per_level/EOL are added in the inbox"
       `Quick
       test_automatically_added_internal_messages;
     Tztest.tztest
       "0-tick commitments are forbidden"
       `Quick
       test_zero_tick_commitment_fails;
-    Tztest.tztest "check the curfew functionality" `Quick test_curfew;
+    Tztest.tztest "the curfew functionality" `Quick test_curfew;
     Tztest.tztest
-      "check that a commitment can be published after the inbox_level + \
-       challenge window is passed."
+      "a commitment can be published after the inbox_level + challenge window \
+       is passed."
       `Quick
       test_curfew_period_is_started_only_after_first_publication;
     Tztest.tztest
@@ -3390,7 +3536,7 @@ let tests =
       test_offline_staker_does_not_prevent_cementation;
     Tztest.tztest "win refutation game by forfeit" `Quick test_winner_by_forfeit;
     Tztest.tztest
-      "win refutation game by forfeit"
+      "win refutation game by forfeit with draw"
       `Quick
       test_winner_by_forfeit_with_draw;
     Tztest.tztest
@@ -3406,3 +3552,7 @@ let tests =
       `Quick
       test_start_game_on_cemented_commitment;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("sc rollup", tests)]
+  |> Lwt_main.run

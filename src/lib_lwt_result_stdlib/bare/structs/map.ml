@@ -29,24 +29,24 @@ module Make (Ord : Stdlib.Map.OrderedType) : S with type key = Ord.t = struct
   open Seq
   include Stdlib.Map.Make (Ord)
 
-  let iter_e f t = iter_e (fun (k, v) -> f k v) (to_seq t)
+  let iter_e f t = E.iter (fun (k, v) -> f k v) (to_seq t)
 
-  let iter_s f t = iter_s (fun (k, v) -> f k v) (to_seq t)
+  let iter_s f t = S.iter (fun (k, v) -> f k v) (to_seq t)
 
-  let iter_es f t = iter_es (fun (k, v) -> f k v) (to_seq t)
+  let iter_es f t = ES.iter (fun (k, v) -> f k v) (to_seq t)
 
   let iter_ep f t = iter_ep (fun (k, v) -> f k v) (to_seq t)
 
   let iter_p f t = iter_p (fun (k, v) -> f k v) (to_seq t)
 
   let fold_e f t init =
-    fold_left_e (fun acc (k, v) -> f k v acc) init (to_seq t)
+    E.fold_left (fun acc (k, v) -> f k v acc) init (to_seq t)
 
   let fold_s f t init =
-    fold_left_s (fun acc (k, v) -> f k v acc) init (to_seq t)
+    S.fold_left (fun acc (k, v) -> f k v acc) init (to_seq t)
 
   let fold_es f t init =
-    fold_left_es (fun acc (k, v) -> f k v acc) init (to_seq t)
+    ES.fold_left (fun acc (k, v) -> f k v acc) init (to_seq t)
 
   let min_binding = min_binding_opt
 

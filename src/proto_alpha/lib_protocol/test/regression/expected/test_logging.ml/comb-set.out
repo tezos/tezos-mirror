@@ -4,9 +4,9 @@ trace
     [ (Pair Unit 1 4 2 Unit) ]
   - CDR (entry) @ location: 11
     [ (Pair Unit 1 4 2 Unit) ]
-    - log/CONST (exit) @ location: 11
+    - log/PUSH (exit) @ location: 11
       [ (Pair 1 4 2 Unit) ]
-  - CONST (entry) @ location: 12
+  - PUSH (entry) @ location: 12
     [ (Pair 1 4 2 Unit) ]
     - log/UPDATE (exit) @ location: 12
       [ 2
@@ -14,9 +14,9 @@ trace
   - UPDATE (entry) @ location: 15
     [ 2
       (Pair 1 4 2 Unit) ]
-    - log/CONST (exit) @ location: 15
+    - log/PUSH (exit) @ location: 15
       [ (Pair 2 4 2 Unit) ]
-  - CONST (entry) @ location: 17
+  - PUSH (entry) @ location: 17
     [ (Pair 2 4 2 Unit) ]
     - log/UPDATE (exit) @ location: 17
       [ 12
@@ -24,9 +24,9 @@ trace
   - UPDATE (entry) @ location: 20
     [ 12
       (Pair 2 4 2 Unit) ]
-    - log/CONST (exit) @ location: 20
+    - log/PUSH (exit) @ location: 20
       [ (Pair 2 12 2 Unit) ]
-  - CONST (entry) @ location: 22
+  - PUSH (entry) @ location: 22
     [ (Pair 2 12 2 Unit) ]
     - log/UPDATE (exit) @ location: 22
       [ 8
@@ -34,9 +34,9 @@ trace
   - UPDATE (entry) @ location: 25
     [ 8
       (Pair 2 12 2 Unit) ]
-    - log/CONST (exit) @ location: 25
+    - log/UNIT (exit) @ location: 25
       [ (Pair 2 12 8 Unit) ]
-  - CONST (entry) @ location: 27
+  - UNIT (entry) @ location: 27
     [ (Pair 2 12 8 Unit) ]
     - log/UPDATE (exit) @ location: 27
       [ Unit

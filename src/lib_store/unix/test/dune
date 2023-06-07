@@ -1,17 +1,11 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names
-  test
-  test_consistency
-  test_locator
-  test_cemented_store
-  test_block_store
-  test_protocol_store
-  test_store
-  test_testchain)
+(library
+ (name src_lib_store_unix_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-crypto
   tezos-context-ops
@@ -28,14 +22,13 @@
   tezos-embedded-protocol-alpha
   tezos-protocol-alpha.parameters
   tezos-protocol-plugin-alpha
-  alcotest-lwt
-  tezos-test-helpers
-  tezos-test-helpers-extra)
- (link_flags
-  (:standard)
-  (:include %{workspace_root}/macos-link-flags.sexp))
+  octez-alcotezt
+  tezos-test-helpers)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_crypto
   -open Tezos_context_ops
@@ -49,48 +42,41 @@
   -open Tezos_protocol_updater
   -open Tezos_protocol_alpha_parameters
   -open Tezos_protocol_plugin_alpha
-  -open Tezos_test_helpers))
+  -open Octez_alcotezt
+  -open Tezos_test_helpers)
+ (modules
+  test
+  test_snapshots
+  test_reconstruct
+  test_history_mode_switch
+  alpha_utils
+  test_consistency
+  test_locator
+  test_cemented_store
+  test_block_store
+  test_protocol_store
+  test_store
+  test_testchain
+  test_utils
+  assert_lib))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_store_unix_test_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-store)
- (action (run %{exe:test_cemented_store.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest)
- (package tezos-store)
- (action (run %{exe:test_consistency.exe})))
-
-(rule
- (alias runtest)
- (package tezos-store)
- (action (run %{exe:test_block_store.exe})))
-
-(rule
- (alias runtest)
- (package tezos-store)
- (action (run %{exe:test_protocol_store.exe})))
-
-(rule
- (alias runtest)
- (package tezos-store)
- (action (run %{exe:test_store.exe})))
-
-(rule
- (alias runtest)
- (package tezos-store)
- (action (run %{exe:test_testchain.exe})))
-
-(rule
- (alias runtest)
- (package tezos-store)
- (action (setenv SLOW_TEST false (run %{exe:test.exe}))))
-
-(rule
- (alias test_slow_manual)
- (action (setenv SLOW_TEST true (run %{exe:test.exe}))))
-
-(rule
- (alias runtest_locator_bench)
- (package tezos-store)
- (action (run %{exe:test_locator.exe} --bench)))
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

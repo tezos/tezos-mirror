@@ -35,41 +35,57 @@ type error += Invalid_slot_size of {provided : int; expected : int}
     commitment and adds the association "commitment -> slot" in the DAL's
     [node_store] if the commitment is not already bound to some data.
 
-    The function returns an error {!ref:Invalid_slot_size} if the [slot]'s size
-    doesn't match the expected slots' size given in [cryptobox], or the [slot]'s
-    commitment otherwise.
+    In addition to decoding errors, the function returns an error
+    {!ref:Invalid_slot_size} if the [slot]'s size doesn't match the expected
+    slots' size given in [cryptobox], or the [slot]'s commitment otherwise.
 *)
 val add_commitment :
   Store.node_store ->
   Cryptobox.slot ->
   Cryptobox.t ->
-  Cryptobox.commitment tzresult Lwt.t
+  (Cryptobox.commitment, [Errors.decoding | Errors.other]) result Lwt.t
 
 (** [associate_slot_id_with_commitment node_store cryptobox commitment slot_id]
-    associates a [slot_id] to a [commitment] in [node_store]. The function
-    returns [Error `Not_found] if there is no entry for [commitment] in
-    [node_store]. Otherwise, [Ok ()] is returned.
+    associates a [slot_id] to a [commitment] in [node_store].
+
+    In addition to decoding errors, the function returns [`Not_found]
+    if there is no entry for [commitment] in [node_store].
 *)
 val associate_slot_id_with_commitment :
   Store.node_store ->
   Cryptobox.t ->
   Cryptobox.commitment ->
   Services.Types.slot_id ->
-  (unit, [> `Not_found]) result Lwt.t
+  (unit, [Errors.decoding | Errors.not_found]) result Lwt.t
 
 (** [get_commitment_slot node_store cryptobox commitment] returns the slot
-   content associated with the given [commitment] in [node_store]. The
-   function returns [Error `Not_found] if there is no slot content for
-   [commitment] in [node_store].  *)
+    content associated with the given [commitment] in [node_store].
+
+    In addition to decoding errors, the function returns [`Not_found]
+    if there is no slot content for [commitment] in [node_store].
+*)
 val get_commitment_slot :
   Store.node_store ->
   Cryptobox.t ->
   Cryptobox.commitment ->
-  (slot, [> `Not_found]) result Lwt.t
+  (slot, [Errors.decoding | Errors.not_found]) result Lwt.t
+
+(** [add_commitment_shards node_store cryptobox commitment ~with_proof]
+    registers the shards of the slot whose commitment is given.
+
+    In addition to decoding errors, the function returns [`Not_found]
+    if there is no slot content for [commitment] in [node_store]. *)
+val add_commitment_shards :
+  Store.node_store ->
+  Cryptobox.t ->
+  Cryptobox.commitment ->
+  Services.Types.with_proof ->
+  (unit, [Errors.decoding | Errors.not_found | Errors.other]) result Lwt.t
 
 (** [store_slot_headers ~block_level ~block_hash slot_headers node_store] stores
     [slot_headers] onto the [node_store] associated to the given [block_hash]
-    baked at level [block_level]. *)
+    baked at level [block_level].
+*)
 val store_slot_headers :
   block_level:int32 ->
   block_hash:Block_hash.t ->
@@ -86,7 +102,7 @@ val store_slot_headers :
     {!`Attested} in [store]. Those which are not are marked as
     {!`Unattested} in the [store] if they previously had a "waiting for
     attestation" status.
- *)
+*)
 val update_selected_slot_headers_statuses :
   block_level:int32 ->
   attestation_lag:int ->
@@ -98,29 +114,40 @@ val update_selected_slot_headers_statuses :
 (** [get_commitment_by_published_level_and_index ~level ~slot_index node_store]
     returns the commitment associated with the accepted slot header of index
     [slot_index] published at level [level]. Returns [Error `Not_found] if no
-    such commitment is found in [node_store]. *)
+    such commitment is found in [node_store].
+
+    In addition to decoding errors, the function returns [`Not_found]
+    if there is no commitment for the given [level] and [slot_index] in
+    [node_store].
+*)
 val get_commitment_by_published_level_and_index :
   level:Services.Types.level ->
   slot_index:Services.Types.slot_index ->
   Store.node_store ->
-  (Cryptobox.commitment, [`Not_found] tzresult) result Lwt.t
+  (Cryptobox.commitment, [Errors.decoding | Errors.not_found]) result Lwt.t
 
 (** [get_commitment_headers commitment ?slot_level ?slot_index store] returns
     the list of slot headers {!Services.Types.slot_header} known by the DAL.
-    The result is filtered by [slot_level] and [slot_index] if provided. *)
+    The result is filtered by [slot_level] and [slot_index] if provided.
+
+    The function may return an decoding error in case of failure.
+*)
 val get_commitment_headers :
   Cryptobox.commitment ->
   ?slot_level:Services.Types.level ->
   ?slot_index:Services.Types.slot_index ->
   Store.node_store ->
-  Services.Types.slot_header list tzresult Lwt.t
+  (Services.Types.slot_header list, Errors.decoding) result Lwt.t
 
 (** [get_published_level_headers ~published_level ?header_status store] returns
     the list of slot headers {!Services.Types.slot_header} that are published
     for the given [published_level]. If a header status is given in
-    [?header_status], the list is filtered accordingly. *)
+    [?header_status], the list is filtered accordingly.
+
+    The function may return an decoding error in case of failure.
+*)
 val get_published_level_headers :
   published_level:Services.Types.level ->
   ?header_status:Services.Types.header_status ->
   Store.node_store ->
-  Services.Types.slot_header list tzresult Lwt.t
+  (Services.Types.slot_header list, Errors.decoding) result Lwt.t

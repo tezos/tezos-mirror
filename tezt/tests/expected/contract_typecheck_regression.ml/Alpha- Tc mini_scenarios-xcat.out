@@ -1,0 +1,83 @@
+
+./octez-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/mini_scenarios/xcat.tz --details
+Well typed
+Gas remaining: 1039967.305 units remaining
+{ parameter bytes ;
+  storage unit ;
+  code { CAR @preimage
+         /* [ bytes ] */ ;
+         DIP { PUSH @from key_hash "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+               /* [ key_hash ] */ ;
+               IMPLICIT_ACCOUNT
+               /* [ contract unit ] */ ;
+               PUSH @to
+                 key_hash
+                 "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"
+               /* [ key_hash : contract unit ] */ ;
+               IMPLICIT_ACCOUNT
+               /* [ contract unit : contract unit ] */ ;
+               PUSH @target_hash bytes 0x123456
+               /* [ bytes : contract unit : contract unit ] */ ;
+               PUSH @deadline
+                 timestamp
+                 "2018-08-08 00:00:00Z"
+               /* [ timestamp : bytes : contract unit : contract unit ] */ }
+         /* [ bytes : timestamp : bytes : contract unit : contract unit ] */ ;
+         SWAP
+         /* [ timestamp : bytes : bytes : contract unit : contract unit ] */ ;
+         NOW
+         /* [ timestamp : timestamp : bytes : bytes : contract unit : contract unit ] */ ;
+         IFCMPLT
+           { DROP
+             /* [ bytes : contract unit : contract unit ] */ ;
+             DROP
+             /* [ contract unit : contract unit ] */ ;
+             DROP
+             /* [ contract unit ] */ ;
+             BALANCE
+             /* [ mutez : contract unit ] */ ;
+             UNIT
+             /* [ unit : mutez : contract unit ] */ ;
+             TRANSFER_TOKENS
+             /* [ operation ] */ }
+           { DUP
+             /* [ bytes : bytes : bytes : contract unit : contract unit ] */ ;
+             SIZE
+             /* [ nat : bytes : bytes : contract unit : contract unit ] */ ;
+             PUSH @max_length
+               nat
+               32
+             /* [ nat : nat : bytes : bytes : contract unit : contract unit ] */ ;
+             IFCMPLT
+               { PUSH string
+                      "preimage too long"
+                 /* [ string : bytes : bytes : contract unit : contract unit ] */ ;
+                 FAILWITH
+                 /* [] */ }
+               { SHA256 @candidate_hash
+                 /* [ bytes : bytes : contract unit : contract unit ] */ ;
+                 IFCMPNEQ
+                   { PUSH string "invalid preimage"
+                     /* [ string : contract unit : contract unit ] */ ;
+                     FAILWITH
+                     /* [] */ }
+                   { BALANCE
+                     /* [ mutez : contract unit : contract unit ] */ ;
+                     UNIT
+                     /* [ unit : mutez : contract unit : contract unit ] */ ;
+                     TRANSFER_TOKENS
+                     /* [ operation : contract unit ] */ ;
+                     DIP { DROP /* [] */ }
+                     /* [ operation ] */ } } } ;
+         NIL operation
+         /* [ list operation : operation ] */ ;
+         SWAP
+         /* [ operation : list operation ] */ ;
+         CONS
+         /* [ list operation ] */ ;
+         UNIT
+         /* [ unit : list operation ] */ ;
+         SWAP
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

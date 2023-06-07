@@ -181,7 +181,7 @@ module type EVENT_DEFINITION = sig
 
   val doc : string
 
-  val pp : short:bool -> Format.formatter -> t -> unit
+  val pp : all_fields:bool -> block:bool -> Format.formatter -> t -> unit
 
   val encoding : t Data_encoding.t
 
@@ -418,7 +418,7 @@ module Generic = struct
 
         method doc = M.doc
 
-        method pp fmt () = M.pp ~short:false fmt ev
+        method pp fmt () = M.pp ~all_fields:true ~block:true fmt ev
 
         method json = Data_encoding.Json.construct M.encoding ev
       end
@@ -709,10 +709,10 @@ module Simple = struct
     in
     find_variable_begin [] 0 0 |> List.rev
 
-  let pp_log_message ~short (msg : msg_atom list) fmt fields =
+  let pp_log_message ~all_fields ~block (msg : msg_atom list) fmt fields =
     (* Add a boolean reference to each field telling whether the field was used. *)
     let fields = List.map (fun field -> (field, ref false)) fields in
-    Format.fprintf fmt "@[<hov 2>" ;
+    if block then Format.fprintf fmt "@[<hov 2>" ;
     (* First, print [msg], including interpolated variables. *)
     let pp_msg_atom = function
       | Text text -> Format.pp_print_string fmt text
@@ -727,7 +727,8 @@ module Simple = struct
               match pp with
               | None -> pp_human_readable ~never_empty:true enc fmt value
               | Some pp -> pp fmt value))
-      | Space -> Format.pp_print_space fmt ()
+      | Space ->
+          if block then Format.pp_print_space fmt () else Format.fprintf fmt " "
     in
     List.iter pp_msg_atom msg ;
     (* Then, print variables that were not used by [msg]. *)
@@ -748,8 +749,9 @@ module Simple = struct
             Format.fprintf fmt "@ (%s = %s" name value)
           else Format.fprintf fmt ",@ %s = %s" name value
     in
-    if not short then List.iter print_field fields ;
-    if !first_field then Format.fprintf fmt "@]" else Format.fprintf fmt ")@]"
+    if all_fields then List.iter print_field fields ;
+    if not !first_field then Format.fprintf fmt ")" ;
+    if block then Format.fprintf fmt "@]"
 
   let with_version ~name encoding =
     Data_encoding.With_version.encoding
@@ -768,7 +770,8 @@ module Simple = struct
 
       let name = name
 
-      let pp ~short fmt () = pp_log_message ~short parsed_msg fmt []
+      let pp ~all_fields ~block fmt () =
+        pp_log_message ~all_fields ~block parsed_msg fmt []
 
       let encoding = with_version ~name Data_encoding.unit
 
@@ -790,9 +793,10 @@ module Simple = struct
 
       let name = name
 
-      let pp ~short fmt f1 =
+      let pp ~all_fields ~block fmt f1 =
         pp_log_message
-          ~short
+          ~all_fields
+          ~block
           parsed_msg
           fmt
           [Parameter (f1_name, f1_enc, f1, pp1)]
@@ -818,9 +822,10 @@ module Simple = struct
 
       let name = name
 
-      let pp ~short fmt (f1, f2) =
+      let pp ~all_fields ~block fmt (f1, f2) =
         pp_log_message
-          ~short
+          ~all_fields
+          ~block
           parsed_msg
           fmt
           [
@@ -854,9 +859,10 @@ module Simple = struct
 
       let name = name
 
-      let pp ~short fmt (f1, f2, f3) =
+      let pp ~all_fields ~block fmt (f1, f2, f3) =
         pp_log_message
-          ~short
+          ~all_fields
+          ~block
           parsed_msg
           fmt
           [
@@ -894,9 +900,10 @@ module Simple = struct
 
       let name = name
 
-      let pp ~short fmt (f1, f2, f3, f4) =
+      let pp ~all_fields ~block fmt (f1, f2, f3, f4) =
         pp_log_message
-          ~short
+          ~all_fields
+          ~block
           parsed_msg
           fmt
           [
@@ -939,9 +946,10 @@ module Simple = struct
 
       let name = name
 
-      let pp ~short fmt (f1, f2, f3, f4, f5) =
+      let pp ~all_fields ~block fmt (f1, f2, f3, f4, f5) =
         pp_log_message
-          ~short
+          ~all_fields
+          ~block
           parsed_msg
           fmt
           [
@@ -987,9 +995,10 @@ module Simple = struct
 
       let name = name
 
-      let pp ~short fmt (f1, f2, f3, f4, f5, f6) =
+      let pp ~all_fields ~block fmt (f1, f2, f3, f4, f5, f6) =
         pp_log_message
-          ~short
+          ~all_fields
+          ~block
           parsed_msg
           fmt
           [
@@ -1040,9 +1049,10 @@ module Simple = struct
 
       let name = name
 
-      let pp ~short fmt (f1, f2, f3, f4, f5, f6, f7) =
+      let pp ~all_fields ~block fmt (f1, f2, f3, f4, f5, f6, f7) =
         pp_log_message
-          ~short
+          ~all_fields
+          ~block
           parsed_msg
           fmt
           [
@@ -1096,9 +1106,10 @@ module Simple = struct
 
       let name = name
 
-      let pp ~short fmt (f1, f2, f3, f4, f5, f6, f7, f8) =
+      let pp ~all_fields ~block fmt (f1, f2, f3, f4, f5, f6, f7, f8) =
         pp_log_message
-          ~short
+          ~all_fields
+          ~block
           parsed_msg
           fmt
           [
@@ -1156,7 +1167,8 @@ module Legacy_logging = struct
       let encoding =
         Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
 
-      let pp ~short:_ ppf message = Format.fprintf ppf "%s" message
+      let pp ~all_fields:_ ~block:_ ppf message =
+        Format.fprintf ppf "%s" message
 
       let doc = "Generic event legacy / string-based information logging."
 
@@ -1257,7 +1269,7 @@ module Debug_event = struct
     let encoding =
       Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
 
-    let pp ~short:_ ppf {message; attachment} =
+    let pp ~all_fields:_ ~block:_ ppf {message; attachment} =
       let open Format in
       fprintf ppf "%s:@ %s@ %a" name message Data_encoding.Json.pp attachment
 
@@ -1279,7 +1291,7 @@ module Lwt_worker_logger = struct
 
     let encoding = Data_encoding.constant "started"
 
-    let pp ~short:_ ppf () = Format.fprintf ppf "started"
+    let pp ~all_fields:_ ~block:_ ppf () = Format.fprintf ppf "started"
 
     let doc = "Worker started event"
 
@@ -1295,7 +1307,7 @@ module Lwt_worker_logger = struct
 
     let encoding = Data_encoding.constant "ended"
 
-    let pp ~short:_ ppf () = Format.fprintf ppf "ended"
+    let pp ~all_fields:_ ~block:_ ppf () = Format.fprintf ppf "ended"
 
     let doc = "Worker ended event"
 
@@ -1311,7 +1323,8 @@ module Lwt_worker_logger = struct
 
     let encoding = Data_encoding.(obj1 (req "error" string))
 
-    let pp ~short:_ ppf error = Format.fprintf ppf "failed with %s" error
+    let pp ~all_fields:_ ~block:_ ppf error =
+      Format.fprintf ppf "failed with %s" error
 
     let doc = "Worker failed event"
 
@@ -1368,7 +1381,7 @@ module Lwt_log_sink = struct
             Format.kasprintf
               (Lwt_log_core.log ~section ~level:M.level)
               "%a"
-              (M.pp ~short:false)
+              (M.pp ~all_fields:true ~block:true)
               ev
           in
           return_ok_unit)

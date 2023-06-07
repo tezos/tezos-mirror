@@ -23,4 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Genesis_block_services = Block_services.Make (Protocol) (Protocol)
+module Lifted_protocol = Tezos_protocol_000_Ps9mPmXa_lifted.Lifted_protocol
+module Genesis_block_services =
+  Block_services.Make (Lifted_protocol) (Lifted_protocol)

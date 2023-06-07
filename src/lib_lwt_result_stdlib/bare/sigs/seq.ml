@@ -32,12 +32,18 @@
     See {!Lwtreslib} for a general description of traversors and the meaning for
     the name suffixes. A full description is also below.
 
-    All traversal functions that are suffixed with [_e] are within the result
-    monad. Note that these functions have a "fail-early" behaviour: the
+    Note the [Seq] module (along with the [Seq_*] modules) (unlike other
+    modules of Lwtreslib) uses submodules to organise different monadic
+    traversors. This is because the implementation of the [Seq] module is
+    delegated to the [Seqes] library which uses functors which produces
+    (sub)modules.
+
+    All traversal functions that are inside the [E] submodule are within the
+    result monad. Note that these functions have a "fail-early" behaviour: the
     traversal is interrupted as soon as any of the intermediate application
     fails (i.e., returns an [Error _]).
 
-    All traversal functions that are suffixed with [_s] are within the Lwt
+    All traversal functions that are inside the [S] submodule are within the Lwt
     monad. These functions traverse the elements sequentially: the promise for a
     given step of the traversal is only initiated when the promise for the
     previous step is resolved. Note that these functions have a fail-early
@@ -55,8 +61,8 @@
     whole-traversal promise is only rejected once all the other step promises
     have resolved.
 
-    All the traversal functions that are suffixed with [_es] are within the
-    combined error-and-Lwt monad. These function traverse the elements
+    All the traversal functions that are inside the [ES] submodule are within
+    the combined error-and-Lwt monad. These function traverse the elements
     sequentially with a fail-early behaviour for both rejection (as an Lwt
     promise) and failure (as a result).
 
@@ -70,7 +76,7 @@
     Because of the type of {!Stdlib.Seq.t}, some interactions with Lwt are not
     possible. Specifically, note that the type includes the variant
     [unit -> 'a node] which is not within Lwt nor within the result monad.
-    As a result, some of the traversals ([map_s], [map_e], etc.) cannot be
+    As a result, some of the traversals ([S.map], [E.map], etc.) cannot be
     applied lazily.
 
     Check-out the [S] variants ({!Seq_s.S}, {!Seq_e.S}, and
@@ -80,59 +86,49 @@
     convert from the standard [S.t]. *)
 
 module type S = sig
-  (** {3 Common interface with Stdlib} *)
+  (** {3 Common interface with Stdlib}
 
+      Note that some functions (namely [init], [take], and [drop]) are shadowed
+      with exception-less versions.
+
+      Note that [once] is not shadowed. Be careful when using [once]: the
+      resulting sequence is {e ephemeral} and using in a non-ephemeral way
+      raises an exception. As a safer alternative, you can use
+      [Seq_e.of_seq_once] which gives you a result-based (exception-less)
+      ephemeral sequence. *)
   include
     module type of Stdlib.Seq
       with type 'a t = 'a Stdlib.Seq.t
        and type 'a node = 'a Stdlib.Seq.node
 
+  (** {3 Lwtreslib-specific safety-shadowing} *)
+
+  val init :
+    when_negative_length:'err -> int -> (int -> 'a) -> ('a t, 'err) result
+
+  val take : when_negative_length:'err -> int -> 'a t -> ('a t, 'err) result
+
+  val drop : when_negative_length:'err -> int -> 'a t -> ('a t, 'err) result
+
+  module E :
+    Seqes.Sigs.SEQMON2TRAVERSORS
+      with type ('a, 'e) mon := ('a, 'e) result
+      with type ('a, 'e) callermon := ('a, 'e) result
+      with type ('a, 'e) t := 'a Stdlib.Seq.t
+
+  module S :
+    Seqes.Sigs.SEQMON1TRAVERSORS
+      with type 'a mon := 'a Lwt.t
+      with type 'a callermon := 'a Lwt.t
+      with type 'a t := 'a Stdlib.Seq.t
+
+  module ES :
+    Seqes.Sigs.SEQMON2TRAVERSORS
+      with type ('a, 'e) mon := ('a, 'e) result Lwt.t
+      with type ('a, 'e) callermon := ('a, 'e) result Lwt.t
+      with type ('a, 'e) t := 'a Stdlib.Seq.t
+
   (** {3 Lwtreslib-specific extensions} *)
-
-  (** [first s] is [None] if [s] is empty, it is [Some x] where [x] is the
-      first element of [s] otherwise.
-
-      Note that [first] forces the first element of the sequence, which can have
-      side-effects or be computationally expensive. Consider, e.g., the case
-      where [s = filter (fun …) s']: [first s] can force multiple of the values
-      from [s']. *)
-  val first : 'a t -> 'a option
-
-  (** Similar to {!fold_left} but wraps the traversal in {!result}. The
-      traversal is interrupted if one of the step returns an [Error _]. *)
-  val fold_left_e :
-    ('a -> 'b -> ('a, 'trace) result) -> 'a -> 'b t -> ('a, 'trace) result
-
-  (** Similar to {!fold_left} but wraps the traversing in {!Lwt}. Each step of
-      the traversal is started after the previous one has resolved. The
-      traversal is interrupted if one of the promise is rejected. *)
-  val fold_left_s : ('a -> 'b -> 'a Lwt.t) -> 'a -> 'b t -> 'a Lwt.t
-
-  (** Similar to {!fold_left} but wraps the traversing in [result Lwt.t].
-      Each step of the traversal is started after the previous one resolved. The
-      traversal is interrupted if one of the step is rejected or is fulfilled
-      with [Error _]. *)
-  val fold_left_es :
-    ('a -> 'b -> ('a, 'trace) result Lwt.t) ->
-    'a ->
-    'b t ->
-    ('a, 'trace) result Lwt.t
-
-  (** Similar to {!iter} but wraps the iteration in {!result}. The iteration
-      is interrupted if one of the step returns an [Error _]. *)
-  val iter_e : ('a -> (unit, 'trace) result) -> 'a t -> (unit, 'trace) result
-
-  (** Similar to {!iter} but wraps the iteration in {!Lwt}. Each step
-      of the iteration is started after the previous one resolved. The iteration
-      is interrupted if one of the promise is rejected. *)
-  val iter_s : ('a -> unit Lwt.t) -> 'a t -> unit Lwt.t
-
-  (** Similar to {!iter} but wraps the iteration in [result Lwt.t]. Each step
-      of the iteration is started after the previous one resolved. The iteration
-      is interrupted if one of the promise is rejected of fulfilled with an
-      [Error _]. *)
-  val iter_es :
-    ('a -> (unit, 'trace) result Lwt.t) -> 'a t -> (unit, 'trace) result Lwt.t
 
   (** Similar to {!iter} but wraps the iteration in [result Lwt.t]. All the
       steps of the iteration are started concurrently. The promise [iter_ep]
@@ -154,14 +150,52 @@ module type S = sig
       them is. *)
   val iter_p : ('a -> unit Lwt.t) -> 'a t -> unit Lwt.t
 
-  (** {3 Values which have made it to the Stdlib since then}
+  (** Similar to {!iteri} but wraps the iteration in [result Lwt.t]. All the
+      steps of the iteration are started concurrently. The promise [iteri_ep]
+      resolves once all the promises of the traversal resolve. At this point it
+      either:
+      - is rejected if at least one of the promises is, otherwise
+      - is fulfilled with [Error _] if at least one of the promises is,
+        otherwise
+      - is fulfilled with [Ok ()] if all the promises are. *)
+  val iteri_ep :
+    (int -> 'a -> (unit, 'trace) result Lwt.t) ->
+    'a t ->
+    (unit, 'trace list) result Lwt.t
 
-      This section is for forward compatibility: bringing you the features of
-      more recent OCaml Stdlib than we compile against. *)
+  (** Similar to {!iteri} but wraps the iteration in {!Lwt}. All the
+      steps of the iteration are started concurrently. The promise [iter_p f s]
+      is resolved only once all the promises of the iteration are. At this point
+      it is either fulfilled if all promises are, or rejected if at least one of
+      them is. *)
+  val iteri_p : (int -> 'a -> unit Lwt.t) -> 'a t -> unit Lwt.t
 
-  (** [concat s] is a sequence containing the elements of the elements of [s]. *)
-  val concat : 'a t t -> 'a t
+  (** Similar to {!iter2} but wraps the iteration in [result Lwt.t]. All the
+      steps of the iteration are started concurrently. The promise
+      [iter2_ep f s1 s2] resolves once all the promises of the traversal resolve.
+      At this point it is either:
+      - rejected if at least one of the promises is,
+      - fulfilled with [Error _] if at least one of the promises is,
+      - fulfilled with [Ok ()] if all of the promises are.
 
-  (** [concat_map] is an alias for {!flat_map} *)
-  val concat_map : ('a -> 'b t) -> 'a t -> 'b t
+      Note that similarly to {!Stdlib.Seq.iter2} this function iterates on the
+      common-length prefix of the two sequences. As a result, the iteration can
+      be successful even if the two sequences are of different lengths. *)
+  val iter2_ep :
+    ('a -> 'b -> (unit, 'trace) result Lwt.t) ->
+    'a t ->
+    'b t ->
+    (unit, 'trace list) result Lwt.t
+
+  (** Similar to {!iter2} but wraps the iteration in {!Lwt}. All the
+      steps of the iteration are started concurrently. The promise
+      [iter2_p f s1 s2] resolves once all the promises of the traversal resolve.
+      At this point it is either:
+      - rejected if at least one of the promises is,
+      - fulfilled with [()] if all of the promises are.
+
+      Note that similarly to {!Stdlib.Seq.iter2} this function iterates on the
+      common-length prefix of the two sequences. As a result, the iteration can
+      be successful even if the two sequences are of different lengths. *)
+  val iter2_p : ('a -> 'b -> unit Lwt.t) -> 'a t -> 'b t -> unit Lwt.t
 end

@@ -89,6 +89,7 @@ val applied_blocks :
 
 val heads :
   #streamed ->
+  ?protocols:Protocol_hash.t list ->
   ?next_protocols:Protocol_hash.t list ->
   Chain_services.chain ->
   ((Block_hash.t * Block_header.t) Lwt_stream.t * stopper) tzresult Lwt.t
@@ -163,7 +164,8 @@ module S : sig
     ( [`GET],
       unit,
       unit * Chain_services.chain,
-      < next_protocols : Protocol_hash.t list >,
+      < protocols : Protocol_hash.t list
+      ; next_protocols : Protocol_hash.t list >,
       unit,
       Block_hash.t * Block_header.t )
     Tezos_rpc.Service.t

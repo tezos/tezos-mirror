@@ -25,6 +25,3 @@
     # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
     - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     - . ./scripts/version.sh
-    # Load the environment poetry previously created in the docker image.
-    # Give access to the Python dependencies/executables
-    - . $HOME/.venv/bin/activate

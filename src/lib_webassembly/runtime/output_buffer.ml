@@ -1,3 +1,6 @@
+open Proto_compat
+open Error_monad
+
 type output_info = {
   outbox_level : int32;  (** The outbox level at which the message exists.*)
   message_index : Z.t;  (** The index of the message in the outbox. *)
@@ -36,11 +39,9 @@ let level_range buffer =
       (Int32.(succ (sub last_level buffer.validity_period)), last_level))
     buffer.last_level
 
-let first_level buffer = Option.map fst (level_range buffer)
-
 let get_outbox_last_message_index messages =
   let last_message_index = Z.pred (Messages.num_elements messages) in
-  if Z.Compare.(last_message_index < Z.zero) then None
+  if Compare.Z.(last_message_index < Z.zero) then None
   else Some last_message_index
 
 (** Predicates on the outboxes *)
@@ -48,27 +49,25 @@ let get_outbox_last_message_index messages =
 let is_outbox_full message_limit outbox =
   match get_outbox_last_message_index outbox with
   | Some last_message_index ->
-      Z.Compare.(last_message_index >= Z.pred message_limit)
+      Compare.Z.(last_message_index >= Z.pred message_limit)
   | None -> false
 
 let is_outbox_available buffer level =
   match level_range buffer with
   | None -> false
   | Some (first_level, last_level) ->
-      level <= last_level && level >= first_level
+      Compare.Int32.(level <= last_level && level >= first_level)
 
 let is_message_available messages index =
   match get_outbox_last_message_index messages with
   | None -> false
-  | Some last_message -> Z.Compare.(index <= last_message && index >= Z.zero)
+  | Some last_message -> Compare.Z.(index <= last_message && index >= Z.zero)
 
 (** Outboxes creation and manipulation *)
 
 let allocate_outbox buffer level =
   Outboxes.set level (Messages.create Z.zero) buffer.outboxes
 
-(** [alloc ~validity_period ~last_level] allocates a new output_buffer. If
-    [last_level] is [Some level], the corresponding outbox is allocated. *)
 let alloc ~validity_period ~message_limit ~last_level =
   let buffer =
     {
@@ -86,17 +85,10 @@ let alloc ~validity_period ~message_limit ~last_level =
       allocate_outbox buffer level ;
       buffer
 
-(** [is_initialized buffer] returns [true] if the output buffer has been
-    initialized. *)
-let is_initialized {last_level; _} = last_level <> None
+let is_initialized {last_level; _} = Option.is_some last_level
 
-(** [initialize_outbox buffer level] initialize the output_buffer with a fresh
-    inbox at the given level.
-
-   @raise Already_initialized_outbox if the output_buffer has already been initialized
-*)
 let initialize_outbox buffer level =
-  if level < 0l then raise Invalid_level
+  if Compare.Int32.(level < 0l) then raise Invalid_level
   else
     match buffer.last_level with
     | None ->
@@ -105,12 +97,6 @@ let initialize_outbox buffer level =
         allocate_outbox buffer level
     | Some _ -> raise Already_initialized_outbox
 
-(** [move_outbox_forward outboxes] increments the last level of the outbox,
-    allocates a new outbox and removes the outbox at the previous first level,
-    according to the validity period.
-
-    @raise Non_initialized_outbox if the output buffer has never been initialized.
-*)
 let move_outbox_forward buffer =
   match level_range buffer with
   | None -> raise Non_initialized_outbox
@@ -120,13 +106,8 @@ let move_outbox_forward buffer =
       allocate_outbox buffer level ;
       Outboxes.remove first_level buffer.outboxes
 
-(** [push_message outboxes msg] push a new message in the last outbox, and
-    returns the its level and index in the outbox.
-
-    @raise Full_outbox if the last outbox is full.
-*)
 let push_message buffer msg =
-  let open Lwt.Syntax in
+  let open Lwt_syntax in
   match buffer.last_level with
   | None ->
       (* Note that this should be an impossible case since the outbox should be
@@ -143,24 +124,55 @@ let push_message buffer msg =
         let new_message_index = Messages.append msg last_outbox in
         {outbox_level = last_level; message_index = new_message_index}
 
-let get_outbox buffer level =
+let get_outbox_messages buffer level =
   if not (is_outbox_available buffer level) then
-    if level < 0l then raise Invalid_level else raise Outdated_level
+    if Compare.Int32.(level < 0l) then raise Invalid_level
+    else raise Outdated_level
   else Outboxes.get level buffer.outboxes
 
-(** [get_message outboxes message_info] finds a message in the output buffer.
+(* This one is exported because it returns immutable vector *)
+let get_outbox buffer level =
+  Lwt.map Messages.snapshot @@ get_outbox_messages buffer level
 
-    @raise Invalid_level if no outbox exists for the given level.
-    @raise Outdated_level if the outbox is outdated according to the validity
-      period.
-    @raise Invalid_id if no message with the given id exists in the outbox at
-      this level.
-*)
 let get_message buffer {outbox_level; message_index} =
-  let open Lwt.Syntax in
-  let* outbox = get_outbox buffer outbox_level in
+  let open Lwt_syntax in
+  let* outbox = get_outbox_messages buffer outbox_level in
   if not (is_message_available outbox message_index) then raise Invalid_id
   else Messages.get message_index outbox
+
+(*
+This implementation strongly relies on the fact,
+that the only possible modifications of Outbox are:
+1. push_message which pushes message in the last outbox
+2. move_outbox_forward which slides the [outboxes] buffer,
+   removing the first outbox and adding a new one to the end of the buffer
+Also, another important detail is
+that we don't return internal mutable structures (like Messages.t) from getters functions.
+
+Given that, the following is sufficient for snapshotting:
+1. Snapshot the Outboxes.t buffer
+2. Shapshot a buffer's last element
+
+For instance, there is no modification of arbitrary element of the buffer,
+which makes the implementation below possible.
+*)
+let snapshot (buffer : t) =
+  let open Lwt_syntax in
+  let snapshotted_outboxes = Outboxes.snapshot buffer.outboxes in
+  let+ snapshotted_outboxes =
+    match buffer.last_level with
+    | Some last_level ->
+        let+ last_outbox = Outboxes.Map.get last_level snapshotted_outboxes in
+        let last_outbox_snapshotted = Messages.snapshot last_outbox in
+        let last_outbox_snapshotted =
+          Messages.of_immutable last_outbox_snapshotted
+        in
+        Outboxes.Map.set last_level last_outbox_snapshotted snapshotted_outboxes
+    | None ->
+        (* No need to snapshot last element then *)
+        Lwt.return snapshotted_outboxes
+  in
+  {buffer with outboxes = Outboxes.of_immutable snapshotted_outboxes}
 
 module Internal_for_tests = struct
   let make level_map =
@@ -168,6 +180,16 @@ module Internal_for_tests = struct
       outboxes = level_map;
       validity_period = Int32.min_int;
       last_level = Some Int32.max_int;
-      message_limit = Z.of_int @@ Int.max_int;
+      message_limit = Z.of_int max_int;
     }
+
+  let get_outbox = get_outbox_messages
+
+  let is_outbox_available = is_outbox_available
+
+  let first_level buffer = Option.map fst (level_range buffer)
+
+  let level_range = level_range
+
+  let get_outbox_last_message_index = get_outbox_last_message_index
 end

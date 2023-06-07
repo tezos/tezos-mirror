@@ -79,7 +79,7 @@ let wait_for_denunciation accuser =
              "completed": 0.009614550999999999
            }
          },
-         "level": "notice"
+         "level": "info"
        }
      ]
    }
@@ -91,7 +91,7 @@ let wait_for_denunciation_injection node client accuser =
     | Some _ | None -> None
   in
   let denunciation_event = wait_for_denunciation accuser in
-  let* _ = Node.wait_for node "request_completed_notice.v0" filter in
+  let* _ = Node.wait_for node "request_completed_info.v0" filter in
   let* oph = denunciation_event in
   let* mempool =
     RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()

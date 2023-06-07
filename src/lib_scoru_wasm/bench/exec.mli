@@ -53,14 +53,19 @@ val show_phase : phase -> string
 val finish_top_level_call_on_state :
   Internal_state.pvm_state -> (Internal_state.pvm_state * int64) Lwt.t
 
-(** [execute_on_state phase state] Execute a given [phase] of the execution loop
-    on the state. *)
+(** [execute_on_state ~reveal_builtins phase state] Execute a given [phase] of
+    the execution loop on the state. *)
 val execute_on_state :
-  phase -> Internal_state.pvm_state -> (Internal_state.pvm_state * int64) Lwt.t
+  reveal_builtins:Tezos_scoru_wasm.Builtins.reveals ->
+  phase ->
+  Internal_state.pvm_state ->
+  (Internal_state.pvm_state * int64) Lwt.t
 
 (** Execute one top level call using fast execution. *)
 val execute_fast :
-  Internal_state.pvm_state -> (Internal_state.pvm_state * int64) Lwt.t
+  reveal_builtins:Tezos_scoru_wasm.Builtins.reveals ->
+  Internal_state.pvm_state ->
+  (Internal_state.pvm_state * int64) Lwt.t
 
 (** [run path k] execute [k] on the content of the file at [path] *)
 val run : Lwt_io.file_name -> (string -> 'a Lwt.t) -> 'a Lwt.t

@@ -25,32 +25,37 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Lima | Mumbai | Alpha
+type t = Mumbai | Nairobi | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
-let name = function Alpha -> "Alpha" | Lima -> "Lima" | Mumbai -> "Mumbai"
+let name = function
+  | Alpha -> "Alpha"
+  | Mumbai -> "Mumbai"
+  | Nairobi -> "Nairobi"
 
-let number = function Lima -> 015 | Mumbai -> 016 | Alpha -> 017
+let number = function Mumbai -> 016 | Nairobi -> 017 | Alpha -> 018
 
 let directory = function
   | Alpha -> "proto_alpha"
-  | Lima -> "proto_015_PtLimaPt"
   | Mumbai -> "proto_016_PtMumbai"
+  | Nairobi -> "proto_017_PtNairob"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
 
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-  | Lima -> "PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW"
   | Mumbai -> "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
+  | Nairobi -> "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
 let demo_noops_hash = "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
 
 let demo_counter_hash = "ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT"
+
+let protocol_zero_hash = "PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i"
 
 let default_constants = Constants_sandbox
 
@@ -68,6 +73,10 @@ let daemon_name = function Alpha -> "alpha" | p -> String.sub (hash p) 0 8
 let accuser proto = "./octez-accuser-" ^ daemon_name proto
 
 let baker proto = "./octez-baker-" ^ daemon_name proto
+
+let sc_rollup_node proto = "./octez-smart-rollup-node-" ^ daemon_name proto
+
+let sc_rollup_client proto = "./octez-smart-rollup-client-" ^ daemon_name proto
 
 let encoding_prefix = function
   | Alpha -> "alpha"
@@ -160,16 +169,16 @@ let write_parameter_file :
   Lwt.return overriden_parameters
 
 let next_protocol = function
-  | Lima -> Some Alpha
-  | Mumbai -> Some Alpha
+  | Mumbai -> Some Nairobi
+  | Nairobi -> Some Alpha
   | Alpha -> None
 
 let previous_protocol = function
-  | Alpha -> Some Lima
-  | Mumbai -> Some Lima
-  | Lima -> None
+  | Alpha -> Some Nairobi
+  | Nairobi -> Some Mumbai
+  | Mumbai -> None
 
-let all = [Alpha; Lima; Mumbai]
+let all = [Alpha; Mumbai; Nairobi]
 
 type supported_protocols =
   | Any_protocol

@@ -24,10 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Type of a protocol-specific mempool filter plugin.
-
-    This is compatible with the plugins of protocols Lima and up. For
-    Kathmandu and older protocols, see {!Legacy_mempool_plugin.FILTER}. *)
+(** Type of a protocol-specific mempool filter plugin. *)
 module type FILTER = sig
   module Proto : Registered_protocol.T
 
@@ -152,25 +149,9 @@ module Undefined_metrics_plugin (P : sig
   val hash : Protocol_hash.t
 end) : METRICS
 
-(** Juggling between recent filter version {!FILTER}, designed for
-    Lima (environment V7) and newer protocols, and legacy filter
-    version {!Legacy_mempool_plugin.FILTER}. *)
-type filter_t =
-  | Recent of (module FILTER)
-  | Legacy of (module Legacy_mempool_plugin.FILTER)
-
-(** Dummy filter that does nothing. *)
-val no_filter : (module Registered_protocol.T) -> filter_t
-
 (** Register a mempool filter plugin for a specific protocol
-    (according to its [Proto.hash]). The protocol must be Lima or a
-    more recent one. *)
+    (according to its [Proto.hash]). *)
 val register_filter : (module FILTER) -> unit
-
-(** Register a mempool filter plugin for a specific protocol
-    (according to its [Proto.hash]). The protocol must be Kathmandu
-    or older. *)
-val register_legacy_filter : (module Legacy_mempool_plugin.FILTER) -> unit
 
 (** Registers a RPC plug-in for a specific protocol *)
 val register_rpc : (module RPC) -> unit
@@ -179,7 +160,7 @@ val register_rpc : (module RPC) -> unit
 val register_metrics : (module METRICS) -> unit
 
 (** Looks for a mempool filter plug-in for a specific protocol. *)
-val find_filter : Protocol_hash.t -> filter_t option
+val find_filter : Protocol_hash.t -> (module FILTER) option
 
 (** Looks for an rpc plug-in for a specific protocol. *)
 val find_rpc : Protocol_hash.t -> (module RPC) option

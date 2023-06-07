@@ -43,11 +43,6 @@
       - origination
       - delegation
       - set deposits limitation
-      - tx rollup origination
-      - tx rollup batch submission
-      - tx rollup commit
-      - tx rollup withdraw
-      - tx rollup reveal withdrawals
       - smart rollup origination
       - smart rollup add messages
       - smart rollup publish
@@ -123,22 +118,6 @@ module Kind : sig
 
   type register_global_constant = Register_global_constant_kind
 
-  type tx_rollup_origination = Tx_rollup_origination_kind
-
-  type tx_rollup_submit_batch = Tx_rollup_submit_batch_kind
-
-  type tx_rollup_commit = Tx_rollup_commit_kind
-
-  type tx_rollup_return_bond = Tx_rollup_return_bond_kind
-
-  type tx_rollup_finalize_commitment = Tx_rollup_finalize_commitment_kind
-
-  type tx_rollup_remove_commitment = Tx_rollup_remove_commitment_kind
-
-  type tx_rollup_rejection = Tx_rollup_rejection_kind
-
-  type tx_rollup_dispatch_tickets = Tx_rollup_dispatch_tickets_kind
-
   type transfer_ticket = Transfer_ticket_kind
 
   type dal_publish_slot_header = Dal_publish_slot_header_kind
@@ -176,17 +155,6 @@ module Kind : sig
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Update_consensus_key_manager_kind : update_consensus_key manager
-    | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
-    | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
-    | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
-    | Tx_rollup_return_bond_manager_kind : tx_rollup_return_bond manager
-    | Tx_rollup_finalize_commitment_manager_kind
-        : tx_rollup_finalize_commitment manager
-    | Tx_rollup_remove_commitment_manager_kind
-        : tx_rollup_remove_commitment manager
-    | Tx_rollup_rejection_manager_kind : tx_rollup_rejection manager
-    | Tx_rollup_dispatch_tickets_manager_kind
-        : tx_rollup_dispatch_tickets manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
     | Dal_publish_slot_header_manager_kind : dal_publish_slot_header manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
@@ -423,70 +391,14 @@ and _ manager_operation =
   | Update_consensus_key :
       Signature.Public_key.t
       -> Kind.update_consensus_key manager_operation
-  (* [Tx_rollup_origination] allows an implicit contract to originate
-     a new transactional rollup. *)
-  | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
-  (* [Tx_rollup_submit_batch] allows to submit batches of L2 operations on a
-     transactional rollup. The content is a string, but stands for an immutable
-     byte sequence. *)
-  | Tx_rollup_submit_batch : {
-      tx_rollup : Tx_rollup_repr.t;
-      content : string;
-      burn_limit : Tez_repr.t option;
-    }
-      -> Kind.tx_rollup_submit_batch manager_operation
-  | Tx_rollup_commit : {
-      tx_rollup : Tx_rollup_repr.t;
-      commitment : Tx_rollup_commitment_repr.Full.t;
-    }
-      -> Kind.tx_rollup_commit manager_operation
-  | Tx_rollup_return_bond : {
-      tx_rollup : Tx_rollup_repr.t;
-    }
-      -> Kind.tx_rollup_return_bond manager_operation
-  | Tx_rollup_finalize_commitment : {
-      tx_rollup : Tx_rollup_repr.t;
-    }
-      -> Kind.tx_rollup_finalize_commitment manager_operation
-  | Tx_rollup_remove_commitment : {
-      tx_rollup : Tx_rollup_repr.t;
-    }
-      -> Kind.tx_rollup_remove_commitment manager_operation
-  | Tx_rollup_rejection : {
-      tx_rollup : Tx_rollup_repr.t;
-      level : Tx_rollup_level_repr.t;
-      message : Tx_rollup_message_repr.t;
-      message_position : int;
-      message_path : Tx_rollup_inbox_repr.Merkle.path;
-      message_result_hash : Tx_rollup_message_result_hash_repr.t;
-      message_result_path : Tx_rollup_commitment_repr.Merkle.path;
-      previous_message_result : Tx_rollup_message_result_repr.t;
-      previous_message_result_path : Tx_rollup_commitment_repr.Merkle.path;
-      proof : Tx_rollup_l2_proof.serialized;
-    }
-      -> Kind.tx_rollup_rejection manager_operation
-  | Tx_rollup_dispatch_tickets : {
-      tx_rollup : Tx_rollup_repr.t;
-          (** The rollup from where the tickets are retrieved *)
-      level : Tx_rollup_level_repr.t;
-          (** The level at which the withdrawal was enabled *)
-      context_hash : Context_hash.t;
-          (** The hash of the l2 context resulting from the execution of the
-          inbox from where this withdrawal was enabled. *)
-      message_index : int;
-          (** Index of the message in the inbox at [level] where this withdrawal was enabled. *)
-      message_result_path : Tx_rollup_commitment_repr.Merkle.path;
-      tickets_info : Tx_rollup_reveal_repr.t list;
-    }
-      -> Kind.tx_rollup_dispatch_tickets manager_operation
       (** [Transfer_ticket] allows an implicit account (the "claimer") to
-      receive [amount] tickets, pulled out of [tx_rollup], to the
-      [entrypoint] of the smart contract [destination].
+          receive [amount] tickets, pulled out of [tx_rollup], to the
+          [entrypoint] of the smart contract [destination].
 
-      The ticket must have been addressed to the
-      claimer, who must be the source of this operation. It must have been
-      pulled out at [level] and from the message at [message_index]. The ticket
-      is composed of [ticketer; ty; contents]. *)
+          The ticket must have been addressed to the
+          claimer, who must be the source of this operation. It must have been
+          pulled out at [level] and from the message at [message_index]. The ticket
+          is composed of [ticketer; ty; contents]. *)
   | Transfer_ticket : {
       contents : Script_repr.lazy_expr;  (** Contents of the withdrawn ticket *)
       ty : Script_repr.lazy_expr;
@@ -525,6 +437,11 @@ and _ manager_operation =
   | Sc_rollup_cement : {
       rollup : Sc_rollup_repr.t;
       commitment : Sc_rollup_commitment_repr.Hash.t;
+          (** The field [commitment] is deprecated. It is not used during the
+              application of [Sc_rollup_cement]. The commitment to cement is
+              computed by the protocol.
+
+              It is deprecated starting N, and can be removed in O. *)
     }
       -> Kind.sc_rollup_cement manager_operation
   | Sc_rollup_publish : {
@@ -613,13 +530,35 @@ val manager_kind : 'kind manager_operation -> 'kind Kind.manager
 
 val encoding : packed_operation Data_encoding.t
 
+(** Operation encoding that accepts legacy attestation name : `endorsement`
+    (and preendorsement, double_<op>_evidence) in JSON
+
+    https://gitlab.com/tezos/tezos/-/issues/5529
+
+    This encoding is temporary and should be removed when the endorsements kinds
+    in JSON will not be accepted any more by the protocol.
+*)
+val encoding_with_legacy_attestation_name : packed_operation Data_encoding.t
+
 val contents_encoding : packed_contents Data_encoding.t
+
+val contents_encoding_with_legacy_attestation_name :
+  packed_contents Data_encoding.t
 
 val contents_list_encoding : packed_contents_list Data_encoding.t
 
+val contents_list_encoding_with_legacy_attestation_name :
+  packed_contents_list Data_encoding.t
+
 val protocol_data_encoding : packed_protocol_data Data_encoding.t
 
+val protocol_data_encoding_with_legacy_attestation_name :
+  packed_protocol_data Data_encoding.t
+
 val unsigned_operation_encoding :
+  (Operation.shell_header * packed_contents_list) Data_encoding.t
+
+val unsigned_operation_encoding_with_legacy_attestation_name :
   (Operation.shell_header * packed_contents_list) Data_encoding.t
 
 val raw : _ operation -> raw
@@ -722,6 +661,14 @@ type error += Missing_signature (* `Permanent *)
 
 type error += Invalid_signature (* `Permanent *)
 
+(** Measuring the length of an operation, ignoring its signature.
+    This is useful to define a gas model for the check of the
+    signature. *)
+val unsigned_operation_length : _ operation -> int
+
+(** Check the signature of an operation. This function serializes the
+    operation before calling the [Signature.check] function with the
+    appropriate watermark. *)
 val check_signature :
   Signature.Public_key.t -> Chain_id.t -> _ operation -> unit tzresult
 
@@ -785,26 +732,6 @@ module Encoding : sig
 
   val increase_paid_storage_case : Kind.increase_paid_storage Kind.manager case
 
-  val tx_rollup_origination_case : Kind.tx_rollup_origination Kind.manager case
-
-  val tx_rollup_submit_batch_case :
-    Kind.tx_rollup_submit_batch Kind.manager case
-
-  val tx_rollup_commit_case : Kind.tx_rollup_commit Kind.manager case
-
-  val tx_rollup_return_bond_case : Kind.tx_rollup_return_bond Kind.manager case
-
-  val tx_rollup_finalize_commitment_case :
-    Kind.tx_rollup_finalize_commitment Kind.manager case
-
-  val tx_rollup_remove_commitment_case :
-    Kind.tx_rollup_remove_commitment Kind.manager case
-
-  val tx_rollup_rejection_case : Kind.tx_rollup_rejection Kind.manager case
-
-  val tx_rollup_dispatch_tickets_case :
-    Kind.tx_rollup_dispatch_tickets Kind.manager case
-
   val transfer_ticket_case : Kind.transfer_ticket Kind.manager case
 
   val dal_publish_slot_header_case :
@@ -865,23 +792,6 @@ module Encoding : sig
 
     val increase_paid_storage_case : Kind.increase_paid_storage case
 
-    val tx_rollup_origination_case : Kind.tx_rollup_origination case
-
-    val tx_rollup_submit_batch_case : Kind.tx_rollup_submit_batch case
-
-    val tx_rollup_commit_case : Kind.tx_rollup_commit case
-
-    val tx_rollup_return_bond_case : Kind.tx_rollup_return_bond case
-
-    val tx_rollup_finalize_commitment_case :
-      Kind.tx_rollup_finalize_commitment case
-
-    val tx_rollup_remove_commitment_case : Kind.tx_rollup_remove_commitment case
-
-    val tx_rollup_rejection_case : Kind.tx_rollup_rejection case
-
-    val tx_rollup_dispatch_tickets_case : Kind.tx_rollup_dispatch_tickets case
-
     val transfer_ticket_case : Kind.transfer_ticket case
 
     val dal_publish_slot_header_case : Kind.dal_publish_slot_header case
@@ -909,4 +819,9 @@ module Encoding : sig
 
     val zk_rollup_update_case : Kind.zk_rollup_update case
   end
+end
+
+module Internal_for_benchmarking : sig
+  (* Serialize an operation, ignoring its signature. *)
+  val serialize_unsigned_operation : _ operation -> bytes
 end

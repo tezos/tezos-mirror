@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Error Monad
-    Invocation:   dune build @src/lib_error_monad/runtest
+    Invocation:   dune exec src/lib_error_monad/test/main.exe \
+                  -- --file test_registration.ml
     Subject:      On the registration and query of errors.
 *)
 
@@ -61,4 +62,7 @@ let tests_extract_infos =
   [Alcotest.test_case "extract-infos" `Quick test_extract_infos]
 
 let () =
-  Alcotest.run "error-registration" [("extract-info", tests_extract_infos)]
+  Alcotest.run
+    ~__FILE__
+    "error-registration"
+    [("extract-info", tests_extract_infos)]

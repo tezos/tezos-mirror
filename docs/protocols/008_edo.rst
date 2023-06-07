@@ -12,11 +12,11 @@ operations.
 The changelog section contains all the Merge Requests and instructions
 to regenerate the protocol sources from the Gitlab branch.
 
-The code can be found in the directory ``../src/proto_008_PtEdo2Zk`` of branch `master` or in the release
+The code can be found in the directory ``../src/proto_008_PtEdo2Zk`` of branch ``master`` or in the release
 8.2 and its full hash is
 ``PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA``.
 
-As usual a :ref:`testnet <test-networks>` called `Edonet` will be available
+As usual a :ref:`testnet <test-networks>` called ``Edonet`` will be available
 during the full lifetime of the protocol.
 
 The main novelties in the Edo protocol are:

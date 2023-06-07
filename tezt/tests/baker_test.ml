@@ -131,15 +131,26 @@ let baker_bls_test =
       client
   in
   let msg =
-    match protocol with
-    | Lima -> rex "Invalid protocol_parameters"
-    | Mumbai | Alpha ->
-        rex "The delegate tz4.*\\w is forbidden as it is a BLS public key hash"
+    rex "The delegate tz4.*\\w is forbidden as it is a BLS public key hash"
   in
   Process.check_error activate_process ~exit_code:1 ~msg
+
+let baker_remote_test =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker in RPC-only mode"
+    ~tags:["baker"; "remote"]
+  @@ fun protocol ->
+  let* node, client =
+    Client.init_with_protocol `Client ~protocol () ~timestamp:Now
+  in
+  let* _ = Baker.init ~remote_mode:true ~protocol node client in
+  let* _ = Node.wait_for_level node 3 in
+  unit
 
 let register ~protocols =
   baker_simple_test protocols ;
   baker_stresstest protocols ;
   baker_stresstest_apply protocols ;
-  baker_bls_test protocols
+  baker_bls_test protocols ;
+  baker_remote_test protocols

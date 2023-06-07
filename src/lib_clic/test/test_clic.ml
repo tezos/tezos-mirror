@@ -27,7 +27,8 @@
 (** Testing
     -------
     Component:    Tezos_clic library
-    Invocation:   dune build @src/lib_clic/runtest
+    Invocation:   dune exec src/lib_clic/test/main.exe \
+                  -- --file test_clic.ml
     Subject:      Test the functionality of the Tezos_clic library, such as CLI
                   command dispatch, parameters and auto-completion.
 *)
@@ -77,6 +78,12 @@ let abcd_param ~name =
 
 let efgh_param ~name =
   Tezos_clic.param ~name ~desc:"must be E,F,G,H, or \"end\"" efgh_parameter
+
+let neg_param ~name =
+  Tezos_clic.param ~name ~desc:"must be negative number"
+  @@ Tezos_clic.parameter (fun _ w ->
+         let i = int_of_string w in
+         if i >= 0 then failwith "must be negative" else Lwt_result.return i)
 
 (* instrumentation *)
 
@@ -225,6 +232,21 @@ let test_dispatch_advanced () =
       (fun () l () ->
         return ("F" ^ String.concat "" (List.map string_of_abcd l)))
   in
+  let enp_neg_1 return =
+    Tezos_clic.command
+      ~desc:"neg-param"
+      Tezos_clic.no_options
+      (Tezos_clic.prefixes ["the"; "start"]
+      @@ neg_param ~name:"neg" @@ Tezos_clic.prefix "done" @@ Tezos_clic.stop)
+      (fun () i () -> return ("E" ^ string_of_int i))
+  in
+  let enp_prefix_stop return =
+    Tezos_clic.command
+      ~desc:"strict-prefix"
+      Tezos_clic.(args1 @@ switch ~doc:"" ~long:"nothing" ())
+      (Tezos_clic.prefixes ["the"; "start"] @@ Tezos_clic.stop)
+      (fun nothing () -> return (Printf.sprintf "E-%b" nothing))
+  in
   let expect line = expect_result line Format.pp_print_string in
   let open Lwt_syntax in
   let* () =
@@ -324,7 +346,22 @@ let test_dispatch_advanced () =
   let* () =
     expect __LINE__ expected_error (dispatch [en; fr] ["a"; "la"; "fin"])
   in
-  expect __LINE__ expected_error (dispatch [fr; en] ["a"; "la"; "fin"])
+  let* () =
+    expect __LINE__ expected_error (dispatch [fr; en] ["a"; "la"; "fin"])
+  in
+  let* () =
+    expect
+      __LINE__
+      (Ok "E-1")
+      (dispatch [enp_prefix_stop; enp_neg_1] ["the"; "start"; "-1"; "done"])
+  in
+  let* () =
+    expect
+      __LINE__
+      (Ok "E-true")
+      (dispatch [enp_prefix_stop; enp_neg_1] ["the"; "start"; "--nothing"])
+  in
+  return_unit
 
 let string_param ~autocomplete next =
   Tezos_clic.(
@@ -640,6 +677,7 @@ let wrap (n, f) =
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "Tezos_clic"
     [
       ( "dispatch",

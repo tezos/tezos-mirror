@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (validate manager)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/validate/main.exe \
-                -- test "^covalidity"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/validate/main.exe \
+                  -- --file test_covalidity.ml
     Subject:    Validation of operation.
 *)
 open Validate_helpers
@@ -155,3 +154,7 @@ let tests =
     []
     voting_periods
   |> Qcheck2_helpers.qcheck_wrap_lwt
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("covalidity", tests)]
+  |> Lwt_main.run

@@ -193,7 +193,7 @@ module Key_map = struct
   let of_seq seq = Seq.fold_left (fun map (k, v) -> insert k v map) empty seq
 
   let fold_lwt f m accu =
-    Seq.fold_left_s (fun acc (k, v) -> f k v acc) accu (to_seq m)
+    Seq.S.fold_left (fun acc (k, v) -> f k v acc) accu (to_seq m)
 
   let sample_uniform map =
     if is_empty map then None

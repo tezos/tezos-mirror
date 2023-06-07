@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Workers
-    Invocation:   dune exec src/lib_workers/test/test_workers_unit.exe
+    Invocation:   dune exec src/lib_workers/test/main.exe \
+                  -- --file test_workers_unit.ml
     Subject:      Unit tests for [Worker]
 *)
 
@@ -343,5 +344,8 @@ let tests_buffer =
   ("Buffer handling", [Tztest.tztest "Dropbox/Async" `Quick test_async_dropbox])
 
 let () =
-  Alcotest_lwt.run "Workers" [tests_history; tests_status; tests_buffer]
+  Alcotest_lwt.run
+    ~__FILE__
+    "Workers"
+    [tests_history; tests_status; tests_buffer]
   |> Lwt_main.run

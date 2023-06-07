@@ -25,7 +25,9 @@
 
 include Slot_manager_legacy
 
-type error += Invalid_slot_size of {provided : int; expected : int}
+type error +=
+  | Invalid_slot_size of {provided : int; expected : int}
+  | Invalid_degree of string
 
 let () =
   register_error_kind
@@ -43,7 +45,16 @@ let () =
     (function
       | Invalid_slot_size {provided; expected} -> Some (provided, expected)
       | _ -> None)
-    (fun (provided, expected) -> Invalid_slot_size {provided; expected})
+    (fun (provided, expected) -> Invalid_slot_size {provided; expected}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.invalid_degree_string"
+    ~title:"Invalid degree"
+    ~description:"The degree of the polynomial is too high"
+    ~pp:(fun ppf msg -> Format.fprintf ppf "%s" msg)
+    Data_encoding.(obj1 (req "msg" string))
+    (function Invalid_degree msg -> Some msg | _ -> None)
+    (fun msg -> Invalid_degree msg)
 
 (* Used wrapper functions on top of Cryptobox. *)
 
@@ -55,7 +66,16 @@ let polynomial_from_slot cryptobox slot =
       let open Cryptobox in
       let provided = Bytes.length slot in
       let {slot_size = expected; _} = parameters cryptobox in
-      tzfail @@ Invalid_slot_size {provided; expected}
+      Error (Errors.other [Invalid_slot_size {provided; expected}])
+
+let commit cryptobox polynomial =
+  let open Result_syntax in
+  match Cryptobox.commit cryptobox polynomial with
+  | Ok cm -> return cm
+  | Error (`Invalid_degree_strictly_less_than_expected _ as commit_error) ->
+      Error
+        (Errors.other
+           [Invalid_degree (Cryptobox.string_of_commit_error commit_error)])
 
 let commitment_should_exist node_store cryptobox commitment =
   let open Lwt_result_syntax in
@@ -69,7 +89,7 @@ let commitment_should_exist node_store cryptobox commitment =
 let add_commitment node_store slot cryptobox =
   let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_slot cryptobox slot in
-  let commitment = Cryptobox.commit cryptobox polynomial in
+  let*? commitment = commit cryptobox polynomial in
   let*! exists =
     Store.Legacy.exists_slot_by_commitment node_store cryptobox commitment
   in
@@ -90,12 +110,26 @@ let associate_slot_id_with_commitment node_store cryptobox commitment slot_id =
 
 let get_commitment_slot node_store cryptobox commitment =
   let open Lwt_result_syntax in
-  let*! slot_opt =
+  let* slot_opt =
     Store.Legacy.find_slot_by_commitment node_store cryptobox commitment
   in
   match slot_opt with
   | None -> fail `Not_found
   | Some slot_content -> return slot_content
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
+   handle with_proof flag. *)
+let add_commitment_shards node_store cryptobox commitment _with_proof =
+  let open Lwt_result_syntax in
+  let* slot = get_commitment_slot node_store cryptobox commitment in
+  let*? polynomial = polynomial_from_slot cryptobox slot in
+  let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
+  Store.(
+    Shards.save_and_notify
+      node_store.shard_store
+      node_store.shards_watcher
+      commitment
+      shards)
 
 let store_slot_headers ~block_level ~block_hash slot_headers node_store =
   Store.Legacy.add_slot_headers ~block_level ~block_hash slot_headers node_store

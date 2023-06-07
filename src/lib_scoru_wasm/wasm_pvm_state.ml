@@ -24,6 +24,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type version = V0 | V1
+
+let versions = [("2.0.0", V0); ("2.0.0-r1", V1)]
+
+let versions_flip = List.map (fun (x, y) -> (y, x)) versions
+
+let version_encoding =
+  (* This encoding is directly used by the protocol. As a consequence,
+     any change done to it needs to be backward compatible!
+
+     We cannot use [string_enum] here because [string_enum] will
+     append the size of the string at the beginning of the encoded
+     bytes. *)
+  Data_encoding.(
+    conv_with_guard
+      (fun v -> Stdlib.List.assoc v versions_flip)
+      (fun str ->
+        match List.assoc_opt ~equal:Compare.String.equal str versions with
+        | Some v -> Ok v
+        | None -> Error "not a valid version")
+      Variable.string)
+
 (** Represents the location of an input message. *)
 type input_info = {
   inbox_level : Tezos_base.Bounded.Non_negative_int32.t;

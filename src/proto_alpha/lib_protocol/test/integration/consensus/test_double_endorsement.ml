@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:    Protocol (double endorsement)
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                  -- test "^double endorsement$"
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
+                  -- --file test_double_endorsement.ml
     Subject:      Double endorsement evidence operation may happen when an
                   endorser endorsed two different blocks on the same level.
 *)
@@ -60,6 +59,10 @@ let order_endorsements ~correct_order op1 op2 =
 let double_endorsement ctxt ?(correct_order = true) op1 op2 =
   let e1, e2 = order_endorsements ~correct_order op1 op2 in
   Op.double_endorsement ctxt e1 e2
+
+let double_preendorsement ctxt ?(correct_order = true) op1 op2 =
+  let e1, e2 = order_endorsements ~correct_order op1 op2 in
+  Op.double_preendorsement ctxt e1 e2
 
 (** This test verifies that when a "cheater" double endorses and
     doesn't have enough tokens to re-freeze of full deposit, we only
@@ -125,6 +128,54 @@ let test_valid_double_endorsement_evidence () =
   >>=? fun full_balance_with_rewards ->
   let real_reward = Test_tez.(full_balance_with_rewards -! full_balance) in
   Assert.equal_tez ~loc:__LOC__ expected_reward real_reward
+
+(** Check that a double (pre)endorsement evidence with equivalent
+    endorsements but on different branches succeeds. *)
+let test_different_branch () =
+  Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, _contracts) ->
+  Block.bake genesis >>=? fun blk ->
+  Context.get_endorser (B blk) >>=? fun (endorser, _slots) ->
+  Op.raw_endorsement ~delegate:endorser blk >>=? fun endorsement_a ->
+  Op.raw_endorsement ~branch:Block_hash.zero ~delegate:endorser blk
+  >>=? fun endorsement_b ->
+  let operation = double_endorsement (B blk) endorsement_a endorsement_b in
+  Block.bake ~operation blk >>=? fun _blk ->
+  Op.raw_preendorsement ~delegate:endorser blk >>=? fun preendorsement_a ->
+  Op.raw_preendorsement ~branch:Block_hash.zero ~delegate:endorser blk
+  >>=? fun preendorsement_b ->
+  let operation =
+    double_preendorsement (B blk) preendorsement_a preendorsement_b
+  in
+  Block.bake ~operation blk >>=? fun _blk -> return_unit
+
+(** Check that a double (pre)endorsement evidence succeeds when the
+    operations have distinct slots (that both belong to the delegate)
+    and are otherwise identical. *)
+let test_different_slots () =
+  let open Lwt_result_syntax in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* blk = Block.bake genesis in
+  let* endorsers = Context.get_endorsers (B blk) in
+  let delegate, slot1, slot2 =
+    (* Find an endorser with more than 1 slot. *)
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (List.find_map
+         (fun (endorser : RPC.Validators.t) ->
+           match endorser.slots with
+           | slot1 :: slot2 :: _ -> Some (endorser.delegate, slot1, slot2)
+           | _ -> None)
+         endorsers)
+  in
+  let* endorsement1 = Op.raw_endorsement ~delegate ~slot:slot1 blk in
+  let* endorsement2 = Op.raw_endorsement ~delegate ~slot:slot2 blk in
+  let doubleA = double_endorsement (B blk) endorsement1 endorsement2 in
+  let* (_ : Block.t) = Block.bake ~operation:doubleA blk in
+  let* preendorsement1 = Op.raw_preendorsement ~delegate ~slot:slot1 blk in
+  let* preendorsement2 = Op.raw_preendorsement ~delegate ~slot:slot2 blk in
+  let doubleB = double_preendorsement (B blk) preendorsement1 preendorsement2 in
+  let* (_ : Block.t) = Block.bake ~operation:doubleB blk in
+  return_unit
 
 (** Say a delegate double-endorses twice and say the 2 evidences are timely
    included. Then the delegate can no longer bake. *)
@@ -250,16 +301,10 @@ let test_different_delegates () =
   block_fork genesis >>=? fun (blk_1, blk_2) ->
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
-  Context.get_endorser (B blk_a) >>=? fun (endorser_a, _a_slots) ->
   Context.get_first_different_endorsers (B blk_b)
-  >>=? fun (endorser_b1c, endorser_b2c) ->
-  let endorser_b =
-    if Signature.Public_key_hash.( = ) endorser_a endorser_b1c.delegate then
-      endorser_b2c.delegate
-    else endorser_b1c.delegate
-  in
-  Op.raw_endorsement ~delegate:endorser_a blk_a >>=? fun e_a ->
-  Op.raw_endorsement ~delegate:endorser_b blk_b >>=? fun e_b ->
+  >>=? fun (endorser_a, endorser_b) ->
+  Op.raw_endorsement ~delegate:endorser_a.delegate blk_a >>=? fun e_a ->
+  Op.raw_endorsement ~delegate:endorser_b.delegate blk_b >>=? fun e_b ->
   Block.bake ~operation:(Operation.pack e_b) blk_b >>=? fun (_ : Block.t) ->
   double_endorsement (B blk_b) e_a e_b |> fun operation ->
   Block.bake ~operation blk_b >>= fun res ->
@@ -473,6 +518,14 @@ let tests =
       `Quick
       test_valid_double_endorsement_evidence;
     Tztest.tztest
+      "valid evidence with same (pre)endorsements on different branches"
+      `Quick
+      test_different_branch;
+    Tztest.tztest
+      "valid evidence with same (pre)endorsements on different slots"
+      `Quick
+      test_different_slots;
+    Tztest.tztest
       "2 valid double endorsement evidences lead to not being able to bake"
       `Quick
       test_two_double_endorsement_evidences_leadsto_no_bake;
@@ -503,3 +556,7 @@ let tests =
       `Quick
       test_freeze_more_with_low_balance;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("double endorsement", tests)]
+  |> Lwt_main.run

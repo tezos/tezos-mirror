@@ -52,6 +52,17 @@ module Types : sig
   (** An ID associated to a slot or to its commitment. *)
   type slot_id = {slot_level : level; slot_index : slot_index}
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4562
+     Use a bitset instead, when available in the standard library. *)
+
+  (** A set of slots, represented by a list of 0s and 1s. It is used for
+      instance to record which slots are deemed available by an attestor. *)
+  type slot_set = bool list
+
+  (** The set of attestable slots of an attestor (which may not necessarily be
+      in the committee for a given level). *)
+  type attestable_slots = Attestable_slots of slot_set | Not_in_committee
+
   (** An index of a DAL shard *)
   type shard_index = int
 
@@ -86,11 +97,17 @@ module Types : sig
     status : header_status;
   }
 
+  (** The [with_proof] flag is associated to shards computation. It indicates
+      whether we also compute shards' proofs or not. *)
+  type with_proof = {with_proof : bool}
+
   val slot_id_encoding : slot_id Data_encoding.t
 
   val header_status_encoding : header_status Data_encoding.t
 
   val profile_encoding : profile Data_encoding.t
+
+  val with_proof_encoding : with_proof Data_encoding.t
 
   val equal_profile : profile -> profile -> bool
 end
@@ -133,6 +150,18 @@ val get_commitment_proof :
   < meth : [`GET]
   ; input : unit
   ; output : Cryptobox.commitment_proof
+  ; prefix : unit
+  ; params : unit * Cryptobox.commitment
+  ; query : unit >
+  service
+
+(** Compute and save the shards of the slot associated to the given
+    commitment. If the input's flag is true, the proofs associated with each
+    given shards are also computed. *)
+val put_commitment_shards :
+  < meth : [`PUT]
+  ; input : Types.with_proof
+  ; output : unit
   ; prefix : unit
   ; params : unit * Cryptobox.commitment
   ; query : unit >
@@ -196,5 +225,28 @@ val get_assigned_shard_indices :
   ; output : Types.shard_index list
   ; prefix : unit
   ; params : (unit * Tezos_crypto.Signature.public_key_hash) * Types.level
+  ; query : unit >
+  service
+
+(** Return the set of currently attestable slots. A slot is attestable at level
+    [l] if it is published at level [l - attestation_lag] and *all* the shards
+    assigned at level [l] to the given public key hash are available in the DAL
+    node's store. *)
+val get_attestable_slots :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.attestable_slots
+  ; prefix : unit
+  ; params : (unit * Tezos_crypto.Signature.public_key_hash) * Types.level
+  ; query : unit >
+  service
+
+(** A service for monitor_shards RPC *)
+val monitor_shards :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Cryptobox.Commitment.t
+  ; prefix : unit
+  ; params : unit
   ; query : unit >
   service

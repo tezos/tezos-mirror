@@ -28,7 +28,7 @@
    -------
    Component:    Client
    Invocation:   dune exec tezt/tests/main.exe -- --file normalize.ml
-   Subject:      Regression tests for the "normalize data" command.
+   Subject:      Regression tests for Michelson normalization commands.
 *)
 
 let hooks = Tezos_regression.hooks
@@ -71,6 +71,59 @@ let test_normalize_legacy_flag =
   in
   unit
 
+let test_normalize_stack =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"Test Michelson stack normalization"
+    ~tags:["client"; "normalize"]
+    ~supports:(From_protocol 17)
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let stack_elt ty v = sf "Stack_elt %s %s" ty v in
+  let elt1 = stack_elt "(pair nat nat nat nat)" "(Pair 0 3 6 9)" in
+  let elt2 =
+    stack_elt
+      "(pair nat (pair nat (pair nat nat)))"
+      "(Pair 1 (Pair 4 (Pair 7 10)))"
+  in
+  let elt3 = stack_elt "(pair nat nat (pair nat nat))" "{2; 5; 8; 11}" in
+  let* () =
+    modes
+    |> Lwt_list.iter_s @@ fun mode ->
+       [[]; [elt1]; [elt1; elt2]; [elt1; elt2; elt3]]
+       |> Lwt_list.iter_s @@ fun stack ->
+          let print_stack fmt =
+            Format.fprintf
+              fmt
+              "{%a}"
+              (Format.pp_print_list
+                 ~pp_sep:(fun fmt () -> Format.pp_print_string fmt "; ")
+                 Format.pp_print_string)
+          in
+          let stack = Format.asprintf "%a" print_stack stack in
+          let* _ = Client.normalize_stack client ~hooks ?mode ~stack in
+          unit
+  in
+  let* () =
+    modes
+    |> Lwt_list.iter_s @@ fun mode ->
+       [
+         "";
+         "{";
+         "0";
+         "{Stack_elt}";
+         "{Stack_elt nat}";
+         "{Stack_elt 0 nat}";
+         "{Stack_elt nat 0 1}";
+         "Stack_elt nat 0";
+         "{Stack_elt nat 0; Stack_elt}";
+       ]
+       |> Lwt_list.iter_s @@ fun stack ->
+          Client.spawn_normalize_stack client ~hooks ?mode ~stack
+          |> Process.check_error
+  in
+  unit
+
 let test_normalize_script =
   Protocol.register_regression_test
     ~__FILE__
@@ -79,11 +132,7 @@ let test_normalize_script =
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let script =
-    sf
-      "file:./tests_python/contracts_%s/opcodes/comb-literals.tz"
-      (match protocol with
-      | Protocol.Alpha -> "alpha"
-      | _ -> sf "%03d" @@ Protocol.number protocol)
+    Michelson_script.(find ["opcodes"; "comb-literals"] protocol |> path)
   in
   let* () =
     modes
@@ -120,5 +169,6 @@ let test_normalize_type =
 let register ~protocols =
   test_normalize_unparsing_mode protocols ;
   test_normalize_legacy_flag protocols ;
+  test_normalize_stack protocols ;
   test_normalize_script protocols ;
   test_normalize_type protocols

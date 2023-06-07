@@ -39,3 +39,15 @@ Accuser manual
 
 .. raw:: html
          :file: octez-accuser.html
+
+Smart rollup client manual
+==========================
+
+.. raw:: html
+        :file: octez-smart-rollup-client.html
+
+Smart rollup node manual
+========================
+
+.. raw:: html
+        :file: octez-smart-rollup-node.html

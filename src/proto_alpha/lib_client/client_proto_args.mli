@@ -86,6 +86,8 @@ val no_print_source_flag : (bool, full) Tezos_clic.arg
 
 val no_confirmation : (bool, full) Tezos_clic.arg
 
+val timelock_locked_value_arg : (string option, full) Tezos_clic.arg
+
 val tez_arg :
   default:string ->
   parameter:string ->
@@ -128,6 +130,8 @@ module Daemon : sig
 end
 
 val int_parameter : (int, full) Tezos_clic.parameter
+
+val z_parameter : (Z.t, full) Tezos_clic.parameter
 
 val uri_parameter : (Uri.t, full) Tezos_clic.parameter
 
@@ -194,6 +198,9 @@ val data_parameter : (Michelson_v1_parser.parsed, full) Tezos_clic.parameter
 
 val raw_level_parameter : (Raw_level.t, full) Tezos_clic.parameter
 
+val micheline_parameter :
+  (Tezos_micheline.Micheline_parser.node * string, full) Tezos_clic.parameter
+
 val unparsing_mode_arg :
   default:string -> (Script_ir_unparser.unparsing_mode, full) Tezos_clic.arg
 
@@ -206,14 +213,6 @@ val level_arg : (Script_int.n Script_int.num option, full) Tezos_clic.arg
 val now_arg : (Script_timestamp.t option, full) Tezos_clic.arg
 
 module Sc_rollup_params : sig
-  val sc_rollup_address_parameter : (Sc_rollup.t, full) Tezos_clic.parameter
-
-  val sc_rollup_address_param :
-    ?name:string ->
-    ?desc:string ->
-    ('a, full) Tezos_clic.params ->
-    (Sc_rollup.t -> 'a, full) Tezos_clic.params
-
   val rollup_kind_parameter : (Sc_rollup.Kind.t, full) Tezos_clic.parameter
 
   val boot_sector_parameter :

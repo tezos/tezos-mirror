@@ -126,12 +126,16 @@ let prepare_context rng_state cache_cardinal =
 (** Benchmark {!Script_cache.update}. This almost directly calls {!Environment_cache.update}.
     We also use the result of this benchmark to assign a cost to {!Environment_cache.find},
     which alas can't be directly benchmarked from the interface provided by {!Script_cache}. *)
-module Cache_update_benchmark : Benchmark.S = struct
+module Cache_update_benchmark : Benchmarks_proto.Benchmark.S = struct
   include Cache_shared_config
 
   let name = ns "CACHE_UPDATE"
 
   let info = "Benchmarking the time it takes to update a key in the cache"
+
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
 
   (** It is expected that cache keys are non-adversarial,
       ie do not share a long common prefix. This is the case for [Script_cache],
@@ -141,9 +145,16 @@ module Cache_update_benchmark : Benchmark.S = struct
       a constant-time operation (two keys will differ after the first few characters).
       We therefore do not take into account the length of the key in the model. *)
   let model =
-    let affine_logn ~intercept ~coeff =
+    let affine_logn name =
       let open Model in
+      let param_name param =
+        Free_variable.of_namespace (Namespace.cons name param)
+      in
+      let intercept = param_name "intercept" in
+      let coeff = param_name "coeff" in
       let module M = struct
+        let name = name
+
         type arg_type = int * unit
 
         module Def (X : Costlang.S) = struct
@@ -162,17 +173,9 @@ module Cache_update_benchmark : Benchmark.S = struct
     in
     (* Looking at the plots, it looks like this benchmark underestimates the constant term.
        In the interpreter, this would warrant a dedicated benchmark for the intercept. *)
-    let intercept_variable =
-      fv (Format.asprintf "%s_const" (Namespace.basename name))
-    in
-    let coeff_variable =
-      fv (Format.asprintf "%s_coeff" (Namespace.basename name))
-    in
-    Model.make
+    Benchmarks_proto.Model.make
       ~conv:(function {cache_cardinal} -> (cache_cardinal, ()))
-      ~model:(affine_logn ~intercept:intercept_variable ~coeff:coeff_variable)
-
-  let models = [("cache_model", model)]
+      ~model:affine_logn
 
   let cache_update_benchmark ctxt some_key_in_domain cache_cardinal =
     let workload = {cache_cardinal} in
@@ -183,15 +186,12 @@ module Cache_update_benchmark : Benchmark.S = struct
 
   (** At the time of writing (Protocol H) the worst case execution path for
       [Cache.update] is to update a key which is already present. *)
-  let make_bench rng_state _cfg () =
+  let create_benchmark ~rng_state _cfg =
     let cache_cardinal =
       Base_samplers.sample_in_interval ~range:{min = 1; max = 100_000} rng_state
     in
     let ctxt, some_key_in_domain = prepare_context rng_state cache_cardinal in
     cache_update_benchmark ctxt some_key_in_domain cache_cardinal
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Cache_update_benchmark)
+let () = Benchmarks_proto.Registration.register (module Cache_update_benchmark)

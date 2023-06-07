@@ -27,7 +27,8 @@
 
     -------
     Component:    Client
-    Invocation:   dune build @src/lib_proxy_server_config/runtest
+    Invocation:   dune exec src/lib_proxy_server_config/test/main.exe \
+                   -- --file test_proxy_server_config.ml
     Description:  Test various functions and types regarding the configuration
                   of [tezos-proxy-server]
 *)
@@ -325,6 +326,7 @@ let test_wrong_sym_block_caching_time =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Proxy_server_config"
     [
       ( "union_right_bias",

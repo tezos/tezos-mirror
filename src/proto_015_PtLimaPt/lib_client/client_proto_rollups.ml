@@ -152,7 +152,7 @@ module ScRollup = struct
     let aux = function
       | Sc_rollup.Kind.Example_arith ->
           let open Lwt_result_syntax in
-          let context = Tezos_context_memory.make_empty_context () in
+          let context = Tezos_context_memory.Context.make_empty_context () in
           let* proof =
             Arith_pvm.produce_origination_proof context boot_sector
           in
@@ -165,7 +165,7 @@ module ScRollup = struct
                end))
       | Sc_rollup.Kind.Wasm_2_0_0 ->
           let open Lwt_result_syntax in
-          let context = Tezos_context_memory.make_empty_context () in
+          let context = Tezos_context_memory.Context.make_empty_context () in
           let* proof = Wasm_pvm.produce_origination_proof context boot_sector in
           return
             (Sc_rollup.Wasm_2_0_0_pvm_with_proof

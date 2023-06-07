@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Stdlib
+   Invocation:   dune exec src/lib_lwt_result_stdlib/test/main.exe \
+                  -- --file test_hashtbl.ml
+   Subject:      Test hashtable
+*)
+
 (* This test suite relies heavily on Lwt. It also deals with error a lot, but it
    checks most errors directly. So we don't need the syntactic support to
    alleviate the error handling. *)
@@ -191,4 +199,5 @@ let tests =
     Alcotest_lwt.test_case "order" `Quick test_order;
   ]
 
-let () = Alcotest_lwt.run "hashtbl" [("hashtbl-lwt", tests)] |> Lwt_main.run
+let () =
+  Alcotest_lwt.run ~__FILE__ "hashtbl" [("hashtbl-lwt", tests)] |> Lwt_main.run

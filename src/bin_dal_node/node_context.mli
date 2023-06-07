@@ -24,13 +24,12 @@
 (*****************************************************************************)
 
 (** A [ready_ctx] value contains globally needed informations for a running dal
-    node. It is available when both cryptobox is initialized and the plugins
-    for dal and dac have been loaded. *)
+    node. It is available when both cryptobox is initialized and the plugin
+    for dal has been loaded. *)
 type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
-  dal_plugin : (module Dal_plugin.T);
-  dac_plugin : (module Dac_plugin.T);
+  plugin : (module Dal_plugin.T);
 }
 
 (** The status of the dal node *)
@@ -48,15 +47,14 @@ val init : Configuration.t -> Store.node_store -> Client_context.full -> t
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready
 
-(** [set_ready ctxt ~dal_plugin ~dac_plugin cryptobox proto_parameters] updates
+(** [set_ready ctxt dal_plugin cryptobox proto_parameters] updates
     in place the status value to [Ready], and initializes the inner
     [ready_ctxt] value with the given parameters.
 
     @raise Status_already_ready when the status is already [Ready _] *)
 val set_ready :
   t ->
-  dal_plugin:(module Tezos_dal_node_lib.Dal_plugin.T) ->
-  dac_plugin:(module Tezos_dal_node_lib.Dac_plugin.T) ->
+  (module Tezos_dal_node_lib.Dal_plugin.T) ->
   Cryptobox.t ->
   Dal_plugin.proto_parameters ->
   unit
@@ -83,9 +81,9 @@ val get_tezos_node_cctxt : t -> Client_context.full
 (** [get_neighbors_cctxts ctxt] returns the dal node neighbors client contexts *)
 val get_neighbors_cctxts : t -> Dal_node_client.cctxt list
 
-(** [fetch_assigned_shard_indicies ctxt ~level ~pkh] fetches from L1 the shard indices assigned to [pkh] at [level].
+(** [fetch_assigned_shard_indices ctxt ~level ~pkh] fetches from L1 the shard indices assigned to [pkh] at [level].
     It internally caches the DAL committee with [level] as the key with FIFO strategy. *)
-val fetch_assigned_shard_indicies :
+val fetch_assigned_shard_indices :
   t ->
   level:int32 ->
   pkh:Tezos_crypto.Signature.Public_key_hash.t ->

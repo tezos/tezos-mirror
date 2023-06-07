@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/validate/main.exe \
-                  -- test "^Mempool"
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/validate/main.exe \
+                  -- --file test_mempool.ml
     Subject:      Integration > Validate > Mempool mode
 *)
 
@@ -385,3 +384,6 @@ let tests =
       test_add_and_replace;
     Tztest.tztest "remove operations" `Quick test_remove_operation;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("mempool", tests)] |> Lwt_main.run

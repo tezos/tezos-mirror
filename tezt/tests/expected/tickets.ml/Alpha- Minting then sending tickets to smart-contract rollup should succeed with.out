@@ -1,7 +1,7 @@
 
 ./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[SMART_ROLLUP_HASH]"'
 Node is bootstrapped.
-Estimated gas: 4514.890 units (will add 100 for safety)
+Estimated gas: 2784.268 units (will add 100 for safety)
 Estimated storage: 132 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000757
+    Fee to the baker: ꜩ0.000584
     Expected counter: 3
-    Gas limit: 4615
+    Gas limit: 2885
     Storage limit: 152 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000757
-      payload fees(the block proposer) ....... +ꜩ0.000757
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000584
+      payload fees(the block proposer) ....... +ꜩ0.000584
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -28,7 +28,7 @@ This sequence of operations was run:
       Updated storage: Unit
       Storage size: 197 bytes
       Paid storage size diff: 132 bytes
-      Consumed gas: 3504.515
+      Consumed gas: 2674.294
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.033
         storage fees ........................... +ꜩ0.033
@@ -37,10 +37,10 @@ This sequence of operations was run:
           Amount: ꜩ0
           From: [CONTRACT_HASH]
           To: [SMART_ROLLUP_HASH]
-          Parameter: { Pair 0x01fd32c99a7029e62387c85d6e9394626ecbcaa97700 (Pair "Ticket2" 1) ;
-                       Pair 0x01fd32c99a7029e62387c85d6e9394626ecbcaa97700 (Pair "Ticket" 1) }
+          Parameter: { Pair 0x01f6719dc3bd86b5c531d6551553c467a31a54717800 (Pair "Ticket2" 1) ;
+                       Pair 0x01f6719dc3bd86b5c531d6551553c467a31a54717800 (Pair "Ticket" 1) }
           This transaction was successfully applied
-          Consumed gas: 1010.375
+          Consumed gas: 109.941
           Ticket updates:
             Ticketer: [CONTRACT_HASH]
             Content type: string

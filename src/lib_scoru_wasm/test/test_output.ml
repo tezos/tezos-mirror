@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:    Lib_scoru_wasm input
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "Output"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_output.ml
     Subject:      Input tests for the tezos-scoru-wasm library
 *)
 
@@ -36,24 +35,26 @@ open Tezos_lazy_containers
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
 
-let test_output_buffer () =
+let test_output_buffer =
   let open Lwt_result_syntax in
   let test (level, output_buffer) =
-    match Output_buffer.level_range output_buffer with
-    | None -> true
+    match Output_buffer.Internal_for_tests.level_range output_buffer with
+    | None -> return_unit
     | Some (first_level, max_level) ->
         if level <= max_level && level >= first_level then
-          Output_buffer.is_outbox_available output_buffer level
-        else true
+          if
+            Output_buffer.Internal_for_tests.is_outbox_available
+              output_buffer
+              level
+          then return_unit
+          else failwith "[test_output_buffer] test failed"
+        else return_unit
   in
-  let test =
-    QCheck2.Test.make
-      QCheck2.Gen.(
-        tup2 (map Int32.of_int small_int) Ast_generators.output_buffer_gen)
-      test
-  in
-  let result = QCheck_base_runner.run_tests [test] in
-  if result = 0 then return_unit else failwith "QCheck tests failed"
+  tztest_qcheck2
+    ~name:"Output buffer"
+    QCheck2.Gen.(
+      tup2 (map Int32.of_int small_int) Ast_generators.output_buffer_gen)
+    test
 
 let test_aux_write_output () =
   let open Lwt.Syntax in
@@ -88,11 +89,12 @@ let test_aux_write_output () =
   let last_outbox_level = output_buffer.Output_buffer.last_level in
   let* last_outbox =
     match last_outbox_level with
-    | Some level -> Output_buffer.get_outbox output_buffer level
+    | Some level ->
+        Output_buffer.Internal_for_tests.get_outbox output_buffer level
     | None -> Stdlib.failwith "No outbox exists"
   in
   let last_message_in_last_outbox =
-    Output_buffer.get_outbox_last_message_index last_outbox
+    Output_buffer.Internal_for_tests.get_outbox_last_message_index last_outbox
   in
   assert (last_outbox_level = Some 0l) ;
   assert (last_message_in_last_outbox = Some Z.zero) ;
@@ -107,7 +109,7 @@ let test_aux_write_output () =
 
   Lwt.return_ok ()
 
-let test_write_host_fun () =
+let test_write_host_fun ~version () =
   let open Lwt.Syntax in
   let input = Input_buffer.alloc () in
   let output = Eval.default_output_buffer () in
@@ -137,7 +139,7 @@ let test_write_host_fun () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      Host_funcs.all
+      (Host_funcs.registry ~write_debug:Noop ~version)
       ~input
       ~output
       Host_funcs.Internal_for_tests.read_input
@@ -149,7 +151,7 @@ let test_write_host_fun () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      Host_funcs.all
+      (Host_funcs.registry ~write_debug:Noop ~version)
       ~input
       ~output
       Host_funcs.Internal_for_tests.write_output
@@ -158,11 +160,11 @@ let test_write_host_fun () =
   let last_outbox_level = output.Output_buffer.last_level in
   let* last_outbox =
     match last_outbox_level with
-    | Some level -> Output_buffer.get_outbox output level
+    | Some level -> Output_buffer.Internal_for_tests.get_outbox output level
     | None -> Stdlib.failwith "No outbox exists"
   in
   let last_message_in_last_outbox =
-    Output_buffer.get_outbox_last_message_index last_outbox
+    Output_buffer.Internal_for_tests.get_outbox_last_message_index last_outbox
   in
   assert (last_outbox_level = Some 0l) ;
   assert (last_message_in_last_outbox = Some Z.zero) ;
@@ -178,7 +180,7 @@ let test_write_host_fun () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      Host_funcs.all
+      (Host_funcs.registry ~write_debug:Noop ~version)
       ~input
       ~output
       Host_funcs.Internal_for_tests.write_output
@@ -187,12 +189,12 @@ let test_write_host_fun () =
   let last_outbox_level = output.Output_buffer.last_level in
   let* last_outbox =
     match last_outbox_level with
-    | Some level -> Output_buffer.get_outbox output level
+    | Some level -> Output_buffer.Internal_for_tests.get_outbox output level
     | None ->
         Stdlib.failwith "The PVM output buffer does not contain any outbox."
   in
   let last_message_in_last_outbox =
-    Output_buffer.get_outbox_last_message_index last_outbox
+    Output_buffer.Internal_for_tests.get_outbox_last_message_index last_outbox
   in
   assert (
     result = Values.[Num (I32 Host_funcs.Error.(code Input_output_too_large))]) ;
@@ -232,7 +234,7 @@ let test_output_limit_gen ~limit ~message_number =
       (List.init ~when_negative_length:[] message_number Z.of_int)
   in
   let* () = List.iter_s push_message messages in
-  let* outbox = Output_buffer.get_outbox buffer 0l in
+  let* outbox = Output_buffer.Internal_for_tests.get_outbox buffer 0l in
   if message_number > limit then
     assert (Output_buffer.Messages.num_elements outbox = message_limit)
   else
@@ -250,7 +252,7 @@ let test_messages_above_limit () =
 
 (* Same as {test_outbox_limit_gen} but uses directly the host function and tests
    the error code. *)
-let test_write_output_above_limit () =
+let test_write_output_above_limit ~version () =
   let open Lwt_syntax in
   let input = Input_buffer.alloc () in
   let message_limit = Z.of_int 5 in
@@ -278,7 +280,7 @@ let test_write_output_above_limit () =
       Eval.invoke
         ~module_reg
         ~caller:module_key
-        Host_funcs.all
+        (Host_funcs.registry ~write_debug:Noop ~version)
         ~input
         ~output
         Host_funcs.Internal_for_tests.write_output
@@ -287,12 +289,12 @@ let test_write_output_above_limit () =
     let last_outbox_level = output.Output_buffer.last_level in
     let* last_outbox =
       match last_outbox_level with
-      | Some level -> Output_buffer.get_outbox output level
+      | Some level -> Output_buffer.Internal_for_tests.get_outbox output level
       | None ->
           Stdlib.failwith "The PVM output buffer does not contain any outbox."
     in
     let last_message_in_last_outbox =
-      Output_buffer.get_outbox_last_message_index last_outbox
+      Output_buffer.Internal_for_tests.get_outbox_last_message_index last_outbox
     in
 
     if expected_message_index >= message_limit then (
@@ -315,7 +317,9 @@ let test_push_output_bigger_than_max_size () =
   let output_buffer = Eval.default_output_buffer () in
   let message_size = Host_funcs.Aux.input_output_max_size * 2 in
   assert (output_buffer.Output_buffer.last_level = Some 0l) ;
-  let* outbox_level_0 = Output_buffer.get_outbox output_buffer 0l in
+  let* outbox_level_0 =
+    Output_buffer.Internal_for_tests.get_outbox output_buffer 0l
+  in
   let num_messages_before =
     Output_buffer.Messages.num_elements outbox_level_0
   in
@@ -328,7 +332,9 @@ let test_push_output_bigger_than_max_size () =
   in
   assert (result = Host_funcs.Error.(code Input_output_too_large)) ;
   assert (output_buffer.Output_buffer.last_level = Some 0l) ;
-  let* outbox_level_0 = Output_buffer.get_outbox output_buffer 0l in
+  let* outbox_level_0 =
+    Output_buffer.Internal_for_tests.get_outbox output_buffer 0l
+  in
   assert (
     Z.equal
       num_messages_before
@@ -336,19 +342,26 @@ let test_push_output_bigger_than_max_size () =
   return_ok_unit
 
 let tests =
-  [
-    tztest "Output buffer" `Quick test_output_buffer;
-    tztest "Aux_write_output" `Quick test_aux_write_output;
-    tztest "Host write" `Quick test_write_host_fun;
-    tztest "Push message below the limit" `Quick test_messages_below_limit;
-    tztest "Push message at the limit" `Quick test_messages_at_limit;
-    tztest "Push message above the limit" `Quick test_messages_above_limit;
-    tztest
-      "Write_output: Push message above the limit"
-      `Quick
-      test_write_output_above_limit;
-    tztest
-      "Write_output: push messages bigger than the protocol limit"
-      `Quick
-      test_push_output_bigger_than_max_size;
-  ]
+  Tztest_helper.tztests_with_pvm
+    ~versions:[V0; V1]
+    [
+      ("Host write", `Quick, test_write_host_fun);
+      ( "Write_output: Push message above the limit",
+        `Quick,
+        test_write_output_above_limit );
+    ]
+  @ [
+      test_output_buffer;
+      tztest "Aux_write_output" `Quick test_aux_write_output;
+      tztest "Push message below the limit" `Quick test_messages_below_limit;
+      tztest "Push message at the limit" `Quick test_messages_at_limit;
+      tztest "Push message above the limit" `Quick test_messages_above_limit;
+      tztest
+        "Write_output: push messages bigger than the protocol limit"
+        `Quick
+        test_push_output_bigger_than_max_size;
+    ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("Output", tests)]
+  |> Lwt_main.run

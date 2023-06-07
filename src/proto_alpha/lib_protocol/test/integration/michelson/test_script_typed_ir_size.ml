@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (script typed IR size)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                -- test "^script typed ir size$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_script_typed_ir_size.ml
     Subject:    Script_typed_ir computes good approximation of values' sizes
 *)
 
@@ -344,30 +343,30 @@ let check_value_size () =
           };
       ])
     (*
-        Union_t
+        Or_t
         =======
     *)
     @ (let module P = struct
-         type ('a, 'b) f = {apply : 'c. (('a, 'b) union, 'c) ty -> ex}
+         type ('a, 'b) f = {apply : 'c. (('a, 'b) or_, 'c) ty -> ex}
        end in
-      let on_union : type a b. (a, _) ty -> (b, _) ty -> (a, b) P.f -> ex =
+      let on_or : type a b. (a, _) ty -> (b, _) ty -> (a, b) P.f -> ex =
        fun ty1 ty2 f ->
-        let (Ty_ex_c ty) = is_ok @@ union_t dummy_loc ty1 ty2 in
+        let (Ty_ex_c ty) = is_ok @@ or_t dummy_loc ty1 ty2 in
         f.apply ty
       in
       let open Script_int in
       [
         (* "int + int" *)
-        on_union
+        on_or
           int_t
           int_t
           {apply = (fun ty -> ex "L 0 : int + int" ty (L (of_int 0)))};
-        on_union
+        on_or
           int_t
           int_t
           {apply = (fun ty -> ex "R 0 : int + int" ty (R (of_int 0)))};
         (* "string + string" *)
-        on_union
+        on_or
           string_t
           string_t
           {
@@ -376,7 +375,7 @@ let check_value_size () =
                 let foo = gen_string "foo" in
                 ex "L foo : string * string" ty (L foo));
           };
-        on_union
+        on_or
           string_t
           string_t
           {
@@ -386,7 +385,7 @@ let check_value_size () =
                 ex "R foo : string * string" ty (R foo));
           };
         (* "string + int" *)
-        on_union
+        on_or
           string_t
           int_t
           {
@@ -396,13 +395,13 @@ let check_value_size () =
                 ex "L foo : string * int" ty (L foo));
           };
         (* "int + int + int" *)
-        on_union
+        on_or
           int_t
           int_t
           {
             apply =
               (fun ty ->
-                on_union
+                on_or
                   int_t
                   ty
                   {
@@ -410,13 +409,13 @@ let check_value_size () =
                       (fun ty -> ex "L 0 : int + int + int" ty (L (of_int 0)));
                   });
           };
-        on_union
+        on_or
           int_t
           int_t
           {
             apply =
               (fun ty ->
-                on_union
+                on_or
                   int_t
                   ty
                   {
@@ -425,13 +424,13 @@ let check_value_size () =
                         ex "R (L 0) : int + int + int" ty (R (L (of_int 0))));
                   });
           };
-        on_union
+        on_or
           int_t
           int_t
           {
             apply =
               (fun ty ->
-                on_union
+                on_or
                   int_t
                   ty
                   {
@@ -711,7 +710,7 @@ let check_kinstr_size () =
   let halt () = IHalt loc in
   let drop () = IDrop (loc, halt ()) in
   let cdr = ICdr (loc, halt ()) in
-  let const ty v = IConst (loc, ty, v, halt ()) in
+  let push ty v = IPush (loc, ty, v, halt ()) in
   let unit_option_t () =
     WithExceptions.Result.get_ok ~loc:__LOC__ @@ option_t loc Unit_t
   in
@@ -745,7 +744,7 @@ let check_kinstr_size () =
       Kinstr ("IDrop", drop ());
       Kinstr ("IDup", IDup (loc, halt ()));
       Kinstr ("ISwap", ISwap (loc, halt ()));
-      Kinstr ("IConst", const String_t @@ str "tezos");
+      Kinstr ("IPush", push String_t @@ str "tezos");
       Kinstr ("ICons_pair", ICons_pair (loc, halt ()));
       Kinstr ("ICar", ICar (loc, halt ()));
       Kinstr ("ICdr", cdr);
@@ -863,7 +862,7 @@ let check_kinstr_size () =
               branch_if_false = halt ();
               k = halt ();
             } );
-      Kinstr ("ILoop", ILoop (loc, const Bool_t true, halt ()));
+      Kinstr ("ILoop", ILoop (loc, push Bool_t true, halt ()));
       Kinstr ("ILoop_left", ILoop_left (loc, INever loc, halt ()));
       Kinstr ("IDip", IDip (loc, halt (), None, halt ()));
       Kinstr ("IExec", IExec (loc, None, halt ()));
@@ -1042,9 +1041,13 @@ let check_micheline_sizes () =
 let tests =
   let open Tztest in
   [
-    tztest "check value size" `Quick check_value_size;
-    tztest "check ty size" `Quick check_ty_size;
-    tztest "check kinstr size" `Quick check_kinstr_size;
-    tztest "check witness sizes" `Quick check_witness_sizes;
-    tztest "check micheline sizes" `Quick check_micheline_sizes;
+    tztest "value size" `Quick check_value_size;
+    tztest "ty size" `Quick check_ty_size;
+    tztest "kinstr size" `Quick check_kinstr_size;
+    tztest "witness sizes" `Quick check_witness_sizes;
+    tztest "micheline sizes" `Quick check_micheline_sizes;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("script typed ir size", tests)]
+  |> Lwt_main.run

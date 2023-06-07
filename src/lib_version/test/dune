@@ -3,24 +3,59 @@
 
 (env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
 
-(executable
- (name test_parser)
- (modes native js)
+(library
+ (name src_lib_version_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-version
   tezos-version.parser
-  alcotest)
+  octez-alcotezt)
  (js_of_ocaml)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -open Tezos_version))
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_version
+  -open Octez_alcotezt)
+ (modules test_parser))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (modes native)
+ (libraries
+  src_lib_version_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-version)
- (action (run %{dep:./test_parser.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
+
+(executable
+ (name main_js)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (modes js)
+ (libraries
+  src_lib_version_test_tezt_lib
+  tezt.js)
+ (js_of_ocaml)
+ (modules main_js))
 
 (rule
  (alias runtest_js)
  (package tezos-version)
- (action (run node %{dep:./test_parser.bc.js})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run node %{dep:./main_js.bc.js})))
+
+(rule
+ (targets main_js.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt_js.Test.run ()"))))

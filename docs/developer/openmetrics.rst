@@ -1,13 +1,10 @@
 
-Octez Metrics
-=============
+Supported Open Metrics
+======================
 
 The Octez node is able to produce metrics information and serve them in the
 `Open Metrics
 <https://openmetrics.io/>`_ format, an emerging standard for exposing metrics data, especially used in cloud-based systems.
-
-Supported Open Metrics
-----------------------
 
 The Octez node supports the following metrics, characterized by: the name of
 the metric, the type of the metric as in the `open metrics specification
@@ -25,7 +22,7 @@ For more information check the openmetrics specification: https://openmetrics.io
 Usage
 -----
 
-In the following, we indicate a typical monitoring setup for core developers.
+In the following, we indicate a typical monitoring setup for Octez developers.
 For more details on setting up the node for monitoring see :doc:`../user/node-monitoring`.
 
 To instruct the Octez node to produce metrics, the user needs to pass the option

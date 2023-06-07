@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:    Transfer_ticket logic
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                  -- test "^transfer ticket$"
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/operations/main.exe \
+                  -- --file test_transfer_ticket.ml
     Subject:      Test ticket transfers
 *)
 
@@ -333,11 +332,15 @@ let test_contract_as_ticket_transfer_destination () =
 let tests =
   [
     Tztest.tztest
-      "Test ticket transfer operations"
+      "ticket transfer operations"
       `Quick
       test_mint_deposit_withdraw_implicit_transfer;
     Tztest.tztest
-      "Test 'contract (ticket cty)' as transfer destination"
+      "'contract (ticket cty)' as transfer destination"
       `Quick
       test_contract_as_ticket_transfer_destination;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("transfer ticket", tests)]
+  |> Lwt_main.run

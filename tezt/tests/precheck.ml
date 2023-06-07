@@ -235,34 +235,14 @@ let propagate_precheckable_bad_block =
           ("operations", `A (List.init 4 (fun _ -> `A [])));
         ])
   in
-  let wait_precheck_but_validation_fail node =
-    let got_prechecked = ref false in
-    Lwt.join
-      [
-        (let* () = Node.wait_for node "prechecked_block.v0" (fun _ -> Some ()) in
-         got_prechecked := true ;
-         Lwt.return ());
-        (let* () =
-           Node.wait_for node "validation_failure_after_precheck.v0" (fun _ ->
-               Some ())
-         in
-         if !got_prechecked then Lwt.return ()
-         else Test.fail "The block was not expected to be prechecked");
-      ]
-  in
   (* Wait all nodes to precheck the block but fail on validation *)
   let expect_precheck_failure node =
     Node.wait_for node "precheck_failure.v0" (fun _ -> Some ())
   in
   let precheck_waiter =
-    if Protocol.(protocol <= Lima) then
-      (* On Lima and below: wait all nodes to precheck the block
-         but fail on validation *)
-      Lwt_list.iter_p wait_precheck_but_validation_fail cluster
-    else
-      (* Post Lima: the precheck is not an over-approximation
-         anymore and cannot even be considered precheckable. *)
-      expect_precheck_failure node_client
+    (* Post Lima: the precheck is not an over-approximation
+       anymore and cannot even be considered precheckable. *)
+    expect_precheck_failure node_client
   in
   let p =
     Client.spawn_rpc ~data:injection_json POST ["injection"; "block"] client
@@ -321,7 +301,12 @@ let propagate_precheckable_bad_block_payload =
   in
   Log.info "Cluster initialized" ;
   let* client = Client.(init ~endpoint:(Node node_client) ()) in
-  let* () = Client.activate_protocol ~protocol client in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Either.Right (protocol, None))
+      [(["proof_of_work_threshold"], `String "-1")]
+  in
+  let* () = Client.activate_protocol ~parameter_file ~protocol client in
   let bootstrap1 = Constant.bootstrap1.alias in
   let* () =
     List.init blocks_to_bake Fun.id

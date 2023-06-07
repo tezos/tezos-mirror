@@ -351,19 +351,15 @@ let may_switch_test_chain w active_chains spawn_child block =
       Lwt.return_unit
 
 let broadcast_head w ~previous block =
-  let open Lwt_syntax in
   let nv = Worker.state w in
   if not (is_bootstrapped nv) then Lwt.return_unit
   else
-    let* successor =
-      let* o =
-        Store.Block.read_predecessor_opt nv.parameters.chain_store block
-      in
-      match o with
-      | None -> Lwt.return_true
-      | Some predecessor -> Lwt.return (Store.Block.equal predecessor previous)
+    let predecessor_hash = Store.Block.predecessor block in
+    let successor_or_sibling =
+      Block_hash.equal predecessor_hash (Store.Block.hash previous)
+      || Block_hash.equal predecessor_hash (Store.Block.predecessor previous)
     in
-    if successor then (
+    if successor_or_sibling then (
       Distributed_db.Advertise.current_head nv.chain_db block ;
       Lwt.return_unit)
     else Distributed_db.Advertise.current_branch nv.chain_db
@@ -381,9 +377,10 @@ let safe_get_prevalidator_filter hash =
             "chain_validator: missing protocol '%a' for the current block."
             Protocol_hash.pp_short
             hash
-      | Some protocol ->
+      | Some (module Proto : Registered_protocol.T) ->
           let* () = Events.(emit prevalidator_filter_not_found) hash in
-          return_ok (Shell_plugin.no_filter protocol))
+          return_ok
+            (module Shell_plugin.No_filter (Proto) : Shell_plugin.FILTER))
 
 let instantiate_prevalidator parameters set_prevalidator block chain_db =
   let open Lwt_syntax in
@@ -609,9 +606,18 @@ let on_disconnection w peer_id =
   match P2p_peer.Error_table.find nv.active_peers peer_id with
   | None -> return_unit
   | Some pv -> (
-      let*! pv = pv in
+      let*! pv in
       match pv with
       | Ok pv ->
+          (* Shutting down the peer validator will indirectly trigger
+             a disconnection. However, the disconnection can be
+             effective only after the peer validator is shutdown (see
+             {!val:Peer_validator.on_close}). This is a defensive
+             mechanism so that if the disconnection takes too much
+             time (even though it is not supposed to happen), the
+             validation is not stuck. In any case, the peer validator
+             is removed from the active peers (see
+             {!val:with_activated_peer_validator}). *)
           let*! () = Peer_validator.shutdown pv in
           return_unit)
 
@@ -700,11 +706,12 @@ let on_error (type a b) w st (request : (a, b) Request.t) (errs : b) :
 
 let on_completion (type a b) w (req : (a, b) Request.t) (update : a)
     request_status =
+  let open Lwt_syntax in
   let nv = Worker.state w in
   Prometheus.Counter.inc_one
     nv.parameters.metrics.worker_counters.worker_completion_count ;
   match req with
-  | Request.Validated {block; _} -> (
+  | Request.Validated {block; _} ->
       let level = Store.Block.level block in
       let () =
         Shell_metrics.Worker.update_timestamps
@@ -736,13 +743,28 @@ let on_completion (type a b) w (req : (a, b) Request.t) (update : a)
       let fitness = Store.Block.fitness block in
       let block_hash = Request.Hash (Store.Block.hash block) in
       let timestamp = Store.Block.timestamp block in
-      let event_infos = (block_hash, level, timestamp, fitness) in
-      match update with
-      | Ignored_head -> Events.(emit ignore_head) event_infos
-      | Branch_switch -> Events.(emit branch_switch) event_infos
-      | Head_increment -> Events.(emit head_increment) event_infos)
-  | Request.Notify_head (peer_id, _, _, _) -> Events.(emit notify_head) peer_id
-  | Request.Notify_branch (peer_id, _) -> Events.(emit notify_branch) peer_id
+      let* () =
+        match update with
+        | Ignored_head -> Events.(emit ignore_head) (block_hash, level)
+        | Branch_switch -> Events.(emit branch_switch) (block_hash, level)
+        | Head_increment ->
+            if
+              Synchronisation_heuristic.Bootstrapping.is_bootstrapped
+                nv.synchronisation_state
+            then Events.(emit head_increment) (block_hash, level)
+            else if Int32.rem level 50l = 0l then
+              (* Display a bootstrapping status message every 50 blocks *)
+              let now = Time.System.now () in
+              let block_time = Time.System.of_protocol_exn timestamp in
+              Chain_validator_events.(emit bootstrap_head_increment)
+                (level, Ptime.diff now block_time)
+            else Lwt.return_unit
+      in
+      Events.(emit block_info) (timestamp, fitness)
+  | Request.Notify_head (peer_id, block_hash, _, _) ->
+      Events.(emit notify_head) (peer_id, block_hash)
+  | Request.Notify_branch (peer_id, locator) ->
+      Events.(emit notify_branch) (peer_id, locator.head_hash)
   | Request.Disconnection peer_id -> Events.(emit disconnection) peer_id
 
 let on_close w =

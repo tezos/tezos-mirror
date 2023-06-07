@@ -25,7 +25,13 @@
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4458
           Better handling of this limitation *)
-let shards_max_mutexes = 50
+let shards_store_lru_size =
+  (* The size of the LRU is determined by a set of parameters, including the
+     number of levels for which we want to maintain the shards in the cache. *)
+  let number_of_shards_per_slot = 2048 in
+  let number_of_slots = 256 in
+  let number_of_remembered_levels = 4 in
+  number_of_shards_per_slot * number_of_slots * number_of_remembered_levels
 
 (* Fewer cache sizes should be enough in practice,
    but we cache 50 since each cache entry has quite a small memory footprint. *)

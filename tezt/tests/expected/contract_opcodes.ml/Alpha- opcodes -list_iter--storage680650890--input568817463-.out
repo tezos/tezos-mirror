@@ -1,0 +1,42 @@
+
+./octez-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/list_iter.tz on storage 0 and input '{ 10 ; 2 ; 1 }' --level 1 --trace-stack
+storage
+  20
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (just consumed gas: 7.002)
+    [ (Pair { 10 ; 2 ; 1 } 0) ]
+  - location: 8 (just consumed gas: 0.010)
+    [ { 10 ; 2 ; 1 } ]
+  - location: 9 (just consumed gas: 0.010)
+    [ 1
+      { 10 ; 2 ; 1 } ]
+  - location: 12 (just consumed gas: 0.010)
+    [ { 10 ; 2 ; 1 }
+      1 ]
+  - location: 13 (just consumed gas: 0)
+    [ 10
+      1 ]
+  - location: 15 (just consumed gas: 0.059)
+    [ 10 ]
+  - location: 13 (just consumed gas: 0.015)
+    [ 2
+      10 ]
+  - location: 15 (just consumed gas: 0.059)
+    [ 20 ]
+  - location: 13 (just consumed gas: 0.015)
+    [ 1
+      20 ]
+  - location: 15 (just consumed gas: 0.059)
+    [ 20 ]
+  - location: 13 (just consumed gas: 0.015)
+    [ 20 ]
+  - location: 16 (just consumed gas: 0.010)
+    [ {}
+      20 ]
+  - location: 18 (just consumed gas: 0.010)
+    [ (Pair {} 20) ]
+

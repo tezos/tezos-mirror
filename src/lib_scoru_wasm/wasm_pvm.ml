@@ -27,6 +27,9 @@
 open Wasm_pvm_state.Internal_state
 module Wasm = Tezos_webassembly_interpreter
 module Parsing = Binary_parser_encodings
+open Tezos_lazy_containers
+
+let durable_scope = ["durable"]
 
 let tick_state_encoding =
   let open Tezos_tree_encoding in
@@ -52,7 +55,7 @@ let tick_state_encoding =
            @@ Parsing.(no_region_encoding Module.module_encoding))
            (scope
               ["externs"]
-              (int32_lazy_vector
+              (Lazy_vector.Int32Vector.encoding
                  (value [] Data_encoding.int32)
                  Wasm_encoding.extern_encoding))
            (value ["imports_offset"] Data_encoding.int32))
@@ -69,9 +72,7 @@ let tick_state_encoding =
            (scope ["self"] Wasm_encoding.module_key_encoding)
            (scope ["ast_module"]
            @@ Parsing.(no_region_encoding Module.module_encoding))
-           (scope
-              ["init_kont"]
-              (Init_encodings.init_kont_encoding ~host_funcs:Host_funcs.all))
+           (scope ["init_kont"] Init_encodings.init_kont_encoding)
            (scope ["modules"] Wasm_encoding.module_instances_encoding))
         (function
           | Init {self; ast_module; init_kont; module_reg} ->
@@ -83,8 +84,7 @@ let tick_state_encoding =
         "eval"
         (tup2
            ~flatten:true
-           (scope ["config"]
-           @@ Wasm_encoding.config_encoding ~host_funcs:Host_funcs.all)
+           (scope ["config"] @@ Wasm_encoding.config_encoding)
            (scope ["modules"] Wasm_encoding.module_instances_encoding))
         (function
           | Eval {config; module_reg} -> Some (config, module_reg) | _ -> None)
@@ -110,7 +110,7 @@ let durable_buffers_encoding =
   Tezos_tree_encoding.(scope ["pvm"; "buffers"] Wasm_encoding.buffers_encoding)
 
 let durable_storage_encoding =
-  Tezos_tree_encoding.(scope ["durable"] Durable.encoding)
+  Tezos_tree_encoding.(scope durable_scope Durable.encoding)
 
 let default_buffers validity_period message_limit () =
   Tezos_webassembly_interpreter.Eval.
@@ -236,20 +236,29 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
     let* tree = T.remove tree ["wasm"] in
     Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
 
-  let initial_state empty_tree =
-    let version = Tezos_lazy_containers.Chunked_byte_vector.of_string "2.0.0" in
-    Tree_encoding_runner.encode
-      Tezos_tree_encoding.(
-        scope ["durable"; "readonly"; "wasm_version"; "@"] chunked_byte_vector)
-      version
-      empty_tree
+  let initial_state version empty_tree =
+    let open Lwt.Syntax in
+    let* durable =
+      Tree_encoding_runner.decode durable_storage_encoding empty_tree
+    in
+    let version_str =
+      Data_encoding.Binary.to_string_exn Wasm_pvm_state.version_encoding version
+    in
+    let* durable =
+      Durable.set_value_exn
+        ~edit_readonly:true
+        durable
+        Constants.version_key
+        version_str
+    in
+    Tree_encoding_runner.encode durable_storage_encoding durable empty_tree
 
   let install_boot_sector ~ticks_per_snapshot ~outbox_validity_period
       ~outbox_message_limit bs tree =
     let open Lwt_syntax in
     let open Tezos_tree_encoding in
     let* durable =
-      Tree_encoding_runner.decode (scope ["durable"] Durable.encoding) tree
+      Tree_encoding_runner.decode (scope durable_scope Durable.encoding) tree
     in
     let reboot_flag_key = Durable.key_of_string_exn "/kernel/env/reboot" in
     let kernel_key = Durable.key_of_string_exn "/kernel/boot.wasm" in
@@ -332,6 +341,11 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
     let* pvm_state = decode tree in
     let* pvm_state = Wasm_vm.reveal_step payload pvm_state in
     encode pvm_state tree
+
+  let get_wasm_version tree =
+    let open Lwt.Syntax in
+    let* pvm = Tree_encoding_runner.decode pvm_state_encoding tree in
+    Wasm_vm.get_wasm_version pvm
 
   module Internal_for_tests = struct
     let get_tick_state tree =

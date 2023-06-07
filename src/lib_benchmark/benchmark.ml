@@ -34,6 +34,12 @@ module type S = sig
   (** Description of the benchmark *)
   val info : string
 
+  (** File where the benchmark module is defined *)
+  val module_filename : string
+
+  (** Destination of generated code *)
+  val generated_code_destination : string option
+
   (** Tags of the benchmark *)
   val tags : string list
 
@@ -55,7 +61,7 @@ module type S = sig
   (** Optional conversion to vector, for report generation purposes *)
   val workload_to_vector : workload -> Sparse_vec.String.t
 
-  (** Cost models *)
+  (** Cost models, with a given local name (string) for reference *)
   val models : (string * workload Model.t) list
 
   (** Benchmark generator *)
@@ -79,3 +85,10 @@ let info ((module B) : t) = B.info
 let tags ((module B) : t) = B.tags
 
 let ex_unpack : t -> packed = fun (module Bench) -> Ex ((module Bench) : _ poly)
+
+let get_free_variable_set (module Bench : S) =
+  List.fold_left
+    (fun acc (_, model) ->
+      Free_variable.Set.union acc @@ Model.get_free_variable_set_of_t model)
+    Free_variable.Set.empty
+    Bench.models

@@ -529,6 +529,27 @@
  (action (run %{bin:octez-protocol-compiler} -warn-error +a .)))
 
 (library
+ (name tezos_protocol_015_PtLimaPt_lifted)
+ (public_name tezos-protocol-015-PtLimaPt.lifted)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-015-PtLimaPt)
+ (flags
+  (:standard)
+  -nopervasives
+  -open Tezos_protocol_015_PtLimaPt)
+ (modules Lifted_protocol))
+
+(rule
+ (targets lifted_protocol.ml)
+ (action
+  (write-file
+   %{targets}
+   "\ninclude Environment.Lift (Protocol)\nlet hash = Protocol.hash\n")))
+
+(library
  (name tezos_protocol_015_PtLimaPt_functor)
  (libraries
   tezos-protocol-environment

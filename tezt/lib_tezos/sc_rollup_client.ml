@@ -32,6 +32,7 @@ type t = {
   sc_node : Sc_rollup_node.t;
   base_dir : string;
   color : Log.Color.t;
+  runner : Runner.t option;
 }
 
 type commitment = {
@@ -39,6 +40,14 @@ type commitment = {
   inbox_level : int;
   predecessor : string;
   number_of_ticks : int;
+}
+
+type commitment_and_hash = {commitment : commitment; hash : string}
+
+type commitment_info = {
+  commitment_and_hash : commitment_and_hash;
+  first_published_at_level : int option;
+  included_at_level : int option;
 }
 
 type slot_header = {level : int; commitment : string; index : int}
@@ -65,10 +74,10 @@ let commitment_with_hash_from_json json =
     (JSON.get "hash" json, JSON.get "commitment" json)
   in
   Option.map
-    (fun commitment -> (JSON.as_string hash, commitment))
+    (fun commitment -> {hash = JSON.as_string hash; commitment})
     (commitment_from_json commitment_json)
 
-let commitment_with_hash_and_levels_from_json json =
+let commitment_info_from_json json =
   let hash, commitment_json, first_published_at_level, included_at_level =
     ( JSON.get "hash" json,
       JSON.get "commitment" json,
@@ -77,10 +86,13 @@ let commitment_with_hash_and_levels_from_json json =
   in
   Option.map
     (fun commitment ->
-      ( JSON.as_string hash,
-        commitment,
-        first_published_at_level |> JSON.as_opt |> Option.map JSON.as_int,
-        included_at_level |> JSON.as_opt |> Option.map JSON.as_int ))
+      {
+        commitment_and_hash = {hash = JSON.as_string hash; commitment};
+        first_published_at_level =
+          first_published_at_level |> JSON.as_opt |> Option.map JSON.as_int;
+        included_at_level =
+          included_at_level |> JSON.as_opt |> Option.map JSON.as_int;
+      })
     (commitment_from_json commitment_json)
 
 let next_name = ref 1
@@ -92,15 +104,14 @@ let fresh_name () =
 
 let () = Test.declare_reset_function @@ fun () -> next_name := 1
 
-let create ?name ?path ?base_dir ?(color = Log.Color.FG.green) sc_node =
+let create ~protocol ?runner ?name ?base_dir ?(color = Log.Color.FG.green)
+    sc_node =
   let name = match name with None -> fresh_name () | Some name -> name in
-  let path =
-    match path with None -> Constant.sc_rollup_client | Some p -> p
-  in
+  let path = Protocol.sc_rollup_client protocol in
   let base_dir =
-    match base_dir with None -> Temp.dir name | Some dir -> dir
+    match base_dir with None -> Temp.dir ?runner name | Some dir -> dir
   in
-  {name; path; sc_node; base_dir; color}
+  {name; path; sc_node; base_dir; color; runner}
 
 let base_dir_arg sc_client = ["--base-dir"; sc_client.base_dir]
 
@@ -110,6 +121,7 @@ let endpoint_arg sc_client =
 let spawn_command ?hooks sc_client command =
   let process =
     Process.spawn
+      ?runner:sc_client.runner
       ~name:sc_client.name
       ~color:sc_client.color
       ?hooks
@@ -134,19 +146,22 @@ type transaction = {
   destination : string;
   entrypoint : string option;
   parameters : string;
+  parameters_ty : string option;
 }
 
-let string_of_transaction {destination; entrypoint; parameters} =
-  Format.asprintf
-    {| { "destination" : "%s", %s"parameters" : "%s" } |}
-    destination
-    (match entrypoint with
-    | None -> ""
-    | Some entrypoint -> Format.asprintf {| "entrypoint" : "%s", |} entrypoint)
-    parameters
-
-let string_of_batch ts =
-  "[ " ^ String.concat "," (List.map string_of_transaction ts) ^ " ]"
+let json_of_batch ts =
+  let json_of_transaction {destination; entrypoint; parameters; parameters_ty} =
+    `O
+      (List.filter_map
+         Fun.id
+         [
+           Some ("destination", `String destination);
+           Some ("parameters", `String parameters);
+           Option.map (fun v -> ("entrypoint", `String v)) entrypoint;
+           Option.map (fun v -> ("parameters_ty", `String v)) parameters_ty;
+         ])
+  in
+  `A (List.map json_of_transaction ts)
 
 type outbox_proof = {commitment_hash : string; proof : string}
 
@@ -168,7 +183,7 @@ let outbox_proof_batch ?hooks ?expected_error sc_client ~message_index
         "level";
         string_of_int outbox_level;
         "transferring";
-        string_of_batch batch;
+        JSON.encode_u (json_of_batch batch);
       ]
   in
   match expected_error with
@@ -183,22 +198,22 @@ let outbox_proof_batch ?hooks ?expected_error sc_client ~message_index
       let* () = Process.check_error ~msg process in
       return None
 
-let outbox_proof_single ?hooks ?expected_error ?entrypoint sc_client
-    ~message_index ~outbox_level ~destination ~parameters =
+let outbox_proof_single ?hooks ?expected_error ?entrypoint ?parameters_ty
+    sc_client ~message_index ~outbox_level ~destination ~parameters =
   outbox_proof_batch
     ?hooks
     ?expected_error
     sc_client
     ~message_index
     ~outbox_level
-    [{destination; entrypoint; parameters}]
+    [{destination; entrypoint; parameters; parameters_ty}]
 
 let encode_batch ?hooks ?expected_error sc_client batch =
   let runnable =
     spawn_command
       ?hooks
       sc_client
-      ["encode"; "outbox"; "message"; string_of_batch batch]
+      ["encode"; "outbox"; "message"; JSON.encode_u (json_of_batch batch)]
   in
   match expected_error with
   | None ->
@@ -309,7 +324,7 @@ let last_stored_commitment ?hooks sc_client =
 
 let last_published_commitment ?hooks sc_client =
   rpc_get ?hooks sc_client ["local"; "last_published_commitment"]
-  |> Runnable.map commitment_with_hash_and_levels_from_json
+  |> Runnable.map commitment_info_from_json
 
 let dal_slot_headers ?hooks ?(block = "head") sc_client =
   rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "slot_headers"]
@@ -323,22 +338,14 @@ let dal_slot_headers ?hooks ?(block = "head") sc_client =
                     index = obj |> get "index" |> as_int;
                   })))
 
-let dal_downloaded_confirmed_slot_pages ?hooks ?(block = "head") sc_client =
-  rpc_get
-    ?hooks
-    sc_client
-    ["global"; "block"; block; "dal"; "confirmed_slot_pages"]
+let get_dal_processed_slots ?hooks ?(block = "head") sc_client =
+  rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "processed_slots"]
   |> Runnable.map (fun json ->
          JSON.as_list json
          |> List.map (fun obj ->
                 let index = obj |> JSON.get "index" |> JSON.as_int in
-                let contents =
-                  obj |> JSON.get "contents" |> JSON.as_list
-                  |> List.map (fun page ->
-                         page |> JSON.as_string |> fun s ->
-                         Hex.to_string (`Hex s))
-                in
-                (index, contents)))
+                let status = obj |> JSON.get "status" |> JSON.as_string in
+                (index, status)))
 
 let simulate ?hooks ?(block = "head") sc_client ?(reveal_pages = []) messages =
   let messages_json =
@@ -436,8 +443,8 @@ let show_address ?hooks ~alias sc_client =
 let spawn_import_secret_key ?hooks ?(force = false)
     (key : Account.aggregate_key) sc_client =
   let sk_uri =
-    let (Unencrypted sk) = key.aggregate_secret_key in
-    "aggregate_unencrypted:" ^ sk
+    "aggregate_unencrypted:"
+    ^ Account.require_unencrypted_secret_key ~__LOC__ key.aggregate_secret_key
   in
   spawn_command
     ?hooks

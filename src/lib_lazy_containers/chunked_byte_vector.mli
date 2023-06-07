@@ -37,11 +37,14 @@ module Chunk : sig
   (** Copy the contents of a chunk into a fresh [bytes]. *)
   val to_bytes : t -> bytes
 
-  (** Size of a chunk in bytes - with 12 bits of address space the chunk is 4KiB *)
+  (** Size of a chunk in bytes - with 9 bits of address space the chunk is 512B *)
   val size : int64
 
   (** [num_needed len] Computes the number of chunks needed to cover [len]. *)
   val num_needed : int64 -> int64
+
+  (** [encoding] is a [Tezos_tree_encoding] for [Chunk]. *)
+  val encoding : t Tezos_tree_encoding.t
 end
 
 (** Chunked byte vector *)
@@ -54,13 +57,16 @@ type t
     tree-encoding library. To create a brand new chunked byte vector,
     use {!allocate}. *)
 val create :
-  ?origin:Lazy_map.tree -> ?get_chunk:(int64 -> Chunk.t Lwt.t) -> int64 -> t
+  ?origin:Tezos_tree_encoding.wrapped_tree ->
+  ?get_chunk:(int64 -> Chunk.t Lwt.t) ->
+  int64 ->
+  t
 
 (** [origin vec] returns the tree of origin of the vector, if it exists.
 
     {b Note:} The sole consumer of this function is expected to be the
     tree-encoding library. *)
-val origin : t -> Lazy_map.tree option
+val origin : t -> Tezos_tree_encoding.wrapped_tree option
 
 (** [allocate len] creates a new zeroed chunked byte vector.
 
@@ -115,3 +121,6 @@ val store_bytes : t -> int64 -> bytes -> unit Lwt.t
     been cached in-memory since [vector] has been created, either by
     reading its contents, or by modifying it. *)
 val loaded_chunks : t -> (int64 * Chunk.t option) list
+
+(** [encoding] is a [Tezos_tree_encoding] for [t]. *)
+val encoding : t Tezos_tree_encoding.t

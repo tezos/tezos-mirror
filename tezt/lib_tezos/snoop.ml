@@ -42,11 +42,11 @@ type tag =
   | Gtoc
   | Cache
   | Carbonated_map
-  | Tx_rollup
   | Tickets
   | Big_map
   | Skip_list
   | Sc_rollup
+  | Shell
 
 type michelson_term_kind = Data | Code
 
@@ -56,7 +56,7 @@ let create ?(path = Constant.tezos_snoop) ?(color = Log.Color.FG.blue) () =
   {path; name = "snoop"; color}
 
 let spawn_command snoop command =
-  Process.spawn ~name:snoop.name ~color:snoop.color snoop.path @@ command
+  Process.spawn ~name:snoop.name ~color:snoop.color snoop.path command
 
 (* Benchmark command *)
 
@@ -351,11 +351,11 @@ let string_of_tag (tag : tag) =
   | Gtoc -> "global_constants"
   | Cache -> "cache"
   | Carbonated_map -> "carbonated_map"
-  | Tx_rollup -> "tx_rollup"
   | Tickets -> "tickets"
   | Big_map -> "big_map"
   | Skip_list -> "skip_list"
   | Sc_rollup -> "sc_rollup"
+  | Shell -> "shell"
 
 let list_benchmarks_command mode tags =
   let tags = List.map string_of_tag tags in
@@ -394,3 +394,32 @@ let write_config ~(benchmark : string) ~(bench_config : string) ~(file : string)
     else Lwt.return_unit
   in
   spawn_command snoop command |> Process.check
+
+let generate_code_using_solution ~solution ?fixed_point snoop =
+  let command =
+    [
+      "generate";
+      "code";
+      "using";
+      "solution";
+      solution;
+      "for";
+      "inferred";
+      "models";
+    ]
+    @ match fixed_point with None -> [] | Some fn -> ["--fixed-point"; fn]
+  in
+  let process = spawn_command snoop command in
+  let* output = Process.check_and_read_stdout process in
+  Lwt.return output
+
+let check_definitions ~files snoop =
+  let open Process in
+  let command ~files = ["check"; "definitions"; "of"] @ files in
+  let spawn ~files snoop = spawn_command snoop (command ~files) in
+  let process = spawn ~files snoop in
+  Lwt.catch
+    (fun () -> check process)
+    (fun exn ->
+      Log.error "Cost function definitions have some issues" ;
+      raise exn)

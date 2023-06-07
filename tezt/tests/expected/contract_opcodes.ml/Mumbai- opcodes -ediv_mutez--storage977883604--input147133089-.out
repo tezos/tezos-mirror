@@ -1,0 +1,37 @@
+
+./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/ediv_mutez.tz on storage '(Left None)' and input '(Pair 10 (Right 0))' --level 1 --trace-stack
+storage
+  (Right None)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 19 (just consumed gas: 14.009)
+    [ (Pair (Pair 10 (Right 0)) (Left None)) ]
+  - location: 19 (just consumed gas: 0.010)
+    [ (Pair 10 (Right 0)) ]
+  - location: 20 (just consumed gas: 0.010)
+    [ 10
+      (Right 0) ]
+  - location: 21 (just consumed gas: 0.010)
+    [ (Right 0)
+      10 ]
+  - location: 22 (just consumed gas: 0)
+    [ 0
+      10 ]
+  - location: 32 (just consumed gas: 0.010)
+    [ 10
+      0 ]
+  - location: 33 (just consumed gas: 0.070)
+    [ None ]
+  - location: 34 (just consumed gas: 0.010)
+    [ (Right None) ]
+  - location: 22 (just consumed gas: 0.015)
+    [ (Right None) ]
+  - location: 39 (just consumed gas: 0.010)
+    [ {}
+      (Right None) ]
+  - location: 41 (just consumed gas: 0.010)
+    [ (Pair {} (Right None)) ]
+

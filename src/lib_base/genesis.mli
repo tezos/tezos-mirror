@@ -7,6 +7,8 @@ type t = {
 
 val encoding : t Data_encoding.t
 
+val equal : t -> t -> bool
+
 val pp : Format.formatter -> t -> unit
 
 module Parameters : sig

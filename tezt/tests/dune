@@ -3,19 +3,110 @@
 
 (executable
  (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   tezt
   str
   bls12-381
   tezt-tezos
+  tezt_ethereum
   data-encoding
   tezos-base
   tezos-base.unix
   tezos-stdlib-unix
   tezos-protocol-alpha
+  tezos_scoru_wasm_regressions
+  tezt_self_tests_tezt_lib
+  src_proto_alpha_lib_sc_rollup_node_test_tezt_lib
+  src_proto_alpha_lib_protocol_test_unit_tezt_lib
   src_proto_alpha_lib_protocol_test_regression_tezt_lib
+  src_proto_alpha_lib_protocol_test_pbt_tezt_lib
+  src_proto_alpha_lib_protocol_test_integration_validate_tezt_lib
+  src_proto_alpha_lib_protocol_test_integration_operations_tezt_lib
+  src_proto_alpha_lib_protocol_test_integration_michelson_tezt_lib
+  src_proto_alpha_lib_protocol_test_integration_gas_tezt_lib
+  src_proto_alpha_lib_protocol_test_integration_consensus_tezt_lib
+  src_proto_alpha_lib_protocol_test_integration_tezt_lib
+  src_proto_alpha_lib_plugin_test_tezt_lib
+  src_proto_alpha_lib_delegate_test_tezt_lib
+  src_proto_alpha_lib_dal_test_tezt_lib
+  src_proto_alpha_lib_dac_plugin_test_tezt_lib
+  src_proto_alpha_lib_client_test_tezt_lib
+  src_proto_017_PtNairob_lib_sc_rollup_node_test_tezt_lib
+  src_proto_017_PtNairob_lib_protocol_test_unit_tezt_lib
+  src_proto_017_PtNairob_lib_protocol_test_regression_tezt_lib
+  src_proto_017_PtNairob_lib_protocol_test_pbt_tezt_lib
+  src_proto_017_PtNairob_lib_protocol_test_integration_validate_tezt_lib
+  src_proto_017_PtNairob_lib_protocol_test_integration_operations_tezt_lib
+  src_proto_017_PtNairob_lib_protocol_test_integration_michelson_tezt_lib
+  src_proto_017_PtNairob_lib_protocol_test_integration_gas_tezt_lib
+  src_proto_017_PtNairob_lib_protocol_test_integration_consensus_tezt_lib
+  src_proto_017_PtNairob_lib_protocol_test_integration_tezt_lib
+  src_proto_017_PtNairob_lib_plugin_test_tezt_lib
+  src_proto_017_PtNairob_lib_delegate_test_tezt_lib
+  src_proto_017_PtNairob_lib_dal_test_tezt_lib
+  src_proto_017_PtNairob_lib_dac_plugin_test_tezt_lib
+  src_proto_017_PtNairob_lib_client_test_tezt_lib
+  src_proto_016_PtMumbai_lib_sc_rollup_node_test_tezt_lib
+  src_proto_016_PtMumbai_lib_protocol_test_unit_tezt_lib
   src_proto_016_PtMumbai_lib_protocol_test_regression_tezt_lib
-  src_proto_015_PtLimaPt_lib_protocol_test_regression_tezt_lib)
+  src_proto_016_PtMumbai_lib_protocol_test_pbt_tezt_lib
+  src_proto_016_PtMumbai_lib_protocol_test_integration_validate_tezt_lib
+  src_proto_016_PtMumbai_lib_protocol_test_integration_operations_tezt_lib
+  src_proto_016_PtMumbai_lib_protocol_test_integration_michelson_tezt_lib
+  src_proto_016_PtMumbai_lib_protocol_test_integration_gas_tezt_lib
+  src_proto_016_PtMumbai_lib_protocol_test_integration_consensus_tezt_lib
+  src_proto_016_PtMumbai_lib_protocol_test_integration_tezt_lib
+  src_proto_016_PtMumbai_lib_plugin_test_tezt_lib
+  src_proto_016_PtMumbai_lib_delegate_test_tezt_lib
+  src_proto_016_PtMumbai_lib_dal_test_tezt_lib
+  src_proto_016_PtMumbai_lib_client_test_tezt_lib
+  src_lib_workers_test_tezt_lib
+  src_lib_webassembly_tests_tezt_lib
+  src_lib_version_test_tezt_lib
+  src_lib_tree_encoding_test_tezt_lib
+  src_lib_store_unix_test_tezt_lib
+  src_lib_stdlib_unix_test__tezt_lib
+  src_lib_stdlib_test_unix_tezt_lib
+  src_lib_stdlib_test_tezt_lib
+  src_lib_srs_extraction_test_tezt_lib
+  src_lib_signer_backends_unix_test_tezt_lib
+  src_lib_signer_backends_test_tezt_lib
+  src_lib_shell_services_test_tezt_lib
+  src_lib_shell_test_tezt_lib
+  src_lib_scoru_wasm_test_tezt_lib
+  src_lib_scoru_wasm_fast_test_tezt_lib
+  src_lib_sapling_test_tezt_lib
+  src_lib_rpc_http_test_tezt_lib
+  src_lib_requester_test_tezt_lib
+  src_lib_proxy_server_config_test_tezt_lib
+  src_lib_proxy_test_helpers_shell_services_test_tezt_lib
+  src_lib_proxy_test_tezt_lib
+  src_lib_protocol_environment_test_shell_context_tezt_lib
+  src_lib_protocol_environment_test_tezt_lib
+  src_lib_polynomial_test_tezt_lib
+  src_lib_p2p_tezt_tezt_lib
+  src_lib_mockup_test_tezt_lib
+  src_lib_mec_test_tezt_lib
+  src_lib_lwt_result_stdlib_test_tezt_lib
+  src_lib_lazy_containers_test_tezt_lib
+  src_lib_layer2_store_test__tezt_lib
+  src_lib_hacl_test_tezt_lib
+  src_lib_error_monad_test_tezt_lib
+  src_lib_dac_node_test_tezt_lib
+  src_lib_crypto_dal_test_tezt_lib
+  src_lib_crypto_test_unix_tezt_lib
+  src_lib_crypto_test_tezt_lib
+  src_lib_context_test_tezt_lib
+  src_lib_context_memory_test_tezt_lib
+  src_lib_client_base_unix_test_tezt_lib
+  src_lib_client_base_test_tezt_lib
+  src_lib_clic_test_tezt_lib
+  src_lib_bls12_381_polynomial_test_tezt_lib
+  src_lib_benchmark_test_tezt_lib
+  src_lib_benchmark_lib_micheline_rewriting_test_tezt_lib
+  src_lib_base_unix_test_tezt_lib
+  src_lib_base_test_tezt_lib)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
@@ -24,4 +115,5 @@
   -open Tezt
   -open Tezt.Base
   -open Tezt_tezos
-  -open Tezt_tezos.Runnable.Syntax))
+  -open Tezt_tezos.Runnable.Syntax
+  -open Tezt_ethereum))

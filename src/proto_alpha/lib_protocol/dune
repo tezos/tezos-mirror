@@ -15,7 +15,7 @@
  (action
   (write-file
    %{targets}
-   "module Name = struct let name = \"alpha\" end\ninclude Tezos_protocol_environment.V9.Make(Name)()\n")))
+   "module Name = struct let name = \"alpha\" end\ninclude Tezos_protocol_environment.V10.Make(Name)()\n")))
 
 (library
  (name tezos_raw_protocol_alpha)
@@ -159,7 +159,6 @@
   Seed_storage
   Contract_manager_storage
   Delegate_activation_storage
-  Frozen_deposits_storage
   Sapling_storage
   Lazy_storage_diff
   Commitment_storage
@@ -168,6 +167,7 @@
   Zk_rollup_storage
   Contract_delegate_storage
   Stake_storage
+  Frozen_deposits_storage
   Contract_storage
   Token
   Fees_storage
@@ -209,12 +209,6 @@
   Script_string
   Script_timestamp
   Script_bytes
-  Tx_rollup_l2_storage_sig
-  Tx_rollup_l2_context_sig
-  Tx_rollup_l2_context
-  Tx_rollup_l2_batch
-  Tx_rollup_l2_apply
-  Tx_rollup_l2_verifier
   Local_gas_counter
   Script_tc_errors
   Gas_monad
@@ -232,6 +226,7 @@
   Michelson_v1_gas_costs_generated
   Michelson_v1_gas_costs
   Michelson_v1_gas
+  Operation_costs
   Script_tc_context
   Ticket_token
   Ticket_receipt
@@ -249,7 +244,6 @@
   Ticket_scanner
   Ticket_balance_key
   Ticket_lazy_storage_diff
-  Tx_rollup_parameters
   Zk_rollup_parameters
   Ticket_token_map
   Ticket_operations_diff
@@ -273,7 +267,6 @@
   Contract_services
   Delegate_services
   Voting_services
-  Tx_rollup_services
   Dal_services
   Alpha_services
   Main))
@@ -444,7 +437,6 @@
   seed_storage.ml seed_storage.mli
   contract_manager_storage.ml contract_manager_storage.mli
   delegate_activation_storage.ml delegate_activation_storage.mli
-  frozen_deposits_storage.ml frozen_deposits_storage.mli
   sapling_storage.ml
   lazy_storage_diff.ml lazy_storage_diff.mli
   commitment_storage.ml commitment_storage.mli
@@ -453,6 +445,7 @@
   zk_rollup_storage.ml zk_rollup_storage.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
+  frozen_deposits_storage.ml frozen_deposits_storage.mli
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   fees_storage.ml fees_storage.mli
@@ -495,12 +488,6 @@
   script_string.ml script_string.mli
   script_timestamp.ml script_timestamp.mli
   script_bytes.ml script_bytes.mli
-  tx_rollup_l2_storage_sig.ml
-  tx_rollup_l2_context_sig.ml
-  tx_rollup_l2_context.ml
-  tx_rollup_l2_batch.ml tx_rollup_l2_batch.mli
-  tx_rollup_l2_apply.ml tx_rollup_l2_apply.mli
-  tx_rollup_l2_verifier.ml tx_rollup_l2_verifier.mli
   local_gas_counter.ml local_gas_counter.mli
   script_tc_errors.ml
   gas_monad.ml gas_monad.mli
@@ -518,6 +505,7 @@
   michelson_v1_gas_costs_generated.ml
   michelson_v1_gas_costs.ml
   michelson_v1_gas.ml michelson_v1_gas.mli
+  operation_costs.ml operation_costs.mli
   script_tc_context.ml script_tc_context.mli
   ticket_token.ml ticket_token.mli
   ticket_receipt.ml ticket_receipt.mli
@@ -535,7 +523,6 @@
   ticket_scanner.ml ticket_scanner.mli
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
-  tx_rollup_parameters.ml tx_rollup_parameters.mli
   zk_rollup_parameters.ml zk_rollup_parameters.mli
   ticket_token_map.ml ticket_token_map.mli
   ticket_operations_diff.ml ticket_operations_diff.mli
@@ -559,12 +546,32 @@
   contract_services.ml contract_services.mli
   delegate_services.ml delegate_services.mli
   voting_services.ml voting_services.mli
-  tx_rollup_services.ml tx_rollup_services.mli
   dal_services.ml dal_services.mli
   alpha_services.ml alpha_services.mli
   main.ml main.mli
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:octez-protocol-compiler} -no-hash-check -warn-error +a .)))
+
+(library
+ (name tezos_protocol_alpha_lifted)
+ (public_name tezos-protocol-alpha.lifted)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-alpha)
+ (flags
+  (:standard)
+  -nopervasives
+  -open Tezos_protocol_alpha)
+ (modules Lifted_protocol))
+
+(rule
+ (targets lifted_protocol.ml)
+ (action
+  (write-file
+   %{targets}
+   "\ninclude Environment.Lift (Protocol)\nlet hash = Protocol.hash\n")))
 
 (library
  (name tezos_protocol_alpha_functor)
@@ -710,7 +717,6 @@
   seed_storage.ml seed_storage.mli
   contract_manager_storage.ml contract_manager_storage.mli
   delegate_activation_storage.ml delegate_activation_storage.mli
-  frozen_deposits_storage.ml frozen_deposits_storage.mli
   sapling_storage.ml
   lazy_storage_diff.ml lazy_storage_diff.mli
   commitment_storage.ml commitment_storage.mli
@@ -719,6 +725,7 @@
   zk_rollup_storage.ml zk_rollup_storage.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
+  frozen_deposits_storage.ml frozen_deposits_storage.mli
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   fees_storage.ml fees_storage.mli
@@ -761,12 +768,6 @@
   script_string.ml script_string.mli
   script_timestamp.ml script_timestamp.mli
   script_bytes.ml script_bytes.mli
-  tx_rollup_l2_storage_sig.ml
-  tx_rollup_l2_context_sig.ml
-  tx_rollup_l2_context.ml
-  tx_rollup_l2_batch.ml tx_rollup_l2_batch.mli
-  tx_rollup_l2_apply.ml tx_rollup_l2_apply.mli
-  tx_rollup_l2_verifier.ml tx_rollup_l2_verifier.mli
   local_gas_counter.ml local_gas_counter.mli
   script_tc_errors.ml
   gas_monad.ml gas_monad.mli
@@ -784,6 +785,7 @@
   michelson_v1_gas_costs_generated.ml
   michelson_v1_gas_costs.ml
   michelson_v1_gas.ml michelson_v1_gas.mli
+  operation_costs.ml operation_costs.mli
   script_tc_context.ml script_tc_context.mli
   ticket_token.ml ticket_token.mli
   ticket_receipt.ml ticket_receipt.mli
@@ -801,7 +803,6 @@
   ticket_scanner.ml ticket_scanner.mli
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
-  tx_rollup_parameters.ml tx_rollup_parameters.mli
   zk_rollup_parameters.ml zk_rollup_parameters.mli
   ticket_token_map.ml ticket_token_map.mli
   ticket_operations_diff.ml ticket_operations_diff.mli
@@ -825,7 +826,6 @@
   contract_services.ml contract_services.mli
   delegate_services.ml delegate_services.mli
   voting_services.ml voting_services.mli
-  tx_rollup_services.ml tx_rollup_services.mli
   dal_services.ml dal_services.mli
   alpha_services.ml alpha_services.mli
   main.ml main.mli (:src_dir TEZOS_PROTOCOL))
@@ -981,7 +981,6 @@
   seed_storage.ml seed_storage.mli
   contract_manager_storage.ml contract_manager_storage.mli
   delegate_activation_storage.ml delegate_activation_storage.mli
-  frozen_deposits_storage.ml frozen_deposits_storage.mli
   sapling_storage.ml
   lazy_storage_diff.ml lazy_storage_diff.mli
   commitment_storage.ml commitment_storage.mli
@@ -990,6 +989,7 @@
   zk_rollup_storage.ml zk_rollup_storage.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
+  frozen_deposits_storage.ml frozen_deposits_storage.mli
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   fees_storage.ml fees_storage.mli
@@ -1032,12 +1032,6 @@
   script_string.ml script_string.mli
   script_timestamp.ml script_timestamp.mli
   script_bytes.ml script_bytes.mli
-  tx_rollup_l2_storage_sig.ml
-  tx_rollup_l2_context_sig.ml
-  tx_rollup_l2_context.ml
-  tx_rollup_l2_batch.ml tx_rollup_l2_batch.mli
-  tx_rollup_l2_apply.ml tx_rollup_l2_apply.mli
-  tx_rollup_l2_verifier.ml tx_rollup_l2_verifier.mli
   local_gas_counter.ml local_gas_counter.mli
   script_tc_errors.ml
   gas_monad.ml gas_monad.mli
@@ -1055,6 +1049,7 @@
   michelson_v1_gas_costs_generated.ml
   michelson_v1_gas_costs.ml
   michelson_v1_gas.ml michelson_v1_gas.mli
+  operation_costs.ml operation_costs.mli
   script_tc_context.ml script_tc_context.mli
   ticket_token.ml ticket_token.mli
   ticket_receipt.ml ticket_receipt.mli
@@ -1072,7 +1067,6 @@
   ticket_scanner.ml ticket_scanner.mli
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
-  tx_rollup_parameters.ml tx_rollup_parameters.mli
   zk_rollup_parameters.ml zk_rollup_parameters.mli
   ticket_token_map.ml ticket_token_map.mli
   ticket_operations_diff.ml ticket_operations_diff.mli
@@ -1096,7 +1090,6 @@
   contract_services.ml contract_services.mli
   delegate_services.ml delegate_services.mli
   voting_services.ml voting_services.mli
-  tx_rollup_services.ml tx_rollup_services.mli
   dal_services.ml dal_services.mli
   alpha_services.ml alpha_services.mli
   main.ml main.mli (:src_dir TEZOS_PROTOCOL))

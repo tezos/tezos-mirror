@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/test_carbonated_map.exe
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/pbt/main.exe \
+                  -- --file test_carbonated_map.ml
     Subject:      Operations in Carbonated_map
 *)
 
@@ -166,7 +166,7 @@ let test_update_replace =
 (** Test merging when ignoring new overlapping keys. *)
 let test_merge_overlaps_left =
   let open Result_syntax in
-  unit_test "Merge overlap keep existing" @@ fun () ->
+  unit_test "Merge overlaps left" @@ fun () ->
   let ctxt = unsafe_new_context () in
   let* map, ctxt =
     CM.of_list
@@ -549,6 +549,4 @@ let tests ~rand = qcheck_wrap ~rand qcheck_tests @ unit_tests
 let () =
   (* Ensure deterministic results. *)
   let rand = Random.State.make [|0x1337533D; 71287309; 397060904|] in
-  Alcotest.run
-    "protocol > pbt > carbonated map"
-    [("Carbonated map", tests ~rand)]
+  Alcotest.run ~__FILE__ Protocol.name [("Carbonated map", tests ~rand)]

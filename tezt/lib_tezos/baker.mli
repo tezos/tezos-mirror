@@ -37,6 +37,12 @@ val terminate : ?timeout:float -> t -> unit Lwt.t
 (** Send SIGKILL and wait for the process to terminate. *)
 val kill : t -> unit Lwt.t
 
+(** Send SIGSTOP to the process. *)
+val stop : t -> unit Lwt.t
+
+(** Send SIGCONT to the process. *)
+val continue : t -> unit Lwt.t
+
 (** See [Daemon.Make.log_events]. *)
 val log_events : t -> unit
 
@@ -58,9 +64,13 @@ val on_event : t -> (event -> unit) -> unit
 
 (** Spawn [octez-baker run].
 
-    The resulting promise is fulfilled as soon as the baker has been spawned.  It
-    continues running in the background.*)
-val run : ?event_level:Daemon.Level.default_level -> t -> unit Lwt.t
+    The resulting promise is fulfilled as soon as the baker has been
+    spawned. It continues running in the background. *)
+val run :
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
+  t ->
+  unit Lwt.t
 
 (** Liquidity baking vote values. *)
 type liquidity_baking_vote = Off | On | Pass
@@ -115,8 +125,14 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
     is not passed. If it is [Some x] then [--liquidity-baking-toggle-vote x] is
     passed. The default value is [Some Pass].
 
-    [force_apply] is passed to the baker daemon through
-    the flag [--force_apply]. *)
+    [operations_pool] and [force_apply] are passed to the baker daemon through
+    the flag [--operations-pool] and [--force_apply].
+
+    If [remote_mode] is specified, the baker will run in RPC-only mode.
+
+    If [dal_node] is specified, then it is the DAL node that the baker queries
+    in order to determine the attestations it sends to the L1 node. A
+    [--dal_node] argument is passed to specify the DAL node's endpoint. *)
 val create :
   protocol:Protocol.t ->
   ?name:string ->
@@ -127,6 +143,9 @@ val create :
   ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?force_apply:bool ->
+  ?remote_mode:bool ->
+  ?operations_pool:string ->
+  ?dal_node:Dal_node.t ->
   Node.t ->
   Client.t ->
   t
@@ -161,20 +180,56 @@ val create :
     baker. This defaults to the empty list, which is a shortcut for "every known
     account".
 
-    [votefile], [liquidity_baking_toggle_vote] and [force_apply] are
-    respectively passed to the baker daemon through the flags
-    [--votefile], [--liquidity-baking-toggle-vote] and
-    [--should-apply]. *)
+    [votefile], [liquidity_baking_toggle_vote], [force_apply] respectively
+    [operations_pool] are passed to the baker daemon through the flags
+    [--votefile], [--liquidity-baking-toggle-vote], [--should-apply]
+    respectively [--operations-pool].
+
+    If [remote_mode] is specified, the baker will run in RPC-only mode.
+
+    If [dal_node] is specified, then it is the DAL node that the baker queries
+    in order to determine the attestations it sends to the L1 node. A
+    [--dal_node] argument is passed to specify the DAL node's endpoint. *)
 val init :
   protocol:Protocol.t ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?runner:Runner.t ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?delegates:string list ->
   ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?force_apply:bool ->
+  ?remote_mode:bool ->
+  ?operations_pool:string ->
+  ?dal_node:Dal_node.t ->
   Node.t ->
   Client.t ->
   t Lwt.t
+
+(** Log block injection events.
+
+    Show the baker daemon name, level and round of the block, and
+    delegate for which it was injected.
+
+    This log is relatively lightweight and a good indicator of chain
+    progress during a test. It can also be useful to observe baking
+    rights at the levels and rounds featured in a test. *)
+val log_block_injection : ?color:Log.Color.t -> t -> unit
+
+(** Log all baker events with [Log.info] on a single line each, which
+    should be easily readable by a human.
+
+    This function should not be called by any test on a permanent
+    basis, but is available for debugging.
+
+    If an event has an unexpected format, the anomaly is signaled with
+    [Log.warn].
+
+    If you want to see all events, don't forget to launch the baker with
+{[
+~event_sections_levels:
+  [(String.concat "." [Protocol.encoding_prefix protocol; "baker"], `Debug)]
+]} *)
+val log_shortened_events : t -> unit

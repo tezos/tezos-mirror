@@ -33,6 +33,10 @@
 # -e: stop on first error.
 set -x -e
 
+# Prevent git errors from being reported to the directory of the previous run if
+# it failed and wasn't cleaned properly.
+rm -f current_run_dir
+
 TODAY=$(date +"%Y%m%d_%H%M")
 
 dated_log() {

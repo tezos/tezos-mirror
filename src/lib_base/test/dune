@@ -3,105 +3,66 @@
 
 (env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
 
-(executables
- (names test_bounded test_time test_protocol)
- (modes native js)
+(library
+ (name src_lib_base_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-error-monad
   data-encoding
+  tezos-test-helpers
   qcheck-alcotest
-  tezos-test-helpers)
+  octez-alcotezt)
  (js_of_ocaml)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base
   -open Tezos_error_monad
-  -open Tezos_test_helpers)
- (modules test_bounded test_time test_protocol))
-
-(rule
- (alias runtest)
- (package tezos-base)
- (action (run %{dep:./test_bounded.exe})))
-
-(rule
- (alias runtest)
- (package tezos-base)
- (action (run %{dep:./test_time.exe})))
-
-(rule
- (alias runtest)
- (package tezos-base)
- (action (run %{dep:./test_protocol.exe})))
-
-(rule
- (alias runtest_js)
- (package tezos-base)
- (action (run node %{dep:./test_bounded.bc.js})))
-
-(rule
- (alias runtest_js)
- (package tezos-base)
- (action (run node %{dep:./test_time.bc.js})))
-
-(rule
- (alias runtest_js)
- (package tezos-base)
- (action (run node %{dep:./test_protocol.bc.js})))
+  -open Tezos_test_helpers
+  -open Octez_alcotezt)
+ (modules test_bounded test_time test_protocol test_p2p_addr test_sized))
 
 (executable
- (name test_p2p_addr)
- (modes native js)
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (modes native)
  (libraries
-  tezos-base
-  tezos-error-monad
-  data-encoding
-  qcheck-alcotest
-  tezos-test-helpers)
- (js_of_ocaml)
- (flags
-  (:standard)
-  -open Tezos_base
-  -open Tezos_error_monad
-  -open Tezos_test_helpers)
- (modules test_p2p_addr))
+  src_lib_base_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-base)
  (deps points.ok points.ko)
- (action (run %{dep:./test_p2p_addr.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
+
+(executable
+ (name main_js)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (modes js)
+ (libraries
+  src_lib_base_test_tezt_lib
+  tezt.js)
+ (js_of_ocaml)
+ (modules main_js))
 
 (rule
  (alias runtest_js)
  (package tezos-base)
  (deps points.ok points.ko)
- (action (run node %{dep:./test_p2p_addr.bc.js})))
-
-(executable
- (name test_sized)
- (modes native js)
- (libraries
-  tezos-base
-  tezos-error-monad
-  data-encoding
-  qcheck-alcotest
-  tezos-test-helpers)
- (js_of_ocaml)
- (flags
-  (:standard)
-  -open Tezos_base
-  -open Tezos_error_monad
-  -open Tezos_test_helpers)
- (modules test_sized))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run node %{dep:./main_js.bc.js})))
 
 (rule
- (alias runtest)
- (package tezos-base)
- (action (run %{dep:./test_sized.exe})))
-
-(rule
- (alias runtest_js)
- (package tezos-base)
- (action (run node %{dep:./test_sized.bc.js})))
+ (targets main_js.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt_js.Test.run ()"))))

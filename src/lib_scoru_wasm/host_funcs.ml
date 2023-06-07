@@ -32,13 +32,14 @@ module Error = struct
     | Store_not_a_value
     | Store_invalid_access
     | Store_value_size_exceeded
-    | Store_invalid_subkey_index
     | Memory_invalid_access
     | Input_output_too_large
     | Generic_invalid_access
     | Store_readonly_value
     | Store_not_a_node
     | Full_outbox
+    | Store_invalid_subkey_index
+    | Store_value_already_exists
 
   (** [code error] returns the error code associated to the error. *)
   let code = function
@@ -54,6 +55,7 @@ module Error = struct
     | Store_not_a_node -> -10l
     | Full_outbox -> -11l
     | Store_invalid_subkey_index -> -12l
+    | Store_value_already_exists -> -13l
 end
 
 module type Memory_access = sig
@@ -170,7 +172,8 @@ module Aux = struct
       key_length:int32 ->
       int32 Lwt.t
 
-    val store_delete :
+    val generic_store_delete :
+      kind:Durable.kind ->
       durable:Durable.t ->
       memory:memory ->
       key_offset:int32 ->
@@ -193,6 +196,14 @@ module Aux = struct
       from_key_length:int32 ->
       to_key_offset:int32 ->
       to_key_length:int32 ->
+      (Durable.t * int32) Lwt.t
+
+    val store_create :
+      durable:Durable.t ->
+      memory:memory ->
+      key_offset:int32 ->
+      key_length:int32 ->
+      size:int32 ->
       (Durable.t * int32) Lwt.t
 
     val store_value_size :
@@ -235,6 +246,15 @@ module Aux = struct
       key_offset:int32 ->
       key_length:int32 ->
       index:int64 ->
+      dst:int32 ->
+      max_size:int32 ->
+      int32 Lwt.t
+
+    val store_get_hash :
+      durable:Durable.t ->
+      memory:memory ->
+      key_offset:int32 ->
+      key_length:int32 ->
       dst:int32 ->
       max_size:int32 ->
       int32 Lwt.t
@@ -423,11 +443,11 @@ module Aux = struct
       in
       extract_error_code res
 
-    let store_delete ~durable ~memory ~key_offset ~key_length =
+    let generic_store_delete ~kind ~durable ~memory ~key_offset ~key_length =
       let open Lwt_result_syntax in
       let*! res =
         let* key = load_key_from_memory key_offset key_length memory in
-        let+ durable = guard (fun () -> Durable.delete durable key) in
+        let+ durable = guard (fun () -> Durable.delete ~kind durable key) in
         (durable, 0l)
       in
       extract_error durable res
@@ -472,6 +492,33 @@ module Aux = struct
           guard (fun () -> Durable.move_tree_exn durable from_key to_key)
         in
         (durable, 0l)
+      in
+      extract_error durable res
+
+    let store_create ~durable ~memory ~key_offset ~key_length ~size =
+      let open Lwt_result_syntax in
+      let*! res =
+        let* key = load_key_from_memory key_offset key_length memory in
+        let* () =
+          (* Internally there's no distinction between signed and unsigned
+             value, as such a negative value can be considered as an unsigned 32
+             bits integer. By convention and construction, we cannot have values
+             above Int32.max_int (`store_value_size` returns a size up tp
+             Int32.max_int, the negative values are error codes, `store_write`
+             checks that the offset + bytes are always within [0 ..
+             Int32.max_int]).
+
+             The error stating the size exceeded is then correct. *)
+          if size < Int32.zero then fail Error.Store_value_size_exceeded
+          else return ()
+        in
+        let* allocated_durable =
+          guard (fun () ->
+              Durable.create_value_exn durable key (Int64.of_int32 size))
+        in
+        match allocated_durable with
+        | None -> fail Error.Store_value_already_exists
+        | Some durable -> return (durable, 0l)
       in
       extract_error durable res
 
@@ -545,6 +592,29 @@ module Aux = struct
         let* key = load_key_from_memory key_offset key_length memory in
         let* result =
           guard (fun () -> Durable.subtree_name_at durable key index)
+        in
+        let result_size = String.length result in
+        let max_size = Int32.to_int max_size in
+        let result =
+          if max_size < result_size then String.sub result 0 max_size
+          else result
+        in
+        let+ () =
+          if result <> "" then M.store_bytes memory dst result else return_unit
+        in
+        Int32.of_int @@ String.length result
+      in
+      extract_error_code res
+
+    let store_get_hash ~durable ~memory ~key_offset ~key_length ~dst ~max_size =
+      let open Lwt_result_syntax in
+      let*! res =
+        let* key = load_key_from_memory key_offset key_length memory in
+        let* result =
+          guard (fun () -> Durable.hash_exn ~kind:Directory durable key)
+        in
+        let result =
+          Data_encoding.Binary.to_string_exn Context_hash.encoding result
         in
         let result_size = String.length result in
         let max_size = Int32.to_int max_size in
@@ -747,6 +817,31 @@ let store_has =
           (durable, [value r], store_has_ticks key_length r)
       | _ -> raise Bad_input)
 
+let store_delete_ticks key_size result =
+  Tick_model.(
+    with_error result (fun () -> read_key_in_memory key_size + tree_deletion)
+    |> to_z)
+
+let generic_store_delete ~kind =
+  Host_funcs.Host_func
+    (fun _input_buffer _output_buffer durable memories inputs ->
+      match inputs with
+      | [Values.(Num (I32 key_offset)); Values.(Num (I32 key_length))] ->
+          let open Lwt.Syntax in
+          let* memory = retrieve_memory memories in
+          let+ durable, code =
+            Aux.generic_store_delete
+              ~kind
+              ~durable:(Durable.of_storage_exn durable)
+              ~memory
+              ~key_offset
+              ~key_length
+          in
+          ( Durable.to_storage durable,
+            [value code],
+            store_delete_ticks key_length code )
+      | _ -> raise Bad_input)
+
 let store_delete_name = "tezos_store_delete"
 
 let store_delete_type =
@@ -756,28 +851,51 @@ let store_delete_type =
   let output_types = Vector.of_list [Types.NumType I32Type] in
   Types.FuncType (input_types, output_types)
 
-let store_delete_ticks key_size result =
+let store_delete = generic_store_delete ~kind:Durable.Directory
+
+let store_delete_value_name = "tezos_store_delete_value"
+
+let store_delete_value_type = store_delete_type
+
+let store_delete_value = generic_store_delete ~kind:Durable.Value
+
+let store_create_name = "tezos_store_create"
+
+let store_create_type =
+  let open Instance in
+  let input_types =
+    Types.[NumType I32Type; NumType I32Type; NumType I32Type] |> Vector.of_list
+  in
+  let output_types = Vector.of_list Types.[NumType I32Type] in
+  Types.FuncType (input_types, output_types)
+
+(* `store_create` does not write anything, simply allocates a new value in the
+   storage. As such, it doesn't need to be tickified more than reading the key
+   and accessing the durable storage. *)
+let store_create_ticks key_size result =
   Tick_model.(
-    with_error result (fun () -> read_key_in_memory key_size + tree_deletion)
+    with_error result (fun () -> read_key_in_memory key_size + tree_access)
     |> to_z)
 
-let store_delete =
+let store_create =
+  let open Lwt_syntax in
+  let open Values in
   Host_funcs.Host_func
-    (fun _input_buffer _output_buffer durable memories inputs ->
+    (fun _input _output durable memories inputs ->
       match inputs with
-      | [Values.(Num (I32 key_offset)); Values.(Num (I32 key_length))] ->
-          let open Lwt.Syntax in
+      | [Num (I32 key_offset); Num (I32 key_length); Num (I32 size)] ->
           let* memory = retrieve_memory memories in
-          let+ durable, code =
-            Aux.store_delete
+          let+ durable, res =
+            Aux.store_create
               ~durable:(Durable.of_storage_exn durable)
               ~memory
               ~key_offset
               ~key_length
+              ~size
           in
           ( Durable.to_storage durable,
-            [value code],
-            store_delete_ticks key_length code )
+            [value res],
+            store_create_ticks key_length res )
       | _ -> raise Bad_input)
 
 let store_value_size_name = "tezos_store_value_size"
@@ -894,6 +1012,46 @@ let store_get_nth_key =
               ~max_size
           in
           (durable, [value result], store_get_nth_key_ticks key_length result)
+      | _ -> raise Bad_input)
+
+let store_get_hash_name = "tezos_internal_store_get_hash"
+
+let store_get_hash_type =
+  let input_types =
+    Types.[NumType I32Type; NumType I32Type; NumType I32Type; NumType I32Type]
+    |> Vector.of_list
+  in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let store_get_hash_ticks key_size result =
+  Tick_model.(
+    with_error result (fun () -> read_key_in_memory key_size + tree_access)
+    |> to_z)
+
+let store_get_hash =
+  Host_funcs.Host_func
+    (fun _input_buffer _output_buffer durable memories inputs ->
+      let open Lwt.Syntax in
+      match inputs with
+      | Values.
+          [
+            Num (I32 key_offset);
+            Num (I32 key_length);
+            Num (I32 dst);
+            Num (I32 max_size);
+          ] ->
+          let* memory = retrieve_memory memories in
+          let+ result =
+            Aux.store_get_hash
+              ~durable:(Durable.of_storage_exn durable)
+              ~memory
+              ~key_offset
+              ~key_length
+              ~dst
+              ~max_size
+          in
+          (durable, [value result], store_get_hash_ticks key_length result)
       | _ -> raise Bad_input)
 
 let store_copy_name = "tezos_store_copy"
@@ -1142,7 +1300,12 @@ let store_write =
             store_write_ticks key_length num_bytes code )
       | _ -> raise Bad_input)
 
-let lookup_opt name =
+let lookup_opt ~version name =
+  let v1_and_above ty name =
+    match version with
+    | Wasm_pvm_state.V0 -> None
+    | V1 -> Some (ExternFunc (HostFunc (ty, name)))
+  in
   match name with
   | "read_input" ->
       Some (ExternFunc (HostFunc (read_input_type, read_input_name)))
@@ -1158,6 +1321,8 @@ let lookup_opt name =
         (ExternFunc (HostFunc (store_get_nth_key_type, store_get_nth_key_name)))
   | "store_delete" ->
       Some (ExternFunc (HostFunc (store_delete_type, store_delete_name)))
+  | "store_delete_value" ->
+      v1_and_above store_delete_value_type store_delete_value_name
   | "store_copy" ->
       Some (ExternFunc (HostFunc (store_copy_type, store_copy_name)))
   | "store_move" ->
@@ -1173,20 +1338,22 @@ let lookup_opt name =
       Some (ExternFunc (HostFunc (store_read_type, store_read_name)))
   | "store_write" ->
       Some (ExternFunc (HostFunc (store_write_type, store_write_name)))
+  | "__internal_store_get_hash" ->
+      v1_and_above store_get_hash_type store_get_hash_name
+  | "store_create" -> v1_and_above store_create_type store_create_name
   | _ -> None
 
-let lookup name =
-  match lookup_opt name with Some f -> f | None -> raise Not_found
+let lookup ~version name =
+  match lookup_opt ~version name with Some f -> f | None -> raise Not_found
 
-let register_host_funcs ~write_debug:implem registry =
+let base =
   List.fold_left
-    (fun _acc (global_name, host_function) ->
-      Host_funcs.register ~global_name host_function registry)
-    ()
+    (fun registry (global_name, implem) ->
+      Host_funcs.with_host_function ~global_name ~implem registry)
+    Host_funcs.empty_builder
     [
       (read_input_name, read_input);
       (write_output_name, write_output);
-      (write_debug_name, write_debug ~implem);
       (store_has_name, store_has);
       (store_list_size_name, store_list_size);
       (store_get_nth_key_name, store_get_nth_key);
@@ -1200,17 +1367,42 @@ let register_host_funcs ~write_debug:implem registry =
       (store_write_name, store_write);
     ]
 
-let all =
-  let registry = Host_funcs.empty () in
-  register_host_funcs ~write_debug:Noop registry ;
-  registry
+let with_write_debug ~write_debug:implem builder =
+  Host_funcs.with_host_function
+    ~global_name:write_debug_name
+    ~implem:(write_debug ~implem)
+    builder
 
-(* We build the registry at toplevel of the module to prevent recomputing it at
-   each initialization tick. *)
-let all_debug ~write_debug =
-  let registry = Host_funcs.empty () in
-  register_host_funcs ~write_debug registry ;
-  registry
+let registry_V0 ~write_debug =
+  Host_funcs.(base |> with_write_debug ~write_debug |> construct)
+
+let registry_V0_noop = registry_V0 ~write_debug:Noop
+
+let registry_V1 ~write_debug =
+  Host_funcs.(
+    base
+    |> with_write_debug ~write_debug
+    |> with_host_function
+         ~global_name:store_get_hash_name
+         ~implem:store_get_hash
+    |> with_host_function
+         ~global_name:store_delete_value_name
+         ~implem:store_delete_value
+    |> with_host_function ~global_name:store_create_name ~implem:store_create
+    |> construct)
+
+let registry_V1_noop = registry_V1 ~write_debug:Noop
+
+let registry ~version ~write_debug =
+  (* We need to keep a top-level definition for the [Noop] case to be able to
+     run the tests related to the tick models. Besides, by doing so, we should
+     optimize (even slightly) the creation of the registry since it is done at
+     compile time for this particular case. *)
+  match (version, write_debug) with
+  | Wasm_pvm_state.V0, Builtins.Noop -> registry_V0_noop
+  | Wasm_pvm_state.V0, _ -> registry_V0 ~write_debug
+  | Wasm_pvm_state.V1, Noop -> registry_V1_noop
+  | Wasm_pvm_state.V1, _ -> registry_V1 ~write_debug
 
 module Internal_for_tests = struct
   let metadata_size = Int32.to_int metadata_size
@@ -1223,9 +1415,14 @@ module Internal_for_tests = struct
 
   let store_delete = Func.HostFunc (store_delete_type, store_delete_name)
 
+  let store_delete_value =
+    Func.HostFunc (store_delete_value_type, store_delete_value_name)
+
   let store_copy = Func.HostFunc (store_copy_type, store_copy_name)
 
   let store_move = Func.HostFunc (store_move_type, store_move_name)
+
+  let store_create = Func.HostFunc (store_create_type, store_create_name)
 
   let store_read = Func.HostFunc (store_read_type, store_read_name)
 
@@ -1239,6 +1436,8 @@ module Internal_for_tests = struct
 
   let store_get_nth_key =
     Func.HostFunc (store_get_nth_key_type, store_get_nth_key_name)
+
+  let store_get_hash = Func.HostFunc (store_get_hash_type, store_get_hash_name)
 
   let write_debug = Func.HostFunc (write_debug_type, write_debug_name)
 end

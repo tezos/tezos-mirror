@@ -53,6 +53,12 @@ module Selected_distribution_for_cycle = struct
     | None -> Storage.Stake.Selected_distribution_for_cycle.get ctxt cycle
     | Some v -> return v
 
+  let find ctxt cycle =
+    let id = identifier_of_cycle cycle in
+    Cache.find ctxt id >>=? function
+    | None -> Storage.Stake.Selected_distribution_for_cycle.find ctxt cycle
+    | Some _ as some_v -> return some_v
+
   let remove_existing ctxt cycle =
     let id = identifier_of_cycle cycle in
     Cache.update ctxt id None >>?= fun ctxt ->
@@ -65,7 +71,6 @@ let get_initialized_stake ctxt delegate =
   Storage.Stake.Staking_balance.find ctxt delegate >>=? function
   | Some staking_balance -> return (staking_balance, ctxt)
   | None ->
-      Frozen_deposits_storage.init ctxt delegate >>=? fun ctxt ->
       let balance = Tez_repr.zero in
       Storage.Stake.Staking_balance.init ctxt delegate balance >>=? fun ctxt ->
       return (balance, ctxt)
@@ -76,16 +81,22 @@ let remove_stake ctxt delegate amount =
   Storage.Stake.Staking_balance.update ctxt delegate staking_balance
   >>=? fun ctxt ->
   let minimal_stake = Constants_storage.minimal_stake ctxt in
-  if Tez_repr.(staking_balance_before >= minimal_stake) then
+  if
+    Tez_repr.(staking_balance_before >= minimal_stake)
+    && Tez_repr.(staking_balance < minimal_stake)
+  then
     Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
-    if (not inactive) && Tez_repr.(staking_balance < minimal_stake) then
+    if inactive then return ctxt
+    else
       Storage.Stake.Active_delegates_with_minimal_stake.remove ctxt delegate
       >>= fun ctxt -> return ctxt
-    else return ctxt
   else
-    (* The delegate was not in Stake.Active_delegates_with_minimal_stake,
-       either because it was inactive, or because it did not have a
-       the minimal required stake, in which case it still does not have it. *)
+    (* The delegate was not in Stake.Active_delegates_with_minimal_stake, either
+        - because it did not have the minimal required stake, in which case it
+          still does not have it;
+        - or because it did have the minimal required stake and still has it,
+          however it was (and is) inactive.
+    *)
     return ctxt
 
 let add_stake ctxt delegate amount =
@@ -94,17 +105,22 @@ let add_stake ctxt delegate amount =
   Storage.Stake.Staking_balance.update ctxt delegate staking_balance
   >>=? fun ctxt ->
   let minimal_stake = Constants_storage.minimal_stake ctxt in
-  if Tez_repr.(staking_balance >= minimal_stake) then
+  if
+    Tez_repr.(staking_balance_before < minimal_stake)
+    && Tez_repr.(staking_balance >= minimal_stake)
+  then
     Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
-    if inactive || Tez_repr.(staking_balance_before >= minimal_stake) then
-      return ctxt
+    if inactive then return ctxt
     else
       Storage.Stake.Active_delegates_with_minimal_stake.add ctxt delegate ()
       >>= fun ctxt -> return ctxt
   else
-    (* The delegate was not in Stake.Active_delegates_with_minimal_stake,
-       because it did not have the minimal required stake (as otherwise it
-       would also have it now). *)
+    (* The delegate was not in Stake.Active_delegates_with_minimal_stake, either
+       - because it did not have the minimal required stake and still does not
+         have it;
+       - or because it did have the minimal required stake, in which case it
+         still has it, however it was (and still is) inactive.
+    *)
     return ctxt
 
 let set_inactive ctxt delegate =
@@ -181,8 +197,7 @@ let fold_on_active_delegates_with_minimal_stake =
 
 let get_selected_distribution = Selected_distribution_for_cycle.get
 
-let find_selected_distribution =
-  Storage.Stake.Selected_distribution_for_cycle.find
+let find_selected_distribution = Selected_distribution_for_cycle.find
 
 let prepare_stake_distribution ctxt =
   let level = Level_storage.current ctxt in

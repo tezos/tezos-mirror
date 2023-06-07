@@ -14,6 +14,7 @@ The rest of this page documents the protocol-dependent tools.
 The protocol-independent tools are documented :doc:`here <../shell/cli-commands>`.
 
 
+.. _client_manual:
 .. _client_manual_mumbai:
 
 Client manual
@@ -23,6 +24,7 @@ Client manual
          :file: octez-client.html
 
 
+.. _baker_manual:
 .. _baker_manual_mumbai:
 
 Baker manual
@@ -32,6 +34,7 @@ Baker manual
          :file: octez-baker.html
 
 
+.. _accuser_manual:
 .. _accuser_manual_mumbai:
 
 Accuser manual
@@ -39,3 +42,15 @@ Accuser manual
 
 .. raw:: html
          :file: octez-accuser.html
+
+Smart rollup client manual
+==========================
+
+.. raw:: html
+        :file: octez-smart-rollup-client.html
+
+Smart rollup node manual
+========================
+
+.. raw:: html
+        :file: octez-smart-rollup-node.html

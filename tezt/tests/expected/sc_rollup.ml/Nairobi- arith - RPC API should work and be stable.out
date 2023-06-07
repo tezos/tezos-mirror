@@ -1,0 +1,304 @@
+
+./octez-client --wait none originate smart rollup rollup from bootstrap1 of kind arith of type string with kernel  --burn-cap 9999999
+Node is bootstrapped.
+Estimated gas: 1920.157 units (will add 100 for safety)
+Estimated storage: 6552 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000551
+    Expected counter: 1
+    Gas limit: 2021
+    Storage limit: 6572 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000551
+      payload fees(the block proposer) ....... +ꜩ0.000551
+    Smart rollup origination:
+      Kind: arith
+      Parameter type: string
+      Kernel Blake2B hash: '0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8'
+      This smart rollup origination was successfully applied
+      Consumed gas: 1920.124
+      Storage size: 6552 bytes
+      Address: [SMART_ROLLUP_HASH]
+      Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ1.638
+        storage fees ........................... +ꜩ1.638
+
+Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
+
+./octez-client rpc post /chains/main/blocks/head/context/smart_rollups/all/origination_proof with '{
+  "kind": "arith",
+  "kernel": ""
+}'
+"030002104135165622d08b0c6eac951c9d4fd65109585907bc30ef0617f6c26853c6badb10db4d3b595f59e0b53740f164bf951bcfae9e0873fd23fbce82fac4f404e18106737461747573c87a31b1c8e3af61756b336bcfc3b0c292c89b40cc8a5080ba99c45463d110ce8b"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/smart_rollup_address
+"[SMART_ROLLUP_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc post /local/batcher/injection with '[
+  "312d31",
+  "312d32",
+  "312d33",
+  "312d34",
+  "312d35"
+]'
+[ "scmsg37MjxsWwLdnhRqRn8suc1oMvpa9riqGvazTg7giMNKDDU56Qfv",
+  "scmsg3X1MAjzt2B4r6gZnLf7mzoRf9UohkLw3Q2DTzLKctivKPYLXZ9",
+  "scmsg3prfVZhL8jFf5LSmxijjd96pKcz98ws6xe81qKagYcSg53e22N",
+  "scmsg2SY3VZWZ8y8491xbXvn8tQtHRCAq3zPJWQ7n4K6Rusw2YKVyNx",
+  "scmsg2zdjgY1tnuHMZqMavgPyc7qNj9MMvY4ywd38yauj3WfaiqDieE" ]
+
+./octez-smart-rollup-client-PtNairob rpc post /local/batcher/injection with '[
+  "322d31",
+  "322d32",
+  "322d33",
+  "322d34",
+  "322d35"
+]'
+[ "scmsg33G4qMwJ869CUzuYWpsdF9bnQ4ezN2YHyERN64j2Q4t9L99CnA",
+  "scmsg3ew4TRYot9RPWjagZdNGdSTD3wzUAKU5WFz6JosGBtEr1UT5o5",
+  "scmsg3Q6eecZLng9BK7maLP1DGqRpfbygCsQj8vPxc3USjpQxhCfEkn",
+  "scmsg2GAoC8FEUfHZfQAKotvjRMpmSknHRpn4w35Y1YWZ4uVZDYvzUL",
+  "scmsg2sqy4npoYQq8iWJWQQgrdG126y3Btxn8ZzVPav8JmptWnVowGz" ]
+
+./octez-smart-rollup-client-PtNairob rpc post /local/batcher/injection with '[
+  "332d31",
+  "332d32",
+  "332d33",
+  "332d34",
+  "332d35"
+]'
+[ "scmsg3EYkw2o4MC45NXUKZsEpzugW9sfumidS78TC8ygnJJznyAe9Yb",
+  "scmsg23CHWGTe3u8Utu3RpafBSEzvwnBKNRLxufPp8QindEWanu8UB6",
+  "scmsg3WnqzTRN8wvANvLKV4MouiTQZzq7X2G3CfKcomuQy4nKDFGRhX",
+  "scmsg3PVb7jXpE723XWdC1B8L34wVenMTi8r4b62Qja6owSMVo3h73C",
+  "scmsg2BZBgg1AFG7Zsar6DD1ZKPK36UakNZNj78npg6SUBoR26FpBdQ" ]
+
+./octez-smart-rollup-client-PtNairob rpc post /local/batcher/injection with '[
+  "342d31",
+  "342d32",
+  "342d33",
+  "342d34",
+  "342d35"
+]'
+[ "scmsg3BLN9sVbJN6BrDh8mu3yDYeVfTBnm83Ciom55sS3dKvvXMk1nR",
+  "scmsg2Nsbi6zbwQUTwpBVcTEhi7oVWxbuka1kiHMJ9BLiUg8QfzyLYM",
+  "scmsg3Ti1eX6WyPXKjy3NdkJnQdzi5RbkFJ8piWhEpDQwWn8VdNMuCK",
+  "scmsg3TMS4Q8jtUhr6YcgkMqwWAXKkXLJMhSRvJcMEgq61t8xftRMFv",
+  "scmsg2AWA1jULPBJb7usha9gJg62T5PdiW9Uz1HdHLhaYDRx4qRvLTL" ]
+
+./octez-smart-rollup-client-PtNairob rpc post /local/batcher/injection with '[
+  "352d31",
+  "352d32",
+  "352d33",
+  "352d34",
+  "352d35"
+]'
+[ "scmsg26t9x2GH9Pt9hiGLnSyNRALPzL8BYcTHik6PvU4vGDbUYM6JkV",
+  "scmsg3rtv5BpkWSR835sbwXJDBYZZW1ptXr8KKxprn4nJnhSacn6t1R",
+  "scmsg32QBihqJwKecppnv3o4MpRVYycR6puAHyhZhDVtewFQwmTdR3Z",
+  "scmsg3LQsvXBvj1qDWFRACbLuyAbZK6tHVTUeiYsPSU9KGxyf6ySxrY",
+  "scmsg3oXBwG2rAT3cjgDbRNyBnTirrkqTAeVMxMSJ5KUno8daWpY2rL" ]
+
+./octez-smart-rollup-client-PtNairob rpc post /local/batcher/injection with '[
+  "362d31",
+  "362d32",
+  "362d33",
+  "362d34",
+  "362d35"
+]'
+[ "scmsg2pUJoCjenPKAK3WnftrcnnKFf8RjTmoie2PS5Xa9jh2f6V4CpU",
+  "scmsg3M61S4suJDXn1yZyQrk9iy3WrDTXbPA6JHaeDWMjUJ4bhFTyAf",
+  "scmsg3SSJRKjcqvMFg2y6tuKWbikFx49kE5PfGg71uhxYdoMHBzutgU",
+  "scmsg3MPjHQ6m6BPJaGnAan8kCnadyCbn37DKAZa7LTbTtz3N36JgtW",
+  "scmsg2mUAHp9G2cJoqKwr4dpagFK6Wa4cNu7NGPXXB3zTfCpLmCP3Yr" ]
+
+./octez-smart-rollup-client-PtNairob rpc post /local/batcher/injection with '[
+  "372d31",
+  "372d32",
+  "372d33",
+  "372d34",
+  "372d35"
+]'
+[ "scmsg2VzSQUy8uj6yXYjwhLp2Qsmr77NixYmsXqqBGJpGsSxVBZHBPN",
+  "scmsg2p1iyQ4MHjNZrZhRmatcGXCzSr3Af7GKg6jawijWAe5ZpwFUMR",
+  "scmsg2xU6itfmj6XeuzYVqGza4Z95uAUXG44mnkM8uKkkdmbv8DyhS3",
+  "scmsg3YhsmhbfMXKmhsjGXej2ySwYFDYKQE1yUs7LcVkZ2ikaotWQKg",
+  "scmsg28neefD54Wsf46QgPtv22mKT32oNFv5ToU95DDsufcWFCZoovM" ]
+
+./octez-smart-rollup-client-PtNairob rpc post /local/batcher/injection with '[
+  "382d31",
+  "382d32",
+  "382d33",
+  "382d34",
+  "382d35"
+]'
+[ "scmsg3krb3ZX2JqPJkoBkrrFJcEtguu4sJDFS1XukN4PboYfxVRMZB8",
+  "scmsg2CXLxs8exJxS49Fi1bQFHhyy27fpTUwNZ8xhbuyd2uo4YmgWYL",
+  "scmsg2XJwuzAw5tZhfiTpUoDNSiM56W97YNEB4YyzGnrBcEgYpL9KMh",
+  "scmsg3RM54nLATBFqzCjvSwPybSbiiWJZey2ZiLbe1gjr9v9Vmoc9H3",
+  "scmsg2NpFWt1MhyDGhacEUpaeEheC8XWzNC3LaNaECXwzpi39QqPX14" ]
+
+./octez-smart-rollup-client-PtNairob rpc post /local/batcher/injection with '[
+  "392d31",
+  "392d32",
+  "392d33",
+  "392d34",
+  "392d35"
+]'
+[ "scmsg2nWa7VYthVQxL9antueegTTcyGzTqZzbFPVibWk8xzRGWvfdt8",
+  "scmsg3KfqCW3JtQAFWYUUKfaxUZ3zeR8t6233UU5frsUgZXjwyRaftR",
+  "scmsg2TJRQjXv5VYgrcVYM4upqfptRz4gLmDV1AMLcxqGJz2faoKfDK",
+  "scmsg2DBhcJVTm8JRWQHLWDXxiCi2PvUZzixqxkqyYupDZW2XU3cdvJ",
+  "scmsg2jKWtDbw5Jsdpc453XsgAVBKyYUzt3pKKsZtQNtvJvhPemp4WN" ]
+
+./octez-smart-rollup-client-PtNairob rpc post /local/batcher/injection with '[
+  "31302d31",
+  "31302d32",
+  "31302d33",
+  "31302d34",
+  "31302d35"
+]'
+[ "scmsg3hFFdb5QTM1kbP7UmHviyd6VWfYaT9KTWDcTjE51BtRdjbCJjq",
+  "scmsg318GJr61qixBt6P4BxuUZ9zXZGct9fpknY7bky676r8esQjLrt",
+  "scmsg2twRwJCXXzvMYcD4Zu3zQSkHjhsDs9ZBczAi4Lvx7ogvJmeCGZ",
+  "scmsg3YFj784yYxTr4LbNfaLpHGpN5hKJgbBA8gUEJ4vief5KL8U5vS",
+  "scmsg2GY9Q5VTRSrjCPewduDXtPtZZ9hhMshPe3zUToBvFHTD9AhKkB" ]
+
+./octez-smart-rollup-client-PtNairob rpc post /local/batcher/injection with '[
+  "31312d31",
+  "31312d32",
+  "31312d33",
+  "31312d34",
+  "31312d35"
+]'
+[ "scmsg2S7XcHeyAHTQy6cJ6pVgxYqdW7XTBz3PsiCx26gyp2EHfCUJTh",
+  "scmsg34AzeCpQWbx2MicoEqumBeh5PzkmeB3XkASNCeEn4u5AC2TQtC",
+  "scmsg23m7SEy65fobQJ22FS7dmnHqPe2pmpCaA5iVWA8KYm4ZU3CVfK",
+  "scmsg3KLGXHeokSBbJcfsrvRkoAjMt5Yi7nj67WFHh6nkW8Ce8Kd4yn",
+  "scmsg2Eaop6LYBSnKMQXqPWijq9fBa4nPw5ZLndHRCH97kumZqLT7pn" ]
+
+./octez-smart-rollup-client-PtNairob rpc post /local/batcher/injection with '[
+  "31322d31",
+  "31322d32",
+  "31322d33",
+  "31322d34",
+  "31322d35"
+]'
+[ "scmsg3Rbcvi4zn7DSuXY8FHordHD4BMqXGi8XhrYAg9Z369qN2qPuPf",
+  "scmsg2JtmeQPL8JBY2MgEKx5f6XvH1bJjnqrjTpPVapmDaVBVcGHf8L",
+  "scmsg2xrhpVNNsUzYNF7LsNmeAbX2wJsZWE8Ub7DQRe8sToXxSjKR4T",
+  "scmsg3HMVWn75kiJ4Lr3KquJNQTkkFtwg9pmiKMythhUJ5h74Nznjd3",
+  "scmsg24y1317Sy46HnzTpvCLRe88LghadZ4eAjkb6EzvEsQVRhPbKzu" ]
+
+./octez-smart-rollup-client-PtNairob rpc post /local/batcher/injection with '[
+  "31332d31",
+  "31332d32",
+  "31332d33",
+  "31332d34",
+  "31332d35"
+]'
+[ "scmsg2vjhNLAF3AeKmzkWbwkVELTGnQcEdsPeD6imGgeejsQta46LxA",
+  "scmsg2mQYGCav4HTBebHEeeVscAeMGL8d17eDZSCeTEBsukRyri51mZ",
+  "scmsg3CyDxp7PAws2HXGTyCeeamNDCs3acBnN7Jymj3GVW3WCS1GKEz",
+  "scmsg2Safqm8tXs1k51v1A7VMyALCDRn5DAgYCJ9kbUD38jwPqtob6B",
+  "scmsg28V9X7iiXCDZM4mFCHKsMxuvc8wNopLGkcnZwo14sSs4dW1E73" ]
+
+./octez-smart-rollup-client-PtNairob rpc post /local/batcher/injection with '[
+  "31342d31",
+  "31342d32",
+  "31342d33",
+  "31342d34",
+  "31342d35"
+]'
+[ "scmsg2LeoW8SZzjCREGXpS2kwSfWCQBLf4M39gCQbuo7MPdcNUQgskZ",
+  "scmsg3KJEQRBNfv4DUb4LCA7EWAh9swowVibwH4Hx7CYn4mjFTEKNfC",
+  "scmsg2fWu16weRJCcgdvJzNtdWDNATvftgUVFfpgi5z3BDn9h2zE1Z2",
+  "scmsg29adqVUp1NnCAVSZVaKCVbrUdMth3C1yuUvBRZtmW9hsDtm8d1",
+  "scmsg2cDM9bscYDvXwkeB6h7RmN82wFgmL3wv5jJmwJukS9ju5zgKWA" ]
+
+./octez-smart-rollup-client-PtNairob rpc post /local/batcher/injection with '[
+  "31352d31",
+  "31352d32",
+  "31352d33",
+  "31352d34",
+  "31352d35"
+]'
+[ "scmsg2DSE1zcsJXhEFsAFMo3qN7jV13LoxrG6qa1RaJtUFkPgJCBN5R",
+  "scmsg2StxsCnbG5vQmzdiY3F4M5bsrkb6Qh3CyrMod5thRVAbZHd38c",
+  "scmsg3fzM3qS4iPZ6qGHCNfupVUKiuYmrNe4k13uUj3ggrzX6rayaVA",
+  "scmsg3qHUB6rys7GmC8XGGKRDrcKX2veZGkT9SkScHyWqLUCjq9PLjx",
+  "scmsg3ZVMYBmAPwFfLDNXFDcBGzRChdFzLJ8tUMW46mGPGumZ6aq79q" ]
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/hash
+"[BLOCK_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/5/hash
+"[BLOCK_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/finalized/level
+16
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/num_messages
+"5"
+
+./octez-smart-rollup-client-PtNairob rpc get '/global/block/head/durable/wasm_2_0_0/value?key=/readonly/wasm_version'
+Error
+  No service found at this URL
+  
+
+./octez-smart-rollup-client-PtNairob rpc get '/global/block/head/durable/arith/value?key=/readonly/wasm_version'
+Error
+  No service found at this URL
+  
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/status
+"Waiting for input message"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/ticks
+"28"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/cemented/outbox/16/messages
+[]
+
+./octez-smart-rollup-client-PtNairob rpc get /global/tezos_head
+"[BLOCK_HASH]"
+
+./octez-smart-rollup-client-PtNairob rpc get /global/tezos_level
+18
+
+./octez-smart-rollup-client-PtNairob rpc get /global/block/head
+{ "block_hash": "[BLOCK_HASH]",
+  "level": 18,
+  "predecessor": "[BLOCK_HASH]",
+  "commitment_hash": null,
+  "previous_commitment_hash":
+    "[SC_ROLLUP_COMMITMENT_HASH]",
+  "context": "[SC_ROLLUP_CONTEXT_HASH]",
+  "inbox_witness": "[SC_ROLLUP_INBOX_MERKELIZED_PAYLOAD_HASHES_HASH]",
+  "inbox_hash": "[SC_ROLLUP_INBOX_HASH]",
+  "inbox":
+    { "level": 18,
+      "old_levels_messages":
+        { "index": "17",
+          "content":
+            { "hash":
+                "[SC_ROLLUP_INBOX_MERKELIZED_PAYLOAD_HASHES_HASH]",
+              "level": 18 },
+          "back_pointers":
+            [ "[SC_ROLLUP_INBOX_HASH]",
+              "[SC_ROLLUP_INBOX_HASH]",
+              "[SC_ROLLUP_INBOX_HASH]" ] } },
+  "messages": [ "31352d31", "31352d32", "31352d33", "31352d34", "31352d35" ],
+  "initial_tick": "352", "num_ticks": "28" }

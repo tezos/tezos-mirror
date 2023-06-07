@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Contract_repr
-    Invocation:   dune exec ./src/proto_alpha/lib_protocol/test/unit/main.exe -- test Contract_repr 
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+                  -- --file test_contract_repr.ml
     Dependencies: contract_hash.ml
     Subject:      To test the modules (including the top-level)
                   in contract_repr.ml as individual units, particularly
@@ -117,3 +118,7 @@ let tests =
       `Quick
       Test_contract_repr.test_to_b58check_originated;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("Contract_repr.ml", tests)]
+  |> Lwt_main.run

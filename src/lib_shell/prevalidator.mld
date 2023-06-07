@@ -1,12 +1,13 @@
 {0 Overview of the prevalidator implementation }
 
-This documentation was written for what is now considered the legacy version of
-the mempool (see {{: https://gitlab.com/tezos/tezos/-/issues/4113 } issue
-#4113}). This mempool supports the Kathmandu protocol and is implemented in
-{{!Tezos_shell.Legacy_prevalidator_internal} Legacy_prevalidator_internal} and
-its dependencies. The newer mempool implementation, supporting protocols Lima
-and up, does not have a similar documentation yet. Nevertheless, most of the
-concepts presented here still apply to the newer mempool.
+FIXME: https://gitlab.com/tezos/tezos/-/issues/4634
+This documentation should be updated with the latest version of
+the mempool.
+This documentation was written for an older version of the mempool
+that supported the Kathmandu protocol. The newer mempool
+implementation, supporting protocols Lima and up, does not have a
+similar documentation yet. Nevertheless, most of the concepts
+presented here still apply to the newer mempool.
 
 FIXME: https://gitlab.com/tezos/tezos/-/issues/4146
 Some links in this file have been broken by file renamings.

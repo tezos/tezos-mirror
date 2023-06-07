@@ -1,0 +1,170 @@
+
+./octez-client --mode mockup --wait none originate contract proxy transferring 0 from bootstrap1 running michelson_test_scripts/opcodes/proxy.tz --burn-cap 10 --force
+Node is bootstrapped.
+Estimated gas: 1415.542 units (will add 100 for safety)
+Estimated storage: 312 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000434
+    Expected counter: 1
+    Gas limit: 1516
+    Storage limit: 332 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000434
+      payload fees(the block proposer) ....... +ꜩ0.000434
+    Origination:
+      From: [PUBLIC_KEY_HASH]
+      Credit: ꜩ0
+      Script:
+        { parameter (contract unit) ;
+          storage unit ;
+          code { UNPAIR ;
+                 AMOUNT ;
+                 UNIT ;
+                 TRANSFER_TOKENS ;
+                 DIP { NIL operation } ;
+                 CONS ;
+                 PAIR } }
+        Initial storage: Unit
+        No delegate for this contract
+        This origination was successfully applied
+        Originated contracts:
+          [CONTRACT_HASH]
+        Storage size: 55 bytes
+        Paid storage size diff: 55 bytes
+        Consumed gas: 1415.542
+        Balance updates:
+          [PUBLIC_KEY_HASH] ... -ꜩ0.01375
+          storage fees ........................... +ꜩ0.01375
+          [PUBLIC_KEY_HASH] ... -ꜩ0.06425
+          storage fees ........................... +ꜩ0.06425
+
+New contract [CONTRACT_HASH] originated.
+Contract memorized as proxy.
+
+./octez-client --mode mockup --wait none originate contract source transferring 0 from bootstrap1 running michelson_test_scripts/opcodes/source.tz --init '"[PUBLIC_KEY_HASH]"' --burn-cap 10 --force
+Node is bootstrapped.
+Estimated gas: 1415.017 units (will add 100 for safety)
+Estimated storage: 322 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000458
+    Expected counter: 2
+    Gas limit: 1516
+    Storage limit: 342 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000458
+      payload fees(the block proposer) ....... +ꜩ0.000458
+    Origination:
+      From: [PUBLIC_KEY_HASH]
+      Credit: ꜩ0
+      Script:
+        { parameter unit ;
+          storage address ;
+          code { DROP ; SOURCE ; NIL operation ; PAIR } }
+        Initial storage: "[PUBLIC_KEY_HASH]"
+        No delegate for this contract
+        This origination was successfully applied
+        Originated contracts:
+          [CONTRACT_HASH]
+        Storage size: 65 bytes
+        Paid storage size diff: 65 bytes
+        Consumed gas: 1415.017
+        Balance updates:
+          [PUBLIC_KEY_HASH] ... -ꜩ0.01625
+          storage fees ........................... +ꜩ0.01625
+          [PUBLIC_KEY_HASH] ... -ꜩ0.06425
+          storage fees ........................... +ꜩ0.06425
+
+New contract [CONTRACT_HASH] originated.
+Contract memorized as source.
+
+./octez-client --mode mockup --wait none transfer 0 from '[PUBLIC_KEY_HASH]' to '[CONTRACT_HASH]' --burn-cap 10 --arg Unit
+Node is bootstrapped.
+Estimated gas: 2110.168 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.00047
+    Expected counter: 1
+    Gas limit: 2211
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.00047
+      payload fees(the block proposer) ....... +ꜩ0.00047
+    Transaction:
+      Amount: ꜩ0
+      From: [PUBLIC_KEY_HASH]
+      To: [CONTRACT_HASH]
+      This transaction was successfully applied
+      Updated storage: 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c
+      Storage size: 65 bytes
+      Consumed gas: 2110.899
+
+
+./octez-client --mode mockup get contract storage for '[CONTRACT_HASH]'
+"[PUBLIC_KEY_HASH]"
+
+./octez-client --mode mockup --wait none transfer 0 from '[PUBLIC_KEY_HASH]' to '[CONTRACT_HASH]' --burn-cap 10 --arg '"[CONTRACT_HASH]"'
+Node is bootstrapped.
+Estimated gas: 4678.895 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000772
+    Expected counter: 2
+    Gas limit: 4779
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000772
+      payload fees(the block proposer) ....... +ꜩ0.000772
+    Transaction:
+      Amount: ꜩ0
+      From: [PUBLIC_KEY_HASH]
+      To: [CONTRACT_HASH]
+      Parameter: "[CONTRACT_HASH]"
+      This transaction was successfully applied
+      Updated storage: Unit
+      Storage size: 55 bytes
+      Consumed gas: 2569.452
+      Internal operations:
+        Internal Transaction:
+          Amount: ꜩ0
+          From: [CONTRACT_HASH]
+          To: [CONTRACT_HASH]
+          This transaction was successfully applied
+          Updated storage: 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c
+          Storage size: 65 bytes
+          Consumed gas: 2110.819
+
+
+./octez-client --mode mockup get contract storage for '[CONTRACT_HASH]'
+"[PUBLIC_KEY_HASH]"

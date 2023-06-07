@@ -442,7 +442,7 @@ let register () =
                 ctxt
                 expr
               >>?= fun (expr, _) ->
-              parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
+              parse_toplevel ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
               Lwt.return
                 ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
                 >>? fun ( Ex_parameter_ty_and_entrypoints {arg_type; entrypoints},
@@ -482,7 +482,7 @@ let register () =
                 ctxt
                 expr
               >>?= fun (expr, _) ->
-              parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
+              parse_toplevel ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
               Lwt.return
                 ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
                 >>? fun ( Ex_parameter_ty_and_entrypoints {arg_type; entrypoints},

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -32,10 +33,7 @@ let lwt_variable = fv "lwt_main_run"
 let lwt_model =
   Model.make
     ~conv:(fun () -> ())
-    ~model:
-      (Model.unknown_const2
-         ~const1:Builtin_benchmarks.timer_variable
-         ~const2:lwt_variable)
+    ~model:(Model.unknown_const1 ~name:(ns "lwt_model") ~const:lwt_variable)
 
 module Lwt_main_run_bench : Benchmark.S = struct
   type config = unit
@@ -47,6 +45,10 @@ module Lwt_main_run_bench : Benchmark.S = struct
   let name = ns "LWT_MAIN.RUN"
 
   let info = "Benchmark of Lwt_main.run"
+
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
 
   let tags = ["misc"]
 

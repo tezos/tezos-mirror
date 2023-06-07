@@ -41,11 +41,11 @@ type contents = {
 
 (** The type for a block's [metadata] stored on disk. This
     representation is tightly linked to
-    {!Tezos_validation.Block_validation.result} which also has a
+    {!Tezos_validation.Block_validation.type-result} which also has a
     strong dependency to
     {!Tezos_protocol_environment.validation_result}.
 
-    Some fields exposed by {!Tezos_validation.Block_validation.result}
+    Some fields exposed by {!Tezos_validation.Block_validation.type-result}
     are unnecessary hence the lack of direct link. *)
 type metadata = {
   message : string option;
@@ -102,11 +102,14 @@ val legacy_encoding : legacy_block Data_encoding.t
     contains metadata. *)
 val create_genesis_block : genesis:Genesis.t -> Context_hash.t -> t
 
-(** Encoding for {!contents}. *)
+(** Encoding for {!type-contents}. *)
 val contents_encoding : contents Data_encoding.t
 
-(** Encoding for {!metadata}. *)
+(** Encoding for {!type-metadata}. *)
 val metadata_encoding : metadata Data_encoding.t
+
+(** Equality on {!block} *)
+val equal : t -> t -> bool
 
 (** Encoding for {!t} (and {!block}).
 

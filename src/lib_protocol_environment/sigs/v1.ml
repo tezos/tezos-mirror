@@ -3672,7 +3672,7 @@ module Json : sig
   (** Unexpected kind of data encountered (w/ the expectation). *)
   exception Unexpected of string * string
 
-  (** Some {!union} couldn't be destructed, w/ the reasons for each {!case}. *)
+  (** Some {!union} couldn't be destructed, w/ the reasons for each {!type-case}. *)
   exception No_case_matched of exn list
 
   (** Array of unexpected size encountered  (w/ the expectation). *)

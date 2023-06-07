@@ -1,0 +1,39 @@
+
+./octez-client --protocol PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/dropn.tz on storage 0 and input '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)' --level 1 --trace-stack
+storage
+  5
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 15 (just consumed gas: 9.048)
+    [ (Pair (Pair (Pair (Pair (Pair 1 2) 3) 4) 5) 0) ]
+  - location: 15 (just consumed gas: 0.010)
+    [ (Pair (Pair (Pair (Pair 1 2) 3) 4) 5) ]
+  - location: 16 (just consumed gas: 0.010)
+    [ (Pair (Pair (Pair 1 2) 3) 4)
+      5 ]
+  - location: 17 (just consumed gas: 0.010)
+    [ (Pair (Pair 1 2) 3)
+      4
+      5 ]
+  - location: 18 (just consumed gas: 0.010)
+    [ (Pair 1 2)
+      3
+      4
+      5 ]
+  - location: 19 (just consumed gas: 0.010)
+    [ 1
+      2
+      3
+      4
+      5 ]
+  - location: 20 (just consumed gas: 0.040)
+    [ 5 ]
+  - location: 22 (just consumed gas: 0.010)
+    [ {}
+      5 ]
+  - location: 24 (just consumed gas: 0.010)
+    [ (Pair {} 5) ]
+

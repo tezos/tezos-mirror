@@ -1,4 +1,4 @@
-type t = Tezos_lazy_containers.Lazy_map.tree option
+type t = Tezos_tree_encoding.wrapped_tree option
 
 exception Durable_empty
 

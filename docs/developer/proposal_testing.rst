@@ -14,7 +14,7 @@ The ``master`` Branch
 The current proposal is developed in the branch ``master``, which
 contains both the new protocol and its migration code from the current active
 protocol. The current protocol proposal under development is referred to as the
-`Alpha protocol`.
+*Alpha protocol*.
 
 Since the migration code is only used once, it is a good practice to keep them clearly
 separated by marking them with the tag ``Proto/Migration:``.
@@ -39,8 +39,8 @@ We can run a node and a client in sandboxed mode by invoking::
   $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
   $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
 
-By default, the sandbox starts from the `genesis` block at level 0, and the
-sandbox's active protocol is the `Genesis protocol`. Once the sandbox is
+By default, the sandbox starts from the ``genesis`` block at level 0, and the
+sandbox's active protocol is the ``Genesis protocol``. Once the sandbox is
 started, the Alpha protocol can be activated by invoking the command::
 
   $ octez-activate-alpha
@@ -57,16 +57,16 @@ Adding New Protocol Tests in OCaml
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Be sure you first read the :doc:`introduction on the testing ecosystem for Tezos <testing>`.
-In addition to system tests written in Python or written in OCaml with :doc:`Tezt <tezt>`,
-unit tests and integration tests for the protocol in OCaml can be found in `src/proto_alpha/lib_protocol/test`.
+In addition to system tests written with :doc:`Tezt <tezt>`,
+unit tests and integration tests for the protocol can be found in :src:`src/proto_alpha/lib_protocol/test`.
 It is strongly recommended to write unit tests and integration tests in addition to the
 system tests.
 To test a new component, create a new file in this directory and add the module in ``main.ml``.
 To print the errors of the ``Error`` monad correctly, alcotests must be wrapped into
 the function ``tztest`` defined in the module ``Test`` defined at the same level.
 
-Some helpers are available in the module `Tezos_alpha_test_helpers` defined in
-the subdirectory `helpers`. For instance, it contains context, operation and
+Some helpers are available in the module ``Tezos_alpha_test_helpers`` defined in
+the subdirectory ``helpers``. For instance, it contains context, operation and
 block fixtures that can be used in tests requiring these components.
 
 
@@ -92,17 +92,17 @@ context from the context of its predecessor. The migration code takes care of
 producing the new context, which often involves converting large data
 structures. Therefore, it is important to bench the migration running time and
 the size of the context produced. For these reasons it is imperative to test the
-migration on a real context imported from `Mainnet`, bench it, and manually
-inspect the content of the storage. We refer to this procedure as `migration on
-a context imported from Mainnet`.
+migration on a real context imported from Mainnet, bench it, and manually
+inspect the content of the storage. We refer to this procedure as "migration on
+a context imported from Mainnet".
 
 However, sometimes we may want to perform some preliminary tests and run the
 migration on an empty context that we populate manually. We can do so by running
 a node in sandboxed mode, and by activating the predecessor of the Alpha
-protocol on the genesis block. We refer to this procedure as `migration on the
-sandbox`.
+protocol on the genesis block. We refer to this procedure as "migration on the
+sandbox".
 
-This section describes a `manual migration procedure` in which the developer is
+This section describes a *manual migration procedure* in which the developer is
 in charge of setting up the migration environment and of manually baking the
 blocks that would eventually trigger the migration. For convenience, we have
 batched parts of this manual migration procedure by providing scripts that
@@ -147,16 +147,16 @@ Prepare the Migration
 
 Preparing the migration comprises the following steps:
 
-1. `snapshot` the Alpha protocol, if so wished,
+1. snapshot the Alpha protocol, if so wished,
 2. link the snapshot Alpha protocol in the build system, if we wished to
    snapshot the Alpha protocol,
-3. set `user-activated upgrade` that will trigger the migration at a given
+3. set ``user-activated upgrade`` that will trigger the migration at a given
    level,
-4. patch the shell to obtain a `yes-node` that can fake baker signatures, if we
+4. patch the shell to obtain a ``yes-node`` that can fake baker signatures, if we
    wish to import the context from Mainnet,
 5. compile the project,
 6. import a context from Mainnet, if so wished, and
-7. create a `yes-wallet` that stores fake baker signatures, if we wish to import
+7. create a ``yes-wallet`` that stores fake baker signatures, if we wish to import
    the context from Mainnet.
 
 
@@ -172,8 +172,8 @@ the sandbox starts on an empty context, and the sandbox automatically contains
 accounts with implicit credentials that will allow us to bake blocks and make
 the chain progress.
 
-When on a context imported from Mainnet, we will use a `snapshot file` (do not
-mistake `snapshot a protocol`, like in step 1 above, with `snapshot a node`,
+When on a context imported from Mainnet, we will use a *snapshot file* (do not
+mistake "snapshot a protocol", like in step 1 above, with "snapshot a node",
 which results in a snapshot file like in here) that contains the real status of
 a Mainnet's node at a particular moment in time. Such a snapshot file can be
 downloaded from several sites on the internet (see :doc:`../user/snapshots`).
@@ -185,7 +185,7 @@ use a snapshot file that is recent enough as to contain the predecessor of the
 Alpha protocol. It is also important to note down the level at which the
 snapshot file was taken, which determines at which level we want to trigger the
 migration. The snapshots websites
-conveniently indicate the date and the level (the `block`) at which each
+conveniently indicate the date and the level (the block) at which each
 snapshot file was taken.
 
 In our example we will use a snapshot file
@@ -260,7 +260,7 @@ The currently active protocol supports self-amending through the voting procedur
 of Tezos. However, such procedure needs to go through several voting periods
 that involve several quorums of bakers, and we would rather test our migration
 in a less involved way. Besides the amendments driven by the protocol, Tezos
-also supports `user-activated` upgrades, which are triggered by the shell. The
+also supports *user-activated* upgrades, which are triggered by the shell. The
 user-activated upgrades allow the user to specify the level at which the next
 protocol will be adopted, which can be used to perform emergency bug fixes, but
 which is also useful to test migrations.
@@ -328,7 +328,7 @@ make the chain progress? We do not know the private keys of existing bakers in
 Mainnet!
 
 In order to produce credentials to make the chain imported from Mainnet
-progress, we modify the code to produce a `yes-node` that forges and verifies
+progress, we modify the code to produce a yes-node that forges and verifies
 fake signatures. This can be achieved with a small patch to
 ``src/lib_crypto/signature.ml`` that replaces each signature with a
 concatenation of a public key and a message, such that this fake signature is
@@ -388,7 +388,7 @@ Mainnet. Otherwise the migration will run on the sandbox.
 7. Create a Yes-Wallet
 ~~~~~~~~~~~~~~~~~~~~~~
 
-We also need to create a `yes-wallet`, which is a special wallet where secret
+We also need to create a yes-wallet, which is a special wallet where secret
 keys actually encode the same bytes as their corresponding public keys. By
 adding to the yes-wallet the existing accounts of Mainnet bakers, we would have
 enough rights to bake blocks at will. We can do so by running::
@@ -802,9 +802,9 @@ When passing ``auto`` as the first parameter, the script
 as follows: since the automatic migration always runs on a context imported from
 Mainnet, the script patches the shell in order to obtain a yes-node and imports
 the context from the file ``<path/to/snapshot.rolling>``. It is enough to
-provide a snapshot file taken with the `rolling` history mode (extension
+provide a snapshot file taken with the ``rolling`` history mode (extension
 ``.rolling``), although the script also accepts snapshot files taken with the
-`full` or the `archive` history mode (extensions ``.full`` and ``.archive``
+``full`` or the ``archive`` history mode (extensions ``.full`` and ``.archive``
 respectively). The script creates a folder under the system's temp directory (in
 our example ``/tmp``) with the same name as the snapshot file, and imports the
 context there.
@@ -842,7 +842,7 @@ cycle. This behaviour can be personalized by modifying test file
 ``tezt/manual_tests/migration.ml``.
 
 The developer will not see the ``STITCHING!`` message when the migration is
-triggered unless the option ``-v`` for `verbose` is passed to the command
+triggered unless the option ``-v`` for "verbose" is passed to the command
 above. The option ``--color`` improves the output of the test by alternating
 colors for the output of each process. Nevertheless, if the developer wants to
 inspect the verbose output of the test, we strongly recommend to use a log file
@@ -940,7 +940,7 @@ value relative to a key of the context, using its json format. This is possible
 thanks to the storage functors of Tezos, which are used to register every piece
 of storage in a node and are aware of the json structure of the data. The latter
 RPC is more low level and simply returns the bytes corresponding to a key. Both
-RPCs support the option `depth` to control how much of the subtree of the key
+RPCs support the option ``depth`` to control how much of the subtree of the key
 should be displayed.
 
 For example, if we use ``context/raw/json`` to inspect the size of the current
@@ -1082,5 +1082,5 @@ suffix corresponding to the previous version (``_011`` in our example).
 
 Some migrations may require breaking the interface offered by the
 ``storage_functors``, and to modify the file ``raw_context.mli`` directly. In
-this case we usually `copy` the data to a temporary path, perform the
-conversion, and then `recursively remove` the temporary path.
+this case we usually *copy* the data to a temporary path, perform the
+conversion, and then *recursively remove* the temporary path.

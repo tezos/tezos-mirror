@@ -49,6 +49,8 @@ let pp_do_not_edit ~comment_start fmt () =
     comment_start
     comment_start
 
+let sanitize_path x = Filename.(dirname x // Filename.basename x)
+
 (*****************************************************************************)
 (*                                  DUNE                                     *)
 (*****************************************************************************)
@@ -293,7 +295,7 @@ module Dune = struct
     ]
 
   let alias_rule ?(deps = Stdlib.List.[]) ?(alias_deps = Stdlib.List.[])
-      ?deps_dune ?action ?locks ?package name =
+      ?deps_dune ?action ?locks ?package ?enabled_if name =
     let deps =
       match (deps, alias_deps, deps_dune) with
       | _ :: _, _, Some _ | _, _ :: _, Some _ ->
@@ -312,6 +314,7 @@ module Dune = struct
       (opt package @@ fun x -> [S "package"; S x]);
       (match deps with [] -> E | _ -> S "deps" :: deps);
       (opt locks @@ fun locks -> [S "locks"; S locks]);
+      (opt enabled_if @@ fun enabled_if -> [S "enabled_if"; enabled_if]);
       [
         S "action";
         (match action with None -> [S "progn"] | Some action -> action);
@@ -322,21 +325,14 @@ module Dune = struct
 
   let run_exe exe_name args = run ("%{exe:" ^ exe_name ^ ".exe}") args
 
-  let runtest_js ?(alias = "runtest_js") ?package ~dep_files name =
-    alias_rule
-      alias
-      ?package
-      ~deps:dep_files
-      ~action:[S "run"; S "node"; S ("%{dep:./" ^ name ^ ".bc.js}")]
-
   let file name = [S "file"; S name]
 
   let glob_files expr = [S "glob_files"; S expr]
 
   let glob_files_rec expr = [S "glob_files_rec"; S expr]
 
-  let runtest ?(alias = "runtest") ?package ~dep_files ~dep_globs ~dep_globs_rec
-      name =
+  let runtest ?(alias = "runtest") ?action ?package ?locks ?enabled_if
+      ~dep_files ~dep_globs ~dep_globs_rec name =
     let deps_dune =
       let files = List.map (fun s -> S s) dep_files in
       let globs = List.map glob_files dep_globs in
@@ -345,18 +341,34 @@ module Dune = struct
       | [] -> None
       | deps -> Some (of_list deps)
     in
-    alias_rule
-      alias
+    let action =
+      Option.value ~default:[S "run"; S ("%{dep:./" ^ name ^ ".exe}")] action
+    in
+    alias_rule alias ?package ?deps_dune ?locks ?enabled_if ~action
+
+  let runtest_js ?(alias = "runtest_js") ?package ?locks ?enabled_if ~dep_files
+      ~dep_globs ~dep_globs_rec name =
+    let action = [S "run"; S "node"; S ("%{dep:./" ^ name ^ ".bc.js}")] in
+    runtest
+      ~alias
+      ~action
       ?package
-      ?deps_dune
-      ~action:[S "run"; S ("%{dep:./" ^ name ^ ".exe}")]
+      ?locks
+      ?enabled_if
+      ~dep_files
+      ~dep_globs
+      ~dep_globs_rec
+      name
 
   let setenv name value followup = [G [S "setenv"; S name; S value]; followup]
+
+  let progn l = [S "progn"; G (of_list l)]
 
   let chdir_workspace_root followup =
     [G [S "chdir"; S "%{workspace_root}"]; followup]
 
-  let backend name = [S "backend"; S name]
+  let backend ?(args = Stdlib.List.[]) name =
+    S "backend" :: S name :: of_atom_list args
 
   let ocamllex name = [S "ocamllex"; S name]
 
@@ -749,6 +761,14 @@ module Opam = struct
     Option.iter (pp_line "description: %a" pp_string) description
 end
 
+module Opam_dependency_set = Set.Make (struct
+  type t = Opam.dependency
+
+  let compare x y =
+    let pkg = String.compare x.Opam.package y.Opam.package in
+    if pkg = 0 then Stdlib.compare x.version y.version else pkg
+end)
+
 module Flags = struct
   type t = {standard : bool; rest : Dune.s_expr list}
 
@@ -989,11 +1009,15 @@ module Target = struct
     | Test_executable of {
         names : string Ne_list.t;
         runtest_alias : string option;
+        locks : string option;
+        enabled_if : Dune.s_expr option;
       }
 
   type preprocessor_dep = File of string
 
   type release_status = Unreleased | Experimental | Released | Auto_opam
+
+  type bisect_ppx = No | Yes | With_sigterm
 
   let show_release_status = function
     | Unreleased -> "Unreleased"
@@ -1002,7 +1026,7 @@ module Target = struct
     | Auto_opam -> "Auto_opam"
 
   type internal = {
-    bisect_ppx : bool;
+    bisect_ppx : bisect_ppx;
     time_measurement_ppx : bool;
     c_library_flags : string list option;
     conflicts : t list;
@@ -1107,6 +1131,7 @@ module Target = struct
   let can_register = ref true
 
   let register_internal ({path; opam; _} as internal) =
+    let path = sanitize_path path in
     if not !can_register then
       invalid_arg
         "cannot register new targets after calling Manifest.check or \
@@ -1172,7 +1197,7 @@ module Target = struct
 
   type 'a maker =
     ?all_modules_except:string list ->
-    ?bisect_ppx:bool ->
+    ?bisect_ppx:bisect_ppx ->
     ?c_library_flags:string list ->
     ?conflicts:t option list ->
     ?deps:t option list ->
@@ -1501,7 +1526,9 @@ module Target = struct
           true
       | Test_executable _ -> false
     in
-    let bisect_ppx = Option.value bisect_ppx ~default:not_a_test in
+    let bisect_ppx =
+      Option.value bisect_ppx ~default:(if not_a_test then Yes else No)
+    in
     let runtest_rules =
       let run_js = js_compatible in
       let run_native =
@@ -1510,7 +1537,9 @@ module Target = struct
         | Some modes -> List.mem Dune.Native modes
       in
       match (kind, opam, dep_files) with
-      | Test_executable {names; runtest_alias = Some alias}, package, _ ->
+      | ( Test_executable {names; runtest_alias = Some alias; locks; enabled_if},
+          package,
+          _ ) ->
           let runtest_js_rules =
             if run_js then
               List.map
@@ -1518,6 +1547,10 @@ module Target = struct
                   Dune.runtest_js
                     ~alias:(alias ^ "_js")
                     ~dep_files
+                    ~dep_globs
+                    ~dep_globs_rec
+                    ?locks
+                    ?enabled_if
                     ?package
                     name)
                 (Ne_list.to_list names)
@@ -1532,13 +1565,18 @@ module Target = struct
                     ~dep_files
                     ~dep_globs
                     ~dep_globs_rec
+                    ?locks
+                    ?enabled_if
                     ?package
                     name)
                 (Ne_list.to_list names)
             else []
           in
           runtest_rules @ runtest_js_rules
-      | Test_executable {names = name, _; runtest_alias = None}, _, _ :: _ ->
+      | ( Test_executable
+            {names = name, _; runtest_alias = None; locks = _; enabled_if = _},
+          _,
+          _ :: _ ) ->
           invalid_argf
             "for targets which provide test executables such as %S, ~dep_files \
              is only meaningful for the runtest alias. It cannot be used with \
@@ -1654,17 +1692,30 @@ module Target = struct
     | [] -> invalid_argf "Target.private_exes: at least one name must be given"
     | head :: tail -> Private_executable (head, tail)
 
-  let test ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec =
+  let test ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec ?locks
+      ?enabled_if =
+    (match (alias, enabled_if, locks) with
+    | "", Some _, _ | "", _, Some _ ->
+        invalid_arg
+          "Target.tests: cannot specify enabled_if or locks without alias"
+    | _ -> ()) ;
     let runtest_alias = if alias = "" then None else Some alias in
     internal ?dep_files ?dep_globs ?dep_globs_rec @@ fun test_name ->
-    Test_executable {names = (test_name, []); runtest_alias}
+    Test_executable {names = (test_name, []); runtest_alias; locks; enabled_if}
 
-  let tests ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec =
+  let tests ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec ?locks
+      ?enabled_if =
+    (match (alias, enabled_if, locks) with
+    | "", Some _, _ | "", _, Some _ ->
+        invalid_arg
+          "Target.tests: cannot specify enabled_if or locks without alias"
+    | _ -> ()) ;
     let runtest_alias = if alias = "" then None else Some alias in
     internal ?dep_files ?dep_globs ?dep_globs_rec @@ fun test_names ->
     match test_names with
     | [] -> invalid_arg "Target.tests: at least one name must be given"
-    | head :: tail -> Test_executable {names = (head, tail); runtest_alias}
+    | head :: tail ->
+        Test_executable {names = (head, tail); runtest_alias; locks; enabled_if}
 
   let vendored_lib ?(released_on_opam = true) ?main_module
       ?(js_compatible = false) ?(npm_deps = []) name version =
@@ -1786,21 +1837,46 @@ type tezt_target = {
   exe_deps : target list;
   js_deps : target list;
   dep_globs : string list;
+  dep_globs_rec : string list;
+  dep_files : string list;
   modules : string list;
   js_compatible : bool option;
   modes : Dune.mode list option;
   synopsis : string option;
+  opam_with_test : with_test option;
   with_macos_security_framework : bool;
+  dune : Dune.s_expr;
+  tezt_local_test_lib : target;
+  preprocess : Target.preprocessor list;
+  preprocessor_deps : Target.preprocessor_dep list;
 }
 
 let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
 
 let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
-    ?(js_deps = []) ?(dep_globs = []) ?synopsis
-    ?(with_macos_security_framework = false) modules =
+    ?(js_deps = []) ?(dep_globs = []) ?(dep_globs_rec = []) ?(dep_files = [])
+    ?synopsis ?opam_with_test ?(with_macos_security_framework = false)
+    ?(dune = Dune.[]) ?(preprocess = []) ?(preprocessor_deps = []) modules =
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
       ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
+  let path_with_underscores =
+    String.map (function '-' | '/' -> '_' | c -> c) path
+  in
+  (* [linkall] is used to ensure that the test executable is linked with [module_name] and [tezt]. *)
+  let tezt_local_test_lib_name = path_with_underscores ^ "_tezt_lib" in
+  let tezt_local_test_lib =
+    Target.(
+      private_lib
+        ~path
+        ~opam:""
+        ?js_compatible
+        ~deps:lib_deps
+        ~modules
+        ~linkall:true
+        ~dune
+        tezt_local_test_lib_name)
+  in
   let tezt_target =
     {
       opam;
@@ -1808,60 +1884,72 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
       exe_deps;
       js_deps;
       dep_globs;
+      dep_files;
+      dep_globs_rec;
       modules;
       js_compatible;
       modes;
       synopsis;
+      opam_with_test;
       with_macos_security_framework;
+      dune;
+      tezt_local_test_lib;
+      preprocess;
+      preprocessor_deps;
     }
   in
-  tezt_targets_by_path := String_map.add path tezt_target !tezt_targets_by_path
+  tezt_targets_by_path := String_map.add path tezt_target !tezt_targets_by_path ;
+  tezt_local_test_lib
 
 let register_tezt_targets ~make_tezt_exe =
   let tezt_test_libs = ref [] in
   let register_path path
       {
         opam;
-        lib_deps;
         exe_deps;
         js_deps;
         dep_globs;
-        modules;
-        js_compatible;
+        dep_globs_rec;
+        dep_files;
         modes;
         synopsis;
+        opam_with_test;
         with_macos_security_framework;
+        tezt_local_test_lib;
+        preprocess;
+        preprocessor_deps;
+        _;
       } =
-    let path_with_underscores =
-      String.map (function '-' | '/' -> '_' | c -> c) path
-    in
-    let lib =
-      (* [linkall] is used to ensure that the test executable is linked with
-         [module_name] and [tezt]. *)
-      Target.private_lib
-        (path_with_underscores ^ "_tezt_lib")
-        ~path
-        ~opam:""
-        ?js_compatible
-        ~deps:lib_deps
-        ~modules
-        ~linkall:true
-    in
-    tezt_test_libs := lib :: !tezt_test_libs ;
+    tezt_test_libs := tezt_local_test_lib :: !tezt_test_libs ;
     let declare_exe ?js_compatible exe_name modes deps main =
       let (_ : Target.t option) =
         Target.test
           exe_name
-          ~alias:"runtezt"
+          (* Tezts can be deselected from the runtest alias by setting
+             the environment variable [RUNTEZTALIAS] to [false]. If
+             this environment variable is unset, or set to any value
+             other than [false], then they are selected.
+
+             For more info on [%{env:VAR=VAL}] see
+             https://dune.readthedocs.io/en/stable/concepts.html#variables *)
+          ~enabled_if:Dune.[S "<>"; S "false"; S "%{env:RUNTEZTALIAS=true}"]
           ~path
           ~with_macos_security_framework
           ~opam
           ?synopsis
           ?js_compatible
           ?modes
-          ~deps:(lib :: deps)
+            (* Instrument with sigterm handler, to ensure that coverage from
+               Tezt worker processes are collected. *)
+          ~bisect_ppx:With_sigterm
+          ~deps:(tezt_local_test_lib :: deps)
           ~dep_globs
+          ~dep_globs_rec
+          ~dep_files
           ~modules:[exe_name]
+          ?opam_with_test
+          ~preprocess
+          ~preprocessor_deps
           ~dune:
             Dune.
               [
@@ -2117,7 +2205,11 @@ let generate_dune (internal : Target.internal) =
 
   let instrumentation =
     let bisect_ppx =
-      if internal.bisect_ppx then Some (Dune.backend "bisect_ppx") else None
+      match internal.bisect_ppx with
+      | Yes -> Some (Dune.backend "bisect_ppx")
+      | With_sigterm ->
+          Some (Dune.backend "bisect_ppx" ~args:["--bisect-sigterm"])
+      | No -> None
     in
     let time_measurement_ppx =
       if internal.time_measurement_ppx then
@@ -2545,7 +2637,11 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     deduplicate_list ~merge (fun {Opam.package; _} -> package) depends
   in
   let conflicts =
-    List.flatten @@ map internals
+    List.of_seq @@ Opam_dependency_set.to_seq
+    @@ List.fold_left
+         (fun set c -> Opam_dependency_set.add c set)
+         Opam_dependency_set.empty
+    @@ List.flatten @@ map internals
     @@ fun internal ->
     List.concat_map
       (as_opam_dependency
@@ -3053,7 +3149,9 @@ let check_circular_opam_deps () =
   in
   while not (Queue.is_empty to_visit) do
     let elt = Queue.take to_visit in
-    let elt_path = Hashtbl.find shortest_path elt.kind in
+    let elt_path =
+      Option.value ~default:[] (Hashtbl.find_opt shortest_path elt.kind)
+    in
     list_iter (deps_of elt) (fun (dep : Target.internal) ->
         if not (Hashtbl.mem shortest_path dep.kind) then (
           let path = dep :: elt_path in
@@ -3281,6 +3379,11 @@ let generate_profiles ~default_profile =
           match String_map.find_opt name profile_deps with
           | None -> version
           | Some old_version ->
+              (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5434
+                 This comparison is wrong as it compares the terms as
+                 a whole. It results in duplicated
+                 versions. Additionally, for the conflicts, the `||`
+                 operator must be used. *)
               if old_version <> version then Version.(version && old_version)
               else version
         in
@@ -3355,10 +3458,17 @@ let generate_profiles ~default_profile =
   in
   String_map.iter generate_profile merged
 
+let precheck () =
+  check_circular_opam_deps () ;
+  check_js_of_ocaml () ;
+  check_opam_with_test_consistency () ;
+  if !has_error then exit 1
+
 let generate ~make_tezt_exe ~default_profile ~add_to_meta_package =
   Printexc.record_backtrace true ;
   try
     register_tezt_targets ~make_tezt_exe ;
+    precheck () ;
     Target.can_register := false ;
     generate_dune_files () ;
     generate_opam_files () ;
@@ -3382,16 +3492,12 @@ let generate ~make_tezt_exe ~default_profile ~add_to_meta_package =
     prerr_endline ("Error: " ^ Printexc.to_string exn) ;
     exit 1
 
-let check ?exclude () =
-  if !checks_done then failwith "Cannot run check twice" ;
-  checks_done := true ;
-  Target.can_register := false ;
+let postcheck ?exclude () =
   Printexc.record_backtrace true ;
   try
-    check_circular_opam_deps () ;
+    if !checks_done then failwith "Cannot run check twice" ;
+    checks_done := true ;
     check_for_non_generated_files ~remove_extra_files ?exclude () ;
-    check_js_of_ocaml () ;
-    check_opam_with_test_consistency () ;
     if !has_error then exit 1
   with exn ->
     Printexc.print_backtrace stderr ;

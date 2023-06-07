@@ -247,7 +247,7 @@ let perform_encoding_benchmarks snoop proto =
     ]
   in
   let* proto_indepenent =
-    Snoop.(list_benchmarks ~mode:Exactly ~tags:[Encoding] snoop)
+    Snoop.(list_benchmarks ~mode:Exactly ~tags:[Encoding; Shell] snoop)
   in
   let* proto_specific =
     Snoop.(list_benchmarks ~mode:All ~tags:[Encoding; Proto proto] snoop)
@@ -279,22 +279,14 @@ let perform_carbonated_map_benchmarks snoop proto =
   in
   perform_benchmarks [] snoop benches
 
-let perform_tx_rollup_benchmarks snoop proto =
-  let* benches =
-    Snoop.(list_benchmarks ~mode:All ~tags:[Tx_rollup; Proto proto] snoop)
-  in
-  perform_benchmarks [] snoop benches
-
 let perform_big_map_benchmarks snoop proto =
   let* benches =
     Snoop.(list_benchmarks ~mode:All ~tags:[Big_map; Proto proto] snoop)
   in
   perform_benchmarks [] snoop benches
 
-let perform_skip_list_benchmarks snoop proto =
-  let* benches =
-    Snoop.(list_benchmarks ~mode:All ~tags:[Skip_list; Proto proto] snoop)
-  in
+let perform_skip_list_benchmarks snoop _proto =
+  let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Skip_list] snoop) in
   perform_benchmarks [] snoop benches
 
 let perform_sc_rollup_benchmarks snoop proto =
@@ -313,7 +305,6 @@ let main protocol =
   let* () = perform_global_constants_benchmarks snoop in
   let* () = perform_cache_benchmarks snoop in
   let* () = perform_encoding_benchmarks snoop protocol in
-  let* () = perform_tx_rollup_benchmarks snoop protocol in
   let* () = perform_big_map_benchmarks snoop protocol in
   let* () = perform_skip_list_benchmarks snoop protocol in
   let* () = perform_carbonated_map_benchmarks snoop protocol in

@@ -578,7 +578,7 @@ let string_of_name n =
   let escape uc =
     let uc = Char.code uc in
     if uc < 0x20 || uc >= 0x7f then
-      Buffer.add_string b (Printf.sprintf "\\u{%02x}" uc)
+      Buffer.add_string b (Format.sprintf "\\u{%02x}" uc)
     else
       let c = Char.chr uc in
       if c = '\"' || c = '\\' then Buffer.add_char b '\\' ;

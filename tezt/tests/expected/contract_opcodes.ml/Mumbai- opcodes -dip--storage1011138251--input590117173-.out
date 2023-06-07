@@ -1,0 +1,36 @@
+
+./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/dip.tz on storage '(Pair 0 0)' and input '(Pair 1 1)' --level 1 --trace-stack
+storage
+  (Pair 1 2)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 11 (just consumed gas: 7.912)
+    [ (Pair (Pair 1 1) 0 0) ]
+  - location: 11 (just consumed gas: 0.010)
+    [ (Pair 1 1) ]
+  - location: 12 (just consumed gas: 0.010)
+    [ 1
+      1 ]
+  - location: 13 (just consumed gas: 0.010)
+    [ 1
+      1
+      1 ]
+  - location: 14 (just consumed gas: 0)
+    [ 1
+      1 ]
+  - location: 16 (just consumed gas: 0.035)
+    [ 2 ]
+  - location: 14 (just consumed gas: 0.025)
+    [ 1
+      2 ]
+  - location: 17 (just consumed gas: 0.010)
+    [ (Pair 1 2) ]
+  - location: 18 (just consumed gas: 0.010)
+    [ {}
+      (Pair 1 2) ]
+  - location: 20 (just consumed gas: 0.010)
+    [ (Pair {} 1 2) ]
+

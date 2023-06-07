@@ -94,9 +94,10 @@ module type T = sig
         ('m, 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t
        and type Error_monad.shell_tztrace = Error_monad.tztrace
        and type 'a Error_monad.shell_tzresult = ('a, Error_monad.tztrace) result
-       and type Timelock.chest = Tezos_crypto.Timelock.chest
-       and type Timelock.chest_key = Tezos_crypto.Timelock.chest_key
-       and type Timelock.opening_result = Tezos_crypto.Timelock.opening_result
+       and type Timelock.chest = Tezos_crypto.Timelock_legacy.chest
+       and type Timelock.chest_key = Tezos_crypto.Timelock_legacy.chest_key
+       and type Timelock.opening_result =
+        Tezos_crypto.Timelock_legacy.opening_result
        and module Sapling = Tezos_sapling.Core.Validator
        and type ('a, 'b) Either.t = ('a, 'b) Stdlib.Either.t
        and type Bls.Primitive.Fr.t = Bls12_381.Fr.t
@@ -193,7 +194,7 @@ struct
 
   module Compare = Compare
   module Either = Either
-  module Seq = Tezos_error_monad.TzLwtreslib.Seq
+  module Seq = Tezos_protocol_environment_structs.V7.Seq
   module List = Tezos_error_monad.TzLwtreslib.List
   module Array = Tezos_protocol_environment_structs.V7.Array
   module Char = Char
@@ -275,7 +276,7 @@ struct
   module P256 = Signature.P256
   module Bls = Signature.Bls
   module Signature = Signature.V0
-  module Timelock = Tezos_crypto.Timelock
+  module Timelock = Tezos_crypto.Timelock_legacy
   module Vdf = Class_group_vdf.Vdf_self_contained
 
   module S = struct
@@ -1064,7 +1065,7 @@ struct
     module Make
         (Tree : Context.TREE with type key = string list and type value = bytes) =
     struct
-      type Tezos_lazy_containers.Lazy_map.tree += PVM_tree of Tree.tree
+      type Tezos_tree_encoding.tree_instance += PVM_tree of Tree.tree
 
       module Wasm = Tezos_scoru_wasm.Wasm_pvm.Make (struct
         include Tree
@@ -1414,8 +1415,10 @@ struct
     let verify_page t sh page proof =
       match verify_page t sh ~page_index:page.index page.content proof with
       | Error `Page_length_mismatch -> Ok false
-      | Error `Segment_index_out_of_range -> Error `Segment_index_out_of_range
-      | Ok r -> Ok r
+      | Error `Page_index_out_of_range -> Error `Segment_index_out_of_range
+      | Error (`Invalid_page | `Invalid_degree_strictly_less_than_expected _) ->
+          Ok false
+      | Ok () -> Ok true
 
     let commitment_proof_encoding = Commitment_proof.encoding
   end

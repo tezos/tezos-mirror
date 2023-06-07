@@ -57,7 +57,7 @@ type packed_internal_operation_contents =
       -> packed_internal_operation_contents
 
 type 'kind internal_operation = {
-  source : Destination.t;
+  sender : Destination.t;
   operation : 'kind internal_operation_contents;
   nonce : int;
 }
@@ -66,7 +66,7 @@ type packed_internal_operation =
   | Internal_operation : 'kind internal_operation -> packed_internal_operation
 
 let internal_operation (type kind)
-    ({source; operation; nonce} : kind Script_typed_ir.internal_operation) :
+    ({sender; operation; nonce} : kind Script_typed_ir.internal_operation) :
     kind internal_operation =
   let operation : kind internal_operation_contents =
     match operation with
@@ -94,15 +94,6 @@ let internal_operation (type kind)
             destination = Contract (Originated destination);
             amount;
             entrypoint;
-            parameters = Script.lazy_expr unparsed_parameters;
-          }
-    | Transaction_to_tx_rollup {destination; unparsed_parameters; _} ->
-        Transaction
-          {
-            destination = Tx_rollup destination;
-            (* Dummy amount used for the external untyped view of internal transactions *)
-            amount = Tez.zero;
-            entrypoint = Entrypoint.deposit;
             parameters = Script.lazy_expr unparsed_parameters;
           }
     | Transaction_to_sc_rollup {destination; entrypoint; unparsed_parameters; _}
@@ -133,7 +124,7 @@ let internal_operation (type kind)
         Origination {delegate; script; credit}
     | Delegation delegate -> Delegation delegate
   in
-  {source; operation; nonce}
+  {sender; operation; nonce}
 
 let packed_internal_operation (Script_typed_ir.Internal_operation op) =
   Internal_operation (internal_operation op)
@@ -151,12 +142,6 @@ type successful_transaction_result =
       storage_size : Z.t;
       paid_storage_size_diff : Z.t;
       allocated_destination_contract : bool;
-    }
-  | Transaction_to_tx_rollup_result of {
-      ticket_hash : Ticket_hash.t;
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-      paid_storage_size_diff : Z.t;
     }
   | Transaction_to_sc_rollup_result of {
       consumed_gas : Gas.Arith.fp;
@@ -239,6 +224,15 @@ module Internal_operation = struct
         -> 'kind case
 
   let transaction_contract_variant_cases =
+    let case = function
+      | Tag tag ->
+          (* The tag was used by old variant. It have been removed in
+             protocol proposal O, it can be unblocked in the future. *)
+          let to_tx_rollup_reserved_tag = 1 in
+          assert (Compare.Int.(tag <> to_tx_rollup_reserved_tag)) ;
+          case (Tag tag)
+      | _ as c -> case c
+    in
     union
       [
         case
@@ -298,39 +292,6 @@ module Internal_operation = struct
                 storage_size;
                 paid_storage_size_diff;
                 allocated_destination_contract;
-              });
-        case
-          ~title:"To_tx_rollup"
-          (Tag 1)
-          (obj4
-             (dft "balance_updates" Receipt.balance_updates_encoding [])
-             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-             (req "ticket_hash" Ticket_hash.encoding)
-             (req "paid_storage_size_diff" n))
-          (function
-            | Transaction_to_tx_rollup_result
-                {
-                  balance_updates;
-                  consumed_gas;
-                  ticket_hash;
-                  paid_storage_size_diff;
-                } ->
-                Some
-                  ( balance_updates,
-                    consumed_gas,
-                    ticket_hash,
-                    paid_storage_size_diff )
-            | _ -> None)
-          (fun ( balance_updates,
-                 consumed_gas,
-                 ticket_hash,
-                 paid_storage_size_diff ) ->
-            Transaction_to_tx_rollup_result
-              {
-                balance_updates;
-                consumed_gas;
-                ticket_hash;
-                paid_storage_size_diff;
               });
         case
           ~title:"To_smart_rollup"
@@ -511,11 +472,13 @@ end
 let internal_operation_encoding : packed_internal_operation Data_encoding.t =
   def "apply_internal_results.alpha.operation_result"
   @@ conv
-       (fun (Internal_operation {source; operation; nonce}) ->
-         ((source, nonce), Internal_operation_contents operation))
-       (fun ((source, nonce), Internal_operation_contents operation) ->
-         Internal_operation {source; operation; nonce})
+       (fun (Internal_operation {sender; operation; nonce}) ->
+         ((sender, nonce), Internal_operation_contents operation))
+       (fun ((sender, nonce), Internal_operation_contents operation) ->
+         Internal_operation {sender; operation; nonce})
        (merge_objs
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/710
+             Rename the "source" field into "sender" *)
           (obj2 (req "source" Destination.encoding) (req "nonce" uint16))
           Internal_operation.encoding)
 
@@ -692,6 +655,8 @@ let internal_operation_result_encoding :
     case
       (Tag op_case.tag)
       ~title:op_case.name
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/710
+         Rename the "source" field into "sender" *)
       (merge_objs
          (obj3
             (req "kind" (constant op_case.name))
@@ -701,10 +666,10 @@ let internal_operation_result_encoding :
       (fun op ->
         match ires_case.iselect op with
         | Some (op, res) ->
-            Some (((), op.source, op.nonce), (ires_case.proj op.operation, res))
+            Some (((), op.sender, op.nonce), (ires_case.proj op.operation, res))
         | None -> None)
-      (fun (((), source, nonce), (op, res)) ->
-        let op = {source; operation = ires_case.inj op; nonce} in
+      (fun (((), sender, nonce), (op, res)) ->
+        let op = {sender; operation = ires_case.inj op; nonce} in
         Internal_operation_result (op, res))
   in
   def "apply_internal_results.alpha.operation_result"

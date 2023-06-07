@@ -1,0 +1,42 @@
+
+./octez-client --protocol PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/list_iter.tz on storage 0 and input '{ 3 ; 6 ; 9 }' --level 1 --trace-stack
+storage
+  162
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (just consumed gas: 7.002)
+    [ (Pair { 3 ; 6 ; 9 } 0) ]
+  - location: 8 (just consumed gas: 0.010)
+    [ { 3 ; 6 ; 9 } ]
+  - location: 9 (just consumed gas: 0.010)
+    [ 1
+      { 3 ; 6 ; 9 } ]
+  - location: 12 (just consumed gas: 0.010)
+    [ { 3 ; 6 ; 9 }
+      1 ]
+  - location: 13 (just consumed gas: 0)
+    [ 3
+      1 ]
+  - location: 15 (just consumed gas: 0.059)
+    [ 3 ]
+  - location: 13 (just consumed gas: 0.015)
+    [ 6
+      3 ]
+  - location: 15 (just consumed gas: 0.059)
+    [ 18 ]
+  - location: 13 (just consumed gas: 0.015)
+    [ 9
+      18 ]
+  - location: 15 (just consumed gas: 0.059)
+    [ 162 ]
+  - location: 13 (just consumed gas: 0.015)
+    [ 162 ]
+  - location: 16 (just consumed gas: 0.010)
+    [ {}
+      162 ]
+  - location: 18 (just consumed gas: 0.010)
+    [ (Pair {} 162) ]
+

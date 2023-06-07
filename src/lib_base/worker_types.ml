@@ -158,3 +158,6 @@ let pp_status ppf {pushed; treated; completed} =
     (Ptime.diff treated pushed)
     Ptime.Span.pp
     (Ptime.diff completed treated)
+
+let pp_status_completed ppf {completed; treated; _} =
+  Format.fprintf ppf "%a" Ptime.Span.pp (Ptime.diff completed treated)

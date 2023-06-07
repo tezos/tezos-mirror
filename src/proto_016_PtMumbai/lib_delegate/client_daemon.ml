@@ -66,11 +66,15 @@ let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
   | Error err ->
       cctxt#error "Unexpected error: %a. Exiting..." pp_print_trace err
 
+let await_protocol_start (cctxt : #Protocol_client_context.full) ~chain =
+  cctxt#message "Waiting for protocol %s to start..." Protocol.name
+  >>= fun () -> Node_rpc.await_protocol_activation cctxt ~chain ()
+
 module Baker = struct
   let run (cctxt : Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
       ?liquidity_baking_toggle_vote ?per_block_vote_file ?extra_operations
-      ?force_apply ~chain ~context_path ~keep_alive delegates =
+      ?force_apply ?context_path ~chain ~keep_alive delegates =
     let process () =
       Config_services.user_activated_upgrades cctxt
       >>=? fun user_activated_upgrades ->
@@ -83,7 +87,7 @@ module Baker = struct
           ?per_block_vote_file
           ?extra_operations
           ?force_apply
-          ~context_path
+          ?context_path
           ~user_activated_upgrades
           ()
       in
@@ -107,9 +111,7 @@ module Baker = struct
       ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
       cctxt
     >>=? fun () ->
-    cctxt#message "Waiting for protocol %s to start..." Protocol.name
-    >>= fun () ->
-    Node_rpc.await_protocol_activation cctxt ~chain () >>=? fun () ->
+    await_protocol_start cctxt ~chain >>=? fun () ->
     if keep_alive then retry_on_disconnection cctxt process else process ()
 end
 
@@ -147,6 +149,7 @@ module Accuser = struct
       ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
       cctxt
     >>=? fun () ->
+    await_protocol_start cctxt ~chain >>=? fun () ->
     if keep_alive then retry_on_disconnection cctxt process else process ()
 end
 
@@ -181,9 +184,6 @@ module VDF = struct
         ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
         cctxt
     in
-    let*! () =
-      cctxt#message "Waiting for protocol %s to start..." Protocol.name
-    in
-    let* () = Node_rpc.await_protocol_activation cctxt ~chain () in
+    let* () = await_protocol_start cctxt ~chain in
     if keep_alive then retry_on_disconnection cctxt process else process ()
 end

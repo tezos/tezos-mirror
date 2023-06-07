@@ -38,29 +38,16 @@ end)
 let chain_proto_registry : t ChainProto_registry.t ref =
   ref ChainProto_registry.empty
 
-let create limits (filter : Shell_plugin.filter_t) chain_db =
+let create limits (module Filter : Shell_plugin.FILTER) chain_db =
   let open Lwt_result_syntax in
   let chain_store = Distributed_db.chain_store chain_db in
   let chain_id = Store.Chain.chain_id chain_store in
-  let proto_hash =
-    match filter with
-    | Recent (module Filter) -> Filter.Proto.hash
-    | Legacy (module Filter) -> Filter.Proto.hash
-  in
   match
-    ChainProto_registry.find (chain_id, proto_hash) !chain_proto_registry
+    ChainProto_registry.find (chain_id, Filter.Proto.hash) !chain_proto_registry
   with
   | None ->
       let prevalidator =
-        match filter with
-        | Recent (module Filter) ->
-            Prevalidator_internal.make limits chain_db chain_id (module Filter)
-        | Legacy (module Filter) ->
-            Legacy_prevalidator_internal.make
-              limits
-              chain_db
-              chain_id
-              (module Filter)
+        Prevalidator_internal.make limits chain_db chain_id (module Filter)
       in
       let (module Prevalidator : T) = prevalidator in
       chain_proto_registry :=

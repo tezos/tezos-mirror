@@ -24,6 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type log_config = {
+  lwt_log_sink_unix : Lwt_log_sink_unix.cfg;
+  internal_events : Tezos_base.Internal_event_config.t;
+}
+
 type parameters = {
   context_root : string;
   protocol_root : string;
@@ -33,10 +38,10 @@ type parameters = {
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
   dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
+  log_config : log_config;
 }
 
 type request =
-  | Init
   | Validate of {
       chain_id : Chain_id.t;
       block_header : Block_header.t;
@@ -90,7 +95,6 @@ type request =
       Tezos_base_unix.Internal_event_unix.Configuration.t
 
 let request_pp ppf = function
-  | Init -> Format.fprintf ppf "process handshake"
   | Validate {block_header; chain_id; _} ->
       Format.fprintf
         ppf
@@ -134,6 +138,17 @@ let request_pp ppf = function
 
 let magic = Bytes.of_string "TEZOS_FORK_VALIDATOR_MAGIC_0"
 
+let log_config_encoding =
+  let open Data_encoding in
+  conv
+    (fun {internal_events; lwt_log_sink_unix} ->
+      (internal_events, lwt_log_sink_unix))
+    (fun (internal_events, lwt_log_sink_unix) ->
+      {internal_events; lwt_log_sink_unix})
+    (obj2
+       (req "internal_events" Tezos_base.Internal_event_config.encoding)
+       (req "lwt_log_sink_unix" Lwt_log_sink_unix.cfg_encoding))
+
 let parameters_encoding =
   let open Data_encoding in
   conv
@@ -146,6 +161,7 @@ let parameters_encoding =
            operation_metadata_size_limit;
            sandbox_parameters;
            dal_config;
+           log_config;
          } ->
       ( context_root,
         protocol_root,
@@ -154,7 +170,8 @@ let parameters_encoding =
         user_activated_protocol_overrides,
         operation_metadata_size_limit,
         sandbox_parameters,
-        dal_config ))
+        dal_config,
+        log_config ))
     (fun ( context_root,
            protocol_root,
            genesis,
@@ -162,7 +179,8 @@ let parameters_encoding =
            user_activated_protocol_overrides,
            operation_metadata_size_limit,
            sandbox_parameters,
-           dal_config ) ->
+           dal_config,
+           log_config ) ->
       {
         context_root;
         protocol_root;
@@ -172,8 +190,9 @@ let parameters_encoding =
         operation_metadata_size_limit;
         sandbox_parameters;
         dal_config;
+        log_config;
       })
-    (obj8
+    (obj9
        (req "context_root" string)
        (req "protocol_root" string)
        (req "genesis" Genesis.encoding)
@@ -185,7 +204,8 @@ let parameters_encoding =
           "operation_metadata_size_limit"
           Shell_limits.operation_metadata_size_limit_encoding)
        (opt "sandbox_parameters" json)
-       (req "dal_config" Tezos_crypto_dal.Cryptobox.Config.encoding))
+       (req "dal_config" Tezos_crypto_dal.Cryptobox.Config.encoding)
+       (req "log_config" log_config_encoding))
 
 let case_validate tag =
   let open Data_encoding in
@@ -410,21 +430,15 @@ let request_encoding =
   let open Data_encoding in
   union
     [
+      case_validate (Tag 0);
       case
-        (Tag 0)
-        ~title:"init"
-        empty
-        (function Init -> Some () | _ -> None)
-        (fun () -> Init);
-      case_validate (Tag 1);
-      case
-        (Tag 2)
+        (Tag 1)
         ~title:"commit_genesis"
         (obj1 (req "chain_id" Chain_id.encoding))
         (function Commit_genesis {chain_id} -> Some chain_id | _ -> None)
         (fun chain_id -> Commit_genesis {chain_id});
       case
-        (Tag 3)
+        (Tag 2)
         ~title:"fork_test_chain"
         (obj3
            (req "chain_id" Chain_id.encoding)
@@ -437,22 +451,21 @@ let request_encoding =
         (fun (chain_id, context_hash, forked_header) ->
           Fork_test_chain {chain_id; context_hash; forked_header});
       case
-        (Tag 4)
+        (Tag 3)
         ~title:"terminate"
         unit
         (function Terminate -> Some () | _ -> None)
         (fun () -> Terminate);
-      (* Tag 5 was ["restore_integrity"]. *)
       case
-        (Tag 6)
+        (Tag 4)
         ~title:"reconfigure_event_logging"
         Tezos_base_unix.Internal_event_unix.Configuration.encoding
         (function Reconfigure_event_logging c -> Some c | _ -> None)
         (fun c -> Reconfigure_event_logging c);
-      case_preapply (Tag 7);
-      case_precheck (Tag 8);
-      case_context_gc (Tag 9);
-      case_context_split (Tag 10);
+      case_preapply (Tag 5);
+      case_precheck (Tag 6);
+      case_context_gc (Tag 7);
+      case_context_split (Tag 8);
     ]
 
 let send pin encoding data =
@@ -491,7 +504,7 @@ let make_socket socket_path = Unix.ADDR_UNIX socket_path
 
 let create_socket ~canceler =
   let open Lwt_syntax in
-  let socket = Lwt_unix.socket PF_UNIX SOCK_STREAM 0o000 in
+  let socket = Lwt_unix.socket ~cloexec:true PF_UNIX SOCK_STREAM 0o000 in
   Lwt_unix.set_close_on_exec socket ;
   Lwt_canceler.on_cancel canceler (fun () ->
       let* (_ : unit tzresult) = Lwt_utils_unix.safe_close socket in

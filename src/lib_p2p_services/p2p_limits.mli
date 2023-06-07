@@ -34,8 +34,9 @@ type t = {
       (** Delay granted to a peer to perform authentication. *)
   greylist_timeout : Time.System.Span.t;
       (** GC delay for the greylists tables. *)
-  maintenance_idle_time : Time.System.Span.t;
-      (** How long to wait at most before running a maintenance loop. *)
+  maintenance_idle_time : Time.System.Span.t option;
+      (** How long to wait at most before running a maintenance loop. If None,
+          the maintenance is disabled. *)
   min_connections : int;
       (** Strict minimum number of connections (triggers an urgent maintenance) *)
   expected_connections : int;
@@ -66,9 +67,9 @@ type t = {
       (** The size of the IP address greylist in kilobytes. *)
   ip_greylist_cleanup_delay : Time.System.Span.t;
       (** The time an IP address is kept in the greylist. *)
-  swap_linger : Time.System.Span.t;
+  swap_linger : Time.System.Span.t option;
       (** Peer swapping does not occur more than once during a timespan of
-      [swap_linger]. *)
+          [swap_linger]. If None, the swap mechanism is disabled.  *)
   binary_chunks_size : int option;
       (** Size (in bytes) of binary blocks that are sent to other
       peers. Default value is 64 kB. Max value is 64kB. *)

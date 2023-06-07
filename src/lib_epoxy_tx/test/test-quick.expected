@@ -1,0 +1,60 @@
+RandomTx.make_rollup:
+Constraints: 3760
+
+RandomTx.make_rollup_optimized:
+Constraints: 1423
+
+insufficient balance: amount > bal:
+Constraints: 3760
+
+insufficient balance: amount > bal_optimized:
+Constraints: 1423
+
+insufficient balance: amount + fee > bal:
+Constraints: 3760
+
+insufficient balance: amount + fee > bal_optimized:
+Constraints: 1423
+
+invalid dst:
+Constraints: 3760
+
+invalid dst_optimized:
+Constraints: 1423
+
+invalid src:
+Constraints: 3760
+
+invalid src_optimized:
+Constraints: 1423
+
+replay:
+Constraints: 3760
+
+replay_optimized:
+Constraints: 1423
+
+balance out of bounds 1:
+Constraints: 3760
+
+balance out of bounds 1_optimized:
+Constraints: 1423
+
+invalid signature: bad msg:
+Constraints: 3760
+
+invalid signature: bad msg_optimized:
+Constraints: 1423
+
+invalid signature: bad sk:
+Constraints: 3760
+
+invalid signature: bad sk_optimized:
+Constraints: 1423
+
+invalid signature: not on curve:
+Constraints: 3760
+
+invalid signature: not on curve_optimized:
+Constraints: 1423
+

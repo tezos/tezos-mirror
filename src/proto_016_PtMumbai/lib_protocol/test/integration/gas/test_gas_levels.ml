@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (Gas levels)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/gas/main.exe \
-                -- test "^gas levels$"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/integration/gas/main.exe \
+                  -- --file test_gas_levels.ml
     Subject:    On gas consumption and exhaustion.
 *)
 
@@ -396,10 +395,10 @@ let make_batch_test_block_one_origination name contract gas_sampler =
   let app_n = List.map (fun (x, y) -> (x ^ " with contract " ^ name, y)) in
   app_n
     [
-      ("Test bake one operation", test_one_operation);
-      ("Test bake one operation list", test_one_operation_list);
-      ("Test multiple single operations", test_many_single_operations);
-      ("Test both lists and single operations", test_mixed_operations);
+      ("bake one operation", test_one_operation);
+      ("bake one operation list", test_one_operation_list);
+      ("multiple single operations", test_many_single_operations);
+      ("both lists and single operations", test_mixed_operations);
     ]
 
 (** Tests the consumption of all gas in a block, should pass *)
@@ -556,9 +555,8 @@ let tests =
        ( "Detect when gas limit of operation list exceeds the hard gas limit \
           per block",
          test_malformed_block_max_limit_reached' );
-       ( "Test the gas consumption of various operations",
-         test_block_mixed_operations );
-       ("Test that emptying an account costs gas", test_emptying_account_gas);
+       ("the gas consumption of various operations", test_block_mixed_operations);
+       ("emptying an account costs gas", test_emptying_account_gas);
      ]
     @ make_batch_test_block_one_origination "nil" nil_contract basic_gas_sampler
     @ make_batch_test_block_one_origination
@@ -569,3 +567,7 @@ let tests =
         "infinite loop"
         loop_contract
         basic_gas_sampler)
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("gas levels", tests)]
+  |> Lwt_main.run

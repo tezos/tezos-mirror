@@ -9,40 +9,14 @@
  (libraries
   tezos-base
   tezos-clic
-  tezos-client-commands
-  tezos-stdlib-unix
+  tezos-protocol-016-PtMumbai
+  tezos-shell-services
   tezos-client-base
   tezos-client-base-unix
+  tezos-client-commands
   tezos-client-016-PtMumbai
-  tezos-context.encoding
-  tezos-context.helpers
-  tezos-protocol-016-PtMumbai
-  tezos-protocol-plugin-016-PtMumbai
-  tezos-protocol-016-PtMumbai.parameters
-  tezos-rpc
-  tezos-rpc-http
-  tezos-rpc-http-server
-  tezos-workers
-  tezos_dal_node_services
-  tezos_dal_node_lib
-  tezos-shell-services
-  tezos-smart-rollup-016-PtMumbai
-  tezos-smart-rollup-layer2-016-PtMumbai
-  tezos-layer2-utils-016-PtMumbai
-  tezos_layer2_store
-  tezos-tree-encoding
-  data-encoding
-  irmin-pack
-  irmin-pack.unix
-  irmin
-  aches
-  aches-lwt
-  tezos-injector-016-PtMumbai
-  tezos-scoru-wasm
-  tezos-scoru-wasm-fast
-  tezos-crypto-dal
-  prometheus-app
-  octez-node-config)
+  octez-smart-rollup-node
+  octez_smart_rollup_node_PtMumbai)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -52,20 +26,11 @@
   -open Tezos_base
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_client_commands
-  -open Tezos_stdlib_unix
+  -open Tezos_protocol_016_PtMumbai
+  -open Tezos_shell_services
   -open Tezos_client_base
   -open Tezos_client_base_unix
+  -open Tezos_client_commands
   -open Tezos_client_016_PtMumbai
-  -open Tezos_protocol_016_PtMumbai
-  -open Tezos_protocol_plugin_016_PtMumbai
-  -open Tezos_protocol_016_PtMumbai_parameters
-  -open Tezos_workers
-  -open Tezos_dal_node_lib
-  -open Tezos_shell_services
-  -open Tezos_smart_rollup_016_PtMumbai
-  -open Tezos_smart_rollup_layer2_016_PtMumbai
-  -open Tezos_layer2_utils_016_PtMumbai
-  -open Tezos_layer2_store
-  -open Tezos_injector_016_PtMumbai
-  -open Tezos_crypto_dal))
+  -open Octez_smart_rollup_node
+  -open Octez_smart_rollup_node_PtMumbai))

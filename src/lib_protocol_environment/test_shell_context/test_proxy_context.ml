@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Proxy context (without delegation for now)
-    Invocation:   dune exec src/lib_protocol_environment/test_shell_context/test_proxy_context.exe
+    Invocation:   dune exec src/lib_protocol_environment/test_shell_context/main.exe
     Dependencies: src/lib_protocol_environment/test_shell_context/assert.ml
     Subject:      Low-level operations on proxy contexts.
 *)
@@ -56,7 +56,7 @@ let key_to_string : String.t list -> String.t = String.concat ";"
 (* Initialize the Context before starting the tests *)
 let init_contexts (f : Context.t -> unit Lwt.t) _ () : 'a Lwt.t =
   let open Lwt_syntax in
-  let ctxt = Tezos_context_memory.make_empty_context () in
+  let ctxt = Tezos_context_memory.Context.make_empty_context () in
   let* ctxt = create_block ctxt in
   let proxy : Context.t =
     Tezos_protocol_environment.Proxy_context.empty
@@ -210,5 +210,8 @@ let tests : unit Alcotest_lwt.test_case list =
     tests
 
 let () =
-  Alcotest_lwt.run "tezos-shell-proxy-context" [("proxy_context", tests)]
+  Alcotest_lwt.run
+    ~__FILE__
+    "tezos-shell-proxy-context"
+    [("proxy_context", tests)]
   |> Lwt_main.run

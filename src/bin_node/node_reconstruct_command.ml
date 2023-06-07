@@ -44,12 +44,13 @@ let () =
 (** Main *)
 
 module Term = struct
-  let process args sandbox_file progress_display_mode =
+  let process data_dir config_file sandbox_file progress_display_mode =
     let run =
       let open Lwt_result_syntax in
-      let*! () = Tezos_base_unix.Internal_event_unix.init () in
-      let* node_config = Shared_arg.read_and_patch_config_file args in
-      let data_dir = node_config.data_dir in
+      let*! () = Tezos_base_unix.Internal_event_unix.init_with_defaults () in
+      let* data_dir, node_config =
+        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+      in
       let ({genesis; _} : Config_file.blockchain_network) =
         node_config.blockchain_network
       in
@@ -132,7 +133,9 @@ module Term = struct
 
   let term =
     let open Cmdliner.Term in
-    ret (const process $ Shared_arg.Term.args $ sandbox $ progress_display_mode)
+    ret
+      (const process $ Shared_arg.Term.data_dir $ Shared_arg.Term.config_file
+     $ sandbox $ progress_display_mode)
 end
 
 module Manpage = struct

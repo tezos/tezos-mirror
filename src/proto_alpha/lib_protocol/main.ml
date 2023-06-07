@@ -44,7 +44,8 @@ type operation_data = Alpha_context.packed_protocol_data =
       'kind Alpha_context.Operation.protocol_data
       -> operation_data
 
-let operation_data_encoding = Alpha_context.Operation.protocol_data_encoding
+let operation_data_encoding =
+  Alpha_context.Operation.protocol_data_encoding_with_legacy_attestation_name
 
 type operation_receipt = Apply_results.packed_operation_metadata =
   | Operation_metadata :
@@ -94,35 +95,6 @@ type validation_state = Validate.validation_state
 
 type application_state = Apply.application_state
 
-let init_allowed_consensus_operations ctxt ~endorsement_level
-    ~preendorsement_level =
-  let open Lwt_result_syntax in
-  let open Alpha_context in
-  let* ctxt = Delegate.prepare_stake_distribution ctxt in
-  let* ctxt, allowed_endorsements, allowed_preendorsements =
-    if Level.(endorsement_level = preendorsement_level) then
-      let* ctxt, slots =
-        Baking.endorsing_rights_by_first_slot ctxt endorsement_level
-      in
-      let consensus_operations = slots in
-      return (ctxt, consensus_operations, consensus_operations)
-    else
-      let* ctxt, endorsements =
-        Baking.endorsing_rights_by_first_slot ctxt endorsement_level
-      in
-      let* ctxt, preendorsements =
-        Baking.endorsing_rights_by_first_slot ctxt preendorsement_level
-      in
-      return (ctxt, endorsements, preendorsements)
-  in
-  let ctxt =
-    Consensus.initialize_consensus_operation
-      ctxt
-      ~allowed_endorsements
-      ~allowed_preendorsements
-  in
-  return ctxt
-
 (** Circumstances and relevant information for [begin_validation] and
     [begin_application] below. *)
 type mode =
@@ -137,6 +109,83 @@ type mode =
       predecessor_hash : Block_hash.t;
       timestamp : Time.t;
     }
+
+(** Initialize the consensus rights by first slot for modes that are
+    about the validation/application of a block: application, partial
+    validation, and full construction.
+
+    In these modes, endorsements must point to the predecessor's level
+    and preendorsements, if any, to the block's level. *)
+let init_consensus_rights_for_block ctxt mode ~predecessor_level =
+  let open Lwt_result_syntax in
+  let open Alpha_context in
+  let* ctxt, endorsements_map =
+    Baking.endorsing_rights_by_first_slot ctxt predecessor_level
+  in
+  let*? can_contain_preendorsements =
+    match mode with
+    | Construction _ | Partial_construction _ -> ok true
+    | Application block_header | Partial_validation block_header ->
+        (* A preexisting block, which has a complete and correct block
+           header, can only contain preendorsements when the locked
+           round in the fitness has an actual value. *)
+        let open Result_syntax in
+        let* locked_round =
+          Fitness.locked_round_from_raw block_header.shell.fitness
+        in
+        return (Option.is_some locked_round)
+  in
+  let* ctxt, allowed_preendorsements =
+    if can_contain_preendorsements then
+      let* ctxt, preendorsements_map =
+        Baking.endorsing_rights_by_first_slot ctxt (Level.current ctxt)
+      in
+      return (ctxt, Some preendorsements_map)
+    else return (ctxt, None)
+  in
+  let ctxt =
+    Consensus.initialize_consensus_operation
+      ctxt
+      ~allowed_endorsements:(Some endorsements_map)
+      ~allowed_preendorsements
+  in
+  return ctxt
+
+(** Initialize the consensus rights for a mempool (partial
+    construction mode).
+
+    In the mempool, there are three allowed levels for both
+    endorsements and preendorsements: [predecessor_level - 1] (aka the
+    grandparent's level), [predecessor_level] (that is, the level of
+    the mempool's head), and [predecessor_level + 1] (aka the current
+    level in ctxt). *)
+let init_consensus_rights_for_mempool ctxt ~predecessor_level =
+  let open Lwt_result_syntax in
+  let open Alpha_context in
+  (* We don't want to compute the tables by first slot for all three
+     possible levels because it is time-consuming. So we don't compute
+     any [allowed_endorsements] or [allowed_preendorsements] tables. *)
+  let ctxt =
+    Consensus.initialize_consensus_operation
+      ctxt
+      ~allowed_endorsements:None
+      ~allowed_preendorsements:None
+  in
+  (* However, we want to ensure that the cycle rights are loaded in
+     the context, so that {!Stake_distribution.slot_owner} doesn't
+     have to initialize them each time it is called (we do this now
+     because the context is discarded at the end of the validation of
+     each operation, so we can't rely on the caching done by
+     [slot_owner] itself). *)
+  let cycle = (Level.current ctxt).cycle in
+  let* ctxt = Stake_distribution.load_sampler_for_cycle ctxt cycle in
+  (* If the cycle has changed between the grandparent level and the
+     current level, we also initialize the sampler for that
+     cycle. That way, all three allowed levels are covered. *)
+  match Level.pred ctxt predecessor_level with
+  | Some gp_level when Cycle.(gp_level.cycle <> cycle) ->
+      Stake_distribution.load_sampler_for_cycle ctxt gp_level.cycle
+  | Some _ | None -> return ctxt
 
 let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
   let open Lwt_result_syntax in
@@ -153,31 +202,20 @@ let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
   in
   let*? predecessor_raw_level = Raw_level.of_int32 predecessor.level in
   let predecessor_level = Level.from_raw ctxt predecessor_raw_level in
-  (* During block (full or partial) application or full construction,
-     endorsements must be for [predecessor_level] and preendorsements,
-     if any, for the block's level. In the mempool (partial
-     construction), only consensus operations for [predecessor_level]
-     (that is, head's level) are allowed (except for grandparent
-     endorsements, which are handled differently). *)
-  let preendorsement_level =
+  let* ctxt = Delegate.prepare_stake_distribution ctxt in
+  let* ctxt =
     match mode with
     | Application _ | Partial_validation _ | Construction _ ->
-        Level.current ctxt
-    | Partial_construction _ -> predecessor_level
-  in
-  let* ctxt =
-    init_allowed_consensus_operations
-      ctxt
-      ~endorsement_level:predecessor_level
-      ~preendorsement_level
+        init_consensus_rights_for_block ctxt mode ~predecessor_level
+    | Partial_construction _ ->
+        init_consensus_rights_for_mempool ctxt ~predecessor_level
   in
   Dal_apply.initialisation ~level:predecessor_level ctxt >>=? fun ctxt ->
   return
     ( ctxt,
       migration_balance_updates,
       migration_operation_results,
-      predecessor_level,
-      predecessor_raw_level )
+      predecessor_level )
 
 let begin_validation ctxt chain_id mode ~predecessor =
   let open Lwt_result_syntax in
@@ -185,8 +223,7 @@ let begin_validation ctxt chain_id mode ~predecessor =
   let* ( ctxt,
          _migration_balance_updates,
          _migration_operation_results,
-         predecessor_level,
-         _predecessor_raw_level ) =
+         predecessor_level ) =
     prepare_ctxt ctxt ~predecessor mode
   in
   let predecessor_timestamp = predecessor.timestamp in
@@ -230,16 +267,12 @@ let begin_validation ctxt chain_id mode ~predecessor =
         block_header_data.contents
   | Partial_construction _ ->
       let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
-      let*? grandparent_round =
-        Fitness.predecessor_round_from_raw predecessor_fitness
-      in
       return
         (Validate.begin_partial_construction
            ctxt
            chain_id
            ~predecessor_level
-           ~predecessor_round
-           ~grandparent_round)
+           ~predecessor_round)
 
 let validate_operation = Validate.validate_operation
 
@@ -270,8 +303,7 @@ let begin_application ctxt chain_id mode ~predecessor =
   let* ( ctxt,
          migration_balance_updates,
          migration_operation_results,
-         predecessor_level,
-         predecessor_raw_level ) =
+         predecessor_level ) =
     prepare_ctxt ctxt ~predecessor mode
   in
   let predecessor_timestamp = predecessor.timestamp in
@@ -305,7 +337,6 @@ let begin_application ctxt chain_id mode ~predecessor =
         chain_id
         ~migration_balance_updates
         ~migration_operation_results
-        ~predecessor_level:predecessor_raw_level
         ~predecessor_hash
         ~predecessor_fitness
 
@@ -401,8 +432,7 @@ module Mempool = struct
     let* ( ctxt,
            _migration_balance_updates,
            _migration_operation_results,
-           head_level,
-           _head_raw_level ) =
+           head_level ) =
       (* We use Partial_construction to factorize the [prepare_ctxt]. *)
       prepare_ctxt
         ctxt
@@ -411,15 +441,13 @@ module Mempool = struct
         ~predecessor:head
     in
     let*? predecessor_round = Fitness.round_from_raw head.fitness in
-    let*? grandparent_round = Fitness.predecessor_round_from_raw head.fitness in
     return
       (init
          ctxt
          chain_id
          ~predecessor_level:head_level
          ~predecessor_round
-         ~predecessor_hash:head_hash
-         ~grandparent_round)
+         ~predecessor_hash:head_hash)
 end
 
 (* Vanity nonce: TBD *)

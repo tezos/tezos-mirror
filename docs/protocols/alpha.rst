@@ -2,48 +2,30 @@ Protocol Alpha
 ==============
 
 This page documents the changes brought by protocol Alpha with respect
-to Mumbai (see :ref:`naming_convention`).
+to Nairobi (see :ref:`naming_convention`).
 
 The code can be found in directory :src:`src/proto_alpha` of the ``master``
 branch of Octez.
 
 .. contents::
 
-New Environment Version (V9)
-----------------------------
+Environment Version
+-------------------
 
-This protocol requires a different protocol environment version than Mumbai.
-It requires protocol environment V9, compared to V8 for Mumbai. (MR :gl:`!7178`)
+This protocol requires a different protocol environment version than Nairobi.
+It requires protocol environment V10, compared to V9 for Nairobi.
 
 Smart Rollups
 -------------
 
-- Update gas model for decoding output proofs. (MR :gl:`!7116`)
-
-- Improve readability of ``assert_commitment_not_too_far_ahead``.
-  (MR :gl:`!7231`)
-
-- Improve readability of ``assert_commitment_is_not_past_curfew``.
-  (MR :gl:`!7230`)
-
-- Remove dead code: legacy Internal for Tests signatures (MR :gl:`!7234`)
-
-- Prefer hex over b58check to encode filenames. (MR :gl:`!7181`)
-
-- Code quality improvements. (MR :gl:`!7287`)
-
-- Fix error raised when no commitment can be cemented. (MR :gl:`!7286`)
-
 Zero Knowledge Rollups (ongoing)
 --------------------------------
-
-Rollups supporting cryptographic proofs of correct execution. (MRs :gl:`!7342`)
 
 Data Availability Layer (ongoing)
 ---------------------------------
 
-Distribution of rollup operations data off-chain. (MRs :gl:`!7074`, :gl:`!7102`,
-:gl:`!7103`, :gl:`!7140`, :gl:`!7182`, :gl:`!7192`, :gl:`!7242`, :gl:`!7315`)
+Gas improvements
+----------------
 
 Breaking Changes
 ----------------
@@ -51,18 +33,50 @@ Breaking Changes
 RPC Changes
 -----------
 
+- Split duplicated argument ``pkh`` in RPC ``smart_rollups/smart_rollup/<address>/staker1/<pkh>/staker2/<pkh>/timeout``
+  and ``smart_rollups/smart_rollup/<address>/staker1/<pkh>/staker2/<pkh>/timeout_reached`` into ``/staker1/<staker1_pkh>/staker2/<staker2_pkh>``.
+  This changes the RPC description but not its use. (MR :gl:`!8339`)
+
 Operation receipts
 ------------------
 
 Bug Fixes
 ---------
 
-- Fix consensus watermark encoding roundtrip. (MR :gl:`!7210`)
-
 Minor Changes
 -------------
 
-- Adapt new mempool with proto add_operation. (MR :gl:`!6749`)
-
 Internal
 --------
+
+- Fail earlier when a smart rollup commitment is in conflict when cementing.
+  (MR :gl:`!8128`)
+
+- split smart rollup origination fct for readibility. (MR :gl:`!8276`)
+
+- Remove the deprecated and unused ``tx_rollup_l2_address`` Michelson
+  type. (MR :gl:`!8546`)
+
+- Add an internal represention case for the ``UNIT`` Michelson instruction. (MR :gl:`!8579`)
+
+- Encoding that supports ``endorsement`` kind in JSON are now suffixed with
+  ``_with_legacy_attestation_name``. Non legacy encoding supports
+  ``attestation`` kind. (MR :gl:`!8563`)
+
+- Michelson: remove legacy behaviour related to contract type. (MR :gl:`!5800`)
+
+- Michelson: cleanup legacy annotation management. (MR :gl:`!8208`)
+
+- Michelson: refactor management of metadata in ty smart constructors. (MR :gl:`!8420`)
+
+- Michelson: remove unused deprecated tx_rollup_l2_address type. (MR :gl:`!8546`)
+
+- Rename ``source`` into ``sender``. (MR :gl:`!7373`)
+
+- Improve efficiency of solving the baker PoW challenge. (MR :gl:`!8403`)
+
+- Refactor declarations of ``make_empty_context`` and ``make_empty_tree`` for easier use.
+  (MR :gl:`!8550`)
+
+- Move notion of Smart rollup address in the shell to make it common to all protocols,
+  and expose it in the environment. (MR :gl:`!8562`)

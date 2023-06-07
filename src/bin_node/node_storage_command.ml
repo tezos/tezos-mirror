@@ -178,29 +178,14 @@ module Term = struct
   let integrity_check_inodes config_file data_dir block =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let*! () = Tezos_base_unix.Internal_event_unix.init () in
-      let actual_data_dir =
-        Option.value ~default:Config_file.default_data_dir data_dir
+      let*! () = Tezos_base_unix.Internal_event_unix.init_with_defaults () in
+      let* data_dir, node_config =
+        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
       in
-      let config_file =
-        Option.value
-          ~default:
-            Filename.Infix.(
-              actual_data_dir // Data_version.default_config_file_name)
-          config_file
-      in
-      let* node_config = Config_file.read config_file in
       let ({genesis; _} : Config_file.blockchain_network) =
         node_config.blockchain_network
       in
       let chain_id = Chain_id.of_block_hash genesis.block in
-      let data_dir =
-        (* The --data-dir argument overrides the potentially given
-           configuration file. *)
-        match data_dir with
-        | Some data_dir -> data_dir
-        | None -> node_config.data_dir
-      in
       let* () = Data_version.ensure_data_dir genesis data_dir in
       let context_dir = Data_version.context_dir data_dir in
       let store_dir = Data_version.store_dir data_dir in
@@ -238,29 +223,14 @@ module Term = struct
   let find_head config_file data_dir =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-      let*! () = Tezos_base_unix.Internal_event_unix.init () in
-      let actual_data_dir =
-        Option.value ~default:Config_file.default_data_dir data_dir
+      let*! () = Tezos_base_unix.Internal_event_unix.init_with_defaults () in
+      let* data_dir, node_config =
+        Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
       in
-      let config_file =
-        Option.value
-          ~default:
-            Filename.Infix.(
-              actual_data_dir // Data_version.default_config_file_name)
-          config_file
-      in
-      let* node_config = Config_file.read config_file in
       let ({genesis; _} : Config_file.blockchain_network) =
         node_config.blockchain_network
       in
       let chain_id = Chain_id.of_block_hash genesis.block in
-      let data_dir =
-        (* The --data-dir argument overrides the potentially given
-           configuration file. *)
-        match data_dir with
-        | Some data_dir -> data_dir
-        | None -> node_config.data_dir
-      in
       let* () = Data_version.ensure_data_dir genesis data_dir in
       let context_dir = Data_version.context_dir data_dir in
       let store_dir = Data_version.store_dir data_dir in

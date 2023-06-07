@@ -1,0 +1,59 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_proto_017_PtNairob_lib_protocol_test_integration_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  tezt
+  tezos-context
+  octez-alcotezt
+  tezos-base
+  tezos-client-017-PtNairob
+  tezos-protocol-017-PtNairob
+  tezos-protocol-017-PtNairob.parameters
+  tezos-017-PtNairob-test-helpers
+  tezos-base-test-helpers)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Octez_alcotezt
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_client_017_PtNairob
+  -open Tezos_protocol_017_PtNairob
+  -open Tezos_protocol_017_PtNairob_parameters
+  -open Tezos_017_PtNairob_test_helpers
+  -open Tezos_base_test_helpers)
+ (modules
+  test_constants
+  test_frozen_bonds
+  test_liquidity_baking
+  test_storage_functions
+  test_storage
+  test_token))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_proto_017_PtNairob_lib_protocol_test_integration_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-017-PtNairob-tests)
+ (deps (glob_files wasm_kernel/*.wasm))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

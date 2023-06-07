@@ -58,6 +58,10 @@ type error += Invalid_auth
 
 type error += Invalid_chunks_size of {value : int; min : int; max : int}
 
+(* P2P conn *)
+
+type error += Peer_discovery_disabled
+
 (* P2P pool *)
 
 type error += Pending_connection
@@ -84,3 +88,7 @@ type error +=
       expected_peer_id : P2p_peer.Id.t;
       received_peer_id : P2p_peer.Id.t;
     }
+
+(* P2P maintenance *)
+
+type error += Maintenance_disabled

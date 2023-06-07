@@ -114,6 +114,26 @@ module Make (X : PARAMETERS) = struct
         Process.terminate ~timeout process ;
         event_loop_promise
 
+  let stop daemon =
+    match daemon.status with
+    | Not_running -> unit
+    | Running {event_loop_promise = None; _} ->
+        invalid_arg "you cannot call Daemon.stop before Daemon.run returns"
+    | Running {process; _} ->
+        let pid = Process.pid process in
+        Unix.kill pid Sys.sigstop ;
+        unit
+
+  let continue daemon =
+    match daemon.status with
+    | Not_running -> unit
+    | Running {event_loop_promise = None; _} ->
+        invalid_arg "you cannot call Daemon.continue before Daemon.run returns"
+    | Running {process; _} ->
+        let pid = Process.pid process in
+        Unix.kill pid Sys.sigcont ;
+        unit
+
   let kill daemon =
     match daemon.status with
     | Not_running -> unit
@@ -205,7 +225,8 @@ module Make (X : PARAMETERS) = struct
           | None when Buffer.length buff >= max_event_size ->
               Format.ksprintf
                 failwith
-                "Could not parse event after %d bytes."
+                "Could not parse daemon %s event after %d bytes."
+                daemon.name
                 max_event_size
           | None -> loop ()
           | Some json -> return (Some json))
@@ -254,7 +275,6 @@ module Make (X : PARAMETERS) = struct
   let run ?(env = String_map.empty) ?runner ?(on_terminate = fun _ -> unit)
       ?(event_level = `Info) ?(event_sections_levels = []) daemon session_state
       arguments =
-    ignore (event_level : Level.default_level) ;
     (match daemon.status with
     | Not_running -> ()
     | Running _ -> Test.fail "daemon %s is already running" daemon.name) ;
@@ -375,6 +395,7 @@ module Make (X : PARAMETERS) = struct
       String_map.find_opt name daemon.one_shot_event_handlers
       |> Option.value ~default:[]
     in
+    Log.debug "Waiting for event [%s]" name ;
     daemon.one_shot_event_handlers <-
       String_map.add
         name
@@ -407,7 +428,11 @@ module Make (X : PARAMETERS) = struct
 
   let log_events daemon =
     on_event daemon @@ fun event ->
-    Log.info "Received event: %s = %s" event.name (JSON.encode event.value)
+    Log.info
+      "[%s] Received event: %s = %s"
+      daemon.name
+      event.name
+      (JSON.encode event.value)
 
   type observe_memory_consumption = Observe of (unit -> int option Lwt.t)
 

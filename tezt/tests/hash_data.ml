@@ -163,7 +163,7 @@ let test_bad_hash_data =
     ]
   in
   let hash_data (data, typ) =
-    let* _ = Client.hash_data ~expect_failure:true ~data ~typ client in
+    let* () = Client.spawn_hash_data ~data ~typ client |> Process.check_error in
     Lwt.return_unit
   in
   Lwt_list.iter_s hash_data data_n_type
@@ -185,7 +185,7 @@ let test_ugly_hash_data =
     [("[]", "list(int"); ("{}", "list('a)"); ("\"ABC\n123\"", "string")]
   in
   let hash_data (data, typ) =
-    let* _ = Client.hash_data ~expect_failure:true ~data ~typ client in
+    let* _ = Client.spawn_hash_data ~data ~typ client |> Process.check_error in
     Lwt.return_unit
   in
   Lwt_list.iter_s hash_data data_n_type

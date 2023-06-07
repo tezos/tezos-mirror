@@ -1,0 +1,55 @@
+
+./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/macros/big_map_get_add.tz --details
+Well typed
+Gas remaining: 1039971.186 units remaining
+{ parameter (pair (pair %set_pair int (option int)) (pair %check_pair int (option int))) ;
+  storage (pair (big_map int int) unit) ;
+  code { DUP
+         /* [ pair (pair (pair int (option int)) int (option int)) (big_map int int) unit
+            : pair (pair (pair int (option int)) int (option int)) (big_map int int) unit ] */ ;
+         DIP { CDAR }
+         /* [ pair (pair (pair int (option int)) int (option int)) (big_map int int) unit
+            : big_map int int ] */ ;
+         DUP
+         /* [ pair (pair (pair int (option int)) int (option int)) (big_map int int) unit
+            : pair (pair (pair int (option int)) int (option int)) (big_map int int) unit
+            : big_map int int ] */ ;
+         DIP { CADR ;
+               DUP
+               /* [ pair int (option int) : pair int (option int) : big_map int int ] */ ;
+               CAR
+               /* [ int : pair int (option int) : big_map int int ] */ ;
+               DIP { CDR /* [ option int : big_map int int ] */ }
+               /* [ int : option int : big_map int int ] */ ;
+               UPDATE
+               /* [ big_map int int ] */ ;
+               DUP
+               /* [ big_map int int : big_map int int ] */ }
+         /* [ pair (pair (pair int (option int)) int (option int)) (big_map int int) unit
+            : big_map int int : big_map int int ] */ ;
+         CADR ;
+         DUP
+         /* [ pair int (option int) : pair int (option int) : big_map int int
+            : big_map int int ] */ ;
+         CDR
+         /* [ option int : pair int (option int) : big_map int int : big_map int int ] */ ;
+         DIP { CAR
+               /* [ int : big_map int int : big_map int int ] */ ;
+               GET
+               /* [ option int : big_map int int ] */ }
+         /* [ option int : option int : big_map int int ] */ ;
+         IF_SOME
+           { SWAP
+             /* [ option int : int : big_map int int ] */ ;
+             IF_SOME { ASSERT_CMPEQ } { FAIL } }
+           { ASSERT_NONE } ;
+         UNIT
+         /* [ unit : big_map int int ] */ ;
+         SWAP
+         /* [ big_map int int : unit ] */ ;
+         PAIR
+         /* [ pair (big_map int int) unit ] */ ;
+         NIL operation
+         /* [ list operation : pair (big_map int int) unit ] */ ;
+         PAIR
+         /* [ pair (list operation) (big_map int int) unit ] */ } }

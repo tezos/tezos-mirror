@@ -47,6 +47,11 @@ let with_node f =
         user_activated_upgrades = [];
         user_activated_protocol_overrides = [];
         operation_metadata_size_limit = Unlimited;
+        external_validator_log_config =
+          {
+            lwt_log_sink_unix = Lwt_log_sink_unix.default_cfg;
+            internal_events = Tezos_base.Internal_event_config.lwt_log;
+          };
         patch_context = None;
         data_dir = dir;
         store_root = dir / "store";

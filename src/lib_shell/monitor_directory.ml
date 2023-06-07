@@ -251,29 +251,61 @@ let build_rpc_directory validator mainchain_validator =
           in
           let* head = Store.Chain.current_head chain_store in
           let shutdown () = Lwt_watcher.shutdown stopper in
-          let in_next_protocols block =
-            match q#next_protocols with
-            | [] -> Lwt.return_true
-            | protocols ->
-                let* context = Store.Block.context_exn chain_store block in
-                let* next_protocol = Context_ops.get_protocol context in
-                Lwt.return
-                  (List.exists (Protocol_hash.equal next_protocol) protocols)
+          let within_protocols header =
+            let find_protocol protocol_level =
+              let+ p = Store.Chain.find_protocol chain_store ~protocol_level in
+              WithExceptions.Option.to_exn
+                ~none:
+                  (Failure
+                     (Format.sprintf "Cannot find protocol %d" protocol_level))
+                p
+            in
+            let next_protocol (header : Block_header.t) =
+              find_protocol header.shell.proto_level
+            in
+            let current_protocol (header : Block_header.t) =
+              let* pred =
+                Store.Block.read_block chain_store header.shell.predecessor
+              in
+              match pred with
+              | Error e ->
+                  Format.kasprintf
+                    Stdlib.failwith
+                    "Cannot find current protocol because missing predecessor: \
+                     %a"
+                    pp_print_trace
+                    e
+              | Ok pred_block ->
+                  let pred_header = Store.Block.header pred_block in
+                  find_protocol pred_header.shell.proto_level
+            in
+            let within protocols get_protocol header =
+              match protocols with
+              | [] -> return_true
+              | _ ->
+                  let+ p = get_protocol header in
+                  List.exists (Protocol_hash.equal p) protocols
+            in
+            let* ok_next = within q#next_protocols next_protocol header in
+            let* ok_current = within q#protocols current_protocol header in
+            return (ok_current && ok_next)
           in
           let stream =
             Lwt_stream.filter_map_s
               (fun block ->
-                let* in_next_protocols = in_next_protocols block in
-                if in_next_protocols then
-                  Lwt.return_some
-                    (Store.Block.hash block, Store.Block.header block)
+                let header = Store.Block.header block in
+                let* within_protocols = within_protocols header in
+                if within_protocols then
+                  Lwt.return_some (Store.Block.hash block, header)
                 else Lwt.return_none)
               block_stream
           in
-          let* first_block_is_among_next_protocols = in_next_protocols head in
+          let* first_block_is_within_protocols =
+            within_protocols (Store.Block.header head)
+          in
           let first_call =
             (* Skip the first block if this is false *)
-            ref first_block_is_among_next_protocols
+            ref first_block_is_within_protocols
           in
           let next () =
             if !first_call then (

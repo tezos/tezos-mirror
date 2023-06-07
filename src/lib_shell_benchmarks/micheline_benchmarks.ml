@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,7 +23,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
+open Benchmarks_shell
 open Tezos_micheline
 
 let ns = Namespace.make Shell_namespace.ns "micheline"
@@ -132,6 +133,10 @@ module Micheline_strip_locations : Benchmark.S = struct
 
   let info = "Benchmarking Micheline.strip_locations"
 
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
+
   let tags = ["micheline"]
 
   type config = unit
@@ -159,7 +164,7 @@ module Micheline_strip_locations : Benchmark.S = struct
         Model.(
           make
             ~conv:(fun {nodes; bytes = _} -> (nodes, ()))
-            ~model:(linear ~coeff:(fv "nodes"))) );
+            ~model:(linear ~name ~coeff:(fv "nodes"))) );
     ]
 
   let create_benchmark rng_state () =

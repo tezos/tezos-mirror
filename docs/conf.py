@@ -26,6 +26,7 @@
 import os
 import sys
 import datetime
+from typing import Dict
 
 sys.path.insert(0, os.path.abspath('.') + '/_extensions')
 
@@ -54,7 +55,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Tezos'
-copyright = '2018-2021, Nomadic Labs <contact@nomadic-labs.com>'
+copyright = '2018-2023, Nomadic Labs <contact@nomadic-labs.com>'
 author = 'Nomadic Labs <contact@nomadic-labs.com>'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -87,7 +88,7 @@ exclude_patterns = [
     'Thumbs.db',
     '.DS_Store',
     'doc_gen',
-    'lima',
+    'mumbai',
 ]
 # TODO tezos/tezos#2170: exclude the active protocol 'NNN' above
 
@@ -125,7 +126,17 @@ html_css_files = [
     'css/custom.css',
 ]
 
-html_extra_path = ['404.html', '_redirects']
+html_extra_path = [
+    '404.html',
+    '_redirects',
+    # manually copy images that are only included in raw HTML directives:
+    'images/building_on_tezos_5.png',
+    'images/contributing_to_octez_6.png',
+    'images/discover_tezos_1.png',
+    'images/getting_started_2.png',
+    'images/understanding_octez_4.png',
+    'images/using_octez_3.png',
+]
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
@@ -148,7 +159,7 @@ htmlhelp_basename = 'Tezosdoc'
 
 # -- Options for LaTeX output ---------------------------------------------
 
-latex_elements = {
+latex_elements: Dict[str, str] = {
     # The paper size ('letterpaper' or 'a4paper').
     #
     # 'papersize': 'letterpaper',
@@ -221,7 +232,6 @@ linkcheck_allowed_redirects = dict(
             r'https://www\.sphinx-doc\.org/.*',
             r'https://www\.sphinx-doc\.org/en/master/.*',
         ),
-        (r'https://docs\.pytest\.org/', r'https://docs\.pytest\.org/en/.*'),
         (
             r'https://tools\.ietf\.org/html/.*',
             r'https://datatracker\.ietf\.org/doc/.*',
@@ -231,6 +241,10 @@ linkcheck_allowed_redirects = dict(
             r'https://github\.com/serokell/tezos-packaging/releases/latest',
             r'https://github\.com/serokell/tezos-packaging/releases/tag/.*',
         ),
+        (
+            r'https://www.reddit.com/r/tezos/',
+            r'https://www.reddit.com/r/tezos/[?]rdt=[0-9]+',
+        ),
         # 2. permanent redidections, maybe fix one day
         (r'https://bitheap\.org/cram/', r'https://github\.com/aiiie/cram'),
     ]
@@ -239,3 +253,5 @@ linkcheck_allowed_redirects = dict(
 
 # Python module index generation is broken, deactivate it.
 html_domain_indices = False
+
+default_role = 'default'

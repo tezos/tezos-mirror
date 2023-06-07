@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Destination_repr
-    Invocation:   dune exec -- ./src/proto_alpha/lib_protocol/test/unit/main.exe \
-                  test Destination_repr
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+                  -- --file test_destination_repr.ml
     Subject:      To test the encoding of [Destination_repr] and assert it is
                   compatible with [Contract_repr.encoding].
 *)
@@ -181,14 +181,11 @@ let test_encoding_json_compat = test_contracts encoding_json_compat
 let test_compare_destination () =
   let tz1 = !!(Destination_repr.of_b58check null_address) in
   let kt1 = !!(Destination_repr.of_b58check liquidity_baking_dex) in
-  let txr1 = !!(Destination_repr.of_b58check tx_rollup_address) in
   let scr1 = !!(Destination_repr.of_b58check sc_rollup_address) in
   let epx1 = !!(Destination_repr.of_b58check zk_rollup_address) in
 
   assert (Destination_repr.(tz1 < kt1)) ;
-  assert (Destination_repr.(kt1 < txr1)) ;
-  assert (Destination_repr.(tz1 < txr1)) ;
-  assert (Destination_repr.(txr1 < scr1)) ;
+  assert (Destination_repr.(kt1 < scr1)) ;
   assert (Destination_repr.(scr1 < epx1)) ;
 
   return_unit
@@ -208,7 +205,7 @@ let tests =
     tztest "Binary Destination_repr to Contract_repr (null address)" `Quick
     @@ test_encode_destination_decode_contract null_address;
     tztest
-      "Binary Contract_repr to Destination_repr (liquidity baking dex)"
+      "Binary Destination_repr to Contract_repr (liquidity baking dex)"
       `Quick
     @@ test_encode_destination_decode_contract liquidity_baking_dex;
     tztest
@@ -223,3 +220,7 @@ let tests =
     @@ test_encoding_json_compat;
     tztest "Comparison of destinations" `Quick test_compare_destination;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("Destination_repr.ml", tests)]
+  |> Lwt_main.run

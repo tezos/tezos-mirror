@@ -51,10 +51,11 @@ module MakeHelpers () = struct
 
   let () =
     let contents =
+      let _prover_pp, public_parameters = Lazy.force Operator.lazy_pp in
       Data_encoding.Binary.(
         to_string_exn
           Tezos_protocol_alpha.Environment.Plonk.public_parameters_encoding
-          Operator.public_parameters)
+          public_parameters)
     in
     write_file public_parameters_file ~contents
 
@@ -198,13 +199,62 @@ module MakeHelpers () = struct
     return state
 end
 
+let originate ?expect_failure ?(gas_cap = 10_000) ?(burn_cap = 10_000)
+    ?(storage_limit = 10_000) client ~src ~alias ~public_parameters_file
+    ~init_state_file ~circuits_info_file ~nb_ops =
+  let* zk_rollup_opt =
+    Client.Zk_rollup.originate
+      ?expect_failure
+      client
+      ~src
+      ~alias
+      ~public_parameters_file
+      ~init_state_file
+      ~circuits_info_file
+      ~nb_ops
+      ~gas_cap
+      ~burn_cap
+      ~storage_limit
+  in
+  let* () = Client.bake_for_and_wait client in
+  return zk_rollup_opt
+
+let publish ?expect_failure ?(burn_cap = 10_000) ?(gas_cap = 10_000) client ~src
+    ~zk_rollup ~ops_file =
+  let* () =
+    Client.Zk_rollup.publish
+      ?expect_failure
+      client
+      ~src
+      ~zk_rollup
+      ~ops_file
+      ~gas_cap
+      ~burn_cap
+  in
+  let* () = Client.bake_for_and_wait client in
+  Lwt.return_unit
+
+let update ?expect_failure ?(gas_cap = 10_000) ?(burn_cap = 10_000) client ~src
+    ~zk_rollup ~update_file =
+  let* () =
+    Client.Zk_rollup.update
+      ?expect_failure
+      client
+      ~src
+      ~zk_rollup
+      ~update_file
+      ~gas_cap
+      ~burn_cap
+  in
+  let* () = Client.bake_for_and_wait client in
+  Lwt.return_unit
+
 (* This test will:
    - Originate a new zk rollup
    - Publish 5 operations
    - Submit an update that processes the first 4 of the published operations
 *)
 let successful_test =
-  let open Client.Zk_rollup in
   Protocol.register_test ~__FILE__ ~title:"successful_test" ~tags:["zk_rollup"]
   @@ fun protocol ->
   let open MakeHelpers () in
@@ -220,9 +270,6 @@ let successful_test =
       ~init_state_file
       ~circuits_info_file
       ~nb_ops:1
-      ~gas_cap:10_000
-      ~burn_cap:10_000
-      ~storage_limit:10_000
   in
   let zk_rollup = Option.get zk_rollup_opt in
   let* pl_length = rpc_pending_list_length c ~zk_rollup in
@@ -237,8 +284,6 @@ let successful_test =
       ~src:bootstrap1.public_key_hash
       ~zk_rollup
       ~ops_file:one_false_op_file
-      ~gas_cap:10_000
-      ~burn_cap:10_000
   in
   let* () =
     publish
@@ -246,8 +291,6 @@ let successful_test =
       ~src:bootstrap1.public_key_hash
       ~zk_rollup
       ~ops_file:one_true_op_file
-      ~gas_cap:10_000
-      ~burn_cap:10_000
   in
   let* () =
     publish
@@ -255,26 +298,22 @@ let successful_test =
       ~src:bootstrap1.public_key_hash
       ~zk_rollup
       ~ops_file:one_true_op_file
-      ~gas_cap:10_000
-      ~burn_cap:10_000
   in
+
   let* () =
     publish
       c
       ~src:bootstrap1.public_key_hash
       ~zk_rollup
       ~ops_file:one_false_op_file
-      ~gas_cap:10_000
-      ~burn_cap:10_000
   in
+
   let* () =
     publish
       c
       ~src:bootstrap1.public_key_hash
       ~zk_rollup
       ~ops_file:one_false_op_file
-      ~gas_cap:10_000
-      ~burn_cap:10_000
   in
   let* pl_length = rpc_pending_list_length c ~zk_rollup in
   assert (pl_length = 5) ;
@@ -289,15 +328,7 @@ let successful_test =
         [false_op; true_op; true_op; false_op])
   in
   let () = write_update upd in
-  let* () =
-    update
-      c
-      ~src:bootstrap1.public_key_hash
-      ~zk_rollup
-      ~update_file
-      ~gas_cap:10_000
-      ~burn_cap:10_000
-  in
+  let* () = update c ~src:bootstrap1.public_key_hash ~zk_rollup ~update_file in
   let* final_state = rpc_state c ~zk_rollup in
   assert (final_state <> initial_state) ;
   let* () = rpc_pending_list c ~zk_rollup in
@@ -306,7 +337,6 @@ let successful_test =
   unit
 
 let failing_origination =
-  let open Client.Zk_rollup in
   Protocol.register_test
     ~__FILE__
     ~title:"failing_origination"
@@ -327,14 +357,10 @@ let failing_origination =
       ~init_state_file
       ~circuits_info_file
       ~nb_ops:1
-      ~gas_cap:10_000
-      ~burn_cap:10_000
-      ~storage_limit:10_000
   in
   unit
 
 let failing_publish =
-  let open Client.Zk_rollup in
   Protocol.register_test ~__FILE__ ~title:"failing_publish" ~tags:["zk_rollup"]
   @@ fun protocol ->
   let open MakeHelpers () in
@@ -349,13 +375,10 @@ let failing_publish =
       ~src:bootstrap1.public_key_hash
       ~zk_rollup
       ~ops_file:one_false_op_file
-      ~gas_cap:10_000
-      ~burn_cap:10_000
   in
   unit
 
 let failing_update =
-  let open Client.Zk_rollup in
   Protocol.register_test ~__FILE__ ~title:"failing_update" ~tags:["zk_rollup"]
   @@ fun protocol ->
   let open MakeHelpers () in
@@ -370,8 +393,6 @@ let failing_update =
       ~src:bootstrap1.public_key_hash
       ~zk_rollup
       ~update_file
-      ~gas_cap:10_000
-      ~burn_cap:10_000
   in
   unit
 

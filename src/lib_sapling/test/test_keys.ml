@@ -105,4 +105,4 @@ let tests =
     ("zip32", `Quick, test_zip32);
   ]
 
-let () = Alcotest.run "sapling" [("keys", tests)]
+let () = Alcotest.run ~__FILE__ "sapling" [("keys", tests)]

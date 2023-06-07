@@ -119,4 +119,4 @@ let signer_bls_test =
 
 let register ~protocols =
   signer_simple_test protocols ;
-  signer_bls_test [Alpha]
+  signer_bls_test [Mumbai; Alpha]

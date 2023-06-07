@@ -57,7 +57,6 @@ let rec unparse_ty_and_entrypoints_uncarbonated :
     | Key_t -> (T_key, [])
     | Timestamp_t -> (T_timestamp, [])
     | Address_t -> (T_address, [])
-    | Tx_rollup_l2_address_t -> (T_tx_rollup_l2_address, [])
     | Operation_t -> (T_operation, [])
     | Chain_id_t -> (T_chain_id, [])
     | Never_t -> (T_never, [])
@@ -82,11 +81,11 @@ let rec unparse_ty_and_entrypoints_uncarbonated :
         match tr with
         | Prim (_, T_pair, ts, []) -> (T_pair, tl :: ts)
         | _ -> (T_pair, [tl; tr]))
-    | Union_t (utl, utr, _meta, _) ->
+    | Or_t (utl, utr, _meta, _) ->
         let entrypoints_l, entrypoints_r =
           match nested_entrypoints with
           | Entrypoints_None -> (no_entrypoints, no_entrypoints)
-          | Entrypoints_Union {left; right} -> (left, right)
+          | Entrypoints_Or {left; right} -> (left, right)
         in
         let tl =
           unparse_ty_and_entrypoints_uncarbonated ~loc utl entrypoints_l
@@ -228,23 +227,6 @@ let unparse_address ~loc ctxt mode {destination; entrypoint} =
       in
       (String (loc, notation), ctxt)
 
-let unparse_tx_rollup_l2_address ~loc ctxt mode
-    (tx_address : tx_rollup_l2_address) =
-  let tx_address = Indexable.to_value tx_address in
-  match mode with
-  | Optimized | Optimized_legacy ->
-      Gas.consume ctxt Unparse_costs.contract_optimized >|? fun ctxt ->
-      let bytes =
-        Data_encoding.Binary.to_bytes_exn
-          Tx_rollup_l2_address.encoding
-          tx_address
-      in
-      (Bytes (loc, bytes), ctxt)
-  | Readable ->
-      Gas.consume ctxt Unparse_costs.contract_readable >|? fun ctxt ->
-      let b58check = Tx_rollup_l2_address.to_b58check tx_address in
-      (String (loc, b58check), ctxt)
-
 let unparse_contract ~loc ctxt mode typed_contract =
   let destination = Typed_contract.destination typed_contract in
   let entrypoint = Typed_contract.entrypoint typed_contract in
@@ -377,7 +359,7 @@ let unparse_pair (type r) ~loc unparse_l unparse_r ctxt mode
   in
   (res, ctxt)
 
-let unparse_union ~loc unparse_l unparse_r ctxt = function
+let unparse_or ~loc unparse_l unparse_r ctxt = function
   | L l ->
       unparse_l ctxt l >|=? fun (l, ctxt) -> (Prim (loc, D_Left, [l], []), ctxt)
   | R r ->
@@ -423,8 +405,6 @@ let rec unparse_comparable_data_rec :
   | Bool_t, b -> Lwt.return @@ unparse_bool ~loc ctxt b
   | Timestamp_t, t -> Lwt.return @@ unparse_timestamp ~loc ctxt mode t
   | Address_t, address -> Lwt.return @@ unparse_address ~loc ctxt mode address
-  | Tx_rollup_l2_address_t, address ->
-      Lwt.return @@ unparse_tx_rollup_l2_address ~loc ctxt mode address
   | Signature_t, s -> Lwt.return @@ unparse_signature ~loc ctxt mode s
   | Mutez_t, v -> Lwt.return @@ unparse_mutez ~loc ctxt v
   | Key_t, k -> Lwt.return @@ unparse_key ~loc ctxt mode k
@@ -436,10 +416,10 @@ let rec unparse_comparable_data_rec :
       let unparse_l ctxt v = unparse_comparable_data_rec ~loc ctxt mode tl v in
       let unparse_r ctxt v = unparse_comparable_data_rec ~loc ctxt mode tr v in
       unparse_pair ~loc unparse_l unparse_r ctxt mode r_witness pair
-  | Union_t (tl, tr, _, YesYes), v ->
+  | Or_t (tl, tr, _, YesYes), v ->
       let unparse_l ctxt v = unparse_comparable_data_rec ~loc ctxt mode tl v in
       let unparse_r ctxt v = unparse_comparable_data_rec ~loc ctxt mode tr v in
-      unparse_union ~loc unparse_l unparse_r ctxt v
+      unparse_or ~loc unparse_l unparse_r ctxt v
   | Option_t (t, _, Yes), v ->
       let unparse_v ctxt v = unparse_comparable_data_rec ~loc ctxt mode t v in
       unparse_option ~loc unparse_v ctxt v
@@ -451,7 +431,12 @@ let account_for_future_serialization_cost unparsed_data ctxt =
   Gas.consume ctxt (Script.micheline_serialization_cost unparsed_data)
   >|? fun ctxt -> (unparsed_data, ctxt)
 
-(* -- Unparsing data of any type -- *)
+type unparse_code_rec =
+  t ->
+  stack_depth:int ->
+  unparsing_mode ->
+  Script.node ->
+  ((canonical_location, prim) node * t, error trace) result Lwt.t
 
 module type MICHELSON_PARSER = sig
   val opened_ticket_type :
@@ -468,6 +453,7 @@ module type MICHELSON_PARSER = sig
     (ex_ty * context) tzresult
 
   val parse_data :
+    unparse_code_rec:unparse_code_rec ->
     elab_conf:Script_ir_translator_config.elab_config ->
     stack_depth:int ->
     context ->
@@ -480,6 +466,7 @@ end
 module Data_unparser (P : MICHELSON_PARSER) = struct
   open Script_tc_errors
 
+  (* -- Unparsing data of any type -- *)
   let rec unparse_data_rec :
       type a ac.
       context ->
@@ -505,8 +492,6 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
     | Bool_t, b -> Lwt.return @@ unparse_bool ~loc ctxt b
     | Timestamp_t, t -> Lwt.return @@ unparse_timestamp ~loc ctxt mode t
     | Address_t, address -> Lwt.return @@ unparse_address ~loc ctxt mode address
-    | Tx_rollup_l2_address_t, address ->
-        Lwt.return @@ unparse_tx_rollup_l2_address ~loc ctxt mode address
     | Contract_t _, contract ->
         Lwt.return @@ unparse_contract ~loc ctxt mode contract
     | Signature_t, s -> Lwt.return @@ unparse_signature ~loc ctxt mode s
@@ -525,10 +510,10 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
         let unparse_l ctxt v = non_terminal_recursion ctxt mode tl v in
         let unparse_r ctxt v = non_terminal_recursion ctxt mode tr v in
         unparse_pair ~loc unparse_l unparse_r ctxt mode r_witness pair
-    | Union_t (tl, tr, _, _), v ->
+    | Or_t (tl, tr, _, _), v ->
         let unparse_l ctxt v = non_terminal_recursion ctxt mode tl v in
         let unparse_r ctxt v = non_terminal_recursion ctxt mode tr v in
-        unparse_union ~loc unparse_l unparse_r ctxt v
+        unparse_or ~loc unparse_l unparse_r ctxt v
     | Option_t (t, _, _), v ->
         let unparse_v ctxt v = non_terminal_recursion ctxt mode t v in
         unparse_option ~loc unparse_v ctxt v
@@ -714,6 +699,7 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
              as all packable values are also forgeable. *)
         in
         P.parse_data
+          ~unparse_code_rec
           ~elab_conf
           ctxt
           ~stack_depth:(stack_depth + 1)

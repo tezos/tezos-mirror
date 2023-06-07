@@ -106,7 +106,11 @@ let prioritize_manager ~max_size ~hard_gas_limit_per_block ~minimal_fees
   | Ok (Some source, Some counter, fee, gas) ->
       if Tez.(fee < minimal_fees) then None
       else
-        let size = Data_encoding.Binary.length Operation.encoding op in
+        let size =
+          Data_encoding.Binary.length
+            Operation.encoding_with_legacy_attestation_name
+            op
+        in
         let size_f = Q.of_int size in
         let gas_f = Q.of_bigint (Gas.Arith.integral_to_z gas) in
         let fee_f = Q.of_int64 (Tez.to_mutez fee) in
@@ -197,7 +201,9 @@ let filter_valid_operations_up_to_quota inc (ops, quota) =
     List.fold_left_s
       (fun (inc, curr_size, nb_ops, acc) op ->
         let op_size =
-          Data_encoding.Binary.length Alpha_context.Operation.encoding op
+          Data_encoding.Binary.length
+            Alpha_context.Operation.encoding_with_legacy_attestation_name
+            op
         in
         let new_size = curr_size + op_size in
         if new_size > max_size then Lwt.return (inc, curr_size, nb_ops, acc)
@@ -283,7 +289,9 @@ let filter_valid_operations_up_to_quota_without_simulation (ops, quota) =
     List.fold_left
       (fun (curr_size, nb_ops, acc) op ->
         let op_size =
-          Data_encoding.Binary.length Alpha_context.Operation.encoding op
+          Data_encoding.Binary.length
+            Alpha_context.Operation.encoding_with_legacy_attestation_name
+            op
         in
         let new_size = curr_size + op_size in
         if new_size > max_size then (curr_size, nb_ops, acc)

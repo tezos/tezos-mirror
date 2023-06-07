@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Operation_repr
-    Invocation:   dune exec ./src/proto_alpha/lib_protocol/test/unit/main.exe -- test Operation_repr
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+                  -- --file test_operation_repr.ml
     Dependencies: --
     Subject:      To test the modules (including the top-level)
                   in operation_repr.ml as individual units, particularly
@@ -104,7 +105,7 @@ module Test_operation_repr = struct
   let test_split_signatures error assemble =
     let op_bytes =
       Data_encoding.Binary.to_bytes_exn
-        Operation_repr.contents_encoding
+        Operation_repr.contents_encoding_with_legacy_attestation_name
         (Contents (Failing_noop ""))
     in
     let prefix, suffix = zero_bls in
@@ -113,7 +114,7 @@ module Test_operation_repr = struct
     in
     match
       Data_encoding.Binary.of_bytes
-        Operation_repr.protocol_data_encoding
+        Operation_repr.protocol_data_encoding_with_legacy_attestation_name
         protocol_data_bytes
     with
     | Ok _ -> failwith "Should have failed with %s" error
@@ -182,3 +183,7 @@ let tests =
       `Quick
       Test_operation_repr.test_multiple_non_manager;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("Operation_repr.ml", tests)]
+  |> Lwt_main.run

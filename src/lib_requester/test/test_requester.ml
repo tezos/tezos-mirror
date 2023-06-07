@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Requester
-    Invocation:   dune build @src/lib_requester/runtest
+    Invocation:   dune exec src/lib_requester/test/main.exe \
+                  -- --file test_requester.ml
     Subject:      Basic behaviors of the API for generic resource
                   fetching/requesting service. Instantiating the [Requester]
                   functor with simple mocks.
@@ -189,11 +190,12 @@ let test_full_fetch_issues_request _ () =
   let open Lwt_syntax in
   let requester = init_full_requester () in
   Test_request.clear_registered_requests () ;
-  check
-    (list (tuple3 unit p2p_peer_id (list testable_test_key)))
-    "should have no requests"
-    []
-    !Test_request.registered_requests ;
+  Alcotest.(
+    check
+      (list (tuple3 unit p2p_peer_id (list testable_test_key)))
+      "should have no requests"
+      []
+      !Test_request.registered_requests) ;
   let f1 =
     Test_Requester.fetch
       ~timeout:
@@ -211,12 +213,13 @@ let test_full_fetch_issues_request _ () =
     "expects 5 requests"
     5
     (List.length !Test_request.registered_requests) ;
-  check
-    (tuple3 unit p2p_peer_id (list testable_test_key))
-    "should have sent a request"
-    ((), P2p_peer.Id.zero, ["baz"])
-    (WithExceptions.Option.get ~loc:__LOC__
-    @@ List.hd !Test_request.registered_requests) ;
+  Alcotest.(
+    check
+      (tuple3 unit p2p_peer_id (list testable_test_key))
+      "should have sent a request"
+      ((), P2p_peer.Id.zero, ["baz"])
+      (WithExceptions.Option.get ~loc:__LOC__
+      @@ List.hd !Test_request.registered_requests)) ;
   Lwt.cancel f1 ;
   Lwt.return_unit
 
@@ -571,9 +574,11 @@ let test_full_requester_test_pending_requests _ () =
       [
         (let* _ = Test_Requester.fetch req key precheck_pass in
          Lwt.return_unit);
-        (* Ensure that the request is registered before [k] is scheduled. *)
-        (let* v = Lwt.pause () in
-         k v);
+        (* Ensure that the request is registered before [k] is
+           scheduled and that enough time is given to the
+           throttler. *)
+        (let* () = Lwt_unix.sleep 0.1 in
+         k ());
       ]
   in
   (* Variant of [with_request] for requests that are never satisfied. When [k]
@@ -583,23 +588,25 @@ let test_full_requester_test_pending_requests _ () =
       [
         (let+ _ = Test_Requester.fetch req key precheck_pass in
          Alcotest.fail "Request should not have been satisfied");
-        (let* v = Lwt.pause () in
-         k v);
+        (let* () = Lwt_unix.sleep 0.1 in
+         k ());
       ]
   in
   (* Fetch value  *)
   check_pending_count "0 pending requests" 0 ;
-  let foo_cancelled : unit Lwt.t =
-    with_request "foo" @@ fun () ->
-    check_pending_count "1 pending requests" 1 ;
-    with_unmet_request "bar" @@ fun () ->
-    check_pending_count "2 pending requests" 2 ;
-    with_unmet_request "bar" @@ fun () ->
-    check_pending_count "still 2 pending requests" 2 ;
-    Lwt.return (Test_Requester.clear_or_cancel req "foo")
+  let* () =
+    with_request "foo" (fun () ->
+        check_pending_count "1 pending requests" 1 ;
+        with_unmet_request "bar" (fun () ->
+            check_pending_count "2 pending requests" 2 ;
+            with_unmet_request "bar" (fun () ->
+                check_pending_count "still 2 pending requests" 2 ;
+                Test_Requester.clear_or_cancel req "foo" ;
+                (* The first "foo" fetch should be resolved *)
+                Lwt_unix.sleep 0.1)))
   in
-  let+ () = foo_cancelled in
-  check_pending_count "back to 1 pending requests" 1
+  check_pending_count "back to 1 pending requests" 1 ;
+  Lwt.return_unit
 
 (** Test memory_table_length *)
 
@@ -626,6 +633,7 @@ let test_full_requester_shutdown _ () =
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "tezos-requester"
     [
       ( "all",

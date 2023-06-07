@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    Crypto
-    Invocation:   dune build @src/lib_crypto/runtest
+    Invocation:   dune exec src/lib_crypto/test/main.exe
     Dependencies: src/lib_crypto/test/roundtrips.ml
     Subject:      Encoding in Base58
 *)

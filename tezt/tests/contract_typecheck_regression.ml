@@ -38,15 +38,39 @@ let hooks =
     ~replace_variables:Fun.id
     ()
 
-let test_typecheck_contract protocol contract =
+let test_typecheck_contract protocol script =
   Protocol.register_regression_test
     ~__FILE__
-    ~title:(sf "Tc %s" contract)
+    ~title:(sf "Tc %s" (Michelson_script.name_s script))
     ~tags:["client"; "michelson"; "typechecking"]
     (fun _protocol ->
-      let client = Client.create_with_mode Mockup in
+      (* Register constants for scripts that require it *)
+      let constants =
+        match Michelson_script.name script with
+        | ["mini_scenarios"; "999_constant"] -> ["999"]
+        | ["mini_scenarios"; "constant_unit"] -> ["Unit"; "unit"]
+        | ["mini_scenarios"; "constant_entrypoints"] -> ["unit"]
+        | _ -> []
+      in
+      let* client =
+        match constants with
+        | [] -> return (Client.create_with_mode Mockup)
+        | constants ->
+            let* client = Client.init_mockup ~protocol () in
+            let* (_exprs : string list) =
+              Lwt_list.map_s
+                (fun value ->
+                  Client.register_global_constant
+                    ~src:Constant.bootstrap1.alias
+                    ~value
+                    ~burn_cap:Tez.one
+                    client)
+                constants
+            in
+            return client
+      in
       Client.typecheck_script
-        ~script:contract
+        ~script:(Michelson_script.path script)
         ~protocol_hash:(Protocol.hash protocol)
         ~hooks
         ~no_base_dir_warnings:true
@@ -57,28 +81,10 @@ let test_typecheck_contract protocol contract =
 let test_typecheck protocols =
   List.iter
     (fun protocol ->
-      (* Type check regression tests for all contracts (except "ill_typed" and "legacy") *)
-      let pytest_dir =
-        sf
-          "tests_python/contracts_%s"
-          (match protocol with
-          | Protocol.Alpha -> "alpha"
-          | _ -> sf "%03d" @@ Protocol.number protocol)
-      in
+      (* Type check regression tests for all well-typed contracts *)
       List.iter
-        (fun subdir ->
-          Array.iter
-            (fun script ->
-              test_typecheck_contract protocol (pytest_dir // subdir // script))
-            (Sys.readdir (pytest_dir // subdir)))
-        [
-          "attic";
-          "entrypoints";
-          "opcodes";
-          "macros";
-          "mini_scenarios";
-          "non_regression";
-        ])
+        (test_typecheck_contract protocol)
+        (Michelson_script.find_all_well_typed protocol))
     protocols
 
 let register ~protocols = test_typecheck protocols

@@ -28,6 +28,13 @@
 
 type error += Parse_error
 
+type error +=
+  | Operation_conflict of {new_hash : Operation_hash.t}
+  | Operation_replacement of {
+      old_hash : Operation_hash.t;
+      new_hash : Operation_hash.t;
+    }
+
 type error += Too_many_operations
 
 type error += Oversized_operation of {size : int; max : int}
@@ -55,6 +62,46 @@ let () =
     Data_encoding.empty
     (function Parse_error -> Some () | _ -> None)
     (fun () -> Parse_error) ;
+  (* Operation conflict *)
+  register_error_kind
+    `Temporary
+    ~id:"prevalidation.operation_conflict"
+    ~title:"Operation conflict"
+    ~description:
+      "The operation cannot be added because the mempool already contains a \
+       conflicting operation."
+    ~pp:(fun ppf new_hash ->
+      Format.fprintf
+        ppf
+        "The operation %a cannot be added because the mempool already contains \
+         a conflicting operation that should not be replaced (e.g. an \
+         operation from the same manager with better fees)."
+        Operation_hash.pp
+        new_hash)
+    (Data_encoding.obj1 (Data_encoding.req "new_hash" Operation_hash.encoding))
+    (function Operation_conflict {new_hash} -> Some new_hash | _ -> None)
+    (fun new_hash -> Operation_conflict {new_hash}) ;
+  (* Operation replacement *)
+  register_error_kind
+    `Temporary
+    ~id:"prevalidation.operation_replacement"
+    ~title:"Operation replacement"
+    ~description:"The operation has been replaced."
+    ~pp:(fun ppf (old_hash, new_hash) ->
+      Format.fprintf
+        ppf
+        "The operation %a has been replaced with %a."
+        Operation_hash.pp
+        old_hash
+        Operation_hash.pp
+        new_hash)
+    (Data_encoding.obj2
+       (Data_encoding.req "old_hash" Operation_hash.encoding)
+       (Data_encoding.req "new_hash" Operation_hash.encoding))
+    (function
+      | Operation_replacement {old_hash; new_hash} -> Some (old_hash, new_hash)
+      | _ -> None)
+    (fun (old_hash, new_hash) -> Operation_replacement {old_hash; new_hash}) ;
   (* Too many operations *)
   register_error_kind
     `Temporary

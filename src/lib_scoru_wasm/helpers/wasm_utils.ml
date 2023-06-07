@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,12 +30,6 @@ open Tezos_lazy_containers
 module Wasm = Wasm_pvm.Make (Tree)
 module Wasm_fast = Tezos_scoru_wasm_fast.Pvm.Make (Tree)
 
-let empty_tree () =
-  let open Lwt_syntax in
-  let* index = Context.init "/tmp" in
-  let empty_store = Context.empty index in
-  return @@ Context.Tree.empty empty_store
-
 let parse_module code =
   let def = Parse.string_to_module code in
   match def.it with
@@ -48,18 +42,20 @@ let wat2wasm code =
 
 let default_max_tick = 100000L
 
+let production_max_tick = 11_000_000_000L
+
 let default_outbox_validity_period = 10l
 
 let default_outbox_message_limit = Z.of_int32 100l
 
-let initial_tree ?(max_tick = default_max_tick)
+let initial_tree ~version ?(ticks_per_snapshot = default_max_tick)
     ?(max_reboots = Constants.maximum_reboots_per_input) ?(from_binary = false)
     ?(outbox_validity_period = default_outbox_validity_period)
     ?(outbox_message_limit = default_outbox_message_limit) code =
   let open Lwt.Syntax in
-  let max_tick_Z = Z.of_int64 max_tick in
+  let max_tick_Z = Z.of_int64 ticks_per_snapshot in
   let* tree = empty_tree () in
-  let* tree = Wasm.initial_state tree in
+  let* tree = Wasm.initial_state version tree in
   let* boot_sector = if from_binary then Lwt.return code else wat2wasm code in
   let* tree =
     Wasm.install_boot_sector
@@ -126,7 +122,10 @@ let rec eval_to_snapshot ?(reveal_builtins = reveal_builtins) ?write_debug
   | Input_required | Reveal_required _ ->
       Stdlib.failwith "Cannot reach snapshot point"
 
-let rec eval_until_input_requested ?(reveal_builtins = Some reveal_builtins)
+(** [eval_until_input_requested tree] will either
+    - return tree if input is required
+    - or run compute_step_many to reach a point where input is required *)
+let eval_until_input_requested ?(reveal_builtins = Some reveal_builtins)
     ?write_debug ?after_fast_exec ?(fast_exec = false)
     ?(max_steps = Int64.max_int) tree =
   let open Lwt_syntax in
@@ -139,13 +138,7 @@ let rec eval_until_input_requested ?(reveal_builtins = Some reveal_builtins)
   match info.input_request with
   | No_input_required ->
       let* tree, _ = run ?reveal_builtins ?write_debug ~max_steps tree in
-      eval_until_input_requested
-        ~reveal_builtins
-        ?write_debug
-        ?after_fast_exec
-        ~fast_exec
-        ~max_steps
-        tree
+      return tree
   | Input_required | Reveal_required _ -> return tree
 
 let eval_until_input_or_reveal_requested =
@@ -173,7 +166,16 @@ let set_sol_input level tree =
   in
   Wasm.set_input_step (input_info level Z.zero) sol_input tree
 
-let set_info_per_level_input level tree =
+let set_protocol_migration_input proto level tree =
+  let sol_input =
+    Pvm_input_kind.(
+      Internal_for_tests.to_binary_input
+        (Internal (Protocol_migration proto))
+        None)
+  in
+  Wasm.set_input_step (input_info level Z.one) sol_input tree
+
+let set_info_per_level_input ?(migration_block = false) level tree =
   let block_hash = Block_hash.zero in
   let timestamp = Time.Protocol.epoch in
   let info_res =
@@ -190,11 +192,20 @@ let set_info_per_level_input level tree =
             (Internal Info_per_level)
             (Some info))
       in
-      Wasm.set_input_step (input_info level Z.one) info_per_level_input tree
+      Wasm.set_input_step
+        (input_info level (if migration_block then Z.of_int 2 else Z.one))
+        info_per_level_input
+        tree
   | Error _ ->
       (* There's no reason the encoding has failed, but we return the tree
          anyway *)
       Stdlib.failwith "Info_per_level encoding has failed, this is impossible"
+
+(* Puts a message into the inbox, where the message already includes
+   Internal vs External etc. information in the payload.
+*)
+let set_raw_message level counter message tree =
+  Wasm.set_input_step (input_info level counter) message tree
 
 let set_internal_message level counter message tree =
   let encoded_message =
@@ -210,13 +221,26 @@ let set_eol_input level counter tree =
   in
   Wasm.set_input_step (input_info level counter) sol_input tree
 
-let set_inputs_step set_internal_message messages level tree =
+let set_inputs_step ?migrate_to set_internal_message messages level tree =
   let open Lwt_syntax in
   let next_message_counter = new_message_counter () in
   let (_ : Z.t) = next_message_counter () in
   let* tree = set_sol_input level tree in
+  let* tree =
+    match migrate_to with
+    | Some proto ->
+        let+ tree = set_protocol_migration_input proto level tree in
+        let (_ : Z.t) = next_message_counter () in
+        tree
+    | None -> return tree
+  in
   let (_ : Z.t) = next_message_counter () in
-  let* tree = set_info_per_level_input level tree in
+  let* tree =
+    set_info_per_level_input
+      ~migration_block:(Option.is_some migrate_to)
+      level
+      tree
+  in
   let* tree =
     List.fold_left_s
       (fun tree message ->
@@ -226,14 +250,22 @@ let set_inputs_step set_internal_message messages level tree =
   in
   set_eol_input level (next_message_counter ()) tree
 
-let set_full_input_step_gen set_internal_message messages level tree =
+let set_full_input_step_gen ?migrate_to set_internal_message messages level tree
+    =
   let open Lwt_syntax in
-  let* tree = set_inputs_step set_internal_message messages level tree in
+  let* tree =
+    set_inputs_step ?migrate_to set_internal_message messages level tree
+  in
   eval_to_snapshot ~max_steps:Int64.max_int tree
 
-let set_full_input_step = set_full_input_step_gen set_internal_message
+let set_full_input_step ?migrate_to =
+  set_full_input_step_gen ?migrate_to set_internal_message
 
-let set_empty_inbox_step level tree = set_full_input_step [] level tree
+let set_full_raw_input_step ?migrate_to =
+  set_full_input_step_gen set_raw_message ?migrate_to
+
+let set_empty_inbox_step ?migrate_to level tree =
+  set_full_input_step ?migrate_to [] level tree
 
 let rec eval_until_init tree =
   let open Lwt_syntax in
@@ -254,6 +286,7 @@ let eval_to_result ?write_debug ?reveal_builtins tree =
   let should_compute pvm_state =
     let+ input_request_val = Wasm_vm.get_info pvm_state in
     match (input_request_val.input_request, pvm_state.tick_state) with
+    | Reveal_required _, _ when reveal_builtins <> None -> true
     | Reveal_required _, _ | Input_required, _ -> false
     | ( No_input_required,
         Eval
@@ -420,8 +453,7 @@ let wrap_as_durable_storage tree =
       Tezos_tree_encoding.(scope ["durable"] wrapped_tree)
       tree
   in
-  Tezos_webassembly_interpreter.Durable_storage.of_tree
-  @@ Tezos_tree_encoding.Wrapped.wrap tree
+  Tezos_webassembly_interpreter.Durable_storage.of_tree tree
 
 let has_stuck_flag tree =
   let open Lwt_syntax in
@@ -451,7 +483,7 @@ let make_durable list_key_vals =
   in
   Durable.to_storage tree
 
-let make_module_inst list_key_vals src =
+let make_module_inst ~version list_key_vals src =
   let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
   let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
   let _ =
@@ -467,7 +499,7 @@ let make_module_inst list_key_vals src =
   let module_reg = Instance.ModuleMap.create () in
   let module_key = Instance.Module_key "test" in
   Instance.update_module_ref module_reg module_key module_inst ;
-  (module_reg, module_key, Host_funcs.all)
+  (module_reg, module_key, Host_funcs.registry ~version ~write_debug:Noop)
 
 let retrieve_memory module_reg =
   let open Lwt_syntax in
@@ -484,15 +516,28 @@ module Kernels = struct
   let unreachable_kernel = "unreachable"
 end
 
+let project_root =
+  match Sys.getenv_opt "DUNE_SOURCEROOT" with
+  | Some x -> x
+  | None -> (
+      match Sys.getenv_opt "PWD" with
+      | Some x -> x
+      | None ->
+          (* For some reason, under [dune runtest], [PWD] and
+             [getcwd] have different values. [getcwd] is in
+             [_build/default], and [PWD] is where [dune runtest] was
+             executed, which is closer to what we want. *)
+          Sys.getcwd ())
+
+let ( // ) = Filename.concat
+
 let test_with_kernel kernel (test : string -> (unit, _) result Lwt.t) () =
-  let open Tezt.Base in
   let open Lwt_result_syntax in
-  (* Reading files using `Tezt_lib` can be fragile and not future-proof, see
-     issue https://gitlab.com/tezos/tezos/-/issues/3746. *)
   let kernel_file =
     project_root // Filename.dirname __FILE__ // "../test/wasm_kernels"
     // (kernel ^ ".wasm")
   in
+
   let* () =
     Lwt_io.with_file ~mode:Lwt_io.Input kernel_file (fun channel ->
         let*! kernel = Lwt_io.read channel in
@@ -501,9 +546,6 @@ let test_with_kernel kernel (test : string -> (unit, _) result Lwt.t) () =
   return_unit
 
 let read_test_messages names =
-  let open Tezt.Base in
-  (* Reading files using `Tezt_lib` can be fragile and not future-proof, see
-     issue https://gitlab.com/tezos/tezos/-/issues/3746. *)
   let locate_file name =
     project_root // Filename.dirname __FILE__ // "../test/messages" // name
   in
@@ -512,3 +554,9 @@ let read_test_messages names =
       let message_file = locate_file name in
       Lwt_io.with_file ~mode:Lwt_io.Input message_file Lwt_io.read)
     names
+
+(** Can be passed to be used as a host function
+    [compute_step_many ~write_debug:write_debug_on_stdout ...] *)
+let write_debug_on_stdout =
+  Tezos_scoru_wasm.Builtins.Printer
+    (fun msg -> Lwt.return @@ Format.printf "%s\n%!" msg)

@@ -28,6 +28,7 @@ depends: [
   "tezos-context-ops"
   "tezos-rpc"
   "tezos-rpc-http"
+  "tezos-dal-node-services"
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
   "uri" { >= "3.1.0" }
@@ -36,10 +37,11 @@ depends: [
   "tezos-mockup"
   "tezos-mockup-proxy"
   "tezos-mockup-commands"
+  "tezt" { with-test & >= "3.1.0" }
   "tezos-micheline" {with-test}
   "tezos-base-test-helpers" {with-test}
   "tezos-crypto" {with-test}
-  "alcotest-lwt" { with-test & >= "1.5.0" }
+  "octez-alcotezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]

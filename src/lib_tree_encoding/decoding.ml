@@ -141,8 +141,24 @@ let value ?default key decoder =
 
 let subtree backend tree prefix =
   let open Lwt_syntax in
-  let+ tree = Tree.find_tree backend tree (prefix []) in
-  Option.map (Tree.wrap backend) tree
+  let tmp_directory = "tmp" in
+  let* subtree = Tree.find_tree backend tree (prefix []) in
+  let+ subtree =
+    match subtree with
+    | Some subtree -> return subtree
+    | None -> (
+        let* tree =
+          Tree.add backend tree (prefix [tmp_directory]) (Bytes.of_string "")
+        in
+        let* subtree = Tree.find_tree backend tree (prefix []) in
+        match subtree with
+        | Some subtree -> Tree.remove backend subtree [tmp_directory]
+        | None ->
+            (* This case is impossible, because we have added something
+               in the tree to avoid it. *)
+            assert false)
+  in
+  subtree
 
 let scope key {decode} =
   {
@@ -162,7 +178,7 @@ let lazy_mapping to_key field_enc =
             input_prefix
         in
         let+ tree = subtree backend input_tree input_prefix in
-        (tree, produce_value));
+        (Some (Tree.Wrapped_tree (tree, backend)), produce_value));
   }
 
 let case_lwt tag decode extract = Case {tag; decode; extract}
@@ -209,8 +225,5 @@ let wrapped_tree =
       (fun backend tree prefix ->
         let open Lwt.Syntax in
         let+ tree = subtree backend tree prefix in
-        match tree with
-        | Some subtree ->
-            Tree.Wrapped_tree (Tree.select backend subtree, backend)
-        | _ -> raise Not_found);
+        Tree.Wrapped_tree (tree, backend));
   }

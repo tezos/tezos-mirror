@@ -10,6 +10,7 @@
   tezos-shell-services
   tezos-client-base
   tezos-protocol-003-PsddFKi3
+  tezos-protocol-003-PsddFKi3.lifted
   tezos-signer-backends
   tezos-rpc
   uri)

@@ -108,6 +108,7 @@ type block_info = {
   round : Round.t;
   prequorum : prequorum option;
   quorum : Kind.endorsement operation list;
+  dal_attestations : Kind.dal_attestation operation list;
   payload : Operation_pool.payload;
 }
 
@@ -136,6 +137,7 @@ type global_state = {
   (* the delegates on behalf of which the baker is running *)
   delegates : consensus_key list;
   cache : cache;
+  dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
 }
 
 let prequorum_encoding =
@@ -155,7 +157,9 @@ let prequorum_encoding =
        (req "level" int32)
        (req "round" Round.encoding)
        (req "block_payload_hash" Block_payload_hash.encoding)
-       (req "preendorsements" (list (dynamic_size Operation.encoding))))
+       (req
+          "preendorsements"
+          (list (dynamic_size Operation.encoding_with_legacy_attestation_name))))
 
 let block_info_encoding =
   let open Data_encoding in
@@ -168,6 +172,7 @@ let block_info_encoding =
            round;
            prequorum;
            quorum;
+           dal_attestations;
            payload;
          } ->
       ( hash,
@@ -177,6 +182,7 @@ let block_info_encoding =
         round,
         prequorum,
         List.map Operation.pack quorum,
+        List.map Operation.pack dal_attestations,
         payload ))
     (fun ( hash,
            shell,
@@ -185,6 +191,7 @@ let block_info_encoding =
            round,
            prequorum,
            quorum,
+           dal_attestations,
            payload ) ->
       {
         hash;
@@ -194,16 +201,23 @@ let block_info_encoding =
         round;
         prequorum;
         quorum = List.filter_map Operation_pool.unpack_endorsement quorum;
+        dal_attestations =
+          List.filter_map Operation_pool.unpack_dal_attestation dal_attestations;
         payload;
       })
-    (obj8
+    (obj9
        (req "hash" Block_hash.encoding)
        (req "shell" Block_header.shell_header_encoding)
        (req "payload_hash" Block_payload_hash.encoding)
        (req "payload_round" Round.encoding)
        (req "round" Round.encoding)
        (req "prequorum" (option prequorum_encoding))
-       (req "quorum" (list (dynamic_size Operation.encoding)))
+       (req
+          "quorum"
+          (list (dynamic_size Operation.encoding_with_legacy_attestation_name)))
+       (req
+          "dal_attestations"
+          (list (dynamic_size Operation.encoding_with_legacy_attestation_name)))
        (req "payload" Operation_pool.payload_encoding))
 
 let round_of_shell_header shell_header =
@@ -280,7 +294,6 @@ type level_state = {
   current_level : int32;
   latest_proposal : proposal;
   is_latest_proposal_applied : bool;
-  injected_preendorsements : packed_operation list option;
   (* Last proposal received where we injected an endorsement (thus we
      have seen 2f+1 preendorsements) *)
   locked_round : locked_round option;
@@ -307,25 +320,25 @@ let phase_encoding =
       case
         ~title:"Idle"
         (Tag 0)
-        unit
+        (constant "Idle")
         (function Idle -> Some () | _ -> None)
         (fun () -> Idle);
       case
         ~title:"Awaiting_preendorsements"
         (Tag 1)
-        unit
+        (constant "Awaiting_preendorsements")
         (function Awaiting_preendorsements -> Some () | _ -> None)
         (fun () -> Awaiting_preendorsements);
       case
         ~title:"Awaiting_application"
         (Tag 2)
-        unit
+        (constant "Awaiting_application")
         (function Awaiting_application -> Some () | _ -> None)
         (fun () -> Awaiting_application);
       case
         ~title:"Awaiting_endorsements"
         (Tag 3)
-        unit
+        (constant "Awaiting_endorsements")
         (function Awaiting_endorsements -> Some () | _ -> None)
         (fun () -> Awaiting_endorsements);
     ]
@@ -359,17 +372,22 @@ let timeout_kind_encoding =
       case
         (Tag 0)
         ~title:"End_of_round"
-        Round.encoding
+        (obj2
+           (req "kind" (constant "End_of_round"))
+           (req "round" Round.encoding))
         (function
-          | End_of_round {ending_round} -> Some ending_round | _ -> None)
-        (fun ending_round -> End_of_round {ending_round});
+          | End_of_round {ending_round} -> Some ((), ending_round) | _ -> None)
+        (fun ((), ending_round) -> End_of_round {ending_round});
       case
         (Tag 1)
         ~title:"Time_to_bake_next_level"
-        Round.encoding
+        (obj2
+           (req "kind" (constant "Time_to_bake_next_level"))
+           (req "round" Round.encoding))
         (function
-          | Time_to_bake_next_level {at_round} -> Some at_round | _ -> None)
-        (fun at_round -> Time_to_bake_next_level {at_round});
+          | Time_to_bake_next_level {at_round} -> Some ((), at_round)
+          | _ -> None)
+        (fun ((), at_round) -> Time_to_bake_next_level {at_round});
     ]
 
 type event =
@@ -388,46 +406,50 @@ let event_encoding =
       case
         (Tag 0)
         ~title:"New_valid_proposal"
-        proposal_encoding
-        (function New_valid_proposal p -> Some p | _ -> None)
-        (fun p -> New_valid_proposal p);
+        (tup2 (constant "New_valid_proposal") proposal_encoding)
+        (function New_valid_proposal p -> Some ((), p) | _ -> None)
+        (fun ((), p) -> New_valid_proposal p);
       case
         (Tag 1)
         ~title:"New_head_proposal"
-        proposal_encoding
-        (function New_head_proposal p -> Some p | _ -> None)
-        (fun p -> New_head_proposal p);
+        (tup2 (constant "New_head_proposal") proposal_encoding)
+        (function New_head_proposal p -> Some ((), p) | _ -> None)
+        (fun ((), p) -> New_head_proposal p);
       case
         (Tag 2)
         ~title:"Prequorum_reached"
-        (tup2
+        (tup3
+           (constant "Prequorum_reached")
            Operation_worker.candidate_encoding
-           (Data_encoding.list (dynamic_size Operation.encoding)))
+           (Data_encoding.list
+              (dynamic_size Operation.encoding_with_legacy_attestation_name)))
         (function
           | Prequorum_reached (candidate, ops) ->
-              Some (candidate, List.map Operation.pack ops)
+              Some ((), candidate, List.map Operation.pack ops)
           | _ -> None)
-        (fun (candidate, ops) ->
+        (fun ((), candidate, ops) ->
           Prequorum_reached
             (candidate, Operation_pool.filter_preendorsements ops));
       case
         (Tag 3)
         ~title:"Quorum_reached"
-        (tup2
+        (tup3
+           (constant "Quorum_reached")
            Operation_worker.candidate_encoding
-           (Data_encoding.list (dynamic_size Operation.encoding)))
+           (Data_encoding.list
+              (dynamic_size Operation.encoding_with_legacy_attestation_name)))
         (function
           | Quorum_reached (candidate, ops) ->
-              Some (candidate, List.map Operation.pack ops)
+              Some ((), candidate, List.map Operation.pack ops)
           | _ -> None)
-        (fun (candidate, ops) ->
+        (fun ((), candidate, ops) ->
           Quorum_reached (candidate, Operation_pool.filter_endorsements ops));
       case
         (Tag 4)
         ~title:"Timeout"
-        timeout_kind_encoding
-        (function Timeout tk -> Some tk | _ -> None)
-        (fun tk -> Timeout tk);
+        (tup2 (constant "Timeout") timeout_kind_encoding)
+        (function Timeout tk -> Some ((), tk) | _ -> None)
+        (fun ((), tk) -> Timeout tk);
     ]
 
 (* Disk state *)
@@ -726,13 +748,15 @@ let pp_block_info fmt
       round;
       prequorum;
       quorum;
+      dal_attestations;
       payload;
       payload_round;
     } =
   Format.fprintf
     fmt
     "@[<v 2>Block:@ hash: %a@ payload_hash: %a@ level: %ld@ round: %a@ \
-     prequorum: %a@ quorum: %d endorsements@ payload: %a@ payload round: %a@]"
+     prequorum: %a@ quorum: %d endorsements@ dal_attestations: %d@ payload: \
+     %a@ payload round: %a@]"
     Block_hash.pp
     hash
     Block_payload_hash.pp_short
@@ -743,6 +767,7 @@ let pp_block_info fmt
     (pp_option pp_prequorum)
     prequorum
     (List.length quorum)
+    (List.length dal_attestations)
     Operation_pool.pp_payload
     payload
     Round.pp
@@ -807,7 +832,6 @@ let pp_level_state fmt
       current_level;
       latest_proposal;
       is_latest_proposal_applied;
-      injected_preendorsements;
       locked_round;
       endorsable_payload;
       elected_block;
@@ -817,13 +841,12 @@ let pp_level_state fmt
     } =
   Format.fprintf
     fmt
-    "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal (applied:%b, \
-     injected preendorsements: %d):@ %a@]@ locked round: %a@ endorsable \
-     payload: %a@ elected block: %a@ @[<v 2>own delegate slots:@ %a@]@ @[<v \
-     2>next level own delegate slots:@ %a@]@ next level proposed round: %a@]"
+    "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal (applied:%b):@ \
+     %a@]@ locked round: %a@ endorsable payload: %a@ elected block: %a@ @[<v \
+     2>own delegate slots:@ %a@]@ @[<v 2>next level own delegate slots:@ %a@]@ \
+     next level proposed round: %a@]"
     current_level
     is_latest_proposal_applied
-    (match injected_preendorsements with None -> 0 | Some l -> List.length l)
     pp_proposal
     latest_proposal
     (pp_option pp_locked_round)

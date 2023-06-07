@@ -40,20 +40,17 @@ type 'protocol_operation operation = private {
           unserialized representation of [raw.protocol_data]. For
           convenience, the type associated to this type may be [unit] if we
           do not have deserialized the operation yet. *)
-  count_successful_prechecks : int;
-      (** This field provides an under-approximation for the number of times
-          the operation has been successfully prechecked. It is an
-          under-approximation because if the operation is e.g., parsed more than
-          once, or is prechecked in other modes, this flag is not globally
-          updated. *)
+  signature_checked : bool;
+      (** This field is initially [false]. It is set to [true] when the
+          operation is successfully validated in any context. While this does
+          not guarantee that the operation will still be valid in another
+          validation context, it notably means that the signature is
+          correct. Therefore, when this field is [true], we can tell the
+          protocol to skip signature checks. *)
 }
 
-(** [increment_successful_precheck op] increments the field
-    [count_successful_prechecks] of the given operation [op]. It is supposed
-    to be called after each successful precheck of a given operation [op],
-    and nowhere else. Overflow is unlikely to occur in practice, as the
-    counter grows very slowly and the number of prechecks is bounded. *)
-val increment_successful_precheck :
+(** Return the operation with the {!signature_checked} field set to [true]. *)
+val record_successful_signature_check :
   'protocol_operation operation -> 'protocol_operation operation
 
 (** The purpose of this module type is to provide the [parse]

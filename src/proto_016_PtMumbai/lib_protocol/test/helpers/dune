@@ -6,7 +6,6 @@
  (public_name tezos-016-PtMumbai-test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
-  alcotest-lwt
   qcheck-alcotest
   tezos-test-helpers
   tezos-base
@@ -18,7 +17,7 @@
   tezos-protocol-environment
   tezos-protocol-plugin-016-PtMumbai
   tezos-shell-services
-  tezos-plompiler
+  octez-plompiler
   tezos-crypto-dal)
  (flags
   (:standard)

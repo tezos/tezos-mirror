@@ -91,7 +91,7 @@ open Script_interpreter_defs
 module S = Saturation_repr
 
 type step_constants = Script_typed_ir.step_constants = {
-  source : Destination.t;
+  sender : Destination.t;
   payer : Signature.public_key_hash;
   self : Contract_hash.t;
   amount : Tez.t;
@@ -545,7 +545,7 @@ module Raw = struct
     in
     let legacy = Script_ir_translator_config.make ~legacy:true () in
     match addr.destination with
-    | Contract (Implicit _) | Tx_rollup _ | Sc_rollup _ | Zk_rollup _ ->
+    | Contract (Implicit _) | Sc_rollup _ | Zk_rollup _ ->
         (return_none [@ocaml.tailcall]) ctxt
     | Contract (Originated contract_hash as c) -> (
         Contract.get_script ctxt contract_hash >>=? fun (ctxt, script_opt) ->
@@ -608,7 +608,7 @@ module Raw = struct
                     (step [@ocaml.tailcall])
                       ( ctxt,
                         {
-                          source =
+                          sender =
                             Destination.Contract (Contract.Originated sc.self);
                           self = contract_hash;
                           amount = Tez.zero;
@@ -654,8 +654,9 @@ module Raw = struct
         | ISwap (_, k) ->
             let top, stack = stack in
             (step [@ocaml.tailcall]) g gas k ks top (accu, stack)
-        | IConst (_, _ty, v, k) ->
+        | IPush (_, _ty, v, k) ->
             (step [@ocaml.tailcall]) g gas k ks v (accu, stack)
+        | IUnit (_, k) -> (step [@ocaml.tailcall]) g gas k ks () (accu, stack)
         (* options *)
         | ICons_some (_, k) ->
             (step [@ocaml.tailcall]) g gas k ks (Some accu) stack
@@ -699,7 +700,7 @@ module Raw = struct
         | ICdr (_, k) ->
             let _, b = accu in
             (step [@ocaml.tailcall]) g gas k ks b stack
-        (* unions *)
+        (* ors *)
         | ICons_left (_, _tyb, k) ->
             (step [@ocaml.tailcall]) g gas k ks (L accu) stack
         | ICons_right (_, _tya, k) ->
@@ -1257,7 +1258,7 @@ module Raw = struct
             let piop =
               Internal_operation
                 {
-                  source = Destination.Contract (Contract.Originated sc.self);
+                  sender = Destination.Contract (Contract.Originated sc.self);
                   operation;
                   nonce;
                 }
@@ -1308,7 +1309,7 @@ module Raw = struct
             let res = {destination; entrypoint = Entrypoint.default} in
             (step [@ocaml.tailcall]) g gas k ks res (accu, stack)
         | ISender (_, k) ->
-            let destination : Destination.t = sc.source in
+            let destination : Destination.t = sc.sender in
             let res = {destination; entrypoint = Entrypoint.default} in
             (step [@ocaml.tailcall]) g gas k ks res (accu, stack)
         | ISelf (_, ty, entrypoint, k) ->

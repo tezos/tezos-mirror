@@ -1,21 +1,41 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test_proxy_context)
+(library
+ (name src_lib_protocol_environment_test_shell_context_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-shell-context
-  alcotest-lwt
+  octez-alcotezt
   tezos-test-helpers
   tezos-base
   tezos-protocol-environment)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Octez_alcotezt
   -open Tezos_test_helpers
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_environment))
+  -open Tezos_protocol_environment)
+ (modules test_proxy_context))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_protocol_environment_test_shell_context_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-shell-context-test)
- (action (run %{dep:./test_proxy_context.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

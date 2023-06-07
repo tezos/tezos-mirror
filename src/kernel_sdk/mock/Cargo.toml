@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-smart-rollup-mock"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["TriliTech <contact@trili.tech>"]
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "Mock implementation of Tezos Smart Rollup host functions to enable unit testing of kernel logic."
+keywords = ["tezos", "smart", "rollup"]
+categories = ["development-tools", "development-tools::testing"]
+
+[dependencies]
+hex = "0.4"
+tezos_crypto_rs = { version = "0.4", default-features = false }
+tezos_data_encoding = "0.4"
+
+[dependencies.tezos-smart-rollup-encoding]
+path = "../encoding"
+version = "0.1.0"
+
+[dependencies.tezos-smart-rollup-core]
+path = "../core"
+version = "0.1.0"
+default-features = false
+
+[dependencies.tezos-smart-rollup-host]
+path = "../host"
+version = "0.1.0"
+default-features = false
+
+[dev-dependencies.tezos-smart-rollup-host]
+path = "../host"
+version = "0.1.0"
+features = ["default"]

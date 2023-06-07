@@ -9,7 +9,7 @@
   zarith
   zarith_stubs_js
   bls12-381
-  tezos-plonk
+  octez-plonk
   tezos-crypto-dal
   class_group_vdf
   aches
@@ -24,5 +24,6 @@
   tezos-event-logging)
  (flags
   (:standard)
+  -open Plonk
   -open Tezos_base.TzPervasives
   -open Tezos_micheline))

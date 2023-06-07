@@ -1,7 +1,7 @@
 [
   {
     "file": "test_logging.ml",
-    "title": "alpha: append",
+    "title": "alpha: xor",
     "tags": [
       "regression",
       "protocol",
@@ -9,135 +9,268 @@
       "logging"
     ],
     "successful_runs": {
-      "total_time": "27270",
+      "total_time": "26706",
       "count": "1"
     }
   },
   {
-    "file": "test_logging.ml",
-    "title": "alpha: view_toplevel_lib",
+    "file": "SC rollup encoding",
+    "title": "SC rollup encoding: alpha: roundtrip",
     "tags": [
-      "regression",
-      "protocol",
-      "regression",
-      "logging"
+      "alcotest"
     ],
     "successful_runs": {
-      "total_time": "20873",
+      "total_time": "1349023",
       "count": "1"
     }
   },
   {
-    "file": "test_logging.ml",
-    "title": "016_PtMumbai: dipn",
+    "file": "protocol > integration > consensus",
+    "title": "alpha: helpers rpcs",
     "tags": [
-      "regression",
-      "protocol",
-      "regression",
-      "logging"
+      "alcotest"
     ],
     "successful_runs": {
-      "total_time": "28037",
+      "total_time": "23492",
       "count": "1"
     }
   },
   {
-    "file": "test_logging.ml",
-    "title": "015_PtLimaPt: faucet",
+    "file": "protocol > unit",
+    "title": "[Unit] 016-PtMumbai: sc rollup management protocol",
     "tags": [
-      "regression",
-      "protocol",
-      "regression",
-      "logging"
+      "alcotest"
     ],
     "successful_runs": {
-      "total_time": "28460",
+      "total_time": "57734",
       "count": "1"
     }
   },
   {
-    "file": "client_keys.ml",
-    "title": "Generates new tz4 keys",
+    "file": "protocol > pbt > script_comparison",
+    "title": "protocol > pbt > script_comparison: 016-PtMumbai: compatible_with_packing",
     "tags": [
-      "bls",
+      "alcotest"
+    ],
+    "successful_runs": {
+      "total_time": "14782",
+      "count": "1"
+    }
+  },
+  {
+    "file": "protocol > integration > operations",
+    "title": "016-PtMumbai: voting",
+    "tags": [
+      "alcotest"
+    ],
+    "successful_runs": {
+      "total_time": "5278413",
+      "count": "1"
+    }
+  },
+  {
+    "file": "protocol > integration > operations",
+    "title": "016-PtMumbai: combined",
+    "tags": [
+      "alcotest"
+    ],
+    "successful_runs": {
+      "total_time": "174693",
+      "count": "1"
+    }
+  },
+  {
+    "file": "protocol > unit",
+    "title": "[Unit] 015-PtLimaPt: Operation_repr.ml",
+    "tags": [
+      "alcotest"
+    ],
+    "successful_runs": {
+      "total_time": "118",
+      "count": "1"
+    }
+  },
+  {
+    "file": "protocol > integration > operations",
+    "title": "015-PtLimaPt: zk rollup",
+    "tags": [
+      "alcotest"
+    ],
+    "successful_runs": {
+      "total_time": "244086",
+      "count": "1"
+    }
+  },
+  {
+    "file": "protocol > integration > consensus",
+    "title": "015-PtLimaPt: baking",
+    "tags": [
+      "alcotest"
+    ],
+    "successful_runs": {
+      "total_time": "803772",
+      "count": "1"
+    }
+  },
+  {
+    "file": "Client proto context",
+    "title": "Client proto context: 015-PtLimaPt: Encodings",
+    "tags": [
+      "alcotest"
+    ],
+    "successful_runs": {
+      "total_time": "81756",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezos-shell",
+    "title": "test protocol validator",
+    "tags": [
+      "alcotest"
+    ],
+    "successful_runs": {
+      "total_time": "174822",
+      "count": "1"
+    }
+  },
+  {
+    "file": "mempool-prevalidation",
+    "title": "add_operation",
+    "tags": [
+      "alcotest"
+    ],
+    "successful_runs": {
+      "total_time": "22189",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezos-rpc-http",
+    "title": "tezos-rpc-http: qcheck",
+    "tags": [
+      "alcotest"
+    ],
+    "successful_runs": {
+      "total_time": "98510",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezos-benchmark",
+    "title": "probe",
+    "tags": [
+      "alcotest"
+    ],
+    "successful_runs": {
+      "total_time": "3118232",
+      "count": "1"
+    }
+  },
+  {
+    "file": "light.ml",
+    "title": "mode light endpoint not in sources",
+    "tags": [
       "client",
-      "keys"
+      "light",
+      "cli"
     ],
     "successful_runs": {
-      "total_time": "1462867",
+      "total_time": "717957",
       "count": "1"
     }
   },
   {
-    "file": "protocol_migration.ml",
-    "title": "protocol migration at level 15",
-    "tags": [
-      "protocol",
-      "migration",
-      "sandbox"
-    ],
-    "successful_runs": {
-      "total_time": "22078547",
-      "count": "1"
-    }
-  },
-  {
-    "file": "bad_annot.ml",
-    "title": "Alpha: Test bad annotation",
+    "file": "baker_test.ml",
+    "title": "Alpha: baker test",
     "tags": [
       "alpha",
-      "client",
-      "michelson"
+      "node",
+      "baker"
     ],
     "successful_runs": {
-      "total_time": "1476521",
+      "total_time": "6220491",
       "count": "1"
     }
   },
   {
-    "file": "bad_indentation.ml",
-    "title": "Alpha: Bad indentation contract is ill-typed",
+    "file": "baker_operations_cli_options.ml",
+    "title": "Alpha: Ignore node mempool",
     "tags": [
       "alpha",
-      "client",
-      "michelson",
-      "typechecking"
+      "ignore",
+      "node",
+      "mempool"
     ],
     "successful_runs": {
-      "total_time": "1462630",
+      "total_time": "12794777",
       "count": "1"
     }
   },
   {
-    "file": "bad_indentation.ml",
-    "title": "Lima: Formatted bad indentation contract hash is expected",
+    "file": "baker_operations_cli_options.ml",
+    "title": "Mumbai: external operations, missing operations (empty) file",
+    "tags": [
+      "mumbai",
+      "baker",
+      "external_operations",
+      "empty",
+      "file"
+    ],
+    "successful_runs": {
+      "total_time": "4915165",
+      "count": "1"
+    }
+  },
+  {
+    "file": "baker_operations_cli_options.ml",
+    "title": "Lima: external operations, singleton operation file",
     "tags": [
       "lima",
-      "client",
-      "michelson",
-      "typechecking"
+      "baker",
+      "external_operations",
+      "singleton",
+      "file"
     ],
     "successful_runs": {
-      "total_time": "2648741",
+      "total_time": "7960402",
       "count": "1"
     }
   },
   {
     "file": "baking.ml",
-    "title": "Lima: External operations are ordered (4 transfers, max 1 operations)",
+    "title": "Alpha: External operations are ordered (4 transfers, max 3 operations)",
     "tags": [
-      "lima",
+      "alpha",
       "operations_pool",
       "baking"
     ],
     "successful_runs": {
-      "total_time": "15996201",
+      "total_time": "16627285",
       "count": "1"
     }
   },
   {
     "file": "bootstrap.ml",
-    "title": "Alpha: node synchronization (full / archive)",
+    "title": "Lima: node synchronization (full / full)",
+    "tags": [
+      "lima",
+      "bootstrap",
+      "node",
+      "sync",
+      "activate",
+      "bake",
+      "primary_full",
+      "secondary_full"
+    ],
+    "successful_runs": {
+      "total_time": "35030803",
+      "count": "1"
+    }
+  },
+  {
+    "file": "bootstrap.ml",
+    "title": "Alpha: node synchronization (full / rolling)",
     "tags": [
       "alpha",
       "bootstrap",
@@ -146,18 +279,32 @@
       "activate",
       "bake",
       "primary_full",
-      "secondary_archive"
+      "secondary_rolling"
     ],
     "successful_runs": {
-      "total_time": "34277997",
+      "total_time": "34616460",
       "count": "1"
     }
   },
   {
     "file": "client_commands.ml",
-    "title": "Alpha: Simulation of successful operation batch",
+    "title": "Alpha: Simulation of successful operation",
     "tags": [
       "alpha",
+      "client",
+      "simulation",
+      "success"
+    ],
+    "successful_runs": {
+      "total_time": "6706216",
+      "count": "1"
+    }
+  },
+  {
+    "file": "client_commands.ml",
+    "title": "Lima: Simulation of successful operation batch",
+    "tags": [
+      "lima",
       "client",
       "simulation",
       "success",
@@ -165,69 +312,42 @@
       "batch"
     ],
     "successful_runs": {
-      "total_time": "6140933",
+      "total_time": "6163754",
       "count": "1"
     }
   },
   {
-    "file": "client_config.ml",
-    "title": "Mumbai: additional bootstrap accounts",
-    "tags": [
-      "mumbai",
-      "client",
-      "bootstrap",
-      "accounts"
-    ],
-    "successful_runs": {
-      "total_time": "6986086",
-      "count": "1"
-    }
-  },
-  {
-    "file": "client_fa12.ml",
-    "title": "Lima: test fa1.2, get allowance callback [mini_scenarios/fa12_reference.tz]",
-    "tags": [
-      "lima",
-      "client",
-      "fa12",
-      "fa12_reference"
-    ],
-    "successful_runs": {
-      "total_time": "4592791",
-      "count": "1"
-    }
-  },
-  {
-    "file": "client_run_view.ml",
-    "title": "Alpha: Run view calling another contract",
+    "file": "client_commands.ml",
+    "title": "Alpha: Transfer from public key hash alias",
     "tags": [
       "alpha",
       "client",
-      "michelson",
-      "view"
+      "alias",
+      "transfer"
     ],
     "successful_runs": {
-      "total_time": "5177892",
+      "total_time": "13009630",
       "count": "1"
     }
   },
   {
-    "file": "client_run_view.ml",
-    "title": "Mumbai: Run view calling another contract",
+    "file": "client_commands.ml",
+    "title": "Alpha: Check consumed gas of origination dry run",
     "tags": [
-      "mumbai",
+      "alpha",
       "client",
-      "michelson",
-      "view"
+      "gas",
+      "estimation",
+      "dryrun"
     ],
     "successful_runs": {
-      "total_time": "5145453",
+      "total_time": "9466901",
       "count": "1"
     }
   },
   {
     "file": "comparable_datatype.ml",
-    "title": "Lima: Run `comparable_unions`",
+    "title": "Lima: Run `comparable_key`",
     "tags": [
       "lima",
       "client",
@@ -236,497 +356,391 @@
       "comparable"
     ],
     "successful_runs": {
-      "total_time": "4353540",
+      "total_time": "2988577",
       "count": "1"
     }
   },
   {
-    "file": "contract_entrypoints.ml",
-    "title": "Alpha: test create_contract_rootname.tz",
+    "file": "contract_liquidity_baking.ml",
+    "title": "Alpha: Test trades",
     "tags": [
+      "regression",
       "alpha",
       "client",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "2934616",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_entrypoints.ml",
-    "title": "Mumbai: simple entrypoints",
-    "tags": [
-      "mumbai",
-      "client",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "15278424",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_hash_fun.ml",
-    "title": "Mumbai: Test contract hash function: sha3",
-    "tags": [
-      "mumbai",
-      "michelson",
-      "crypto",
-      "contract",
-      "hash",
-      "sha3"
-    ],
-    "successful_runs": {
-      "total_time": "25445549",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_non_regressions.ml",
-    "title": "Mumbai: Contract-related non-regressions, Issue 843",
-    "tags": [
-      "mumbai",
-      "client",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "5132628",
+      "total_time": "10057512",
       "count": "1"
     }
   },
   {
     "file": "contract_opcodes.ml",
-    "title": "Lima: opcodes [reverse.tz--storage528921618--input851203613]",
+    "title": "Lima: opcodes [list_map_block--storage907453363--input908379154]",
     "tags": [
       "regression",
       "lima",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "725392",
+      "total_time": "743301",
       "count": "1"
     }
   },
   {
     "file": "contract_opcodes.ml",
-    "title": "Mumbai: opcodes [slice_bytes.tz--storage229749865--input839234860]",
+    "title": "Alpha: opcodes [slice_bytes--storage229749865--input551316239]",
+    "tags": [
+      "regression",
+      "alpha",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "742980",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_opcodes.ml",
+    "title": "Mumbai: opcodes [or--storage921624073--input181204719]",
     "tags": [
       "regression",
       "mumbai",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "720447",
+      "total_time": "822657",
       "count": "1"
     }
   },
   {
     "file": "contract_opcodes.ml",
-    "title": "Alpha: opcodes [cdr.tz--storage680650890--input783124233]",
+    "title": "Mumbai: opcodes [and_logical_1--storage570553153--input106930123]",
     "tags": [
       "regression",
-      "alpha",
+      "mumbai",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "728577",
+      "total_time": "722227",
       "count": "1"
     }
   },
   {
     "file": "contract_opcodes.ml",
-    "title": "Alpha: opcodes [and_logical_1.tz--storage570553153--input908807505]",
-    "tags": [
-      "regression",
-      "alpha",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "724951",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Alpha: opcodes [not_binary.tz--storage921624073--input921874253]",
-    "tags": [
-      "regression",
-      "alpha",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "972492",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Lima: opcodes [not_binary.tz--storage921624073--input1051197453]",
+    "title": "Lima: opcodes [not_binary--storage921624073--input123939249]",
     "tags": [
       "regression",
       "lima",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "728031",
+      "total_time": "792971",
       "count": "1"
     }
   },
   {
     "file": "contract_opcodes.ml",
-    "title": "Alpha: opcodes [xor.tz--storage921624073--input1058477720]",
+    "title": "Alpha: opcodes [list_id_map--storage528921618--input457300675]",
     "tags": [
       "regression",
       "alpha",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "724022",
+      "total_time": "740895",
       "count": "1"
     }
   },
   {
     "file": "contract_opcodes.ml",
-    "title": "Alpha: opcodes [shifts.tz--storage921624073--input705767726]",
+    "title": "Mumbai: opcodes [map_id--storage457300675--input1027566226]",
+    "tags": [
+      "regression",
+      "mumbai",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "751340",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_opcodes.ml",
+    "title": "Lima: opcodes [set_id--storage457300675--input989507347]",
+    "tags": [
+      "regression",
+      "lima",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "730260",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_opcodes.ml",
+    "title": "Mumbai: opcodes [set_member--storage605111220--input33757838]",
+    "tags": [
+      "regression",
+      "mumbai",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "737555",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_opcodes.ml",
+    "title": "Mumbai: opcodes [contains_all--storage921624073--input51111414]",
+    "tags": [
+      "regression",
+      "mumbai",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "793100",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_opcodes.ml",
+    "title": "Alpha: opcodes [concat_hello--storage457300675--input640104625]",
     "tags": [
       "regression",
       "alpha",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "728599",
+      "total_time": "886363",
       "count": "1"
     }
   },
   {
     "file": "contract_opcodes.ml",
-    "title": "Lima: opcodes [shifts.tz--storage921624073--input374168553]",
+    "title": "Lima: opcodes [concat_hello--storage457300675--input392583650]",
     "tags": [
       "regression",
       "lima",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "735506",
+      "total_time": "734328",
       "count": "1"
     }
   },
   {
     "file": "contract_opcodes.ml",
-    "title": "Mumbai: opcodes [concat_list.tz--storage79230375--input316676251]",
-    "tags": [
-      "regression",
-      "mumbai",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "744699",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Alpha: opcodes [list_id.tz--storage528921618--input264787654]",
+    "title": "Alpha: opcodes [empty_map--storage457300675--input125992234]",
     "tags": [
       "regression",
       "alpha",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "726409",
+      "total_time": "749036",
       "count": "1"
     }
   },
   {
     "file": "contract_opcodes.ml",
-    "title": "Alpha: opcodes [map_mem_nat.tz--storage56274299--input654274102]",
+    "title": "Mumbai: opcodes [get_map_value--storage139236239--input329240220]",
+    "tags": [
+      "regression",
+      "mumbai",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "724786",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_opcodes.ml",
+    "title": "Lima: opcodes [exec_concat--storage398998998--input246262487]",
+    "tags": [
+      "regression",
+      "lima",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "988945",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_opcodes.ml",
+    "title": "Lima: opcodes [tez_add_sub--storage921624073--input706350605]",
+    "tags": [
+      "regression",
+      "lima",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "848711",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_opcodes.ml",
+    "title": "Alpha: opcodes [add_delta_timestamp--storage921624073--input267363182]",
     "tags": [
       "regression",
       "alpha",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "733850",
+      "total_time": "743324",
       "count": "1"
     }
   },
   {
     "file": "contract_opcodes.ml",
-    "title": "Lima: opcodes [map_map.tz--storage457300675--input798141440]",
-    "tags": [
-      "regression",
-      "lima",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "726696",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Mumbai: opcodes [set_member.tz--storage605111220--input33757838]",
-    "tags": [
-      "regression",
-      "mumbai",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "728116",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Lima: opcodes [contains_all.tz--storage921624073--input315650912]",
-    "tags": [
-      "regression",
-      "lima",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "728809",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Alpha: opcodes [get_and_update_map.tz--storage382368661--input329240220]",
+    "title": "Alpha: opcodes [neg--storage680650890--input380029349]",
     "tags": [
       "regression",
       "alpha",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "728632",
+      "total_time": "739505",
       "count": "1"
     }
   },
   {
     "file": "contract_opcodes.ml",
-    "title": "Lima: opcodes [left_right.tz--storage4177631--input44576556]",
-    "tags": [
-      "regression",
-      "lima",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "726768",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Lima: opcodes [tez_add_sub.tz--storage921624073--input856198194]",
-    "tags": [
-      "regression",
-      "lima",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "726022",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Mumbai: opcodes [int.tz--storage921624073--input453441034]",
-    "tags": [
-      "regression",
-      "mumbai",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "717709",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Mumbai: opcodes [add_timestamp_delta.tz--storage921624073--input249636002]",
-    "tags": [
-      "regression",
-      "mumbai",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "727686",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Lima: opcodes [add_timestamp_delta.tz--storage921624073--input373737581]",
-    "tags": [
-      "regression",
-      "lima",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "724277",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Alpha: opcodes [diff_timestamps.tz--storage492856247--input1011138251]",
+    "title": "Alpha: opcodes [self_with_entrypoint--storage125992234--input289072903]",
     "tags": [
       "regression",
       "alpha",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "721017",
+      "total_time": "740710",
       "count": "1"
     }
   },
   {
     "file": "contract_opcodes.ml",
-    "title": "Mumbai: opcodes [packunpack_rev_cty.tz--storage125992234--input802670583]",
+    "title": "Mumbai: opcodes [voting_power--storage1011138251--input1040351577]",
     "tags": [
       "regression",
       "mumbai",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "787552",
+      "total_time": "744574",
       "count": "1"
     }
   },
   {
     "file": "contract_opcodes.ml",
-    "title": "Mumbai: opcodes [ediv_mutez.tz--storage977883604--input215785357]",
-    "tags": [
-      "regression",
-      "mumbai",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "726722",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Lima: opcodes [ediv_mutez.tz--storage977883604--input993071382]",
-    "tags": [
-      "regression",
-      "lima",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "724925",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Mumbai: opcodes [neg.tz--storage680650890--input380029349]",
-    "tags": [
-      "regression",
-      "mumbai",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "734660",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Alpha: opcodes [self_address.tz--storage125992234--input125992234]",
+    "title": "Alpha: opcodes [bls12_381_fr_z_int--storage994282947--input680650890]",
     "tags": [
       "regression",
       "alpha",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "722237",
+      "total_time": "735911",
       "count": "1"
     }
   },
   {
     "file": "contract_opcodes.ml",
-    "title": "Alpha: opcodes [bls12_381_fr_z_int.tz--storage994282947--input701858804]",
+    "title": "Mumbai: opcodes [bls12_381_fr_z_int--storage994282947--input1055524890]",
+    "tags": [
+      "regression",
+      "mumbai",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "744730",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_opcodes.ml",
+    "title": "Lima: opcodes [bls12_381_fr_z_int--storage739946440--input583291483]",
+    "tags": [
+      "regression",
+      "lima",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "747787",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_opcodes.ml",
+    "title": "Lima: opcodes [bls12_381_z_fr_int--storage994282947--input453441034]",
+    "tags": [
+      "regression",
+      "lima",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "733862",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_opcodes.ml",
+    "title": "Mumbai: opcodes [bls12_381_z_fr_int--storage739946440--input583291483]",
+    "tags": [
+      "regression",
+      "mumbai",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "734742",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_opcodes.ml",
+    "title": "Lima: opcodes [add_bls12_381_fr--storage921624073--input461261325]",
+    "tags": [
+      "regression",
+      "lima",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "762179",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_opcodes.ml",
+    "title": "Alpha: opcodes [bls12_381_fr_to_int--storage680650890--input1043734173]",
     "tags": [
       "regression",
       "alpha",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "721223",
+      "total_time": "744058",
       "count": "1"
     }
   },
   {
     "file": "contract_opcodes.ml",
-    "title": "Lima: opcodes [bls12_381_z_fr_nat.tz--storage698210250--input949526473]",
+    "title": "Lima: test Michelson opcodes: check_signature",
     "tags": [
       "regression",
       "lima",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "721775",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Mumbai: opcodes [bls12_381_z_fr_int.tz--storage994282947--input680650890]",
-    "tags": [
-      "regression",
-      "mumbai",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "726135",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Mumbai: opcodes [bls12_381_fr_to_int.tz--storage680650890--input151303925]",
-    "tags": [
-      "regression",
-      "mumbai",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "722267",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Lima: opcodes [bls12_381_fr_to_mutez.tz--storage680650890--input229402968]",
-    "tags": [
-      "regression",
-      "lima",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "722384",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_opcodes.ml",
-    "title": "Mumbai: opcodes [lsl_bytes.tz--storage125992234--input125992234]",
-    "tags": [
-      "regression",
-      "mumbai",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "731503",
+      "total_time": "2252199",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Alpha: Tc tests_python/contracts_alpha/attic/list_of_transactions.tz",
+    "title": "Alpha: Tc attic/auction",
     "tags": [
       "regression",
       "alpha",
@@ -735,13 +749,13 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "723107",
+      "total_time": "743412",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Alpha: Tc tests_python/contracts_alpha/opcodes/chain_id.tz",
+    "title": "Alpha: Tc macros/assert_ge",
     "tags": [
       "regression",
       "alpha",
@@ -750,13 +764,13 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "748748",
+      "total_time": "750977",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Alpha: Tc tests_python/contracts_alpha/opcodes/ediv.tz",
+    "title": "Alpha: Tc mini_scenarios/legacy_multisig",
     "tags": [
       "regression",
       "alpha",
@@ -765,13 +779,13 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "1030795",
+      "total_time": "802073",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Alpha: Tc tests_python/contracts_alpha/opcodes/ticketer-2.tz",
+    "title": "Alpha: Tc mini_scenarios/viewable",
     "tags": [
       "regression",
       "alpha",
@@ -780,13 +794,13 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "836121",
+      "total_time": "757668",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Alpha: Tc tests_python/contracts_alpha/opcodes/or_bytes.tz",
+    "title": "Alpha: Tc opcodes/bytes_of_nat",
     "tags": [
       "regression",
       "alpha",
@@ -795,13 +809,13 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "844160",
+      "total_time": "733449",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Alpha: Tc tests_python/contracts_alpha/opcodes/loop_left_failwith.tz",
+    "title": "Alpha: Tc opcodes/hash_key",
     "tags": [
       "regression",
       "alpha",
@@ -810,13 +824,13 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "842233",
+      "total_time": "733844",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Alpha: Tc tests_python/contracts_alpha/opcodes/add_delta_timestamp.tz",
+    "title": "Alpha: Tc opcodes/not",
     "tags": [
       "regression",
       "alpha",
@@ -825,13 +839,13 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "732730",
+      "total_time": "737196",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Alpha: Tc tests_python/contracts_alpha/opcodes/set_delegate.tz",
+    "title": "Alpha: Tc opcodes/sha3",
     "tags": [
       "regression",
       "alpha",
@@ -840,13 +854,13 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "731412",
+      "total_time": "730027",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Alpha: Tc tests_python/contracts_alpha/macros/carn_and_cdrn.tz",
+    "title": "Alpha: Tc opcodes/view_op_nonexistent_func",
     "tags": [
       "regression",
       "alpha",
@@ -855,28 +869,13 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "732033",
+      "total_time": "728718",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Alpha: Tc tests_python/contracts_alpha/mini_scenarios/legacy_multisig.tz",
-    "tags": [
-      "regression",
-      "alpha",
-      "client",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "781946",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_typecheck_regression.ml",
-    "title": "Lima: Tc tests_python/contracts_015/attic/int_publisher.tz",
+    "title": "Lima: Tc attic/id",
     "tags": [
       "regression",
       "lima",
@@ -885,13 +884,13 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "741532",
+      "total_time": "737059",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Lima: Tc tests_python/contracts_015/opcodes/map_car.tz",
+    "title": "Lima: Tc macros/min",
     "tags": [
       "regression",
       "lima",
@@ -900,13 +899,13 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "725019",
+      "total_time": "747568",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Lima: Tc tests_python/contracts_015/opcodes/ediv_mutez.tz",
+    "title": "Lima: Tc mini_scenarios/receive_tickets_in_big_map",
     "tags": [
       "regression",
       "lima",
@@ -915,13 +914,13 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "721381",
+      "total_time": "725741",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Lima: Tc tests_python/contracts_015/opcodes/chain_id_store.tz",
+    "title": "Lima: Tc opcodes/amount_after_view",
     "tags": [
       "regression",
       "lima",
@@ -930,13 +929,13 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "727692",
+      "total_time": "736413",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Lima: Tc tests_python/contracts_015/opcodes/unpair.tz",
+    "title": "Lima: Tc opcodes/diff_timestamps",
     "tags": [
       "regression",
       "lima",
@@ -945,13 +944,13 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "763194",
+      "total_time": "730804",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Lima: Tc tests_python/contracts_015/opcodes/sets.tz",
+    "title": "Lima: Tc opcodes/map_iter",
     "tags": [
       "regression",
       "lima",
@@ -960,13 +959,13 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "725507",
+      "total_time": "733545",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Lima: Tc tests_python/contracts_015/opcodes/pair_id.tz",
+    "title": "Lima: Tc opcodes/self_address_after_nonexistent_view",
     "tags": [
       "regression",
       "lima",
@@ -975,13 +974,13 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "730556",
+      "total_time": "728779",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Lima: Tc tests_python/contracts_015/opcodes/add_bls12_381_g1.tz",
+    "title": "Lima: Tc opcodes/ticket_store-2",
     "tags": [
       "regression",
       "lima",
@@ -990,248 +989,243 @@
       "typechecking"
     ],
     "successful_runs": {
-      "total_time": "722834",
+      "total_time": "735409",
       "count": "1"
     }
   },
   {
     "file": "contract_typecheck_regression.ml",
-    "title": "Lima: Tc tests_python/contracts_015/macros/big_map_mem.tz",
+    "title": "Mumbai: Tc attic/dispatch",
+    "tags": [
+      "regression",
+      "mumbai",
+      "client",
+      "michelson",
+      "typechecking"
+    ],
+    "successful_runs": {
+      "total_time": "738557",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_typecheck_regression.ml",
+    "title": "Mumbai: Tc macros/compare_bytes",
+    "tags": [
+      "regression",
+      "mumbai",
+      "client",
+      "michelson",
+      "typechecking"
+    ],
+    "successful_runs": {
+      "total_time": "750160",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_typecheck_regression.ml",
+    "title": "Mumbai: Tc mini_scenarios/nat_id",
+    "tags": [
+      "regression",
+      "mumbai",
+      "client",
+      "michelson",
+      "typechecking"
+    ],
+    "successful_runs": {
+      "total_time": "741647",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_typecheck_regression.ml",
+    "title": "Mumbai: Tc mini_scenarios/xcat_dapp",
+    "tags": [
+      "regression",
+      "mumbai",
+      "client",
+      "michelson",
+      "typechecking"
+    ],
+    "successful_runs": {
+      "total_time": "785305",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_typecheck_regression.ml",
+    "title": "Mumbai: Tc opcodes/chain_id",
+    "tags": [
+      "regression",
+      "mumbai",
+      "client",
+      "michelson",
+      "typechecking"
+    ],
+    "successful_runs": {
+      "total_time": "734009",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_typecheck_regression.ml",
+    "title": "Mumbai: Tc opcodes/hash_key",
+    "tags": [
+      "regression",
+      "mumbai",
+      "client",
+      "michelson",
+      "typechecking"
+    ],
+    "successful_runs": {
+      "total_time": "728698",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_typecheck_regression.ml",
+    "title": "Mumbai: Tc opcodes/none",
+    "tags": [
+      "regression",
+      "mumbai",
+      "client",
+      "michelson",
+      "typechecking"
+    ],
+    "successful_runs": {
+      "total_time": "767184",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_typecheck_regression.ml",
+    "title": "Mumbai: Tc opcodes/set_size",
+    "tags": [
+      "regression",
+      "mumbai",
+      "client",
+      "michelson",
+      "typechecking"
+    ],
+    "successful_runs": {
+      "total_time": "721983",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_typecheck_regression.ml",
+    "title": "Mumbai: Tc opcodes/view_op_test_step_contants",
+    "tags": [
+      "regression",
+      "mumbai",
+      "client",
+      "michelson",
+      "typechecking"
+    ],
+    "successful_runs": {
+      "total_time": "749688",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_macros.ml",
+    "title": "Mumbai: macros [assert_le--storage125992234--input280547028]",
+    "tags": [
+      "mumbai",
+      "michelson",
+      "macros"
+    ],
+    "successful_runs": {
+      "total_time": "729972",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_macros.ml",
+    "title": "Alpha: macros [assert_cmpeq--storage125992234--input637504981]",
+    "tags": [
+      "alpha",
+      "michelson",
+      "macros"
+    ],
+    "successful_runs": {
+      "total_time": "727008",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_macros.ml",
+    "title": "Lima: macro failure [assert_lt--storage125992234--input1011138251]",
+    "tags": [
+      "lima",
+      "michelson",
+      "macros"
+    ],
+    "successful_runs": {
+      "total_time": "737736",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_macros.ml",
+    "title": "Alpha: Macro expansion: macros/assert_cmpeq",
+    "tags": [
+      "regression",
+      "alpha",
+      "michelson",
+      "macros"
+    ],
+    "successful_runs": {
+      "total_time": "737848",
+      "count": "1"
+    }
+  },
+  {
+    "file": "contract_macros.ml",
+    "title": "Lima: Macro expansion: macros/assert_lt",
     "tags": [
       "regression",
       "lima",
-      "client",
       "michelson",
-      "typechecking"
+      "macros"
     ],
     "successful_runs": {
-      "total_time": "723183",
+      "total_time": "734241",
       "count": "1"
     }
   },
   {
-    "file": "contract_typecheck_regression.ml",
-    "title": "Lima: Tc tests_python/contracts_015/mini_scenarios/groth16.tz",
-    "tags": [
-      "regression",
-      "lima",
-      "client",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "767811",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_typecheck_regression.ml",
-    "title": "Mumbai: Tc tests_python/contracts_016/attic/cadr_annotation.tz",
+    "file": "contract_macros.ml",
+    "title": "Mumbai: Macro expansion: macros/assert_eq",
     "tags": [
       "regression",
       "mumbai",
-      "client",
       "michelson",
-      "typechecking"
+      "macros"
     ],
     "successful_runs": {
-      "total_time": "725324",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_typecheck_regression.ml",
-    "title": "Mumbai: Tc tests_python/contracts_016/entrypoints/simple_entrypoints.tz",
-    "tags": [
-      "regression",
-      "mumbai",
-      "client",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "723336",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_typecheck_regression.ml",
-    "title": "Mumbai: Tc tests_python/contracts_016/opcodes/view_op_constant.tz",
-    "tags": [
-      "regression",
-      "mumbai",
-      "client",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "741291",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_typecheck_regression.ml",
-    "title": "Mumbai: Tc tests_python/contracts_016/opcodes/split_string.tz",
-    "tags": [
-      "regression",
-      "mumbai",
-      "client",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "727055",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_typecheck_regression.ml",
-    "title": "Mumbai: Tc tests_python/contracts_016/opcodes/mul_bls12_381_fr.tz",
-    "tags": [
-      "regression",
-      "mumbai",
-      "client",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "723797",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_typecheck_regression.ml",
-    "title": "Mumbai: Tc tests_python/contracts_016/opcodes/concat_hello_bytes.tz",
-    "tags": [
-      "regression",
-      "mumbai",
-      "client",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "738691",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_typecheck_regression.ml",
-    "title": "Mumbai: Tc tests_python/contracts_016/opcodes/sapling_empty_state.tz",
-    "tags": [
-      "regression",
-      "mumbai",
-      "client",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "721945",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_typecheck_regression.ml",
-    "title": "Mumbai: Tc tests_python/contracts_016/opcodes/hash_string.tz",
-    "tags": [
-      "regression",
-      "mumbai",
-      "client",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "724232",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_typecheck_regression.ml",
-    "title": "Mumbai: Tc tests_python/contracts_016/opcodes/balance_after_view.tz",
-    "tags": [
-      "regression",
-      "mumbai",
-      "client",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "731251",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_typecheck_regression.ml",
-    "title": "Mumbai: Tc tests_python/contracts_016/mini_scenarios/add_clear_tickets.tz",
-    "tags": [
-      "regression",
-      "mumbai",
-      "client",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "726428",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_typecheck_regression.ml",
-    "title": "Mumbai: Tc tests_python/contracts_016/mini_scenarios/ticket_builder_fungible.tz",
-    "tags": [
-      "regression",
-      "mumbai",
-      "client",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "719571",
-      "count": "1"
-    }
-  },
-  {
-    "file": "contract_mini_scenarios.ml",
-    "title": "Mumbai: test replay",
-    "tags": [
-      "mumbai",
-      "client",
-      "michelson",
-      "mini_scenarios"
-    ],
-    "successful_runs": {
-      "total_time": "2211398",
+      "total_time": "735969",
       "count": "1"
     }
   },
   {
     "file": "encoding.ml",
-    "title": "octez-codec dump encodings",
-    "tags": [
-      "codec",
-      "dump"
-    ],
-    "successful_runs": {
-      "total_time": "15030153",
-      "count": "1"
-    }
-  },
-  {
-    "file": "encoding.ml",
-    "title": "Mumbai: protocol encoding regression test: block_header.unsigned",
+    "title": "Alpha: protocol encoding regression test: block_header.raw",
     "tags": [
       "regression",
-      "mumbai",
+      "alpha",
       "encoding",
       "protocol"
     ],
     "successful_runs": {
-      "total_time": "1183711",
+      "total_time": "1190278",
       "count": "1"
     }
   },
   {
     "file": "encoding.ml",
-    "title": "Lima: protocol encoding regression test: operation",
+    "title": "Lima: protocol encoding regression test: contract",
     "tags": [
       "regression",
       "lima",
@@ -1239,13 +1233,27 @@
       "protocol"
     ],
     "successful_runs": {
-      "total_time": "19351209",
+      "total_time": "2411295",
       "count": "1"
     }
   },
   {
     "file": "encoding.ml",
-    "title": "Lima: protocol encoding regression test: voting_period",
+    "title": "Mumbai: protocol encoding regression test: cycle",
+    "tags": [
+      "regression",
+      "mumbai",
+      "encoding",
+      "protocol"
+    ],
+    "successful_runs": {
+      "total_time": "2398588",
+      "count": "1"
+    }
+  },
+  {
+    "file": "encoding.ml",
+    "title": "Lima: protocol encoding regression test: gas",
     "tags": [
       "regression",
       "lima",
@@ -1253,13 +1261,13 @@
       "protocol"
     ],
     "successful_runs": {
-      "total_time": "2315242",
+      "total_time": "4299815",
       "count": "1"
     }
   },
   {
     "file": "gas_bound.ml",
-    "title": "Alpha: typecheck map dup key",
+    "title": "Alpha: typecheck map bad ordering",
     "tags": [
       "alpha",
       "client",
@@ -1267,138 +1275,168 @@
       "gas_bound"
     ],
     "successful_runs": {
-      "total_time": "1467355",
+      "total_time": "1487891",
       "count": "1"
     }
   },
   {
-    "file": "global_constants.ml",
-    "title": "Mumbai: Originate a large, flat contract",
+    "file": "manager_operations.ml",
+    "title": "Alpha: Contract's body illtyped 2",
     "tags": [
-      "mumbai",
+      "alpha",
+      "precheck",
+      "illtyped",
+      "origination",
+      "typing"
+    ],
+    "successful_runs": {
+      "total_time": "11792104",
+      "count": "1"
+    }
+  },
+  {
+    "file": "manager_operations.ml",
+    "title": "Alpha: Test simple transfer with low balance to pay allocation (1)",
+    "tags": [
+      "alpha",
+      "transaction",
+      "transfer"
+    ],
+    "successful_runs": {
+      "total_time": "28756036",
+      "count": "1"
+    }
+  },
+  {
+    "file": "mockup.ml",
+    "title": "Lima: (Mockup) Register Global Constant failure",
+    "tags": [
+      "lima",
+      "mockup",
+      "client",
       "global_constant"
     ],
     "successful_runs": {
-      "total_time": "7161159",
+      "total_time": "2686486",
       "count": "1"
     }
   },
   {
-    "file": "light.ml",
-    "title": "Mumbai: (Light) RPC get's location",
-    "tags": [
-      "mumbai",
-      "light",
-      "location",
-      "rpc",
-      "get"
-    ],
-    "successful_runs": {
-      "total_time": "10044300",
-      "count": "1"
-    }
-  },
-  {
-    "file": "light.ml",
-    "title": "Lima: (Light) Compare RPC get",
+    "file": "multisig.ml",
+    "title": "Lima: Multisig [by_address:true, generic, sig_algs:None,secp256k1,ed25519]",
     "tags": [
       "lima",
-      "light",
-      "rpc",
-      "get"
+      "multisig",
+      "by_address",
+      "generic"
     ],
     "successful_runs": {
-      "total_time": "28996099",
+      "total_time": "64446762",
       "count": "1"
     }
   },
   {
-    "file": "manager_operations.ml",
-    "title": "Mumbai: Simple transfer applied",
-    "tags": [
-      "mumbai",
-      "transaction",
-      "transfer"
-    ],
-    "successful_runs": {
-      "total_time": "14106103",
-      "count": "1"
-    }
-  },
-  {
-    "file": "manager_operations.ml",
-    "title": "Lima: Test simple transfer with low balance to pay allocation (2)",
-    "tags": [
-      "lima",
-      "transaction",
-      "transfer"
-    ],
-    "successful_runs": {
-      "total_time": "28443753",
-      "count": "1"
-    }
-  },
-  {
-    "file": "mockup.ml",
-    "title": "Alpha: (Mockup) Show config failure.",
+    "file": "multisig.ml",
+    "title": "Alpha: Multisig [by_address:false, legacy, sig_algs:None,secp256k1,ed25519]",
     "tags": [
       "alpha",
-      "mockup",
-      "client",
-      "config"
+      "multisig",
+      "by_alias",
+      "legacy"
     ],
     "successful_runs": {
-      "total_time": "1735620",
-      "count": "1"
-    }
-  },
-  {
-    "file": "mockup.ml",
-    "title": "Mumbai: (Mockup) Mockup transfer RPC.",
-    "tags": [
-      "mumbai",
-      "mockup",
-      "client",
-      "transfer",
-      "rpc"
-    ],
-    "successful_runs": {
-      "total_time": "5466410",
+      "total_time": "51245937",
       "count": "1"
     }
   },
   {
     "file": "normalize.ml",
-    "title": "Lima: Test normalize script",
+    "title": "Alpha: Test normalize script",
     "tags": [
       "regression",
-      "lima",
+      "alpha",
       "client",
       "normalize"
     ],
     "successful_runs": {
-      "total_time": "4680463",
+      "total_time": "4493921",
       "count": "1"
     }
   },
   {
     "file": "prevalidator.ml",
-    "title": "Lima: Manager_restriction_inject_isolated_node",
+    "title": "Lima: Flush mempool",
+    "tags": [
+      "lima",
+      "mempool",
+      "flush"
+    ],
+    "successful_runs": {
+      "total_time": "46744230",
+      "count": "1"
+    }
+  },
+  {
+    "file": "prevalidator.ml",
+    "title": "Lima: Manager_restriction_flush",
     "tags": [
       "lima",
       "mempool",
       "manager_restriction",
-      "inject",
-      "isolated_node"
+      "flush"
     ],
     "successful_runs": {
-      "total_time": "22829329",
+      "total_time": "19981683",
+      "count": "1"
+    }
+  },
+  {
+    "file": "prevalidator.ml",
+    "title": "Mumbai: Test prefiltered limits of mempool after a remove/replace",
+    "tags": [
+      "mumbai",
+      "mempool",
+      "gc",
+      "limit",
+      "replace",
+      "remove"
+    ],
+    "successful_runs": {
+      "total_time": "25197038",
+      "count": "1"
+    }
+  },
+  {
+    "file": "prevalidator.ml",
+    "title": "Lima: Precheck refused an operation which empties a balance",
+    "tags": [
+      "lima",
+      "mempool",
+      "precheck",
+      "empty",
+      "balance"
+    ],
+    "successful_runs": {
+      "total_time": "9236640",
       "count": "1"
     }
   },
   {
     "file": "proxy.ml",
-    "title": "Alpha: (Proxy) (/chains/main/blocks/head/votes/current_proposal) No useless RPC call",
+    "title": "Lima: (Proxy) Wrong proto",
+    "tags": [
+      "lima",
+      "proxy",
+      "initialization"
+    ],
+    "successful_runs": {
+      "total_time": "5969813",
+      "count": "1"
+    }
+  },
+  {
+    "file": "proxy.ml",
+    "title": "Alpha: (Proxy) (/chains/main/blocks/head/helpers/endorsing_rights) No useless RPC call",
     "tags": [
       "alpha",
       "proxy",
@@ -1406,143 +1444,68 @@
       "get"
     ],
     "successful_runs": {
-      "total_time": "6669091",
+      "total_time": "5734606",
       "count": "1"
     }
   },
   {
     "file": "proxy.ml",
-    "title": "Lima: (Proxy) (/chains/main/blocks/head/votes/total_voting_power) No useless RPC call",
+    "title": "Alpha: (Proxy) (/chains/main/blocks/head/votes/ballots) No useless RPC call",
     "tags": [
-      "lima",
+      "alpha",
       "proxy",
       "rpc",
       "get"
     ],
     "successful_runs": {
-      "total_time": "5883486",
+      "total_time": "5344123",
       "count": "1"
     }
   },
   {
     "file": "proxy.ml",
-    "title": "Mumbai: (Proxy) (/chains/main/blocks/head/helpers/current_level) Cache at most once",
+    "title": "Alpha: (Proxy) split_key heuristic",
     "tags": [
-      "mumbai",
+      "alpha",
       "proxy",
       "rpc",
       "get"
     ],
     "successful_runs": {
-      "total_time": "5594555",
+      "total_time": "16370018",
       "count": "1"
     }
   },
   {
     "file": "RPC_test.ml",
-    "title": "Lima: (mode client) RPC regression tests: contracts",
+    "title": "Lima: (mode client) RPC regression tests: delegates",
     "tags": [
       "regression",
       "lima",
-      "rpc",
-      "client",
-      "contracts"
-    ],
-    "successful_runs": {
-      "total_time": "46668626",
-      "count": "1"
-    }
-  },
-  {
-    "file": "RPC_test.ml",
-    "title": "Mumbai: (mode client) RPC regression tests: delegates",
-    "tags": [
-      "regression",
-      "mumbai",
       "rpc",
       "client",
       "delegates"
     ],
     "successful_runs": {
-      "total_time": "18525660",
+      "total_time": "19046462",
       "count": "1"
     }
   },
   {
     "file": "RPC_test.ml",
-    "title": "Lima: (mode client) RPC regression tests: misc_protocol",
+    "title": "Test RPC blacklist @ localhost",
     "tags": [
-      "regression",
-      "lima",
       "rpc",
-      "client",
-      "misc_protocol"
+      "acl"
     ],
     "successful_runs": {
-      "total_time": "9058534",
-      "count": "1"
-    }
-  },
-  {
-    "file": "RPC_test.ml",
-    "title": "Mumbai: (mode proxy_server_data_dir) RPC regression tests: misc_protocol",
-    "tags": [
-      "regression",
-      "mumbai",
-      "rpc",
-      "proxy_server_data_dir",
-      "misc_protocol"
-    ],
-    "successful_runs": {
-      "total_time": "10253827",
-      "count": "1"
-    }
-  },
-  {
-    "file": "RPC_test.ml",
-    "title": "Alpha: (mode proxy_server_data_dir) RPC tests: deprecated",
-    "tags": [
-      "alpha",
-      "rpc",
-      "proxy_server_data_dir",
-      "deprecated"
-    ],
-    "successful_runs": {
-      "total_time": "8087878",
-      "count": "1"
-    }
-  },
-  {
-    "file": "RPC_test.ml",
-    "title": "Alpha: (mode proxy_server_rpc) RPC tests: deprecated",
-    "tags": [
-      "alpha",
-      "rpc",
-      "proxy_server_rpc",
-      "deprecated"
-    ],
-    "successful_runs": {
-      "total_time": "9100996",
+      "total_time": "5371954",
       "count": "1"
     }
   },
   {
     "file": "replace_by_fees.ml",
-    "title": "Mumbai: Gas limit doubled in batch. More fees needed",
-    "tags": [
-      "mumbai",
-      "replace",
-      "fee",
-      "manager"
-    ],
-    "successful_runs": {
-      "total_time": "13587238",
-      "count": "1"
-    }
-  },
-  {
-    "file": "replace_by_fees.ml",
-    "title": "Alpha: Low balance - second op's fees are equal to max_int64-1",
+    "title": "Alpha: Second op's fees are equal to replacement fees threshold",
     "tags": [
       "alpha",
       "replace",
@@ -1550,185 +1513,80 @@
       "manager"
     ],
     "successful_runs": {
-      "total_time": "19229907",
+      "total_time": "14858871",
       "count": "1"
     }
   },
   {
-    "file": "rpc_config_logging.ml",
-    "title": "Mumbai: logging configuration RPCs",
+    "file": "script_illtyped.ml",
+    "title": "Alpha: Test Ill Typecheck - set_update_non_comparable",
+    "tags": [
+      "alpha",
+      "client",
+      "script",
+      "michelson",
+      "typechecking"
+    ],
+    "successful_runs": {
+      "total_time": "1531921",
+      "count": "1"
+    }
+  },
+  {
+    "file": "script_illtyped.ml",
+    "title": "Alpha: Test Ill Typecheck - push_big_map_with_id_with_parens",
+    "tags": [
+      "alpha",
+      "client",
+      "script",
+      "michelson",
+      "typechecking"
+    ],
+    "successful_runs": {
+      "total_time": "1464475",
+      "count": "1"
+    }
+  },
+  {
+    "file": "script_illtyped.ml",
+    "title": "Lima: Test Ill Typecheck - pack_sapling_state",
+    "tags": [
+      "lima",
+      "client",
+      "script",
+      "michelson",
+      "typechecking"
+    ],
+    "successful_runs": {
+      "total_time": "1456283",
+      "count": "1"
+    }
+  },
+  {
+    "file": "script_illtyped.ml",
+    "title": "Lima: Test Ill Typecheck - ticket_apply",
+    "tags": [
+      "lima",
+      "client",
+      "script",
+      "michelson",
+      "typechecking"
+    ],
+    "successful_runs": {
+      "total_time": "1474013",
+      "count": "1"
+    }
+  },
+  {
+    "file": "storage_reconstruction.ml",
+    "title": "Mumbai: storage reconstruction",
     "tags": [
       "mumbai",
-      "rpc",
-      "node",
-      "logging"
+      "storage",
+      "reconstruction"
     ],
     "successful_runs": {
-      "total_time": "15030755",
-      "count": "1"
-    }
-  },
-  {
-    "file": "run_operation_RPC.ml",
-    "title": "Lima: Run_operation proposals",
-    "tags": [
-      "lima",
-      "rpc",
-      "run_operation",
-      "voting",
-      "proposals"
-    ],
-    "successful_runs": {
-      "total_time": "6313457",
-      "count": "1"
-    }
-  },
-  {
-    "file": "run_operation_RPC.ml",
-    "title": "Alpha: Run_operation misc manager ops from fresh account",
-    "tags": [
-      "alpha",
-      "rpc",
-      "run_operation",
-      "fresh_account",
-      "manager",
-      "reveal",
-      "transaction",
-      "delegation"
-    ],
-    "successful_runs": {
-      "total_time": "18749090",
-      "count": "1"
-    }
-  },
-  {
-    "file": "script_illtyped.ml",
-    "title": "Alpha: Test Deprecated Typecheck Breaks - legacy/steps_to_quota",
-    "tags": [
-      "alpha",
-      "client",
-      "script",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "1474770",
-      "count": "1"
-    }
-  },
-  {
-    "file": "script_illtyped.ml",
-    "title": "Lima: Test Deprecated Typecheck in Legacy - legacy/steps_to_quota",
-    "tags": [
-      "lima",
-      "client",
-      "script",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "1483757",
-      "count": "1"
-    }
-  },
-  {
-    "file": "script_illtyped.ml",
-    "title": "Mumbai: Test Ill Typecheck - stack_bottom_undug2able",
-    "tags": [
-      "mumbai",
-      "client",
-      "script",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "1473464",
-      "count": "1"
-    }
-  },
-  {
-    "file": "script_illtyped.ml",
-    "title": "Lima: Test Ill Typecheck - stack_bottom_undropable",
-    "tags": [
-      "lima",
-      "client",
-      "script",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "1457029",
-      "count": "1"
-    }
-  },
-  {
-    "file": "script_illtyped.ml",
-    "title": "Mumbai: Test Ill Typecheck - big_dip",
-    "tags": [
-      "mumbai",
-      "client",
-      "script",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "1466006",
-      "count": "1"
-    }
-  },
-  {
-    "file": "script_illtyped.ml",
-    "title": "Alpha: Test Ill Typecheck - push_big_map_with_id_without_parens",
-    "tags": [
-      "alpha",
-      "client",
-      "script",
-      "michelson",
-      "typechecking"
-    ],
-    "successful_runs": {
-      "total_time": "1455286",
-      "count": "1"
-    }
-  },
-  {
-    "file": "stresstest_command.ml",
-    "title": "Alpha: stresstest multiple nodes",
-    "tags": [
-      "alpha",
-      "stresstest",
-      "multiple_nodes"
-    ],
-    "successful_runs": {
-      "total_time": "44063815",
-      "count": "1"
-    }
-  },
-  {
-    "file": "testnet_dictator.ml",
-    "title": "Lima: testnet dictator (mainnet, proposal)",
-    "tags": [
-      "lima",
-      "amendment",
-      "mainnet",
-      "proposal"
-    ],
-    "successful_runs": {
-      "total_time": "20576884",
-      "count": "1"
-    }
-  },
-  {
-    "file": "testnet_dictator.ml",
-    "title": "Alpha: testnet dictator (ghostnet, proposal)",
-    "tags": [
-      "alpha",
-      "amendment",
-      "ghostnet",
-      "proposal"
-    ],
-    "successful_runs": {
-      "total_time": "19792120",
+      "total_time": "197724016",
       "count": "1"
     }
   },
@@ -1742,55 +1600,26 @@
       "exploration"
     ],
     "successful_runs": {
-      "total_time": "24244606",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tickets.ml",
-    "title": "Alpha: Sending zero ticket from implicit accounts must be rejected",
-    "tags": [
-      "regression",
-      "alpha",
-      "client",
-      "michelson"
-    ],
-    "successful_runs": {
-      "total_time": "4319531",
-      "count": "1"
-    }
-  },
-  {
-    "file": "timelock.ml",
-    "title": "Alpha: Check a contract containing timelock operations is forbidden",
-    "tags": [
-      "alpha",
-      "client",
-      "michelson",
-      "timelock"
-    ],
-    "successful_runs": {
-      "total_time": "1462252",
+      "total_time": "23478079",
       "count": "1"
     }
   },
   {
     "file": "dal.ml",
-    "title": "Alpha: Testing DAL node (dal node GET /commitments/<commitment>/slot)",
+    "title": "Alpha: Testing DAL node (dal node PATCH+GET /profiles)",
     "tags": [
       "alpha",
-      "dal",
       "dal",
       "layer1"
     ],
     "successful_runs": {
-      "total_time": "11597599",
+      "total_time": "10940838",
       "count": "1"
     }
   },
   {
     "file": "sc_rollup.ml",
-    "title": "Alpha: arith - refutation games winning strategies (parallel_games_1)",
+    "title": "Alpha: arith - refutation games winning strategies (inbox_proof_at_genesis)",
     "tags": [
       "alpha",
       "sc_rollup",
@@ -1799,48 +1628,90 @@
       "refutation"
     ],
     "successful_runs": {
-      "total_time": "229523170",
+      "total_time": "135132547",
       "count": "1"
     }
   },
   {
     "file": "sc_rollup.ml",
-    "title": "Alpha: wasm_2_0_0 - rollup node - correct handling of commitments (observer_does_not_publish)",
+    "title": "Alpha: wasm_2_0_0 - rollup node - correct handling of commitments (node_use_proto_param)",
     "tags": [
       "alpha",
       "sc_rollup",
       "wasm_2_0_0",
       "rollup_node",
-      "commitment",
-      "modes",
-      "observer"
+      "commitment"
     ],
     "successful_runs": {
-      "total_time": "150116678",
+      "total_time": "36179706",
       "count": "1"
     }
   },
   {
     "file": "sc_rollup.ml",
-    "title": "Alpha: wasm_2_0_0 - trigger exec output (entrypoint: %aux, earliness: 0, external)",
+    "title": "Alpha: wasm_2_0_0 - trigger exec output (entrypoint: %default, earliness: 5, external)",
     "tags": [
-      "regression",
       "alpha",
       "sc_rollup",
       "wasm_2_0_0",
       "rollup_node",
       "outbox",
       "external",
-      "aux"
+      "default"
     ],
     "successful_runs": {
-      "total_time": "24711215",
+      "total_time": "17329197",
+      "count": "1"
+    }
+  },
+  {
+    "file": "sc_rollup.ml",
+    "title": "Mumbai: arith - the smart contract rollup node runs on correct address",
+    "tags": [
+      "mumbai",
+      "sc_rollup",
+      "arith",
+      "rollup_node",
+      "running"
+    ],
+    "successful_runs": {
+      "total_time": "6968809",
+      "count": "1"
+    }
+  },
+  {
+    "file": "sc_rollup.ml",
+    "title": "Mumbai: arith - maintenance of inbox in the rollup node (basic)",
+    "tags": [
+      "mumbai",
+      "sc_rollup",
+      "arith",
+      "rollup_node",
+      "inbox"
+    ],
+    "successful_runs": {
+      "total_time": "10362313",
+      "count": "1"
+    }
+  },
+  {
+    "file": "sc_rollup.ml",
+    "title": "Alpha: arith - a rollup should recover on interruption before first inbox",
+    "tags": [
+      "alpha",
+      "sc_rollup",
+      "arith",
+      "rollup_node",
+      "interrupt"
+    ],
+    "successful_runs": {
+      "total_time": "19207173",
       "count": "1"
     }
   },
   {
     "file": "test_contract_bls12_381.ml",
-    "title": "Alpha: Bls12_381 contract primitives, g2: store",
+    "title": "Alpha: Bls12_381 contract primitives, fr: store",
     "tags": [
       "regression",
       "alpha",
@@ -1848,51 +1719,122 @@
       "crypto",
       "contract",
       "bls12_381",
-      "g2",
+      "fr",
       "store"
     ],
     "successful_runs": {
-      "total_time": "9909100",
+      "total_time": "9551304",
       "count": "1"
     }
   },
   {
-    "file": "tx_rollup_l2_node.ml",
-    "title": "Lima: TX_rollup: test that the node starts if allowed to deposit",
+    "file": "test_contract_bls12_381.ml",
+    "title": "Mumbai: Bls12_381 contract primitives: pairing_check(pos, pos)",
     "tags": [
-      "lima",
-      "tx_rollup",
-      "node",
-      "allow",
-      "deposit"
+      "regression",
+      "mumbai",
+      "michelson",
+      "crypto",
+      "contract",
+      "bls12_381",
+      "pairing_check"
     ],
     "successful_runs": {
-      "total_time": "6537580",
+      "total_time": "90320493",
+      "count": "1"
+    }
+  },
+  {
+    "file": "test_contract_bls12_381.ml",
+    "title": "Mumbai: Bls12_381 contract primitives: test_groth16",
+    "tags": [
+      "regression",
+      "mumbai",
+      "michelson",
+      "crypto",
+      "contract",
+      "bls12_381",
+      "groth16"
+    ],
+    "successful_runs": {
+      "total_time": "1528579",
       "count": "1"
     }
   },
   {
     "file": "views.ml",
-    "title": "Alpha: Typecheck view - view_toplevel_dupable_type_input",
+    "title": "Alpha: Test view runtimes - op_toplevel_inconsistent_input_type - 5",
     "tags": [
       "alpha",
       "client",
       "michelson"
     ],
     "successful_runs": {
-      "total_time": "1538095",
+      "total_time": "3791080",
+      "count": "1"
+    }
+  },
+  {
+    "file": "views.ml",
+    "title": "Mumbai: Create contract with view",
+    "tags": [
+      "mumbai",
+      "client",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "5375957",
+      "count": "1"
+    }
+  },
+  {
+    "file": "views.ml",
+    "title": "Alpha: self after view - self_after_fib_view",
+    "tags": [
+      "alpha",
+      "client",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "3815783",
+      "count": "1"
+    }
+  },
+  {
+    "file": "views.ml",
+    "title": "Alpha: self after view - self_after_nonexistent_view",
+    "tags": [
+      "alpha",
+      "client",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "3885619",
+      "count": "1"
+    }
+  },
+  {
+    "file": "views.ml",
+    "title": "Alpha: Typecheck view - view_op_invalid_arity",
+    "tags": [
+      "alpha",
+      "client",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "1496564",
       "count": "1"
     }
   },
   {
     "file": "zk_rollup.ml",
-    "title": "Alpha: failing_origination",
+    "title": "Alpha: successful_test",
     "tags": [
       "alpha",
       "zk_rollup"
     ],
     "successful_runs": {
-      "total_time": "6808182",
+      "total_time": "22454409",
       "count": "1"
     }
   }

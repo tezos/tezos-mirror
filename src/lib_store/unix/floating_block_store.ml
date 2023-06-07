@@ -149,7 +149,7 @@ let append_all floating_store (blocks : (Block_repr.t * info) Seq.t) =
   Lwt_idle_waiter.force_idle floating_store.scheduler (fun () ->
       let*! eof_offset = Lwt_unix.lseek floating_store.fd 0 Unix.SEEK_END in
       let* _last_offset =
-        Seq.fold_left_es
+        Seq.ES.fold_left
           (fun offset (block, ({predecessors; resulting_context_hash} : info)) ->
             let* written_len =
               locked_write_block

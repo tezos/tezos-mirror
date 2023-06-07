@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (baking)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "^\[Unit\] level module$"
+    Invocation: dune exec src/proto_016_PtMumbai/lib_protocol/test/unit/main.exe \
+                  -- --file test_level_module.ml
     Subject:    some functions in the Level module
 *)
 
@@ -277,3 +277,7 @@ let tests =
     Tztest.tztest "level_from_raw" `Quick test_level_from_raw;
     Tztest.tztest "first_level_in_cycle" `Quick test_first_level_in_cycle;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("level module", tests)]
+  |> Lwt_main.run

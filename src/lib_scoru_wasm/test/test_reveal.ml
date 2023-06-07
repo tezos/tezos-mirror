@@ -26,17 +26,16 @@
 (** Testing
     -------
     Component:    Lib_scoru_wasm reveal
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "Reveal"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_reveal.ml
     Subject:      Reveal tests for the tezos-scoru-wasm library
 *)
 
-open Tztest
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
 open Wasm_utils
+open Tztest_helper
 
-let reveal_preimage_module hash_addr hash_size preimage_addr max_bytes =
+let reveal_preimage_module hash hash_addr hash_size preimage_addr max_bytes =
   Format.sprintf
     {|
       (module
@@ -44,12 +43,15 @@ let reveal_preimage_module hash_addr hash_size preimage_addr max_bytes =
           (func $reveal_preimage (param i32 i32 i32 i32) (result i32))
         )
         (memory 1)
+        (data (i32.const %ld) "%s")
         (export "mem" (memory 0))
         (func (export "kernel_run")
           (call $reveal_preimage (i32.const %ld) (i32.const %ld) (i32.const %ld) (i32.const %ld))
         )
       )
     |}
+    hash_addr
+    hash
     hash_addr
     hash_size
     preimage_addr
@@ -93,29 +95,56 @@ let reveal_returned_size tree =
       | _ -> Stdlib.failwith "Incorrect stack")
   | _ -> Stdlib.failwith "The tick after reveal_builtins is not consistent"
 
-let test_reveal_preimage_gen preimage max_bytes =
+let to_hex_string ?(tag = "\\00") s =
+  let open Format in
+  asprintf
+    "%s%a"
+    tag
+    (pp_print_seq
+       ~pp_sep:(fun _ _ -> ())
+       (fun ppf e -> fprintf ppf "\\%02x" (Char.code e)))
+    (String.to_seq s)
+
+let test_reveal_preimage_gen ~version preimage max_bytes =
   let open Lwt_result_syntax in
   let hash_addr = 120l in
   let preimage_addr = 200l in
-  let hash_size = 33l in
+  (* The first byte corresponds to a tag which in the case of Blake2B hashes
+     is set to zero. *)
+  let hash_size = Int32.of_int (1 + Tezos_crypto.Blake2B.size) in
+  let hash = Tezos_crypto.Blake2B.(to_string (hash_string [preimage])) in
   let modl =
-    reveal_preimage_module hash_addr hash_size preimage_addr max_bytes
+    reveal_preimage_module
+      (to_hex_string hash)
+      hash_addr
+      hash_size
+      preimage_addr
+      max_bytes
   in
-  let*! state = initial_tree modl in
+  let*! state = initial_tree ~version modl in
   let*! state_snapshotted = eval_until_input_or_reveal_requested state in
   let*! state_with_dummy_input = set_empty_inbox_step 0l state_snapshotted in
   (* Let’s go *)
   let*! state = eval_until_input_or_reveal_requested state_with_dummy_input in
+  (* Let's check the hash in memory. *)
+  let*! module_instance =
+    Wasm.Internal_for_tests.get_module_instance_exn state
+  in
+  let*! memory = Instance.Vector.get 0l module_instance.memories in
+  let*! hash_in_memory =
+    Memory.load_bytes memory hash_addr (Int32.to_int hash_size)
+  in
+  assert (
+    String.equal (String.sub hash_in_memory 1 Tezos_crypto.Blake2B.size) hash) ;
   let*! info = Wasm.get_info state in
   let* () =
     let open Wasm_pvm_state in
     match info.Wasm_pvm_state.input_request with
-    | Wasm_pvm_state.Reveal_required (Reveal_raw_data hash) ->
-        (* The PVM has reached a point where it’s asking for some
-           preimage. Since the memory is left blank, we are looking
-           for the zero hash *)
-        let zero_hash = String.make (Int32.to_int hash_size) '\000' in
-        assert (hash = zero_hash) ;
+    | Wasm_pvm_state.Reveal_required (Reveal_raw_data reveal_hash) ->
+        (* The PVM has reached a point where it’s asking for some preimage. *)
+        assert (
+          String.equal (String.sub reveal_hash 1 Tezos_crypto.Blake2B.size) hash) ;
+
         return_unit
     | No_input_required | Input_required | Reveal_required _ -> assert false
   in
@@ -148,29 +177,29 @@ let test_reveal_preimage_gen preimage max_bytes =
 
 (* Test the best conditions for the preimage reveal: its size is below the
    maximum bytes for the preimage, it will be . *)
-let test_reveal_preimage_classic () =
+let test_reveal_preimage_classic ~version () =
   let preimage =
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse \
      elementum nec ex sed porttitor."
     (* 100 bytes *)
   in
   let max_bytes = 200l in
-  test_reveal_preimage_gen preimage max_bytes
+  test_reveal_preimage_gen ~version preimage max_bytes
 
-let test_reveal_preimage_above_max () =
+let test_reveal_preimage_above_max ~version () =
   let preimage =
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse \
      elementum nec ex sed porttitor."
     (* 100 bytes *)
   in
   let max_bytes = 50l in
-  test_reveal_preimage_gen preimage max_bytes
+  test_reveal_preimage_gen ~version preimage max_bytes
 
-let test_reveal_metadata () =
+let test_reveal_metadata ~version () =
   let open Lwt_result_syntax in
   let metadata_addr = 200l in
   let modl = reveal_metadata_module metadata_addr in
-  let*! state = initial_tree modl in
+  let*! state = initial_tree ~version modl in
   let*! state_snapshotted = eval_until_input_or_reveal_requested state in
   let*! state_with_dummy_input = set_empty_inbox_step 0l state_snapshotted in
   (* Let’s go *)
@@ -247,7 +276,7 @@ let apply_fast ?(images = Preimage_map.empty) tree =
     Stdlib.failwith "Fast Execution was expected to run!" ;
   tree
 
-let test_fast_exec_reveal () =
+let test_fast_exec_reveal ~version () =
   let open Lwt.Syntax in
   let example_hash = "this represents the 33-byte hash!" in
   let example_preimage = "This is the expected preimage" in
@@ -303,7 +332,7 @@ let test_fast_exec_reveal () =
       example_hash
   in
 
-  let* tree = initial_tree kernel in
+  let* tree = initial_tree ~version kernel in
   let* tree = eval_until_input_or_reveal_requested tree in
   let* tree = set_empty_inbox_step 0l tree in
   let* tree = apply_fast ~images tree in
@@ -322,15 +351,19 @@ let test_fast_exec_reveal () =
   Lwt_result_syntax.return_unit
 
 let tests =
-  [
-    tztest
-      "Test reveal_preimage with preimage length below max_bytes"
-      `Quick
-      test_reveal_preimage_classic;
-    tztest
-      "Test reveal_preimage with preimage length above max_bytes"
-      `Quick
-      test_reveal_preimage_above_max;
-    tztest "Test reveal_metadata" `Quick test_reveal_metadata;
-    tztest "Test reveal_preimage with Fast Exec" `Quick test_fast_exec_reveal;
-  ]
+  tztests_with_pvm
+    ~versions:[V0; V1]
+    [
+      ( "Test reveal_preimage with preimage length below max_bytes",
+        `Quick,
+        test_reveal_preimage_classic );
+      ( "Test reveal_preimage with preimage length above max_bytes",
+        `Quick,
+        test_reveal_preimage_above_max );
+      ("Test reveal_metadata", `Quick, test_reveal_metadata);
+      ("Test reveal_preimage with Fast Exec", `Quick, test_fast_exec_reveal);
+    ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("Reveal", tests)]
+  |> Lwt_main.run

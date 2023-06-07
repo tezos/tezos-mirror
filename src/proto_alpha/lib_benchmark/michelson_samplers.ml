@@ -67,7 +67,7 @@ type type_name =
   | `TAddress
   | `TBool
   | `TPair
-  | `TUnion
+  | `TOr
   | `TLambda
   | `TOption
   | `TList
@@ -108,7 +108,7 @@ type atomic_type_name =
 
 type non_atomic_type_name =
   [ `TPair
-  | `TUnion
+  | `TOr
   | `TLambda
   | `TOption
   | `TList
@@ -150,7 +150,7 @@ let all_atomic_type_names : atomic_type_name array =
 let all_non_atomic_type_names : non_atomic_type_name array =
   [|
     `TPair;
-    `TUnion;
+    `TOr;
     `TLambda;
     `TOption;
     `TList;
@@ -176,7 +176,7 @@ type comparable_type_name =
   | `TChain_id
   | `TAddress
   | `TPair
-  | `TUnion
+  | `TOr
   | `TOption ]
 
 (* Ensure inclusion of comparable_type_name in type_name *)
@@ -207,7 +207,7 @@ type 'a comparable_and_non_atomic = 'a
   constraint 'a = [< non_atomic_type_name]
 
 let all_comparable_non_atomic_type_names : 'a comparable_and_non_atomic array =
-  [|`TPair; `TUnion; `TOption|]
+  [|`TPair; `TOr; `TOption|]
 
 (* Ensure inclusion of comparable_and_atomic in type_name *)
 let (_ : 'a comparable_and_atomic -> type_name) = fun x -> (x :> type_name)
@@ -378,11 +378,11 @@ end)
             match lambda_t (-1) domain range with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
-        | `TUnion -> (
+        | `TOr -> (
             let* lsize, rsize = pick_split (size - 1) in
             let* (Ex_ty left) = m_type ~size:lsize in
             let* (Ex_ty right) = m_type ~size:rsize in
-            match union_t (-1) left right with
+            match or_t (-1) left right with
             | Error _ -> assert false
             | Ok (Ty_ex_c res_ty) -> return @@ Ex_ty res_ty)
         | `TOption -> (
@@ -452,7 +452,7 @@ end)
         | Error _ -> assert false
         | Ok res_ty -> return @@ Ex_comparable_ty res_ty
       in
-      let union_case size =
+      let or_case size =
         let size = size - 1 in
         let* size_left =
           Base_samplers.sample_in_interval ~range:{min = 1; max = size - 1}
@@ -460,7 +460,7 @@ end)
         let size_right = size - size_left in
         let* (Ex_comparable_ty l) = m_comparable_type ~size:size_left in
         let* (Ex_comparable_ty r) = m_comparable_type ~size:size_right in
-        match comparable_union_t (-1) l r with
+        match comparable_or_t (-1) l r with
         | Error _ -> assert false
         | Ok res_ty -> return @@ Ex_comparable_ty res_ty
       in
@@ -471,7 +471,7 @@ end)
         let* cmp_tn = uniform_comparable_non_atomic_type_name in
         match cmp_tn with
         | `TPair -> pair_case size
-        | `TUnion -> union_case size
+        | `TOr -> or_case size
         | `TOption -> option_case size
   end
 
@@ -525,7 +525,7 @@ end)
      fun arg_ty ->
       let open M in
       let* c = originated in
-      let* entrypoint = entrypoint in
+      let* entrypoint in
       let destination = Alpha_context.Destination.Contract (Originated c) in
       return
         (Typed_contract.Internal_for_tests.typed_exn
@@ -609,7 +609,7 @@ end)
               let* left_v = value left_t in
               let* right_v = value right_t in
               return (left_v, right_v))
-        | Union_t (left_t, right_t, _, _) ->
+        | Or_t (left_t, right_t, _, _) ->
             fun rng_state ->
               if Base_samplers.uniform_bool rng_state then
                 L (value left_t rng_state)
@@ -630,9 +630,6 @@ end)
         | Bls12_381_g2_t -> generate_bls12_381_g2
         | Bls12_381_fr_t -> generate_bls12_381_fr
         | Ticket_t (contents_ty, _) -> generate_ticket contents_ty
-        | Tx_rollup_l2_address_t ->
-            fail_sampling
-              "Michelson_samplers: tx_rollup_l2_address is deprecated"
         | Sapling_transaction_t _ ->
             fail_sampling
               "Michelson_samplers: sapling transactions not handled yet"

@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (Helpers RPCs)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                -- test "^helpers rpcs$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
+                  -- --file test_helpers_rpcs.ml
     Subject:    On RPCs.
 *)
 
@@ -63,3 +62,7 @@ let test_baking_rights () =
   return_unit
 
 let tests = [Tztest.tztest "baking_rights" `Quick test_baking_rights]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("helpers rpcs", tests)]
+  |> Lwt_main.run

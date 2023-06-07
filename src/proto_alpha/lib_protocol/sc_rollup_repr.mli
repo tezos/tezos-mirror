@@ -42,14 +42,12 @@
 
 (** A smart rollup has an address starting with "sr1". *)
 module Address : sig
-  include S.HASH
-
-  (** [encoded_size] is the number of bytes needed to represent an address. *)
-  val encoded_size : int
+  include
+    module type of Smart_rollup_address with type t = Smart_rollup_address.t
 
   val of_b58data : Base58.data -> t option
 
-  (** [prefix] is the prefix of smart contract rollup addresses. *)
+  (** Prefix of smart rollup addresses in base58-check. *)
   val prefix : string
 end
 
@@ -77,7 +75,7 @@ end
     about the state of the PVM, which can be disputed as part of a commitment
     dispute.
 
-    See also {!Commitment_repr.}. *)
+    See also {!Commitment_repr}. *)
 module Number_of_ticks : sig
   include Bounded.S with type ocaml_type := int64
 
@@ -98,8 +96,18 @@ val pp : Format.formatter -> t -> unit
 val in_memory_size : t -> Cache_memory_helpers.sint
 
 (** A [Staker] is an implicit account, identified by its public key hash. *)
-module Staker :
-  S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
+module Staker : sig
+  include S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
+
+  (** Classic RPC argument with name ["pkh"]. *)
+  val rpc_arg : t RPC_arg.t
+
+  (** RPC argument with name ["staker1_pkh"]. *)
+  val rpc_arg_staker1 : t RPC_arg.t
+
+  (** RPC argument with name ["staker2_pkh"]. *)
+  val rpc_arg_staker2 : t RPC_arg.t
+end
 
 (** The data model uses an index of these addresses. *)
 module Index : Storage_description.INDEX with type t = Address.t

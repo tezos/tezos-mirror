@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type secret_key = Unencrypted of string
+type secret_key = Unencrypted of string | Encrypted of string
 
 type key = {
   alias : string;
@@ -33,12 +33,38 @@ type key = {
   secret_key : secret_key;
 }
 
-let secret_key_equal secret_key1 secret_key2 =
-  match (secret_key1, secret_key2) with
-  | Unencrypted s1, Unencrypted s2 -> String.equal s1 s2
+type aggregate_key = {
+  aggregate_alias : string;
+  aggregate_public_key_hash : string;
+  aggregate_public_key : string;
+  aggregate_secret_key : secret_key;
+}
+
+let require_unencrypted_secret_key ~__LOC__ = function
+  | Unencrypted b58_secret_key -> b58_secret_key
+  | Encrypted _ ->
+      Test.fail
+        ~__LOC__
+        "[require_unencrypted_secret_key] expected an unencrypted secret key"
+
+let sign_bytes ~watermark ~(signer : key) (message : Bytes.t) =
+  let b58_secret_key =
+    require_unencrypted_secret_key ~__LOC__ signer.secret_key
+  in
+  let secret_key =
+    Tezos_crypto.Signature.Secret_key.of_b58check_exn b58_secret_key
+  in
+  Tezos_crypto.Signature.sign ~watermark secret_key message
 
 let uri_of_secret_key = function
   | Unencrypted secret_key -> "unencrypted:" ^ secret_key
+  | Encrypted secret_key -> "encrypted:" ^ secret_key
+
+let secret_key_equal secret_key1 secret_key2 =
+  match (secret_key1, secret_key2) with
+  | Unencrypted s1, Unencrypted s2 | Encrypted s1, Encrypted s2 ->
+      String.equal s1 s2
+  | _ -> false
 
 let secret_key_typ : secret_key Check.typ =
   Check.equalable
@@ -62,20 +88,6 @@ let key_typ : key Check.typ =
       && String.equal key1.public_key key2.public_key
       && secret_key_equal key1.secret_key key2.secret_key)
 
-type aggregate_key = {
-  aggregate_alias : string;
-  aggregate_public_key_hash : string;
-  aggregate_public_key : string;
-  aggregate_secret_key : secret_key;
-}
-
-let sign_bytes ~watermark ~(signer : key) (message : Bytes.t) =
-  let (Unencrypted b58_secret_key) = signer.secret_key in
-  let secret_key =
-    Tezos_crypto.Signature.Secret_key.of_b58check_exn b58_secret_key
-  in
-  Tezos_crypto.Signature.sign ~watermark secret_key message
-
 module Wallet : sig
   val write : key list -> base_dir:string -> unit
 end = struct
@@ -84,8 +96,7 @@ end = struct
     | `Public_key -> "public_keys"
     | `Secret_key -> "secret_keys"
 
-  let json_of_secret_key = function
-    | Unencrypted secret_key -> `String ("unencrypted:" ^ secret_key)
+  let json_of_secret_key secret_key = `String (uri_of_secret_key secret_key)
 
   let json_of_public_key public_key = `String ("unencrypted:" ^ public_key)
 
@@ -170,14 +181,12 @@ let parse_client_output ~alias ~client_output =
     parse_client_output_public_keys ~client_output
   in
   let secret_key =
-    (* group of letters and digits after "Secret Key: unencrypted:" e.g.
-       "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh" Note: The tests
-       only use unencrypted keys for the moment. If this changes, please update
-       secret key parsing. *)
-    client_output
-    =~* rex "Secret Key: unencrypted:?(\\w*)"
-    |> mandatory "secret key"
-    |> fun sk -> Unencrypted sk
+    (* group of letters and digits after "Secret Key: (un)encrypted:" e.g.
+       "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh". *)
+    match client_output =~** rex "Secret Key: ?(\\w*):?(\\w*)" with
+    | Some ("unencrypted", sk) -> Unencrypted sk
+    | Some ("encrypted", sk) -> Encrypted sk
+    | _ -> Test.fail "Could not parse [show address] output: %s" client_output
   in
   {alias; public_key_hash; public_key; secret_key}
 

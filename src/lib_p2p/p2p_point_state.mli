@@ -104,8 +104,9 @@ module Info : sig
      practically allowing the node to try the connection immediately *)
   val reset_reconnection_delay : 'conn point_info -> unit
 
-  (* [can_reconnect] Check if a point is greylisted w.r.t. the current time *)
-  val can_reconnect : now:Time.System.t -> 'conn point_info -> bool
+  (* [cannot_reconnect_yet] Check if a point has its reconnection delay
+     outdated w.r.t. the current time *)
+  val cannot_reconnect_yet : now:Time.System.t -> 'conn point_info -> bool
 
   (* [reconnection_time] Return the time at which the node can try to
      reconnect with this point, Or None if the point is already in state

@@ -26,8 +26,8 @@
 (* Testing
    -------
    Component:    Shell
-   Invocation:   dune exec src/lib_shell/test/test_shell.exe \
-                 -- test '^synchronisation heuristic'
+   Invocation:   dune exec src/lib_shell/test/main.exe \
+                  -- --file test_synchronisation_heuristic.ml
    Subject:      Test the synchronisation heuristic
 *)
 
@@ -689,3 +689,13 @@ let tests_lwt_raw : (string * (Lwt_switch.t -> unit -> unit Lwt.t)) list =
 
 let tests_lwt =
   List.map (fun (s, f) -> Alcotest_lwt.test_case s `Quick f) tests_lwt_raw
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    "tezos-shell"
+    [
+      ("synchronisation heuristic sync", tests);
+      ("synchronisation heuristic ", tests_lwt);
+    ]
+  |> Lwt_main.run

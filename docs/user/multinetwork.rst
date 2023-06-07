@@ -1,30 +1,30 @@
 .. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
 
-Multinetwork Node
-=================
+Connecting to a Network
+=======================
 
 Tezos is run on several networks, such as Mainnet (the main network)
-and various :ref:`Test Networks<test-networks>`. Some users may also want to run
+and various :ref:`test Networks<test-networks>`. Some users may also want to run
 their own networks for various reasons. Networks differ in various ways:
 
 - they start from their own genesis block;
 
-- they have different names so that nodes know not to talk to other networks;
+- they have different names so that each node can choose the network to connect to;
 
-- they may run (or have run) different protocols;
+- they may run different protocols (or upgrade protocols at different moments);
 
 - protocols may run with different :ref:`constants <protocol_constants>` (for instance, test networks move faster);
 
 - they have different bootstrap peers (nodes that new nodes connect to initially);
 
-- they may have had user-activated upgrades or user-activated protocol overrides
-  to change the protocol without going through the voting process.
+- some networks may change the protocol without going through the regular voting process, via user-activated upgrades or user-activated protocol overrides.
 
-By default, the multinetwork node connects to Mainnet.
+The Octez node can be configured to connect to a given network when it is started.
+By default, the node connects to Mainnet.
 To connect to other networks, you can either use one of the
 `Built-In Networks`_ or configure the node to connect to `Custom Networks`_.
 See also `Alias Versus Explicit Configuration`_ for a discussion
-regarding what happens when you update your node.
+regarding what happens when you update your node, in each case.
 
 .. _builtin_networks:
 
@@ -32,11 +32,13 @@ Built-In Networks
 -----------------
 
 The simplest way to select the network to connect to is to use the ``--network``
-option when you initialize your :doc:`node configuration <./node-configuration>`. For instance, to run on Limanet::
+option for selecting a :ref:`test network<test-networks>` when you initialize your :doc:`node configuration <./node-configuration>`.
 
-  octez-node config init --data-dir ~/tezos-limanet --network limanet
-  octez-node identity generate --data-dir ~/tezos-limanet
-  octez-node run --data-dir ~/tezos-limanet
+For instance, to run on Ghostnet::
+
+  octez-node config init --data-dir ~/tezos-ghostnet --network ghostnet
+  octez-node identity generate --data-dir ~/tezos-ghostnet
+  octez-node run --data-dir ~/tezos-ghostnet
 
 .. note::
    Once initialized, the node remembers its network settings on subsequent runs
@@ -54,26 +56,32 @@ the following built-in networks:
 
 - ``sandbox``
 
-- ``limanet`` (available from version 15.0)
+- ``ghostnet``
+
+- ``mumbainet`` (available from version :doc:`../releases/version-16`)
 
 If you did not initialize your node configuration, or if your configuration
 file contains no ``network`` field, the node assumes you want to run Mainnet.
 You can use the ``--network`` option with ``octez-node run`` to make sure
 your node runs on the expected network. For instance, to make sure that
-it runs on Limanet::
+it runs on Ghostnet::
 
-  octez-node run --data-dir ~/tezos-limanet --network limanet
+  octez-node run --data-dir ~/tezos-ghostnet --network ghostnet
 
-This command will fail with an error if the configured network is not Limanet.
+This command will fail with an error if the configured network is not Ghostnet.
 The node also displays the chain name (such as ``TEZOS_MAINNET``) when it starts.
 Also mind opening the :doc:`RPC interface <../developer/rpc>` as appropriate.
+
+The list of built-in networks is in :src:`src/lib_node_config/config_file.ml`.
+Octez developers edit the ``builtin_blockchain_networks_with_tags`` variable in this file to
+add or remove built-in networks.
 
 Custom Networks
 ---------------
 
 If the network you want to connect to is not in the list of built-in networks,
 you need a corresponding network configuration file. There are several ways to
-get that. If you have an appropriate file, you can specify it with ``--network``
+set that up. If you have an appropriate file, you can specify it with the ``--network``
 argument when you initialize your node configuration (see above), and the node will load it. If you know a URL from which the file can be
 downloaded, you can also specify it with ``--network``. The node will then
 download the config automatically. The network configuration should be in JSON format,
@@ -114,13 +122,21 @@ Here is an example configuration file for Mainnet::
         {
           "replaced_protocol": "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU",
           "replacement_protocol": "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS"
+        },
+        {
+          "replaced_protocol": "PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq",
+          "replacement_protocol": "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
+        },
+        {
+          "replaced_protocol": "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r",
+          "replacement_protocol": "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
         }
       ],
       "default_bootstrap_peers": [ "boot.tzbeta.net" ]
     }
   }
 
-This is equivalent to using ``config init --network mainnet``, or ``"network": "Mainnet"``
+This is equivalent to doing ``config init --network mainnet``, or using ``"network": "Mainnet"``
 in the configuration file (or to doing nothing, as Mainnet is the default), except
 that you will not automatically get updates to the list of bootstrap peers and
 user-activated upgrades (see `Alias Versus Explicit Configuration`_).
@@ -157,10 +173,10 @@ user-activated upgrades (see `Alias Versus Explicit Configuration`_).
   and ``--no-bootstrap-peers`` is not given on the command-line.
 
 Genesis Parameters
-------------------
+~~~~~~~~~~~~~~~~~~
 
 In addition to the above fields, you can also specify custom genesis parameters.
-For instance, if your genesis protocol is ``proto_genesis``, you can specify the
+That is, you can additionally specify the
 activation key::
 
   {
@@ -195,43 +211,35 @@ comes with genesis parameters, you can override them with ``--sandbox``.
 Alias Versus Explicit Configuration
 -----------------------------------
 
-If you use one of the `Built-In Networks`_, the configuration file stores
+The previous sections explained two different ways to configure the network a node is connecting to:
+
+- alias configuration: using the name (also called the "alias") of an existing, built-in network
+- explicit configuration: explicitly specifying the parameters of the network, which can be an existing or a custom network.
+
+When connecting to existing networks, both options may apply, so here are some useful explanations to inform your choice.
+
+If you use alias configuration, the configuration file stores
 the name of the network to connect to. For instance, if you configured it
-to connect to Limanet, it will contain something like::
+to connect to Ghostnet, it will contain something like::
 
   {
     "p2p": {},
-    "network": "limanet"
+    "network": "ghostnet"
   }
 
 For Mainnet, it would contain ``mainnet``, or nothing as this is actually the default.
 
 When you update your node to new versions, built-in network parameters may
 change. For instance, the list of bootstrap peers may be updated with
-new addresses. Or, new user-activated upgrades or user-activated protocol
+new addresses; new user-activated upgrades or user-activated protocol
 overrides may be added. Because the configuration file only contains the name
 of the network and not its parameters, it will automatically use the updated values.
 
-However, if you configure `Custom Networks`_, the configuration file will
-no longer contain an alias such as ``mainnet`` or ``limanet``. Instead,
+However, if you use explicit configuration, the configuration file will
+no longer contain an alias such as ``mainnet`` or ``ghostnet``. Instead,
 it will explicitly contain the list of bootstrap peers, user-activated upgrades
 and user-activated protocol overrides that you specify. This means that when
-you update your node, updates to built-in network parameters will have no effect.
+you update your node, the updated values will not be used.
 
-As a consequence, if you configure a custom network, you need to update
-its parameters yourself. Reciprocally, if you wish to update your node to
-a new version but do not wish to use the new built-in network parameters,
-you can configure a custom network.
-
-Development
------------
-
-The list of built-in networks is in :src:`src/lib_node_config/config_file.ml`.
-Edit the ``builtin_blockchain_networks_with_tags`` variable in this file to
-add or remove built-in networks.
-
-To be able to connect to multiple networks without having to download the protocols,
-and to provide all the relevant baker / accuser (/ endorser) binaries, all current and
-past protocols are compiled and linked. This means that if you patch the client commands
-for a protocol, you should patch the other protocols as well (at least the ones which
-are still in use).
+As a consequence, if you use explicit configuration, you need to update
+its parameters yourself when you update your node, unless you wish to keep the old network parameters.

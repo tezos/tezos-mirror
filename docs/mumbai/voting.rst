@@ -44,11 +44,11 @@ The five periods are as follows:
   moves back to a new **proposal period**.
 
 - *Exploration period*: During this period delegates can cast one
-  Yay, Nay, or Pass ballot on the selected proposal. They do so using the
+  Yea, Nay, or Pass ballot on the selected proposal. They do so using the
   ``Ballot`` operation.
 
   If the voting participation reaches *quorum* and there is a *super-majority*
-  of Yay, the process moves to the **cooldown period**. (See below for details
+  of Yea, the process moves to the **cooldown period**. (See below for details
   on participation, quorum, and super-majority.)
 
   Otherwise the process moves back to the **proposal period**.
@@ -60,11 +60,11 @@ The five periods are as follows:
 
   At the end of this period, the process moves to the **promotion period**.
 
-- *Promotion period*: During this period, delegates can cast a Yay, Nay, or Pass
+- *Promotion period*: During this period, delegates can cast a Yea, Nay, or Pass
   ballots using the ``Ballot`` operation.
 
   If the voting participation reaches *quorum* and there is a super-majority of
-  Yay, the process moves to the **adoption period**.
+  Yea, the process moves to the **adoption period**.
 
   Otherwise the process moves back to the **proposal period**.
 
@@ -82,6 +82,9 @@ The five periods are as follows:
   economic protocol (the one that was voted in).
 
   And a new **proposal period** starts.
+
+.. warning::
+   Thanks to an old spelling mistake, the most enthusiastic voters can cast ``Yay`` ballots. Enthusiasm does however not impact the result of the vote and the tools accepting ``Yay`` consider it as a deprecated synonym for ``Yea``.
 
 
 Activation
@@ -101,25 +104,20 @@ requirement might differ, etc.
 Voting Power
 ------------
 
-When supporting a proposal or casting a Yay, Nay, or Pass ballot, each delegate
-has voting power equal to its *stake*. The stake is always measured in
-**mutez**.
-
-Note that the stake of each delegate is computed at the beginning of each
-period.
-
+When supporting a proposal or casting a Yea, Nay, or Pass ballot, each delegate
+has a voting power equal to its *stake*. More precisely, the voting power of a delegate during a voting period is its :ref:`staking balance <active_stake_mumbai>`, measured in *mutez*, sampled at the beginning of the period. (Note that this is opposed to validator selection for consensus, which is based on the active stake, and sampled at some stake snapshot during some previous cycle.)
 
 Super-majority and Quorum
 -------------------------
 
 As mentioned above, during either of the **exploration** or **promotion** periods,
 delegates can cast ballots using the ``Ballot`` operation (see below).
-In both cases, delegates can cast a single Yay, Nay, or Pass ballot. A ballot
+In both cases, delegates can cast a single Yea, Nay, or Pass ballot. A ballot
 has a weight equal to the delegate's stake as detailed above.
 
 For either of these two periods, the process continues to the next period if the
 *vote participation* reaches *quorum* and there is a *super-majority* of
-Yay.
+Yea.
 
 The *vote participation* is the ratio of all the cumulated stake of cast ballots
 (including Pass ballots) to the total stake.
@@ -139,8 +137,8 @@ This formula avoids establishing quorums close to 100% that would be
 very difficult to attain, or, conversely, low quorums close to 0% making
 little participation chronic, ensuring that the quorums are lower- and upper-bounded by :ref:`quorum_caps` (0.2 and 0.7, respectively).
 
-The *super-majority* is reached if the cumulated stake of Yay ballots is
-greater than 8/10 of the cumulated stake of Yay and Nay ballots.
+The *super-majority* is reached if the cumulated stake of Yea ballots is
+greater than 8/10 of the cumulated stake of Yea and Nay ballots.
 
 Note that Pass ballots do not count towards or against the super-majority;
 they still counts towards participation and quorum.
@@ -236,7 +234,7 @@ A *ballot* operation can only be submitted during periods where a vote happens
      ballot: Vote_repr.ballot ; }
 
 The fields ``source`` and ``period`` are the same as above, while ``proposal``
-is the currently selected proposal and ``ballot`` is one of ``Yay``, ``Nay`` or
+is the currently selected proposal and ``ballot`` is one of ``Yea``, ``Nay`` or
 ``Pass``.
 The ``Pass`` vote allows a delegate to contribute towards the quorum without
 contributing towards the super-majority. This is important because, as detailed
@@ -323,7 +321,7 @@ Submit ballots
 During either of the **exploration** or **promotion** periods,
 ballots can be submitted once with::
 
-    octez-client submit ballot for <delegate> <proposal> <yay|nay|pass>
+    octez-client submit ballot for <delegate> <proposal> <yea|nay|pass>
 
 Further External Resources
 --------------------------

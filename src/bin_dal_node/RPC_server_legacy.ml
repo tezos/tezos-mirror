@@ -26,27 +26,6 @@
 
 open Tezos_dal_node_services
 
-let handle_split_slot ctxt () slot =
-  let open Lwt_result_syntax in
-  let*? {cryptobox; _} = Node_context.get_ready ctxt in
-  let store = Node_context.get_store ctxt in
-  let+ commitment, proof =
-    Slot_manager.split_and_store
-      store.slots_watcher
-      cryptobox
-      store.shard_store
-      slot
-  in
-  (Cryptobox.Commitment.to_b58check commitment, proof)
-
-let handle_slot ctxt (_, commitment) () () =
-  let open Lwt_result_syntax in
-  let*? {cryptobox; _} = Node_context.get_ready ctxt in
-  Slot_manager.get_slot
-    cryptobox
-    (Node_context.get_store ctxt).shard_store
-    commitment
-
 let handle_slot_pages ctxt (_, commitment) () () =
   let open Lwt_result_syntax in
   let*? {cryptobox; _} = Node_context.get_ready ctxt in
@@ -56,34 +35,16 @@ let handle_slot_pages ctxt (_, commitment) () () =
     commitment
 
 let handle_shard ctxt ((_, commitment), shard) () () =
-  let open Lwt_result_syntax in
-  let*? {cryptobox; _} = Node_context.get_ready ctxt in
   Slot_manager.get_shard
-    cryptobox
     (Node_context.get_store ctxt).shard_store
     commitment
     shard
 
 let handle_shards ctxt (_, commitment) () shards =
-  let open Lwt_result_syntax in
-  let*? {cryptobox; _} = Node_context.get_ready ctxt in
   Slot_manager.get_shards
-    cryptobox
     (Node_context.get_store ctxt).shard_store
     commitment
     shards
-
-let handle_monitor_slot_headers ctxt () () () =
-  let stream, stopper = Store.open_slots_stream (Node_context.get_store ctxt) in
-  let shutdown () = Lwt_watcher.shutdown stopper in
-  let next () = Lwt_stream.get stream in
-  Tezos_rpc.Answer.return_stream {next; shutdown}
-
-let register_split_slot ctxt dir =
-  Tezos_rpc.Directory.register0 dir Services.split_slot (handle_split_slot ctxt)
-
-let register_show_slot ctxt dir =
-  Tezos_rpc.Directory.register dir Services.slot (handle_slot ctxt)
 
 let register_show_slot_pages ctxt dir =
   Tezos_rpc.Directory.register dir Services.slot_pages (handle_slot_pages ctxt)
@@ -112,21 +73,5 @@ let shard_rpc ctxt commitment shard =
     Services.shard
     ctxt
     (((), commitment), shard)
-    ()
-    ()
-
-let monitor_slot_headers_service = Services.monitor_slot_headers
-
-let register_monitor_slot_headers ctxt dir =
-  Tezos_rpc.Directory.gen_register
-    dir
-    monitor_slot_headers_service
-    (handle_monitor_slot_headers ctxt)
-
-let monitor_slot_headers_rpc ctxt =
-  Tezos_rpc.Context.make_streamed_call
-    monitor_slot_headers_service
-    ctxt
-    ()
     ()
     ()

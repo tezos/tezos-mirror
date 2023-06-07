@@ -515,12 +515,8 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   let fork_test_chain v ~protocol ~expiration =
     add_test_chain v (Forking {protocol; expiration})
 
-  let init ?patch_context ?(readonly = false) ?indexing_strategy ?index_log_size
-      path =
+  let init ?patch_context ?(readonly = false) ?index_log_size path =
     let open Lwt_syntax in
-    (* Note: we silently ignore the [indexing_strategy] and [index_log_size] arguments
-       but we could copy what the disk implementation is doing. *)
-    ignore indexing_strategy ;
     ignore index_log_size ;
     let cfg = Irmin_pack.config ~readonly path in
     let* repo = Store.Repo.v cfg in

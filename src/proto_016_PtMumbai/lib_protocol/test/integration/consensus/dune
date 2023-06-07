@@ -1,30 +1,65 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name main)
+(library
+ (name
+  src_proto_016_PtMumbai_lib_protocol_test_integration_consensus_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
-  alcotest-lwt
+  tezt.core
+  octez-alcotezt
   tezos-base
   tezos-protocol-016-PtMumbai
   tezos-016-PtMumbai-test-helpers
   tezos-base-test-helpers
   tezos-protocol-016-PtMumbai.parameters
   tezos-protocol-plugin-016-PtMumbai)
- (link_flags
-  (:standard)
-  (:include %{workspace_root}/macos-link-flags.sexp))
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Octez_alcotezt
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_protocol_016_PtMumbai
   -open Tezos_016_PtMumbai_test_helpers
   -open Tezos_base_test_helpers
   -open Tezos_protocol_016_PtMumbai_parameters
-  -open Tezos_protocol_plugin_016_PtMumbai))
+  -open Tezos_protocol_plugin_016_PtMumbai)
+ (modules
+  test_baking
+  test_consensus_key
+  test_deactivation
+  test_delegation
+  test_double_baking
+  test_double_endorsement
+  test_double_preendorsement
+  test_endorsement
+  test_frozen_deposits
+  test_helpers_rpcs
+  test_participation
+  test_preendorsement_functor
+  test_preendorsement
+  test_seed))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_proto_016_PtMumbai_lib_protocol_test_integration_consensus_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-protocol-016-PtMumbai-tests)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

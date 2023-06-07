@@ -25,8 +25,10 @@
 
 (** Testing
     _______
-
-    Invocation: dune build @src/lib_version/test/runtest
+    Component: lib_version
+    Invocation: dune exec src/lib_version/test/main.exe \
+                  -- --file test_parser.ml
+    Subject: Test versions parser
  *)
 
 module Assert = struct
@@ -83,4 +85,7 @@ let test_parser _ =
         (parse_version x))
 
 let () =
-  Alcotest.run "version" [("parser", [("versions", `Quick, test_parser)])]
+  Alcotest.run
+    ~__FILE__
+    "version"
+    [("parser", [("versions", `Quick, test_parser)])]

@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_io_scheduler_ipv4
+    Invocation:   dune exec src/lib_p2p/test/test_p2p_io_scheduler.exe
     Dependencies: src/lib_p2p/test/process.ml
     Subject:      On I/O scheduling of client-server connections.
 *)
@@ -40,11 +40,9 @@ exception Error of error list
 
 let rec listen ?port addr =
   let open Lwt_syntax in
-  let tentative_port =
-    match port with None -> 49152 + Random.int 16384 | Some port -> port
-  in
+  let tentative_port = match port with None -> 0 | Some port -> port in
   let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
-  let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
+  let main_socket = Lwt_unix.(socket ~cloexec:true PF_INET6 SOCK_STREAM 0) in
   Lwt_unix.(setsockopt main_socket SO_REUSEADDR true) ;
   Lwt.catch
     (fun () ->
@@ -124,10 +122,10 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
       ()
   in
   Moving_average.on_update (P2p_io_scheduler.ma_state sched) (fun () ->
-      log_notice "Stat: %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
+      debug "Stat: %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
       if display_client_stat then
         P2p_io_scheduler.iter_connection sched (fun conn ->
-            log_notice
+            debug
               " client(%d) %a"
               (P2p_io_scheduler.id conn)
               P2p_stat.pp
@@ -139,7 +137,7 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
   let* r = List.iter_ep P2p_io_scheduler.close conns in
   match r with
   | Ok () ->
-      log_notice "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
+      debug "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
       return_ok ()
   | Error _ -> Lwt.fail Alcotest.Test_error
 
@@ -188,7 +186,7 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
   | Error err -> Lwt.fail (Error err)
   | Ok () ->
       let stat = P2p_io_scheduler.stat conn in
-      let* () = lwt_log_notice "Client OK %a" P2p_stat.pp stat in
+      let* () = lwt_debug "Client OK %a" P2p_stat.pp stat in
       return_ok ()
 
 (** Listens to address [addr] on port [port] to open a socket [main_socket].
@@ -238,63 +236,6 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
 
 let () = Random.self_init ()
 
-let addr = ref Ipaddr.V6.localhost
-
-let port = ref None
-
-let max_download_speed = ref None
-
-let max_upload_speed = ref None
-
-let read_buffer_size = ref (1 lsl 14)
-
-let read_queue_size = ref (Some (1 lsl 14))
-
-let write_queue_size = ref (Some (1 lsl 14))
-
-let delay = ref 60.
-
-let clients = ref 8
-
-let display_client_stat = ref None
-
-let spec =
-  Arg.
-    [
-      ("--port", Int (fun p -> port := Some p), " Listening port");
-      ( "--addr",
-        String (fun p -> addr := Ipaddr.V6.of_string_exn p),
-        " Listening addr" );
-      ( "--max-download-speed",
-        Int (fun i -> max_download_speed := Some i),
-        " Max download speed in B/s (default: unbounded)" );
-      ( "--max-upload-speed",
-        Int (fun i -> max_upload_speed := Some i),
-        " Max upload speed in B/s (default: unbounded)" );
-      ( "--read-buffer-size",
-        Set_int read_buffer_size,
-        " Size of the read buffers" );
-      ( "--read-queue-size",
-        Int (fun i -> read_queue_size := if i <= 0 then None else Some i),
-        " Size of the read queue (0=unbounded)" );
-      ( "--write-queue-size",
-        Int (fun i -> write_queue_size := if i <= 0 then None else Some i),
-        " Size of the write queue (0=unbounded)" );
-      ("--delay", Set_float delay, " Client execution time.");
-      ("--clients", Set_int clients, " Number of concurrent clients.");
-      ( "--hide-clients-stat",
-        Unit (fun () -> display_client_stat := Some false),
-        " Hide the client bandwidth statistic." );
-      ( "--display_clients_stat",
-        Unit (fun () -> display_client_stat := Some true),
-        " Display the client bandwidth statistic." );
-    ]
-
-let () =
-  let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
-  let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
-  Arg.parse spec anon_fun usage_msg
-
 let init_logs = lazy (Tezos_base_unix.Internal_event_unix.init ())
 
 let wrap n f =
@@ -308,24 +249,35 @@ let wrap n f =
           Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 
 let () =
+  let addr = Node.default_ipv6_addr in
+  let port = Some (Tezt_tezos.Port.fresh ()) in
+  let max_download_speed = 1048576 in
+  let max_upload_speed = 262144 in
+  (* 1 << 14 = 16kB *)
+  let read_buffer_size = 1 lsl 14 in
+  let read_queue_size = 1 lsl 14 in
+  let write_queue_size = 1 lsl 14 in
+  let delay = 5. in
+  let clients = 8 in
   Lwt_main.run
   @@ Alcotest_lwt.run
-       ~argv:[|""|]
+       ~__FILE__
        "tezos-p2p"
        [
          ( "p2p.io-scheduler",
            [
              wrap "trivial-quota" (fun () ->
                  run
-                   ?display_client_stat:!display_client_stat
-                   ?max_download_speed:!max_download_speed
-                   ?max_upload_speed:!max_upload_speed
-                   ~read_buffer_size:!read_buffer_size
-                   ?read_queue_size:!read_queue_size
-                   ?write_queue_size:!write_queue_size
-                   !addr
-                   !port
-                   !delay
-                   !clients);
+                   ~max_download_speed
+                   ~max_upload_speed
+                   ~read_buffer_size
+                   ~read_queue_size
+                   ~write_queue_size
+                   addr
+                   port
+                   delay
+                   clients);
            ] );
        ]
+
+let () = Tezt.Test.run ()

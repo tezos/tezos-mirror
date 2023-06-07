@@ -26,8 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (smart contract rollup inbox)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "^\[Unit\] sc rollup inbox legacy$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe
     Subject:    These unit tests check the off-line inbox implementation for
                 smart contract rollups
 *)
@@ -78,6 +77,7 @@ let populate_inboxes level history inbox inboxes list_of_messages =
         let* payloads_history, history, inbox, witness, _messages =
           Environment.wrap_tzresult
           @@ add_all_messages
+               ~protocol_migration_message:None
                ~predecessor_timestamp:Time.Protocol.epoch
                ~predecessor:Block_hash.zero
                history
@@ -149,6 +149,7 @@ let setup_node_inbox_with_messages list_of_messages f =
         let*? payloads_history, history, inbox, witness, _messages =
           Environment.wrap_tzresult
           @@ add_all_messages
+               ~protocol_migration_message:None
                ~predecessor_timestamp:Time.Protocol.epoch
                ~predecessor:Block_hash.zero
                history
@@ -415,7 +416,7 @@ let test_inclusion_proofs_depending_on_history_capacity
   in
   let proof s v =
     let open Lwt_result_syntax in
-    let*! v = v in
+    let*! v in
     match Environment.wrap_tzresult v with
     | Ok v -> return v
     | Error _ -> tzfail (err (s ^ ": Expecting some inclusion proof."))
@@ -451,8 +452,14 @@ let test_inclusion_proofs_depending_on_history_capacity
          "Should not be able to get inbox inclusion proofs without a history \
           (i.e., a history with no capacity). ")
   in
-  let*? hp1'' = verify_inclusion_proof ip1 hp1 |> Environment.wrap_tzresult in
-  let*? hp2'' = verify_inclusion_proof ip2 hp2 |> Environment.wrap_tzresult in
+  let*? hp1'' =
+    I.Internal_for_tests.verify_inclusion_proof ip1 hp1
+    |> Environment.wrap_tzresult
+  in
+  let*? hp2'' =
+    I.Internal_for_tests.verify_inclusion_proof ip2 hp2
+    |> Environment.wrap_tzresult
+  in
   fail_unless
     (hp1' = hp1'' && hp2' = hp2'' && hp1' = hp2')
     (err "Inclusion proofs are expected to be valid.")

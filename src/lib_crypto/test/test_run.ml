@@ -7,6 +7,7 @@ type t = (module T)
 let runtest l =
   let _ =
     Alcotest.run
+      ~__FILE__
       "tezos-crypto"
       (List.fold_left
          (fun acc (e : t) ->
@@ -28,5 +29,6 @@ runtest
     (module Test_signature);
     (module Test_signature_encodings);
     (module Test_timelock);
+    (module Test_timelock_legacy);
     (module Test_context_hash);
   ]

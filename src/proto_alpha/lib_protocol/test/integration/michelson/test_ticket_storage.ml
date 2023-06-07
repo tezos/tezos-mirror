@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (Alpha_context.Ticket_balance)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                -- test "^ticket storage$"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
+                  -- --file test_ticket_storage.ml
     Subject:    Ticket storage functions tested using the Ticket_balance module in Alpha_context.
 *)
 
@@ -42,41 +41,37 @@ let make_context () =
   return (Incremental.alpha_ctxt incr)
 
 let hash_key ctxt ~ticketer ~ty ~contents ~owner =
-  let open Lwt_result_wrap_syntax in
   let ticketer = Micheline.root @@ Expr.from_string ticketer in
   let ty = Micheline.root @@ Expr.from_string ty in
   let contents = Micheline.root @@ Expr.from_string contents in
   let owner = Micheline.root @@ Expr.from_string owner in
-  wrap
-  @@ Lwt.return
-       (Alpha_context.Ticket_hash.make ctxt ~ticketer ~ty ~contents ~owner)
+  Alpha_context.Ticket_hash.make ctxt ~ticketer ~ty ~contents ~owner
 
 let assert_balance ctxt ~loc key expected =
   let open Lwt_result_wrap_syntax in
-  let* balance, _ = wrap @@ Ticket_balance.get_balance ctxt key in
+  let*@ balance, _ = Ticket_balance.get_balance ctxt key in
   match balance with
   | Some b -> Assert.equal_int ~loc (Z.to_int b) expected
   | None -> failwith "Expected balance %d" expected
 
 let assert_no_balance ctxt key =
   let open Lwt_result_wrap_syntax in
-  let* balance, _ = wrap @@ Ticket_balance.get_balance ctxt key in
+  let*@ balance, _ = Ticket_balance.get_balance ctxt key in
   match balance with
   | Some b -> failwith "Expected empty (none) balance but got %d" (Z.to_int b)
   | None -> return ()
 
 let adjust_balance ctxt key delta =
-  let open Lwt_result_wrap_syntax in
-  wrap @@ Ticket_balance.adjust_balance ctxt key ~delta:(Z.of_int delta)
+  Ticket_balance.adjust_balance ctxt key ~delta:(Z.of_int delta)
 
 let assert_non_overlapping_keys ~loc ~ticketer1 ~ticketer2 ~contents1 ~contents2
     ~ty1 ~ty2 ~owner1 ~owner2 =
   let open Lwt_result_wrap_syntax in
   let* ctxt = make_context () in
-  let* k1, ctxt =
+  let*?@ k1, ctxt =
     hash_key ctxt ~ticketer:ticketer1 ~ty:ty1 ~contents:contents1 ~owner:owner1
   in
-  let* k2, _ctxt =
+  let*?@ k2, _ctxt =
     hash_key ctxt ~ticketer:ticketer2 ~ty:ty2 ~contents:contents2 ~owner:owner2
   in
   Assert.not_equal
@@ -153,8 +148,8 @@ let test_non_overlapping_keys_owner () =
 let test_ticket_balance_single_update () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = make_context () in
-  let* alice_red, ctxt = make_key ctxt "alice_red" in
-  let* _, ctxt = adjust_balance ctxt alice_red 1 in
+  let*?@ alice_red, ctxt = make_key ctxt "alice_red" in
+  let*@ _, ctxt = adjust_balance ctxt alice_red 1 in
   assert_balance ctxt ~loc:__LOC__ alice_red 1
 
 (** Test that updating the ticket-balance table with different keys
@@ -162,10 +157,10 @@ let test_ticket_balance_single_update () =
 let test_ticket_balance_different_owners () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = make_context () in
-  let* alice_red, ctxt = make_key ctxt "alice_red" in
-  let* alice_blue, ctxt = make_key ctxt "alice_blue" in
-  let* _, ctxt = adjust_balance ctxt alice_red 1 in
-  let* _, ctxt = adjust_balance ctxt alice_blue 1 in
+  let*?@ alice_red, ctxt = make_key ctxt "alice_red" in
+  let*?@ alice_blue, ctxt = make_key ctxt "alice_blue" in
+  let*@ _, ctxt = adjust_balance ctxt alice_red 1 in
+  let*@ _, ctxt = adjust_balance ctxt alice_blue 1 in
   let* () = assert_balance ctxt ~loc:__LOC__ alice_red 1 in
   let* () = assert_balance ctxt ~loc:__LOC__ alice_blue 1 in
   return ()
@@ -175,10 +170,10 @@ let test_ticket_balance_different_owners () =
 let test_ticket_balance_multiple_updates () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = make_context () in
-  let* alice_red, ctxt = make_key ctxt "alice_red" in
-  let* _, ctxt = adjust_balance ctxt alice_red 1 in
-  let* _, ctxt = adjust_balance ctxt alice_red 2 in
-  let* _, ctxt = adjust_balance ctxt alice_red (-1) in
+  let*?@ alice_red, ctxt = make_key ctxt "alice_red" in
+  let*@ _, ctxt = adjust_balance ctxt alice_red 1 in
+  let*@ _, ctxt = adjust_balance ctxt alice_red 2 in
+  let*@ _, ctxt = adjust_balance ctxt alice_red (-1) in
   assert_balance ctxt ~loc:__LOC__ alice_red 2
 
 (** Test that with no updates to the table, no balance is present in
@@ -186,7 +181,7 @@ let test_ticket_balance_multiple_updates () =
 let test_empty_balance () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = make_context () in
-  let* alice_red, ctxt = make_key ctxt "alice_red" in
+  let*?@ alice_red, ctxt = make_key ctxt "alice_red" in
   assert_no_balance ctxt alice_red
 
 (** Test that adding one entry with positive balance and then
@@ -194,9 +189,9 @@ let test_empty_balance () =
 let test_empty_balance_after_update () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = make_context () in
-  let* alice_red, ctxt = make_key ctxt "alice_red" in
-  let* _, ctxt = adjust_balance ctxt alice_red 1 in
-  let* _, ctxt = adjust_balance ctxt alice_red (-1) in
+  let*?@ alice_red, ctxt = make_key ctxt "alice_red" in
+  let*@ _, ctxt = adjust_balance ctxt alice_red 1 in
+  let*@ _, ctxt = adjust_balance ctxt alice_red (-1) in
   assert_no_balance ctxt alice_red
 
 (** Test that attempting to update an entry with a negative balance
@@ -204,8 +199,8 @@ let test_empty_balance_after_update () =
 let test_negative_balance () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = make_context () in
-  let* alice_red, ctxt = make_key ctxt "alice_red" in
-  adjust_balance ctxt alice_red (-1) >>= fun res ->
+  let*?@ alice_red, ctxt = make_key ctxt "alice_red" in
+  let*! res = wrap @@ adjust_balance ctxt alice_red (-1) in
   Assert.proto_error ~loc:__LOC__ res (fun _err -> true)
 
 (** Test that positive storage spaces are returned for operations
@@ -214,32 +209,31 @@ let test_negative_balance () =
 let test_storage_space () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = make_context () in
-  let* alice_red, ctxt = make_key ctxt "alice_red" in
+  let*?@ alice_red, ctxt = make_key ctxt "alice_red" in
   (* Space for adding an entry is 65 for the key plus 1 for the value. *)
-  let* space, ctxt = adjust_balance ctxt alice_red 1 in
+  let*@ space, ctxt = adjust_balance ctxt alice_red 1 in
   let* () = Assert.equal_int ~loc:__LOC__ 66 (Z.to_int space) in
   (* Adding one does not consume additional space. *)
-  let* space, ctxt = adjust_balance ctxt alice_red 1 in
+  let*@ space, ctxt = adjust_balance ctxt alice_red 1 in
   let* () = Assert.equal_int ~loc:__LOC__ 0 (Z.to_int space) in
   (* Adding a big balance costs extra. *)
-  let* space, ctxt = adjust_balance ctxt alice_red 1000 in
+  let*@ space, ctxt = adjust_balance ctxt alice_red 1000 in
   let* () = Assert.equal_int ~loc:__LOC__ 1 (Z.to_int space) in
   (* Reset balance to zero should free up space.
      The freed up space is 65 for the key + 2 for the value *)
-  let* b, ctxt = wrap @@ Ticket_balance.get_balance ctxt alice_red in
-  let* space, ctxt =
-    wrap
-      (Ticket_balance.adjust_balance
-         ctxt
-         alice_red
-         ~delta:(Z.neg @@ Option.value ~default:Z.zero b))
+  let*@ b, ctxt = Ticket_balance.get_balance ctxt alice_red in
+  let*@ space, ctxt =
+    Ticket_balance.adjust_balance
+      ctxt
+      alice_red
+      ~delta:(Z.neg @@ Option.value ~default:Z.zero b)
   in
   let* () = Assert.equal_int ~loc:__LOC__ (-67) (Z.to_int space) in
   (* Adjusting the space to 0 again should not free anything *)
-  let* space, ctxt = adjust_balance ctxt alice_red 0 in
+  let*@ space, ctxt = adjust_balance ctxt alice_red 0 in
   let* () = Assert.equal_int ~loc:__LOC__ 0 (Z.to_int space) in
   (* Adding a balance requiers extra space. *)
-  let* space, _ = adjust_balance ctxt alice_red 10 in
+  let*@ space, _ = adjust_balance ctxt alice_red 10 in
   Assert.equal_int ~loc:__LOC__ 66 (Z.to_int space)
 
 let tests =
@@ -280,3 +274,7 @@ let tests =
       test_ticket_balance_different_owners;
     Tztest.tztest "ticket storage space" `Quick test_storage_space;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("ticket storage", tests)]
+  |> Lwt_main.run

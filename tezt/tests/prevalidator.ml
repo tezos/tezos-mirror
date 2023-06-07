@@ -30,30 +30,6 @@
    Subject:      .
 *)
 
-(** Section containing the prevalidator worker events.
-
-    These events are defined in [lib_workers/worker_events.ml], and
-    the section name comes from the [Name] module given as argument to
-    [Worker.MakeGroup] in either [lib_shell/prevalidator_internal.ml]
-    (for protocols Lima and up) or [lib_shell/legacy_prevalidator_internal.ml]
-    (for Kathmandu and older). They should not be confused with the
-    prevalidator-specific events from
-    [lib_shell/prevalidator_events.ml], which are always in the
-    "prevalidator" section regardless of the protocol version. *)
-let prevalidator_worker_event_section protocol =
-  if Protocol.number protocol <= 014 (* Kathmandu *) then "legacy_prevalidator"
-  else "prevalidator"
-
-(** The [event_sections_levels] argument that should be provided to
-    {!Node.init} in order to observe all debug-level prevalidator
-    events, depending on the protocol version. See
-    {!prevalidator_worker_event_section} regarding the section
-    names. *)
-let prevalidator_debug protocol =
-  if Protocol.number protocol <= 014 (* Kathmandu *) then
-    [("prevalidator", `Debug); ("legacy_prevalidator", `Debug)]
-  else [("prevalidator", `Debug)]
-
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1657
 
    Some refactorisation is needed. All new tests should be in the Revamped
@@ -284,7 +260,7 @@ module Revamped = struct
     log_step 1 "Connect and initialise two nodes." ;
     let* node1 =
       Node.init
-        ~event_sections_levels:(prevalidator_debug protocol)
+        ~event_sections_levels:[("prevalidator", `Debug)]
         [Synchronisation_threshold 0; Private_mode]
     and* node2 = Node.init [Synchronisation_threshold 0; Private_mode] in
     let* client1 = Client.init ~endpoint:(Node node1) ()
@@ -603,7 +579,7 @@ module Revamped = struct
     in
     let* node3, client3 =
       Client.init_with_protocol
-        ~event_sections_levels:(prevalidator_debug protocol)
+        ~event_sections_levels:[("prevalidator", `Debug)]
         ~nodes_args:[Synchronisation_threshold 0]
         ~protocol
         `Client
@@ -828,17 +804,10 @@ module Revamped = struct
        operation). Check that it fails and the mempool is unchanged. Indeed, \
        the [force] argument of [inject] defaults to [false] so the faulty \
        injected operation is discarded." ;
-    let error =
-      if Protocol.number protocol <= 014 (* Kathmandu *) then
-        rex "Only one manager operation per manager per block allowed"
-      else
-        rex
-          {|The operation [\w\d]+ cannot be added because the mempool already contains a conflicting operation that should not be replaced \(e\.g\. an operation from the same manager with better fees\)\.|}
-    in
     let* (`OpHash _) =
       Operation.Manager.(
         inject
-          ~error
+          ~error:Operation.conflict_error
           ~signer
           [make ~source:source1 ~fee @@ transfer ~dest:Constant.bootstrap4 ()]
           client)
@@ -972,7 +941,7 @@ module Revamped = struct
     log_step 1 "Initialize a node and a client." ;
     let* node, client =
       Client.init_with_protocol
-        ~event_sections_levels:(prevalidator_debug protocol)
+        ~event_sections_levels:[("prevalidator", `Debug)]
         ~nodes_args:[Synchronisation_threshold 0]
         ~protocol
         `Client
@@ -1311,7 +1280,7 @@ module Revamped = struct
     in
     let* node2, client2 =
       Client.init_with_node
-        ~event_sections_levels:(prevalidator_debug protocol)
+        ~event_sections_levels:[("prevalidator", `Debug)]
         ~nodes_args:[Synchronisation_threshold 0; Connections 2]
         `Client
         ()
@@ -1356,7 +1325,7 @@ module Revamped = struct
     log_step 5 "Add node3 connected only to node2." ;
     let* node3, client3 =
       Client.init_with_node
-        ~event_sections_levels:(prevalidator_debug protocol)
+        ~event_sections_levels:[("prevalidator", `Debug)]
         ~nodes_args:[Synchronisation_threshold 0; Connections 1]
         `Client
         ()
@@ -1514,14 +1483,14 @@ module Revamped = struct
     log_step 1 "Start two nodes, connect them, activate the protocol." ;
     let* node1, client1 =
       Client.init_with_node
-        ~event_sections_levels:(prevalidator_debug protocol)
+        ~event_sections_levels:[("prevalidator", `Debug)]
         ~nodes_args:[Synchronisation_threshold 0; Connections 1]
         `Client
         ()
     in
     let* node2, client2 =
       Client.init_with_node
-        ~event_sections_levels:(prevalidator_debug protocol)
+        ~event_sections_levels:[("prevalidator", `Debug)]
         ~nodes_args:[Synchronisation_threshold 0; Connections 1]
         `Client
         ()
@@ -1599,7 +1568,7 @@ module Revamped = struct
     let gas_limit = 1500 in
     let* node1 =
       Node.init
-        ~event_sections_levels:(prevalidator_debug protocol)
+        ~event_sections_levels:[("prevalidator", `Debug)]
         [Synchronisation_threshold 0; Private_mode]
     and* node2 = Node.init [Synchronisation_threshold 0; Private_mode] in
     let* client1 = Client.init ~endpoint:(Node node1) ()
@@ -1781,7 +1750,7 @@ module Revamped = struct
     let gas_limit = 1500 in
     let* node1 =
       Node.init
-        ~event_sections_levels:(prevalidator_debug protocol)
+        ~event_sections_levels:[("prevalidator", `Debug)]
         [Synchronisation_threshold 0; Private_mode]
     and* node2 = Node.init [Synchronisation_threshold 0; Private_mode] in
     let* client1 = Client.init ~endpoint:(Node node1) ()
@@ -2179,36 +2148,8 @@ let pp_mempool_count fmt
     outdated
     unprocessed
 
-(** Matches events which contain an injection request.
-   For example:
-
-  {[
-    { "event": {
-       "request": {
-         "request": "inject",
-         "operation": {
-           "branch": "BL2FDpiSbzxkXpefiSRCpBHGhZ1kDpEUzWswSCABvGKr3hF6xre",
-           "data": "6c0002298c03ed7d454a101eb7022bc95f7e5f41ac78940a0280bd3f00e8070000e7670f32038107a59a2b9cfefae36ea21f5aa63c00cf958f834a8d89a88068d7da1209db3c8dc6f5a0c88fb7df0fc8b910f5e100c1179e0862993fd2abadcc47eb4710ad41b68603983559b5fb68bb98499aa1800d"
-         }
-       },
-       "status": {
-         "pushed": "2021-05-03T17:16:03.826-00:00",
-         "treated": 3.0033e-05,
-         "completed": 0.00190934
-       }
-     },
-     "level": "notice"
-   }
-  ]}
- *)
-let wait_for_injection node =
-  let filter json =
-    match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
-    | Some s when s = "inject" -> Some s
-    | Some _ | None -> None
-  in
-  let* _ = Node.wait_for node "request_completed_notice.v0" filter in
-  return ()
+(** Wait for an injection request event. *)
+let wait_for_injection = Node.wait_for_request ~request:`Inject
 
 (** Matches events which contain an flush request.
    For example:
@@ -2235,7 +2176,7 @@ let wait_for_flush node =
     | Some s when s = "flush" -> Some s
     | Some _ | None -> None
   in
-  let* _ = Node.wait_for node "request_completed_notice.v0" filter in
+  let* _ = Node.wait_for node "request_completed_info.v0" filter in
   return ()
 
 let operation_json ~fee ~gas_limit ~source ~destination ~counter =
@@ -2412,72 +2353,35 @@ let get_endorsement_as_bytes client =
   in
   Lwt.return (wrapped_bytes, hash)
 
-let wait_for_synch node =
-  let filter json =
-    match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
-    | Some s when s = "notify" -> Some s
-    | Some _ | None -> None
-  in
-  let* _ = Node.wait_for node "request_completed_debug.v0" filter in
-  return ()
-
 let mempool_synchronisation client node =
-  let waiter = wait_for_synch node in
+  let waiter = Node.wait_for_request ~request:`Notify node in
   let* _ =
     RPC.Client.call client @@ RPC.post_chain_mempool_request_operations ()
   in
   waiter
 
-(** This test checks that future endorsement are still propagated when
-    the head is  incremented *)
+(** This test checks that future endorsements are correctly
+    propagated, either immediately or when the head is sufficiently
+    incremented. *)
 let propagation_future_endorsement =
-  let step1_msg =
-    "Step 1: 3 nodes are initialised, chain connected and the protocol is \
-     activated."
-  in
-  let step2_msg = "Step 2: disconnect the nodes" in
-  let step3_msg = "Step 3: bake one block on node_1" in
-  let step4_msg = "Step 4: Endorsement on node_1 injected" in
-  let step5_msg =
-    "Step 5: recover hash endorsement and bytes representing the endorsement"
-  in
-  let step6_msg =
-    "Step 6: ban the endorsement on node_1 to ensure it will not be propagated \
-     from this node"
-  in
-  let step7_msg = "Step 7: Endorsement has been inject on node_2" in
-  let step8_msg =
-    "Step 8: Reconnect node_2 and node_3 and synchronise their mempool"
-  in
-  let step9_msg =
-    "Step 9: ensure that endorsement is in node_2 mempool and classified as \
-     branch_delayed"
-  in
-  let step10_msg =
-    "Step 10: ensure that endorsement is not in node_3 mempool"
-  in
-  let step11_msg = "Step 11: Reconnect node_1 and node_2, new head on node_2" in
-  let step12_msg =
-    "Step 12: Synchronise mempool on node_2 and check that endorsement is now \
-     applied"
-  in
-  let step13_msg =
-    "Step 13: Synchronise mempool on node_3 and check that endorsement has \
-     been propagated"
-  in
   Protocol.register_test
     ~__FILE__
-    ~title:"Ensure that future endorsement are propagated"
+    ~title:"Ensure that future endorsements are propagated"
     ~tags:["endorsement"; "mempool"; "branch_delayed"]
   @@ fun protocol ->
+  (* For this test to be moved to {!Revamped}, we need to update its
+     auxiliary functions. Notably, {!get_endorsement_as_bytes} should
+     use the {!Operation} module to build the endorsement bytes. *)
+  let log_step = Revamped.log_step in
+  log_step 1 "Initialize 3 nodes, connect them, and activate the protocol." ;
   let* node_1 = Node.init [Synchronisation_threshold 0; Private_mode]
   and* node_2 =
     Node.init
-      ~event_sections_levels:(prevalidator_debug protocol)
+      ~event_sections_levels:[("prevalidator", `Debug)]
       [Synchronisation_threshold 0; Private_mode]
   and* node_3 =
     Node.init
-      ~event_sections_levels:(prevalidator_debug protocol)
+      ~event_sections_levels:[("prevalidator", `Debug)]
       [Synchronisation_threshold 0; Private_mode]
   in
   let* client_1 = Client.init ~endpoint:(Node node_1) ()
@@ -2491,7 +2395,7 @@ let propagation_future_endorsement =
   and* () = Client.Admin.connect_address client_2 ~peer:node_3 in
   let* () = Client.activate_protocol_and_wait ~protocol client_1 in
   let* _ = Node.wait_for_level node_2 1 and* _ = Node.wait_for_level node_3 1 in
-  Log.info "%s" step1_msg ;
+  log_step 2 "Disconnect all the nodes from each other." ;
   let* node_1_id = Node.wait_for_identity node_1
   and* node_2_id = Node.wait_for_identity node_2
   and* node_3_id = Node.wait_for_identity node_3 in
@@ -2499,56 +2403,107 @@ let propagation_future_endorsement =
   and* () = Client.Admin.kick_peer client_2 ~peer:node_1_id
   and* () = Client.Admin.kick_peer client_2 ~peer:node_3_id
   and* () = Client.Admin.kick_peer client_3 ~peer:node_2_id in
-  Log.info "%s" step2_msg ;
+  log_step
+    3
+    "Bake a block on node_1 then inject an endorsement, which is one level in \
+     the future from the perspective of nodes 2 and 3. Retrieve the hash and \
+     bytes representing this endorsement, called future1 from now on." ;
   let* () = Node_event_level.bake_wait_log node_1 client_1 in
-  Log.info "%s" step3_msg ;
-  let endorser_waiter = wait_for_injection node_1 in
+  let injection_waiter = wait_for_injection node_1 in
   let* () = Client.endorse_for client_1 ~force:true ~protocol in
-  let* () = endorser_waiter in
-  Log.info "%s" step4_msg ;
-  let* bytes, hash = get_endorsement_as_bytes client_1 in
-  Log.info "%s" step5_msg ;
-  let* _ =
-    RPC.Client.call client_1
-    @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String hash)) ()
-  in
-  Log.info "%s" step6_msg ;
-  let (`Hex bytes) = Hex.of_bytes bytes in
-  let injection_waiter = wait_for_injection node_2 in
-  let* _ =
-    RPC.Client.call client_2
-    @@ RPC.post_private_injection_operation (Data (`String bytes))
-  in
   let* () = injection_waiter in
-  Log.info "%s" step7_msg ;
+  let* bytes_future1, oph_future1 = get_endorsement_as_bytes client_1 in
+  log_step
+    4
+    "Bake another block on node_1 then inject another endorsement, which is \
+     two levels in the future from the perspective of nodes 2 and 3. Retrieve \
+     the hash and bytes representing this endorsement, called future2." ;
+  let* () = Node_event_level.bake_wait_log node_1 client_1 in
+  let injection_waiter2 = wait_for_injection node_1 in
+  let* () = Client.endorse_for client_1 ~force:true ~protocol in
+  let* () = injection_waiter2 in
+  let* bytes_future2, oph_future2 = get_endorsement_as_bytes client_1 in
+  log_step 5 "Inject both endorsements in node_2." ;
+  let inject_bytes_in_node_2 bytes =
+    let (`Hex bytes) = Hex.of_bytes bytes in
+    let injection_waiter = wait_for_injection node_2 in
+    let* (_ : JSON.t) =
+      RPC.Client.call client_2
+      @@ RPC.post_private_injection_operation (Data (`String bytes))
+    in
+    injection_waiter
+  in
+  let* () = inject_bytes_in_node_2 bytes_future1 in
+  let* () = inject_bytes_in_node_2 bytes_future2 in
+  log_step 6 "Reconnect node_2 and node_3, and synchronize their mempools." ;
   let* () = Client.Admin.trust_address client_2 ~peer:node_3
   and* () = Client.Admin.trust_address client_3 ~peer:node_2 in
   let* () = Client.Admin.connect_address client_2 ~peer:node_3 in
-  let* _ = mempool_synchronisation client_3 node_3 in
-  Log.info "%s" step8_msg ;
-  let* _ =
-    check_if_op_is_in_mempool
-      client_2
-      ~classification:(Some "branch_delayed")
-      hash
+  let* () = mempool_synchronisation client_3 node_3 in
+  log_step
+    7
+    "Check that both endorsements are in the mempool of node_2: future1 is \
+     branch_delayed for protocols 016 and before, and applied for protocol 017 \
+     on; future2 is branch_delayed for all protocols." ;
+  (* From protocol N on, consensus operations that are one level in
+     the future are accepted and propagated by the mempool. *)
+  let accept_one_level_in_future = Protocol.number protocol >= 017 in
+  let* () =
+    let classification =
+      Some (if accept_one_level_in_future then "applied" else "branch_delayed")
+    in
+    check_if_op_is_in_mempool client_2 ~classification oph_future1
   in
-  Log.info "%s" step9_msg ;
-  let* _ = check_if_op_is_in_mempool client_3 ~classification:None hash in
-  Log.info "%s" step10_msg ;
-  let* () = Client.Admin.trust_address client_1 ~peer:node_2
-  and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
-  let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
-  Log.info "%s" step11_msg ;
-  let* _ = mempool_synchronisation client_2 node_2 in
-  let* _ =
-    check_if_op_is_in_mempool client_2 ~classification:(Some "applied") hash
+  let* () =
+    let classification = Some "branch_delayed" in
+    check_if_op_is_in_mempool client_2 ~classification oph_future2
   in
-  Log.info "%s" step12_msg ;
-  let* _ = mempool_synchronisation client_3 node_3 in
-  let* _ =
-    check_if_op_is_in_mempool client_3 ~classification:(Some "applied") hash
+  log_step
+    8
+    "Check that none of the endorsements is in node_3 mempool for protocols \
+     016 and before. For protocol 017 on, only future1 is present (and \
+     applied) in node_3 mempool." ;
+  let* () =
+    let classification =
+      if accept_one_level_in_future then Some "applied" else None
+    in
+    check_if_op_is_in_mempool client_3 ~classification oph_future1
   in
-  Log.info "%s" step13_msg ;
+  let* () =
+    check_if_op_is_in_mempool client_3 ~classification:None oph_future2
+  in
+  log_step
+    9
+    "Bake one block on node_2 and synchronize its mempool. Check that future1 \
+     is now applied for all protocols, and future2 is also applied for \
+     protocol 017 on." ;
+  let* () = Node_event_level.bake_wait_log node_2 client_2 in
+  let* () = mempool_synchronisation client_2 node_2 in
+  let* () =
+    let classification = Some "applied" in
+    check_if_op_is_in_mempool client_2 ~classification oph_future1
+  in
+  let* () =
+    let classification =
+      Some (if accept_one_level_in_future then "applied" else "branch_delayed")
+    in
+    check_if_op_is_in_mempool client_2 ~classification oph_future2
+  in
+  log_step
+    10
+    "Synchronize the mempool of node_3. Check that future1 is present and \
+     applied for both protocols, and so is future2 for protocol 017 on." ;
+  let* () = mempool_synchronisation client_3 node_3 in
+  let* () =
+    let classification = Some "applied" in
+    check_if_op_is_in_mempool client_3 ~classification oph_future1
+  in
+  let* () =
+    let classification =
+      if accept_one_level_in_future then Some "applied" else None
+    in
+    check_if_op_is_in_mempool client_3 ~classification oph_future2
+  in
   unit
 
 let check_empty_operation__ddb ddb =
@@ -2694,7 +2649,7 @@ let refetch_failed_operation =
     Node.init
     (* Run the node with the new config.
        event_level is set to debug to catch fetching event at this level *)
-      ~event_sections_levels:(prevalidator_debug protocol)
+      ~event_sections_levels:[("prevalidator", `Debug)]
         (* Set a low operations_request_timeout to force timeout at fetching *)
       ~patch_config:(set_config_operations_timeout 0.00001)
       [Synchronisation_threshold 0; Private_mode]
@@ -2885,7 +2840,7 @@ let ban_operation_and_check_applied =
   Log.info "Step 1: Start two nodes, connect them, activate the protocol." ;
   let* node_1 =
     Node.init
-      ~event_sections_levels:(prevalidator_debug protocol)
+      ~event_sections_levels:[("prevalidator", `Debug)]
         (* to witness operation arrival events *)
       [Synchronisation_threshold 0; Connections 1]
   and* node_2 = Node.init [Synchronisation_threshold 0; Connections 1] in
@@ -3052,13 +3007,8 @@ let check_mempool_ops ?(log = false) client ~applied ~refused =
 
 (** Waits for [node] to receive a notification from a peer of a mempool
     containing exactly [n_ops] valid operations. *)
-let wait_for_notify_n_valid_ops proto node n_ops =
-  let name =
-    Format.sprintf
-      "request_no_errors_%s.v0"
-      (prevalidator_worker_event_section proto)
-  in
-  Node.wait_for node name (fun event ->
+let wait_for_notify_n_valid_ops node n_ops =
+  Node.wait_for node "request_no_errors_prevalidator.v0" (fun event ->
       let open JSON in
       let view = event |-> "view" in
       match view |-> "request" |> as_string_opt with
@@ -3130,7 +3080,7 @@ let test_do_not_reclassify =
     "Step 1: Start two nodes, connect them, and activate the protocol." ;
   let* node1 =
     Node.init
-      ~event_sections_levels:(prevalidator_debug protocol)
+      ~event_sections_levels:[("prevalidator", `Debug)]
       [Synchronisation_threshold 0; Connections 1]
   and* node2 = Node.init [Synchronisation_threshold 0; Connections 1] in
   let* client1 = Client.init ~endpoint:Client.(Node node1) ()
@@ -3193,9 +3143,7 @@ let test_do_not_reclassify =
      so it must not be revalidated." ;
   let* _ = set_filter_no_fee_requirement client1 in
   let* () = inject_transfer Constant.bootstrap3 ~fee:5 in
-  let waiter_notify_3_valid_ops =
-    wait_for_notify_n_valid_ops protocol node1 3
-  in
+  let waiter_notify_3_valid_ops = wait_for_notify_n_valid_ops node1 3 in
   let* () =
     bake_empty_block_and_wait_for_flush ~protocol ~log:true client1 node1
   in
@@ -3251,7 +3199,7 @@ let test_pending_operation_version =
   (* Initialise one node *)
   let* node_1 =
     Node.init
-      ~event_sections_levels:(prevalidator_debug protocol)
+      ~event_sections_levels:[("prevalidator", `Debug)]
       [Synchronisation_threshold 0; Private_mode]
   in
   let* client_1 = Client.init ~endpoint:(Node node_1) () in
@@ -3743,7 +3691,7 @@ let test_get_post_mempool_filter =
     (* We need event level [debug] for event
        [invalid_mempool_filter_configuration]. *)
     init_single_node_and_activate_protocol
-      ~event_sections_levels:(prevalidator_debug protocol)
+      ~event_sections_levels:[("prevalidator", `Debug)]
       protocol
   in
   log_step 2 step2_msg ;
@@ -3995,7 +3943,7 @@ let test_mempool_filter_operation_arrival =
   let* node1, client1, node2, client2 =
     init_two_connected_nodes_and_activate_protocol
     (* Need event level [debug] to receive operation arrival events in [node1]. *)
-      ~event_sections_levels1:(prevalidator_debug protocol)
+      ~event_sections_levels1:[("prevalidator", `Debug)]
       protocol
   in
   log_step 2 step2 ;
@@ -4076,7 +4024,7 @@ let test_request_operations_peer =
   Log.info "%s" step1_msg ;
   let init_node () =
     Node.init
-      ~event_sections_levels:(prevalidator_debug protocol)
+      ~event_sections_levels:[("prevalidator", `Debug)]
       [Synchronisation_threshold 0; Private_mode]
   in
   let* node_1 = init_node () and* node_2 = init_node () in

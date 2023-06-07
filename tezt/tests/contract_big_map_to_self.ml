@@ -31,15 +31,6 @@
    Subject:      Tests sending big_map to self
 *)
 
-let contract_path protocol kind contract =
-  sf
-    "tests_python/contracts_%s/%s/%s"
-    (match protocol with
-    | Protocol.Alpha -> "alpha"
-    | _ -> sf "%03d" @@ Protocol.number protocol)
-    kind
-    contract
-
 let test_big_map_to_self =
   Protocol.register_test
     ~__FILE__
@@ -47,16 +38,15 @@ let test_big_map_to_self =
     ~tags:["client"; "michelson"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let prg = contract_path protocol "opcodes" "big_map_to_self.tz" in
-  let* contract =
-    Client.originate_contract
-      ~alias:"big_map_to_self"
+  let* _alias, contract =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap5"
-      ~prg
       ~init:"{}"
       ~burn_cap:Tez.one
       client
+      ["opcodes"; "big_map_to_self"]
+      protocol
   in
   let* () =
     Client.transfer

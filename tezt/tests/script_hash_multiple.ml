@@ -30,15 +30,6 @@
    Subject:      Tests various invocations of the [octez-client hash script]
 *)
 
-let contract_path protocol kind contract =
-  sf
-    "tests_python/contracts_%s/%s/%s"
-    (match protocol with
-    | Protocol.Alpha -> "alpha"
-    | _ -> sf "%03d" @@ Protocol.number protocol)
-    kind
-    contract
-
 (* Test octez-client hash script with different number and type of
    arguments *)
 let test_script_hash_multiple =
@@ -47,7 +38,9 @@ let test_script_hash_multiple =
     ~title:"Script hash multiple"
     ~tags:["script"; "hash"; "multiple"]
   @@ fun protocol ->
-  let id_script_path = contract_path protocol "attic" "empty.tz" in
+  let id_script_path =
+    Michelson_script.(find ["attic"; "empty"] protocol |> path)
+  in
   let id_script_literal = Base.read_file id_script_path in
   let id_script_hash =
     "expruat2BS4KCwn9kbopeX1ZwxtrtJbyFhpnpnG6A5KdCBCwHNsdod"

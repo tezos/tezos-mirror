@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Requester
-    Invocation:   dune build @src/lib_requester/runtest
+    Invocation:   dune exec src/lib_requester/test/main.exe \
+                  -- --file test_fuzzing_requester.ml
     Subject:      Relations between functions of [Requester]'s API
 *)
 
@@ -216,6 +217,7 @@ let test_clear_pending =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Requester_PBT"
     [
       ("read", qcheck_wrap [test_read_read_opt; test_read_opt_known]);

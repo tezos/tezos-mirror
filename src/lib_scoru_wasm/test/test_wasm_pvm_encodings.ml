@@ -27,12 +27,10 @@
 (** Testing
     -------
     Component:    Tree_encoding_decoding
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "^WASM PVM Encodings$"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_wasm_pvm_encodings.ml
     Subject:      WASM PVM encoding tests for the tezos-scoru-wasm library
 *)
 
-open Tztest
 open Tezos_scoru_wasm
 open Tezos_webassembly_interpreter
 module Contest = Tezos_context_memory.Context_binary
@@ -303,12 +301,17 @@ let error_state_check state state' =
 
 let tests =
   [
-    tztest
-      "Wasm_pvm_errors"
-      `Quick
-      (Test_encodings_util.make_test
-         ~print:Wasm_utils.print_error_state
-         (Tezos_tree_encoding.value [] Wasm_pvm_errors.encoding)
-         error_state_gen
-         error_state_check);
+    Test_encodings_util.make_test
+      ~print:Wasm_utils.print_error_state
+      ~name:"Wasm_pvm_errors"
+      (Tezos_tree_encoding.value [] Wasm_pvm_errors.encoding)
+      error_state_gen
+      error_state_check;
   ]
+
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    "test lib scoru wasm"
+    [("WASM PVM Encodings", tests)]
+  |> Lwt_main.run

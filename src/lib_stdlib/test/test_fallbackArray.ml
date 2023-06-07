@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    stdlib
-    Invocation:   dune build @src/lib_stdlib/test/runtest
+    Invocation:   dune exec src/lib_stdlib/test/main.exe \
+                  -- --file test_fallbackArray.ml
     Subject:      Fallback arrays
  *)
 
@@ -68,4 +69,4 @@ module Tests = struct
   let tests = ("of_list", `Quick, check_of_list) :: tests
 end
 
-let () = Alcotest.run "stdlib" [("FallbackArray", Tests.tests)]
+let () = Alcotest.run ~__FILE__ "stdlib" [("FallbackArray", Tests.tests)]

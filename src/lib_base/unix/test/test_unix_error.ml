@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Base, Unix
-   Invocation:   dune build @src/lib_base/unix/runtest
+   Invocation:   dune exec src/lib_base/unix/test/main.exe
    Subject:      Check the serialization or deserialization of unix errors
 *)
 
@@ -144,6 +144,7 @@ let test_binary () =
 let () =
   let open Alcotest in
   run
+    ~__FILE__
     "Base.unix.unix_error"
     [
       ( "encoding",

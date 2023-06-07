@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -101,6 +101,7 @@ val additional_bootstraps : t -> Account.key list
     to an endpoint. Most commands require an endpoint to be specified (either with [create]
     or with the command itself). *)
 val create :
+  ?runner:Runner.t ->
   ?path:string ->
   ?admin_path:string ->
   ?name:string ->
@@ -113,6 +114,7 @@ val create :
 
 (** Create a client like [create] but do not assume [Client] as the mode. *)
 val create_with_mode :
+  ?runner:Runner.t ->
   ?path:string ->
   ?admin_path:string ->
   ?name:string ->
@@ -326,6 +328,12 @@ module Admin : sig
   (** Same as [ban_peer], but do not wait for the process to exit. *)
   val spawn_ban_peer : ?endpoint:endpoint -> peer:string -> t -> Process.t
 
+  (** Run [octez-admin-client p2p stat]. *)
+  val p2p_stat : ?endpoint:endpoint -> t -> string Lwt.t
+
+  (** Same as [p2p_stat], but do not wait for the process to exit. *)
+  val spawn_p2p_stat : ?endpoint:endpoint -> t -> Process.t
+
   (** Run [octez-admin-client inject protocol <protocol_path>].
 
       Returns the hash of the injected protocol. *)
@@ -359,6 +367,47 @@ val version : t -> unit Lwt.t
 
 (** Same as [version], but do not wait for the process to exit. *)
 val spawn_version : t -> Process.t
+
+(** Run [octez-client import secret keys from mnemonic]. *)
+val import_keys_from_mnemonic :
+  ?endpoint:endpoint ->
+  ?force:bool ->
+  ?passphrase:string ->
+  ?encryption_password:string ->
+  t ->
+  alias:string ->
+  mnemonic:string list ->
+  unit Lwt.t
+
+(** Same as [import_keys_from_mnemonic], but do not wait for the
+    process to exit. This function opens and returns an [output_channel]
+    and returns it along with the process.  *)
+val spawn_import_keys_from_mnemonic :
+  ?endpoint:endpoint ->
+  ?force:bool ->
+  ?encrypt:bool ->
+  t ->
+  alias:string ->
+  Process.t * Lwt_io.output_channel
+
+(** Run [octez-client import secret key] for an encrypted key. *)
+val import_encrypted_secret_key :
+  ?hooks:Process_hooks.t ->
+  ?force:bool ->
+  ?endpoint:endpoint ->
+  t ->
+  Account.key ->
+  password:string ->
+  unit Lwt.t
+
+(** Same as [import_encrypted_secret_key], but do not wait for the process to exit. *)
+val spawn_import_encrypted_secret_key :
+  ?hooks:Process_hooks.t ->
+  ?force:bool ->
+  ?endpoint:endpoint ->
+  t ->
+  Account.key ->
+  Process.t * Lwt_io.output_channel
 
 (** Run [octez-client import secret key]. *)
 val import_secret_key : ?endpoint:endpoint -> t -> Account.key -> unit Lwt.t
@@ -461,6 +510,7 @@ val bake_for :
   ?ignore_node_mempool:bool ->
   ?force:bool ->
   ?context_path:string ->
+  ?dal_node_endpoint:string ->
   ?expect_failure:bool ->
   t ->
   unit Lwt.t
@@ -486,6 +536,7 @@ val bake_for_and_wait :
   ?force:bool ->
   ?context_path:string ->
   ?node:Node.t ->
+  ?dal_node_endpoint:string ->
   t ->
   unit Lwt.t
 
@@ -502,6 +553,7 @@ val spawn_bake_for :
   ?ignore_node_mempool:bool ->
   ?force:bool ->
   ?context_path:string ->
+  ?dal_node_endpoint:string ->
   t ->
   Process.t
 
@@ -760,6 +812,10 @@ val multiple_transfers :
   t ->
   unit Runnable.process
 
+(** Run octez-client register key <delegate> as delegate. *)
+val register_delegate :
+  ?endpoint:endpoint -> delegate:string -> t -> string Lwt.t
+
 (** Run octez-client get delegate for <src>. Returns [Some address] if delegate
     is set or [None] otherwise. *)
 val get_delegate : ?endpoint:endpoint -> src:string -> t -> string option Lwt.t
@@ -772,6 +828,7 @@ val set_delegate :
   ?fee_cap:Tez.t ->
   ?force_low_fee:bool ->
   ?expect_failure:bool ->
+  ?simulation:bool ->
   src:string ->
   delegate:string ->
   t ->
@@ -1035,6 +1092,8 @@ val spawn_originate_contract :
 
     Returns a pair [(alias, res)] where [alias] is a value which can be used to
     identify the originated contract, and [res] is the originated contract hash.
+    By default, [alias] is the last component of the scripts name [n], but this
+    can be overriden through the [alias] parameter.
 *)
 val originate_contract_at :
   ?hooks:Process.hooks ->
@@ -1045,6 +1104,9 @@ val originate_contract_at :
   ?burn_cap:Tez.t ->
   ?gas_limit:int ->
   ?dry_run:bool ->
+  ?force:bool ->
+  ?prefix:string ->
+  ?alias:string ->
   amount:Tez.t ->
   src:string ->
   t ->
@@ -1062,6 +1124,9 @@ val spawn_originate_contract_at :
   ?burn_cap:Tez.t ->
   ?gas_limit:int ->
   ?dry_run:bool ->
+  ?force:bool ->
+  ?prefix:string ->
+  ?alias:string ->
   amount:Tez.t ->
   src:string ->
   t ->
@@ -1203,6 +1268,9 @@ val stresstest_fund_accounts_from_source :
   t ->
   unit Lwt.t
 
+(** The result of a [octez-client run script .. on storage .. and input ..] call. *)
+type run_script_result = {storage : string; big_map_diff : string list}
+
 (** Run [octez-client run script .. on storage .. and input ..].
 
     Returns the new storage as a string.
@@ -1221,11 +1289,12 @@ val run_script :
   ?gas:int ->
   ?trace_stack:bool ->
   ?level:int ->
+  ?now:string ->
   prg:string ->
   storage:string ->
   input:string ->
   t ->
-  string Lwt.t
+  run_script_result Lwt.t
 
 (** Same as [run_script] but do not wait for the process to exit. *)
 val spawn_run_script :
@@ -1239,6 +1308,7 @@ val spawn_run_script :
   ?gas:int ->
   ?trace_stack:bool ->
   ?level:int ->
+  ?now:string ->
   prg:string ->
   storage:string ->
   input:string ->
@@ -1256,24 +1326,34 @@ val spawn_run_script :
     Fails if the new storage cannot be extracted from the output. *)
 val run_script_at :
   ?hooks:Process.hooks ->
+  ?protocol_hash:string ->
   ?balance:Tez.t ->
   ?self_address:string ->
   ?source:string ->
   ?payer:string ->
+  ?prefix:string ->
+  ?now:string ->
+  ?trace_stack:bool ->
+  ?level:int ->
   storage:string ->
   input:string ->
   t ->
   string list ->
   Protocol.t ->
-  string Lwt.t
+  run_script_result Lwt.t
 
 (** Same as [run_script_at] but do not wait for the process to exit. *)
 val spawn_run_script_at :
   ?hooks:Process.hooks ->
+  ?protocol_hash:string ->
   ?balance:Tez.t ->
   ?self_address:string ->
   ?source:string ->
   ?payer:string ->
+  ?prefix:string ->
+  ?now:string ->
+  ?trace_stack:bool ->
+  ?level:int ->
   storage:string ->
   input:string ->
   t ->
@@ -1300,37 +1380,39 @@ val spawn_register_global_constant :
   t ->
   Process.t
 
-(** Run [octez-client hash data .. of type ...]
+(** Represents the result of a [octez-client hash data .. of type ...] call.
 
-    Given that the output of [octez-client] is:
+    Given the output:
+{v
+    $ ./tezos-client hash data Unit of type unit
+    Raw packed data: 0x05030b
+    Script-expression-ID-Hash: expruaDPoTWXcTR6fiQPy4KZSW72U6Swc1rVmMiP...
+    Raw Script-expression-ID-Hash: 0x8b456a4530fb6d0fea9a0dcd0e9d6ff6b3...
+    Ledger Blake2b hash: ANf4YSkDc71Uy14uWg3wL8u49LUAHdVVnVHbSwNKyEJo
+    Raw Sha256 hash: 0x5f6d1c5a35306dc8be3a54058774f9cb8f1bc71a6a743a25...
+    Raw Sha512 hash: 0xe89c39b714a041046cf421532526b466a8ad29a89a4f0279...
+    Gas remaining: 1039999.624 units remaining
+v}
 
-    [Raw packed data: 0x050303
-     Script-expression-ID-Hash: exprvDnoPjyKeR9FSnvwYg5a1v6mDyB6TmnATwWySSP6VmJxrzQb9E
-     Raw Script-expression-ID-Hash: 0xe0978ddc9329cbd84d25fd15a161a7d2e7e555da91e2a335ece8c8bc11ade245
-     Ledger Blake2b hash: G7iMrYNckCFRujDLFgtj3cDMCnfeSQ2cmhnDtkh9REc4
-     Raw Sha256 hash: 0x35ef99f7718e7d1f065bae635780f41c0cd201e9ffb3390ba6ef428c2815fa66
-     Raw Sha512 hash: 0x2c9ca967bf47f6cc76861693379b7397f65e6a1b6e633df28cf02be0b0d18319ae783b4c199fd61115e000a15a5ba8a292a3b1468c2cfe2b3e3a9fa08d419698
-     Gas remaining: 1039991.350 units remaining]
+    we obtain a [hash_data_result] record with each field filled from
+    the corresponding line above (omitting the last [Gas remaining
+    line]). *)
+type hash_data_result = {
+  packed : string;
+  script_expr_hash : string;
+  raw_script_expr_hash : string;
+  ledger_blake2b_hash : string;
+  raw_sha256_hash : string;
+  raw_sha512_hash : string;
+}
 
-    this function returns the list:
-
-    [("Raw packed data"; "0x050303")
-     ("Script-expression-ID-Hash"; "exprvDnoPjyKeR9FSnvwYg5a1v6mDyB6TmnATwWySSP6VmJxrzQb9E")
-     ("Raw Script-expression-ID-Hash"; "0xe0978ddc9329cbd84d25fd15a161a7d2e7e555da91e2a335ece8c8bc11ade245")
-     ("Ledger Blake2b hash"; "G7iMrYNckCFRujDLFgtj3cDMCnfeSQ2cmhnDtkh9REc4")
-     ("Raw Sha256 hash"; "0x35ef99f7718e7d1f065bae635780f41c0cd201e9ffb3390ba6ef428c2815fa66")
-     ("Raw Sha512 hash"; "0x2c9ca967bf47f6cc76861693379b7397f65e6a1b6e633df28cf02be0b0d18319ae783b4c199fd61115e000a15a5ba8a292a3b1468c2cfe2b3e3a9fa08d419698")
-     ("Gas remaining"; "1039991.350 units remaining")]
-
-    If some lines cannot be parsed, warnings are emitted in output and
-    the corresponding lines are omitted from the result. *)
+(** Run [octez-client hash data .. of type ...] *)
 val hash_data :
-  ?expect_failure:bool ->
   ?hooks:Process.hooks ->
   data:string ->
   typ:string ->
   t ->
-  (string * string) list Lwt.t
+  hash_data_result Lwt.t
 
 (** Same as [hash_data], but do not wait for the process to exit. *)
 val spawn_hash_data :
@@ -1398,6 +1480,24 @@ val spawn_normalize_data :
   ?legacy:bool ->
   data:string ->
   typ:string ->
+  t ->
+  Process.t
+
+(** Run [octez-client normalize stack ...]*)
+val normalize_stack :
+  ?hooks:Process_hooks.t ->
+  ?mode:normalize_mode ->
+  ?legacy:bool ->
+  stack:string ->
+  t ->
+  string Lwt.t
+
+(** Same as [normalize_stack], but do not wait for the process to exit. *)
+val spawn_normalize_stack :
+  ?hooks:Process_hooks.t ->
+  ?mode:normalize_mode ->
+  ?legacy:bool ->
+  stack:string ->
   t ->
   Process.t
 
@@ -1536,6 +1636,13 @@ val list_protocols : [< `Light | `Mockup | `Proxy] -> t -> string list Lwt.t
     and do not process stdout. *)
 val spawn_list_protocols : [< `Light | `Mockup | `Proxy] -> t -> Process.t
 
+(** Run [octez-client list understood protocols]. *)
+val list_understood_protocols : ?config_file:string -> t -> string list Lwt.t
+
+(** Same as [list_understood_protocols], but do not wait for the process to exit
+    and do not process stdout. *)
+val spawn_list_understood_protocols : ?config_file:string -> t -> Process.t
+
 (** Run [octez-client migrate mockup to]. *)
 val migrate_mockup : next_protocol:Protocol.t -> t -> unit Lwt.t
 
@@ -1563,121 +1670,6 @@ val check_message :
 val spawn_check_message :
   ?branch:string -> t -> src:string -> signature:string -> string -> Process.t
 
-module Tx_rollup : sig
-  (** Run [octez-client originate tx rollup from <src>]. *)
-  val originate :
-    ?wait:string ->
-    ?burn_cap:Tez.t ->
-    ?storage_limit:int ->
-    ?fee:Tez.t ->
-    ?hooks:Process.hooks ->
-    ?alias:string ->
-    src:string ->
-    t ->
-    string Runnable.process
-
-  (** Run [octez-client submit tx rollup batch <batch_content> to <tx_rollup> from <src>]. *)
-  val submit_batch :
-    ?wait:string ->
-    ?burn_cap:Tez.t ->
-    ?storage_limit:int ->
-    ?hooks:Process.hooks ->
-    ?log_output:bool ->
-    ?log_command:bool ->
-    content:Hex.t ->
-    rollup:string ->
-    src:string ->
-    t ->
-    unit Runnable.process
-
-  (** Run [octez-client submit tx rollup commitment <content> to <tx_rollup> from <src>]. *)
-  val submit_commitment :
-    ?wait:string ->
-    ?burn_cap:Tez.t ->
-    ?storage_limit:int ->
-    ?hooks:Process.hooks ->
-    ?predecessor:string ->
-    level:int ->
-    roots:string list ->
-    inbox_merkle_root:string ->
-    rollup:string ->
-    src:string ->
-    t ->
-    unit Runnable.process
-
-  (** Run [octez-client submit tx rollup finalize commitment to <tx_rollup> from <src>]. *)
-  val submit_finalize_commitment :
-    ?wait:string ->
-    ?burn_cap:Tez.t ->
-    ?storage_limit:int ->
-    ?hooks:Process.hooks ->
-    rollup:string ->
-    src:string ->
-    t ->
-    unit Runnable.process
-
-  (** Run [octez-client submit tx rollup remove commitment to <tx_rollup> from <src>]. *)
-  val submit_remove_commitment :
-    ?wait:string ->
-    ?burn_cap:Tez.t ->
-    ?storage_limit:int ->
-    ?hooks:Process.hooks ->
-    rollup:string ->
-    src:string ->
-    t ->
-    unit Runnable.process
-
-  (** Run [octez-client submit tx rollup rejection commitment at level
-     <level> message <message> at <position> with <proof> with agreed
-     context hash <context_hash> and withdraw list
-     <withdraw_list_hash> to <tx_rollup> from <src>]. *)
-  val submit_rejection :
-    ?wait:string ->
-    ?burn_cap:Tez.t ->
-    ?storage_limit:int ->
-    ?hooks:Process.hooks ->
-    level:int ->
-    message:string ->
-    position:int ->
-    path:string ->
-    message_result_hash:string ->
-    rejected_message_result_path:string ->
-    agreed_message_result_path:string ->
-    proof:string ->
-    context_hash:string ->
-    withdraw_list_hash:string ->
-    rollup:string ->
-    src:string ->
-    t ->
-    unit Runnable.process
-
-  (** Run [octez-client submit tx rollup return bond to <tx_rollup> from <src>]. *)
-  val submit_return_bond :
-    ?wait:string ->
-    ?burn_cap:Tez.t ->
-    ?storage_limit:int ->
-    ?hooks:Process.hooks ->
-    rollup:string ->
-    src:string ->
-    t ->
-    unit Runnable.process
-
-  val dispatch_tickets :
-    ?wait:string ->
-    ?burn_cap:Tez.t ->
-    ?storage_limit:int ->
-    ?hooks:Process.hooks ->
-    tx_rollup:string ->
-    src:string ->
-    level:int ->
-    message_position:int ->
-    context_hash:string ->
-    message_result_path:string ->
-    ticket_dispatch_info_data_list:string list ->
-    t ->
-    unit Runnable.process
-end
-
 val transfer_tickets :
   ?wait:string ->
   ?burn_cap:Tez.t ->
@@ -1700,11 +1692,33 @@ val show_voting_period : ?endpoint:endpoint -> t -> string Lwt.t
 val spawn_show_voting_period : ?endpoint:endpoint -> t -> Process.t
 
 module Sc_rollup : sig
-  (** Run [octez-client originate sc rollup from <src> of kind <kind> booting with <boot_sector>]. *)
+  (** Run [octez-client remember smart rollup <alias> <address>]. *)
+  val remember_smart_rollup :
+    ?hooks:Process.hooks ->
+    ?force:bool ->
+    t ->
+    alias:string ->
+    address:string ->
+    unit Runnable.process
+
+  (** Run [octez-client list known smart rollups]. *)
+  val list_known_smart_rollups :
+    ?hooks:Process.hooks -> t -> (string * string) list Runnable.process
+
+  (** Run [octez-client forget all smart rollups]. *)
+  val forget_all_smart_rollups :
+    ?hooks:Process.hooks -> ?force:bool -> t -> unit Runnable.process
+
+  (** Run [octez-client show known smart rollup <alias>]. *)
+  val show_known_smart_rollup :
+    ?hooks:Process.hooks -> t -> alias:string -> string Runnable.process
+
+  (** Run [octez-client originate sc rollup <alias> from <src> of kind <kind> booting with <boot_sector>]. *)
   val originate :
     ?hooks:Process.hooks ->
     ?wait:string ->
     ?burn_cap:Tez.t ->
+    alias:string ->
     src:string ->
     kind:string ->
     parameters_ty:string ->
@@ -1717,6 +1731,7 @@ module Sc_rollup : sig
     ?hooks:Process.hooks ->
     ?wait:string ->
     ?burn_cap:Tez.t ->
+    alias:string ->
     src:string ->
     kind:string ->
     parameters_ty:string ->
@@ -1746,7 +1761,7 @@ module Sc_rollup : sig
 
   (** Run [octez-client publish commitment from <src> for sc rollup <sc_rollup>
       with compressed state <compressed_state> at inbox level <inbox_level>
-      and predecessor <predecessor> and number of ticks <number_of_ticks>. *)
+      and predecessor <predecessor> and number of ticks <number_of_ticks>]. *)
   val publish_commitment :
     ?hooks:Process.hooks ->
     ?wait:string ->
@@ -2333,9 +2348,26 @@ val spawn_command :
   ?hooks:Process.hooks ->
   ?admin:bool ->
   ?protocol_hash:string ->
+  ?config_file:string ->
+  ?no_base_dir_warnings:bool ->
+  ?block:string ->
   t ->
   string list ->
   Process.t
+
+(** Spawn a low-level client command as in [spawn_command] but with a channel to send data to the process [stdin]. *)
+val spawn_command_with_stdin :
+  ?log_command:bool ->
+  ?log_status_on_exit:bool ->
+  ?log_output:bool ->
+  ?env:string String_map.t ->
+  ?endpoint:endpoint ->
+  ?hooks:Process.hooks ->
+  ?admin:bool ->
+  ?protocol_hash:string ->
+  t ->
+  string list ->
+  Process.t * Lwt_io.output_channel
 
 (** Register public key for given account with given client. *)
 val spawn_register_key :
@@ -2410,24 +2442,30 @@ val convert_data_to_json :
 val bootstrapped : t -> unit Lwt.t
 
 (** Run [tezos-client config show]. *)
-val config_show : ?protocol:Protocol.t -> t -> string Lwt.t
+val config_show :
+  ?config_file:string -> ?protocol:Protocol.t -> t -> string Lwt.t
 
 (** Same as [config_show], but do not wait for the process to exit. *)
-val spawn_config_show : ?protocol:Protocol.t -> t -> Process.t
+val spawn_config_show :
+  ?config_file:string -> ?protocol:Protocol.t -> t -> Process.t
 
 (** Run [tezos-client config show]. *)
 val config_init :
+  ?config_file:string ->
   ?protocol:Protocol.t ->
   ?bootstrap_accounts:string ->
   ?protocol_constants:string ->
+  ?output:string ->
   t ->
   unit Lwt.t
 
 (** Same as [config_init], but do not wait for the process to exit. *)
 val spawn_config_init :
+  ?config_file:string ->
   ?protocol:Protocol.t ->
   ?bootstrap_accounts:string ->
   ?protocol_constants:string ->
+  ?output:string ->
   t ->
   Process.t
 
@@ -2446,3 +2484,364 @@ val compute_chain_id_from_seed :
 (** Same as [compute_chain_id_from_seed], but do not wait for the process to exit. *)
 val spawn_compute_chain_id_from_seed :
   ?endpoint:endpoint -> t -> string -> Process.t
+
+(** {2 Commands for managing a multisig smart contract} *)
+
+(** Run [octez-client show supported multisig hashes]. *)
+val show_supported_multisig_hashes : t -> unit Lwt.t
+
+(** Same as [show_supported_multisig_hashes], but do not wait for the
+    process to exit. *)
+val spawn_show_supported_multisig_hashes : t -> Process.t
+
+(** Run [octez-client show multisig script]. *)
+val show_multisig_script : t -> unit Lwt.t
+
+(** Same as [show_multisig_script], but do not wait for the process to
+    exit. *)
+val spawn_show_multisig_script : t -> Process.t
+
+(** Run [octez-client deploy multisig <new_multisig> transferring
+    <qty> from <src> with threshold <threshold> on public keys
+    <key>]. *)
+val deploy_multisig :
+  new_multisig:string ->
+  qty:Tez.t ->
+  src:string ->
+  threshold:int ->
+  keys:string list ->
+  ?delegate:string ->
+  ?force:bool ->
+  ?burn_cap:Tez.t ->
+  t ->
+  unit Lwt.t
+
+(** Same as [deploy_multisig], but do not wait for the process to exit. *)
+val spawn_deploy_multisig :
+  new_multisig:string ->
+  qty:Tez.t ->
+  src:string ->
+  threshold:int ->
+  keys:string list ->
+  ?delegate:string ->
+  ?force:bool ->
+  ?burn_cap:Tez.t ->
+  t ->
+  Process.t
+
+(** Run [octez-client sign multisig transaction on <multisig>
+    transferring <qty> to <dst> using secret key <key>]. *)
+val sign_multisig_transaction_transfer :
+  multisig:string ->
+  qty:Tez.t ->
+  dst:string ->
+  key:string ->
+  ?arg:string ->
+  ?entrypoint:string ->
+  t ->
+  string Lwt.t
+
+(** Same as [sign_multisig_transaction_transfer],
+    but do not wait for the process to exit. *)
+val spawn_sign_multisig_transaction_transfer :
+  multisig:string ->
+  qty:Tez.t ->
+  dst:string ->
+  key:string ->
+  ?arg:string ->
+  ?entrypoint:string ->
+  t ->
+  Process.t
+
+(** Run [octez-client sign multisig transaction on <multisig> running
+    lambda <lambda> using secret key <key>]. *)
+val sign_multisig_transaction_run_lambda :
+  multisig:string -> lambda:string -> key:string -> t -> string Lwt.t
+
+(** Same as [sign_multisig_transaction_run_lambda],
+    but do not wait for the process to exit. *)
+val spawn_sign_multisig_transaction_run_lambda :
+  multisig:string -> lambda:string -> key:string -> t -> Process.t
+
+(** Run [octez-client sign multisig transaction on <multisig> setting
+    delegate to <dlgt> using secret key <key>]. *)
+val sign_multisig_transaction_set_delegate :
+  multisig:string -> dlgt:string -> key:string -> t -> string Lwt.t
+
+(** Same as [sign_multisig_transaction_set_delegate],
+    but do not wait for the process to exit. *)
+val spawn_sign_multisig_transaction_set_delegate :
+  multisig:string -> dlgt:string -> key:string -> t -> Process.t
+
+(** Run [octez-client sign multisig transaction on <multisig>
+    withdrawing delegate using secret key <key>]. *)
+val sign_multisig_transaction_withdraw_delegate :
+  multisig:string -> key:string -> t -> string Lwt.t
+
+(** Same as [sign_multisig_transaction_withdraw_delegate],
+    but do not wait for the process to exit. *)
+val spawn_sign_multisig_transaction_withdraw_delegate :
+  multisig:string -> key:string -> t -> Process.t
+
+(** Run [octez-client sign multisig transaction on <multisig> using
+    secret key <key> setting threshold to <threshold> and public keys
+    to <key>]. *)
+val sign_multisig_transaction_set_threshold_and_public_keys :
+  multisig:string ->
+  signing_key:string ->
+  threshold:int ->
+  public_keys:string list ->
+  t ->
+  string Lwt.t
+
+(** Same as [sign_multisig_transaction_set_threshold_and_public_keys],
+    but do not wait for the process to exit. *)
+val spawn_sign_multisig_transaction_set_threshold_and_public_keys :
+  multisig:string ->
+  signing_key:string ->
+  threshold:int ->
+  public_keys:string list ->
+  t ->
+  Process.t
+
+(** Run [octez-client from multisig contract <multisig> transfer <qty>
+    to <dst> on behalf of <src> with signatures <signature>]. *)
+val from_multisig_transfer :
+  multisig:string ->
+  qty:Tez.t ->
+  dst:string ->
+  src:string ->
+  signatures:string list ->
+  ?arg:string ->
+  ?burn_cap:Tez.t ->
+  ?entrypoint:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [from_multisig_transfer],
+    but do not wait for the process to exit. *)
+val spawn_from_multisig_transfer :
+  multisig:string ->
+  qty:Tez.t ->
+  dst:string ->
+  src:string ->
+  signatures:string list ->
+  ?arg:string ->
+  ?burn_cap:Tez.t ->
+  ?entrypoint:string ->
+  t ->
+  Process.t
+
+(** Run [octez-client from multisig contract <multisig> run lambda
+    <lambda> on behalf of <src> with signatures <signature>]. *)
+val from_multisig_run_lambda :
+  multisig:string ->
+  lambda:string ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  unit Lwt.t
+
+(** Same as [from_multisig_run_lambda],
+    but do not wait for the process to exit. *)
+val spawn_from_multisig_run_lambda :
+  multisig:string ->
+  lambda:string ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  Process.t
+
+(** Run [octez-client set delegate of multisig contract <multisig> to
+    <dlgt> on behalf of <src> with signatures <signature>]. *)
+val set_delegate_of_multisig :
+  multisig:string ->
+  dlgt:string ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  unit Lwt.t
+
+(** Same as [set_delegate_of_multisig],
+    but do not wait for the process to exit. *)
+val spawn_set_delegate_of_multisig :
+  multisig:string ->
+  dlgt:string ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  Process.t
+
+(** Run [octez-client withdraw delegate of multisig contract
+    <multisig> on behalf of <src> with signatures <signature>]. *)
+val withdraw_delegate_of_multisig :
+  multisig:string ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  unit Lwt.t
+
+(** Same as [withdraw_delegate_of_multisig],
+    but do not wait for the process to exit. *)
+val spawn_withdraw_delegate_of_multisig :
+  multisig:string ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  Process.t
+
+(** Run [octez-client set threshold of multisig contract <multisig> to
+    <threshold> and public keys to <public_keys> on behalf of <src> with
+    signatures <signature>]. *)
+val set_threshold_of_multisig :
+  multisig:string ->
+  threshold:int ->
+  public_keys:string list ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  unit Lwt.t
+
+(** Same as [set_threshold_of_multisig],
+    but do not wait for the process to exit. *)
+val spawn_set_threshold_of_multisig :
+  multisig:string ->
+  threshold:int ->
+  public_keys:string list ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  Process.t
+
+(** Run [octez-client run transaction <bytes> on multisig contract
+    <multisig> on behalf of <src> with signatures <signature>]. *)
+val run_transaction_on_multisig :
+  bytes:string ->
+  multisig:string ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  unit Lwt.t
+
+(** Same as [run_transaction_on_multisig],
+    but do not wait for the process to exit. *)
+val spawn_run_transaction_on_multisig :
+  bytes:string ->
+  multisig:string ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  Process.t
+
+(** Run [octez-client prepare multisig transaction on <multisig>
+    transferring <qty> to <dst>]. *)
+val prepare_multisig_transaction :
+  multisig:string ->
+  qty:Tez.t ->
+  dst:string ->
+  ?arg:string ->
+  ?entrypoint:string ->
+  ?bytes_only:bool ->
+  t ->
+  string Lwt.t
+
+(** Same as [prepare_multisig_transaction], but do
+    not wait for the process to exit. *)
+val spawn_prepare_multisig_transaction :
+  multisig:string ->
+  qty:Tez.t ->
+  dst:string ->
+  ?arg:string ->
+  ?entrypoint:string ->
+  ?bytes_only:bool ->
+  t ->
+  Process.t
+
+(** Run [octez-client prepare multisig transaction on <multisig>
+    running lambda <lambda>]. *)
+val prepare_multisig_transaction_run_lambda :
+  multisig:string -> lambda:string -> ?bytes_only:bool -> t -> string Lwt.t
+
+(** Same as [prepare_multisig_transaction_run_lambda], but do
+    not wait for the process to exit. *)
+val spawn_prepare_multisig_transaction_run_lambda :
+  multisig:string -> lambda:string -> ?bytes_only:bool -> t -> Process.t
+
+(** Run [octez-client prepare multisig transaction on <multisig>
+    setting delegate to <dlgt>]. *)
+val prepare_multisig_transaction_set_delegate :
+  multisig:string -> dlgt:string -> ?bytes_only:bool -> t -> string Lwt.t
+
+(** Same as [prepare_multisig_transaction_set_delegate], but
+    do not wait for the process to exit. *)
+val spawn_prepare_multisig_transaction_set_delegate :
+  multisig:string -> dlgt:string -> ?bytes_only:bool -> t -> Process.t
+
+(** Run [octez-client prepare multisig transaction on <multisig>
+    withdrawing delegate]. *)
+val prepare_multisig_transaction_withdraw_delegate :
+  multisig:string -> ?bytes_only:bool -> t -> string Lwt.t
+
+(** Same as [prepare_multisig_transaction_withdraw_delegate],
+    but do not wait for the process to exit. *)
+val spawn_prepare_multisig_transaction_withdraw_delegate :
+  multisig:string -> ?bytes_only:bool -> t -> Process.t
+
+(** Run [octez-client prepare multisig transaction on <multisig>
+    setting threshold to <threshold> and public keys to <public_keys>]. *)
+val prepare_multisig_transaction_set_threshold_and_public_keys :
+  multisig:string ->
+  threshold:int ->
+  public_keys:string list ->
+  ?bytes_only:bool ->
+  t ->
+  string Lwt.t
+
+(** Same as
+    [prepare_multisig_transaction_set_threshold_and_public_keys],
+    but do not wait for the process to exit. *)
+val spawn_prepare_multisig_transaction_set_threshold_and_public_keys :
+  multisig:string ->
+  threshold:int ->
+  public_keys:string list ->
+  ?bytes_only:bool ->
+  t ->
+  Process.t
+
+(** Run [tezos-client expand macros in <script>]. *)
+val expand_macros :
+  ?endpoint:endpoint ->
+  ?hooks:Process_hooks.t ->
+  ?protocol_hash:string ->
+  ?no_base_dir_warnings:bool ->
+  t ->
+  string ->
+  string Lwt.t
+
+(** Same as [expand_macros], but do not wait for the process to exit. *)
+val spawn_expand_macros :
+  ?endpoint:endpoint ->
+  ?hooks:Process_hooks.t ->
+  ?protocol_hash:string ->
+  ?no_base_dir_warnings:bool ->
+  t ->
+  string ->
+  Process.t
+
+(** Run [tezos-client get timestamp]. *)
+val get_timestamp :
+  ?endpoint:endpoint -> ?block:string -> ?seconds:bool -> t -> string Lwt.t
+
+(** Same as [get_timestamp], but do not wait for the process to exit. *)
+val spawn_get_timestamp :
+  ?endpoint:endpoint -> ?block:string -> ?seconds:bool -> t -> Process.t

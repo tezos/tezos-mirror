@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    PBT for refutation proofs of Dal
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/test_dal_slot_proof.exe
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_protocol/test/pbt/main.exe \
+                  -- --file test_dal_slot_proof.ml
     Subject:      Refutation proof-related functions of Dal
 *)
 
@@ -45,6 +45,7 @@ struct
     include Parameters
 
     let cryptobox =
+      Lazy.from_fun @@ fun () ->
       WithExceptions.Result.get_ok ~loc:__LOC__
       @@ Dal_helpers.mk_cryptobox Parameters.dal_parameters.cryptobox_parameters
   end)
@@ -201,7 +202,13 @@ struct
     ]
 
   let tests =
-    [(Format.sprintf "[%s] Dal slots refutation" Parameters.name, tests)]
+    [
+      ( Format.sprintf
+          "[%s: %s] Dal slots refutation"
+          Protocol.name
+          Parameters.name,
+        tests );
+    ]
 end
 
 let () =
@@ -213,4 +220,8 @@ let () =
 
     let dal_parameters = constants_test.dal
   end) in
-  Alcotest_lwt.run "Refutation_game" Test.tests |> Lwt_main.run
+  Alcotest_lwt.run
+    ~__FILE__
+    (Protocol.name ^ ": Dal slots refutation game")
+    Test.tests
+  |> Lwt_main.run

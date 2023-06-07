@@ -36,17 +36,21 @@ type eval_step =
 
 (* Possible commands for the REPL. *)
 type commands =
+  | Bench
   | Time of commands
   | Show_inbox
   | Show_outbox of int32
   | Show_status
   | Show_durable_storage
-  | Show_key of string
-  | Show_memory of int32 * int
+  | Show_subkeys of string
+  | Show_key of string * printable_value_kind
+  | Show_memory of int32 * int * printable_value_kind
+  | Dump_function_symbols
   | Step of eval_step
   | Load_inputs
   | Reveal_preimage of string option
   | Reveal_metadata
+  | Profile of bool
   | Unknown of string
   | Stop
 
@@ -56,6 +60,24 @@ let parse_eval_step = function
   | "kernel_run" -> Some Kernel_run
   | "inbox" -> Some Inbox
   | _ -> None
+
+let parse_memory_commands full_command = function
+  | ["at"; address; "for"; length; "bytes"] -> (
+      match (Int32.of_string_opt address, int_of_string_opt length) with
+      | Some address, Some length -> Show_memory (address, length, `Hex)
+      | _, _ -> Unknown full_command)
+  | ["at"; address; "for"; length; "bytes"; "as"; "string"] -> (
+      match (Int32.of_string_opt address, int_of_string_opt length) with
+      | Some address, Some length -> Show_memory (address, length, `String)
+      | _, _ -> Unknown full_command)
+  | ["at"; address; "as"; kind] -> (
+      match
+        (Int32.of_string_opt address, integer_value_kind_of_string kind)
+      with
+      | Some address, Some kind ->
+          Show_memory (address, value_kind_length kind, kind)
+      | _, _ -> Unknown full_command)
+  | _ -> Unknown full_command
 
 let parse_commands s =
   let command = String.split_no_empty ' ' (String.trim s) in
@@ -70,11 +92,15 @@ let parse_commands s =
         | None -> Unknown s)
     | ["show"; "status"] -> Show_status
     | ["show"; "durable"; "storage"] -> Show_durable_storage
-    | ["show"; "key"; key] -> Show_key key
-    | ["show"; "memory"; "at"; address; "for"; length; "bytes"] -> (
-        match (Int32.of_string_opt address, int_of_string_opt length) with
-        | Some address, Some length -> Show_memory (address, length)
-        | _, _ -> Unknown s)
+    | ["show"; "subkeys"; path] | ["ls"; path] -> Show_subkeys path
+    | ["show"; "subkeys"] | ["ls"] -> Show_subkeys "/"
+    | ["show"; "key"; key] -> Show_key (key, `Hex)
+    | ["show"; "key"; key; "as"; kind] -> (
+        match printable_value_kind_of_string kind with
+        | Some kind -> Show_key (key, kind)
+        | None -> Unknown s)
+    | "show" :: "memory" :: rest -> parse_memory_commands s rest
+    | ["dump"; "function"; "symbols"] -> Dump_function_symbols
     | ["step"; step] -> (
         match parse_eval_step step with Some s -> Step s | None -> Unknown s)
     | ["load"; "inputs"] -> Load_inputs
@@ -83,6 +109,9 @@ let parse_commands s =
         Reveal_preimage (Some hex_encoded_preimage)
     | ["reveal"; "metadata"] -> Reveal_metadata
     | ["stop"] -> Stop
+    | ["bench"] -> Bench
+    | ["profile"] -> Profile false
+    | ["profile"; "--collapsed"] -> Profile true
     | _ -> Unknown s
   in
   go command
@@ -121,13 +150,11 @@ let reveal_preimage_manually retries hash =
   in
   input_preimage retries
 
-let reveal_preimage_builtin retries hash =
+let reveal_preimage_builtin config retries hash =
   let (`Hex hex) = Hex.of_string hash in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4545
-     Let the user override this hardcoded value. *)
   Lwt.catch
     (fun () ->
-      let path = "preimages/" ^ hex in
+      let path = Filename.concat config.Config.preimage_directory hex in
       let ch = open_in path in
       let s = really_input_string ch (in_channel_length ch) in
       close_in ch ;
@@ -139,7 +166,7 @@ let reveal_builtins config =
     {
       (* We retry 3 times to reveal the preimage manually, this should be
          configurable at some point. *)
-      reveal_preimage = reveal_preimage_builtin 3;
+      reveal_preimage = reveal_preimage_builtin config 3;
       reveal_metadata = (fun () -> Lwt.return (build_metadata config));
     }
 
@@ -196,12 +223,45 @@ let eval_until_input_requested config tree =
       ( tree,
         Z.to_int64 @@ Z.sub info_after.current_tick info_before.current_tick ))
 
-(* Eval dispatcher. *)
-let eval config = function
-  | Tick -> compute_step
-  | Result -> eval_to_result config
-  | Kernel_run -> eval_kernel_run config
-  | Inbox -> eval_until_input_requested config
+type extra = {functions : string Custom_section.FuncMap.t}
+
+let produce_flamegraph ~collapse ~max_depth (current_node, remaining_nodes) =
+  let filename =
+    Time.System.(
+      Format.asprintf "wasm-debugger-profiling-%a.out" pp_hum (now ()))
+  in
+  let path = Filename.(concat (get_temp_dir_name ()) filename) in
+  let file = open_out path in
+  if remaining_nodes <> [] then
+    Format.printf
+      "The resulting call graph is inconsistent, please open an issue.\n%!" ;
+  Profiling.pp_flamegraph
+    ~collapse
+    ~max_depth
+    Profiling.pp_call
+    (Format.formatter_of_out_channel file)
+    current_node ;
+  close_out file ;
+  Format.printf "Profiling result can be found in %s\n%!" path
+
+let eval_and_profile ~collapse config extra tree =
+  let open Lwt_syntax in
+  trap_exn (fun () ->
+      Format.printf
+        "Starting the profiling until new messages are expected. Please note \
+         that it will take some time and does not reflect a real computation \
+         time.\n\
+         %!" ;
+      let+ tree, ticks, graph =
+        Profiling.eval_and_profile
+          ~write_debug
+          ~reveal_builtins:(reveal_builtins config)
+          extra.functions
+          tree
+      in
+      produce_flamegraph ~collapse ~max_depth:100 graph ;
+      Format.printf "The execution took %a ticks.\n%!" Z.pp_print ticks ;
+      tree)
 
 let set_raw_message_input_step level counter encoded_message tree =
   Wasm.set_input_step (input_info level counter) encoded_message tree
@@ -253,6 +313,38 @@ let load_inputs inboxes level tree =
       Format.printf "%s\n%!" msg ;
       return (tree, inboxes, level)
 
+(* Eval dispatcher. *)
+let eval level inboxes config step tree =
+  let open Lwt_result_syntax in
+  let return' ?(inboxes = inboxes) f =
+    let* tree, count = f in
+    return (tree, count, inboxes)
+  in
+  match step with
+  | Tick -> return' (compute_step tree)
+  | Result -> return' (eval_to_result config tree)
+  | Kernel_run -> return' (eval_kernel_run config tree)
+  | Inbox -> (
+      let*! status = check_input_request tree in
+      match status with
+      | Ok () ->
+          let* tree, inboxes, count1 = load_inputs inboxes level tree in
+          let* tree, count2 = eval_until_input_requested config tree in
+          return (tree, Int64.(add (of_int32 count1) count2), inboxes)
+      | Error _ -> return' (eval_until_input_requested config tree))
+
+let profile ~collapse level inboxes config extra tree =
+  let open Lwt_result_syntax in
+  let*! status = check_input_request tree in
+  match status with
+  | Ok () ->
+      let* tree, inboxes, level = load_inputs inboxes level tree in
+      let* tree = eval_and_profile ~collapse config extra tree in
+      return (tree, inboxes, level)
+  | Error _ ->
+      let* tree = eval_and_profile ~collapse config extra tree in
+      return (tree, inboxes, level)
+
 let pp_input_request ppf = function
   | Wasm_pvm_state.No_input_required -> Format.fprintf ppf "Evaluating"
   | Input_required -> Format.fprintf ppf "Waiting for input"
@@ -274,13 +366,34 @@ let show_status tree =
        pp_state
        state)
 
-(* [step kind tree] evals according to the step kind and prints the number of
-   ticks elapsed and the new status. *)
-let step config kind tree =
+(* [step level inboxes config kind tree] evals according to the step kind and
+   prints the number of ticks elapsed and the new status. *)
+let step level inboxes config kind tree =
   let open Lwt_result_syntax in
-  let* tree, ticks = eval config kind tree in
+  let* tree, ticks, inboxes = eval level inboxes config kind tree in
   let*! () = Lwt_io.printf "Evaluation took %Ld ticks so far\n" ticks in
   let*! () = show_status tree in
+  return (tree, inboxes)
+
+let bench config tree =
+  let open Lwt_syntax in
+  let action =
+    Octez_smart_rollup_wasm_benchmark_lib.Scenario.exec_slow
+      ~reveal_builtins:(reveal_builtins config)
+  in
+  let step =
+    Octez_smart_rollup_wasm_benchmark_lib.Scenario.make_scenario_step "" action
+  in
+  let eval = Octez_smart_rollup_wasm_benchmark_lib.Scenario.apply_step step in
+  let* benchmark, tree = eval tree in
+  let* () =
+    Lwt_io.printf
+      "%s\n%!"
+      (Format.asprintf
+         "%a"
+         Octez_smart_rollup_wasm_benchmark_lib.Data.pp_analysis
+         benchmark)
+  in
   return tree
 
 (* [show_inbox tree] prints the current input buffer and the number of messages
@@ -333,8 +446,7 @@ let show_outbox_gen tree level =
     Tezos_webassembly_interpreter.Output_buffer.get_outbox output_buffer level
   in
   let* messages =
-    Tezos_lazy_containers.Lazy_vector.(
-      Mutable.ZVector.snapshot level_vector |> ZVector.to_list)
+    Tezos_lazy_containers.Lazy_vector.(level_vector |> ZVector.to_list)
   in
   let pp_messages () =
     Format.asprintf
@@ -345,7 +457,7 @@ let show_outbox_gen tree level =
       messages
   in
   let size =
-    Tezos_lazy_containers.Lazy_vector.Mutable.ZVector.num_elements level_vector
+    Tezos_lazy_containers.Lazy_vector.ZVector.num_elements level_vector
   in
   Lwt_io.printf
     "Outbox has %s messages:\n%s\n%!"
@@ -361,9 +473,35 @@ let show_outbox tree level =
 (* [show_durable] prints the durable storage from the tree. *)
 let show_durable tree = Repl_helpers.print_durable ~depth:10 tree
 
+(* [show_subkeys tree path] prints the direct subkeys under the given path. *)
+let show_subkeys tree path =
+  let invalid_path () =
+    Lwt.return @@ Format.printf "Invalid path, it must start with '/'\n%!"
+  in
+  match String.index_opt path '/' with
+  | Some i when i <> 0 -> invalid_path ()
+  | None -> invalid_path ()
+  | Some _ ->
+      Repl_helpers.print_durable
+        ~depth:1
+        ~path:(String.split_no_empty '/' path)
+        ~show_values:false
+        tree
+
+let show_value kind value =
+  let printable = Repl_helpers.print_wasm_encoded_value kind value in
+  match printable with
+  | Ok s -> s
+  | Error err ->
+      Format.asprintf
+        "Error: %s. Defaulting to hexadecimal value\n%a"
+        err
+        Hex.pp
+        (Hex.of_string value)
+
 (* [show_key_gen tree key] looks for the given [key] in the durable storage and
    print its value in hexadecimal format. *)
-let show_key_gen tree key =
+let show_key_gen tree key kind =
   let open Lwt_syntax in
   let* value = Repl_helpers.find_key_in_durable tree key in
   match value with
@@ -372,16 +510,16 @@ let show_key_gen tree key =
       return_unit
   | Some v ->
       let+ str_value = Tezos_lazy_containers.Chunked_byte_vector.to_string v in
-      Format.printf "%a\n%!" Hex.pp (Hex.of_string str_value)
+      Format.printf "%s\n%!" @@ show_value kind str_value
 
 (* [show_key tree key] looks for the given [key] in the durable storage and
    print its value in hexadecimal format. Prints errors in case the key is
    invalid or not existing. *)
-let show_key tree key =
+let show_key tree key kind =
   Lwt.catch
     (fun () ->
       let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
-      show_key_gen tree key)
+      show_key_gen tree key kind)
     (function
       | Tezos_scoru_wasm.Durable.Invalid_key _ ->
           Lwt_io.printf "Invalid key\n%!"
@@ -411,7 +549,7 @@ let load_memory tree =
 
 (* [show_memory tree address length] loads the [length] bytes at address
    [address] in the memory, and prints it in its hexadecimal representation. *)
-let show_memory tree address length =
+let show_memory tree address length kind =
   let open Lwt_syntax in
   Lwt.catch
     (fun () ->
@@ -419,8 +557,7 @@ let show_memory tree address length =
       let* value =
         Tezos_webassembly_interpreter.Memory.load_bytes memory address length
       in
-      Lwt_io.printf "%s\n%!"
-      @@ Format.asprintf "%a" Hex.pp (Hex.of_string value))
+      Lwt_io.printf "%s\n%!" @@ show_value kind value)
     (function
       | Cannot_inspect_memory state ->
           Lwt_io.printf
@@ -428,10 +565,16 @@ let show_memory tree address length =
             state
       | exn -> Lwt_io.printf "Error: %s\n%!" (Printexc.to_string exn))
 
-(* [reveal_preimage hex tree] checks the current state is waiting for a
+let dump_function_symbols extra =
+  let functions =
+    Format.asprintf "%a" Custom_section.pp_function_subsection extra.functions
+  in
+  Lwt_io.printf "Functions:\n%s\n" functions
+
+(* [reveal_preimage config hex tree] checks the current state is waiting for a
    preimage, parses [hex] as an hexadecimal representation of the data or use
    the builtin if none is given, and does a reveal step. *)
-let reveal_preimage bytes tree =
+let reveal_preimage config bytes tree =
   let open Lwt_syntax in
   let* info = Wasm.get_info tree in
   match
@@ -444,7 +587,7 @@ let reveal_preimage bytes tree =
   | Reveal_required (Reveal_raw_data hash), None ->
       Lwt.catch
         (fun () ->
-          let* preimage = reveal_preimage_builtin 1 hash in
+          let* preimage = reveal_preimage_builtin config 1 hash in
           Wasm.reveal_step (String.to_bytes preimage) tree)
         (fun _ -> return tree)
   | _ ->
@@ -464,11 +607,16 @@ let reveal_metadata config tree =
 
 (* [handle_command command tree inboxes level] dispatches the commands to their
    actual implementation. *)
-let handle_command c config tree inboxes level =
+let handle_command c config extra tree inboxes level =
   let open Lwt_result_syntax in
   let command = parse_commands c in
-  let return ?(tree = tree) () = return (tree, inboxes, level) in
+  let return ?(tree = tree) ?(inboxes = inboxes) () =
+    return (tree, inboxes, level)
+  in
   let rec go = function
+    | Bench ->
+        let*! tree = bench config tree in
+        return ~tree ()
     | Time cmd ->
         let t = Time.System.now () in
         let* res = go cmd in
@@ -484,8 +632,8 @@ let handle_command c config tree inboxes level =
         let*! () = show_status tree in
         return ()
     | Step kind ->
-        let* tree = step config kind tree in
-        return ~tree ()
+        let* tree, inboxes = step level inboxes config kind tree in
+        return ~tree ~inboxes ()
     | Show_inbox ->
         let*! () = show_inbox tree in
         return ()
@@ -495,18 +643,29 @@ let handle_command c config tree inboxes level =
     | Show_durable_storage ->
         let*! () = show_durable tree in
         return ()
-    | Show_key key ->
-        let*! () = show_key tree key in
+    | Show_subkeys path ->
+        let*! () = show_subkeys tree path in
         return ()
-    | Show_memory (address, length) ->
-        let*! () = show_memory tree address length in
+    | Show_key (key, kind) ->
+        let*! () = show_key tree key kind in
+        return ()
+    | Show_memory (address, length, kind) ->
+        let*! () = show_memory tree address length kind in
+        return ()
+    | Dump_function_symbols ->
+        let*! () = dump_function_symbols extra in
         return ()
     | Reveal_preimage bytes ->
-        let*! tree = reveal_preimage bytes tree in
+        let*! tree = reveal_preimage config bytes tree in
         return ~tree ()
     | Reveal_metadata ->
         let*! tree = reveal_metadata config tree in
         return ~tree ()
+    | Profile collapse ->
+        let* tree, inboxes, level =
+          profile ~collapse level inboxes config extra tree
+        in
+        Lwt.return_ok (tree, inboxes, level)
     | Unknown s ->
         let*! () = Lwt_io.eprintf "Unknown command `%s`\n%!" s in
         return ()

@@ -1,0 +1,82 @@
+
+./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/opcodes/mul.tz --details
+Well typed
+Gas remaining: 1039961.621 units remaining
+{ parameter unit ;
+  storage unit ;
+  code { CAR
+         /* [ unit ] */ ;
+         DROP
+         /* [] */ ;
+         PUSH nat 7987
+         /* [ nat ] */ ;
+         PUSH mutez 10
+         /* [ mutez : nat ] */ ;
+         MUL
+         /* [ mutez ] */ ;
+         PUSH mutez 79870
+         /* [ mutez : mutez ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         PUSH mutez 10
+         /* [ mutez ] */ ;
+         PUSH nat 7987
+         /* [ nat : mutez ] */ ;
+         MUL
+         /* [ mutez ] */ ;
+         PUSH mutez 79870
+         /* [ mutez : mutez ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         PUSH int 10
+         /* [ int ] */ ;
+         PUSH int -7987
+         /* [ int : int ] */ ;
+         MUL
+         /* [ int ] */ ;
+         PUSH int -79870
+         /* [ int : int ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         PUSH nat 10
+         /* [ nat ] */ ;
+         PUSH int -7987
+         /* [ int : nat ] */ ;
+         MUL
+         /* [ int ] */ ;
+         PUSH int -79870
+         /* [ int : int ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         PUSH int -10
+         /* [ int ] */ ;
+         PUSH nat 7987
+         /* [ nat : int ] */ ;
+         MUL
+         /* [ int ] */ ;
+         PUSH int -79870
+         /* [ int : int ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         PUSH nat 10
+         /* [ nat ] */ ;
+         PUSH nat 7987
+         /* [ nat : nat ] */ ;
+         MUL
+         /* [ nat ] */ ;
+         PUSH nat 79870
+         /* [ nat : nat ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         UNIT
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

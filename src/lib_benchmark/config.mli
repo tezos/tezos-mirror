@@ -34,8 +34,14 @@ type t
 (** Its encoding *)
 val encoding : t Data_encoding.t
 
+(** Print [t] in JSON *)
+val pp : Format.formatter -> t -> unit
+
 (** The minimal config file *)
 val empty : t
+
+(** Build [t] from the given bindings *)
+val build : (Namespace.t * Data_encoding.json) list -> t
 
 (** Given a benchmark [b] and a config [c], [get_config b c] returns the
     configuration for the benchmark [b] stored in [c], in json form. *)
@@ -49,6 +55,9 @@ val get_config : Benchmark.t -> t -> Data_encoding.json
     Otherwise nothing is printed *)
 val parse_config :
   ?print:out_channel -> ('c, 't) Benchmark.poly -> string option -> 'c
+
+(** Save the given config to a file *)
+val save_config : string -> t -> unit
 
 (** Given a list of benchmarks [l], [generate_default l]
     generates a default configuration containing all the given benchmarks,
@@ -78,5 +87,5 @@ val edit_config :
     | `Edit of string > `Edit
     `Stdin ] ->
   string ->
-  string ->
+  Namespace.t ->
   unit

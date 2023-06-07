@@ -92,7 +92,7 @@ let inboxes_encoding default_sender default_source default_destination =
       (list (input_encoding default_sender default_source default_destination)))
 
 (* [parse_inboxes inputs config] parses an inbox from raw string. *)
-let parse_inboxes inputs Config.{sender; source; destination} =
+let parse_inboxes inputs Config.{sender; source; destination; _} =
   let open Lwt_result_syntax in
   match Data_encoding.Json.from_string inputs with
   | Ok json ->
@@ -128,6 +128,8 @@ let pp_input ppf bytes =
         Data_encoding.Json.pp ppf json
     | Internal Start_of_level -> Format.fprintf ppf "Start_of_level"
     | Internal End_of_level -> Format.fprintf ppf "End_of_level"
+    | Internal (Protocol_migration proto) ->
+        Format.fprintf ppf "Protocol_migration %s" proto
     | Internal (Info_per_level {predecessor_timestamp; predecessor}) ->
         Format.fprintf
           ppf
@@ -159,8 +161,9 @@ let compare_input_buffer_messages i1 i2 =
    also handles deserialization from raw bytes. If the message cannot be
    decoded, it prints its hexadecimal representation. *)
 let pp_output ppf bytes =
-  let pp_message ppf
-      Sc_rollup.Outbox.Message.{unparsed_parameters; destination; entrypoint} =
+  let pp_message_untyped ppf
+      ({unparsed_parameters; destination; entrypoint} :
+        Sc_rollup.Outbox.Message.transaction) =
     let json =
       Data_encoding.Json.construct Script_repr.expr_encoding unparsed_parameters
     in
@@ -174,13 +177,36 @@ let pp_output ppf bytes =
       Entrypoint.pp
       entrypoint
   in
-  let pp_batch ppf
-      Sc_rollup.Outbox.Message.(Atomic_transaction_batch {transactions}) =
-    Format.pp_print_list
-      ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
-      pp_message
+  let pp_message_typed ppf
+      ({unparsed_parameters; unparsed_ty; destination; entrypoint} :
+        Sc_rollup.Outbox.Message.typed_transaction) =
+    let parameters_json =
+      Data_encoding.Json.construct Script_repr.expr_encoding unparsed_parameters
+    in
+    let ty_json =
+      Data_encoding.Json.construct Script_repr.expr_encoding unparsed_ty
+    in
+    Format.fprintf
       ppf
-      transactions
+      "@[<v2>unparsed_parameters: %a@,\
+       unparsed_ty: %a@,\
+       destination: %a@,\
+       entrypoint: %a@]"
+      Data_encoding.Json.pp
+      parameters_json
+      Data_encoding.Json.pp
+      ty_json
+      Contract_hash.pp
+      destination
+      Entrypoint.pp
+      entrypoint
+  in
+  let pp_batch ppf = function
+    | Sc_rollup.Outbox.Message.(Atomic_transaction_batch {transactions}) ->
+        Format.pp_print_list pp_message_untyped ppf transactions
+    | Sc_rollup.Outbox.Message.(Atomic_transaction_batch_typed {transactions})
+      ->
+        Format.pp_print_list pp_message_typed ppf transactions
   in
   match
     Sc_rollup.Outbox.Message.(

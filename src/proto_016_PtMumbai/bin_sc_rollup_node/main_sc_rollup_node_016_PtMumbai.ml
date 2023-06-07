@@ -24,14 +24,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let force_switch =
+  Tezos_clic.switch
+    ~long:"force"
+    ~doc:"Overwrites the configuration file when it exists."
+    ()
+
 let sc_rollup_address_param =
-  Tezos_clic.param
+  Smart_rollup_alias.Address.param
     ~name:"smart-rollup-address"
     ~desc:"The smart rollup address"
-    (Tezos_clic.parameter (fun _ s ->
-         match Protocol.Alpha_context.Sc_rollup.Address.of_b58check_opt s with
-         | None -> failwith "Invalid smart rollup address"
-         | Some addr -> return addr))
+
+let sc_rollup_address_arg =
+  Tezos_clic.arg
+    ~long:"rollup"
+    ~placeholder:"smart-rollup-address"
+    ~doc:"The smart rollup address (required when no configuration file exists)"
+    (Smart_rollup_alias.Address.parameter ())
 
 let sc_rollup_node_operator_param =
   let open Lwt_result_syntax in
@@ -82,20 +91,25 @@ let mode_parameter =
     ~autocomplete:(fun _ -> return possible_modes)
     (fun _ m -> Lwt.return (Configuration.mode_of_string m))
 
-let mode_param =
-  Tezos_clic.param
-    ~name:"mode"
-    ~desc:
-      (Format.asprintf
-         "@[<v 2>The mode for the rollup node (%s)@,%a@]"
-         (String.concat ", " possible_modes)
-         (Format.pp_print_list (fun fmt mode ->
-              Format.fprintf
-                fmt
-                "- %s: %s"
-                (Configuration.string_of_mode mode)
-                (Configuration.description_of_mode mode)))
-         Configuration.modes)
+let mode_doc =
+  Format.asprintf
+    "The mode for the rollup node (%s)@\n%a"
+    (String.concat ", " possible_modes)
+    (Format.pp_print_list (fun fmt mode ->
+         Format.fprintf
+           fmt
+           "- %s: %s"
+           (Configuration.string_of_mode mode)
+           (Configuration.description_of_mode mode)))
+    Configuration.modes
+
+let mode_param = Tezos_clic.param ~name:"mode" ~desc:mode_doc mode_parameter
+
+let mode_arg =
+  Tezos_clic.arg
+    ~long:"mode"
+    ~placeholder:"mode"
+    ~doc:(mode_doc ^ "\n(required when no configuration file exists)")
     mode_parameter
 
 let rpc_addr_arg =
@@ -117,17 +131,17 @@ let metrics_addr_arg =
     ~doc:"The address of the smart rollup node metrics server."
     Client_proto_args.string_parameter
 
-let dal_node_addr_arg =
-  let default = Configuration.default_dal_node_addr in
+let dal_node_endpoint_arg =
   Tezos_clic.arg
-    ~long:"dal-node-addr"
-    ~placeholder:"dal-node-address|ip"
+    ~long:"dal-node"
+    ~placeholder:"dal-node-endpoint"
     ~doc:
       (Format.sprintf
          "The address of the dal node from which the smart rollup node \
-          downloads slots. Default value is %s"
-         default)
-    Client_proto_args.string_parameter
+          downloads slots. When not provided, the rollup node will not support \
+          the DAL. In production, a DAL node must be provided if DAL is \
+          enabled and used in the rollup.")
+    (Tezos_clic.parameter (fun _ s -> Lwt.return_ok (Uri.of_string s)))
 
 let rpc_port_arg =
   let default = Configuration.default_rpc_port |> string_of_int in
@@ -137,18 +151,6 @@ let rpc_port_arg =
     ~doc:
       (Format.sprintf
          "The port the smart rollup node listens to. Default value is %s"
-         default)
-    Client_proto_args.int_parameter
-
-let dal_node_port_arg =
-  let default = Configuration.default_dal_node_port |> string_of_int in
-  Tezos_clic.arg
-    ~long:"dal-node-port"
-    ~placeholder:"dal-node-port"
-    ~doc:
-      (Format.sprintf
-         "The port of the dal node from which the smart rollup node downloads \
-          slots from. Default value is %s"
          default)
     Client_proto_args.int_parameter
 
@@ -164,11 +166,10 @@ let data_dir_arg =
     ~default
     Client_proto_args.string_parameter
 
-let loser_mode =
-  Tezos_clic.default_arg
+let loser_mode_arg =
+  Tezos_clic.arg
     ~long:"loser-mode"
     ~placeholder:"mode"
-    ~default:""
     ~doc:"Set the rollup node failure points (for test only!)."
     (Tezos_clic.parameter (fun _ s ->
          match Loser_mode.make s with
@@ -195,26 +196,65 @@ let reconnection_delay_arg =
          try return (float_of_string p) with _ -> failwith "Cannot read float"))
 
 let injector_retention_period_arg =
-  let default =
-    Configuration.default_injector_retention_period |> string_of_int
-  in
-  Tezos_clic.default_arg
+  Tezos_clic.arg
     ~long:"injector-retention-period"
     ~placeholder:"blocks"
     ~doc:
       (Format.sprintf
          "The number of blocks the injector keeps in memory. Decrease to free \
           memory, and increase to be able to query information about included \
-          messages for longer. Default value is %s"
-         default)
-    ~default
+          messages for longer. Default value is %d"
+         Configuration.default_injector.retention_period)
   @@ Tezos_clic.map_parameter Client_proto_args.int_parameter ~f:(fun p ->
-         if p > Configuration.max_injector_retention_period then
+         if p > Configuration.max_injector_retention_period || p < 0 then
            Format.ksprintf
              Stdlib.failwith
-             "injector-retention-period should be smaller than %d"
+             "injector-retention-period should be a positive number smaller \
+              than %d"
              Configuration.max_injector_retention_period ;
          p)
+
+let injector_attempts_arg =
+  Tezos_clic.arg
+    ~long:"injector-attempts"
+    ~placeholder:"number"
+    ~doc:
+      (Format.sprintf
+         "The number of attempts that the injector will make to inject an \
+          operation when it fails. Default value is %d"
+         Configuration.default_injector.attempts)
+  @@ Tezos_clic.map_parameter Client_proto_args.int_parameter ~f:(fun p ->
+         if p < 0 then
+           Format.ksprintf
+             Stdlib.failwith
+             "injector-attempts should be positive" ;
+         p)
+
+let injection_ttl_arg =
+  Tezos_clic.arg
+    ~long:"injection-ttl"
+    ~placeholder:"number"
+    ~doc:
+      (Format.sprintf
+         "The number of blocks after which an operation that is injected but \
+          never included is retried. Default value is %d"
+         Configuration.default_injector.injection_ttl)
+  @@ Tezos_clic.map_parameter Client_proto_args.int_parameter ~f:(fun p ->
+         if p < 1 then Stdlib.failwith "injection-ttl should be > 1" ;
+         p)
+
+let log_kernel_debug_arg =
+  Tezos_clic.switch
+    ~long:"log-kernel-debug"
+    ~doc:"Log the kernel debug output to kernel.log in the data directory"
+    ()
+
+let log_kernel_debug_file_arg =
+  Tezos_clic.arg
+    ~long:"log-kernel-debug-file"
+    ~placeholder:"file"
+    ~doc:""
+    Client_proto_args.string_parameter
 
 let group =
   {
@@ -222,25 +262,320 @@ let group =
     title = "Commands related to the smart rollup node.";
   }
 
+let make_operators sc_rollup_node_operators =
+  let open Configuration in
+  let purposed_operators, default_operators =
+    List.partition_map
+      (function
+        | `Purpose p_operator -> Left p_operator
+        | `Default operator -> Right operator)
+      sc_rollup_node_operators
+  in
+  let default_operator =
+    match default_operators with
+    | [] -> None
+    | [default_operator] -> Some default_operator
+    | _ -> Stdlib.failwith "Multiple default operators"
+  in
+  make_purpose_map purposed_operators ~default:default_operator
+
+let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
+    ~reconnection_delay ~dal_node_endpoint ~injector_attempts
+    ~injector_retention_period ~injection_ttl ~mode ~sc_rollup_address
+    ~sc_rollup_node_operators ~log_kernel_debug =
+  let open Configuration in
+  let sc_rollup_node_operators = make_operators sc_rollup_node_operators in
+  let config =
+    {
+      sc_rollup_address;
+      boot_sector_file = None;
+      sc_rollup_node_operators;
+      rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
+      rpc_port = Option.value ~default:default_rpc_port rpc_port;
+      reconnection_delay =
+        Option.value ~default:default_reconnection_delay reconnection_delay;
+      dal_node_endpoint;
+      dac_observer_endpoint = None;
+      dac_timeout = None;
+      metrics_addr;
+      fee_parameters = Operator_purpose_map.empty;
+      mode;
+      loser_mode = Option.value ~default:Loser_mode.no_failures loser_mode;
+      batcher = Configuration.default_batcher;
+      injector =
+        {
+          retention_period =
+            Option.value
+              ~default:default_injector.retention_period
+              injector_retention_period;
+          attempts =
+            Option.value ~default:default_injector.attempts injector_attempts;
+          injection_ttl =
+            Option.value ~default:default_injector.injection_ttl injection_ttl;
+        };
+      l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size;
+      log_kernel_debug;
+    }
+  in
+  check_mode config
+
+let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
+    ~metrics_addr ~loser_mode ~reconnection_delay ~dal_node_endpoint
+    ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
+    ~sc_rollup_address ~sc_rollup_node_operators =
+  let open Configuration in
+  let new_sc_rollup_node_operators = make_operators sc_rollup_node_operators in
+  (* Merge operators *)
+  let sc_rollup_node_operators =
+    Operator_purpose_map.merge
+      (fun _purpose -> Option.either)
+      new_sc_rollup_node_operators
+      configuration.sc_rollup_node_operators
+  in
+  let configuration =
+    Configuration.
+      {
+        configuration with
+        sc_rollup_address =
+          Option.value
+            ~default:configuration.sc_rollup_address
+            sc_rollup_address;
+        sc_rollup_node_operators;
+        mode = Option.value ~default:configuration.mode mode;
+        rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
+        rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
+        dal_node_endpoint =
+          Option.either dal_node_endpoint configuration.dal_node_endpoint;
+        reconnection_delay =
+          Option.value
+            ~default:configuration.reconnection_delay
+            reconnection_delay;
+        injector =
+          {
+            retention_period =
+              Option.value
+                ~default:default_injector.retention_period
+                injector_retention_period;
+            attempts =
+              Option.value ~default:default_injector.attempts injector_attempts;
+            injection_ttl =
+              Option.value ~default:default_injector.injection_ttl injection_ttl;
+          };
+        loser_mode = Option.value ~default:configuration.loser_mode loser_mode;
+        metrics_addr = Option.either metrics_addr configuration.metrics_addr;
+      }
+  in
+  Configuration.check_mode configuration
+
+let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
+    ~loser_mode ~reconnection_delay ~dal_node_endpoint
+    ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
+    ~sc_rollup_address ~sc_rollup_node_operators ~log_kernel_debug =
+  let open Lwt_result_syntax in
+  let config_file = Configuration.config_filename ~data_dir in
+  let*! exists_config = Lwt_unix.file_exists config_file in
+  if exists_config then
+    (* Read configuration from file and patch if user wanted to override
+       some fields with values provided by arguments. *)
+    let* configuration = Configuration.load ~data_dir in
+    let*? configuration =
+      patch_configuration_from_args
+        configuration
+        ~rpc_addr
+        ~rpc_port
+        ~metrics_addr
+        ~loser_mode
+        ~reconnection_delay
+        ~dal_node_endpoint
+        ~injector_retention_period
+        ~injector_attempts
+        ~injection_ttl
+        ~mode
+        ~sc_rollup_address
+        ~sc_rollup_node_operators
+    in
+    return configuration
+  else
+    (* Build configuration from arguments only. *)
+    let*? mode =
+      Option.value_e
+        mode
+        ~error:
+          (TzTrace.make
+          @@ error_of_fmt
+               "Argument --mode is required when configuration file is not \
+                present.")
+    in
+    let*? sc_rollup_address =
+      Option.value_e
+        sc_rollup_address
+        ~error:
+          (TzTrace.make
+          @@ error_of_fmt
+               "Argument --rollup is required when configuration file is not \
+                present.")
+    in
+    let*? config =
+      configuration_from_args
+        ~rpc_addr
+        ~rpc_port
+        ~metrics_addr
+        ~loser_mode
+        ~reconnection_delay
+        ~dal_node_endpoint
+        ~injector_retention_period
+        ~injector_attempts
+        ~injection_ttl
+        ~mode
+        ~sc_rollup_address
+        ~sc_rollup_node_operators
+        ~log_kernel_debug
+    in
+    return config
+
 let config_init_command =
   let open Lwt_result_syntax in
   let open Tezos_clic in
   command
     ~group
     ~desc:"Configure the smart rollup node."
-    (args9
+    (args12
+       force_switch
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
        metrics_addr_arg
-       loser_mode
+       loser_mode_arg
        reconnection_delay_arg
-       dal_node_addr_arg
-       dal_node_port_arg
-       injector_retention_period_arg)
+       dal_node_endpoint_arg
+       injector_retention_period_arg
+       injector_attempts_arg
+       injection_ttl_arg
+       log_kernel_debug_arg)
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
+    @@ prefixes ["with"; "operators"]
+    @@ seq_of_param @@ sc_rollup_node_operator_param)
+    (fun ( force,
+           data_dir,
+           rpc_addr,
+           rpc_port,
+           metrics_addr,
+           loser_mode,
+           reconnection_delay,
+           dal_node_endpoint,
+           injector_retention_period,
+           injector_attempts,
+           injection_ttl,
+           log_kernel_debug )
+         mode
+         sc_rollup_address
+         sc_rollup_node_operators
+         cctxt ->
+      let*? config =
+        configuration_from_args
+          ~rpc_addr
+          ~rpc_port
+          ~metrics_addr
+          ~loser_mode
+          ~reconnection_delay
+          ~dal_node_endpoint
+          ~injector_retention_period
+          ~injector_attempts
+          ~injection_ttl
+          ~mode
+          ~sc_rollup_address
+          ~sc_rollup_node_operators
+          ~log_kernel_debug
+      in
+      let* () = Configuration.save ~force ~data_dir config in
+      let*! () =
+        cctxt#message
+          "Smart rollup node configuration written in %s"
+          (Configuration.config_filename ~data_dir)
+      in
+      return_unit)
+
+let legacy_run_command =
+  let open Tezos_clic in
+  let open Lwt_result_syntax in
+  command
+    ~group
+    ~desc:"Run the rollup node daemon (deprecated)."
+    (args14
+       data_dir_arg
+       mode_arg
+       sc_rollup_address_arg
+       rpc_addr_arg
+       rpc_port_arg
+       metrics_addr_arg
+       loser_mode_arg
+       reconnection_delay_arg
+       dal_node_endpoint_arg
+       injector_retention_period_arg
+       injector_attempts_arg
+       injection_ttl_arg
+       log_kernel_debug_arg
+       log_kernel_debug_file_arg)
+    (prefixes ["run"] @@ stop)
+    (fun ( data_dir,
+           mode,
+           sc_rollup_address,
+           rpc_addr,
+           rpc_port,
+           metrics_addr,
+           loser_mode,
+           reconnection_delay,
+           dal_node_endpoint,
+           injector_retention_period,
+           injector_attempts,
+           injection_ttl,
+           log_kernel_debug,
+           log_kernel_debug_file )
+         cctxt ->
+      let* configuration =
+        create_or_read_config
+          ~data_dir
+          ~rpc_addr
+          ~rpc_port
+          ~metrics_addr
+          ~loser_mode
+          ~reconnection_delay
+          ~dal_node_endpoint
+          ~injector_retention_period
+          ~injector_attempts
+          ~injection_ttl
+          ~mode
+          ~sc_rollup_address
+          ~sc_rollup_node_operators:[]
+          ~log_kernel_debug
+      in
+      Daemon.run ~data_dir ?log_kernel_debug_file configuration cctxt)
+
+let run_command =
+  let open Tezos_clic in
+  let open Lwt_result_syntax in
+  command
+    ~group
+    ~desc:
+      "Run the rollup node daemon. Arguments overwrite values provided in the \
+       configuration file."
+    (args12
+       data_dir_arg
+       rpc_addr_arg
+       rpc_port_arg
+       metrics_addr_arg
+       loser_mode_arg
+       reconnection_delay_arg
+       dal_node_endpoint_arg
+       injector_retention_period_arg
+       injector_attempts_arg
+       injection_ttl_arg
+       log_kernel_debug_arg
+       log_kernel_debug_file_arg)
+    (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
+   @@ sc_rollup_address_param
     @@ prefixes ["with"; "operators"]
     @@ seq_of_param @@ sc_rollup_node_operator_param)
     (fun ( data_dir,
@@ -249,104 +584,34 @@ let config_init_command =
            metrics_addr,
            loser_mode,
            reconnection_delay,
-           dal_node_addr,
-           dal_node_port,
-           injector_retention_period )
+           dal_node_endpoint,
+           injector_retention_period,
+           injector_attempts,
+           injection_ttl,
+           log_kernel_debug,
+           log_kernel_debug_file )
          mode
          sc_rollup_address
          sc_rollup_node_operators
          cctxt ->
-      let open Configuration in
-      let purposed_operators, default_operators =
-        List.partition_map
-          (function
-            | `Purpose p_operator -> Left p_operator
-            | `Default operator -> Right operator)
-          sc_rollup_node_operators
+      let* configuration =
+        create_or_read_config
+          ~data_dir
+          ~rpc_addr
+          ~rpc_port
+          ~metrics_addr
+          ~loser_mode
+          ~reconnection_delay
+          ~dal_node_endpoint
+          ~injector_retention_period
+          ~injector_attempts
+          ~injection_ttl
+          ~mode:(Some mode)
+          ~sc_rollup_address:(Some sc_rollup_address)
+          ~sc_rollup_node_operators
+          ~log_kernel_debug
       in
-      let default_operator =
-        match default_operators with
-        | [] -> None
-        | [default_operator] -> Some default_operator
-        | _ -> Stdlib.failwith "Multiple default operators"
-      in
-      let sc_rollup_node_operators =
-        Configuration.make_purpose_map
-          purposed_operators
-          ~default:default_operator
-      in
-      let config =
-        {
-          sc_rollup_address;
-          sc_rollup_node_operators;
-          rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
-          rpc_port = Option.value ~default:default_rpc_port rpc_port;
-          reconnection_delay =
-            Option.value ~default:default_reconnection_delay reconnection_delay;
-          dal_node_addr =
-            Option.value ~default:default_dal_node_addr dal_node_addr;
-          dal_node_port =
-            Option.value ~default:default_dal_node_port dal_node_port;
-          metrics_addr;
-          fee_parameters = Operator_purpose_map.empty;
-          mode;
-          loser_mode;
-          batcher = Configuration.default_batcher;
-          injector_retention_period;
-          l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size;
-        }
-      in
-      let*? config = check_mode config in
-      let* () = save ~data_dir config in
-      let*! () =
-        cctxt#message
-          "Smart rollup node configuration written in %s"
-          (config_filename ~data_dir)
-      in
-      return_unit)
-
-let run_command =
-  let open Tezos_clic in
-  let open Lwt_result_syntax in
-  command
-    ~group
-    ~desc:"Run the rollup daemon."
-    (args7
-       data_dir_arg
-       rpc_addr_arg
-       rpc_port_arg
-       dal_node_addr_arg
-       dal_node_port_arg
-       reconnection_delay_arg
-       metrics_addr_arg)
-    (prefixes ["run"] @@ stop)
-    (fun ( data_dir,
-           rpc_addr,
-           rpc_port,
-           dal_node_addr,
-           dal_node_port,
-           reconnection_delay,
-           metrics_addr )
-         cctxt ->
-      let* configuration = Configuration.load ~data_dir in
-      let configuration =
-        Configuration.
-          {
-            configuration with
-            rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
-            rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
-            dal_node_addr =
-              Option.value ~default:configuration.dal_node_addr dal_node_addr;
-            dal_node_port =
-              Option.value ~default:configuration.dal_node_port dal_node_port;
-            reconnection_delay =
-              Option.value
-                ~default:configuration.reconnection_delay
-                reconnection_delay;
-            metrics_addr = Option.either metrics_addr configuration.metrics_addr;
-          }
-      in
-      Daemon.run ~data_dir configuration cctxt)
+      Daemon.run ~data_dir ?log_kernel_debug_file configuration cctxt)
 
 (** Command to dump the rollup node metrics. *)
 let dump_metrics =
@@ -367,18 +632,10 @@ let dump_metrics =
 let sc_rollup_commands () =
   List.map
     (Tezos_clic.map_command (new Protocol_client_context.wrap_full))
-    [config_init_command; run_command; dump_metrics]
+    [config_init_command; run_command; legacy_run_command; dump_metrics]
 
-let mainnet_disclaimer () =
-  Format.eprintf
-    "@[<v 2>@{<warning>@{<title>Disclaimer@}@}@,\
-     This rollup node is not suitable to use on@,\
-     mainnet. Consider using a version from a more@,\
-     recent release of Octez.@]@\n\
-     @."
-
-let select_commands _ _ =
-  mainnet_disclaimer () ;
-  return (sc_rollup_commands () @ Client_helpers_commands.commands ())
+let select_commands _ctxt _ =
+  Lwt_result_syntax.return
+    (sc_rollup_commands () @ Client_helpers_commands.commands ())
 
 let () = Client_main_run.run (module Daemon_config) ~select_commands

@@ -1,8 +1,9 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name benchmark_scoru_wasm)
+(library
+ (name octez_smart_rollup_wasm_benchmark_lib)
+ (package octez-smart-rollup-wasm-benchmark-lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (validate manager)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/validate/main.exe \
-                -- test "sanity checks"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/validate/main.exe \
+                  -- --file test_sanity.ml
     Subject:    Validation of operation.
 *)
 
@@ -83,13 +82,9 @@ let ensure_kind infos kind =
           return_unit
       | ( ( Transaction _ | Origination _ | Register_global_constant _
           | Delegation _ | Set_deposits_limit _ | Update_consensus_key _
-          | Increase_paid_storage _ | Reveal _ | Tx_rollup_origination
-          | Tx_rollup_submit_batch _ | Tx_rollup_commit _
-          | Tx_rollup_return_bond _ | Tx_rollup_finalize_commitment _
-          | Tx_rollup_remove_commitment _ | Tx_rollup_dispatch_tickets _
-          | Transfer_ticket _ | Tx_rollup_rejection _ | Sc_rollup_originate _
-          | Sc_rollup_publish _ | Sc_rollup_cement _ | Sc_rollup_add_messages _
-          | Sc_rollup_refute _ | Sc_rollup_timeout _
+          | Increase_paid_storage _ | Reveal _ | Transfer_ticket _
+          | Sc_rollup_originate _ | Sc_rollup_publish _ | Sc_rollup_cement _
+          | Sc_rollup_add_messages _ | Sc_rollup_refute _ | Sc_rollup_timeout _
           | Sc_rollup_execute_outbox_message _ | Sc_rollup_recover_bond _
           | Dal_publish_slot_header _ | Zk_rollup_origination _
           | Zk_rollup_publish _ | Zk_rollup_update _ ),
@@ -166,3 +161,7 @@ let tests =
       ("manager operation coverage", ensure_manager_operation_coverage);
       ("covalidation coverage", covalidation_sanity);
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("sanity checks", tests)]
+  |> Lwt_main.run

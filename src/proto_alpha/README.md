@@ -20,7 +20,7 @@ First of all, one must distinguish the Tezos economic protocol from the other pr
   subject to the on-chain governance, and hence is not involved in the protocol
   hash computation.
 
-There are other protocol-related files outside of this directory. Integration tests are located in `tests_python/contracts_alpha/`, `tests_python/tests_alpha`, and `tezt/`. Protocol documentation is located in `docs/alpha/` and the protocol changelog is in `docs/protocols/alpha.rst`.
+There are other protocol-related files outside of this directory. Integration tests are located in `tezt/`. Protocol documentation is located in `docs/alpha/` and the protocol changelog is in `docs/protocols/alpha.rst`.
 
 ## Implementation Details
 <!--

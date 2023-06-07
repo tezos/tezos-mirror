@@ -217,7 +217,7 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
       hash_pp [Signature.bytes_of_watermark watermark; bytes]) ;
   let json =
     Data_encoding.Json.construct
-      Operation.unsigned_encoding
+      Operation.unsigned_encoding_with_legacy_attestation_name
       ({branch}, Contents_list contents)
   in
   item (fun ppf () ->
@@ -231,7 +231,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
   get_branch cctxt ~chain ~block branch >>=? fun (_chain_id, branch) ->
   let bytes =
     Data_encoding.Binary.to_bytes_exn
-      Operation.unsigned_encoding
+      Operation.unsigned_encoding_with_legacy_attestation_name
       ({branch}, Contents_list contents)
   in
   (match src_sk with
@@ -258,7 +258,11 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
   let packed_op =
     {shell = {branch}; protocol_data = Operation_data {contents; signature}}
   in
-  let size = Data_encoding.Binary.length Operation.encoding packed_op in
+  let size =
+    Data_encoding.Binary.length
+      Operation.encoding_with_legacy_attestation_name
+      packed_op
+  in
   (match fee_parameter with
   | Some fee_parameter -> check_fees cctxt fee_parameter contents size
   | None -> Lwt.return_unit)
@@ -316,7 +320,6 @@ let estimated_gas_single (type kind)
         match res with
         | Transaction_result
             ( Transaction_to_contract_result {consumed_gas; _}
-            | Transaction_to_tx_rollup_result {consumed_gas; _}
             | Transaction_to_sc_rollup_result {consumed_gas; _}
             | Transaction_to_zk_rollup_result {consumed_gas; _} )
         | Origination_result {consumed_gas; _}
@@ -326,14 +329,6 @@ let estimated_gas_single (type kind)
         | Set_deposits_limit_result {consumed_gas}
         | Update_consensus_key_result {consumed_gas; _}
         | Increase_paid_storage_result {consumed_gas; _}
-        | Tx_rollup_origination_result {consumed_gas; _}
-        | Tx_rollup_submit_batch_result {consumed_gas; _}
-        | Tx_rollup_commit_result {consumed_gas; _}
-        | Tx_rollup_return_bond_result {consumed_gas; _}
-        | Tx_rollup_finalize_commitment_result {consumed_gas; _}
-        | Tx_rollup_remove_commitment_result {consumed_gas; _}
-        | Tx_rollup_rejection_result {consumed_gas; _}
-        | Tx_rollup_dispatch_tickets_result {consumed_gas; _}
         | Transfer_ticket_result {consumed_gas; _}
         | Dal_publish_slot_header_result {consumed_gas; _}
         | Sc_rollup_originate_result {consumed_gas; _}
@@ -361,7 +356,6 @@ let estimated_gas_single (type kind)
         match res with
         | ITransaction_result
             ( Transaction_to_contract_result {consumed_gas; _}
-            | Transaction_to_tx_rollup_result {consumed_gas; _}
             | Transaction_to_sc_rollup_result {consumed_gas; _}
             | Transaction_to_zk_rollup_result {consumed_gas; _} )
         | IOrigination_result {consumed_gas; _}
@@ -379,8 +373,7 @@ let estimated_gas_single (type kind)
     gas
     internal_operation_results
 
-let estimated_storage_single (type kind) ~tx_rollup_origination_size
-    ~origination_size
+let estimated_storage_single (type kind) ~origination_size
     (Manager_operation_result {operation_result; internal_operation_results; _} :
       kind Kind.manager contents_result) =
   let storage_size_diff (type kind) (result : kind manager_operation_result) =
@@ -398,10 +391,7 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
         | Register_global_constant_result {size_of_constant; _} ->
             Ok size_of_constant
         | Update_consensus_key_result _ -> Ok Z.zero
-        | Tx_rollup_origination_result _ -> Ok tx_rollup_origination_size
-        | Tx_rollup_submit_batch_result {paid_storage_size_diff; _}
         | Sc_rollup_execute_outbox_message_result {paid_storage_size_diff; _}
-        | Tx_rollup_dispatch_tickets_result {paid_storage_size_diff; _}
         | Transfer_ticket_result {paid_storage_size_diff; _}
         | Zk_rollup_publish_result {paid_storage_size_diff; _}
         | Zk_rollup_update_result {paid_storage_size_diff; _}
@@ -410,19 +400,10 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
             Ok paid_storage_size_diff
         | Sc_rollup_originate_result {size; _} -> Ok size
         | Zk_rollup_origination_result {storage_size; _} -> Ok storage_size
-        | Transaction_result (Transaction_to_tx_rollup_result _) ->
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
-               Storage fees for transaction rollup.
-               We need to charge for newly allocated storage (as we do for
-               Michelson’s big map). *)
-            Ok Z.zero
         | Transaction_result (Transaction_to_sc_rollup_result _)
         | Reveal_result _ | Delegation_result _ | Set_deposits_limit_result _
-        | Increase_paid_storage_result _ | Tx_rollup_commit_result _
-        | Tx_rollup_return_bond_result _
-        | Tx_rollup_finalize_commitment_result _
-        | Tx_rollup_remove_commitment_result _ | Tx_rollup_rejection_result _
-        | Dal_publish_slot_header_result _ | Sc_rollup_add_messages_result _
+        | Increase_paid_storage_result _ | Dal_publish_slot_header_result _
+        | Sc_rollup_add_messages_result _
         (* The following Sc_rollup operations have zero storage cost because we
            consider them to be paid in the stake deposit.
 
@@ -452,12 +433,6 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
             else Ok paid_storage_size_diff
         | IOrigination_result {paid_storage_size_diff; _} ->
             Ok (Z.add paid_storage_size_diff origination_size)
-        | ITransaction_result (Transaction_to_tx_rollup_result _) ->
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
-               Storage fees for transaction rollup.
-               We need to charge for newly allocated storage (as we do for
-               Michelson’s big map). *)
-            Ok Z.zero
         | ITransaction_result
             (Transaction_to_zk_rollup_result {paid_storage_size_diff; _}) ->
             Ok paid_storage_size_diff
@@ -475,21 +450,14 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
     storage
     internal_operation_results
 
-let estimated_storage ~tx_rollup_origination_size ~origination_size res =
+let estimated_storage ~origination_size res =
   let rec estimated_storage : type kind. kind contents_result_list -> _ =
     function
     | Single_result (Manager_operation_result _ as res) ->
-        estimated_storage_single
-          ~tx_rollup_origination_size
-          ~origination_size
-          res
+        estimated_storage_single ~origination_size res
     | Single_result _ -> Ok Z.zero
     | Cons_result (res, rest) ->
-        estimated_storage_single
-          ~tx_rollup_origination_size
-          ~origination_size
-          res
-        >>? fun storage1 ->
+        estimated_storage_single ~origination_size res >>? fun storage1 ->
         estimated_storage rest >>? fun storage2 -> Ok (Z.add storage1 storage2)
   in
   estimated_storage res >>? fun diff -> Ok (Z.max Z.zero diff)
@@ -507,21 +475,16 @@ let originated_contracts_single (type kind)
         | Origination_result {originated_contracts; _} ->
             Ok originated_contracts
         | Transaction_result
-            ( Transaction_to_tx_rollup_result _
-            | Transaction_to_sc_rollup_result _
+            ( Transaction_to_sc_rollup_result _
             | Transaction_to_zk_rollup_result _ )
         | Register_global_constant_result _ | Reveal_result _
         | Delegation_result _ | Set_deposits_limit_result _
         | Update_consensus_key_result _ | Increase_paid_storage_result _
-        | Tx_rollup_origination_result _ | Tx_rollup_submit_batch_result _
-        | Tx_rollup_commit_result _ | Tx_rollup_return_bond_result _
-        | Tx_rollup_finalize_commitment_result _
-        | Tx_rollup_remove_commitment_result _ | Tx_rollup_rejection_result _
-        | Tx_rollup_dispatch_tickets_result _ | Transfer_ticket_result _
-        | Dal_publish_slot_header_result _ | Sc_rollup_originate_result _
-        | Sc_rollup_add_messages_result _ | Sc_rollup_cement_result _
-        | Sc_rollup_publish_result _ | Sc_rollup_refute_result _
-        | Sc_rollup_timeout_result _ | Sc_rollup_execute_outbox_message_result _
+        | Transfer_ticket_result _ | Dal_publish_slot_header_result _
+        | Sc_rollup_originate_result _ | Sc_rollup_add_messages_result _
+        | Sc_rollup_cement_result _ | Sc_rollup_publish_result _
+        | Sc_rollup_refute_result _ | Sc_rollup_timeout_result _
+        | Sc_rollup_execute_outbox_message_result _
         | Sc_rollup_recover_bond_result _ | Zk_rollup_origination_result _
         | Zk_rollup_publish_result _ | Zk_rollup_update_result _ ->
             Ok [])
@@ -541,8 +504,7 @@ let originated_contracts_single (type kind)
         | IOrigination_result {originated_contracts; _} ->
             Ok originated_contracts
         | ITransaction_result
-            ( Transaction_to_tx_rollup_result _
-            | Transaction_to_sc_rollup_result _
+            ( Transaction_to_sc_rollup_result _
             | Transaction_to_zk_rollup_result _ )
         | IDelegation_result _ | IEvent_result _ ->
             Ok [])
@@ -568,22 +530,13 @@ let rec originated_contracts : type kind. kind contents_result_list -> _ =
       originated_contracts rest >>? fun contracts2 ->
       Ok (List.rev_append contracts1 contracts2)
 
-let estimated_storage_single ~force ~tx_rollup_origination_size
-    ~origination_size result =
-  match
-    estimated_storage_single
-      ~tx_rollup_origination_size
-      ~origination_size
-      result
-  with
+let estimated_storage_single ~force ~origination_size result =
+  match estimated_storage_single ~origination_size result with
   | Error _ when force -> Ok Z.zero
   | res -> res
 
-let estimated_storage ~force ~tx_rollup_origination_size ~origination_size
-    result =
-  match
-    estimated_storage ~tx_rollup_origination_size ~origination_size result
-  with
+let estimated_storage ~force ~origination_size result =
+  match estimated_storage ~origination_size result with
   | Error _ when force -> Ok Z.zero
   | res -> res
 
@@ -680,7 +633,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
                  hard_gas_limit_per_block;
                  hard_storage_limit_per_operation;
                  origination_size;
-                 tx_rollup = {origination_size = tx_rollup_origination_size; _};
+                 tx_rollup = {origination_size = _tx_rollup_origination_size; _};
                  cost_per_byte;
                  _;
                };
@@ -726,12 +679,26 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
         in
         gas_patching_stats_list rest need_patching gas_consumed
   in
+  let gas_limit_per_patched_op =
+    let need_gas_patching, gas_consumed =
+      gas_patching_stats_list annotated_contents 0 Gas.Arith.zero
+    in
+    if need_gas_patching = 0 then hard_gas_limit_per_operation
+    else
+      let remaining_gas = Gas.Arith.sub hard_gas_limit_per_block gas_consumed in
+      let average_per_operation_gas =
+        Gas.Arith.integral_exn
+        @@ Z.div
+             (Gas.Arith.integral_to_z remaining_gas)
+             (Z.of_int need_gas_patching)
+      in
+      Gas.Arith.min hard_gas_limit_per_operation average_per_operation_gas
+  in
   let may_need_patching_single :
       type kind.
-      Gas.Arith.integral ->
       kind Annotated_manager_operation.t ->
       kind Annotated_manager_operation.t option =
-   fun gas_limit_per_patched_op op ->
+   fun op ->
     match op with
     | Manager_info c ->
         let needs_patching =
@@ -757,18 +724,16 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             (Manager_info
                {c with gas_limit; storage_limit; fee = Limit.known fee})
   in
-  let may_need_patching gas_limit_per_patched_op ops =
+  let may_need_patching ops =
     let rec loop :
         type kind.
         kind Annotated_manager_operation.annotated_list ->
         kind Annotated_manager_operation.annotated_list option = function
       | Single_manager annotated_op ->
           Option.map (fun op -> Annotated_manager_operation.Single_manager op)
-          @@ may_need_patching_single gas_limit_per_patched_op annotated_op
+          @@ may_need_patching_single annotated_op
       | Cons_manager (annotated_op, rest) -> (
-          let annotated_op_opt =
-            may_need_patching_single gas_limit_per_patched_op annotated_op
-          in
+          let annotated_op_opt = may_need_patching_single annotated_op in
           let rest_opt = loop rest in
           match (annotated_op_opt, rest_opt) with
           | None, None -> None
@@ -799,12 +764,12 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             @@ Data_encoding.Binary.fixed_length
                  Tezos_base.Operation.shell_header_encoding)
             + Data_encoding.Binary.length
-                Operation.contents_encoding
+                Operation.contents_encoding_with_legacy_attestation_name
                 (Contents op)
             + signature_size_of_algo signature_algo
           else
             Data_encoding.Binary.length
-              Operation.contents_encoding
+              Operation.contents_encoding_with_legacy_attestation_name
               (Contents op)
         in
         let minimal_fees_in_nanotez =
@@ -845,12 +810,12 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
          Lwt.return (estimated_gas_single result) >>= fun gas ->
          match gas with
          | Error _ when force ->
-             (* When doing a simulation, set gas to hard limit so as to not change
-                the error. When force injecting a failing operation, set gas to
-                zero to not pay fees for this operation. *)
+             (* When doing a simulation, set gas to the maximum possible value
+                so as to not change the error. When force injecting a failing
+                operation, set gas to zero to not pay fees for this
+                operation. *)
              let gas =
-               if simulation then hard_gas_limit_per_operation
-               else Gas.Arith.zero
+               if simulation then gas_limit_per_patched_op else Gas.Arith.zero
              in
              return
                (Annotated_manager_operation.set_gas_limit (Limit.known gas) op)
@@ -891,7 +856,6 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
         (if user_storage_limit_needs_patching c.storage_limit then
          Lwt.return
            (estimated_storage_single
-              ~tx_rollup_origination_size:(Z.of_int tx_rollup_origination_size)
               ~origination_size:(Z.of_int origination_size)
               ~force
               result)
@@ -943,22 +907,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
         return (Cons (op, rest))
     | _ -> assert false
   in
-  let gas_limit_per_patched_op =
-    let need_gas_patching, gas_consumed =
-      gas_patching_stats_list annotated_contents 0 Gas.Arith.zero
-    in
-    if need_gas_patching = 0 then hard_gas_limit_per_operation
-    else
-      let remaining_gas = Gas.Arith.sub hard_gas_limit_per_block gas_consumed in
-      let average_per_operation_gas =
-        Gas.Arith.integral_exn
-        @@ Z.div
-             (Gas.Arith.integral_to_z remaining_gas)
-             (Z.of_int need_gas_patching)
-      in
-      Gas.Arith.min hard_gas_limit_per_operation average_per_operation_gas
-  in
-  match may_need_patching gas_limit_per_patched_op annotated_contents with
+  match may_need_patching annotated_contents with
   | Some annotated_for_simulation ->
       Lwt.return
         (Annotated_manager_operation.manager_list_from_annotated
@@ -983,7 +932,6 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
       >>=? fun () ->
       ( Lwt.return
           (estimated_storage
-             ~tx_rollup_origination_size:(Z.of_int tx_rollup_origination_size)
              ~origination_size:(Z.of_int origination_size)
              ~force
              result.contents)
@@ -1061,7 +1009,9 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
       >>= fun () -> if force then return_unit else Lwt.return res)
   >>=? fun () ->
   let bytes =
-    Data_encoding.Binary.to_bytes_exn Operation.encoding (Operation.pack op)
+    Data_encoding.Binary.to_bytes_exn
+      Operation.encoding_with_legacy_attestation_name
+      (Operation.pack op)
   in
   if dry_run || simulation then
     let oph = Operation_hash.hash_bytes [bytes] in
@@ -1186,10 +1136,6 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
 let prepare_manager_operation ~fee ~gas_limit ~storage_limit operation =
   Annotated_manager_operation.Manager_info
     {source = None; fee; gas_limit; storage_limit; counter = None; operation}
-
-(* [gas_limit] must correspond to
-   [Michelson_v1_gas.Cost_of.manager_operation] *)
-let cost_of_manager_operation = Gas.Arith.integral_of_int_exn 1_000
 
 let reveal_error_message =
   "Requested operation requires to perform a public key revelation beforehand.\n\
@@ -1441,7 +1387,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
       let reveal =
         prepare_manager_operation
           ~fee:Limit.unknown
-          ~gas_limit:(Limit.known cost_of_manager_operation)
+          ~gas_limit:Limit.unknown
           ~storage_limit:Limit.unknown
           (Reveal src_pk)
       in

@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+#
+# SPDX-License-Identifier: MIT
+
+[workspace]
+
+members = [
+  "ethereum",
+  "kernel",
+  "evm_execution",
+  "kernel_benchmark"
+]

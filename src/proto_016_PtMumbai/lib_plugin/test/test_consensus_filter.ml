@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Plugin.Mempool
+    Invocation:   dune exec src/proto_016_PtMumbai/lib_plugin/test/main.exe \
+                  -- --file test_consensus_filter.ml
+    Subject:      Unit tests the Mempool consensus filter
+*)
+
 open Qcheck2_helpers
 open Plugin.Mempool
 open Alpha_context
@@ -53,11 +61,11 @@ module Generator = struct
   let of_result = Result.value_f ~default:(fun _ -> assert false)
 
   let small_nat_32 =
-    let+ small_nat = small_nat in
+    let+ small_nat in
     Int32.of_int small_nat
 
   let small_signed_32 =
-    let+ small_signed_int = small_signed_int in
+    let+ small_signed_int in
     Int32.of_int small_signed_int
 
   let dup gen =
@@ -433,7 +441,8 @@ let test_not_acceptable_next_level =
 
 let () =
   Alcotest.run
-    "Filter"
+    ~__FILE__
+    Protocol.name
     [
       ( "pre_filter",
         qcheck_wrap

@@ -1,0 +1,120 @@
+
+./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/entrypoints/big_map_entrypoints.tz --details
+Well typed
+Gas remaining: 1039953.156 units remaining
+{ storage (pair (big_map string nat) (big_map string nat)) ;
+  parameter
+    (or (unit %default
+        /* [ list operation : big_map string nat ] */)
+        (or (or %mem
+               (string %mem_left)
+               (string %mem_right)
+            /* [ pair (list operation) (big_map string nat) ] */)
+            (or (or %add (pair %add_left string nat) (pair %add_right string nat))
+                (or %rem (string %rem_left) (string %rem_right))))
+    /* [ big_map string nat ] */)
+  /* [ string : big_map string nat ] */ ;
+  code { UNPAIR
+         /* [ or unit
+               (or (or string string) (or (or (pair string nat) (pair string nat)) (or string string)))
+            : pair (big_map string nat) (big_map string nat) ] */ ;
+         IF_LEFT
+           { DROP
+             /* [ pair (big_map string nat) (big_map string nat) ] */ ;
+             DUP
+             /* [ pair (big_map string nat) (big_map string nat)
+                : pair (big_map string nat) (big_map string nat) ] */ ;
+             CAR
+             /* [ big_map string nat : pair (big_map string nat) (big_map string nat) ] */ ;
+             PUSH mutez
+                  0
+             /* [ mutez : big_map string nat
+                : pair (big_map string nat) (big_map string nat) ] */ ;
+             NONE key_hash
+             /* [ option key_hash : mutez : big_map string nat
+                : pair (big_map string nat) (big_map string nat) ] */ ;
+             CREATE_CONTRACT
+               { parameter string ;
+                 storage (big_map string nat) ;
+                 code { UNPAIR ; DROP ; NIL operation ; PAIR } }
+             /* [ operation : address : pair (big_map string nat) (big_map string nat) ] */ ;
+             DIP { DROP /* [ pair (big_map string nat) (big_map string nat) ] */ }
+             /* [ operation : pair (big_map string nat) (big_map string nat) ] */ ;
+             NIL operation
+             /* [ list operation : operation
+                : pair (big_map string nat) (big_map string nat) ] */ ;
+             SWAP
+             /* [ operation : list operation
+                : pair (big_map string nat) (big_map string nat) ] */ ;
+             CONS
+             /* [ list operation : pair (big_map string nat) (big_map string nat) ] */ ;
+             PAIR
+             /* [ pair (list operation) (big_map string nat) (big_map string nat) ] */ }
+           { IF_LEFT
+               { IF_LEFT
+                   { DIP { UNPAIR /* [ big_map string nat : big_map string nat ] */ }
+                     /* [ string : big_map string nat : big_map string nat ] */ ;
+                     DIP { DUP /* [ big_map string nat : big_map string nat : big_map string nat ] */ }
+                     /* [ string : big_map string nat : big_map string nat : big_map string nat ] */ ;
+                     MEM
+                     /* [ bool : big_map string nat : big_map string nat ] */ ;
+                     ASSERT }
+                   { DIP { UNPAIR
+                           /* [ big_map string nat : big_map string nat ] */ ;
+                           SWAP
+                           /* [ big_map string nat : big_map string nat ] */ }
+                     /* [ string : big_map string nat : big_map string nat ] */ ;
+                     DIP { DUP /* [ big_map string nat : big_map string nat : big_map string nat ] */ }
+                     /* [ string : big_map string nat : big_map string nat : big_map string nat ] */ ;
+                     MEM
+                     /* [ bool : big_map string nat : big_map string nat ] */ ;
+                     ASSERT ;
+                     SWAP
+                     /* [ big_map string nat : big_map string nat ] */ } }
+               { IF_LEFT
+                   { IF_LEFT
+                       { UNPAIR
+                         /* [ string : nat : pair (big_map string nat) (big_map string nat) ] */ ;
+                         DIIP { UNPAIR /* [ big_map string nat : big_map string nat ] */ }
+                         /* [ string : nat : big_map string nat : big_map string nat ] */ ;
+                         DIP { SOME /* [ option nat : big_map string nat : big_map string nat ] */ }
+                         /* [ string : option nat : big_map string nat : big_map string nat ] */ ;
+                         UPDATE
+                         /* [ big_map string nat : big_map string nat ] */ }
+                       { UNPAIR
+                         /* [ string : nat : pair (big_map string nat) (big_map string nat) ] */ ;
+                         DIIP { UNPAIR
+                                /* [ big_map string nat : big_map string nat ] */ ;
+                                SWAP
+                                /* [ big_map string nat : big_map string nat ] */ }
+                         /* [ string : nat : big_map string nat : big_map string nat ] */ ;
+                         DIP { SOME /* [ option nat : big_map string nat : big_map string nat ] */ }
+                         /* [ string : option nat : big_map string nat : big_map string nat ] */ ;
+                         UPDATE
+                         /* [ big_map string nat : big_map string nat ] */ ;
+                         SWAP
+                         /* [ big_map string nat : big_map string nat ] */ } }
+                   { IF_LEFT
+                       { DIP { UNPAIR /* [ big_map string nat : big_map string nat ] */ }
+                         /* [ string : big_map string nat : big_map string nat ] */ ;
+                         DIP { NONE nat /* [ option nat : big_map string nat : big_map string nat ] */ }
+                         /* [ string : option nat : big_map string nat : big_map string nat ] */ ;
+                         UPDATE
+                         /* [ big_map string nat : big_map string nat ] */ }
+                       { DIP { UNPAIR
+                               /* [ big_map string nat : big_map string nat ] */ ;
+                               SWAP
+                               /* [ big_map string nat : big_map string nat ] */ }
+                         /* [ string : big_map string nat : big_map string nat ] */ ;
+                         DIP { NONE nat /* [ option nat : big_map string nat : big_map string nat ] */ }
+                         /* [ string : option nat : big_map string nat : big_map string nat ] */ ;
+                         UPDATE
+                         /* [ big_map string nat : big_map string nat ] */ ;
+                         SWAP
+                         /* [ big_map string nat : big_map string nat ] */ } } } ;
+             PAIR
+             /* [ pair (big_map string nat) (big_map string nat) ] */ ;
+             NIL operation
+             /* [ list operation : pair (big_map string nat) (big_map string nat) ] */ ;
+             PAIR
+             /* [ pair (list operation) (big_map string nat) (big_map string nat) ] */ } } }

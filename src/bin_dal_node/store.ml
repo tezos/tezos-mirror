@@ -32,48 +32,143 @@
 (* Relative path to store directory from base-dir *)
 let path = "store"
 
-let slot_header_store = "slot_header_store"
-
 module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
 include StoreMaker.Make (Irmin.Contents.String)
 
-let shard_store_path = "shard_store"
+let shard_store_dir = "shard_store"
 
 let info message =
   let date = Unix.gettimeofday () |> int_of_float |> Int64.of_int in
-  Irmin.Info.Default.v ~author:"DAL Node" ~message date
+  Info.v ~author:"DAL Node" ~message date
 
 let set ~msg store path v = set_exn store path v ~info:(fun () -> info msg)
 
 let remove ~msg store path = remove_exn store path ~info:(fun () -> info msg)
 
+module Shards = struct
+  include Key_value_store
+
+  type nonrec t = (Cryptobox.Commitment.t * int, Cryptobox.share) t
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
+     Make storage more resilient to DAL parameters change. *)
+  let are_shards_available store commitment shard_indexes =
+    let open Lwt_result_syntax in
+    List.for_all_es
+      (fun index ->
+        let*! value = read_value store (commitment, index) in
+        match value with
+        | Ok _ -> return true
+        | Error [Stored_data.Missing_stored_data _] -> return false
+        | Error e -> fail e)
+      shard_indexes
+
+  let save_and_notify shards_store shards_watcher commitment shards =
+    let open Lwt_result_syntax in
+    let shards =
+      Seq.map
+        (fun {Cryptobox.index; share} -> ((commitment, index), share))
+        shards
+    in
+    let* () = write_values shards_store shards |> Errors.other_lwt_result in
+    let*! () =
+      Event.(emit stored_slot_shards (commitment, Seq.length shards))
+    in
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4974
+
+       DAL/Node: rehaul the store  abstraction & notification system.
+    *)
+    return @@ Lwt_watcher.notify shards_watcher commitment
+
+  let init node_store_dir shard_store_dir =
+    let ( // ) = Filename.concat in
+    let dir_path = node_store_dir // shard_store_dir in
+    init ~lru_size:Constants.shards_store_lru_size (fun (commitment, index) ->
+        let commitment_string = Cryptobox.Commitment.to_b58check commitment in
+        let filename = string_of_int index in
+        let filepath = dir_path // commitment_string // filename in
+        Stored_data.make_file ~filepath Cryptobox.share_encoding Stdlib.( = ))
+end
+
 (** Store context *)
 type node_store = {
   store : t;
-  shard_store : Shard_store.t;
-  slots_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
+  shard_store : Shards.t;
+  shards_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
 }
 
-(** [open_slots_watcher node_store] opens a stream that should be notified when
-    the storage is updated with a new slot. *)
-let open_slots_stream {slots_watcher; _} =
-  Lwt_watcher.create_stream slots_watcher
+(** [open_shards_stream node_store] opens a stream that should be notified when
+    the storage is updated with new shards. *)
+let open_shards_stream {shards_watcher; _} =
+  Lwt_watcher.create_stream shards_watcher
 
 (** [init config] inits the store on the filesystem using the given [config]. *)
 let init config =
   let open Lwt_result_syntax in
-  let dir = Configuration.data_dir_path config path in
-  let slots_watcher = Lwt_watcher.create_input () in
-  let*! repo = Repo.v (Irmin_pack.config dir) in
+  let base_dir = Configuration.data_dir_path config path in
+  let shards_watcher = Lwt_watcher.create_input () in
+  let*! repo = Repo.v (Irmin_pack.config base_dir) in
   let*! store = main repo in
-  let* shard_store =
-    Shard_store.init
-      ~max_mutexes:Constants.shards_max_mutexes
-      (Filename.concat dir shard_store_path)
-  in
+  let shard_store = Shards.init base_dir shard_store_dir in
   let*! () = Event.(emit store_is_ready ()) in
-  return {shard_store; store; slots_watcher}
+  return {shard_store; store; shards_watcher}
 
+let trace_decoding_error ~data_kind ~tztrace_of_error r =
+  let open Result_syntax in
+  match r with
+  | Ok r -> return r
+  | Error err ->
+      let tztrace = tztrace_of_error err in
+      fail @@ `Decoding_failed (data_kind, tztrace)
+
+let tztrace_of_read_error read_err =
+  [Exn (Data_encoding.Binary.Read_error read_err)]
+
+let encode_commitment = Cryptobox.Commitment.to_b58check
+
+let decode_commitment v =
+  trace_decoding_error
+    ~data_kind:Types.Commitment
+    ~tztrace_of_error:(fun tztrace -> tztrace)
+  @@ Cryptobox.Commitment.of_b58check v
+
+let encode_header_status =
+  Data_encoding.Binary.to_string_exn Services.Types.header_status_encoding
+
+let decode_header_status v =
+  trace_decoding_error
+    ~data_kind:Types.Header_status
+    ~tztrace_of_error:tztrace_of_read_error
+  @@ Data_encoding.Binary.of_string Services.Types.header_status_encoding v
+
+let decode_slot_id v =
+  trace_decoding_error
+    ~data_kind:Types.Slot_id
+    ~tztrace_of_error:tztrace_of_read_error
+  @@ Data_encoding.Binary.of_string Services.Types.slot_id_encoding v
+
+let encode_slot slot_size =
+  Data_encoding.Binary.to_string_exn (Data_encoding.Fixed.bytes slot_size)
+
+let decode_slot slot_size v =
+  trace_decoding_error
+    ~data_kind:Types.Slot
+    ~tztrace_of_error:tztrace_of_read_error
+  @@ Data_encoding.Binary.of_string (Data_encoding.Fixed.bytes slot_size) v
+
+let encode_profile profile =
+  Data_encoding.Binary.to_string_exn Services.Types.profile_encoding profile
+
+let decode_profile profile =
+  trace_decoding_error
+    ~data_kind:Types.Profile
+    ~tztrace_of_error:tztrace_of_read_error
+  @@ Data_encoding.Binary.of_string Services.Types.profile_encoding profile
+
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4975
+
+   DAL/Node: Replace Irmin storage for paths
+*)
 module Legacy = struct
   module Path : sig
     type t = string list
@@ -201,42 +296,17 @@ module Legacy = struct
 
       let profiles = root
 
-      let encode_profile profile =
-        Data_encoding.Binary.to_string_exn
-          Services.Types.profile_encoding
-          profile
-
       let profile profile = root / encode_profile profile
     end
   end
-
-  let encode_exn encoding value =
-    Data_encoding.Binary.to_string_exn encoding value
-
-  let decode encoding string =
-    Data_encoding.Binary.of_string_opt encoding string
-
-  let encode_commitment = Cryptobox.Commitment.to_b58check
-
-  let decode_commitment = Cryptobox.Commitment.of_b58check_opt
-
-  let encode_header_status =
-    Data_encoding.Binary.to_string_exn Services.Types.header_status_encoding
-
-  let decode_header_status =
-    Data_encoding.Binary.of_string_opt Services.Types.header_status_encoding
-
-  let decode_slot_id =
-    Data_encoding.Binary.of_string_exn Services.Types.slot_id_encoding
 
   let add_slot_by_commitment node_store cryptobox slot commitment =
     let open Lwt_syntax in
     let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
     let path = Path.Commitment.slot commitment ~slot_size in
-    let encoded_slot = encode_exn (Data_encoding.Fixed.bytes slot_size) slot in
+    let encoded_slot = encode_slot slot_size slot in
     let* () = set ~msg:"Slot stored" node_store.store path encoded_slot in
     let* () = Event.(emit stored_slot_content commitment) in
-    Lwt_watcher.notify node_store.slots_watcher commitment ;
     return_unit
 
   let associate_slot_id_with_commitment node_store commitment slot_id =
@@ -279,12 +349,16 @@ module Legacy = struct
     mem node_store.store path
 
   let find_slot_by_commitment node_store cryptobox commitment =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
     let path = Path.Commitment.slot commitment ~slot_size in
-    let* res_opt = find node_store.store path in
-    Option.bind res_opt (decode (Data_encoding.Fixed.bytes slot_size))
-    |> Lwt.return
+    let*! res_opt = find node_store.store path in
+    Option.fold
+      ~none:(return None)
+      ~some:(fun v ->
+        let*? dec = decode_slot slot_size v in
+        return @@ Some dec)
+      res_opt
 
   let add_slot_headers ~block_level ~block_hash:_ slot_headers node_store =
     let open Lwt_syntax in
@@ -390,22 +464,15 @@ module Legacy = struct
       find node_store.store @@ Path.Level.accepted_header_commitment index
     in
     Option.fold
+      ~none:(fail `Not_found)
+      ~some:(fun c_str -> Lwt.return @@ decode_commitment c_str)
       commitment_str_opt
-      ~none:(fail (Ok `Not_found))
-      ~some:(fun c_str ->
-        Option.fold
-          ~none:(Lwt.return (Error (error_with "Commitment decoding failed")))
-          ~some:return
-        @@ decode_commitment c_str)
-
-  let decode_profile profile =
-    Data_encoding.Binary.of_string_exn Services.Types.profile_encoding profile
 
   let get_profiles node_store =
     let open Lwt_syntax in
     let path = Path.Profile.profiles in
     let* profiles = list node_store.store path in
-    return @@ List.map (fun (p, _) -> decode_profile p) profiles
+    return @@ List.map_e (fun (p, _) -> decode_profile p) profiles
 
   let add_profile node_store profile =
     let path = Path.Profile.profile profile in
@@ -420,9 +487,15 @@ module Legacy = struct
   let filter_indexes =
     let keep_field v = function None -> true | Some f -> f = v in
     fun ?slot_level ?slot_index indexes ->
-      List.map (fun (slot_id, _) -> decode_slot_id slot_id) indexes
-      |> List.filter (fun {Services.Types.slot_level = l; slot_index = i} ->
-             keep_field l slot_level && keep_field i slot_index)
+      let open Result_syntax in
+      let* indexes =
+        List.map_e (fun (slot_id, _) -> decode_slot_id slot_id) indexes
+      in
+      List.filter
+        (fun {Services.Types.slot_level = l; slot_index = i} ->
+          keep_field l slot_level && keep_field i slot_index)
+        indexes
+      |> return
 
   (* See doc-string in {!Legacy.Path.Level} for the notion of "accepted"
      header. *)
@@ -435,24 +508,23 @@ module Legacy = struct
         match commitment_opt with
         | None -> return acc
         | Some read_commitment -> (
-            match skip_commitment read_commitment with
+            let*? decision = skip_commitment read_commitment in
+            match decision with
             | `Skip -> return acc
             | `Keep commitment -> (
                 let status_path = Path.Level.accepted_header_status slot_id in
                 let*! status_opt = find store status_path in
                 match status_opt with
                 | None -> return acc
-                | Some status_str -> (
-                    match decode_header_status status_str with
-                    | None -> failwith "Attestation status decoding failed"
-                    | Some status ->
-                        return
-                        @@ {
-                             Services.Types.slot_id;
-                             commitment;
-                             status = (status :> Services.Types.header_status);
-                           }
-                           :: acc))))
+                | Some status_str ->
+                    let*? status = decode_header_status status_str in
+                    return
+                    @@ {
+                         Services.Types.slot_id;
+                         commitment;
+                         status = (status :> Services.Types.header_status);
+                       }
+                       :: acc)))
       accu
       slot_ids
 
@@ -461,8 +533,10 @@ module Legacy = struct
   let get_accepted_headers_of_commitment commitment slot_ids store accu =
     let encoded_commitment = encode_commitment commitment in
     let skip_commitment read_commitment =
-      if String.equal read_commitment encoded_commitment then `Keep commitment
-      else `Skip
+      Result_syntax.return
+        (if String.equal read_commitment encoded_commitment then
+         `Keep commitment
+        else `Skip)
     in
     get_accepted_headers ~skip_commitment slot_ids store accu
 
@@ -475,11 +549,9 @@ module Legacy = struct
     in
     match status_opt with
     | None -> return acc
-    | Some status_str -> (
-        match decode_header_status status_str with
-        | None -> failwith "Attestation status decoding failed"
-        | Some status ->
-            return @@ ({Services.Types.slot_id; commitment; status} :: acc))
+    | Some status_str ->
+        let*? status = decode_header_status status_str in
+        return @@ ({Services.Types.slot_id; commitment; status} :: acc)
 
   (* See doc-string in {!Legacy.Path.Level} for the notion of "other(s)"
      header. *)
@@ -499,7 +571,7 @@ module Legacy = struct
     (* Get the list of known slot identifiers for [commitment]. *)
     let*! indexes = list store @@ Path.Commitment.headers commitment in
     (* Filter the list of indices by the values of [slot_level] [slot_index]. *)
-    let slot_ids = filter_indexes ?slot_level ?slot_index indexes in
+    let*? slot_ids = filter_indexes ?slot_level ?slot_index indexes in
     let* accu = get_other_headers_of_commitment commitment slot_ids store [] in
     get_accepted_headers_of_commitment commitment slot_ids store accu
 
@@ -514,14 +586,12 @@ module Legacy = struct
         in
         List.fold_left_es
           (fun acc (encoded_commitment, _status_tree) ->
-            match decode_commitment encoded_commitment with
-            | None -> return acc
-            | Some commitment ->
-                get_other_headers_of_identified_commitment
-                  commitment
-                  slot_id
-                  store
-                  acc)
+            let*? commitment = decode_commitment encoded_commitment in
+            get_other_headers_of_identified_commitment
+              commitment
+              slot_id
+              store
+              acc)
           acc
           commitments_with_statuses)
       accu
@@ -547,7 +617,9 @@ module Legacy = struct
     let* accu = get_other_headers slot_ids store [] in
     let* accu =
       let skip_commitment c =
-        decode_commitment c |> Option.fold ~none:`Skip ~some:(fun c -> `Keep c)
+        let open Result_syntax in
+        let* commit = decode_commitment c in
+        return @@ `Keep commit
       in
       get_accepted_headers ~skip_commitment slot_ids store accu
     in

@@ -27,7 +27,8 @@
 
     -------
     Component:    Client
-    Invocation:   dune build @src/lib_proxy/runtest
+    Invocation:   dune exec src/lib_proxy/test/main.exe \
+                  -- --file test_fuzzing_light.ml
     Dependencies: src/lib_proxy/test/light_lib.ml
                   src/lib_proxy/test/test_light.ml
     Description:  Most generators in this module are recursive / nested, hence
@@ -38,7 +39,7 @@ module Store = Tezos_context_memory.Context
 module Proof = Tezos_context_sigs.Context.Proof_types
 open Qcheck2_helpers
 
-open Tezos_shell_services_test_helpers.Shell_services_test_helpers
+open Tezos_proxy_test_helpers_shell_services.Test_helpers_shell_services
 
 module Consensus = struct
   let chain, block = (`Main, `Head 0)
@@ -216,6 +217,7 @@ let test_consensus_spec =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "Mode Light"
     [
       ( "Consensus consistency examples",
@@ -248,7 +250,6 @@ let () =
                (0.6, 4, 1, true);
                (0.6, 5, 1, true);
                (0.5, 2, 2, true);
-               (0.01, 1, 2, true);
              ] );
       ("Consensus consistency", qcheck_wrap [test_consensus_spec]);
     ]

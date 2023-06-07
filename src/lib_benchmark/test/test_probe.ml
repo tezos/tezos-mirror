@@ -57,6 +57,10 @@ module Probing_bench = struct
 
   let default_config = {max_bytes = 1 lsl 16}
 
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
+
   (* The encoding is used by `tezos-snoop` to load the config from json
      files. *)
   let config_encoding =
@@ -150,4 +154,6 @@ let do_bench () =
 
 let tests = [Test.tztest_assert "probing bench" `Quick do_bench]
 
-let () = Alcotest_lwt.run "tezos-benchmark" [("probe", tests)] |> Lwt_main.run
+let () =
+  Alcotest_lwt.run ~__FILE__ "tezos-benchmark" [("probe", tests)]
+  |> Lwt_main.run

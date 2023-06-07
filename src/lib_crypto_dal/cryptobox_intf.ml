@@ -39,6 +39,10 @@ module type COMMITMENT = sig
         representation. *)
   val of_b58check_opt : string -> t option
 
+  (** [of_b58check bytes] computes a commitment from its b58
+      representation. Returns [Error _] if it is not a valid representation. *)
+  val of_b58check : string -> t Error_monad.tzresult
+
   val pp : Format.formatter -> t -> unit
 
   val equal : t -> t -> bool
@@ -68,7 +72,9 @@ module type VERIFIER = sig
     number_of_shards : int;
   }
 
-  (** An encoding for values of type {!parameters}. *)
+  type ('a, 'b) error_container = {given : 'a; expected : 'b}
+
+  (** An encoding for values of type {!type-parameters}. *)
   val parameters_encoding : parameters Data_encoding.t
 
   (** [make] precomputes the set of values needed by the cryptographic
@@ -90,12 +96,11 @@ module type VERIFIER = sig
 
   module Commitment_proof : COMMITMENT_PROOF with type t := commitment_proof
 
-  (** [verify_commitment t commitment proof] checks whether
-     [commitment] is valid. In particular, it checks
-     that the size of the data committed via [commitment] does not
-     exceed [t.slot_size]. The verification time is constant.
+  (** [verify_commitment t commitment proof] returns [true] if and only if the
+      size of the data committed via [commitment] does not exceed the
+      [slot_size] declared in [t].
 
-      Fails if the size of the srs on the group G2 is too small. *)
+      The verification time is constant. *)
   val verify_commitment : t -> commitment -> commitment_proof -> bool
 
   (** The original slot can be split into a list of pages of fixed
@@ -113,19 +118,38 @@ module type VERIFIER = sig
   (** [pages_per_slot t] returns the number of expected pages per slot. *)
   val pages_per_slot : parameters -> int
 
-  (** [verify_page t srs commitment page page_proof] returns [Ok true]
-     if the [proof] certifies that the [slot_page] is indeed included
-     in the slot committed with commitment [commitment]. Returns [Ok
-     false] otherwise.
+  (** [verify_page t commitment ~page_index page proof] returns [Ok ()]
+      if the [proof] certifies that the [page] is the [page_index]-th page
+      of the slot with the given [commitment].
 
-      Fails if the index of the page is out of range or if the page is
-     not of the expected length [page_size] given for the
-     initialisation of [t]. *)
+      Fails with:
+      - [Error `Invalid_page] if the verification Fails
+      - [Error `Invalid_degree_strictly_less_than_expected _] if the SRS
+      contained in [t] is too small to proceed with the verification
+      - [Error `Page_length_mismatch] if the page is not of the expected
+      length [page_size] given for the initialisation of [t]
+      - [Error `Page_index_out_of_range] if [page_index] is out of the
+      range [0, slot_size/page_size - 1] where [slot_size] and [page_size]
+      are given for the initialisation of [t]
+
+      Ensures:
+      - [verify_page t commitment ~page_index page proof = Ok ()] if
+      and only if
+      [page = Bytes.sub slot (page_index * t.page_size) t.page_size]),
+      [proof = prove_page t polynomial page_index],
+      [p = polynomial_from_slot t slot],
+      and [commitment = commit t p]. *)
   val verify_page :
     t ->
     commitment ->
     page_index:int ->
     page ->
     page_proof ->
-    (bool, [> `Segment_index_out_of_range | `Page_length_mismatch]) Result.t
+    ( unit,
+      [> `Invalid_degree_strictly_less_than_expected of
+         (int, int) error_container
+      | `Invalid_page
+      | `Page_length_mismatch
+      | `Page_index_out_of_range ] )
+    Result.t
 end

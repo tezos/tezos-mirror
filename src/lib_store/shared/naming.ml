@@ -38,9 +38,9 @@ let file_path {file_path} = file_path
 
 let is_json_file file = file.Stored_data.json
 
-let make_encoded_file ?(json = false) dir ~filename encoding =
+let make_encoded_file ?(json = false) dir ~filename encoding eq =
   let filepath = dir_path dir // filename in
-  Stored_data.make_file ~json ~filepath encoding
+  Stored_data.make_file ~json ~filepath encoding eq
 
 let encoded_file_path {Stored_data.path; _} = path
 
@@ -63,7 +63,12 @@ let chain_dir dir chain_id =
   mk_dir dir (Format.asprintf "chain_%a" Chain_id.pp_short chain_id)
 
 let chain_config_file dir =
-  make_encoded_file ~json:true dir ~filename:"config.json" chain_config_encoding
+  make_encoded_file
+    ~json:true
+    dir
+    ~filename:"config.json"
+    chain_config_encoding
+    chain_config_equal
 
 let lock_file dir = mk_file dir "lock"
 
@@ -74,52 +79,77 @@ let reconstruction_lock_file dir = mk_file dir "reconstruction_lock"
 let testchains_dir dir = mk_dir dir "testchains"
 
 let protocol_levels_file dir =
-  make_encoded_file dir ~filename:"protocol_levels" Protocol_levels.encoding
+  make_encoded_file
+    dir
+    ~filename:"protocol_levels"
+    Protocol_levels.encoding
+    Store_types.Protocol_levels.equal
 
 let legacy_protocol_levels_file dir =
   make_encoded_file
     dir
     ~filename:"protocol_levels"
     Protocol_levels.Legacy.encoding
+    Protocol_levels.Legacy.equal
 
 let genesis_block_file dir =
-  make_encoded_file dir ~filename:"genesis" Block_repr.encoding
+  make_encoded_file dir ~filename:"genesis" Block_repr.encoding Block_repr.equal
 
 let current_head_file dir =
-  make_encoded_file dir ~filename:"current_head" block_descriptor_encoding
+  make_encoded_file
+    dir
+    ~filename:"current_head"
+    block_descriptor_encoding
+    block_descriptor_equal
 
 let cementing_highwatermark_file dir =
   make_encoded_file
     dir
     ~filename:"cementing_highwatermark"
     Data_encoding.(option int32)
+    (Option.equal Int32.equal)
 
 let checkpoint_file dir =
-  make_encoded_file dir ~filename:"checkpoint" block_descriptor_encoding
+  make_encoded_file
+    dir
+    ~filename:"checkpoint"
+    block_descriptor_encoding
+    block_descriptor_equal
 
 let target_file dir =
   make_encoded_file
     dir
     ~filename:"target"
     (Data_encoding.option block_descriptor_encoding)
+    (Option.equal block_descriptor_equal)
 
 let invalid_blocks_file dir =
   make_encoded_file
     dir
     ~filename:"invalid_blocks"
     (Block_hash.Map.encoding invalid_block_encoding)
+    (Block_hash.Map.equal invalid_block_equal)
 
 let forked_chains_file dir =
   make_encoded_file
     dir
     ~filename:"forked_chains"
     (Chain_id.Map.encoding Block_hash.encoding)
+    (Chain_id.Map.equal Block_hash.equal)
 
 let savepoint_file dir =
-  make_encoded_file dir ~filename:"savepoint" block_descriptor_encoding
+  make_encoded_file
+    dir
+    ~filename:"savepoint"
+    block_descriptor_encoding
+    Store_types.block_descriptor_equal
 
 let caboose_file dir =
-  make_encoded_file dir ~filename:"caboose" block_descriptor_encoding
+  make_encoded_file
+    dir
+    ~filename:"caboose"
+    block_descriptor_encoding
+    Store_types.block_descriptor_equal
 
 type block_store_status = Idle | Merging
 
@@ -130,8 +160,18 @@ let block_store_status_encoding =
     (function false -> Idle | true -> Merging)
     bool
 
+let status_equal s1 s2 =
+  match (s1, s2) with
+  | Idle, Idle -> true
+  | Merging, Merging -> true
+  | Idle, Merging | Merging, Idle -> false
+
 let block_store_status_file dir =
-  make_encoded_file dir ~filename:"status" block_store_status_encoding
+  make_encoded_file
+    dir
+    ~filename:"status"
+    block_store_status_encoding
+    status_equal
 
 let cemented_blocks_dir dir = mk_dir dir "cemented"
 
@@ -195,6 +235,10 @@ let snapshot_metadata_file dir = mk_file dir "metadata.json"
 let snapshot_version_file dir = mk_file dir "snapshot_version.json"
 
 let snapshot_protocol_levels_file dir =
-  make_encoded_file dir ~filename:"protocol_levels" Protocol_levels.encoding
+  make_encoded_file
+    dir
+    ~filename:"protocol_levels"
+    Protocol_levels.encoding
+    Protocol_levels.equal
 
 let snapshot_tar_root = {dir_path = ""}

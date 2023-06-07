@@ -38,7 +38,7 @@ type host_state = {
   mutable durable : Durable.t;
 }
 
-let make ~reveal_builtins ~write_debug state =
+let make ~version ~reveal_builtins ~write_debug state =
   let open Wasmer in
   let open Lwt.Syntax in
   let with_mem f =
@@ -95,13 +95,14 @@ let make ~reveal_builtins ~write_debug state =
         state.durable <- durable ;
         result)
   in
-  let store_delete =
+  let store_delete_generic ~kind =
     fn
       (i32 @-> i32 @-> returning1 i32)
       (fun key_offset key_length ->
         with_mem @@ fun memory ->
         let+ durable, result =
-          Host_funcs.Aux.store_delete
+          Host_funcs.Aux.generic_store_delete
+            ~kind
             ~durable:state.durable
             ~memory
             ~key_offset
@@ -110,6 +111,8 @@ let make ~reveal_builtins ~write_debug state =
         state.durable <- durable ;
         result)
   in
+  let store_delete = store_delete_generic ~kind:Directory in
+  let store_delete_value = store_delete_generic ~kind:Value in
   let write_debug =
     fn
       (i32 @-> i32 @-> returning nothing)
@@ -147,6 +150,22 @@ let make ~reveal_builtins ~write_debug state =
             ~from_key_length
             ~to_key_offset
             ~to_key_length
+        in
+        state.durable <- durable ;
+        result)
+  in
+  let store_create =
+    fn
+      (i32 @-> i32 @-> i32 @-> returning1 i32)
+      (fun key_offset key_length size ->
+        with_mem @@ fun memory ->
+        let+ durable, result =
+          Host_funcs.Aux.store_create
+            ~durable:state.durable
+            ~memory
+            ~key_offset
+            ~key_length
+            ~size
         in
         state.durable <- durable ;
         result)
@@ -197,6 +216,19 @@ let make ~reveal_builtins ~write_debug state =
           ~dst
           ~max_size)
   in
+  let store_get_hash =
+    fn
+      (i32 @-> i32 @-> i32 @-> i32 @-> returning1 i32)
+      (fun key_offset key_length dst max_size ->
+        with_mem @@ fun memory ->
+        Host_funcs.Aux.store_get_hash
+          ~durable:state.durable
+          ~memory
+          ~key_offset
+          ~key_length
+          ~dst
+          ~max_size)
+  in
   let store_value_size =
     fn
       (i32 @-> i32 @-> returning1 i32)
@@ -244,8 +276,7 @@ let make ~reveal_builtins ~write_debug state =
           ~payload:(Bytes.of_string payload))
   in
 
-  List.map
-    (fun (name, impl) -> (Constants.wasm_host_funcs_virual_module, name, impl))
+  let base =
     [
       ("read_input", read_input);
       ("write_output", write_output);
@@ -262,3 +293,17 @@ let make ~reveal_builtins ~write_debug state =
       ("reveal_preimage", reveal_preimage);
       ("reveal_metadata", reveal_metadata);
     ]
+  in
+  let extra =
+    match version with
+    | Wasm_pvm_state.V0 -> []
+    | V1 ->
+        [
+          ("__internal_store_get_hash", store_get_hash);
+          ("store_delete_value", store_delete_value);
+          ("store_create", store_create);
+        ]
+  in
+  List.map
+    (fun (name, impl) -> (Constants.wasm_host_funcs_virual_module, name, impl))
+    (base @ extra)

@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Persistence library
-    Invocation:   dune build @src/lib_mockup/runtest
+    Invocation:   dune exec src/lib_mockup/test/main.exe \
+                  -- --file test_persistence.ml
     Subject:      Unit tests of the Persistence library
 *)
 
@@ -269,6 +270,7 @@ let test_get_registered_mockup_take_requested =
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "tezos-mockup"
     [
       ( "persistence",

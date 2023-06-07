@@ -101,6 +101,12 @@ release:
 experimental-release:
 	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES)"
 
+.PHONY: strip
+strip: all
+	@chmod +w $(ALL_EXECUTABLES)
+	@strip -s $(ALL_EXECUTABLES)
+	@chmod -w $(ALL_EXECUTABLES)
+
 .PHONY: static
 static:
 	@$(MAKE) build PROFILE=static OCTEZ_EXECUTABLES?="$(RELEASED_EXECUTABLES)"
@@ -232,7 +238,17 @@ test-proto-unit:
 		scripts/test_wrapper.sh test-proto-unit \
 		$(addprefix @, $(addsuffix /runtest,$(PROTO_DIRS)))
 
+.PHONY: test-lib-store-slow
+test-lib-store-slow:
+	DUNE_PROFILE=$(PROFILE) \
+		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
+		dune exec src/lib_store/unix/test/slow/test_slow.exe -- --file test_slow.ml --info
 
+.PHONY: test-lib-store-bench
+test-lib-store-bench:
+	DUNE_PROFILE=$(PROFILE) \
+		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
+		dune exec src/lib_store/unix/test/bench/bench.exe -- --file bench.ml --info
 
 .PHONY: test-nonproto-unit
 test-nonproto-unit:
@@ -248,20 +264,8 @@ test-unit: test-nonproto-unit test-proto-unit
 test-unit-alpha:
 	@dune build --profile=$(PROFILE) @src/proto_alpha/lib_protocol/runtest
 
-.PHONY: test-python
-test-python: all
-	@$(MAKE) -C tests_python all
-
-.PHONY: test-python-alpha
-test-python-alpha: all
-	@$(MAKE) -C tests_python alpha
-
-.PHONY: test-python-tenderbake
-test-python-tenderbake: all
-	@$(MAKE) -C tests_python tenderbake
-
-# TODO: https://gitlab.com/tezos/tezos/-/issues/3018
-# Disable verbose once the log file bug in Alcotest is fixed.
+# TODO: https://gitlab.com/tezos/tezos/-/issues/5377
+# Running the runtest_js targets intermittently hangs.
 .PHONY: test-js
 test-js:
 	@dune build --error-reporting=twice @runtest_js
@@ -291,7 +295,7 @@ test-tezt-coverage:
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --keep-going --test-timeout 1800
 
 .PHONY: test-code
-test-code: test-protocol-compile test-unit test-python test-tezt
+test-code: test-protocol-compile test-unit test-tezt
 
 # This is as `make test-code` except we allow failure (prefix "-")
 # because we still want the coverage report even if an individual
@@ -300,13 +304,11 @@ test-code: test-protocol-compile test-unit test-python test-tezt
 test-coverage:
 	-@$(MAKE) test-protocol-compile
 	-@$(MAKE) test-unit
-	-@$(MAKE) test-python
 	-@$(MAKE) test-tezt
 
 .PHONY: test-coverage-tenderbake
 test-coverage-tenderbake:
 	-@$(MAKE) test-unit-alpha
-	-@$(MAKE) test-python-tenderbake
 
 .PHONY: test-webassembly
 test-webassembly:
@@ -363,11 +365,14 @@ check-linting:
 	@scripts/lint.sh --check-scripts
 	@scripts/lint.sh --check-ocamlformat
 	@scripts/lint.sh --check-coq-attributes
+	@scripts/lint.sh --check-rust-toolchain
 	@dune build --profile=$(PROFILE) @fmt
 
 check-python-linting:
-	@$(MAKE) -C tests_python lint
 	@$(MAKE) -C docs lint
+
+check-python-typecheck:
+	@$(MAKE) -C docs typecheck
 
 check-ocaml-linting:
 	@./scripts/semgrep/lint-all-ocaml-sources.sh
@@ -379,7 +384,7 @@ fmt-ocaml:
 	@dune build --profile=$(PROFILE) @fmt --auto-promote
 
 fmt-python:
-	@$(MAKE) -C tests_python fmt
+	@$(MAKE) -C docs fmt
 
 .PHONY: build-deps
 build-deps:
@@ -399,7 +404,7 @@ build-tps-deps:
 	@./scripts/install_build_deps.sh --tps
 
 .PHONY: build-tps
-build-tps: lift-protocol-limits-patch build build-tezt
+build-tps: lift-protocol-limits-patch all build-tezt
 	@dune build ./src/bin_tps_evaluation
 	@cp -f ./_build/default/src/bin_tps_evaluation/main_tps_evaluation.exe tezos-tps-evaluation
 	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-benchmark-tps .
@@ -472,7 +477,30 @@ coverage-clean:
 .PHONY: clean
 clean: coverage-clean clean-old-names
 	@-dune clean
-	@-rm -f ${OCTEZ_BIN} ${UNRELEASED_OCTEZ_BIN}
+	@-rm -f ${ALL_EXECUTABLES}
 	@-${MAKE} -C docs clean
-	@-${MAKE} -C tests_python clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html
+
+.PHONY: build-kernels-deps
+build-kernels-deps:
+	make -f kernels.mk build-deps
+
+.PHONY: build-kernels-dev-deps
+build-kernels-dev-deps:
+	make -f kernels.mk build-dev-deps
+
+.PHONY: build-kernels
+build-kernels:
+	make -f kernels.mk build
+
+.PHONY: check-kernels
+check-kernels:
+	make -f kernels.mk check
+
+.PHONY: test-kernels
+test-kernels:
+	make -f kernels.mk test
+
+.PHONY: clean-kernels
+clean-kernels:
+	make -f kernels.mk clean

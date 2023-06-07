@@ -32,5 +32,4 @@ let must_exist ctxt =
       let+ () = Contract_storage.must_exist ctxt k in
       ctxt
   | Sc_rollup sc -> Sc_rollup_storage.must_exist ctxt sc
-  | Tx_rollup tx -> Tx_rollup_state_storage.assert_exist ctxt tx
   | Zk_rollup zk -> Zk_rollup_storage.assert_exist ctxt zk

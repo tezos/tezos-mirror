@@ -311,7 +311,7 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
     lwt_bad_citizen_hack := (file_path, event_json) :: !lwt_bad_citizen_hack ;
     let* () =
       output_json file_path event_json ~pp:(fun fmt () ->
-          M.pp ~short:false fmt event)
+          M.pp ~block:true ~all_fields:true fmt event)
     in
     lwt_bad_citizen_hack :=
       List.filter (fun (f, _) -> f <> file_path) !lwt_bad_citizen_hack ;

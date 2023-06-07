@@ -27,23 +27,33 @@
 (** Testing
     -------
     Component:    Tree_encoding_decoding
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "^WASM PVM$"
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_wasm_pvm.ml
     Subject:      WASM PVM evaluation tests for the tezos-scoru-wasm library
 *)
 
-open Tztest
 open Tezos_scoru_wasm
+open Tezos_scoru_wasm_helpers.Encodings_util
 open Wasm_utils
-open Encodings_util
+open Tztest_helper
 
-let should_boot_unreachable_kernel ~max_steps kernel =
+let should_boot_unreachable_kernel ~version ~batch_size kernel =
   let open Lwt_syntax in
-  let* tree = initial_tree ~from_binary:true kernel in
+  (* we call recursively the eval function on given increment *)
+  let rec loop_until_input_required batch_size tree =
+    let* info = Wasm.get_info tree in
+    match info.input_request with
+    | No_input_required ->
+        let* tree =
+          eval_until_input_or_reveal_requested ~max_steps:batch_size tree
+        in
+        loop_until_input_required batch_size tree
+    | _ -> return tree
+  in
+  let* tree = initial_tree ~version ~from_binary:true kernel in
   (* Feeding it with one input *)
   let* tree = set_empty_inbox_step 0l tree in
   (* running until waiting for input *)
-  let* tree = eval_until_input_or_reveal_requested ~max_steps tree in
+  let* tree = loop_until_input_required batch_size tree in
   let* info_after_first_message = Wasm.get_info tree in
   (* The kernel is expected to fail, then ths PVM should
      have failed during the evaluation when evaluating a `Unreachable`
@@ -66,7 +76,7 @@ let should_boot_unreachable_kernel ~max_steps kernel =
   assert stuck_flag ;
   return_ok_unit
 
-let should_run_debug_kernel () =
+let should_run_debug_kernel ~version () =
   let open Lwt_syntax in
   let module_ =
     {|
@@ -90,7 +100,7 @@ let should_run_debug_kernel () =
  )
 |}
   in
-  let* tree = initial_tree ~from_binary:false module_ in
+  let* tree = initial_tree ~version ~from_binary:false module_ in
   (* Feeding it with one input *)
   let* tree = set_empty_inbox_step 0l tree in
   (* running until waiting for input *)
@@ -105,11 +115,13 @@ let add_value ?(content = "a very long value") tree key_steps =
   let value = Chunked_byte_vector.of_string content in
   Tree_encoding_runner.encode
     Tezos_tree_encoding.(
-      scope ("durable" :: List.append key_steps ["@"]) chunked_byte_vector)
+      scope
+        ("durable" :: List.append key_steps ["@"])
+        Chunked_byte_vector.encoding)
     value
     tree
 
-let should_run_store_has_kernel () =
+let should_run_store_has_kernel ~version () =
   let open Lwt_syntax in
   let module_ =
     {|
@@ -161,7 +173,7 @@ let should_run_store_has_kernel () =
  )
   |}
   in
-  let* tree = initial_tree ~from_binary:false module_ in
+  let* tree = initial_tree ~version ~from_binary:false module_ in
   let* tree = add_value tree ["hi"; "bye"] in
   let* tree = add_value tree ["hello"] in
   let* tree = add_value tree ["hello"; "universe"] in
@@ -190,7 +202,7 @@ let should_run_store_has_kernel () =
 (* The `should_run_store_list_size_kernel` asserts
    whether the tree has three subtrees. Note that the `_` subtree is included
    and so, after adding the `four` subtree the state will receive the stuck tag.*)
-let should_run_store_list_size_kernel () =
+let should_run_store_list_size_kernel ~version () =
   let open Lwt_syntax in
   let module_ =
     {|
@@ -217,7 +229,7 @@ let should_run_store_list_size_kernel () =
  )
   |}
   in
-  let* tree = initial_tree ~from_binary:false module_ in
+  let* tree = initial_tree ~version ~from_binary:false module_ in
   let* tree = add_value tree ["one"] in
   let* tree = add_value tree ["one"; "two"] in
   let* tree = add_value tree ["one"; "three"] in
@@ -240,7 +252,7 @@ let should_run_store_list_size_kernel () =
   assert stuck_flag ;
   return_ok_unit
 
-let should_run_store_delete_kernel () =
+let should_run_store_delete_kernel ~version () =
   let module_ =
     {|
 (module
@@ -275,7 +287,7 @@ let should_run_store_delete_kernel () =
 |}
   in
   let open Lwt_syntax in
-  let* tree = initial_tree ~from_binary:false module_ in
+  let* tree = initial_tree ~version ~from_binary:false module_ in
   let* tree = add_value tree ["one"] in
   let* tree = add_value tree ["one"; "two"] in
   let* tree = add_value tree ["three"] in
@@ -314,7 +326,7 @@ let assert_store_value tree path expected_value =
   assert (Option.equal String.equal value expected_value)
 
 (* store_move *)
-let should_run_store_move_kernel () =
+let should_run_store_move_kernel ~version () =
   let open Lwt_syntax in
   let from_path = "/a/b" in
   let from_path_location = 100 in
@@ -348,7 +360,7 @@ let should_run_store_move_kernel () =
       from_path
       to_path
   in
-  let* tree = initial_tree ~from_binary:false module_ in
+  let* tree = initial_tree ~version ~from_binary:false module_ in
   let* tree = add_value tree ["a"; "b"] ~content:"ab" in
   let* tree = add_value tree ["a"; "b"; "c"] ~content:"abc" in
   let* tree = add_value tree ["a"; "b"; "d"] ~content:"abd" in
@@ -375,7 +387,7 @@ let should_run_store_move_kernel () =
   return_ok_unit
 
 (* store_copy *)
-let should_run_store_copy_kernel () =
+let should_run_store_copy_kernel ~version () =
   let open Lwt_syntax in
   let from_path = "/a/b" in
   let from_path_location = 100 in
@@ -409,7 +421,7 @@ let should_run_store_copy_kernel () =
       from_path
       to_path
   in
-  let* tree = initial_tree ~from_binary:false module_ in
+  let* tree = initial_tree ~version ~from_binary:false module_ in
   let* tree = add_value tree ["a"; "b"] ~content:"ab" in
   let* tree = add_value tree ["a"; "b"; "c"] ~content:"abc" in
   let* tree = add_value tree ["a"; "b"; "d"] ~content:"abd" in
@@ -435,7 +447,67 @@ let should_run_store_copy_kernel () =
   let* () = assert_store_value tree "/a/b" (Some "ab") in
   return_ok_unit
 
-let test_modify_read_only_storage_kernel () =
+let nop_module import_name import_params import_results =
+  Format.sprintf
+    {|
+(module
+ (import "smart_rollup_core" "%s"
+         (func $%s (param %s) (result %s)))
+ (memory 1)
+ (export "mem" (memory 0))
+ (func (export "kernel_run")
+    (nop)))
+  |}
+    import_name
+    import_name
+    (String.concat " " import_params)
+    (String.concat " " import_results)
+
+(* Note that import_name, import_params and import_results could be probably
+   read from the host function definition directly in {Host_funcs}, this would
+   ensure the error does not come from an invalid import type. *)
+let try_availability_above_v1_only ~version import_name import_params
+    import_results () =
+  let open Lwt_syntax in
+  let* tree =
+    initial_tree
+      ~version
+      ~from_binary:false
+      (nop_module import_name import_params import_results)
+  in
+  let* tree = set_empty_inbox_step 0l tree in
+  let* tree = eval_until_input_or_reveal_requested tree in
+  let* state = Wasm.Internal_for_tests.get_tick_state tree in
+  let predicate state =
+    match version with
+    | Wasm_pvm_state.V0 -> is_stuck state
+    | V1 -> not (is_stuck state)
+  in
+  assert (predicate state) ;
+  Lwt_result_syntax.return_unit
+
+let try_run_store_get_hash ~version =
+  try_availability_above_v1_only
+    ~version
+    "__internal_store_get_hash"
+    ["i32"; "i32"; "i32"; "i32"]
+    ["i32"]
+
+let try_run_store_delete_value ~version =
+  try_availability_above_v1_only
+    ~version
+    "store_delete_value"
+    ["i32"; "i32"]
+    ["i32"]
+
+let try_run_store_create ~version =
+  try_availability_above_v1_only
+    ~version
+    "store_create"
+    ["i32"; "i32"; "i32"]
+    ["i32"]
+
+let test_modify_read_only_storage_kernel ~version () =
   let open Lwt_syntax in
   let module_ =
     {|
@@ -502,7 +574,7 @@ let test_modify_read_only_storage_kernel () =
  )
   |}
   in
-  let* tree = initial_tree ~from_binary:false module_ in
+  let* tree = initial_tree ~version ~from_binary:false module_ in
   (* The kernel is not expected to fail, the PVM should not have stuck state on.
       *)
   let* state = Wasm.Internal_for_tests.get_tick_state tree in
@@ -643,7 +715,7 @@ let build_snapshot_wasm_state_from_set_input
     durable
     tree
 
-let test_snapshotable_state () =
+let test_snapshotable_state ~version () =
   let open Lwt_result_syntax in
   let module_ =
     {|
@@ -656,7 +728,7 @@ let test_snapshotable_state () =
       )
     |}
   in
-  let*! tree = initial_tree ~from_binary:false module_ in
+  let*! tree = initial_tree ~version ~from_binary:false module_ in
   let*! state = Wasm.Internal_for_tests.get_tick_state tree in
   let* () =
     match state with
@@ -685,7 +757,7 @@ let test_snapshotable_state () =
         Wasm_utils.pp_state
         state
 
-let test_rebuild_snapshotable_state () =
+let test_rebuild_snapshotable_state ~version () =
   let open Lwt_result_syntax in
   let module_ =
     {|
@@ -698,7 +770,7 @@ let test_rebuild_snapshotable_state () =
       )
     |}
   in
-  let*! tree = initial_tree ~from_binary:false module_ in
+  let*! tree = initial_tree ~version ~from_binary:false module_ in
   let*! tree = set_empty_inbox_step 0l tree in
   (* First evaluate until the snapshotable state. *)
   let*! tree_after_eval = eval_to_snapshot tree in
@@ -744,7 +816,7 @@ let test_rebuild_snapshotable_state () =
     Context_hash.equal hash_input_tree_after_eval hash_input_rebuilded_tree) ;
   return_unit
 
-let test_unkown_host_function_truncated () =
+let test_unkown_host_function_truncated ~version () =
   let open Lwt_result_syntax in
   let smart_rollup_core = "smart_rollup_core" in
   let unknown_function = String.make 100 'a' in
@@ -768,7 +840,7 @@ let test_unkown_host_function_truncated () =
       unknown_function
   in
   (* Let's first init the tree to compute. *)
-  let*! tree = initial_tree ~from_binary:false module_ in
+  let*! tree = initial_tree ~version ~from_binary:false module_ in
   (* The tree should be in snapshot state by default, hence in input step. *)
   let*! tree_with_dummy_input = set_empty_inbox_step 0l tree in
   let*! tree_stuck =
@@ -789,7 +861,7 @@ let test_unkown_host_function_truncated () =
   assert (is_stuck ~step:`No_fallback_link ~reason state) ;
   return_unit
 
-let test_bulk_noops () =
+let test_bulk_noops ~version () =
   let open Lwt.Syntax in
   let module_ =
     {|
@@ -802,7 +874,7 @@ let test_bulk_noops () =
       )
     |}
   in
-  let* base_tree = initial_tree ~max_tick:500L module_ in
+  let* base_tree = initial_tree ~version ~ticks_per_snapshot:500L module_ in
   let* base_tree = set_empty_inbox_step 0l base_tree in
 
   let rec goto_snapshot ticks tree_slow =
@@ -824,7 +896,7 @@ let test_bulk_noops () =
 
   Lwt_result_syntax.return_unit
 
-let test_durable_store_io () =
+let test_durable_store_io ~version () =
   let open Lwt_result_syntax in
   let from_path = "/from/value" in
   let from_path_location = 100 in
@@ -879,7 +951,7 @@ let test_durable_store_io () =
       to_path
   in
   (* Let's first init the tree to compute. *)
-  let*! tree = initial_tree ~from_binary:false modul in
+  let*! tree = initial_tree ~version ~from_binary:false modul in
 
   (* Add content to '/from/value' key in durable *)
   let content = "abcde" in
@@ -989,11 +1061,11 @@ let assert_kernel tree expected_kernel =
   in
   assert (Option.equal String.equal value expected_kernel)
 
-let test_reveal_upgrade_kernel_ok () =
+let test_reveal_upgrade_kernel_ok ~version () =
   let open Lwt_result_syntax in
   let*! modul = wat2wasm @@ reveal_upgrade_kernel () in
   (* Let's first init the tree to compute. *)
-  let*! tree = initial_tree ~from_binary:true modul in
+  let*! tree = initial_tree ~version ~from_binary:true modul in
   let*! state_before_first_message =
     Wasm.Internal_for_tests.get_tick_state tree
   in
@@ -1063,11 +1135,12 @@ let test_reveal_upgrade_kernel_ok () =
   let*! () = assert_fallback_kernel tree @@ Some preimage in
   return_unit
 
-let test_reveal_upgrade_kernel_fallsback_on_error ~binary invalid_kernel () =
+let test_reveal_upgrade_kernel_fallsback_on_error ~version ~binary
+    invalid_kernel () =
   let open Lwt_result_syntax in
   let*! modul = wat2wasm @@ reveal_upgrade_kernel () in
   (* Let's first init the tree to compute. *)
-  let*! tree = initial_tree ~from_binary:true modul in
+  let*! tree = initial_tree ~version ~from_binary:true modul in
   let*! tree = eval_until_input_or_reveal_requested tree in
   let*! state_before_first_message =
     Wasm.Internal_for_tests.get_tick_state tree
@@ -1143,7 +1216,7 @@ let test_reveal_upgrade_kernel_fallsback_on_error ~binary invalid_kernel () =
   assert (not has_upgrade_error) ;
   return_unit
 
-let test_pvm_reboot_counter ~pvm_max_reboots () =
+let test_pvm_reboot_counter ~version ~pvm_max_reboots () =
   let open Lwt_result_syntax in
   let reboot_kernel =
     {|
@@ -1193,6 +1266,7 @@ let test_pvm_reboot_counter ~pvm_max_reboots () =
 
   let*! tree =
     initial_tree
+      ~version
       ~max_reboots:(Z.of_int32 pvm_max_reboots)
       ~from_binary:false
       reboot_kernel
@@ -1201,7 +1275,8 @@ let test_pvm_reboot_counter ~pvm_max_reboots () =
 
   check_counter tree 0l
 
-let test_kernel_reboot_gen ~reboots ~expected_reboots ~pvm_max_reboots =
+let test_kernel_reboot_gen ~version ~reboots ~expected_reboots ~pvm_max_reboots
+    =
   let open Lwt_result_syntax in
   (* Extracted from the kernel, these are the constant values used to build the
      initial memory and the addresses where values are stored. *)
@@ -1351,6 +1426,7 @@ let test_kernel_reboot_gen ~reboots ~expected_reboots ~pvm_max_reboots =
   (* Let's first init the tree to compute. *)
   let*! tree =
     initial_tree
+      ~version
       ~max_reboots:(Z.of_int32 pvm_max_reboots)
       ~from_binary:false
       reboot_module
@@ -1385,14 +1461,22 @@ let test_kernel_reboot_gen ~reboots ~expected_reboots ~pvm_max_reboots =
       assert (value = expected_reboots) ;
       return_unit
 
-let test_kernel_reboot () =
+let test_kernel_reboot ~version () =
   (* The kernel doesn't accept more than 10 reboots between two inputs, this test will succeed. *)
-  test_kernel_reboot_gen ~reboots:5l ~expected_reboots:5l ~pvm_max_reboots:10l
+  test_kernel_reboot_gen
+    ~version
+    ~reboots:5l
+    ~expected_reboots:5l
+    ~pvm_max_reboots:10l
 
-let test_kernel_reboot_failing () =
+let test_kernel_reboot_failing ~version () =
   (* The kernel doesn't accept more than 10 reboots between two inputs, it will
      then fail after 10. *)
-  test_kernel_reboot_gen ~reboots:15l ~expected_reboots:10l ~pvm_max_reboots:10l
+  test_kernel_reboot_gen
+    ~version
+    ~reboots:15l
+    ~expected_reboots:10l
+    ~pvm_max_reboots:10l
 
 (* Set a certain number `n` of dummy inputs and check the scheduling is
    consistent:
@@ -1444,7 +1528,7 @@ let test_set_inputs number_of_inputs level tree =
   assert (state = Padding) ;
   tree
 
-let test_inbox_cleanup () =
+let test_inbox_cleanup ~version () =
   let open Lwt_syntax in
   let check_messages_count tree count =
     let+ buffer = Wasm.Internal_for_tests.get_input_buffer tree in
@@ -1465,7 +1549,13 @@ let test_inbox_cleanup () =
     |}
   in
   let max_tick = 1000L in
-  let* tree = initial_tree ~max_tick ~from_binary:false module_ in
+  let* tree =
+    initial_tree
+      ~version
+      ~ticks_per_snapshot:max_tick
+      ~from_binary:false
+      module_
+  in
   let* tree = set_empty_inbox_step 0l tree in
   (* Before executing: EOL, Info_per_level and SOL. *)
   let* () = check_messages_count tree 3 in
@@ -1480,7 +1570,7 @@ let test_inbox_cleanup () =
   let* () = check_messages_count tree 0 in
   Lwt_result_syntax.return_unit
 
-let test_scheduling_multiple_inboxes input_numbers =
+let test_scheduling_multiple_inboxes ~version input_numbers =
   let open Lwt_result_syntax in
   let module_ =
     {|
@@ -1493,7 +1583,7 @@ let test_scheduling_multiple_inboxes input_numbers =
       )
     |}
   in
-  let*! initial_tree = initial_tree ~from_binary:false module_ in
+  let*! initial_tree = initial_tree ~version ~from_binary:false module_ in
   let+ (_ : Wasm.tree) =
     List.fold_left_i_es
       (fun level tree input_number ->
@@ -1519,10 +1609,11 @@ let test_scheduling_multiple_inboxes input_numbers =
   in
   ()
 
-let test_scheduling_one_inbox () = test_scheduling_multiple_inboxes [10]
+let test_scheduling_one_inbox ~version () =
+  test_scheduling_multiple_inboxes ~version [10]
 
-let test_scheduling_five_inboxes () =
-  test_scheduling_multiple_inboxes [10; 5; 15; 8; 2]
+let test_scheduling_five_inboxes ~version () =
+  test_scheduling_multiple_inboxes ~version [10; 5; 15; 8; 2]
 
 (* Module only outputting one message. *)
 let output_only_module message =
@@ -1564,7 +1655,7 @@ let eval_and_test_outboxes_gen test_outbox max_level tree =
   in
   go 0l tree
 
-let test_outboxes_at_each_level () =
+let test_outboxes_at_each_level ~version () =
   let open Lwt_syntax in
   let open Tezos_webassembly_interpreter.Output_buffer in
   let output_message = "output_message" in
@@ -1579,16 +1670,18 @@ let test_outboxes_at_each_level () =
 
   let* tree =
     initial_tree
-      ~max_tick:1000L (* This kernel takes about 838 ticks to run. *)
+      ~version
+      ~ticks_per_snapshot:1000L (* This kernel takes about 838 ticks to run. *)
       ~from_binary:false
       (output_only_module output_message)
   in
   let* () = eval_and_test_outboxes_gen check_outboxes 5l tree in
   return_ok_unit
 
-let test_outbox_validity_period () =
+let test_outbox_validity_period ~version () =
   let open Lwt_syntax in
   let open Tezos_webassembly_interpreter.Output_buffer in
+  let open Tezos_webassembly_interpreter.Output_buffer.Internal_for_tests in
   let output_message = "output_message" in
 
   let outbox_validity_period = 2l in
@@ -1627,7 +1720,8 @@ let test_outbox_validity_period () =
 
   let* tree =
     initial_tree
-      ~max_tick:1000L (* This kernel takes about 838 ticks to run. *)
+      ~version
+      ~ticks_per_snapshot:1000L (* This kernel takes about 838 ticks to run. *)
       ~from_binary:false
       ~outbox_validity_period
       (output_only_module output_message)
@@ -1636,94 +1730,92 @@ let test_outbox_validity_period () =
   return_ok_unit
 
 let tests =
-  [
-    tztest
-      "Test unreachable kernel (tick per tick)"
-      `Quick
-      (test_with_kernel
-         Kernels.unreachable_kernel
-         (should_boot_unreachable_kernel ~max_steps:1L));
-    tztest
-      "Test unreachable kernel (10 ticks at a time)"
-      `Quick
-      (test_with_kernel
-         Kernels.unreachable_kernel
-         (should_boot_unreachable_kernel ~max_steps:10L));
-    tztest
-      "Test unreachable kernel (in one go)"
-      `Quick
-      (test_with_kernel
-         Kernels.unreachable_kernel
-         (should_boot_unreachable_kernel ~max_steps:Int64.max_int));
-    tztest "Test write_debug kernel" `Quick should_run_debug_kernel;
-    tztest "Test store-has kernel" `Quick should_run_store_has_kernel;
-    tztest
-      "Test store-list-size kernel"
-      `Quick
-      should_run_store_list_size_kernel;
-    tztest "Test store-delete kernel" `Quick should_run_store_delete_kernel;
-    tztest "Test store-move kernel" `Quick should_run_store_move_kernel;
-    tztest "Test store-copy kernel" `Quick should_run_store_copy_kernel;
-    tztest
-      "Test modifying read-only storage fails"
-      `Quick
-      test_modify_read_only_storage_kernel;
-    tztest "Test snapshotable state" `Quick test_snapshotable_state;
-    tztest
-      "Test rebuild snapshotable state"
-      `Quick
-      test_rebuild_snapshotable_state;
-    tztest
-      "Test Stuck state is truncated on long messages"
-      `Quick
-      test_unkown_host_function_truncated;
-    tztest "Test bulk no-ops function properly" `Quick test_bulk_noops;
-    tztest "Test durable store io" `Quick test_durable_store_io;
-    tztest "Test /readonly/kernel/env/reboot_counter" `Quick
-    @@ test_pvm_reboot_counter ~pvm_max_reboots:10l;
-    tztest "Test reboot" `Quick test_kernel_reboot;
-    tztest
-      "Test reboot takes too many reboots"
-      `Quick
-      test_kernel_reboot_failing;
-    tztest "Test kernel upgrade ok" `Quick test_reveal_upgrade_kernel_ok;
-    tztest
-      "Test kernel upgrade fallsback on decoding error"
-      `Quick
-      (test_reveal_upgrade_kernel_fallsback_on_error
-         ~binary:true
-         "INVALID WASM!!!");
-    tztest
-      "Test kernel upgrade fallsback on linking error"
-      `Quick
-      (test_reveal_upgrade_kernel_fallsback_on_error
-         ~binary:false
-         {|
+  tztests_with_pvm
+    ~versions:[V0; V1]
+    [
+      ( "Test __internal_store_get_hash available",
+        `Quick,
+        try_run_store_get_hash );
+      ("Test store_delete_value available", `Quick, try_run_store_delete_value);
+      ("Test store_create available", `Quick, try_run_store_create);
+      ( "Test unreachable kernel (tick per tick)",
+        `Quick,
+        fun ~version ->
+          test_with_kernel
+            Kernels.unreachable_kernel
+            (should_boot_unreachable_kernel ~version ~batch_size:1L) );
+      ( "Test unreachable kernel (10 ticks at a time)",
+        `Quick,
+        fun ~version ->
+          test_with_kernel
+            Kernels.unreachable_kernel
+            (should_boot_unreachable_kernel ~version ~batch_size:10L) );
+      ( "Test unreachable kernel (in one go)",
+        `Quick,
+        fun ~version ->
+          test_with_kernel
+            Kernels.unreachable_kernel
+            (should_boot_unreachable_kernel ~version ~batch_size:Int64.max_int)
+      );
+      ("Test write_debug kernel", `Quick, should_run_debug_kernel);
+      ("Test store-has kernel", `Quick, should_run_store_has_kernel);
+      ("Test store-list-size kernel", `Quick, should_run_store_list_size_kernel);
+      ("Test store-delete kernel", `Quick, should_run_store_delete_kernel);
+      ("Test store-move kernel", `Quick, should_run_store_move_kernel);
+      ("Test store-copy kernel", `Quick, should_run_store_copy_kernel);
+      ( "Test modifying read-only storage fails",
+        `Quick,
+        test_modify_read_only_storage_kernel );
+      ("Test snapshotable state", `Quick, test_snapshotable_state);
+      ( "Test rebuild snapshotable state",
+        `Quick,
+        test_rebuild_snapshotable_state );
+      ( "Test Stuck state is truncated on long messages",
+        `Quick,
+        test_unkown_host_function_truncated );
+      ("Test bulk no-ops function properly", `Quick, test_bulk_noops);
+      ("Test durable store io", `Quick, test_durable_store_io);
+      ( "Test /readonly/kernel/env/reboot_counter",
+        `Quick,
+        test_pvm_reboot_counter ~pvm_max_reboots:10l );
+      ("Test reboot", `Quick, test_kernel_reboot);
+      ("Test reboot takes too many reboots", `Quick, test_kernel_reboot_failing);
+      ("Test kernel upgrade ok", `Quick, test_reveal_upgrade_kernel_ok);
+      ( "Test kernel upgrade fallsback on decoding error",
+        `Quick,
+        test_reveal_upgrade_kernel_fallsback_on_error
+          ~binary:true
+          "INVALID WASM!!!" );
+      ( "Test kernel upgrade fallsback on linking error",
+        `Quick,
+        test_reveal_upgrade_kernel_fallsback_on_error
+          ~binary:false
+          {|
 (module
  (import "invalid_module" "write_debug"
          (func $write_debug (param i32 i32))))
-|});
-    tztest
-      "Test kernel upgrade fallsback on initing error"
-      `Quick
-      (test_reveal_upgrade_kernel_fallsback_on_error
-         ~binary:false
-         "(module (memory 1))");
-    tztest
-      "Test scheduling with 10 inputs in a unique inbox"
-      `Quick
-      test_scheduling_one_inbox;
-    tztest
-      "Test scheduling with 5 inboxes with a different input number"
-      `Quick
-      test_scheduling_five_inboxes;
-    tztest "Test inbox clean-up" `Quick test_inbox_cleanup;
-    tztest
-      "Test outboxes are created at each level"
-      `Quick
-      test_outboxes_at_each_level;
-    tztest
-      "Test outbox validity period clean-up"
-      `Quick
-      test_outbox_validity_period;
-  ]
+|}
+      );
+      ( "Test kernel upgrade fallsback on initing error",
+        `Quick,
+        test_reveal_upgrade_kernel_fallsback_on_error
+          ~binary:false
+          "(module (memory 1))" );
+      ( "Test scheduling with 10 inputs in a unique inbox",
+        `Quick,
+        test_scheduling_one_inbox );
+      ( "Test scheduling with 5 inboxes with a different input number",
+        `Quick,
+        test_scheduling_five_inboxes );
+      ("Test inbox clean-up", `Quick, test_inbox_cleanup);
+      ( "Test outboxes are created at each level",
+        `Quick,
+        test_outboxes_at_each_level );
+      ( "Test outbox validity period clean-up",
+        `Quick,
+        test_outbox_validity_period );
+    ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("WASM PVM", tests)]
+  |> Lwt_main.run

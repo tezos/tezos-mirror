@@ -1,0 +1,66 @@
+
+./octez-client --protocol PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/attic/auction.tz --details
+Well typed
+Gas remaining: 1039974.418 units remaining
+{ parameter key_hash ;
+  storage (pair timestamp (pair mutez key_hash)) ;
+  code { DUP
+         /* [ pair key_hash timestamp mutez key_hash
+            : pair key_hash timestamp mutez key_hash ] */ ;
+         CDAR ;
+         DUP
+         /* [ timestamp : timestamp : pair key_hash timestamp mutez key_hash ] */ ;
+         NOW
+         /* [ timestamp : timestamp : timestamp
+            : pair key_hash timestamp mutez key_hash ] */ ;
+         CMPGT ;
+         IF { FAIL } { /* [ timestamp : pair key_hash timestamp mutez key_hash ] */ } ;
+         SWAP
+         /* [ pair key_hash timestamp mutez key_hash : timestamp ] */ ;
+         DUP
+         /* [ pair key_hash timestamp mutez key_hash
+            : pair key_hash timestamp mutez key_hash : timestamp ] */ ;
+         CAR
+         /* [ key_hash : pair key_hash timestamp mutez key_hash : timestamp ] */ ;
+         DIP { CDDR }
+         /* [ key_hash : pair mutez key_hash : timestamp ] */ ;
+         AMOUNT
+         /* [ mutez : key_hash : pair mutez key_hash : timestamp ] */ ;
+         PAIR
+         /* [ pair mutez key_hash : pair mutez key_hash : timestamp ] */ ;
+         SWAP
+         /* [ pair mutez key_hash : pair mutez key_hash : timestamp ] */ ;
+         DIP { SWAP
+               /* [ timestamp : pair mutez key_hash ] */ ;
+               PAIR
+               /* [ pair timestamp mutez key_hash ] */ }
+         /* [ pair mutez key_hash : pair timestamp mutez key_hash ] */ ;
+         DUP
+         /* [ pair mutez key_hash : pair mutez key_hash : pair timestamp mutez key_hash ] */ ;
+         CAR
+         /* [ mutez : pair mutez key_hash : pair timestamp mutez key_hash ] */ ;
+         AMOUNT
+         /* [ mutez : mutez : pair mutez key_hash : pair timestamp mutez key_hash ] */ ;
+         CMPLE ;
+         IF { FAIL } { /* [ pair mutez key_hash : pair timestamp mutez key_hash ] */ } ;
+         DUP
+         /* [ pair mutez key_hash : pair mutez key_hash : pair timestamp mutez key_hash ] */ ;
+         CAR
+         /* [ mutez : pair mutez key_hash : pair timestamp mutez key_hash ] */ ;
+         DIP { CDR
+               /* [ key_hash : pair timestamp mutez key_hash ] */ ;
+               IMPLICIT_ACCOUNT
+               /* [ contract unit : pair timestamp mutez key_hash ] */ }
+         /* [ mutez : contract unit : pair timestamp mutez key_hash ] */ ;
+         UNIT
+         /* [ unit : mutez : contract unit : pair timestamp mutez key_hash ] */ ;
+         TRANSFER_TOKENS
+         /* [ operation : pair timestamp mutez key_hash ] */ ;
+         NIL operation
+         /* [ list operation : operation : pair timestamp mutez key_hash ] */ ;
+         SWAP
+         /* [ operation : list operation : pair timestamp mutez key_hash ] */ ;
+         CONS
+         /* [ list operation : pair timestamp mutez key_hash ] */ ;
+         PAIR
+         /* [ pair (list operation) timestamp mutez key_hash ] */ } }

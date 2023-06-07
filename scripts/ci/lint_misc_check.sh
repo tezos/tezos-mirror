@@ -6,10 +6,10 @@ set -eu
 find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
 
 make check-linting
-make check-python-linting
 
 # python checks
-make -C tests_python typecheck
+make check-python-linting
+make check-python-typecheck
 
 # Ensure that all unit tests are restricted to their opam package
 make lint-tests-pkg

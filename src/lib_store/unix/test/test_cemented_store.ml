@@ -23,7 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Assert_lib = Lib_test_extra.Assert_lib
+(** Testing
+    _______
+
+    Component: Store
+    Invocation: dune exec src/lib_store/unix/test/main.exe -- --file test_cemented_store.ml
+    Subject: Store tests ( block cementing )
+*)
+
 open Test_utils
 
 let assert_presence_in_cemented_store ?(with_metadata = true) cemented_store
@@ -140,8 +147,4 @@ let tests =
   in
   ("cemented store", test_cases)
 
-let () =
-  let open Lwt_syntax in
-  Lwt_main.run
-    (let* () = Tezos_base_unix.Internal_event_unix.init () in
-     Alcotest_lwt.run "tezos-store" [tests])
+let () = Lwt_main.run (Alcotest_lwt.run ~__FILE__ "tezos-store" [tests])

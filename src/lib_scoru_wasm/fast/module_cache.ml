@@ -44,7 +44,7 @@ let load_parse_module store key durable =
 
 let load_module store key durable =
   let open Lwt.Syntax in
-  let* kernel_hash = Durable.hash_exn durable key in
+  let* kernel_hash = Durable.hash_exn ~kind:Value durable key in
   let md = Kernel_cache.find_opt kernel_cache kernel_hash in
   match md with
   | None ->

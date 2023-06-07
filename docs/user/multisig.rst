@@ -1,7 +1,7 @@
 Multi-signature smart contracts
 ===============================
 
-A multi-signed account, or `multisig` for short, is a way to share the
+A multi-signed account, or *multisig* for short, is a way to share the
 ownership of an address (and of the associated balance) between
 several participants.
 
@@ -147,7 +147,7 @@ the legacy multisig contract.
 The generic multisig contract
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The :src:`generic multisig contract<tests_python/contracts_alpha/mini_scenarios/generic_multisig.tz>` is
+The :src:`generic multisig contract<michelson_test_scripts/mini_scenarios/generic_multisig.tz>` is
 the multisig contract that is currently recommended. It has the
 following features:
 
@@ -165,7 +165,7 @@ The legacy multisig contract
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``octez-client`` also supports
-:src:`a legacy version<tests_python/contracts_alpha/mini_scenarios/legacy_multisig.tz>` of the multisig contract which has the following
+:src:`a legacy version<michelson_test_scripts/mini_scenarios/legacy_multisig.tz>` of the multisig contract which has the following
 limitations:
 
 - it cannot receive tokens from unauthenticated sources, sending

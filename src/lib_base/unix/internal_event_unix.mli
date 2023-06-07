@@ -40,8 +40,12 @@ module Configuration : sig
   val of_file : string -> t tzresult Lwt.t
 end
 
+(** This is the environment variable name that contains the a list of
+    URIs on which events can be reported (see {!val:init}). *)
+val env_var_name : string
+
 (** Initialize the internal-event sinks by looking at the
-    [?configuration] argument and then at the (whitespace separated) list
+    [?internal_events] argument and then at the (whitespace separated) list
     of URIs in the ["TEZOS_EVENTS_CONFIG"] environment variable, if an URI
     does not have a scheme it is expected to be a path to a configuration
     JSON file (cf. {!Configuration.of_file}), e.g.:
@@ -50,12 +54,43 @@ end
 
     The function also initializes the {!Lwt_log_sink_unix} module
     (corresponding to the ["TEZOS_LOG"] environment variable).
+
+    - [internal_events] is the value of configured sinks of command calling
+    init.
+
+    - [log_cfg] is the configuration specific to the default sinks if
+    applicable.
 *)
 val init :
-  ?lwt_log_sink:Lwt_log_sink_unix.cfg ->
-  ?configuration:Configuration.t ->
+  ?log_cfg:Lwt_log_sink_unix.cfg ->
+  ?internal_events:Internal_event_config.t ->
   unit ->
   unit Lwt.t
 
 (** Call [close] on all the sinks. *)
 val close : unit -> unit Lwt.t
+
+(** [make_with_defaults ?enable_default_daily_logs_at ?internal_events ] creates
+    internal event configuration using default values depending on parameters.
+
+    - If [internal_events] is provided, nothing is modified. Otherwise default
+    values are used.
+
+    - [enable_default_daily_logs_at] adds daily rotating sink at the given path
+    with the following value:
+    ["file-descriptor-path:///<daily_logs_path>/daily.log
+    ?create-dirs=true&daily-logs=7&section-prefix=info&format=pp"] *)
+
+val make_with_defaults :
+  ?internal_events:Internal_event_config.t ->
+  ?enable_default_daily_logs_at:string ->
+  unit ->
+  Internal_event_config.t
+
+(** Calls [init] with the same arguments as [make_with_defaults] *)
+val init_with_defaults :
+  ?internal_events:Internal_event_config.t ->
+  ?enable_default_daily_logs_at:string ->
+  ?log_cfg:Lwt_log_sink_unix.cfg ->
+  unit ->
+  unit Lwt.t

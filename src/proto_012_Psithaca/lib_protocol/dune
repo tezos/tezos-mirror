@@ -302,6 +302,28 @@
  (action (run %{bin:octez-protocol-compiler} -warning -51 -warn-error +a .)))
 
 (library
+ (name tezos_protocol_012_Psithaca_lifted)
+ (public_name tezos-protocol-012-Psithaca.lifted)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-012-Psithaca)
+ (flags
+  (:standard)
+  -w -51
+  -nopervasives
+  -open Tezos_protocol_012_Psithaca)
+ (modules Lifted_protocol))
+
+(rule
+ (targets lifted_protocol.ml)
+ (action
+  (write-file
+   %{targets}
+   "\ninclude Environment.Lift (Protocol)\nlet hash = Protocol.hash\n")))
+
+(library
  (name tezos_protocol_012_Psithaca_functor)
  (libraries
   tezos-protocol-environment

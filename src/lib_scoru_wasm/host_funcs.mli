@@ -23,27 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [lookup name] retrieves or instantiates a host function by the given [name].
-    Currently dispatches [read_input] to {!read_input} using host function global
-    names as registered by {!register_host_funcs}.
+(** [lookup ~version name] retrieves or instantiates a host function
+    by the given [name].
+
     Used to plug host function wrappers in the WASN interpreter linker. *)
 val lookup :
+  version:Wasm_pvm_state.version ->
   Tezos_webassembly_interpreter.Ast.name ->
   Tezos_webassembly_interpreter.Instance.extern
 
-(** [lookup_opt name] is exactly [lookup name] but returns an option instead of
+(** [lookup_opt ~version name] is exactly [lookup name] but returns an option instead of
       raising `Not_found`. *)
 val lookup_opt :
+  version:Wasm_pvm_state.version ->
   Tezos_webassembly_interpreter.Ast.name ->
   Tezos_webassembly_interpreter.Instance.extern option
 
-(** [all] represents all registered host functions that are important for the
-      SCORU WASM PVM. *)
-val all : Tezos_webassembly_interpreter.Host_funcs.registry
-
-(** [all_debug] contains the same functions as [all], with the alternative
-    implementation of [write_debug]. *)
-val all_debug :
+(** [registry ~version ~write_debug] returns the host functions registry for
+    the expected PVM [version], and with the expected implementation for the
+    [write_debug] function.  *)
+val registry :
+  version:Wasm_pvm_state.version ->
   write_debug:Builtins.write_debug ->
   Tezos_webassembly_interpreter.Host_funcs.registry
 
@@ -68,8 +68,6 @@ module Error : sig
               out of bounds of a value. Has code `-4`. *)
     | Store_value_size_exceeded
         (** Writing a value has exceeded 2^31 bytes. Has code `-5`. *)
-    | Store_invalid_subkey_index
-        (** Trying to get the nth subkey, where n is too big. *)
     | Memory_invalid_access
         (** An address is out of bound of the memory. Has code `-6`. *)
     | Input_output_too_large
@@ -84,6 +82,11 @@ module Error : sig
             Has code `-10`. *)
     | Full_outbox
         (** The outbox is full an cannot accept new messages at this level. Has code `-11`. *)
+    | Store_invalid_subkey_index
+        (** Trying to get the nth subkey, where n is too big. Has code `-12`. *)
+    | Store_value_already_exists
+        (** Trying to create a value at a key that already has an associated
+            value. Has code `-13`. *)
 
   (** [code error] returns the error code associated to the error. *)
   val code : t -> int32
@@ -159,7 +162,17 @@ module Aux : sig
       key_length:int32 ->
       int32 Lwt.t
 
-    val store_delete :
+    (** [generic_store_delete ~kind ~durable ~memory ~key_offset ~key_length]
+        either removes the value if [kind = Value] or the complete directory if
+        [kind = Directory] at the given key.
+
+        [store_delete] from version 2.0.0 is actually [generic_store_delete
+        ~kind:Durable.Directory].
+
+        @since 2.0.0~r1
+    *)
+    val generic_store_delete :
+      kind:Durable.kind ->
       durable:Durable.t ->
       memory:memory ->
       key_offset:int32 ->
@@ -182,6 +195,24 @@ module Aux : sig
       from_key_length:int32 ->
       to_key_offset:int32 ->
       to_key_length:int32 ->
+      (Durable.t * int32) Lwt.t
+
+    (** [store_create ~durable ~memory ~key_offset ~key_length ~size] allocates
+        a new value under the given [key] if it doesn't exist. Returns [0] if
+        the new value has been allocated, and [Error.code
+        Store_value_already_exists] (`-13`) if there was already a value. The
+        function is tick safe: allocating won't write the data itself, hence the
+        [size] is not limited by the maximum size of an IO. It is limited to the
+        maximum size of values, which is 2GB (`Int32.max_int`).
+
+        @since 2.0.0~r1
+    *)
+    val store_create :
+      durable:Durable.t ->
+      memory:memory ->
+      key_offset:int32 ->
+      key_length:int32 ->
+      size:int32 ->
       (Durable.t * int32) Lwt.t
 
     val store_value_size :
@@ -218,12 +249,28 @@ module Aux : sig
       key_length:int32 ->
       (Durable.t * int64) Lwt.t
 
+    (** The current implementation of [store_get_nth_key] is not deterministic,
+        and should not be used in kernel development. It cannot be removed from
+        the PVM for backward compatibility reason, but it should not be used in
+        any new kernel development.
+
+        See issue https://gitlab.com/tezos/tezos/-/issues/5301
+    *)
     val store_get_nth_key :
       durable:Durable.t ->
       memory:memory ->
       key_offset:int32 ->
       key_length:int32 ->
       index:int64 ->
+      dst:int32 ->
+      max_size:int32 ->
+      int32 Lwt.t
+
+    val store_get_hash :
+      durable:Durable.t ->
+      memory:memory ->
+      key_offset:int32 ->
+      key_length:int32 ->
       dst:int32 ->
       max_size:int32 ->
       int32 Lwt.t
@@ -319,11 +366,15 @@ module Internal_for_tests : sig
 
   val store_delete : Tezos_webassembly_interpreter.Instance.func_inst
 
+  val store_delete_value : Tezos_webassembly_interpreter.Instance.func_inst
+
   val store_copy : Tezos_webassembly_interpreter.Instance.func_inst
 
   val store_move : Tezos_webassembly_interpreter.Instance.func_inst
 
   val store_value_size : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val store_create : Tezos_webassembly_interpreter.Instance.func_inst
 
   val store_read : Tezos_webassembly_interpreter.Instance.func_inst
 
@@ -332,6 +383,8 @@ module Internal_for_tests : sig
   val store_list_size : Tezos_webassembly_interpreter.Instance.func_inst
 
   val store_get_nth_key : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val store_get_hash : Tezos_webassembly_interpreter.Instance.func_inst
 
   val write_debug : Tezos_webassembly_interpreter.Instance.func_inst
 end

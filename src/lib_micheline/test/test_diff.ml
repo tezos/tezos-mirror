@@ -23,11 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Micheline
-    Invocation:   dune build @src/lib_micheline/runtest
-    Subject:      Diffing Micheline expressions
+(* Testing
+   -------
+   Component:    Micheline
+   Invocation:   dune build @src/lib_micheline/runtest
+   Subject:      Diffing Micheline expressions
 *)
 
 open Micheline

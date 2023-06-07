@@ -1,42 +1,48 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names
-  test_mem_context
-  test_mem_context_array_theory
-  test_cache
-  test_data_encoding)
+(library
+ (name src_lib_protocol_environment_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-base.unix
   tezos-protocol-environment
-  alcotest-lwt
+  octez-alcotezt
   tezos-test-helpers
   qcheck-alcotest
   lwt.unix)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_protocol_environment
-  -open Tezos_test_helpers))
+  -open Octez_alcotezt
+  -open Tezos_test_helpers)
+ (modules
+  test_mem_context
+  test_mem_context_array_theory
+  test_mem_context_common
+  test_cache
+  test_data_encoding))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_protocol_environment_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-protocol-environment)
- (action (run %{dep:./test_mem_context.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest)
- (package tezos-protocol-environment)
- (action (run %{dep:./test_mem_context_array_theory.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-environment)
- (action (run %{dep:./test_cache.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-environment)
- (action (run %{dep:./test_data_encoding.exe})))
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

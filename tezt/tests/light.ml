@@ -236,6 +236,11 @@ module NoUselessRpc = struct
         (["votes"; "proposals"], []);
       ]
     in
+    let paths =
+      if Protocol.(number protocol > number Nairobi) then
+        (["helpers"; "attestation_rights"], []) :: paths
+      else paths
+    in
     Lwt_list.iter_s
       (fun (sub_path, query_string) ->
         test_no_useless_rpc

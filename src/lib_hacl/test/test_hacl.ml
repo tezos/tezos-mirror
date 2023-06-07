@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Crypto
-    Invocation:   dune build @src/lib_hacl/runtest
+    Invocation:   dune exec src/lib_hacl/test/main.exe
     Subject:      Checking all of the HACL* primitives used in lib_crypto:
                   hashing, HMAC, NaCl, Ed25519, and P-256.
 *)
@@ -131,13 +131,9 @@ let test_sha256_seq () =
       of_hex "ddabe6c4552e944d927bd0b03dd5ab95ecdfa5a135b6c3b60416dbde57b38416"
     in
     let st = init () in
-    Printf.printf "Init done\n" ;
     update st msg ;
     update st randmsg ;
-    print_endline "Update done." ;
     let d = finish st in
-    Printf.printf "Digest size %d\n" (Bytes.length d) ;
-    print_endline "Finish done." ;
     Alcotest.(check bytes "sha256_seq" bothresp d)
   in
   one_update () ;
@@ -319,11 +315,31 @@ let test_public_ed25519 () =
   Alcotest.(check bytes "public" pk' ppk) ;
   Alcotest.(check bytes "public" pk' psk)
 
+(** Checks that Ed25519 makes the expected choices in the scope allowed by
+    RFC-8032. See [Vectors_ed25519] for more details. *)
+let test_speccheck_ed25519 () =
+  let open Vectors_ed25519 in
+  List.iter
+    (fun case ->
+      match Ed25519.pk_of_bytes (hex case.pub_key) with
+      | Some pk ->
+          let msg = hex case.message in
+          let signature = hex case.signature in
+          Alcotest.(
+            check
+              bool
+              "ed25519-speccheck"
+              (Hacl.Ed25519.verify ~pk ~msg ~signature)
+              case.expected)
+      | None -> Alcotest.fail "pk_of_bytes")
+    cases
+
 let ed25519 =
   [
     ("keypair", `Quick, test_keypair_ed25519);
     ("sign", `Quick, test_sign_ed25519);
     ("public", `Quick, test_public_ed25519);
+    ("ed25519-speccheck", `Quick, test_speccheck_ed25519);
   ]
 
 open P256
@@ -485,4 +501,4 @@ let tests =
     ("p256", p256);
   ]
 
-let () = Alcotest.run "tezos-crypto" tests
+let () = Alcotest.run ~__FILE__ "tezos-crypto" tests

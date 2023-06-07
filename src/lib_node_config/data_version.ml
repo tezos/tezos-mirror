@@ -93,15 +93,15 @@ end
  *  - (0.)0.1 : original storage
  *  - (0.)0.2 : never released
  *  - (0.)0.3 : store upgrade (introducing history mode)
- *  - (0.)0.4 : context upgrade (switching from LMDB to IRMIN v2)
- *  - (0.)0.5 : never released (but used in 10.0~rc1 and 10.0~rc2)
- *  - (0.)0.6 : store upgrade (switching from LMDB)
- *  - (0.)0.7 : new store metadata representation
- *  - (0.)0.8 : context upgrade (upgrade to irmin.3.0)
- *  - 1.0     : context upgrade (upgrade to irmin.3.3)
- *  - 2.0     : introduce context GC (upgrade to irmin.3.4)
- *  - 3.0     : change blocks' context hash semantics and upgrade to
-                irmin.3.5 *)
+ *  - (0.)0.4 : context upgrade (switching from LMDB to IRMIN v2) -- v9.0
+ *  - (0.)0.5 : never released -- v10.0~rc1 and 10.0~rc2
+ *  - (0.)0.6 : store upgrade (switching from LMDB) -- v11.0
+ *  - (0.)0.7 : new store metadata representation -- v12.1
+ *  - (0.)0.8 : context upgrade (upgrade to irmin.3.0) -- v13.0
+ *  - 1.0     : context upgrade (upgrade to irmin.3.3) -- v14.0
+ *  - 2.0     : introduce context GC (upgrade to irmin.3.4) -- v15.0
+ *  - 3.0     : change blocks' context hash semantics and introduce
+                context split (upgrade to irmin.3.5) -- v16.0 *)
 
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/2861
    We should enable the semantic versioning instead of applying
@@ -124,7 +124,13 @@ let current_version = v_3_0
    version to the current [data_version] above. If this list grows too
    much, an idea would be to have triples (version, version,
    converter), and to sequence them dynamically instead of
-   statically. *)
+   statically.
+   The list of upgradable version must be updated as soon as a new
+   upgrade function is added. We remove former upgrades if:
+   - the upgrade requires a non-automatic upgrade
+   - two automatic upgrades were already enabled
+   - we want to deprecate a specific upgrade
+*)
 let upgradable_data_version =
   let open Lwt_result_syntax in
   let v_1_0_upgrade ~data_dir =
@@ -222,7 +228,8 @@ let () =
     ~pp:(fun ppf path ->
       Format.fprintf
         ppf
-        "Tried to read version file at '%s', but the file could not be parsed."
+        "Tried to read version file at '%s', but the file could not be found \
+         or parsed."
         path)
     (function Could_not_read_data_dir_version path -> Some path | _ -> None)
     (fun path -> Could_not_read_data_dir_version path) ;
@@ -311,13 +318,12 @@ module Events = struct
       ()
 
   let aborting_upgrade =
-    declare_1
+    declare_0
       ~section
       ~level:Notice
       ~name:"aborting_upgrade"
-      ~msg:"failed to upgrade storage: {error}"
-      ~pp1:Error_monad.pp_print_trace
-      ("error", Error_monad.trace_encoding)
+      ~msg:"failed to upgrade storage"
+      ()
 
   let upgrade_status =
     declare_2
@@ -367,13 +373,11 @@ let read_version_file version_file =
   try return (Data_encoding.Json.destruct Version.encoding json)
   with _ -> tzfail (Could_not_read_data_dir_version version_file)
 
-let check_data_dir_version files data_dir =
+let check_data_dir_version data_dir =
   let open Lwt_result_syntax in
   let version_file = version_file data_dir in
   let*! file_exists = Lwt_unix.file_exists version_file in
-  if not file_exists then
-    let msg = Some (clean_directory files) in
-    tzfail (Invalid_data_dir {data_dir; msg})
+  if not file_exists then tzfail (Could_not_read_data_dir_version version_file)
   else
     let* version = read_version_file version_file in
     if Version.(equal version current_version) then return_none
@@ -415,7 +419,7 @@ let ensure_data_dir ~mode data_dir =
         | files, Is_bare ->
             let msg = Some (clean_directory files) in
             tzfail (Invalid_data_dir {data_dir; msg})
-        | files, Is_compatible -> check_data_dir_version files data_dir
+        | _, Is_compatible -> check_data_dir_version data_dir
         | _files, Exists -> return_none
       else
         let*! () = Lwt_utils_unix.create_dir ~perm:0o700 data_dir in
@@ -440,7 +444,7 @@ let upgrade_data_dir ~data_dir genesis ~chain_name ~sandbox_parameters =
           let*! () = Events.(emit update_success ()) in
           return_unit
       | Error e ->
-          let*! () = Events.(emit aborting_upgrade e) in
+          let*! () = Events.(emit aborting_upgrade) () in
           Lwt.return (Error e))
 
 let ensure_data_dir ?(mode = Is_compatible) genesis data_dir =

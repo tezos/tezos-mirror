@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name plompiler)
+ (public_name octez-plompiler)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  repr
+  stdint
+  hacl-star
+  octez-bls12-381-hash
+  octez-polynomial
+  octez-mec)
+ (preprocess (staged_pps ppx_repr ppx_deriving.show)))

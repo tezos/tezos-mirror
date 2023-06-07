@@ -72,8 +72,8 @@ val get_config : JSON.t t
 
 (** RPC: [GET /network/connections]
 
-    Returns the list of [(address, port)] pairs. *)
-val get_network_connections : (string * int) list t
+    Returns the list of [(address, port, peer_id)] tuple. *)
+val get_network_connections : (string * int * string) list t
 
 (** RPC: [GET /network/connections/<peer_id>]
 
@@ -201,6 +201,9 @@ val get_network_points : (string * JSON.t) list t
 (** RPC: [GET /network/points/<point_id>] *)
 val get_network_point : string -> JSON.t t
 
+(** RPC: [PATCH /network/points] *)
+val patch_network_point : string -> JSON.t -> unit t
+
 (** RPC: [GET /network/points/<point_id>/ban] *)
 val get_network_point_ban : string -> JSON.t t
 
@@ -224,6 +227,9 @@ val get_network_version : JSON.t t
 
 (** RPC: [GET /network/versions] *)
 val get_network_versions : JSON.t t
+
+(** RPC: [PUT /network/points/<point>] *)
+val put_network_points : string -> JSON.t t
 
 (** RPC: [GET /versions] *)
 val get_version : JSON.t t
@@ -370,7 +376,7 @@ val get_worker_prevalidator : ?chain:string -> unit -> JSON.t t
 (** RPC: [GET /errors] *)
 val get_errors : JSON.t t
 
-(** RPC: [GET /protocols *)
+(** RPC: [GET /protocols] *)
 val get_protocols : string list t
 
 (** RPC: [GET /protocols/<protocol_hash>] *)
@@ -505,6 +511,14 @@ val post_chain_block_helpers_preapply_block :
 val post_chain_block_helpers_forge_operations :
   ?chain:string -> ?block:string -> data:data -> unit -> JSON.t t
 
+(** RPC: [POST /chains/<chain>/blocks/<block>/helpers/forge_block_header]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val post_chain_block_helpers_forge_block_header :
+  ?chain:string -> ?block:string -> data:data -> unit -> JSON.t t
+
 (** RPC: [POST /chains/<chain>/blocks/<block>/helpers/scripts/simulate_operation]
 
     [chain] defaults to ["main"].
@@ -523,7 +537,7 @@ val post_chain_block_helpers_scripts_event_address :
 
 type ctxt_type = Bytes | Json
 
-(** RPC: [GET /chains/<chain>/blocks/<block>/context/raw/<ctxt_type>/<value_path>
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/raw/<ctxt_type>/<value_path>]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -607,6 +621,14 @@ type level = {
 *)
 val get_chain_block_helper_current_level :
   ?chain:string -> ?block:string -> ?offset:int -> unit -> level t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/attestation_rights]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_helper_attestation_rights :
+  ?chain:string -> ?block:string -> ?delegate:string -> unit -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/helpers/endorsing_rights]
 

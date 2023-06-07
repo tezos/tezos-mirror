@@ -43,6 +43,12 @@ type 'workload benchmark =
       closure : unit -> unit;
     }
       -> 'workload benchmark
+  | PlainWithAllocation : {
+      workload : 'workload;
+      closure : unit -> unit;
+      measure_allocation : unit -> int option;
+    }
+      -> 'workload benchmark
   | With_context : {
       workload : 'workload;
       closure : 'context -> unit;

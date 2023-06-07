@@ -12,10 +12,11 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezos-base"
   "tezos-stdlib-unix"
+  "tezt" { with-test & >= "3.1.0" }
   "tezos-stdlib" {with-test}
   "tezos-test-helpers" {with-test}
   "tezos-base-test-helpers" {with-test}
-  "alcotest-lwt" { with-test & >= "1.5.0" }
+  "octez-alcotezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]

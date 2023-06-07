@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Client
-    Invocation:   dune build @src/lib_proxy/runtest
+    Invocation:   dune exec src/lib_proxy/test/main.exe \
+                  -- --file test_light.ml
     Dependencies: src/lib_proxy/test/light_lib.ml
 *)
 
@@ -116,6 +117,7 @@ let test_parse_example_sources _ =
 
 let () =
   Alcotest.run
+    ~__FILE__
     "tezos-light"
     [
       ( "light",

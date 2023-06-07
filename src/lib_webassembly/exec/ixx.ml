@@ -1,3 +1,5 @@
+open Proto_compat
+
 exception Overflow
 
 exception DivideByZero
@@ -58,6 +60,8 @@ module type RepType = sig
   val to_hex_string : t -> string
 
   val bitwidth : int
+
+  val compare : t -> t -> int
 end
 
 module type S = sig
@@ -181,6 +185,8 @@ end
 
 module Make (Rep : RepType) : S with type bits = Rep.t and type t = Rep.t =
 struct
+  module Rep_compare = Compare.Make (Rep)
+
   (*
    * Unsigned comparison in terms of signed comparison.
    *)
@@ -192,13 +198,14 @@ struct
    * "Unsigned Short Division from Signed Division".
    *)
   let divrem_u n d =
-    if d = Rep.zero then raise DivideByZero
+    if Rep_compare.(d = Rep.zero) then raise DivideByZero
     else
       let t = Rep.shift_right d (Rep.bitwidth - 1) in
       let n' = Rep.logand n (Rep.lognot t) in
       let q = Rep.shift_left (Rep.div (Rep.shift_right_logical n' 1) d) 1 in
       let r = Rep.sub n (Rep.mul q d) in
-      if cmp_u r ( < ) d then (q, r) else (Rep.add q Rep.one, Rep.sub r d)
+      if cmp_u r Rep_compare.( < ) d then (q, r)
+      else (Rep.add q Rep.one, Rep.sub r d)
 
   type t = Rep.t
 
@@ -244,8 +251,8 @@ struct
 
   (* result is truncated toward zero *)
   let div_s x y =
-    if y = Rep.zero then raise DivideByZero
-    else if x = low_int && y = Rep.minus_one then raise Overflow
+    if Rep_compare.(y = Rep.zero) then raise DivideByZero
+    else if Rep_compare.(x = low_int && y = Rep.minus_one) then raise Overflow
     else Rep.div x y
 
   (* result is floored (which is the same as truncating for unsigned values) *)
@@ -254,7 +261,8 @@ struct
     q
 
   (* result has the sign of the dividend *)
-  let rem_s x y = if y = Rep.zero then raise DivideByZero else Rep.rem x y
+  let rem_s x y =
+    if Rep_compare.(y = Rep.zero) then raise DivideByZero else Rep.rem x y
 
   let rem_u x y =
     let _, r = divrem_u x y in
@@ -282,7 +290,8 @@ struct
   let shr_s x y = shift Rep.shift_right x y
 
   (* Check if we are storing smaller ints. *)
-  let needs_extend = shl one (Rep.of_int (Rep.bitwidth - 1)) <> Rep.min_int
+  let needs_extend =
+    Rep_compare.(shl one (Rep.of_int (Rep.bitwidth - 1)) <> Rep.min_int)
 
   (*
    * When Int is used to store a smaller int, it is stored in signed extended
@@ -312,6 +321,7 @@ struct
 
   (* clz is defined for all values, including all-zeros. *)
   let clz x =
+    let open Rep_compare in
     let rec loop acc n =
       if n = Rep.zero then Rep.bitwidth
       else if and_ n (Rep.shift_left Rep.one (Rep.bitwidth - 1)) = zero then
@@ -322,6 +332,7 @@ struct
 
   (* ctz is defined for all values, including all-zeros. *)
   let ctz x =
+    let open Rep_compare in
     let rec loop acc n =
       if n = Rep.zero then Rep.bitwidth
       else if and_ n Rep.one = Rep.one then acc
@@ -331,9 +342,11 @@ struct
 
   let popcnt x =
     let rec loop acc i n =
-      if i = 0 then acc
+      if Compare.Int.(i = 0) then acc
       else
-        let acc' = if and_ n Rep.one = Rep.one then acc + 1 else acc in
+        let acc' =
+          if Rep_compare.(and_ n Rep.one = Rep.one) then acc + 1 else acc
+        in
         loop acc' (i - 1) (Rep.shift_right_logical n 1)
     in
     Rep.of_int (loop 0 Rep.bitwidth x)
@@ -342,39 +355,40 @@ struct
     let shift = Rep.bitwidth - n in
     Rep.shift_right (Rep.shift_left x shift) shift
 
-  let eqz x = x = Rep.zero
+  let eqz x = Rep_compare.(x = Rep.zero)
 
-  let eq x y = x = y
+  let eq x y = Rep_compare.(x = y)
 
-  let ne x y = x <> y
+  let ne x y = Rep_compare.(x <> y)
 
-  let lt_s x y = x < y
+  let lt_s x y = Rep_compare.(x < y)
 
-  let lt_u x y = cmp_u x ( < ) y
+  let lt_u x y = cmp_u x Rep_compare.( < ) y
 
-  let le_s x y = x <= y
+  let le_s x y = Rep_compare.(x <= y)
 
-  let le_u x y = cmp_u x ( <= ) y
+  let le_u x y = cmp_u x Rep_compare.( <= ) y
 
-  let gt_s x y = x > y
+  let gt_s x y = Rep_compare.(x > y)
 
-  let gt_u x y = cmp_u x ( > ) y
+  let gt_u x y = cmp_u x Rep_compare.( > ) y
 
-  let ge_s x y = x >= y
+  let ge_s x y = Rep_compare.(x >= y)
 
-  let ge_u x y = cmp_u x ( >= ) y
+  let ge_u x y = cmp_u x Rep_compare.( >= ) y
 
-  let saturate_s x = sx (min (max x low_int) high_int)
+  let saturate_s x = sx Rep_compare.(min (max x low_int) high_int)
 
-  let saturate_u x = sx (min (max x Rep.zero) (as_unsigned Rep.minus_one))
+  let saturate_u x =
+    sx Rep_compare.(min (max x Rep.zero) (as_unsigned Rep.minus_one))
 
   (* add/sub for int, used for higher-precision arithmetic for I8 and I16 *)
   let add_int x y =
-    assert (Rep.bitwidth < 32) ;
+    assert (Compare.Int.(Rep.bitwidth < 32)) ;
     Rep.(of_int (to_int x + to_int y))
 
   let sub_int x y =
-    assert (Rep.bitwidth < 32) ;
+    assert (Compare.Int.(Rep.bitwidth < 32)) ;
     Rep.(of_int (to_int x - to_int y))
 
   let add_sat_s x y = saturate_s (add_int x y)
@@ -388,7 +402,7 @@ struct
   let q15mulr_sat_s x y =
     (* mul x64 y64 can overflow int64 when both are int32 min, but this is only
      * used by i16x8, so we are fine for now. *)
-    assert (Rep.bitwidth < 32) ;
+    assert (Compare.Int.(Rep.bitwidth < 32)) ;
     let x64 = Rep.to_int64 x in
     let y64 = Rep.to_int64 y in
     saturate_s (Rep.of_int64 Int64.(shift_right (add (mul x64 y64) 0x4000L) 15))
@@ -430,7 +444,7 @@ struct
     if not needs_extend then i
     else
       let sign_bit = Rep.logand (Rep.of_int (1 lsl (Rep.bitwidth - 1))) i in
-      if sign_bit = Rep.zero then i
+      if Rep_compare.(sign_bit = Rep.zero) then i
       else
         (* Build a sign-extension mask *)
         let sign_mask = Rep.shift_left Rep.minus_one Rep.bitwidth in
@@ -440,28 +454,33 @@ struct
     let open Rep in
     let len = String.length s in
     let rec parse_hex i num =
-      if i = len then num
-      else if s.[i] = '_' then parse_hex (i + 1) num
+      if Compare.Int.(i = len) then num
+      else if Compare.Char.(s.[i] = '_') then parse_hex (i + 1) num
       else
         let digit = of_int (hex_digit s.[i]) in
         require (le_u num (shr_u minus_one (of_int 4))) ;
         parse_hex (i + 1) (logor (shift_left num 4) digit)
     in
     let rec parse_dec i num =
-      if i = len then num
-      else if s.[i] = '_' then parse_dec (i + 1) num
+      if Compare.Int.(i = len) then num
+      else if Compare.Char.(s.[i] = '_') then parse_dec (i + 1) num
       else
         let digit = of_int (dec_digit s.[i]) in
-        require (lt_u num max_upper || (num = max_upper && le_u digit max_lower)) ;
+        require
+          (lt_u num max_upper
+          || (Rep_compare.(num = max_upper) && le_u digit max_lower)) ;
         parse_dec (i + 1) (add (mul num ten) digit)
     in
     let parse_int i =
-      require (len - i > 0) ;
-      if i + 2 <= len && s.[i] = '0' && s.[i + 1] = 'x' then
-        parse_hex (i + 2) zero
+      require Compare.Int.(len - i > 0) ;
+      if
+        Compare.Int.(i + 2 <= len)
+        && Compare.Char.(s.[i] = '0')
+        && Compare.Char.(s.[i + 1] = 'x')
+      then parse_hex (i + 2) zero
       else parse_dec i zero
     in
-    require (len > 0) ;
+    require Compare.Int.(len > 0) ;
     let parsed =
       match s.[0] with
       | '+' -> parse_int 1
@@ -472,30 +491,30 @@ struct
       | _ -> parse_int 0
     in
     let n = sign_extend parsed in
-    require (low_int <= n && n <= high_int) ;
+    require Rep_compare.(low_int <= n && n <= high_int) ;
     n
 
   let of_string_s s =
     let n = of_string s in
-    require (s.[0] = '-' || ge_s n Rep.zero) ;
+    require (Compare.Char.(s.[0] = '-') || ge_s n Rep.zero) ;
     n
 
   let of_string_u s =
     let n = of_string s in
-    require (s.[0] <> '+' && s.[0] <> '-') ;
+    require Compare.Char.(s.[0] <> '+' && s.[0] <> '-') ;
     n
 
   (* String conversion that groups digits for readability *)
 
   let rec add_digits buf s i j k n =
-    if i < j then (
-      if k = 0 then Buffer.add_char buf '_' ;
+    if Compare.Int.(i < j) then (
+      if Compare.Int.(k = 0) then Buffer.add_char buf '_' ;
       Buffer.add_char buf s.[i] ;
       add_digits buf s (i + 1) j ((k + n - 1) mod n) n)
 
   let group_digits n s =
     let len = String.length s in
-    let num = if s.[0] = '-' then 1 else 0 in
+    let num = if Compare.Char.(s.[0] = '-') then 1 else 0 in
     let buf = Buffer.create (len * (n + 1) / n) in
     Buffer.add_substring buf s 0 num ;
     add_digits buf s num len (((len - num) mod n) + n) n ;
@@ -504,7 +523,7 @@ struct
   let to_string_s i = group_digits 3 (Rep.to_string i)
 
   let to_string_u i =
-    if i >= Rep.zero then group_digits 3 (Rep.to_string i)
+    if Rep_compare.(i >= Rep.zero) then group_digits 3 (Rep.to_string i)
     else
       group_digits 3 (Rep.to_string (div_u i ten) ^ Rep.to_string (rem_u i ten))
 

@@ -27,7 +27,7 @@
 module Events = P2p_events.P2p_protocol
 
 type ('msg, 'peer, 'conn) config = {
-  swap_linger : Time.System.Span.t;
+  swap_linger : Time.System.Span.t option;
   pool : ('msg, 'peer, 'conn) P2p_pool.t;
   log : P2p_connection.P2p_event.t -> unit;
   connect : P2p_point.Id.t -> ('msg, 'peer, 'conn) P2p_conn.t tzresult Lwt.t;
@@ -42,15 +42,19 @@ let message conn _request size msg =
 
 module Private_answerer = struct
   let advertise conn _request _points =
+    Prometheus.Counter.inc_one P2p_metrics.Messages.advertise_received ;
     Events.(emit private_node_new_peers) conn.peer_id
 
   let bootstrap conn _request =
+    Prometheus.Counter.inc_one P2p_metrics.Messages.bootstrap_received ;
     Lwt_result.ok @@ Events.(emit private_node_peers_request) conn.peer_id
 
   let swap_request conn _request _new_point _peer =
+    Prometheus.Counter.inc_one P2p_metrics.Messages.swap_request_received ;
     Events.(emit private_node_swap_request) conn.peer_id
 
   let swap_ack conn _request _point _peer_id =
+    Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_received ;
     Events.(emit private_node_swap_ack) conn.peer_id
 
   let create conn =
@@ -71,6 +75,7 @@ module Default_answerer = struct
     let log = config.log in
     let source_peer_id = conn.peer_id in
     log (Advertise_received {source = source_peer_id}) ;
+    Prometheus.Counter.inc_one P2p_metrics.Messages.advertise_received ;
     P2p_pool.register_list_of_new_points
       ~medium:"advertise"
       ~source:conn.peer_id
@@ -82,6 +87,7 @@ module Default_answerer = struct
     let log = config.log in
     let source_peer_id = conn.peer_id in
     log (Bootstrap_received {source = source_peer_id}) ;
+    Prometheus.Counter.inc_one P2p_metrics.Messages.bootstrap_received ;
     if conn.is_private then
       let*! () = Events.(emit private_node_request) conn.peer_id in
       return_unit
@@ -95,6 +101,7 @@ module Default_answerer = struct
           match conn.write_advertise points with
           | Ok true ->
               log (Advertise_sent {source = source_peer_id}) ;
+              Prometheus.Counter.inc_one P2p_metrics.Messages.advertise_sent ;
               return_unit
           | Ok false ->
               (* TODO: https://gitlab.com/tezos/tezos/-/issues/4594
@@ -114,13 +121,15 @@ module Default_answerer = struct
     | Ok _new_conn -> (
         t.latest_successful_swap <- Time.System.now () ;
         t.log (Swap_success {source = source_peer_id}) ;
+        Prometheus.Counter.inc_one P2p_metrics.Swap.success ;
         let* () = Events.(emit swap_succeeded) new_point in
         match P2p_pool.Connection.find_by_peer_id pool current_peer_id with
-        | None -> Lwt.return_unit
+        | None -> return_unit
         | Some conn -> P2p_conn.disconnect conn)
     | Error err -> (
         t.latest_accepted_swap <- t.latest_successful_swap ;
         t.log (Swap_failure {source = source_peer_id}) ;
+        Prometheus.Counter.inc_one P2p_metrics.Swap.fail ;
         match err with
         | [Timeout] -> Events.(emit swap_interrupted) (new_point, err)
         | _ -> Events.(emit swap_failed) (new_point, err))
@@ -132,54 +141,113 @@ module Default_answerer = struct
     let connect = config.connect in
     let log = config.log in
     log (Swap_ack_received {source = source_peer_id}) ;
-    let* () = Events.(emit swap_ack_received) source_peer_id in
-    match request.last_sent_swap_request with
-    | None -> Lwt.return_unit (* ignore *)
-    | Some (_time, proposed_peer_id) -> (
-        match P2p_pool.Connection.find_by_peer_id pool proposed_peer_id with
-        | None ->
-            swap config pool source_peer_id ~connect proposed_peer_id new_point
-        | Some _ -> Lwt.return_unit)
+    Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_received ;
+    let do_swap =
+      let open Option_syntax in
+      let* _ = config.swap_linger (* Don't answer if swap is disabled. *) in
+      let* _time, proposed_peer_id =
+        (* Checks that a swap request has been sent to this connection. *)
+        request.last_sent_swap_request
+      in
+      P2p_pool.Connection.find_by_point pool new_point
+      (* Ignore the swap if the new point is already connected *)
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5211
+         Should we accept the swap if we are not yet connected
+         to the node, but already in the process of connecting to
+         it? This can raise race conditions. *)
+      |> Option.fold_f
+           ~some:(fun _ -> None)
+           ~none:(fun () ->
+             Some
+               (swap
+                  config
+                  pool
+                  source_peer_id
+                  ~connect
+                  proposed_peer_id
+                  new_point))
+    in
+    Option.value ~default:return_unit do_swap
 
   let swap_request config conn _request new_point _peer =
-    let open Lwt_syntax in
+    let open Result_syntax in
     let source_peer_id = conn.peer_id in
     let pool = config.pool in
-    let swap_linger = config.swap_linger in
     let connect = config.connect in
     let log = config.log in
     log (Swap_request_received {source = source_peer_id}) ;
-    let* () = Events.(emit swap_request_received) source_peer_id in
-    (* Ignore if already connected to peer or already swapped less than <swap_linger> ago. *)
-    let span_since_last_swap =
-      Ptime.diff
-        (Time.System.now ())
-        (Time.System.max
-           config.latest_successful_swap
-           config.latest_accepted_swap)
+    Prometheus.Counter.inc_one P2p_metrics.Messages.swap_request_received ;
+    let do_swap =
+      let* swap_linger =
+        config.swap_linger |> Option.to_result ~none:`Swap_is_disabled
+      in
+      (* Ignore if already connected to peer or already swapped less than <swap_linger> ago. *)
+      let span_since_last_swap =
+        Ptime.diff
+          (Time.System.now ())
+          (Time.System.max
+             config.latest_successful_swap
+             config.latest_accepted_swap)
+      in
+      (* We don't need to register the point here.
+         Registering the point is the responsibility of the
+         [P2p_connect_handler]. Registering the point will
+         eventually be done in [P2p_connect_handler.connect].
+
+         Moreover, registering the point here could lead to
+         chaotic interactions with the maintainance. *)
+      let new_point_info = P2p_pool.Points.info pool new_point in
+      if
+        Ptime.Span.compare span_since_last_swap swap_linger < 0
+        || not
+             (Option.fold
+                ~none:true
+                ~some:(fun new_point_info ->
+                  P2p_point_state.is_disconnected new_point_info)
+                new_point_info)
+      then (
+        log (Swap_request_ignored {source = source_peer_id}) ;
+        Prometheus.Counter.inc_one P2p_metrics.Swap.ignored ;
+        return @@ Events.(emit swap_request_ignored) source_peer_id)
+      else
+        let* source_conn =
+          P2p_pool.Connection.find_by_peer_id pool source_peer_id
+          |> Option.to_result ~none:`Couldnt_find_by_peer
+        in
+        let* proposed_point, proposed_peer_id =
+          P2p_pool.Connection.random_addr
+            pool
+            ~different_than:source_conn
+            ~no_private:true
+          |> Option.to_result ~none:(`No_swap_candidate source_peer_id)
+        in
+        let* () =
+          let* sent_succeeded =
+            conn.write_swap_ack proposed_point proposed_peer_id
+            |> Result.map_error (fun _ ->
+                   `Couldnt_write_swap_ack "Connection closed")
+          in
+          if sent_succeeded then return_unit
+          else
+            fail @@ `Couldnt_write_swap_ack "Buffer is full. Message dropped."
+        in
+        log (Swap_ack_sent {source = source_peer_id}) ;
+        Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_sent ;
+        return
+        @@ swap config pool source_peer_id ~connect proposed_peer_id new_point
     in
-    let new_point_info = P2p_pool.register_point pool new_point in
-    if
-      Ptime.Span.compare span_since_last_swap swap_linger < 0
-      || not (P2p_point_state.is_disconnected new_point_info)
-    then (
-      log (Swap_request_ignored {source = source_peer_id}) ;
-      Events.(emit swap_request_ignored) source_peer_id)
-    else
-      match P2p_pool.Connection.random_addr pool ~no_private:true with
-      | None -> Events.(emit no_swap_candidate) source_peer_id
-      | Some (proposed_point, proposed_peer_id) -> (
-          match conn.write_swap_ack proposed_point proposed_peer_id with
-          | Ok true ->
-              log (Swap_ack_sent {source = source_peer_id}) ;
-              swap
-                config
-                pool
-                source_peer_id
-                ~connect
-                proposed_peer_id
-                new_point
-          | Ok false | Error _ -> Lwt.return_unit)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5187
+       Handle silently ignored error cases. *)
+    Result.fold
+      ~ok:Fun.id
+      ~error:(function
+        | `No_swap_candidate source_peer_id ->
+            Events.(emit no_swap_candidate) source_peer_id
+        | `Couldnt_find_by_peer
+        (* The connection has been lost so ignore the request *)
+        | `Swap_is_disabled | `Couldnt_write_swap_ack _ ->
+            Lwt.return_unit)
+      do_swap
 
   let create config conn =
     P2p_answerer.

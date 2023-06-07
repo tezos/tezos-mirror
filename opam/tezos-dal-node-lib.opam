@@ -17,10 +17,6 @@ depends: [
   "tezos-client-base-unix"
   "tezos-stdlib-unix"
   "tezos-crypto-dal"
-  "tezos-stdlib" {with-test}
-  "tezos-test-helpers" {with-test}
-  "tezos-base-test-helpers" {with-test}
-  "alcotest-lwt" { with-test & >= "1.5.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]

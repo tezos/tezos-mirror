@@ -42,11 +42,11 @@ let compute_until_snapshot ~max_steps ?write_debug pvm_state =
 
 let compute_fast ~reveal_builtins ~write_debug pvm_state =
   let open Lwt.Syntax in
+  let* version = Wasm_vm.get_wasm_version pvm_state in
   (* Execute! *)
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4123
-     Support performing multiple calls to [Eval.compute]. *)
   let* durable =
     Exec.compute
+      ~version
       ~reveal_builtins
       ~write_debug
       pvm_state.durable
@@ -72,8 +72,9 @@ let compute_fast ~reveal_builtins ~write_debug pvm_state =
 
      As a consequence of these two facts, we call [compute_step] to
      avoid this penalty.*)
-  let+ pvm_state = Wasm_vm.compute_step pvm_state in
-  (pvm_state, Z.to_int64 ticks)
+  let* pvm_state = Wasm_vm.compute_step pvm_state in
+
+  Lwt.return pvm_state
 
 let rec compute_step_many accum_ticks ?reveal_builtins
     ?(write_debug = Builtins.Noop) ?(after_fast_exec = fun () -> ())
@@ -83,6 +84,13 @@ let rec compute_step_many accum_ticks ?reveal_builtins
   let eligible_for_fast_exec =
     Z.Compare.(pvm_state.max_nb_ticks <= Z.of_int64 max_steps)
   in
+  let inbox_snapshot =
+    Tezos_webassembly_interpreter.Input_buffer.snapshot pvm_state.buffers.input
+  in
+  let* outbox_snapshot =
+    Tezos_webassembly_interpreter.Output_buffer.snapshot
+      pvm_state.buffers.output
+  in
   let backup pvm_state =
     let+ pvm_state, ticks =
       Wasm_vm.compute_step_many
@@ -90,7 +98,10 @@ let rec compute_step_many accum_ticks ?reveal_builtins
         ~write_debug
         ~stop_at_snapshot
         ~max_steps
-        pvm_state
+        {
+          pvm_state with
+          buffers = {input = inbox_snapshot; output = outbox_snapshot};
+        }
     in
     (pvm_state, Int64.add accum_ticks ticks)
   in
@@ -118,11 +129,28 @@ let rec compute_step_many accum_ticks ?reveal_builtins
         | _ -> Lwt.return (pvm_state, ticks)
       in
       let go_like_the_wind () =
-        let+ pvm_state, ticks =
-          compute_fast ~write_debug ~reveal_builtins pvm_state
+        let* pvm_state = compute_fast ~write_debug ~reveal_builtins pvm_state in
+        let accum_ticks =
+          Int64.add accum_ticks (Z.to_int64 pvm_state.max_nb_ticks)
         in
         after_fast_exec () ;
-        (pvm_state, Int64.(add ticks accum_ticks))
+        let max_steps =
+          Int64.sub max_steps (Z.to_int64 pvm_state.max_nb_ticks)
+        in
+        if
+          max_steps > 0L
+          && Wasm_vm.should_compute pvm_state
+          && not stop_at_snapshot
+        then
+          (compute_step_many [@tailcall])
+            accum_ticks
+            ~max_steps
+            ~reveal_builtins
+            ~write_debug
+            ~stop_at_snapshot
+            ~after_fast_exec
+            pvm_state
+        else Lwt.return (pvm_state, accum_ticks)
       in
       match pvm_state.tick_state with
       | Snapshot -> Lwt.catch go_like_the_wind (fun _ -> backup pvm_state)
@@ -134,6 +162,8 @@ let rec compute_step_many accum_ticks ?reveal_builtins
       backup pvm_state
 
 let compute_step_many = compute_step_many 0L
+
+let get_wasm_version = Wasm_vm.get_wasm_version
 
 module Internal_for_tests = struct
   let compute_step_many_with_hooks = compute_step_many

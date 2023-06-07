@@ -28,10 +28,7 @@
    -------
    Component: Client - mockup mode
    Invocation: dune exec tezt/tests/main.exe -- --file mockup.ml
-   Subject: Unexhaustive tests of the client's --mode mockup. Unexhaustive,
-            because most tests of the mockup are written with the python
-            framework for now. It was important, though, to provide the
-            mockup's API in tezt; for other tests that use the mockup.
+   Subject: Tests of the client's --mode mockup.
 *)
 
 (* Test.
@@ -128,7 +125,7 @@ let test_calling_contract_with_global_constant_success =
   let* _ = Client.register_global_constant ~src ~value ?burn_cap client in
   let storage = "0" in
   let input = "Unit" in
-  let* result =
+  let* {storage; _} =
     Client.run_script_at
       ~storage
       ~input
@@ -136,10 +133,9 @@ let test_calling_contract_with_global_constant_success =
       ["mini_scenarios"; "999_constant"]
       protocol
   in
-  let result = String.trim result in
-  Log.info "Contract with constant output storage %s" result ;
-  if result = value then return ()
-  else Test.fail "Expected storage '%s' but got '%s'" value result
+  Log.info "Contract with constant output storage %s" storage ;
+  if storage = value then return ()
+  else Test.fail "Expected storage '%s' but got '%s'" value storage
 
 let test_calling_contract_with_global_constant_failure =
   Protocol.register_test

@@ -1,0 +1,27 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "3.0" }
+  "ocaml" { >= "4.14" }
+  "tezt" { with-test & >= "3.1.0" }
+  "tezos-stdlib" {with-test}
+  "tezos-stdlib-unix" {with-test}
+  "tezos-base" {with-test}
+  "tezos-test-helpers" {with-test}
+  "tezos-base-test-helpers" {with-test}
+  "tezos-dac-node-lib" {with-test}
+  "octez-alcotezt" {with-test}
+]
+build: [
+  ["rm" "-r" "vendors"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Test for dac node lib"

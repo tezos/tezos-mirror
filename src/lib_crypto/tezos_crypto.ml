@@ -37,6 +37,7 @@ module Hashed = struct
   module Operation_metadata_list_hash = Operation_metadata_list_hash
   module Operation_metadata_list_list_hash = Operation_metadata_list_list_hash
   module Protocol_hash = Protocol_hash
+  module Smart_rollup_address = Smart_rollup_address
 end
 
 module Signature = struct
@@ -54,4 +55,5 @@ module Crypto_box = Crypto_box
 module Hacl = Hacl
 module Helpers = Helpers
 module Rand = Rand
+module Timelock_legacy = Timelock_legacy
 module Timelock = Timelock

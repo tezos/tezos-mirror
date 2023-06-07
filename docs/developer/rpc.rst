@@ -65,7 +65,7 @@ the JSON input using command
 the JSON according to your shell rules.
 
 If you want to learn more about the exchange of RPCs between node and
-client you can pass the option `-l` and the client will print all the
+client you can pass the option ``-l`` and the client will print all the
 calls with their input/output.
 
 A useful tool to manipulate JSON is `jq <https://stedolan.github.io/jq/>`_.

@@ -39,7 +39,6 @@ These are defined in
 
 - ``lib_client/test``
 - ``lib_protocol/test``
-- ``tests_python/tests_XXX``
 
 Remove ``lib_delegate``
 -----------------------
@@ -61,16 +60,6 @@ amended.
 
 The protocol plugin registration module should be removed from
 :src:`src/bin_node/dune` and :src:`opam/octez-node.opam`.
-
-Remove Protocol From Python Tests of Current Protocol
------------------------------------------------------
-
-Tests ``test_voting_full.py`` and ``test_migration.py`` from the current
-protocol should be removed. Any mention of the protocol in
-``tests_python/tests_XXX/protocol.py`` should also be removed.
-
-These changes remove the migration testing code of the current protocol that is
-no longer necessary to test.
 
 Remove RW Commands From ``lib_client_commands``
 -----------------------------------------------

@@ -36,52 +36,14 @@ let test_script_hash_regression =
     ~title:"Test script hash regression"
     ~tags:["script"; "michelson"; "hash"]
   @@ fun protocol ->
-  let pytest_script_dir =
-    sf
-      "tests_python/contracts_%s"
-      (match protocol with
-      | Protocol.Alpha -> "alpha"
-      | _ -> sf "%03d" @@ Protocol.number protocol)
-  in
-  let scrub_script_dirs output =
-    replace_string (rex pytest_script_dir) ~by:"[CONTRACT_PATH]" output
-  in
   let hooks =
-    let Process_hooks.{on_spawn = _; on_log} = Tezos_regression.hooks in
-    (* We don't actually care about the location of the scripts *)
-    let on_log output = on_log (scrub_script_dirs output) in
     (* We don't care about the actual command invoked, only script hashes. *)
     let on_spawn _cmd _args = () in
-    Process_hooks.{on_spawn; on_log}
+    {Tezos_regression.hooks with on_spawn}
   in
-  let all_pytest_scripts =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4008
-
-       Once the location of scripts is decided upon, then we should
-       only fetch script from that location. We'll notice when that
-       happens, becase this test will fail when
-       [tests_python/contracts_NNN/] no longer exists. *)
-    let sub_dirs =
-      [
-        "attic";
-        "entrypoints";
-        "opcodes";
-        "macros";
-        "mini_scenarios";
-        "non_regression";
-        "ill_typed";
-        "legacy";
-      ]
-    in
-    List.concat_map
-      (fun dir ->
-        Sys.readdir (pytest_script_dir // dir)
-        |> Array.to_list
-        |> List.map (fun script -> pytest_script_dir // dir // script))
-      sub_dirs
-  in
+  let all_scripts = Michelson_script.(find_all protocol |> List.map path) in
   (* Sort scripts for more legible output *)
-  let scripts = all_pytest_scripts |> List.sort String.compare in
+  let scripts = all_scripts |> List.sort String.compare in
   let* client = Client.init_mockup ~protocol () in
   let* (_hashes : string list) =
     Client.hash_scripts ~hooks ~display_names:true scripts client

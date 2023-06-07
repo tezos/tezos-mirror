@@ -26,9 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (token)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/main.exe \
-                -- test "^frozen bonds"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/main.exe \
+                 -- --file test_frozen_bonds.ml
     Subject:    Frozen bonds applicable to contracts and part of their stake.
 *)
 
@@ -39,12 +38,12 @@ open Test_tez
 let ( >>>=? ) x f = x >|= Environment.wrap_tzresult >>=? f
 
 let big_random_amount () =
-  match Tez.of_mutez (Int64.add 1L (Random.int64 10_000L)) with
+  match Tez.of_mutez (Int64.add 100_000L (Random.int64 1_000_000L)) with
   | None -> assert false
   | Some x -> x
 
 let small_random_amount () =
-  match Tez.of_mutez (Int64.add 1L (Random.int64 1_000L)) with
+  match Tez.of_mutez (Int64.add 1_000L (Random.int64 10_000L)) with
   | None -> assert false
   | Some x -> x
 
@@ -673,27 +672,31 @@ let tests =
       tztest "frozen bonds - delegated balance" `Quick test_delegated_balance;
       tztest "frozen bonds - test rpcs" `Quick test_rpcs;
       tztest
-        "test: delegate, freeze, unfreeze, undelegate"
+        "delegate, freeze, unfreeze, undelegate"
         `Quick
         test_delegate_freeze_unfreeze_undelegate;
       tztest
-        "test: delegate, freeze, undelegate, unfreeze"
+        "delegate, freeze, undelegate, unfreeze"
         `Quick
         test_delegate_freeze_undelegate_unfreeze;
       tztest
-        "test: delegate, double freeze, undelegate, unfreeze"
+        "delegate, double freeze, undelegate, unfreeze"
         `Quick
         test_delegate_double_freeze_undelegate_unfreeze;
       tztest
-        "test: delegate, freeze, redelegate, unfreeze"
+        "delegate, freeze, redelegate, unfreeze"
         `Quick
         test_delegate_freeze_redelegate_unfreeze;
       tztest
-        "test: delegate, freeze, unfreeze, freeze, redelegate"
+        "delegate, freeze, unfreeze, freeze, redelegate"
         `Quick
         test_delegate_freeze_unfreeze_freeze_redelegate;
       tztest
-        "test: delegate, freeze, slash, undelegate"
+        "delegate, freeze, slash, undelegate"
         `Quick
         test_delegate_freeze_slash_undelegate;
     ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("frozen bonds", tests)]
+  |> Lwt_main.run

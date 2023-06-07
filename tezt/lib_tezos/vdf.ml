@@ -121,3 +121,10 @@ let restart vdf_baker =
   let* () = terminate vdf_baker in
   let* () = run vdf_baker in
   wait_for_ready vdf_baker
+
+module Helpers = struct
+  let is_in_nonce_revelation_stage ~nonce_revelation_threshold
+      ~(level : RPC.level) =
+    let cycle_position = Int32.of_int level.cycle_position in
+    Int32.compare cycle_position nonce_revelation_threshold < 0
+end

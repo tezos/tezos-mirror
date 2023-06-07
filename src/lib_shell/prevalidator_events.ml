@@ -33,7 +33,7 @@ let request_failed =
   declare_3
     ~section
     ~name:"request_failed"
-    ~msg:"request {view} failed ({worker_status}): {errors}"
+    ~msg:"request {view} failed {worker_status}: {errors}"
     ~level:Notice
     ~pp1:Request.pp
     ~pp2:Worker_types.pp_status
@@ -109,14 +109,32 @@ let operation_reclassified =
     ~pp1:Operation_hash.pp
     ("oph", Operation_hash.encoding)
 
-let request_completed_notice =
+let operation_injected =
+  declare_1
+    ~section
+    ~name:"operation_injected"
+    ~msg:"operation {oph} injected "
+    ~level:Notice
+    ~pp1:Operation_hash.pp
+    ("oph", Operation_hash.encoding)
+
+let operation_banned =
+  declare_1
+    ~section
+    ~name:"operation_banned"
+    ~msg:"operation {oph} banned"
+    ~level:Notice
+    ~pp1:Operation_hash.pp
+    ("oph", Operation_hash.encoding)
+
+let request_completed_info =
   declare_2
     ~section
-    ~name:"request_completed_notice"
-    ~msg:"{view} {worker_status}"
-    ~level:Notice
+    ~name:"request_completed_info"
+    ~msg:"{view} in {worker_status}"
+    ~level:Info
     ~pp1:Request.pp
-    ~pp2:Worker_types.pp_status
+    ~pp2:Worker_types.pp_status_completed
     ("view", Request.encoding)
     ("worker_status", Worker_types.request_status_encoding)
 

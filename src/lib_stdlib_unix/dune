@@ -12,6 +12,7 @@
   tezos-event-logging
   tezos-stdlib
   data-encoding
+  aches-lwt
   lwt.unix
   ipaddr.unix
   re

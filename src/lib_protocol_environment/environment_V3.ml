@@ -80,9 +80,10 @@ module type T = sig
         ('m, 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t
        and type Error_monad.shell_tztrace = Error_monad.tztrace
        and type 'a Error_monad.shell_tzresult = ('a, Error_monad.tztrace) result
-       and type Timelock.chest = Tezos_crypto.Timelock.chest
-       and type Timelock.chest_key = Tezos_crypto.Timelock.chest_key
-       and type Timelock.opening_result = Tezos_crypto.Timelock.opening_result
+       and type Timelock.chest = Tezos_crypto.Timelock_legacy.chest
+       and type Timelock.chest_key = Tezos_crypto.Timelock_legacy.chest_key
+       and type Timelock.opening_result =
+        Tezos_crypto.Timelock_legacy.opening_result
        and module Sapling = Tezos_sapling.Core.Validator_legacy
 
   type error += Ecoproto_error of Error_monad.error
@@ -172,7 +173,7 @@ struct
   end
 
   module Compare = Compare
-  module Seq = Tezos_error_monad.TzLwtreslib.Seq
+  module Seq = Tezos_protocol_environment_structs.V3.Seq
 
   module List = struct
     include Tezos_error_monad.TzLwtreslib.List
@@ -275,7 +276,7 @@ struct
   module Secp256k1 = Signature.Secp256k1
   module P256 = Signature.P256
   module Signature = Signature.V0
-  module Timelock = Tezos_crypto.Timelock
+  module Timelock = Tezos_crypto.Timelock_legacy
 
   module S = struct
     module type T = Tezos_base.S.T
@@ -1210,7 +1211,8 @@ struct
     let acceptable_pass op =
       match acceptable_passes op with [n] -> Some n | _ -> None
 
-    (* Fake mempool *)
+    (* Fake mempool that can be successfully initialized but cannot
+       accept any operations. *)
     module Mempool = struct
       type t = unit
 
@@ -1245,7 +1247,11 @@ struct
       let encoding = Data_encoding.unit
 
       let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
-        Lwt.return_ok ((), Unchanged)
+        let msg =
+          "The mempool cannot accept any operations because it does not \
+           support the current protocol."
+        in
+        Lwt.return_error (Validation_error [Exn (Failure msg)])
 
       let remove_operation () _ = ()
 

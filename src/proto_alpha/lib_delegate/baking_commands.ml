@@ -214,6 +214,13 @@ let sources_param =
          "name of the delegate owning the endorsement/baking right or name of \
           the consensus key signing on the delegate's behalf")
 
+let endpoint_arg =
+  Tezos_clic.arg
+    ~long:"dal-node"
+    ~placeholder:"uri"
+    ~doc:"endpoint of the DAL node, e.g. 'http://localhost:8933'"
+    (Tezos_clic.parameter (fun _ s -> return @@ Uri.of_string s))
+
 let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
     =
   let open Tezos_clic in
@@ -223,8 +230,120 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
   [
     command
       ~group
+      ~desc:"Benchmark the proof of work challenge resolution"
+      (args2
+         (default_arg
+            ~doc:"Proof of work threshold"
+            ~long:"threshold"
+            ~placeholder:"int"
+            ~default:
+              (Int64.to_string
+                 Default_parameters.constants_mainnet.proof_of_work_threshold)
+            (parameter (fun (cctxt : Protocol_client_context.full) x ->
+                 try return (Int64.of_string x)
+                 with _ -> cctxt#error "Expect an integer")))
+         (arg
+            ~doc:"Random seed"
+            ~long:"seed"
+            ~placeholder:"int"
+            (parameter (fun (cctxt : Protocol_client_context.full) x ->
+                 try return (int_of_string x)
+                 with _ -> cctxt#error "Expect an integer"))))
+      (prefix "bench"
+      @@ param
+           ~name:"nb_draw"
+           ~desc:"number of draws"
+           (parameter (fun (cctxt : Protocol_client_context.full) x ->
+                match int_of_string x with
+                | x when x >= 1 -> return x
+                | _ | (exception _) ->
+                    cctxt#error "Expect a strictly positive integer"))
+      @@ fixed ["baking"; "PoW"; "challenges"])
+      (fun (proof_of_work_threshold, seed) nb_draw cctxt ->
+        let open Lwt_result_syntax in
+        let*! () =
+          cctxt#message
+            "Running %d iterations of proof-of-work challenge..."
+            nb_draw
+        in
+        let rstate =
+          match seed with
+          | None -> Random.State.make_self_init ()
+          | Some s -> Random.State.make [|s|]
+        in
+        let* all =
+          List.map_es
+            (fun i ->
+              let level = Int32.of_int (Random.State.int rstate (1 lsl 29)) in
+              let shell_header =
+                Tezos_base.Block_header.
+                  {
+                    level;
+                    proto_level = 1;
+                    (* uint8 *)
+                    predecessor = Tezos_crypto.Hashed.Block_hash.zero;
+                    timestamp = Time.Protocol.epoch;
+                    validation_passes = 3;
+                    (* uint8 *)
+                    operations_hash =
+                      Tezos_crypto.Hashed.Operation_list_list_hash.zero;
+                    fitness = [];
+                    context = Tezos_crypto.Hashed.Context_hash.zero;
+                  }
+              in
+              let now = Time.System.now () in
+              let* _ =
+                Baking_pow.mine
+                  ~proof_of_work_threshold
+                  shell_header
+                  (fun proof_of_work_nonce ->
+                    Protocol.Alpha_context.
+                      {
+                        Block_header.payload_hash =
+                          Protocol.Block_payload_hash.zero;
+                        payload_round = Round.zero;
+                        seed_nonce_hash = None;
+                        proof_of_work_nonce;
+                        liquidity_baking_toggle_vote = LB_pass;
+                      })
+              in
+              let _then = Time.System.now () in
+              let x = Ptime.diff _then now in
+              let*! () = cctxt#message "%d/%d: %a" i nb_draw Ptime.Span.pp x in
+              return x)
+            (1 -- nb_draw)
+        in
+        let sum = List.fold_left Ptime.Span.add Ptime.Span.zero all in
+        let base, tail = Stdlib.List.(hd all, tl all) in
+        let max =
+          List.fold_left
+            (fun x y -> if Ptime.Span.compare x y > 0 then x else y)
+            base
+            tail
+        in
+        let min =
+          List.fold_left
+            (fun x y -> if Ptime.Span.compare x y <= 0 then x else y)
+            base
+            tail
+        in
+        let div = Ptime.Span.to_float_s sum /. float (List.length all) in
+        let*! () =
+          cctxt#message
+            "%d runs: min: %a, max: %a, average: %a"
+            nb_draw
+            Ptime.Span.pp
+            min
+            Ptime.Span.pp
+            max
+            (Format.pp_print_option Ptime.Span.pp)
+            (Ptime.Span.of_float_s div)
+        in
+        return_unit);
+    command
+      ~group
       ~desc:"Forge and inject block using the delegates' rights."
-      (args9
+      (args10
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
          minimal_nanotez_per_byte_arg
@@ -233,7 +352,8 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
          force_switch
          operations_arg
          context_path_arg
-         do_not_monitor_node_mempool_arg)
+         do_not_monitor_node_mempool_arg
+         endpoint_arg)
       (prefixes ["bake"; "for"] @@ sources_param)
       (fun ( minimal_fees,
              minimal_nanotez_per_gas_unit,
@@ -243,7 +363,8 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
              force,
              extra_operations,
              context_path,
-             do_not_monitor_node_mempool )
+             do_not_monitor_node_mempool,
+             dal_node_endpoint )
            pkhs
            cctxt ->
         get_delegates cctxt pkhs >>=? fun delegates ->
@@ -258,6 +379,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ~monitor_node_mempool:(not do_not_monitor_node_mempool)
           ?extra_operations
           ?context_path
+          ?dal_node_endpoint
           delegates);
     command
       ~group
@@ -314,8 +436,8 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
 
 let directory_parameter =
   Tezos_clic.parameter (fun _ p ->
-      if not (Sys.file_exists p && Sys.is_directory p) then
-        failwith "Directory doesn't exist: '%s'" p
+      Lwt_utils_unix.dir_exists p >>= fun exists ->
+      if not exists then failwith "Directory doesn't exist: '%s'" p
       else return p)
 
 let per_block_vote_file_arg =
@@ -325,6 +447,72 @@ let per_block_vote_file_arg =
     ~long:"votefile"
     ~placeholder:"filename"
     (Tezos_clic.parameter (fun _ s -> return s))
+
+type baking_mode = Local of {local_data_dir_path : string} | Remote
+
+let baker_args =
+  Tezos_clic.args10
+    pidfile_arg
+    minimal_fees_arg
+    minimal_nanotez_per_gas_unit_arg
+    minimal_nanotez_per_byte_arg
+    force_apply_switch_arg
+    keep_alive_arg
+    liquidity_baking_toggle_vote_arg
+    per_block_vote_file_arg
+    operations_arg
+    endpoint_arg
+
+let run_baker
+    ( pidfile,
+      minimal_fees,
+      minimal_nanotez_per_gas_unit,
+      minimal_nanotez_per_byte,
+      force_apply,
+      keep_alive,
+      liquidity_baking_toggle_vote,
+      per_block_vote_file,
+      extra_operations,
+      dal_node_endpoint ) baking_mode sources cctxt =
+  let per_block_vote_file_or_default =
+    match per_block_vote_file with
+    | None -> Baking_configuration.default_per_block_vote_file
+    | Some arg -> arg
+  in
+  (* We don't let the user run the baker without providing some
+     option (CLI, file path, or file in default location) for
+     the toggle vote. *)
+  Liquidity_baking_vote_file.read_liquidity_baking_toggle_vote_on_startup
+    ~default:liquidity_baking_toggle_vote
+    ~per_block_vote_file:per_block_vote_file_or_default
+  >>=? fun (liquidity_baking_toggle_vote, vote_file_present) ->
+  let per_block_vote_file =
+    match (per_block_vote_file, vote_file_present) with
+    | Some _, _ | None, true -> Some per_block_vote_file_or_default
+    | None, false -> None
+  in
+  may_lock_pidfile pidfile @@ fun () ->
+  get_delegates cctxt sources >>=? fun delegates ->
+  let context_path =
+    match baking_mode with
+    | Local {local_data_dir_path} ->
+        Some Filename.Infix.(local_data_dir_path // "context")
+    | Remote -> None
+  in
+  Client_daemon.Baker.run
+    cctxt
+    ~minimal_fees
+    ~minimal_nanotez_per_gas_unit
+    ~minimal_nanotez_per_byte
+    ~liquidity_baking_toggle_vote
+    ?per_block_vote_file
+    ?extra_operations
+    ?dal_node_endpoint
+    ~force_apply
+    ?context_path
+    ~chain:cctxt#chain
+    ~keep_alive
+    delegates
 
 let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
   let open Tezos_clic in
@@ -338,65 +526,24 @@ let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
     command
       ~group
       ~desc:"Launch the baker daemon."
-      (args9
-         pidfile_arg
-         minimal_fees_arg
-         minimal_nanotez_per_gas_unit_arg
-         minimal_nanotez_per_byte_arg
-         force_apply_switch_arg
-         keep_alive_arg
-         liquidity_baking_toggle_vote_arg
-         per_block_vote_file_arg
-         operations_arg)
+      baker_args
       (prefixes ["run"; "with"; "local"; "node"]
       @@ param
            ~name:"node_data_path"
            ~desc:"Path to the node data directory (e.g. $HOME/.tezos-node)"
            directory_parameter
       @@ sources_param)
-      (fun ( pidfile,
-             minimal_fees,
-             minimal_nanotez_per_gas_unit,
-             minimal_nanotez_per_byte,
-             force_apply,
-             keep_alive,
-             liquidity_baking_toggle_vote,
-             per_block_vote_file,
-             extra_operations )
-           node_data_path
-           sources
-           cctxt ->
-        let per_block_vote_file_or_default =
-          match per_block_vote_file with
-          | None -> Baking_configuration.default_per_block_vote_file
-          | Some arg -> arg
-        in
-        (* We don't let the user run the baker without providing some option (CLI, file path, or file in default location) for the toggle vote. *)
-        Liquidity_baking_vote_file.read_liquidity_baking_toggle_vote_on_startup
-          ~default:liquidity_baking_toggle_vote
-          ~per_block_vote_file:per_block_vote_file_or_default
-        >>=? fun (liquidity_baking_toggle_vote, vote_file_present) ->
-        let per_block_vote_file =
-          match (per_block_vote_file, vote_file_present) with
-          | Some _, _ | None, true -> Some per_block_vote_file_or_default
-          | None, false -> None
-        in
-        may_lock_pidfile pidfile @@ fun () ->
-        get_delegates cctxt sources >>=? fun delegates ->
-        let context_path = Filename.Infix.(node_data_path // "context") in
-        Client_daemon.Baker.run
-          cctxt
-          ~minimal_fees
-          ~minimal_nanotez_per_gas_unit
-          ~minimal_nanotez_per_byte
-          ~liquidity_baking_toggle_vote
-          ?per_block_vote_file
-          ?extra_operations
-          ~force_apply
-          ~chain:cctxt#chain
-          ~context_path
-          ~keep_alive
-          delegates);
+      (fun args local_data_dir_path sources cctxt ->
+        let baking_mode = Local {local_data_dir_path} in
+        run_baker args baking_mode sources cctxt);
+    command
+      ~group
+      ~desc:"Launch the baker daemon using RPCs only."
+      baker_args
+      (prefixes ["run"; "remotely"] @@ sources_param)
+      (fun args sources cctxt ->
+        let baking_mode = Remote in
+        run_baker args baking_mode sources cctxt);
     command
       ~group
       ~desc:"Launch the VDF daemon"

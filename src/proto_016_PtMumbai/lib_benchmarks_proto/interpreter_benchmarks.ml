@@ -28,7 +28,6 @@ let ns = Interpreter_model.ns
 
 let fv = Interpreter_model.fv
 
-module Timelock_samplers = Tezos_crypto.Timelock
 open Protocol
 
 (* ------------------------------------------------------------------------- *)
@@ -261,12 +260,14 @@ let make_benchmark :
 
     let tags = tags @ more_tags
 
+    let module_filename = __FILE__
+
+    let generated_code_destination = None
+
     let models =
       (* [intercept = true] implies there's a benchmark with [intercept = false].
          No need to register the model twice. *)
-      Interpreter_model.make_model
-        ?amplification
-        (if intercept then None else Some (Instr_name name))
+      Interpreter_model.make_model ?amplification (Instr_name name)
 
     let info, name =
       info_and_name
@@ -544,12 +545,13 @@ let make_continuation_benchmark :
     include Default_config
     include Default_boilerplate
 
+    let module_filename = __FILE__
+
+    let generated_code_destination = None
+
     let tags = tags @ more_tags
 
-    let models =
-      Interpreter_model.make_model
-        ?amplification
-        (if intercept then None else Some (Cont_name name))
+    let models = Interpreter_model.make_model ?amplification (Cont_name name)
 
     let info, name =
       info_and_name
@@ -651,6 +653,10 @@ module Registration_section = struct
       let name = ns "amplification_loop"
 
       let info = "Benchmarking the cost of an empty loop"
+
+      let module_filename = __FILE__
+
+      let generated_code_destination = None
 
       let tags = [Tags.interpreter]
 
@@ -2701,12 +2707,16 @@ module Registration_section = struct
 
         let info = info
 
+        let module_filename = __FILE__
+
+        let generated_code_destination = None
+
         include Default_config
         include Default_boilerplate
 
         let models =
           Interpreter_model.make_model
-            (Some (Instr_name Interpreter_workload.N_ISapling_verify_update))
+            (Instr_name Interpreter_workload.N_ISapling_verify_update)
 
         let stack_type =
           let spl_state = sapling_state memo_size in
@@ -3124,6 +3134,8 @@ module Registration_section = struct
   end
 
   module Timelock = struct
+    module Timelock_samplers = Tezos_crypto.Timelock_legacy
+
     let name = Interpreter_workload.N_IOpen_chest
 
     let stack_type =

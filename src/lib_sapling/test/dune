@@ -3,9 +3,11 @@
 
 (env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
 
-(executables
- (names test_rustzcash test_keys test_merkle test_roots test_sapling)
+(library
+ (name src_lib_sapling_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-sapling
   tezos-crypto
   str
@@ -15,47 +17,25 @@
   tezos-stdlib-unix
   data-encoding
   tezos-base-test-helpers
-  alcotest-lwt)
- (link_flags
-  (:standard)
-  (:include %{workspace_root}/macos-link-flags.sexp))
+  octez-alcotezt)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_sapling
   -open Tezos_stdlib
   -open Data_encoding
-  -open Tezos_base_test_helpers)
- (modules (:standard \ test_js)))
-
-(rule
- (alias runtest)
- (package tezos-sapling)
- (deps vectors.csv vectors-zip32.csv)
- (action (run %{dep:./test_rustzcash.exe})))
-
-(rule
- (alias runtest)
- (package tezos-sapling)
- (deps vectors.csv vectors-zip32.csv)
- (action (run %{dep:./test_keys.exe})))
-
-(rule
- (alias runtest)
- (package tezos-sapling)
- (deps vectors.csv vectors-zip32.csv)
- (action (run %{dep:./test_merkle.exe})))
-
-(rule
- (alias runtest)
- (package tezos-sapling)
- (deps vectors.csv vectors-zip32.csv)
- (action (run %{dep:./test_roots.exe})))
-
-(rule
- (alias runtest)
- (package tezos-sapling)
- (deps vectors.csv vectors-zip32.csv)
- (action (run %{dep:./test_sapling.exe})))
+  -open Tezos_base_test_helpers
+  -open Octez_alcotezt)
+ (modules
+  test_rustzcash
+  test_keys
+  test_merkle
+  test_roots
+  test_sapling
+  keys
+  example))
 
 (executable
  (name test_js)
@@ -73,3 +53,25 @@
  (alias runtest_js)
  (package tezos-sapling)
  (action (run node %{dep:./test_js.bc.js})))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_sapling_test_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos-sapling)
+ (deps vectors.csv vectors-zip32.csv)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

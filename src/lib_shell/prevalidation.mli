@@ -24,16 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
-
-   This file is part of the implementation of the new mempool, which
-   uses features of the protocol that only exist since Lima.
-
-   When you modify this file, consider whether you should also change
-   the files that implement the legacy mempool for Kathmandu. They all
-   start with the "legacy" prefix and will be removed when Lima is
-   activated on Mainnet. *)
-
 (** A newly received block is validated by replaying locally the block
     creation, applying each operation and its finalization to ensure their
     consistency. This module is stateless and creates and manipulates the
@@ -58,7 +48,7 @@ module type T = sig
       production, and mocked in tests *)
   type chain_store
 
-  (** The state used internally by this module. Created by {!create}
+  (** The state used internally by this module. Created by {!val-create}
       and then passed back and possibly updated by {!add_operation} and
       {!remove_operation}.
 
@@ -99,26 +89,26 @@ module type T = sig
     | Prevalidator_classification.error_classification ]
     Lwt.t
 
-  (** If an old operation has been replaced by a newly added
-      operation, then this type contains its hash and its new
-      classification. If there is no replaced operation, this is [None]. *)
-  type replacement =
-    (Operation_hash.t * Prevalidator_classification.error_classification) option
+  (** Contain the hash and new classification of any operations that
+      had to be removed to make room for the newly validated
+      operation. *)
+  type replacements =
+    (Operation_hash.t * Prevalidator_classification.error_classification) list
 
   (** Result of {!add_operation}.
 
       Contain the updated (or unchanged) state {!t},
       the operation (in which [count_successful_prechecks]
       has been incremented if appropriate), its classification,
-      and the potential {!replacement}.
+      and the potential {!replacements}.
 
-      Invariant: [replacement] can only be [Some _] when the
+      Invariant: [replacements] can only be non-empty when the
       classification is [`Prechecked]. *)
   type add_result =
     t
     * protocol_operation Shell_operation.operation
     * Prevalidator_classification.classification
-    * replacement
+    * replacements
 
   (** Call the protocol [Mempool.add_operation] function, providing it
       with the [conflict_handler] from the plugin.
@@ -143,16 +133,16 @@ module type T = sig
   module Internal_for_tests : sig
     (** Return the map of operations currently present in the protocol
         representation of the mempool. *)
-    val get_valid_operations : t -> protocol_operation Operation_hash.Map.t
+    val get_mempool_operations : t -> protocol_operation Operation_hash.Map.t
 
     (** Return the filter_state component of the state. *)
     val get_filter_state : t -> filter_state
 
-    (** Type {!Tezos_protocol_environment.PROTOCOL.Mempool.validation_info}. *)
-    type validation_info
+    (** Type {!Tezos_protocol_environment.PROTOCOL.Mempool.t}. *)
+    type mempool
 
-    (** Modify the [validation_info] field of the internal state [t]. *)
-    val set_validation_info : t -> validation_info -> t
+    (** Modify the [mempool] field of the internal state [t]. *)
+    val set_mempool : t -> mempool -> t
   end
 end
 
@@ -197,6 +187,5 @@ module Internal_for_tests : sig
        and type filter_state = Filter.Mempool.state
        and type filter_config = Filter.Mempool.config
        and type chain_store = Chain_store.chain_store
-       and type Internal_for_tests.validation_info =
-        Filter.Proto.Mempool.validation_info
+       and type Internal_for_tests.mempool = Filter.Proto.Mempool.t
 end

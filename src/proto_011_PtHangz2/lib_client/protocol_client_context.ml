@@ -23,12 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Lifted_protocol = struct
-  include Environment.Lift (Protocol)
-
-  let hash = Protocol.hash
-end
-
+module Lifted_protocol = Tezos_protocol_011_PtHangz2_lifted.Lifted_protocol
 module Alpha_block_services =
   Block_services.Make (Lifted_protocol) (Lifted_protocol)
 

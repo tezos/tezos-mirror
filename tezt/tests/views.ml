@@ -30,15 +30,6 @@
    Subject:      Call smart contract views to catch performance regressions.
 *)
 
-let contract_path protocol kind contract =
-  sf
-    "file:tests_python/contracts_%s/%s/%s"
-    (match protocol with
-    | Protocol.Alpha -> "alpha"
-    | _ -> sf "%03d" @@ Protocol.number protocol)
-    kind
-    contract
-
 let hooks = Tezos_regression.hooks
 
 let test_regression =
@@ -103,30 +94,32 @@ let test_regression =
   unit
 
 let deploy_lib_contract ?(amount = Tez.zero) ~protocol client =
-  Client.originate_contract
-    ~hooks
-    ~burn_cap:Tez.one
-    ~alias:"lib"
-    ~amount
-    ~src:Constant.bootstrap1.alias
-    ~prg:(contract_path protocol "opcodes" "view_toplevel_lib.tz")
-    ~init:"3"
-    client
+  let* _alias, contract =
+    Client.originate_contract_at
+      ~hooks
+      ~burn_cap:Tez.one
+      ~amount
+      ~src:Constant.bootstrap1.alias
+      ~init:"3"
+      client
+      ["opcodes"; "view_toplevel_lib"]
+      protocol
+  in
+  return contract
 
 let test_run_view protocol ~contract ~init ~expected =
   let* client = Client.init_mockup ~protocol () in
   let* lib_contract = deploy_lib_contract ~protocol client in
-  let prg = contract_path protocol "opcodes" @@ sf "view_%s.tz" contract in
-  let* contract =
-    Client.originate_contract
+  let* _alias, contract =
+    Client.originate_contract_at
       ~hooks
       ~burn_cap:Tez.one
-      ~alias:"view"
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg
       ~init
       client
+      ["opcodes"; sf "view_%s" contract]
+      protocol
   in
   let arg = sf "(Pair 10 \"%s\")" lib_contract in
   let* () =
@@ -172,16 +165,16 @@ let test_create_contract =
     ~tags:["client"; "michelson"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* contract =
-    Client.originate_contract
+  let* _alias, contract =
+    Client.originate_contract_at
       ~hooks
       ~burn_cap:Tez.one
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(contract_path protocol "opcodes" "create_contract_with_view.tz")
       ~init:"None"
-      ~alias:"view"
       client
+      ["opcodes"; "create_contract_with_view"]
+      protocol
   in
   let* () =
     Client.transfer
@@ -197,16 +190,16 @@ let test_create_contract =
     Client.contract_storage ~unparsing_mode:Optimized contract client
   in
   let addr = String.sub addr 5 @@ (String.length addr - 5) in
-  let* contract =
-    Client.originate_contract
+  let* _alias, contract =
+    Client.originate_contract_at
       ~hooks
       ~burn_cap:Tez.one
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(contract_path protocol "opcodes" "view_op_constant.tz")
       ~init:"2"
-      ~alias:"contract"
       client
+      ["opcodes"; "view_op_constant"]
+      protocol
   in
   let expected = "10" in
   let* () =
@@ -237,16 +230,16 @@ let test_view_step_constant =
   let* lib_contract =
     deploy_lib_contract ~protocol ~amount:(Tez.of_mutez_int amount) client
   in
-  let* contract =
-    Client.originate_contract
+  let* _alias, contract =
+    Client.originate_contract_at
       ~hooks
       ~burn_cap:Tez.one
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(contract_path protocol "opcodes" "view_op_test_step_contants.tz")
       ~init:"None"
-      ~alias:"view"
       client
+      ["opcodes"; "view_op_test_step_contants"]
+      protocol
   in
   let* () =
     Client.transfer
@@ -279,16 +272,16 @@ let test_view_step_constant =
 let test_consts_after_view ~contract ~expected protocol =
   let* client = Client.init_mockup ~protocol () in
   let* lib_contract = deploy_lib_contract ~protocol client in
-  let* contract =
-    Client.originate_contract
+  let* _alias, contract =
+    Client.originate_contract_at
       ~hooks
       ~burn_cap:Tez.one
       ~amount:Tez.one
       ~src:Constant.bootstrap1.alias
-      ~prg:(contract_path protocol "opcodes" @@ sf "%s.tz" contract)
       ~init:(sf "%S" lib_contract)
-      ~alias:"view"
       client
+      ["opcodes"; contract]
+      protocol
   in
   let* () =
     Client.transfer
@@ -353,16 +346,16 @@ let test_balance_after_view ~contract protocol =
   let* lib_contract = deploy_lib_contract ~protocol client in
   let contract_amount = Tez.of_int 1000 in
   let transfer_amount = Tez.of_int 10 in
-  let* contract =
-    Client.originate_contract
+  let* _alias, contract =
+    Client.originate_contract_at
       ~hooks
       ~burn_cap:Tez.one
       ~amount:contract_amount
       ~src:Constant.bootstrap1.alias
-      ~prg:(contract_path protocol "opcodes" @@ sf "%s.tz" contract)
       ~init:"0"
-      ~alias:"view"
       client
+      ["opcodes"; contract]
+      protocol
   in
   let* () =
     Client.transfer
@@ -401,16 +394,16 @@ let test_balance_after_view_suite protocols =
 let test_amount_after_view ~contract protocol =
   let* client = Client.init_mockup ~protocol () in
   let* lib_contract = deploy_lib_contract ~protocol client in
-  let* contract =
-    Client.originate_contract
+  let* _alias, contract =
+    Client.originate_contract_at
       ~hooks
       ~burn_cap:Tez.one
       ~amount:Tez.(of_int 1000)
       ~src:Constant.bootstrap1.alias
-      ~prg:(contract_path protocol "opcodes" @@ sf "%s.tz" contract)
       ~init:"0"
-      ~alias:"view"
       client
+      ["opcodes"; contract]
+      protocol
   in
   let amount = Tez.of_int 3 in
   let* () =
@@ -450,16 +443,16 @@ let test_recursive_view =
     ~tags:["client"; "michelson"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* contract =
-    Client.originate_contract
+  let* _alias, contract =
+    Client.originate_contract_at
       ~hooks
       ~burn_cap:Tez.one
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(contract_path protocol "opcodes" "view_rec.tz")
       ~init:"Unit"
-      ~alias:"view"
       client
+      ["opcodes"; "view_rec"]
+      protocol
   in
   Client.spawn_transfer
     ~hooks
@@ -474,16 +467,18 @@ let test_recursive_view =
 
 let test_typecheck ~contract ~error protocol =
   let* client = Client.init_mockup ~protocol () in
-  Client.spawn_originate_contract
-    ~hooks
-    ~burn_cap:Tez.one
-    ~amount:Tez.zero
-    ~src:Constant.bootstrap1.alias
-    ~prg:(contract_path protocol "ill_typed" @@ sf "%s.tz" contract)
-    ~init:"4"
-    ~alias:"view"
-    client
-  |> Process.check_error ~msg:error
+  let _alias, process =
+    Client.spawn_originate_contract_at
+      ~hooks
+      ~burn_cap:Tez.one
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.alias
+      ~init:"4"
+      client
+      ["ill_typed"; contract]
+      protocol
+  in
+  process |> Process.check_error ~msg:error
 
 let test_typecheck_suite protocols =
   [
@@ -527,7 +522,7 @@ let test_typecheck_suite protocols =
        (test_typecheck ~contract ~error)
        protocols
 
-let register protocols =
+let register ~protocols =
   test_regression protocols ;
   test_all_view_runs protocols ;
   test_create_contract protocols ;

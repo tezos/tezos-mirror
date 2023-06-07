@@ -101,7 +101,6 @@ val admin_instr_encoding : Eval.admin_instr Tezos_tree_encoding.t
 
 val frame_encoding : Eval.frame Tezos_tree_encoding.t
 
-val config_encoding :
-  host_funcs:Host_funcs.registry -> Eval.config Tezos_tree_encoding.t
+val config_encoding : Eval.config Tezos_tree_encoding.t
 
 val buffers_encoding : Eval.buffers Tezos_tree_encoding.t

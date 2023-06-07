@@ -1,31 +1,63 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name main)
+(library
+ (name src_proto_alpha_lib_protocol_test_integration_operations_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
-  alcotest-lwt
+  tezt.core
+  octez-alcotezt
   tezos-base
   tezos-protocol-alpha
   tezos-client-alpha
   tezos-alpha-test-helpers
   tezos-base-test-helpers
   tezos-protocol-plugin-alpha)
- (link_flags
-  (:standard)
-  (:include %{workspace_root}/macos-link-flags.sexp))
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Octez_alcotezt
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_protocol_alpha
   -open Tezos_client_alpha
   -open Tezos_alpha_test_helpers
   -open Tezos_base_test_helpers
-  -open Tezos_protocol_plugin_alpha))
+  -open Tezos_protocol_plugin_alpha)
+ (modules
+  test_activation
+  test_combined_operations
+  test_failing_noop
+  test_origination
+  test_paid_storage_increase
+  test_reveal
+  test_sc_rollup_transfer
+  test_sc_rollup
+  test_transfer
+  test_voting
+  test_zk_rollup
+  test_transfer_ticket))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_proto_alpha_lib_protocol_test_integration_operations_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-protocol-alpha-tests)
  (deps (glob_files contracts/*))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

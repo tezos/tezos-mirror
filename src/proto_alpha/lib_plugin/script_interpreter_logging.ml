@@ -173,14 +173,23 @@ module Stack_utils = struct
                continuation = k;
                reconstruct = (fun k -> ISwap (loc, k));
              }
-    | IConst (loc, a, x, k), s ->
+    | IPush (loc, a, x, k), s ->
         let s = Item_t (a, s) in
         ok
         @@ Ex_split_kinstr
              {
                cont_init_stack = s;
                continuation = k;
-               reconstruct = (fun k -> IConst (loc, a, x, k));
+               reconstruct = (fun k -> IPush (loc, a, x, k));
+             }
+    | IUnit (loc, k), s ->
+        let s = Item_t (unit_t, s) in
+        ok
+        @@ Ex_split_kinstr
+             {
+               cont_init_stack = s;
+               continuation = k;
+               reconstruct = (fun k -> IUnit (loc, k));
              }
     | ICons_pair (loc, k), Item_t (a, Item_t (b, s)) ->
         pair_t dummy a b >|? fun (Ty_ex_c c) ->
@@ -263,7 +272,7 @@ module Stack_utils = struct
                reconstruct = (fun body k -> IOpt_map {loc; body; k});
              }
     | ICons_left (loc, b, k), Item_t (a, s) ->
-        union_t dummy a b >|? fun (Ty_ex_c c) ->
+        or_t dummy a b >|? fun (Ty_ex_c c) ->
         let s = Item_t (c, s) in
         Ex_split_kinstr
           {
@@ -272,7 +281,7 @@ module Stack_utils = struct
             reconstruct = (fun k -> ICons_left (loc, b, k));
           }
     | ICons_right (loc, a, k), Item_t (b, s) ->
-        union_t dummy a b >|? fun (Ty_ex_c c) ->
+        or_t dummy a b >|? fun (Ty_ex_c c) ->
         let s = Item_t (c, s) in
         Ex_split_kinstr
           {
@@ -281,7 +290,7 @@ module Stack_utils = struct
             reconstruct = (fun k -> ICons_right (loc, a, k));
           }
     | ( IIf_left {loc; branch_if_left; branch_if_right; k},
-        Item_t (Union_t (a, b, _meta, _), s) ) ->
+        Item_t (Or_t (a, b, _meta, _), s) ) ->
         ok
         @@ Ex_split_if
              {
@@ -984,7 +993,7 @@ module Stack_utils = struct
                continuation = k;
                reconstruct = (fun body k -> ILoop (loc, body, k));
              }
-    | ILoop_left (loc, kl, kr), Item_t (Union_t (a, b, _meta, _), s) ->
+    | ILoop_left (loc, kl, kr), Item_t (Or_t (a, b, _meta, _), s) ->
         ok
         @@ Ex_split_loop_may_fail
              {
@@ -1693,7 +1702,7 @@ module Stack_utils = struct
             reconstruct = (fun k -> IJoin_tickets (loc, ty, k));
           }
     | IOpen_chest (loc, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
-        let s = Item_t (union_bytes_bool_t, s) in
+        let s = Item_t (or_bytes_bool_t, s) in
         ok
         @@ Ex_split_kinstr
              {
@@ -1962,7 +1971,7 @@ module Logger (Base : Logger_base) = struct
         let k' = instrument_cont logger (assert_some sty) k in
         ok @@ KReturn (stack, sty, k')
     | KLoop_in_left (ki, k) ->
-        let (Item_t (Union_t (a_ty, b_ty, _, _), rest)) = stack_ty in
+        let (Item_t (Or_t (a_ty, b_ty, _, _), rest)) = stack_ty in
         let ki' = enable_log (Item_t (a_ty, rest)) ki in
         let k' = instrument_cont logger (Item_t (b_ty, rest)) k in
         ok @@ KLoop_in_left (ki', k')
@@ -2065,7 +2074,7 @@ module Logger (Base : Logger_base) = struct
             in
             (step [@ocaml.tailcall]) g gas body ks' v stack)
     | IIf_left {branch_if_left; branch_if_right; k; _} -> (
-        let (Item_t (Union_t (lty, rty, _, _), rest)) = sty in
+        let (Item_t (Or_t (lty, rty, _, _), rest)) = sty in
         branched_final_stack_type
           [
             Ex_init_stack_ty (Item_t (lty, rest), branch_if_left);

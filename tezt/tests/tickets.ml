@@ -849,13 +849,8 @@ let test_originated_implicit_can_be_equipotent =
   unit
 
 let setup_sc_enabled_node protocol ~parameters_ty =
-  let parameters =
-    match protocol with
-    | Protocol.Alpha | Mumbai -> []
-    | _ -> [(["sc_rollup_enable"], `Bool true)]
-  in
   let base = Either.right (protocol, None) in
-  let* parameter_file = Protocol.write_parameter_file ~base parameters in
+  let* parameter_file = Protocol.write_parameter_file ~base [] in
   let nodes_args =
     Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
   in
@@ -866,6 +861,7 @@ let setup_sc_enabled_node protocol ~parameters_ty =
     Client.Sc_rollup.(
       originate
         ~burn_cap:(Tez.of_int 2)
+        ~alias:"rollup"
         ~src:Constant.bootstrap1.alias
         ~kind:"wasm_2_0_0"
         ~parameters_ty

@@ -1,44 +1,54 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names test_proxy test_fuzzing_proxy_getter test_light test_fuzzing_light)
+(library
+ (name src_lib_proxy_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-base
   tezos-base.unix
   tezos-stdlib-unix
   tezos-proxy
   tezos-base-test-helpers
   tezos-test-helpers
-  tezos-shell-services-test-helpers
+  tezos_proxy_test_helpers_shell_services
   qcheck-alcotest
-  alcotest-lwt
+  octez-alcotezt
   uri)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezos_base_test_helpers
+  -open Tezos_test_helpers
+  -open Octez_alcotezt)
+ (modules
+  test_proxy
+  test_fuzzing_proxy_getter
+  test_light
+  test_fuzzing_light
+  light_lib))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_proxy_test_tezt_lib
+  tezt)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
- (flags
-  (:standard)
-  -open Tezos_base.TzPervasives
-  -open Tezos_base_test_helpers
-  -open Tezos_test_helpers))
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-proxy)
- (action (run %{dep:./test_proxy.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest)
- (package tezos-proxy)
- (action (run %{dep:./test_fuzzing_proxy_getter.exe})))
-
-(rule
- (alias runtest)
- (package tezos-proxy)
- (action (run %{dep:./test_light.exe})))
-
-(rule
- (alias runtest)
- (package tezos-proxy)
- (action (run %{dep:./test_fuzzing_light.exe})))
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

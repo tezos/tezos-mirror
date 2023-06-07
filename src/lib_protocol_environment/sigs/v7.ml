@@ -4683,17 +4683,17 @@ module Compact : sig
 
   (** [or_int32 ~i32_title ~alt_title ?alt_description c] creates a new
       compact encoding for the disjunction of
-      any type [a] (see {!case}) with [int32]. It uses the same number
+      any type [a] (see {!val-case}) with [int32]. It uses the same number
       of bits as {!int32}, that is 2, and uses the spare tag ([11]) within
       this size for values of type [a].
 
       @param i32_title is used as a prefix to each of the int32 cases' title.
 
-      @param alt_title is used as the title of the alt case. (See {!case} and
+      @param alt_title is used as the title of the alt case. (See {!val-case} and
       {!union} for details.)
 
       @param alt_description is used as the description of the alternate case.
-      (See {!case} and {!union} for details.) *)
+      (See {!val-case} and {!union} for details.) *)
   val or_int32 :
     int32_title:string ->
     alt_title:string ->
@@ -4763,7 +4763,7 @@ module Compact : sig
         of a value is [M.(partial_encoding (layout v) v)].
 
         It is the user's responsibility to ensure that all the values of [M]
-        follow the invariants documented in {!S}. *)
+        follow the invariants documented in {!module-type-S}. *)
     val make : (module S with type input = 'a) -> 'a t
   end
 end
@@ -4980,8 +4980,8 @@ end
 (** {2 Signatures and a functor} *)
 
 (** [COMPARABLE] is a signature for basic comparison. It is used only for
-    instantiating full comparison modules of signature {!S} via the functor
-    {!Make}. *)
+    instantiating full comparison modules of signature {!module-type-S} via the
+    functor {!Make}. *)
 module type COMPARABLE = sig
   type t
 
@@ -11273,13 +11273,13 @@ module type PROTOCOL = sig
             yet which operations will be included in the future block.
 
             The provided [block_header_data] is not expected to be the final
-            value of the field of the same type in the {!block_header} of the
-            constructed block. Instead, it should be a protocol-specific,
+            value of the field of the same type in the {!type-block_header} of
+            the constructed block. Instead, it should be a protocol-specific,
             good enough, "prototype" of the final value. E.g. if the
-            {!block_header_data} type for the current economic protocol
-            includes a signature, then the provided [block_header_data]
-            should contain a fake signature (since providing a correct
-            signature is not possible at this stage). *)
+            {!block_header_data} type for the current economic protocol includes
+            a signature, then the provided [block_header_data] should contain a
+            fake signature (since providing a correct signature is not possible
+            at this stage). *)
     | Partial_construction of {
         predecessor_hash : Block_hash.t;
         timestamp : Time.t;

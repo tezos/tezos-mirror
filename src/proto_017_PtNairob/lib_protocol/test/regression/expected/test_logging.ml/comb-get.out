@@ -1,0 +1,234 @@
+
+trace
+  - CAR (interp) @ location: 11
+    [ (Pair (Pair 1 4 2 Unit) Unit) ]
+  - CAR (entry) @ location: 11
+    [ (Pair (Pair 1 4 2 Unit) Unit) ]
+    - log/DUP (exit) @ location: 11
+      [ (Pair 1 4 2 Unit) ]
+  - DUP (entry) @ location: 12
+    [ (Pair 1 4 2 Unit) ]
+    - log/CAR (exit) @ location: 12
+      [ (Pair 1 4 2 Unit)
+        (Pair 1 4 2 Unit) ]
+  - CAR (entry) @ location: 13
+    [ (Pair 1 4 2 Unit)
+      (Pair 1 4 2 Unit) ]
+    - log/PUSH (exit) @ location: 13
+      [ 1
+        (Pair 1 4 2 Unit) ]
+  - PUSH (entry) @ location: 14
+    [ 1
+      (Pair 1 4 2 Unit) ]
+    - log/COMPARE (exit) @ location: 14
+      [ 1
+        1
+        (Pair 1 4 2 Unit) ]
+  - COMPARE (entry) @ location: 19
+    [ 1
+      1
+      (Pair 1 4 2 Unit) ]
+    - log/EQ (exit) @ location: 19
+      [ 0
+        (Pair 1 4 2 Unit) ]
+  - EQ (entry) @ location: 20
+    [ 0
+      (Pair 1 4 2 Unit) ]
+    - log/IF (exit) @ location: 20
+      [ True
+        (Pair 1 4 2 Unit) ]
+  - IF (entry) @ location: 21
+    [ True
+      (Pair 1 4 2 Unit) ]
+    - log/[halt] (exit) @ location: 21
+      [ (Pair 1 4 2 Unit) ]
+  - [halt] (entry) @ location: 27
+    [ (Pair 1 4 2 Unit) ]
+    - control: KCons
+    - log/DUP (exit) @ location: 21
+      [ (Pair 1 4 2 Unit) ]
+  - DUP (entry) @ location: 27
+    [ (Pair 1 4 2 Unit) ]
+    - log/GET (exit) @ location: 27
+      [ (Pair 1 4 2 Unit)
+        (Pair 1 4 2 Unit) ]
+  - GET (entry) @ location: 28
+    [ (Pair 1 4 2 Unit)
+      (Pair 1 4 2 Unit) ]
+    - log/PUSH (exit) @ location: 28
+      [ 1
+        (Pair 1 4 2 Unit) ]
+  - PUSH (entry) @ location: 30
+    [ 1
+      (Pair 1 4 2 Unit) ]
+    - log/COMPARE (exit) @ location: 30
+      [ 1
+        1
+        (Pair 1 4 2 Unit) ]
+  - COMPARE (entry) @ location: 35
+    [ 1
+      1
+      (Pair 1 4 2 Unit) ]
+    - log/EQ (exit) @ location: 35
+      [ 0
+        (Pair 1 4 2 Unit) ]
+  - EQ (entry) @ location: 36
+    [ 0
+      (Pair 1 4 2 Unit) ]
+    - log/IF (exit) @ location: 36
+      [ True
+        (Pair 1 4 2 Unit) ]
+  - IF (entry) @ location: 37
+    [ True
+      (Pair 1 4 2 Unit) ]
+    - log/[halt] (exit) @ location: 37
+      [ (Pair 1 4 2 Unit) ]
+  - [halt] (entry) @ location: 43
+    [ (Pair 1 4 2 Unit) ]
+    - control: KCons
+    - log/DUP (exit) @ location: 37
+      [ (Pair 1 4 2 Unit) ]
+  - DUP (entry) @ location: 43
+    [ (Pair 1 4 2 Unit) ]
+    - log/GET (exit) @ location: 43
+      [ (Pair 1 4 2 Unit)
+        (Pair 1 4 2 Unit) ]
+  - GET (entry) @ location: 44
+    [ (Pair 1 4 2 Unit)
+      (Pair 1 4 2 Unit) ]
+    - log/PUSH (exit) @ location: 44
+      [ 4
+        (Pair 1 4 2 Unit) ]
+  - PUSH (entry) @ location: 46
+    [ 4
+      (Pair 1 4 2 Unit) ]
+    - log/COMPARE (exit) @ location: 46
+      [ 4
+        4
+        (Pair 1 4 2 Unit) ]
+  - COMPARE (entry) @ location: 51
+    [ 4
+      4
+      (Pair 1 4 2 Unit) ]
+    - log/EQ (exit) @ location: 51
+      [ 0
+        (Pair 1 4 2 Unit) ]
+  - EQ (entry) @ location: 52
+    [ 0
+      (Pair 1 4 2 Unit) ]
+    - log/IF (exit) @ location: 52
+      [ True
+        (Pair 1 4 2 Unit) ]
+  - IF (entry) @ location: 53
+    [ True
+      (Pair 1 4 2 Unit) ]
+    - log/[halt] (exit) @ location: 53
+      [ (Pair 1 4 2 Unit) ]
+  - [halt] (entry) @ location: 59
+    [ (Pair 1 4 2 Unit) ]
+    - control: KCons
+    - log/DUP (exit) @ location: 53
+      [ (Pair 1 4 2 Unit) ]
+  - DUP (entry) @ location: 59
+    [ (Pair 1 4 2 Unit) ]
+    - log/GET (exit) @ location: 59
+      [ (Pair 1 4 2 Unit)
+        (Pair 1 4 2 Unit) ]
+  - GET (entry) @ location: 60
+    [ (Pair 1 4 2 Unit)
+      (Pair 1 4 2 Unit) ]
+    - log/PUSH (exit) @ location: 60
+      [ 2
+        (Pair 1 4 2 Unit) ]
+  - PUSH (entry) @ location: 62
+    [ 2
+      (Pair 1 4 2 Unit) ]
+    - log/COMPARE (exit) @ location: 62
+      [ 2
+        2
+        (Pair 1 4 2 Unit) ]
+  - COMPARE (entry) @ location: 67
+    [ 2
+      2
+      (Pair 1 4 2 Unit) ]
+    - log/EQ (exit) @ location: 67
+      [ 0
+        (Pair 1 4 2 Unit) ]
+  - EQ (entry) @ location: 68
+    [ 0
+      (Pair 1 4 2 Unit) ]
+    - log/IF (exit) @ location: 68
+      [ True
+        (Pair 1 4 2 Unit) ]
+  - IF (entry) @ location: 69
+    [ True
+      (Pair 1 4 2 Unit) ]
+    - log/[halt] (exit) @ location: 69
+      [ (Pair 1 4 2 Unit) ]
+  - [halt] (entry) @ location: 75
+    [ (Pair 1 4 2 Unit) ]
+    - control: KCons
+    - log/DUP (exit) @ location: 69
+      [ (Pair 1 4 2 Unit) ]
+  - DUP (entry) @ location: 75
+    [ (Pair 1 4 2 Unit) ]
+    - log/GET (exit) @ location: 75
+      [ (Pair 1 4 2 Unit)
+        (Pair 1 4 2 Unit) ]
+  - GET (entry) @ location: 76
+    [ (Pair 1 4 2 Unit)
+      (Pair 1 4 2 Unit) ]
+    - log/PUSH (exit) @ location: 76
+      [ Unit
+        (Pair 1 4 2 Unit) ]
+  - PUSH (entry) @ location: 78
+    [ Unit
+      (Pair 1 4 2 Unit) ]
+    - log/COMPARE (exit) @ location: 78
+      [ Unit
+        Unit
+        (Pair 1 4 2 Unit) ]
+  - COMPARE (entry) @ location: 81
+    [ Unit
+      Unit
+      (Pair 1 4 2 Unit) ]
+    - log/EQ (exit) @ location: 81
+      [ 0
+        (Pair 1 4 2 Unit) ]
+  - EQ (entry) @ location: 82
+    [ 0
+      (Pair 1 4 2 Unit) ]
+    - log/IF (exit) @ location: 82
+      [ True
+        (Pair 1 4 2 Unit) ]
+  - IF (entry) @ location: 83
+    [ True
+      (Pair 1 4 2 Unit) ]
+    - log/[halt] (exit) @ location: 83
+      [ (Pair 1 4 2 Unit) ]
+  - [halt] (entry) @ location: 89
+    [ (Pair 1 4 2 Unit) ]
+    - control: KCons
+    - log/DROP (exit) @ location: 83
+      [ (Pair 1 4 2 Unit) ]
+  - DROP (entry) @ location: 89
+    [ (Pair 1 4 2 Unit) ]
+    - log/PUSH (exit) @ location: 89
+      [  ]
+  - PUSH (entry) @ location: 90
+    [  ]
+    - log/NIL (exit) @ location: 90
+      [ Unit ]
+  - NIL (entry) @ location: 91
+    [ Unit ]
+    - log/PAIR (exit) @ location: 91
+      [ {}
+        Unit ]
+  - PAIR (entry) @ location: 93
+    [ {}
+      Unit ]
+    - log/[halt] (exit) @ location: 93
+      [ (Pair {} Unit) ]
+  - [halt] (entry) @ location: 10
+    [ (Pair {} Unit) ]
+    - control: KNil

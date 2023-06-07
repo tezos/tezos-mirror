@@ -123,9 +123,15 @@ let is_directory file_name =
   let+ s = Lwt_unix.stat file_name in
   s.st_kind = S_DIR
 
+let dir_exists path =
+  Lwt.try_bind
+    (fun () -> Lwt_unix.stat path)
+    (fun {st_kind; _} -> Lwt.return (st_kind = S_DIR))
+    (function Unix.Unix_error _ -> Lwt.return_false | e -> raise e)
+
 let remove_dir dir =
+  let open Lwt_syntax in
   let rec remove dir =
-    let open Lwt_syntax in
     let files = Lwt_unix.files_of_directory dir in
     let* () =
       Lwt_stream.iter_s
@@ -138,8 +144,8 @@ let remove_dir dir =
     in
     Lwt_unix.rmdir dir
   in
-  if Sys.file_exists dir && Sys.is_directory dir then remove dir
-  else Lwt.return_unit
+  let* dir_exists = dir_exists dir in
+  if dir_exists then remove dir else Lwt.return_unit
 
 let rec create_dir ?(perm = 0o755) dir =
   let open Lwt_syntax in
@@ -233,7 +239,8 @@ let copy_dir ?(perm = 0o755) src dst =
           else copy_file ~src:file ~dst:(Filename.concat dst_dir basename))
       files
   in
-  if Sys.file_exists src && Sys.is_directory src then copy_dir src dst
+  let* src_dir_exists = dir_exists src in
+  if src_dir_exists then copy_dir src dst
   else Lwt.fail (Unix.Unix_error (Unix.ENOTDIR, "", "copy_dir"))
 
 let of_sockaddr = function

@@ -113,7 +113,7 @@ let init_p2p chain_name p2p_params disable_mempool =
           conn_metadata_cfg
           message_cfg
       in
-      let*! () = Node_event.(emit p2p_event) "p2p_maintain_started" in
+      let*! () = Node_event.(emit p2p_event) "p2p_maintenance_started" in
       return p2p |> trace Failed_to_init_P2P
 
 type config = {
@@ -124,6 +124,7 @@ type config = {
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
   data_dir : string;
+  external_validator_log_config : External_validation.log_config;
   store_root : string;
   context_root : string;
   protocol_root : string;
@@ -153,7 +154,7 @@ let test_protocol_hashes =
 let store_known_protocols store =
   let open Lwt_syntax in
   let embedded_protocols = Registered_protocol.seq_embedded () in
-  Seq.iter_s
+  Seq.S.iter
     (fun protocol_hash ->
       match Store.Protocol.mem store protocol_hash with
       | true -> Node_event.(emit store_protocol_already_included) protocol_hash
@@ -205,6 +206,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       user_activated_protocol_overrides;
       operation_metadata_size_limit;
       data_dir;
+      external_validator_log_config;
       store_root;
       context_root;
       protocol_root;
@@ -268,6 +270,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
                process_path = Sys.executable_name;
                sandbox_parameters;
                dal_config = dal;
+               log_config = external_validator_log_config;
              })
       in
       let commit_genesis ~chain_id =

@@ -1,0 +1,28 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "3.0" }
+  "ocaml" { >= "4.14" }
+  "tezos-base"
+  "tezos-protocol-017-PtNairob"
+  "tezos-client-commands"
+  "tezos-client-base"
+  "tezos-client-base-unix"
+  "tezos-client-017-PtNairob"
+  "tezos-smart-rollup-017-PtNairob"
+  "tezos-smart-rollup-layer2-017-PtNairob"
+  "tezos-clic"
+]
+build: [
+  ["rm" "-r" "vendors"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Tezos/Protocol: Smart rollup client"

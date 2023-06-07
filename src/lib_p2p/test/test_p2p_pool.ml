@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_pool
+    Invocation:   dune exec src/lib_p2p/test/test_p2p_pool.exe
     Dependencies: src/lib_p2p/test/process.ml
     Subject:      Testing of the Pool
                   Each test launches nodes in separate process, each node
@@ -46,7 +46,7 @@ type error += Connect | Write | Read
 module Simple = struct
   let rec connect ~timeout connect_handler pool point =
     let open Lwt_syntax in
-    let* () = lwt_log_info "Connect to %a" P2p_point.Id.pp point in
+    let* () = lwt_debug "Connect to %a" P2p_point.Id.pp point in
     let* r = P2p_connect_handler.connect connect_handler point ~timeout in
     match r with
     | Error (Tezos_p2p_services.P2p_errors.Connected :: _) -> (
@@ -61,7 +61,7 @@ module Simple = struct
           | Timeout | Tezos_p2p_services.P2p_errors.Rejected _ ) as head_err)
         :: _) ->
         let* () =
-          lwt_log_info
+          lwt_debug
             "Connection to %a failed (%a)@."
             P2p_point.Id.pp
             point
@@ -126,16 +126,16 @@ module Simple = struct
         node.pool
         node.points
     in
-    let*! () = lwt_log_info "Bootstrap OK@." in
+    let*! () = lwt_debug "Bootstrap OK@." in
     let* () = Node.sync node in
     let* () = write_all conns Node.Ping in
-    let*! () = lwt_log_info "Sent all messages.@." in
+    let*! () = lwt_debug "Sent all messages.@." in
     let* () = Node.sync node in
     let* () = read_all conns in
-    let*! () = lwt_log_info "Read all messages.@." in
+    let*! () = lwt_debug "Read all messages.@." in
     let* () = Node.sync node in
     let*! () = close_all conns in
-    let*! () = lwt_log_info "All connections successfully closed.@." in
+    let*! () = lwt_debug "All connections successfully closed.@." in
     return_unit
 
   let run points = Node.detach_nodes (fun _ -> node) points
@@ -164,7 +164,7 @@ module Random_connections = struct
     let*! () = P2p_conn.disconnect conn in
     let*! () =
       decr rem ;
-      if !rem mod total = 0 then lwt_log_info "Remaining: %d.@." (!rem / total)
+      if !rem mod total = 0 then lwt_debug "Remaining: %d.@." (!rem / total)
       else Lwt.return_unit
     in
     if n > 1 then connect_random connect_handler pool total rem point (pred n)
@@ -179,11 +179,11 @@ module Random_connections = struct
 
   let node repeat (node : Node.t) =
     let open Lwt_result_syntax in
-    let*! () = lwt_log_info "Begin random connections.@." in
+    let*! () = lwt_debug "Begin random connections.@." in
     let* () =
       connect_random_all node.connect_handler node.pool node.points repeat
     in
-    let*! () = lwt_log_info "Random connections OK.@." in
+    let*! () = lwt_debug "Random connections OK.@." in
     return_unit
 
   let run points repeat = Node.detach_nodes (fun _ -> node repeat) points
@@ -203,7 +203,7 @@ module Garbled = struct
         true
     | Ok _ -> false
     | Error err ->
-        log_info "Unexpected error: %a@." pp_print_trace err ;
+        debug "Unexpected error: %a@." pp_print_trace err ;
         false
 
   let write_bad_all conns =
@@ -257,7 +257,7 @@ module Overcrowded = struct
   let rec connect ?iter_count ~timeout connect_handler pool point =
     let open Lwt_syntax in
     let* () =
-      lwt_log_info
+      lwt_debug
         "Connect%a to %a@."
         (fun ppf iter_count ->
           Option.iter (Format.fprintf ppf " to peer %d") iter_count)
@@ -279,7 +279,7 @@ module Overcrowded = struct
            | Timeout | Tezos_p2p_services.P2p_errors.Rejected _ ) as err);
         ] ->
         let* () =
-          lwt_log_info
+          lwt_debug
             "Connection to%a %a failed (%a)@."
             (fun ppf iter_count ->
               Option.iter (Format.fprintf ppf " peer %d") iter_count)
@@ -341,7 +341,7 @@ module Overcrowded = struct
     match r with
     | Ok conn ->
         let*! () =
-          lwt_log_info
+          lwt_debug
             "Not good: connection accepted while it should be rejected (local: \
              %d, remote: %d).@."
             port
@@ -360,7 +360,7 @@ module Overcrowded = struct
         ] as err ->
         if legacy then
           let*! () =
-            lwt_log_info
+            lwt_debug
               "Good: client is rejected without point list (local: %d, remote: \
                %d)@."
               port
@@ -369,7 +369,7 @@ module Overcrowded = struct
           return_unit
         else
           let*! () =
-            lwt_log_info
+            lwt_debug
               "Not good: client is rejected without point list (local: %d, \
                remote: %d)@."
               port
@@ -382,7 +382,7 @@ module Overcrowded = struct
             {alternative_points = Some alternative_points; _};
         ] ->
         let*! () =
-          lwt_log_info
+          lwt_debug
             "Good: client is rejected with point list (local: %d, remote: %d) \
              @[%a@]@."
             port
@@ -412,11 +412,11 @@ module Overcrowded = struct
     let unknowns, _known = client_knowledge pool all_points in
     let advert_succeed = unknowns = [] in
     if legacy || advert_succeed then
-      log_info
+      debug
         "Good: Advertisement%s worked as intended.@."
         (if legacy then " legacy" else "")
     else
-      log_info
+      debug
         "@[<v 2>Not Good: advertisement failure. legacy %b. unknowns :  @[%a@]\n\
          \t knowns : @[%a@].@."
         legacy
@@ -460,7 +460,7 @@ module Overcrowded = struct
     let* () = client_check node.pool node.points legacy in
     let* () = Node.sync node in
     (* sync 4 *)
-    let*! () = lwt_log_info "client closing.@." in
+    let*! () = lwt_debug "client closing.@." in
     return_unit
 
   (** Code of the target that should be overcrowded by all the clients. *)
@@ -488,7 +488,7 @@ module Overcrowded = struct
     let _pool_log =
       Lwt_stream.iter (debug "p2p event %a" P2p_connection.P2p_event.pp) log
     in
-    let*! () = lwt_log_info "Target waiting@." in
+    let*! () = lwt_debug "Target waiting@." in
     let* () = Node.sync node in
     (* sync 2 *)
     let* () = Node.sync node in
@@ -496,7 +496,7 @@ module Overcrowded = struct
     let* () = Node.sync node in
     (* sync 4 *)
     Lwt_watcher.shutdown stopper ;
-    let*! () = lwt_log_info "Target closing.@." in
+    let*! () = lwt_debug "Target closing.@." in
     return_unit
 
   let node i = if i = 0 then target else client false
@@ -569,7 +569,7 @@ module No_common_network = struct
   let rec connect ?iter_count ~timeout connect_handler pool point =
     let open Lwt_syntax in
     let* () =
-      lwt_log_info
+      lwt_debug
         "Connect%a to @[%a@]@."
         (fun ppf iter_count ->
           Option.iter (Format.fprintf ppf " to peer %d") iter_count)
@@ -591,7 +591,7 @@ module No_common_network = struct
            | Timeout | Tezos_p2p_services.P2p_errors.Rejected _ ) as err);
         ] ->
         let* () =
-          lwt_log_info
+          lwt_debug
             "Connection to%a %a failed (%a)@."
             (fun ppf iter_count ->
               Option.iter (Format.fprintf ppf " peer %d") iter_count)
@@ -645,7 +645,7 @@ module No_common_network = struct
     match r with
     | Ok conn ->
         let*! () =
-          lwt_log_info
+          lwt_debug
             "Not good: connection accepted while it should be rejected.@."
         in
         let*! () = P2p_conn.disconnect conn in
@@ -654,7 +654,7 @@ module No_common_network = struct
         [Tezos_p2p_services.P2p_errors.Rejected_no_common_protocol {announced}]
       ->
         let*! () =
-          lwt_log_info
+          lwt_debug
             "Good: Connection cannot be established,no common network with \
              @[%a@].@."
             Network_version.pp
@@ -674,16 +674,16 @@ module No_common_network = struct
     in
     let* () = Node.sync node in
     (* sync 2 *)
-    let*! () = lwt_log_info "client closing.@." in
+    let*! () = lwt_debug "client closing.@." in
     return_unit
 
   (** Code of the target that should be overcrowded by all the clients. *)
   let target (node : Node.t) =
     let open Lwt_result_syntax in
-    let*! () = lwt_log_info "Target waiting.@." in
+    let*! () = lwt_debug "Target waiting.@." in
     let* () = Node.sync node in
     (* sync 2 *)
-    let*! () = lwt_log_info "Target closing.@." in
+    let*! () = lwt_debug "Target closing.@." in
     return_unit
 
   let node i = if i = 0 then target else client
@@ -718,120 +718,45 @@ end
 
 let () = Random.self_init ()
 
-let addr = ref Ipaddr.V6.localhost
-
-let port = ref None
-
-let clients = ref 10
-
-let repeat_connections = ref 5
-
-let log_config = ref None
-
-let spec =
-  Arg.
-    [
-      ( "--port",
-        Int (fun p -> port := Some p),
-        " Listening port of the first peer." );
-      ( "--addr",
-        String (fun p -> addr := Ipaddr.V6.of_string_exn p),
-        " Listening addr" );
-      ("--clients", Set_int clients, " Number of concurrent clients.");
-      ( "--repeat",
-        Set_int repeat_connections,
-        " Number of connections/disconnections." );
-      ( "-v",
-        Unit
-          (fun () ->
-            log_config :=
-              Some
-                (Lwt_log_sink_unix.create_cfg
-                   ~rules:
-                     "test.p2p.connection-pool -> info; p2p.connection-pool -> \
-                      info"
-                   ())),
-        " Log up to info msgs" );
-      ( "-vv",
-        Unit
-          (fun () ->
-            log_config :=
-              Some
-                (Lwt_log_sink_unix.create_cfg
-                   ~rules:
-                     "test.p2p.connection-pool -> debug; p2p.connection-pool \
-                      -> debug"
-                   ())),
-        " Log up to debug msgs" );
-      ( "-vvv",
-        Unit
-          (fun () ->
-            log_config :=
-              Some
-                (Lwt_log_sink_unix.create_cfg
-                   ~rules:
-                     "test.p2p.connection-pool -> debug;p2p.connection-pool -> \
-                      debug;p2p.connection -> debug"
-                   ())),
-        " Log up to debug msgs, socket included" );
-    ]
-
 let init_logs =
-  lazy (Tezos_base_unix.Internal_event_unix.init ?lwt_log_sink:!log_config ())
-
-let points = ref []
-
-let gen_points () =
-  let clients = !clients in
-  let addr = !addr in
-  let port =
-    Option.value_f ~default:(fun () -> 49152 + Random.int 16384) !port
+  let log_cfg =
+    Lwt_log_sink_unix.create_cfg
+      ~rules:"test.p2p.connection-pool -> info; p2p.connection-pool -> info"
+      ()
   in
-  let ports = port -- (port + clients - 1) in
-  points := List.map (fun port -> (addr, port)) ports
+  lazy (Tezos_base_unix.Internal_event_unix.init ~log_cfg ())
 
-let wrap n f =
+let wrap ?(clients = 10) n f =
+  let addr = Node.default_ipv6_addr in
+  let points = Node.gen_points clients addr in
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       let open Lwt_syntax in
       let* () = Lazy.force init_logs in
-      let rec aux n f =
-        let* r = f () in
-        match r with
-        | Ok () -> Lwt.return_unit
-        | Error (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _)
-          ->
-            warn "Conflict on ports, retry the test." ;
-            gen_points () ;
-            aux n f
-        | Error error ->
-            Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
-      in
-      aux n f)
+      let* r = f points in
+      match r with
+      | Ok () -> Lwt.return_unit
+      | Error error ->
+          Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 
-let main () =
-  let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
-  let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
-  Arg.parse spec anon_fun usage_msg ;
-  gen_points () ;
+let () =
+  let repeat_connections = 5 in
   Lwt_main.run
   @@ Alcotest_lwt.run
-       ~argv:[|""|]
+       ~__FILE__
        "tezos-p2p"
        [
          ( "p2p-connection-pool",
            [
-             wrap "simple" (fun _ -> Simple.run !points);
-             wrap "random" (fun _ ->
-                 Random_connections.run !points !repeat_connections);
-             wrap "garbled" (fun _ -> Garbled.run !points);
-             wrap "overcrowded" (fun _ -> Overcrowded.run !points);
-             wrap "overcrowded-mixed" (fun _ ->
-                 Overcrowded.run_mixed_versions !points);
-             wrap "no-common-network-protocol" (fun _ ->
-                 No_common_network.run !points);
+             wrap "simple" (fun points -> Simple.run points);
+             wrap "random" (fun points ->
+                 Random_connections.run points repeat_connections);
+             wrap "garbled" (fun points -> Garbled.run points);
+             wrap "overcrowded" (fun points -> Overcrowded.run points);
+             wrap "overcrowded-mixed" (fun points ->
+                 Overcrowded.run_mixed_versions points);
+             wrap "no-common-network-protocol" (fun points ->
+                 No_common_network.run points);
            ] );
        ]
 
-let () =
-  Sys.catch_break true ;
-  try main () with _ -> ()
+let () = Tezt.Test.run ()

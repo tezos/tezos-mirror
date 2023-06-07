@@ -18,10 +18,11 @@ depends: [
   "tezos-base-test-helpers"
   "tezos-test-helpers"
   "tezos-scoru-wasm"
+  "tezos-scoru-wasm-durable-snapshot"
   "tezos-scoru-wasm-fast"
   "tezos-scoru-wasm-helpers"
   "qcheck-alcotest" { >= "0.20" }
-  "alcotest-lwt" { >= "1.5.0" }
+  "octez-alcotezt"
   "tezos-webassembly-interpreter-extra"
 ]
 build: [

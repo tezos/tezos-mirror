@@ -16,6 +16,20 @@ rules:
     category: performance
     technology:
     - ocaml
+- id: ocamllint-fold-left-iter-list
+  pattern-either:
+  - pattern: List.fold_left $X () $Y
+  - pattern: List.fold_left_e $X () $Y
+  - pattern: List.fold_left_s $X () $Y
+  - pattern: List.fold_left_p $X () $Y
+  - pattern: List.fold_left_es $X () $Y
+  message: You probably want to use List.iter (or one of its monadic variants).
+  languages: [ocaml]
+  severity: ERROR
+  metadata:
+    category: performance
+    technology:
+    - ocaml
 - id: ocamllint-length-list-compare
   pattern-either:
   - pattern: compare (List.length $X) $Y
@@ -44,6 +58,23 @@ rules:
   - pattern: $X > List.length $Y
   - pattern: $X <> List.length $Y
   message: You probably want to use Compare.List_length_with or List.compare_length_with, which are faster. See https://tezos.gitlab.io/developer/guidelines.html#linting-list-length-comparison for details.
+  languages: [ocaml]
+  severity: ERROR
+  metadata:
+    category: performance
+    technology:
+    - ocaml
+- id: ocamllint-empty-list-compare
+  pattern-either:
+  - pattern: List.compare_length_with $X 0
+  - pattern: Compare.List_length_with.( = ) $X 0
+  - pattern: Compare.List_length_with.( == ) $X 0
+  - pattern: Compare.List_length_with.( <= ) $X 0
+  - pattern: Compare.List_length_with.( >= ) $X 0
+  - pattern: Compare.List_length_with.( < ) $X 0
+  - pattern: Compare.List_length_with.( > ) $X 0
+  - pattern: Compare.List_length_with.( <> ) $X 0
+  message: 'You probably want to test emptiness of this list using a pattern-matching of the form (match xs with [] -> ... | _ :: _ -> ...). If you are just computing the boolean value you can also use the List.is_empty function. See https://tezos.gitlab.io/developer/guidelines.html#linting-list-length-empty for details.'
   languages: [ocaml]
   severity: ERROR
   metadata:

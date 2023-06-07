@@ -27,6 +27,7 @@ module T = Tezos_tree_encoding.Wrapped
 module Runner = Tezos_tree_encoding.Runner.Make (Tezos_tree_encoding.Wrapped)
 module E = Tezos_tree_encoding
 module Storage = Tezos_webassembly_interpreter.Durable_storage
+open Tezos_lazy_containers
 
 type t = T.tree
 
@@ -52,11 +53,13 @@ exception Readonly_value
 let encoding = E.wrapped_tree
 
 let of_storage ~default s =
-  match Storage.to_tree s with Some t -> T.select t | None -> default
+  match Storage.to_tree s with Some t -> t | None -> default
 
-let of_storage_exn s = T.select @@ Storage.to_tree_exn s
+let of_storage_exn s = Storage.to_tree_exn s
 
-let to_storage d = Storage.of_tree @@ T.wrap d
+let to_storage d = Storage.of_tree d
+
+type kind = Value | Directory
 
 type key = Writeable of string list | Readonly of string list
 
@@ -117,7 +120,7 @@ let find_value tree key =
   match opt with
   | None -> Lwt.return_none
   | Some subtree ->
-      let+ value = Runner.decode E.chunked_byte_vector subtree in
+      let+ value = Runner.decode Chunked_byte_vector.encoding subtree in
       Some value
 
 let find_value_exn tree key =
@@ -144,11 +147,13 @@ let count_subtrees tree key = T.length tree @@ key_contents key
 let list tree key =
   let open Lwt.Syntax in
   let+ subtrees = T.list tree @@ key_contents key in
-  List.map (fun (name, _) -> if name == "@" then "" else name) subtrees
+  List.map (fun (name, _) -> if name = "@" then "" else name) subtrees
 
-let delete ?(edit_readonly = false) tree key =
+let delete ?(edit_readonly = false) ~kind tree key =
   if not edit_readonly then assert_key_writeable key ;
-  T.remove tree @@ key_contents key
+  match kind with
+  | Value -> T.remove tree @@ to_value_key (key_contents key)
+  | Directory -> T.remove tree @@ key_contents key
 
 let subtree_name_at tree key index =
   let open Lwt.Syntax in
@@ -165,27 +170,53 @@ let move_tree_exn tree from_key to_key =
   assert_key_writeable from_key ;
   assert_key_writeable to_key ;
   let* move_tree = find_tree_exn tree from_key in
-  let* tree = delete tree from_key in
+  let* tree = delete ~kind:Directory tree from_key in
   T.add_tree tree (key_contents to_key) move_tree
 
-let hash tree key =
+let hash ~kind tree key =
   let open Lwt.Syntax in
-  let+ opt = T.find_tree tree @@ to_value_key @@ key_contents key in
+  let key =
+    match kind with
+    | Value -> to_value_key (key_contents key)
+    | Directory -> key_contents key
+  in
+  let+ opt = T.find_tree tree key in
   Option.map (fun subtree -> T.hash subtree) opt
 
-let hash_exn tree key =
+let hash_exn ~kind tree key =
   let open Lwt.Syntax in
-  let+ opt = hash tree key in
-  match opt with None -> raise Value_not_found | Some hash -> hash
+  let+ opt = hash ~kind tree key in
+  match opt with
+  | None ->
+      let exn =
+        match kind with Value -> Value_not_found | Directory -> Tree_not_found
+      in
+      raise exn
+  | Some hash -> hash
 
 let set_value_exn tree ?(edit_readonly = false) key str =
   if not edit_readonly then assert_key_writeable key ;
   let key = to_value_key @@ key_contents key in
-  let encoding = E.scope key E.chunked_byte_vector in
+  let encoding = E.scope key Chunked_byte_vector.encoding in
   Runner.encode
     encoding
     (Tezos_lazy_containers.Chunked_byte_vector.of_string str)
     tree
+
+let create_value_exn tree ?(edit_readonly = false) key size =
+  let open Lwt.Syntax in
+  let open Tezos_lazy_containers in
+  if not edit_readonly then assert_key_writeable key ;
+  let key = to_value_key @@ key_contents key in
+  let* opt = T.find_tree tree key in
+  let encoding = E.scope key Chunked_byte_vector.encoding in
+  match opt with
+  | None ->
+      let* durable =
+        Runner.encode encoding (Chunked_byte_vector.allocate size) tree
+      in
+      Lwt.return_some durable
+  | Some _subtree -> Lwt.return_none
 
 let write_value_exn tree ?(edit_readonly = false) key offset bytes =
   if not edit_readonly then assert_key_writeable key ;
@@ -197,7 +228,7 @@ let write_value_exn tree ?(edit_readonly = false) key offset bytes =
 
   let key = to_value_key @@ key_contents key in
   let* opt = T.find_tree tree key in
-  let encoding = E.scope key E.chunked_byte_vector in
+  let encoding = E.scope key Chunked_byte_vector.encoding in
   let* value =
     match opt with
     | None -> Lwt.return @@ Chunked_byte_vector.allocate 0L
@@ -231,4 +262,6 @@ let read_value_exn tree key offset num_bytes =
 
 module Internal_for_tests = struct
   let key_is_readonly = function Readonly _ -> true | Writeable _ -> false
+
+  let key_to_list = key_contents
 end

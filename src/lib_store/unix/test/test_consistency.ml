@@ -23,6 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    _______
+
+    Component: Store
+    Invocation: dune exec src/lib_store/unix/test/main.exe \
+                -- --file test_consistency.ml
+    Subject: Store consistency tests
+*)
+
 open Test_utils
 
 let nb_protocols = 5
@@ -30,7 +39,7 @@ let nb_protocols = 5
 let register_protocol ~hash ~sources =
   let module M = struct
     include
-      Registered_protocol.Register_embedded_V8
+      Registered_protocol.Register_embedded_V9
         (Tezos_protocol_environment_demo_noops)
         (Tezos_protocol_demo_noops.Protocol)
         (struct
@@ -46,7 +55,7 @@ let test_protocols =
     let s = string_of_int i in
     let proto =
       {
-        Protocol.expected_env = V8;
+        Protocol.expected_env = V9;
         components = [{name = s; interface = None; implementation = s}];
       }
     in
@@ -123,14 +132,13 @@ let init_protocols store history_mode =
           return_unit)
       all_proto_levels
   in
-  let*! () = Store.close_store store in
-  return (store, all_proto_levels)
+  return all_proto_levels
 
 let test_protocol_level_consistency_drop_one history_mode nth
     (store_dir, context_dir) store =
   let open Lwt_result_syntax in
   assert (nth < 5) ;
-  let* store, _ = init_protocols store history_mode in
+  let* _ = init_protocols store history_mode in
   let chain_store = Store.main_chain_store store in
   (* Close the store and remove a protocol level between savepoint and head *)
   let chain_id = Store.Chain.chain_id chain_store in
@@ -150,7 +158,8 @@ let test_protocol_level_consistency_drop_one history_mode nth
     in
     Stored_data.init protocol_level_file ~initial_data:protos
   in
-  let* store =
+  let*! () = Store.close_store store in
+  let* store' =
     Store.init
       ~patch_context:dummy_patch_context
       ~history_mode
@@ -161,7 +170,7 @@ let test_protocol_level_consistency_drop_one history_mode nth
   in
   (* Check that between the savepoint and the head, all protocol
      levels are known and correct. *)
-  let chain_store = Store.main_chain_store store in
+  let chain_store = Store.main_chain_store store' in
   let*! current_head = Store.Chain.current_head chain_store in
   let*! _savepoint, savepoint_level = Store.Chain.savepoint chain_store in
   let* () =
@@ -193,6 +202,7 @@ let test_protocol_level_consistency_drop_one history_mode nth
       (Int32.to_int savepoint_level
       -- Int32.to_int (Store.Block.level current_head))
   in
+  let*! () = Store.close_store store' in
   return_unit
 
 let check_protocol_levels_availability chain_store ~expected_protocols
@@ -213,7 +223,7 @@ let check_protocol_levels_availability chain_store ~expected_protocols
 let test_protocol_level_consistency_remove_file history_mode
     (store_dir, context_dir) store =
   let open Lwt_result_syntax in
-  let* store, expected_protocols = init_protocols store history_mode in
+  let* expected_protocols = init_protocols store history_mode in
   let open Store_types in
   let chain_store = Store.main_chain_store store in
   (* Close the store and remove a protocol level between savepoint and head *)
@@ -228,7 +238,8 @@ let test_protocol_level_consistency_remove_file history_mode
   let*! _ =
     Stored_data.init protocol_level_file ~initial_data:Protocol_levels.empty
   in
-  let* store =
+  let*! () = Store.close_store store in
+  let* store' =
     Store.init
       ~patch_context:dummy_patch_context
       ~history_mode
@@ -239,7 +250,7 @@ let test_protocol_level_consistency_remove_file history_mode
   in
   (* Check that between the savepoint and the head, all protocol
      levels are known and correct. *)
-  let chain_store = Store.main_chain_store store in
+  let chain_store = Store.main_chain_store store' in
   let*! current_head = Store.Chain.current_head chain_store in
   let*! _savepoint, savepoint_level = Store.Chain.savepoint chain_store in
   let* () =
@@ -273,6 +284,7 @@ let test_protocol_level_consistency_remove_file history_mode
       ~expected_protocols
       ~recovered_protocols
   in
+  let*! () = Store.close_store store' in
   return_unit
 
 let make_tests =
@@ -299,6 +311,7 @@ let make_tests =
 let () =
   Lwt_main.run
   @@ Alcotest_lwt.run
+       ~__FILE__
        "tezos-store"
        [
          ( "consistency",

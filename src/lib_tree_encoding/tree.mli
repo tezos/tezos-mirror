@@ -24,6 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** An extensible type to record the type of trees used as a way to compare
+    backends during decoding/encoding.
+*)
+type tree_instance = ..
+
 (** Exposes a module type {!S} representing trees. *)
 
 type key = string list
@@ -37,9 +42,9 @@ module type S = sig
   type tree
 
   (** @raise Incorrect_tree_type *)
-  val select : Tezos_lazy_containers.Lazy_map.tree -> tree
+  val select : tree_instance -> tree
 
-  val wrap : tree -> Tezos_lazy_containers.Lazy_map.tree
+  val wrap : tree -> tree_instance
 
   val remove : tree -> key -> tree Lwt.t
 
@@ -61,9 +66,9 @@ end
 
 type 'tree backend = (module S with type tree = 'tree)
 
-val select : 'tree backend -> Tezos_lazy_containers.Lazy_map.tree -> 'tree
+val select : 'tree backend -> tree_instance -> 'tree
 
-val wrap : 'tree backend -> 'tree -> Tezos_lazy_containers.Lazy_map.tree
+val wrap : 'tree backend -> 'tree -> tree_instance
 
 val remove : 'tree backend -> 'tree -> key -> 'tree Lwt.t
 

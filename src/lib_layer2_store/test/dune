@@ -1,20 +1,40 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test_indexed_store)
+(library
+ (name src_lib_layer2_store_test__tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-error-monad
   tezos_layer2_store
   qcheck-alcotest
-  alcotest-lwt)
+  octez-alcotezt)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_error_monad
   -open Tezos_error_monad.TzLwtreslib
-  -open Tezos_layer2_store))
+  -open Tezos_layer2_store
+  -open Octez_alcotezt)
+ (modules test_indexed_store))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_layer2_store_test__tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-layer2-store)
- (action (run %{dep:./test_indexed_store.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

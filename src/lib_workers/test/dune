@@ -1,18 +1,23 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test_workers_unit)
+(library
+ (name src_lib_workers_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-stdlib
   tezos-stdlib-unix
   tezos-base
   tezos-workers
   tezos-test-helpers
   tezos-base-test-helpers
-  alcotest-lwt)
+  octez-alcotezt)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_stdlib
   -open Tezos_stdlib_unix
   -open Tezos_base
@@ -20,9 +25,24 @@
   -open Tezos_base.Worker_types
   -open Tezos_workers
   -open Tezos_test_helpers
-  -open Tezos_base_test_helpers))
+  -open Tezos_base_test_helpers
+  -open Octez_alcotezt)
+ (modules mocked_worker test_workers_unit))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_workers_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-workers)
- (action (run %{dep:./test_workers_unit.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

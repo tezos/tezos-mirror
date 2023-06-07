@@ -1,0 +1,68 @@
+# SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-smart-rollup"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["TriliTech <contact@trili.tech>"]
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "SDK for Tezos Smart Rollup kernel development."
+keywords = ["tezos", "smart", "rollup"]
+categories = ["wasm", "encoding", "development-tools"]
+
+[dependencies.tezos-smart-rollup-core]
+path = "../core"
+version = "0.1.0"
+default-features = false
+
+[dependencies.tezos-smart-rollup-host]
+path = "../host"
+version = "0.1.0"
+default-features = false
+
+[dependencies.tezos-smart-rollup-debug]
+path = "../debug"
+version = "0.1.0"
+
+[dependencies.tezos-smart-rollup-encoding]
+path = "../encoding"
+version = "0.1.0"
+default-features = false
+
+[dependencies.tezos-smart-rollup-storage]
+path = "../storage"
+version = "0.1.0"
+optional = true
+
+[dependencies.tezos-smart-rollup-entrypoint]
+path = "../entrypoint"
+version = "0.1.0"
+default-features = false
+
+[dependencies.tezos-smart-rollup-mock]
+path = "../mock"
+version = "0.1.0"
+optional = true
+
+[dependencies.tezos_crypto_rs]
+version = "0.4"
+default-features = false
+optional = true
+
+[dependencies.tezos_data_encoding]
+version = "0.4"
+optional = true
+
+[features]
+default = ["std", "crypto", "dlmalloc", "panic-hook", "data-encoding", "storage"]
+crypto = ["tezos_crypto_rs"]
+alloc = ["tezos-smart-rollup-entrypoint/alloc"]
+dlmalloc = ["tezos-smart-rollup-entrypoint/dlmalloc"]
+panic-hook = ["tezos-smart-rollup-entrypoint/default"]
+data-encoding = ["tezos_data_encoding", "tezos-smart-rollup-encoding/default"]
+storage = ["tezos-smart-rollup-storage"]
+std = ["alloc", "tezos-smart-rollup-entrypoint/std"]
+testing = ["crypto", "tezos-smart-rollup-mock"]

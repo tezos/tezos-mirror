@@ -1,8 +1,40 @@
-open Tztest
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(** Testing
+    -------
+    Component:    Lib_scoru_wasm
+    Invocation:   dune exec src/lib_scoru_wasm/test/main.exe -- --file test_wasm_vm.ml
+    Subject:      Tests for the tezos-scoru-wasm library
+*)
+
 open Tezos_scoru_wasm
 open Wasm_utils
+open Tztest_helper
 
-let init_tree_with_empty_input () =
+let init_tree_with_empty_input ~version =
   let open Lwt_result_syntax in
   let module_ =
     {|
@@ -15,15 +47,15 @@ let init_tree_with_empty_input () =
       )
     |}
   in
-  let*! tree = initial_tree ~from_binary:false module_ in
+  let*! tree = initial_tree ~version ~from_binary:false module_ in
   let*! tree = eval_until_input_requested tree in
   let*! tree = set_empty_inbox_step 0l tree in
   return tree
 
-let test_padding_state () =
+let test_padding_state ~version () =
   let open Lwt_result_syntax in
   let open Wasm_pvm_state.Internal_state in
-  let* tree = init_tree_with_empty_input () in
+  let* tree = init_tree_with_empty_input ~version in
   let*! pvm_state =
     Encodings_util.Tree_encoding_runner.decode
       Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
@@ -53,9 +85,9 @@ let test_padding_state () =
   in
   return_unit
 
-let test_set_input_step_in_padding () =
+let test_set_input_step_in_padding ~version () =
   let open Lwt_result_syntax in
-  let* tree = init_tree_with_empty_input () in
+  let* tree = init_tree_with_empty_input ~version in
   (* Advance execution for relatively many steps in order to reach Padding tick_state *)
   let*! tree, _ = Wasm.compute_step_many ~max_steps:(Int64.of_int 10000) tree in
 
@@ -84,9 +116,9 @@ let test_set_input_step_in_padding () =
   in
   return_unit
 
-let test_last_input_info_updated_in_set_input_step () =
+let test_last_input_info_updated_in_set_input_step ~version () =
   let open Lwt_result_syntax in
-  let* tree = init_tree_with_empty_input () in
+  let* tree = init_tree_with_empty_input ~version in
   let assert_input_info ?(inp_req = Wasm_pvm_state.Input_required) tree level
       msg_counter =
     let expected_info =
@@ -129,11 +161,16 @@ let test_last_input_info_updated_in_set_input_step () =
   return_unit
 
 let tests =
-  [
-    tztest "Test eval_has_finished: padding" `Quick test_padding_state;
-    tztest "Test set_input_state: padding" `Quick test_set_input_step_in_padding;
-    tztest
-      "Test set_input_state: update last input info"
-      `Quick
-      test_last_input_info_updated_in_set_input_step;
-  ]
+  tztests_with_pvm
+    ~versions:[V0; V1]
+    [
+      ("Test eval_has_finished: padding", `Quick, test_padding_state);
+      ("Test set_input_state: padding", `Quick, test_set_input_step_in_padding);
+      ( "Test set_input_state: update last input info",
+        `Quick,
+        test_last_input_info_updated_in_set_input_step );
+    ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("WASM VM", tests)]
+  |> Lwt_main.run

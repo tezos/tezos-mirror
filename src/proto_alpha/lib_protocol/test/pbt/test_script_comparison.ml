@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Script_comparison
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/pbt/test_script_comparison.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
+                  -- --file test_script_comparison.ml
     Subject:      PBT of the Script_comparable.compare_comparable function.
 *)
 
@@ -64,17 +64,15 @@ let rec reference_compare_comparable : type a. a comparable_ty -> a -> a -> int
   | Timestamp_t, x, y -> normalize_compare @@ Script_timestamp.compare x y
   | Address_t, x, y ->
       normalize_compare @@ Script_comparable.compare_address x y
-  | Tx_rollup_l2_address_t, x, y ->
-      normalize_compare @@ Script_comparable.compare_tx_rollup_l2_address x y
   | Bytes_t, x, y -> normalize_compare @@ Compare.Bytes.compare x y
   | Chain_id_t, x, y -> normalize_compare @@ Script_chain_id.compare x y
   | Pair_t (tl, tr, _, YesYes), (lx, rx), (ly, ry) ->
       let cl = reference_compare_comparable tl lx ly in
       if Compare.Int.(cl = 0) then reference_compare_comparable tr rx ry else cl
-  | Union_t (tl, _, _, YesYes), L x, L y -> reference_compare_comparable tl x y
-  | Union_t _, L _, R _ -> -1
-  | Union_t _, R _, L _ -> 1
-  | Union_t (_, tr, _, YesYes), R x, R y -> reference_compare_comparable tr x y
+  | Or_t (tl, _, _, YesYes), L x, L y -> reference_compare_comparable tl x y
+  | Or_t _, L _, R _ -> -1
+  | Or_t _, R _, L _ -> 1
+  | Or_t (_, tr, _, YesYes), R x, R y -> reference_compare_comparable tr x y
   | Option_t _, None, None -> 0
   | Option_t _, None, Some _ -> -1
   | Option_t _, Some _, None -> 1
@@ -343,7 +341,8 @@ let test_pack_unpack =
 
 let () =
   Alcotest.run
-    "protocol > pbt > script_comparison"
+    ~__FILE__
+    Protocol.name
     [
       ("compatible_with_reference", qcheck_wrap [test_compatible_with_reference]);
       ("compatible_with_packing", qcheck_wrap [test_compatible_with_packing]);

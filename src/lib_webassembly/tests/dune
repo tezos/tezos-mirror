@@ -1,18 +1,38 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name main)
+(library
+ (name src_lib_webassembly_tests_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   tezos-webassembly-interpreter
-  alcotest)
+  octez-alcotezt)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -open Tezos_webassembly_interpreter))
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_webassembly_interpreter
+  -open Octez_alcotezt)
+ (modules smallint))
+
+(include_subdirs no)
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_webassembly_tests_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package tezos-webassembly-interpreter)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 
-(include_subdirs no)
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

@@ -617,7 +617,7 @@ let test_votes _test_mode_tag _protocol ?endpoint client =
   unit
 
 (* Test the various other RPCs. *)
-let test_misc_protocol _test_mode_tag _protocol ?endpoint client =
+let test_misc_protocol _test_mode_tag protocol ?endpoint client =
   let* _ =
     RPC.Client.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_constants ()
@@ -645,6 +645,21 @@ let test_misc_protocol _test_mode_tag _protocol ?endpoint client =
     @@ RPC.get_chain_block_helper_endorsing_rights
          ~delegate:Constant.bootstrap4.public_key_hash
          ()
+  in
+  let* () =
+    if Protocol.(number protocol > number Nairobi) then
+      let* _ =
+        RPC.Client.call ?endpoint ~hooks client
+        @@ RPC.get_chain_block_helper_attestation_rights ()
+      in
+      let* _ =
+        RPC.Client.call ?endpoint ~hooks client
+        @@ RPC.get_chain_block_helper_attestation_rights
+             ~delegate:Constant.bootstrap4.public_key_hash
+             ()
+      in
+      unit
+    else unit
   in
   let* _ =
     RPC.Client.call ?endpoint ~hooks client
@@ -1457,25 +1472,14 @@ let register protocols =
       ~test_function:test_votes
       ~parameter_overrides:(fun protocol ->
         (* reduced periods duration to get to testing vote period faster *)
-        if Protocol.number protocol >= 14 then
-          (* We need nonce_revelation_threshold < blocks_per_cycle for sanity
-             checks *)
-          [
-            (["blocks_per_cycle"], `Int 4);
-            (["cycles_per_voting_period"], `Int 1);
-            (["nonce_revelation_threshold"], `Int 3);
-          ]
-        else if Protocol.number protocol >= 13 then
-          [
-            (["blocks_per_cycle"], `Int 4);
-            (["cycles_per_voting_period"], `Int 1);
-          ]
-        else
-          [
-            (["blocks_per_cycle"], `Int 4);
-            (["blocks_per_voting_period"], `Int 4);
-          ]
-          @ consensus_threshold protocol) ;
+        (* We need nonce_revelation_threshold < blocks_per_cycle for sanity
+           checks *)
+        [
+          (["blocks_per_cycle"], `Int 4);
+          (["cycles_per_voting_period"], `Int 1);
+          (["nonce_revelation_threshold"], `Int 3);
+        ]
+        @ consensus_threshold protocol) ;
     check_rpc_regression
       "misc_protocol"
       ~test_function:test_misc_protocol

@@ -68,20 +68,21 @@ let should_continue phase (pvm_state : pvm_state) =
 let finish_top_level_call_on_state pvm_state =
   Wasm_vm.compute_step_many ~max_steps:Int64.max_int ~write_debug:Noop pvm_state
 
-let execute_fast pvm_state =
+let execute_fast ~reveal_builtins pvm_state =
   Wasm_fast_vm.compute_step_many
-    ~reveal_builtins:builtins
+    ~reveal_builtins
     ~max_steps:Int64.max_int
     ~write_debug:Noop
     pvm_state
 
-let execute_on_state phase state =
+let execute_on_state ~reveal_builtins phase state =
   match state.tick_state with
   | Stuck _ -> Lwt.return (state, 0L)
   | _ ->
       Wasm_vm.compute_step_many_until
-        ~write_debug:Noop
+        ~reveal_builtins
         ~max_steps:Int64.max_int
+        ~write_debug:Wasm_utils.write_debug_on_stdout
         (should_continue phase)
         state
 
@@ -103,7 +104,13 @@ let read_message name =
 
 let initial_boot_sector_from_kernel ?(max_tick = 1000000000000L) kernel =
   let open Lwt_syntax in
-  let+ tree = Wasm_utils.initial_tree ~max_tick ~from_binary:true kernel in
+  let+ tree =
+    Wasm_utils.initial_tree
+      ~version:V1
+      ~ticks_per_snapshot:max_tick
+      ~from_binary:true
+      kernel
+  in
   tree
 
 type input = File of string | Str of string

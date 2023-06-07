@@ -45,6 +45,14 @@ let metric ~help ~component ~name collector =
   in
   (info, collect)
 
+(* we add this function to impose the correct namespace *)
+let metric_counter ~component ~help ~name () =
+  Prometheus.Counter.v
+    ~help
+    ~namespace
+    ~subsystem
+    (String.concat "_" [component; name])
+
 let add_metric (info, collector) =
   Prometheus.CollectorRegistry.(register default) info collector
 
@@ -253,6 +261,85 @@ module Points = struct
         | Some _ -> Stats.greylisted := !Stats.greylisted +. 1.
         | _ -> ())
       pool
+end
+
+module Messages = struct
+  let component = "messages"
+
+  let metric_counter = metric_counter ~component
+
+  let broadcast_message_sent =
+    metric_counter
+      ~help:"Number of user message sent by broadcasting"
+      ~name:"broadcast_message_sent"
+      ()
+
+  let user_message_sent =
+    metric_counter
+      ~help:"Number of user message sent"
+      ~name:"user_message_sent"
+      ()
+
+  let user_message_received =
+    metric_counter
+      ~help:"Number of user message received"
+      ~name:"user_message_received"
+      ()
+
+  let user_message_received_error =
+    metric_counter
+      ~help:"Number of user message received that resulted in error"
+      ~name:"user_message_received_error"
+      ()
+
+  let advertise_received =
+    metric_counter
+      ~help:"Number of advertise received"
+      ~name:"advertise_received"
+      ()
+
+  let advertise_sent =
+    metric_counter ~help:"Number of advertise sent" ~name:"advertise_sent" ()
+
+  let bootstrap_received =
+    metric_counter
+      ~help:"Number of bootstrap received"
+      ~name:"bootstrap_received"
+      ()
+
+  let bootstrap_sent =
+    metric_counter ~help:"Number of bootstrap sent" ~name:"bootstrap_sent" ()
+
+  let swap_request_sent =
+    metric_counter ~help:"Number of swap sent" ~name:"swap_requests_sent" ()
+
+  let swap_request_received =
+    metric_counter
+      ~help:"Number of swap received"
+      ~name:"swap_requests_received"
+      ()
+
+  let swap_ack_sent =
+    metric_counter ~help:"Number of swap acks sent" ~name:"swap_ack_sent" ()
+
+  let swap_ack_received =
+    metric_counter
+      ~help:"Number of swap acks received"
+      ~name:"swap_ack_received"
+      ()
+end
+
+module Swap = struct
+  let component = "swap"
+
+  let metric_counter = metric_counter ~component
+
+  let ignored = metric_counter ~help:"Number of ignored swap" ~name:"ignored" ()
+
+  let success =
+    metric_counter ~help:"Number of successful swap" ~name:"success" ()
+
+  let fail = metric_counter ~help:"Number of failed swap" ~name:"fail" ()
 end
 
 let collect pool =

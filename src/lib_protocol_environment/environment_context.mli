@@ -101,7 +101,7 @@ module Context : sig
   (** Cached values inhabit an extensible type. *)
   type cache_value = ..
 
-  (** See {!Context.CACHE} in [sigs/v3/context.mli] for documentation. *)
+  (** See [Context.CACHE] in [sigs/v3/context.mli] for documentation. *)
   module Cache : sig
     include
       CACHE

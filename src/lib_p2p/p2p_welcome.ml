@@ -130,11 +130,13 @@ let rec worker_loop st =
   | Error (Canceled :: _) -> Lwt.return_unit
   | Error err -> Events.(emit unexpected_error) err
 
-let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
+let create_listening_socket ?(reuse_port = false) ~backlog
+    ?(addr = Ipaddr.V6.unspecified) port =
   let open Lwt_result_syntax in
   Lwt.catch
     (fun () ->
       let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
+      (if reuse_port then Lwt_unix.(setsockopt main_socket SO_REUSEPORT true)) ;
       Lwt_unix.(setsockopt main_socket SO_REUSEADDR true) ;
       let*! () =
         Lwt_unix.bind
@@ -150,11 +152,11 @@ let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
                {reason = err; address = addr; port})
       | exn -> Lwt.fail exn)
 
-let create ?addr ~backlog connect_handler port =
+let create ?reuse_port ?addr ~backlog connect_handler port =
   let open Lwt_result_syntax in
   Lwt.catch
     (fun () ->
-      let* socket = create_listening_socket ~backlog ?addr port in
+      let* socket = create_listening_socket ?reuse_port ~backlog ?addr port in
       let canceler = Lwt_canceler.create () in
       let st =
         {

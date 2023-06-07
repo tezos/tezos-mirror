@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Shell (Plugin)
-    Invocation:   dune exec src/proto_alpha/lib_plugin/test/test_plugin.exe
+    Invocation:   dune exec src/proto_alpha/lib_plugin/test/main.exe \
+                  -- --file test_plugin.ml
     Subject:      Unit tests the plugin
 *)
 
@@ -69,7 +70,8 @@ let test_flush () =
 
 let () =
   Alcotest_lwt.run
-    "Plugin"
+    ~__FILE__
+    Protocol.name
     [
       ( "on_flush",
         [

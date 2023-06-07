@@ -36,7 +36,9 @@ let default_operation_inclusion_latency = 3
 
 let parse_operation (op : Operation.raw) =
   match
-    Data_encoding.Binary.of_bytes_opt Operation.protocol_data_encoding op.proto
+    Data_encoding.Binary.of_bytes_opt
+      Operation.protocol_data_encoding_with_legacy_attestation_name
+      op.proto
   with
   | Some protocol_data -> ok {shell = op.shell; protocol_data}
   | None -> error Plugin_errors.Cannot_parse_operation
@@ -181,6 +183,8 @@ module Scripts = struct
            (req "amount" Tez.encoding)
            (opt "balance" Tez.encoding)
            (req "chain_id" Chain_id.encoding)
+           (* TODO: https://gitlab.com/tezos/tezos/-/issues/710
+              Rename the "source" field into "sender" *)
            (opt "source" Contract.encoding)
            (opt "payer" Contract.implicit_encoding)
            (opt "self" Contract.originated_encoding)
@@ -227,6 +231,12 @@ module Scripts = struct
            (req "trace" trace_encoding)
            (opt "lazy_storage_diff" Lazy_storage.encoding))
 
+    let stack_encoding =
+      list
+        (obj2
+           (req "type" Script.expr_encoding)
+           (req "val" Script.expr_encoding))
+
     let run_tzip4_view_encoding =
       let open Data_encoding in
       obj10
@@ -234,6 +244,8 @@ module Scripts = struct
         (req "entrypoint" Entrypoint.simple_encoding)
         (req "input" Script.expr_encoding)
         (req "chain_id" Chain_id.encoding)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/710
+           Rename the "source" field into "sender" *)
         (opt "source" Contract.encoding)
         (opt "payer" Contract.implicit_encoding)
         (opt "gas" Gas.Arith.z_integral_encoding)
@@ -250,12 +262,22 @@ module Scripts = struct
            (req "input" Script.expr_encoding)
            (dft "unlimited_gas" bool false)
            (req "chain_id" Chain_id.encoding)
+           (* TODO: https://gitlab.com/tezos/tezos/-/issues/710
+              Rename the "source" field into "sender" *)
            (opt "source" Contract.encoding)
            (opt "payer" Contract.implicit_encoding)
            (opt "gas" Gas.Arith.z_integral_encoding)
            (req "unparsing_mode" unparsing_mode_encoding)
            (opt "now" Script_timestamp.encoding))
         (obj1 (opt "level" Script_int.n_encoding))
+
+    let normalize_stack_input_encoding =
+      obj3
+        (req "input" stack_encoding)
+        (req "unparsing_mode" unparsing_mode_encoding)
+        (opt "legacy" bool)
+
+    let normalize_stack_output_encoding = obj1 (req "output" stack_encoding)
 
     let run_code =
       RPC_service.post_service
@@ -365,6 +387,15 @@ module Scripts = struct
         ~query:RPC_query.empty
         RPC_path.(path / "normalize_data")
 
+    let normalize_stack =
+      RPC_service.post_service
+        ~description:
+          "Normalize a Michelson stack using the requested unparsing mode"
+        ~query:RPC_query.empty
+        ~input:normalize_stack_input_encoding
+        ~output:normalize_stack_output_encoding
+        RPC_path.(path / "normalize_stack")
+
     let normalize_script =
       RPC_service.post_service
         ~description:
@@ -397,7 +428,7 @@ module Scripts = struct
         ~query:RPC_query.empty
         ~input:
           (obj2
-             (req "operation" Operation.encoding)
+             (req "operation" Operation.encoding_with_legacy_attestation_name)
              (req "chain_id" Chain_id.encoding))
         ~output:Apply_results.operation_data_and_metadata_encoding
         RPC_path.(path / "run_operation")
@@ -430,24 +461,11 @@ module Scripts = struct
         ~input:
           (obj4
              (opt "blocks_before_activation" int32)
-             (req "operation" Operation.encoding)
+             (req "operation" Operation.encoding_with_legacy_attestation_name)
              (req "chain_id" Chain_id.encoding)
              (dft "latency" int16 default_operation_inclusion_latency))
         ~output:Apply_results.operation_data_and_metadata_encoding
         RPC_path.(path / "simulate_operation")
-
-    let simulate_tx_rollup_operation =
-      RPC_service.post_service
-        ~description:"Simulate a tx rollup operation"
-        ~query:RPC_query.empty
-        ~input:
-          (obj4
-             (opt "blocks_before_activation" int32)
-             (req "operation" Operation.encoding)
-             (req "chain_id" Chain_id.encoding)
-             (dft "latency" int16 default_operation_inclusion_latency))
-        ~output:Apply_results.operation_data_and_metadata_encoding
-        RPC_path.(path / "simulate_tx_rollup_operation")
 
     let entrypoint_type =
       RPC_service.post_service
@@ -617,7 +635,6 @@ module Scripts = struct
       | Key_t -> return (T_key, [], [])
       | Timestamp_t -> return (T_timestamp, [], [])
       | Address_t -> return (T_address, [], [])
-      | Tx_rollup_l2_address_t -> return (T_tx_rollup_l2_address, [], [])
       | Operation_t -> return (T_operation, [], [])
       | Chain_id_t -> return (T_chain_id, [], [])
       | Never_t -> return (T_never, [], [])
@@ -632,7 +649,7 @@ module Scripts = struct
           let tl = unparse_ty ~loc utl in
           let tr = unparse_ty ~loc utr in
           return (T_pair, [tl; tr], annot)
-      | Union_t (utl, utr, _meta, _) ->
+      | Or_t (utl, utr, _meta, _) ->
           let annot = [] in
           let tl = unparse_ty ~loc utl in
           let tr = unparse_ty ~loc utr in
@@ -675,6 +692,61 @@ module Scripts = struct
       | Chest_key_t -> return (T_chest_key, [], [])
   end
 
+  module Normalize_stack = struct
+    type ex_stack =
+      | Ex_stack : ('a, 's) Script_typed_ir.stack_ty * 'a * 's -> ex_stack
+
+    let rec parse_stack :
+        context ->
+        legacy:bool ->
+        (Script.node * Script.node) list ->
+        (ex_stack * context) tzresult Lwt.t =
+     fun ctxt ~legacy l ->
+      match l with
+      | [] -> return (Ex_stack (Bot_t, EmptyCell, EmptyCell), ctxt)
+      | (ty_node, data_node) :: l ->
+          Lwt.return
+          @@ Script_ir_translator.parse_ty
+               ctxt
+               ~legacy
+               ~allow_lazy_storage:true
+               ~allow_operation:true
+               ~allow_contract:true
+               ~allow_ticket:true
+               ty_node
+          >>=? fun (Ex_ty ty, ctxt) ->
+          let elab_conf = elab_conf ~legacy () in
+          Script_ir_translator.parse_data
+            ctxt
+            ~elab_conf
+            ~allow_forged:true
+            ty
+            data_node
+          >>=? fun (x, ctxt) ->
+          parse_stack ctxt ~legacy l >>=? fun (Ex_stack (sty, y, st), ctxt) ->
+          return (Ex_stack (Item_t (ty, sty), x, (y, st)), ctxt)
+
+    let rec unparse_stack :
+        type a s.
+        context ->
+        Script_ir_unparser.unparsing_mode ->
+        (a, s) Script_typed_ir.stack_ty ->
+        a ->
+        s ->
+        ((Script.expr * Script.expr) list * context) tzresult Lwt.t =
+      let loc = Micheline.dummy_location in
+      fun ctxt unparsing_mode sty x st ->
+        match (sty, x, st) with
+        | Bot_t, EmptyCell, EmptyCell -> return ([], ctxt)
+        | Item_t (ty, sty), x, (y, st) ->
+            Script_ir_unparser.unparse_ty ~loc ctxt ty
+            >>?= fun (ty_node, ctxt) ->
+            Script_ir_translator.unparse_data ctxt unparsing_mode ty x
+            >>=? fun (data_node, ctxt) ->
+            unparse_stack ctxt unparsing_mode sty y st >>=? fun (l, ctxt) ->
+            return ((Micheline.strip_locations ty_node, data_node) :: l, ctxt)
+  end
+
   let rec pp_instr_name :
       type a b c d.
       Format.formatter -> (a, b, c, d) Script_typed_ir.kinstr -> unit =
@@ -684,7 +756,8 @@ module Scripts = struct
       | IDrop _ -> pp_print_string fmt "DROP"
       | IDup _ -> pp_print_string fmt "DUP"
       | ISwap _ -> pp_print_string fmt "SWAP"
-      | IConst _ -> pp_print_string fmt "CONST"
+      | IPush _ -> pp_print_string fmt "PUSH"
+      | IUnit _ -> pp_print_string fmt "UNIT"
       | ICons_pair _ -> pp_print_string fmt "PAIR"
       | ICar _ -> pp_print_string fmt "CAR"
       | ICdr _ -> pp_print_string fmt "CDR"
@@ -885,10 +958,8 @@ module Scripts = struct
       oph
       packed_operation
     >>=? fun _validate_operation_state ->
-    Raw_level.of_int32 block_header.level >>?= fun predecessor_level ->
     let application_mode =
-      Apply.Partial_construction
-        {predecessor_level; predecessor_fitness = block_header.fitness}
+      Apply.Partial_construction {predecessor_fitness = block_header.fitness}
     in
     let application_state =
       Apply.
@@ -941,7 +1012,7 @@ module Scripts = struct
     balance : Tez.t;
     self : Contract_hash.t;
     payer : Signature.public_key_hash;
-    source : Contract.t;
+    sender : Contract.t;
   }
 
   (* 4_000_000 ꜩ *)
@@ -967,15 +1038,16 @@ module Scripts = struct
         balance
       >>=? fun (ctxt, _) -> return (ctxt, dummy_contract_hash)
     in
-    let source_and_payer ~src_opt ~pay_opt ~default_src =
-      match (src_opt, pay_opt) with
+    let sender_and_payer ~sender_opt ~payer_opt ~default_sender =
+      match (sender_opt, payer_opt) with
       | None, None ->
-          (Contract.Originated default_src, Signature.Public_key_hash.zero)
+          (Contract.Originated default_sender, Signature.Public_key_hash.zero)
       | Some c, None -> (c, Signature.Public_key_hash.zero)
       | None, Some c -> (Contract.Implicit c, c)
-      | Some src, Some pay -> (src, pay)
+      | Some sender, Some payer -> (sender, payer)
     in
-    let configure_contracts ctxt script balance ~src_opt ~pay_opt ~self_opt =
+    let configure_contracts ctxt script balance ~sender_opt ~payer_opt ~self_opt
+        =
       (match self_opt with
       | None ->
           let balance = Option.value ~default:default_balance balance in
@@ -988,16 +1060,16 @@ module Scripts = struct
             balance
           >>=? fun bal -> return (ctxt, addr, bal))
       >>=? fun (ctxt, self, balance) ->
-      let source, payer =
-        source_and_payer ~src_opt ~pay_opt ~default_src:self
+      let sender, payer =
+        sender_and_payer ~sender_opt ~payer_opt ~default_sender:self
       in
-      return (ctxt, {balance; self; source; payer})
+      return (ctxt, {balance; self; sender; payer})
     in
     let script_entrypoint_type ctxt expr entrypoint =
       let ctxt = Gas.set_unlimited ctxt in
       let legacy = false in
       let open Script_ir_translator in
-      parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
+      parse_toplevel ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
       Lwt.return
         ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
         >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _) ->
@@ -1013,9 +1085,8 @@ module Scripts = struct
     in
     let script_view_type ctxt contract expr view =
       let ctxt = Gas.set_unlimited ctxt in
-      let legacy = false in
       let open Script_ir_translator in
-      parse_toplevel ctxt ~legacy expr >>=? fun ({views; _}, _) ->
+      parse_toplevel ctxt expr >>=? fun ({views; _}, _) ->
       Lwt.return
         ( Script_string.of_string view >>? fun view_name ->
           match Script_map.get view_name views with
@@ -1035,8 +1106,8 @@ module Scripts = struct
             amount,
             balance,
             chain_id,
-            src_opt,
-            pay_opt,
+            sender_opt,
+            payer_opt,
             self_opt,
             entrypoint ),
           (unparsing_mode, gas, now, level) )
@@ -1048,10 +1119,10 @@ module Scripts = struct
           ctxt
           {storage; code}
           balance
-          ~src_opt
-          ~pay_opt
+          ~sender_opt
+          ~payer_opt
           ~self_opt
-        >>=? fun (ctxt, {self; source; payer; balance}) ->
+        >>=? fun (ctxt, {self; sender; payer; balance}) ->
         let gas =
           match gas with
           | Some gas -> gas
@@ -1070,8 +1141,8 @@ module Scripts = struct
         in
         let step_constants =
           let open Script_interpreter in
-          let source = Destination.Contract source in
-          {source; payer; self; amount; balance; chain_id; now; level}
+          let sender = Destination.Contract sender in
+          {sender; payer; self; amount; balance; chain_id; now; level}
         in
         Script_interpreter.execute
           ctxt
@@ -1107,8 +1178,8 @@ module Scripts = struct
             amount,
             balance,
             chain_id,
-            src_opt,
-            pay_opt,
+            sender_opt,
+            payer_opt,
             self_opt,
             entrypoint ),
           (unparsing_mode, gas, now, level) )
@@ -1120,10 +1191,10 @@ module Scripts = struct
           ctxt
           {storage; code}
           balance
-          ~src_opt
-          ~pay_opt
+          ~sender_opt
+          ~payer_opt
           ~self_opt
-        >>=? fun (ctxt, {self; source; payer; balance}) ->
+        >>=? fun (ctxt, {self; sender; payer; balance}) ->
         let gas =
           match gas with
           | Some gas -> gas
@@ -1142,8 +1213,8 @@ module Scripts = struct
         in
         let step_constants =
           let open Script_interpreter in
-          let source = Destination.Contract source in
-          {source; payer; self; amount; balance; chain_id; now; level}
+          let sender = Destination.Contract sender in
+          {sender; payer; self; amount; balance; chain_id; now; level}
         in
         let module Unparsing_mode = struct
           let unparsing_mode = unparsing_mode
@@ -1180,8 +1251,8 @@ module Scripts = struct
           entrypoint,
           input,
           chain_id,
-          src_opt,
-          pay_opt,
+          sender_opt,
+          payer_opt,
           gas,
           unparsing_mode,
           now,
@@ -1205,8 +1276,8 @@ module Scripts = struct
              (View_helpers.make_tzip4_viewer_script ty)
              Tez.zero
         >>=? fun (ctxt, viewer_contract) ->
-        let source, payer =
-          source_and_payer ~src_opt ~pay_opt ~default_src:contract_hash
+        let sender, payer =
+          sender_and_payer ~sender_opt ~payer_opt ~default_sender:contract_hash
         in
         let gas =
           Option.value
@@ -1226,9 +1297,9 @@ module Scripts = struct
         in
         let step_constants =
           let open Script_interpreter in
-          let source = Destination.Contract source in
+          let sender = Destination.Contract sender in
           {
-            source;
+            sender;
             payer;
             self = contract_hash;
             amount = Tez.zero;
@@ -1278,8 +1349,8 @@ module Scripts = struct
             input,
             unlimited_gas,
             chain_id,
-            src_opt,
-            pay_opt,
+            sender_opt,
+            payer_opt,
             gas,
             unparsing_mode,
             now ),
@@ -1296,8 +1367,8 @@ module Scripts = struct
         script_view_type ctxt contract_hash decoded_script view
         >>=? fun (input_ty, output_ty) ->
         Contract.get_balance ctxt contract >>=? fun balance ->
-        let source, payer =
-          source_and_payer ~src_opt ~pay_opt ~default_src:contract_hash
+        let sender, payer =
+          sender_and_payer ~sender_opt ~payer_opt ~default_sender:contract_hash
         in
         let now =
           match now with None -> Script_timestamp.now ctxt | Some t -> t
@@ -1325,9 +1396,9 @@ module Scripts = struct
              |> Script_int.of_int32 |> Script_int.abs)
         in
         let step_constants =
-          let source = Destination.Contract source in
+          let sender = Destination.Contract sender in
           {
-            Script_interpreter.source;
+            Script_interpreter.sender;
             payer;
             self = contract_hash;
             amount = Tez.zero;
@@ -1481,6 +1552,19 @@ module Scripts = struct
         >|=? fun (normalized, _ctxt) -> normalized) ;
     Registration.register0
       ~chunked:true
+      S.normalize_stack
+      (fun ctxt () (stack, unparsing_mode, legacy) ->
+        let legacy = Option.value ~default:false legacy in
+        let ctxt = Gas.set_unlimited ctxt in
+        let nodes =
+          List.map (fun (a, b) -> (Micheline.root a, Micheline.root b)) stack
+        in
+        Normalize_stack.parse_stack ctxt ~legacy nodes
+        >>=? fun (Normalize_stack.Ex_stack (st_ty, x, st), ctxt) ->
+        Normalize_stack.unparse_stack ctxt unparsing_mode st_ty x st
+        >|=? fun (normalized, _ctxt) -> normalized) ;
+    Registration.register0
+      ~chunked:true
       S.normalize_script
       (fun ctxt () (script, unparsing_mode) ->
         let ctxt = Gas.set_unlimited ctxt in
@@ -1524,7 +1608,7 @@ module Scripts = struct
         let ctxt = Gas.set_unlimited ctxt in
         let legacy = false in
         let open Script_ir_translator in
-        parse_toplevel ~legacy ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
+        parse_toplevel ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
         Lwt.return
           ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
           >|? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
@@ -1544,7 +1628,7 @@ module Scripts = struct
                 [] ) ))
 
   let run_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default) ?balance
-      ~script ~storage ~input ~amount ~chain_id ~source ~payer ~self ~now ~level
+      ~script ~storage ~input ~amount ~chain_id ~sender ~payer ~self ~now ~level
       ctxt block =
     RPC_context.make_call0
       S.run_code
@@ -1557,14 +1641,14 @@ module Scripts = struct
           amount,
           balance,
           chain_id,
-          source,
+          sender,
           payer,
           self,
           entrypoint ),
         (unparsing_mode, gas, now, level) )
 
   let trace_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default)
-      ?balance ~script ~storage ~input ~amount ~chain_id ~source ~payer ~self
+      ?balance ~script ~storage ~input ~amount ~chain_id ~sender ~payer ~self
       ~now ~level ctxt block =
     RPC_context.make_call0
       S.trace_code
@@ -1577,14 +1661,14 @@ module Scripts = struct
           amount,
           balance,
           chain_id,
-          source,
+          sender,
           payer,
           self,
           entrypoint ),
         (unparsing_mode, gas, now, level) )
 
   let run_tzip4_view ?gas ~contract ~entrypoint ~input ~chain_id ~now ~level
-      ?source ?payer ~unparsing_mode ctxt block =
+      ?sender ?payer ~unparsing_mode ctxt block =
     RPC_context.make_call0
       S.run_tzip4_view
       ctxt
@@ -1594,7 +1678,7 @@ module Scripts = struct
         entrypoint,
         input,
         chain_id,
-        source,
+        sender,
         payer,
         gas,
         unparsing_mode,
@@ -1604,7 +1688,7 @@ module Scripts = struct
   (** [run_script_view] is an helper function to call the corresponding
         RPC. [unlimited_gas] is set to [false] by default. *)
   let run_script_view ?gas ~contract ~view ~input ?(unlimited_gas = false)
-      ~chain_id ~now ~level ?source ?payer ~unparsing_mode ctxt block =
+      ~chain_id ~now ~level ?sender ?payer ~unparsing_mode ctxt block =
     RPC_context.make_call0
       S.run_script_view
       ctxt
@@ -1615,7 +1699,7 @@ module Scripts = struct
           input,
           unlimited_gas,
           chain_id,
-          source,
+          sender,
           payer,
           gas,
           unparsing_mode,
@@ -1651,6 +1735,14 @@ module Scripts = struct
       block
       ()
       (data, ty, unparsing_mode, legacy)
+
+  let normalize_stack ?legacy ~stack ~unparsing_mode ctxt block =
+    RPC_context.make_call0
+      S.normalize_stack
+      ctxt
+      block
+      ()
+      (stack, unparsing_mode, legacy)
 
   let normalize_script ~script ~unparsing_mode ctxt block =
     RPC_context.make_call0
@@ -2132,8 +2224,8 @@ module Sc_rollup = struct
         ~query:RPC_query.empty
         ~output
         RPC_path.(
-          path_sc_rollup / "staker1" /: Sc_rollup.Staker.rpc_arg / "staker2"
-          /: Sc_rollup.Staker.rpc_arg / "timeout")
+          path_sc_rollup / "staker1" /: Sc_rollup.Staker.rpc_arg_staker1
+          / "staker2" /: Sc_rollup.Staker.rpc_arg_staker2 / "timeout")
 
     let timeout_reached =
       let output = Data_encoding.option Sc_rollup.Game.game_result_encoding in
@@ -2143,8 +2235,8 @@ module Sc_rollup = struct
         ~query:RPC_query.empty
         ~output
         RPC_path.(
-          path_sc_rollup / "staker1" /: Sc_rollup.Staker.rpc_arg / "staker2"
-          /: Sc_rollup.Staker.rpc_arg / "timeout_reached")
+          path_sc_rollup / "staker1" /: Sc_rollup.Staker.rpc_arg_staker1
+          / "staker2" /: Sc_rollup.Staker.rpc_arg_staker2 / "timeout_reached")
 
     let can_be_cemented =
       let output = Data_encoding.bool in
@@ -2361,13 +2453,14 @@ module Sc_rollup = struct
       S.can_be_cemented
       (fun context rollup commitment_hash () () ->
         let open Lwt_result_syntax in
-        let*! res =
-          Sc_rollup.Stake_storage.cement_commitment
-            context
-            rollup
-            commitment_hash
-        in
-        match res with Ok _context -> return_true | Error _ -> return_false)
+        let*! res = Sc_rollup.Stake_storage.cement_commitment context rollup in
+        match res with
+        | Ok (_context, _cemented_commitment, cemented_commitment_hash)
+          when Sc_rollup.Commitment.Hash.equal
+                 commitment_hash
+                 cemented_commitment_hash ->
+            return_true
+        | Ok _ | Error _ -> return_false)
 
   let register () =
     register_kind () ;
@@ -2542,39 +2635,6 @@ module Dal = struct
     register_shards ()
 end
 
-module Tx_rollup = struct
-  open Data_encoding
-
-  module S = struct
-    let path : RPC_context.t RPC_path.context =
-      RPC_path.(open_root / "context" / "tx_rollup")
-
-    let has_bond =
-      RPC_service.get_service
-        ~description:
-          "Returns true if the public key hash already deposited a bond  for \
-           the given rollup"
-        ~query:RPC_query.empty
-        ~output:bool
-        RPC_path.(
-          path /: Tx_rollup.rpc_arg / "has_bond"
-          /: Signature.Public_key_hash.rpc_arg)
-  end
-
-  let register_has_bond () =
-    Registration.register2
-      ~chunked:false
-      S.has_bond
-      (fun ctxt rollup operator () () ->
-        Tx_rollup_commitment.has_bond ctxt rollup operator
-        >>=? fun (_ctxt, has_bond) -> return has_bond)
-
-  let register () = register_has_bond ()
-
-  let has_bond ctxt block rollup operator =
-    RPC_context.make_call2 S.has_bond ctxt block rollup operator () ()
-end
-
 module Forge = struct
   module S = struct
     open Data_encoding
@@ -2585,7 +2645,7 @@ module Forge = struct
       RPC_service.post_service
         ~description:"Forge an operation"
         ~query:RPC_query.empty
-        ~input:Operation.unsigned_encoding
+        ~input:Operation.unsigned_encoding_with_legacy_attestation_name
         ~output:(bytes Hex)
         RPC_path.(path / "operations")
 
@@ -2614,99 +2674,6 @@ module Forge = struct
                  LB_pass))
         ~output:(obj1 (req "protocol_data" (bytes Hex)))
         RPC_path.(path / "protocol_data")
-
-    module Tx_rollup = struct
-      open Data_encoding
-
-      let path = RPC_path.(path / "tx_rollup")
-
-      module Inbox = struct
-        let path = RPC_path.(path / "inbox")
-
-        let message_hash =
-          RPC_service.post_service
-            ~description:"Compute the hash of a message"
-            ~query:RPC_query.empty
-            ~input:(obj1 (req "message" Tx_rollup_message.encoding))
-            ~output:(obj1 (req "hash" Tx_rollup_message_hash.encoding))
-            RPC_path.(path / "message_hash")
-
-        let merkle_tree_hash =
-          RPC_service.post_service
-            ~description:"Compute the merkle tree hash of an inbox"
-            ~query:RPC_query.empty
-            ~input:
-              (obj1
-                 (req "message_hashes" (list Tx_rollup_message_hash.encoding)))
-            ~output:(obj1 (req "hash" Tx_rollup_inbox.Merkle.root_encoding))
-            RPC_path.(path / "merkle_tree_hash")
-
-        let merkle_tree_path =
-          RPC_service.post_service
-            ~description:"Compute a path of an inbox message in a merkle tree"
-            ~query:RPC_query.empty
-            ~input:
-              (obj2
-                 (req "message_hashes" (list Tx_rollup_message_hash.encoding))
-                 (req "position" int16))
-            ~output:(obj1 (req "path" Tx_rollup_inbox.Merkle.path_encoding))
-            RPC_path.(path / "merkle_tree_path")
-      end
-
-      module Commitment = struct
-        let path = RPC_path.(path / "commitment")
-
-        let merkle_tree_hash =
-          RPC_service.post_service
-            ~description:"Compute the merkle tree hash of a commitment"
-            ~query:RPC_query.empty
-            ~input:
-              (obj1
-                 (req
-                    "message_result_hashes"
-                    (list Tx_rollup_message_result_hash.encoding)))
-            ~output:
-              (obj1 (req "hash" Tx_rollup_commitment.Merkle_hash.encoding))
-            RPC_path.(path / "merkle_tree_hash")
-
-        let merkle_tree_path =
-          RPC_service.post_service
-            ~description:
-              "Compute a path of a message result hash in the commitment \
-               merkle tree"
-            ~query:RPC_query.empty
-            ~input:
-              (obj2
-                 (req
-                    "message_result_hashes"
-                    (list Tx_rollup_message_result_hash.encoding))
-                 (req "position" int16))
-            ~output:
-              (obj1 (req "path" Tx_rollup_commitment.Merkle.path_encoding))
-            RPC_path.(path / "merkle_tree_path")
-
-        let message_result_hash =
-          RPC_service.post_service
-            ~description:"Compute the message result hash"
-            ~query:RPC_query.empty
-            ~input:Tx_rollup_message_result.encoding
-            ~output:(obj1 (req "hash" Tx_rollup_message_result_hash.encoding))
-            RPC_path.(path / "message_result_hash")
-      end
-
-      module Withdraw = struct
-        let path = RPC_path.(path / "withdraw")
-
-        let withdraw_list_hash =
-          RPC_service.post_service
-            ~description:"Compute the hash of a withdraw list"
-            ~query:RPC_query.empty
-            ~input:
-              (obj1 (req "withdraw_list" (list Tx_rollup_withdraw.encoding)))
-            ~output:(obj1 (req "hash" Tx_rollup_withdraw_list_hash.encoding))
-            RPC_path.(path / "withdraw_list_hash")
-      end
-    end
   end
 
   let register () =
@@ -2716,7 +2683,7 @@ module Forge = struct
       (fun () (shell, proto) ->
         return
           (Data_encoding.Binary.to_bytes_exn
-             Operation.unsigned_encoding
+             Operation.unsigned_encoding_with_legacy_attestation_name
              (shell, proto))) ;
     Registration.register0_noctxt
       ~chunked:true
@@ -2738,46 +2705,7 @@ module Forge = struct
                seed_nonce_hash;
                proof_of_work_nonce;
                liquidity_baking_toggle_vote;
-             })) ;
-    Registration.register0_noctxt
-      ~chunked:true
-      S.Tx_rollup.Inbox.message_hash
-      (fun () message ->
-        return (Tx_rollup_message_hash.hash_uncarbonated message)) ;
-    Registration.register0_noctxt
-      ~chunked:true
-      S.Tx_rollup.Inbox.merkle_tree_hash
-      (fun () message_hashes ->
-        return (Tx_rollup_inbox.Merkle.merklize_list message_hashes)) ;
-    Registration.register0_noctxt
-      ~chunked:true
-      S.Tx_rollup.Inbox.merkle_tree_path
-      (fun () (message_hashes, position) ->
-        Lwt.return (Tx_rollup_inbox.Merkle.compute_path message_hashes position)) ;
-    Registration.register0_noctxt
-      ~chunked:true
-      S.Tx_rollup.Commitment.merkle_tree_hash
-      (fun () message_result_hashes ->
-        let open Tx_rollup_commitment.Merkle in
-        let tree = List.fold_left snoc nil message_result_hashes in
-        return (root tree)) ;
-    Registration.register0_noctxt
-      ~chunked:true
-      S.Tx_rollup.Commitment.merkle_tree_path
-      (fun () (message_result_hashes, position) ->
-        let open Tx_rollup_commitment.Merkle in
-        let tree = List.fold_left snoc nil message_result_hashes in
-        Lwt.return (compute_path tree position)) ;
-    Registration.register0_noctxt
-      ~chunked:true
-      S.Tx_rollup.Commitment.message_result_hash
-      (fun () message_result ->
-        return (Tx_rollup_message_result_hash.hash_uncarbonated message_result)) ;
-    Registration.register0_noctxt
-      ~chunked:true
-      S.Tx_rollup.Withdraw.withdraw_list_hash
-      (fun () withdrawals ->
-        return (Tx_rollup_withdraw_list_hash.hash_uncarbonated withdrawals))
+             }))
 
   module Manager = struct
     let operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
@@ -2940,7 +2868,8 @@ module Parse = struct
           (obj2
              (req "operations" (list (dynamic_size Operation.raw_encoding)))
              (opt "check_signature" bool))
-        ~output:(list (dynamic_size Operation.encoding))
+        ~output:
+          (list (dynamic_size Operation.encoding_with_legacy_attestation_name))
         RPC_path.(path / "operations")
 
     let block =
@@ -3220,12 +3149,12 @@ module Baking_rights = struct
       ()
 end
 
-module Endorsing_rights = struct
+module Attestation_rights = struct
   type delegate_rights = {
     delegate : Signature.Public_key_hash.t;
     consensus_key : Signature.Public_key_hash.t;
     first_slot : Slot.t;
-    endorsing_power : int;
+    attestation_power : int;
   }
 
   type t = {
@@ -3234,20 +3163,22 @@ module Endorsing_rights = struct
     estimated_time : Time.t option;
   }
 
-  let delegate_rights_encoding =
+  let delegate_rights_encoding use_endorsement =
     let open Data_encoding in
     conv
-      (fun {delegate; consensus_key; first_slot; endorsing_power} ->
-        (delegate, first_slot, endorsing_power, consensus_key))
-      (fun (delegate, first_slot, endorsing_power, consensus_key) ->
-        {delegate; first_slot; endorsing_power; consensus_key})
+      (fun {delegate; consensus_key; first_slot; attestation_power} ->
+        (delegate, first_slot, attestation_power, consensus_key))
+      (fun (delegate, first_slot, attestation_power, consensus_key) ->
+        {delegate; first_slot; attestation_power; consensus_key})
       (obj4
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "first_slot" Slot.encoding)
-         (req "endorsing_power" uint16)
+         (req
+            (if use_endorsement then "endorsing_power" else "attestation_power")
+            uint16)
          (req "consensus_key" Signature.Public_key_hash.encoding))
 
-  let encoding =
+  let encoding ~use_endorsement =
     let open Data_encoding in
     conv
       (fun {level; delegates_rights; estimated_time} ->
@@ -3256,22 +3187,24 @@ module Endorsing_rights = struct
         {level; delegates_rights; estimated_time})
       (obj3
          (req "level" Raw_level.encoding)
-         (req "delegates" (list delegate_rights_encoding))
+         (req "delegates" (list (delegate_rights_encoding use_endorsement)))
          (opt "estimated_time" Timestamp.encoding))
 
   module S = struct
     open Data_encoding
 
-    let path = RPC_path.(path / "endorsing_rights")
+    let attestation_path = RPC_path.(path / "attestation_rights")
 
-    type endorsing_rights_query = {
+    let endorsing_path = RPC_path.(path / "endorsing_rights")
+
+    type attestation_rights_query = {
       levels : Raw_level.t list;
       cycle : Cycle.t option;
       delegates : Signature.Public_key_hash.t list;
       consensus_keys : Signature.Public_key_hash.t list;
     }
 
-    let endorsing_rights_query =
+    let attestation_rights_query =
       let open RPC_query in
       query (fun levels cycle delegates consensus_keys ->
           {levels; cycle; delegates; consensus_keys})
@@ -3283,10 +3216,36 @@ module Endorsing_rights = struct
              t.consensus_keys)
       |> seal
 
+    let attestation_rights =
+      RPC_service.get_service
+        ~description:
+          "Retrieves the delegates allowed to attest a block.\n\
+           By default, it gives the attestation power for delegates that have \
+           at least one attestation slot for the next block.\n\
+           Parameters `level` and `cycle` can be used to specify the (valid) \
+           level(s) in the past or future at which the attestation rights have \
+           to be returned. Parameter `delegate` can be used to restrict the \
+           results to the given delegates.\n\
+           Parameter `consensus_key` can be used to restrict the results to \
+           the given consensus_keys. \n\
+           Returns the smallest attestation slots and the attestation power. \
+           Also returns the minimal timestamp that corresponds to attestation \
+           at the given level. The timestamps are omitted for levels in the \
+           past, and are only estimates for levels higher that the next \
+           block's, based on the hypothesis that all predecessor blocks were \
+           baked at the first round."
+        ~query:attestation_rights_query
+        ~output:(list (encoding ~use_endorsement:false))
+        attestation_path
+
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5156
+       endorsing_rights RPC should be removed once the depreciation period
+       will be over *)
     let endorsing_rights =
       RPC_service.get_service
         ~description:
-          "Retrieves the delegates allowed to endorse a block.\n\
+          "Deprecated: use `attestation_rights` instead.\n\
+           Retrieves the delegates allowed to endorse a block.\n\
            By default, it gives the endorsing power for delegates that have at \
            least one endorsing slot for the next block.\n\
            Parameters `level` and `cycle` can be used to specify the (valid) \
@@ -3301,12 +3260,12 @@ module Endorsing_rights = struct
            are only estimates for levels higher that the next block's, based \
            on the hypothesis that all predecessor blocks were baked at the \
            first round."
-        ~query:endorsing_rights_query
-        ~output:(list encoding)
-        path
+        ~query:attestation_rights_query
+        ~output:(list (encoding ~use_endorsement:true))
+        endorsing_path
   end
 
-  let endorsing_rights_at_level ctxt level =
+  let attestation_rights_at_level ctxt level =
     Baking.endorsing_rights_by_first_slot ctxt level >>=? fun (ctxt, rights) ->
     Round.get ctxt >>=? fun current_round ->
     let current_level = Level.current ctxt in
@@ -3328,9 +3287,9 @@ module Endorsing_rights = struct
                  consensus_pk = _;
                  consensus_pkh = consensus_key;
                },
-               endorsing_power )
+               attestation_power )
              acc ->
-          {delegate; consensus_key; first_slot; endorsing_power} :: acc)
+          {delegate; consensus_key; first_slot; attestation_power} :: acc)
         rights
         []
     in
@@ -3338,46 +3297,46 @@ module Endorsing_rights = struct
     return
       (ctxt, {level = level.level; delegates_rights = rights; estimated_time})
 
+  let get_attestation_rights ctxt (q : S.attestation_rights_query) =
+    let cycles = match q.cycle with None -> [] | Some cycle -> [cycle] in
+    let levels =
+      requested_levels ~default_level:(Level.current ctxt) ctxt cycles q.levels
+    in
+    List.fold_left_map_es attestation_rights_at_level ctxt levels
+    >|=? fun (_ctxt, rights_per_level) ->
+    let rights_per_level =
+      match (q.consensus_keys, q.delegates) with
+      | [], [] -> rights_per_level
+      | _, _ ->
+          let is_requested p =
+            List.exists
+              (Signature.Public_key_hash.equal p.consensus_key)
+              q.consensus_keys
+            || List.exists
+                 (Signature.Public_key_hash.equal p.delegate)
+                 q.delegates
+          in
+          List.filter_map
+            (fun rights_at_level ->
+              match
+                List.filter is_requested rights_at_level.delegates_rights
+              with
+              | [] -> None
+              | delegates_rights -> Some {rights_at_level with delegates_rights})
+            rights_per_level
+    in
+    rights_per_level
+
   let register () =
+    Registration.register0 ~chunked:true S.attestation_rights (fun ctxt q () ->
+        get_attestation_rights ctxt q) ;
     Registration.register0 ~chunked:true S.endorsing_rights (fun ctxt q () ->
-        let cycles = match q.cycle with None -> [] | Some cycle -> [cycle] in
-        let levels =
-          requested_levels
-            ~default_level:(Level.current ctxt)
-            ctxt
-            cycles
-            q.levels
-        in
-        List.fold_left_map_es endorsing_rights_at_level ctxt levels
-        >|=? fun (_ctxt, rights_per_level) ->
-        let rights_per_level =
-          match (q.consensus_keys, q.delegates) with
-          | [], [] -> rights_per_level
-          | _, _ ->
-              let is_requested p =
-                List.exists
-                  (Signature.Public_key_hash.equal p.consensus_key)
-                  q.consensus_keys
-                || List.exists
-                     (Signature.Public_key_hash.equal p.delegate)
-                     q.delegates
-              in
-              List.filter_map
-                (fun rights_at_level ->
-                  match
-                    List.filter is_requested rights_at_level.delegates_rights
-                  with
-                  | [] -> None
-                  | delegates_rights ->
-                      Some {rights_at_level with delegates_rights})
-                rights_per_level
-        in
-        rights_per_level)
+        get_attestation_rights ctxt q)
 
   let get ctxt ?(levels = []) ?cycle ?(delegates = []) ?(consensus_keys = [])
       block =
     RPC_context.make_call0
-      S.endorsing_rights
+      S.attestation_rights
       ctxt
       block
       {levels; cycle; delegates; consensus_keys}
@@ -3556,11 +3515,10 @@ let register () =
   Contract.register () ;
   Big_map.register () ;
   Baking_rights.register () ;
-  Endorsing_rights.register () ;
+  Attestation_rights.register () ;
   Validators.register () ;
   Sc_rollup.register () ;
   Dal.register () ;
-  Tx_rollup.register () ;
   Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
       if q.offset < 0l then tzfail Negative_level_offset
       else

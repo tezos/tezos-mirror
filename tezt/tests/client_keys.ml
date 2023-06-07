@@ -47,8 +47,8 @@ module BLS_aggregate_wallet = struct
         expected.aggregate_public_key
         shown.aggregate_public_key
     else if expected.aggregate_secret_key <> shown.aggregate_secret_key then
-      let (Unencrypted sk) = shown.aggregate_secret_key in
-      let (Unencrypted expected_sk) = shown.aggregate_secret_key in
+      let sk = Account.uri_of_secret_key shown.aggregate_secret_key in
+      let expected_sk = Account.uri_of_secret_key shown.aggregate_secret_key in
       Test.fail
         ~__LOC__
         "Expecting %s, got %s as secret key from the client "
@@ -162,8 +162,8 @@ module BLS_normal_wallet = struct
         expected.public_key
         shown.public_key
     else if expected.secret_key <> shown.secret_key then
-      let (Unencrypted sk) = shown.secret_key in
-      let (Unencrypted expected_sk) = shown.secret_key in
+      let sk = Account.uri_of_secret_key shown.secret_key in
+      let expected_sk = Account.uri_of_secret_key shown.secret_key in
       Test.fail
         ~__LOC__
         "Expecting %s, got %s as secret key from the client "
@@ -281,7 +281,140 @@ module Wallet = struct
        in
        unit
 
-  let register_protocol_independent () = test_duplicate_alias ()
+  (* Checks that the keys are correctly imported from a mnemonic. *)
+  let test_import_key_mnemonic () =
+    Test.register
+      ~__FILE__
+      ~title:"Wallet: Import key mnemonic"
+      ~tags:["client"; "keys"; "import"; "mnemonic"]
+    @@ fun () ->
+    let mnemonic =
+      [
+        "seek";
+        "paddle";
+        "siege";
+        "sting";
+        "siege";
+        "sick";
+        "kidney";
+        "detect";
+        "coral";
+        "because";
+        "comfort";
+        "long";
+        "enforce";
+        "napkin";
+        "enter";
+      ]
+    in
+    let* client = Client.init () in
+    Log.info "Test a simple import." ;
+    let* () =
+      Client.import_keys_from_mnemonic
+        ~force:true
+        client
+        ~alias:"zebra"
+        ~mnemonic:
+          [
+            "release";
+            "easy";
+            "pulp";
+            "drop";
+            "select";
+            "attack";
+            "false";
+            "math";
+            "cook";
+            "angry";
+            "spin";
+            "ostrich";
+            "round";
+            "dress";
+            "acoustic";
+          ]
+    in
+    let* addresses = Client.list_known_addresses client in
+    Check.(
+      (List.assoc_opt "zebra" addresses
+      = Some "tz1aGUKE72eN21iWztoDEeH4FeKaxWb7SAUb")
+        (option string)
+        ~__LOC__
+        ~error_msg:"Expected %R, got %L") ;
+    Log.info "Test that importing fails if the alias is already present." ;
+    let alias = "super_original" in
+    let* () =
+      Client.import_keys_from_mnemonic ~force:true client ~alias ~mnemonic
+    in
+    let* () =
+      let process, output_channel =
+        Client.spawn_import_keys_from_mnemonic client ~alias
+      in
+      let stdin = String.concat " " mnemonic ^ "\n\n" in
+      let* () = Lwt_io.write_line output_channel stdin in
+      let* () = Lwt_io.close output_channel in
+      Process.check_error
+        process
+        ~msg:(rex "The secret_key alias super_original already exists.")
+    in
+    Log.info "Test an import where the user specifies a passphrase." ;
+    let passphrase = "very_secure_passphrase" in
+    let* () =
+      Client.import_keys_from_mnemonic
+        ~force:true
+        client
+        ~alias:"key"
+        ~mnemonic
+        ~passphrase
+    in
+    let* addresses = Client.list_known_addresses client in
+    Check.(
+      (List.assoc_opt "key" addresses
+      = Some "tz1QSF4TSVzaosgbaxnFJpRbs7798Skeb8Re")
+        (option string)
+        ~__LOC__
+        ~error_msg:"Expected %R, got %L") ;
+    Log.info "Test an import where the user wants to encrypt the key." ;
+    let* () =
+      let alias = "cryptkey" in
+      let encryption_password = "imgonnaencryptthiskeysohard" in
+      let* () =
+        Client.import_keys_from_mnemonic
+          ~force:true
+          ~encryption_password
+          client
+          ~alias
+          ~mnemonic
+          ~passphrase
+      in
+      let* addresses = Client.list_known_addresses client in
+      Check.(
+        (List.assoc_opt alias addresses
+        = Some "tz1QSF4TSVzaosgbaxnFJpRbs7798Skeb8Re")
+          (option string)
+          ~__LOC__
+          ~error_msg:"Expected %R, got %L") ;
+      let* account = Client.show_address ~alias client in
+      match account.secret_key with
+      | Encrypted _ -> unit
+      | Unencrypted _ -> Test.fail "Expected an encrypted secret key"
+    in
+    Log.info "Test that the command fails if the user gives a bad mnemonic." ;
+    let* () =
+      let process, output_channel =
+        Client.spawn_import_keys_from_mnemonic client ~alias:"alias"
+      in
+      let stdin = "hello\n\n" in
+      let* () = Lwt_io.write_line output_channel stdin in
+      let* () = Lwt_io.close output_channel in
+      Process.check_error
+        process
+        ~msg:(rex "\"hello\" is not a valid BIP39 mnemonic.")
+    in
+    unit
+
+  let register_protocol_independent () =
+    test_duplicate_alias () ;
+    test_import_key_mnemonic ()
 
   let register protocols = test_remember_contract protocols
 end

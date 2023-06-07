@@ -113,6 +113,20 @@ let () =
             if divisor = 0. then (* in that case all values are null *) 0.
             else 100. *. diff /. divisor
           in
-          Printf.printf ",%f,%f,%f,%f\n" final_min final_max diff change
+          Printf.printf ",%f,%f,%f,%f\n" final_min final_max diff change ;
+          if change > 20. then
+            Printf.eprintf "%f%% regression for %s.\n" change name
       | _, _ -> Printf.printf ",,,,\n")
-    all_param_names
+    all_param_names ;
+
+  (* Report parameters disappearing or appearing between the last two files. *)
+  if len >= 2 then
+    let before_last, _ = tables.(len - 2) in
+    let last, _ = tables.(len - 1) in
+    List.iter
+      (fun name ->
+        match (List.mem_assoc name before_last, List.mem_assoc name last) with
+        | false, false | true, true -> ()
+        | true, false -> Printf.eprintf "%s is removed.\n" name
+        | false, true -> Printf.eprintf "%s is new.\n" name)
+      all_param_names

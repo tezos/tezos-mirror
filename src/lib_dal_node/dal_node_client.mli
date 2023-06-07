@@ -37,9 +37,9 @@ class type cctxt =
 class unix_cctxt :
   rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config -> cctxt
 
-(** [make_unix_client_context config] generates a cctxt from
-    the client configuration. *)
-val make_unix_cctxt : addr:string -> port:int -> cctxt
+(** [make_unix_context endpoint] generates a cctxt with the provided
+    [endpoint]. *)
+val make_unix_cctxt : Uri.t -> cctxt
 
 val get_slot : #cctxt -> Cryptobox.Commitment.t -> Cryptobox.slot tzresult Lwt.t
 

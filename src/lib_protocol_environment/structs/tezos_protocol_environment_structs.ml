@@ -80,6 +80,7 @@ module V3 = struct
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Error_monad_trace_eval = V0_error_monad_trace_eval
   module RPC_directory = V0_RPC_directory
+  module Seq = V3_seq_monad
 end
 
 module V4 = struct
@@ -88,6 +89,7 @@ module V4 = struct
   module Lwtreslib_list_combine = V3_lwtreslib_list_combine
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module RPC_directory = V0_RPC_directory
+  module Seq = V3_seq_monad
 end
 
 module V5 = struct
@@ -95,6 +97,7 @@ module V5 = struct
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Bounded = V5_bounded
   module RPC_directory = V0_RPC_directory
+  module Seq = V3_seq_monad
 end
 
 module V6 = struct
@@ -102,6 +105,7 @@ module V6 = struct
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Bounded = V5_bounded
   module RPC_directory = V0_RPC_directory
+  module Seq = V3_seq_monad
 end
 
 module V7 = struct
@@ -109,6 +113,7 @@ module V7 = struct
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Array = V7_array
   module Plonk = V7_plonk
+  module Seq = V3_seq_monad
 end
 
 module V8 = struct
@@ -116,6 +121,15 @@ module V8 = struct
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Array = V7_array
   module Plonk = V8_plonk
+  module Seq = V3_seq_monad
 end
 
-module V9 = V8
+module V9 = struct
+  module Data_encoding = V8_data_encoding
+  module Error_monad_infix_globals = V0_error_monad_infix_globals
+  module Array = V7_array
+  module Plonk = V8_plonk
+  module Seq = V9_seq_monad
+end
+
+module V10 = V9

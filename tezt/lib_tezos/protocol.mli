@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = Lima | Mumbai | Alpha
+type t = Mumbai | Nairobi | Alpha
 
 (** Protocol parameters.
 
@@ -65,6 +65,9 @@ val demo_noops_hash : string
 (** Hash of protocol demo_counter *)
 val demo_counter_hash : string
 
+(** Hash of protocol zero *)
+val protocol_zero_hash : string
+
 (** Get the location of the parameter file.
 
     This returns the path to one of the parameter files of the ["parameters"]
@@ -76,6 +79,14 @@ val accuser : t -> string
 
 (** Get the path of the baker of a protocol, such as ["./octez-baker-alpha"]. *)
 val baker : t -> string
+
+(** Get the path of the smart rollup node of a protocol, such as
+    ["./octez-smart-rollup-node-alpha"]. *)
+val sc_rollup_node : t -> string
+
+(** Get the path of the smart rollup client of a protocol, such as
+    ["./octez-smart-rollup-client-alpha"]. *)
+val sc_rollup_client : t -> string
 
 (** Get the part of the daemon name that is specific to a protocol (e.g. ["PtEdo2Zk"]).
 

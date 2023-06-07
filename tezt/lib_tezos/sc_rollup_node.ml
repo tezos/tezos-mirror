@@ -25,21 +25,22 @@
 
 type 'a known = Unknown | Known of 'a
 
-type mode = Batcher | Custom | Maintenance | Observer | Operator
+type mode = Batcher | Custom | Maintenance | Observer | Operator | Accuser
 
 module Parameters = struct
   type persistent_state = {
     data_dir : string;
+    base_dir : string;
     operators : (string * string) list;
     default_operator : string option;
     rpc_host : string;
     rpc_port : int;
     mode : mode;
     dal_node : Dal_node.t option;
-    client : Client.t;
-    node : Node.t;
+    mutable node : Node.t;
     mutable pending_ready : unit option Lwt.u list;
     mutable pending_level : (int * int option Lwt.u) list;
+    runner : Runner.t option;
   }
 
   type session_state = {mutable ready : bool; mutable level : int known}
@@ -58,6 +59,7 @@ let string_of_mode = function
   | Maintenance -> "maintenance"
   | Operator -> "operator"
   | Custom -> "custom"
+  | Accuser -> "accuser"
 
 let check_error ?exit_code ?msg sc_node =
   match sc_node.status with
@@ -91,7 +93,7 @@ let endpoint sc_node =
 
 let data_dir sc_node = sc_node.persistent_state.data_dir
 
-let base_dir sc_node = Client.base_dir sc_node.persistent_state.client
+let base_dir sc_node = sc_node.persistent_state.base_dir
 
 let operators_params sc_node =
   let acc =
@@ -109,45 +111,63 @@ let layer1_addr sc_node = Node.rpc_host sc_node.persistent_state.node
 
 let layer1_port sc_node = Node.rpc_port sc_node.persistent_state.node
 
-let spawn_command sc_node args =
-  Process.spawn ~name:sc_node.name ~color:sc_node.color sc_node.path
-  @@ ["--base-dir"; base_dir sc_node]
-  @ args
+let make_arguments node =
+  [
+    "--endpoint";
+    Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
+    "--base-dir";
+    base_dir node;
+  ]
 
-let spawn_config_init sc_node ?loser_mode rollup_address =
-  spawn_command sc_node
-  @@ [
-       "init";
-       string_of_mode sc_node.persistent_state.mode;
-       "config";
-       "for";
-       rollup_address;
-       "with";
-       "operators";
-     ]
-  @ operators_params sc_node
-  @ [
-      "--data-dir";
-      data_dir sc_node;
-      "--rpc-addr";
-      rpc_host sc_node;
-      "--rpc-port";
-      string_of_int @@ rpc_port sc_node;
-    ]
+let spawn_command sc_node args =
+  Process.spawn
+    ?runner:sc_node.persistent_state.runner
+    ~name:sc_node.name
+    ~color:sc_node.color
+    sc_node.path
+  @@ make_arguments sc_node @ args
+
+let common_node_args ?loser_mode sc_node =
+  [
+    "--data-dir";
+    data_dir sc_node;
+    "--rpc-addr";
+    rpc_host sc_node;
+    "--rpc-port";
+    string_of_int @@ rpc_port sc_node;
+  ]
   @ (match loser_mode with None -> [] | Some mode -> ["--loser-mode"; mode])
   @
   match sc_node.persistent_state.dal_node with
   | None -> []
   | Some dal_node ->
-      [
-        "--dal-node-addr";
-        Dal_node.rpc_host dal_node;
-        "--dal-node-port";
-        Int.to_string @@ Dal_node.rpc_port dal_node;
-      ]
+      let endpoint =
+        sf
+          "http://%s:%d"
+          (Dal_node.rpc_host dal_node)
+          (Dal_node.rpc_port dal_node)
+      in
+      ["--dal-node"; endpoint]
 
-let config_init sc_node ?loser_mode rollup_address =
-  let process = spawn_config_init sc_node ?loser_mode rollup_address in
+let node_args ?loser_mode sc_node rollup_address =
+  let mode = string_of_mode sc_node.persistent_state.mode in
+  ( mode,
+    ["for"; rollup_address; "with"; "operators"]
+    @ operators_params sc_node
+    @ common_node_args ?loser_mode sc_node )
+
+let legacy_node_args ?loser_mode sc_node rollup_address =
+  let mode = string_of_mode sc_node.persistent_state.mode in
+  ["--mode"; mode; "--rollup"; rollup_address]
+  @ common_node_args ?loser_mode sc_node
+
+let spawn_config_init sc_node ?(force = false) ?loser_mode rollup_address =
+  let mode, args = node_args ?loser_mode sc_node rollup_address in
+  spawn_command sc_node @@ ["init"; mode; "config"] @ args
+  @ if force then ["--force"] else []
+
+let config_init sc_node ?force ?loser_mode rollup_address =
+  let process = spawn_config_init sc_node ?force ?loser_mode rollup_address in
   let* output = Process.check_and_read_stdout process in
   match
     output =~* rex "Smart rollup node configuration written in ([^\n]*)"
@@ -177,6 +197,7 @@ let set_ready sc_node =
   trigger_ready sc_node (Some ())
 
 let check_event ?timeout ?where sc_node name promise =
+  let promise = Lwt.map Result.ok promise in
   let* result =
     match timeout with
     | None -> promise
@@ -185,14 +206,20 @@ let check_event ?timeout ?where sc_node name promise =
           [
             promise;
             (let* () = Lwt_unix.sleep timeout in
-             Lwt.return None);
+             Lwt.return_error ());
           ]
   in
   match result with
-  | None ->
+  | Ok (Some x) -> return x
+  | Ok None ->
       raise
         (Terminated_before_event {daemon = sc_node.name; event = name; where})
-  | Some x -> return x
+  | Error () ->
+      Format.ksprintf
+        failwith
+        "Timeout waiting for event %s of %s"
+        name
+        sc_node.name
 
 let wait_for_ready sc_node =
   match sc_node.status with
@@ -238,6 +265,10 @@ let wait_for_level ?timeout sc_node level =
         ~where:("level >= " ^ string_of_int level)
         promise
 
+let wait_sync sc_node ~timeout =
+  let node_level = Node.get_level sc_node.persistent_state.node in
+  wait_for_level ~timeout sc_node node_level
+
 let handle_event sc_node {name; value; timestamp = _} =
   match name with
   | "smart_rollup_node_is_ready.v0" -> set_ready sc_node
@@ -246,9 +277,9 @@ let handle_event sc_node {name; value; timestamp = _} =
       update_level sc_node level
   | _ -> ()
 
-let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
+let create ~protocol ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
     ?(rpc_host = "127.0.0.1") ?rpc_port ?(operators = []) ?default_operator
-    ?(dal_node : Dal_node.t option) mode (node : Node.t) (client : Client.t) =
+    ?(dal_node : Dal_node.t option) mode (node : Node.t) =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -256,40 +287,33 @@ let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
   in
+  let path = Option.value ~default:(Protocol.sc_rollup_node protocol) path in
   let sc_node =
     create
       ~path
       ~name
+      ?runner
       ?color
       ?event_pipe
       {
         data_dir;
+        base_dir;
         rpc_host;
         rpc_port;
         operators;
         default_operator;
         mode;
         node;
-        client;
         dal_node;
         pending_ready = [];
         pending_level = [];
+        runner;
       }
   in
   on_event sc_node (handle_event sc_node) ;
   sc_node
 
-let make_arguments node =
-  List.filter_map Fun.id
-  @@ [
-       Some "--endpoint";
-       Some
-         (Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node));
-       Some "--base-dir";
-       Some (base_dir node);
-     ]
-
-let do_runlike_command node arguments =
+let do_runlike_command ?event_level ?event_sections_levels node arguments =
   if node.status <> Not_running then
     Test.fail "Smart contract rollup node %s is already running" node.name ;
   let on_terminate _status =
@@ -297,14 +321,47 @@ let do_runlike_command node arguments =
     unit
   in
   let arguments = make_arguments node @ arguments in
-  run node {ready = false; level = Unknown} arguments ~on_terminate
-
-let run node arguments =
-  do_runlike_command
+  run
+    ?runner:node.persistent_state.runner
+    ?event_level
+    ?event_sections_levels
     node
-    (["run"; "--data-dir"; node.persistent_state.data_dir] @ arguments)
+    {ready = false; level = Unknown}
+    arguments
+    ~on_terminate
 
-let run node arguments =
-  let* () = run node arguments in
+let run ?(legacy = false) ?event_level ?event_sections_levels ?loser_mode node
+    rollup_address extra_arguments =
+  let cmd =
+    if legacy then
+      let args = legacy_node_args ?loser_mode node rollup_address in
+      ["run"] @ args @ extra_arguments
+    else
+      let mode, args = node_args ?loser_mode node rollup_address in
+      ["run"; mode] @ args @ extra_arguments
+  in
+  do_runlike_command ?event_level ?event_sections_levels node cmd
+
+let run ?legacy ?event_level ?event_sections_levels ?loser_mode node
+    rollup_address arguments =
+  let* () =
+    run
+      ?legacy
+      ?event_level
+      ?event_sections_levels
+      ?loser_mode
+      node
+      rollup_address
+      arguments
+  in
   let* () = wait_for_ready node in
   return ()
+
+let spawn_run node rollup_address extra_arguments =
+  let mode, args = node_args node rollup_address in
+  spawn_command node (["run"; mode] @ args @ extra_arguments)
+
+let change_node_and_restart ?event_level sc_rollup_node rollup_address node =
+  let* () = terminate sc_rollup_node in
+  sc_rollup_node.persistent_state.node <- node ;
+  run ?event_level sc_rollup_node rollup_address []

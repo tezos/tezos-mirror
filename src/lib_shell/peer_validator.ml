@@ -109,9 +109,13 @@ let bootstrap_new_branch w unknown_prefix =
       unknown_prefix
   in
   pv.pipeline <- Some pipeline ;
+  let worker_canceler = Worker.canceler w in
+  Lwt_canceler.on_cancel worker_canceler (fun () ->
+      pv.pipeline <- None ;
+      Bootstrap_pipeline.cancel pipeline) ;
   let* () =
     protect
-      ~canceler:(Worker.canceler w)
+      ~canceler:worker_canceler
       ~on_error:(fun error ->
         (* if the peer_validator is killed, let's cancel the pipeline *)
         pv.pipeline <- None ;
@@ -290,10 +294,11 @@ let may_validate_new_branch w locator =
           locator
       in
       match v with
-      | Known_valid, prefix_locator ->
-          if prefix_locator.Block_locator.history <> [] then
-            bootstrap_new_branch w prefix_locator
-          else return_unit
+      | Known_valid, {history = []; _} -> return_unit
+      | Known_valid, {history = [x]; head_header; head_hash}
+        when Block_hash.equal x head_header.shell.predecessor ->
+          validate_new_head w head_hash head_header
+      | Known_valid, prefix_locator -> bootstrap_new_branch w prefix_locator
       | Unknown, _ ->
           (* May happen when:
              - A locator from another chain is received;
@@ -413,7 +418,7 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
             ( pv.peer_id,
               Format.asprintf "unknown ancestor or too short locator: kick" )
         in
-        let* () = Events.(emit request_error) (request_view, st, err) in
+        let* () = Events.(emit insufficient_history) pv.peer_id in
         Worker.trigger_shutdown w ;
         return_ok_unit
     | Distributed_db.Operations.Canceled _ :: _ -> (
@@ -441,6 +446,14 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
             Prometheus.Counter.inc_one
               metrics.operations_fetching_canceled_new_branch ;
             Lwt.return_error err)
+    | Canceled :: _ ->
+        let* () =
+          Events.(emit terminating_worker)
+            (pv.peer_id, Format.asprintf "canceled")
+        in
+        let* () = Peer_validator_events.(emit peer_disconnection) pv.peer_id in
+        Worker.trigger_shutdown w ;
+        return_ok_unit
     | _ ->
         Prometheus.Counter.inc_one metrics.unknown_error ;
         let* () = Events.(emit request_error) (request_view, st, err) in
@@ -451,9 +464,17 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
   | New_branch _ -> on_error_trace err
 
 let on_close w =
-  let open Lwt_syntax in
   let pv = Worker.state w in
-  let* () = Distributed_db.disconnect pv.parameters.chain_db pv.peer_id in
+  (* We request the the P2P layer to disconnect from this peer, but we
+     do not wait for the disconnection to be effective (the underlying
+     socket is closed). This is because the P2P layer does not offer
+     the guarantee that the disconnection will be quick.
+
+     This is not a problem, and allows the reconnection with this peer
+     using a different socket. *)
+  let (_ : unit Lwt.t) =
+    Distributed_db.disconnect pv.parameters.chain_db pv.peer_id
+  in
   pv.parameters.notify_termination () ;
   Lwt.return_unit
 

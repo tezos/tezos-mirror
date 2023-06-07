@@ -1,7 +1,8 @@
 (** Testing
     -------
     Component:    Client Base
-    Invocation:   dune build @src/lib_client_base/runtest
+    Invocation:   dune exec src/lib_client_base/test/main.exe \
+                  -- --file bip39_tests.ml
     Subject:      BIP39 seed phrases. Mnemonic sentences for the
                   generation of deterministic wallets.
 *)
@@ -277,4 +278,4 @@ let vectors () =
 
 let basic = [("vectors", `Quick, vectors)]
 
-let () = Alcotest.run "bip39" [("basic", basic)]
+let () = Alcotest.run ~__FILE__ "bip39" [("basic", basic)]

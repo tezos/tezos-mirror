@@ -121,6 +121,8 @@ let division_cost name =
   let module M = struct
     type arg_type = int * (int * unit)
 
+    let name = ns name
+
     module Def (X : Costlang.S) = struct
       open X
 
@@ -145,6 +147,8 @@ let addlogadd name =
   let coeff = fv (sf "%s_coeff" name) in
   let module M = struct
     type arg_type = int * (int * unit)
+
+    let name = ns name
 
     module Def (X : Costlang.S) = struct
       open X
@@ -172,23 +176,26 @@ let name_of_instr_or_cont ?specialization instr_or_cont =
 module Models = struct
   let const1_model name =
     (* For constant-time instructions *)
-    Model.unknown_const1 ~const:(fv (sf "%s_const" name))
+    Model.unknown_const1 ~name:(ns name) ~const:(fv (sf "%s_const" name))
 
   let affine_model name =
     (* For instructions with cost function
        [\lambda size. const + coeff * size] *)
     Model.affine
+      ~name:(ns name)
       ~intercept:(fv (sf "%s_const" name))
       ~coeff:(fv (sf "%s_coeff" name))
 
   let break_model name break =
     Model.breakdown
+      ~name:(ns name)
       ~coeff1:(fv (sf "%s_coeff1" name))
       ~coeff2:(fv (sf "%s_coeff2" name))
       ~break
 
   let break_model_2 name break1 break2 =
     Model.breakdown2
+      ~name:(ns name)
       ~coeff1:(fv (sf "%s_coeff1" name))
       ~coeff2:(fv (sf "%s_coeff2" name))
       ~coeff3:(fv (sf "%s_coeff3" name))
@@ -197,6 +204,7 @@ module Models = struct
 
   let break_model_2_const name break1 break2 =
     Model.breakdown2_const
+      ~name:(ns name)
       ~coeff1:(fv (sf "%s_coeff1" name))
       ~coeff2:(fv (sf "%s_coeff2" name))
       ~coeff3:(fv (sf "%s_coeff3" name))
@@ -208,17 +216,20 @@ module Models = struct
     (* For instructions with cost function
        [\lambda size1. \lambda size2. const + coeff * size1 log2(size2)] *)
     Model.nlogm
+      ~name:(ns name)
       ~intercept:(fv (sf "%s_const" name))
       ~coeff:(fv (sf "%s_coeff" name))
 
   let concat_model name =
     Model.bilinear_affine
+      ~name:(ns name)
       ~intercept:(fv (sf "%s_const" name))
       ~coeff1:(fv (sf "%s_total_bytes" name))
       ~coeff2:(fv (sf "%s_list_length" name))
 
   let concat_pair_model name =
     Model.linear_sum
+      ~name:(ns name)
       ~intercept:(fv (sf "%s_const" name))
       ~coeff:(fv (sf "%s_coeff" name))
 
@@ -226,6 +237,7 @@ module Models = struct
     (* For instructions with cost function
        [\lambda size1. \lambda size2. const + coeff * max(size1,size2)] *)
     Model.linear_max
+      ~name:(ns name)
       ~intercept:(fv (sf "%s_const" name))
       ~coeff:(fv (sf "%s_coeff" name))
 
@@ -233,11 +245,13 @@ module Models = struct
     (* For instructions with cost function
        [\lambda size1. \lambda size2. const + coeff * min(size1,size2)] *)
     Model.linear_min
+      ~name:(ns name)
       ~intercept:(fv (sf "%s_const" name))
       ~coeff:(fv (sf "%s_coeff" name))
 
   let pack_model name =
     Model.trilinear
+      ~name:(ns name)
       ~coeff1:(fv (sf "%s_micheline_nodes" name))
       ~coeff2:(fv (sf "%s_micheline_int_bytes" name))
       ~coeff3:(fv (sf "%s_micheline_string_bytes" name))
@@ -260,11 +274,14 @@ module Models = struct
           + (free ~name:(fv (sf "%s_log_time_coeff" name)) * size1)
           + (free ~name:(fv (sf "%s_plaintext_coeff" name)) * size2)
       end
+
+      let name = ns name
     end in
     (module M : Model.Model_impl with type arg_type = int * (int * unit))
 
   let verify_update_model name =
     Model.bilinear_affine
+      ~name:(ns name)
       ~intercept:(fv (sf "%s_const" name))
       ~coeff1:(fv (sf "%s_inputs" name))
       ~coeff2:(fv (sf "%s_ouputs" name))
@@ -289,6 +306,8 @@ module Models = struct
             + (free ~name:(fv (sf "%s_coeff" name)) * size_ys))
             (free ~name:(fv (sf "%s_iter" name)))
       end
+
+      let name = ns name
     end in
     (module M : Model.Model_impl with type arg_type = int * (int * unit))
 
@@ -310,6 +329,8 @@ module Models = struct
             (free ~name:(fv (sf "%s_%s" name case_0)))
             (free ~name:(fv (sf "%s_%s" name case_1)))
       end
+
+      let name = ns name
     end in
     (module M : Model.Model_impl with type arg_type = int * unit)
 
@@ -340,12 +361,15 @@ module Models = struct
           + free ~name:(fv (sf "%s_add_coeff" name))
             * max amount_size_x amount_size_y
       end
+
+      let name = ns name
     end in
     (module M : Model.Model_impl
       with type arg_type = int * (int * (int * (int * unit))))
 
   let lsl_bytes_model name =
     Model.bilinear_affine
+      ~name:(ns name)
       ~intercept:(fv (sf "%s_const" name))
       ~coeff1:(fv (sf "%s_bytes" name))
       ~coeff2:(fv (sf "%s_shift" name))
@@ -372,6 +396,8 @@ module Models = struct
           let_ ~name:"q" (sat_sub size1 (size2 * float 0.125)) @@ fun q ->
           free ~name:const + (free ~name:coeff * q)
       end
+
+      let name = ns name
     end in
     (module M : Model.Model_impl with type arg_type = int * (int * unit))
 end
@@ -507,35 +533,32 @@ let amplification_loop_iteration = fv "amplification_loop_iteration"
 let amplification_loop_model =
   Model.make
     ~conv:(fun iterations -> (iterations, ()))
-    ~model:(Model.linear ~coeff:amplification_loop_iteration)
+    ~model:(Model.linear ~name:(ns "amp") ~coeff:amplification_loop_iteration)
 
 (* The following model stitches together the per-instruction models and
    adds a term corresponding to the latency induced by the timer itself. *)
-let interpreter_model ?amplification ?specialization () =
-  Model.make_preapplied ~model:(fun trace ->
+let interpreter_model ?amplification sub_model =
+  Model.make_aggregated
+    ~model:(fun trace ->
       let module Def (X : Costlang.S) = struct
+        type t = X.size X.repr
+
         let applied =
-          let (module Timer_applied) =
-            Model.apply Tezos_benchmark.Builtin_benchmarks.timer_model ()
-          in
-          let module Timer_result = Timer_applied (X) in
           let initial =
             match amplification with
-            | None -> Timer_result.applied
+            | None -> X.int 0
             | Some amplification_factor ->
                 let (module Amplification_applied) =
                   Model.apply amplification_loop_model amplification_factor
                 in
                 let module Amplification_result = Amplification_applied (X) in
-                X.(Timer_result.applied + Amplification_result.applied)
+                Amplification_result.applied
           in
           List.fold_left
             (fun (acc : X.size X.repr) instr_trace ->
               let (module Applied_instr) =
                 Model.apply
-                  (ir_model
-                     ?specialization
-                     instr_trace.Interpreter_workload.name)
+                  (ir_model instr_trace.Interpreter_workload.name)
                   instr_trace
               in
               let module R = Applied_instr (X) in
@@ -544,25 +567,14 @@ let interpreter_model ?amplification ?specialization () =
             trace
       end in
       ((module Def) : Model.applied))
+    ~sub_models:[sub_model]
 
-let make_model ?amplification ?specialization instr_name_opt =
-  match instr_name_opt with
-  | None ->
-      [("interpreter", interpreter_model ?amplification ?specialization ())]
-  | Some name ->
-      (* When generating code, we don't want to consider the terms specific to
-         Lwt and to the timer latency. Also, we restrict to single instructions. *)
-      let ir_model = ir_model ?specialization name in
-      let name = name_of_instr_or_cont ?specialization name in
-      Registration_helpers.register_for_codegen
-        name
-        (Model.For_codegen ir_model) ;
-      let ir_model =
-        Model.precompose
-          (function [sized_step] -> sized_step | _ -> assert false)
-          ir_model
-      in
-      [
-        ("interpreter", interpreter_model ?amplification ?specialization ());
-        ("codegen", ir_model);
-      ]
+let make_model ?amplification instr_name =
+  (* When generating code, we don't want to consider the terms specific to
+     Lwt and to the timer latency. Also, we restrict to single instructions. *)
+  let ir_model =
+    match ir_model instr_name with
+    | Aggregate _ -> assert false
+    | Abstract {model; _} -> Model.Model model
+  in
+  [("interpreter", interpreter_model ?amplification ir_model)]

@@ -32,6 +32,7 @@
   prometheus-app.unix
   lwt-exit
   uri
+  tezos-base.p2p-identity-file
   (select void_for_linking-tezos-embedded-protocol-genesis from
    (tezos-embedded-protocol-genesis -> void_for_linking-tezos-embedded-protocol-genesis.empty)
    (-> void_for_linking-tezos-embedded-protocol-genesis.empty))
@@ -114,10 +115,16 @@
   (select void_for_linking-tezos-protocol-plugin-014-PtKathma-registerer from
    (tezos-protocol-plugin-014-PtKathma-registerer -> void_for_linking-tezos-protocol-plugin-014-PtKathma-registerer.empty)
    (-> void_for_linking-tezos-protocol-plugin-014-PtKathma-registerer.empty))
-  tezos-embedded-protocol-015-PtLimaPt
-  tezos-protocol-plugin-015-PtLimaPt-registerer
+  (select void_for_linking-tezos-embedded-protocol-015-PtLimaPt from
+   (tezos-embedded-protocol-015-PtLimaPt -> void_for_linking-tezos-embedded-protocol-015-PtLimaPt.empty)
+   (-> void_for_linking-tezos-embedded-protocol-015-PtLimaPt.empty))
+  (select void_for_linking-tezos-protocol-plugin-015-PtLimaPt-registerer from
+   (tezos-protocol-plugin-015-PtLimaPt-registerer -> void_for_linking-tezos-protocol-plugin-015-PtLimaPt-registerer.empty)
+   (-> void_for_linking-tezos-protocol-plugin-015-PtLimaPt-registerer.empty))
   tezos-embedded-protocol-016-PtMumbai
   tezos-protocol-plugin-016-PtMumbai-registerer
+  tezos-embedded-protocol-017-PtNairob
+  tezos-protocol-plugin-017-PtNairob-registerer
   (select void_for_linking-tezos-embedded-protocol-alpha from
    (tezos-embedded-protocol-alpha -> void_for_linking-tezos-embedded-protocol-alpha.empty)
    (-> void_for_linking-tezos-embedded-protocol-alpha.empty))
@@ -146,7 +153,8 @@
   -open Tezos_validation
   -open Tezos_shell_context
   -open Tezos_workers
-  -open Tezos_protocol_updater))
+  -open Tezos_protocol_updater
+  -open Tezos_base_p2p_identity_file))
 
 (rule
  (action
@@ -178,6 +186,8 @@
    (write-file void_for_linking-tezos-protocol-plugin-013-PtJakart-registerer.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-014-PtKathma.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-014-PtKathma-registerer.empty "")
+   (write-file void_for_linking-tezos-embedded-protocol-015-PtLimaPt.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-015-PtLimaPt-registerer.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-alpha.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-alpha-registerer.empty ""))))
 

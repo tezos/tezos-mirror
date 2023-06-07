@@ -5023,11 +5023,11 @@ module Compact : sig
 
       @param i32_title is used as a prefix to each of the int32 cases' title.
 
-      @param alt_title is used as the title of the alt case. (See {!case} and
+      @param alt_title is used as the title of the alt case. (See {!val-case} and
       {!union} for details.)
 
       @param alt_description is used as the description of the alternate case.
-      (See {!case} and {!union} for details.) *)
+      (See {!val-case} and {!union} for details.) *)
   val or_int32 :
     int32_title:string ->
     alt_title:string ->
@@ -5097,7 +5097,7 @@ module Compact : sig
         of a value is [M.(partial_encoding (layout v) v)].
 
         It is the user's responsibility to ensure that all the values of [M]
-        follow the invariants documented in {!S}. *)
+        follow the invariants documented in {!module-type-S}. *)
     val make : (module S with type input = 'a) -> 'a t
   end
 end
@@ -5314,8 +5314,8 @@ end
 (** {2 Signatures and a functor} *)
 
 (** [COMPARABLE] is a signature for basic comparison. It is used only for
-    instantiating full comparison modules of signature {!S} via the functor
-    {!Make}. *)
+    instantiating full comparison modules of signature {!module-type-S} via the
+    functor {!Make}. *)
 module type COMPARABLE = sig
   type t
 
@@ -6612,28 +6612,14 @@ val assoc : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> 'b option
     {!Stdlib.List}. *)
 val assoc_opt : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> 'b option
 
-(** [assq k kvs] is the same as [assoc ~equal:Stdlib.( == ) k kvs]: it uses
-    the physical equality. *)
-val assq : 'a -> ('a * 'b) list -> 'b option
-
-(** [assq_opt] is an alias for [assq] provided for compatibility with
-    {!Stdlib.List}. *)
-val assq_opt : 'a -> ('a * 'b) list -> 'b option
-
 (** [mem_assoc ~equal k l] is equivalent to
     [Option.is_some @@ assoc ~equal k l]. *)
 val mem_assoc : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> bool
-
-(** [mem_assq k l] is [mem_assoc ~equal:Stdlib.( == ) k l]. *)
-val mem_assq : 'a -> ('a * 'b) list -> bool
 
 (** [remove_assoc ~equal k l] is [l] without the first element [(k', _)] such
     that [equal k k']. *)
 val remove_assoc :
   equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> ('a * 'b) list
-
-(** [remove_assoq k l] is [remove_assoc ~equal:Stdlib.( == ) k l]. *)
-val remove_assq : 'a -> ('a * 'b) list -> ('a * 'b) list
 
 (** {3 Initialisation} *)
 
@@ -6787,21 +6773,6 @@ val fold_left2 :
   'b list ->
   'c list ->
   ('a, 'trace) result
-
-(** [fold_right2 ~when_different_lengths f xs ys init] is
-    [f x0 y0 (f x1 y1 (…))].
-
-    This function is not tail-recursive.
-
-    Note that unlike the left-to-right double-list traversors, [fold_right2]
-    only calls [f] if the lists are of the same length. *)
-val fold_right2 :
-  when_different_lengths:'trace ->
-  ('a -> 'b -> 'c -> 'c) ->
-  'a list ->
-  'b list ->
-  'c ->
-  ('c, 'trace) result
 
 (** [for_all2 ~when_different_lengths f xs ys] is
     [f x0 y0 && f x1 y1 && …].
@@ -7416,23 +7387,6 @@ val fold_left_i_es :
   'b list ->
   ('a, 'trace) result Lwt.t
 
-(** This function is not tail-recursive *)
-val fold_right : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
-
-(** This function is not tail-recursive *)
-val fold_right_e :
-  ('a -> 'b -> ('b, 'trace) result) -> 'a list -> 'b -> ('b, 'trace) result
-
-(** This function is not tail-recursive *)
-val fold_right_s : ('a -> 'b -> 'b Lwt.t) -> 'a list -> 'b -> 'b Lwt.t
-
-(** This function is not tail-recursive *)
-val fold_right_es :
-  ('a -> 'b -> ('b, 'trace) result Lwt.t) ->
-  'a list ->
-  'b ->
-  ('b, 'trace) result Lwt.t
-
 (** {3 Double-traversal variants}
 
     As mentioned above, there are no [_p] and [_ep] double-traversors. Use
@@ -7524,33 +7478,6 @@ val fold_left2_es :
   'b list ->
   'c list ->
   ('a, 'trace) result Lwt.t
-
-(** This function is not tail-recursive *)
-val fold_right2_e :
-  when_different_lengths:'trace ->
-  ('a -> 'b -> 'c -> ('c, 'trace) result) ->
-  'a list ->
-  'b list ->
-  'c ->
-  ('c, 'trace) result
-
-(** This function is not tail-recursive *)
-val fold_right2_s :
-  when_different_lengths:'trace ->
-  ('a -> 'b -> 'c -> 'c Lwt.t) ->
-  'a list ->
-  'b list ->
-  'c ->
-  ('c, 'trace) result Lwt.t
-
-(** This function is not tail-recursive *)
-val fold_right2_es :
-  when_different_lengths:'trace ->
-  ('a -> 'b -> 'c -> ('c, 'trace) result Lwt.t) ->
-  'a list ->
-  'b list ->
-  'c ->
-  ('c, 'trace) result Lwt.t
 
 (** {3 Scanning variants} *)
 
@@ -11590,13 +11517,13 @@ module type PROTOCOL = sig
             yet which operations will be included in the future block.
 
             The provided [block_header_data] is not expected to be the final
-            value of the field of the same type in the {!block_header} of the
-            constructed block. Instead, it should be a protocol-specific,
+            value of the field of the same type in the {!type-block_header} of
+            the constructed block. Instead, it should be a protocol-specific,
             good enough, "prototype" of the final value. E.g. if the
-            {!block_header_data} type for the current economic protocol
-            includes a signature, then the provided [block_header_data]
-            should contain a fake signature (since providing a correct
-            signature is not possible at this stage). *)
+            {!block_header_data} type for the current economic protocol includes
+            a signature, then the provided [block_header_data] should contain a
+            fake signature (since providing a correct signature is not possible
+            at this stage). *)
     | Partial_construction of {
         predecessor_hash : Block_hash.t;
         timestamp : Time.t;
@@ -12078,6 +12005,10 @@ end
 (*                                                                           *)
 (*****************************************************************************)
 
+type version
+
+val v1 : version
+
 type input = {inbox_level : Bounded.Non_negative_int32.t; message_counter : Z.t}
 
 type output = {outbox_level : Bounded.Non_negative_int32.t; message_index : Z.t}
@@ -12099,7 +12030,7 @@ type info = {
 
 module Make
     (Tree : Context.TREE with type key = string list and type value = bytes) : sig
-  val initial_state : Tree.tree -> Tree.tree Lwt.t
+  val initial_state : version -> Tree.tree -> Tree.tree Lwt.t
 
   val install_boot_sector :
     ticks_per_snapshot:Z.t ->
@@ -12280,7 +12211,7 @@ type parameters = {
   number_of_shards : int;
 }
 
-(** An encoding for values of type {!parameters}. *)
+(** An encoding for values of type {!type-parameters}. *)
 val parameters_encoding : parameters Data_encoding.t
 
 (** [make] precomputes the set of values needed by cryptographic primitives

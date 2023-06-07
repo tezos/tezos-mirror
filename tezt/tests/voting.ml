@@ -57,7 +57,7 @@ let test_proto_files = ["main.ml"; "main.mli"]
 let test_proto_TEZOS_PROTOCOL =
   {|{
     "modules": ["Main"],
-    "expected_env_version": 9
+    "expected_env_version": 10
 }
 |}
 
@@ -701,7 +701,14 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
       (* The test protocol has no amendment process and no baker. We can't go further.
          Instead, we check that another node can fetch the injected protocol. *)
       Log.info "Creating a second node..." ;
-      let* node2 = Node.init [Synchronisation_threshold 1] in
+      (* FIXME https://gitlab.com/tezos/tezos/-/issues/4837
+
+         We use the "Singleprocess" option because this test relies on
+         events which are emitted by the validator. The event mechanism
+         of Tezt is currently not compatible with the validator events if it
+         is run as an external process by the octez-node (which is the
+         case by default). *)
+      let* node2 = Node.init [Synchronisation_threshold 1; Singleprocess] in
       let check_event_fetching_protocol =
         (* Example:
            fetching_protocol.v0 = {

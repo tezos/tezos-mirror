@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/test_bitset.exe
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
+                  -- --file test_bitset.ml
     Subject:      Bitset structure
 *)
 
@@ -87,16 +88,15 @@ let test_diff (c1, c2) =
 let test_fill =
   let two = Z.of_int 2 in
   fun length ->
-    let f1 = fill ~length |> value_of |> Internal_for_tests.to_z in
-    let f2 =
-      from_list (0 -- (length - 1)) |> value_of |> Internal_for_tests.to_z
-    in
+    let f1 = fill ~length |> value_of |> to_z in
+    let f2 = from_list (0 -- (length - 1)) |> value_of |> to_z in
     let f3 = Z.(pow two length |> pred) in
     Z.equal f1 f2 && Z.equal f2 f3
 
 let () =
   Alcotest.run
-    "bits"
+    ~__FILE__
+    Protocol.name
     [
       ( "quantity",
         qcheck_wrap

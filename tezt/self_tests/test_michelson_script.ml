@@ -32,6 +32,16 @@ let script1 name start = sf "%s_%03d.tz" name (Protocol.number start)
 let script2 name start end_ =
   sf "%s_%03d_%03d.tz" name (Protocol.number start) (Protocol.number end_)
 
+let with_previous_protocol p f =
+  match Protocol.previous_protocol p with
+  | None ->
+      Log.warn
+        "@[Test@ is@ desactivated@ because@ there@ is@ no@ declared@ \
+         predecessor@ for@ %s.@]"
+        (Protocol.name p) ;
+      unit
+  | Some p' -> f p'
+
 let require_previous_protocol p =
   match Protocol.previous_protocol p with
   | Some p' -> p'
@@ -233,7 +243,7 @@ let test_version_range1 () =
   @@ fun () ->
   let prefix = make_prefix_dir () in
   let prev_proto = require_previous_protocol Alpha in
-  let prev_prev_proto = require_previous_protocol prev_proto in
+  with_previous_protocol prev_proto @@ fun prev_prev_proto ->
   (* Assuming:
      alpha ~ 016
      prev_proto ~ 015
@@ -275,7 +285,7 @@ let test_version_range2 () =
   @@ fun () ->
   let prefix = make_prefix_dir () in
   let prev_proto = require_previous_protocol Alpha in
-  let prev_prev_proto = require_previous_protocol prev_proto in
+  with_previous_protocol prev_proto @@ fun prev_prev_proto ->
   (* Assuming:
      Alpha ~ 016
      prev_proto ~ 015
@@ -315,7 +325,7 @@ let test_version_range3 () =
   @@ fun () ->
   let prefix = make_prefix_dir () in
   let prev_proto = require_previous_protocol Alpha in
-  let prev_prev_proto = require_previous_protocol prev_proto in
+  with_previous_protocol prev_proto @@ fun prev_prev_proto ->
   (* Assuming:
      Alpha ~ 016
      prev_proto ~ 015
@@ -327,8 +337,10 @@ let test_version_range3 () =
 
      And test that [find_all prev_proto] returns an ok.
   *)
-  let* () = touch_p (prefix // "foo" // script0 "bar") in
-  let* () = touch_p (prefix // "foo" // script2 "bar" prev_prev_proto Alpha) in
+  let out_of_range = "foo" // script0 "bar" in
+  let in_range = "foo" // script2 "bar" prev_prev_proto Alpha in
+  let* () = touch_p (prefix // out_of_range) in
+  let* () = touch_p (prefix // in_range) in
   let () =
     match Michelson_script.find_all_res ~prefix prev_proto with
     | Error (__LOC__, msg) ->
@@ -337,10 +349,10 @@ let test_version_range3 () =
         let paths = ts |> List.map (Michelson_script.path ~no_prefix:true) in
         Check.( = )
           paths
-          ["foo/bar_014_016.tz"]
+          ["foo" // script2 "bar" prev_prev_proto Alpha]
           Check.(list string)
           ~__LOC__
-          ~error_msg:"Expected []"
+          ~error_msg:"Got %R, expected %L"
   in
 
   unit
@@ -353,7 +365,7 @@ let test_version_range4 () =
   @@ fun () ->
   let prefix = make_prefix_dir () in
   let prev_proto = require_previous_protocol Alpha in
-  let prev_prev_proto = require_previous_protocol prev_proto in
+  with_previous_protocol prev_proto @@ fun prev_prev_proto ->
   (* Assuming:
      Alpha ~ 016
      prev_proto ~ 015
@@ -428,7 +440,7 @@ let test_version_range6 () =
   @@ fun () ->
   let prefix = make_prefix_dir () in
   let prev_proto = require_previous_protocol Alpha in
-  let prev_prev_proto = require_previous_protocol prev_proto in
+  with_previous_protocol prev_proto @@ fun prev_prev_proto ->
   (* Assuming:
      Alpha ~ 016
      prev_proto ~ 015
@@ -455,7 +467,7 @@ let test_version_range6 () =
           []
           Check.(list string)
           ~__LOC__
-          ~error_msg:"Expected []"
+          ~error_msg:"Expected %R, got %L"
   in
   unit
 
@@ -467,7 +479,7 @@ let test_version_range7 () =
   @@ fun () ->
   let prefix = make_prefix_dir () in
   let prev_proto = require_previous_protocol Alpha in
-  let prev_prev_proto = require_previous_protocol prev_proto in
+  with_previous_protocol prev_proto @@ fun prev_prev_proto ->
   (* Assuming:
      Alpha ~ 016
      prev_proto ~ 015
@@ -498,7 +510,7 @@ let test_version_range7 () =
   in
   unit
 
-let register () =
+let () =
   test_all () ;
   test_find () ;
   test_version_range1 () ;

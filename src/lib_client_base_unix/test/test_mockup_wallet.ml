@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Mockup wallet library
-    Invocation:   dune build @src/lib_client_base_unix/runtest
+    Invocation:   dune exec src/lib_client_base_unix/test/main.exe \
+                  -- --file test_mockup_wallet.ml
     Subject:      Unit tests of the Mockup wallet library
 *)
 
@@ -176,6 +177,7 @@ let test_with_valid_bootstrap_accounts_file_populates =
 
 let () =
   Alcotest_lwt.run
+    ~__FILE__
     "tezos-mockup-commands"
     [
       ( "mockup_wallet",

@@ -23,8 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    _______
+
+    Component: Store
+    Invocation: dune exec src/lib_store/unix/test/main.exe \
+                -- --file test_block_store.ml
+    Subject: Store tests ( block storing and access )
+*)
+
 module Assert = Assert
-module Assert_lib = Lib_test_extra.Assert_lib
 open Test_utils
 open Block_store
 
@@ -753,8 +761,4 @@ let tests : string * unit Alcotest_lwt.test_case list =
   in
   ("block store", test_cases)
 
-let () =
-  let open Lwt_syntax in
-  Lwt_main.run
-    (let* () = Tezos_base_unix.Internal_event_unix.init () in
-     Alcotest_lwt.run "tezos-store" [tests])
+let () = Lwt_main.run (Alcotest_lwt.run ~__FILE__ "tezos-store" [tests])

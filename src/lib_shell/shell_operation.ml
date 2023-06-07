@@ -29,18 +29,10 @@ type 'protocol_operation operation = {
   hash : Operation_hash.t;
   raw : Operation.t;
   protocol : 'protocol_operation;
-  count_successful_prechecks : int;
+  signature_checked : bool;
 }
 
-let increment_successful_precheck op =
-  (* We avoid {op with ...} to get feedback from the compiler if the record
-     type is extended/modified in the future. *)
-  {
-    hash = op.hash;
-    raw = op.raw;
-    protocol = op.protocol;
-    count_successful_prechecks = op.count_successful_prechecks + 1;
-  }
+let record_successful_signature_check op = {op with signature_checked = true}
 
 (** Doesn't depend on heavy [Registered_protocol.T] for testability. *)
 let safe_binary_of_bytes (encoding : 'a Data_encoding.t) (bytes : bytes) :
@@ -77,9 +69,7 @@ module MakeParser (Proto : Tezos_protocol_environment.PROTOCOL) :
         hash;
         raw;
         protocol = {Proto.shell = raw.Operation.shell; protocol_data};
-        (* When an operation is parsed, we assume that it has never been
-           successfully prechecked. *)
-        count_successful_prechecks = 0;
+        signature_checked = false;
       }
 end
 
@@ -89,9 +79,7 @@ module Internal_for_tests = struct
   let hash_of {hash; _} = hash
 
   let make_operation op oph data =
-    (* When we build an operation, we assume that it has never been
-       successfully prechecked. *)
-    {hash = oph; raw = op; protocol = data; count_successful_prechecks = 0}
+    {hash = oph; raw = op; protocol = data; signature_checked = false}
 
   let safe_binary_of_bytes = safe_binary_of_bytes
 end

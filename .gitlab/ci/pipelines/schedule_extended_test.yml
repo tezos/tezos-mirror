@@ -5,7 +5,6 @@ include:
   - .gitlab/ci/jobs/build/static_x86_64_experimental.yml
 
   # Stage: test
-  - .gitlab/ci/jobs/test/integration_pytest_old_protocols.yml
   - .gitlab/ci/jobs/test/ometrics_code_quality_default.yml
 
   # Stage: test_coverage

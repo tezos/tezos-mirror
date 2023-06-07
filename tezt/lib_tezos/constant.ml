@@ -38,15 +38,20 @@ let tezos_snoop = "./octez-snoop"
 
 let tezos_protocol_compiler = "./octez-protocol-compiler"
 
-let sc_rollup_node = "./octez-smart-rollup-node-alpha"
-
-let sc_rollup_client = "./octez-smart-rollup-client-alpha"
-
-let tx_rollup_node = "./octez-tx-rollup-node"
-
-let tx_rollup_client = "./octez-tx-rollup-client"
-
 let dal_node = "./octez-dal-node"
+
+let dac_node = "./octez-dac-node"
+
+(* TODO: tezos/tezos#4803
+   Can we do better than to depend on script-inputs?
+*)
+(* We use the [released-executables] script input as source of released
+   executable binaries to test. *)
+let released_executables = "./script-inputs/released-executables"
+
+(* We use the [experimental-executables] script input as source of
+   experimental executable binaries to test. *)
+let experimental_executables = "./script-inputs/experimental-executables"
 
 (** Key pair used to activate a protocol from genesis with [--network sandbox].
     The public key is hard-coded in the node. *)
@@ -84,27 +89,8 @@ let max_op_ttl = 120
 
 (** Constant gas cost required for every manager operation. Should
     match [Michelson_v1_gas.Cost_of.manager_operation]. *)
-let manager_operation_gas_cost = 1000
-
-(** A valid base58 encoded layer-2 address to be used to test
-    transaction rollups. *)
-let tx_rollup_l2_address = "tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K"
-
-let tx_rollup_empty_l2_context =
-  "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF"
-
-let tx_rollup_empty_withdraw_list_hash =
-  "txw1sFoLju3ySMAdY6v1dcHUMqJ4Zxc1kcynC8xkYgCmH6bpNSDhV"
-
-let tx_rollup_initial_message_result =
-  "txmr344vtdPzvWsfnoSd3mJ3MCFA5ehKLQs1pK9WGcX4FEACg1rVgC"
-
-(** A valid rejection proof for the initial layer2 state. *)
-let tx_rollup_proof_initial_state =
-  {|{ "version": 3,
-  "before": { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" },
-  "after": { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" } ,
-  "state": [] }|}
+let manager_operation_gas_cost ~protocol =
+  match protocol with Protocol.Nairobi | Alpha -> 100 | Mumbai -> 1000
 
 (** A valid base58 encoded compressed state hash. *)
 let sc_rollup_compressed_state =
@@ -135,3 +121,12 @@ let tz4_account : Account.key =
     section of the reference manual. *)
 let wasm_echo_kernel_boot_sector =
   "0061736d0100000001280760037f7f7f017f60027f7f017f60057f7f7f7f7f017f60017f0060017f017f60027f7f0060000002610311736d6172745f726f6c6c75705f636f72650a726561645f696e707574000011736d6172745f726f6c6c75705f636f72650c77726974655f6f7574707574000111736d6172745f726f6c6c75705f636f72650b73746f72655f77726974650002030504030405060503010001071402036d656d02000a6b65726e656c5f72756e00060aa401042a01027f41fa002f0100210120002f010021022001200247044041e4004112410041e400410010021a0b0b0800200041c4006b0b5001057f41fe002d0000210341fc002f0100210220002d0000210420002f0100210520011004210620042003460440200041016a200141016b10011a0520052002460440200041076a200610011a0b0b0b1d01017f41dc0141840241901c100021004184022000100541840210030b0b38050041e4000b122f6b65726e656c2f656e762f7265626f6f740041f8000b0200010041fa000b0200020041fc000b0200000041fe000b0101"
+
+(** Regular expressions that can be provided to [Process.check_error]
+    to identify errors. *)
+module Error_msg = struct
+  let gas_limit_exceeded =
+    rex
+      "Gas limit exceeded during typechecking or execution.\n\
+       Try again with a higher gas limit."
+end

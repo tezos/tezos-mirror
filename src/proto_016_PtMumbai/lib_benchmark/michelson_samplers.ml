@@ -525,7 +525,7 @@ end)
      fun arg_ty ->
       let open M in
       let* c = originated in
-      let* entrypoint = entrypoint in
+      let* entrypoint in
       let destination = Alpha_context.Destination.Contract (Originated c) in
       return
         (Typed_contract.Internal_for_tests.typed_exn

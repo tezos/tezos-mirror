@@ -34,6 +34,14 @@ type commitment = {
   number_of_ticks : int;
 }
 
+type commitment_and_hash = {commitment : commitment; hash : string}
+
+type commitment_info = {
+  commitment_and_hash : commitment_and_hash;
+  first_published_at_level : int option;
+  included_at_level : int option;
+}
+
 type slot_header = {level : int; commitment : string; index : int}
 
 type simulation_result = {
@@ -44,13 +52,14 @@ type simulation_result = {
   num_ticks : int;
 }
 
-(** [create ?name ?path ?base_dir ?path node] returns a fresh client
+(** [create ~protocol ?runner ?name ?base_dir node] returns a fresh client
    identified by a specified [name], logging in [color], executing the
    program at [path], storing local information in [base_dir], and
-   communicating with the specified [node]. *)
+   communicating with the specified [node], using the [runner]. *)
 val create :
+  protocol:Protocol.t ->
+  ?runner:Runner.t ->
   ?name:string ->
-  ?path:string ->
   ?base_dir:string ->
   ?color:Log.Color.t ->
   Sc_rollup_node.t ->
@@ -145,6 +154,7 @@ val outbox_proof_single :
   ?hooks:Process.hooks ->
   ?expected_error:Base.rex ->
   ?entrypoint:string ->
+  ?parameters_ty:string ->
   t ->
   message_index:int ->
   outbox_level:int ->
@@ -156,6 +166,7 @@ type transaction = {
   destination : string;
   entrypoint : string option;
   parameters : string;
+  parameters_ty : string option;
 }
 
 (** Same as [outbox_proof_single] except that the claim is about a batch
@@ -181,24 +192,21 @@ val encode_batch :
 (** [commitment_from_json] parses a commitment from its JSON representation. *)
 val commitment_from_json : JSON.t -> commitment option
 
-(** [commitment_with_hash_and_level_from_json] parses a commitment, its hash and
+(** [commitment_info_from_json] parses a commitment, its hash and
     the levels when the commitment was first published (if any) and included,
     from the JSON representation. *)
-val commitment_with_hash_and_levels_from_json :
-  JSON.t -> (string * commitment * int option * int option) option
+val commitment_info_from_json : JSON.t -> commitment_info option
 
 (** [last_stored_commitment client] gets the last commitment with its hash
     stored by the rollup node. *)
 val last_stored_commitment :
-  ?hooks:Process.hooks -> t -> (string * commitment) option Runnable.process
+  ?hooks:Process.hooks -> t -> commitment_and_hash option Runnable.process
 
 (** [last_published_commitment client] gets the last commitment published by the
     rollup node, with its hash and level when the commitment was first published
     and the level it was included. *)
 val last_published_commitment :
-  ?hooks:Process.hooks ->
-  t ->
-  (string * commitment * int option * int option) option Runnable.process
+  ?hooks:Process.hooks -> t -> commitment_info option Runnable.process
 
 (** [dal_slot_headers ?block client] returns the dal slot headers of the
     [block] (default ["head"]). *)
@@ -208,13 +216,14 @@ val dal_slot_headers :
   t ->
   slot_header list Runnable.process
 
-(** [dal_downloaded_confirmed_slot_pages ?block client] returns the confirmed
-    slots downloaded after processing the [block] (default ["head"]). *)
-val dal_downloaded_confirmed_slot_pages :
+(** [get_dal_processed_slots ?block client] returns the slots indices that have
+    been marked by the rollup node as confirmed or unconfirmed for block [block]
+    (default ["head"]), with their statuses. *)
+val get_dal_processed_slots :
   ?hooks:Process.hooks ->
   ?block:string ->
   t ->
-  (int * string list) list Runnable.process
+  (int * string) list Runnable.process
 
 (** [simulate ?block client ?reveal_pages messages] simulates the evaluation of
     input [messages] for the rollup PVM at [block] (default

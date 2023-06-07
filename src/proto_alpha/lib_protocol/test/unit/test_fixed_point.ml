@@ -27,7 +27,7 @@
     -------
     Component:  Protocol (fixed-point decimals)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "^\[Unit\] fixed point computation$"
+                  -- --file test_fixed_point.ml
     Subject:    On fixed-point decimal numbers.
 *)
 
@@ -173,3 +173,7 @@ let tests =
     Tztest.tztest "FP tests (3 decimals)" `Quick fp_nonzero;
     Tztest.tztest "FP pp tests (3 decimals)" `Quick fp_pp;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("fixed point computation", tests)]
+  |> Lwt_main.run

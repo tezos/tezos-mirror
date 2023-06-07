@@ -1,3 +1,11 @@
+(* Testing
+   -------
+   Component:    Protocol, delegate
+   Invocation:   dune exec src/proto_016_PtMumbai/lib_delegate/test/main.exe \
+                  -- --file test_scenario.ml
+   Subject:      Test different scenario for delegate
+*)
+
 open Mockup_simulator
 
 let bootstrap1 = Signature.Public_key.hash bootstrap1
@@ -641,7 +649,8 @@ let test_scenario_f1 () =
               (3l, bootstrap3);
             ] );
         ];
-      timeout = 60;
+      timeout = 30;
+      debug = true;
     }
   in
   run
@@ -1579,23 +1588,29 @@ let test_scenario_m8 () =
       (1, (module Node_d_hooks));
     ]
 
-let tests =
-  let open Tezos_base_test_helpers.Tztest in
-  [
-    tztest "reaches level 5" `Quick test_level_5;
-    tztest "cannot progress without new head" `Quick test_preendorse_on_valid;
-    tztest "reset delayed pqc" `Quick test_reset_delayed_pqc;
-    tztest "scenario t1" `Quick test_scenario_t1;
-    tztest "scenario t2" `Quick test_scenario_t2;
-    tztest "scenario t3" `Quick test_scenario_t3;
-    tztest "scenario f1" `Quick test_scenario_f1;
-    tztest "scenario f2" `Quick test_scenario_f2;
-    tztest "scenario m1" `Quick test_scenario_m1;
-    tztest "scenario m2" `Quick test_scenario_m2;
-    tztest "scenario m3" `Quick test_scenario_m3;
-    tztest "scenario m4" `Quick test_scenario_m4;
-    tztest "scenario m5" `Quick test_scenario_m5;
-    tztest "scenario m6" `Quick test_scenario_m6;
-    tztest "scenario m7" `Quick test_scenario_m7;
-    tztest "scenario m8" `Quick test_scenario_m8;
-  ]
+let () =
+  Alcotest_lwt.run "mockup_baking" ~__FILE__
+  @@ List.map
+       (fun (title, body) ->
+         let open Tezos_base_test_helpers.Tztest in
+         (title, [tztest title `Quick body]))
+       [
+         (Protocol.name ^ ": reaches level 5", test_level_5);
+         ( Protocol.name ^ ": cannot progress without new head",
+           test_preendorse_on_valid );
+         (Protocol.name ^ ": reset delayed pqc", test_reset_delayed_pqc);
+         (Protocol.name ^ ": scenario t1", test_scenario_t1);
+         (Protocol.name ^ ": scenario t2", test_scenario_t2);
+         (Protocol.name ^ ": scenario t3", test_scenario_t3);
+         (Protocol.name ^ ": scenario f1", test_scenario_f1);
+         (Protocol.name ^ ": scenario f2", test_scenario_f2);
+         (Protocol.name ^ ": scenario m1", test_scenario_m1);
+         (Protocol.name ^ ": scenario m2", test_scenario_m2);
+         (Protocol.name ^ ": scenario m3", test_scenario_m3);
+         (Protocol.name ^ ": scenario m4", test_scenario_m4);
+         (Protocol.name ^ ": scenario m5", test_scenario_m5);
+         (Protocol.name ^ ": scenario m6", test_scenario_m6);
+         (Protocol.name ^ ": scenario m7", test_scenario_m7);
+         (Protocol.name ^ ": scenario m8", test_scenario_m8);
+       ]
+  |> Lwt_main.run

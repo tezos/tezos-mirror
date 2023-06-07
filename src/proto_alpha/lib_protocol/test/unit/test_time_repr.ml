@@ -2,7 +2,7 @@
     -------
     Component:  Protocol (time repr)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                -- test "^\[Unit\] time$"
+                  -- --file test_time_repr.ml
     Subject:    Error handling of time operations 
 *)
 
@@ -43,3 +43,6 @@ let tests =
     Tztest.tztest "non-overflowing addition" `Quick test_nominal_add;
     Tztest.tztest "overflowing addition" `Quick test_overflow_add;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("time", tests)] |> Lwt_main.run

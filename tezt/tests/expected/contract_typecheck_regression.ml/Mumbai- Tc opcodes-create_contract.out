@@ -1,0 +1,27 @@
+
+./octez-client --protocol PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1 --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/opcodes/create_contract.tz --details
+Well typed
+Gas remaining: 1039991.584 units remaining
+{ parameter unit ;
+  storage (option address) ;
+  code { /* [ pair unit unit ] */
+         DROP
+         /* [ list operation : unit ] */ ;
+         UNIT
+         /* [ unit ] */ ;
+         AMOUNT
+         /* [ pair (list operation) unit ] */ ;
+         NONE key_hash
+         /* [ option key_hash : mutez : unit ] */ ;
+         CREATE_CONTRACT
+           { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
+         /* [ operation : address ] */ ;
+         DIP { SOME
+               /* [ option address ] */ ;
+               NIL operation
+               /* [ list operation : option address ] */ }
+         /* [ operation : list operation : option address ] */ ;
+         CONS
+         /* [ list operation : option address ] */ ;
+         PAIR
+         /* [ pair (list operation) (option address) ] */ } }

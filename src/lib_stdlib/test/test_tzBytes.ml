@@ -26,8 +26,8 @@
 (** Testing
     _______
 
-    Invocation: dune build @src/lib_stdlib/test/runtest
-    Single invocation: dune exec src/lib_stdlib/test/test_tzBytes.exe
+    Invocation: dune exec src/lib_stdlib/test/main.exe \
+                  -- --file test_tzBytes.ml
     Subject: Bitwise byte operation and Bytes <=> nat/int conversion
 *)
 
@@ -258,4 +258,4 @@ let () =
   Format.eprintf "TEST_SEED=%d@." seed ;
   (* To run the same test for the same seed, even if not all the tests are selected *)
   let get_rng () = Random.State.make [|seed|] in
-  Alcotest.run "TzBytes" (Bitwise.tests get_rng)
+  Alcotest.run ~__FILE__ "TzBytes" (Bitwise.tests get_rng)

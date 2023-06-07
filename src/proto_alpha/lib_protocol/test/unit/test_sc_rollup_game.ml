@@ -28,12 +28,11 @@
     -------
     Component:  Protocol Sc_rollup_refutation_storage
     Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-      -- test "^\[Unit\] sc rollup game$"
+                  -- --file test_sc_rollup_game.ml
     Subject:    Tests for the SCORU refutation game
 *)
 
 open Protocol
-open Lwt_result_syntax
 module Commitment_repr = Sc_rollup_commitment_repr
 module T = Test_sc_rollup_storage
 module R = Sc_rollup_refutation_storage
@@ -43,10 +42,12 @@ module Tick = Sc_rollup_tick_repr
 
 (** Assert that the computation fails with the given error. *)
 let assert_fails_with ~__LOC__ k expected_err =
+  let open Lwt_result_syntax in
   let*! res = k in
   Assert.proto_error ~loc:__LOC__ res (( = ) expected_err)
 
 let assert_fails_with_f ~__LOC__ k f =
+  let open Lwt_result_syntax in
   let*! res = k in
   Assert.proto_error ~loc:__LOC__ res f
 
@@ -102,8 +103,8 @@ let two_stakers_in_conflict () =
       }
   in
   let level l = T.valid_inbox_level ctxt l in
-  let* parent, _, ctxt =
-    wrap @@ T.advance_level_n_refine_stake ctxt rollup defender parent_commit
+  let*@ parent, _, ctxt =
+    T.advance_level_n_refine_stake ctxt rollup defender parent_commit
   in
   let child1 =
     Commitment_repr.
@@ -124,13 +125,11 @@ let two_stakers_in_conflict () =
       }
   in
   let ctxt = T.advance_level_for_commitment ctxt child1 in
-  let* _, _, ctxt, _ =
-    wrap
-    @@ Sc_rollup_stake_storage.publish_commitment ctxt rollup defender child1
+  let*@ _, _, ctxt, _ =
+    Sc_rollup_stake_storage.publish_commitment ctxt rollup defender child1
   in
-  let* _, _, ctxt, _ =
-    wrap
-    @@ Sc_rollup_stake_storage.publish_commitment ctxt rollup refuter child2
+  let*@ _, _, ctxt, _ =
+    Sc_rollup_stake_storage.publish_commitment ctxt rollup refuter child2
   in
   let defender_commitment_hash =
     Sc_rollup_commitment_repr.hash_uncarbonated child1
@@ -172,13 +171,12 @@ let test_poorly_distributed_dissection () =
   let player = refuter and opponent = defender in
   let player_commitment_hash = refuter_commitment_hash
   and opponent_commitment_hash = defender_commitment_hash in
-  let* ctxt =
-    wrap
-    @@ R.start_game
-         ctxt
-         rollup
-         ~player:(player, player_commitment_hash)
-         ~opponent:(opponent, opponent_commitment_hash)
+  let*@ ctxt =
+    R.start_game
+      ctxt
+      rollup
+      ~player:(player, player_commitment_hash)
+      ~opponent:(opponent, opponent_commitment_hash)
   in
   let size =
     Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
@@ -219,18 +217,16 @@ let test_single_valid_game_move () =
   let player_commitment_hash = refuter_commitment_hash
   and opponent_commitment_hash = defender_commitment_hash in
 
-  let* ctxt =
-    wrap
-    @@ R.start_game
-         ctxt
-         rollup
-         ~player:(player, player_commitment_hash)
-         ~opponent:(opponent, opponent_commitment_hash)
+  let*@ ctxt =
+    R.start_game
+      ctxt
+      rollup
+      ~player:(player, player_commitment_hash)
+      ~opponent:(opponent, opponent_commitment_hash)
   in
   let choice, step = (Sc_rollup_tick_repr.initial, G.Dissection dissection) in
-  let* game_result, _ctxt =
-    wrap
-    @@ R.game_move ctxt rollup ~player:refuter ~opponent:defender ~choice ~step
+  let*@ game_result, _ctxt =
+    R.game_move ctxt rollup ~player:refuter ~opponent:defender ~choice ~step
   in
   Assert.is_none ~loc:__LOC__ ~pp:Sc_rollup_game_repr.pp_game_result game_result
 
@@ -386,7 +382,7 @@ let test_first_move_with_invalid_ancestor () =
          defender_commitment_hash ) =
     two_stakers_in_conflict ()
   in
-  let* inbox_level = wrap @@ T.proper_valid_inbox_level (ctxt, rollup) 3 in
+  let*@ inbox_level = T.proper_valid_inbox_level (ctxt, rollup) 3 in
   let refuter_commitment =
     let context_hash11 = hash_string "child11" in
     Commitment_repr.
@@ -464,21 +460,23 @@ let tests =
       `Quick
       test_invalid_serialized_inbox_proof;
     Tztest.tztest
-      "Test to start a game with invalid commitment hash (swap commitment)."
+      "start a game with invalid commitment hash (swap commitment)."
       `Quick
       test_first_move_with_swapped_commitment;
     Tztest.tztest
-      "Test to start a game with invalid commitment hash (op from outsider)."
+      "start a game with invalid commitment hash (op from outsider)."
       `Quick
       test_first_move_from_invalid_player;
     Tztest.tztest
-      "Test to start a game with invalid commitment hash (opponent is not in \
-       game)."
+      "start a game with invalid commitment hash (opponent is not in game)."
       `Quick
       test_first_move_with_invalid_opponent;
     Tztest.tztest
-      "Test to start a game with commitment hash that are not the first \
-       conflict."
+      "start a game with commitment hash that are not the first conflict."
       `Quick
       test_first_move_with_invalid_ancestor;
   ]
+
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("sc rollup game", tests)]
+  |> Lwt_main.run

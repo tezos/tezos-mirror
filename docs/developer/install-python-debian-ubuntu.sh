@@ -67,20 +67,20 @@ pyenv --version
 [ "$PYENV_VIRTUALENV_INIT" = "1" ]
 
 ##
-## Install python 3.10.10 through pyenv
+## Install python 3.10.11 through pyenv
 ##
 ## References:
 ##  - https://github.com/pyenv/pyenv#usage
 
 # [install python through pyenv]
-pyenv install 3.10.10
-pyenv global 3.10.10
+pyenv install 3.10.11
+pyenv global 3.10.11
 
 # [print python version]
-python --version # should output 3.10.10
+python --version # should output 3.10.11
 
 # [verify python version]
-[ "$(python --version)" = "Python 3.10.10" ]
+[ "$(python --version)" = "Python 3.10.11" ]
 
 ##
 ## Install poetry
@@ -110,11 +110,8 @@ git clone --depth 1 --branch "$BRANCH" https://gitlab.com/"$REPO".git tezos
 cd tezos
 poetry install
 
-# [print pytest/sphinx-build versions]
-poetry run pytest --version --version # should output python 6.2.5 and pytest-regtest-1.4.4+nomadiclabs
+# [print sphinx-build versions]
 poetry run sphinx-build --version # should output 4.2.0
 
-# [verify pytest/sphinx-build version]
-[ "$(poetry run pytest --version 2>&1)" = "pytest 6.2.5" ]
-[ "$(poetry run pip show pytest-regtest --version | grep Version | cut -d' ' -f2)" = "1.4.4+nomadiclabs" ]
+# [verify sphinx-build version]
 [ "$(poetry run sphinx-build --version)" = "sphinx-build 4.2.0" ]
