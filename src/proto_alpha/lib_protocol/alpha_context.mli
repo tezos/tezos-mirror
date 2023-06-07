@@ -4725,6 +4725,9 @@ module Toggle_votes : sig
 
   val compute_new_liquidity_baking_ema :
     toggle_vote:toggle_vote -> Toggle_EMA.t -> Toggle_EMA.t
+
+  val compute_new_adaptive_inflation_ema :
+    toggle_vote:toggle_vote -> Toggle_EMA.t -> Toggle_EMA.t
 end
 
 (** This module re-exports definitions from {!Liquidity_baking_storage}. *)

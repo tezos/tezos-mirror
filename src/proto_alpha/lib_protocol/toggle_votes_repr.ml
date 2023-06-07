@@ -92,3 +92,9 @@ let compute_new_liquidity_baking_ema ~toggle_vote ema =
   | Toggle_vote_pass -> ema
   | Toggle_vote_off -> Toggle_EMA.update_ema_up ema
   | Toggle_vote_on -> Toggle_EMA.update_ema_down ema
+
+let compute_new_adaptive_inflation_ema ~toggle_vote ema =
+  match toggle_vote with
+  | Toggle_vote_pass -> ema
+  | Toggle_vote_off -> Toggle_EMA.update_ema_down ema
+  | Toggle_vote_on -> Toggle_EMA.update_ema_up ema
