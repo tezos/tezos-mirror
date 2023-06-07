@@ -122,6 +122,8 @@ fn store_genesis_transaction_object<Host: Runtime>(
     genesis_address: &H160,
 ) -> Result<(), Error> {
     let object = TransactionObject {
+        block_hash: block.hash,
+        block_number: block.number,
         from: *genesis_address,
         hash: *hash,
         gas_used: U256::zero(),
@@ -140,13 +142,7 @@ fn store_genesis_transaction_object<Host: Runtime>(
     };
 
     let object_path = storage::object_path(&object.hash)?;
-    storage::store_transaction_object(
-        &object_path,
-        host,
-        block.hash,
-        block.number,
-        &object,
-    )
+    storage::store_transaction_object(&object_path, host, &object)
 }
 
 fn store_genesis_transaction_receipt<Host: Runtime>(
@@ -277,7 +273,7 @@ mod tests {
 
         for transaction in block.transactions {
             let object_path = storage::object_path(&transaction).unwrap();
-            assert_eq!(host.store_has(&object_path), Ok(Some(ValueType::Subtree)));
+            assert_eq!(host.store_has(&object_path), Ok(Some(ValueType::Value)));
             let receipt_path = storage::receipt_path(&transaction).unwrap();
             assert_eq!(host.store_has(&receipt_path), Ok(Some(ValueType::Value)));
         }
