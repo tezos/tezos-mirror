@@ -25,22 +25,8 @@
 
 open Alpha_context
 
-let stake ctxt ~sender ~delegate amount =
-  Token.transfer
-    ctxt
-    (`Contract (Contract.Implicit sender))
-    (`Frozen_deposits delegate)
-    amount
-
-let finalize_unstake ctxt pkh =
+let perform_finalizable_unstake_transfers ctxt contract finalizable =
   let open Lwt_result_syntax in
-  let contract = Contract.Implicit pkh in
-  let* ctxt, finalizable =
-    Unstake_requests
-    .prepare_finalize_unstake_and_save_remaining_unfinalizable_requests
-      ctxt
-      contract
-  in
   List.fold_left_es
     (fun (ctxt, balance_updates) (delegate, cycle, amount) ->
       let+ ctxt, new_balance_updates =
@@ -53,6 +39,17 @@ let finalize_unstake ctxt pkh =
       (ctxt, new_balance_updates @ balance_updates))
     (ctxt, [])
     finalizable
+
+let finalize_unstake ctxt pkh =
+  let open Lwt_result_syntax in
+  let contract = Contract.Implicit pkh in
+  let* ctxt, finalizable =
+    Unstake_requests
+    .prepare_finalize_unstake_and_save_remaining_unfinalizable_requests
+      ctxt
+      contract
+  in
+  perform_finalizable_unstake_transfers ctxt contract finalizable
 
 let punish_delegate ctxt delegate level mistake ~rewarded =
   let open Lwt_result_syntax in
@@ -82,3 +79,10 @@ let punish_delegate ctxt delegate level mistake ~rewarded =
     Token.transfer_n ctxt to_reward (`Contract rewarded)
   in
   (ctxt, reward_balance_updates @ punish_balance_updates)
+
+let stake ctxt ~sender ~delegate amount =
+  Token.transfer
+    ctxt
+    (`Contract (Contract.Implicit sender))
+    (`Frozen_deposits delegate)
+    amount
