@@ -30,7 +30,6 @@
 open Alpha_context
 
 type error +=
-  | Not_enough_endorsements of {required : int; provided : int}
   | Faulty_validation_wrong_slot
   | Error_while_taking_fees
   | Update_consensus_key_on_unregistered_delegate of Signature.Public_key_hash.t
@@ -51,24 +50,6 @@ type error +=
   | Invalid_staking_parameters_sender
 
 let () =
-  register_error_kind
-    `Permanent
-    ~id:"operation.not_enough_endorsements"
-    ~title:"Not enough endorsements"
-    ~description:
-      "The block being validated does not include the required minimum number \
-       of endorsements."
-    ~pp:(fun ppf (required, provided) ->
-      Format.fprintf
-        ppf
-        "Wrong number of endorsements (%i), at least %i are expected"
-        provided
-        required)
-    Data_encoding.(obj2 (req "required" int31) (req "provided" int31))
-    (function
-      | Not_enough_endorsements {required; provided} -> Some (required, provided)
-      | _ -> None)
-    (fun (required, provided) -> Not_enough_endorsements {required; provided}) ;
   let description =
     "The consensus operation uses an invalid slot. This error should not \
      happen: the operation validation should have failed earlier."
