@@ -139,3 +139,16 @@ let cost_verify_output_proof ~bytes_len =
   let size = S.safe_int bytes_len in
   let v0 = size in
   S.safe_int 103450 + (v0 lsl 2) + (v0 lsl 1) + v0
+
+(* Derived form benchmark in
+   [Sc_rollup_benchmarks.Sc_rollup_install_boot_sector_benchmark] and model
+   [sc_rollup/Sc_rollup_install_boot_sector_benchmark/model]
+   assuming
+   model builtin/timer_model
+   19. *)
+(* fun size -> (13535.257218 + (3.68260983358 * size)) *)
+let cost_install_boot_sector_in_wasm_pvm ~boot_sector_size_in_bytes =
+  let open S.Syntax in
+  let size = S.safe_int boot_sector_size_in_bytes in
+  let v0 = size in
+  S.safe_int 13550 + ((v0 lsl 1) + v0 + (v0 lsr 1))
