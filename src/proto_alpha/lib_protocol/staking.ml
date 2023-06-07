@@ -122,6 +122,12 @@ let stake ctxt ~sender ~delegate amount =
   let* ctxt, finalize_balance_updates =
     finalize_unstake_and_check ~check_unfinalizable ctxt sender
   in
+  let* ctxt, _new_pseudotokens =
+    Staking_pseudotokens.credit_frozen_deposits_pseudotokens_for_tez_amount
+      ctxt
+      delegate
+      amount
+  in
   let* ctxt, stake_balance_updates =
     Token.transfer
       ctxt

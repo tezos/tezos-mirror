@@ -31,7 +31,10 @@
     increases [delegate]'s stake pseudotokens by an amount [pa] corresponding to
     [tez_amount] multiplied by the current rate of the delegate's frozen
     deposits pseudotokens per tez.
-    The function also returns [pa]. *)
+    The function also returns [pa].
+
+    This function must be called on "stake" before transferring tez to
+    [delegate]'s frozen deposits. *)
 val credit_frozen_deposits_pseudotokens_for_tez_amount :
   Raw_context.t ->
   Signature.Public_key_hash.t ->

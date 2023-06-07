@@ -4892,6 +4892,15 @@ module Unstake_requests : sig
     context -> Contract.t -> stored_requests -> context tzresult Lwt.t
 end
 
+(** This module re-exports definitions from {!Staking_pseudotoken_repr} and
+    {!Staking_pseudotokens_storage}. *)
+module Staking_pseudotokens : sig
+  type t
+
+  val credit_frozen_deposits_pseudotokens_for_tez_amount :
+    context -> public_key_hash -> Tez.t -> (context * t) tzresult Lwt.t
+end
+
 (** This module re-exports definitions from {!Fees_storage}. *)
 module Fees : sig
   val record_paid_storage_space :
