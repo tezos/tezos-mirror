@@ -123,7 +123,7 @@ let block_hash_encoding =
   Data_encoding.(
     conv (fun (Block_hash h) -> append_0x h) block_hash_of_string string)
 
-(** Ethereum any hash. *)
+(** Ethereum hash or data, that would encoded with a 0x prefix. *)
 type hash = Hash of string [@@ocaml.unboxed]
 
 (** [hash_of_string s] takes a string [s] representing a hash in

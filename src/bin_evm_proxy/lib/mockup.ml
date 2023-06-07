@@ -139,7 +139,7 @@ let transaction_object =
     s = hash_f @@ "00";
   }
 
-let call = empty_hash
+let simulate_call _ = Lwt_result_syntax.return (hash_of_string "0x000102030405")
 
 let smart_rollup_address = return "foo"
 

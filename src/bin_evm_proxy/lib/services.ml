@@ -140,7 +140,9 @@ let dispatch_input
         return (Send_raw_transaction.Output (Ok tx_hash))
     | Send_transaction.Input _ ->
         return (Send_transaction.Output (Ok Mockup.transaction_hash))
-    | Eth_call.Input _ -> return (Eth_call.Output (Ok Mockup.call))
+    | Eth_call.Input (Some (call, _)) ->
+        let* call_result = Rollup_node_rpc.simulate_call call in
+        return (Eth_call.Output (Ok call_result))
     | Get_estimate_gas.Input _ ->
         return (Get_estimate_gas.Output (Ok Mockup.gas_price))
     | Txpool_content.Input _ ->

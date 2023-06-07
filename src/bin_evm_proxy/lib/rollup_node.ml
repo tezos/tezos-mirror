@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -451,6 +452,9 @@ module RPC = struct
 
   let chain_id base () =
     inspect_durable_and_decode base Durable_storage_path.chain_id decode_number
+
+  (* TODO: HERE IS THE IMPLEM OF CALL *)
+  let simulate_call _ = Mockup.simulate_call
 end
 
 module type S = sig
@@ -484,6 +488,8 @@ module type S = sig
   val txpool : unit -> Ethereum_types.txpool tzresult Lwt.t
 
   val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
+
+  val simulate_call : Ethereum_types.call -> Ethereum_types.hash tzresult Lwt.t
 end
 
 module Make (Base : sig
@@ -512,4 +518,6 @@ end) : S = struct
   let txpool = RPC.txpool Base.base
 
   let chain_id = RPC.chain_id Base.base
+
+  let simulate_call = RPC.simulate_call Base.base
 end
