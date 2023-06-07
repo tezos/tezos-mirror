@@ -157,38 +157,29 @@ let level_mempool =
   Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/mempool"]
   |> Re.whole_string |> Re.compile
 
-let get_summery_query =
-  Caqti_request.Infix.(
-    Caqti_type.(unit ->? tup3 int32 int32 Sql_requests.Type.time_protocol))
-    "SELECT level, round, timestamp FROM blocks ORDER BY level DESC, round \
-     DESC LIMIT 1"
-
-let get_summary db_pool =
-  let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
-  let* out =
-    Caqti_lwt.Pool.use
-      (fun (module Db : Caqti_lwt.CONNECTION) ->
-        Db.find_opt get_summery_query ())
-      db_pool
+let get_stats db_pool =
+  let query =
+    Caqti_request.Infix.(
+      Caqti_type.(unit ->? tup3 int32 int32 Sql_requests.Type.time_protocol))
+      "SELECT level, round, timestamp FROM blocks ORDER BY level DESC, round \
+       DESC LIMIT 1"
   in
-  match out with
-  | Some (max_level, round, timestamp) ->
-      return
-        (Format.asprintf
-           "<!DOCTYPE html><html><head><title>Teztale \
-            status</title></head><body><h1>Teztale status</h1><p>Highest \
-            recorded block is level %li round %li (%a)</p><p><a \
-            href=\"visualization/\">Vizualize data</a></p></body></html>"
-           max_level
-           round
-           Tezos_base.Time.Protocol.pp_hum
-           timestamp)
-  | None ->
-      return
-        "<!DOCTYPE html><html><head><title>Teztale \
-         status</title></head><body><h1>Teztale status</h1><p>No registered \
-         block yet.</p><p><a href=\"visualization/\">Vizualize \
-         data</a></p></body></html>"
+  with_caqti_error
+    (Caqti_lwt.Pool.use
+       (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find_opt query ())
+       db_pool)
+    (function
+      | Some (level, round, timestamp) ->
+          reply_public_json
+            Data_encoding.(
+              obj3
+                (req "level" int32)
+                (req "round" int32)
+                (req "timestamp" string))
+            (level, round, Tezos_base.Time.Protocol.to_notation timestamp)
+      | None ->
+          let body = "No registered block yet." in
+          Cohttp_lwt_unix.Server.respond_error ~body ())
 
 let get_head db_pool =
   let query =
@@ -382,7 +373,7 @@ let operations_callback db_pool g source operations =
         ~body:"Received operations stored"
         ())
 
-let callback rights db_pool _connection request body =
+let callback ~public rights db_pool _connection request body =
   let header = Cohttp.Request.headers request in
   let meth = Cohttp.Request.meth request in
   let uri = Cohttp.Request.uri request in
@@ -460,53 +451,37 @@ let callback rights db_pool _connection request body =
                       | `OPTIONS -> options_respond methods
                       | _ -> method_not_allowed_respond methods)
                   | None -> (
-                      let subpath = String.split_on_char '/' path in
-                      match subpath with
-                      | [] | [_] | [""; ""] | [_; "index.html"] ->
-                          with_caqti_error (get_summary db_pool) (fun body ->
-                              Cohttp_lwt_unix.Server.respond_string
+                      match path with
+                      | "/stats.json" -> get_stats db_pool
+                      | "/head.json" -> get_head db_pool
+                      | _ -> (
+                          match public with
+                          | None -> Cohttp_lwt_unix.Server.respond_not_found ()
+                          | Some docroot ->
+                              let path =
+                                match path with
+                                | "" | "/" -> "/index.html"
+                                | _ -> path
+                              in
+                              let uri = Uri.of_string path in
+                              let fname =
+                                Cohttp.Path.resolve_local_file ~docroot ~uri
+                              in
+                              (* Resolving symlink here in order to have Magic_mime works with targeted file extension *)
+                              let fname =
+                                try
+                                  Filename.concat
+                                    (Filename.dirname fname)
+                                    (Unix.readlink fname)
+                                with _ -> fname
+                              in
+                              Cohttp_lwt_unix.Server.respond_file
                                 ~headers:
                                   (Cohttp.Header.init_with
                                      "content-type"
-                                     "text/html; charset=UTF-8")
-                                ~status:`OK
-                                ~body
-                                ())
-                      | [_; "head.json"] -> get_head db_pool
-                      | [_; "visualization"; "js"; "local_config.js"] ->
-                          let body = "const server_adress = \"../\";" in
-                          Cohttp_lwt_unix.Server.respond_string
-                            ~headers:
-                              (Cohttp.Header.init_with
-                                 "content-type"
-                                 "text/javascript; charset=UTF-8")
-                            ~status:`OK
-                            ~body
-                            ()
-                      | _ :: pre :: subpath -> (
-                          if pre <> "visualization" then
-                            Cohttp_lwt_unix.Server.respond_not_found ~uri ()
-                          else
-                            let path, subpath =
-                              match subpath with
-                              | [] | [""] -> ("index.html", ["index.html"])
-                              | _ -> (path, subpath)
-                            in
-                            match
-                              find_in_ocamlres subpath Visualization.root
-                            with
-                            | Some body ->
-                                Cohttp_lwt_unix.Server.respond_string
-                                  ~headers:
-                                    (Cohttp.Header.init_with
-                                       "content-type"
-                                       (Magic_mime.lookup path))
-                                  ~status:`OK
-                                  ~body
-                                  ()
-                            | None ->
-                                Cohttp_lwt_unix.Server.respond_not_found ~uri ()
-                          ))))))
+                                     (Magic_mime.lookup fname))
+                                ~fname
+                                ()))))))
 
 (* Must exists somewhere but where ! *)
 let print_location f ((fl, fc), (tl, tc)) =
@@ -592,7 +567,11 @@ let () =
                             ~ctx
                             ~mode
                             (Cohttp_lwt_unix.Server.make
-                               ~callback:(callback config.Config.users pool)
+                               ~callback:
+                                 (callback
+                                    ~public:config.Config.public_directory
+                                    config.Config.users
+                                    pool)
                                ())))
                     config.Config.network_interfaces
                 in

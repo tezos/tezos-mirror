@@ -30,6 +30,7 @@ type connection = {source : string option; port : int; tls : tls_conf option}
 type t = {
   db_uri : string;
   network_interfaces : connection list;
+  public_directory : string option;
   users : (string * string) list;
 }
 

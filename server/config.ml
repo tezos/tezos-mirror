@@ -30,6 +30,7 @@ type connection = {source : string option; port : int; tls : tls_conf option}
 type t = {
   db_uri : string;
   network_interfaces : connection list;
+  public_directory : string option;
   users : (string * string) list;
 }
 
@@ -63,15 +64,22 @@ let user_encoding =
 let encoding =
   let open Data_encoding in
   conv
-    (fun {db_uri; network_interfaces; users} ->
-      (db_uri, network_interfaces, users))
-    (fun (db_uri, network_interfaces, users) ->
-      {db_uri; network_interfaces; users})
-    (obj3
+    (fun {db_uri; network_interfaces; public_directory; users} ->
+      (db_uri, network_interfaces, public_directory, users))
+    (fun (db_uri, network_interfaces, public_directory, users) ->
+      {db_uri; network_interfaces; public_directory; users})
+    (obj4
        (req
           ~description:
             "Uri to reach the database: sqlite3:path or postgresql://host:port"
           "db"
           string)
        (dft "interfaces" (list connection_encoding) [])
+       (opt
+          "public_directory"
+          ~description:
+            "Path of the directory used to server static files (e.g. a dataviz \
+             frontend application). If none provided this feature will not be \
+             used (i.e. no default value)."
+          string)
        (req "users" (list user_encoding)))
