@@ -31,9 +31,14 @@
 type finalizable =
   (Signature.Public_key_hash.t * Cycle_repr.t * Tez_repr.t) list
 
+type stored_requests = Storage.Unstake_request.t = {
+  delegate : Signature.Public_key_hash.t;
+  requests : (Cycle_repr.t * Tez_repr.t) list;
+}
+
 type prepared_finalize_unstake = {
   finalizable : finalizable;
-  unfinalizable : Storage.Unstake_request.t;
+  unfinalizable : stored_requests;
 }
 
 (** [prepare_finalize_unstake ctxt contract] preprocesses a [finalize_unstake]
@@ -49,10 +54,9 @@ val prepare_finalize_unstake :
   Contract_repr.t ->
   prepared_finalize_unstake option tzresult Lwt.t
 
-(** [prepare_finalize_unstake_and_save_remaining_unfinalizable_requests ctxt contract]
-    calls [prepare_finalize_unstake], saves the remaining [unfinalizable]
-    requests and returns the [finalizable] ones. *)
-val prepare_finalize_unstake_and_save_remaining_unfinalizable_requests :
+(** [update ctxt contract requests] updates unstake requests for [contract]. *)
+val update :
   Raw_context.t ->
   Contract_repr.t ->
-  (Raw_context.t * finalizable) tzresult Lwt.t
+  stored_requests ->
+  Raw_context.t tzresult Lwt.t

@@ -4839,8 +4839,21 @@ end
 module Unstake_requests : sig
   type finalizable = (public_key_hash * Cycle.t * Tez.t) list
 
-  val prepare_finalize_unstake_and_save_remaining_unfinalizable_requests :
-    context -> Contract.t -> (context * finalizable) tzresult Lwt.t
+  type stored_requests = private {
+    delegate : public_key_hash;
+    requests : (Cycle.t * Tez.t) list;
+  }
+
+  type prepared_finalize_unstake = {
+    finalizable : finalizable;
+    unfinalizable : stored_requests;
+  }
+
+  val prepare_finalize_unstake :
+    context -> Contract.t -> prepared_finalize_unstake option tzresult Lwt.t
+
+  val update :
+    context -> Contract.t -> stored_requests -> context tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Fees_storage}. *)

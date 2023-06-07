@@ -43,13 +43,12 @@ let perform_finalizable_unstake_transfers ctxt contract finalizable =
 let finalize_unstake ctxt pkh =
   let open Lwt_result_syntax in
   let contract = Contract.Implicit pkh in
-  let* ctxt, finalizable =
-    Unstake_requests
-    .prepare_finalize_unstake_and_save_remaining_unfinalizable_requests
-      ctxt
-      contract
-  in
-  perform_finalizable_unstake_transfers ctxt contract finalizable
+  let* prepared_opt = Unstake_requests.prepare_finalize_unstake ctxt contract in
+  match prepared_opt with
+  | None -> return (ctxt, [])
+  | Some {finalizable; unfinalizable} ->
+      let* ctxt = Unstake_requests.update ctxt contract unfinalizable in
+      perform_finalizable_unstake_transfers ctxt contract finalizable
 
 let punish_delegate ctxt delegate level mistake ~rewarded =
   let open Lwt_result_syntax in

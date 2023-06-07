@@ -26,9 +26,14 @@
 type finalizable =
   (Signature.Public_key_hash.t * Cycle_repr.t * Tez_repr.t) list
 
+type stored_requests = Storage.Unstake_request.t = {
+  delegate : Signature.Public_key_hash.t;
+  requests : (Cycle_repr.t * Tez_repr.t) list;
+}
+
 type prepared_finalize_unstake = {
   finalizable : finalizable;
-  unfinalizable : Storage.Unstake_request.t;
+  unfinalizable : stored_requests;
 }
 
 let z100 = Z.of_int 100
@@ -102,14 +107,4 @@ let prepare_finalize_unstake ctxt contract =
           in
           return_some {finalizable; unfinalizable})
 
-let prepare_finalize_unstake_and_save_remaining_unfinalizable_requests ctxt
-    contract =
-  let open Lwt_result_syntax in
-  let* prepared_opt = prepare_finalize_unstake ctxt contract in
-  match prepared_opt with
-  | None -> return (ctxt, [])
-  | Some {finalizable; unfinalizable} ->
-      let+ ctxt =
-        Storage.Contract.Unstake_requests.update ctxt contract unfinalizable
-      in
-      (ctxt, finalizable)
+let update = Storage.Contract.Unstake_requests.update
