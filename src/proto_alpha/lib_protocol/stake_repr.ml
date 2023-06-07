@@ -40,11 +40,6 @@ let encoding =
 
 let zero = make ~frozen:Tez_repr.zero ~delegated:Tez_repr.zero
 
-let staking_weight {frozen; delegated} =
-  Int64.add (Tez_repr.to_mutez frozen) (Tez_repr.to_mutez delegated)
-
-let compare s1 s2 = Int64.compare (staking_weight s1) (staking_weight s2)
-
 let ( +? ) {frozen = f1; delegated = d1} {frozen = f2; delegated = d2} =
   let open Result_syntax in
   let* frozen = Tez_repr.(f1 +? f2) in
