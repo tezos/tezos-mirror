@@ -1216,6 +1216,44 @@ module Full_infrastructure = struct
     let* () = root_hash_pushed_to_data_streamer_promise in
     Lwt.return_unit
 
+  (** [init_config_of_nodes dac_nodes] initializes the configuration of all
+      [dac_nodes]. *)
+  let init_config_of_nodes dac_nodes =
+    Lwt_list.iter_s
+      (fun dac_node ->
+        let* _ = Dac_node.init_config dac_node in
+        return ())
+      dac_nodes
+
+  (** [run_and_subscribe_nodes coordinator_node dac_nodes] runs all [dac_nodes].
+      Additionally, it blocks until all nodes are successfully subscribed to
+      [coordinator_node]. *)
+  let run_and_subscribe_nodes coordinator_node dac_nodes =
+    let wait_for_node_subscribed_to_data_streamer () =
+      wait_for_handle_new_subscription_to_hash_streamer coordinator_node
+    in
+    (* Run all dac nodes and wait for their subscription to coordinator.
+       Because the event resolution loop in the Daemon always resolves
+       all promises matching an event filter, when a new event is received,
+       we cannot wait for multiple subscription to the hash streamer, as
+       events of this kind are indistinguishable one from the other.
+       Instead, we wait for the subscription of one observer/committe_member
+       node to be notified before running the next node. *)
+    Lwt_list.iter_s
+      (fun node ->
+        let node_is_subscribed = wait_for_node_subscribed_to_data_streamer () in
+        let* () = Dac_node.run ~wait_ready:true node in
+        let* () = check_liveness_and_readiness node in
+        node_is_subscribed)
+      dac_nodes
+
+  (** [init_run_and_subscribe_nodes coordinator_node dac_nodes] initializes
+      the configuration, runs, and synchronizes all [dac_nodes], to be
+      subscribed to the streaming of root hashes of [coordinator_node]. *)
+  let init_run_and_subscribe_nodes coordinator_node dac_nodes =
+    let* () = init_config_of_nodes dac_nodes in
+    run_and_subscribe_nodes coordinator_node dac_nodes
+
   let test_download_and_retrieval_of_pages
       Scenarios.{coordinator_node; committee_members_nodes; observer_nodes; _} =
     (* 0. Coordinator node is already running when the this function is
