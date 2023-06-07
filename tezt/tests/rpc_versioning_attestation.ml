@@ -988,9 +988,114 @@ module Preapply = struct
     test_preapply_double_preconsensus_evidence protocols
 end
 
+module Block = struct
+  let call_and_check_operation ~validation_pass get_name client =
+    Log.info "Check kind for operation rpc" ;
+    check_rpc_versions
+      ~check:(fun ~use_legacy_name:_ -> check_kind)
+      ~get_name
+      ~rpc:(fun ~version () ->
+        RPC.get_chain_block_operations_validation_pass
+          ~version
+          ~operation_offset:0
+          ~validation_pass
+          ())
+      ~data:()
+      client
+
+  let call_and_check_operations_validation_pass ~validation_pass get_name client
+      =
+    Log.info "Check kind for operations_validation_pass rpc" ;
+    let check ~use_legacy_name:_ json = check_kind JSON.(json |=> 0) in
+    check_rpc_versions
+      ~check
+      ~get_name
+      ~rpc:(fun ~version () ->
+        RPC.get_chain_block_operations_validation_pass
+          ~version
+          ~validation_pass
+          ())
+      ~data:()
+      client
+
+  let call_and_check_operations ~validation_pass get_name client =
+    Log.info "Check kind for operations rpc" ;
+    let check ~use_legacy_name:_ json =
+      check_kind JSON.(json |=> validation_pass |=> 0)
+    in
+    check_rpc_versions
+      ~check
+      ~get_name
+      ~rpc:(fun ~version () -> RPC.get_chain_block_operations ~version ())
+      ~data:()
+      client
+
+  let call_and_check_block ~validation_pass get_name client =
+    Log.info "Check kind for block rpc" ;
+    let check ~use_legacy_name:_ json =
+      check_kind JSON.(json |-> "operations" |=> validation_pass |=> 0)
+    in
+    check_rpc_versions
+      ~check
+      ~get_name
+      ~rpc:(fun ~version () -> RPC.get_chain_block ~version ())
+      ~data:()
+      client
+
+  let test_block_consensus kind protocol =
+    let* node, client = Client.init_with_protocol ~protocol `Client () in
+    let* () = Client.bake_for_and_wait ~node client in
+
+    let* level, slots, block_payload_hash =
+      get_consensus_info Constant.bootstrap1.public_key_hash client
+    in
+    let signer = Constant.bootstrap1 in
+    let* consensus1 =
+      create_consensus_op
+        ~level
+        ~block_payload_hash
+        ~slot:(List.hd slots)
+        ~kind
+        ~signer
+        ~use_legacy_name:false
+        client
+    in
+    let* signature = Operation.sign consensus1 client in
+    let* (`OpHash _) =
+      Operation.inject ~request:`Inject ~signature consensus1 client
+    in
+    let* () = Client.bake_for_and_wait ~node client in
+
+    let get_name = Operation.Consensus.kind_to_string kind in
+    let validation_pass = 0 (* Consensus operations *) in
+    let* () = call_and_check_operation ~validation_pass get_name client in
+    let* () =
+      call_and_check_operations_validation_pass ~validation_pass get_name client
+    in
+    let* () = call_and_check_operations ~validation_pass get_name client in
+    call_and_check_block ~validation_pass get_name client
+
+  let test_block_operation_consensus =
+    register_test
+      ~title:"Block consensus operations"
+      ~additionnal_tags:["block"; "operations"; "consensus"]
+    @@ fun protocol -> test_block_consensus Operation.Attestation protocol
+
+  let test_block_operation_preconsensus =
+    register_test
+      ~title:"Block pre-consensus operations"
+      ~additionnal_tags:["block"; "operations"; "consensus"; "pre"]
+    @@ fun protocol -> test_block_consensus Operation.Preattestation protocol
+
+  let register ~protocols = test_block_operation_consensus protocols
+  (* There is no test for preconsensus since crafting a block with
+     preconsensus operations in it may be complicated to do. *)
+end
+
 let register ~protocols =
   Forge.register ~protocols ;
   Parse.register ~protocols ;
   Mempool.register ~protocols ;
   Run_Simulate.register ~protocols ;
-  Preapply.register ~protocols
+  Preapply.register ~protocols ;
+  Block.register ~protocols
