@@ -132,6 +132,7 @@
 
         "Zk_rollup_storage",
 
+        "Stake_context",
         "Contract_delegate_storage",
         "Stake_storage",
         "Unstaked_frozen_deposits_storage",
