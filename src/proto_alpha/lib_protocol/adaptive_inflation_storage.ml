@@ -42,8 +42,46 @@ let ratio_to_bonus q = Q.(q * of_int64 bonus_unit |> to_int64)
 
 let max_bonus = Int64.div bonus_unit 20L (* = 5% *)
 
+type error += Undetermined_inflation_coeff_for_cycle of Cycle_repr.t
+
+let () =
+  let open Data_encoding in
+  let undetermined_inflation_coeff_for_cycle_description =
+    "Inflation coefficient is only determined for the current cycle and the \
+     next [preserved_cycles] cycles to come. Requested cycle is not in this \
+     window."
+  in
+  register_error_kind
+    `Permanent
+    ~id:"undetermined_inflation_coeff_for_cycle"
+    ~title:"Undetermined inflation coeff for cycle"
+    ~description:undetermined_inflation_coeff_for_cycle_description
+    ~pp:(fun ppf cycle ->
+      Format.fprintf
+        ppf
+        "%s (cycle %a)"
+        undetermined_inflation_coeff_for_cycle_description
+        Cycle_repr.pp
+        cycle)
+    (obj1 (req "Undetermined_inflation_coeff_for_cycle" Cycle_repr.encoding))
+    (function
+      | Undetermined_inflation_coeff_for_cycle cycle -> Some cycle | _ -> None)
+    (fun cycle -> Undetermined_inflation_coeff_for_cycle cycle)
+
+let check_determined_cycle ctxt cycle =
+  let ai_enable = Constants_storage.adaptive_inflation_enable ctxt in
+  if ai_enable then
+    let ctxt_cycle = (Raw_context.current_level ctxt).cycle in
+    let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+    fail_unless
+      Cycle_repr.(
+        ctxt_cycle <= cycle && cycle <= add ctxt_cycle preserved_cycles)
+      (Undetermined_inflation_coeff_for_cycle cycle)
+  else return_unit
+
 let get_reward_coeff ctxt ~cycle =
   let open Lwt_result_syntax in
+  let* () = check_determined_cycle ctxt cycle in
   let ai_enable = Constants_storage.adaptive_inflation_enable ctxt in
   if ai_enable then
     (* Even if AI is enabled, the storage can be empty: this is the case for

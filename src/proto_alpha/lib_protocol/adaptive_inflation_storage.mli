@@ -68,10 +68,11 @@ val launch_cycle : Raw_context.t -> Cycle_repr.t option tzresult Lwt.t
 module For_RPC : sig
   (** [get_reward_coeff ctxt cycle] reads the reward coeff for the given cycle
       from the storage.
-      Returns [Q.one] if the given cycle is not between [current_cycle] and
+
+      Fails if the given cycle is not between [current_cycle] and
       [current_cycle + preserved_cycles].
-      If adaptive inflation has not been activated, or has been activated and the
-      given cycle is less than [preserved_cycles] after the activation cycle,
+
+      If adaptive inflation has not been activated,
       then this function returns [Q.one].
       Used only for RPCs. To get the actual rewards, use [Delegate_rewards]. *)
   val get_reward_coeff :
