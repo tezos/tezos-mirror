@@ -283,7 +283,8 @@ val get_chain_chain_id : ?chain:string -> unit -> string t
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
-val get_chain_block : ?chain:string -> ?block:string -> unit -> JSON.t t
+val get_chain_block :
+  ?chain:string -> ?block:string -> ?version:string -> unit -> JSON.t t
 
 type block_metadata = {
   protocol : string;
@@ -423,7 +424,12 @@ val get_chain_block_header_protocol_data :
     [block] defaults to ["head"].
 *)
 val get_chain_block_operations :
-  ?chain:string -> ?block:string -> unit -> JSON.t t
+  ?chain:string ->
+  ?block:string ->
+  ?version:string ->
+  ?force_metadata:bool ->
+  unit ->
+  JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/operations/<validation_pass>] if
     [operation_offset] is unset
@@ -438,6 +444,7 @@ val get_chain_block_operations :
 val get_chain_block_operations_validation_pass :
   ?chain:string ->
   ?block:string ->
+  ?version:string ->
   ?force_metadata:bool ->
   ?operation_offset:int ->
   validation_pass:int ->
