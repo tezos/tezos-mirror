@@ -2450,6 +2450,45 @@ module Registration_section = struct
                 kinstr;
               })
         ()
+
+    let () =
+      benchmark
+        ~name:Interpreter_workload.N_ICompare
+        ~salt:"_intercepts"
+        ~kinstr_and_stack_sampler:(fun cfg rng_state ->
+          (* Sample from values whose [size_of_comparable_value] is 1. *)
+          (* [unit] and [bool] are excluded since they are relatively quick. *)
+          let sampler =
+            {
+              cfg.sampler with
+              base_parameters =
+                {
+                  int_size = {min = 1; max = 1};
+                  string_size = {min = 1; max = 1};
+                  bytes_size = {min = 1; max = 1};
+                };
+            }
+          in
+          let _, (module Samplers) = make_default_samplers sampler in
+          fun () ->
+            let ty : Script_ir_translator.ex_comparable_ty =
+              match Random.State.int rng_state 4 with
+              | 0 -> Ex_comparable_ty String_t
+              | 1 -> Ex_comparable_ty Bytes_t
+              | 2 -> Ex_comparable_ty Int_t
+              | 3 -> Ex_comparable_ty Nat_t
+              | _ -> assert false
+            in
+            let (Ex_comparable_ty ty) = ty in
+            let value = Samplers.Random_value.comparable ty rng_state in
+            let kinstr = ICompare (dummy_loc, ty, halt) in
+            Ex_stack_and_kinstr
+              {
+                stack = (value, (value, eos));
+                stack_type = ty @$ ty @$ bot;
+                kinstr;
+              })
+        ()
   end
 
   module Comparators = struct
@@ -3091,6 +3130,7 @@ module Registration_section = struct
       simple_benchmark
         ~check
         ~name:Interpreter_workload.N_IPairing_check_bls12_381
+        ~intercept_stack:(Script_list.empty, eos)
         ~stack_type:(list p @$ bot)
         ~kinstr:(IPairing_check_bls12_381 (dummy_loc, halt))
         ()

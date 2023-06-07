@@ -479,6 +479,28 @@ let linear_min ~name ~intercept ~coeff =
   end in
   (module M : Model_impl with type arg_type = int * (int * unit))
 
+let linear_min_offset ~name ~intercept ~coeff ~offset =
+  let module M = struct
+    type arg_type = int * (int * unit)
+
+    let name = name
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size -> size
+
+      let arity = arity_2
+
+      let model =
+        lam ~name:"size1" @@ fun size1 ->
+        lam ~name:"size2" @@ fun size2 ->
+        free ~name:intercept
+        + (free ~name:coeff * sat_sub (min size1 size2) (int offset))
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * (int * unit))
+
 let linear_mul ~name ~intercept ~coeff =
   let module M = struct
     type arg_type = int * (int * unit)

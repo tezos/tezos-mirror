@@ -241,6 +241,15 @@ module Models = struct
       ~intercept:(fv (sf "%s_const" name))
       ~coeff:(fv (sf "%s_coeff" name))
 
+  let linear_min_offset_model name ~offset =
+    (* For instructions with cost function
+       [\lambda size1. \lambda size2. const + coeff * (min(size1,size2) - offset)] *)
+    Model.linear_min_offset
+      ~name:(ns name)
+      ~intercept:(fv (sf "%s_const" name))
+      ~coeff:(fv (sf "%s_coeff" name))
+      ~offset
+
   let pack_model name =
     Model.trilinear
       ~name:(ns name)
@@ -482,7 +491,7 @@ let ir_model instr_or_cont =
       | N_IAnd_int_nat -> linear_min_model name |> m
       | N_IXor_nat -> linear_max_model name |> m
       | N_INot_int -> affine_model name |> m
-      | N_ICompare -> linear_min_model name |> m
+      | N_ICompare -> linear_min_offset_model name ~offset:1 |> m
       | N_IEq | N_INeq | N_ILt | N_IGt | N_ILe | N_IGe -> const1_model name |> m
       | N_IPack -> pack_model name |> m
       | N_IBlake2b | N_ISha256 | N_ISha512 | N_IKeccak | N_ISha3 ->

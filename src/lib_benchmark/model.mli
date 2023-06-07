@@ -211,6 +211,14 @@ val linear_min :
   coeff:Free_variable.t ->
   (int * (int * unit)) model
 
+(** fun a b -> intercept + coeff × (min(a,b) - offset) *)
+val linear_min_offset :
+  name:Namespace.t ->
+  intercept:Free_variable.t ->
+  coeff:Free_variable.t ->
+  offset:int ->
+  (int * (int * unit)) model
+
 (** [fun a b -> intercept + coeff × (a×b)] *)
 val linear_mul :
   name:Namespace.t ->
