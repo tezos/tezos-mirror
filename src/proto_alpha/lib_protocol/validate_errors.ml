@@ -60,7 +60,7 @@ module Consensus = struct
         Format.fprintf
           ppf
           "Delegate %a has zero frozen deposits; it is not allowed to \
-           bake/preendorse/endorse."
+           bake/preattest/attest."
           Signature.Public_key_hash.pp
           delegate)
       Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
@@ -70,24 +70,24 @@ module Consensus = struct
   (** This type is only used in consensus operation errors to make
       them more informative. *)
   type consensus_operation_kind =
-    | Preendorsement
-    | Endorsement
+    | Preattestation
+    | Attestation
     | Dal_attestation
 
   let consensus_operation_kind_encoding =
     Data_encoding.string_enum
       [
-        ("Preendorsement", Preendorsement);
-        ("Endorsement", Endorsement);
+        ("Preattestation", Preattestation);
+        ("Attestation", Attestation);
         ("Dal_attestation", Dal_attestation);
       ]
 
   let consensus_operation_kind_pp fmt = function
-    | Preendorsement -> Format.fprintf fmt "Preendorsement"
-    | Endorsement -> Format.fprintf fmt "Endorsement"
+    | Preattestation -> Format.fprintf fmt "Preattestation"
+    | Attestation -> Format.fprintf fmt "Attestation"
     | Dal_attestation -> Format.fprintf fmt "Dal_attestation"
 
-  (** Errors for preendorsements and endorsements. *)
+  (** Errors for preattestation and attestation. *)
   type error +=
     | Consensus_operation_for_old_level of {
         kind : consensus_operation_kind;
@@ -114,9 +114,9 @@ module Consensus = struct
         expected : Block_payload_hash.t;
         provided : Block_payload_hash.t;
       }
-    | Unexpected_preendorsement_in_block
-    | Unexpected_endorsement_in_block
-    | Preendorsement_round_too_high of {
+    | Unexpected_preattestation_in_block
+    | Unexpected_attestation_in_block
+    | Preattestation_round_too_high of {
         block_round : Round.t;
         provided : Round.t;
       }
@@ -266,32 +266,32 @@ module Consensus = struct
         Wrong_payload_hash_for_consensus_operation {kind; expected; provided}) ;
     register_error_kind
       `Permanent
-      ~id:"validate.unexpected_preendorsement_in_block"
-      ~title:"Unexpected preendorsement in block"
-      ~description:"Unexpected preendorsement in block."
+      ~id:"validate.unexpected_preattestation_in_block"
+      ~title:"Unexpected preattestation in block"
+      ~description:"Unexpected preattestation in block."
       ~pp:(fun ppf () ->
-        Format.fprintf ppf "Unexpected preendorsement in block.")
+        Format.fprintf ppf "Unexpected preattestation in block.")
       Data_encoding.empty
-      (function Unexpected_preendorsement_in_block -> Some () | _ -> None)
-      (fun () -> Unexpected_preendorsement_in_block) ;
+      (function Unexpected_preattestation_in_block -> Some () | _ -> None)
+      (fun () -> Unexpected_preattestation_in_block) ;
     register_error_kind
       `Permanent
-      ~id:"validate.unexpected_endorsement_in_block"
-      ~title:"Unexpected endorsement in block"
-      ~description:"Unexpected endorsement in block."
-      ~pp:(fun ppf () -> Format.fprintf ppf "Unexpected endorsement in block.")
+      ~id:"validate.unexpected_attestation_in_block"
+      ~title:"Unexpected attestation in block"
+      ~description:"Unexpected attestation in block."
+      ~pp:(fun ppf () -> Format.fprintf ppf "Unexpected attestation in block.")
       Data_encoding.empty
-      (function Unexpected_endorsement_in_block -> Some () | _ -> None)
-      (fun () -> Unexpected_endorsement_in_block) ;
+      (function Unexpected_attestation_in_block -> Some () | _ -> None)
+      (fun () -> Unexpected_attestation_in_block) ;
     register_error_kind
       `Permanent
-      ~id:"validate.preendorsement_round_too_high"
-      ~title:"Preendorsement round too high"
-      ~description:"Preendorsement round too high."
+      ~id:"validate.preattestation_round_too_high"
+      ~title:"Preattestation round too high"
+      ~description:"Preattestation round too high."
       ~pp:(fun ppf (block_round, provided) ->
         Format.fprintf
           ppf
-          "Preendorsement round too high (block_round: %a, provided: %a)."
+          "Preattestation round too high (block_round: %a, provided: %a)."
           Round.pp
           block_round
           Round.pp
@@ -299,16 +299,16 @@ module Consensus = struct
       Data_encoding.(
         obj2 (req "block_round" Round.encoding) (req "provided" Round.encoding))
       (function
-        | Preendorsement_round_too_high {block_round; provided} ->
+        | Preattestation_round_too_high {block_round; provided} ->
             Some (block_round, provided)
         | _ -> None)
       (fun (block_round, provided) ->
-        Preendorsement_round_too_high {block_round; provided}) ;
+        Preattestation_round_too_high {block_round; provided}) ;
     register_error_kind
       `Permanent
       ~id:"validate.wrong_slot_for_consensus_operation"
       ~title:"Wrong slot for consensus operation"
-      ~description:"Wrong slot used for a preendorsement or endorsement."
+      ~description:"Wrong slot used for a preattestation or attestation."
       ~pp:(fun ppf kind ->
         Format.fprintf
           ppf
@@ -677,20 +677,20 @@ module Anonymous = struct
         | _ -> None)
       (fun (edpkh, conflict) -> Conflicting_activation {edpkh; conflict})
 
-  type denunciation_kind = Preendorsement | Endorsement | Block
+  type denunciation_kind = Preattestation | Attestation | Block
 
   let denunciation_kind_encoding =
     let open Data_encoding in
     string_enum
       [
-        ("preendorsement", Preendorsement);
-        ("endorsement", Endorsement);
+        ("preattestation", Preattestation);
+        ("attestation", Attestation);
         ("block", Block);
       ]
 
   let pp_denunciation_kind fmt : denunciation_kind -> unit = function
-    | Preendorsement -> Format.fprintf fmt "preendorsement"
-    | Endorsement -> Format.fprintf fmt "endorsement"
+    | Preattestation -> Format.fprintf fmt "preattestation"
+    | Attestation -> Format.fprintf fmt "attestation"
     | Block -> Format.fprintf fmt "block"
 
   type error +=
@@ -1263,7 +1263,7 @@ let () =
 module Block = struct
   (* All block errors are permanent. *)
   type error +=
-    | Not_enough_endorsements of {required : int; provided : int}
+    | Not_enough_attestations of {required : int; provided : int}
     | Inconsistent_validation_passes_in_block of {
         expected : int;
         provided : int;
@@ -1284,23 +1284,23 @@ module Block = struct
   let () =
     register_error_kind
       `Permanent
-      ~id:"validate.block.not_enough_endorsements"
-      ~title:"Not enough endorsements"
+      ~id:"validate.block.not_enough_attestations"
+      ~title:"Not enough attestations"
       ~description:
         "The block being validated does not include the required minimum \
-         number of endorsements."
+         number of attestations."
       ~pp:(fun ppf (required, provided) ->
         Format.fprintf
           ppf
-          "Wrong number of endorsements (%i), at least %i are expected"
+          "Wrong number of attestations (%i), at least %i are expected"
           provided
           required)
       Data_encoding.(obj2 (req "required" int31) (req "provided" int31))
       (function
-        | Not_enough_endorsements {required; provided} ->
+        | Not_enough_attestations {required; provided} ->
             Some (required, provided)
         | _ -> None)
-      (fun (required, provided) -> Not_enough_endorsements {required; provided}) ;
+      (fun (required, provided) -> Not_enough_attestations {required; provided}) ;
     register_error_kind
       `Permanent
       ~id:"validate.block.inconsistent_validation_passes_in_block"
