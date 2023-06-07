@@ -210,6 +210,16 @@ module RPC = struct
             (list string))
       (open_root / "local" / "batcher" / "injection")
 
+  let simulation =
+    Tezos_rpc.Service.post_service
+      ~description:
+        "Simulate messages evaluation by the PVM, and find result in durable \
+         storage"
+      ~query:Tezos_rpc.Query.empty
+      ~input:Simulation.Encodings.simulate_input
+      ~output:Data_encoding.Json.encoding
+      (open_root / "global" / "block" / "head" / "simulate")
+
   let call_service ~base ?(media_types = Media_type.all_media_types) =
     Tezos_rpc_http_client_unix.RPC_client_unix.call_service media_types ~base
 
@@ -453,8 +463,26 @@ module RPC = struct
   let chain_id base () =
     inspect_durable_and_decode base Durable_storage_path.chain_id decode_number
 
-  (* TODO: HERE IS THE IMPLEM OF CALL *)
-  let simulate_call _ = Mockup.simulate_call
+  let simulate_call base call =
+    let open Lwt_result_syntax in
+    let*? messages = Simulation.encode call in
+    let insight_requests =
+      [
+        Simulation.Encodings.Durable_storage_key ["evm"; "simulation_result"];
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5900
+           for now the status is not used but it should be for error handling *)
+        Simulation.Encodings.Durable_storage_key ["evm"; "simulation_status"];
+      ]
+    in
+    let* r =
+      call_service
+        ~base
+        simulation
+        ()
+        ()
+        {messages; reveal_pages = None; insight_requests}
+    in
+    Simulation.parse_insights r
 end
 
 module type S = sig

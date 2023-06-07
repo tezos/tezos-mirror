@@ -47,6 +47,7 @@ type full_evm_setup = {
   originator_key : string;
   rollup_operator_key : string;
   evm_proxy_server : Evm_proxy_server.t;
+  endpoint : string;
 }
 
 let hex_256_of n = Printf.sprintf "%064x" n
@@ -213,7 +214,9 @@ let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
       ~src:originator_key
       client
   in
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
+  let* () =
+    Sc_rollup_node.run sc_rollup_node sc_rollup_address ["--log-kernel-debug"]
+  in
   let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   (* EVM Kernel installation level. *)
   let* () = Client.bake_for_and_wait client in
@@ -224,6 +227,7 @@ let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
       (Node.get_level node)
   in
   let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
+  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   return
     {
       node;
@@ -234,6 +238,7 @@ let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
       originator_key;
       rollup_operator_key;
       evm_proxy_server;
+      endpoint;
     }
 
 let setup_past_genesis ?originator_key ?rollup_operator_key protocol =
@@ -596,6 +601,18 @@ let test_l2_deploy_simple_storage =
       ~error_msg:"Expected %L account to be initialized by contract creation.") ;
   unit
 
+let send_call_set_storage_simple contract_address sender n
+    {sc_rollup_node; node; client; endpoint; _} =
+  let call_set (sender : Eth_account.t) n =
+    Eth_cli.call
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:simple_storage.label
+      ~address:contract_address
+      ~method_call:(Printf.sprintf "set(%d)" n)
+  in
+  wait_for_application ~sc_rollup_node ~node ~client (call_set sender n) ()
+
 (** Test that a contract can be called,
     and that the call can modify the storage.  *)
 let test_l2_call_simple_storage =
@@ -605,8 +622,7 @@ let test_l2_call_simple_storage =
     ~title:"Check L2 contract call"
   @@ fun protocol ->
   (* setup *)
-  let* ({sc_rollup_node; node; client; evm_proxy_server; sc_rollup_client; _} as
-       evm_setup) =
+  let* ({evm_proxy_server; sc_rollup_client; _} as evm_setup) =
     setup_past_genesis protocol
   in
   let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
@@ -615,36 +631,23 @@ let test_l2_call_simple_storage =
   (* deploy contract *)
   let* address, _tx = deploy ~contract:simple_storage ~sender evm_setup in
 
-  (* calls the set method *)
-  let call_set (sender : Eth_account.t) n =
-    Eth_cli.call
-      ~source_private_key:sender.private_key
-      ~endpoint
-      ~abi_label:simple_storage.label
-      ~address
-      ~method_call:(Printf.sprintf "set(%d)" n)
-  in
-
   (* set 42 *)
-  let* tx =
-    wait_for_application ~sc_rollup_node ~node ~client (call_set sender 42) ()
-  in
-  let* () = check_tx_succeeded ~endpoint ~tx in
+  let* tx = send_call_set_storage_simple address sender 42 evm_setup in
 
+  let* () = check_tx_succeeded ~endpoint ~tx in
   let* () = check_storage_size sc_rollup_client ~address 1 in
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:42 in
 
   (* set 24 by another user *)
   let* tx =
-    wait_for_application
-      ~sc_rollup_node
-      ~node
-      ~client
-      (call_set Eth_account.bootstrap_accounts.(1) 24)
-      ()
+    send_call_set_storage_simple
+      address
+      Eth_account.bootstrap_accounts.(1)
+      24
+      evm_setup
   in
-  let* () = check_tx_succeeded ~endpoint ~tx in
 
+  let* () = check_tx_succeeded ~endpoint ~tx in
   let* () = check_storage_size sc_rollup_client ~address 1 in
   (* value stored has changed *)
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:24 in
@@ -652,11 +655,9 @@ let test_l2_call_simple_storage =
   (* set -1 *)
   (* some environments prevent sending a negative value, as the value is
      unsigned (eg remix) but it is actually the expected result *)
-  let* tx =
-    wait_for_application ~sc_rollup_node ~node ~client (call_set sender (-1)) ()
-  in
-  let* () = check_tx_succeeded ~endpoint ~tx in
+  let* tx = send_call_set_storage_simple address sender (-1) evm_setup in
 
+  let* () = check_tx_succeeded ~endpoint ~tx in
   let* () = check_storage_size sc_rollup_client ~address 1 in
   (* value stored has changed *)
   let* () =
@@ -1064,6 +1065,136 @@ let test_inject_100_transactions =
        hasn't changed" ;
   unit
 
+let test_eth_call_storage_contract_rollup_node =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "eth_call"; "simulate"]
+    ~title:"Try to call a view in storage contract"
+    (fun protocol ->
+      (* setup *)
+      let* ({evm_proxy_server; endpoint; _} as evm_setup) =
+        setup_past_genesis protocol
+      in
+
+      let sender = Eth_account.bootstrap_accounts.(0) in
+
+      (* deploy contract *)
+      let* address, tx = deploy ~contract:simple_storage ~sender evm_setup in
+      let* () = check_tx_succeeded ~endpoint ~tx in
+      Check.(
+        (String.lowercase_ascii address
+        = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344")
+          string
+          ~error_msg:"Expected address to be %R but was %L.") ;
+
+      (* craft request *)
+      let data = "0x4e70b1dc" in
+      let eth_call =
+        [
+          ("to", Ezjsonm.encode_string address);
+          ("data", Ezjsonm.encode_string data);
+          ("gas", `String "111111");
+        ]
+      in
+
+      (* make call to proxy *)
+      let* call_result =
+        Evm_proxy_server.(
+          call_evm_rpc
+            evm_proxy_server
+            {
+              method_ = "eth_call";
+              parameters = `A [`O eth_call; `String "latest"];
+            })
+      in
+
+      let r = call_result |> Evm_proxy_server.extract_result in
+      Check.(
+        (JSON.as_string r
+       = "0x0000000000000000000000000000000000000000000000000000000000000000")
+          string)
+        ~error_msg:"Expected result %R, but got %L" ;
+
+      let* tx = send_call_set_storage_simple address sender 42 evm_setup in
+      let* () = check_tx_succeeded ~endpoint ~tx in
+
+      (* make call to proxy *)
+      let* call_result =
+        Evm_proxy_server.(
+          call_evm_rpc
+            evm_proxy_server
+            {
+              method_ = "eth_call";
+              parameters = `A [`O eth_call; `String "latest"];
+            })
+      in
+      let r = call_result |> Evm_proxy_server.extract_result in
+      Check.(
+        (JSON.as_string r
+       = "0x000000000000000000000000000000000000000000000000000000000000002a")
+          string)
+        ~error_msg:"Expected result %R, but got %L" ;
+
+      unit)
+
+let test_eth_call_storage_contract_proxy =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "simulate"]
+    ~title:"A call can be simulated in the rollup node"
+    (fun protocol ->
+      let* ({
+              sc_rollup_client;
+              sc_rollup_node;
+              node;
+              evm_proxy_server;
+              client;
+              _;
+            } as evm_setup) =
+        setup_past_genesis protocol
+      in
+
+      let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+      let sender = Eth_account.bootstrap_accounts.(0) in
+
+      (* deploy contract *)
+      let* address, tx = deploy ~contract:simple_storage ~sender evm_setup in
+      let* () = check_tx_succeeded ~endpoint ~tx in
+
+      Check.(
+        (String.lowercase_ascii address
+        = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344")
+          string
+          ~error_msg:"Expected address to be %R but was %L.") ;
+
+      let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+
+      let*! simulation_result =
+        Sc_rollup_client.simulate
+          ~insight_requests:
+            [
+              `Durable_storage_key ["evm"; "simulation_result"];
+              `Durable_storage_key ["evm"; "simulation_status"];
+            ]
+          sc_rollup_client
+          [
+            Hex.to_string @@ `Hex "ff";
+            Hex.to_string
+            @@ `Hex
+                 "ff01e68094d77420f73b4612a7a99dba8c2afd30a1886b03448857040000000000008080844e70b1dc";
+          ]
+      in
+      let expected_insights =
+        [
+          Some "0000000000000000000000000000000000000000000000000000000000000000";
+          Some "01";
+        ]
+      in
+      Check.(
+        (simulation_result.insights = expected_insights) (list @@ option string))
+        ~error_msg:"Expected result %R, but got %L" ;
+      unit)
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -1084,6 +1215,8 @@ let register_evm_proxy_server ~protocols =
   test_l2_deploy_simple_storage protocols ;
   test_l2_call_simple_storage protocols ;
   test_l2_deploy_erc20 protocols ;
-  test_inject_100_transactions protocols
+  test_inject_100_transactions protocols ;
+  test_eth_call_storage_contract_rollup_node protocols ;
+  test_eth_call_storage_contract_proxy protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
