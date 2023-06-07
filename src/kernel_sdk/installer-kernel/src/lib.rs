@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -47,7 +48,9 @@ tezos_smart_rollup::kernel_entry!(installer);
 /// Installer.
 pub fn installer<Host: Runtime>(host: &mut Host) {
     if let Ok(config_program_size) = read_config_program_size(host) {
-        if let Err(e) = install_kernel(host, config_program_size as usize) {
+        if let Err(e) =
+            install_kernel(host, config_program_size as usize, KERNEL_BOOT_PATH)
+        {
             Runtime::write_debug(host, e)
         } else {
             let _ = host.mark_for_reboot();
@@ -67,17 +70,28 @@ fn panic(_info: &PanicInfo) -> ! {
     panic!()
 }
 
-fn install_kernel(
+/// Kernel installer function.
+///
+/// Non-trivial preliminary steps needs to be processed before calling
+/// this function:
+///     - Prepare preimages of the targeted kernel.
+///     - Create a config program consisting of `reveal` instruction followed by a `move` one.
+///     - Serialise the program and write the output to durable storage.
+///     - Finally execute the config program by calling `install_kernel`, with the path the config
+///       was written to.
+// TODO: provide a concrete example (see https://gitlab.com/tezos/tezos/-/issues/5855)
+pub fn install_kernel(
     host: &mut impl Runtime,
     config_program_size: usize,
+    config_interpretation_path: RefPath,
 ) -> Result<(), &'static str> {
     let mut config_instruction_buffer = [0; RefConfigInstruction::MAX_SIZE];
 
     let kernel_size = host
-        .store_value_size(&KERNEL_BOOT_PATH)
+        .store_value_size(&config_interpretation_path)
         .map_err(|_| "Failed to read kernel boot path size")?;
 
-    host.store_copy(&KERNEL_BOOT_PATH, &AUXILIARY_KERNEL_BOOT_PATH)
+    host.store_copy(&config_interpretation_path, &AUXILIARY_KERNEL_BOOT_PATH)
         .map_err(|_| "Failed to copy kernel boot before config execution")?;
 
     let end_offset = kernel_size - 4;
