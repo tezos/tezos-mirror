@@ -25,7 +25,20 @@ version = "0.2.0"
 path = "../kernel_sdk/mock"
 version = "0.2.0"
 
-[dev-dependencies.tezos-smart-rollup-encoding]
+[dependencies.tezos_data_encoding]
+version = "0.5"
+
+[dependencies.tezos_data_encoding_derive]
+version = "0.5"
+
+[dependencies.nom] 
+version = "7.1"
+
+[dependencies.tezos_crypto_rs]
+version = "0.5.0"
+default-features = false
+
+[dependencies.tezos-smart-rollup-encoding]
 path = "../kernel_sdk/encoding"
 version = "0.2.0"
 
