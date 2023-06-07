@@ -25,8 +25,15 @@
 
 open Stake_repr
 
-let staking_weight _ctxt {frozen; delegated} =
-  Int64.add (Tez_repr.to_mutez frozen) (Tez_repr.to_mutez delegated)
+let staking_weight ctxt {frozen; delegated} =
+  let frozen = Tez_repr.to_mutez frozen in
+  let delegated = Tez_repr.to_mutez delegated in
+  let staking_over_delegation_edge =
+    Constants_storage.adaptive_inflation_staking_over_delegation_edge ctxt
+  in
+  if Constants_storage.adaptive_inflation_enable ctxt then
+    Int64.(add frozen (div delegated (of_int staking_over_delegation_edge)))
+  else Int64.add frozen delegated
 
 let compare ctxt s1 s2 =
   Int64.compare (staking_weight ctxt s1) (staking_weight ctxt s2)
