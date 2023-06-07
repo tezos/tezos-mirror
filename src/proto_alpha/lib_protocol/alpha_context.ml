@@ -512,6 +512,11 @@ module Stake_distribution = struct
   let slot_owner = Delegate_sampler.slot_owner
 
   let load_sampler_for_cycle = Delegate_sampler.load_sampler_for_cycle
+
+  let get_total_frozen_stake ctxt cycle =
+    let open Lwt_result_syntax in
+    let* total_stake = Stake_storage.get_total_active_stake ctxt cycle in
+    return (Stake_repr.get_frozen total_stake)
 end
 
 module Nonce = Nonce_storage

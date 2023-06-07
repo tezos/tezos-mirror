@@ -36,12 +36,25 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(context_path / "total_supply")
+
+  let total_frozen_stake =
+    RPC_service.get_service
+      ~description:"Returns the total stake (in mutez) frozen on the chain"
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(context_path / "total_frozen_stake")
 end
 
 let register () =
   let open Services_registration in
   register0 ~chunked:false S.total_supply (fun ctxt () () ->
-      Contract.get_total_supply ctxt)
+      Contract.get_total_supply ctxt) ;
+  register0 ~chunked:false S.total_frozen_stake (fun ctxt () () ->
+      let cycle = (Level.current ctxt).cycle in
+      Stake_distribution.get_total_frozen_stake ctxt cycle)
 
 let total_supply ctxt block =
   RPC_context.make_call0 S.total_supply ctxt block () ()
+
+let total_frozen_stake ctxt block =
+  RPC_context.make_call0 S.total_frozen_stake ctxt block () ()
