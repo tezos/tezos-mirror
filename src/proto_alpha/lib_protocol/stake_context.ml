@@ -25,7 +25,8 @@
 
 open Stake_repr
 
-let staking_weight {frozen; delegated} =
+let staking_weight _ctxt {frozen; delegated} =
   Int64.add (Tez_repr.to_mutez frozen) (Tez_repr.to_mutez delegated)
 
-let compare s1 s2 = Int64.compare (staking_weight s1) (staking_weight s2)
+let compare ctxt s1 s2 =
+  Int64.compare (staking_weight ctxt s1) (staking_weight ctxt s2)

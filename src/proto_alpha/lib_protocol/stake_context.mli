@@ -26,6 +26,6 @@
 (** Functions on stake and depending on the context. *)
 
 (** Weight for staking rights. *)
-val staking_weight : Stake_repr.t -> int64
+val staking_weight : Raw_context.t -> Stake_repr.t -> int64
 
-val compare : Stake_repr.t -> Stake_repr.t -> int
+val compare : Raw_context.t -> Stake_repr.t -> Stake_repr.t -> int
