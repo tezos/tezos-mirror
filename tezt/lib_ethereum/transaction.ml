@@ -76,8 +76,13 @@ type transaction_receipt = {
 
 let transaction_receipt_of_json json =
   let open JSON in
+  let as_int_or_bool json =
+    match as_int_opt json with Some i -> i = 1 | None -> as_bool json
+  in
   {
-    status = json |-> "status" |> as_bool;
+    (* Status is returned as a quantityy, 0 being `false`, 1 being `true`.
+       However, `eth_cli` returns a boolean. *)
+    status = json |-> "status" |> as_int_or_bool;
     blockHash = json |-> "blockHash" |> as_string;
     blockNumber = json |-> "blockNumber" |> as_int32;
     transactionHash = json |-> "transactionHash" |> as_string;

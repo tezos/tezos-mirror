@@ -129,6 +129,31 @@ let next_evm_level ~sc_rollup_node ~node ~client =
     sc_rollup_node
     (Node.get_level node)
 
+(** [wait_for_transaction_receipt ~evm_proxy_server ~transaction_hash] takes an
+    transaction_hash and returns only when the receipt is non null, or [count]
+    blocks have passed and the receipt is still not available. *)
+let wait_for_transaction_receipt ?(count = 3) ~evm_proxy_server
+    ~transaction_hash () =
+  let rec loop count =
+    let* () = Lwt_unix.sleep 5. in
+    let* receipt =
+      Evm_proxy_server.(
+        call_evm_rpc
+          evm_proxy_server
+          {
+            method_ = "eth_getTransactionReceipt";
+            parameters = `A [`String transaction_hash];
+          })
+    in
+    if receipt |> Evm_proxy_server.extract_result |> JSON.is_null then
+      if count > 0 then loop (count - 1)
+      else Test.fail "Transaction still hasn't been included"
+    else
+      receipt |> Evm_proxy_server.extract_result
+      |> Transaction.transaction_receipt_of_json |> return
+  in
+  loop count
+
 let wait_for_application ~sc_rollup_node ~node ~client apply () =
   let* start_level = Client.level client in
   let max_iteration = 10 in
@@ -960,6 +985,85 @@ let test_eth_call_nullable_recipient =
   let _result = call_result |> Evm_proxy_server.extract_result in
   unit
 
+let test_inject_100_transactions =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "bigger_blocks"]
+    ~title:"Check blocks can contain more than 64 transactions"
+  @@ fun protocol ->
+  let* {evm_proxy_server; sc_rollup_node; node; client; _} =
+    setup_past_genesis protocol
+  in
+  (* Retrieves all the messages and prepare them for the current rollup. *)
+  let txs =
+    read_file (kernel_inputs_path ^ "/100-inputs-for-proxy")
+    |> String.trim |> String.split_on_char '\n'
+  in
+  let requests =
+    List.map
+      (fun tx ->
+        Evm_proxy_server.
+          {method_ = "eth_sendRawTransaction"; parameters = `A [`String tx]})
+      txs
+  in
+  let* hashes = Evm_proxy_server.batch_evm_rpc evm_proxy_server requests in
+  let first_hash =
+    hashes |> JSON.as_list |> List.hd |> Evm_proxy_server.extract_result
+    |> JSON.as_string
+  in
+  (* Let's wait until one of the transactions is injected into a block, and
+      test this block contains the 100 transactions as expected. *)
+  let* receipt =
+    wait_for_application
+      ~sc_rollup_node
+      ~node
+      ~client
+      (wait_for_transaction_receipt
+         ~evm_proxy_server
+         ~transaction_hash:first_hash)
+      ()
+  in
+  let* block_with_100tx =
+    Evm_proxy_server.(
+      call_evm_rpc
+        evm_proxy_server
+        {
+          method_ = "eth_getBlockByNumber";
+          parameters =
+            `A
+              [`String (Format.sprintf "%#lx" receipt.blockNumber); `Bool false];
+        })
+  in
+  let block_with_100tx =
+    block_with_100tx |> Evm_proxy_server.extract_result |> Block.of_json
+  in
+  (match block_with_100tx.Block.transactions with
+  | Block.Empty -> Test.fail "Expected a non empty block"
+  | Block.Full _ ->
+      Test.fail "Block is supposed to contain only transaction hashes"
+  | Block.Hash hashes ->
+      Check.((List.length hashes = List.length requests) int)
+        ~error_msg:"Expected %R transactions in the latest block, got %L") ;
+
+  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+  let* latest_evm_level =
+    Evm_proxy_server.(
+      call_evm_rpc
+        evm_proxy_server
+        {method_ = "eth_blockNumber"; parameters = `A []})
+  in
+  let latest_evm_level =
+    latest_evm_level |> Evm_proxy_server.extract_result |> JSON.as_int32
+  in
+  (* At each loop, the kernel reads the previous block. Until the patch, the
+     kernel failed to read the previous block if there was more than 64 hash,
+     this test ensures it works by assessing new blocks are produced. *)
+  Check.((latest_evm_level >= Int32.succ block_with_100tx.Block.number) int32)
+    ~error_msg:
+      "Expected a new block after the one with 100 transactions, but level \
+       hasn't changed" ;
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -979,6 +1083,7 @@ let register_evm_proxy_server ~protocols =
   test_eth_call_nullable_recipient protocols ;
   test_l2_deploy_simple_storage protocols ;
   test_l2_call_simple_storage protocols ;
-  test_l2_deploy_erc20 protocols
+  test_l2_deploy_erc20 protocols ;
+  test_inject_100_transactions protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
