@@ -30,7 +30,7 @@ let get_cpmm_address = Storage.Liquidity_baking.Cpmm_address.get
 
 let get_toggle_ema ctxt =
   Storage.Liquidity_baking.Toggle_ema.get ctxt >>=? fun ema ->
-  Toggle_EMA.of_int64 ema
+  Liquidity_baking_toggle_EMA.of_int64 ema
 
 let on_cpmm_exists ctxt f =
   get_cpmm_address ctxt >>=? fun cpmm_contract ->
@@ -44,11 +44,13 @@ let on_cpmm_exists ctxt f =
 let update_toggle_ema ctxt ~toggle_vote =
   get_toggle_ema ctxt >>=? fun old_ema ->
   let new_ema = compute_new_liquidity_baking_ema ~toggle_vote old_ema in
-  Storage.Liquidity_baking.Toggle_ema.update ctxt (Toggle_EMA.to_int64 new_ema)
+  Storage.Liquidity_baking.Toggle_ema.update
+    ctxt
+    (Liquidity_baking_toggle_EMA.to_int64 new_ema)
   >|=? fun ctxt -> (ctxt, new_ema)
 
 let check_ema_below_threshold ctxt ema =
-  Toggle_EMA.(
+  Liquidity_baking_toggle_EMA.(
     ema < Constants_storage.liquidity_baking_toggle_ema_threshold ctxt)
 
 let on_subsidy_allowed ctxt ~toggle_vote f =

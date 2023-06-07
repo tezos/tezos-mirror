@@ -39,6 +39,10 @@ val adaptive_inflation_vote_encoding : toggle_vote Data_encoding.encoding
 
 val toggle_votes_encoding : toggle_votes Data_encoding.encoding
 
+module Liquidity_baking_toggle_EMA : Toggle_EMA.T
+
+module Adaptive_inflation_launch_EMA : Toggle_EMA.T
+
 (** [compute_new_liquidity_baking_ema ~toggle_vote old_ema] returns the value
     [new_ema] of the exponential moving average [old_ema] updated by the vote
     [toggle_vote] interpreted as a vote to deactivate the liquidity baking
@@ -53,7 +57,9 @@ val toggle_votes_encoding : toggle_votes Data_encoding.encoding
     rounded toward 1,000,000,000 (the middle of the interval).
     *)
 val compute_new_liquidity_baking_ema :
-  toggle_vote:toggle_vote -> Toggle_EMA.t -> Toggle_EMA.t
+  toggle_vote:toggle_vote ->
+  Liquidity_baking_toggle_EMA.t ->
+  Liquidity_baking_toggle_EMA.t
 
 (** [compute_new_adaptive_inflation_ema ~toggle_vote old_ema] returns the value
     [new_ema] of the exponential moving average [old_ema] updated by the vote
@@ -69,4 +75,6 @@ val compute_new_liquidity_baking_ema :
     rounded toward 1,000,000,000 (the middle of the interval).
     *)
 val compute_new_adaptive_inflation_ema :
-  toggle_vote:toggle_vote -> Toggle_EMA.t -> Toggle_EMA.t
+  toggle_vote:toggle_vote ->
+  Adaptive_inflation_launch_EMA.t ->
+  Adaptive_inflation_launch_EMA.t

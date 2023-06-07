@@ -87,14 +87,26 @@ let toggle_votes_encoding =
     "toggle_votes"
     (Compact.make ~tag_size:`Uint8 toggle_votes_compact_encoding)
 
+module Liquidity_baking_toggle_EMA = Toggle_EMA.Make (struct
+  let baker_contribution = Z.of_int 500_000
+
+  let ema_max = 2_000_000_000L
+end)
+
+module Adaptive_inflation_launch_EMA = Toggle_EMA.Make (struct
+  let baker_contribution = Z.of_int 500_000
+
+  let ema_max = 2_000_000_000L
+end)
+
 let compute_new_liquidity_baking_ema ~toggle_vote ema =
   match toggle_vote with
   | Toggle_vote_pass -> ema
-  | Toggle_vote_off -> Toggle_EMA.update_ema_up ema
-  | Toggle_vote_on -> Toggle_EMA.update_ema_down ema
+  | Toggle_vote_off -> Liquidity_baking_toggle_EMA.update_ema_up ema
+  | Toggle_vote_on -> Liquidity_baking_toggle_EMA.update_ema_down ema
 
 let compute_new_adaptive_inflation_ema ~toggle_vote ema =
   match toggle_vote with
   | Toggle_vote_pass -> ema
-  | Toggle_vote_off -> Toggle_EMA.update_ema_down ema
-  | Toggle_vote_on -> Toggle_EMA.update_ema_up ema
+  | Toggle_vote_off -> Adaptive_inflation_launch_EMA.update_ema_down ema
+  | Toggle_vote_on -> Adaptive_inflation_launch_EMA.update_ema_up ema

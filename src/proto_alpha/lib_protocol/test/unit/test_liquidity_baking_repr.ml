@@ -32,6 +32,7 @@
 *)
 
 open Protocol
+module Toggle_EMA = Toggle_votes_repr.Liquidity_baking_toggle_EMA
 
 let ema_of_int64 ema = Toggle_EMA.of_int64 ema >|= Environment.wrap_tzresult
 

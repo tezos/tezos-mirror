@@ -981,8 +981,10 @@ module Scripts = struct
           mode = application_mode;
           op_count = 0;
           migration_balance_updates = [];
-          liquidity_baking_toggle_ema = Toggle_EMA.zero;
-          adaptive_inflation_toggle_ema = Toggle_EMA.zero;
+          liquidity_baking_toggle_ema =
+            Toggle_votes.Liquidity_baking_toggle_EMA.zero;
+          adaptive_inflation_toggle_ema =
+            Toggle_votes.Adaptive_inflation_launch_EMA.zero;
           implicit_operations_results = [];
         }
     in

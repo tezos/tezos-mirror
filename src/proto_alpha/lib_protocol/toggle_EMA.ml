@@ -52,10 +52,10 @@
 
 *)
 
-module EMA_parameters = struct
-  let baker_contribution = Z.of_int 500_000
+module type EMA_PARAMETERS = sig
+  val baker_contribution : Z.t
 
-  let ema_max = 2_000_000_000L
+  val ema_max : Int64.t
 
   (* We don't need to parameterize by the attenuation factor because
      it can be computed from the two other parameters with the
@@ -65,61 +65,82 @@ module EMA_parameters = struct
   *)
 end
 
-type t = Int64.t
-(* Invariant 0L <= ema <= EMA_Parameters.ema_max *)
+module type T = sig
+  type t
 
-(* This error is not registered because we don't expect it to be
-   raised. *)
-type error += Toggle_ema_out_of_bound of Int64.t
+  val of_int64 : Int64.t -> t tzresult Lwt.t
 
-let check_bounds x = Compare.Int64.(0L <= x && x <= EMA_parameters.ema_max)
+  val zero : t
 
-let of_int64 (x : Int64.t) : t tzresult Lwt.t =
-  if check_bounds x then return x else tzfail @@ Toggle_ema_out_of_bound x
+  val to_int64 : t -> Int64.t
 
-let zero : t = Int64.zero
+  val encoding : t Data_encoding.t
 
-(* The conv_with_guard combinator of Data_encoding expects a (_, string) result. *)
-let of_int64_for_encoding x =
-  if check_bounds x then Ok x else Error "out of bounds"
+  val ( < ) : t -> Int64.t -> bool
 
-let to_int64 (ema : t) : Int64.t = ema
+  val update_ema_up : t -> t
 
-(* We perform the computations in Z to avoid overflows. *)
+  val update_ema_down : t -> t
+end
 
-let ema_max_z = Z.of_int64 EMA_parameters.ema_max
+module Make (EMA_parameters : EMA_PARAMETERS) : T = struct
+  type t = Int64.t
+  (* Invariant 0L <= ema <= EMA_Parameters.ema_max *)
 
-let attenuation_numerator =
-  Z.(sub ema_max_z (mul (of_int 2) EMA_parameters.baker_contribution))
+  (* This error is not registered because we don't expect it to be
+     raised. *)
+  type error += Toggle_ema_out_of_bound of Int64.t
 
-let attenuation_denominator = ema_max_z
+  let check_bounds x = Compare.Int64.(0L <= x && x <= EMA_parameters.ema_max)
 
-let attenuate z = Z.(div (mul attenuation_numerator z) attenuation_denominator)
+  let of_int64 (x : Int64.t) : t tzresult Lwt.t =
+    if check_bounds x then return x else tzfail @@ Toggle_ema_out_of_bound x
 
-let half_ema_max_z = Z.(div ema_max_z (of_int 2))
+  let zero : t = Int64.zero
 
-(* Outside of this module, the EMA is always between 0L and ema_max.
-   This [recenter] wrappers, puts it in between -ema_max/2 and
-   ema_max/2.  The goal of this recentering around zero is to make
-   [update_ema_off] and [update_ema_on] behave symmetrically with
-   respect to rounding. *)
-let recenter f ema = Z.(add half_ema_max_z (f (sub ema half_ema_max_z)))
+  (* The conv_with_guard combinator of Data_encoding expects a (_, string) result. *)
+  let of_int64_for_encoding x =
+    if check_bounds x then Ok x else Error "out of bounds"
 
-let update_ema_up (ema : t) : t =
-  let ema = Z.of_int64 ema in
-  recenter
-    (fun ema -> Z.add (attenuate ema) EMA_parameters.baker_contribution)
-    ema
-  |> Z.to_int64
+  let to_int64 (ema : t) : Int64.t = ema
 
-let update_ema_down (ema : t) : t =
-  let ema = Z.of_int64 ema in
-  recenter
-    (fun ema -> Z.sub (attenuate ema) EMA_parameters.baker_contribution)
-    ema
-  |> Z.to_int64
+  (* We perform the computations in Z to avoid overflows. *)
 
-let ( < ) : t -> Int64.t -> bool = Compare.Int64.( < )
+  let ema_max_z = Z.of_int64 EMA_parameters.ema_max
 
-let encoding : t Data_encoding.t =
-  Data_encoding.(conv_with_guard to_int64 of_int64_for_encoding int64)
+  let attenuation_numerator =
+    Z.(sub ema_max_z (mul (of_int 2) EMA_parameters.baker_contribution))
+
+  let attenuation_denominator = ema_max_z
+
+  let attenuate z =
+    Z.(div (mul attenuation_numerator z) attenuation_denominator)
+
+  let half_ema_max_z = Z.(div ema_max_z (of_int 2))
+
+  (* Outside of this module, the EMA is always between 0L and ema_max.
+     This [recenter] wrappers, puts it in between -ema_max/2 and
+     ema_max/2.  The goal of this recentering around zero is to make
+     [update_ema_off] and [update_ema_on] behave symmetrically with
+     respect to rounding. *)
+  let recenter f ema = Z.(add half_ema_max_z (f (sub ema half_ema_max_z)))
+
+  let update_ema_up (ema : t) : t =
+    let ema = Z.of_int64 ema in
+    recenter
+      (fun ema -> Z.add (attenuate ema) EMA_parameters.baker_contribution)
+      ema
+    |> Z.to_int64
+
+  let update_ema_down (ema : t) : t =
+    let ema = Z.of_int64 ema in
+    recenter
+      (fun ema -> Z.sub (attenuate ema) EMA_parameters.baker_contribution)
+      ema
+    |> Z.to_int64
+
+  let ( < ) : t -> Int64.t -> bool = Compare.Int64.( < )
+
+  let encoding : t Data_encoding.t =
+    Data_encoding.(conv_with_guard to_int64 of_int64_for_encoding int64)
+end
