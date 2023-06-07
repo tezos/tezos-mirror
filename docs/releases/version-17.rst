@@ -1,5 +1,5 @@
-Version 17.0~rc1
-================
+Version 17.0
+============
 
 Version 17.0 contains a new version (V9) of the protocol environment,
 which is the set of functions that a protocol can call. This new version is used by protocol :doc:`Nairobi<../protocols/017_nairobi>`,
@@ -21,14 +21,14 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout v17.0-rc1
+  git checkout v17.0
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v17.0-rc1`` Docker images of Octez.
+If you are using Docker instead, use the ``v17.0`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
@@ -36,4 +36,5 @@ You can also install Octez using Opam by running ``opam install octez``.
 Changelog
 ---------
 
+- `Version 17.0 <../CHANGES.html#version-17-0>`_
 - `Version 17.0~rc1 <../CHANGES.html#version-17-0-rc1>`_
