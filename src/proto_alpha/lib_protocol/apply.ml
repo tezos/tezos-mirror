@@ -367,7 +367,7 @@ let apply_finalize_unstake ~ctxt ~sender ~amount ~destination ~before_operation
   >>?= fun () ->
   let contract = Contract.Implicit sender in
   Contract.allocated ctxt contract >>= fun already_allocated ->
-  Staking.finalize_unstake ctxt sender >>=? fun (ctxt, balance_updates) ->
+  Staking.finalize_unstake ctxt contract >>=? fun (ctxt, balance_updates) ->
   let result =
     Transaction_to_contract_result
       {
