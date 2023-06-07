@@ -50,6 +50,8 @@ const TRANSACTION_OBJECT_V: RefPath = RefPath::assert_from(b"/v");
 const TRANSACTION_OBJECT_R: RefPath = RefPath::assert_from(b"/r");
 const TRANSACTION_OBJECT_S: RefPath = RefPath::assert_from(b"/s");
 
+const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/evm/chain_id");
+
 pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result");
 
 /// The size of an address. Size in bytes.
@@ -568,6 +570,17 @@ pub fn create_chunked_transaction<Host: Runtime>(
         0,
     )
     .map_err(Error::from)
+}
+
+pub fn store_chain_id<Host: Runtime>(
+    host: &mut Host,
+    chain_id: U256,
+) -> Result<(), Error> {
+    write_u256(host, &EVM_CHAIN_ID.into(), chain_id)
+}
+
+pub fn read_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
+    read_u256(host, &EVM_CHAIN_ID.into())
 }
 
 pub(crate) mod internal_for_tests {

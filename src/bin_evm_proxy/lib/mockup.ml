@@ -27,6 +27,8 @@
 
 open Ethereum_types
 
+let return = Lwt_result_syntax.return
+
 module Conv = struct
   let pow_18 = String.make 18 '0'
 
@@ -40,11 +42,9 @@ let hash_f = hash_of_string
 let qty_f = quantity_of_z
 
 (* Default chain_id for ethereum custom networks with Ganache. *)
-let id = Z.of_int 1337
+let chain_id () = return (qty_f (Z.of_int 1337))
 
-let chain_id = qty_f id
-
-let net_version = Z.to_string id
+let net_version = chain_id
 
 let block_height_counter = ref 0
 
@@ -139,8 +139,6 @@ let transaction_object =
   }
 
 let call = empty_hash
-
-let return = Lwt_result_syntax.return
 
 let smart_rollup_address = return "foo"
 

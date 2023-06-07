@@ -90,8 +90,13 @@ let dispatch_input
   let* output =
     match input with
     | Accounts.Input _ -> return (Accounts.Output (Ok []))
-    | Network_id.Input _ -> return (Network_id.Output (Ok Mockup.net_version))
-    | Chain_id.Input _ -> return (Chain_id.Output (Ok Mockup.chain_id))
+    | Network_id.Input _ ->
+        let* (Qty chain_id) = Rollup_node_rpc.chain_id () in
+        let net_version = Z.to_string chain_id in
+        return (Network_id.Output (Ok net_version))
+    | Chain_id.Input _ ->
+        let* chain_id = Rollup_node_rpc.chain_id () in
+        return (Chain_id.Output (Ok chain_id))
     | Get_balance.Input (Some (address, _block_param)) ->
         let* balance = Rollup_node_rpc.balance address in
         return (Get_balance.Output (Ok balance))

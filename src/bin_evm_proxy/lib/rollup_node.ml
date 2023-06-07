@@ -129,6 +129,8 @@ module Durable_storage_path = struct
 
   let transactions = "/transactions"
 
+  let chain_id = "/evm/chain_id"
+
   module Block = struct
     let blocks = "/evm/blocks"
 
@@ -550,6 +552,9 @@ module RPC = struct
 
   let txpool _ () =
     Lwt.return_ok {pending = AddressMap.empty; queued = AddressMap.empty}
+
+  let chain_id base () =
+    inspect_durable_and_decode base Durable_storage_path.chain_id decode_number
 end
 
 module type S = sig
@@ -581,6 +586,8 @@ module type S = sig
     Ethereum_types.transaction_object option tzresult Lwt.t
 
   val txpool : unit -> Ethereum_types.txpool tzresult Lwt.t
+
+  val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
 end
 
 module Make (Base : sig
@@ -607,4 +614,6 @@ end) : S = struct
   let transaction_object = RPC.transaction_object Base.base
 
   let txpool = RPC.txpool Base.base
+
+  let chain_id = RPC.chain_id Base.base
 end
