@@ -58,3 +58,34 @@ let transaction_object_of_json json =
     r = json |-> "r" |> as_string;
     s = json |-> "s" |> as_string;
   }
+
+(* as per https://web3js.readthedocs.io/en/v1.2.9/web3-eth.html#gettransactionreceipt *)
+type transaction_receipt = {
+  status : bool;
+  blockHash : string;
+  blockNumber : int32;
+  transactionHash : string;
+  transactionIndex : int32;
+  from : string;
+  to_ : string option;
+  contractAddress : string option;
+  cumulativeGasUsed : int32;
+  gasUsed : int32;
+  logs : string list;
+}
+
+let transaction_receipt_of_json json =
+  let open JSON in
+  {
+    status = json |-> "status" |> as_bool;
+    blockHash = json |-> "blockHash" |> as_string;
+    blockNumber = json |-> "blockNumber" |> as_int32;
+    transactionHash = json |-> "transactionHash" |> as_string;
+    transactionIndex = json |-> "transactionIndex" |> as_int32;
+    from = json |-> "from" |> as_string;
+    to_ = json |-> "to" |> as_string_opt;
+    contractAddress = json |-> "contractAddress" |> as_string_opt;
+    cumulativeGasUsed = json |-> "cumulativeGasUsed" |> as_int32;
+    gasUsed = json |-> "gasUsed" |> as_int32;
+    logs = json |-> "logs" |> as_list |> List.map as_string;
+  }

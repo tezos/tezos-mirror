@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -57,14 +58,38 @@ val add_abi : label:string -> abi:string -> unit -> unit Lwt.t
     transaction deploying [bin] whose interface [abi] is registered in the
     client, and sends the raw transaction to the JSON-API server listening at
     [endpoint]. [bin] is a path to the binary file, and [abi] is the label used
-    while registering the ABI in the client. Returns the deployed contract
-    address and the transaction hash *)
+    while registering the ABI in the client.
+
+    Returns a pair [(address, tx_hash)]. *)
 val deploy :
   source_private_key:string ->
   endpoint:string ->
   abi:string ->
   bin:string ->
   (string * string) Lwt.t
+
+(** [call  ~source_private_key ~endpoint ~abi_label ~address ~method_call ()]
+    make a call to a contract found at [address], with interface registered as
+    [abi_labbel] in the client, signed with a user's [source_private_key].
+    [method_call] is the call data, as a solidity expression.
+
+    example:
+    [call
+      ~source_private_key
+      ~endpoint
+      ~abi_label:"storage"
+      ~address:"0xaaaa....aaaa"
+      ~method_call:"set(42)"
+      ()]*)
+val call :
+  ?expect_failure:bool ->
+  source_private_key:string ->
+  endpoint:string ->
+  abi_label:string ->
+  address:string ->
+  method_call:string ->
+  unit ->
+  string Lwt.t
 
 (** [get_block ~block_id ~endpoint] asks the block [block_id] (it can be a
     hash or a number) to the JSON-RPC API server listening at [endpoint]. *)
@@ -73,3 +98,8 @@ val get_block : block_id:string -> endpoint:string -> Block.t Lwt.t
 (** [block_number ~endpoint] asks the current block number to the
     JSON-RPC API server listening at [endpoint]. *)
 val block_number : endpoint:string -> int Lwt.t
+
+(** [get_receipt ~endpoint ~tx] returns the [transaction_receipt] objects of a
+    mined transaction if it exists. *)
+val get_receipt :
+  endpoint:string -> tx:string -> Transaction.transaction_receipt option Lwt.t
