@@ -42,6 +42,13 @@ val update_stored_rewards_at_cycle_end :
 (** [init_ema ctxt] adds into the context an adaptive inflation vote EMA at 0 *)
 val init_ema : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
+(** [update_ema ctxt ~vote] returns the new context with the new EMA *)
+val update_ema :
+  Raw_context.t ->
+  vote:Toggle_votes_repr.toggle_vote ->
+  (Raw_context.t * Toggle_votes_repr.Adaptive_inflation_launch_EMA.t) tzresult
+  Lwt.t
+
 (** [activate ctxt ~cycle] adds into the context the cycle at which
     the adaptive inflation feature gets activated. If this function is
     never called, then the context does not contain the cycle for the
