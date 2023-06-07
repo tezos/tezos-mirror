@@ -87,7 +87,7 @@ let toggle_votes_encoding =
     "toggle_votes"
     (Compact.make ~tag_size:`Uint8 toggle_votes_compact_encoding)
 
-let compute_new_ema ~toggle_vote ema =
+let compute_new_liquidity_baking_ema ~toggle_vote ema =
   match toggle_vote with
   | Toggle_vote_pass -> ema
   | Toggle_vote_off -> Toggle_EMA.update_ema_up ema

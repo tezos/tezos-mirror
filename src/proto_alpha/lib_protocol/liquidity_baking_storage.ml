@@ -43,7 +43,7 @@ let on_cpmm_exists ctxt f =
 
 let update_toggle_ema ctxt ~toggle_vote =
   get_toggle_ema ctxt >>=? fun old_ema ->
-  let new_ema = compute_new_ema ~toggle_vote old_ema in
+  let new_ema = compute_new_liquidity_baking_ema ~toggle_vote old_ema in
   Storage.Liquidity_baking.Toggle_ema.update ctxt (Toggle_EMA.to_int64 new_ema)
   >|=? fun ctxt -> (ctxt, new_ema)
 

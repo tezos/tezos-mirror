@@ -4723,7 +4723,8 @@ module Toggle_votes : sig
 
   val toggle_votes_encoding : toggle_votes Data_encoding.encoding
 
-  val compute_new_ema : toggle_vote:toggle_vote -> Toggle_EMA.t -> Toggle_EMA.t
+  val compute_new_liquidity_baking_ema :
+    toggle_vote:toggle_vote -> Toggle_EMA.t -> Toggle_EMA.t
 end
 
 (** This module re-exports definitions from {!Liquidity_baking_storage}. *)
