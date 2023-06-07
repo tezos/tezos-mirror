@@ -1126,7 +1126,11 @@ module Make
               | None -> (
                   let* o = Lwt_stream.get op_stream in
                   match o with
-                  | Some (kind, op) when filter_result kind ->
+                  | Some (kind, op)
+                    when filter_result kind
+                         && filter_validation_passes
+                              params#validation_passes
+                              op.protocol ->
                       let errors =
                         match kind with
                         | `Validated -> None
