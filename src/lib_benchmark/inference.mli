@@ -80,11 +80,8 @@ val make_problem :
   overrides:(Free_variable.t -> float option) ->
   problem
 
-(** [solve_problem problem ~is_constant_input solver] solves [problem] using
-    [solver]. When [is_constant_input = true], the computation of the R^2 score
-    is skipped since it is meaningless.
-*)
-val solve_problem : problem -> is_constant_input:bool -> solver -> solution
+(** [solve_problem problem solver] solves [problem] using [solver]. *)
+val solve_problem : problem -> solver -> solution
 
 val problem_to_csv : problem -> Csv.csv
 

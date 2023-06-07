@@ -416,10 +416,22 @@ let calculate_benchmark_scores ~input ~output =
   let params, tvalues = Pyinference.benchmark_score ~input ~output in
   (params |> of_scipy, tvalues |> of_scipy)
 
-let solve_problem : problem -> is_constant_input:bool -> solver -> solution =
- fun problem ~is_constant_input solver ->
+let solve_problem : problem -> solver -> solution =
+ fun problem solver ->
   let calculate_regression_scores ~output ~prediction =
     let r2_score =
+      (* The R^2 score for a constant input problem is uninformative,
+         and the score is usually negative, leading to a false positive alert.
+         We skip calculating the R^2 score for such problems. *)
+      let is_constant_input =
+        match problem with
+        | Degenerate _ -> false
+        | Non_degenerate {lines; _} ->
+            List.map (fun (Full (affine, _)) -> affine) lines
+            |> List.all_equal (fun v1 v2 ->
+                   Free_variable.Sparse_vec.equal v1.linear_comb v2.linear_comb
+                   && Float.equal v1.const v2.const)
+      in
       if is_constant_input then None else r2_score ~output ~prediction
     in
     let rmse_score = rmse_score ~output ~prediction in
