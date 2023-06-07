@@ -43,7 +43,9 @@ type error +=
   | Multiple_revelation
   | Invalid_transfer_to_sc_rollup
   | Invalid_sender of Destination.t
-  | Invalid_staking_destination of public_key_hash
+  | Invalid_self_transaction_destination
+  | Staking_for_nondelegate_while_costaking_disabled
+  | Invalid_nonzero_transaction_amount of Tez.t
 
 let () =
   register_error_kind
@@ -219,23 +221,53 @@ let () =
     Data_encoding.(obj1 (req "contract" Destination.encoding))
     (function Invalid_sender c -> Some c | _ -> None)
     (fun c -> Invalid_sender c) ;
+  let invalid_self_transaction_destination_description =
+    "A pseudo-transaction destination must equal its sender."
+  in
   register_error_kind
     `Permanent
-    ~id:"operations.invalid_staking_destination"
-    ~title:"Invalid destination for a stake operation"
-    ~description:
-      "The transaction destination must be a registered delegate. Additionally \
-       it must equal the operation source for now."
-    ~pp:(fun ppf pkh ->
+    ~id:"operations.invalid_self_transaction_destination"
+    ~title:"Invalid destination for a pseudo-transaction"
+    ~description:invalid_self_transaction_destination_description
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        invalid_self_transaction_destination_description)
+    Data_encoding.unit
+    (function Invalid_self_transaction_destination -> Some () | _ -> None)
+    (fun () -> Invalid_self_transaction_destination) ;
+  let staking_for_nondelegate_while_costaking_disabled_description =
+    "As long as co-staking is not enabled, staking and unstaking operations \
+     are only allowed from delegates."
+  in
+  register_error_kind
+    `Permanent
+    ~id:"operations.staking_for_nondelegate_while_costaking_disabled"
+    ~title:"Staking for a non-delegate while co-staking is disabled"
+    ~description:staking_for_nondelegate_while_costaking_disabled_description
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        staking_for_nondelegate_while_costaking_disabled_description)
+    Data_encoding.unit
+    (function
+      | Staking_for_nondelegate_while_costaking_disabled -> Some () | _ -> None)
+    (fun () -> Staking_for_nondelegate_while_costaking_disabled) ;
+  register_error_kind
+    `Permanent
+    ~id:"operations.invalid_nonzero_transaction_amount"
+    ~title:"Invalid non-zero transaction amount"
+    ~description:"A transaction expected a zero-amount but got non-zero."
+    ~pp:(fun ppf amount ->
       Format.fprintf
         ppf
-        "Invalid destination (%a) for this stake operation. Only registered \
-         delegate are allowed."
-        Signature.Public_key_hash.pp
-        pkh)
-    Data_encoding.(obj1 (req "destination" Contract.implicit_encoding))
-    (function Invalid_staking_destination pkh -> Some pkh | _ -> None)
-    (fun pkh -> Invalid_staking_destination pkh)
+        "A transaction expected a zero-amount but got %a."
+        Tez.pp
+        amount)
+    Data_encoding.(obj1 (req "amount" Tez.encoding))
+    (function
+      | Invalid_nonzero_transaction_amount amount -> Some amount | _ -> None)
+    (fun amount -> Invalid_nonzero_transaction_amount amount)
 
 open Apply_results
 open Apply_operation_result
@@ -288,16 +320,18 @@ let apply_transaction_to_implicit ~ctxt ~sender ~amount ~pkh ~before_operation =
   in
   return (ctxt, result, [])
 
-let apply_stake ~ctxt ~sender ~amount ~delegate ~before_operation =
-  let contract = Contract.Implicit delegate in
+let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
+  let contract = Contract.Implicit destination in
   (* Staking of zero is forbidden. *)
   error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
   error_unless
-    Signature.Public_key_hash.(sender = delegate)
-    (Invalid_staking_destination delegate)
+    Signature.Public_key_hash.(sender = destination)
+    Invalid_self_transaction_destination
   >>?= fun () ->
-  Contract.is_delegate ctxt delegate >>=? fun is_delegate ->
-  error_unless is_delegate (Invalid_staking_destination delegate) >>?= fun () ->
+  Contract.is_delegate ctxt sender >>=? fun is_delegate ->
+  error_unless is_delegate Staking_for_nondelegate_while_costaking_disabled
+  >>?= fun () ->
+  let delegate = sender in
   Token.transfer
     ctxt
     (`Contract (Contract.Implicit sender))
@@ -318,6 +352,33 @@ let apply_stake ~ctxt ~sender ~amount ~delegate ~before_operation =
         storage_size = Z.zero;
         paid_storage_size_diff = Z.zero;
         allocated_destination_contract;
+      }
+  in
+  return (ctxt, result, [])
+
+let apply_finalize_unstake ~ctxt ~sender ~amount ~destination ~before_operation
+    =
+  error_when Tez.(amount <> zero) (Invalid_nonzero_transaction_amount amount)
+  >>?= fun () ->
+  error_unless
+    Signature.Public_key_hash.(sender = destination)
+    Invalid_self_transaction_destination
+  >>?= fun () ->
+  let contract = Contract.Implicit sender in
+  Contract.allocated ctxt contract >>= fun already_allocated ->
+  Staking.finalize_unstake ctxt sender >>=? fun (ctxt, balance_updates) ->
+  let result =
+    Transaction_to_contract_result
+      {
+        storage = None;
+        lazy_storage_diff = None;
+        balance_updates;
+        ticket_receipt = [];
+        originated_contracts = [];
+        consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+        storage_size = Z.zero;
+        paid_storage_size_diff = Z.zero;
+        allocated_destination_contract = not already_allocated;
       }
   in
   return (ctxt, result, [])
@@ -805,10 +866,18 @@ let apply_manager_operation :
             ~ctxt
             ~sender:source
             ~amount
-            ~delegate:pkh
+            ~destination:pkh
             ~before_operation:ctxt_before_op
-      | ("default" | "stake"), _ ->
-          (* Only allow [Unit] parameter to implicit accounts' default and stake entrypoints. *)
+      | "finalize_unstake", Prim (_, D_Unit, [], _) ->
+          apply_finalize_unstake
+            ~ctxt
+            ~sender:source
+            ~amount
+            ~destination:pkh
+            ~before_operation:ctxt_before_op
+      | ("default" | "stake" | "finalize_unstake"), _ ->
+          (* Only allow [Unit] parameter to implicit accounts' default, stake,
+             and finalize_unstake entrypoints. *)
           tzfail (Script_interpreter.Bad_contract_parameter source_contract)
       | _ -> tzfail (Script_tc_errors.No_such_entrypoint entrypoint))
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)

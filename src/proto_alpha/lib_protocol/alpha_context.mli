@@ -4828,6 +4828,14 @@ module Token : sig
     (context * Receipt.balance_updates) tzresult Lwt.t
 end
 
+(** This module re-exports definitions from {!Unstake_requests_storage}. *)
+module Unstake_requests : sig
+  type finalizable = (public_key_hash * Cycle.t * Tez.t) list
+
+  val prepare_finalize_unstake_and_save_remaining_unfinalizable_requests :
+    context -> Contract.t -> (context * finalizable) tzresult Lwt.t
+end
+
 (** This module re-exports definitions from {!Fees_storage}. *)
 module Fees : sig
   val record_paid_storage_space :

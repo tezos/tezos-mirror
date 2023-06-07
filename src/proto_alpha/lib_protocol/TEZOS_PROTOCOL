@@ -235,6 +235,7 @@
         "Dal_apply",
         "Zk_rollup_apply",
 
+        "Staking",
         "Baking",
         "Validate_errors",
         "Amendment",

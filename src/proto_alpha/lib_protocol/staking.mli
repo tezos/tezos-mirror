@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,36 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Simple abstraction from low-level storage to handle unstake requests.
+open Alpha_context
 
-    This module is responsible for maintaining the
-    {!Storage.Contract.Unstake_requests} table. *)
-
-type finalizable =
-  (Signature.Public_key_hash.t * Cycle_repr.t * Tez_repr.t) list
-
-type prepared_finalize_unstake = {
-  finalizable : finalizable;
-  unfinalizable : Storage.Unstake_request.t;
-}
-
-(** [prepare_finalize_unstake ctxt contract] preprocesses a [finalize_unstake]
-    for [contract]. It returns a list of transfers [(d, c, a)] to do from
-    delegate's [d] unstaked frozen deposits for cycle [c] of amount [a] in
-    the [finalizable_field] as well as the remaining unfinalizable requests
-    that should be kept in the storage in [unfinalizable].
-
-    It returns [None] if there are no finalizable unstake requests (regardless
-    of whether there are unstake requests at all). *)
-val prepare_finalize_unstake :
-  Raw_context.t ->
-  Contract_repr.t ->
-  prepared_finalize_unstake option tzresult Lwt.t
-
-(** [prepare_finalize_unstake_and_save_remaining_unfinalizable_requests ctxt contract]
-    calls [prepare_finalize_unstake], saves the remaining [unfinalizable]
-    requests and returns the [finalizable] ones. *)
-val prepare_finalize_unstake_and_save_remaining_unfinalizable_requests :
-  Raw_context.t ->
-  Contract_repr.t ->
-  (Raw_context.t * finalizable) tzresult Lwt.t
+(** [finalize_unstake ctxt pkh] performs the finalization of all unstake
+    requests from [pkh] that can be finalized.
+    An unstake request can be finalized if it is old enough, specifically the
+    requested amount must not be at stake anymore and must not be slashable
+    anymore, i.e. after [preserved_cycles + max_slashing_period] after the
+    request.
+    Amounts are transferred from the [pkh]'s delegate (at request time) unstaked
+    frozen deposits to [pkh]'s spendable balance, minus slashing the requested
+    stake undergone in between. *)
+val finalize_unstake :
+  context ->
+  public_key_hash ->
+  (context * Receipt.balance_updates) tzresult Lwt.t
