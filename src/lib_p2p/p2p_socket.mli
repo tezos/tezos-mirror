@@ -204,6 +204,83 @@ val close : ?wait:bool -> ('msg, 'meta) t -> unit Lwt.t
 (**/**)
 
 module Internal_for_tests : sig
+  (** [Crypto] module permits to create cryptographic data required during some
+      p2p handshake tests. *)
+  module Crypto : sig
+    (** Type of cryptographic data required to send and receive ciphered
+        messages. *)
+    type data
+
+    (** [create_data ~incoming ~sent_msg ~recv_msg ~sk ~pk] creates
+        cryptographic data from:
+        - [~sent_msg] and [~recv_msg] that are bytes of connection messages
+          respectively sent and received during the first step of the
+          handshake.
+        _ [~sk] that is the secret key from the p2p identity of
+          the node.
+        - [~pk] that is the public key from the other connect that has been
+          send during the first step of p2p handshake in the connection message.
+
+        [~incoming] should be true if the handshake has been initiated by the
+        other node else false.
+    *)
+    val create_data :
+      incoming:bool ->
+      sent_msg:bytes ->
+      recv_msg:bytes ->
+      sk:Tezos_crypto.Crypto_box.secret_key ->
+      pk:Tezos_crypto.Crypto_box.public_key ->
+      data
+  end
+
+  (** [Connection_message] module permits to send or receive the first message
+      exchanged after the TCP connection has been established. This message is
+      sent and received by the both nodes of the connection and are not
+      ciphered.
+      This module is required for some tests about p2p handshake. *)
+  module Connection_message : sig
+    (** Type of the message that is sent and received during the first step of
+        the p2p handshake. *)
+    type t
+
+    (** [get_public_key conn_msg] returns the public key contained in
+        [conn_msg]. *)
+    val get_public_key : t -> Tezos_crypto.Crypto_box.public_key
+
+    (** [write ~canceler scheduled_conn conn_msg] encodes then sends [conn_msg]
+        on [scheduled_conn] and returns the bytes of this message to initiate
+        cryptographic data. *)
+    val write :
+      canceler:Lwt_canceler.t ->
+      P2p_io_scheduler.connection ->
+      t ->
+      (bytes, error trace) result Lwt.t
+
+    (** [read ~canceler buff] reads the received data in [buff] then tries to
+        decode it has a connection message. Returns the received [t] and the
+        bytes of this message to initiate cryptographic data. *)
+    val read :
+      canceler:Lwt_canceler.t ->
+      P2p_buffer_reader.readable ->
+      (t * bytes, tztrace) result Lwt.t
+  end
+
+  (** [Metadata] module permits to send the second message of the p2p
+      handshake. These message is exchanged cyphered.
+      This module is required for some tests about p2p handshake. *)
+  module Metadata : sig
+    (** [write ~canceler metadata_config scheduled_conn crypto_data metadata]
+        encodes with [metadata_config], cyphers with [crypto_data] then sends
+        [metadata] on [scheduled_conn]. *)
+    val write :
+      canceler:Lwt_canceler.t ->
+      'a P2p_params.conn_meta_config ->
+      P2p_io_scheduler.connection ->
+      Crypto.data ->
+      'a ->
+      (unit, error trace) result Lwt.t
+  end
+
   val raw_write_sync : ('msg, 'meta) t -> Bytes.t -> unit tzresult Lwt.t
 
   val mock_authenticated_connection : 'meta -> 'meta authenticated_connection

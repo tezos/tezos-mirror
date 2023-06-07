@@ -56,6 +56,13 @@ module Crypto = struct
      input and output. *)
   let () = assert (tag_length >= header_length)
 
+  let create_data ~incoming ~sent_msg ~recv_msg ~sk ~pk =
+    let channel_key = Tezos_crypto.Crypto_box.precompute sk pk in
+    let local_nonce, remote_nonce =
+      Tezos_crypto.Crypto_box.generate_nonces ~incoming ~sent_msg ~recv_msg
+    in
+    {channel_key; local_nonce; remote_nonce}
+
   (* msg is overwritten and should not be used after this invocation *)
   let write_chunk ?canceler fd cryptobox_data msg =
     let open Lwt_result_syntax in
@@ -153,6 +160,16 @@ module Connection_message = struct
          (req "message_nonce" Tezos_crypto.Crypto_box.nonce_encoding)
          (req "version" Network_version.encoding))
 
+  let create identity advertised_port announced_version =
+    let local_nonce_seed = Tezos_crypto.Crypto_box.random_nonce () in
+    {
+      public_key = identity.P2p_identity.public_key;
+      proof_of_work_stamp = identity.proof_of_work_stamp;
+      message_nonce = local_nonce_seed;
+      port = advertised_port;
+      version = announced_version;
+    }
+
   let write ~canceler fd message =
     let open Lwt_result_syntax in
     let encoded_message_len = Data_encoding.Binary.length encoding message in
@@ -210,7 +227,14 @@ module Connection_message = struct
     | Ok (next_pos, message) ->
         if next_pos <> pos + len then
           tzfail (P2p_errors.Decoding_error Data_encoding.Binary.Extra_bytes)
-        else return (message, buf)
+        else
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/4604
+
+             make the below bytes-to-string copy-conversion unnecessary.
+             This requires making the consumer of the [buf] value
+             ([Crypto_box.generate_nonces]) able to work with strings directly. *)
+          let buf = Bytes.of_string buf in
+          return (message, buf)
 end
 
 module Metadata = struct
@@ -376,41 +400,23 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
     ((remote_addr, remote_socket_port) as point) ?advertised_port identity
     announced_version metadata_config =
   let open Lwt_result_syntax in
-  let local_nonce_seed = Tezos_crypto.Crypto_box.random_nonce () in
   let*! () = Events.(emit sending_authentication) point in
+  let msg_to_send =
+    Connection_message.create identity advertised_port announced_version
+  in
   let* sent_msg =
-    Connection_message.write
-      ~canceler
-      scheduled_conn
-      {
-        public_key = identity.P2p_identity.public_key;
-        proof_of_work_stamp = identity.proof_of_work_stamp;
-        message_nonce = local_nonce_seed;
-        port = advertised_port;
-        version = announced_version;
-      }
+    Connection_message.write ~canceler scheduled_conn msg_to_send
   in
   let* msg, recv_msg =
     Connection_message.read
       ~canceler
       (P2p_io_scheduler.to_readable scheduled_conn)
   in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4604
-
-     make the below bytes-to-string copy-conversion unnecessary.
-     This requires making the consumer of the [recv_msg] value
-     ([Crypto_box.generate_nonces]) able to work with strings directly. *)
-  let recv_msg = Bytes.of_string recv_msg in
   let remote_listening_port =
     if incoming then msg.port else Some remote_socket_port
   in
   let id_point = (remote_addr, remote_listening_port) in
   let remote_peer_id = Tezos_crypto.Crypto_box.hash msg.public_key in
-  let* () =
-    fail_unless
-      (remote_peer_id <> identity.P2p_identity.peer_id)
-      (P2p_errors.Myself id_point)
-  in
   let* () =
     fail_unless
       (Tezos_crypto.Crypto_box.check_proof_of_work
@@ -419,15 +425,14 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
          proof_of_work_target)
       (P2p_errors.Not_enough_proof_of_work remote_peer_id)
   in
-  let channel_key =
-    Tezos_crypto.Crypto_box.precompute
-      identity.P2p_identity.secret_key
-      msg.public_key
+  let cryptobox_data =
+    Crypto.create_data
+      ~incoming
+      ~recv_msg
+      ~sent_msg
+      ~sk:identity.P2p_identity.secret_key
+      ~pk:msg.public_key
   in
-  let local_nonce, remote_nonce =
-    Tezos_crypto.Crypto_box.generate_nonces ~incoming ~sent_msg ~recv_msg
-  in
-  let cryptobox_data = {Crypto.channel_key; local_nonce; remote_nonce} in
   let local_metadata = metadata_config.P2p_params.conn_meta_value () in
   let* () =
     Metadata.write
@@ -443,6 +448,13 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
       metadata_config
       (P2p_io_scheduler.to_readable scheduled_conn)
       cryptobox_data
+  in
+  (* Check that this connection does not lead to the node itself after reading
+     first encrypted message. *)
+  let* () =
+    fail_unless
+      (remote_peer_id <> identity.P2p_identity.peer_id)
+      (P2p_errors.Myself id_point)
   in
   let info =
     {
@@ -843,6 +855,20 @@ let close ?(wait = false) st =
   Lwt.return_unit
 
 module Internal_for_tests = struct
+  module Connection_message = struct
+    type t = Connection_message.t
+
+    let get_public_key t = t.Connection_message.public_key
+
+    let write = Connection_message.write
+
+    let read = Connection_message.read
+  end
+
+  module Metadata = struct
+    let write = Metadata.write
+  end
+
   let raw_write_sync = raw_write_sync
 
   let mock_authenticated_connection default_metadata =
@@ -865,6 +891,12 @@ module Internal_for_tests = struct
     in
     let info = P2p_connection.Internal_for_tests.Info.mock default_metadata in
     {scheduled_conn; info; cryptobox_data}
+
+  module Crypto = struct
+    type data = Crypto.data
+
+    let create_data = Crypto.create_data
+  end
 
   let make_crashing_encoding () : 'a Data_encoding.t =
     Data_encoding.conv
