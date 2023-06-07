@@ -401,9 +401,9 @@ let run ~data_dir cctxt =
   let* store = Store.init config in
   let ctxt = Node_context.init config store gs_worker transport_layer cctxt in
   let* rpc_server = RPC_server.(start config ctxt) in
+  connect_gossipsub_with_p2p gs_worker transport_layer store ;
   (* activate the p2p instance. *)
   Gossipsub.Transport_layer.activate ~additional_points:peers transport_layer ;
-  connect_gossipsub_with_p2p gs_worker transport_layer store ;
 
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () = Event.(emit rpc_server_is_ready rpc_addr) in
