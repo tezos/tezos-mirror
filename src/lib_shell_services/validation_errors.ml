@@ -29,7 +29,10 @@
 type error += Parse_error
 
 type error +=
-  | Operation_conflict of {new_hash : Operation_hash.t}
+  | Operation_conflict of {
+      new_hash : Operation_hash.t;
+      needed_fee_in_mutez : int64 option;
+    }
   | Operation_replacement of {
       old_hash : Operation_hash.t;
       new_hash : Operation_hash.t;
@@ -75,17 +78,32 @@ let () =
     ~description:
       "The operation cannot be added because the mempool already contains a \
        conflicting operation."
-    ~pp:(fun ppf new_hash ->
+    ~pp:(fun ppf (new_hash, needed_fee_in_mutez) ->
       Format.fprintf
         ppf
         "The operation %a cannot be added because the mempool already contains \
-         a conflicting operation that should not be replaced (e.g. an \
-         operation from the same manager with better fees)."
+         a conflicting operation. %s"
         Operation_hash.pp
-        new_hash)
-    (Data_encoding.obj1 (Data_encoding.req "new_hash" Operation_hash.encoding))
-    (function Operation_conflict {new_hash} -> Some new_hash | _ -> None)
-    (fun new_hash -> Operation_conflict {new_hash}) ;
+        new_hash
+        (match needed_fee_in_mutez with
+        | None ->
+            "The pre-existing operation cannot be replaced with the new one, \
+             even if fees were increased. Try again after the next block has \
+             been baked."
+        | Some needed_fee_in_mutez ->
+            Format.asprintf
+              "To replace the latter, this particular operation would need a \
+               total fee of at least %Ld mutez."
+              needed_fee_in_mutez))
+    (Data_encoding.obj2
+       (Data_encoding.req "new_hash" Operation_hash.encoding)
+       (Data_encoding.opt "needed_fee_in_mutez" Data_encoding.int64))
+    (function
+      | Operation_conflict {new_hash; needed_fee_in_mutez} ->
+          Some (new_hash, needed_fee_in_mutez)
+      | _ -> None)
+    (fun (new_hash, needed_fee_in_mutez) ->
+      Operation_conflict {new_hash; needed_fee_in_mutez}) ;
   (* Operation replacement *)
   register_error_kind
     `Temporary
@@ -137,7 +155,7 @@ let () =
     Data_encoding.(
       obj2
         (req "operation_hash" Operation_hash.encoding)
-        (req "needed_fee_in_mutez" (option int64)))
+        (opt "needed_fee_in_mutez" int64))
     (function
       | Rejected_by_full_mempool {hash; needed_fee_in_mutez} ->
           Some (hash, needed_fee_in_mutez)

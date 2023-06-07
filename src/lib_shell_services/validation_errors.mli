@@ -29,7 +29,10 @@
 type error += Parse_error
 
 type error +=
-  | Operation_conflict of {new_hash : Operation_hash.t}
+  | Operation_conflict of {
+      new_hash : Operation_hash.t;
+      needed_fee_in_mutez : int64 option;
+    }
   | Operation_replacement of {
       old_hash : Operation_hash.t;
       new_hash : Operation_hash.t;

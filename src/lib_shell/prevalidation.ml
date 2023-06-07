@@ -222,7 +222,9 @@ module MakeAbstract
           [Operation_replacement {old_hash = removed; new_hash = op.hash}]
         in
         return_some (removed, `Outdated trace)
-    | Unchanged -> error [Operation_conflict {new_hash = op.hash}]
+    | Unchanged ->
+        error
+          [Operation_conflict {new_hash = op.hash; needed_fee_in_mutez = None}]
 
   let bounding_add_operation bounding_state bounding_config op =
     Result.map_error
