@@ -32,7 +32,9 @@ struct
   module Block_directory = Make_directory (struct
     include Sc_rollup_services.Global.Block
 
-    type context = Node_context.ro * Block_hash.t
+    type context = Node_context.rw
+
+    type subcontext = Node_context.ro * Block_hash.t
 
     let context_of_prefix node_ctxt (((), block) : prefix) =
       let open Lwt_result_syntax in

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -24,48 +24,61 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_rpc
+open Tezos_rpc_http_server
+open RPC_directory_helpers
 
-(** This module defines subcontext type of the subdirectory and
-    the way to project it from Node_context and a path prefix. *)
-module type PARAM = sig
-  include Sc_rollup_services.PREFIX
+module Local_directory = Make_directory (struct
+  include Sc_rollup_services.Local
 
-  type context
+  type context = unit
 
-  val context_of_prefix : Node_context.rw -> prefix -> context tzresult Lwt.t
-end
+  type subcontext = unit
 
-(** This module is a helper to register your endpoints and
-    build a resulting subdirectory eventually. *)
-module Make_directory (S : PARAM) : sig
-  (** Register an endpoint with no parameters in the path. *)
-  val register0 :
-    ([< Resto.meth], 'prefix, 'prefix, 'query, 'input, 'output) Service.t ->
-    (S.context -> 'query -> 'input -> 'output tzresult Lwt.t) ->
-    unit
+  let context_of_prefix _ll_node_ctxt () = return ()
+end)
 
-  (** Register an endpoint with a single parameter in the path. *)
-  val register1 :
-    ( [< Resto.meth],
-      'prefix,
-      'prefix * 'param1,
-      'query,
-      'input,
-      'output )
-    Service.t ->
-    (S.context -> 'param1 -> 'query -> 'input -> 'output tzresult Lwt.t) ->
-    unit
+(* Register server handlers *)
+let () =
+  let open Protocol.Alpha_context.Sc_rollup in
+  ( Local_directory.register0
+      (Sequencer_services.Local.durable_state_value Kind.Wasm_2_0_0)
+  @@ fun () _key () -> failwith "Not implemented" ) ;
 
-  (** Build directory with registered endpoints with respect to Node_context. *)
-  val build_directory : Node_context.rw -> unit Tezos_rpc.Directory.t
-end
+  ( Local_directory.register0
+      (Sequencer_services.Local.durable_state_subkeys Kind.Wasm_2_0_0)
+  @@ fun () _key () -> failwith "Not implemented" ) ;
 
-(** This module is a helper to extract a block hash
-    from block reference and Node_context *)
-module Block_directory_helpers : sig
-  val block_of_prefix :
-    Node_context.rw ->
-    [< `Cemented | `Finalized | `Hash of Block_hash.t | `Head | `Level of int32] ->
-    Block_hash.t tzresult Lwt.t
-end
+  Local_directory.register0 Sc_rollup_services.Local.injection
+  @@ fun _node_ctxt () _messages -> failwith "Not implemented"
+
+let register node_ctxt =
+  List.fold_left
+    (fun dir f -> Tezos_rpc.Directory.merge dir (f node_ctxt))
+    Tezos_rpc.Directory.empty
+    [Local_directory.build_directory]
+
+let start node_ctxt configuration =
+  let open Lwt_result_syntax in
+  let Configuration.{rpc_addr; rpc_port; _} = configuration in
+  let rpc_addr = P2p_addr.of_string_exn rpc_addr in
+  let host = Ipaddr.V6.to_string rpc_addr in
+  let node = `TCP (`Port rpc_port) in
+  let acl = RPC_server.Acl.allow_all in
+  let dir = register node_ctxt in
+  let server =
+    RPC_server.init_server
+      dir
+      ~acl
+      ~media_types:Tezos_rpc_http.Media_type.all_media_types
+  in
+  protect @@ fun () ->
+  let*! () =
+    RPC_server.launch
+      ~host
+      server
+      ~callback:(RPC_server.resto_callback server)
+      node
+  in
+  return server
+
+let shutdown = RPC_server.shutdown
