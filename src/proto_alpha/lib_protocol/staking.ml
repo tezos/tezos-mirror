@@ -22,7 +22,15 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
 open Alpha_context
+
+let stake ctxt ~sender ~delegate amount =
+  Token.transfer
+    ctxt
+    (`Contract (Contract.Implicit sender))
+    (`Frozen_deposits delegate)
+    amount
 
 let finalize_unstake ctxt pkh =
   let open Lwt_result_syntax in

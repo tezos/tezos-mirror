@@ -337,11 +337,7 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
       tzfail Staking_for_nondelegate_while_costaking_disabled
   | Some delegate ->
       let* ctxt, balance_updates =
-        Token.transfer
-          ctxt
-          (`Contract (Contract.Implicit sender))
-          (`Frozen_deposits delegate)
-          amount
+        Staking.stake ctxt ~sender ~delegate amount
       in
       (* Since [delegate] is an already existing delegate, it is already allocated. *)
       let allocated_destination_contract = false in
