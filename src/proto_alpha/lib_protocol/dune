@@ -157,6 +157,7 @@
   Unstaked_frozen_deposits_storage
   Unstake_requests_storage
   Frozen_deposits_storage
+  Staking_pseudotokens_storage
   Contract_storage
   Token
   Fees_storage
@@ -423,6 +424,7 @@
   unstaked_frozen_deposits_storage.ml unstaked_frozen_deposits_storage.mli
   unstake_requests_storage.ml unstake_requests_storage.mli
   frozen_deposits_storage.ml frozen_deposits_storage.mli
+  staking_pseudotokens_storage.ml staking_pseudotokens_storage.mli
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   fees_storage.ml fees_storage.mli
@@ -691,6 +693,7 @@
   unstaked_frozen_deposits_storage.ml unstaked_frozen_deposits_storage.mli
   unstake_requests_storage.ml unstake_requests_storage.mli
   frozen_deposits_storage.ml frozen_deposits_storage.mli
+  staking_pseudotokens_storage.ml staking_pseudotokens_storage.mli
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   fees_storage.ml fees_storage.mli
@@ -943,6 +946,7 @@
   unstaked_frozen_deposits_storage.ml unstaked_frozen_deposits_storage.mli
   unstake_requests_storage.ml unstake_requests_storage.mli
   frozen_deposits_storage.ml frozen_deposits_storage.mli
+  staking_pseudotokens_storage.ml staking_pseudotokens_storage.mli
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   fees_storage.ml fees_storage.mli
