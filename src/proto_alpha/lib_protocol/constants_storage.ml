@@ -285,4 +285,7 @@ let adaptive_inflation_enable c = (adaptive_inflation c).enable
 let adaptive_inflation_staking_over_baking_limit c =
   (adaptive_inflation c).staking_over_baking_limit
 
+let adaptive_inflation_staking_over_delegation_edge c =
+  (adaptive_inflation c).staking_over_delegation_edge
+
 let freeze_rewards = adaptive_inflation_enable

@@ -23,25 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {frozen : Tez_repr.t; delegated : Tez_repr.t}
+open Stake_repr
 
-let make ~frozen ~delegated = {frozen; delegated}
+let staking_weight ctxt {frozen; delegated} =
+  let frozen = Tez_repr.to_mutez frozen in
+  let delegated = Tez_repr.to_mutez delegated in
+  let staking_over_delegation_edge =
+    Constants_storage.adaptive_inflation_staking_over_delegation_edge ctxt
+  in
+  if Constants_storage.adaptive_inflation_enable ctxt then
+    Int64.(add frozen (div delegated (of_int staking_over_delegation_edge)))
+  else Int64.add frozen delegated
 
-let total {frozen; delegated} = Tez_repr.(frozen +? delegated)
-
-let get_frozen {frozen; _} = frozen
-
-let encoding =
-  let open Data_encoding in
-  conv
-    (fun {frozen; delegated} -> (frozen, delegated))
-    (fun (frozen, delegated) -> {frozen; delegated})
-    (obj2 (req "frozen" Tez_repr.encoding) (req "delegated" Tez_repr.encoding))
-
-let zero = make ~frozen:Tez_repr.zero ~delegated:Tez_repr.zero
-
-let ( +? ) {frozen = f1; delegated = d1} {frozen = f2; delegated = d2} =
-  let open Result_syntax in
-  let* frozen = Tez_repr.(f1 +? f2) in
-  let+ delegated = Tez_repr.(d1 +? d2) in
-  {frozen; delegated}
+let compare ctxt s1 s2 =
+  Int64.compare (staking_weight ctxt s1) (staking_weight ctxt s2)

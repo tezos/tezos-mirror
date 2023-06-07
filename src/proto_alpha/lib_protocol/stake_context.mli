@@ -23,25 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {frozen : Tez_repr.t; delegated : Tez_repr.t}
+(** Functions on stake and depending on the context. *)
 
-let make ~frozen ~delegated = {frozen; delegated}
+(** Weight for staking rights. *)
+val staking_weight : Raw_context.t -> Stake_repr.t -> int64
 
-let total {frozen; delegated} = Tez_repr.(frozen +? delegated)
-
-let get_frozen {frozen; _} = frozen
-
-let encoding =
-  let open Data_encoding in
-  conv
-    (fun {frozen; delegated} -> (frozen, delegated))
-    (fun (frozen, delegated) -> {frozen; delegated})
-    (obj2 (req "frozen" Tez_repr.encoding) (req "delegated" Tez_repr.encoding))
-
-let zero = make ~frozen:Tez_repr.zero ~delegated:Tez_repr.zero
-
-let ( +? ) {frozen = f1; delegated = d1} {frozen = f2; delegated = d2} =
-  let open Result_syntax in
-  let* frozen = Tez_repr.(f1 +? f2) in
-  let+ delegated = Tez_repr.(d1 +? d2) in
-  {frozen; delegated}
+val compare : Raw_context.t -> Stake_repr.t -> Stake_repr.t -> int

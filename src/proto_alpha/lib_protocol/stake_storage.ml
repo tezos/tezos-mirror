@@ -149,7 +149,9 @@ let snapshot ctxt =
 let max_snapshot_index = Storage.Stake.Last_snapshot.get
 
 let set_selected_distribution_for_cycle ctxt cycle stakes total_stake =
-  let stakes = List.sort (fun (_, x) (_, y) -> Stake_repr.compare y x) stakes in
+  let stakes =
+    List.sort (fun (_, x) (_, y) -> Stake_context.compare ctxt y x) stakes
+  in
   Selected_distribution_for_cycle.init ctxt cycle stakes >>=? fun ctxt ->
   Storage.Stake.Total_active_stake.add ctxt cycle total_stake >>= fun ctxt ->
   (* cleanup snapshots *)
