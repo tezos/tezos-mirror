@@ -1081,15 +1081,55 @@ module Block = struct
       ~additionnal_tags:["block"; "operations"; "consensus"]
     @@ fun protocol -> test_block_consensus Operation.Attestation protocol
 
-  let test_block_operation_preconsensus =
-    register_test
-      ~title:"Block pre-consensus operations"
-      ~additionnal_tags:["block"; "operations"; "consensus"; "pre"]
-    @@ fun protocol -> test_block_consensus Operation.Preattestation protocol
+  let test_block_double_consensus_evidence double_evidence_kind protocol =
+    let* node, client = Client.init_with_protocol ~protocol `Client () in
+    let* () = Client.bake_for_and_wait ~node client in
 
-  let register ~protocols = test_block_operation_consensus protocols
-  (* There is no test for preconsensus since crafting a block with
-     preconsensus operations in it may be complicated to do. *)
+    let* op =
+      create_double_consensus_evidence
+        ~double_evidence_kind
+        ~use_legacy_name:false
+        client
+    in
+    let* (`OpHash _) = Operation.inject ~request:`Inject op client in
+    let* () = Client.bake_for_and_wait ~node client in
+
+    let get_name = Operation.Anonymous.kind_to_string double_evidence_kind in
+    let validation_pass = 2 (* Anonymous operations *) in
+    let* () = call_and_check_block ~validation_pass get_name client in
+    let* () = call_and_check_operation ~validation_pass get_name client in
+    let* () =
+      call_and_check_operations_validation_pass ~validation_pass get_name client
+    in
+    let* () = call_and_check_operations ~validation_pass get_name client in
+    call_and_check_block ~validation_pass get_name client
+
+  let test_block_operation_double_consensus_evidence =
+    register_test
+      ~title:"Block double consensus evidence operations"
+      ~additionnal_tags:
+        ["block"; "operations"; "consensus"; "double"; "evidence"]
+    @@ fun protocol ->
+    test_block_double_consensus_evidence
+      Operation.Anonymous.Double_attestation_evidence
+      protocol
+
+  let test_block_operation_double_preconsensus_evidence =
+    register_test
+      ~title:"Block double preconsensus evidence operations"
+      ~additionnal_tags:
+        ["block"; "operations"; "consensus"; "pre"; "double"; "evidence"]
+    @@ fun protocol ->
+    test_block_double_consensus_evidence
+      Operation.Anonymous.Double_preattestation_evidence
+      protocol
+
+  let register ~protocols =
+    test_block_operation_consensus protocols
+    (* There is no test for preconsensus since crafting a block with
+       preconsensus operations in it may be complicated to do. *) ;
+    test_block_operation_double_consensus_evidence protocols ;
+    test_block_operation_double_preconsensus_evidence protocols
 end
 
 let register ~protocols =
