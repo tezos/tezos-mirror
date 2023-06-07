@@ -75,9 +75,9 @@ let tz4_address_parameter =
       in
       return pkh)
 
-let tz4_address_param ?(name = "public key hash")
-    ?(desc = "bls public key hash to use") =
-  let desc = String.concat "\n" [desc; "A tz4 address"] in
+let tz4_address_param ?(name = "bls-public-key-hash")
+    ?(desc = "BLS public key hash.") =
+  let desc = String.concat " " [desc; "A tz4 address."] in
   Tezos_clic.param ~name ~desc tz4_address_parameter
 
 let tz4_public_key_parameter =
@@ -86,12 +86,12 @@ let tz4_public_key_parameter =
       let*? pk = Tezos_crypto.Aggregate_signature.Public_key.of_b58check s in
       return pk)
 
-let tz4_public_key_param ?(name = "public key")
-    ?(desc = "BLS public key of committee member") =
+let tz4_public_key_param ?(name = "bls-public-key")
+    ?(desc = "BLS public key of committee member.") =
   let desc =
     String.concat
-      "\n"
-      [desc; "A BLS12-381 public key which belongs to a tz4 account"]
+      " "
+      [desc; "A BLS12-381 public key which belongs to a tz4 account."]
   in
   Tezos_clic.param ~name ~desc tz4_public_key_parameter
 
@@ -132,7 +132,7 @@ let rpc_address_arg =
     ~placeholder:"rpc-address|ip"
     ~doc:
       (Format.sprintf
-         "The address the DAC node listens to. Default value is %s"
+         "The address the DAC node listens to. Default value is %s."
          default)
     ~default
     (Client_config.string_parameter ())
@@ -144,7 +144,7 @@ let rpc_port_arg =
     ~placeholder:"rpc-port"
     ~doc:
       (Format.sprintf
-         "The port the DAC node listens to. Default value is %s"
+         "The port the DAC node listens to. Default value is %s."
          default)
     ~default
     positive_int_parameter
@@ -163,16 +163,16 @@ let raw_rpc_parameter =
           with _ -> failwith "Address not in format <rpc_address>:<rpc_port>")
       | _ -> failwith "Address not in format <rpc_address>:<rpc_port>")
 
-let coordinator_rpc_param ?(name = "DAC coordinator rpc address parameter")
-    ?(desc = "The address of the DAC coordinator") =
-  let desc =
-    String.concat "\n" [desc; "An address of the form <rpc_address>:<rpc_port>"]
-  in
+let coordinator_rpc_param ?(name = "coordinator-rpc-address")
+    ?(desc =
+      "The RPC address of the DAC coordinator in the form of \
+       <rpc_address>:<rpc_port>.") =
   Tezos_clic.param ~name ~desc raw_rpc_parameter
 
-let committee_rpc_addresses_param
-    ?(name = "DAC committee member rpc address parameter.")
-    ?(desc = "RPC address of the DAC committee member.") =
+let committee_rpc_addresses_param ?(name = "committee-member-rpc-address")
+    ?(desc =
+      "The RPC address of the DAC committee member in the form of \
+       <rpc_address>:<rpc_port>.") =
   Tezos_clic.param ~name ~desc raw_rpc_parameter
 
 let experimental_disclaimer () =
@@ -212,7 +212,7 @@ module Config_init = struct
     let open Tezos_clic in
     command
       ~group
-      ~desc:"Configure DAC node in legacy mode."
+      ~desc:"(Deprecated) Configure DAC node in legacy mode."
       (args5
          data_dir_arg
          rpc_address_arg
@@ -305,7 +305,8 @@ module Config_init = struct
          ["configure"; "as"; "committee"; "member"; "with"; "coordinator"]
       @@ coordinator_rpc_param
       @@ prefixes ["and"; "signer"]
-      @@ tz4_address_param @@ stop)
+      @@ tz4_address_param ~desc:"BLS public key hash to use as the signer."
+      @@ stop)
       (fun (data_dir, rpc_address, rpc_port, reveal_data_dir, allow_v1_api)
            (coordinator_rpc_address, coordinator_rpc_port)
            address
@@ -336,8 +337,8 @@ module Config_init = struct
          (timeout
             ~doc:
               (Format.sprintf
-                 "The timeout in seconds for requesting a missing page from \
-                  Committee Member. Defaults to %i seconds."
+                 "Timeout, in seconds, when requesting a missing page from \
+                  Committee Members. Defaults to %i.0 seconds."
                  Configuration.Observer.default_timeout))
          allow_v1_api_arg)
       (prefixes ["configure"; "as"; "observer"; "with"; "coordinator"]
@@ -402,7 +403,9 @@ let run_command =
   let open Lwt_result_syntax in
   command
     ~group
-    ~desc:"Run the DAC node."
+    ~desc:
+      "Run the DAC node. Use --endpoint to configure the Octez node to connect \
+       to (See Global options)."
     (args1 data_dir_arg)
     (prefixes ["run"] @@ stop)
     (fun data_dir cctxt ->
