@@ -141,7 +141,10 @@ module MakeAbstract
         (** Static information needed by [Filter.Mempool.pre_filter]. *)
     conflict_map : Filter.Mempool.Conflict_map.t;
         (** State needed by
-            [Filter.Mempool.Conflict_map.fee_needed_to_replace_by_fee]. *)
+            [Filter.Mempool.Conflict_map.fee_needed_to_replace_by_fee] in
+            order to provide the [needed_fee_in_mutez] field of the
+            [Operation_conflict] error (see the [translate_proto_add_result]
+            function below). *)
   }
 
   let create_aux ?old_state chain_store head timestamp =
@@ -211,8 +214,10 @@ module MakeAbstract
                   with [num >= 7]. *)
                assert false)
 
+  (* Analyse the output of [Proto.Mempool.add_operation] to extract
+     the potential replaced operation or return the appropriate error. *)
   let translate_proto_add_result (proto_add_result : Proto.Mempool.add_result)
-      op : replacement tzresult =
+      op conflict_map filter_config : replacement tzresult =
     let open Result in
     let open Validation_errors in
     match proto_add_result with
@@ -223,8 +228,18 @@ module MakeAbstract
         in
         return_some (removed, `Outdated trace)
     | Unchanged ->
-        error
-          [Operation_conflict {new_hash = op.hash; needed_fee_in_mutez = None}]
+        (* There was an operation conflict and [op] lost to the
+           pre-existing operation. The error should indicate the fee
+           that [op] would need in order to win the conflict and replace
+           the old operation, if such a fee exists; otherwise the error
+           should contain [None]. *)
+        let needed_fee_in_mutez =
+          Filter.Mempool.Conflict_map.fee_needed_to_replace_by_fee
+            filter_config
+            ~candidate_op:op.protocol
+            ~conflict_map
+        in
+        error [Operation_conflict {new_hash = op.hash; needed_fee_in_mutez}]
 
   let bounding_add_operation bounding_state bounding_config op =
     Result.map_error
@@ -253,11 +268,13 @@ module MakeAbstract
      [Proto.Mempool.add_operation], already contains the new operation
      (if it has been accepted). So the only update it may need is the
      removal of any operations replaced during [Bounding.add]. *)
-  let check_conflict_and_bound (mempool, proto_add_result) bounding_state
-      bounding_config op :
+  let check_conflict_and_bound (mempool, proto_add_result)
+      {bounding_state; conflict_map; _} (filter_config, bounding_config) op :
       (Proto.Mempool.t * Bounding.state * replacements) tzresult =
     let open Result_syntax in
-    let* proto_replacement = translate_proto_add_result proto_add_result op in
+    let* proto_replacement =
+      translate_proto_add_result proto_add_result op conflict_map filter_config
+    in
     let bounding_state =
       match proto_replacement with
       | None -> bounding_state
@@ -300,10 +317,9 @@ module MakeAbstract
       ~new_operation:op.protocol
       ~replacements
 
-  let add_operation_result state (filter_config, bounding_config) op :
-      add_result tzresult Lwt.t =
+  let add_operation_result state config op : add_result tzresult Lwt.t =
     let open Lwt_result_syntax in
-    let conflict_handler = Filter.Mempool.conflict_handler filter_config in
+    let conflict_handler = Filter.Mempool.conflict_handler (fst config) in
     let* proto_output = proto_add_operation ~conflict_handler state op in
     (* The operation might still be rejected because of a conflict
        with a previously validated operation, or if the mempool is
@@ -315,11 +331,7 @@ module MakeAbstract
     let valid_op = record_successful_signature_check op in
     let res =
       catch_e @@ fun () ->
-      check_conflict_and_bound
-        proto_output
-        state.bounding_state
-        bounding_config
-        valid_op
+      check_conflict_and_bound proto_output state config valid_op
     in
     match res with
     | Ok (mempool, bounding_state, replacements) ->
