@@ -4145,9 +4145,6 @@ type 'a consensus_operation_type =
   | Endorsement : Kind.endorsement consensus_operation_type
   | Preendorsement : Kind.preendorsement consensus_operation_type
 
-val pp_operation_kind :
-  Format.formatter -> 'kind consensus_operation_type -> unit
-
 type consensus_content = {
   slot : Slot.t;
   level : Raw_level.t;

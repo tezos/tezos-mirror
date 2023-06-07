@@ -138,12 +138,6 @@ type 'a consensus_operation_type =
   | Endorsement : Kind.endorsement consensus_operation_type
   | Preendorsement : Kind.preendorsement consensus_operation_type
 
-let pp_operation_kind (type kind) ppf
-    (operation_kind : kind consensus_operation_type) =
-  match operation_kind with
-  | Endorsement -> Format.fprintf ppf "Endorsement"
-  | Preendorsement -> Format.fprintf ppf "Preendorsement"
-
 type consensus_content = {
   slot : Slot_repr.t;
   level : Raw_level_repr.t;
