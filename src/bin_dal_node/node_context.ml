@@ -117,6 +117,8 @@ let get_status ctxt = ctxt.status
 
 let get_store ctxt = ctxt.store
 
+let get_gs_worker ctxt = ctxt.gs_worker
+
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
 
 let get_neighbors_cctxts ctxt = ctxt.neighbors_cctxts

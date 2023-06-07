@@ -257,6 +257,7 @@ module Handler = struct
                 ~block_hash
                 slot_headers
                 (Node_context.get_store ctxt)
+                (Node_context.get_gs_worker ctxt)
             in
             let*? attested_slots =
               Dal_plugin.attested_slot_headers
@@ -397,7 +398,7 @@ let run ~data_dir cctxt =
     let* p2p_config = p2p_config config in
     Gossipsub.Transport_layer.create p2p_config p2p_limits ~network_name
   in
-  let* store = Store.init gs_worker config in
+  let* store = Store.init config in
   let ctxt = Node_context.init config store gs_worker transport_layer cctxt in
   let* rpc_server = RPC_server.(start config ctxt) in
   (* activate the p2p instance. *)

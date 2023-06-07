@@ -90,6 +90,9 @@ val get_status : t -> status
 (** [get_store ctxt] returns the dal node store. *)
 val get_store : t -> Store.node_store
 
+(** [get_gs_worker ctxt] returns the Gossipsub worker state. *)
+val get_gs_worker : t -> Gossipsub.Worker.t
+
 (** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context *)
 val get_tezos_node_cctxt : t -> Tezos_rpc.Context.generic
 

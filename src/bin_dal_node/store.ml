@@ -108,7 +108,6 @@ type node_store = {
   store : t;
   shard_store : Shards.t;
   shards_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
-  gs_worker : Gossipsub.Worker.t;
   in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;
       (* The length of the array is the number of shards per slot *)
 }
@@ -120,7 +119,7 @@ let open_shards_stream {shards_watcher; _} =
 
 (** [init gs_worker config] inits the store on the filesystem using the
     given [config] and [gs_worker]. *)
-let init gs_worker config =
+let init config =
   let open Lwt_result_syntax in
   let base_dir = Configuration_file.store_path config in
   let shards_watcher = Lwt_watcher.create_input () in
@@ -133,7 +132,6 @@ let init gs_worker config =
       shard_store;
       store;
       shards_watcher;
-      gs_worker;
       in_memory_shard_proofs =
         Shard_proofs_cache.create Constants.shards_proofs_cache_size;
     }
@@ -417,8 +415,8 @@ module Legacy = struct
   (* This function publishes the shards of a commitment that is waiting for
      attestion on L1 if this node has those shards on disk and their proofs in
      memory. *)
-  let publish_slot_data ~level_committee node_store cryptobox proto_parameters
-      commitment published_level slot_index =
+  let publish_slot_data ~level_committee node_store gs_worker cryptobox
+      proto_parameters commitment published_level slot_index =
     let open Lwt_result_syntax in
     match
       Shard_proofs_cache.find_opt node_store.in_memory_shard_proofs commitment
@@ -492,11 +490,11 @@ module Legacy = struct
                        in
                        Gossipsub.Worker.(
                          Publish_message {message; topic; message_id}
-                         |> app_input node_store.gs_worker) ;
+                         |> app_input gs_worker) ;
                        return_unit))
 
   let add_slot_headers ~level_committee cryptobox proto_parameters ~block_level
-      ~block_hash:_ slot_headers node_store =
+      ~block_hash:_ slot_headers node_store gs_worker =
     let open Lwt_result_syntax in
     let slots_store = node_store.store in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4388
@@ -552,6 +550,7 @@ module Legacy = struct
             publish_slot_data
               ~level_committee
               node_store
+              gs_worker
               cryptobox
               proto_parameters
               commitment
@@ -623,7 +622,7 @@ module Legacy = struct
     let* profiles = list node_store.store path in
     return @@ List.map_e (fun (p, _) -> decode_profile p) profiles
 
-  let add_profile Dal_plugin.{number_of_slots; _} node_store profile =
+  let add_profile Dal_plugin.{number_of_slots; _} node_store gs_worker profile =
     let open Lwt_syntax in
     let path = Path.Profile.profile profile in
     let* () =
@@ -638,7 +637,7 @@ module Legacy = struct
         List.iter
           (fun slot_index ->
             Join Gossipsub.{slot_index; pkh}
-            |> Gossipsub.Worker.(app_input node_store.gs_worker))
+            |> Gossipsub.Worker.(app_input gs_worker))
           Utils.Infix.(0 -- (number_of_slots - 1)) ;
         return_unit
 
