@@ -40,6 +40,6 @@ val encoding : t Data_encoding.t
 
 val ( < ) : t -> Int64.t -> bool
 
-val update_ema_off : t -> t
+val update_ema_up : t -> t
 
-val update_ema_on : t -> t
+val update_ema_down : t -> t

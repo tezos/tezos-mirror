@@ -87,9 +87,8 @@ let toggle_votes_encoding =
     "toggle_votes"
     (Compact.make ~tag_size:`Uint8 toggle_votes_compact_encoding)
 
-(* Invariant: 0 <= ema <= 2_000_000 *)
 let compute_new_ema ~toggle_vote ema =
   match toggle_vote with
   | Toggle_vote_pass -> ema
-  | Toggle_vote_off -> Toggle_EMA.update_ema_off ema
-  | Toggle_vote_on -> Toggle_EMA.update_ema_on ema
+  | Toggle_vote_off -> Toggle_EMA.update_ema_up ema
+  | Toggle_vote_on -> Toggle_EMA.update_ema_down ema

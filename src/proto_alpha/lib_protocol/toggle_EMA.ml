@@ -105,14 +105,14 @@ let half_ema_max_z = Z.(div ema_max_z (of_int 2))
    respect to rounding. *)
 let recenter f ema = Z.(add half_ema_max_z (f (sub ema half_ema_max_z)))
 
-let update_ema_off (ema : t) : t =
+let update_ema_up (ema : t) : t =
   let ema = Z.of_int64 ema in
   recenter
     (fun ema -> Z.add (attenuate ema) EMA_parameters.baker_contribution)
     ema
   |> Z.to_int64
 
-let update_ema_on (ema : t) : t =
+let update_ema_down (ema : t) : t =
   let ema = Z.of_int64 ema in
   recenter
     (fun ema -> Z.sub (attenuate ema) EMA_parameters.baker_contribution)
