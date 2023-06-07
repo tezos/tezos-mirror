@@ -4899,6 +4899,9 @@ module Staking_pseudotokens : sig
 
   val credit_frozen_deposits_pseudotokens_for_tez_amount :
     context -> public_key_hash -> Tez.t -> (context * t) tzresult Lwt.t
+
+  val credit_costaking_pseudotokens :
+    context -> Contract.t -> t -> context tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Fees_storage}. *)
