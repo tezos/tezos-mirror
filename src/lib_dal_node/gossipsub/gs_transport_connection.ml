@@ -120,11 +120,36 @@ end = struct
     point_opt
 end
 
-(** This handler forwards information about connections established by the P2P layer
-    to the Gossipsub worker. *)
+(** This handler forwards information about connections established by the P2P
+    layer to the Gossipsub worker.
+
+    Note that, a connection is considered [outbound] only if we initiated it and
+    we trust the point or the peer we are connecting to. Consequently, PX peers
+    are not considered outgoing connections by default, as they are not trusted
+    unless explicitly specified otherwise.
+
+    Indeed, Gossipsub tries to maintain a threshold of outbound connections per
+    topic. So, we don't automatically set connections we initiate to PX peers as
+    outbound to avoid possible love bombing attacks. The Rust version also
+    implements a way to mitigate this risk, but not the Go implementation.
+*)
 let new_connections_handler gs_worker p2p_layer peer conn =
-  let info = P2p.connection_info p2p_layer conn in
-  let outbound = not info.incoming in
+  let P2p_connection.Info.{incoming; id_point = addr, port_opt; _} =
+    P2p.connection_info p2p_layer conn
+  in
+  let pool_opt = P2p.pool p2p_layer in
+  let fold_pool_opt f arg =
+    Option.fold
+      pool_opt
+      ~none:true (* It doesn't matter in fake networks where pool is None *)
+      ~some:(fun pool -> f pool arg)
+  in
+  let trusted_peer = fold_pool_opt P2p_pool.Peers.get_trusted peer in
+  let trusted_point =
+    Option.fold port_opt ~none:false ~some:(fun port ->
+        fold_pool_opt P2p_pool.Points.get_trusted (addr, port))
+  in
+  let outbound = (not incoming) && (trusted_peer || trusted_point) in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5584
 
      Add the ability to have direct peers. *)

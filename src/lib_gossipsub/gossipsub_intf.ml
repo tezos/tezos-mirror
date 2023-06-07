@@ -730,10 +730,12 @@ module type AUTOMATON = sig
   (** Initialise a state. *)
   val make : Random.State.t -> limits -> parameters -> state
 
-  (** [add_peer { direct; outbound; peer }] is called to notify a new connection. If
-      [direct] is [true], the gossipsub always forwards messages to those
-      peers. [outbound] is [true] if it is an outbound connection, that is, a
-      connection initiated by the local (not the remote) peer. *)
+  (** [add_peer { direct; outbound; peer }] is called to notify a new
+      connection. If [direct] is [true], the gossipsub always forwards messages
+      to those peers. [outbound] is [true] if it is an outbound connection, that
+      is, a connection initiated by the local (not the remote) peer. Note
+      however that the notion of "outbound" connections can be refined, relaxed
+      or redefined by the application layer to fit its own needs. *)
   val add_peer : add_peer -> [`Add_peer] monad
 
   (** [remove_peer { peer }] notifies gossipsub that we are disconnected

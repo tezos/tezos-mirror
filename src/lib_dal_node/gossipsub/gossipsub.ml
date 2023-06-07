@@ -57,7 +57,8 @@ module Transport_layer = struct
     P2p.pool p2p
     |> Option.iter (fun pool ->
            List.iter
-             (fun point -> P2p_pool.register_point pool point |> ignore)
+             (fun point ->
+               P2p_pool.register_point ~trusted:true pool point |> ignore)
              additional_points)
 end
 
