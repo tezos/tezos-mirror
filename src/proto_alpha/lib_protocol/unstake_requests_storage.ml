@@ -108,3 +108,20 @@ let prepare_finalize_unstake ctxt contract =
           return_some {finalizable; unfinalizable})
 
 let update = Storage.Contract.Unstake_requests.update
+
+let add ctxt ~contract ~delegate cycle amount =
+  let open Lwt_result_syntax in
+  let* requests_opt = Storage.Contract.Unstake_requests.find ctxt contract in
+  let requests =
+    match requests_opt with
+    | None -> []
+    | Some {delegate = request_delegate; requests} ->
+        assert (Signature.Public_key_hash.(delegate = request_delegate)) ;
+        requests
+  in
+  let*? requests = Storage.Unstake_request.add cycle amount requests in
+  let unstake_request = Storage.Unstake_request.{delegate; requests} in
+  let*! ctxt =
+    Storage.Contract.Unstake_requests.add ctxt contract unstake_request
+  in
+  return ctxt

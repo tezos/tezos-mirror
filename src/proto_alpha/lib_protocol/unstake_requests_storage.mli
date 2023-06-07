@@ -60,3 +60,16 @@ val update :
   Contract_repr.t ->
   stored_requests ->
   Raw_context.t tzresult Lwt.t
+
+(** [add ctxt ~contract ~delegate cycle amount] adds a request from [contract]
+    to unstake [amount] from [delegate] at cycle [cycle].
+
+    @raises Assert_failure if [contract] already has unstake requests from another
+      delegate (broken invariant). *)
+val add :
+  Raw_context.t ->
+  contract:Contract_repr.t ->
+  delegate:Signature.Public_key_hash.t ->
+  Cycle_repr.t ->
+  Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t

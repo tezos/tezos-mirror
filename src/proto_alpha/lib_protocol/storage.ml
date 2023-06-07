@@ -204,6 +204,21 @@ module Unstake_request = struct
       (obj2
          (req "delegate" Contract_repr.implicit_encoding)
          (req "requests" requests_encoding))
+
+  let add cycle amount requests =
+    let rec loop rev_prefix =
+      let open Result_syntax in
+      function
+      | [] ->
+          (* cycle does not exist -> add at the head *)
+          Ok ((cycle, amount) :: requests)
+      | (c, a) :: tl when Cycle_repr.(c = cycle) ->
+          let+ a = Tez_repr.(a +? amount) in
+          (* cycle found, do not change the order *)
+          List.rev_append rev_prefix ((c, a) :: tl)
+      | hd :: tl -> loop (hd :: rev_prefix) tl
+    in
+    loop [] requests
 end
 
 module Contract = struct

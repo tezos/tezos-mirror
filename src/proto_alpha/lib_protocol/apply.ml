@@ -46,6 +46,7 @@ type error +=
   | Invalid_self_transaction_destination
   | Staking_for_nondelegate_while_costaking_disabled
   | Invalid_nonzero_transaction_amount of Tez.t
+  | Invalid_unstake_request_amount of {requested_amount : Z.t}
 
 let () =
   register_error_kind
@@ -267,7 +268,24 @@ let () =
     Data_encoding.(obj1 (req "amount" Tez.encoding))
     (function
       | Invalid_nonzero_transaction_amount amount -> Some amount | _ -> None)
-    (fun amount -> Invalid_nonzero_transaction_amount amount)
+    (fun amount -> Invalid_nonzero_transaction_amount amount) ;
+  register_error_kind
+    `Permanent
+    ~id:"operations.invalid_unstake_request_amount"
+    ~title:"Invalid unstake request amount"
+    ~description:"The unstake requested amount is negative or too large."
+    ~pp:(fun ppf requested_amount ->
+      Format.fprintf
+        ppf
+        "The unstake requested amount, %a, is negative or too large."
+        Z.pp_print
+        requested_amount)
+    Data_encoding.(obj1 (req "requested_amount" z))
+    (function
+      | Invalid_unstake_request_amount {requested_amount} ->
+          Some requested_amount
+      | _ -> None)
+    (fun requested_amount -> Invalid_unstake_request_amount {requested_amount})
 
 open Apply_results
 open Apply_operation_result
@@ -353,6 +371,53 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
             storage_size = Z.zero;
             paid_storage_size_diff = Z.zero;
             allocated_destination_contract;
+          }
+      in
+      return (ctxt, result, [])
+
+let apply_unstake ~ctxt ~sender ~amount ~requested_amount ~destination
+    ~before_operation =
+  let open Lwt_result_syntax in
+  let*? () =
+    error_when Tez.(amount <> zero) (Invalid_nonzero_transaction_amount amount)
+  in
+  let*? () =
+    error_unless
+      Signature.Public_key_hash.(sender = destination)
+      Invalid_self_transaction_destination
+  in
+  let requested_amount_opt =
+    if Z.fits_int64 requested_amount then
+      Tez.of_mutez (Z.to_int64 requested_amount)
+    else None
+  in
+  let*? requested_amount =
+    match requested_amount_opt with
+    | None -> error (Invalid_unstake_request_amount {requested_amount})
+    | Some requested_amount -> Ok requested_amount
+  in
+  let sender_contract = Contract.Implicit sender in
+  let* delegate_opt = Contract.Delegate.find ctxt sender_contract in
+  match delegate_opt with
+  | None -> tzfail Staking_for_nondelegate_while_costaking_disabled
+  | Some delegate when Signature.Public_key_hash.(delegate <> sender) ->
+      tzfail Staking_for_nondelegate_while_costaking_disabled
+  | Some delegate ->
+      let* ctxt, balance_updates =
+        Staking.request_unstake ctxt ~sender_contract ~delegate requested_amount
+      in
+      let result =
+        Transaction_to_contract_result
+          {
+            storage = None;
+            lazy_storage_diff = None;
+            balance_updates;
+            ticket_receipt = [];
+            originated_contracts = [];
+            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            storage_size = Z.zero;
+            paid_storage_size_diff = Z.zero;
+            allocated_destination_contract = false;
           }
       in
       return (ctxt, result, [])
@@ -869,6 +934,14 @@ let apply_manager_operation :
             ~amount
             ~destination:pkh
             ~before_operation:ctxt_before_op
+      | "unstake", Int (_, requested_amount) ->
+          apply_unstake
+            ~ctxt
+            ~sender:source
+            ~amount
+            ~requested_amount
+            ~destination:pkh
+            ~before_operation:ctxt_before_op
       | "finalize_unstake", Prim (_, D_Unit, [], _) ->
           apply_finalize_unstake
             ~ctxt
@@ -876,9 +949,11 @@ let apply_manager_operation :
             ~amount
             ~destination:pkh
             ~before_operation:ctxt_before_op
-      | ("default" | "stake" | "finalize_unstake"), _ ->
-          (* Only allow [Unit] parameter to implicit accounts' default, stake,
-             and finalize_unstake entrypoints. *)
+      | ("default" | "stake" | "unstake" | "finalize_unstake"), _ ->
+          (* Only allow:
+             - [unit] parameter to implicit accounts' default, stake,
+               and finalize_unstake entrypoints;
+             - [nat] parameter to implicit accounts' unstake entrypoint. *)
           tzfail (Script_interpreter.Bad_contract_parameter source_contract)
       | _ -> tzfail (Script_tc_errors.No_such_entrypoint entrypoint))
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
