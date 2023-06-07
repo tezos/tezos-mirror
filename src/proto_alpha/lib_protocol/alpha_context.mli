@@ -2138,7 +2138,12 @@ module Delegate : sig
   val already_slashed_for_double_baking :
     context -> public_key_hash -> Level.t -> bool tzresult Lwt.t
 
-  type punishing_amounts = {reward : Tez.t; amount_to_burn : Tez.t}
+  type reward_and_burn = {reward : Tez.t; amount_to_burn : Tez.t}
+
+  type punishing_amounts = {
+    staked : reward_and_burn;
+    unstaked : (Cycle.t * reward_and_burn) list;
+  }
 
   val punish_double_endorsing :
     context ->

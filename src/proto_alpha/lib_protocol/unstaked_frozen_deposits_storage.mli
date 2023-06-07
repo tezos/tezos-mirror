@@ -38,6 +38,14 @@ val balance :
   Cycle_repr.t ->
   Tez_repr.t tzresult Lwt.t
 
+(** [get] acts like [balance] but returns both the initial amount and the
+    current amount. *)
+val get :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Cycle_repr.t ->
+  Deposits_repr.t tzresult Lwt.t
+
 (** [credit_only_call_from_token ctxt delegate cycle amount] credits the
     unstaked frozen deposits for [delegate] at [cycle] by [amount].
     If [cycle] is an unslashable cycle, the credited cycle is the last

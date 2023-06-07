@@ -1942,25 +1942,9 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
   return (ctxt, contents_result_list)
 
 let punish_delegate ctxt delegate level mistake mk_result ~payload_producer =
-  let punish =
-    match mistake with
-    | `Double_baking -> Delegate.punish_double_baking
-    | `Double_endorsing -> Delegate.punish_double_endorsing
-  in
-  punish ctxt delegate level >>=? fun (ctxt, {reward; amount_to_burn}) ->
-  Token.transfer
-    ctxt
-    (`Frozen_deposits delegate)
-    `Double_signing_punishments
-    amount_to_burn
-  >>=? fun (ctxt, punish_balance_updates) ->
-  Token.transfer
-    ctxt
-    (`Frozen_deposits delegate)
-    (`Contract (Contract.Implicit payload_producer.Consensus_key.delegate))
-    reward
-  >|=? fun (ctxt, reward_balance_updates) ->
-  let balance_updates = reward_balance_updates @ punish_balance_updates in
+  let rewarded = Contract.Implicit payload_producer.Consensus_key.delegate in
+  Staking.punish_delegate ctxt delegate level mistake ~rewarded
+  >|=? fun (ctxt, balance_updates) ->
   (ctxt, Single_result (mk_result balance_updates))
 
 let punish_double_endorsement_or_preendorsement (type kind) ctxt

@@ -58,11 +58,14 @@ let normalized_cycle ctxt ~cycle =
   | None -> cycle
   | Some unslashable_cycle -> Cycle_repr.max cycle unslashable_cycle
 
-let balance ctxt delegate cycle =
-  let open Lwt_result_syntax in
+let get ctxt delegate cycle =
   let contract = Contract_repr.Implicit delegate in
   let normalized_cycle = normalized_cycle ctxt ~cycle in
-  let+ frozen_deposits = Internal.get ctxt contract ~normalized_cycle in
+  Internal.get ctxt contract ~normalized_cycle
+
+let balance ctxt delegate cycle =
+  let open Lwt_result_syntax in
+  let+ frozen_deposits = get ctxt delegate cycle in
   frozen_deposits.current_amount
 
 let credit_only_call_from_token ctxt delegate cycle amount =
