@@ -205,7 +205,7 @@ let default_test_constants =
 let get_baking_reward_fixed_portion ctxt =
   get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
   return
-    (Delegate.Rewards.Internal_for_tests.reward_from_constants
+    (Delegate.Rewards.For_RPC.reward_from_constants
        csts
        ~reward_kind:Baking_reward_fixed_portion)
 
@@ -213,7 +213,7 @@ let get_bonus_reward ctxt ~endorsing_power =
   get_constants ctxt
   >>=? fun {Constants.parametric = {consensus_threshold; _} as csts; _} ->
   let baking_reward_bonus_per_slot =
-    Delegate.Rewards.Internal_for_tests.reward_from_constants
+    Delegate.Rewards.For_RPC.reward_from_constants
       csts
       ~reward_kind:Baking_reward_bonus_per_slot
   in
@@ -223,7 +223,7 @@ let get_bonus_reward ctxt ~endorsing_power =
 let get_endorsing_reward ctxt ~expected_endorsing_power =
   get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
   let endorsing_reward_per_slot =
-    Delegate.Rewards.Internal_for_tests.reward_from_constants
+    Delegate.Rewards.For_RPC.reward_from_constants
       csts
       ~reward_kind:Endorsing_reward_per_slot
   in
@@ -234,7 +234,7 @@ let get_endorsing_reward ctxt ~expected_endorsing_power =
 let get_liquidity_baking_subsidy ctxt =
   get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
   return
-    (Delegate.Rewards.Internal_for_tests.reward_from_constants
+    (Delegate.Rewards.For_RPC.reward_from_constants
        csts
        ~reward_kind:Liquidity_baking_subsidy)
 
@@ -247,14 +247,14 @@ let get_adaptive_inflation_launch_cycle ctxt =
 let get_seed_nonce_revelation_tip ctxt =
   get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
   return
-    (Delegate.Rewards.Internal_for_tests.reward_from_constants
+    (Delegate.Rewards.For_RPC.reward_from_constants
        csts
        ~reward_kind:Seed_nonce_revelation_tip)
 
 let get_vdf_revelation_tip ctxt =
   get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
   return
-    (Delegate.Rewards.Internal_for_tests.reward_from_constants
+    (Delegate.Rewards.For_RPC.reward_from_constants
        csts
        ~reward_kind:Vdf_revelation_tip)
 

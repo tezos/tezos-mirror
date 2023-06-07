@@ -138,7 +138,7 @@ let seed_nonce_revelation_tip ctxt =
 let vdf_revelation_tip ctxt =
   reward_from_context ~ctxt ~reward_kind:Vdf_revelation_tip
 
-module Internal_for_tests = struct
+module For_RPC = struct
   include M
 
   let reward_from_constants ?(coeff = Q.one)

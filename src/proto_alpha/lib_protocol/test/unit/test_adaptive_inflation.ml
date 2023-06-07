@@ -37,11 +37,11 @@ open Alpha_context
 let test_reward_coefficient () =
   let csts = Default_parameters.constants_test in
   let default =
-    Delegate.Rewards.Internal_for_tests.(
+    Delegate.Rewards.For_RPC.(
       reward_from_constants csts ~reward_kind:Baking_reward_fixed_portion)
   in
   let default_times_4 =
-    Delegate.Rewards.Internal_for_tests.(
+    Delegate.Rewards.For_RPC.(
       reward_from_constants
         ~coeff:(Q.of_int 4)
         csts
