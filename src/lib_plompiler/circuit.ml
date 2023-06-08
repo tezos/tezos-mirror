@@ -1189,6 +1189,48 @@ module Mod_arith = struct
         xs
     in
     ret unit
+
+  let is_zero ~label ~modulus ~is_prime ~nb_limbs ~base ~moduli ~qm_bound
+      ~ts_bounds (List xs) =
+    let mul ?(division = false) =
+      mul ~division ~label ~modulus ~nb_limbs ~base ~moduli ~qm_bound ~ts_bounds
+    in
+    let assert_non_zero =
+      assert_non_zero
+        ~label
+        ~modulus
+        ~is_prime
+        ~nb_limbs
+        ~base
+        ~moduli
+        ~qm_bound
+        ~ts_bounds
+    in
+    with_label ~label:"Mod_arith.is_zero"
+    @@ (* b is the output of [is_zero]: b = 1 if x = 0 and b = 0 otherwise *)
+    let* b = fresh Dummy.bool in
+    let* rs = fresh @@ Dummy.list nb_limbs Dummy.scalar in
+    let (Bool out) = b in
+    let inp = List.map unscalar xs in
+    let aux = List.map unscalar (of_list rs) in
+    let solver = Mod_IsZero {modulus; base; nb_limbs; inp; aux; out} in
+    let* (Bool not_b) = add_solver ~solver >* Bool.bnot b in
+    let* z = Num.constant S.zero in
+    (* [zero_or_one] represents the modular integer [0] if [x] is zero
+       (b = 1) or the modular integer [1] if [x] is non-zero (b = 0) *)
+    let zero_or_one =
+      Scalar not_b :: List.init (nb_limbs - 1) (Fun.const z)
+      |> List.rev |> to_list
+    in
+    (* We enforce the constraint [x * r = zero_or_one] for some [r <> 0].
+       Note that if [x] is zero, the only way to satisfy the above equation
+       is to set [zero_or_one] to be [zero], that is, set [b = 1].
+       On the other hand, if [x <> 0], because we will enforce the constraint
+       [r <> 0] and we are over an integral domain, the only way to satisfy
+       the above constraint is to set [zero_or_one] to be [one], i.e. [b = 0],
+       as desired. *)
+    let* x_times_r = mul (List xs) rs in
+    assert_non_zero rs >* assert_equal x_times_r zero_or_one >* ret b
 end
 
 module Poseidon = struct

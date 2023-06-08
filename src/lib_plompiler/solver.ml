@@ -229,6 +229,16 @@ type mod_arith_desc = {
 }
 [@@deriving repr]
 
+type mod_arith_is_zero_desc = {
+  modulus : Z.t;
+  base : Z.t;
+  nb_limbs : int;
+  inp : int list;
+  aux : int list;
+  out : int;
+}
+[@@deriving repr]
+
 type solver_desc =
   | Arith of arith_desc
   | Pow5 of pow5_desc
@@ -248,6 +258,7 @@ type solver_desc =
   | AnemoiCustom of anemoi_custom_desc
   | Mod_Add of mod_arith_desc
   | Mod_Mul of mod_arith_desc
+  | Mod_IsZero of mod_arith_is_zero_desc
   | Updater of Optimizer.trace_info
 [@@deriving repr]
 
@@ -567,7 +578,30 @@ let solve_one trace solver =
           assert (Z.(compare tj_value tj_ubound < 0)) ;
           trace.(tj) <- S.of_z tj_value)
         moduli
-        (List.combine ts ts_bounds)) ;
+        (List.combine ts ts_bounds)
+  | Mod_IsZero {modulus; base; nb_limbs; inp; aux; out} ->
+      (* See [lib_plompiler/gadget_mod_arith.ml] for explanations *)
+      (* This is just a sanity check *)
+      assert (List.compare_length_with inp nb_limbs = 0) ;
+      assert (List.compare_length_with aux nb_limbs = 0) ;
+      let xs = List.map (fun v -> trace.(v) |> S.to_z) inp in
+      let x = Utils.z_of_limbs ~base xs in
+      if Z.(rem x modulus = zero) then (
+        (* The auxiliary variable [r] must satisfy the equation [x * r = 0],
+           because [x = 0], the value of [r] is irrelevant here.
+           Since it must be non-zero, we set it to be 1. *)
+        trace.(out) <- S.one ;
+        List.iteri
+          (fun i v ->
+            if i < nb_limbs - 1 then trace.(v) <- S.zero else trace.(v) <- S.one)
+          aux)
+      else (
+        (* The auxiliary variable [r] must satisfy the equation [x * r = 1],
+           therefore, [r] must be the inverse of [x <> 0]. *)
+        trace.(out) <- S.zero ;
+        let one = Utils.z_to_limbs ~len:nb_limbs ~base Z.one in
+        let x_inv = Utils.mod_div_limbs ~modulus ~base one xs in
+        List.iter2 (fun v r -> trace.(v) <- S.of_z r) aux x_inv)) ;
   trace
 
 let solve : t -> S.t array -> S.t array =

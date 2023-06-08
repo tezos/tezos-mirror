@@ -167,6 +167,17 @@ type mod_arith_desc = {
   ts : int list;
 }
 
+(* See [lib_plompiler/gadget_mod_arith.ml] for documentation on mod_arith *)
+type mod_arith_is_zero_desc = {
+  modulus : Z.t;
+  base : Z.t;
+  nb_limbs : int;
+  inp : int list;
+  aux : int list;
+  out : int;
+}
+[@@deriving repr]
+
 type solver_desc =
   | Arith of arith_desc
   | Pow5 of pow5_desc
@@ -186,6 +197,7 @@ type solver_desc =
   | AnemoiCustom of anemoi_custom_desc
   | Mod_Add of mod_arith_desc
   | Mod_Mul of mod_arith_desc
+  | Mod_IsZero of mod_arith_is_zero_desc
   | Updater of Optimizer.trace_info
 
 type solvers

@@ -387,6 +387,12 @@ module Mod_arith = struct
     let x = Utils.z_of_limbs ~base xs in
     assert (not Z.(rem x modulus = zero)) ;
     ret unit
+
+  let is_zero ~label:_ ~modulus ~is_prime:_ ~nb_limbs:_ ~base ~moduli:_
+      ~qm_bound:_ ~ts_bounds:_ x =
+    let xs = List.map (fun s -> of_s s |> S.to_z) (of_list x) in
+    let x = Utils.z_of_limbs ~base xs in
+    ret @@ B Z.(rem x modulus = zero)
 end
 
 module Poseidon = struct

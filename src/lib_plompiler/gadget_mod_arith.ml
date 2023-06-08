@@ -142,7 +142,10 @@ module type MOD_ARITH = functor (L : LIB) -> sig
 
   (* val assert_equal : mod_int repr -> mod_int repr -> unit repr t *)
 
-  (* val equal : mod_int repr -> mod_int repr -> bool repr t *)
+  (* [equal] makes use of an internal function [assert_non_zero] which
+     requires [modulus] to be prime. This function would need to be generalized
+     for arbitrary moduli *)
+  val equal : mod_int repr -> mod_int repr -> bool repr t
 
   val add : mod_int repr -> mod_int repr -> mod_int repr t
 
@@ -628,6 +631,19 @@ functor
         ~ts_bounds:(snd bounds_mul)
         os
         xs
+
+    let equal xs ys =
+      let* diff = sub xs ys in
+      Mod_arith.is_zero
+        ~label
+        ~modulus
+        ~is_prime
+        ~nb_limbs
+        ~base
+        ~moduli:moduli_mul
+        ~qm_bound:(fst bounds_mul)
+        ~ts_bounds:(snd bounds_mul)
+        diff
   end
 
 module ArithMod25519 = Make (struct

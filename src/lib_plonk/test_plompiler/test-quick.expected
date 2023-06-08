@@ -2338,6 +2338,54 @@ Constraints: 7
 ModArith.test_mod_inv_optimized:
 Constraints: 7
 
+ModArith.test_mod_equal:
+Constraints: 14
+
+ModArith.test_mod_equal_optimized:
+Constraints: 12
+
+ModArith.test_mod_equal:
+Constraints: 14
+
+ModArith.test_mod_equal_optimized:
+Constraints: 12
+
+ModArith.test_mod_equal:
+Constraints: 14
+
+ModArith.test_mod_equal_optimized:
+Constraints: 12
+
+ModArith.test_mod_equal:
+Constraints: 14
+
+ModArith.test_mod_equal_optimized:
+Constraints: 12
+
+ModArith.test_mod_equal:
+Constraints: 14
+
+ModArith.test_mod_equal_optimized:
+Constraints: 12
+
+ModArith.test_mod_equal:
+Constraints: 14
+
+ModArith.test_mod_equal_optimized:
+Constraints: 12
+
+ModArith.test_mod_equal:
+Constraints: 14
+
+ModArith.test_mod_equal_optimized:
+Constraints: 12
+
+ModArith.test_mod_equal:
+Constraints: 14
+
+ModArith.test_mod_equal_optimized:
+Constraints: 12
+
 Edwards.test_add:
 Constraints: 4
 
