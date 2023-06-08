@@ -132,6 +132,7 @@
   Stake_repr
   Carbonated_map_costs
   Carbonated_map
+  Staking_parameters_repr
   Raw_context_intf
   Raw_context
   Storage_costs
@@ -399,6 +400,7 @@
   stake_repr.ml stake_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
+  staking_parameters_repr.ml staking_parameters_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs.ml storage_costs.mli
@@ -668,6 +670,7 @@
   stake_repr.ml stake_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
+  staking_parameters_repr.ml staking_parameters_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs.ml storage_costs.mli
@@ -921,6 +924,7 @@
   stake_repr.ml stake_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
+  staking_parameters_repr.ml staking_parameters_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs.ml storage_costs.mli
