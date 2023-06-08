@@ -119,17 +119,7 @@ let unfreeze_exceeding_deposits ?(origin = Receipt_repr.Block_application) ctxt
       >>=? fun ctxt ->
       Frozen_deposits_storage.get ctxt delegate_contract >>=? fun deposits ->
       let current_amount = deposits.current_amount in
-      if Tez_repr.(current_amount > maximum_stake_to_be_deposited) then
-        Tez_repr.(current_amount -? maximum_stake_to_be_deposited)
-        >>?= fun to_reimburse ->
-        Token.transfer
-          ~origin
-          ctxt
-          (`Frozen_deposits delegate)
-          (`Contract delegate_contract)
-          to_reimburse
-        >|=? fun (ctxt, bupds) -> (ctxt, bupds @ balance_updates)
-      else if Tez_repr.(current_amount = zero) then
+      if Tez_repr.(current_amount = zero) then
         (* If the delegate's current deposit remains at zero then we add it to
            the forbidden set. *)
         Delegate_storage.forbid_delegate ctxt delegate >>= fun ctxt ->
