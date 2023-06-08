@@ -234,10 +234,10 @@ let plot_scatter opts title input_columns outputs =
   let open Result_syntax in
   match input_columns with
   | [] ->
-      Format.kasprintf
-        Result.error
-        "Display.plot_scatter (%s): empty scatter data"
-        (Str.global_replace (Str.regexp {|\\n|}) " " title)
+      let rows = Array.length @@ Stdlib.List.hd outputs in
+      let column = ("constant axis", Array.init rows (fun _ -> 0.)) in
+      let plot = scatterplot_2d opts title column outputs in
+      return [plot]
   | [column] ->
       let plot = scatterplot_2d opts title column outputs in
       return [plot]
