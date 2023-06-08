@@ -70,6 +70,10 @@ val div2 : t -> t
 (** [div2_sub tez] returns [(⌊tez / 2⌋, tez - ⌊tez / 2⌋)]. *)
 val div2_sub : t -> t * t
 
+(** [mul_ratio tez ~num ~den] returns [tez * num / den] without failing
+    when [tez * num] overflows. *)
+val mul_ratio : t -> num:int64 -> den:int64 -> t tzresult
+
 val to_mutez : t -> int64
 
 (** [of_mutez n] (micro tez) is None if n is negative *)
