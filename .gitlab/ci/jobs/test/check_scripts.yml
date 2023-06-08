@@ -5,7 +5,12 @@
 # Note: this job actually probably doesn't need the build_x86_64 job
 # to have finished, but we don't want to start before build_x86_64 has finished either.
 script:snapshot_alpha_and_link:
-  extends: .test_template
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+  stage: test
+  before_script:
+    - . ./scripts/version.sh
   needs: ["build_x86_64"]
   script:
     - make -C ${CI_PROJECT_DIR}/.gitlab/ci integration-test-snapshot-alpha-and-link
