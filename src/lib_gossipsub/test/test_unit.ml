@@ -117,6 +117,18 @@ let assert_topic_mesh ~__LOC__ ~topic ~expected_peers state =
       ~error_msg:"Expected %R, got %L"
       ~__LOC__)
 
+let assert_peer_score ~__LOC__ ~expected_score peer state =
+  let view = GS.Introspection.view state in
+  let actual_score =
+    GS.Introspection.get_peer_score peer view
+    |> GS.Score.Internal_for_tests.to_float
+  in
+  Check.(
+    (actual_score = expected_score)
+      float
+      ~error_msg:"Expected score %R, got %L"
+      ~__LOC__)
+
 let many_peers limits = (4 * limits.degree_optimal) + 1
 
 let make_peers ~number =
@@ -1886,6 +1898,76 @@ let test_heartbeat_scenario rng limits parameters =
   assert_mesh_size ~__LOC__ ~topic ~expected_size:1 s ;
   unit
 
+(** Test for P1 (Time in Mesh).
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L3166 *)
+let test_scoring_p1 rng _limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Scoring P1"
+    ~tags:["gossipsub"; "scoring"; "p1"]
+  @@ fun () ->
+  let time_in_mesh_quantum = Milliseconds.of_int_ms 50 in
+  let time_in_mesh_weight = 2.0 in
+  let time_in_mesh_cap = 10.0 in
+  let limits =
+    Default_limits.default_limits
+      ~time_in_mesh_weight
+      ~time_in_mesh_quantum
+      ~time_in_mesh_cap
+      ()
+  in
+  let peers = make_peers ~number:1 in
+  let peer = Stdlib.List.hd peers in
+  let topic = "topic" in
+  (* Build mesh with one peer. *)
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  (* sleep for 2 times the mesh_quantum *)
+  Time.elapse GS.Span.(mul time_in_mesh_quantum 2) ;
+  (* refresh scores *)
+  let state, _ = GS.heartbeat state in
+  (* score should be 2 * time_in_mesh_weight *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:(time_in_mesh_weight *. 2.0)
+    peer
+    state ;
+  (* sleep again for 2 times the mesh_quantum *)
+  Time.elapse GS.Span.(mul time_in_mesh_quantum 2) ;
+  (* refresh scores *)
+  let state, _ = GS.heartbeat state in
+  (* score should be 4 * time_in_mesh_weight *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:(time_in_mesh_weight *. 4.0)
+    peer
+    state ;
+  (* sleep for enough periods to reach maximum *)
+  Time.elapse
+    GS.Span.(
+      mul time_in_mesh_quantum (Float.to_int @@ (time_in_mesh_cap +. 10.0))) ;
+  (* refresh scores *)
+  let state, _ = GS.heartbeat state in
+  (* score should be exactly time_in_mesh_cap * time_in_mesh_weight *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:(time_in_mesh_weight *. time_in_mesh_cap)
+    peer
+    state ;
+  unit
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/5293
+   Add test the described test scenario *)
+
 let register rng limits parameters =
   test_ignore_graft_from_unknown_topic rng limits parameters ;
   test_handle_received_subscriptions rng limits parameters ;
@@ -1918,4 +2000,5 @@ let register rng limits parameters =
   test_handle_ihave_not_subscribed rng limits parameters ;
   test_ignore_too_many_ihaves rng limits parameters ;
   test_ignore_too_many_messages_in_ihave rng limits parameters ;
-  test_heartbeat_scenario rng limits parameters
+  test_heartbeat_scenario rng limits parameters ;
+  test_scoring_p1 rng limits parameters
