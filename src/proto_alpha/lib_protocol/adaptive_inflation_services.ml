@@ -26,9 +26,17 @@
 open Alpha_context
 
 module S = struct
+  open Data_encoding
+
+  let q_encoding =
+    conv
+      (fun Q.{num; den} -> (num, den))
+      (fun (num, den) -> Q.make num den)
+      (obj2 (req "numerator" n) (req "denominator" n))
+
   let context_path = RPC_path.(open_root / "context")
 
-  let _path = RPC_path.(context_path / "inflation")
+  let path = RPC_path.(context_path / "inflation")
 
   let total_supply =
     RPC_service.get_service
@@ -43,6 +51,31 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(context_path / "total_frozen_stake")
+
+  let current_yearly_rate =
+    RPC_service.get_service
+      ~description:
+        "Returns the current expected maximum yearly inflation rate (in %)"
+      ~query:RPC_query.empty
+      ~output:(string Plain)
+      RPC_path.(path / "current_yearly_rate")
+
+  let current_yearly_rate_exact =
+    RPC_service.get_service
+      ~description:
+        "Returns the current expected maximum yearly inflation rate (exact \
+         quotient)"
+      ~query:RPC_query.empty
+      ~output:q_encoding
+      RPC_path.(path / "current_yearly_rate_exact")
+
+  let current_rewards_per_minute =
+    RPC_service.get_service
+      ~description:
+        "Returns the current expected maximum rewards per minute (in mutez)"
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(path / "rewards_per_minute")
 end
 
 let q_to_float_string q =
@@ -82,14 +115,31 @@ let current_yearly_rate_value ~formatter ctxt =
 
 let register () =
   let open Services_registration in
+  let open Lwt_result_syntax in
   register0 ~chunked:false S.total_supply (fun ctxt () () ->
       Contract.get_total_supply ctxt) ;
   register0 ~chunked:false S.total_frozen_stake (fun ctxt () () ->
       let cycle = (Level.current ctxt).cycle in
-      Stake_distribution.get_total_frozen_stake ctxt cycle)
+      Stake_distribution.get_total_frozen_stake ctxt cycle) ;
+  register0 ~chunked:false S.current_yearly_rate (fun ctxt () () ->
+      current_yearly_rate_value ~formatter:q_to_float_string ctxt) ;
+  register0 ~chunked:false S.current_yearly_rate_exact (fun ctxt () () ->
+      current_yearly_rate_value ~formatter:(fun x -> x) ctxt) ;
+  register0 ~chunked:false S.current_rewards_per_minute (fun ctxt () () ->
+      let* f = current_rewards_per_minute ctxt in
+      return (Tez.of_mutez_exn (Q.to_int64 f)))
 
 let total_supply ctxt block =
   RPC_context.make_call0 S.total_supply ctxt block () ()
 
 let total_frozen_stake ctxt block =
   RPC_context.make_call0 S.total_frozen_stake ctxt block () ()
+
+let current_yearly_rate ctxt block =
+  RPC_context.make_call0 S.current_yearly_rate ctxt block () ()
+
+let current_yearly_rate_exact ctxt block =
+  RPC_context.make_call0 S.current_yearly_rate_exact ctxt block () ()
+
+let current_rewards_per_minute ctxt block =
+  RPC_context.make_call0 S.current_rewards_per_minute ctxt block () ()
