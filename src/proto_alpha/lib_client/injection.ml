@@ -358,7 +358,7 @@ let estimated_gas_single (type kind)
             | Transaction_to_sc_rollup_result {consumed_gas; _}
             | Transaction_to_zk_rollup_result {consumed_gas; _} )
         | IOrigination_result {consumed_gas; _}
-        | IDelegation_result {consumed_gas}
+        | IDelegation_result {consumed_gas; _}
         | IEvent_result {consumed_gas} ->
             Ok consumed_gas)
     | Skipped _ ->

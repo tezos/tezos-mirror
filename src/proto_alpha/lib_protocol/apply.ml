@@ -902,7 +902,7 @@ let apply_internal_operation_contents :
       assert_sender_is_contract sender >>?= fun sender ->
       apply_delegation ~ctxt ~sender ~delegate ~before_operation:ctxt_before_op
       >|=? fun (ctxt, consumed_gas, ops) ->
-      (ctxt, IDelegation_result {consumed_gas}, ops)
+      (ctxt, IDelegation_result {consumed_gas; balance_updates = []}, ops)
 
 let apply_manager_operation :
     type kind.

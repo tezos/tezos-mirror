@@ -173,6 +173,7 @@ type _ successful_internal_operation_result =
       -> Kind.origination successful_internal_operation_result
   | IDelegation_result : {
       consumed_gas : Gas.Arith.fp;
+      balance_updates : Receipt.balance_updates;
     }
       -> Kind.delegation successful_internal_operation_result
   | IEvent_result : {
@@ -621,14 +622,19 @@ module Internal_operation_result = struct
       ~op_case:Internal_operation.delegation_case
       ~encoding:
         Data_encoding.(
-          obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+          obj2
+            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
+            (dft "balance_updates" Receipt.balance_updates_encoding []))
       ~select:(function
         | Successful_internal_operation_result (IDelegation_result _ as op) ->
             Some op
         | _ -> None)
       ~kind:Kind.Delegation_manager_kind
-      ~proj:(function IDelegation_result {consumed_gas} -> consumed_gas)
-      ~inj:(fun consumed_gas -> IDelegation_result {consumed_gas})
+      ~proj:(function
+        | IDelegation_result {consumed_gas; balance_updates} ->
+            (consumed_gas, balance_updates))
+      ~inj:(fun (consumed_gas, balance_updates) ->
+        IDelegation_result {consumed_gas; balance_updates})
 
   let event_case =
     make

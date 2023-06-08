@@ -119,6 +119,7 @@ type _ successful_internal_operation_result =
       -> Kind.origination successful_internal_operation_result
   | IDelegation_result : {
       consumed_gas : Gas.Arith.fp;
+      balance_updates : Receipt.balance_updates;
     }
       -> Kind.delegation successful_internal_operation_result
   | IEvent_result : {
