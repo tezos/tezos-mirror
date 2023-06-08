@@ -156,14 +156,58 @@ let get_stakes_for_selected_index ctxt index =
   let delegation_over_baking_limit =
     Int64.of_int (Constants_storage.delegation_over_baking_limit ctxt)
   in
+  let global_staking_over_baking_limit_millionth =
+    Int64.(
+      mul
+        1_000_000L
+        (of_int
+           (Constants_storage.adaptive_inflation_staking_over_baking_limit ctxt)))
+  in
   Stake_storage.fold_snapshot
     ctxt
     ~index
     ~f:(fun (delegate, staking_balance) (acc, total_stake) ->
       let delegate_contract = Contract_repr.Implicit delegate in
+      let* delegate_own_pseudotokens =
+        Staking_pseudotokens_storage.costaking_pseudotokens_balance
+          ctxt
+          delegate_contract
+      in
+      let* delegate_own_frozen_deposits =
+        Staking_pseudotokens_storage.tez_of_frozen_deposits_pseudotokens
+          ctxt
+          delegate
+          delegate_own_pseudotokens
+      in
+      let* {staking_over_baking_limit; _} =
+        Delegate_staking_parameters.of_delegate ctxt delegate
+      in
+      let staking_over_baking_limit_millionth =
+        let delegate_staking_over_baking_limit_millionth =
+          Int64.of_int32 staking_over_baking_limit
+        in
+        Compare.Int64.min
+          global_staking_over_baking_limit_millionth
+          delegate_staking_over_baking_limit_millionth
+      in
+      let staking_over_baking_limit_plus_1_millionth =
+        Int64.add 1_000_000L staking_over_baking_limit_millionth
+      in
       let open Tez_repr in
-      let* {current_amount = frozen; initial_amount = _} =
+      let* {current_amount = all_frozen_deposits; initial_amount = _} =
         Frozen_deposits_storage.get ctxt delegate_contract
+      in
+      let frozen =
+        match
+          mul_ratio
+            delegate_own_frozen_deposits
+            ~num:staking_over_baking_limit_plus_1_millionth
+            ~den:1_000_000L
+        with
+        | Ok max_allowed_frozen_deposits ->
+            min all_frozen_deposits max_allowed_frozen_deposits
+            (* Over-co-staked frozen deposits counts towards delegated stake. *)
+        | Error _max_allowed_frozen_deposits_overflows -> all_frozen_deposits
       in
       (* This subtraction may result in a negative value if tez were frozen
          after the snapshot. This is fine, they are then taken into account as
