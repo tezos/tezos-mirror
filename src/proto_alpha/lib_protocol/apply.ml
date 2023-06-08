@@ -482,10 +482,17 @@ let apply_finalize_unstake ~ctxt ~sender ~amount ~destination ~before_operation
   in
   return (ctxt, result, [])
 
-let apply_set_delegate_parameters ~ctxt ~delegate
+let apply_set_delegate_parameters ~ctxt ~sender ~destination
     ~staking_over_baking_limit_millionth ~baking_over_staking_edge_billionth
     ~before_operation =
   let open Lwt_result_syntax in
+  let*? () =
+    error_unless
+      Signature.Public_key_hash.(sender = destination)
+      Invalid_self_transaction_destination
+  in
+  let* is_delegate = Contract.is_delegate ctxt sender in
+  let*? () = error_unless is_delegate Invalid_staking_parameters_sender in
   let staking_over_baking_limit_millionth =
     Z.to_int32 staking_over_baking_limit_millionth
   in
@@ -497,9 +504,7 @@ let apply_set_delegate_parameters ~ctxt ~delegate
       ~staking_over_baking_limit_millionth
       ~baking_over_staking_edge_billionth
   in
-  let* is_delegate = Contract.is_delegate ctxt delegate in
-  let*? () = error_unless is_delegate Invalid_staking_parameters_sender in
-  let* ctxt = Delegate.Staking_parameters.register_update ctxt delegate t in
+  let* ctxt = Delegate.Staking_parameters.register_update ctxt sender t in
   let result =
     Transaction_to_contract_result
       {
@@ -1034,7 +1039,8 @@ let apply_manager_operation :
               [] ) ) ->
           apply_set_delegate_parameters
             ~ctxt
-            ~delegate:source
+            ~sender:source
+            ~destination:pkh
             ~staking_over_baking_limit_millionth
             ~baking_over_staking_edge_billionth
             ~before_operation:ctxt_before_op
