@@ -185,6 +185,14 @@ let init_state ~rng ~limits ~parameters ~peers ~topics
   in
   state
 
+let gen_message =
+  let counter = ref 0 in
+  fun () ->
+    let message_id = !counter in
+    let message = "message" ^ string_of_int message_id in
+    incr counter ;
+    (message_id, message)
+
 (** Test that grafting an unknown topic is ignored.
 
     Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L4367 *)
@@ -2011,14 +2019,6 @@ let test_scoring_p2 rng _limits parameters =
         Test.fail
           ~__LOC__
           "Output should have been Route_message or Already_received"
-  in
-  let gen_message =
-    let counter = ref 0 in
-    fun () ->
-      let message_id = !counter in
-      let message = "message" ^ string_of_int message_id in
-      incr counter ;
-      (message_id, message)
   in
   (* peer 0 delivers message first *)
   let message_id, message = gen_message () in
