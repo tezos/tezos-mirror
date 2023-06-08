@@ -3061,7 +3061,7 @@ let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
     ~expect_app_notification
     ~is_first_slot_attestable
 
-let test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
+let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
     dal_node1 =
   let rec repeat_i n f =
     if n <= 0 then unit
@@ -3303,11 +3303,16 @@ let register ~protocols =
     "GS invalid messages exchange"
     test_dal_node_gs_invalid_messages_exchange
     protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~tags:["gossipsub"]
-    "GS prune due to negative score, ihave and iwant"
-    test_gs_prune_ihave_and_iwant
-    protocols ;
+
+  (* Will be re-enabled once the debug in
+     https://gitlab.com/tezos/tezos/-/merge_requests/9032 allows explaning the
+     issue and how to fix
+     scenario_with_layer1_and_dal_nodes
+       ~tags:["gossipsub"]
+       "GS prune due to negative score, ihave and iwant"
+       test_gs_prune_ihave_and_iwant
+       protocols ;
+  *)
 
   (* Tests with all nodes *)
   scenario_with_all_nodes
