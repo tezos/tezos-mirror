@@ -1833,8 +1833,58 @@ let test_ignore_too_many_messages_in_ihave rng limits parameters =
       check_subset_message_ids ~__LOC__ ids message_ids) ;
   unit
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/5293
-   Add test the described test scenario *)
+(* Check the following scenario:
+   * we joined a topic and we have a unique peer in the mesh
+   * the peer has a negative score
+   * the heartbeat removes that peer
+   * a new peer subscribes to the same topic
+   * a new heartbeat adds to the new peer to the mesh
+*)
+let test_heartbeat_scenario rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: simple heartbeat scenario"
+    ~tags:["gossipsub"; "heartbeat"]
+  @@ fun () ->
+  let peer_topics_map_to_list map =
+    map |> Peer.Map.bindings
+    |> List.map (fun (peer, topics) -> (peer, Topic.Set.elements topics))
+  in
+  let topic = "topic" in
+  let peer = 0 in
+  let s = GS.make rng limits parameters in
+  let s, output = GS.add_peer {direct = false; outbound = false; peer} s in
+  assert_output ~__LOC__ output Peer_added ;
+  let s, output = GS.handle_subscribe {topic; peer} s in
+  assert_output ~__LOC__ output Subscribed ;
+  let s, output = GS.join {topic} s in
+  (match output with
+  | Joining_topic {to_graft} when Peer.Set.elements to_graft = [peer] -> ()
+  | _ -> Test.fail ~__LOC__ "Unexpected Join output.") ;
+  assert_mesh_size ~__LOC__ ~topic ~expected_size:1 s ;
+  let s, GS.Set_application_score =
+    GS.set_application_score ({peer; score = -1.0} : GS.set_application_score) s
+  in
+  let s, Heartbeat {to_prune; _} = GS.heartbeat s in
+  Check.(
+    (peer_topics_map_to_list to_prune = [(peer, [topic])])
+      (list (tuple2 int (list string)))
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__) ;
+  assert_mesh_size ~__LOC__ ~topic ~expected_size:0 s ;
+  let peer = 1 in
+  let s, output = GS.add_peer {direct = false; outbound = false; peer} s in
+  assert_output ~__LOC__ output Peer_added ;
+  let s, output = GS.handle_subscribe {peer; topic} s in
+  assert_output ~__LOC__ output Subscribed ;
+  let s, Heartbeat {to_graft; _} = GS.heartbeat s in
+  Check.(
+    (peer_topics_map_to_list to_graft = [(peer, [topic])])
+      (list (tuple2 int (list string)))
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__) ;
+  assert_mesh_size ~__LOC__ ~topic ~expected_size:1 s ;
+  unit
 
 let register rng limits parameters =
   test_ignore_graft_from_unknown_topic rng limits parameters ;
@@ -1867,4 +1917,5 @@ let register rng limits parameters =
   test_handle_ihave_subscribed_and_msg_seen rng limits parameters ;
   test_handle_ihave_not_subscribed rng limits parameters ;
   test_ignore_too_many_ihaves rng limits parameters ;
-  test_ignore_too_many_messages_in_ihave rng limits parameters
+  test_ignore_too_many_messages_in_ihave rng limits parameters ;
+  test_heartbeat_scenario rng limits parameters
