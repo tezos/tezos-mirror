@@ -14,6 +14,9 @@ use crate::storage;
 use evm_execution::account_storage::init_account_storage;
 use evm_execution::account_storage::EthereumAccountStorage;
 use evm_execution::handler::ExecutionOutcome;
+use evm_execution::EthereumError::{
+    EthereumAccountError, EthereumStorageError, InternalTrapError,
+};
 use evm_execution::{precompiles, run_transaction};
 use tezos_ethereum::transaction::{TransactionHash, TransactionObject};
 use tezos_smart_rollup_debug::debug_msg;
@@ -258,22 +261,32 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
             ) {
                 Ok(outcome) => {
                     valid_txs.push(transaction.tx_hash);
-                    make_receipt_info(
+                    Ok(make_receipt_info(
                         transaction.tx_hash,
                         index - skip_shift,
                         Some(outcome),
                         caller,
                         transaction.tx.to,
-                    )
+                    ))
                 }
-                Err(_) => make_receipt_info(
+                Err(
+                    InternalTrapError | EthereumAccountError(_) | EthereumStorageError(_),
+                ) => {
+                    // TODO: https://gitlab.com/tezos/tezos/-/issues/5665
+                    // Because the proposal's state is unclear, and we do not have a sequencer
+                    // if an error that leads to a durable storage corruption is caught, we
+                    // invalidate the entire proposal.
+                    Err(Error::InvalidRunTransaction)
+                }
+                Err(_) => Ok(make_receipt_info(
                     transaction.tx_hash,
                     index - skip_shift,
                     None,
                     caller,
                     transaction.tx.to,
-                ),
-            };
+                )),
+            }?;
+
             let gas_used = match &receipt_info.execution_outcome {
                 Some(execution_outcome) => execution_outcome.gas_used.into(),
                 None => U256::zero(),
