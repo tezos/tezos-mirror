@@ -161,6 +161,18 @@ module Contract : sig
        and type value = Signature.Public_key_hash.t
        and type t := Raw_context.t
 
+  module Staking_parameters :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Staking_parameters_repr.t
+       and type t := Raw_context.t
+
+  module Pending_staking_parameters :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value = Staking_parameters_repr.t
+       and type t := Raw_context.t * Contract_repr.t
+
   (** All contracts (implicit and originated) that are delegated, if any  *)
   module Delegated :
     Data_set_storage

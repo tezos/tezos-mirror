@@ -109,6 +109,7 @@
         "Stake_repr",
         "Carbonated_map_costs",
         "Carbonated_map",
+        "Staking_parameters_repr",
 
         "Raw_context_intf",
         "Raw_context",
@@ -144,6 +145,7 @@
         "Token",
         "Fees_storage",
         "Adaptive_inflation_storage",
+        "Delegate_staking_parameters",
         "Delegate_consensus_key",
         "Delegate_storage",
         "Delegate_sampler",

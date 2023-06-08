@@ -2263,6 +2263,14 @@ module Delegate : sig
       val get_reward_coeff : t -> cycle:Cycle.t -> Q.t tzresult Lwt.t
     end
   end
+
+  module Staking_parameters : sig
+    val register_update :
+      context ->
+      Signature.Public_key_hash.t ->
+      Staking_parameters_repr.t ->
+      context tzresult Lwt.t
+  end
 end
 
 (** This module re-exports definitions from {!Voting_period_repr} and

@@ -47,6 +47,7 @@ type error +=
   | Staking_for_nondelegate_while_costaking_disabled
   | Invalid_nonzero_transaction_amount of Tez.t
   | Invalid_unstake_request_amount of {requested_amount : Z.t}
+  | Invalid_staking_parameters_sender
 
 let () =
   register_error_kind
@@ -285,7 +286,16 @@ let () =
       | Invalid_unstake_request_amount {requested_amount} ->
           Some requested_amount
       | _ -> None)
-    (fun requested_amount -> Invalid_unstake_request_amount {requested_amount})
+    (fun requested_amount -> Invalid_unstake_request_amount {requested_amount}) ;
+  register_error_kind
+    `Permanent
+    ~id:"operations.invalid_staking_parameters_sender"
+    ~title:"Invalid staking parameters sender"
+    ~description:"The staking parameters can only be set by delegates."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Invalid staking parameters sender")
+    Data_encoding.empty
+    (function Invalid_staking_parameters_sender -> Some () | _ -> None)
+    (fun () -> Invalid_staking_parameters_sender)
 
 open Apply_results
 open Apply_operation_result
@@ -445,6 +455,35 @@ let apply_finalize_unstake ~ctxt ~sender ~amount ~destination ~before_operation
         storage_size = Z.zero;
         paid_storage_size_diff = Z.zero;
         allocated_destination_contract = not already_allocated;
+      }
+  in
+  return (ctxt, result, [])
+
+let apply_set_delegate_parameters ~ctxt ~delegate ~staking_over_baking_limit
+    ~baking_over_staking_edge ~before_operation =
+  let open Lwt_result_syntax in
+  let staking_over_baking_limit = Z.to_int32 staking_over_baking_limit in
+  let baking_over_staking_edge = Z.to_int32 baking_over_staking_edge in
+  let*? t =
+    Staking_parameters_repr.make
+      ~staking_over_baking_limit
+      ~baking_over_staking_edge
+  in
+  let* is_delegate = Contract.is_delegate ctxt delegate in
+  let*? () = error_unless is_delegate Invalid_staking_parameters_sender in
+  let* ctxt = Delegate.Staking_parameters.register_update ctxt delegate t in
+  let result =
+    Transaction_to_contract_result
+      {
+        storage = None;
+        lazy_storage_diff = None;
+        balance_updates = [];
+        ticket_receipt = [];
+        originated_contracts = [];
+        consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+        storage_size = Z.zero;
+        paid_storage_size_diff = Z.zero;
+        allocated_destination_contract = false;
       }
   in
   return (ctxt, result, [])
@@ -949,11 +988,36 @@ let apply_manager_operation :
             ~amount
             ~destination:pkh
             ~before_operation:ctxt_before_op
-      | ("default" | "stake" | "unstake" | "finalize_unstake"), _ ->
+      | ( "set_delegate_parameters",
+          Prim
+            ( _,
+              D_Pair,
+              [
+                Int (_, staking_over_baking_limit);
+                Prim
+                  ( _,
+                    D_Pair,
+                    [
+                      Int (_, baking_over_staking_edge); Prim (_, D_Unit, [], []);
+                    ],
+                    [] );
+              ],
+              [] ) ) ->
+          apply_set_delegate_parameters
+            ~ctxt
+            ~delegate:source
+            ~staking_over_baking_limit
+            ~baking_over_staking_edge
+            ~before_operation:ctxt_before_op
+      | ( ( "default" | "stake" | "unstake" | "finalize_unstake"
+          | "set_delegate_parameters" ),
+          _ ) ->
           (* Only allow:
              - [unit] parameter to implicit accounts' default, stake,
                and finalize_unstake entrypoints;
-             - [nat] parameter to implicit accounts' unstake entrypoint. *)
+             - [nat] parameter to implicit accounts' unstake entrypoint;
+             - [pair nat nat unit] parameter to implicit accounts'
+               set_delegate_parameters entrypoint.*)
           tzfail (Script_interpreter.Bad_contract_parameter source_contract)
       | _ -> tzfail (Script_tc_errors.No_such_entrypoint entrypoint))
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)

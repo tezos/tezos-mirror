@@ -132,6 +132,7 @@
   Stake_repr
   Carbonated_map_costs
   Carbonated_map
+  Staking_parameters_repr
   Raw_context_intf
   Raw_context
   Storage_costs
@@ -162,6 +163,7 @@
   Token
   Fees_storage
   Adaptive_inflation_storage
+  Delegate_staking_parameters
   Delegate_consensus_key
   Delegate_storage
   Delegate_sampler
@@ -399,6 +401,7 @@
   stake_repr.ml stake_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
+  staking_parameters_repr.ml staking_parameters_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs.ml storage_costs.mli
@@ -429,6 +432,7 @@
   token.ml token.mli
   fees_storage.ml fees_storage.mli
   adaptive_inflation_storage.ml adaptive_inflation_storage.mli
+  delegate_staking_parameters.ml delegate_staking_parameters.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
@@ -668,6 +672,7 @@
   stake_repr.ml stake_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
+  staking_parameters_repr.ml staking_parameters_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs.ml storage_costs.mli
@@ -698,6 +703,7 @@
   token.ml token.mli
   fees_storage.ml fees_storage.mli
   adaptive_inflation_storage.ml adaptive_inflation_storage.mli
+  delegate_staking_parameters.ml delegate_staking_parameters.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
@@ -921,6 +927,7 @@
   stake_repr.ml stake_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
+  staking_parameters_repr.ml staking_parameters_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs.ml storage_costs.mli
@@ -951,6 +958,7 @@
   token.ml token.mli
   fees_storage.ml fees_storage.mli
   adaptive_inflation_storage.ml adaptive_inflation_storage.mli
+  delegate_staking_parameters.ml delegate_staking_parameters.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
