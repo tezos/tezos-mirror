@@ -2178,11 +2178,11 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->
       let tip = Delegate.Rewards.seed_nonce_revelation_tip ctxt in
       let delegate = payload_producer.Consensus_key.delegate in
-      let receiver =
-        if Constants.freeze_rewards ctxt then `Frozen_deposits delegate
-        else `Contract (Contract.Implicit delegate)
-      in
-      Token.transfer ctxt `Revelation_rewards receiver tip
+      Delegate.Staking_parameters.pay_rewards
+        ctxt
+        ~source:`Revelation_rewards
+        ~delegate
+        tip
       >|=? fun (ctxt, balance_updates) ->
       (ctxt, Single_result (Seed_nonce_revelation_result balance_updates))
   | Single (Vdf_revelation {solution}) ->
