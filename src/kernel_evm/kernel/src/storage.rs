@@ -24,19 +24,18 @@ use primitive_types::{H160, H256, U256};
 const SMART_ROLLUP_ADDRESS: RefPath =
     RefPath::assert_from(b"/metadata/smart_rollup_address");
 
-const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/evm/blocks/current");
-const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/evm/blocks");
+const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/blocks/current");
+const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/blocks");
 const BLOCKS_NUMBER: RefPath = RefPath::assert_from(b"/number");
 const BLOCKS_HASH: RefPath = RefPath::assert_from(b"/hash");
 const BLOCKS_TRANSACTIONS: RefPath = RefPath::assert_from(b"/transactions");
 
 const EVM_TRANSACTIONS_RECEIPTS: RefPath =
-    RefPath::assert_from(b"/evm/transactions_receipts");
+    RefPath::assert_from(b"/transactions_receipts");
 
-const EVM_TRANSACTIONS_OBJECTS: RefPath =
-    RefPath::assert_from(b"/evm/transactions_objects");
+const EVM_TRANSACTIONS_OBJECTS: RefPath = RefPath::assert_from(b"/transactions_objects");
 
-const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/evm/chain_id");
+const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/chain_id");
 
 pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result");
 
