@@ -64,9 +64,8 @@ let perform_finalizable_unstake_transfers ctxt contract finalizable =
     (ctxt, [])
     finalizable
 
-let finalize_unstake_and_check ~check_unfinalizable ctxt pkh =
+let finalize_unstake_and_check ~check_unfinalizable ctxt contract =
   let open Lwt_result_syntax in
-  let contract = Contract.Implicit pkh in
   let* prepared_opt = Unstake_requests.prepare_finalize_unstake ctxt contract in
   match prepared_opt with
   | None -> return (ctxt, [])
@@ -75,9 +74,9 @@ let finalize_unstake_and_check ~check_unfinalizable ctxt pkh =
       let* ctxt = Unstake_requests.update ctxt contract unfinalizable in
       perform_finalizable_unstake_transfers ctxt contract finalizable
 
-let finalize_unstake ctxt pkh =
+let finalize_unstake ctxt contract =
   let check_unfinalizable _unfinalizable = Lwt_result_syntax.return_unit in
-  finalize_unstake_and_check ~check_unfinalizable ctxt pkh
+  finalize_unstake_and_check ~check_unfinalizable ctxt contract
 
 let punish_delegate ctxt delegate level mistake ~rewarded =
   let open Lwt_result_syntax in
@@ -119,8 +118,9 @@ let stake ctxt ~sender ~delegate amount =
           Signature.Public_key_hash.(delegate <> unstake_delegate)
           Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
   in
+  let sender_contract = Contract.Implicit sender in
   let* ctxt, finalize_balance_updates =
-    finalize_unstake_and_check ~check_unfinalizable ctxt sender
+    finalize_unstake_and_check ~check_unfinalizable ctxt sender_contract
   in
   let* ctxt, new_pseudotokens =
     Staking_pseudotokens.credit_frozen_deposits_pseudotokens_for_tez_amount
@@ -128,7 +128,6 @@ let stake ctxt ~sender ~delegate amount =
       delegate
       amount
   in
-  let sender_contract = Contract.Implicit sender in
   let* ctxt, stake_balance_updates =
     Token.transfer
       ctxt
@@ -143,3 +142,48 @@ let stake ctxt ~sender ~delegate amount =
       new_pseudotokens
   in
   return (ctxt, stake_balance_updates @ finalize_balance_updates)
+
+let request_unstake ctxt ~sender_contract ~delegate requested_amount =
+  let open Lwt_result_syntax in
+  let* ctxt, finalize_balance_updates = finalize_unstake ctxt sender_contract in
+  let* requested_pseudotokens =
+    Staking_pseudotokens.frozen_deposits_pseudotokens_for_tez_amount
+      ctxt
+      delegate
+      requested_amount
+  in
+  let* available_pseudotokens =
+    Staking_pseudotokens.costaking_pseudotokens_balance ctxt sender_contract
+  in
+  let pseudotokens_to_unstake =
+    Staking_pseudotokens.min requested_pseudotokens available_pseudotokens
+  in
+  let* ctxt, tez_to_unstake =
+    Staking_pseudotokens.debit_frozen_deposits_pseudotokens
+      ctxt
+      delegate
+      pseudotokens_to_unstake
+  in
+  let* ctxt =
+    Staking_pseudotokens.debit_costaking_pseudotokens
+      ctxt
+      sender_contract
+      pseudotokens_to_unstake
+  in
+  let current_cycle = (Level.current ctxt).cycle in
+  let* ctxt, unstake_balance_updates =
+    Token.transfer
+      ctxt
+      (`Frozen_deposits delegate)
+      (`Unstaked_frozen_deposits (delegate, current_cycle))
+      tez_to_unstake
+  in
+  let+ ctxt =
+    Unstake_requests.add
+      ctxt
+      ~contract:sender_contract
+      ~delegate
+      current_cycle
+      tez_to_unstake
+  in
+  (ctxt, unstake_balance_updates @ finalize_balance_updates)

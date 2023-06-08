@@ -72,6 +72,8 @@ module Unstake_request : sig
   type requests = request list
 
   type t = {delegate : Signature.Public_key_hash.t; requests : requests}
+
+  val add : Cycle_repr.t -> Tez_repr.t -> requests -> requests tzresult
 end
 
 module Contract : sig

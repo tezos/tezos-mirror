@@ -34,19 +34,26 @@ val stake :
   Tez.t ->
   (context * Receipt.balance_updates) tzresult Lwt.t
 
-(** [finalize_unstake ctxt pkh] performs the finalization of all unstake
-    requests from [pkh] that can be finalized.
+(** [request_unstake ctxt ~sender_contract ~delegate amount] records a request
+    from [sender_contract] to unstake [amount] from [delegate]. *)
+val request_unstake :
+  context ->
+  sender_contract:Contract.t ->
+  delegate:public_key_hash ->
+  Tez.t ->
+  (context * Receipt.balance_updates) tzresult Lwt.t
+
+(** [finalize_unstake ctxt contract] performs the finalization of all unstake
+    requests from [contract] that can be finalized.
     An unstake request can be finalized if it is old enough, specifically the
     requested amount must not be at stake anymore and must not be slashable
     anymore, i.e. after [preserved_cycles + max_slashing_period] after the
     request.
-    Amounts are transferred from the [pkh]'s delegate (at request time) unstaked
-    frozen deposits to [pkh]'s spendable balance, minus slashing the requested
-    stake undergone in between. *)
+    Amounts are transferred from the [contract]'s delegate (at request time)
+    unstaked frozen deposits to [contract]'s spendable balance, minus slashing
+    the requested stake undergone in between. *)
 val finalize_unstake :
-  context ->
-  public_key_hash ->
-  (context * Receipt.balance_updates) tzresult Lwt.t
+  context -> Contract.t -> (context * Receipt.balance_updates) tzresult Lwt.t
 
 (** [punish_delegate ctxt delegate level mistake ~rewarded] slashes [delegate]
     for a [mistake] at [level] and rewards [rewarded]. *)
