@@ -37,6 +37,10 @@ Smart Rollups
   Now::
     ./octez-client cement commitment from <src> for smart rollup <smart rollup address>
 
+- Enable the latest version of the WASM PVM (``2.0.0-r2``). Existing smart
+  rollups will see their PVM automatically upgrade, and newly originated smart
+  rollups will use this version directly (MR :gl:`!9051`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
