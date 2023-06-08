@@ -533,7 +533,7 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
            "%a_%s_%s"
            Namespace.pp_short
            Bench.name
-           model_name
+           (Benchmark_helpers.filename_of_local_model_name model_name)
            kind)
   in
   let workload_data =

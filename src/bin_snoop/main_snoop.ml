@@ -956,7 +956,8 @@ module Auto_build = struct
             let mkfilename ext =
               Filename.concat
                 outdir
-                String.(concat "__" @@ split_on_char '/' local_model_name)
+                (Benchmark_helpers.filename_of_local_model_name
+                   local_model_name)
               ^ ext
             in
             (* Infernece *)
