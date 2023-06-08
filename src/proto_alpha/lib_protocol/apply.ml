@@ -362,7 +362,10 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
   match delegate_opt with
   | None -> tzfail Staking_for_nondelegate_while_costaking_disabled
   | Some delegate ->
-      let allowed = Signature.Public_key_hash.(delegate = sender) in
+      let allowed =
+        Signature.Public_key_hash.(delegate = sender)
+        || Constants.adaptive_inflation_enable ctxt
+      in
       let*? () =
         error_unless allowed Staking_for_nondelegate_while_costaking_disabled
       in
