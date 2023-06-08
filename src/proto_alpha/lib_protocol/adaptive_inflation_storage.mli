@@ -54,3 +54,16 @@ val init_ema : Raw_context.t -> Raw_context.t tzresult Lwt.t
     voted to be activated (yet). *)
 val activate :
   Raw_context.t -> cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+
+module For_RPC : sig
+  (** [get_reward_coeff ctxt cycle] reads the reward coeff for the given cycle
+      from the storage.
+      Returns [Q.one] if the given cycle is not between [current_cycle] and
+      [current_cycle + preserved_cycles].
+      If adaptive inflation has not been activated, or has been activated and the
+      given cycle is less than [preserved_cycles] after the activation cycle,
+      then this function returns [Q.one].
+      Used only for RPCs. To get the actual rewards, use [Delegate_rewards]. *)
+  val get_reward_coeff :
+    Raw_context.t -> cycle:Cycle_repr.t -> Q.t tzresult Lwt.t
+end

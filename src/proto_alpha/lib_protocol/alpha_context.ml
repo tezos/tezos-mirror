@@ -499,7 +499,11 @@ module Delegate = struct
   let deactivated = Delegate_activation_storage.is_inactive
 
   module Consensus_key = Delegate_consensus_key
-  module Rewards = Delegate_rewards
+
+  module Rewards = struct
+    include Delegate_rewards
+    module For_RPC = Adaptive_inflation_storage.For_RPC
+  end
 end
 
 module Stake_distribution = struct
