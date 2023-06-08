@@ -4761,6 +4761,7 @@ end = struct
           [
             ("test_constants", true);
             ("test_frozen_bonds", true);
+            ("test_adaptive_inflation_launch", N.(number >= 018));
             ("test_liquidity_baking", true);
             ("test_storage_functions", true);
             ("test_storage", true);
