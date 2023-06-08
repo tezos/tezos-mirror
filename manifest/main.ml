@@ -4847,6 +4847,7 @@ end = struct
             ("test_tx_rollup_l2_apply", N.(number >= 015 && number <= 016));
             ("test_tx_rollup_l2", N.(number >= 015 && number <= 016));
             ("test_adaptive_inflation", N.(number >= 018));
+            ("test_adaptive_inflation_ema", N.(number >= 018));
           ]
           |> List.filter_map (fun (n, b) -> if b then Some n else None)
         in
