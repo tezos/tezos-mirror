@@ -53,14 +53,16 @@ val update_ema :
     the adaptive inflation feature gets activated. If this function is
     never called, then the context does not contain the cycle for the
     feature activation, which implies the feature is inactive.
-
-    In practice, it means that you may call
-    [Storage.Adaptive_inflation.Activation.find ctxt] to get the value
-    of the cycle at which the feature is activated, and if that call
-    returns [None], then it means the feature has not been
-    voted to be activated (yet). *)
+*)
 val activate :
   Raw_context.t -> cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+
+(** [launch_cycle ctxt] reads from the context the cycle at which
+    the adaptive inflation feature is set to activate.
+
+    If this function returns [None], then it means the feature has not been
+    voted to be activated (yet). *)
+val launch_cycle : Raw_context.t -> Cycle_repr.t option tzresult Lwt.t
 
 module For_RPC : sig
   (** [get_reward_coeff ctxt cycle] reads the reward coeff for the given cycle

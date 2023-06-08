@@ -219,6 +219,8 @@ let update_ema ctxt ~vote =
 
 let activate ctxt ~cycle = Storage.Adaptive_inflation.Activation.init ctxt cycle
 
+let launch_cycle ctxt = Storage.Adaptive_inflation.Activation.find ctxt
+
 module For_RPC = struct
   let get_reward_coeff = get_reward_coeff
 end
