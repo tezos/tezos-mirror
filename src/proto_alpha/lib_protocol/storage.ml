@@ -293,6 +293,23 @@ module Contract = struct
          (Make_index (Cycle_repr.Index))
       (Signature.Public_key)
 
+  module Staking_parameters =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["staking_parameters"; "active"]
+      end)
+      (Staking_parameters_repr)
+
+  module Pending_staking_parameters =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["staking_parameters"; "pendings"]
+         end))
+         (Make_index (Cycle_repr.Index))
+      (Staking_parameters_repr)
+
   module Delegate =
     Indexed_context.Make_map
       (Registered)
