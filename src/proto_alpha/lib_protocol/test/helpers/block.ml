@@ -832,6 +832,25 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
     ?operations
     pred
 
+let bake_n_with_metadata ?locked_round ?policy ?timestamp ?payload_round
+    ?check_size ?(baking_mode = Application) ?(allow_manager_failures = false)
+    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote n pred =
+  let get_next b =
+    bake_with_metadata
+      ?locked_round
+      ?policy
+      ?timestamp
+      ?payload_round
+      ?check_size
+      ~baking_mode
+      ~allow_manager_failures
+      ?liquidity_baking_toggle_vote
+      ?adaptive_inflation_vote
+      b
+  in
+  get_next pred >>=? fun b ->
+  List.fold_left_es (fun (b, _metadata) _ -> get_next b) b (2 -- n)
+
 let bake ?(baking_mode = Application) ?(allow_manager_failures = false)
     ?payload_round ?locked_round ?policy ?timestamp ?operation ?operations
     ?liquidity_baking_toggle_vote ?adaptive_inflation_vote ?check_size pred =
