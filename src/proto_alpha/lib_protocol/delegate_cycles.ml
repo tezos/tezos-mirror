@@ -89,8 +89,7 @@ let max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle =
     (Signature.Public_key_hash.Map.empty, cleared_cycle_delegates)
     cycles
 
-let unfreeze_exceeding_deposits ?(origin = Receipt_repr.Block_application) ctxt
-    ~new_cycle ~balance_updates =
+let unfreeze_exceeding_deposits ?origin:_ ctxt ~new_cycle ~balance_updates =
   Delegate_storage.reset_forbidden_delegates ctxt >>= fun ctxt ->
   let max_slashable_period = Constants_storage.max_slashing_period ctxt in
   (* We want to be able to slash for at most [max_slashable_period] *)
@@ -128,11 +127,6 @@ let unfreeze_exceeding_deposits ?(origin = Receipt_repr.Block_application) ctxt
     maxima
     (ctxt, balance_updates)
   >>=? fun (ctxt, balance_updates) ->
-  (* Unfreeze deposits (that is, set them to zero) for delegates that
-     were previously in the relevant window (and therefore had some
-     frozen deposits) but are not in the new window; because that means
-     that such a delegate had no active stake in the relevant cycles,
-     and therefore it should have no frozen deposits. *)
   Signature.Public_key_hash.Set.fold_es
     (fun delegate (ctxt, balance_updates) ->
       let delegate_contract = Contract_repr.Implicit delegate in
@@ -140,18 +134,7 @@ let unfreeze_exceeding_deposits ?(origin = Receipt_repr.Block_application) ctxt
         ctxt
         delegate_contract
         Tez_repr.zero
-      >>=? fun ctxt ->
-      Frozen_deposits_storage.get ctxt delegate_contract
-      >>=? fun frozen_deposits ->
-      if Tez_repr.(frozen_deposits.current_amount > zero) then
-        Token.transfer
-          ~origin
-          ctxt
-          (`Frozen_deposits delegate)
-          (`Contract delegate_contract)
-          frozen_deposits.current_amount
-        >|=? fun (ctxt, bupds) -> (ctxt, bupds @ balance_updates)
-      else return (ctxt, balance_updates))
+      >>=? fun ctxt -> return (ctxt, balance_updates))
     delegates_to_remove
     (ctxt, balance_updates)
 
