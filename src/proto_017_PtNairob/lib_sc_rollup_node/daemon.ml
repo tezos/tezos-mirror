@@ -259,7 +259,7 @@ let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
 let process_l1_block_operations node_ctxt (head : Layer1.header) =
   let open Lwt_result_syntax in
   let* block =
-    Layer1.fetch_tezos_block node_ctxt.Node_context.l1_ctxt head.hash
+    Layer1_helpers.fetch_tezos_block node_ctxt.Node_context.l1_ctxt head.hash
   in
   let apply (type kind) accu ~source (operation : kind manager_operation) result
       =
@@ -494,7 +494,7 @@ let on_layer_1_head (daemon_components : (module Daemon_components.S)) node_ctxt
   let* () =
     List.iter_es
       (fun (block, to_prefetch) ->
-        Layer1.prefetch_tezos_blocks node_ctxt.l1_ctxt to_prefetch ;
+        Layer1_helpers.prefetch_tezos_blocks node_ctxt.l1_ctxt to_prefetch ;
         let* header = get_header block in
         let catching_up = block.level < head.level in
         process_head daemon_components node_ctxt ~catching_up header)
