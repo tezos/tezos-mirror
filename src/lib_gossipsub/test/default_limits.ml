@@ -27,7 +27,8 @@ module Milliseconds = Test_gossipsub_shared.Milliseconds
 
 (* Most of these limits are the default ones used by the Go implementation. *)
 let default_limits ?mesh_message_deliveries_activation ?time_in_mesh_weight
-    ?time_in_mesh_quantum ?time_in_mesh_cap () :
+    ?time_in_mesh_quantum ?time_in_mesh_cap ?first_message_deliveries_weight
+    ?first_message_deliveries_cap ?first_message_deliveries_decay () :
     (string, int, int, Milliseconds.t) limits =
   let per_topic_score_limits =
     {
@@ -35,9 +36,12 @@ let default_limits ?mesh_message_deliveries_activation ?time_in_mesh_weight
       time_in_mesh_cap = Option.value ~default:3600.0 time_in_mesh_cap;
       time_in_mesh_quantum =
         Option.value ~default:(Milliseconds.of_float_s 1.0) time_in_mesh_quantum;
-      first_message_deliveries_weight = 1.0;
-      first_message_deliveries_cap = 2000;
-      first_message_deliveries_decay = 0.5;
+      first_message_deliveries_weight =
+        Option.value ~default:1.0 first_message_deliveries_weight;
+      first_message_deliveries_cap =
+        Option.value ~default:2000 first_message_deliveries_cap;
+      first_message_deliveries_decay =
+        Option.value ~default:0.5 first_message_deliveries_decay;
       mesh_message_deliveries_weight = ~-.1.0;
       mesh_message_deliveries_window = Milliseconds.of_float_s 0.01;
       mesh_message_deliveries_activation =
