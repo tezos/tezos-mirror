@@ -45,5 +45,4 @@ val cycle_end :
     active stake involved in the calculation of baking rights for all cycles
     in the range [0, preserved_cycles]. It also freezes the deposits for all
     the active delegates. *)
-val init_first_cycles :
-  Raw_context.t -> (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
+val init_first_cycles : Raw_context.t -> Raw_context.t tzresult Lwt.t
