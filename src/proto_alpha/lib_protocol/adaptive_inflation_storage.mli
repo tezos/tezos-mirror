@@ -49,14 +49,6 @@ val update_ema :
   (Raw_context.t * Toggle_votes_repr.Adaptive_inflation_launch_EMA.t) tzresult
   Lwt.t
 
-(** [activate ctxt ~cycle] adds into the context the cycle at which
-    the adaptive inflation feature gets activated. If this function is
-    never called, then the context does not contain the cycle for the
-    feature activation, which implies the feature is inactive.
-*)
-val activate :
-  Raw_context.t -> cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
-
 (** [launch_cycle ctxt] reads from the context the cycle at which
     the adaptive inflation feature is set to activate.
 
