@@ -10,7 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezt" { >= "3.1.0" }
+  "tezt" { >= "3.1.1" }
   "tezt-tezos"
   "tezt-ethereum"
 ]

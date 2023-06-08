@@ -20,7 +20,7 @@ depends: [
   "tezos-p2p-services"
   "tezos-version"
   "prometheus" { >= "1.2" }
-  "tezt" { >= "3.1.0" }
+  "tezt" { >= "3.1.1" }
   "tezos-test-helpers" {with-test}
   "tezos-base-test-helpers" {with-test}
   "tezos-event-logging-test-helpers" {with-test}

@@ -15,7 +15,7 @@ depends: [
   "ctypes_stubs_js"
   "ctypes" { >= "0.18.0" }
   "ezjsonm" { >= "1.1.0" }
-  "tezt" { with-test & >= "3.1.0" }
+  "tezt" { with-test & >= "3.1.1" }
   "tezos-stdlib" {with-test}
   "tezos-error-monad" {with-test}
   "tezos-lwt-result-stdlib" {with-test}
