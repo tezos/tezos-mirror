@@ -250,7 +250,7 @@ let prepare_first_block _chain_id ctxt ~typecheck_smart_contract
         param.bootstrap_contracts
         param.bootstrap_smart_rollups
       >>=? fun (ctxt, bootstrap_balance_updates) ->
-      Delegate_cycles.init_first_cycles ctxt ~origin:Protocol_migration
+      Delegate_cycles.init_first_cycles ctxt
       >>=? fun (ctxt, deposits_balance_updates) ->
       Vote_storage.init
         ctxt

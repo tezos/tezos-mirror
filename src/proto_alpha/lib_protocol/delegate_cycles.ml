@@ -89,7 +89,7 @@ let max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle =
     (Signature.Public_key_hash.Map.empty, cleared_cycle_delegates)
     cycles
 
-let unfreeze_exceeding_deposits ?origin:_ ctxt ~new_cycle ~balance_updates =
+let unfreeze_exceeding_deposits ctxt ~new_cycle ~balance_updates =
   Delegate_storage.reset_forbidden_delegates ctxt >>= fun ctxt ->
   let max_slashable_period = Constants_storage.max_slashing_period ctxt in
   (* We want to be able to slash for at most [max_slashable_period] *)
@@ -229,7 +229,7 @@ let cycle_end ctxt last_cycle =
     ~last_cycle
   >>=? fun ctxt -> return (ctxt, balance_updates, deactivated_delegates)
 
-let init_first_cycles ctxt ~origin =
+let init_first_cycles ctxt =
   let preserved = Constants_storage.preserved_cycles ctxt in
   List.fold_left_es
     (fun ctxt c ->
@@ -242,4 +242,4 @@ let init_first_cycles ctxt ~origin =
     Misc.(0 --> preserved)
   >>=? fun ctxt ->
   let cycle = (Raw_context.current_level ctxt).cycle in
-  unfreeze_exceeding_deposits ~origin ~new_cycle:cycle ~balance_updates:[] ctxt
+  unfreeze_exceeding_deposits ~new_cycle:cycle ~balance_updates:[] ctxt
