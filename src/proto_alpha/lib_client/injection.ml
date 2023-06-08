@@ -324,7 +324,7 @@ let estimated_gas_single (type kind)
             | Transaction_to_zk_rollup_result {consumed_gas; _} )
         | Origination_result {consumed_gas; _}
         | Reveal_result {consumed_gas}
-        | Delegation_result {consumed_gas}
+        | Delegation_result {consumed_gas; _}
         | Register_global_constant_result {consumed_gas; _}
         | Update_consensus_key_result {consumed_gas; _}
         | Increase_paid_storage_result {consumed_gas; _}

@@ -48,6 +48,7 @@ type _ successful_manager_operation_result =
       -> Kind.origination successful_manager_operation_result
   | Delegation_result : {
       consumed_gas : Gas.Arith.fp;
+      balance_updates : Receipt.balance_updates;
     }
       -> Kind.delegation successful_manager_operation_result
   | Register_global_constant_result : {
@@ -443,13 +444,18 @@ module Manager_result = struct
       ~op_case:Operation.Encoding.Manager_operations.delegation_case
       ~encoding:
         Data_encoding.(
-          obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+          obj2
+            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
+            (dft "balance_updates" Receipt.balance_updates_encoding []))
       ~select:(function
         | Successful_manager_result (Delegation_result _ as op) -> Some op
         | _ -> None)
       ~kind:Kind.Delegation_manager_kind
-      ~proj:(function Delegation_result {consumed_gas} -> consumed_gas)
-      ~inj:(fun consumed_gas -> Delegation_result {consumed_gas})
+      ~proj:(function
+        | Delegation_result {consumed_gas; balance_updates} ->
+            (consumed_gas, balance_updates))
+      ~inj:(fun (consumed_gas, balance_updates) ->
+        Delegation_result {consumed_gas; balance_updates})
 
   let update_consensus_key_case =
     make

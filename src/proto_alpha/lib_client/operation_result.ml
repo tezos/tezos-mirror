@@ -737,7 +737,9 @@ let pp_manager_operation_contents_result ppf op_result =
       (result : kind successful_manager_operation_result) =
     match result with
     | Reveal_result {consumed_gas} -> pp_consumed_gas ppf consumed_gas
-    | Delegation_result {consumed_gas} -> pp_consumed_gas ppf consumed_gas
+    | Delegation_result {consumed_gas; balance_updates} ->
+        pp_consumed_gas ppf consumed_gas ;
+        pp_balance_updates ppf balance_updates
     | Update_consensus_key_result {consumed_gas} ->
         pp_consumed_gas ppf consumed_gas
     | Transaction_result tx -> pp_transaction_result ppf tx

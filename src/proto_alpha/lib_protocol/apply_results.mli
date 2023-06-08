@@ -139,6 +139,7 @@ and _ successful_manager_operation_result =
       -> Kind.origination successful_manager_operation_result
   | Delegation_result : {
       consumed_gas : Gas.Arith.fp;
+      balance_updates : Receipt.balance_updates;
     }
       -> Kind.delegation successful_manager_operation_result
   | Register_global_constant_result : {
