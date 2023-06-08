@@ -27,6 +27,14 @@
     {!Storage.Contract.Frozen_deposits_pseudotokens} and
     {!Storage.Contract.Costaking_pseudotokens} tables. *)
 
+(** [init_frozen_deposits_pseudotokens_from_frozen_deposits_balance ctxt contract]
+    initializes [contract]'s frozen deposits pseudotokens usings [contract]'s
+    current frozen deposits tez.
+    This function must be called whenever a contract's frozen deposits tez are
+    initialized. *)
+val init_frozen_deposits_pseudotokens_from_frozen_deposits_balance :
+  Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
+
 (** [frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount]
     returns the amount of [delegate]'s stake pseudotokens the [tez_amount] is
     currently worth.
