@@ -525,5 +525,7 @@ struct
 
   module Internal_for_tests = struct
     let get_topic_params = get_topic_params
+
+    let to_float = Fun.id
   end
 end

@@ -413,6 +413,9 @@ module type SCORE = sig
   module Internal_for_tests : sig
     val get_topic_params :
       ('topic, 'span) score_limits -> 'topic -> 'span per_topic_score_limits
+
+    (** Convert a score value into a float.  *)
+    val to_float : value -> float
   end
 end
 
