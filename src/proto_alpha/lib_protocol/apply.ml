@@ -371,6 +371,16 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
       let*? () =
         error_unless allowed Staking_for_nondelegate_while_costaking_disabled
       in
+      let* {staking_over_baking_limit; _} =
+        Delegate.Staking_parameters.of_delegate ctxt delegate
+      in
+      let forbidden =
+        Signature.Public_key_hash.(delegate <> sender)
+        && Compare.Int32.(staking_over_baking_limit = 0l)
+      in
+      let*? () =
+        error_when forbidden Staking_to_delegate_that_refuses_costaking
+      in
       let* ctxt, balance_updates =
         Staking.stake ctxt ~sender ~delegate amount
       in
