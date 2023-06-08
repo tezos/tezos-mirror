@@ -25,6 +25,6 @@ trace
       1
       2
       3 ]
-  - location: 22 (just consumed gas: 0.014)
+  - location: 22 (just consumed gas: 0.037)
     [ (Pair {} 1 2 3) ]
 
