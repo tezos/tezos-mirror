@@ -26,9 +26,17 @@
 open Alpha_context
 
 module S = struct
+  open Data_encoding
+
+  let q_encoding =
+    conv
+      (fun Q.{num; den} -> (num, den))
+      (fun (num, den) -> Q.make num den)
+      (obj2 (req "numerator" n) (req "denominator" n))
+
   let context_path = RPC_path.(open_root / "context")
 
-  let _path = RPC_path.(context_path / "inflation")
+  let path = RPC_path.(context_path / "inflation")
 
   let total_supply =
     RPC_service.get_service
@@ -43,18 +51,95 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(context_path / "total_frozen_stake")
+
+  let current_yearly_rate =
+    RPC_service.get_service
+      ~description:
+        "Returns the current expected maximum yearly inflation rate (in %)"
+      ~query:RPC_query.empty
+      ~output:(string Plain)
+      RPC_path.(path / "current_yearly_rate")
+
+  let current_yearly_rate_exact =
+    RPC_service.get_service
+      ~description:
+        "Returns the current expected maximum yearly inflation rate (exact \
+         quotient)"
+      ~query:RPC_query.empty
+      ~output:q_encoding
+      RPC_path.(path / "current_yearly_rate_exact")
+
+  let current_rewards_per_minute =
+    RPC_service.get_service
+      ~description:
+        "Returns the current expected maximum rewards per minute (in mutez)"
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(path / "rewards_per_minute")
 end
+
+let q_to_float_string q =
+  let offset = 1000 in
+  let unit = Z.div q.Q.num q.den in
+  let q = Q.(sub q (unit /// Z.one)) in
+  let q = Q.(mul q (offset // 1)) in
+  let dec = Z.div q.num q.den in
+  let padded_dec_string = Format.asprintf "%03d" (Z.to_int dec) in
+  Format.asprintf "%a.%s" Z.pp_print unit padded_dec_string
+
+let current_rewards_per_minute ctxt =
+  let open Lwt_result_syntax in
+  let base_total_rewards_per_minute =
+    (Constants.reward_weights ctxt).base_total_rewards_per_minute
+  in
+  let q_base_total_rewards_per_minute =
+    Tez.to_mutez base_total_rewards_per_minute |> Q.of_int64
+  in
+  let cycle = (Level.current ctxt).cycle in
+  let* f = Delegate.Rewards.For_RPC.get_reward_coeff ctxt ~cycle in
+  let f = Q.mul f q_base_total_rewards_per_minute (* rewards per minute *) in
+  return f
+
+(* Does the reverse operations of [compute_coeff] in [adaptive_inflation_storage.ml] *)
+let current_yearly_rate_value ~formatter ctxt =
+  let open Lwt_result_syntax in
+  let q_min_per_year = Q.of_int 525600 in
+  let* total_supply = Contract.get_total_supply ctxt in
+  let q_total_supply = Tez.to_mutez total_supply |> Q.of_int64 in
+  let* f = current_rewards_per_minute ctxt in
+  let f = Q.div f q_total_supply (* inflation per minute *) in
+  let f = Q.mul f q_min_per_year (* inflation per year *) in
+  (* transform into a string *)
+  let f = Q.(mul f (100 // 1)) in
+  return (formatter f)
 
 let register () =
   let open Services_registration in
+  let open Lwt_result_syntax in
   register0 ~chunked:false S.total_supply (fun ctxt () () ->
       Contract.get_total_supply ctxt) ;
   register0 ~chunked:false S.total_frozen_stake (fun ctxt () () ->
       let cycle = (Level.current ctxt).cycle in
-      Stake_distribution.get_total_frozen_stake ctxt cycle)
+      Stake_distribution.get_total_frozen_stake ctxt cycle) ;
+  register0 ~chunked:false S.current_yearly_rate (fun ctxt () () ->
+      current_yearly_rate_value ~formatter:q_to_float_string ctxt) ;
+  register0 ~chunked:false S.current_yearly_rate_exact (fun ctxt () () ->
+      current_yearly_rate_value ~formatter:(fun x -> x) ctxt) ;
+  register0 ~chunked:false S.current_rewards_per_minute (fun ctxt () () ->
+      let* f = current_rewards_per_minute ctxt in
+      return (Tez.of_mutez_exn (Q.to_int64 f)))
 
 let total_supply ctxt block =
   RPC_context.make_call0 S.total_supply ctxt block () ()
 
 let total_frozen_stake ctxt block =
   RPC_context.make_call0 S.total_frozen_stake ctxt block () ()
+
+let current_yearly_rate ctxt block =
+  RPC_context.make_call0 S.current_yearly_rate ctxt block () ()
+
+let current_yearly_rate_exact ctxt block =
+  RPC_context.make_call0 S.current_yearly_rate_exact ctxt block () ()
+
+let current_rewards_per_minute ctxt block =
+  RPC_context.make_call0 S.current_rewards_per_minute ctxt block () ()

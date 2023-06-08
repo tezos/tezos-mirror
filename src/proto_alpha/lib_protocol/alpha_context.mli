@@ -2249,6 +2249,19 @@ module Delegate : sig
       val reward_from_constants :
         ?coeff:Q.t -> Constants.Parametric.t -> reward_kind:reward_kind -> Tez.t
     end
+
+    module For_RPC : sig
+      (** [get_reward_coeff ctxt cycle] reads the reward coeff for the given cycle
+          from the storage.
+          Returns [Q.one] if the given cycle is not between [current_cycle] and
+          [current_cycle + preserved_cycles].
+          If adaptive inflation has not been activated, or has been activated and the
+          given cycle is less than [preserved_cycles] after the activation cycle,
+          then this function returns [Q.one].
+          Used only for RPCs. To get the actual rewards, use the reward functions
+          defined above. *)
+      val get_reward_coeff : t -> cycle:Cycle.t -> Q.t tzresult Lwt.t
+    end
   end
 end
 

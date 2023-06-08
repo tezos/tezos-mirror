@@ -204,3 +204,7 @@ let load_reward_coeff ctxt =
 let init_ema ctxt = Storage.Adaptive_inflation.Launch_ema.init ctxt 0L
 
 let activate ctxt ~cycle = Storage.Adaptive_inflation.Activation.init ctxt cycle
+
+module For_RPC = struct
+  let get_reward_coeff = get_reward_coeff
+end
