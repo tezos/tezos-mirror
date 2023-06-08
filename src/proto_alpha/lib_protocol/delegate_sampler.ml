@@ -216,7 +216,7 @@ let get_stakes_for_selected_index ctxt index =
         sub_opt staking_balance frozen |> Option.value ~default:zero
       in
       let delegated =
-        match frozen *? delegation_over_baking_limit with
+        match delegate_own_frozen_deposits *? delegation_over_baking_limit with
         | Ok max_allowed_delegated ->
             min max_allowed_delegated available_delegated
         | Error _max_allowed_delegated_overflows -> available_delegated

@@ -28,6 +28,11 @@ val of_delegate :
   Signature.Public_key_hash.t ->
   Staking_parameters_repr.t tzresult Lwt.t
 
+val find :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Staking_parameters_repr.t option tzresult Lwt.t
+
 val of_delegate_for_cycle :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
