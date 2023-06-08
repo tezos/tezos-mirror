@@ -11,7 +11,6 @@ depends: [
   "tezos-client-base-unix"
   "caqti-lwt"
   "caqti-dynload"
-  "ocp-ocamlres"
 ]
 depopts: [
   "tezos-client-001-PtCJ7pwo"

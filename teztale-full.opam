@@ -13,7 +13,6 @@ depends: [
   "caqti-dynload"
   "caqti-driver-sqlite3"
   "caqti-driver-postgresql"
-  "ocp-ocamlres"
   "tezos-client-001-PtCJ7pwo"
   "tezos-client-002-PsYLVpVv"
   "tezos-client-003-PsddFKi3"

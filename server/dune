@@ -4,10 +4,3 @@
  (public_name teztale-server)
  (promote (until-clean))
  (libraries cohttp-lwt-unix caqti-lwt caqti-dynload teztale.lib))
-
-(rule
- (targets visualization.ml)
- (deps
-  (source_tree ../dataviz))
- (action
-  (run %{bin:ocp-ocamlres} -format variants -o %{targets} ../dataviz)))

@@ -23,16 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let rec find_in_ocamlres path dir =
-  match (path, dir) with
-  | [], _ | _ :: _, [] -> None
-  | [x], `File (y, a) :: t ->
-      if String.equal x y then Some a else find_in_ocamlres path t
-  | _ :: _ :: _, `File _ :: t -> find_in_ocamlres path t
-  | [_], _ :: t -> find_in_ocamlres path t
-  | x :: p, `Dir (y, a) :: t ->
-      if String.equal x y then find_in_ocamlres p a else find_in_ocamlres path t
-
 (*let mainnet_cycle_of_level level =*)
 (*if level < 1_589_248 then level / 4096 else 388 + ((level - 1_589_248) / 8192)*)
 
