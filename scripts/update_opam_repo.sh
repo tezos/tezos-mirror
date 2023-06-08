@@ -91,6 +91,10 @@ do
     v=$(echo "$f" | cut -d '.' -f '2-')
     echo "\"$p\" {= \"$v\"}" >> $dummy_opam
 done
+# FIXME: https://gitlab.com/tezos/tezos/-/issues/5832
+# opam unintentionally picks up a windows dependency. We add a
+# conflict here to work around it.
+echo '"ocamlbuild" {= "0.14.2+win" }' >> $dummy_opam
 echo ']' >> $dummy_opam
 
 # Opam < 2.1 requires opam-depext as a plugin, later versions include it
