@@ -481,7 +481,7 @@ let try_availability_above_v1_only ~version import_name import_params
   let predicate state =
     match version with
     | Wasm_pvm_state.V0 -> is_stuck state
-    | V1 -> not (is_stuck state)
+    | V1 | V2 -> not (is_stuck state)
   in
   assert (predicate state) ;
   Lwt_result_syntax.return_unit
@@ -1730,8 +1730,7 @@ let test_outbox_validity_period ~version () =
   return_ok_unit
 
 let tests =
-  tztests_with_pvm
-    ~versions:[V0; V1]
+  tztests_with_all_pvms
     [
       ( "Test __internal_store_get_hash available",
         `Quick,

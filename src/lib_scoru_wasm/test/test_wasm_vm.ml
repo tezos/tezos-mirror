@@ -161,8 +161,7 @@ let test_last_input_info_updated_in_set_input_step ~version () =
   return_unit
 
 let tests =
-  tztests_with_pvm
-    ~versions:[V0; V1]
+  tztests_with_all_pvms
     [
       ("Test eval_has_finished: padding", `Quick, test_padding_state);
       ("Test set_input_state: padding", `Quick, test_set_input_step_in_padding);

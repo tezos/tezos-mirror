@@ -297,7 +297,7 @@ let make ~version ~reveal_builtins ~write_debug state =
   let extra =
     match version with
     | Wasm_pvm_state.V0 -> []
-    | V1 ->
+    | V1 | V2 ->
         [
           ("__internal_store_get_hash", store_get_hash);
           ("store_delete_value", store_delete_value);

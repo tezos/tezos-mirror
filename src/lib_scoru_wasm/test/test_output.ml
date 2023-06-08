@@ -342,8 +342,7 @@ let test_push_output_bigger_than_max_size () =
   return_ok_unit
 
 let tests =
-  Tztest_helper.tztests_with_pvm
-    ~versions:[V0; V1]
+  Tztest_helper.tztests_with_all_pvms
     [
       ("Host write", `Quick, test_write_host_fun);
       ( "Write_output: Push message above the limit",

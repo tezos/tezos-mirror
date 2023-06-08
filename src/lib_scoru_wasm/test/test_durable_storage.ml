@@ -321,7 +321,7 @@ let test_v1_and_above ~version test =
   | Wasm_pvm_state.V0 ->
       (* the host function is not available before [V1]. *)
       Lwt.return_ok ()
-  | V1 -> test ~version
+  | V1 | V2 -> test ~version
 
 let test_store_get_hash ~version =
   let open Lwt_syntax in
@@ -1254,8 +1254,7 @@ let test_readonly_key () =
   Lwt.return_ok ()
 
 let tests =
-  Tztest_helper.tztests_with_pvm
-    ~versions:[V0; V1]
+  Tztest_helper.tztests_with_all_pvms
     [
       ("store_has missing key", `Quick, test_store_has_missing_key);
       ("store_has existing key", `Quick, test_store_has_existing_key);

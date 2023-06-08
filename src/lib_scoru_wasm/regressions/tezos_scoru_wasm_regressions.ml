@@ -118,7 +118,10 @@ module Verifier =
   Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup.Wasm_2_0_0PVM
   .Protocol_implementation
 
-let version_name = function Wasm_pvm_state.V0 -> "v0" | V1 -> "v1"
+let version_name = function
+  | Wasm_pvm_state.V0 -> "v0"
+  | V1 -> "v1"
+  | V2 -> "v2"
 
 let capture_hash_of tree =
   Regression.capture @@ Context_hash.to_b58check
@@ -292,12 +295,13 @@ let register ?(from_binary = false) ?(fail_on_stuck = true) ?ticks_per_snapshot
   | None -> ()
 
 let register () =
+  let versions = List.map snd Tezos_scoru_wasm.Wasm_pvm_state.versions in
   register
     ~name:"echo"
     ~from_binary:false
     ~ticks_per_snapshot:5_000L
     ~inputs:[]
-    ~versions:[V0; V1]
+    ~versions
     ~hash_frequency:137L
     ~proof_frequency:(11L, 23L)
     echo_kernel ;
@@ -306,7 +310,7 @@ let register () =
     ~from_binary:true
     ~ticks_per_snapshot:6_000_000L
     ~inputs:tx_no_verify_inputs
-    ~versions:[V0; V1]
+    ~versions
     ~hash_frequency:10_037L
     ~proof_frequency:(3L, 30_893L)
     tx_no_verify_kernel ;
@@ -316,7 +320,7 @@ let register () =
     ~from_binary:false
     ~ticks_per_snapshot:5_000L
     ~inputs:tx_no_verify_inputs
-    ~versions:[V0; V1]
+    ~versions
     ~hash_frequency:0L
     ~proof_frequency:(1L, 0L)
     (link_kernel "store_create" ["i32"; "i32"; "i32"] ["i32"]) ;
@@ -326,7 +330,7 @@ let register () =
     ~from_binary:false
     ~ticks_per_snapshot:5_000L
     ~inputs:tx_no_verify_inputs
-    ~versions:[V0; V1]
+    ~versions
     ~hash_frequency:0L
     ~proof_frequency:(1L, 0L)
     (link_kernel "store_delete_value" ["i32"; "i32"] ["i32"]) ;
@@ -336,7 +340,7 @@ let register () =
     ~from_binary:false
     ~ticks_per_snapshot:5_000L
     ~inputs:tx_no_verify_inputs
-    ~versions:[V0; V1]
+    ~versions
     ~hash_frequency:0L
     ~proof_frequency:(1L, 0L)
     (link_kernel

@@ -1304,7 +1304,7 @@ let lookup_opt ~version name =
   let v1_and_above ty name =
     match version with
     | Wasm_pvm_state.V0 -> None
-    | V1 -> Some (ExternFunc (HostFunc (ty, name)))
+    | V1 | V2 -> Some (ExternFunc (HostFunc (ty, name)))
   in
   match name with
   | "read_input" ->
@@ -1393,6 +1393,10 @@ let registry_V1 ~write_debug =
 
 let registry_V1_noop = registry_V1 ~write_debug:Noop
 
+let registry_V2 ~write_debug = registry_V1 ~write_debug
+
+let registry_V2_noop = registry_V2 ~write_debug:Noop
+
 let registry ~version ~write_debug =
   (* We need to keep a top-level definition for the [Noop] case to be able to
      run the tests related to the tick models. Besides, by doing so, we should
@@ -1403,6 +1407,8 @@ let registry ~version ~write_debug =
   | Wasm_pvm_state.V0, _ -> registry_V0 ~write_debug
   | Wasm_pvm_state.V1, Noop -> registry_V1_noop
   | Wasm_pvm_state.V1, _ -> registry_V1 ~write_debug
+  | Wasm_pvm_state.V2, Noop -> registry_V2_noop
+  | Wasm_pvm_state.V2, _ -> registry_V2 ~write_debug
 
 module Internal_for_tests = struct
   let metadata_size = Int32.to_int metadata_size

@@ -211,8 +211,7 @@ let test_get_output ~version () =
   Lwt_result_syntax.return_unit
 
 let tests =
-  tztests_with_pvm
-    ~versions:[V0; V1]
+  tztests_with_all_pvms
     [
       ("Get info", `Quick, test_get_info);
       ("Set input", `Quick, test_set_input);

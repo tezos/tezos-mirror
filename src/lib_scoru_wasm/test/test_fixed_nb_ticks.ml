@@ -152,8 +152,7 @@ let test_stuck_in_init_kernel ~version () =
     (assert (info.current_tick = Z.add previous_max_nb_ticks new_max_nb_ticks))
 
 let tests =
-  tztests_with_pvm
-    ~versions:[V0; V1]
+  tztests_with_all_pvms
     [
       ("nb of ticks limited", `Quick, test_looping_kernel);
       ("evaluation takes fixed nb of ticks", `Quick, test_noop_kernel);
