@@ -269,7 +269,8 @@ val bake_n_with_liquidity_baking_toggle_ema :
   ?adaptive_inflation_vote:Toggle_votes.toggle_vote ->
   int ->
   t ->
-  (block * Alpha_context.Toggle_EMA.t) tzresult Lwt.t
+  (block * Alpha_context.Toggle_votes.Liquidity_baking_toggle_EMA.t) tzresult
+  Lwt.t
 
 val current_cycle : t -> Cycle.t tzresult Lwt.t
 

@@ -4696,13 +4696,23 @@ end
 
 (** This module re-exports definitions from {!Toggle_EMA} *)
 module Toggle_EMA : sig
-  type t
+  module type T = sig
+    type t
 
-  val zero : t
+    val of_int64 : Int64.t -> t tzresult Lwt.t
 
-  val to_int64 : t -> Int64.t
+    val zero : t
 
-  val encoding : t Data_encoding.t
+    val to_int64 : t -> Int64.t
+
+    val encoding : t Data_encoding.t
+
+    val ( < ) : t -> Int64.t -> bool
+
+    val update_ema_up : t -> t
+
+    val update_ema_down : t -> t
+  end
 end
 
 (** This module re-exports definitions from {!Toggle_votes_repr}. *)
@@ -4723,7 +4733,19 @@ module Toggle_votes : sig
 
   val toggle_votes_encoding : toggle_votes Data_encoding.encoding
 
-  val compute_new_ema : toggle_vote:toggle_vote -> Toggle_EMA.t -> Toggle_EMA.t
+  module Liquidity_baking_toggle_EMA : Toggle_EMA.T
+
+  module Adaptive_inflation_launch_EMA : Toggle_EMA.T
+
+  val compute_new_liquidity_baking_ema :
+    toggle_vote:toggle_vote ->
+    Liquidity_baking_toggle_EMA.t ->
+    Liquidity_baking_toggle_EMA.t
+
+  val compute_new_adaptive_inflation_ema :
+    toggle_vote:toggle_vote ->
+    Adaptive_inflation_launch_EMA.t ->
+    Adaptive_inflation_launch_EMA.t
 end
 
 (** This module re-exports definitions from {!Liquidity_baking_storage}. *)
@@ -4734,7 +4756,8 @@ module Liquidity_baking : sig
     context ->
     toggle_vote:Toggle_votes.toggle_vote ->
     (context -> Contract_hash.t -> (context * 'a list) tzresult Lwt.t) ->
-    (context * 'a list * Toggle_EMA.t) tzresult Lwt.t
+    (context * 'a list * Toggle_votes.Liquidity_baking_toggle_EMA.t) tzresult
+    Lwt.t
 end
 
 (** This module re-exports definitions from {!Ticket_storage}. *)

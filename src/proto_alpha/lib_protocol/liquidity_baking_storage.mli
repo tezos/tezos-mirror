@@ -40,4 +40,6 @@ val on_subsidy_allowed :
   Raw_context.t ->
   toggle_vote:Toggle_votes_repr.toggle_vote ->
   (Raw_context.t -> Contract_hash.t -> (Raw_context.t * 'a list) tzresult Lwt.t) ->
-  (Raw_context.t * 'a list * Toggle_EMA.t) tzresult Lwt.t
+  (Raw_context.t * 'a list * Toggle_votes_repr.Liquidity_baking_toggle_EMA.t)
+  tzresult
+  Lwt.t

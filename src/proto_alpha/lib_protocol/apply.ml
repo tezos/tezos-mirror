@@ -1791,8 +1791,8 @@ type application_state = {
   mode : mode;
   op_count : int;
   migration_balance_updates : Receipt.balance_updates;
-  liquidity_baking_toggle_ema : Toggle_EMA.t;
-  adaptive_inflation_toggle_ema : Toggle_EMA.t;
+  liquidity_baking_toggle_ema : Toggle_votes.Liquidity_baking_toggle_EMA.t;
+  adaptive_inflation_toggle_ema : Toggle_votes.Adaptive_inflation_launch_EMA.t;
   implicit_operations_results :
     Apply_results.packed_successful_manager_operation_result list;
 }
@@ -2388,7 +2388,8 @@ let begin_application ctxt chain_id ~migration_balance_updates
       op_count = 0;
       migration_balance_updates;
       liquidity_baking_toggle_ema;
-      adaptive_inflation_toggle_ema = Toggle_EMA.zero;
+      adaptive_inflation_toggle_ema =
+        Toggle_votes.Adaptive_inflation_launch_EMA.zero;
       implicit_operations_results =
         Apply_results.pack_migration_operation_results
           migration_operation_results
@@ -2447,7 +2448,8 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
       op_count = 0;
       migration_balance_updates;
       liquidity_baking_toggle_ema;
-      adaptive_inflation_toggle_ema = Toggle_EMA.zero;
+      adaptive_inflation_toggle_ema =
+        Toggle_votes.Adaptive_inflation_launch_EMA.zero;
       implicit_operations_results =
         Apply_results.pack_migration_operation_results
           migration_operation_results
@@ -2480,7 +2482,8 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
       op_count = 0;
       migration_balance_updates;
       liquidity_baking_toggle_ema;
-      adaptive_inflation_toggle_ema = Toggle_EMA.zero;
+      adaptive_inflation_toggle_ema =
+        Toggle_votes.Adaptive_inflation_launch_EMA.zero;
       implicit_operations_results =
         Apply_results.pack_migration_operation_results
           migration_operation_results

@@ -24,22 +24,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Exponential moving average of toggle votes. Represented as an int64 between
-    0 and 2,000,000,000. It is an exponential moving average of the "off" votes
-    over a window of the most recent 2000 blocks that did not vote "pass". *)
+module type EMA_PARAMETERS = sig
+  (* This represents the impact on the EMA of a single block
+     vote. Between voting On and voting Off, the impact on the EMA is
+     twice this number. *)
+  val baker_contribution : Z.t
 
-type t
+  (* This is the maximum value that the EMA can take. The minimal
+     value cannot be set, it is 0L. *)
+  val ema_max : Int64.t
+end
 
-val of_int64 : Int64.t -> t tzresult Lwt.t
+module type T = sig
+  type t
 
-val zero : t
+  val of_int64 : Int64.t -> t tzresult Lwt.t
 
-val to_int64 : t -> Int64.t
+  val zero : t
 
-val encoding : t Data_encoding.t
+  val to_int64 : t -> Int64.t
 
-val ( < ) : t -> Int64.t -> bool
+  val encoding : t Data_encoding.t
 
-val update_ema_off : t -> t
+  val ( < ) : t -> Int64.t -> bool
 
-val update_ema_on : t -> t
+  val update_ema_up : t -> t
+
+  val update_ema_down : t -> t
+end
+
+module Make (_ : EMA_PARAMETERS) : T

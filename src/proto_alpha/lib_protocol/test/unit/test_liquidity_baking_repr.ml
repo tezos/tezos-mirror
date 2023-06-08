@@ -32,18 +32,21 @@
 *)
 
 open Protocol
+module Toggle_EMA = Toggle_votes_repr.Liquidity_baking_toggle_EMA
 
 let ema_of_int64 ema = Toggle_EMA.of_int64 ema >|= Environment.wrap_tzresult
 
 let ema_to_int64 = Toggle_EMA.to_int64
 
 let compute_new_ema ~toggle_vote ema =
-  Toggle_votes_repr.compute_new_ema ~toggle_vote ema |> ema_to_int64
+  Toggle_votes_repr.compute_new_liquidity_baking_ema ~toggle_vote ema
+  |> ema_to_int64
 
 (* Folds compute_new_ema on a list of votes *)
 let compute_new_ema_n toggle_votes initial_ema =
   List.fold_left
-    (fun ema toggle_vote -> Toggle_votes_repr.compute_new_ema ~toggle_vote ema)
+    (fun ema toggle_vote ->
+      Toggle_votes_repr.compute_new_liquidity_baking_ema ~toggle_vote ema)
     initial_ema
     toggle_votes
   |> ema_to_int64

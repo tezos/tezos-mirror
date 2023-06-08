@@ -996,7 +996,7 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
 
 let bake_n_with_liquidity_baking_toggle_ema ?(baking_mode = Application) ?policy
     ?liquidity_baking_toggle_vote ?adaptive_inflation_vote n b =
-  let initial_ema = Toggle_EMA.zero in
+  let initial_ema = Toggle_votes.Liquidity_baking_toggle_EMA.zero in
   List.fold_left_es
     (fun (b, _toggle_ema) _ ->
       bake_with_metadata
