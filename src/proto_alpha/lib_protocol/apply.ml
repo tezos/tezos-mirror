@@ -239,8 +239,8 @@ let () =
     (function Invalid_self_transaction_destination -> Some () | _ -> None)
     (fun () -> Invalid_self_transaction_destination) ;
   let staking_for_nondelegate_while_costaking_disabled_description =
-    "As long as co-staking is not enabled, staking and unstaking operations \
-     are only allowed from delegates."
+    "As long as co-staking is not enabled, staking operations are only allowed \
+     from delegates."
   in
   register_error_kind
     `Permanent
@@ -410,8 +410,6 @@ let apply_unstake ~ctxt ~sender ~amount ~requested_amount ~destination
   let* delegate_opt = Contract.Delegate.find ctxt sender_contract in
   match delegate_opt with
   | None -> tzfail Staking_for_nondelegate_while_costaking_disabled
-  | Some delegate when Signature.Public_key_hash.(delegate <> sender) ->
-      tzfail Staking_for_nondelegate_while_costaking_disabled
   | Some delegate ->
       let* ctxt, balance_updates =
         Staking.request_unstake ctxt ~sender_contract ~delegate requested_amount
