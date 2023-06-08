@@ -41,7 +41,7 @@ module Topic_score = struct
 
   let time_in_mesh_cap = 3600.0
 
-  let time_in_mesh_quantum = 1.0
+  let time_in_mesh_quantum = Span.of_float_s 1.0
 
   let first_message_deliveries_weight = 1.0
 

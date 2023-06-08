@@ -117,7 +117,7 @@ struct
         let seconds_in_mesh = Span.to_float_s during in
         let weighted_time =
           topic_parameters.time_in_mesh_weight *. seconds_in_mesh
-          /. topic_parameters.time_in_mesh_quantum
+          /. Span.(to_float_s topic_parameters.time_in_mesh_quantum)
         in
         Float.min weighted_time topic_parameters.time_in_mesh_cap
 

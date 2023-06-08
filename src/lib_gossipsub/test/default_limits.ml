@@ -33,7 +33,8 @@ let default_limits ?mesh_message_deliveries_activation ?time_in_mesh_weight
     {
       time_in_mesh_weight = Option.value ~default:1.0 time_in_mesh_weight;
       time_in_mesh_cap = Option.value ~default:3600.0 time_in_mesh_cap;
-      time_in_mesh_quantum = Option.value ~default:1.0 time_in_mesh_quantum;
+      time_in_mesh_quantum =
+        Option.value ~default:(Milliseconds.of_float_s 1.0) time_in_mesh_quantum;
       first_message_deliveries_weight = 1.0;
       first_message_deliveries_cap = 2000;
       first_message_deliveries_decay = 0.5;

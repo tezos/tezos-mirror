@@ -183,7 +183,7 @@ let pp_per_topic_score_limits =
       Fmt.Dump.field
         "time_in_mesh_quantum"
         (fun l -> l.time_in_mesh_quantum)
-        Fmt.float;
+        GS.Span.pp;
       Fmt.Dump.field
         "first_message_deliveries_weight"
         (fun l -> l.first_message_deliveries_weight)

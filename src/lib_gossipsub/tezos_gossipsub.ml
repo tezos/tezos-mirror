@@ -255,7 +255,7 @@ module Make (C : AUTOMATON_CONFIG) :
   let check_per_topic_score_limits tsp =
     assert (tsp.time_in_mesh_weight >= 0.0) ;
     assert (tsp.time_in_mesh_cap >= 0.0) ;
-    assert (tsp.time_in_mesh_quantum > 0.0) ;
+    assert (Span.(tsp.time_in_mesh_quantum > zero)) ;
     assert (tsp.first_message_deliveries_weight >= 0.0) ;
     assert (tsp.first_message_deliveries_cap >= 0) ;
     assert_in_unit_interval tsp.first_message_deliveries_decay ;
