@@ -112,9 +112,14 @@ val create :
     creation. *)
 val config : _ t -> config
 
-(** [connect ?timeout t point] tries to add a connection to [point]
-    in [t] in less than [timeout]. *)
+(** [connect ?trusted ?expected_peer_id ?timeout t point] tries to add a
+    connection to [point] in [t] in less than [timeout]. Prior to connection
+    attempt, the [point] is registered with {!P2p_pool.register_point}, to which
+    the optional arguments [trusted] and [expected_peer_id] are also
+    provided. *)
 val connect :
+  ?trusted:bool ->
+  ?expected_peer_id:P2p_peer.Id.t ->
   ?timeout:Time.System.Span.t ->
   ('msg, 'peer, 'conn) t ->
   P2p_point.Id.t ->

@@ -308,8 +308,13 @@ module Real = struct
   let get_peer_metadata {pool; _} conn =
     P2p_pool.Peers.get_peer_metadata pool conn
 
-  let connect ?timeout net point =
-    P2p_connect_handler.connect ?timeout net.connect_handler point
+  let connect ?trusted ?expected_peer_id ?timeout net point =
+    P2p_connect_handler.connect
+      ?trusted
+      ?expected_peer_id
+      ?timeout
+      net.connect_handler
+      point
 
   let recv _net conn =
     let open Lwt_syntax in
@@ -505,6 +510,8 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   get_peer_metadata : P2p_peer.Id.t -> 'peer_meta;
   set_peer_metadata : P2p_peer.Id.t -> 'peer_meta -> unit;
   connect :
+    ?trusted:bool ->
+    ?expected_peer_id:P2p_peer.Id.t ->
     ?timeout:Ptime.span ->
     P2p_point.Id.t ->
     ('msg, 'peer_meta, 'conn_meta) connection tzresult Lwt.t;
@@ -598,7 +605,9 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
       global_stat = Real.global_stat net;
       get_peer_metadata = Real.get_peer_metadata net;
       set_peer_metadata = Real.set_peer_metadata net;
-      connect = (fun ?timeout -> Real.connect ?timeout net);
+      connect =
+        (fun ?trusted ?expected_peer_id ?timeout ->
+          Real.connect ?trusted ?expected_peer_id ?timeout net);
       recv = Real.recv net;
       recv_any = Real.recv_any net;
       send = Real.send net;
@@ -645,7 +654,7 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     get_peer_metadata = (fun _ -> peer_cfg.P2p_params.peer_meta_initial ());
     set_peer_metadata = (fun _ _ -> ());
     connect =
-      (fun ?timeout:_ _ ->
+      (fun ?trusted:_ ?expected_peer_id:_ ?timeout:_ _ ->
         Lwt_result_syntax.tzfail P2p_errors.Connection_refused);
     recv = (fun _ -> Lwt_utils.never_ending ());
     recv_any = (fun () -> Lwt_utils.never_ending ());
