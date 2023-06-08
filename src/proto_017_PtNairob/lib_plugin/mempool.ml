@@ -625,46 +625,27 @@ let conflict_handler config : Mempool.conflict_handler =
   else if Operation.compare existing_operation new_operation < 0 then `Replace
   else `Keep
 
-let find_manager {shell = _; protocol_data = Operation_data {contents; _}} =
-  match contents with
-  | Single (Manager_operation {source; _}) -> Some source
-  | Cons (Manager_operation {source; _}, _) -> Some source
-  | Single
-      ( Preendorsement _ | Endorsement _ | Dal_attestation _ | Proposals _
-      | Ballot _ | Seed_nonce_revelation _ | Vdf_revelation _
-      | Double_baking_evidence _ | Double_preendorsement_evidence _
-      | Double_endorsement_evidence _ | Activate_account _ | Drain_delegate _
-      | Failing_noop _ ) ->
-      None
-
-let fee_needed_to_overtake ~op_to_overtake ~candidate_op =
-  if is_manager_operation candidate_op && is_manager_operation op_to_overtake
-  then
-    (let open Result_syntax in
-    let* _fee, candidate_gas = compute_fee_and_gas_limit candidate_op in
-    let* target_fee, target_gas = compute_fee_and_gas_limit op_to_overtake in
-    if Gas.Arith.(target_gas = zero || candidate_gas = zero) then
-      (* This should not happen when both operations are valid. *)
-      Result.return_none
-    else
-      (* Compute the target ratio as in {!Operation_repr.weight_manager}.
-         We purposefully don't use {!fee_and_ratio_as_q} because the code
-         here needs to stay in sync with {!Operation_repr.weight_manager}
-         rather than {!better_fees_and_ratio}. *)
-      let target_fee = Q.of_int64 (Tez.to_mutez target_fee) in
-      let target_gas = Q.of_bigint (Gas.Arith.integral_to_z target_gas) in
-      let target_ratio = Q.(target_fee / target_gas) in
-      (* Compute the minimal fee needed to have a strictly greater ratio. *)
-      let candidate_gas = Q.of_bigint (Gas.Arith.integral_to_z candidate_gas) in
-      Result.return_some
-        (Int64.succ Q.(to_int64 (target_ratio * candidate_gas))))
-    |> Option.of_result |> Option.join
-  else None
-
 let int64_ceil_of_q q =
   let n = Q.to_int64 q in
   if Q.(equal q (of_int64 n)) then n else Int64.succ n
 
+(* Compute the minimal fee (expressed in mutez) that [candidate_op]
+   would need to have in order for the {!conflict_handler} to let it
+   replace [op_to_replace], when both operations are manager
+   operations.
+
+   As specified in {!conflict_handler}, this means that [candidate_op]
+   with the returned fee needs to have both its fee and its fee/gas
+   ratio exceed (or match) [op_to_replace]'s same metrics bumped by
+   the {!config}'s [replace_by_fee_factor].
+
+   Return [None] when at least one operation is not a manager
+   operation.
+
+   Also return [None] if both operations are manager operations but
+   there was an error while computing the needed fee. However, note
+   that this cannot happen when both manager operations have been
+   successfully validated by the protocol. *)
 let fee_needed_to_replace_by_fee config ~op_to_replace ~candidate_op =
   if is_manager_operation candidate_op && is_manager_operation op_to_replace
   then
@@ -691,6 +672,100 @@ let fee_needed_to_replace_by_fee config ~op_to_replace ~candidate_op =
     |> Option.of_result |> Option.join
   else None
 
+let find_manager {shell = _; protocol_data = Operation_data {contents; _}} =
+  match contents with
+  | Single (Manager_operation {source; _}) -> Some source
+  | Cons (Manager_operation {source; _}, _) -> Some source
+  | Single
+      ( Preendorsement _ | Endorsement _ | Dal_attestation _ | Proposals _
+      | Ballot _ | Seed_nonce_revelation _ | Vdf_revelation _
+      | Double_baking_evidence _ | Double_preendorsement_evidence _
+      | Double_endorsement_evidence _ | Activate_account _ | Drain_delegate _
+      | Failing_noop _ ) ->
+      None
+
+(* The purpose of this module is to offer a version of
+   [fee_needed_to_replace_by_fee] where the caller doesn't need to
+   provide the [op_to_replace]. Instead, it needs to call
+   [Conflict_map.update] every time a new operation is added to the
+   mempool. This setup prevents the mempool plugin from exposing the
+   notion of manager operations and their source. *)
+module Conflict_map = struct
+  (* The state consists in a map of all validated manager operations,
+     indexed by their source.
+
+     Note that the protocol already enforces that there is at most one
+     operation per source.
+
+     The state only tracks manager operations because other kinds of
+     operations don't have fees that we might adjust to change the
+     outcome of the {!conflict_handler}, so
+     [fee_needed_to_replace_by_fee] will always return [None] when
+     they are involved anyway. *)
+  type t = packed_operation Signature.Public_key_hash.Map.t
+
+  let empty = Signature.Public_key_hash.Map.empty
+
+  (* Remove all the [replacements] from the state, then add
+     [new_operation]. Non-manager operations are ignored.
+
+     It is important to remove before adding: otherwise, we would
+     remove the newly added operation when it has the same manager as
+     one of the replacements. *)
+  let update conflict_map ~new_operation ~replacements =
+    let conflict_map =
+      List.fold_left
+        (fun conflict_map op ->
+          match find_manager op with
+          | Some manager ->
+              Signature.Public_key_hash.Map.remove manager conflict_map
+          | None -> (* Non-manager operation: ignore it. *) conflict_map)
+        conflict_map
+        replacements
+    in
+    match find_manager new_operation with
+    | Some manager ->
+        Signature.Public_key_hash.Map.add manager new_operation conflict_map
+    | None -> (* Non-manager operation: ignore it. *) conflict_map
+
+  let fee_needed_to_replace_by_fee config ~candidate_op ~conflict_map =
+    match find_manager candidate_op with
+    | None -> (* Non-manager operation. *) None
+    | Some manager -> (
+        match Signature.Public_key_hash.Map.find manager conflict_map with
+        | None ->
+            (* This can only happen when the pre-existing conflicting
+               operation is a [Drain_delegate], which cannot be replaced by a
+               manager operation regardless of the latter's fee. *)
+            None
+        | Some op_to_replace ->
+            fee_needed_to_replace_by_fee config ~candidate_op ~op_to_replace)
+end
+
+let fee_needed_to_overtake ~op_to_overtake ~candidate_op =
+  if is_manager_operation candidate_op && is_manager_operation op_to_overtake
+  then
+    (let open Result_syntax in
+    let* _fee, candidate_gas = compute_fee_and_gas_limit candidate_op in
+    let* target_fee, target_gas = compute_fee_and_gas_limit op_to_overtake in
+    if Gas.Arith.(target_gas = zero || candidate_gas = zero) then
+      (* This should not happen when both operations are valid. *)
+      Result.return_none
+    else
+      (* Compute the target ratio as in {!Operation_repr.weight_manager}.
+         We purposefully don't use {!fee_and_ratio_as_q} because the code
+         here needs to stay in sync with {!Operation_repr.weight_manager}
+         rather than {!better_fees_and_ratio}. *)
+      let target_fee = Q.of_int64 (Tez.to_mutez target_fee) in
+      let target_gas = Q.of_bigint (Gas.Arith.integral_to_z target_gas) in
+      let target_ratio = Q.(target_fee / target_gas) in
+      (* Compute the minimal fee needed to have a strictly greater ratio. *)
+      let candidate_gas = Q.of_bigint (Gas.Arith.integral_to_z candidate_gas) in
+      Result.return_some
+        (Int64.succ Q.(to_int64 (target_ratio * candidate_gas))))
+    |> Option.of_result |> Option.join
+  else None
+
 module Internal_for_tests = struct
   let default_config_with_clock_drift clock_drift =
     {default_config with clock_drift}
@@ -701,4 +776,6 @@ module Internal_for_tests = struct
   let get_clock_drift {clock_drift; _} = clock_drift
 
   let acceptable_op = acceptable_op
+
+  let fee_needed_to_replace_by_fee = fee_needed_to_replace_by_fee
 end

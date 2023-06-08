@@ -103,10 +103,41 @@ val pre_filter :
     able to call {!Protocol.Alpha_context.Operation.compare}). *)
 val conflict_handler : config -> Protocol.Mempool.conflict_handler
 
-(** If the operation is a manager operation, return its source,
-    otherwise return [None]. *)
-val find_manager :
-  Protocol.Alpha_context.packed_operation -> Signature.Public_key_hash.t option
+(** The purpose of this module is to provide the
+    [fee_needed_to_replace_by_fee] function. For this function to be
+    correct, the caller must maintain the state of type [t] by calling
+    [update] on each successfully validated operation and its induced
+    replacements. *)
+module Conflict_map : sig
+  (** Internal state needed by [fee_needed_to_replace_by_fee]. *)
+  type t
+
+  (** Initial state. *)
+  val empty : t
+
+  (** Removes all the [replacements] from the state then adds
+      [new_operation]. *)
+  val update :
+    t ->
+    new_operation:Protocol.Alpha_context.packed_operation ->
+    replacements:Protocol.Alpha_context.packed_operation list ->
+    t
+
+  (** This function should be called when
+      [Protocol.Mempool.add_operation] has returned [Unchanged]. This
+      means that the [candidate_op] has been rejected because there was
+      a conflict with an pre-existing operation and the
+      {!val-conflict_handler} has returned [`Keep]. When both
+      operations are manager operations, this function returns the
+      minimal fee (in mutez) that [candidate_op] would need in order to
+      win the conflict, i.e. make the {!val-conflict_handler} return
+      [`Replace] instead. Otherwise, it returns [None]. *)
+  val fee_needed_to_replace_by_fee :
+    config ->
+    candidate_op:Protocol.Alpha_context.packed_operation ->
+    conflict_map:t ->
+    int64 option
+end
 
 (** Compute the minimal fee (expressed in mutez) that [candidate_op] would
     need to have in order to be strictly greater than [op_to_overtake]
@@ -121,27 +152,6 @@ val find_manager :
     successfully validated by the protocol. *)
 val fee_needed_to_overtake :
   op_to_overtake:Protocol.Alpha_context.packed_operation ->
-  candidate_op:Protocol.Alpha_context.packed_operation ->
-  int64 option
-
-(** Compute the minimal fee (expressed in mutez) that [candidate_op]
-    would need to have in order for the {!conflict_handler} to let it
-    replace [op_to_replace], when both operations are manager operations.
-
-    As specified in {!conflict_handler}, this means that
-    [candidate_op] with the returned fee needs to have both its fee and
-    its fee/gas ratio exceed (or match) [op_to_replace]'s same metrics
-    bumped by the {!config}'s [replace_by_fee_factor].
-
-    Return [None] when at least one operation is not a manager operation.
-
-    Also return [None] if both operations are manager operations but
-    there was an error while computing the needed fee. However, note
-    that this cannot happen when both manager operations have been
-    successfully validated by the protocol. *)
-val fee_needed_to_replace_by_fee :
-  config ->
-  op_to_replace:Protocol.Alpha_context.packed_operation ->
   candidate_op:Protocol.Alpha_context.packed_operation ->
   int64 option
 
@@ -189,4 +199,13 @@ module Internal_for_tests : sig
     op_round:Round.t ->
     now_timestamp:Timestamp.time ->
     bool Environment.Error_monad.tzresult
+
+  (** The main component of
+      {!Conflict_map.fee_needed_to_replace_by_fee}. See comment in the
+      ml file. *)
+  val fee_needed_to_replace_by_fee :
+    config ->
+    op_to_replace:Protocol.Alpha_context.packed_operation ->
+    candidate_op:Protocol.Alpha_context.packed_operation ->
+    int64 option
 end

@@ -129,8 +129,6 @@ module MakeAbstract
 
   type operation = protocol_operation Shell_operation.operation
 
-  module Manager = Signature.Public_key_hash
-
   type t = {
     validation_info : Proto.Mempool.validation_info;
         (** Static information needed by [Proto.Mempool.add_operation]. *)
@@ -139,10 +137,11 @@ module MakeAbstract
     bounding_state : Bounding.state;
         (** Representation of currently valid operations used to enforce
             mempool bounds. *)
-    manager_map : protocol_operation Manager.Map.t;
-        (** Valid manager operations in the mempool, indexed by manager. *)
     filter_info : Filter.Mempool.filter_info;
         (** Static information needed by [Filter.Mempool.pre_filter]. *)
+    conflict_map : Filter.Mempool.Conflict_map.t;
+        (** State needed by
+            [Filter.Mempool.Conflict_map.fee_needed_to_replace_by_fee]. *)
   }
 
   let create_aux ?old_state chain_store head timestamp =
@@ -166,8 +165,8 @@ module MakeAbstract
       | Some old_state -> Filter.Mempool.flush old_state.filter_info ~head
     in
     let bounding_state = Bounding.empty in
-    let manager_map = Manager.Map.empty in
-    return {validation_info; mempool; bounding_state; manager_map; filter_info}
+    let conflict_map = Filter.Mempool.Conflict_map.empty in
+    return {validation_info; mempool; bounding_state; filter_info; conflict_map}
 
   let create chain_store ~head ~timestamp =
     create_aux chain_store head timestamp
@@ -278,37 +277,26 @@ module MakeAbstract
     in
     return (mempool, bounding_state, replacements)
 
-  (* Update the [manager_map] by removing the [replacements] then
-     adding [op] if it is a manager operation. Non-manager operations
-     are ignored.
-
-     Note that it is important to remove before adding, otherwise we
-     risk removing the newly added operation if it has just replaced
-     an operation from the same manager.
-
-     [mempool_before] is the protocol's mempool representation before
-     calling [Proto.Mempool.add_operation], so that it still contains
-     the replaced operations. Indeed, it is used to retrieve these
-     operations from their hash. *)
-  let update_manager_map manager_map mempool_before op replacements =
-    let manager_map =
-      (* No need to call [Proto.Mempool.operations] when the list is empty. *)
-      if List.is_empty replacements then manager_map
+  let update_conflict_map conflict_map ~mempool_before op replacements =
+    (* [mempool_before] is the protocol's mempool representation
+       **before calling [Proto.Mempool.add_operation]**, so that it
+       still contains the replaced operations. Indeed, it is used to
+       retrieve these operations from their hash. *)
+    let replacements =
+      if List.is_empty replacements then []
+        (* No need to call [Proto.Mempool.operations] when the list is empty. *)
       else
         let ops = Proto.Mempool.operations mempool_before in
-        let remove_replacement mmap (oph, _error_classification) =
-          match Operation_hash.Map.find oph ops with
-          | None -> (* This case should never happen. *) mmap
-          | Some op -> (
-              match Filter.Mempool.find_manager op with
-              | None -> (* Not a manager operation: ignore it. *) mmap
-              | Some manager -> Manager.Map.remove manager mmap)
-        in
-        List.fold_left remove_replacement manager_map replacements
+        List.filter_map
+          (fun (oph, (_ : error_classification)) ->
+            (* This should always return [Some _]. *)
+            Operation_hash.Map.find oph ops)
+          replacements
     in
-    match Filter.Mempool.find_manager op.protocol with
-    | None -> (* Not a manager operation: ignore it. *) manager_map
-    | Some manager -> Manager.Map.add manager op.protocol manager_map
+    Filter.Mempool.Conflict_map.update
+      conflict_map
+      ~new_operation:op.protocol
+      ~replacements
 
   let add_operation_result state (filter_config, bounding_config) op :
       add_result tzresult Lwt.t =
@@ -333,10 +321,14 @@ module MakeAbstract
     in
     match res with
     | Ok (mempool, bounding_state, replacements) ->
-        let manager_map =
-          update_manager_map state.manager_map state.mempool op replacements
+        let conflict_map =
+          update_conflict_map
+            state.conflict_map
+            ~mempool_before:state.mempool
+            op
+            replacements
         in
-        let state = {state with mempool; bounding_state; manager_map} in
+        let state = {state with mempool; bounding_state; conflict_map} in
         return (state, valid_op, `Validated, replacements)
     | Error trace ->
         (* We convert any error from [check_conflict_and_bound] into an

@@ -28,8 +28,8 @@
     Component:    Plugin.Mempool
     Invocation:   dune exec src/proto_016_PtMumbai/lib_plugin/test/main.exe \
                   -- --file test_fee_needed_to_replace_by_fee.ml
-    Subject:      Unit tests the Mempool.fee_needed_to_replace_by_fee
-                  function of the plugin
+    Subject:      Unit tests the fee_needed_to_replace_by_fee function
+                  of the mempool plugin
 *)
 
 let register_test =
@@ -53,7 +53,7 @@ let () =
   let test op_to_replace candidate_op =
     assert (
       Option.is_none
-        (Plugin.Mempool.fee_needed_to_replace_by_fee
+        (Plugin.Mempool.Internal_for_tests.fee_needed_to_replace_by_fee
            Plugin.Mempool.default_config
            ~op_to_replace
            ~candidate_op))
@@ -85,7 +85,7 @@ let test_manager_ops config (op_to_replace, fee_r, gas_r)
     gas_c ;
   let fee_needed =
     WithExceptions.Option.get ~loc:__LOC__
-    @@ Plugin.Mempool.fee_needed_to_replace_by_fee
+    @@ Plugin.Mempool.Internal_for_tests.fee_needed_to_replace_by_fee
          config
          ~op_to_replace:(snd op_to_replace)
          ~candidate_op:(snd candidate_op)

@@ -31,15 +31,6 @@
     Subject:      Unit tests for {!Prevalidation.T}
 *)
 
-(* Note: the logic of Prevalidation.t.manager_map is not tested here
-   because the mock protocol operations don't have a notion of
-   manager. However, it will serve to indicate the fees needed to
-   replace the previous operation in a manager conflict error, which
-   will be tested in tezt. *)
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/5197
-   Update the comment above once the fees needed to replace are
-   implemented and tested. *)
-
 let register_test ~title ~additional_tags =
   Test.register
     ~__FILE__
