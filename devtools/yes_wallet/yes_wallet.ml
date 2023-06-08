@@ -26,6 +26,41 @@
 
 type error = Overwrite_forbiden of string | File_not_found of string
 
+(* We need to exit Lwt + tzResult context from Yes_wallet. *)
+let run_load_mainnet_bakers_public_keys ?staking_share_opt base_dir
+    ~active_bakers_only alias_pkh_pk_list =
+  let open Yes_wallet_lib in
+  let open Tezos_error_monad in
+  match
+    Lwt_main.run
+      (load_mainnet_bakers_public_keys
+         ?staking_share_opt
+         base_dir
+         ~active_bakers_only
+         alias_pkh_pk_list)
+  with
+  | Ok alias_pkh_pk_list -> alias_pkh_pk_list
+  | Error trace ->
+      Format.eprintf "error:@.%a@." Error_monad.pp_print_trace trace ;
+      exit 1
+
+let run_build_yes_wallet ?staking_share_opt base_dir ~active_bakers_only
+    ~aliases =
+  let open Yes_wallet_lib in
+  let open Tezos_error_monad in
+  match
+    Lwt_main.run
+      (build_yes_wallet
+         ?staking_share_opt
+         base_dir
+         ~active_bakers_only
+         ~aliases)
+  with
+  | Ok alias_pkh_pk_list -> alias_pkh_pk_list
+  | Error trace ->
+      Format.eprintf "error:@.%a@." Error_monad.pp_print_trace trace ;
+      exit 1
+
 let try_copy ~replace source target =
   if source = target then Ok ()
   else
@@ -91,11 +126,10 @@ let convert_wallet ~replace wallet_dir target_dir =
         pk_source
 
 let populate_wallet ~replace yes_wallet_dir alias_pkh_pk_list =
-  let pkh_filename = "public_key_hashs" in
-  let pk_filename = "public_keys" in
-  let sk_filename = "secret_keys" in
+  let pkh_filename = Filename.concat yes_wallet_dir "public_key_hashs" in
+  let pk_filename = Filename.concat yes_wallet_dir "public_keys" in
+  let sk_filename = Filename.concat yes_wallet_dir "secret_keys" in
   if not (Sys.file_exists yes_wallet_dir) then Unix.mkdir yes_wallet_dir 0o750 ;
-  Unix.chdir yes_wallet_dir ;
   if
     (Sys.file_exists pkh_filename
     || Sys.file_exists pk_filename
@@ -112,10 +146,12 @@ let populate_wallet ~replace yes_wallet_dir alias_pkh_pk_list =
       sk_filename ;
     false)
   else (
-    json_to_file (pkh_list_json alias_pkh_pk_list) pkh_filename ;
-    json_to_file (pk_list_json alias_pkh_pk_list) pk_filename ;
-    json_to_file (sk_list_json alias_pkh_pk_list) sk_filename ;
+    Yes_wallet_lib.write_yes_wallet yes_wallet_dir alias_pkh_pk_list ;
     true)
+
+let alias_file_opt_name = "--aliases"
+
+let alias_file_extension = ".json"
 
 let active_bakers_only_opt_name = "--active-bakers-only"
 
@@ -143,7 +179,8 @@ let usage () =
      @[<v>@[<v 4>> convert wallet <wallet-dir> inplace@,\
      same as above but overwrite the file in the directory <wallet-dir>@]@,\
      @[<v>@[<v 4>> create minimal in <yes_wallet_dir>@,\
-     creates a yes-wallet with the foundation baker keys in <yes_wallet_dir>@]@,\
+     creates a yes-wallet with the Tezos Foundation baker keys in \
+     <yes_wallet_dir>@]@,\
      @[<v 4>> create from context <base_dir> in <yes_wallet_dir> [%s] [%s \
      <NUM>]@,\
      creates a yes-wallet with all delegates in the head block of the context \
@@ -153,11 +190,14 @@ let usage () =
      stake of at least <NUM> percent of the total stake are kept@]@]@,\
      @[<v>@[<v 4>> dump staking balances from <base_dir> in <csv_file>@,\
      saves the staking balances of all delegates in the target csv file@]@]@,\
-     @[<v>if %s is used existing files will be overwritten@]@."
+     @[<v>if %s <FILE> is used, it will input aliases from an .json file.See \
+     README.md for the spec of this file and how to generate it.@],@[<v>if %s \
+     is used existing files will be overwritten@]@."
     active_bakers_only_opt_name
     staking_share_opt_name
     active_bakers_only_opt_name
     staking_share_opt_name
+    alias_file_opt_name
     force_opt_name
 
 let () =
@@ -166,10 +206,27 @@ let () =
     let rec aux argv =
       match argv with
       | [] -> None
-      | "--staking-share" :: percentage :: _ ->
+      | str :: percentage :: _ when str = staking_share_opt_name ->
           let percentage = Int64.of_string percentage in
           assert (0L < percentage && percentage < 100L) ;
           Some percentage
+      | _ :: argv' -> aux argv'
+    in
+    aux argv
+  in
+  (* Take an alias file as input. *)
+  let alias_file_opt =
+    let rec aux argv =
+      match argv with
+      | [] -> None
+      | str :: file :: _ when str = alias_file_opt_name ->
+          if Sys.file_exists file then Some file
+          else (
+            Format.eprintf
+              "Warning: %a doesn't point to an existing alias file.\n"
+              Format.pp_print_string
+              file ;
+            None)
       | _ :: argv' -> aux argv'
     in
     aux argv
@@ -178,7 +235,10 @@ let () =
     List.partition
       (fun arg ->
         (String.length arg > 0 && String.get arg 0 = '-')
-        || Str.string_match (Str.regexp "[0-9]+") arg 0)
+        || Str.string_match (Str.regexp "[0-9]+") arg 0
+        (* FIME this is an uggly hack, but hey -lets' force alias files
+           to have a .json extension.*)
+        || String.ends_with ~suffix:alias_file_extension arg)
       argv
   in
   let active_bakers_only =
@@ -195,9 +255,20 @@ let () =
         when opt = staking_share_opt_name
              && Str.string_match (Str.regexp "[0-9]+") num 0 ->
           filter t
+      | opt :: file :: t
+        when opt = alias_file_opt_name
+             && String.ends_with ~suffix:alias_file_extension file ->
+          filter t
       | h :: t -> h :: filter t
     in
     filter options
+  in
+  (* parse alias file *)
+  let aliases =
+    match alias_file_opt with
+    (* Fallback  to hardcoded TF baker list *)
+    | None -> Yes_wallet_lib.tf_alias_pkh_pk_list
+    | Some file -> Yes_wallet_lib.load_alias_file file
   in
   if unknown_options <> [] then
     Format.eprintf
@@ -214,26 +285,25 @@ let () =
         Format.eprintf
           "Warning: option %s is ignored for create minimal@."
           active_bakers_only_opt_name ;
-      if
-        populate_wallet
-          ~replace:!force
-          yes_wallet_dir
-          Yes_wallet_lib.alias_pkh_pk_list
-      then Format.printf "Created minimal wallet in %s@." yes_wallet_dir
+      if populate_wallet ~replace:!force yes_wallet_dir aliases then
+        Format.printf "Created minimal wallet in %s@." yes_wallet_dir
   | [_; "create"; "from"; "context"; base_dir; "in"; yes_wallet_dir] ->
-      let alias_pkh_pk_list =
-        Yes_wallet_lib.load_mainnet_bakers_public_keys
-          base_dir
-          active_bakers_only
-          staking_share_opt
-        (* get rid of stake *)
-        |> List.map (fun (alias, pkh, pk, _stake) -> (alias, pkh, pk))
-      in
-      Format.printf
-        "@[<h>Number of keys to export:@;<3 0>%d@]@."
-        (List.length alias_pkh_pk_list) ;
-      if populate_wallet ~replace:!force yes_wallet_dir alias_pkh_pk_list then
-        Format.printf "@[<h>Exported path:@;<14 0>%s@]@." yes_wallet_dir
+      if not (Sys.file_exists base_dir) then (
+        Format.eprintf "Invalid --data-dir provided: %s.\n" base_dir ;
+        exit 1)
+      else
+        let yes_alias_list =
+          run_build_yes_wallet
+            ~staking_share_opt
+            base_dir
+            ~active_bakers_only
+            ~aliases
+        in
+        Format.printf
+          "@[<h>Number of keys to export:@;<3 0>%d@]@."
+          (List.length yes_alias_list) ;
+        if populate_wallet ~replace:!force yes_wallet_dir yes_alias_list then
+          Format.printf "@[<h>Exported path:@;<14 0>%s@]@." yes_wallet_dir
   | [_; "convert"; "wallet"; base_dir; "in"; target_dir] ->
       convert_wallet ~replace:!force base_dir target_dir ;
       Format.printf
@@ -251,10 +321,11 @@ let () =
           base_dir
   | [_; "dump"; "staking"; "balances"; "from"; base_dir; "in"; csv_file] ->
       let alias_pkh_pk_list =
-        Yes_wallet_lib.load_mainnet_bakers_public_keys
+        run_load_mainnet_bakers_public_keys
+          ~staking_share_opt
           base_dir
-          active_bakers_only
-          staking_share_opt
+          ~active_bakers_only
+          aliases
       in
       let flags =
         if !force then [Open_wronly; Open_creat; Open_trunc; Open_text]

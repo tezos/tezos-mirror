@@ -121,7 +121,23 @@ let sk_list_of_pk_file file =
   Format.printf "found %d keys@." (List.length list) ;
   map_bind_to_json (fun (alias, pk_s) -> sk_json (alias, alias, pk_s)) list
 
-let alias_pkh_pk_list =
+let load_alias_file chn =
+  let alias_of_json (json : Ezjsonm.value) =
+    match json with
+    | `O
+        [
+          ("alias", `String alias);
+          ("address", `String pkh);
+          ("publicKey", `String pk);
+        ] ->
+        (alias, pkh, pk)
+    | _json -> raise (Failure "Unsupported alias file format: ")
+  in
+  map_bind_of_json alias_of_json @@ json_of_file chn
+
+(* FIXME Can we get rid of the list for minimal? Just make sure we get
+   a few active bakers and that's it? *)
+let tf_alias_pkh_pk_list =
   [
     ( "foundation1",
       "tz3RDC3Jdn4j15J7bBHZd29EUee9gVB1CxD9",
@@ -148,6 +164,16 @@ let alias_pkh_pk_list =
       "tz3VEZ4k6a4Wx42iyev6i2aVAptTRLEAivNN",
       "p2pk67uapBxwkM1JNasGJ6J3rozzYELgrtcqxKZwZLjvsr4XcAr4FqC" );
   ]
+
+(* Creaye a yes-wallet in [dest] using the alias list [alias_pkh_pk_list]. *)
+let write_yes_wallet dest alias_pkh_pk_list =
+  let pkh_filename = Filename.concat dest "public_key_hashs" in
+  let pk_filename = Filename.concat dest "public_keys" in
+  let sk_filename = Filename.concat dest "secret_keys" in
+  if not (Sys.file_exists dest) then Unix.mkdir dest 0o750 ;
+  json_to_file (pkh_list_json alias_pkh_pk_list) pkh_filename ;
+  json_to_file (pk_list_json alias_pkh_pk_list) pk_filename ;
+  json_to_file (sk_list_json alias_pkh_pk_list) sk_filename
 
 (** Assuming that the [keys_list] is sorted in descending order, the
     function extracts the first keys until reaching the limit of
@@ -232,17 +258,17 @@ let protocol_of_hash protocol_hash =
     (fun (module P : Sigs.PROTOCOL) -> Protocol_hash.equal P.hash protocol_hash)
     (Known_protocols.get_all ())
 
-(** [load_mainnet_bakers_public_keys base_dir active_backers_only] checkouts
-    the head context at the given [base_dir] and computes a list of triples
-    [(alias, pkh, pk)] corresponding to all delegates in that context. The
-    [alias] is either procedurally generated for non-foundation bakers, or of
-    the form ["foundationN"] for foundation bakers (see [alias_pkh_pk_list]).
+(** [load_mainnet_bakers_public_keys base_dir active_backers_only
+    alias_phk_pk_list] checkouts the head context at the given
+    [base_dir] and computes a list of triples [(alias, pkh, pk)]
+    corresponding to all delegates in that context. The [alias] for
+    the delegates are gathered from [alias_pkh_pk_list]).
 
     if [active_bakers_only] then the deactivated delegates are filtered out of
     the list.
 *)
-let load_mainnet_bakers_public_keys base_dir active_bakers_only
-    staking_share_opt =
+let load_mainnet_bakers_public_keys ?(staking_share_opt = None) base_dir
+    ~active_bakers_only alias_pkh_pk_list =
   let open Lwt_result_syntax in
   let open Tezos_store in
   let mainnet_genesis =
@@ -321,16 +347,14 @@ let load_mainnet_bakers_public_keys base_dir active_bakers_only
          (alias, pkh, pk, stake))
        delegates
 
-let load_mainnet_bakers_public_keys base_dir active_bakers_only
-    staking_share_opt =
-  match
-    Lwt_main.run
-      (load_mainnet_bakers_public_keys
-         base_dir
-         active_bakers_only
-         staking_share_opt)
-  with
-  | Ok alias_pkh_pk_list -> alias_pkh_pk_list
-  | Error trace ->
-      Format.eprintf "error:@.%a@." Error_monad.pp_print_trace trace ;
-      exit 1
+let build_yes_wallet ?staking_share_opt base_dir ~active_bakers_only ~aliases =
+  let open Lwt_result_syntax in
+  let+ mainnet_bakers =
+    load_mainnet_bakers_public_keys
+      ?staking_share_opt
+      base_dir
+      ~active_bakers_only
+      aliases
+    (* get rid of stake *)
+  in
+  List.map (fun (alias, pkh, pk, _stake) -> (alias, pkh, pk)) mainnet_bakers
