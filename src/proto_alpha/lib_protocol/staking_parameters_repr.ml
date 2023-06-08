@@ -32,6 +32,8 @@ let maximum_baking_over_staking_edge =
   (* max is 1 expressed in portions of 1_000_000_000 *)
   1_000_000_000l
 
+let default = {staking_over_baking_limit = 0l; baking_over_staking_edge = 0l}
+
 type error += Invalid_staking_parameters
 
 let () =
