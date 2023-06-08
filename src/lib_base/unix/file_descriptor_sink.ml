@@ -584,6 +584,11 @@ end) : Internal_event.SINK with type t = t = struct
     lwt_bad_citizen_hack :=
       (to_write, M.level, section) :: !lwt_bad_citizen_hack ;
     let*! r = output_one now output section M.level to_write in
+    let () =
+      match !lwt_bad_citizen_hack with
+      | [] -> ()
+      | _h :: t -> lwt_bad_citizen_hack := t
+    in
     match r with
     | Error [Exn (Unix.Unix_error (Unix.EBADF, _, _))] ->
         (* The file descriptor was closed before the event arrived,
