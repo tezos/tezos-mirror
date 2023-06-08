@@ -196,38 +196,53 @@ let commands = [main_command]
 
 let global_options = Tezos_clic.no_options
 
+let executable_name = Filename.basename Sys.executable_name
+
+let argv () = Array.to_list Sys.argv |> List.tl |> Stdlib.Option.get
+
 let dispatch initial_ctx args =
   let open Lwt_result_syntax in
+  let commands =
+    Tezos_clic.add_manual
+      ~executable_name
+      ~global_options
+      (if Unix.isatty Unix.stdout then Tezos_clic.Ansi else Tezos_clic.Plain)
+      Format.std_formatter
+      commands
+  in
   let* ctx, remaining_args =
     Tezos_clic.parse_global_options global_options initial_ctx args
   in
   Tezos_clic.dispatch commands ctx remaining_args
 
-let () =
-  ignore
-    Tezos_clic.(
-      setup_formatter
-        Format.std_formatter
-        (if Unix.isatty Unix.stdout then Ansi else Plain)
-        Short) ;
-  let args = Array.to_list Sys.argv |> List.tl |> Option.value ~default:[] in
-  let result = Lwt_main.run (dispatch () args) in
-  match result with
+let handle_error = function
   | Ok _ -> ()
   | Error [Tezos_clic.Version] ->
       let version = Tezos_version_value.Bin_version.version_string in
       Format.printf "%s\n" version ;
       exit 0
-  | Error e ->
-      Format.eprintf
-        "%a\n%!"
-        Tezos_clic.(
-          fun ppf errs ->
-            pp_cli_errors
-              ppf
-              ~executable_name:"evm_proxy"
-              ~global_options:no_options
-              ~default:pp
-              errs)
-        e ;
-      exit 1
+  | Error [Tezos_clic.Help command] ->
+      Tezos_clic.usage
+        Format.std_formatter
+        ~executable_name
+        ~global_options
+        (match command with None -> [] | Some c -> [c]) ;
+      Stdlib.exit 0
+  | Error errs ->
+      Tezos_clic.pp_cli_errors
+        Format.err_formatter
+        ~executable_name
+        ~global_options
+        ~default:Error_monad.pp
+        errs ;
+      Stdlib.exit 1
+
+let () =
+  let _ =
+    Tezos_clic.(
+      setup_formatter
+        Format.std_formatter
+        (if Unix.isatty Unix.stdout then Ansi else Plain)
+        Short)
+  in
+  Lwt_main.run (dispatch () (argv ())) |> handle_error
