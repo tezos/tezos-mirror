@@ -168,4 +168,6 @@ val adaptive_inflation_staking_over_baking_limit : Raw_context.t -> int
 
 val adaptive_inflation_staking_over_delegation_edge : Raw_context.t -> int
 
+val adaptive_inflation_launch_ema_threshold : Raw_context.t -> int64
+
 val freeze_rewards : Raw_context.t -> bool
