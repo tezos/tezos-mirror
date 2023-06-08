@@ -1965,6 +1965,124 @@ let test_scoring_p1 rng _limits parameters =
     state ;
   unit
 
+(** Test for P2 (First Message Deliveries).
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L3247 *)
+let test_scoring_p2 rng _limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Scoring P2"
+    ~tags:["gossipsub"; "scoring"; "p2"]
+  @@ fun () ->
+  let first_message_deliveries_weight = 2.0 in
+  let first_message_deliveries_cap = 10 in
+  let first_message_deliveries_decay = 0.9 in
+  let limits =
+    Default_limits.default_limits
+      ~time_in_mesh_weight:0.0 (* deactivate time in mesh *)
+      ~first_message_deliveries_weight
+      ~first_message_deliveries_cap
+      ~first_message_deliveries_decay
+      ()
+  in
+  let peers = make_peers ~number:2 in
+  let topic = "topic" in
+  (* Build mesh with one peer. *)
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  let peers = Array.of_list peers in
+  let receive_message ~__LOC__ peer message_id message state =
+    let state, output =
+      GS.handle_receive_message
+        {sender = peer; topic; message_id; message}
+        state
+    in
+    match output with
+    | GS.Route_message _ | Already_received -> state
+    | _ ->
+        Test.fail
+          ~__LOC__
+          "Output should have been Route_message or Already_received"
+  in
+  let gen_message =
+    let counter = ref 0 in
+    fun () ->
+      let message_id = !counter in
+      let message = "message" ^ string_of_int message_id in
+      incr counter ;
+      (message_id, message)
+  in
+  (* peer 0 delivers message first *)
+  let message_id, message = gen_message () in
+  let state = receive_message ~__LOC__ peers.(0) message_id message state in
+  (* peer 1 delivers message second *)
+  let state = receive_message ~__LOC__ peers.(1) message_id message state in
+  (* score for peer 0 should be exactly first_message_deliveries_weight *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:first_message_deliveries_weight
+    peers.(0)
+    state ;
+  (* score for peer 1 should stay at 0. *)
+  assert_peer_score ~__LOC__ ~expected_score:0.0 peers.(1) state ;
+  (* peer 1 delivers two new messages *)
+  let message_id, message = gen_message () in
+  let state = receive_message ~__LOC__ peers.(1) message_id message state in
+  let message_id, message = gen_message () in
+  let state = receive_message ~__LOC__ peers.(1) message_id message state in
+  (* Score for peer1 should be exactly 2 * first_message_deliveries_weight *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:(2.0 *. first_message_deliveries_weight)
+    peers.(1)
+    state ;
+  (* test decaying *)
+  (* refresh scores *)
+  let state, _ = GS.heartbeat state in
+  (* score of peer 0 should be exactly
+     first_message_deliveries_decay * first_message_deliveries_weight *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:
+      (first_message_deliveries_decay *. first_message_deliveries_weight)
+    peers.(0)
+    state ;
+  (* score of peer 1 should be exactly
+     2 * first_message_deliveries_decay * first_message_deliveries_weight *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:
+      (2. *. first_message_deliveries_decay *. first_message_deliveries_weight)
+    peers.(1)
+    state ;
+  (* test cap *)
+  (* peer 1 delivers first_message_deliveries_cap more messages *)
+  let state =
+    Stdlib.List.init first_message_deliveries_cap (fun _i -> gen_message ())
+    |> List.fold_left
+         (fun state (message_id, message) ->
+           receive_message ~__LOC__ peers.(1) message_id message state)
+         state
+  in
+  (* score of peer 1 should be exactly
+     first_message_deliveries_cap * first_message_deliveries_weight *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:
+      (float_of_int first_message_deliveries_cap
+      *. first_message_deliveries_weight)
+    peers.(1)
+    state ;
+  unit
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/5293
    Add test the described test scenario *)
 
@@ -2001,4 +2119,5 @@ let register rng limits parameters =
   test_ignore_too_many_ihaves rng limits parameters ;
   test_ignore_too_many_messages_in_ihave rng limits parameters ;
   test_heartbeat_scenario rng limits parameters ;
-  test_scoring_p1 rng limits parameters
+  test_scoring_p1 rng limits parameters ;
+  test_scoring_p2 rng limits parameters
