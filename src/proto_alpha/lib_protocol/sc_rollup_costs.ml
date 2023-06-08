@@ -140,7 +140,7 @@ let cost_verify_output_proof ~bytes_len =
   let v0 = size in
   S.safe_int 103450 + (v0 lsl 2) + (v0 lsl 1) + v0
 
-(* Derived form benchmark in
+(* Derived from benchmark in
    [Sc_rollup_benchmarks.Sc_rollup_install_boot_sector_benchmark] and model
    [sc_rollup/Sc_rollup_install_boot_sector_benchmark/model]
    assuming
