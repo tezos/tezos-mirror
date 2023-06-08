@@ -96,14 +96,16 @@ let () =
       let all_values = ref [] in
       Array.iter
         (fun (table, _file_name) ->
-          let value = List.assoc_opt name table in
-          (match value with
-          | None -> all_values := !all_values @ [""]
-          | Some value ->
-              let v = read_num value in
-              current_min := lift min !current_min v ;
-              current_max := lift max !current_max v ;
-              all_values := !all_values @ [value]))
+          let value =
+            match List.assoc_opt name table with
+            | None -> ""
+            | Some value ->
+                let v = read_num value in
+                current_min := lift min !current_min v ;
+                current_max := lift max !current_max v ;
+                value
+          in
+          all_values := !all_values @ [value])
         tables ;
       List.iter (Printf.printf "%s,") !all_values ;
       match (!current_min, !current_max) with
