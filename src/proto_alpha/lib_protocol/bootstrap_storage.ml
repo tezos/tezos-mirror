@@ -90,7 +90,13 @@ let init_account (ctxt, balance_updates)
             ctxt
             (`Contract contract)
             (`Frozen_deposits public_key_hash)
-            amount_to_freeze)
+            amount_to_freeze
+          >>=? fun (ctxt, balance_updates) ->
+          Staking_pseudotokens_storage
+          .init_frozen_deposits_pseudotokens_from_frozen_deposits_balance
+            ctxt
+            contract
+          >|=? fun ctxt -> (ctxt, balance_updates))
   | None ->
       fail_when
         (Option.is_some delegate_to)
