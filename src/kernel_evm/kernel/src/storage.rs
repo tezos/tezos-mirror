@@ -40,7 +40,7 @@ const EVM_TRANSACTIONS_OBJECTS: RefPath = RefPath::assert_from(b"/transactions_o
 const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/chain_id");
 
 const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
-    RefPath::assert_from(b"/evm/info_per_level/timestamp");
+    RefPath::assert_from(b"/info_per_level/timestamp");
 
 pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result");
 

@@ -129,6 +129,8 @@ module Durable_storage_path = struct
 
   let transactions = "/transactions"
 
+  let timestamp = "/timestamp"
+
   let chain_id = "/evm/chain_id"
 
   module Block = struct
@@ -146,6 +148,8 @@ module Durable_storage_path = struct
     let hash block_number = block_field block_number hash
 
     let transactions block_number = block_field block_number transactions
+
+    let timestamp block_number = block_field block_number timestamp
 
     let current_number = blocks ^ "/current" ^ number
   end
@@ -210,6 +214,18 @@ module RPC = struct
 
   let call_service ~base ?(media_types = Media_type.all_media_types) =
     Tezos_rpc_http_client_unix.RPC_client_unix.call_service media_types ~base
+
+  let inspect_durable_and_decode_opt base key decode =
+    let open Lwt_result_syntax in
+    let* bytes = call_service ~base durable_state_value () {key} () in
+    match bytes with
+    | Some bytes -> return_some (decode bytes)
+    | None -> return_none
+
+  let inspect_durable_and_decode base key decode =
+    let open Lwt_result_syntax in
+    let* res_opt = inspect_durable_and_decode_opt base key decode in
+    match res_opt with Some res -> return res | None -> failwith "null"
 
   let smart_rollup_address base =
     let open Lwt_result_syntax in
@@ -312,20 +328,18 @@ module RPC = struct
         raise
         @@ Invalid_block_structure "Unexpected [None] value for [block.hash]"
 
+  let block_timestamp base number =
+    let open Lwt_result_syntax in
+    let* (Block_height block_number) =
+      match number with
+      | Durable_storage_path.Block.Current -> block_number base number
+      | Nth n -> return (Block_height n)
+    in
+    let key = Durable_storage_path.Block.timestamp (Nth block_number) in
+    inspect_durable_and_decode base key decode_number
+
   let current_block_number base () =
     block_number base Durable_storage_path.Block.Current
-
-  let inspect_durable_and_decode_opt base key decode =
-    let open Lwt_result_syntax in
-    let* bytes = call_service ~base durable_state_value () {key} () in
-    match bytes with
-    | Some bytes -> return_some (decode bytes)
-    | None -> return_none
-
-  let inspect_durable_and_decode base key decode =
-    let open Lwt_result_syntax in
-    let* res_opt = inspect_durable_and_decode_opt base key decode in
-    match res_opt with Some res -> return res | None -> failwith "null"
 
   let transaction_receipt base (Hash tx_hash) =
     let open Lwt_result_syntax in
@@ -392,6 +406,7 @@ module RPC = struct
       block_number base number
     in
     let* hash = block_hash base number in
+    let* timestamp = block_timestamp base number in
     let* parent =
       if Z.zero = level_z then
         return (Ethereum_types.Block_hash (String.make 64 'a'))
@@ -417,7 +432,7 @@ module RPC = struct
         size = Ethereum_types.Qty Z.zero;
         gasLimit = Ethereum_types.Qty Z.zero;
         gasUsed = Ethereum_types.Qty Z.zero;
-        timestamp = Ethereum_types.Qty Z.zero;
+        timestamp;
         transactions;
         uncles = [];
       }
