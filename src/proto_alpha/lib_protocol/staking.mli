@@ -43,6 +43,13 @@ val request_unstake :
   Tez.t ->
   (context * Receipt.balance_updates) tzresult Lwt.t
 
+(** [request_full_unstake ctxt ~sender_contract] records a request from
+    [sender_contract] to unstake everything from their delegate. *)
+val request_full_unstake :
+  context ->
+  sender_contract:Contract.t ->
+  (context * Receipt.balance_updates) tzresult Lwt.t
+
 (** [finalize_unstake ctxt contract] performs the finalization of all unstake
     requests from [contract] that can be finalized.
     An unstake request can be finalized if it is old enough, specifically the

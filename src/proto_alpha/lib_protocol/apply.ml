@@ -318,8 +318,12 @@ let update_script_storage_and_ticket_balances ctxt ~self_contract storage
     operations
 
 let apply_delegation ~ctxt ~sender ~delegate ~before_operation =
-  Contract.Delegate.set ctxt sender delegate >|=? fun ctxt ->
-  (ctxt, Gas.consumed ~since:before_operation ~until:ctxt, [], [])
+  let open Lwt_result_syntax in
+  let* ctxt, balance_updates =
+    Staking.request_full_unstake ctxt ~sender_contract:sender
+  in
+  let+ ctxt = Contract.Delegate.set ctxt sender delegate in
+  (ctxt, Gas.consumed ~since:before_operation ~until:ctxt, balance_updates, [])
 
 type 'loc execution_arg =
   | Typed_arg : 'loc * ('a, _) Script_typed_ir.ty * 'a -> 'loc execution_arg

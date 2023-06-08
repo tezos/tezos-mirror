@@ -126,6 +126,8 @@ module Tez : sig
 
   val one : tez
 
+  val max_mutez : tez
+
   val ( -? ) : tez -> tez -> tez tzresult
 
   val sub_opt : tez -> tez -> tez option
