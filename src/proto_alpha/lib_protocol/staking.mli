@@ -25,6 +25,15 @@
 
 open Alpha_context
 
+(** [stake ctxt ~sender ~delegate amount] add [amount] as [sender]'s stake
+    to [delegate]. *)
+val stake :
+  context ->
+  sender:public_key_hash ->
+  delegate:public_key_hash ->
+  Tez.t ->
+  (context * Receipt.balance_updates) tzresult Lwt.t
+
 (** [finalize_unstake ctxt pkh] performs the finalization of all unstake
     requests from [pkh] that can be finalized.
     An unstake request can be finalized if it is old enough, specifically the

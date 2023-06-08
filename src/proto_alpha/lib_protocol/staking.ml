@@ -22,17 +22,35 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
 open Alpha_context
 
-let finalize_unstake ctxt pkh =
-  let open Lwt_result_syntax in
-  let contract = Contract.Implicit pkh in
-  let* ctxt, finalizable =
-    Unstake_requests
-    .prepare_finalize_unstake_and_save_remaining_unfinalizable_requests
-      ctxt
-      contract
+type error +=
+  | Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
+
+let () =
+  let description =
+    "A contract tries to stake to its delegate while having unstake requests \
+     to a previous delegate that cannot be finalized yet. Try again in a later \
+     cycle (no more than preserved_cycles + max_slashing_period)."
   in
+  register_error_kind
+    `Permanent
+    ~id:
+      "operation.cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate"
+    ~title:
+      "Cannot stake with unfinalizable unstake requests to another delegate"
+    ~description
+    Data_encoding.unit
+    (function
+      | Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate ->
+          Some ()
+      | _ -> None)
+    (fun () ->
+      Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate)
+
+let perform_finalizable_unstake_transfers ctxt contract finalizable =
+  let open Lwt_result_syntax in
   List.fold_left_es
     (fun (ctxt, balance_updates) (delegate, cycle, amount) ->
       let+ ctxt, new_balance_updates =
@@ -45,6 +63,21 @@ let finalize_unstake ctxt pkh =
       (ctxt, new_balance_updates @ balance_updates))
     (ctxt, [])
     finalizable
+
+let finalize_unstake_and_check ~check_unfinalizable ctxt pkh =
+  let open Lwt_result_syntax in
+  let contract = Contract.Implicit pkh in
+  let* prepared_opt = Unstake_requests.prepare_finalize_unstake ctxt contract in
+  match prepared_opt with
+  | None -> return (ctxt, [])
+  | Some {finalizable; unfinalizable} ->
+      let* () = check_unfinalizable unfinalizable in
+      let* ctxt = Unstake_requests.update ctxt contract unfinalizable in
+      perform_finalizable_unstake_transfers ctxt contract finalizable
+
+let finalize_unstake ctxt pkh =
+  let check_unfinalizable _unfinalizable = Lwt_result_syntax.return_unit in
+  finalize_unstake_and_check ~check_unfinalizable ctxt pkh
 
 let punish_delegate ctxt delegate level mistake ~rewarded =
   let open Lwt_result_syntax in
@@ -74,3 +107,26 @@ let punish_delegate ctxt delegate level mistake ~rewarded =
     Token.transfer_n ctxt to_reward (`Contract rewarded)
   in
   (ctxt, reward_balance_updates @ punish_balance_updates)
+
+let stake ctxt ~sender ~delegate amount =
+  let open Lwt_result_syntax in
+  let check_unfinalizable
+      Unstake_requests.{delegate = unstake_delegate; requests} =
+    match requests with
+    | [] -> return_unit
+    | _ :: _ ->
+        fail_when
+          Signature.Public_key_hash.(delegate <> unstake_delegate)
+          Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
+  in
+  let* ctxt, finalize_balance_updates =
+    finalize_unstake_and_check ~check_unfinalizable ctxt sender
+  in
+  let* ctxt, stake_balance_updates =
+    Token.transfer
+      ctxt
+      (`Contract (Contract.Implicit sender))
+      (`Frozen_deposits delegate)
+      amount
+  in
+  return (ctxt, stake_balance_updates @ finalize_balance_updates)

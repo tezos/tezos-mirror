@@ -321,40 +321,41 @@ let apply_transaction_to_implicit ~ctxt ~sender ~amount ~pkh ~before_operation =
   return (ctxt, result, [])
 
 let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
+  let open Lwt_result_syntax in
   let contract = Contract.Implicit destination in
   (* Staking of zero is forbidden. *)
-  error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
-  error_unless
-    Signature.Public_key_hash.(sender = destination)
-    Invalid_self_transaction_destination
-  >>?= fun () ->
-  Contract.is_delegate ctxt sender >>=? fun is_delegate ->
-  error_unless is_delegate Staking_for_nondelegate_while_costaking_disabled
-  >>?= fun () ->
-  let delegate = sender in
-  Token.transfer
-    ctxt
-    (`Contract (Contract.Implicit sender))
-    (`Frozen_deposits delegate)
-    amount
-  >>=? fun (ctxt, balance_updates) ->
-  (* Since [delegate] is an already existing delegate, it is already allocated. *)
-  let allocated_destination_contract = false in
-  let result =
-    Transaction_to_contract_result
-      {
-        storage = None;
-        lazy_storage_diff = None;
-        balance_updates;
-        ticket_receipt = [];
-        originated_contracts = [];
-        consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-        storage_size = Z.zero;
-        paid_storage_size_diff = Z.zero;
-        allocated_destination_contract;
-      }
+  let*? () = error_when Tez.(amount = zero) (Empty_transaction contract) in
+  let*? () =
+    error_unless
+      Signature.Public_key_hash.(sender = destination)
+      Invalid_self_transaction_destination
   in
-  return (ctxt, result, [])
+  let* delegate_opt = Contract.Delegate.find ctxt contract in
+  match delegate_opt with
+  | None -> tzfail Staking_for_nondelegate_while_costaking_disabled
+  | Some delegate when Signature.Public_key_hash.(delegate <> sender) ->
+      tzfail Staking_for_nondelegate_while_costaking_disabled
+  | Some delegate ->
+      let* ctxt, balance_updates =
+        Staking.stake ctxt ~sender ~delegate amount
+      in
+      (* Since [delegate] is an already existing delegate, it is already allocated. *)
+      let allocated_destination_contract = false in
+      let result =
+        Transaction_to_contract_result
+          {
+            storage = None;
+            lazy_storage_diff = None;
+            balance_updates;
+            ticket_receipt = [];
+            originated_contracts = [];
+            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            storage_size = Z.zero;
+            paid_storage_size_diff = Z.zero;
+            allocated_destination_contract;
+          }
+      in
+      return (ctxt, result, [])
 
 let apply_finalize_unstake ~ctxt ~sender ~amount ~destination ~before_operation
     =
