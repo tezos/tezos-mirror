@@ -54,6 +54,7 @@
  (libraries
   tezos-base
   tezos-stdlib-unix
+  cohttp-lwt-unix
   resto-cohttp-server
   resto-acl
   tezos-rpc
