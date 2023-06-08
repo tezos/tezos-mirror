@@ -361,9 +361,11 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
   let* delegate_opt = Contract.Delegate.find ctxt contract in
   match delegate_opt with
   | None -> tzfail Staking_for_nondelegate_while_costaking_disabled
-  | Some delegate when Signature.Public_key_hash.(delegate <> sender) ->
-      tzfail Staking_for_nondelegate_while_costaking_disabled
   | Some delegate ->
+      let allowed = Signature.Public_key_hash.(delegate = sender) in
+      let*? () =
+        error_unless allowed Staking_for_nondelegate_while_costaking_disabled
+      in
       let* ctxt, balance_updates =
         Staking.stake ctxt ~sender ~delegate amount
       in
