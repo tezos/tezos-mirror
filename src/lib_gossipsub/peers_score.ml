@@ -115,11 +115,12 @@ struct
     | Inactive -> 0.0
     | Active {since = _; during} ->
         let seconds_in_mesh = Span.to_float_s during in
-        let weighted_time =
-          topic_parameters.time_in_mesh_weight *. seconds_in_mesh
+        let v =
+          seconds_in_mesh
           /. Span.(to_float_s topic_parameters.time_in_mesh_quantum)
         in
-        Float.min weighted_time topic_parameters.time_in_mesh_cap
+        topic_parameters.time_in_mesh_weight
+        *. Float.min v topic_parameters.time_in_mesh_cap
 
   let p2 topic_parameters {first_message_deliveries; _} =
     let weighted_deliveries =
