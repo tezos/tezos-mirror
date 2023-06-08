@@ -29,8 +29,9 @@ module Milliseconds = Test_gossipsub_shared.Milliseconds
 let default_limits ?mesh_message_deliveries_activation ?time_in_mesh_weight
     ?time_in_mesh_quantum ?time_in_mesh_cap ?first_message_deliveries_weight
     ?first_message_deliveries_cap ?first_message_deliveries_decay
-    ?mesh_message_deliveries_weight ?(behaviour_penalty_weight = ~-.10.0)
-    ?(behaviour_penalty_decay = 0.2) () :
+    ?(behaviour_penalty_weight = ~-.10.0) ?(behaviour_penalty_decay = 0.2)
+    ?mesh_message_deliveries_weight ?mesh_failure_penalty_weight
+    ?invalid_message_deliveries_weight ?invalid_message_deliveries_decay () :
     (string, int, int, Milliseconds.t) limits =
   let per_topic_score_limits =
     {
@@ -45,7 +46,7 @@ let default_limits ?mesh_message_deliveries_activation ?time_in_mesh_weight
       first_message_deliveries_decay =
         Option.value ~default:0.5 first_message_deliveries_decay;
       mesh_message_deliveries_weight =
-        mesh_message_deliveries_weight |> Option.value ~default:~-.1.0;
+        Option.value ~default:~-.1.0 mesh_message_deliveries_weight;
       mesh_message_deliveries_window = Milliseconds.of_float_s 0.01;
       mesh_message_deliveries_activation =
         mesh_message_deliveries_activation
@@ -54,10 +55,13 @@ let default_limits ?mesh_message_deliveries_activation ?time_in_mesh_weight
       mesh_message_deliveries_cap = 100;
       mesh_message_deliveries_threshold = 20;
       mesh_message_deliveries_decay = 0.5;
-      mesh_failure_penalty_weight = ~-.1.;
+      mesh_failure_penalty_weight =
+        Option.value ~default:~-.1. mesh_failure_penalty_weight;
       mesh_failure_penalty_decay = 0.5;
-      invalid_message_deliveries_weight = ~-.1.;
-      invalid_message_deliveries_decay = 0.3;
+      invalid_message_deliveries_weight =
+        Option.value ~default:~-.1. invalid_message_deliveries_weight;
+      invalid_message_deliveries_decay =
+        Option.value ~default:0.3 invalid_message_deliveries_decay;
     }
   in
   let topic_score_limits = Topic_score_limits_single per_topic_score_limits in
