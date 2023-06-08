@@ -26,9 +26,9 @@ open Gossipsub_intf
 module Milliseconds = Test_gossipsub_shared.Milliseconds
 
 (* Most of these limits are the default ones used by the Go implementation. *)
-let default_limits ?(mesh_message_deliveries_activation = None)
-    ?(time_in_mesh_weight = None) ?(time_in_mesh_quantum = None)
-    ?(time_in_mesh_cap = None) () : (string, int, int, Milliseconds.t) limits =
+let default_limits ?mesh_message_deliveries_activation ?time_in_mesh_weight
+    ?time_in_mesh_quantum ?time_in_mesh_cap () :
+    (string, int, int, Milliseconds.t) limits =
   let per_topic_score_limits =
     {
       time_in_mesh_weight = Option.value ~default:1.0 time_in_mesh_weight;
