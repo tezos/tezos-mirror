@@ -24,7 +24,7 @@ depends: [
   "caqti-lwt"
   "class_group_vdf" { >= "0.0.4" }
   "cmdliner" { >= "1.1.0" }
-  "cohttp-lwt-unix" { >= "4.0.0" }
+  "cohttp-lwt-unix" { >= "4.0.0" & != "5.1.0" }
   "conf-libev"
   "conf-rust"
   "ctypes" { >= "0.18.0" }
