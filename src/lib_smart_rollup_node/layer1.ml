@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol_client_context
-
 (**
 
     Errors
@@ -36,7 +34,7 @@ open Protocol_client_context
 type error += Cannot_find_block of Block_hash.t
 
 let () =
-  Sc_rollup_node_errors.register_error_kind
+  register_error_kind
     ~id:"sc_rollup.node.cannot_find_block"
     ~title:"Cannot find block from L1"
     ~description:"A block couldn't be found from the L1 node"
@@ -88,9 +86,19 @@ module Blocks_cache =
   Aches_lwt.Lache.Make_option
     (Aches.Rache.Transfer (Aches.Rache.LRU) (Block_hash))
 
-type blocks_cache = Alpha_block_services.block_info Blocks_cache.t
+type block = ..
+
+type fetch_block_rpc =
+  Client_context.full ->
+  ?metadata:[`Always | `Never] ->
+  ?chain:Tezos_shell_services.Block_services.chain ->
+  ?block:Tezos_shell_services.Block_services.block ->
+  unit ->
+  block tzresult Lwt.t
 
 type headers_cache = Block_header.shell_header Blocks_cache.t
+
+type blocks_cache = block Blocks_cache.t
 
 open Octez_crawler.Layer_1
 
@@ -124,6 +132,8 @@ let shutdown {l1; _} = shutdown l1
 
 let cache_shell_header {headers_cache; _} hash header =
   Blocks_cache.put headers_cache hash (Lwt.return_some header)
+
+let client_context {cctxt; _} = cctxt
 
 let iter_heads l1_ctxt f =
   iter_heads l1_ctxt.l1 @@ fun (hash, {shell = {level; _} as header; _}) ->
@@ -164,7 +174,7 @@ end
 (** [fetch_tezos_block cctxt hash] returns a block shell header of
     [hash]. Looks for the block in the blocks cache first, and fetches it from
     the L1 node otherwise. *)
-let fetch_tezos_shell_header {cctxt; blocks_cache; headers_cache; _} hash =
+let fetch_tezos_shell_header {cctxt; headers_cache; _} hash =
   let open Lwt_syntax in
   trace (Cannot_find_block hash)
   @@
@@ -184,21 +194,7 @@ let fetch_tezos_shell_header {cctxt; blocks_cache; headers_cache; _} hash =
     | Ok shell_header -> return_some shell_header
   in
   let+ shell_header =
-    let do_cached_header_fetch () =
-      Blocks_cache.bind_or_put headers_cache hash fetch Lwt.return
-    in
-    match Blocks_cache.bind blocks_cache hash Lwt.return with
-    | None -> do_cached_header_fetch ()
-    | Some block -> (
-        (* There is already a full block being fetched. *)
-        let* block in
-        match block with
-        | None ->
-            (* Fetching full block failed. *)
-            do_cached_header_fetch ()
-        | Some block ->
-            (* The full block is already in the cache. *)
-            return_some block.header.shell)
+    Blocks_cache.bind_or_put headers_cache hash fetch Lwt.return
   in
   match (shell_header, !errors) with
   | None, None ->
@@ -211,22 +207,18 @@ let fetch_tezos_shell_header {cctxt; blocks_cache; headers_cache; _} hash =
   | None, Some errs -> Error errs
   | Some shell_header, _ -> Ok shell_header
 
-(** [fetch_tezos_block cctxt hash] returns a block info given a block
-    hash. Looks for the block in the blocks cache first, and fetches it from the
-    L1 node otherwise. *)
-let fetch_tezos_block {cctxt; blocks_cache; headers_cache; _} hash =
+(** [fetch_tezos_block cctxt fetch extract_header hash] returns a block info
+    given a block hash. Looks for the block in the blocks cache first, and
+    fetches it from the L1 node otherwise. *)
+let fetch_tezos_block (fetch : fetch_block_rpc) extract_header
+    ({cctxt; blocks_cache; _} as l1_ctxt) hash =
   let open Lwt_syntax in
   trace (Cannot_find_block hash)
   @@
   let errors = ref None in
   let fetch hash =
     let* block =
-      Alpha_block_services.info
-        cctxt
-        ~chain:`Main
-        ~block:(`Hash (hash, 0))
-        ~metadata:`Always
-        ()
+      fetch cctxt ~chain:`Main ~block:(`Hash (hash, 0)) ~metadata:`Always ()
     in
     match block with
     | Error errs ->
@@ -245,7 +237,7 @@ let fetch_tezos_block {cctxt; blocks_cache; headers_cache; _} hash =
         hash
   | None, Some errs -> Error errs
   | Some block, _ ->
-      Blocks_cache.put headers_cache hash (Lwt.return_some block.header.shell) ;
+      cache_shell_header l1_ctxt hash (extract_header block) ;
       Ok block
 
 let make_prefetching_schedule {prefetch_blocks; _} blocks =
@@ -263,13 +255,15 @@ let make_prefetching_schedule {prefetch_blocks; _} blocks =
   | [], _ | _, [] -> blocks_with_prefetching
   | (first, _) :: rest, _ -> (first, first_prefetch) :: rest
 
-let prefetch_tezos_blocks l1_ctxt = function
+let prefetch_tezos_blocks fetch extract_header l1_ctxt = function
   | [] -> ()
   | blocks ->
       Lwt.async @@ fun () ->
       List.iter_p
         (fun {hash; _} ->
           let open Lwt_syntax in
-          let+ _maybe_block = fetch_tezos_block l1_ctxt hash in
+          let+ _maybe_block =
+            fetch_tezos_block fetch extract_header l1_ctxt hash
+          in
           ())
         blocks

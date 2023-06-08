@@ -26,6 +26,7 @@
 open Octez_smart_rollup
 open Protocol
 open Alpha_context
+open Octez_smart_rollup_node
 
 let uid = ref 0
 

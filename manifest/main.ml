@@ -4114,8 +4114,9 @@ let octez_smart_rollup_node_lib =
         prometheus_app;
         octez_injector |> open_;
         octez_version_value |> open_;
-        octez_smart_rollup_lib |> open_;
         octez_layer2_store |> open_;
+        octez_crawler |> open_;
+        octez_smart_rollup_lib |> open_;
       ]
 
 let octez_scoru_wasm_helpers =
