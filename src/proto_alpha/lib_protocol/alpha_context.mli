@@ -2266,6 +2266,11 @@ module Delegate : sig
       Signature.Public_key_hash.t ->
       Staking_parameters_repr.t ->
       context tzresult Lwt.t
+
+    val of_delegate :
+      context ->
+      Signature.Public_key_hash.t ->
+      Staking_parameters_repr.t tzresult Lwt.t
   end
 end
 
