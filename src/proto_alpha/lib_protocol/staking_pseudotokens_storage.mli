@@ -60,6 +60,15 @@ val frozen_deposits_pseudotokens_for_tez_amount :
   Tez_repr.t ->
   Staking_pseudotoken_repr.t tzresult Lwt.t
 
+(** [tez_of_frozen_deposits_pseudotokens ctxt delegate p_amount] returns the
+    number of tez [p_amount] pseudotokens are currently worth in [delegate]'s
+    frozen deposits. *)
+val tez_of_frozen_deposits_pseudotokens :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Staking_pseudotoken_repr.t ->
+  Tez_repr.t tzresult Lwt.t
+
 (** [credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount]
     increases [delegate]'s stake pseudotokens by an amount [pa] corresponding to
     [tez_amount] multiplied by the current rate of the delegate's frozen
