@@ -162,7 +162,7 @@ let compute_reward_distrib ~stake ~baking_over_staking_edge
   let to_spendable = Tez_repr.of_mutez_exn to_spendable in
   ok {to_frozen; to_spendable}
 
-let _compute_reward_distrib ctxt delegate stake rewards =
+let compute_reward_distrib ctxt delegate stake rewards =
   let open Lwt_result_syntax in
   let* (delegate_parameter : Staking_parameters_repr.t) =
     of_delegate ctxt delegate
@@ -179,3 +179,32 @@ let _compute_reward_distrib ctxt delegate stake rewards =
        ~baking_over_staking_edge
        ~staking_over_delegation_edge
        ~rewards
+
+let pay_rewards ctxt ?active_stake ~source ~delegate rewards =
+  let open Lwt_result_syntax in
+  let*? active_stake =
+    let open Result_syntax in
+    match active_stake with
+    | Some active_stake -> ok active_stake
+    | None ->
+        let+ stake_distrib =
+          Raw_context.stake_distribution_for_current_cycle ctxt
+        in
+        Option.value
+          (Signature.Public_key_hash.Map.find delegate stake_distrib)
+          ~default:Stake_repr.zero
+  in
+  let* {to_frozen; to_spendable} =
+    compute_reward_distrib ctxt delegate active_stake rewards
+  in
+  let* ctxt, balance_updates_frozen_rewards =
+    Token.transfer ctxt source (`Frozen_deposits delegate) to_frozen
+  in
+  let+ ctxt, balance_updates_spendable_rewards =
+    Token.transfer
+      ctxt
+      source
+      (`Contract (Contract_repr.Implicit delegate))
+      to_spendable
+  in
+  (ctxt, balance_updates_frozen_rewards @ balance_updates_spendable_rewards)
