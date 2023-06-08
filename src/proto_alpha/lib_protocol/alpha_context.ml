@@ -626,6 +626,11 @@ module Token = Token
 module Cache = Cache_repr
 module Unstake_requests = Unstake_requests_storage
 
+module Staking_pseudotokens = struct
+  include Staking_pseudotoken_repr
+  include Staking_pseudotokens_storage
+end
+
 module Internal_for_tests = struct
   let to_raw x = x
 end

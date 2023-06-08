@@ -122,11 +122,24 @@ let stake ctxt ~sender ~delegate amount =
   let* ctxt, finalize_balance_updates =
     finalize_unstake_and_check ~check_unfinalizable ctxt sender
   in
+  let* ctxt, new_pseudotokens =
+    Staking_pseudotokens.credit_frozen_deposits_pseudotokens_for_tez_amount
+      ctxt
+      delegate
+      amount
+  in
+  let sender_contract = Contract.Implicit sender in
   let* ctxt, stake_balance_updates =
     Token.transfer
       ctxt
-      (`Contract (Contract.Implicit sender))
+      (`Contract sender_contract)
       (`Frozen_deposits delegate)
       amount
+  in
+  let* ctxt =
+    Staking_pseudotokens.credit_costaking_pseudotokens
+      ctxt
+      sender_contract
+      new_pseudotokens
   in
   return (ctxt, stake_balance_updates @ finalize_balance_updates)

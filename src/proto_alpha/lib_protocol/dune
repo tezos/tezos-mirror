@@ -53,6 +53,7 @@
   Slot_repr
   Tez_repr
   Deposits_repr
+  Staking_pseudotoken_repr
   Period_repr
   Time_repr
   Ratio_repr
@@ -156,6 +157,7 @@
   Unstaked_frozen_deposits_storage
   Unstake_requests_storage
   Frozen_deposits_storage
+  Staking_pseudotokens_storage
   Contract_storage
   Token
   Fees_storage
@@ -315,6 +317,7 @@
   slot_repr.ml slot_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
+  staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
   time_repr.ml time_repr.mli
   ratio_repr.ml ratio_repr.mli
@@ -421,6 +424,7 @@
   unstaked_frozen_deposits_storage.ml unstaked_frozen_deposits_storage.mli
   unstake_requests_storage.ml unstake_requests_storage.mli
   frozen_deposits_storage.ml frozen_deposits_storage.mli
+  staking_pseudotokens_storage.ml staking_pseudotokens_storage.mli
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   fees_storage.ml fees_storage.mli
@@ -582,6 +586,7 @@
   slot_repr.ml slot_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
+  staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
   time_repr.ml time_repr.mli
   ratio_repr.ml ratio_repr.mli
@@ -688,6 +693,7 @@
   unstaked_frozen_deposits_storage.ml unstaked_frozen_deposits_storage.mli
   unstake_requests_storage.ml unstake_requests_storage.mli
   frozen_deposits_storage.ml frozen_deposits_storage.mli
+  staking_pseudotokens_storage.ml staking_pseudotokens_storage.mli
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   fees_storage.ml fees_storage.mli
@@ -833,6 +839,7 @@
   slot_repr.ml slot_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
+  staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
   time_repr.ml time_repr.mli
   ratio_repr.ml ratio_repr.mli
@@ -939,6 +946,7 @@
   unstaked_frozen_deposits_storage.ml unstaked_frozen_deposits_storage.mli
   unstake_requests_storage.ml unstake_requests_storage.mli
   frozen_deposits_storage.ml frozen_deposits_storage.mli
+  staking_pseudotokens_storage.ml staking_pseudotokens_storage.mli
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   fees_storage.ml fees_storage.mli
