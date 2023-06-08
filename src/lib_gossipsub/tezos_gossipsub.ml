@@ -940,19 +940,24 @@ module Make (C : AUTOMATON_CONFIG) :
       | None -> Prune_topic_not_tracked |> fail
       | Some mesh -> pass mesh
 
+    let take_threshold_px (px : Peer.t Seq.t) (state : state) =
+      (* [peers_to_px] is not just the max number of peers we send via PX, but
+         also the max number of advertised PXs we accept. *)
+      let peers_to_px = peers_to_px state in
+      List.of_seq px
+      |> List.shuffle ~rng:(rng state)
+      |> List.take_n peers_to_px |> Peer.Set.of_list
+
     let handle peer topic ~px ~backoff =
       let open Monad.Syntax in
       let*? mesh = check_topic_tracked topic in
       let*? () = fail_if_not (Peer.Set.mem peer mesh) Peer_not_in_mesh in
-      let mesh = Peer.Set.remove peer mesh in
-      let* () = set_mesh_topic topic mesh in
+      let* () = Peer.Set.remove peer mesh |> set_mesh_topic topic in
       let* () = set_backoff_for_peer backoff topic peer in
       let* () = update_score peer (fun s -> Score.prune s topic) in
-      let px = Peer.Set.of_seq px in
-      if Peer.Set.is_empty px then No_PX |> return
-      else
-        let*? () = check_px_score peer in
-        return (PX px)
+      let*? () = check_px_score peer in
+      let*! px = take_threshold_px px in
+      return @@ if Peer.Set.is_empty px then No_PX else PX px
   end
 
   let handle_prune : prune -> [`Prune] output Monad.t =
