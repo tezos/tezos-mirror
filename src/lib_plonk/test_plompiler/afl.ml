@@ -57,13 +57,15 @@ let test_afl () =
     (E1.t, E1.ins)
   in
 
-  let LibCircuit.{cs; tables; solver; _} = LibCircuit.(get_cs (circuit ins)) in
+  let cs = LibCircuit.(get_cs (circuit ins)) in
   (* safety: sat => trace *)
-  let private_inputs = Array.init solver.final_size (fun _ -> Gen.scalar ()) in
-  if CS.sat cs tables private_inputs then (
+  let private_inputs =
+    Array.init cs.solver.final_size (fun _ -> Gen.scalar ())
+  in
+  if CS.sat cs private_inputs then (
     print_endline "satisfied" ;
     let initial, _ = LibCircuit.(get_inputs (circuit ins)) in
-    let solved_pi = Solver.solve solver initial in
+    let solved_pi = Solver.solve cs.solver initial in
     assert (Array.for_all2 S.( = ) solved_pi private_inputs))
   else () ;
   (* soundness: trace => sat *)
@@ -71,12 +73,12 @@ let test_afl () =
     let x = LibCircuit.Input.scalar @@ Gen.scalar () in
     let y = LibCircuit.Input.scalar @@ Gen.scalar () in
     let initial, _ = LibCircuit.(get_inputs (circuit (x, y))) in
-    try Solver.solve solver initial |> fun x -> Some x with _ -> None
+    try Solver.solve cs.solver initial |> fun x -> Some x with _ -> None
   in
   match trace with
   | None -> ()
   | Some trace ->
       print_endline "found trace" ;
-      assert (CS.sat cs tables trace)
+      assert (CS.sat cs trace)
 
 let () = test_afl ()

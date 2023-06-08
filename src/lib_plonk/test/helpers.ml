@@ -465,8 +465,7 @@ module Plompiler_Helpers = struct
                   ","
                   (List.map S.string_of_scalar (Array.to_list private_inputs))) ;
              Printf.printf "CS:\n%s\n" (CS.to_string cs) ; *)
-          if not info.valid then
-            assert (not @@ CS.sat cs.cs cs.tables private_inputs)
+          if not info.valid then assert (not @@ CS.sat cs private_inputs)
           else (
             Printf.fprintf
               !output_buffer
@@ -484,7 +483,7 @@ module Plompiler_Helpers = struct
                 out_size
             in
 
-            assert (CS.sat cs.cs cs.tables private_inputs) ;
+            assert (CS.sat cs private_inputs) ;
             let cs, private_inputs =
               if optimize then (
                 let cs = LibCircuit.(get_cs ~optimize (circuit ())) in
@@ -494,7 +493,7 @@ module Plompiler_Helpers = struct
                   info.name
                   Array.(concat cs.cs |> length) ;
                 let private_inputs = Solver.solve cs.solver initial in
-                assert (CS.sat cs.cs cs.tables private_inputs) ;
+                assert (CS.sat cs private_inputs) ;
 
                 (cs, private_inputs))
               else (cs, private_inputs)

@@ -94,7 +94,7 @@ module Circuit : sig
 
   val get_selectors : t -> string list
 
-  val sat : CS.t -> Table.t list -> Scalar.t array -> bool
+  val sat : LibCircuit.cs_result -> Scalar.t array -> bool
 
   val to_plonk : Plompiler.LibCircuit.cs_result -> t
 end = struct
@@ -295,6 +295,21 @@ end = struct
   let get_nb_of_constraints cs = Array.length cs.wires.(0)
   (* ////////////////////////////////////////////////////////// *)
 
+  let sat_rc (cs : Plompiler.LibCircuit.cs_result) trace =
+    let consts = Array.concat cs.cs in
+    List.for_all
+      (* [k] is the current wire (defined by its index) that has to be range-checked. *)
+        (fun (k, l) ->
+        (* [i] corresponds to the position in the wire that has to be range checked. *)
+        List.for_all
+          (fun (i, nb_bits) ->
+            (* [w_idx] indicates the element of the trace that correspond to this
+               position in this wire *)
+            let w_idx = consts.(i).wires.(k) in
+            Z.compare (S.to_z trace.(w_idx)) Z.(one lsl nb_bits) < 0)
+          l)
+      cs.range_checks
+
   let sat_gate identities gate trace tables =
     let open CS in
     let nb_cs = Array.length gate in
@@ -345,7 +360,7 @@ end = struct
            b))
       identities
 
-  let sat cs tables trace =
+  let sat (cs : Plompiler.LibCircuit.cs_result) trace =
     (* We initialise a map with all ids used in the circuit *)
     let identities =
       List.fold_left
@@ -357,22 +372,23 @@ end = struct
         Custom_gates.gates_list
     in
     let exception Constraint_not_satisfied of string in
-    try
-      (* We check in each gate, constraint by constraint, that all ids are satisfied *)
-      List.iteri
-        (fun i gate ->
-          (* Printf.printf "\n\nGate %i: %s" i
-                (Plompiler.Csir.CS.to_string_gate gate); *)
-          let b = sat_gate identities gate trace tables in
-          if b then ()
-          else
-            (* just to exit the iter *)
-            raise
-              (Constraint_not_satisfied
-                 (Printf.sprintf "\nGate #%i not satisfied." i)))
-        cs ;
-      true
-    with Constraint_not_satisfied _ -> false
+    (* Checking range-checks. *)
+    if not (sat_rc cs trace) then false
+    else
+      try
+        (* We check in each gate, constraint by constraint, that all ids are satisfied *)
+        List.iteri
+          (fun i gate ->
+            (* Printf.printf "\n\nGate %i: %s" i
+                  (Plompiler.Csir.CS.to_string_gate gate); *)
+            if not @@ sat_gate identities gate trace cs.tables then
+              (* just to exit the iter *)
+              raise
+                (Constraint_not_satisfied
+                   (Printf.sprintf "\nGate #%i not satisfied." i)))
+          cs.cs ;
+        true
+      with Constraint_not_satisfied _ -> false
 
   let to_plonk (cs : Plompiler.LibCircuit.cs_result) =
     let open CS in
@@ -422,7 +438,12 @@ end = struct
     |> fun (wires, selectors, advice, _) ->
     let gates = SMap.union_disjoint selectors advice in
     let tables = List.map Table.to_list cs.tables in
-    let range_checks = SMap.of_list cs.range_checks in
+    let range_checks =
+      List.fold_left
+        (fun acc (w, rc) -> SMap.add (Plompiler.Csir.wire_name w) rc acc)
+        SMap.empty
+        cs.range_checks
+    in
     make
       ~wires
       ~gates
