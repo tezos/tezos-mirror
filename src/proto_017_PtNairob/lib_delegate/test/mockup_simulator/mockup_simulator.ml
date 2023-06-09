@@ -476,7 +476,8 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
             unprocessed = Operation_hash.Map.empty;
           }
 
-    let monitor_operations ~validated ~branch_delayed ~branch_refused ~refused =
+    let monitor_operations ~version ~validated ~branch_delayed ~branch_refused
+        ~refused =
       ignore validated ;
       ignore branch_delayed ;
       ignore branch_refused ;
@@ -489,11 +490,11 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
           | None when !streamed -> Lwt.return None
           | None ->
               streamed := true ;
-              Lwt.return (Some [])
+              Lwt.return_some (version, [])
           | Some ops -> (
               List.filter_map_s User_hooks.on_new_operation ops >>= function
               | [] -> loop ()
-              | l -> Lwt.return_some (List.map (fun x -> (x, None)) l))
+              | l -> Lwt.return_some (version, List.map (fun x -> (x, None)) l))
         in
         loop ()
       in

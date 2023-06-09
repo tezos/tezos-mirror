@@ -455,6 +455,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     val monitor_operations :
       #streamed ->
       ?chain:chain ->
+      ?version:version ->
       ?validated:bool ->
       ?branch_delayed:bool ->
       ?branch_refused:bool ->
@@ -757,15 +758,17 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ( [`GET],
           'a,
           'b,
-          < validated : bool
+          < version : version
+          ; validated : bool
           ; branch_delayed : bool
           ; branch_refused : bool
           ; refused : bool
           ; outdated : bool
           ; validation_passes : int list >,
           unit,
-          ((Operation_hash.t * Next_proto.operation) * error trace option) list
-        )
+          version
+          * ((Operation_hash.t * Next_proto.operation) * error trace option)
+            list )
         Tezos_rpc.Service.t
 
       (** Define RPC GET /chains/[chain]/mempool/filter *)
