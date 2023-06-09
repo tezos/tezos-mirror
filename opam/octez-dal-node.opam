@@ -12,6 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezos-base"
   "tezos-clic"
+  "cmdliner" { >= "1.1.0" }
   "tezos-client-base"
   "tezos-client-base-unix"
   "tezos-client-commands"
