@@ -30,8 +30,14 @@ let init_frozen_deposits_pseudotokens_from_frozen_deposits_tez ctxt contract
     Staking_pseudotoken_repr.of_int64_exn
       (Tez_repr.to_mutez frozen_deposits_tez)
   in
-  let+ ctxt =
+  let* ctxt =
     Storage.Contract.Frozen_deposits_pseudotokens.init
+      ctxt
+      contract
+      initial_pseudotokens
+  in
+  let+ ctxt =
+    Storage.Contract.Costaking_pseudotokens.init
       ctxt
       contract
       initial_pseudotokens
