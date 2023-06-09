@@ -1,6 +1,12 @@
 29ba7bff3c7c7a393c6a04f4940448063d3e18ee36649c9b8c30baba78dbc95d  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel echo run (hash- v0).out
 30fa228f195dc3028a4015f50bfb3b80720dcbde4b4aa70c5b086bc8e7853af6  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel link_store_exists run (hash- v0).out
+54bdc63d5b1cf8d5750101e1e6a4346036acf74abfc14efbc8bc8f37dbce84bb  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel link_store_delete_value run (hash- v1).out
 596fcb69efa87b91a8cbff250291e9d5daedbc9149664caf2aaba18a03061e3b  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel link_store_delete_value run (hash- v0).out
+7dae7b98717307d39e9ebd837746038ed084899e2eb9378d5da57f03103c63bb  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel link_store_exists run (hash- v1).out
 863f63c96f5d7fca01bdda358ec1ea8fd49fb7a9716ee55abb3a2daae638406b  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel link_store_get_hash run (hash- v0).out
+a28aa78349b26008301912ff034ee530f089f65e2d5408ff1abade9861b07c6f  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel link_store_get_hash run (hash- v1).out
 ac9dbd968c7e78abd6d28ef649a8eb98e75c3bc61ccc5b8afb93cdd0e37dbe90  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel link_store_create run (hash- v0).out
 c30c3dc42962304e1ca6445e13d81525060ed82c15873f145e4e62198e68f3ab  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel tx_no_verify run (hash- v0).out
+d5cfd8f6d408f4bd29a6f1b76bc6576ee1402a2f3292544b13bc6f0c8064763b  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel link_store_create run (hash- v1).out
+d89a855a81ea96e3789bc8e6426e64a0f6e8b58d765b2ee3d1a72fd9ca16a3e2  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel echo run (hash- v1).out
+e2d46c1d2181e8c225feb92942eb3d9a54f5c276b99940ea8018c81fea2c3743  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel tx_no_verify run (hash- v1).out
