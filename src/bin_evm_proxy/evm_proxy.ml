@@ -47,10 +47,7 @@ let make_config ?rpc_addr ?rpc_port ?debug ~rollup_node_endpoint () =
     rpc_addr = Option.value ~default:default_config.rpc_addr rpc_addr;
     rpc_port = Option.value ~default:default_config.rpc_port rpc_port;
     debug = Option.value ~default:default_config.debug debug;
-    rollup_node_endpoint =
-      Option.value
-        ~default:default_config.rollup_node_endpoint
-        rollup_node_endpoint;
+    rollup_node_endpoint;
   }
 
 let install_finalizer server =
@@ -165,13 +162,12 @@ let rpc_port_arg =
     ~doc:"The EVM proxy server rpc port."
     Params.int
 
-let rollup_node_endpoint_arg =
-  Tezos_clic.arg
-    ~long:"rollup-node-endpoint"
-    ~placeholder:"ADDR:PORT"
-    ~doc:
-      "The smart rollup node endpoint address the proxy server will \
-       communicate with, or [mockup] if you want to use mock values."
+let rollup_node_endpoint_param =
+  Tezos_clic.param
+    ~name:"rollup-node-endpoint"
+    ~desc:
+      "The smart rollup node endpoint address (as ADDR:PORT) the proxy server \
+       will communicate with, or [mockup] if you want to use mock values."
     Params.rollup_node_endpoint
 
 let main_command =
@@ -179,9 +175,9 @@ let main_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the RPC server"
-    (args3 rpc_addr_arg rpc_port_arg rollup_node_endpoint_arg)
-    (prefixes ["run"] @@ stop)
-    (fun (rpc_addr, rpc_port, rollup_node_endpoint) () ->
+    (args2 rpc_addr_arg rpc_port_arg)
+    (prefixes ["run"; "with"; "endpoint"] @@ rollup_node_endpoint_param @@ stop)
+    (fun (rpc_addr, rpc_port) rollup_node_endpoint () ->
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
       let*! () = Internal_event.Simple.emit Event.event_starting () in
       let config = make_config ?rpc_addr ?rpc_port ~rollup_node_endpoint () in
