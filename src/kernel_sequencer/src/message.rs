@@ -8,13 +8,46 @@ use nom::{
     combinator::{all_consuming, map},
     sequence::preceded,
 };
-use tezos_crypto_rs::hash::Signature;
+use tezos_crypto_rs::{blake2b, hash::Signature};
 use tezos_data_encoding::{
     enc::{self, BinResult, BinWriter},
     nom::{NomReader, NomResult},
 };
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
+use tezos_smart_rollup_host::runtime::RuntimeError;
+
+#[derive(Debug, Clone, PartialEq, Eq, BinWriter, NomReader)]
+pub struct UnverifiedSigned<A>
+where
+    A: NomReader + BinWriter,
+{
+    pub body: A,
+    pub signature: Signature,
+}
+
+impl<A> UnverifiedSigned<A>
+where
+    A: NomReader + BinWriter,
+{
+    /// Returns the hash of the body.
+    fn hash_body(body: &A) -> Result<Vec<u8>, RuntimeError> {
+        // Get the bytes of the body.
+        let mut bytes = Vec::new();
+        body.bin_write(&mut bytes)
+            .map_err(|_| RuntimeError::DecodingError)?;
+
+        // Returns the hash of the body.
+        blake2b::digest_256(&bytes).map_err(|_| RuntimeError::DecodingError)
+    }
+
+    /// Returns the hash of the signed message.
+    ///
+    /// It's equivalent of the body's hash.
+    pub fn hash(&self) -> Result<Vec<u8>, RuntimeError> {
+        UnverifiedSigned::hash_body(&self.body)
+    }
+}
 
 /// Framing protocol v0
 ///
@@ -58,7 +91,6 @@ pub struct Sequence {
     delayed_messages_suffix: u32,
     #[encoding(dynamic, list)]
     messages: Vec<Bytes>,
-    signature: Signature,
 }
 
 /// Message to set the appropriate sequencer
@@ -70,7 +102,6 @@ pub struct SetSequencer {
     nonce: u32,
     admin_public_key: PublicKey,
     sequencer_public_key: PublicKey,
-    signature: Signature,
 }
 
 #[derive(NomReader, BinWriter, Debug, Clone, Eq, PartialEq)]
@@ -81,7 +112,7 @@ pub enum SequencerMsg {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KernelMessage {
-    Sequencer(Framed<SequencerMsg>),
+    Sequencer(UnverifiedSigned<Framed<SequencerMsg>>),
     DelayedMessage(Vec<u8>),
 }
 
@@ -128,7 +159,7 @@ impl NomReader for KernelMessage {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         all_consuming(alt((
             all_consuming(map(
-                preceded(tag([1]), Framed::<SequencerMsg>::nom_read),
+                preceded(tag([1]), UnverifiedSigned::<Framed<SequencerMsg>>::nom_read),
                 KernelMessage::Sequencer,
             )),
             map(
@@ -155,7 +186,7 @@ impl BinWriter for KernelMessage {
 
 #[cfg(test)]
 mod tests {
-    use crate::message::{Framed, SequencerMsg};
+    use crate::message::{Framed, SequencerMsg, UnverifiedSigned};
 
     use super::{KernelMessage, Sequence};
     use crate::message::SetSequencer;
@@ -181,7 +212,7 @@ mod tests {
         let (_, secret) = key_pair("edsk3a5SDDdMWw3Q5hPiJwDXUosmZMTuKQkriPqY6UqtSfdLifpZbB");
         let signature = secret.sign([0x0]).expect("sign should work");
 
-        let sequence = KernelMessage::Sequencer(Framed {
+        let body = Framed {
             destination: SmartRollupAddress::from_b58check("sr1EzLeJYWrvch2Mhvrk1nUVYrnjGQ8A4qdb")
                 .expect("decoding should work"),
             payload: SequencerMsg::Sequence(Sequence {
@@ -189,9 +220,10 @@ mod tests {
                 delayed_messages_prefix: 0,
                 delayed_messages_suffix: 0,
                 messages: Vec::default(),
-                signature,
             }),
-        });
+        };
+
+        let sequence = KernelMessage::Sequencer(UnverifiedSigned { body, signature });
 
         // Serializing
         let mut bin: Vec<u8> = Vec::new();
@@ -209,16 +241,17 @@ mod tests {
             key_pair("edsk3a5SDDdMWw3Q5hPiJwDXUosmZMTuKQkriPqY6UqtSfdLifpZbB");
         let signature = secret.sign([0x0]).expect("sign should work");
 
-        let sequence = KernelMessage::Sequencer(Framed {
+        let body = Framed {
             destination: SmartRollupAddress::from_b58check("sr1EzLeJYWrvch2Mhvrk1nUVYrnjGQ8A4qdb")
                 .expect("decoding should work"),
             payload: SequencerMsg::SetSequencer(SetSequencer {
                 nonce: 0,
                 admin_public_key: public_key.clone(),
                 sequencer_public_key: public_key,
-                signature,
             }),
-        });
+        };
+
+        let sequence = KernelMessage::Sequencer(UnverifiedSigned { body, signature });
 
         // Serializing
         let mut bin: Vec<u8> = Vec::new();
@@ -249,17 +282,18 @@ mod tests {
         let (_, secret) = key_pair("edsk3a5SDDdMWw3Q5hPiJwDXUosmZMTuKQkriPqY6UqtSfdLifpZbB");
         let signature = secret.sign([0x0]).expect("sign should work");
 
-        let sequence = KernelMessage::Sequencer(Framed {
+        let body = Framed {
             destination: SmartRollupAddress::from_b58check("sr1EzLeJYWrvch2Mhvrk1nUVYrnjGQ8A4qdb")
                 .expect("decoding should work"),
             payload: SequencerMsg::Sequence(Sequence {
                 nonce: 0,
-                signature,
                 delayed_messages_prefix: 5,
                 delayed_messages_suffix: 5,
                 messages: Vec::default(),
             }),
-        });
+        };
+
+        let sequence = KernelMessage::Sequencer(UnverifiedSigned { body, signature });
 
         // Serializing
         let mut bin: Vec<u8> = Vec::new();
