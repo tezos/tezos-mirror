@@ -7251,7 +7251,7 @@ let _octez_dac_node =
     ~path:"src/bin_dac_node"
     ~internal_name:"main_dac"
     ~synopsis:"Tezos: `octez-dac-node` binary"
-    ~release_status:Released
+    ~release_status:Experimental
     ~with_macos_security_framework:true
     ~deps:
       ([
@@ -7303,7 +7303,7 @@ let _octez_dac_client =
     ~path:"src/bin_dac_client"
     ~internal_name:"main_dac_client"
     ~synopsis:"Tezos: `octez-dac-client` binary"
-    ~release_status:Released
+    ~release_status:Experimental
     ~with_macos_security_framework:true
     ~deps:
       ([
