@@ -115,10 +115,19 @@ let frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount =
   let* {current_amount = frozen_deposits_tez; initial_amount = _} =
     Frozen_deposits_storage.get ctxt contract
   in
-  let+ frozen_deposits_pseudotokens =
-    Storage.Contract.Frozen_deposits_pseudotokens.get ctxt contract
-  in
-  pseudotokens_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez ~tez_amount
+  if Tez_repr.(frozen_deposits_tez = zero) then
+    (* [Frozen_deposits_pseudotokens] may not be initialized when there are no
+       frozen deposits tez. This may happen when a new delegate is registered. *)
+    return
+      Staking_pseudotoken_repr.(of_int64_exn (Tez_repr.to_mutez tez_amount))
+  else
+    let+ frozen_deposits_pseudotokens =
+      Storage.Contract.Frozen_deposits_pseudotokens.get ctxt contract
+    in
+    pseudotokens_of
+      ~frozen_deposits_pseudotokens
+      ~frozen_deposits_tez
+      ~tez_amount
 
 let update_frozen_deposits_pseudotokens ~f ctxt delegate =
   let open Lwt_result_syntax in
