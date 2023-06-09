@@ -330,8 +330,8 @@ let exit_after_proto_migration node_ctxt ?predecessor head =
       let*! _ = Lwt_exit.exit_and_wait 0 in
       return_unit
 
-let rec process_head (node_ctxt : _ Node_context.t) ~catching_up
-    (head : Layer1.header) =
+let rec process_head (daemon_components : (module Daemon_components.S))
+    (node_ctxt : _ Node_context.t) ~catching_up (head : Layer1.header) =
   let open Lwt_result_syntax in
   let start_timestamp = Time.System.now () in
   let* already_processed = Node_context.is_processed node_ctxt head.hash in
@@ -345,7 +345,9 @@ let rec process_head (node_ctxt : _ Node_context.t) ~catching_up
       return_unit
   | Some predecessor ->
       let* () = exit_on_other_proto node_ctxt ~predecessor head in
-      let* () = process_head node_ctxt ~catching_up:true predecessor in
+      let* () =
+        process_head daemon_components node_ctxt ~catching_up:true predecessor
+      in
       let* ctxt = previous_context node_ctxt ~predecessor in
       let* () =
         Node_context.save_level
@@ -419,8 +421,10 @@ let rec process_head (node_ctxt : _ Node_context.t) ~catching_up
 
 (* [on_layer_1_head node_ctxt head] processes a new head from the L1. It
    also processes any missing blocks that were not processed. *)
-let on_layer_1_head node_ctxt (head : Layer1.header) =
+let on_layer_1_head (daemon_components : (module Daemon_components.S)) node_ctxt
+    (head : Layer1.header) =
   let open Lwt_result_syntax in
+  let (module Components) = daemon_components in
   let* old_head = Node_context.last_processed_head_opt node_ctxt in
   let old_head =
     match old_head with
@@ -479,28 +483,33 @@ let on_layer_1_head node_ctxt (head : Layer1.header) =
         Layer1.prefetch_tezos_blocks node_ctxt.l1_ctxt to_prefetch ;
         let* header = get_header block in
         let catching_up = block.level < head.level in
-        process_head node_ctxt ~catching_up header)
+        process_head daemon_components node_ctxt ~catching_up header)
       new_chain_prefetching
   in
   let* () = Publisher.publish_commitments () in
   let* () = Publisher.cement_commitments () in
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
   let* () = Refutation_coordinator.process stripped_head in
-  let* () = Batcher.batch () in
-  let* () = Batcher.new_head stripped_head in
+  let* () = Components.Batcher.batch () in
+  let* () = Components.Batcher.new_head stripped_head in
   let*! () = Injector.inject ~header:head.header () in
   let* () = exit_after_proto_migration node_ctxt head in
   return_unit
 
-let daemonize (node_ctxt : _ Node_context.t) =
-  Layer1.iter_heads node_ctxt.l1_ctxt (on_layer_1_head node_ctxt)
+let daemonize (daemon_components : (module Daemon_components.S))
+    (node_ctxt : _ Node_context.t) =
+  Layer1.iter_heads
+    node_ctxt.l1_ctxt
+    (on_layer_1_head daemon_components node_ctxt)
 
-let degraded_refutation_mode (node_ctxt : _ Node_context.t) =
+let degraded_refutation_mode (daemon_components : (module Daemon_components.S))
+    (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
+  let (module Components) = daemon_components in
   let*! () = Daemon_event.degraded_mode () in
   let message = node_ctxt.Node_context.cctxt#message in
   let*! () = message "Shutting down Batcher@." in
-  let*! () = Batcher.shutdown () in
+  let*! () = Components.Batcher.shutdown () in
   let*! () = message "Shutting down Commitment Publisher@." in
   let*! () = Publisher.shutdown () in
   Layer1.iter_heads node_ctxt.l1_ctxt @@ fun head ->
@@ -509,16 +518,18 @@ let degraded_refutation_mode (node_ctxt : _ Node_context.t) =
   let* () = exit_on_other_proto node_ctxt head in
   return_unit
 
-let install_finalizer node_ctxt rpc_server =
+let install_finalizer (daemon_components : (module Daemon_components.S))
+    node_ctxt rpc_server =
   let open Lwt_syntax in
+  let (module Components) = daemon_components in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let message = node_ctxt.Node_context.cctxt#message in
   let* () = message "Shutting down RPC server@." in
-  let* () = RPC_server.shutdown rpc_server in
+  let* () = Components.RPC_server.shutdown rpc_server in
   let* () = message "Shutting down Injector@." in
   let* () = Injector.shutdown () in
   let* () = message "Shutting down Batcher@." in
-  let* () = Batcher.shutdown () in
+  let* () = Components.Batcher.shutdown () in
   let* () = message "Shutting down Commitment Publisher@." in
   let* () = Publisher.shutdown () in
   let* () = message "Shutting down Refutation Coordinator@." in
@@ -547,12 +558,14 @@ let check_initial_state_hash {Node_context.cctxt; rollup_address; pvm; _} =
          expected_state_hash = l1_reference_initial_state_hash;
        })
 
-let run node_ctxt configuration =
+let run node_ctxt configuration
+    (daemon_components : (module Daemon_components.S)) =
   let open Lwt_result_syntax in
+  let (module Components) = daemon_components in
   let* () = check_initial_state_hash node_ctxt in
   let* rpc_server = RPC_server.start node_ctxt configuration in
   let (_ : Lwt_exit.clean_up_callback_id) =
-    install_finalizer node_ctxt rpc_server
+    install_finalizer daemon_components node_ctxt rpc_server
   in
   let start () =
     let*! () = Inbox.start () in
@@ -598,7 +611,8 @@ let run node_ctxt configuration =
         Configuration.Operator_purpose_map.find Add_messages node_ctxt.operators
       with
       | None -> return_unit
-      | Some signer -> Batcher.init configuration.batcher ~signer node_ctxt
+      | Some signer ->
+          Components.Batcher.init configuration.batcher ~signer node_ctxt
     in
     Lwt.dont_wait
       (fun () ->
@@ -614,7 +628,7 @@ let run node_ctxt configuration =
         ~rpc_addr:configuration.rpc_addr
         ~rpc_port:configuration.rpc_port
     in
-    daemonize node_ctxt
+    daemonize daemon_components node_ctxt
   in
   Metrics.Info.init_rollup_node_info
     ~id:configuration.sc_rollup_address
@@ -629,7 +643,7 @@ let run node_ctxt configuration =
           return_unit
       | e ->
           let*! () = Daemon_event.error e in
-          degraded_refutation_mode node_ctxt)
+          degraded_refutation_mode daemon_components node_ctxt)
 
 module Internal_for_tests = struct
   (** Same as {!process_head} but only builds and stores the L2 block
@@ -687,8 +701,15 @@ module Internal_for_tests = struct
     return l2_block
 end
 
-let run ~data_dir ?log_kernel_debug_file (configuration : Configuration.t)
-    (cctxt : Protocol_client_context.full) =
+module Rollup_node_daemon_components : Daemon_components.S = struct
+  module Batcher = Batcher
+  module RPC_server = RPC_server
+end
+
+let run
+    ?(daemon_components : (module Daemon_components.S) =
+      (module Rollup_node_daemon_components)) ~data_dir ?log_kernel_debug_file
+    (configuration : Configuration.t) (cctxt : Protocol_client_context.full) =
   let open Lwt_result_syntax in
   Random.self_init () (* Initialize random state (for reconnection delays) *) ;
   let*! () = Event.starting_node () in
@@ -726,4 +747,4 @@ let run ~data_dir ?log_kernel_debug_file (configuration : Configuration.t)
       ~proto_level:predecessor.proto_level
       configuration
   in
-  run node_ctxt configuration
+  run node_ctxt configuration daemon_components
