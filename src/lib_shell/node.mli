@@ -34,7 +34,7 @@ type config = {
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
   data_dir : string;
-  external_validator_log_config : External_validation.log_config;
+  internal_events : Tezos_base.Internal_event_config.t;
   store_root : string;
   context_root : string;
   protocol_root : string;

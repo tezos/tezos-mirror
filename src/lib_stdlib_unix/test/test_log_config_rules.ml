@@ -73,6 +73,7 @@ let () =
   test_case "   toto   ->  notice  " [("toto", Notice)] ;
   test_case_error "toto -> tata -> error" Incorrect_log_rules_syntax ;
   test_case "info" [("", Info)] ;
+  test_case "*->info" [("", Info)] ;
   test_case_error "notice ->" Incorrect_log_rules_missing_level ;
   test_case_error "-> info" Incorrect_log_rules_missing_pattern ;
   test_case_error "  -> info" Incorrect_log_rules_missing_pattern ;

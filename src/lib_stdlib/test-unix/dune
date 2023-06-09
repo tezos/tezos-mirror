@@ -8,7 +8,6 @@
   tezt.core
   tezos-stdlib
   octez-alcotezt
-  lwt_log
   bigstring
   lwt.unix
   tezos-test-helpers

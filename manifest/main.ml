@@ -207,10 +207,6 @@ let lwt_canceler =
 
 let lwt_exit = external_lib "lwt-exit" V.True
 
-let lwt_log = external_lib "lwt_log" V.True
-
-let lwt_log_core = external_sublib ~js_compatible:true lwt_log "lwt_log.core"
-
 let lwt_unix = external_sublib lwt "lwt.unix"
 
 let lwt_watcher = external_lib "lwt-watcher" V.(exactly "0.2")
@@ -557,7 +553,6 @@ let _octez_stdlib_test_unix =
       [
         octez_stdlib |> open_;
         alcotezt;
-        lwt_log;
         bigstring;
         lwt_unix;
         octez_test_helpers |> open_;
@@ -1618,7 +1613,6 @@ let octez_event_logging =
         data_encoding |> open_;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_lwt_result_stdlib;
-        lwt_log_core;
         uri;
       ]
     ~js_compatible:true
@@ -1666,7 +1660,6 @@ let octez_stdlib_unix =
         ptime_clock_os;
         mtime;
         mtime_clock_os;
-        lwt_log;
         conf_libev;
         uri;
       ]
@@ -2228,6 +2221,7 @@ let octez_p2p_test_common =
     ~opam:"tezos-p2p"
     ~deps:
       [
+        tezt_lib |> open_ |> open_ ~m:"Base";
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix |> open_;
         octez_stdlib_unix |> open_;

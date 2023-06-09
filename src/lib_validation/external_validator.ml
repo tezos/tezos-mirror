@@ -197,7 +197,7 @@ let init ~readonly input output =
           user_activated_protocol_overrides;
           operation_metadata_size_limit;
           dal_config;
-          log_config;
+          internal_events;
         } =
     External_validation.recv input External_validation.parameters_encoding
   in
@@ -237,7 +237,7 @@ let init ~readonly input output =
       user_activated_upgrades,
       user_activated_protocol_overrides,
       operation_metadata_size_limit,
-      log_config )
+      internal_events )
 
 let run ~readonly ~using_std_channel input output =
   let open Lwt_result_syntax in
@@ -248,18 +248,14 @@ let run ~readonly ~using_std_channel input output =
          user_activated_upgrades,
          user_activated_protocol_overrides,
          operation_metadata_size_limit,
-         log_config ) =
+         internal_events ) =
     init ~readonly input output
   in
   let*! () =
     (* if the external validator is spawned in a standalone way and communicates
        with the node through stdin/stdoud, we do no start the logging system. *)
     if using_std_channel then Lwt.return_unit
-    else
-      Tezos_base_unix.Internal_event_unix.init
-        ~internal_events:log_config.internal_events
-        ~log_cfg:log_config.lwt_log_sink_unix
-        ()
+    else Tezos_base_unix.Internal_event_unix.init ~internal_events ()
   in
   (* Main loop waiting for request to be processed, forever, until the
      [Terminate] request is received.

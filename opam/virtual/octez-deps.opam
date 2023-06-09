@@ -52,7 +52,6 @@ depends: [
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
   "lwt-watcher" { = "0.2" }
-  "lwt_log"
   "mtime" { >= "1.4.0" & < "2.0.0" }
   "num"
   "ocaml-migrate-parsetree"

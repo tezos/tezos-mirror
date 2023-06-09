@@ -102,7 +102,7 @@ let main () =
     | Quiet | Error | Warn | Report -> None
     | Info | Debug -> Some "test.p2p.node -> info;"
   in
-  let log_cfg = Lwt_log_sink_unix.create_cfg ?rules () in
+  let log_cfg = Tezos_base_unix.Logs_simple_config.create_cfg ?rules () in
   let () =
     Lwt_main.run (Tezos_base_unix.Internal_event_unix.init ~log_cfg ())
   in

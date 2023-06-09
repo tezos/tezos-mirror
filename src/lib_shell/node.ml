@@ -124,7 +124,7 @@ type config = {
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
   data_dir : string;
-  external_validator_log_config : External_validation.log_config;
+  internal_events : Tezos_base.Internal_event_config.t;
   store_root : string;
   context_root : string;
   protocol_root : string;
@@ -206,7 +206,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       user_activated_protocol_overrides;
       operation_metadata_size_limit;
       data_dir;
-      external_validator_log_config;
+      internal_events;
       store_root;
       context_root;
       protocol_root;
@@ -270,7 +270,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
                process_path = Sys.executable_name;
                sandbox_parameters;
                dal_config = dal;
-               log_config = external_validator_log_config;
+               internal_events;
              })
       in
       let commit_genesis ~chain_id =

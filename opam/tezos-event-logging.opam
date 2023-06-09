@@ -14,7 +14,6 @@ depends: [
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "tezos-error-monad"
   "tezos-lwt-result-stdlib"
-  "lwt_log"
   "uri" { >= "3.1.0" }
 ]
 build: [

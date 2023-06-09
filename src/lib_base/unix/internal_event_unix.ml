@@ -42,7 +42,7 @@ end
    run with [Singleprocess]. *)
 let env_var_name = "TEZOS_EVENTS_CONFIG"
 
-let init ?log_cfg ?(internal_events = Internal_event_config.lwt_log) () =
+let init_raw ~internal_events () =
   let _ =
     (* This is just here to force the linking (and hence
        initialization) of all these modules: *)
@@ -53,7 +53,6 @@ let init ?log_cfg ?(internal_events = Internal_event_config.lwt_log) () =
   in
   let open Lwt_result_syntax in
   let*! r =
-    let* () = Lwt_result.ok @@ Lwt_log_sink_unix.initialize ?cfg:log_cfg () in
     let* () =
       match Sys.(getenv_opt env_var_name) with
       | None -> return_unit
@@ -108,33 +107,72 @@ let close () =
 
 open Filename.Infix
 
-let make_default_internal_events daily_log_path =
+let make_default_internal_events ~rules ~verbosity
+    ~(log_output : Logs_simple_config.Output.t) ~daily_logs_path =
   (* By default the node has two logs output:
-     - on stdout using Lwt_log using the configured verbosity
-     - on disk, with a 7 days rotation with an info verbosity level *)
-  let internal_logs =
+     - on the configured [log_output] using the configured [verbosity] and
+       a short pretty printing
+     - on disk, with a 7 days rotation with an info verbosity level and a
+       standard pretty printing *)
+  let origin, rules = Level_config_rules.find_log_rules rules in
+  let section_prefixes =
+    match rules with
+    | Some rules -> (
+        try Level_config_rules.parse_rules rules
+        with _ ->
+          Printf.ksprintf
+            Stdlib.failwith
+            "Incorrect log rules defined in %s"
+            origin)
+    | None -> []
+  in
+  let user_events =
+    let kind =
+      match log_output with
+      | Stdout -> `Stdout
+      | Stderr -> `Stderr
+      | File fp -> `Path fp
+      | Null -> `Null
+      | Syslog _ -> `Syslog (Logs_simple_config.Output.to_string log_output)
+    in
     Internal_event_config.make_config_uri
-      ~daily_logs:7
-      ~create_dirs:true
-      ~level:Info
-      ~format:"pp"
-      (`Path (daily_log_path // "daily.log"))
+      ~level:verbosity
+      ~section_prefixes
+      ~format:"pp-short"
+      kind
   in
-  let user_logs = Uri.make ~scheme:Internal_event.Lwt_log_sink.uri_scheme () in
-  Internal_event_config.make_custom [user_logs; internal_logs]
+  let sinks = [user_events] in
+  let sinks =
+    match daily_logs_path with
+    | Some daily_logs_path ->
+        let internal_logs_events =
+          Internal_event_config.make_config_uri
+            ~create_dirs:true
+            ~daily_logs:7
+            ~level:Info
+            ~format:"pp-rfc5424"
+            (`Path (daily_logs_path // "daily.log"))
+        in
+        internal_logs_events :: sinks
+    | None -> sinks
+  in
+  Internal_event_config.make_custom sinks
 
-let make_with_defaults ?internal_events ?enable_default_daily_logs_at () =
-  let internal_events =
-    match (internal_events, enable_default_daily_logs_at) with
-    | None, None -> Internal_event_config.lwt_log
-    | None, Some daily_logs_path -> make_default_internal_events daily_logs_path
-    | Some internal_events, _ -> internal_events
-  in
-  internal_events
+let make_with_defaults ?verbosity ?enable_default_daily_logs_at
+    ?(log_cfg = Logs_simple_config.default_cfg) () =
+  make_default_internal_events
+    ~rules:log_cfg.rules
+    ~verbosity:(Option.value verbosity ~default:log_cfg.default_level)
+    ~log_output:log_cfg.output
+    ~daily_logs_path:enable_default_daily_logs_at
 
-let init_with_defaults ?internal_events ?enable_default_daily_logs_at ?log_cfg
-    () =
+let init ?internal_events ?verbosity ?enable_default_daily_logs_at ?log_cfg () =
+  let open Lwt_syntax in
   let internal_events =
-    make_with_defaults ?internal_events ?enable_default_daily_logs_at ()
+    match internal_events with
+    | Some internal_events -> internal_events
+    | None ->
+        make_with_defaults ?verbosity ?enable_default_daily_logs_at ?log_cfg ()
   in
-  init ?log_cfg ~internal_events ()
+  let* () = init_raw ~internal_events () in
+  return_unit

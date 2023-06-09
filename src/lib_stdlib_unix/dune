@@ -21,7 +21,6 @@
   ptime.clock.os
   mtime
   mtime.clock.os
-  lwt_log
   uri)
  (flags
   (:standard)

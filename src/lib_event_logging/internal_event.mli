@@ -51,9 +51,6 @@ module Level : sig
   (** The default level is {!Info}. *)
   val default : t
 
-  (** Cast the level to a value of {!Lwt_log_core.level}. *)
-  val to_lwt_log : t -> Lwt_log_core.level
-
   val to_string : t -> string
 
   val of_string : string -> t option
@@ -72,9 +69,6 @@ module Section : sig
 
   (** Build a {!Section.t} by replacing special characters with ['_']. *)
   val make_sanitized : string list -> t
-
-  (** Make the equivalent {!Lwt_log} section.  *)
-  val to_lwt_log : t -> Lwt_log_core.section
 
   (** [is_prefix ~prefix p] checks that [p] starts with [~prefix].  *)
   val is_prefix : prefix:t -> t -> bool
@@ -511,19 +505,4 @@ module Legacy_logging : sig
 
     val lwt_fatal_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
   end
-end
-
-(** {3 Common Event-Sink Definitions } *)
-
-(** The lwt-sink outputs pretty-printed renderings of events to the
-    lwt-log logging framework (see the {!Lwt_log_core} module).
-
-    It is activated {i by default} in {!Internal_event_unix.Configuration.default}
-    (in any case it can be activated with [TEZOS_EVENTS_CONFIG="lwt-log://"]. To
-    configure further how the sink outputs to a file or the user's
-    terminal, one needs to use the [TEZOS_LOG] variable (see also the module
-    {!Lwt_log_sink_unix}).
-*)
-module Lwt_log_sink : sig
-  val uri_scheme : string
 end

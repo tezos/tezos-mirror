@@ -132,7 +132,7 @@ let make_with_pp_short pp wrapped_event =
     let ms = mod_float (time *. 1000.) 1000. in
     Format.fprintf
       fmt
-      "%s %2d %02d:%02d:%02d.%03.0f"
+      "%s %02d %02d:%02d:%02d.%03.0f"
       month_string
       tm.Unix.tm_mday
       tm.Unix.tm_hour
@@ -337,7 +337,7 @@ end) : Internal_event.SINK with type t = t = struct
                   match Internal_event.Level.of_string lvl with
                   | Some l ->
                       (* establish default for all sections *)
-                      (Internal_event.Section.empty, Some l) :: pairs
+                      pairs @ [(Internal_event.Section.empty, Some l)]
                   | None ->
                       Format.kasprintf
                         Stdlib.failwith
@@ -584,6 +584,11 @@ end) : Internal_event.SINK with type t = t = struct
     lwt_bad_citizen_hack :=
       (to_write, M.level, section) :: !lwt_bad_citizen_hack ;
     let*! r = output_one now output section M.level to_write in
+    let () =
+      match !lwt_bad_citizen_hack with
+      | [] -> ()
+      | _h :: t -> lwt_bad_citizen_hack := t
+    in
     match r with
     | Error [Exn (Unix.Unix_error (Unix.EBADF, _, _))] ->
         (* The file descriptor was closed before the event arrived,

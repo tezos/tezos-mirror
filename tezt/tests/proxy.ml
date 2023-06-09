@@ -70,15 +70,13 @@ let test_cache_at_most_once ?query_string path =
   let lines = String.split_on_char '\n' stderr in
   let proxy_cache_regexp =
     Re.Str.regexp
-      {|^.*proxy_rpc: proxy cache created for chain \([a-zA-Z0-9]*\) and block \([a-zA-Z0-9]*\)|}
+      {|^.*: proxy cache created for chain \([a-zA-Z0-9]*\) and block \([a-zA-Z0-9]*\)|}
   in
   let proxy_cache_multi_regexp1 =
     Re.Str.regexp
-      {|^.*proxy_rpc: proxy cache created for chain \([a-zA-Z0-9]*\) and block|}
+      {|^.*: proxy cache created for chain \([a-zA-Z0-9]*\) and block|}
   in
-  let proxy_cache_multi_regexp2 =
-    Re.Str.regexp {|^.*proxy_rpc: *\([a-zA-Z0-9]*\)|}
-  in
+  let proxy_cache_multi_regexp2 = Re.Str.regexp {|^.*: *\([a-zA-Z0-9]*\)|} in
   let rec extract_chain_block = function
     | [] -> []
     | [line] ->
@@ -401,8 +399,7 @@ module Location = struct
 
   let block_id = "head"
 
-  let log_line_prefix =
-    Re.Str.regexp "[A-Z][a-z]+[ 0-9:\\.]+ - proxy_rpc_ctxt: +"
+  let log_line_prefix = Re.Str.regexp "[A-Z][a-z]+[ 0-9:\\.]+: +"
 
   (** [output] is the output of executing [rpc get rpc_path] *)
   let parse_rpc_exec_location ?query_string output rpc_path =
