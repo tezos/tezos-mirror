@@ -26,6 +26,8 @@
 
 module Proof = Tezos_context_sigs.Context.Proof_types
 
+type version = Version_0 | Version_1 | Version_2
+
 type chain = [`Main | `Test | `Hash of Chain_id.t]
 
 type chain_prefix = unit * chain
@@ -406,8 +408,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       unprocessed : Next_proto.operation Operation_hash.Map.t;
     }
 
-    type version = Version_0 | Version_1 | Version_2
-
     (** Call RPC GET /chains/[chain]/mempool/pending_operations
 
     - Default [version] is [0].
@@ -725,7 +725,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ( [`GET],
           'a,
           'b,
-          < version : Mempool.version
+          < version : version
           ; validated : bool
           ; branch_delayed : bool
           ; branch_refused : bool
@@ -733,7 +733,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           ; outdated : bool
           ; validation_passes : int list >,
           unit,
-          Mempool.version * Mempool.t )
+          version * Mempool.t )
         Tezos_rpc.Service.t
 
       (** Define RPC POST /chains/[chain]/mempool/ban_operation *)

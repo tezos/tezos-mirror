@@ -27,6 +27,46 @@
 open Data_encoding
 module Proof = Tezos_context_sigs.Context.Proof_types
 
+type version = Version_0 | Version_1 | Version_2
+
+let string_of_version = function
+  | Version_0 -> "0"
+  | Version_1 -> "1"
+  | Version_2 -> "2"
+
+let unsupported_version_msg version supported =
+  Format.asprintf
+    "Unsupported version %s (supported versions %a)"
+    version
+    (Format.pp_print_list
+       ~pp_sep:(fun fmt () -> Format.fprintf fmt ",")
+       (fun fmt version ->
+         Format.fprintf fmt "\"%s\"" (string_of_version version)))
+    supported
+
+let is_supported_version version supported =
+  List.mem ~equal:( == ) version supported
+
+let version_of_string supported version =
+  let open Result_syntax in
+  let* version_t =
+    match version with
+    | "0" -> Ok Version_0
+    | "1" -> Ok Version_1
+    | "2" -> Ok Version_2
+    | _ -> Error (unsupported_version_msg version supported)
+  in
+  if is_supported_version version_t supported then Ok version_t
+  else Error (unsupported_version_msg version supported)
+
+let version_arg supported =
+  let open Tezos_rpc.Arg in
+  make
+    ~name:"version"
+    ~destruct:(version_of_string supported)
+    ~construct:string_of_version
+    ()
+
 (* TODO: V2.Tree32 has been chosen arbitrarily ; maybe it's not the best option *)
 module Merkle_proof_encoding =
   Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree32
@@ -1190,30 +1230,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       (* This encoding should be always the one by default. *)
       let encoding = version_1_encoding
 
-      type version = Version_0 | Version_1 | Version_2
-
-      let string_of_version = function
-        | Version_0 -> "0"
-        | Version_1 -> "1"
-        | Version_2 -> "2"
-
-      let version_of_string = function
-        | "0" -> Ok Version_0
-        | "1" -> Ok Version_1
-        | "2" -> Ok Version_2
-        | _ ->
-            Error
-              "Cannot parse version (supported versions \"0\", \"1\" and \"2\")"
-
       let default_pending_operations_version = Version_1
 
-      let version_arg =
-        let open Tezos_rpc.Arg in
-        make
-          ~name:"version"
-          ~destruct:version_of_string
-          ~construct:string_of_version
-          ()
+      let pending_operations_supported_versions =
+        [Version_0; Version_1; Version_2]
 
       let pending_query =
         let open Tezos_rpc.Query in
@@ -1244,7 +1264,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             end)
         |+ field
              "version"
-             version_arg
+             (version_arg pending_operations_supported_versions)
              default_pending_operations_version
              (fun t -> t#version)
         |+ field
@@ -1736,14 +1756,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       unprocessed : Next_proto.operation Operation_hash.Map.t;
     }
 
-    type version = S.Mempool.version = Version_0 | Version_1 | Version_2
-
     let pending_operations ctxt ?(chain = `Main)
         ?(version = S.Mempool.default_pending_operations_version)
         ?(validated = true) ?(branch_delayed = true) ?(branch_refused = true)
         ?(refused = true) ?(outdated = true) ?(validation_passes = []) () =
       let open Lwt_result_syntax in
-      let* v =
+      let* _version, pending_operations =
         Tezos_rpc.Context.make_call1
           (S.Mempool.pending_operations (mempool_path chain_path))
           ctxt
@@ -1765,9 +1783,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           end)
           ()
       in
-      match v with
-      | (Version_2 | Version_1 | Version_0), pending_operations ->
-          return pending_operations
+      return pending_operations
 
     let ban_operation ctxt ?(chain = `Main) op_hash =
       let s = S.Mempool.ban_operation (mempool_path chain_path) in
