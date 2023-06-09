@@ -23,8 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+include Daemon_components.Batcher_sig
 
 (** The type for the status of messages in the batcher.  *)
 type status =
@@ -32,15 +31,6 @@ type status =
   | Batched of Injector.Inj_operation.hash
       (** The message has already been batched and sent to the injector in an L1
           operation whose hash is given. *)
-
-(** [init config ~signer node_ctxt] initializes and starts the batcher for
-    [signer]. If [config.simulation] is [true] (the default), messages added to
-    the batcher are simulated in an incremental simulation context. *)
-val init :
-  Configuration.batcher ->
-  signer:public_key_hash ->
-  _ Node_context.t ->
-  unit tzresult Lwt.t
 
 (** Return [true] if the batcher was started for this node. *)
 val active : unit -> bool
@@ -58,17 +48,6 @@ val get_queue : unit -> (L2_message.hash * L2_message.t) list tzresult
     simulation context. In this case, when the application fails, the messages
     are not queued.  *)
 val register_messages : string list -> L2_message.hash list tzresult Lwt.t
-
-(** Create L2 batches of operations from the queue and pack them in an L1 batch
-    operation. The batch operation is queued in the injector for injection on
-    the Tezos node. *)
-val batch : unit -> unit tzresult Lwt.t
-
-(** Notify a new L2 head to the batcher worker. *)
-val new_head : Layer1.head -> unit tzresult Lwt.t
-
-(** Shutdown the batcher, waiting for the ongoing request to be processed. *)
-val shutdown : unit -> unit Lwt.t
 
 (** The status of a message in the batcher. Returns [None] if the message is not
     known by the batcher (the batcher only keeps the batched status of the last
