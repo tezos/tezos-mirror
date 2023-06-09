@@ -40,7 +40,7 @@ pub struct Bytes {
 /// The sequence contains the number of messages
 /// that should be processed from the delayed inbox
 /// and the messages from the sequencer
-///  
+///
 /// The number of messages that should be processed
 /// from the delayed inbox is divided into two parts
 /// delayed_messages_prefix and delayed_messages_suffix

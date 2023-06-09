@@ -5,6 +5,7 @@
 
 use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding_derive::BinWriter;
+use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 use tezos_smart_rollup_host::{
     input::Message,
@@ -53,7 +54,12 @@ pub fn read_input<Host: Runtime>(
                         KernelMessage::Sequencer(Framed {
                             destination,
                             payload: SequencerMsg::Sequence(sequence),
-                        }) => handle_sequence_message(sequence, destination, &raw_rollup_address),
+                        }) => handle_sequence_message(
+                            host,
+                            sequence,
+                            destination,
+                            &raw_rollup_address,
+                        ),
                         KernelMessage::Sequencer(Framed {
                             destination,
                             payload: SequencerMsg::SetSequencer(set_sequence),
@@ -82,11 +88,17 @@ pub fn read_input<Host: Runtime>(
 
 /// Handle Sequence message
 fn handle_sequence_message(
-    _sequence: Sequence,
+    host: &impl Runtime,
+    sequence: Sequence,
     destination: SmartRollupAddress,
     rollup_address: &[u8; RAW_ROLLUP_ADDRESS_SIZE],
 ) {
     if destination.hash().as_ref() == rollup_address {
+        debug_msg!(
+            host,
+            "Received a sequence message {:?} targeting our rollup",
+            sequence
+        );
         // process the sequence
     }
 }
@@ -113,6 +125,12 @@ fn handle_message<H: Runtime>(
 ) -> Result<(), RuntimeError> {
     // Check if the message should be included in the delayed inbox
     if filter_behavior.predicate(user_message.as_ref(), rollup_address) {
+        debug_msg!(
+            host,
+            "Received user message {:?} targeting our rollup, hence, will be added to the delayed inbox",
+            user_message
+        );
+
         // add the message to the delayed inbox
         let user_message = UserMessage {
             timeout_level: level + timeout_window,

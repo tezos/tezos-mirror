@@ -1,4 +1,4 @@
-KERNELS = evm_kernel.wasm
+KERNELS = evm_kernel.wasm sequenced_kernel.wasm
 SDK_DIR=src/kernel_sdk
 EVM_DIR=src/kernel_evm
 SEQUENCER_DIR=src/kernel_sequencer
@@ -37,7 +37,7 @@ sequenced_kernel.wasm:
 	@wasm-strip $@
 
 .PHONY: build
-build: ${KERNELS} kernel_sdk sequenced_kernel.wasm
+build: ${KERNELS} kernel_sdk
 
 .PHONY: build-dev-deps
 build-dev-deps: build-deps

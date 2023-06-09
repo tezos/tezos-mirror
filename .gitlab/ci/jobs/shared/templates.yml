@@ -54,6 +54,7 @@
     name: "build-kernels-$CI_COMMIT_REF_SLUG"
     paths:
       - evm_kernel.wasm
+      - sequenced_kernel.wasm
       - smart-rollup-installer
     expire_in: 1 day
     when: on_success

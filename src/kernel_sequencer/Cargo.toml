@@ -31,7 +31,7 @@ version = "0.5"
 [dependencies.tezos_data_encoding_derive]
 version = "0.5"
 
-[dependencies.nom] 
+[dependencies.nom]
 version = "7.1"
 
 [dependencies.tezos_crypto_rs]
@@ -40,6 +40,10 @@ default-features = false
 
 [dependencies.tezos-smart-rollup-encoding]
 path = "../kernel_sdk/encoding"
+version = "0.2.0"
+
+[dependencies.tezos-smart-rollup-debug]
+path = "../kernel_sdk/debug"
 version = "0.2.0"
 
 [dev-dependencies.tezos_crypto_rs]
