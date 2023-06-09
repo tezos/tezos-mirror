@@ -684,7 +684,7 @@ module Make_s
                     | `Outdated e ) ) ->
                   Lwt.return
                   @@ error_with
-                       "Error while applying operation %a:@ %a"
+                       "Error while validating injected operation %a:@ %a"
                        Operation_hash.pp
                        oph
                        pp_print_trace

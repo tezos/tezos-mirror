@@ -127,6 +127,10 @@ Node
   ``double_attestation_evidence`` and ``double_preattestation_evidence`` kinds
   in the JSON result. (MR :gl:`!8949`)
 
+- The error message when the local injection of an operation fails now
+  begins with ``Error while validating injected operation`` instead of
+  ``Error while applying operation``. (MR :gl:`!8857`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.

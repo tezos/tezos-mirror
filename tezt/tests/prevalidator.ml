@@ -3326,7 +3326,8 @@ let force_operation_injection =
   let injection_error_rex =
     rex
       ~opts:[`Dotall]
-      "Fatal error:\n  Command failed: Error while applying operation.*:"
+      "Fatal error:\n\
+      \  Command failed: Error while validating injected operation.*:"
   in
   let* () = Process.check_error ~msg:injection_error_rex p in
   Log.info "%s" step6_msg ;
