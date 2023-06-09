@@ -3329,9 +3329,10 @@ let generate_opam_ci opam_release_graph =
         - "**/dune-project"
         - "**/dune-workspace"
         - "**/*.opam"
-        - .gitlab/ci/opam-ci.yml
-        - .gitlab/ci/packaging.yml
+        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam_package.yml
         - manifest/manifest.ml
+        - manifest/main.ml
         - scripts/opam-prepare-repo.sh
         - scripts/version.sh
       when: delayed
