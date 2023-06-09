@@ -351,8 +351,7 @@ let test_fast_exec_reveal ~version () =
   Lwt_result_syntax.return_unit
 
 let tests =
-  tztests_with_pvm
-    ~versions:[V0; V1]
+  tztests_with_all_pvms
     [
       ( "Test reveal_preimage with preimage length below max_bytes",
         `Quick,

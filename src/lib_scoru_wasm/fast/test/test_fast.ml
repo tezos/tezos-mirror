@@ -976,8 +976,7 @@ let test_read_input_write_output_failing ~version () =
     ()
 
 let tests =
-  tztests_with_pvm
-    ~versions:[V0; V1]
+  tztests_with_all_pvms
     [
       ("Big addresses are working correctly", `Quick, test_big_address);
       ("Computation kernel", `Quick, test_computation);
