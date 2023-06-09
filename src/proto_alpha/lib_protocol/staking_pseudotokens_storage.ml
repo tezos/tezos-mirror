@@ -157,38 +157,44 @@ let update_frozen_deposits_pseudotokens ~f ctxt delegate =
 
 let credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount
     =
-  let f ~frozen_deposits_pseudotokens ~frozen_deposits_tez =
-    let open Result_syntax in
-    let pseudotokens_to_add =
-      pseudotokens_of
-        ~frozen_deposits_pseudotokens
-        ~frozen_deposits_tez
-        ~tez_amount
+  if Tez_repr.(tez_amount = zero) then
+    return (ctxt, Staking_pseudotoken_repr.zero)
+  else
+    let f ~frozen_deposits_pseudotokens ~frozen_deposits_tez =
+      let open Result_syntax in
+      let pseudotokens_to_add =
+        pseudotokens_of
+          ~frozen_deposits_pseudotokens
+          ~frozen_deposits_tez
+          ~tez_amount
+      in
+      let+ new_pseudotokens_balance =
+        Staking_pseudotoken_repr.(
+          pseudotokens_to_add +? frozen_deposits_pseudotokens)
+      in
+      (new_pseudotokens_balance, pseudotokens_to_add)
     in
-    let+ new_pseudotokens_balance =
-      Staking_pseudotoken_repr.(
-        pseudotokens_to_add +? frozen_deposits_pseudotokens)
-    in
-    (new_pseudotokens_balance, pseudotokens_to_add)
-  in
-  update_frozen_deposits_pseudotokens ~f ctxt delegate
+    update_frozen_deposits_pseudotokens ~f ctxt delegate
 
 let debit_frozen_deposits_pseudotokens ctxt delegate pseudotoken_amount =
-  let f ~frozen_deposits_pseudotokens ~frozen_deposits_tez =
-    let open Result_syntax in
-    let+ new_pseudotokens_balance =
-      Staking_pseudotoken_repr.(
-        frozen_deposits_pseudotokens -? pseudotoken_amount)
+  if Staking_pseudotoken_repr.(pseudotoken_amount = zero) then
+    return (ctxt, Tez_repr.zero)
+  else
+    let f ~frozen_deposits_pseudotokens ~frozen_deposits_tez =
+      let open Result_syntax in
+      let+ new_pseudotokens_balance =
+        Staking_pseudotoken_repr.(
+          frozen_deposits_pseudotokens -? pseudotoken_amount)
+      in
+      let tez_amount =
+        tez_of
+          ~frozen_deposits_pseudotokens
+          ~frozen_deposits_tez
+          ~pseudotoken_amount
+      in
+      (new_pseudotokens_balance, tez_amount)
     in
-    let tez_amount =
-      tez_of
-        ~frozen_deposits_pseudotokens
-        ~frozen_deposits_tez
-        ~pseudotoken_amount
-    in
-    (new_pseudotokens_balance, tez_amount)
-  in
-  update_frozen_deposits_pseudotokens ~f ctxt delegate
+    update_frozen_deposits_pseudotokens ~f ctxt delegate
 
 let costaking_pseudotokens_balance ctxt contract =
   let open Lwt_result_syntax in
