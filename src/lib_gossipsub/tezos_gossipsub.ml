@@ -171,7 +171,10 @@ module Make (C : AUTOMATON_CONFIG) :
     direct : bool;
         (** A direct (aka explicit) connection is a connection to which we
             forward all the messages. *)
-    outbound : bool;  (** An outbound connection is a connection we initiated. *)
+    outbound : bool;
+        (** Intuitively, an outbound connection is a connection we
+            initiated. But, the application layer can refine, relax or redefine
+            this notion to fit its needs. *)
   }
 
   type fanout_peers = {peers : Peer.Set.t; last_published_time : time}
