@@ -15,7 +15,7 @@ use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Rlp};
 use tezos_ethereum::rlp_helpers::{decode_field, decode_option, next};
-use tezos_smart_rollup_debug::Runtime;
+use tezos_smart_rollup_debug::{debug_msg, Runtime};
 
 // SIMULATION/SIMPLE/RLP_ENCODED_SIMULATION
 pub const SIMULATION_SIMPLE_TAG: u8 = 1;
@@ -227,8 +227,11 @@ fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Simulation, Error> {
 }
 
 pub fn start_simulation_mode<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+    debug_msg!(host, "Starting simulation mode ");
     let simulation = parse_inbox(host)?;
     let outcome = simulation.run(host)?;
+    debug_msg!(host, "outcome={:?} ", outcome);
+    storage::store_simulation_status(host, outcome.is_success)?;
     storage::store_simulation_result(host, outcome.result)
 }
 
@@ -417,6 +420,44 @@ mod tests {
             parsed,
             "should have been parsed as complete simulation"
         );
+    }
+
+    #[test]
+    fn parse_simulation2() {
+        // setup
+        let mut host = MockHost::default();
+        let new_address = create_contract(&mut host);
+
+        let to = Some(new_address);
+        let data = hex::decode(STORAGE_CONTRACT_CALL_GET).unwrap();
+        let gas = Some(11111);
+        let expected = Simulation {
+            from: None,
+            to,
+            gas,
+            gas_price: None,
+            value: None,
+            data,
+        };
+
+        let encoded = hex::decode(
+            "ff01e68094907823e0a92f94355968feb2cbf0fbb594fe321488672b0000000000008080846d4ce63c",
+        )
+        .unwrap();
+
+        let parsed = Input::parse(&encoded);
+        assert_eq!(
+            Input::SimpleSimulation(expected),
+            parsed,
+            "should have been parsed as complete simulation"
+        );
+
+        if let Input::SimpleSimulation(s) = parsed {
+            let res = s.run(&mut host).expect("simulation should run");
+            assert!(res.is_success, "simulation should have succeeded");
+        } else {
+            panic!("Parsing failed")
+        }
     }
 
     #[test]
