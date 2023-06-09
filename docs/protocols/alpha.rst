@@ -207,3 +207,6 @@ Internal
 - Renaming the ``endorsement_power`` and ``preendorsement_power`` fields from
   consensus operation receipt to ``consensus_power`` in the non legacy encoding.
   (MR :gl:`!8531`)
+
+- Improve storage cleaning at the end of a refutation game. (MR :gl:`!8881`)
+

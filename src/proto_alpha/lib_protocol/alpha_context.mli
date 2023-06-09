@@ -3746,6 +3746,9 @@ module Sc_rollup : sig
       Staker.t ->
       ((Game.t * Game.Index.t) list * context) tzresult Lwt.t
 
+    val find_game :
+      context -> t -> Game.Index.t -> (context * Game.t option) tzresult Lwt.t
+
     val start_game :
       context ->
       t ->

@@ -119,12 +119,28 @@ let assert_equal_game_status ?game_status actual_game_status =
         in
         Stdlib.failwith msg
 
-let assert_refute_result ?game_status incr =
+let assert_game_exists incr rollup game_index ~exists =
+  let open Lwt_result_wrap_syntax in
+  let ctxt = Incremental.alpha_ctxt incr in
+  let*@ _ctxt, game_opt =
+    Sc_rollup.Refutation_storage.find_game ctxt rollup game_index
+  in
+  match game_opt with
+  | Some _ when exists -> return_unit
+  | Some _ -> Stdlib.failwith "Found game but expected no game."
+  | None when not exists -> return_unit
+  | None -> Stdlib.failwith "No game game but expected one."
+
+let assert_refute_result ?game_status incr rollup game_index =
+  let open Lwt_result_syntax in
+  let* () = assert_game_exists incr rollup game_index ~exists:false in
   let actual_game_status, op_type = get_game_status_result incr in
   assert (op_type = `Refute) ;
   assert_equal_game_status ?game_status actual_game_status
 
-let assert_timeout_result ?game_status incr =
+let assert_timeout_result ?game_status incr rollup game_index =
+  let open Lwt_result_syntax in
+  let* () = assert_game_exists incr rollup game_index ~exists:false in
   let actual_game_status, op_type = get_game_status_result incr in
   assert (op_type = `Timeout) ;
   assert_equal_game_status ?game_status actual_game_status
@@ -2055,14 +2071,26 @@ let test_timeout () =
   let expected_game_status : Sc_rollup.Game.status =
     Ended (Loser {reason = Timeout; loser = pkh2})
   in
-  assert_timeout_result ~game_status:expected_game_status incr
+  assert_timeout_result ~game_status:expected_game_status incr rollup game_index
 
-let init_with_conflict () =
+let start_game block rollup (first_player, commitment1) (pkh2, commitment2) =
   let open Lwt_result_syntax in
-  let* block, (account1, account2) = context_init Context.T2 in
-  let pkh1 = Account.pkh_of_contract_exn account1 in
-  let pkh2 = Account.pkh_of_contract_exn account2 in
-  let* block, rollup = sc_originate block account1 in
+  let refutation =
+    Sc_rollup.Game.Start
+      {
+        player_commitment_hash =
+          Sc_rollup.Commitment.hash_uncarbonated commitment1;
+        opponent_commitment_hash =
+          Sc_rollup.Commitment.hash_uncarbonated commitment2;
+      }
+  in
+  let* start_game_op =
+    Op.sc_rollup_refute (B block) first_player rollup pkh2 refutation
+  in
+  add_op block start_game_op
+
+let create_conflicting_commitment block rollup first_player second_player =
+  let open Lwt_result_syntax in
   let compressed_state =
     Sc_rollup.State_hash.context_hash_to_state_hash
       (Context_hash.hash_string ["first"])
@@ -2077,21 +2105,30 @@ let init_with_conflict () =
   let* commitment2 =
     dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup
   in
-  let* block = add_publish ~rollup block account1 commitment1 in
-  let* block = add_publish ~rollup block account2 commitment2 in
-  let refutation =
-    Sc_rollup.Game.Start
-      {
-        player_commitment_hash =
-          Sc_rollup.Commitment.hash_uncarbonated commitment1;
-        opponent_commitment_hash =
-          Sc_rollup.Commitment.hash_uncarbonated commitment2;
-      }
+  let* block = add_publish ~rollup block first_player commitment1 in
+  let* block = add_publish ~rollup block second_player commitment2 in
+  return (block, commitment1, commitment2)
+
+let create_conflict block rollup ~first_player ~second_player =
+  let open Lwt_result_syntax in
+  let pkh2 = Account.pkh_of_contract_exn second_player in
+  let* block, commitment1, commitment2 =
+    create_conflicting_commitment block rollup first_player second_player
   in
-  let* start_game_op =
-    Op.sc_rollup_refute (B block) account1 rollup pkh2 refutation
+  let* block =
+    start_game block rollup (first_player, commitment1) (pkh2, commitment2)
   in
-  let* block = add_op block start_game_op in
+  return block
+
+let init_with_conflict () =
+  let open Lwt_result_syntax in
+  let* block, (account1, account2) = context_init Context.T2 in
+  let pkh1 = Account.pkh_of_contract_exn account1 in
+  let pkh2 = Account.pkh_of_contract_exn account2 in
+  let* block, rollup = sc_originate block account1 in
+  let* block =
+    create_conflict block rollup ~first_player:account1 ~second_player:account2
+  in
   return (block, (account1, pkh1), (account2, pkh2), rollup)
 
 module Arith_pvm = Sc_rollup_helpers.Arith_pvm
@@ -2163,7 +2200,13 @@ let test_draw_with_two_invalid_moves () =
 
   (* As both players played invalid moves, the game ends in a draw. *)
   let expected_game_status : Sc_rollup.Game.status = Ended Draw in
-  let* () = assert_refute_result ~game_status:expected_game_status incr in
+  let* () =
+    assert_refute_result
+      ~game_status:expected_game_status
+      incr
+      rollup
+      (Sc_rollup.Game.Index.make p1_pkh p2_pkh)
+  in
 
   (* The two players should have been slashed. *)
   let* constants = Context.get_constants (I incr) in
@@ -2186,12 +2229,8 @@ let test_draw_with_two_invalid_moves () =
   in
   return_unit
 
-(** Test that timeout a player during the final move ends the game if
-    the other player played. *)
-let test_timeout_during_final_move () =
+let play_conflict_until_draw block (p1, p1_pkh) p2_pkh rollup =
   let open Lwt_result_syntax in
-  let* block, (p1, p1_pkh), (_p2, p2_pkh), rollup = init_with_conflict () in
-
   (* Player1 will play an invalid final move. *)
   let* block =
     let* p1_refutation =
@@ -2217,7 +2256,116 @@ let test_timeout_during_final_move () =
   (* As the player1 played an invalid move, the timeout is counted
      as an invalid one too. The game ends in a draw. *)
   let expected_game_status : Sc_rollup.Game.status = Ended Draw in
-  assert_timeout_result ~game_status:expected_game_status incr
+  let* () =
+    assert_timeout_result
+      ~game_status:expected_game_status
+      incr
+      rollup
+      (Sc_rollup.Game.Index.make p1_pkh p2_pkh)
+  in
+  Incremental.finalize_block incr
+
+let play_conflict_with_timeout block (p1, p1_pkh) p2_pkh rollup =
+  let open Lwt_result_syntax in
+  (* Player1 will not play and it will be timeout. *)
+  let game_index = Sc_rollup.Game.Index.make p1_pkh p2_pkh in
+  let* incr =
+    let* block = bake_timeout_period block in
+    let* timeout = Op.sc_rollup_timeout (B block) p1 rollup game_index in
+    let* incr = Incremental.begin_construction block in
+    Incremental.add_operation incr timeout
+  in
+  (* The game ends with p2 as a winner. *)
+  let expected_game_status : Sc_rollup.Game.status =
+    Ended (Loser {reason = Timeout; loser = p1_pkh})
+  in
+  let* () =
+    assert_timeout_result
+      ~game_status:expected_game_status
+      incr
+      rollup
+      game_index
+  in
+  let* () = assert_game_exists incr rollup game_index ~exists:false in
+  Incremental.finalize_block incr
+
+(** Test that timeout a player during the final move ends the game if
+    the other player played. *)
+let test_timeout_during_final_move () =
+  let open Lwt_result_syntax in
+  let* block, (p1, p1_pkh), (_p2, p2_pkh), rollup = init_with_conflict () in
+  let* _block = play_conflict_until_draw block (p1, p1_pkh) p2_pkh rollup in
+  return_unit
+
+(** Test that timeout a player during the final move ends the game if
+    the other player played. *)
+let test_draw_with_parallel_game () =
+  let open Lwt_result_syntax in
+  let* block, (account1, account2, account3) = context_init Context.T3 in
+  let pkh1 = Account.pkh_of_contract_exn account1 in
+  let pkh2 = Account.pkh_of_contract_exn account2 in
+  let pkh3 = Account.pkh_of_contract_exn account3 in
+  let* block, rollup = sc_originate block account1 in
+  let compressed_state =
+    Sc_rollup.State_hash.context_hash_to_state_hash
+      (Context_hash.hash_string ["first"])
+  in
+  let* commitment1 =
+    dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup
+  in
+  let compressed_state =
+    Sc_rollup.State_hash.context_hash_to_state_hash
+      (Context_hash.hash_string ["second"])
+  in
+  let* commitment2 =
+    dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup
+  in
+  let compressed_state =
+    Sc_rollup.State_hash.context_hash_to_state_hash
+      (Context_hash.hash_string ["third"])
+  in
+  let* commitment3 =
+    dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup
+  in
+  let* block = add_publish ~rollup block account1 commitment1 in
+  let* block = add_publish ~rollup block account2 commitment2 in
+  let* block = add_publish ~rollup block account3 commitment3 in
+  let* block =
+    start_game block rollup (account1, commitment1) (pkh2, commitment2)
+  in
+  let* block =
+    start_game block rollup (account3, commitment3) (pkh2, commitment2)
+  in
+  let* block =
+    start_game block rollup (account3, commitment3) (pkh1, commitment1)
+  in
+  let* block = play_conflict_with_timeout block (account1, pkh1) pkh2 rollup in
+  let* block = play_conflict_with_timeout block (account3, pkh3) pkh2 rollup in
+
+  (* [pkh1] and [pkh3] were both slashed, any move in their game will
+     result in a draw. *)
+  let* incr = Incremental.begin_construction block in
+  let* incr =
+    let* refutation =
+      let choice = Sc_rollup.Tick.initial in
+      dumb_proof ~choice
+    in
+    let* final_move_op =
+      Op.sc_rollup_refute (B block) account3 rollup pkh1 refutation
+    in
+    Incremental.add_operation incr final_move_op
+  in
+  let expected_game_status : Sc_rollup.Game.status = Ended Draw in
+  let game_index = Sc_rollup.Game.Index.make pkh1 pkh3 in
+  let* () =
+    assert_refute_result
+      ~game_status:expected_game_status
+      incr
+      rollup
+      game_index
+  in
+  let* () = assert_game_exists incr rollup game_index ~exists:false in
+  return_unit
 
 (** Test that playing a dissection during a final move is rejected. *)
 let test_dissection_during_final_move () =
@@ -2429,7 +2577,11 @@ let test_refute_set_input
   let expected_game_status : Sc_rollup.Game.status =
     Ended (Loser {reason = Conflict_resolved; loser = pkh2})
   in
-  assert_refute_result ~game_status:expected_game_status incr
+  assert_refute_result
+    ~game_status:expected_game_status
+    incr
+    rollup
+    (Sc_rollup.Game.Index.make pkh1 pkh2)
 
 let test_refute_invalid_metadata () =
   let open Lwt_result_syntax in
@@ -3394,6 +3546,10 @@ let tests =
       "Timeout during the final move can end the game in a draw situation"
       `Quick
       test_timeout_during_final_move;
+    Tztest.tztest
+      "Multiple draw in parallel game are valid"
+      `Quick
+      test_draw_with_parallel_game;
     Tztest.tztest
       "Cannot play a dissection when the final move has started"
       `Quick
