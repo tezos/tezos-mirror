@@ -275,6 +275,8 @@ module Cycle : sig
 
   val to_int32 : cycle -> int32
 
+  val ( ---> ) : cycle -> cycle -> cycle list
+
   module Map : Map.S with type key = cycle
 end
 
