@@ -119,7 +119,8 @@ let transition_pvm node_ctxt ctxt predecessor Layer1.{hash = _; _}
   let*! () =
     Interpreter_event.transitioned_pvm inbox_level state_hash tick num_messages
   in
-  return (ctxt, num_messages, Z.to_int64 num_ticks, initial_tick)
+  return
+    (ctxt, num_messages, Z.to_int64 num_ticks, Sc_rollup.Tick.to_z initial_tick)
 
 (** [process_head node_ctxt ctxt ~predecessor head] runs the PVM for the given
       head. *)
@@ -137,8 +138,8 @@ let process_head (node_ctxt : _ Node_context.t) ctxt
   else if head.Layer1.level = node_ctxt.genesis_info.level then
     let* ctxt, state = genesis_state head.hash node_ctxt ctxt in
     let*! ctxt = Context.PVMState.set ctxt state in
-    return (ctxt, 0, 0L, Sc_rollup.Tick.initial)
-  else return (ctxt, 0, 0L, Sc_rollup.Tick.initial)
+    return (ctxt, 0, 0L, Z.zero)
+  else return (ctxt, 0, 0L, Z.zero)
 
 (** Returns the starting evaluation before the evaluation of the block. It
     contains the PVM state at the end of the execution of the previous block and
