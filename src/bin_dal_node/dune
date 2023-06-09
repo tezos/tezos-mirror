@@ -9,7 +9,7 @@
  (libraries
   tezos-base
   tezos-base.unix
-  tezos-clic
+  tezos-version
   cmdliner
   tezos-client-base
   tezos-client-base-unix

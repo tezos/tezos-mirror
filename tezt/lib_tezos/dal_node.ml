@@ -83,13 +83,12 @@ let spawn_config_init ?(use_unsafe_srs = true) ?(expected_pow = 0.) dal_node =
   @@ List.filter_map
        Fun.id
        [
-         Some "init-config";
+         Some "config";
+         Some "init";
          Some "--data-dir";
          Some (data_dir dal_node);
-         Some "--rpc-port";
-         Some (string_of_int (rpc_port dal_node));
          Some "--rpc-addr";
-         Some (rpc_host dal_node);
+         Some (Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node));
          Some "--net-addr";
          Some (listen_addr dal_node);
          (if use_unsafe_srs then Some "--use-unsafe-srs-for-tests" else None);
@@ -190,16 +189,10 @@ let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
   dal_node
 
 let make_arguments node =
-  let base_dir_args =
-    ["--base-dir"; Client.base_dir node.persistent_state.client]
-  in
-  let endpoint_args =
-    [
-      "--endpoint";
-      Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
-    ]
-  in
-  base_dir_args @ endpoint_args
+  [
+    "--endpoint";
+    Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
+  ]
 
 let do_runlike_command ?env node arguments =
   if node.status <> Not_running then
@@ -208,7 +201,7 @@ let do_runlike_command ?env node arguments =
     trigger_ready node None ;
     unit
   in
-  let arguments = make_arguments node @ arguments in
+  let arguments = arguments @ make_arguments node in
   run ?env node {ready = false} arguments ~on_terminate
 
 let run ?env node =

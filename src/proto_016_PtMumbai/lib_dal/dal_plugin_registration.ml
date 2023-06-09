@@ -32,7 +32,7 @@ module Plugin = struct
   type block_info = Protocol_client_context.Alpha_block_services.block_info
 
   let parametric_constants chain block ctxt =
-    let cpctxt = new Protocol_client_context.wrap_full ctxt in
+    let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol.Constants_services.parametric cpctxt (chain, block)
 
   let get_constants chain block ctxt =
@@ -60,7 +60,7 @@ module Plugin = struct
       }
 
   let block_info ?chain ?block ~metadata ctxt =
-    let cpctxt = new Protocol_client_context.wrap_full ctxt in
+    let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol_client_context.Alpha_block_services.info
       cpctxt
       ?chain

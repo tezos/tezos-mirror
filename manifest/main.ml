@@ -7222,7 +7222,7 @@ let _octez_dal_node =
       ([
          octez_base |> open_ ~m:"TzPervasives";
          octez_base_unix;
-         octez_clic;
+         octez_version;
          cmdliner;
          octez_client_base |> open_;
          octez_client_base_unix |> open_;

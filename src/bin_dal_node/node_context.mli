@@ -53,7 +53,7 @@ val init :
   Store.node_store ->
   Gossipsub.Worker.t ->
   Gossipsub.Transport_layer.t ->
-  Client_context.full ->
+  Tezos_rpc.Context.generic ->
   t
 
 (** Raised by [set_ready] when the status is already [Ready _] *)
@@ -88,7 +88,7 @@ val get_status : t -> status
 val get_store : t -> Store.node_store
 
 (** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context *)
-val get_tezos_node_cctxt : t -> Client_context.full
+val get_tezos_node_cctxt : t -> Tezos_rpc.Context.generic
 
 (** [get_neighbors_cctxts ctxt] returns the dal node neighbors client contexts *)
 val get_neighbors_cctxts : t -> Dal_node_client.cctxt list

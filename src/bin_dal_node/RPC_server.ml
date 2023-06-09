@@ -227,9 +227,10 @@ let merge dir plugin_dir = Tezos_rpc.Directory.merge dir plugin_dir
 
 let start configuration ctxt =
   let open Lwt_syntax in
-  let Configuration.{rpc_addr; rpc_port; _} = configuration in
+  let Configuration.{rpc_addr; _} = configuration in
   let dir = register ctxt in
-  let rpc_addr = P2p_addr.of_string_exn rpc_addr in
+  let rpc_port = snd rpc_addr in
+  let rpc_addr = fst rpc_addr in
   let host = Ipaddr.V6.to_string rpc_addr in
   let node = `TCP (`Port rpc_port) in
   let acl = RPC_server.Acl.default rpc_addr in

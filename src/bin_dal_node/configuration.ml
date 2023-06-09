@@ -28,8 +28,7 @@ type neighbor = {addr : string; port : int}
 type t = {
   use_unsafe_srs : bool;
   data_dir : string;
-  rpc_addr : string;
-  rpc_port : int;
+  rpc_addr : P2p_point.Id.t;
   neighbors : neighbor list;
   listen_addr : P2p_point.Id.t;
   peers : P2p_point.Id.t list;
@@ -45,9 +44,8 @@ let relative_filename data_dir = Filename.concat data_dir "config.json"
 
 let filename config = relative_filename config.data_dir
 
-let default_rpc_addr = "127.0.0.1"
-
-let default_rpc_port = 10732
+let default_rpc_addr =
+  P2p_point.Id.of_string_exn ~default_port:10732 "127.0.0.1"
 
 let default_listen_addr =
   let open Gossipsub.Transport_layer.Default_parameters.P2p_config in
@@ -80,7 +78,6 @@ let encoding : t Data_encoding.t =
            use_unsafe_srs;
            data_dir;
            rpc_addr;
-           rpc_port;
            listen_addr;
            neighbors;
            peers;
@@ -90,7 +87,6 @@ let encoding : t Data_encoding.t =
       ( use_unsafe_srs,
         data_dir,
         rpc_addr,
-        rpc_port,
         listen_addr,
         neighbors,
         peers,
@@ -99,7 +95,6 @@ let encoding : t Data_encoding.t =
     (fun ( use_unsafe_srs,
            data_dir,
            rpc_addr,
-           rpc_port,
            listen_addr,
            neighbors,
            peers,
@@ -109,14 +104,13 @@ let encoding : t Data_encoding.t =
         use_unsafe_srs;
         data_dir;
         rpc_addr;
-        rpc_port;
         listen_addr;
         neighbors;
         peers;
         expected_pow;
         network_name;
       })
-    (obj9
+    (obj8
        (dft
           "use_unsafe_srs"
           ~description:"use unsafe srs for tests"
@@ -127,8 +121,11 @@ let encoding : t Data_encoding.t =
           ~description:"Location of the data dir"
           string
           default_data_dir)
-       (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
-       (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
+       (dft
+          "rpc-addr"
+          ~description:"RPC address"
+          P2p_point.Id.encoding
+          default_rpc_addr)
        (dft
           "net-addr"
           ~description:"P2P address of this node"

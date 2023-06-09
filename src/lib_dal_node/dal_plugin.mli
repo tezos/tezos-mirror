@@ -64,13 +64,13 @@ module type T = sig
     ?chain:Tezos_shell_services.Block_services.chain ->
     ?block:Tezos_shell_services.Block_services.block ->
     metadata:[`Always | `Never] ->
-    Client_context.full ->
+    Tezos_rpc.Context.generic ->
     block_info tzresult Lwt.t
 
   val get_constants :
     Tezos_shell_services.Chain_services.chain ->
     Tezos_shell_services.Block_services.block ->
-    Client_context.full ->
+    Tezos_rpc.Context.generic ->
     proto_parameters tzresult Lwt.t
 
   val get_published_slot_headers :
@@ -82,7 +82,7 @@ module type T = sig
       the committee an interval [(s,n)], meaning that the slots [s;s+1;...;s+n-1]
       belong to [pkh] *)
   val get_committee :
-    Client_context.full ->
+    Tezos_rpc.Context.generic ->
     level:int32 ->
     (int * int) Tezos_crypto.Signature.Public_key_hash.Map.t tzresult Lwt.t
 

@@ -158,7 +158,7 @@ module Handler = struct
       | Some plugin ->
           let (module Dal_plugin : Dal_plugin.T) = plugin in
           let* proto_parameters =
-            Dal_plugin.get_constants cctxt#chain cctxt#block cctxt
+            Dal_plugin.get_constants `Main (`Head 0) cctxt
           in
           let* cryptobox =
             init_cryptobox config.Configuration.use_unsafe_srs proto_parameters
@@ -321,8 +321,18 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store =
 *)
 let run ~data_dir cctxt =
   let open Lwt_result_syntax in
+  let log_cfg = Tezos_base_unix.Logs_simple_config.default_cfg in
+  let internal_events =
+    Tezos_base_unix.Internal_event_unix.make_with_defaults
+      ~enable_default_daily_logs_at:Filename.Infix.(data_dir // "daily_logs")
+      ~log_cfg
+      ()
+  in
+  let*! () =
+    Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
+  in
   let*! () = Event.(emit starting_node) () in
-  let* ({network_name; rpc_addr; rpc_port; peers; _} as config) =
+  let* ({network_name; rpc_addr; peers; _} as config) =
     Configuration.load ~data_dir
   in
   let*! () = Event.(emit configuration_loaded) () in
@@ -355,7 +365,7 @@ let run ~data_dir cctxt =
   connect_gossipsub_with_p2p gs_worker transport_layer store ;
 
   let _ = RPC_server.install_finalizer rpc_server in
-  let*! () = Event.(emit rpc_server_is_ready (rpc_addr, rpc_port)) in
+  let*! () = Event.(emit rpc_server_is_ready rpc_addr) in
   (* Start daemon to resolve current protocol plugin *)
   let* () =
     daemonize [Handler.resolve_plugin_and_set_ready config ctxt cctxt]

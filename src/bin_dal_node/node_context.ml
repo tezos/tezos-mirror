@@ -38,7 +38,7 @@ type t = {
   mutable status : status;
   config : Configuration.t;
   store : Store.node_store;
-  tezos_node_cctxt : Client_context.full;
+  tezos_node_cctxt : Tezos_rpc.Context.generic;
   neighbors_cctxts : Dal_node_client.cctxt list;
   committee_cache : Committee_cache.t;
   gs_worker : Gossipsub.Worker.t;
