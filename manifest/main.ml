@@ -5491,6 +5491,7 @@ let hash = Protocol.hash
           "test_conflict_handler";
           "test_consensus_filter";
           "test_fee_needed_to_overtake";
+          "test_fee_needed_to_replace_by_fee";
         ]
         ~path:(path // "lib_plugin/test")
         ~with_macos_security_framework:true

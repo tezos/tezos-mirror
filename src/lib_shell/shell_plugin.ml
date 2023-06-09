@@ -62,6 +62,12 @@ module type FILTER = sig
       op_to_overtake:Proto.operation ->
       candidate_op:Proto.operation ->
       int64 option
+
+    val fee_needed_to_replace_by_fee :
+      config ->
+      op_to_replace:Proto.operation ->
+      candidate_op:Proto.operation ->
+      int64 option
   end
 end
 
@@ -99,6 +105,9 @@ module No_filter (Proto : Registered_protocol.T) :
     let find_manager _ = None
 
     let fee_needed_to_overtake ~op_to_overtake:_ ~candidate_op:_ = None
+
+    let fee_needed_to_replace_by_fee _config ~op_to_replace:_ ~candidate_op:_ =
+      None
   end
 end
 

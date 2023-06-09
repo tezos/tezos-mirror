@@ -106,6 +106,22 @@ module type FILTER = sig
       op_to_overtake:Proto.operation ->
       candidate_op:Proto.operation ->
       int64 option
+
+    (** Compute the minimal fee (expressed in mutez) that [candidate_op]
+        would need to have in order for the {!conflict_handler} to let it
+        replace [op_to_replace], when both operations are manager operations.
+
+        Return [None] when at least one operation is not a manager operation.
+
+        Also return [None] if both operations are manager operations but
+        there was an error while computing the needed fee. However,
+        note that this cannot happen when both manager operations have
+        been successfully validated by the protocol. *)
+    val fee_needed_to_replace_by_fee :
+      config ->
+      op_to_replace:Proto.operation ->
+      candidate_op:Proto.operation ->
+      int64 option
   end
 end
 

@@ -566,22 +566,31 @@ let is_manager_operation op =
 let compute_fee_and_gas_limit {protocol_data = Operation_data data; _} =
   compute_manager_contents_fee_and_gas_limit data.contents
 
+let gas_as_q gas = Gas.Arith.integral_to_z gas |> Q.of_bigint
+
+let fee_and_ratio_as_q fee gas =
+  let fee = Tez.to_mutez fee |> Z.of_int64 |> Q.of_bigint in
+  let gas = gas_as_q gas in
+  let ratio = Q.div fee gas in
+  (fee, ratio)
+
+let bumped_fee_and_ratio_as_q config fee gas =
+  let bump = Q.mul config.replace_by_fee_factor in
+  let fee, ratio = fee_and_ratio_as_q fee gas in
+  (bump fee, bump ratio)
+
 (** Determine whether the new manager operation is sufficiently better
     than the old manager operation to replace it. Sufficiently better
     means that the new operation's fee and fee/gas ratio are both
     greater than or equal to the old operation's same metrics bumped by
     the factor [config.replace_by_fee_factor]. *)
-let better_fees_and_ratio =
-  let bump config q = Q.mul q config.replace_by_fee_factor in
-  fun config old_gas old_fee new_gas new_fee ->
-    let old_fee = Tez.to_mutez old_fee |> Z.of_int64 |> Q.of_bigint in
-    let old_gas = Gas.Arith.integral_to_z old_gas |> Q.of_bigint in
-    let new_fee = Tez.to_mutez new_fee |> Z.of_int64 |> Q.of_bigint in
-    let new_gas = Gas.Arith.integral_to_z new_gas |> Q.of_bigint in
-    let old_ratio = Q.div old_fee old_gas in
-    let new_ratio = Q.div new_fee new_gas in
-    Q.compare new_ratio (bump config old_ratio) >= 0
-    && Q.compare new_fee (bump config old_fee) >= 0
+let better_fees_and_ratio config old_gas old_fee new_gas new_fee =
+  let bumped_old_fee, bumped_old_ratio =
+    bumped_fee_and_ratio_as_q config old_fee old_gas
+  in
+  let new_fee, new_ratio = fee_and_ratio_as_q new_fee new_gas in
+  Q.compare new_fee bumped_old_fee >= 0
+  && Q.compare new_ratio bumped_old_ratio >= 0
 
 (** [conflict_handler config] returns a conflict handler for
     {!Mempool.add_operation} (see {!Mempool.conflict_handler}).
@@ -640,7 +649,10 @@ let fee_needed_to_overtake ~op_to_overtake ~candidate_op =
       (* This should not happen when both operations are valid. *)
       Result.return_none
     else
-      (* Compute the target ratio as in {!Operation_repr.weight_manager}. *)
+      (* Compute the target ratio as in {!Operation_repr.weight_manager}.
+         We purposefully don't use {!fee_and_ratio_as_q} because the code
+         here needs to stay in sync with {!Operation_repr.weight_manager}
+         rather than {!better_fees_and_ratio}. *)
       let target_fee = Q.of_int64 (Tez.to_mutez target_fee) in
       let target_gas = Q.of_bigint (Gas.Arith.integral_to_z target_gas) in
       let target_ratio = Q.(target_fee / target_gas) in
@@ -648,6 +660,36 @@ let fee_needed_to_overtake ~op_to_overtake ~candidate_op =
       let candidate_gas = Q.of_bigint (Gas.Arith.integral_to_z candidate_gas) in
       Result.return_some
         (Int64.succ Q.(to_int64 (target_ratio * candidate_gas))))
+    |> Option.of_result |> Option.join
+  else None
+
+let int64_ceil_of_q q =
+  let n = Q.to_int64 q in
+  if Q.(equal q (of_int64 n)) then n else Int64.succ n
+
+let fee_needed_to_replace_by_fee config ~op_to_replace ~candidate_op =
+  if is_manager_operation candidate_op && is_manager_operation op_to_replace
+  then
+    (let open Result_syntax in
+    let* _fee, candidate_gas = compute_fee_and_gas_limit candidate_op in
+    let* old_fee, old_gas = compute_fee_and_gas_limit op_to_replace in
+    if Gas.Arith.(old_gas = zero || candidate_gas = zero) then
+      (* This should not happen when both operations are valid. *)
+      Result.return_none
+    else
+      let candidate_gas = gas_as_q candidate_gas in
+      let bumped_old_fee, bumped_old_ratio =
+        bumped_fee_and_ratio_as_q config old_fee old_gas
+      in
+      (* The new operation needs to exceed both the bumped fee and the
+         bumped ratio to make {!better_fees_and_ratio} return [true].
+         (Having fee or ratio equal to its bumped counterpart is ok too,
+         hence the [ceil] in [int64_ceil_of_q].) *)
+      let fee_needed_for_fee = int64_ceil_of_q bumped_old_fee in
+      let fee_needed_for_ratio =
+        int64_ceil_of_q Q.(bumped_old_ratio * candidate_gas)
+      in
+      Result.return_some (max fee_needed_for_fee fee_needed_for_ratio))
     |> Option.of_result |> Option.join
   else None
 

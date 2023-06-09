@@ -96,3 +96,77 @@ let manager_op_with_fee_and_gas_gen ~fee_in_mutez ~gas =
     and gas limit. *)
 let generate_manager_op_with_fee_and_gas ~fee_in_mutez ~gas =
   QCheck2.Gen.generate1 (manager_op_with_fee_and_gas_gen ~fee_in_mutez ~gas)
+
+(** Change the total fee of the packed operation [op] to [fee] (in mutez).
+    Also change its source to [source] if the argument is provided.
+
+    Precondition: [op] must be a manager operation. *)
+let set_fee_and_source fee ?source op =
+  let open Alpha_context in
+  let open QCheck2.Gen in
+  let rec set_fee_contents_list_gen :
+      type kind. int64 -> kind contents_list -> kind contents_list t =
+   fun desired_total_fee (* in mutez *) -> function
+    | Single (Manager_operation data) ->
+        let fee = Tez.of_mutez_exn desired_total_fee in
+        let contents =
+          match source with
+          | Some source -> Manager_operation {data with fee; source}
+          | None -> Manager_operation {data with fee}
+        in
+        return (Single contents)
+    | Cons (Manager_operation data, tail) ->
+        let* local_fee =
+          (* We generate some corner cases where some individual
+             operations in the batch have zero fees. *)
+          let* r = frequencyl [(7, `Random); (2, `Zero); (1, `All)] in
+          match r with
+          | `Random ->
+              let* n = int_range 0 (Int64.to_int desired_total_fee) in
+              return (Int64.of_int n)
+          | `Zero -> return 0L
+          | `All -> return desired_total_fee
+        in
+        let fee = Tez.of_mutez_exn local_fee in
+        let contents =
+          match source with
+          | Some source -> Manager_operation {data with fee; source}
+          | None -> Manager_operation {data with fee}
+        in
+        let* tail =
+          set_fee_contents_list_gen (Int64.sub desired_total_fee local_fee) tail
+        in
+        return (Cons (contents, tail))
+    | Single _ -> (* see precondition: manager operation *) assert false
+  in
+  let {shell = _; protocol_data = Operation_data data} = op in
+  let contents = generate1 (set_fee_contents_list_gen fee data.contents) in
+  {op with protocol_data = Operation_data {data with contents}}
+
+let set_fee fee op = set_fee_and_source fee op
+
+(** Return an [Operation_hash.t] that is distinct from [different_from]. *)
+let different_oph ~different_from =
+  if Operation_hash.(different_from = zero) then (
+    let new_hash = Operation_hash.hash_string ["1"] in
+    assert (Operation_hash.(new_hash <> zero)) ;
+    new_hash)
+  else Operation_hash.zero
+
+(** List helpers *)
+
+let rec iter_neighbors f = function
+  | [] | [_] -> ()
+  | x :: (y :: _ as l) ->
+      f x y ;
+      iter_neighbors f l
+
+let iter2_exn f l1 l2 =
+  match List.iter2 ~when_different_lengths:() f l1 l2 with
+  | Ok () -> ()
+  | Error () ->
+      Test.fail
+        ~__LOC__
+        "Lists have respective lengths %d and %d."
+        (List.length l1)
+        (List.length l2)
