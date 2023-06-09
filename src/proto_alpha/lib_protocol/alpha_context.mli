@@ -4914,7 +4914,11 @@ end
 module Staking_pseudotokens : sig
   type t
 
+  val zero : t
+
   val min : t -> t -> t
+
+  val ( = ) : t -> t -> bool
 
   val frozen_deposits_pseudotokens_for_tez_amount :
     context -> public_key_hash -> Tez.t -> t tzresult Lwt.t
