@@ -113,7 +113,7 @@ type 'span per_topic_score_limits = {
   time_in_mesh_cap : float;
       (** P1: The maximum value considered for the score associated to the time spent
           by a peer in the mesh. *)
-  time_in_mesh_quantum : float;
+  time_in_mesh_quantum : 'span;
       (** P1: The score associated to the time spent [t] in the mesh is
           [(min t time_in_mesh_cap) / time_in_mesh_quantum]. *)
   first_message_deliveries_weight : float;
@@ -413,6 +413,9 @@ module type SCORE = sig
   module Internal_for_tests : sig
     val get_topic_params :
       ('topic, 'span) score_limits -> 'topic -> 'span per_topic_score_limits
+
+    (** Convert a score value into a float.  *)
+    val to_float : value -> float
   end
 end
 
