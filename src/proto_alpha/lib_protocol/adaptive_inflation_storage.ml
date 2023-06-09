@@ -44,7 +44,7 @@ let max_bonus = Int64.div bonus_unit 20L (* = 5% *)
 
 let get_reward_coeff ctxt ~cycle =
   let open Lwt_result_syntax in
-  let ai_enable = (Raw_context.constants ctxt).adaptive_inflation.enable in
+  let ai_enable = Constants_storage.adaptive_inflation_enable ctxt in
   if ai_enable then
     (* Even if AI is enabled, the storage can be empty: this is the case for
        the first 5 cycles after AI is enabled *)
@@ -57,7 +57,7 @@ let get_reward_bonus ctxt ~cycle =
   match cycle with
   | None -> return default_bonus
   | Some cycle ->
-      let ai_enable = (Raw_context.constants ctxt).adaptive_inflation.enable in
+      let ai_enable = Constants_storage.adaptive_inflation_enable ctxt in
       if ai_enable then
         let* k_opt = Storage.Reward_bonus.find ctxt cycle in
         return (Option.value ~default:default_bonus k_opt)
@@ -146,7 +146,7 @@ let compute_coeff =
 
 let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
   let open Lwt_result_syntax in
-  let ai_enable = (Raw_context.constants ctxt).adaptive_inflation.enable in
+  let ai_enable = Constants_storage.adaptive_inflation_enable ctxt in
   if not ai_enable then return ctxt
   else
     let preserved = Constants_storage.preserved_cycles ctxt in
