@@ -211,6 +211,18 @@ let activate ctxt ~cycle =
 
 let launch_cycle ctxt = Storage.Adaptive_inflation.Activation.get ctxt
 
+let set_adaptive_inflation_enable ctxt =
+  let open Lwt_result_syntax in
+  let+ enable =
+    let+ launch_cycle = launch_cycle ctxt in
+    match launch_cycle with
+    | None -> false
+    | Some launch_cycle ->
+        let current_cycle = (Level_storage.current ctxt).cycle in
+        Cycle_repr.(current_cycle >= launch_cycle)
+  in
+  if enable then Raw_context.set_adaptive_inflation_enable ctxt else ctxt
+
 let update_ema ctxt ~vote =
   Storage.Adaptive_inflation.Launch_ema.get ctxt >>=? fun old_ema ->
   Toggle_votes_repr.Adaptive_inflation_launch_EMA.of_int32 old_ema
