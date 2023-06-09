@@ -66,6 +66,23 @@ val create_coordinator :
   unit ->
   t
 
+(** Same as {!create_coordinator}, but do not assume the endpoint is a node. *)
+val create_coordinator_with_endpoint :
+  ?path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?data_dir:string ->
+  ?event_pipe:string ->
+  ?rpc_host:string ->
+  ?rpc_port:int ->
+  ?reveal_data_dir:string ->
+  ?allow_v1_api:bool ->
+  committee_members:string list ->
+  endpoint:Client.endpoint ->
+  client:Client.t ->
+  unit ->
+  t
+
 (** Creates a DAC node to run in committee_member mode, using the specified address,
     coordinator rpc host and port. *)
 val create_committee_member :
@@ -82,6 +99,26 @@ val create_committee_member :
   ?allow_v1_api:bool ->
   address:string ->
   node:Node.t ->
+  client:Client.t ->
+  unit ->
+  t
+
+(** Same as {!create_committee_member}, but do not assume the endpoint is a
+    node. *)
+val create_committee_member_with_endpoint :
+  ?path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?data_dir:string ->
+  ?event_pipe:string ->
+  ?rpc_host:string ->
+  ?rpc_port:int ->
+  ?reveal_data_dir:string ->
+  ?coordinator_rpc_host:string ->
+  ?coordinator_rpc_port:int ->
+  ?allow_v1_api:bool ->
+  address:string ->
+  endpoint:Client.endpoint ->
   client:Client.t ->
   unit ->
   t
@@ -104,6 +141,27 @@ val create_observer :
   ?allow_v1_api:bool ->
   committee_member_rpcs:(string * int) list ->
   node:Node.t ->
+  client:Client.t ->
+  unit ->
+  t
+
+(** Same as {!create_obsever}, but do not assume the endpoint is a
+    node. *)
+val create_observer_with_endpoint :
+  ?path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?data_dir:string ->
+  ?event_pipe:string ->
+  ?rpc_host:string ->
+  ?rpc_port:int ->
+  ?reveal_data_dir:string ->
+  ?coordinator_rpc_host:string ->
+  ?coordinator_rpc_port:int ->
+  ?timeout:int ->
+  ?allow_v1_api:bool ->
+  committee_member_rpcs:(string * int) list ->
+  endpoint:Client.endpoint ->
   client:Client.t ->
   unit ->
   t
