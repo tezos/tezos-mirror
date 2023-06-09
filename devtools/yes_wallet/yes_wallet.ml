@@ -178,9 +178,6 @@ let usage () =
      <source-wallet-dir>@]@,\
      @[<v>@[<v 4>> convert wallet <wallet-dir> inplace@,\
      same as above but overwrite the file in the directory <wallet-dir>@]@,\
-     @[<v>@[<v 4>> create minimal in <yes_wallet_dir>@,\
-     creates a yes-wallet with the Tezos Foundation baker keys in \
-     <yes_wallet_dir>@]@,\
      @[<v 4>> create from context <base_dir> in <yes_wallet_dir> [%s] [%s \
      <NUM>]@,\
      creates a yes-wallet with all delegates in the head block of the context \
@@ -263,11 +260,10 @@ let () =
     in
     filter options
   in
-  (* parse alias file *)
+  (* load alias file *)
   let aliases =
     match alias_file_opt with
-    (* Fallback  to hardcoded TF baker list *)
-    | None -> Yes_wallet_lib.tf_alias_pkh_pk_list
+    | None -> []
     | Some file -> Yes_wallet_lib.load_alias_file file
   in
   if unknown_options <> [] then
@@ -280,13 +276,6 @@ let () =
   | [_] ->
       usage () ;
       exit 0
-  | [_; "create"; "minimal"; "in"; yes_wallet_dir] ->
-      if active_bakers_only then
-        Format.eprintf
-          "Warning: option %s is ignored for create minimal@."
-          active_bakers_only_opt_name ;
-      if populate_wallet ~replace:!force yes_wallet_dir aliases then
-        Format.printf "Created minimal wallet in %s@." yes_wallet_dir
   | [_; "create"; "from"; "context"; base_dir; "in"; yes_wallet_dir] ->
       if not (Sys.file_exists base_dir) then (
         Format.eprintf "Invalid --data-dir provided: %s.\n" base_dir ;
