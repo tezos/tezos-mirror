@@ -214,7 +214,7 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
   else
     let* inbox =
       Layer1_helpers.genesis_inbox
-        (new Protocol_client_context.wrap_full node_ctxt.cctxt)
+        node_ctxt.cctxt
         ~genesis_level:node_ctxt.genesis_info.level
     in
     let Octez_smart_rollup.Inbox.{hash = witness; _} =
