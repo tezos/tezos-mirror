@@ -639,6 +639,65 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
     Generator.Plain {workload; closure}
 end
 
+(** This benchmark estimates the cost of installing a boot sector. *)
+module Sc_rollup_install_boot_sector_benchmark = struct
+  open Pvm_state_generator
+  module Full_Wasm =
+    Sc_rollup_wasm.V2_0_0.Make (Environment.Wasm_2_0_0.Make) (Wasm_context)
+
+  (* Benchmark starts here. *)
+
+  let name = ns "Sc_rollup_install_boot_sector_benchmark"
+
+  let group = Benchmarks_proto.Benchmark.Standalone
+
+  let info = "Estimating the cost of installing a boot sector."
+
+  let module_filename = __FILE__
+
+  let generated_code_destination = None
+
+  let tags = ["sc_rollup"]
+
+  type config = unit
+
+  let config_encoding = Data_encoding.unit
+
+  let default_config = ()
+
+  type workload = {boot_sector_length : int}
+
+  let workload_encoding =
+    let open Data_encoding in
+    conv
+      (fun {boot_sector_length} -> boot_sector_length)
+      (fun boot_sector_length -> {boot_sector_length})
+      (obj1 (req "boot_sector_length" int31))
+
+  let workload_to_vector {boot_sector_length} =
+    Sparse_vec.String.of_list
+      [("boot_sector_length", float_of_int boot_sector_length)]
+
+  let model =
+    let open Benchmarks_proto in
+    Model.make
+      ~conv:(fun {boot_sector_length} -> (boot_sector_length, ()))
+      ~model:Model.affine
+
+  let create_benchmark ~rng_state _conf =
+    let open Base_samplers in
+    let max_boot_sector_size = 32 * 1024 in
+    let boot_sector_length =
+      sample_in_interval ~range:(0 -- (max_boot_sector_size - 1)) rng_state
+    in
+    let workload = {boot_sector_length} in
+    let boot_sector = uniform_string ~nbytes:boot_sector_length rng_state in
+    let state = empty_tree in
+
+    let closure () = ignore (Full_Wasm.install_boot_sector state boot_sector) in
+    Generator.Plain {workload; closure}
+end
+
 let () =
   Benchmarks_proto.Registration.register
     (module Sc_rollup_verify_output_proof_benchmark)
@@ -646,3 +705,7 @@ let () =
 let () =
   Benchmarks_proto.Registration.register
     (module Sc_rollup_deserialize_output_proof_benchmark)
+
+let () =
+  Benchmarks_proto.Registration.register
+    (module Sc_rollup_install_boot_sector_benchmark)

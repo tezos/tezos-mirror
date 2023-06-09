@@ -82,3 +82,10 @@ val cost_verify_output_proof : bytes_len:int -> Gas_limit_repr.cost
     internally in the [Sc_rollup_storage] module and covers the function
     {!Sc_rollup_inbox_merkelized_payload_hashes_repr.add_payload} *)
 val cost_add_message : current_index:Z.t -> msg_len:int -> Gas_limit_repr.cost
+
+(** [cost_install_boot_sector_in_wasm_pvm ~boot_sector_size_in_bytes]
+    returns the cost of installing a boot sector in an empty WASM PVM
+    state. This function is used in the implementation of the
+    origination. *)
+val cost_install_boot_sector_in_wasm_pvm :
+  boot_sector_size_in_bytes:int -> Gas_limit_repr.cost
