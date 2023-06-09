@@ -10,7 +10,6 @@ depends: [
   "tls-lwt"
   "tezos-client-base-unix"
   "caqti-lwt"
-  "caqti-dynload"
   "caqti-driver-sqlite3"
   "caqti-driver-postgresql"
   "tezos-client-001-PtCJ7pwo"

@@ -1,7 +1,7 @@
 # Must be the same as the build of .gitlab-ci.yml
 FROM ubuntu:22.04
 
-RUN apt-get update && apt-get install -y libev4 libsqlite3-0 ca-certificates
+RUN apt-get update && apt-get install -y libev4 libpq5 libsqlite3-0 ca-certificates
 RUN mkdir /etc/teztale
 COPY server/main.exe /usr/local/bin/teztale-server
 
