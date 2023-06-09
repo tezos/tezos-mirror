@@ -5,7 +5,10 @@
 //! Public Key of Layer1.
 
 use std::fmt::Display;
-use tezos_crypto_rs::hash::{PublicKeyEd25519, PublicKeyP256, PublicKeySecp256k1};
+use tezos_crypto_rs::hash::{
+    PublicKeyEd25519, PublicKeyP256, PublicKeySecp256k1, Signature,
+};
+use tezos_crypto_rs::{CryptoError, PublicKeySignatureVerifier};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::encoding::HasEncoding;
 use tezos_data_encoding::nom::NomReader;
@@ -77,6 +80,23 @@ impl TryFrom<&str> for PublicKey {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Self::from_b58check(value)
+    }
+}
+
+impl PublicKeySignatureVerifier for PublicKey {
+    type Signature = Signature;
+    type Error = CryptoError;
+
+    fn verify_signature(
+        &self,
+        signature: &Self::Signature,
+        msg: &[u8],
+    ) -> Result<bool, Self::Error> {
+        match self {
+            PublicKey::Ed25519(ed25519) => ed25519.verify_signature(signature, msg),
+            PublicKey::Secp256k1(secp256k1) => secp256k1.verify_signature(signature, msg),
+            PublicKey::P256(p256) => p256.verify_signature(signature, msg),
+        }
     }
 }
 
