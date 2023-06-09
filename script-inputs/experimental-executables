@@ -1,6 +1,4 @@
 octez-evm-proxy-server
-octez-dac-client
-octez-dac-node
 octez-dal-node
 octez-smart-rollup-node-alpha
 octez-smart-rollup-client-alpha
