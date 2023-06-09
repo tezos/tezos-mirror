@@ -29,10 +29,6 @@ diff pyproject.toml /home/tezos/pyproject.toml
 #    enable reuse of build artifacts.
 make BUILD_EXTRA="src/bin_tps_evaluation tezt/tests/main.exe"
 
-
-# 3. clean-up caches before uploading the cache
-opam clean
-
-# 4. Strip the built binaries
+# 3. Strip the built binaries
 chmod +w octez-* _build/default/tezt/tests/main.exe _build/default/src/lib_protocol_compiler/bin/main_native.exe
 strip -s octez-* _build/default/tezt/tests/main.exe _build/default/src/lib_protocol_compiler/bin/main_native.exe
