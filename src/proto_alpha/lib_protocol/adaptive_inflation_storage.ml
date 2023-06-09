@@ -203,6 +203,10 @@ let load_reward_coeff ctxt =
 
 let init_ema ctxt = Storage.Adaptive_inflation.Launch_ema.init ctxt 0L
 
+let activate ctxt ~cycle = Storage.Adaptive_inflation.Activation.init ctxt cycle
+
+let launch_cycle ctxt = Storage.Adaptive_inflation.Activation.find ctxt
+
 let update_ema ctxt ~vote =
   Storage.Adaptive_inflation.Launch_ema.get ctxt >>=? fun old_ema ->
   Toggle_votes_repr.Adaptive_inflation_launch_EMA.of_int64 old_ema
@@ -215,11 +219,23 @@ let update_ema ctxt ~vote =
   Storage.Adaptive_inflation.Launch_ema.update
     ctxt
     (Toggle_votes_repr.Adaptive_inflation_launch_EMA.to_int64 new_ema)
+  >>=? fun ctxt ->
+  let open Constants_storage in
+  (if
+   Toggle_votes_repr.Adaptive_inflation_launch_EMA.(
+     new_ema < adaptive_inflation_launch_ema_threshold ctxt)
+  then return ctxt
+  else
+    launch_cycle ctxt >>=? function
+    | Some _ ->
+        (* the feature is already set to launch, do nothing to avoid postponing it. *)
+        return ctxt
+    | None ->
+        (* set the feature to activate in a few cycles *)
+        let current_cycle = (Level_storage.current ctxt).cycle in
+        let delay = 1 + preserved_cycles ctxt + max_slashing_period ctxt in
+        activate ctxt ~cycle:(Cycle_repr.add current_cycle delay))
   >|=? fun ctxt -> (ctxt, new_ema)
-
-let activate ctxt ~cycle = Storage.Adaptive_inflation.Activation.init ctxt cycle
-
-let launch_cycle ctxt = Storage.Adaptive_inflation.Activation.find ctxt
 
 module For_RPC = struct
   let get_reward_coeff = get_reward_coeff

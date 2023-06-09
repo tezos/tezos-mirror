@@ -128,6 +128,7 @@ type adaptive_inflation = {
   staking_over_baking_limit : int;
   max_costaking_baker_count : int;
   staking_over_delegation_edge : int;
+  launch_ema_threshold : int64;
 }
 
 type reward_weights = {
@@ -344,26 +345,31 @@ let adaptive_inflation_encoding =
            staking_over_baking_limit;
            max_costaking_baker_count;
            staking_over_delegation_edge;
+           launch_ema_threshold;
          } ->
       ( enable,
         staking_over_baking_limit,
         max_costaking_baker_count,
-        staking_over_delegation_edge ))
+        staking_over_delegation_edge,
+        launch_ema_threshold ))
     (fun ( adaptive_inflation_enable,
            staking_over_baking_limit,
            max_costaking_baker_count,
-           staking_over_delegation_edge ) ->
+           staking_over_delegation_edge,
+           launch_ema_threshold ) ->
       {
         enable = adaptive_inflation_enable;
         staking_over_baking_limit;
         max_costaking_baker_count;
         staking_over_delegation_edge;
+        launch_ema_threshold;
       })
-    (obj4
+    (obj5
        (req "adaptive_inflation_enable" bool)
        (req "staking_over_baking_limit" uint8)
        (req "max_costaking_baker_count" uint16)
-       (req "staking_over_delegation_edge" uint8))
+       (req "staking_over_delegation_edge" uint8)
+       (req "adaptive_inflation_launch_ema_threshold" int64))
 
 let reward_weights_encoding =
   let open Data_encoding in
