@@ -203,6 +203,20 @@ let load_reward_coeff ctxt =
 
 let init_ema ctxt = Storage.Adaptive_inflation.Launch_ema.init ctxt 0L
 
+let update_ema ctxt ~vote =
+  Storage.Adaptive_inflation.Launch_ema.get ctxt >>=? fun old_ema ->
+  Toggle_votes_repr.Adaptive_inflation_launch_EMA.of_int64 old_ema
+  >>=? fun old_ema ->
+  let new_ema =
+    Toggle_votes_repr.compute_new_adaptive_inflation_ema
+      ~toggle_vote:vote
+      old_ema
+  in
+  Storage.Adaptive_inflation.Launch_ema.update
+    ctxt
+    (Toggle_votes_repr.Adaptive_inflation_launch_EMA.to_int64 new_ema)
+  >|=? fun ctxt -> (ctxt, new_ema)
+
 let activate ctxt ~cycle = Storage.Adaptive_inflation.Activation.init ctxt cycle
 
 module For_RPC = struct

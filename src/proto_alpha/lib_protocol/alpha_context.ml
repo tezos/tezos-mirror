@@ -615,6 +615,10 @@ module Liquidity_baking = struct
   include Liquidity_baking_storage
 end
 
+module Adaptive_inflation = struct
+  include Adaptive_inflation_storage
+end
+
 module Ticket_hash = struct
   include Ticket_hash_repr
   include Ticket_hash_builder

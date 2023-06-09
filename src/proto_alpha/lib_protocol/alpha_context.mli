@@ -4783,6 +4783,14 @@ module Liquidity_baking : sig
     Lwt.t
 end
 
+(** This module re-exports definitions from {!Adaptive_inflation_storage}. *)
+module Adaptive_inflation : sig
+  val update_ema :
+    context ->
+    vote:Toggle_votes.toggle_vote ->
+    (context * Toggle_votes.Adaptive_inflation_launch_EMA.t) tzresult Lwt.t
+end
+
 (** This module re-exports definitions from {!Ticket_storage}. *)
 module Ticket_balance : sig
   type error +=
