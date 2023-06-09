@@ -9,6 +9,7 @@
   tezos-base
   tezos-smart-rollup-layer2-alpha
   tezos-protocol-alpha
+  octez_smart_rollup_node_alpha
   tezos-rpc
   tezos-rpc-http
   tezos-rpc-http-server)

@@ -11,16 +11,18 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "tezos-base"
-  "tezos-smart-rollup-layer2-alpha"
-  "tezos-protocol-alpha"
+  "tezos-clic"
+  "tezos-client-base"
+  "tezos-client-base-unix"
+  "tezos-client-commands"
+  "octez-smart-rollup-node"
+  "tezos-client-alpha"
   "octez-smart-rollup-node-alpha"
-  "tezos-rpc"
-  "tezos-rpc-http"
-  "tezos-rpc-http-server"
+  "octez-smart-rollup-sequencer"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Sequencer library for smart contract rollup"
+synopsis: "Smart rollup sequencer node (low-latency node)"

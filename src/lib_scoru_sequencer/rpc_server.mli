@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Tezos_rpc_http_server
+open Octez_smart_rollup_node
 
 (** [start node_ctxt config] starts an RPC server listening for requests on the
     port [config.rpc_port] and address [config.rpc_addr]. *)

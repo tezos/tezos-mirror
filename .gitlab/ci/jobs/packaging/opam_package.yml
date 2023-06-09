@@ -430,6 +430,8 @@ opam:octez-smart-rollup-node-PtNairob:
 
 # Ignoring unreleased package octez-smart-rollup-sequencer.
 
+# Ignoring unreleased package octez-smart-rollup-sequencer-node.
+
 # Ignoring unreleased package octez-smart-rollup-wasm-benchmark.
 
 opam:octez-smart-rollup-wasm-benchmark-lib:
