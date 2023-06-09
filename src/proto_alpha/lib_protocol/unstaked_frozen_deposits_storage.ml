@@ -69,12 +69,15 @@ let balance ctxt delegate cycle =
   frozen_deposits.current_amount
 
 let credit_only_call_from_token ctxt delegate cycle amount =
+  let open Lwt_result_syntax in
   let contract = Contract_repr.Implicit delegate in
   let normalized_cycle = normalized_cycle ctxt ~cycle in
   let f deposits = Deposits_repr.(deposits +? amount) in
+  let* ctxt = Stake_storage.add_stake ctxt delegate amount in
   Internal.update_balance ~f ctxt contract ~normalized_cycle
 
 let spend_only_call_from_token ctxt delegate cycle amount =
+  let open Lwt_result_syntax in
   let contract = Contract_repr.Implicit delegate in
   let normalized_cycle = normalized_cycle ctxt ~cycle in
   let f Deposits_repr.{initial_amount; current_amount} =
@@ -82,6 +85,7 @@ let spend_only_call_from_token ctxt delegate cycle amount =
     let+ current_amount = Tez_repr.(current_amount -? amount) in
     Deposits_repr.{initial_amount; current_amount}
   in
+  let* ctxt = Stake_storage.remove_stake ctxt delegate amount in
   Internal.update_balance ~f ctxt contract ~normalized_cycle
 
 let squash_unstaked_frozen_deposits ctxt ~from_cycle ~into_cycle ~delegate =
