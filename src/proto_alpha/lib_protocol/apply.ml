@@ -32,7 +32,6 @@ open Alpha_context
 type error +=
   | Not_enough_endorsements of {required : int; provided : int}
   | Faulty_validation_wrong_slot
-  | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
   | Error_while_taking_fees
   | Update_consensus_key_on_unregistered_delegate of Signature.Public_key_hash.t
   | Empty_transaction of Contract.t
@@ -81,21 +80,6 @@ let () =
     Data_encoding.empty
     (function Faulty_validation_wrong_slot -> Some () | _ -> None)
     (fun () -> Faulty_validation_wrong_slot) ;
-  register_error_kind
-    `Temporary
-    ~id:"operation.set_deposits_limit_on_unregistered_delegate"
-    ~title:"Set deposits limit on an unregistered delegate"
-    ~description:"Cannot set deposits limit on an unregistered delegate."
-    ~pp:(fun ppf c ->
-      Format.fprintf
-        ppf
-        "Cannot set a deposits limit on the unregistered delegate %a."
-        Signature.Public_key_hash.pp
-        c)
-    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
-    (function
-      | Set_deposits_limit_on_unregistered_delegate c -> Some c | _ -> None)
-    (fun c -> Set_deposits_limit_on_unregistered_delegate c) ;
 
   let error_while_taking_fees_description =
     "There was an error while taking the fees, which should not happen and \
@@ -1223,18 +1207,6 @@ let apply_manager_operation :
           }
       in
       return (ctxt, result, [])
-  | Set_deposits_limit limit ->
-      Delegate.registered ctxt source >>= fun is_registered ->
-      error_unless
-        is_registered
-        (Set_deposits_limit_on_unregistered_delegate source)
-      >>?= fun () ->
-      Delegate.set_frozen_deposits_limit ctxt source limit >>= fun ctxt ->
-      return
-        ( ctxt,
-          Set_deposits_limit_result
-            {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
-          [] )
   | Increase_paid_storage {amount_in_bytes; destination} ->
       Contract.increase_paid_storage ctxt destination ~amount_in_bytes
       >>=? fun ctxt ->
@@ -1553,8 +1525,7 @@ let burn_manager_storage_fees :
             size_of_constant = payload.size_of_constant;
             global_address = payload.global_address;
           } )
-  | Set_deposits_limit_result _ | Update_consensus_key_result _ ->
-      return (ctxt, storage_limit, smopr)
+  | Update_consensus_key_result _ -> return (ctxt, storage_limit, smopr)
   | Increase_paid_storage_result _ -> return (ctxt, storage_limit, smopr)
   | Transfer_ticket_result payload ->
       let consumed = payload.paid_storage_size_diff in

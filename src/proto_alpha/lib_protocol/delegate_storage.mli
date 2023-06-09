@@ -31,7 +31,6 @@
     It also groups "trivial" getters/setters related to delegates.
 
     It is responsible for maintaining the following tables:
-    - {!Storage.Contract.Frozen_deposits_limit}
     - {!Storage.Delegates}
 *)
 
@@ -100,17 +99,6 @@ val fold :
 
 (** List all registered delegates. *)
 val list : Raw_context.t -> Signature.Public_key_hash.t list Lwt.t
-
-val frozen_deposits_limit :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Tez_repr.t option tzresult Lwt.t
-
-val set_frozen_deposits_limit :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Tez_repr.t option ->
-  Raw_context.t Lwt.t
 
 (** Returns a delegate's frozen deposits, both the current amount and
    the initial freezed amount.

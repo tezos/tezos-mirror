@@ -190,15 +190,6 @@ let pp_manager_operation_content (type kind) source ppf
         "Register Global:@,Value: %a"
         pp_micheline_from_lazy_expr
         value
-  | Set_deposits_limit limit_opt -> (
-      Format.fprintf
-        ppf
-        "Set deposits limit:@,Delegate: %a@,"
-        Contract.pp
-        source ;
-      match limit_opt with
-      | None -> Format.pp_print_string ppf "Unlimited deposits"
-      | Some limit -> Format.fprintf ppf "Limit: %a" Tez.pp limit)
   | Increase_paid_storage {amount_in_bytes; destination} ->
       Format.fprintf
         ppf
@@ -724,7 +715,6 @@ let pp_manager_operation_contents_result ppf op_result =
     | Origination_result _ -> "origination"
     | Delegation_result _ -> "delegation"
     | Register_global_constant_result _ -> "global constant registration"
-    | Set_deposits_limit_result _ -> "deposits limit modification"
     | Update_consensus_key_result _ -> "consensus key update"
     | Increase_paid_storage_result _ -> "paid storage increase"
     | Transfer_ticket_result _ -> "tickets transfer"
@@ -748,8 +738,6 @@ let pp_manager_operation_contents_result ppf op_result =
     match result with
     | Reveal_result {consumed_gas} -> pp_consumed_gas ppf consumed_gas
     | Delegation_result {consumed_gas} -> pp_consumed_gas ppf consumed_gas
-    | Set_deposits_limit_result {consumed_gas} ->
-        pp_consumed_gas ppf consumed_gas
     | Update_consensus_key_result {consumed_gas} ->
         pp_consumed_gas ppf consumed_gas
     | Transaction_result tx -> pp_transaction_result ppf tx

@@ -190,7 +190,6 @@ module Delegate : sig
     current_frozen_deposits : Tez.t;
     frozen_deposits : Tez.t;
     staking_balance : Tez.t;
-    frozen_deposits_limit : Tez.t option;
     delegated_contracts : Alpha_context.Contract.t list;
     delegated_balance : Tez.t;
     deactivated : bool;
@@ -211,9 +210,6 @@ module Delegate : sig
   val initial_frozen_deposits : t -> public_key_hash -> Tez.t tzresult Lwt.t
 
   val staking_balance : t -> public_key_hash -> Tez.t tzresult Lwt.t
-
-  val frozen_deposits_limit :
-    t -> public_key_hash -> Tez.t option tzresult Lwt.t
 
   val deactivated : t -> public_key_hash -> bool tzresult Lwt.t
 

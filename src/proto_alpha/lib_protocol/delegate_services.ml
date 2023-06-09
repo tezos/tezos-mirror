@@ -113,7 +113,6 @@ type info = {
   current_frozen_deposits : Tez.t;
   frozen_deposits : Tez.t;
   staking_balance : Tez.t;
-  frozen_deposits_limit : Tez.t option;
   delegated_contracts : Contract.t list;
   delegated_balance : Tez.t;
   deactivated : bool;
@@ -131,7 +130,6 @@ let info_encoding =
            current_frozen_deposits;
            frozen_deposits;
            staking_balance;
-           frozen_deposits_limit;
            delegated_contracts;
            delegated_balance;
            deactivated;
@@ -144,7 +142,6 @@ let info_encoding =
           current_frozen_deposits,
           frozen_deposits,
           staking_balance,
-          frozen_deposits_limit,
           delegated_contracts,
           delegated_balance,
           deactivated,
@@ -154,7 +151,6 @@ let info_encoding =
              current_frozen_deposits,
              frozen_deposits,
              staking_balance,
-             frozen_deposits_limit,
              delegated_contracts,
              delegated_balance,
              deactivated,
@@ -165,7 +161,6 @@ let info_encoding =
         current_frozen_deposits;
         frozen_deposits;
         staking_balance;
-        frozen_deposits_limit;
         delegated_contracts;
         delegated_balance;
         deactivated;
@@ -175,12 +170,11 @@ let info_encoding =
         pending_consensus_keys;
       })
     (merge_objs
-       (obj9
+       (obj8
           (req "full_balance" Tez.encoding)
           (req "current_frozen_deposits" Tez.encoding)
           (req "frozen_deposits" Tez.encoding)
           (req "staking_balance" Tez.encoding)
-          (opt "frozen_deposits_limit" Tez.encoding)
           (req "delegated_contracts" (list Contract.encoding))
           (req "delegated_balance" Tez.encoding)
           (req "deactivated" bool)
@@ -320,15 +314,6 @@ module S = struct
       ~output:Tez.encoding
       RPC_path.(path / "staking_balance")
 
-  let frozen_deposits_limit =
-    RPC_service.get_service
-      ~description:
-        "Returns the frozen deposits limit for the given delegate or none if \
-         no limit is set."
-      ~query:RPC_query.empty
-      ~output:(Data_encoding.option Tez.encoding)
-      RPC_path.(path / "frozen_deposits_limit")
-
   let delegated_contracts =
     RPC_service.get_service
       ~description:
@@ -459,7 +444,6 @@ let register () =
       Delegate.full_balance ctxt pkh >>=? fun full_balance ->
       Delegate.frozen_deposits ctxt pkh >>=? fun frozen_deposits ->
       Delegate.staking_balance ctxt pkh >>=? fun staking_balance ->
-      Delegate.frozen_deposits_limit ctxt pkh >>=? fun frozen_deposits_limit ->
       Delegate.delegated_contracts ctxt pkh >>= fun delegated_contracts ->
       Delegate.delegated_balance ctxt pkh >>=? fun delegated_balance ->
       Delegate.deactivated ctxt pkh >>=? fun deactivated ->
@@ -475,7 +459,6 @@ let register () =
         current_frozen_deposits = frozen_deposits.current_amount;
         frozen_deposits = frozen_deposits.initial_amount;
         staking_balance;
-        frozen_deposits_limit;
         delegated_contracts;
         delegated_balance;
         deactivated;
@@ -498,9 +481,6 @@ let register () =
   register1 ~chunked:false S.staking_balance (fun ctxt pkh () () ->
       check_delegate_registered ctxt pkh >>=? fun () ->
       Delegate.staking_balance ctxt pkh) ;
-  register1 ~chunked:false S.frozen_deposits_limit (fun ctxt pkh () () ->
-      check_delegate_registered ctxt pkh >>=? fun () ->
-      Delegate.frozen_deposits_limit ctxt pkh) ;
   register1 ~chunked:true S.delegated_contracts (fun ctxt pkh () () ->
       check_delegate_registered ctxt pkh >>=? fun () ->
       Delegate.delegated_contracts ctxt pkh >|= ok) ;
@@ -560,9 +540,6 @@ let frozen_deposits ctxt block pkh =
 
 let staking_balance ctxt block pkh =
   RPC_context.make_call1 S.staking_balance ctxt block pkh () ()
-
-let frozen_deposits_limit ctxt block pkh =
-  RPC_context.make_call1 S.frozen_deposits_limit ctxt block pkh () ()
 
 let delegated_contracts ctxt block pkh =
   RPC_context.make_call1 S.delegated_contracts ctxt block pkh () ()

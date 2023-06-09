@@ -784,31 +784,6 @@ let commands_ro () =
                .unsigned_encoding_with_legacy_attestation_name)
         in
         return_unit);
-    command
-      ~group
-      ~desc:"Get the frozen deposits limit of a delegate."
-      no_options
-      (prefixes ["get"; "deposits"; "limit"; "for"]
-      @@ Client_keys.Public_key_hash.source_param
-           ~name:"src"
-           ~desc:"source delegate"
-      @@ stop)
-      (fun () delegate (cctxt : Protocol_client_context.full) ->
-        let open Lwt_result_syntax in
-        let* deposit =
-          get_frozen_deposits_limit
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            delegate
-        in
-        let*! () =
-          match deposit with
-          | None -> cctxt#answer "unlimited"
-          | Some limit ->
-              cctxt#answer "%a %s" Tez.pp limit Operation_result.tez_sym
-        in
-        return_unit);
   ]
 
 (* ----------------------------------------------------------------------------*)
@@ -2420,83 +2395,6 @@ let commands_rw () =
             ~dry_run
             proposal
             ballot
-        in
-        return_unit);
-    command
-      ~group
-      ~desc:"Set the deposits limit of a registered delegate."
-      (args5
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         simulate_switch
-         fee_parameter_args)
-      (prefixes ["set"; "deposits"; "limit"; "for"]
-      @@ Client_keys.Public_key_hash.source_param
-           ~name:"src"
-           ~desc:"source contract"
-      @@ prefix "to"
-      @@ tez_param
-           ~name:"deposits limit"
-           ~desc:"the maximum amount of frozen deposits"
-      @@ stop)
-      (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
-           mgr
-           limit
-           (cctxt : Protocol_client_context.full) ->
-        let open Lwt_result_syntax in
-        let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
-        let* (_ : _ Injection.result) =
-          set_deposits_limit
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ?confirmations:cctxt#confirmations
-            ~dry_run
-            ~verbose_signing
-            ~simulation
-            ~fee_parameter
-            ?fee
-            mgr
-            ~src_pk
-            ~manager_sk
-            (Some limit)
-        in
-        return_unit);
-    command
-      ~group
-      ~desc:"Remove the deposits limit of a registered delegate."
-      (args5
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         simulate_switch
-         fee_parameter_args)
-      (prefixes ["unset"; "deposits"; "limit"; "for"]
-      @@ Client_keys.Public_key_hash.source_param
-           ~name:"src"
-           ~desc:"source contract"
-      @@ stop)
-      (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
-           mgr
-           (cctxt : Protocol_client_context.full) ->
-        let open Lwt_result_syntax in
-        let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
-        let* (_ : _ Injection.result) =
-          set_deposits_limit
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ?confirmations:cctxt#confirmations
-            ~dry_run
-            ~verbose_signing
-            ~simulation
-            ~fee_parameter
-            ?fee
-            mgr
-            ~src_pk
-            ~manager_sk
-            None
         in
         return_unit);
     command
