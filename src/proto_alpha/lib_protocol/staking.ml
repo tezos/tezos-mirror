@@ -143,9 +143,8 @@ let stake ctxt ~sender ~delegate amount =
   in
   return (ctxt, stake_balance_updates @ finalize_balance_updates)
 
-let request_unstake ctxt ~sender_contract ~delegate requested_amount =
+let record_request_unstake ctxt ~sender_contract ~delegate requested_amount =
   let open Lwt_result_syntax in
-  let* ctxt, finalize_balance_updates = finalize_unstake ctxt sender_contract in
   let* requested_pseudotokens =
     Staking_pseudotokens.frozen_deposits_pseudotokens_for_tez_amount
       ctxt
@@ -171,7 +170,7 @@ let request_unstake ctxt ~sender_contract ~delegate requested_amount =
       pseudotokens_to_unstake
   in
   let current_cycle = (Level.current ctxt).cycle in
-  let* ctxt, unstake_balance_updates =
+  let* ctxt, balance_updates =
     Token.transfer
       ctxt
       (`Frozen_deposits delegate)
@@ -185,5 +184,13 @@ let request_unstake ctxt ~sender_contract ~delegate requested_amount =
       ~delegate
       current_cycle
       tez_to_unstake
+  in
+  (ctxt, balance_updates)
+
+let request_unstake ctxt ~sender_contract ~delegate requested_amount =
+  let open Lwt_result_syntax in
+  let* ctxt, finalize_balance_updates = finalize_unstake ctxt sender_contract in
+  let+ ctxt, unstake_balance_updates =
+    record_request_unstake ctxt ~sender_contract ~delegate requested_amount
   in
   (ctxt, unstake_balance_updates @ finalize_balance_updates)
