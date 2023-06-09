@@ -375,6 +375,26 @@ val save_messages :
   Sc_rollup.Inbox_message.t list ->
   unit tzresult Lwt.t
 
+(** Return values for {!protocol_of_level}. *)
+type proto_info = {
+  proto_level : int;
+      (** Protocol level for operations of block (can be different from L1
+          header value in the case of a migration block). *)
+  first_level_of_protocol : bool;
+      (** [true] if the level is the first of the protocol. *)
+  protocol : Protocol_hash.t;
+      (** Hash of the {e current} protocol for this level. *)
+}
+
+(** [protocol_of_level t level] returns the protocol of block level [level]. *)
+val protocol_of_level : _ t -> int32 -> proto_info tzresult Lwt.t
+
+(** [save_protocol_info t block ~predecessor] saves to disk the protocol
+    information associated to the [block], if there is a protocol change
+    between [block] and [predecessor]. *)
+val save_protocol_info :
+  rw -> Layer1.header -> predecessor:Layer1.header -> unit tzresult Lwt.t
+
 (** {3 DAL} *)
 
 (** [get_slot_header t ~published_in_block_hash slot_index] returns the slot

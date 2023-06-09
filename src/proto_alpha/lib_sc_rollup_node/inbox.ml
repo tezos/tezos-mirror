@@ -172,14 +172,8 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
         head.level
         (List.length collected_messages)
     in
-    let* grandparent =
-      Node_context.get_predecessor_header node_ctxt predecessor
-    in
-    let is_first_block =
-      (* head is the first block of the protocol if its predecessor is a
-         migration block. *)
-      grandparent.header.proto_level <> predecessor.header.proto_level
-    in
+    let* head_proto = Node_context.protocol_of_level node_ctxt head.level in
+    let is_first_block = head_proto.first_level_of_protocol in
     process_messages
       node_ctxt
       ~is_first_block

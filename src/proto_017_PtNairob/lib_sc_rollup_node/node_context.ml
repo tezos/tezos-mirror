@@ -874,6 +874,154 @@ let get_full_l2_block node_ctxt block_hash =
   in
   return {block with content = {Sc_rollup_block.inbox; messages; commitment}}
 
+type proto_info = {
+  proto_level : int;
+  first_level_of_protocol : bool;
+  protocol : Protocol_hash.t;
+}
+
+let protocol_of_level node_ctxt level =
+  let open Lwt_result_syntax in
+  assert (level >= Raw_level.to_int32 node_ctxt.genesis_info.level) ;
+  let* protocols = Store.Protocols.read node_ctxt.store.protocols in
+  let*? protocols =
+    match protocols with
+    | None | Some [] ->
+        error_with "Cannot infer protocol for level %ld: no protocol info" level
+    | Some protos -> Ok protos
+  in
+  let rec find = function
+    | [] ->
+        error_with "Cannot infer protocol for level %ld: no information" level
+    | {Store.Protocols.level = p_level; proto_level; protocol} :: protos -> (
+        (* Latest protocols appear first in the list *)
+        match p_level with
+        | First_known l when level >= l ->
+            Ok {protocol; proto_level; first_level_of_protocol = false}
+        | Activation_level l when level > l ->
+            (* The block at the activation level is of the previous protocol, so
+               we are in the protocol that was activated at [l] only when the
+               level we query is after [l]. *)
+            Ok
+              {
+                protocol;
+                proto_level;
+                first_level_of_protocol = level = Int32.succ l;
+              }
+        | _ -> (find [@tailcall]) protos)
+  in
+  Lwt.return (find protocols)
+
+let save_protocol_info node_ctxt (block : Layer1.header)
+    ~(predecessor : Layer1.header) =
+  let open Lwt_result_syntax in
+  let* protocols = Store.Protocols.read node_ctxt.store.protocols in
+  match protocols with
+  | Some ({proto_level; _} :: _)
+    when proto_level = block.header.proto_level
+         && block.header.proto_level = predecessor.header.proto_level ->
+      (* Nominal case, no protocol change. Nothing to do. *)
+      return_unit
+  | None | Some [] ->
+      (* No protocols information saved in the rollup node yet, initialize with
+         information by looking at the current head and its predecessor.
+         We need to figure out if a protocol upgrade happened in one of these two blocks.
+      *)
+      let* {current_protocol; next_protocol} =
+        Tezos_shell_services.Shell_services.Blocks.protocols
+          node_ctxt.cctxt
+          ~block:(`Hash (block.hash, 0))
+          ()
+      and* {
+             current_protocol = pred_current_protocol;
+             next_protocol = pred_next_protocol;
+           } =
+        Tezos_shell_services.Shell_services.Blocks.protocols
+          node_ctxt.cctxt
+          ~block:(`Hash (predecessor.hash, 0))
+          ()
+      in
+      (* The first point in the protocol list is the one regarding
+         [predecessor]. If it is a migration block we register the activation
+         level, otherwise we don't go back any further and consider it as the
+         first known block of the protocol. *)
+      let pred_proto_info =
+        Store.Protocols.
+          {
+            level =
+              (if Protocol_hash.(pred_current_protocol = pred_next_protocol)
+              then First_known predecessor.level
+              else Activation_level predecessor.level);
+            proto_level = predecessor.header.proto_level;
+            protocol = pred_next_protocol;
+          }
+      in
+      let protocols =
+        if Protocol_hash.(current_protocol = next_protocol) then
+          (* There is no protocol upgrade in [head], so no new point to add the protocol list. *)
+          [pred_proto_info]
+        else
+          (* [head] is a migration block, add the new protocol with its activation in the list. *)
+          let proto_info =
+            Store.Protocols.
+              {
+                level = Activation_level block.level;
+                proto_level = block.header.proto_level;
+                protocol = next_protocol;
+              }
+          in
+          [proto_info; pred_proto_info]
+      in
+      Store.Protocols.write node_ctxt.store.protocols protocols
+  | Some
+      ({proto_level = last_proto_level; _} :: previous_protocols as protocols)
+    ->
+      (* block.header.proto_level <> last_proto_level or head is a migration
+         block, i.e. there is a protocol change w.r.t. last registered one. *)
+      let is_head_migration_block =
+        block.header.proto_level <> predecessor.header.proto_level
+      in
+      let* proto_info =
+        let+ {next_protocol = protocol; _} =
+          Tezos_shell_services.Shell_services.Blocks.protocols
+            node_ctxt.cctxt
+            ~block:(`Hash (block.hash, 0))
+            ()
+        in
+        let level =
+          if is_head_migration_block then
+            Store.Protocols.Activation_level block.level
+          else First_known block.level
+        in
+        Store.Protocols.
+          {level; proto_level = block.header.proto_level; protocol}
+      in
+      let protocols =
+        if block.header.proto_level > last_proto_level then
+          (* Protocol upgrade, add new item to protocol list *)
+          proto_info :: protocols
+        else if block.header.proto_level < last_proto_level then (
+          (* Reorganization in which a protocol migration block was
+             backtracked. *)
+          match previous_protocols with
+          | [] ->
+              (* No info further back, store what we know. *)
+              [proto_info]
+          | previous_proto :: _ ->
+              (* make sure that we are in the case where we backtracked the
+                 migration block. *)
+              assert (
+                Protocol_hash.(proto_info.protocol = previous_proto.protocol)) ;
+              (* Remove last stored protocol *)
+              previous_protocols)
+        else
+          (* block.header.proto_level = last_proto_level && is_migration_block *)
+          (* Reorganization where we are doing a different protocol
+             upgrade. Replace last stored protocol. *)
+          proto_info :: previous_protocols
+      in
+      Store.Protocols.write node_ctxt.store.protocols protocols
+
 let get_slot_header {store; _} ~published_in_block_hash slot_index =
   Error.trace_lwt_result_with
     "Could not retrieve slot header for slot index %a published in block %a"

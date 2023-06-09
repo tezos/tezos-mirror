@@ -145,7 +145,62 @@ module Commitments =
       include Add_empty_header
     end)
 
-type nonrec 'a store = {
+module Protocols = struct
+  type level = First_known of int32 | Activation_level of int32
+
+  type proto_info = {
+    level : level;
+    proto_level : int;
+    protocol : Protocol_hash.t;
+  }
+
+  type value = proto_info list
+
+  let level_encoding =
+    let open Data_encoding in
+    conv
+      (function First_known l -> (l, false) | Activation_level l -> (l, true))
+      (function l, false -> First_known l | l, true -> Activation_level l)
+    @@ obj2 (req "level" int32) (req "activates" bool)
+
+  let proto_info_encoding =
+    let open Data_encoding in
+    conv
+      (fun {level; proto_level; protocol} -> (level, proto_level, protocol))
+      (fun (level, proto_level, protocol) -> {level; proto_level; protocol})
+    @@ obj3
+         (req "level" level_encoding)
+         (req "proto_level" int31)
+         (req "protocol" Protocol_hash.encoding)
+
+  include Indexed_store.Make_singleton (struct
+    type t = value
+
+    let name = "protocols"
+
+    let level_encoding =
+      let open Data_encoding in
+      conv
+        (function
+          | First_known l -> (l, false) | Activation_level l -> (l, true))
+        (function l, false -> First_known l | l, true -> Activation_level l)
+      @@ obj2 (req "level" int32) (req "activates" bool)
+
+    let proto_info_encoding =
+      let open Data_encoding in
+      conv
+        (fun {level; proto_level; protocol} -> (level, proto_level, protocol))
+        (fun (level, proto_level, protocol) -> {level; proto_level; protocol})
+      @@ obj3
+           (req "level" level_encoding)
+           (req "proto_level" int31)
+           (req "protocol" Protocol_hash.encoding)
+
+    let encoding = Data_encoding.list proto_info_encoding
+  end)
+end
+
+type 'a store = {
   l2_blocks : 'a L2_blocks.t;
   messages : 'a Messages.t;
   inboxes : 'a Inboxes.t;
@@ -154,6 +209,7 @@ type nonrec 'a store = {
   l2_head : 'a L2_head.t;
   last_finalized_level : 'a Last_finalized_level.t;
   levels_to_hashes : 'a Levels_to_hashes.t;
+  protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;
 }
 
@@ -173,6 +229,7 @@ let readonly
        l2_head;
        last_finalized_level;
        levels_to_hashes;
+       protocols;
        irmin_store;
      } :
       _ t) : ro =
@@ -186,6 +243,7 @@ let readonly
     l2_head = L2_head.readonly l2_head;
     last_finalized_level = Last_finalized_level.readonly last_finalized_level;
     levels_to_hashes = Levels_to_hashes.readonly levels_to_hashes;
+    protocols = Protocols.readonly protocols;
     irmin_store = Irmin_store.readonly irmin_store;
   }
 
@@ -199,6 +257,7 @@ let close
        l2_head = _;
        last_finalized_level = _;
        levels_to_hashes;
+       protocols = _;
        irmin_store;
      } :
       _ t) =
@@ -235,6 +294,7 @@ let load (type a) (mode : a mode) ~l2_blocks_cache_size data_dir :
   let* levels_to_hashes =
     Levels_to_hashes.load mode ~path:(path "levels_to_hashes")
   in
+  let* protocols = Protocols.load mode ~path:(path "protocols") in
   let+ irmin_store = Irmin_store.load mode (path "irmin_store") in
   {
     l2_blocks;
@@ -245,6 +305,7 @@ let load (type a) (mode : a mode) ~l2_blocks_cache_size data_dir :
     l2_head;
     last_finalized_level;
     levels_to_hashes;
+    protocols;
     irmin_store;
   }
 

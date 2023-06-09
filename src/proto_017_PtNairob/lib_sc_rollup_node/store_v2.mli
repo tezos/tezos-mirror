@@ -57,6 +57,27 @@ module Commitments :
      and type value := Sc_rollup.Commitment.t
      and type header := unit
 
+module Protocols : sig
+  type level = First_known of int32 | Activation_level of int32
+
+  (** Each element of this type represents information we have about a Tezos
+      protocol regarding its activation. *)
+  type proto_info = {
+    level : level;
+        (** The level at which we have seen the protocol for the first time,
+            either because we saw its activation or because the first block we
+            saw (at the origination of the rollup) was from this protocol. *)
+    proto_level : int;
+        (** The protocol level, i.e. its number in the sequence of protocol
+            activations on the chain. *)
+    protocol : Protocol_hash.t;  (** The protocol this information concerns. *)
+  }
+
+  val proto_info_encoding : proto_info Data_encoding.t
+
+  include SINGLETON_STORE with type value = proto_info list
+end
+
 type +'a store = {
   l2_blocks : 'a L2_blocks.t;
   messages : 'a Messages.t;
@@ -66,6 +87,7 @@ type +'a store = {
   l2_head : 'a L2_head.t;
   last_finalized_level : 'a Last_finalized_level.t;
   levels_to_hashes : 'a Levels_to_hashes.t;
+  protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;
 }
 
