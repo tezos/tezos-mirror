@@ -28,7 +28,8 @@ module Milliseconds = Test_gossipsub_shared.Milliseconds
 (* Most of these limits are the default ones used by the Go implementation. *)
 let default_limits ?mesh_message_deliveries_activation ?time_in_mesh_weight
     ?time_in_mesh_quantum ?time_in_mesh_cap ?first_message_deliveries_weight
-    ?first_message_deliveries_cap ?first_message_deliveries_decay () :
+    ?first_message_deliveries_cap ?first_message_deliveries_decay
+    ?mesh_message_deliveries_weight () :
     (string, int, int, Milliseconds.t) limits =
   let per_topic_score_limits =
     {
@@ -42,7 +43,8 @@ let default_limits ?mesh_message_deliveries_activation ?time_in_mesh_weight
         Option.value ~default:2000 first_message_deliveries_cap;
       first_message_deliveries_decay =
         Option.value ~default:0.5 first_message_deliveries_decay;
-      mesh_message_deliveries_weight = ~-.1.0;
+      mesh_message_deliveries_weight =
+        mesh_message_deliveries_weight |> Option.value ~default:~-.1.0;
       mesh_message_deliveries_window = Milliseconds.of_float_s 0.01;
       mesh_message_deliveries_activation =
         mesh_message_deliveries_activation
@@ -68,21 +70,6 @@ let default_limits ?mesh_message_deliveries_activation ?time_in_mesh_weight
       app_specific_weight = 10.;
       decay_zero = 0.1;
     }
-  in
-  let score_limits =
-    match mesh_message_deliveries_activation with
-    | None -> score_limits
-    | Some mesh_message_deliveries_activation ->
-        {
-          score_limits with
-          topics =
-            Topic_score_limits_single
-              {
-                per_topic_score_limits with
-                mesh_message_deliveries_activation =
-                  Milliseconds.of_int_s mesh_message_deliveries_activation;
-              };
-        }
   in
   {
     max_recv_ihave_per_heartbeat = 10;

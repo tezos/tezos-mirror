@@ -118,8 +118,8 @@ val graft : gen_peer:Peer.t t -> gen_topic:Topic.t t -> GS.graft t
 val prune :
   gen_peer:Peer.t t ->
   gen_topic:Topic.t t ->
-  gen_span:span t ->
-  int ->
+  gen_backoff:span t ->
+  gen_px_count:int t ->
   GS.prune t
 
 val receive_message :

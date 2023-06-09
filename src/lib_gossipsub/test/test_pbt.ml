@@ -76,6 +76,14 @@ module Basic_fragments = struct
     of_input_gen (iwant ~gen_peer ~gen_message_id ~gen_msg_count) (fun iwant ->
         [I.iwant iwant])
 
+  let graft ~gen_peer ~gen_topic : t =
+    of_input_gen (graft ~gen_peer ~gen_topic) (fun graft -> [I.graft graft])
+
+  let prune ~gen_peer ~gen_topic ~gen_backoff ~gen_px_count : t =
+    of_input_gen
+      (prune ~gen_peer ~gen_topic ~gen_backoff ~gen_px_count)
+      (fun prune -> [I.prune prune])
+
   let receive_message ~gen_peer ~gen_topic ~gen_message_id ~gen_message : t =
     of_input_gen
       (receive_message ~gen_peer ~gen_topic ~gen_message_id ~gen_message)
@@ -85,6 +93,12 @@ module Basic_fragments = struct
     of_input_gen
       (publish_message ~gen_topic ~gen_message_id ~gen_message)
       (fun publish_message -> [I.publish_message publish_message])
+
+  let set_application_score ~gen_peer ~gen_score : t =
+    of_input_gen
+      (set_application_score ~gen_peer ~gen_score)
+      (fun set_application_score ->
+        [I.set_application_score set_application_score])
 
   (** [add_distinct_peers_and_subscribe ~all_peers ~gen_direct ~gen_outbound ~topics_to_subscribe]
       returns [add_peer] inputs for peers [all_peers] using generators [gen_direct] and [gen_outbound]
@@ -1525,9 +1539,294 @@ module Test_opportunistic_grafting = struct
     unit
 end
 
+(** Check that when handling Grafts:
+    1. If we have not joined the grafted topic,
+       we don't add the peer to our mesh and backoff the peer.
+    2. If the peer is a direct peer,
+       we don't add the peer to our mesh and backoff the peer.
+    3. If the peer is backed off,
+       we don't add the peer to our mesh and backoff the peer.
+    4. If the peer has a negative score,
+       we don't add the peer to our mesh and backoff the peer.
+    5. If mesh if full and the peer is not an outbound connection,
+       we don't add the peer to our mesh and backoff the peer.
+
+    Furthermore, when backing off a peer, the backoff should be updated to
+    [time + prune_backoff]. This update should occur only if the
+    new backoff duration is longer than the existing backoff period. *)
+module Test_handle_graft = struct
+  open Gossipsub_pbt_generators
+
+  let pp_state fmtr state =
+    let v = GS.Introspection.view state in
+    Fmt.Dump.record
+      Fmt.Dump.
+        [
+          field
+            "mesh"
+            (fun v -> v.GS.Introspection.mesh)
+            GS.Introspection.(pp_topic_map pp_peer_set);
+          field
+            "backoff"
+            (fun v -> v.GS.Introspection.backoff)
+            GS.Introspection.(pp_topic_map (pp_peer_map Milliseconds.pp));
+          field
+            "scores"
+            (fun v -> Peer.Map.map GS.Score.value v.GS.Introspection.scores)
+            GS.Introspection.pp_scores;
+        ]
+      fmtr
+      v
+
+  let predicate {degree_high; prune_backoff; _}
+      (Transition {time; input; state; state'; output} : transition) () =
+    let open Result_syntax in
+    match input with
+    | Graft {peer; topic} ->
+        let view = GS.Introspection.view state in
+        let view' = GS.Introspection.view state' in
+        let in_mesh_before = GS.Introspection.in_mesh topic peer view in
+        if in_mesh_before then return_unit
+        else
+          let in_mesh_after = GS.Introspection.in_mesh topic peer view' in
+          let backoff_before =
+            GS.Introspection.get_peer_backoff topic peer view
+          in
+          let backoff_after =
+            GS.Introspection.get_peer_backoff topic peer view'
+          in
+          let graft_succeeded = ref true in
+          let check_graft_failure_and_backoff ~expect_fail ~failure
+              ~expected_output =
+            if not expect_fail then return_unit
+            else
+              let graft_succeeded_before_check = !graft_succeeded in
+              graft_succeeded := false ;
+              if in_mesh_after then fail failure
+              else
+                (* When backing off a peer, the backoff should be updated to
+                   [time + prune_backoff]. This update should occur only if the
+                   new backoff duration is longer than the existing backoff period. *)
+                let expected_backoff =
+                  match backoff_before with
+                  | None -> Some (Milliseconds.add time prune_backoff)
+                  | Some backoff ->
+                      Some Milliseconds.(max (add time prune_backoff) backoff)
+                in
+                if
+                  not
+                  @@ Option.equal
+                       Milliseconds.equal
+                       backoff_after
+                       expected_backoff
+                then
+                  fail
+                  @@ `not_expected_backoff
+                       (peer, backoff_after, expected_backoff)
+                else if
+                  (* Polymorphic compare should work well enough as
+                     none of the variant constructors have arguments. *)
+                  expected_output != output
+                  && (* Only check the output if this is the
+                        first matched failure case. *)
+                  graft_succeeded_before_check
+                then fail @@ `not_expected_output (O output, O expected_output)
+                else return_unit
+          in
+          (* 1. If we have not joined the grafted topic,
+                we don't add the peer to our mesh and backoff the peer. *)
+          let* () =
+            check_graft_failure_and_backoff
+              ~expect_fail:(not @@ GS.Introspection.has_joined topic view)
+              ~failure:(`not_joined topic)
+              ~expected_output:Unsubscribed_topic
+          in
+          (* 2. If the peer is a direct peer,
+                we don't add the peer to our mesh and backoff the peer. *)
+          let* () =
+            check_graft_failure_and_backoff
+              ~expect_fail:(GS.Introspection.is_direct peer view)
+              ~failure:(`direct_peer peer)
+              ~expected_output:Grafting_direct_peer
+          in
+          (* 3. If the peer is backed off,
+                we don't add the peer to our mesh and backoff the peer. *)
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/5793
+
+             Add checks for the penalty (via p7) when peers flood us with grafts. *)
+          let has_unexpired_backoff_before =
+            match backoff_before with
+            | None -> false
+            | Some backoff_time -> Milliseconds.(time < backoff_time)
+          in
+          let* () =
+            check_graft_failure_and_backoff
+              ~expect_fail:has_unexpired_backoff_before
+              ~failure:(`backed_off peer)
+              ~expected_output:Peer_backed_off
+          in
+          (* 4. If the peer has a negative score,
+                we don't add the peer to our mesh and backoff the peer. *)
+          let* () =
+            let score = GS.Introspection.get_peer_score peer view in
+            check_graft_failure_and_backoff
+              ~expect_fail:GS.Score.(score < zero)
+              ~failure:(`negative_score (peer, score))
+              ~expected_output:Grafting_peer_with_negative_score
+          in
+          (* 5. If mesh if full and the peer is not an outbound connection,
+                we don't add the peer to our mesh and backoff the peer. *)
+          let* () =
+            let topic_mesh_size =
+              List.length @@ GS.Introspection.get_peers_in_topic_mesh topic view
+            in
+            let is_peer_outbound = GS.Introspection.is_outbound peer view in
+            check_graft_failure_and_backoff
+              ~expect_fail:
+                (topic_mesh_size >= degree_high && not is_peer_outbound)
+              ~failure:(`mesh_full (topic_mesh_size, degree_high))
+              ~expected_output:Mesh_full
+          in
+          if !graft_succeeded then
+            if not in_mesh_after then fail `expected_peer_added_to_mesh
+            else if GS.Grafting_successfully != output then
+              fail @@ `not_expected_output (O output, O Grafting_successfully)
+            else return_unit
+          else return_unit
+    | _ -> return_unit
+
+  let test rng _limits parameters =
+    Tezt_core.Test.register
+      ~__FILE__
+      ~title:"Gossipsub: Handle Grafts"
+      ~tags:["gossipsub"; "graft"]
+    @@ fun () ->
+    let scenario =
+      let open M in
+      let* limits =
+        return
+          (Default_limits.default_limits
+           (* This effectively disables P3. If we don't do this,
+              all peers will have negative scores after a few heartbeats. *)
+             ~mesh_message_deliveries_weight:0.0
+             ())
+      in
+      let state = GS.make rng limits parameters in
+      let* scenario =
+        let open Fragment in
+        let open Basic_fragments in
+        let open M in
+        let+ peer_count = M.int_range 1 50 in
+        let all_peers = range 0 peer_count in
+        let gen_peer = M.oneofl all_peers in
+        let joined_topics =
+          ["topicA"; "topicB"; "topicC"; "topicD"; "topicE"]
+        in
+        let not_joined_topics = ["topicF"] in
+        let all_topics = joined_topics @ not_joined_topics in
+        let gen_topic = M.oneofl all_topics in
+        let gen_backoff =
+          let* seconds = M.int_range 1 100 in
+          return @@ GS.Span.of_int_s seconds
+        in
+        let gen_px_count = M.int_range 1 10 in
+        let gen_message_id = M.int_range 1 50 in
+        let gen_message = M.string in
+        of_list (List.map (fun topic -> I.join {topic}) joined_topics)
+        @% add_distinct_peers_and_subscribe
+             ~all_peers
+             ~topics_to_subscribe:all_topics
+             ~gen_outbound:M.bool
+             ~gen_direct:(M.return false)
+        @% interleave
+             [
+               repeat_at_most 100 (heartbeat @% tick);
+               repeat_at_most 30 (graft ~gen_peer ~gen_topic);
+               repeat_at_most
+                 30
+                 (prune ~gen_peer ~gen_topic ~gen_backoff ~gen_px_count);
+               repeat_at_most
+                 30
+                 (receive_message
+                    ~gen_peer
+                    ~gen_topic
+                    ~gen_message_id
+                    ~gen_message);
+               (* Use [set_application_score] to introduce
+                  some peers with negative scores. *)
+               repeat_at_most
+                 5
+                 (set_application_score ~gen_peer ~gen_score:(return (-10.0)));
+             ]
+      in
+      let+ trace = run state scenario in
+      (trace, limits)
+    in
+    let test =
+      QCheck2.Test.make ~count:100 ~name:"Gossipsub: Handle Grafts" scenario
+      @@ fun (trace, limits) ->
+      match check_fold (predicate limits) () trace with
+      | Ok () -> true
+      | Error (e, prefix) ->
+          let msg =
+            match e with
+            | `not_joined topic ->
+                Format.asprintf
+                  "Grafting for unsubscribed topic %a should fail."
+                  Topic.pp
+                  topic
+            | `backed_off peer ->
+                Format.asprintf
+                  "Grafting a backed off peer %a should fail."
+                  Peer.pp
+                  peer
+            | `negative_score (peer, score) ->
+                Format.asprintf
+                  "Grafting peer %a with negative socre %a should fail."
+                  Peer.pp
+                  peer
+                  GS.Score.pp_value
+                  score
+            | `direct_peer peer ->
+                Format.asprintf
+                  "Grafting direct peer %a should fail."
+                  GS.Peer.pp
+                  peer
+            | `not_expected_backoff (peer, actual_backoff, expected_backoff) ->
+                Format.asprintf
+                  "Expected backoff for peer %a is %a, got %a."
+                  GS.Peer.pp
+                  peer
+                  (Fmt.option Milliseconds.pp)
+                  expected_backoff
+                  (Fmt.option Milliseconds.pp)
+                  actual_backoff
+            | `not_expected_output (output, expected_output) ->
+                Format.asprintf
+                  "Expected output is %a, got %a."
+                  pp_output
+                  expected_output
+                  pp_output
+                  output
+            | `mesh_full (mesh_size, max_mesh_size) ->
+                Format.asprintf
+                  "Expected for graft to fail as mesh size %d exceeds max mesh \
+                   size %d."
+                  mesh_size
+                  max_mesh_size
+            | `expected_peer_added_to_mesh ->
+                "Expected the peer to be added to the mesh."
+          in
+          dump_trace_and_fail prefix limits pp_state msg
+    in
+    QCheck2.Test.check_exn ~rand:rng test ;
+    unit
+end
+
 let register rng limits parameters =
   Test_remove_peer.test rng limits parameters ;
   Test_message_cache.test rng ;
   Test_peers_below_degree_high.test rng limits parameters ;
   Test_handle_ihave.test rng limits parameters ;
-  Test_opportunistic_grafting.test rng limits parameters
+  Test_opportunistic_grafting.test rng limits parameters ;
+  Test_handle_graft.test rng limits parameters

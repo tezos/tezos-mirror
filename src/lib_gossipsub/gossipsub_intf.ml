@@ -930,12 +930,27 @@ module type AUTOMATON = sig
         the number of IWants sent to [peer] since the last heartbeat. *)
     val get_peer_iwant_per_heartbeat : Peer.t -> view -> int
 
+    (** [get_peer_backoff topic peer view] returns the backoff time of [peer] for [topic].
+        Returns [None] if the peer is not backoffed for [topic]. *)
+    val get_peer_backoff : Topic.t -> Peer.t -> view -> Time.t option
+
     val limits : view -> limits
 
     (** [has_joined topic view] returns true if and only if the automaton is
         currently tracking messages for [topic]. That is, the local peer has joined
         and hasn't left the [topic]. *)
     val has_joined : Topic.t -> view -> bool
+
+    (** [in_mesh peer topic view] returns true if and only if [peer] is
+        in the mesh of [topic]. *)
+    val in_mesh : Topic.t -> Peer.t -> view -> bool
+
+    (** [is_direct peer view] returns true if and only if [peer] is a direct peer. *)
+    val is_direct : Peer.t -> view -> bool
+
+    (** [is_outbound peer view] returns true if and only if
+        [peer] has an outbound connection. *)
+    val is_outbound : Peer.t -> view -> bool
 
     val pp_connection : connection Fmt.t
 
