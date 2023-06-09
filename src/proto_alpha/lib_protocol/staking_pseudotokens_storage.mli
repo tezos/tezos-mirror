@@ -27,12 +27,26 @@
     {!Storage.Contract.Frozen_deposits_pseudotokens} and
     {!Storage.Contract.Costaking_pseudotokens} tables. *)
 
-(** [init_frozen_deposits_pseudotokens_from_frozen_deposits_balance ctxt contract]
-    initializes [contract]'s frozen deposits pseudotokens usings [contract]'s
-    current frozen deposits tez.
+(* Invariant: all delegates with non-zero frozen deposits tez have their
+   frozen deposits pseudotokens initialized.
+
+   It is ensured by:
+     - [init_delegate_pseudotokens_from_frozen_deposits_balance] called
+       for bootstrap accounts and at stitching to protocol O;
+     - stake correctly handles missing pseudotokens and offers a 1:1
+       tez/pseudotoken rate fallback;
+     - frozen deposits can be initialized only by:
+       - stake,
+       - rewards, but rewards can be paid only if a delegate has a non-zero
+         stake, hence has staked before. *)
+
+(** [init_delegate_pseudotokens_from_frozen_deposits_balance ctxt contract]
+    initializes [contract]'s frozen deposits pseudotokens and costaking
+    pseudotokens usings [contract]'s current frozen deposits tez.
+
     This function must be called whenever a contract's frozen deposits tez are
-    initialized. *)
-val init_frozen_deposits_pseudotokens_from_frozen_deposits_balance :
+    initialized (see invariant above). *)
+val init_delegate_pseudotokens_from_frozen_deposits_balance :
   Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
 
 (** [frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount]

@@ -151,8 +151,9 @@ let initialize_total_supply_for_o ctxt =
     ctxt
     (Tez_repr.of_mutez_exn 940_000_000_000_000L)
 
-(** Initializes frozen deposits pseudotokens for all existing delegates. *)
-let init_delegates_frozen_deposits_pseudotokens_for_o ctxt =
+(** Initializes frozen deposits pseudotokens and costaking pseudotokens for all
+    existing delegates. *)
+let init_delegates_pseudotokens_for_o ctxt =
   Delegate_storage.fold
     ctxt
     ~order:`Undefined
@@ -161,7 +162,7 @@ let init_delegates_frozen_deposits_pseudotokens_for_o ctxt =
       let open Lwt_result_syntax in
       let*? ctxt in
       Staking_pseudotokens_storage
-      .init_frozen_deposits_pseudotokens_from_frozen_deposits_balance
+      .init_delegate_pseudotokens_from_frozen_deposits_balance
         ctxt
         (Contract_repr.Implicit delegate))
 
@@ -284,8 +285,7 @@ let prepare_first_block _chain_id ctxt ~typecheck_smart_contract
       >>= fun ctxt ->
       migrate_liquidity_baking_ema ctxt >>=? fun ctxt ->
       Adaptive_inflation_storage.init_ema ctxt >>=? fun ctxt ->
-      init_delegates_frozen_deposits_pseudotokens_for_o ctxt >>=? fun ctxt ->
-      return (ctxt, []))
+      init_delegates_pseudotokens_for_o ctxt >>=? fun ctxt -> return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   List.fold_left_es patch_script ctxt Legacy_script_patches.addresses_to_patch
   >>=? fun ctxt ->

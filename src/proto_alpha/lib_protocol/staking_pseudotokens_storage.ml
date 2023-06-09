@@ -23,9 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let init_frozen_deposits_pseudotokens_from_frozen_deposits_tez ctxt contract
-    ~frozen_deposits_tez =
+let init_delegate_pseudotokens_from_frozen_deposits_balance ctxt contract =
   let open Lwt_result_syntax in
+  let* {current_amount = frozen_deposits_tez; initial_amount = _} =
+    Frozen_deposits_storage.get ctxt contract
+  in
   let initial_pseudotokens =
     Staking_pseudotoken_repr.of_int64_exn
       (Tez_repr.to_mutez frozen_deposits_tez)
@@ -36,44 +38,10 @@ let init_frozen_deposits_pseudotokens_from_frozen_deposits_tez ctxt contract
       contract
       initial_pseudotokens
   in
-  let+ ctxt =
-    Storage.Contract.Costaking_pseudotokens.init
-      ctxt
-      contract
-      initial_pseudotokens
-  in
-  (ctxt, initial_pseudotokens)
-
-let init_frozen_deposits_pseudotokens_from_frozen_deposits_balance ctxt contract
-    =
-  let open Lwt_result_syntax in
-  let* {current_amount = frozen_deposits_tez; initial_amount = _} =
-    Frozen_deposits_storage.get ctxt contract
-  in
-  let+ ctxt, _pseudotokens =
-    init_frozen_deposits_pseudotokens_from_frozen_deposits_tez
-      ctxt
-      contract
-      ~frozen_deposits_tez
-  in
-  ctxt
-
-(** Avoids a stitching.
-    Initializes contract's pseudotokens so that 1 pseudotoken = 1 mutez. *)
-let get_or_init_frozen_deposits_pseudotokens ctxt contract ~frozen_deposits_tez
-    =
-  let open Lwt_result_syntax in
-  let* frozen_deposits_pseudotokens_opt =
-    Storage.Contract.Frozen_deposits_pseudotokens.find ctxt contract
-  in
-  match frozen_deposits_pseudotokens_opt with
-  | None ->
-      init_frozen_deposits_pseudotokens_from_frozen_deposits_tez
-        ctxt
-        contract
-        ~frozen_deposits_tez
-  | Some frozen_deposits_pseudotokens ->
-      return (ctxt, frozen_deposits_pseudotokens)
+  Storage.Contract.Costaking_pseudotokens.init
+    ctxt
+    contract
+    initial_pseudotokens
 
 let pseudotokens_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
     ~tez_amount =
@@ -147,19 +115,19 @@ let update_frozen_deposits_pseudotokens ~f ctxt delegate =
   let* {current_amount = frozen_deposits_tez; initial_amount = _} =
     Frozen_deposits_storage.get ctxt contract
   in
-  let* ctxt, frozen_deposits_pseudotokens =
-    get_or_init_frozen_deposits_pseudotokens ctxt contract ~frozen_deposits_tez
+  let* frozen_deposits_pseudotokens =
+    get_frozen_deposits_pseudotokens ctxt contract ~frozen_deposits_tez
   in
   let*? new_frozen_deposits_pseudotokens, x =
     f ~frozen_deposits_pseudotokens ~frozen_deposits_tez
   in
-  let+ ctxt =
-    Storage.Contract.Frozen_deposits_pseudotokens.update
+  let*! ctxt =
+    Storage.Contract.Frozen_deposits_pseudotokens.add
       ctxt
       contract
       new_frozen_deposits_pseudotokens
   in
-  (ctxt, x)
+  return (ctxt, x)
 
 let credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount
     =
