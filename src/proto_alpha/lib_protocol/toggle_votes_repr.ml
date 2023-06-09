@@ -94,7 +94,19 @@ module Liquidity_baking_toggle_EMA = Toggle_EMA.Make (struct
 end)
 
 module Adaptive_inflation_launch_EMA = Toggle_EMA.Make (struct
-  let baker_contribution = Z.of_int 500_000
+  (* The baker_contribution parameter of the adaptive inflation
+     activation vote was chosen so that 2 weeks are needed to move
+     the EMA from 0% to 50% when all bakers vote On.
+
+     This was computed using the following formula:
+
+     baker_contrib = (1/2) * ema_max * (1 - 2^(-1/k))
+
+     where k is the number of blocks in 2 weeks (which is 80640).
+
+     Because of a small accumulation of rounding errors, two more
+     blocks are actually needed. *)
+  let baker_contribution = Z.of_int 8595
 
   let ema_max = 2_000_000_000l
 end)
