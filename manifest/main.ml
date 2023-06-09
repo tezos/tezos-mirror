@@ -99,7 +99,8 @@ let caqti_dynload = external_lib "caqti-dynload" V.True
 
 let cmdliner = external_lib "cmdliner" V.(at_least "1.1.0")
 
-let cohttp_lwt_unix = external_lib "cohttp-lwt-unix" V.(at_least "4.0.0")
+let cohttp_lwt_unix =
+  external_lib "cohttp-lwt-unix" V.(at_least "4.0.0" && different_from "5.1.0")
 
 let compiler_libs_common = external_lib "compiler-libs.common" V.True ~opam:""
 
@@ -3302,6 +3303,7 @@ let octez_rpc_http_server =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_stdlib_unix |> open_;
+        cohttp_lwt_unix;
         resto_cohttp_server;
         resto_acl;
         octez_rpc;
