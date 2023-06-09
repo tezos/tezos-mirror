@@ -23,6 +23,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let init_frozen_deposits_pseudotokens_from_frozen_deposits_tez ctxt contract
+    ~frozen_deposits_tez =
+  let open Lwt_result_syntax in
+  let initial_pseudotokens =
+    Staking_pseudotoken_repr.of_int64_exn
+      (Tez_repr.to_mutez frozen_deposits_tez)
+  in
+  let+ ctxt =
+    Storage.Contract.Frozen_deposits_pseudotokens.init
+      ctxt
+      contract
+      initial_pseudotokens
+  in
+  (ctxt, initial_pseudotokens)
+
+let init_frozen_deposits_pseudotokens_from_frozen_deposits_balance ctxt contract
+    =
+  let open Lwt_result_syntax in
+  let* {current_amount = frozen_deposits_tez; initial_amount = _} =
+    Frozen_deposits_storage.get ctxt contract
+  in
+  let+ ctxt, _pseudotokens =
+    init_frozen_deposits_pseudotokens_from_frozen_deposits_tez
+      ctxt
+      contract
+      ~frozen_deposits_tez
+  in
+  ctxt
+
 (** Avoids a stitching.
     Initializes contract's pseudotokens so that 1 pseudotoken = 1 mutez. *)
 let get_or_init_frozen_deposits_pseudotokens ctxt contract ~frozen_deposits_tez
@@ -33,17 +62,10 @@ let get_or_init_frozen_deposits_pseudotokens ctxt contract ~frozen_deposits_tez
   in
   match frozen_deposits_pseudotokens_opt with
   | None ->
-      let initial_pseudotokens =
-        Staking_pseudotoken_repr.of_int64_exn
-          (Tez_repr.to_mutez frozen_deposits_tez)
-      in
-      let+ ctxt =
-        Storage.Contract.Frozen_deposits_pseudotokens.init
-          ctxt
-          contract
-          initial_pseudotokens
-      in
-      (ctxt, initial_pseudotokens)
+      init_frozen_deposits_pseudotokens_from_frozen_deposits_tez
+        ctxt
+        contract
+        ~frozen_deposits_tez
   | Some frozen_deposits_pseudotokens ->
       return (ctxt, frozen_deposits_pseudotokens)
 
