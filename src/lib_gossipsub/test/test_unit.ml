@@ -2159,6 +2159,39 @@ let test_scoring_p4 rng _limits parameters =
   Validity_hook.set validity_function_before ;
   unit
 
+(** Test for P5 (Application-Specific).
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L4049 *)
+let test_scoring_p5 rng _limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Scoring P5"
+    ~tags:["gossipsub"; "scoring"; "p5"]
+  @@ fun () ->
+  let app_specific_weight = 2.0 in
+  let limits = Default_limits.default_limits ~app_specific_weight () in
+  let peers = make_peers ~number:1 in
+  let peer = Stdlib.List.hd peers in
+  let topic = "topic" in
+  (* build mesh with one peer *)
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  let state, _ = GS.set_application_score {peer; score = 1.1} state in
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:(app_specific_weight *. 1.1)
+    peer
+    state ;
+  unit
+
 (** Test for P7 (Behavioural Penalty - Grafts before backoff).
 
     Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L4203 *)
@@ -2290,4 +2323,5 @@ let register rng limits parameters =
   test_scoring_p1 rng limits parameters ;
   test_scoring_p2 rng limits parameters ;
   test_scoring_p4 rng limits parameters ;
+  test_scoring_p5 rng limits parameters ;
   test_scoring_p7_grafts_before_backoff rng limits parameters
