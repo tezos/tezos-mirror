@@ -1465,26 +1465,10 @@ module Display_info_cmd = struct
     let bold_title = Format.asprintf "\027[0;1;4m%s\027[m" title in
     normal_block fmt bold_title
 
-  let pp_abstract_model fmt (Model.Model m) =
-    let module M = (val m) in
-    Format.fprintf fmt "%a" Namespace.pp M.name
-
-  let pp_model fmt = function
-    | Model.Aggregate {sub_models; _} ->
-        normal_block
-          fmt
-          "Aggregated model containing the following abstract models"
-          (Format.pp_print_list pp_abstract_model)
-          sub_models
-    | Model.Abstract {model; _} ->
-        normal_block
-          fmt
-          "Abstract model. Name"
-          pp_abstract_model
-          (Model.Model model)
+  let pp_model = Model.pp
 
   let pp_model_bench fmt (local_name, model) =
-    normal_block fmt local_name pp_model model
+    Format.fprintf fmt "@[<v2>%s:@;%a@]" local_name pp_model model
 
   let pp_models () = Format.pp_print_list pp_model_bench
 
@@ -1543,6 +1527,11 @@ module Display_info_cmd = struct
     Format.printf "@.%a@." pp_fancy_benchmark b ;
     Lwt.return_ok ()
 
+  let display_all_benchmarks_handler () () =
+    List.iter (fun (_n, b) -> Format.printf "%a@." Benchmark.pp b)
+    @@ Registration.all_benchmarks () ;
+    Lwt.return_ok ()
+
   let display_model_handler () s () =
     let s = Namespace.of_string s in
     let {Registration.model = Model.Model m; from = l} =
@@ -1569,6 +1558,9 @@ module Display_info_cmd = struct
     Tezos_clic.(
       params_prefix @@ prefix "benchmark" @@ List_cmd.benchmark_param () @@ stop)
 
+  let display_all_benchmarks_params =
+    Tezos_clic.fixed ["display"; "info"; "for"; "all"; "benchmarks"]
+
   let display_model_params =
     Tezos_clic.(
       params_prefix @@ prefix "model" @@ List_cmd.model_param () @@ stop)
@@ -1590,6 +1582,14 @@ module Display_info_cmd = struct
       options
       display_benchmark_params
       display_benchmark_handler
+
+  let command_all_benchmarks =
+    Tezos_clic.command
+      ~group
+      ~desc:"Display detailed information on all the benchmarks"
+      options
+      display_all_benchmarks_params
+      display_all_benchmarks_handler
 
   let command_model =
     Tezos_clic.command
@@ -1616,7 +1616,13 @@ module Display_info_cmd = struct
       display_parameter_handler
 
   let commands =
-    [command_benchmark; command_model; command_parameter; command_local_model]
+    [
+      command_benchmark;
+      command_all_benchmarks;
+      command_model;
+      command_parameter;
+      command_local_model;
+    ]
 end
 
 let all_commands =

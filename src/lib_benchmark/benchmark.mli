@@ -88,6 +88,8 @@ end
 
 type t = (module S)
 
+val pp : Format.formatter -> t -> unit
+
 type ('cfg, 'workload) poly =
   (module S with type config = 'cfg and type workload = 'workload)
 

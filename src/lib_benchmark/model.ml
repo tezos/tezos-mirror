@@ -89,15 +89,15 @@ type _ t =
 let pp_packed_model ppf (Model model) =
   let module Model = (val model) in
   let module Pp = Model.Def (Costlang.Pp) in
-  Format.fprintf ppf "@[<2>%a:@ %s@]" Namespace.pp Model.name Pp.model
+  Format.fprintf ppf "@[<v2>%a:@ %s@]" Namespace.pp Model.name Pp.model
 
 let pp ppf = function
   | Abstract {model; _} ->
-      Format.fprintf ppf "@[<2>Abstract@ %a@]" pp_packed_model (Model model)
+      Format.fprintf ppf "@[<v2>Abstract@ %a@]" pp_packed_model (Model model)
   | Aggregate {sub_models; _} ->
       Format.fprintf
         ppf
-        "@[<2>Aggregate@ @[%a@]@]"
+        "@[<v2>Aggregate with submodels:@ @[%a@]@]"
         (Format.pp_print_list pp_packed_model)
         sub_models
 
