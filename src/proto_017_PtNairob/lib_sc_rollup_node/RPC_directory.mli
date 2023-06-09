@@ -1,7 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -24,4 +23,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Daemon_components.RPC_server_sig
+(** The RPC directory for this rollup node. *)
+val directory : Node_context.rw -> unit Tezos_rpc.Directory.t
