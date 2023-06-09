@@ -44,6 +44,7 @@ type error +=
   | Invalid_sender of Destination.t
   | Invalid_self_transaction_destination
   | Staking_for_nondelegate_while_costaking_disabled
+  | Staking_to_delegate_that_refuses_costaking
   | Invalid_nonzero_transaction_amount of Tez.t
   | Invalid_unstake_request_amount of {requested_amount : Z.t}
   | Invalid_staking_parameters_sender
@@ -239,6 +240,23 @@ let () =
     (function
       | Staking_for_nondelegate_while_costaking_disabled -> Some () | _ -> None)
     (fun () -> Staking_for_nondelegate_while_costaking_disabled) ;
+  let staking_to_delegate_that_refuses_costaking_description =
+    "The delegate currently does not accept staking operations from sources \
+     other than itself: its `staking_over_baking_limit` parameter is set to 0."
+  in
+  register_error_kind
+    `Permanent
+    ~id:"operations.staking_to_delegate_that_refuses_costaking"
+    ~title:"Staking to delegate that does not accept external staking"
+    ~description:staking_to_delegate_that_refuses_costaking_description
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        staking_to_delegate_that_refuses_costaking_description)
+    Data_encoding.unit
+    (function
+      | Staking_to_delegate_that_refuses_costaking -> Some () | _ -> None)
+    (fun () -> Staking_to_delegate_that_refuses_costaking) ;
   register_error_kind
     `Permanent
     ~id:"operations.invalid_nonzero_transaction_amount"
@@ -352,6 +370,16 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
       in
       let*? () =
         error_unless allowed Staking_for_nondelegate_while_costaking_disabled
+      in
+      let* {staking_over_baking_limit; _} =
+        Delegate.Staking_parameters.of_delegate ctxt delegate
+      in
+      let forbidden =
+        Signature.Public_key_hash.(delegate <> sender)
+        && Compare.Int32.(staking_over_baking_limit = 0l)
+      in
+      let*? () =
+        error_when forbidden Staking_to_delegate_that_refuses_costaking
       in
       let* ctxt, balance_updates =
         Staking.stake ctxt ~sender ~delegate amount

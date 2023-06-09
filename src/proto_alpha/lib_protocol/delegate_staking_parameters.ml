@@ -24,7 +24,15 @@
 (*****************************************************************************)
 
 let of_delegate ctxt delegate =
-  Storage.Contract.Staking_parameters.get ctxt (Contract_repr.Implicit delegate)
+  let open Lwt_result_syntax in
+  let* t =
+    Storage.Contract.Staking_parameters.find
+      ctxt
+      (Contract_repr.Implicit delegate)
+  in
+  match t with
+  | None -> return Staking_parameters_repr.default
+  | Some t -> return t
 
 let raw_pending_updates ctxt delegate =
   Storage.Contract.Pending_staking_parameters.bindings

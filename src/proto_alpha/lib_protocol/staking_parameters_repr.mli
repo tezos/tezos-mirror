@@ -28,6 +28,9 @@ type t = private {
   baking_over_staking_edge : int32; (* as a portion of 1_000_000_000 *)
 }
 
+(** Value used when unset *)
+val default : t
+
 type error += Invalid_staking_parameters
 
 val make :
