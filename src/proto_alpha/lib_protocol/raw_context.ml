@@ -389,6 +389,9 @@ let[@inline] update_reward_coeff_for_current_cycle ctxt
     reward_coeff_for_current_cycle =
   update_back ctxt {ctxt.back with reward_coeff_for_current_cycle}
 
+let[@inline] set_adaptive_inflation_enable ctxt =
+  update_back ctxt {ctxt.back with adaptive_inflation_enable = true}
+
 type error += Too_many_internal_operations (* `Permanent *)
 
 type error += Block_quota_exceeded (* `Temporary *)

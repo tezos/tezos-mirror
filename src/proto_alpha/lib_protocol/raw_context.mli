@@ -301,6 +301,9 @@ val update_reward_coeff_for_current_cycle : t -> Q.t -> t
 (** Returns true if adaptive inflation has launched. *)
 val adaptive_inflation_enable : t -> bool
 
+(** Set the feature flag of adaptive inflation. *)
+val set_adaptive_inflation_enable : t -> t
+
 module Internal_for_tests : sig
   val add_level : t -> int -> t
 
