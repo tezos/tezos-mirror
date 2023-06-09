@@ -318,8 +318,12 @@ let update_script_storage_and_ticket_balances ctxt ~self_contract storage
     operations
 
 let apply_delegation ~ctxt ~sender ~delegate ~before_operation =
-  Contract.Delegate.set ctxt sender delegate >|=? fun ctxt ->
-  (ctxt, Gas.consumed ~since:before_operation ~until:ctxt, [])
+  let open Lwt_result_syntax in
+  let* ctxt, balance_updates =
+    Staking.request_full_unstake ctxt ~sender_contract:sender
+  in
+  let+ ctxt = Contract.Delegate.set ctxt sender delegate in
+  (ctxt, Gas.consumed ~since:before_operation ~until:ctxt, balance_updates, [])
 
 type 'loc execution_arg =
   | Typed_arg : 'loc * ('a, _) Script_typed_ir.ty * 'a -> 'loc execution_arg
@@ -901,8 +905,8 @@ let apply_internal_operation_contents :
   | Delegation delegate ->
       assert_sender_is_contract sender >>?= fun sender ->
       apply_delegation ~ctxt ~sender ~delegate ~before_operation:ctxt_before_op
-      >|=? fun (ctxt, consumed_gas, ops) ->
-      (ctxt, IDelegation_result {consumed_gas}, ops)
+      >|=? fun (ctxt, consumed_gas, balance_updates, ops) ->
+      (ctxt, IDelegation_result {consumed_gas; balance_updates}, ops)
 
 let apply_manager_operation :
     type kind.
@@ -1201,8 +1205,8 @@ let apply_manager_operation :
         ~sender:source_contract
         ~delegate
         ~before_operation:ctxt_before_op
-      >|=? fun (ctxt, consumed_gas, ops) ->
-      (ctxt, Delegation_result {consumed_gas}, ops)
+      >|=? fun (ctxt, consumed_gas, balance_updates, ops) ->
+      (ctxt, Delegation_result {consumed_gas; balance_updates}, ops)
   | Register_global_constant {value} ->
       (* Decode the value and consume gas appropriately *)
       Script.force_decode_in_context ~consume_deserialization_gas ctxt value

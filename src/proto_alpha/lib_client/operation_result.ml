@@ -737,7 +737,9 @@ let pp_manager_operation_contents_result ppf op_result =
       (result : kind successful_manager_operation_result) =
     match result with
     | Reveal_result {consumed_gas} -> pp_consumed_gas ppf consumed_gas
-    | Delegation_result {consumed_gas} -> pp_consumed_gas ppf consumed_gas
+    | Delegation_result {consumed_gas; balance_updates} ->
+        pp_consumed_gas ppf consumed_gas ;
+        pp_balance_updates ppf balance_updates
     | Update_consensus_key_result {consumed_gas} ->
         pp_consumed_gas ppf consumed_gas
     | Transaction_result tx -> pp_transaction_result ppf tx
@@ -782,8 +784,10 @@ let pp_internal_operation_and_result ppf (Internal_operation_result (op, res)) =
     match result with
     | ITransaction_result tx -> pp_transaction_result ppf tx
     | IOrigination_result op_res -> pp_origination_result ppf op_res
-    | IDelegation_result {consumed_gas} | IEvent_result {consumed_gas} ->
-        pp_consumed_gas ppf consumed_gas
+    | IDelegation_result {consumed_gas; balance_updates} ->
+        pp_consumed_gas ppf consumed_gas ;
+        pp_balance_updates ppf balance_updates
+    | IEvent_result {consumed_gas} -> pp_consumed_gas ppf consumed_gas
   in
   Format.fprintf
     ppf

@@ -928,16 +928,16 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
             fun (Successful_manager_result r) ->
               match r with
               | Transaction_result (Transaction_to_sc_rollup_result _)
-              | Reveal_result _ | Delegation_result _
-              | Update_consensus_key_result _ | Transfer_ticket_result _
-              | Dal_publish_slot_header_result _ | Sc_rollup_originate_result _
-              | Sc_rollup_add_messages_result _ | Sc_rollup_cement_result _
-              | Sc_rollup_publish_result _ | Sc_rollup_refute_result _
-              | Sc_rollup_timeout_result _
+              | Reveal_result _ | Update_consensus_key_result _
+              | Transfer_ticket_result _ | Dal_publish_slot_header_result _
+              | Sc_rollup_originate_result _ | Sc_rollup_add_messages_result _
+              | Sc_rollup_cement_result _ | Sc_rollup_publish_result _
+              | Sc_rollup_refute_result _ | Sc_rollup_timeout_result _
               | Sc_rollup_execute_outbox_message_result _
               | Sc_rollup_recover_bond_result _ | Zk_rollup_origination_result _
               | Zk_rollup_publish_result _ | Zk_rollup_update_result _ ->
                   balance_updates_rev
+              | Delegation_result {balance_updates; _}
               | Transaction_result
                   ( Transaction_to_contract_result {balance_updates; _}
                   | Transaction_to_zk_rollup_result {balance_updates; _} )
