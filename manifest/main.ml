@@ -4131,6 +4131,8 @@ let octez_smart_rollup_node_lib =
         cohttp_lwt_unix;
         octez_node_config;
         prometheus_app;
+        octez_dal_node_lib |> open_;
+        octez_dac_client_lib |> open_;
         octez_injector |> open_;
         octez_version_value |> open_;
         octez_layer2_store |> open_;
