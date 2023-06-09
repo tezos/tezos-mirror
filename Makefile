@@ -91,7 +91,7 @@ endif
 # This is more efficient than 'make octez-node octez-client'
 # because it only calls 'dune' once.
 #
-# Targets 'all', 'release', 'experimental-release' and 'static' define different
+# Targets 'all', 'release', 'experimental-release', 'static' and 'all-extras' define different
 # default lists of executables to build but they all can be overridden from the command-line.
 .PHONY: all
 all:
@@ -104,6 +104,13 @@ release:
 .PHONY: experimental-release
 experimental-release:
 	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES)"
+
+# all-extras is targetted by the CI build jobs 'x86_64' and 'arm64',
+# and builds test executables in addition to the default set of
+# executables.
+.PHONY: all-extras
+all-extras:
+	@$(MAKE) all BUILD_EXTRA="src/bin_tps_evaluation tezt/tests/main.exe"
 
 .PHONY: strip
 strip: all
