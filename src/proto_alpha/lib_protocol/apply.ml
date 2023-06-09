@@ -317,10 +317,19 @@ let update_script_storage_and_ticket_balances ctxt ~self_contract storage
     ~ticket_diffs
     operations
 
-let apply_delegation ~ctxt ~sender ~delegate ~before_operation =
+let apply_delegation ~ctxt ~(sender : Contract.t) ~delegate ~before_operation =
   let open Lwt_result_syntax in
   let* ctxt, balance_updates =
-    Staking.request_full_unstake ctxt ~sender_contract:sender
+    match sender with
+    | Originated _ ->
+        (* Originated contracts have no costake (yet). *)
+        return (ctxt, [])
+    | Implicit sender_pkh ->
+        let* sender_is_delegate = Contract.is_delegate ctxt sender_pkh in
+        if sender_is_delegate then
+          (* This is just a re-activation, do not unstake. *)
+          Staking.finalize_unstake ctxt sender
+        else Staking.request_full_unstake ctxt ~sender_contract:sender
   in
   let+ ctxt = Contract.Delegate.set ctxt sender delegate in
   (ctxt, Gas.consumed ~since:before_operation ~until:ctxt, balance_updates, [])

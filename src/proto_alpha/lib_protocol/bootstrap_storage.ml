@@ -93,7 +93,7 @@ let init_account (ctxt, balance_updates)
             amount_to_freeze
           >>=? fun (ctxt, balance_updates) ->
           Staking_pseudotokens_storage
-          .init_frozen_deposits_pseudotokens_from_frozen_deposits_balance
+          .init_delegate_pseudotokens_from_frozen_deposits_balance
             ctxt
             contract
           >|=? fun ctxt -> (ctxt, balance_updates))

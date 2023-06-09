@@ -167,6 +167,16 @@ let div_exn t d =
   | Ok v -> v
   | Error _ -> invalid_arg "div_exn"
 
+let mul_ratio tez ~num ~den =
+  let (Tez_tag t) = tez in
+  if num < 0L then error (Negative_multiplicator (tez, num))
+  else if den <= 0L then error (Invalid_divisor (tez, den))
+  else if num = 0L then ok zero
+  else
+    let z = Z.(div (mul (of_int64 t) (of_int64 num)) (of_int64 den)) in
+    if Z.fits_int64 z then ok (Tez_tag (Z.to_int64 z))
+    else error (Multiplication_overflow (tez, num))
+
 let of_mutez t = if t < 0L then None else Some (Tez_tag t)
 
 let of_mutez_exn x =

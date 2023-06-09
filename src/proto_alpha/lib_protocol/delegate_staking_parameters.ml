@@ -34,6 +34,11 @@ let of_delegate ctxt delegate =
   | None -> return Staking_parameters_repr.default
   | Some t -> return t
 
+let find ctxt delegate =
+  Storage.Contract.Staking_parameters.find
+    ctxt
+    (Contract_repr.Implicit delegate)
+
 let raw_pending_updates ctxt delegate =
   Storage.Contract.Pending_staking_parameters.bindings
     (ctxt, Contract_repr.Implicit delegate)
