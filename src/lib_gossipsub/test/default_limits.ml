@@ -71,21 +71,6 @@ let default_limits ?mesh_message_deliveries_activation ?time_in_mesh_weight
       decay_zero = 0.1;
     }
   in
-  let score_limits =
-    match mesh_message_deliveries_activation with
-    | None -> score_limits
-    | Some mesh_message_deliveries_activation ->
-        {
-          score_limits with
-          topics =
-            Topic_score_limits_single
-              {
-                per_topic_score_limits with
-                mesh_message_deliveries_activation =
-                  Milliseconds.of_int_s mesh_message_deliveries_activation;
-              };
-        }
-  in
   {
     max_recv_ihave_per_heartbeat = 10;
     max_sent_iwant_per_heartbeat = 5000;
