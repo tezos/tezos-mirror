@@ -53,9 +53,12 @@ let fetch_tezos_block l1_ctxt hash =
 
 let prefetch_tezos_blocks = Layer1.prefetch_tezos_blocks fetch extract_header
 
-let get_last_cemented_commitment (cctxt : Protocol_client_context.full)
-    rollup_address : Node_context.lcc tzresult Lwt.t =
+let get_last_cemented_commitment (cctxt : #Client_context.full) rollup_address :
+    Node_context.lcc tzresult Lwt.t =
   let open Lwt_result_syntax in
+  let cctxt =
+    new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
+  in
   let rollup_address = Sc_rollup_proto_types.Address.of_octez rollup_address in
   let+ commitment, level =
     Plugin.RPC.Sc_rollup.last_cemented_commitment_hash_with_level
@@ -69,9 +72,12 @@ let get_last_cemented_commitment (cctxt : Protocol_client_context.full)
     level = Protocol.Alpha_context.Raw_level.to_int32 level;
   }
 
-let get_last_published_commitment (cctxt : Protocol_client_context.full)
-    rollup_address operator =
+let get_last_published_commitment (cctxt : #Client_context.full) rollup_address
+    operator =
   let open Lwt_result_syntax in
+  let cctxt =
+    new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
+  in
   let rollup_address = Sc_rollup_proto_types.Address.of_octez rollup_address in
   let*! res =
     Plugin.RPC.Sc_rollup.staked_on_commitment
@@ -98,6 +104,9 @@ let get_last_published_commitment (cctxt : Protocol_client_context.full)
 
 let get_kind cctxt rollup_address =
   let open Lwt_result_syntax in
+  let cctxt =
+    new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
+  in
   let rollup_address = Sc_rollup_proto_types.Address.of_octez rollup_address in
   let+ kind =
     RPC.Sc_rollup.kind cctxt (cctxt#chain, cctxt#block) rollup_address ()
@@ -106,6 +115,9 @@ let get_kind cctxt rollup_address =
 
 let genesis_inbox cctxt ~genesis_level =
   let open Lwt_result_syntax in
+  let cctxt =
+    new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
+  in
   let+ inbox =
     Plugin.RPC.Sc_rollup.inbox cctxt (cctxt#chain, `Level genesis_level)
   in
@@ -142,6 +154,9 @@ let constants_of_parametric
 *)
 let retrieve_constants ?(block = `Head 0) cctxt =
   let open Lwt_result_syntax in
+  let cctxt =
+    new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
+  in
   let+ {parametric; _} =
     Protocol.Constants_services.all cctxt (cctxt#chain, block)
   in
@@ -150,6 +165,9 @@ let retrieve_constants ?(block = `Head 0) cctxt =
 let retrieve_genesis_info cctxt rollup_address =
   let open Lwt_result_syntax in
   let open Protocol.Alpha_context in
+  let cctxt =
+    new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
+  in
   let+ {level; commitment_hash} =
     RPC.Sc_rollup.genesis_info cctxt (cctxt#chain, `Head 0) rollup_address
   in

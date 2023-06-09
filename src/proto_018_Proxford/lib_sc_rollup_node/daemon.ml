@@ -430,13 +430,7 @@ let rec process_head (daemon_components : (module Daemon_components.S))
           }
       in
       let l2_block =
-        Sc_rollup_block.
-          {
-            header;
-            content = ();
-            num_ticks;
-            initial_tick = Sc_rollup.Tick.to_z initial_tick;
-          }
+        Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
       in
       let* () =
         Node_context.mark_finalized_level
@@ -761,13 +755,7 @@ module Internal_for_tests = struct
         }
     in
     let l2_block =
-      Sc_rollup_block.
-        {
-          header;
-          content = ();
-          num_ticks;
-          initial_tick = Sc_rollup.Tick.to_z initial_tick;
-        }
+      Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
     in
     let* () = Node_context.save_l2_head node_ctxt l2_block in
     return l2_block

@@ -72,11 +72,12 @@ let sub_level level decrement =
   if r < 0l then None else Some r
 
 let sc_rollup_commitment_period node_ctxt =
-  node_ctxt.Node_context.protocol_constants.sc_rollup
+  node_ctxt.Node_context.current_protocol.constants.sc_rollup
     .commitment_period_in_blocks
 
 let sc_rollup_challenge_window node_ctxt =
-  node_ctxt.Node_context.protocol_constants.sc_rollup.challenge_window_in_blocks
+  node_ctxt.Node_context.current_protocol.constants.sc_rollup
+    .challenge_window_in_blocks
 
 let next_commitment_level node_ctxt last_commitment_level =
   add_level last_commitment_level (sc_rollup_commitment_period node_ctxt)
