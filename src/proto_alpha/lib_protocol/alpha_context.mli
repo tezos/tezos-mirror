@@ -4789,6 +4789,8 @@ module Adaptive_inflation : sig
     context ->
     vote:Toggle_votes.toggle_vote ->
     (context * Toggle_votes.Adaptive_inflation_launch_EMA.t) tzresult Lwt.t
+
+  val launch_cycle : context -> Cycle.t option tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Ticket_storage}. *)

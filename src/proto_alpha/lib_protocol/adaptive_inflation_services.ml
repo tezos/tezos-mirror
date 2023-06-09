@@ -76,6 +76,16 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "rewards_per_minute")
+
+  let launch_cycle =
+    RPC_service.get_service
+      ~description:
+        "Returns the cycle at which the launch of the Adaptive Inflation \
+         feature is set to happen. A result of None means that the feature is \
+         not yet set to launch."
+      ~query:RPC_query.empty
+      ~output:(Data_encoding.option Cycle.encoding)
+      RPC_path.(context_path / "adaptive_inflation_launch_cycle")
 end
 
 let q_to_float_string q =
@@ -127,7 +137,9 @@ let register () =
       current_yearly_rate_value ~formatter:(fun x -> x) ctxt) ;
   register0 ~chunked:false S.current_rewards_per_minute (fun ctxt () () ->
       let* f = current_rewards_per_minute ctxt in
-      return (Tez.of_mutez_exn (Q.to_int64 f)))
+      return (Tez.of_mutez_exn (Q.to_int64 f))) ;
+  register0 ~chunked:false S.launch_cycle (fun ctxt () () ->
+      Adaptive_inflation.launch_cycle ctxt)
 
 let total_supply ctxt block =
   RPC_context.make_call0 S.total_supply ctxt block () ()
@@ -143,3 +155,6 @@ let current_yearly_rate_exact ctxt block =
 
 let current_rewards_per_minute ctxt block =
   RPC_context.make_call0 S.current_rewards_per_minute ctxt block () ()
+
+let launch_cycle ctxt block =
+  RPC_context.make_call0 S.launch_cycle ctxt block () ()
