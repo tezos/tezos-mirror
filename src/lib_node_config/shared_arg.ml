@@ -130,6 +130,16 @@ module Event = struct
       ~msg:"The command-line option `--enable-testchain` is deprecated."
       ()
 
+  let disable_mempool_precheck_is_deprecated =
+    Internal_event.Simple.declare_0
+      ~section
+      ~level:Warning
+      ~name:"disable_mempool_precheck_is_deprecated"
+      ~msg:
+        "The command-line option `--disable-mempool-precheck` is deprecated \
+         and has no effects."
+      ()
+
   let overriding_config_file_arg =
     declare_1
       ~section
@@ -849,7 +859,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     disable_p2p_maintenance;
     disable_p2p_swap;
     disable_mempool;
-    disable_mempool_precheck = _;
+    disable_mempool_precheck;
     enable_testchain;
     rpc_listen_addrs;
     rpc_tls;
@@ -986,6 +996,11 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
   in
   let*! () =
     if enable_testchain then emit Event.testchain_is_deprecated ()
+    else Lwt.return_unit
+  in
+  let*! () =
+    if disable_mempool_precheck then
+      emit Event.disable_mempool_precheck_is_deprecated ()
     else Lwt.return_unit
   in
   Config_file.update
