@@ -103,14 +103,22 @@ module Event = struct
       ~level:Warning
       ()
 
-  let starting_rpc_server =
+  let starting_local_rpc_server =
     declare_3
       ~section
-      ~name:"starting_rpc_server"
-      ~msg:"starting RPC server on {host}:{port} (acl = {acl_policy})"
+      ~name:"starting_local_rpc_server"
+      ~msg:"starting local RPC server on {host}:{port} (acl = {acl_policy})"
       ~level:Notice
       ("host", Data_encoding.string)
       ("port", Data_encoding.uint16)
+      ("acl_policy", Data_encoding.string)
+
+  let starting_internal_rpc_server =
+    declare_1
+      ~section
+      ~name:"starting_internal_rpc_server"
+      ~msg:"starting internal RPC server (acl = {acl_policy})"
+      ~level:Info
       ("acl_policy", Data_encoding.string)
 
   let starting_metrics_server =
@@ -149,12 +157,12 @@ module Event = struct
       ~level:Notice
       ()
 
-  let shutting_down_rpc_server =
+  let shutting_down_local_rpc_server =
     declare_0
       ~section
-      ~name:"shutting_down_rpc_server"
-      ~msg:"shutting down the RPC server"
-      ~level:Notice
+      ~name:"shutting_down_local_rpc_server"
+      ~msg:"shutting down the local RPC server"
+      ~level:Info
       ()
 
   let bye =
@@ -367,10 +375,13 @@ let rpc_metrics =
 
 module Metrics_server = Prometheus_app.Cohttp (Cohttp_lwt_unix.Server)
 
-let launch_rpc_server ~acl_policy ~media_types (config : Config_file.t) node
-    (addr, port) =
+(* Launches an RPC server depending on the given [mode] (which is
+   usually TCP, TLS or unix sockets). *)
+let launch_rpc_server ~mode (config : Config_file.t) node (addr, port) =
   let open Lwt_result_syntax in
   let rpc_config = config.rpc in
+  let media_types = rpc_config.media_type in
+  let*! acl_policy = RPC_server.Acl.resolve_domain_names rpc_config.acl in
   let host = Ipaddr.V6.to_string addr in
   let version = Tezos_version_value.Current_git_info.version in
   let commit_info =
@@ -387,19 +398,20 @@ let launch_rpc_server ~acl_policy ~media_types (config : Config_file.t) node
       dir
       Tezos_rpc.Service.description_service
   in
-  let mode =
-    match rpc_config.tls with
-    | None -> `TCP (`Port port)
-    | Some {cert; key} ->
-        `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port)
-  in
   let acl =
     let open RPC_server.Acl in
     find_policy acl_policy (Ipaddr.V6.to_string addr, Some port)
     |> Option.value_f ~default:(fun () -> default addr)
   in
   let*! () =
-    Event.(emit starting_rpc_server) (host, port, RPC_server.Acl.policy_type acl)
+    match (mode : Conduit_lwt_unix.server) with
+    | `Unix_domain_socket _ ->
+        Event.(emit starting_internal_rpc_server)
+          (RPC_server.Acl.policy_type acl)
+    | `TCP _ | `TLS _ ->
+        Event.(emit starting_local_rpc_server)
+          (host, port, RPC_server.Acl.policy_type acl)
+    | _ -> Lwt.return_unit
   in
   let cors_headers =
     sanitize_cors_headers ~default:["Content-Type"] rpc_config.cors_headers
@@ -443,23 +455,117 @@ let launch_rpc_server ~acl_policy ~media_types (config : Config_file.t) node
           tzfail (RPC_Port_already_in_use [(addr, port)])
       | exn -> fail_with_exn exn)
 
-let init_rpc (config : Config_file.t) node =
+(* Describes the kind of servers that can be handled by the node.
+   - Local_rpc_server: RPC server is run by the node itself
+     (this may block the node in case of heavy RPC load),
+   - External_rpc_server: RPC server is spawned as an external
+     process,
+   - No_server: the node is not responding to any RPC. *)
+type rpc_server_kind =
+  | Local_rpc_server of RPC_server.server list
+  | External_rpc_server of (RPC_server.server * Rpc_process_worker.t) list
+  | No_server
+
+(* Initializes an RPC server handled by the node main process. *)
+let init_local_rpc_server (config : Config_file.t) node =
   let open Lwt_result_syntax in
-  let media_types = config.rpc.media_type in
-  List.concat_map_es
-    (fun addr ->
-      let* addrs = Config_file.resolve_rpc_listening_addrs addr in
-      match addrs with
-      | [] -> failwith "Cannot resolve listening address: %S" addr
-      | addrs ->
-          let*! acl_policy =
-            RPC_server.Acl.resolve_domain_names config.rpc.acl
-          in
-          List.map_es
-            (fun addr ->
-              launch_rpc_server ~acl_policy ~media_types config node addr)
-            addrs)
-    config.rpc.listen_addrs
+  let* servers =
+    List.concat_map_es
+      (fun addr ->
+        let* addrs = Config_file.resolve_rpc_listening_addrs addr in
+        match addrs with
+        | [] -> failwith "Cannot resolve listening address: %S" addr
+        | addrs ->
+            List.map_es
+              (fun addr ->
+                let port = snd addr in
+                let mode =
+                  match config.rpc.tls with
+                  | None -> `TCP (`Port port)
+                  | Some {cert; key} ->
+                      `TLS
+                        ( `Crt_file_path cert,
+                          `Key_file_path key,
+                          `No_password,
+                          `Port port )
+                in
+                launch_rpc_server ~mode config node addr)
+              addrs)
+      config.rpc.local_listen_addrs
+  in
+  return (Local_rpc_server servers)
+
+let rpc_socket_path ~socket_dir ~id ~pid =
+  let filename = Format.sprintf "octez-external-rpc-socket-%d-%d" pid id in
+  Filename.concat socket_dir filename
+
+(* Initializes an RPC server handled by the node process. It will be
+   used by an external RPC process, identified by [id], to forward
+   RPCs to the node through a Unix socket. *)
+let init_local_rpc_server_for_external_process id (config : Config_file.t) node
+    addr =
+  let open Lwt_result_syntax in
+  let socket_dir = Tezos_base_unix.Socket.get_temporary_socket_dir () in
+  let pid = Unix.getpid () in
+  let comm_socket_path = rpc_socket_path ~id ~socket_dir ~pid in
+  let mode = `Unix_domain_socket (`File comm_socket_path) in
+  (* Register a clean up callback to clean the comm_socket_path when
+     shutting down. Indeed, the socket file is created by the
+     Conduit-lwt-unix.Conduit_lwt_server.listen function, but the
+     resource is not cleaned. *)
+  let _ =
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+        Lwt_unix.unlink comm_socket_path)
+  in
+  let* rpc_server = launch_rpc_server ~mode config node addr in
+  return (rpc_server, comm_socket_path)
+
+let init_external_rpc_server config node internal_events =
+  let open Lwt_result_syntax in
+  (* Start one rpc_process for each rpc endpoint. *)
+  let id = ref 0 in
+  let* rpc_servers =
+    List.concat_map_ep
+      (fun addr ->
+        let* addrs = Config_file.resolve_rpc_listening_addrs addr in
+        match addrs with
+        | [] -> failwith "Cannot resolve listening address: %S" addr
+        | addrs ->
+            List.map_ep
+              (fun (p2p_point : P2p_point.Id.t) ->
+                let id =
+                  let curid = !id in
+                  incr id ;
+                  curid
+                in
+                let* local_rpc_server, comm_socket_path =
+                  init_local_rpc_server_for_external_process
+                    id
+                    config
+                    node
+                    p2p_point
+                in
+                let addr = P2p_point.Id.to_string p2p_point in
+                (* Update the config sent to the rpc_process to
+                   start so that it contains a single listen
+                   address. *)
+                let config =
+                  {config with rpc = {config.rpc with listen_addrs = [addr]}}
+                in
+                let rpc_process =
+                  Octez_rpc_process.Rpc_process_worker.create
+                    ~comm_socket_path
+                    config
+                    internal_events
+                in
+                let* () =
+                  Octez_rpc_process.Rpc_process_worker.start rpc_process
+                in
+                return (local_rpc_server, rpc_process))
+              addrs)
+      config.rpc.listen_addrs
+  in
+  return (External_rpc_server rpc_servers)
 
 let metrics_serve metrics_addrs =
   let open Lwt_result_syntax in
@@ -497,6 +603,25 @@ let init_zcash () =
       (Printf.sprintf
          "Failed to initialize Zcash parameters: %s"
          (Printexc.to_string exn))
+
+let init_rpc (config : Config_file.t) node internal_events =
+  let open Lwt_result_syntax in
+  (* Start local RPC server (handled by the node main process) only
+     when at least one local listen addr is given. *)
+  let* local_rpc_server =
+    if config.rpc.local_listen_addrs = [] then return No_server
+    else init_local_rpc_server config node
+  in
+  (* Start RPC process only when at least one listen addr is given. *)
+  let* rpc_server =
+    if config.rpc.listen_addrs = [] then return No_server
+    else
+      (* Starts the node's local RPC server that aims to handle the
+         RPCs forwarded by the rpc_process, if they cannot be
+         processed by the rpc_process itself. *)
+      init_external_rpc_server config node internal_events
+  in
+  return (local_rpc_server :: [rpc_server])
 
 let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     ?ignore_testchain_warning ~singleprocess ~force_history_mode_switch
@@ -567,14 +692,28 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
         let*! () = Event.(emit shutting_down_node) () in
         Node.shutdown node)
   in
-  let* rpc = init_rpc config node in
+  let* rpc_servers = init_rpc config node internal_events in
   let rpc_downer =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
       ~after:[node_downer]
       (fun _ ->
-        let*! () = Event.(emit shutting_down_rpc_server) () in
-        List.iter_p RPC_server.shutdown rpc)
+        let*! () = Event.(emit shutting_down_local_rpc_server) () in
+        List.iter_s
+          (function
+            | No_server -> Lwt.return_unit
+            | External_rpc_server rpc_servers ->
+                List.iter_p
+                  (fun (local_server, rpc_process) ->
+                    let*! () = RPC_server.shutdown local_server in
+                    let () =
+                      Octez_rpc_process.Rpc_process_worker.stop rpc_process
+                    in
+                    Lwt.return_unit)
+                  rpc_servers
+            | Local_rpc_server rpc_server ->
+                List.iter_p RPC_server.shutdown rpc_server)
+          rpc_servers)
   in
   let*! () = Event.(emit node_is_ready) () in
   let _ =

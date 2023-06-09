@@ -384,6 +384,7 @@ and p2p = {
 
 and rpc = {
   listen_addrs : string list;
+  local_listen_addrs : string list;
   cors_origins : string list;
   cors_headers : string list;
   tls : tls option;
@@ -411,6 +412,7 @@ let default_p2p =
 let default_rpc =
   {
     listen_addrs = [];
+    local_listen_addrs = [];
     cors_origins = [];
     cors_headers = [];
     tls = None;
@@ -578,13 +580,22 @@ let p2p =
 let rpc : rpc Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {cors_origins; cors_headers; listen_addrs; tls; acl; media_type} ->
+    (fun {
+           cors_origins;
+           cors_headers;
+           listen_addrs;
+           local_listen_addrs;
+           tls;
+           acl;
+           media_type;
+         } ->
       let cert, key =
         match tls with
         | None -> (None, None)
         | Some {cert; key} -> (Some cert, Some key)
       in
       ( Some listen_addrs,
+        Some local_listen_addrs,
         None,
         cors_origins,
         cors_headers,
@@ -593,6 +604,7 @@ let rpc : rpc Data_encoding.t =
         acl,
         media_type ))
     (fun ( listen_addrs,
+           local_listen_addrs,
            legacy_listen_addr,
            cors_origins,
            cors_headers,
@@ -615,10 +627,27 @@ let rpc : rpc Data_encoding.t =
               "Config file: Use only \"listen-addrs\" and not (legacy) \
                \"listen-addr\"."
       in
-      {listen_addrs; cors_origins; cors_headers; tls; acl; media_type})
-    (obj8
+      let local_listen_addrs =
+        Option.value local_listen_addrs ~default:default_rpc.local_listen_addrs
+      in
+      {
+        listen_addrs;
+        local_listen_addrs;
+        cors_origins;
+        cors_headers;
+        tls;
+        acl;
+        media_type;
+      })
+    (obj9
        (opt
           "listen-addrs"
+          ~description:
+            "Hosts to listen to. If the port is not specified, the default \
+             port 8732 will be assumed."
+          (list string))
+       (opt
+          "local-listen-addrs"
           ~description:
             "Hosts to listen to. If the port is not specified, the default \
              port 8732 will be assumed."
@@ -839,9 +868,9 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?expected_connections ?max_connections ?max_download_speed ?max_upload_speed
     ?binary_chunks_size ?peer_table_size ?expected_pow ?bootstrap_peers
     ?listen_addr ?advertised_net_port ?discovery_addr ?(rpc_listen_addrs = [])
-    ?(allow_all_rpc = []) ?(media_type = Media_type.Command_line.Any)
-    ?(metrics_addr = []) ?operation_metadata_size_limit
-    ?(private_mode = default_p2p.private_mode)
+    ?(local_rpc_listen_addrs = []) ?(allow_all_rpc = [])
+    ?(media_type = Media_type.Command_line.Any) ?(metrics_addr = [])
+    ?operation_metadata_size_limit ?(private_mode = default_p2p.private_mode)
     ?(disable_p2p_maintenance =
       Option.is_none default_p2p.limits.maintenance_idle_time)
     ?(disable_p2p_swap = Option.is_none default_p2p.limits.swap_linger)
@@ -921,6 +950,8 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
   and rpc : rpc =
     {
       listen_addrs = unopt_list ~default:cfg.rpc.listen_addrs rpc_listen_addrs;
+      local_listen_addrs =
+        unopt_list ~default:cfg.rpc.local_listen_addrs local_rpc_listen_addrs;
       cors_origins = unopt_list ~default:cfg.rpc.cors_origins cors_origins;
       cors_headers = unopt_list ~default:cfg.rpc.cors_headers cors_headers;
       tls = Option.either rpc_tls cfg.rpc.tls;
