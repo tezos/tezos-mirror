@@ -182,12 +182,13 @@ let test_deposits_after_stake_removal () =
   >>=? fun frozen_deposits_2 ->
   Assert.equal_tez ~loc:__LOC__ frozen_deposits_2 initial_frozen_deposits_2
 
-let test_unfreeze_deposits_after_deactivation () =
+let test_deposits_not_unfrozen_after_deactivation () =
   Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
-  let (contract1, account1), (_contract2, account2) =
+  let (_contract1, account1), (_contract2, account2) =
     get_first_2_accounts_contracts contracts
   in
-  Context.Delegate.full_balance (B genesis) account1 >>=? fun initial_balance ->
+  Context.Delegate.current_frozen_deposits (B genesis) account1
+  >>=? fun initial_frozen_deposits ->
   (* [account1] will not participate (ie bake/endorse); we set the
      expected last cycles at which it is considered active and at
      which it has non-zero deposits *)
@@ -208,22 +209,14 @@ let test_unfreeze_deposits_after_deactivation () =
       Context.Delegate.deactivated (B b) account1 >>=? fun is_deactivated ->
       Context.Delegate.current_frozen_deposits (B b) account1
       >>=? fun frozen_deposits ->
-      (* the spendable balance *)
-      Context.Contract.balance (B b) contract1 >>=? fun balance ->
       let new_cycle = cycles_to_bake - n + 1 in
       Assert.equal_bool
         ~loc:__LOC__
         is_deactivated
         (new_cycle > last_active_cycle)
       >>=? fun () ->
-      Assert.equal_bool
-        ~loc:__LOC__
-        (new_cycle > last_cycle_with_deposits)
-        (* as soon as frozen_deposits are set to zero from a non-zero value v, v is
-           returned to the spendable balance of account1; in this particular
-           case, the spendable balance [balance] updated with v is precisely the
-           initial_balance.*)
-        (Tez.(frozen_deposits = zero) && Tez.(balance = initial_balance))
+      (* deposits are not automatically unfrozen *)
+      Assert.equal_tez ~loc:__LOC__ frozen_deposits initial_frozen_deposits
       >>=? fun () -> loop b (pred n)
   in
   loop genesis cycles_to_bake >>=? fun (_b : Block.t) -> return_unit
@@ -428,9 +421,9 @@ let tests =
         `Quick
         test_deposits_after_stake_removal;
       tztest
-        "unfreeze deposits after deactivation"
+        "deposits are not unfrozen after deactivation"
         `Quick
-        test_unfreeze_deposits_after_deactivation;
+        test_deposits_not_unfrozen_after_deactivation;
       tztest
         "frozen deposits with delegation"
         `Quick

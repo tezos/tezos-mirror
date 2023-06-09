@@ -250,8 +250,7 @@ let prepare_first_block _chain_id ctxt ~typecheck_smart_contract
         param.bootstrap_contracts
         param.bootstrap_smart_rollups
       >>=? fun (ctxt, bootstrap_balance_updates) ->
-      Delegate_cycles.init_first_cycles ctxt ~origin:Protocol_migration
-      >>=? fun (ctxt, deposits_balance_updates) ->
+      Delegate_cycles.init_first_cycles ctxt >>=? fun ctxt ->
       Vote_storage.init
         ctxt
         ~start_position:(Level_storage.current ctxt).level_position
@@ -264,10 +263,7 @@ let prepare_first_block _chain_id ctxt ~typecheck_smart_contract
       >>=? fun ctxt ->
       Sc_rollup_inbox_storage.init_inbox ~predecessor ctxt >>=? fun ctxt ->
       Adaptive_inflation_storage.init_ema ctxt >>=? fun ctxt ->
-      return
-        ( ctxt,
-          commitments_balance_updates @ bootstrap_balance_updates
-          @ deposits_balance_updates )
+      return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
   | Nairobi_017
   (* Please update [next_protocol] and [previous_protocol] in
      [tezt/lib_tezos/protocol.ml] when you update this value. *) ->
