@@ -1,6 +1,4 @@
 octez-smart-rollup-wasm-debugger
-octez-dac-client
-octez-dac-node
 octez-signer
 octez-proxy-server
 octez-codec
