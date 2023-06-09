@@ -97,13 +97,6 @@ let spawn_config_init ?(use_unsafe_srs = true) ?(expected_pow = 0.) dal_node =
          Some (string_of_float expected_pow);
        ]
 
-let init_config ?use_unsafe_srs ?expected_pow dal_node =
-  let process = spawn_config_init ?use_unsafe_srs ?expected_pow dal_node in
-  let* output = Process.check_and_read_stdout process in
-  match output =~* rex "DAL node configuration written in ([^\n]*)" with
-  | None -> failwith "DAL node configuration initialization failed"
-  | Some filename -> return filename
-
 module Config_file = struct
   let filename dal_node = sf "%s/config.json" @@ data_dir dal_node
 
@@ -113,6 +106,10 @@ module Config_file = struct
 
   let update dal_node update = read dal_node |> update |> write dal_node
 end
+
+let init_config ?use_unsafe_srs ?expected_pow dal_node =
+  let process = spawn_config_init ?use_unsafe_srs ?expected_pow dal_node in
+  Process.check process
 
 let read_identity dal_node =
   let filename = sf "%s/identity.json" @@ data_dir dal_node in
