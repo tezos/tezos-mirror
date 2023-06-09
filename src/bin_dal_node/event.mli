@@ -25,6 +25,10 @@
 
 include module type of Event_legacy
 
+(** An event emitted at startup when the configuration of the node is read from
+    disk. *)
+val configuration_loaded : unit t
+
 (** Storing a slot content event. The given parameter is the slot's commitment
     hash. *)
 val stored_slot_content : Cryptobox.Commitment.t t

@@ -325,6 +325,7 @@ let run ~data_dir cctxt =
   let* ({network_name; rpc_addr; rpc_port; peers; _} as config) =
     Configuration.load ~data_dir
   in
+  let*! () = Event.(emit configuration_loaded) () in
   let config = {config with data_dir} in
   (* Create and start a GS worker *)
   let gs_worker =
