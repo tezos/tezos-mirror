@@ -30,7 +30,10 @@
     that rewrites queries that the proxy server cannot
     handle and forwards them to the full node at the given [Uri.t]. *)
 val proxy_server_query_forwarder :
-  Uri.t -> RPC_server.callback -> RPC_server.callback
+  ?ctx:Cohttp_lwt_unix.Net.ctx ->
+  Uri.t ->
+  RPC_server.callback ->
+  RPC_server.callback
 
 (** A Resto middleware that transforms any server callback to an other
     that handles RPC metrics *)
