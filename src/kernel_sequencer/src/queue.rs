@@ -253,6 +253,27 @@ impl Queue {
 
         Ok(Some(element))
     }
+
+    /// Read the last element of the queue
+    ///
+    /// It does not remove it
+    pub fn head<Host: Runtime, E>(&self, host: &Host) -> Result<Option<E>, RuntimeError>
+    where
+        E: NomReader,
+    {
+        let Some(Pointer { head, .. }) = self.pointer else {return Ok(None)};
+
+        // get the path of the stored element
+        let path = self.element_path(head)?;
+        // get the size of this element
+        let size = host.store_value_size(&path)?;
+        // get the bytes from the durable storage
+        let bytes = host.store_read(&path, 0, size)?;
+        // deserialize the bytes into the corresponding type
+        let (_, data) = E::nom_read(&bytes).map_err(|_| RuntimeError::DecodingError)?;
+        // returns the parsed type
+        Ok(Some(data))
+    }
 }
 
 #[cfg(test)]
@@ -431,5 +452,44 @@ mod tests2 {
 
         assert_eq!(e1, Element::new(0));
         assert_eq!(e2, Element::new(1));
+    }
+
+    #[test]
+    fn test_head_empty_queue() {
+        let host = MockHost::default();
+        let queue = Queue::new(&host, &QUEUE_PATH).expect("create first queue");
+
+        let head: Option<Element> = queue.head(&host).expect("should not be runtime work");
+
+        assert!(queue.is_empty());
+        assert_eq!(head, None);
+    }
+
+    #[test]
+    fn test_head_one_element_queue() {
+        let mut host = MockHost::default();
+        let mut queue = Queue::new(&host, &QUEUE_PATH).expect("create first queue");
+
+        queue.add(&mut host, &Element::new(0)).unwrap();
+
+        let head: Option<Element> = queue.head(&host).expect("should not be runtime error");
+
+        assert_eq!(head, Some(Element::new(0)));
+    }
+
+    #[test]
+    fn test_head_two_elements_queue() {
+        let mut host = MockHost::default();
+        let mut queue = Queue::new(&host, &QUEUE_PATH).expect("create first queue");
+
+        queue.add(&mut host, &Element::new(0)).unwrap();
+        queue.add(&mut host, &Element::new(1)).unwrap();
+
+        let e1: Option<Element> = queue.head(&host).expect("should not be runtime error");
+        let _: Option<Element> = queue.pop(&mut host).expect("Can pop element");
+        let e2: Option<Element> = queue.head(&host).expect("should not be runtime error");
+
+        assert_eq!(e1, Some(Element::new(0)));
+        assert_eq!(e2, Some(Element::new(1)));
     }
 }
