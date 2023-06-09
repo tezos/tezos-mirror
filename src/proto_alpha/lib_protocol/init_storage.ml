@@ -261,4 +261,6 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
     ~timestamp
     ~adaptive_inflation_enable:false
     ctxt
-  >>=? fun ctxt -> Storage.Pending_migration.remove ctxt
+  >>=? fun ctxt ->
+  Adaptive_inflation_storage.set_adaptive_inflation_enable ctxt >>=? fun ctxt ->
+  Storage.Pending_migration.remove ctxt
