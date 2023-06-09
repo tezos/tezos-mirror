@@ -93,21 +93,27 @@ let pseudotokens_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
 
 let tez_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
     ~pseudotoken_amount =
-  let frozen_deposits_tez_z =
-    Z.of_int64 (Tez_repr.to_mutez frozen_deposits_tez)
-  in
-  let frozen_deposits_pseudotokens_z =
-    Z.of_int64 (Staking_pseudotoken_repr.to_int64 frozen_deposits_pseudotokens)
-  in
-  let pseudotoken_amount_z =
-    Z.of_int64 (Staking_pseudotoken_repr.to_int64 pseudotoken_amount)
-  in
-  let res_z =
-    Z.div
-      (Z.mul frozen_deposits_tez_z pseudotoken_amount_z)
-      frozen_deposits_pseudotokens_z
-  in
-  Tez_repr.of_mutez_exn (Z.to_int64 res_z)
+  if Staking_pseudotoken_repr.(frozen_deposits_pseudotokens = zero) then (
+    (* When there are no frozen deposits, starts with 1 mutez = 1 pseudotoken. *)
+    assert (Tez_repr.(frozen_deposits_tez = zero)) ;
+    Tez_repr.of_mutez_exn (Staking_pseudotoken_repr.to_int64 pseudotoken_amount))
+  else
+    let frozen_deposits_tez_z =
+      Z.of_int64 (Tez_repr.to_mutez frozen_deposits_tez)
+    in
+    let frozen_deposits_pseudotokens_z =
+      Z.of_int64
+        (Staking_pseudotoken_repr.to_int64 frozen_deposits_pseudotokens)
+    in
+    let pseudotoken_amount_z =
+      Z.of_int64 (Staking_pseudotoken_repr.to_int64 pseudotoken_amount)
+    in
+    let res_z =
+      Z.div
+        (Z.mul frozen_deposits_tez_z pseudotoken_amount_z)
+        frozen_deposits_pseudotokens_z
+    in
+    Tez_repr.of_mutez_exn (Z.to_int64 res_z)
 
 let frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount =
   let open Lwt_result_syntax in
