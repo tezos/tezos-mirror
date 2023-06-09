@@ -54,6 +54,7 @@ let check_stake ~loc (b : Block.t) (account : Account.t) =
     ~level:b.header.shell.level
     ~predecessor_timestamp:b.header.shell.timestamp
     ~timestamp:b.header.shell.timestamp
+    ~adaptive_inflation_enable:false
   >>= wrap
   >>=? fun ctxt ->
   Stake_storage.get ctxt account.pkh >>= wrap >>=? fun stake ->
@@ -74,6 +75,7 @@ let check_no_stake ~loc (b : Block.t) (account : Account.t) =
     ~level:b.header.shell.level
     ~predecessor_timestamp:b.header.shell.timestamp
     ~timestamp:b.header.shell.timestamp
+    ~adaptive_inflation_enable:false
   >>= wrap
   >>=? fun ctxt ->
   Stake_storage.get ctxt account.pkh >>= wrap >>=? fun stake ->
