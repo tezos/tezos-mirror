@@ -4,7 +4,6 @@
 
 use crate::state::State;
 use tezos_data_encoding::enc::BinWriter;
-#[cfg(test)]
 use tezos_data_encoding::nom::NomReader;
 use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, Path, RefPath, PATH_SEPARATOR},
@@ -52,7 +51,6 @@ pub fn write_state<H: Runtime>(host: &mut H, state: State) -> Result<(), Runtime
 /// Returns the state of the sequencer kernel.
 ///
 /// Or the default value if it is not present in storage.
-#[cfg(test)]
 pub fn read_state<H: Runtime>(host: &mut H) -> Result<State, RuntimeError> {
     let path = sequencer_prefix(&STATE)?;
 

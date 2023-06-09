@@ -17,7 +17,8 @@ use crate::{
     message::{Framed, KernelMessage, Sequence, SequencerMsg, SetSequencer},
     queue::Queue,
     routing::FilterBehavior,
-    state::update_state,
+    state::{update_state, State},
+    storage::read_state,
 };
 
 /// Message added to the delayed inbox
@@ -53,6 +54,9 @@ pub fn read_input<Host: Runtime>(
                     update_state(host, delayed_inbox_queue, msg.level)?;
                 }
 
+                // The state can change at each iteration
+                let state = read_state(host)?;
+
                 let message = KernelMessage::nom_read(payload);
                 match message {
                     Err(_) => {}
@@ -65,6 +69,7 @@ pub fn read_input<Host: Runtime>(
                             sequence,
                             destination,
                             &raw_rollup_address,
+                            state,
                         ),
                         KernelMessage::Sequencer(Framed {
                             destination,
@@ -98,15 +103,21 @@ fn handle_sequence_message(
     sequence: Sequence,
     destination: SmartRollupAddress,
     rollup_address: &[u8; RAW_ROLLUP_ADDRESS_SIZE],
+    state: State,
 ) {
-    if destination.hash().as_ref() == rollup_address {
-        debug_msg!(
-            host,
-            "Received a sequence message {:?} targeting our rollup",
-            sequence
-        );
-        // process the sequence
+    if destination.hash().as_ref() != rollup_address {
+        return;
     }
+
+    debug_msg!(
+        host,
+        "Received a sequence message {:?} targeting our rollup",
+        sequence
+    );
+
+    let State::Sequenced(_) = state else {return;};
+
+    // process the sequence
 }
 
 fn handle_set_sequencer_message(
