@@ -1540,17 +1540,6 @@ module Revamped = struct
     let* () = check_mempool ~applied:[oph4; oph3; oph2; oph1] client1 in
     check_mempool ~applied:[oph4; oph3; oph2; oph1] client2
 
-  let check_process_error_and_capture_two_groups ?__LOC__ rex process =
-    let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
-    match stderr =~** rex with
-    | None ->
-        Test.fail
-          ?__LOC__
-          "Process was expected to fail with:\n%s\nbut instead failed with:\n%s"
-          (show_rex rex)
-          stderr
-    | Some groups -> return groups
-
   let test_full_mempool =
     Protocol.register_test
       ~__FILE__
@@ -1612,21 +1601,27 @@ module Revamped = struct
       4
       "The client should report when the mempool is full and not enough fees \
        are provided." ;
+    let* op4 =
+      Operation.Manager.(
+        operation
+          [
+            make
+              ~source:Constant.bootstrap5
+              ~fee:(fee - 1)
+              ~gas_limit
+              (transfer ());
+          ])
+        client1
+    in
     let* _oph, recommended_fee =
-      check_process_error_and_capture_two_groups
-        ~__LOC__
-        Constant.Error_msg.rejected_by_full_mempool
-        (Client.spawn_transfer
-           ~giver:Constant.bootstrap5.alias
-           ~receiver:Constant.bootstrap2.alias
-           ~amount:(Tez.of_int 55)
-           ~fee:(Tez.of_mutez_int (fee - 1))
-           ~gas_limit
-           client1)
+      Operation.inject_and_capture2_stderr
+        ~rex:Constant.Error_msg.rejected_by_full_mempool
+        op4
+        client1
     in
     Check.(
-      (recommended_fee = string_of_int (fee + 1))
-        string
+      (int_of_string recommended_fee = fee + 1)
+        int
         ~error_msg:"The recommended fee is %L but expected %R.") ;
 
     log_step 5 "Force inject an extra operation with not enough fees." ;

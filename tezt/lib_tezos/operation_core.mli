@@ -147,6 +147,25 @@ val inject :
   Client.t ->
   [`OpHash of string] Lwt.t
 
+(** Same as [inject], but do not wait for the process to exit. *)
+val spawn_inject :
+  ?force:bool ->
+  ?protocol:Protocol.t ->
+  ?signature:Tezos_crypto.Signature.t ->
+  t ->
+  Client.t ->
+  JSON.t Runnable.process Lwt.t
+
+(** Run [spawn_inject] then capture two groups on stderr with [rex]. *)
+val inject_and_capture2_stderr :
+  rex:rex ->
+  ?force:bool ->
+  ?protocol:Protocol.t ->
+  ?signature:Tezos_crypto.Signature.t ->
+  t ->
+  Client.t ->
+  (string * string) Lwt.t
+
 (** [inject_operations ?protocol ?request ?force ?error ?use_tmp_file ops
     client] is similar as [inject] for a list of operations. This function calls
     the RPC {!val:RPC.post_private_injection_operations} which is faster than
