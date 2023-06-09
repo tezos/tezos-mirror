@@ -1031,6 +1031,8 @@ module Constants : sig
 
   val zk_rollup_min_pending_to_process : context -> int
 
+  val adaptive_inflation_enable : context -> bool
+
   val freeze_rewards : context -> bool
 
   (** All constants: fixed and parametric *)
