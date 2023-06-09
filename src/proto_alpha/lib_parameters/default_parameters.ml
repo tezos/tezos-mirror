@@ -289,7 +289,6 @@ let constants_mainnet =
       };
     adaptive_inflation =
       {
-        enable = false;
         staking_over_baking_limit = 5;
         max_costaking_baker_count = 5;
         staking_over_delegation_edge = 2;

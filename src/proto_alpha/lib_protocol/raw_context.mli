@@ -89,6 +89,7 @@ val prepare :
   level:Int32.t ->
   predecessor_timestamp:Time.t ->
   timestamp:Time.t ->
+  adaptive_inflation_enable:bool ->
   Context.t ->
   t tzresult Lwt.t
 
@@ -296,6 +297,9 @@ val reward_coeff_for_current_cycle : t -> Q.t
     This update should only be called once per cycle. It is done in
     [Adaptive_inflation_storage] *)
 val update_reward_coeff_for_current_cycle : t -> Q.t -> t
+
+(** Returns true if adaptive inflation has launched. *)
+val adaptive_inflation_enable : t -> bool
 
 module Internal_for_tests : sig
   val add_level : t -> int -> t

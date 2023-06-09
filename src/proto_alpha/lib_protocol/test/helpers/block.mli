@@ -137,7 +137,6 @@ val genesis :
   ?dal_enable:bool ->
   ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
-  ?adaptive_inflation_enable:bool ->
   ?nonce_revelation_threshold:int32 ->
   Parameters.bootstrap_account list ->
   block tzresult Lwt.t
@@ -299,7 +298,6 @@ val prepare_initial_context_params :
   ?sc_rollup_arith_pvm_enable:bool ->
   ?dal_enable:bool ->
   ?zk_rollup_enable:bool ->
-  ?adaptive_inflation_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
   unit ->

@@ -255,5 +255,10 @@ let prepare_first_block _chain_id ctxt ~typecheck_smart_contract
   >>= fun ctxt -> return ctxt
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
-  Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
+  Raw_context.prepare
+    ~level
+    ~predecessor_timestamp
+    ~timestamp
+    ~adaptive_inflation_enable:false
+    ctxt
   >>=? fun ctxt -> Storage.Pending_migration.remove ctxt
