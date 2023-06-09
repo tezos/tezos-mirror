@@ -408,17 +408,22 @@ let combine_pseudo_blocks ~scope ~perfectly pseudo_blocks =
   combine_quadratic ~scope ~join:try_both_ways pseudo_blocks
 
 let linear_combination ~this ~next qc =
-  let pad = List.init (nb_wires_arch - List.length this) (fun _ -> 0) in
-  let wires = List.map snd this @ pad in
-
   let combine l1 l2 = List.combine (list_sub (List.length l2) l1) l2 in
-  let this_sels = combine CS.this_constr_linear_selectors (List.map fst this) in
-  let next_sels = combine CS.next_constr_linear_selectors (List.map fst next) in
+  let pad = List.init (nb_wires_arch - List.length this) (fun _ -> 0) in
+  (* Combining with reversed linear-selectors will leave the a-wire (w0) free
+     when possible. This allows for future combinations with e.g. boolean
+     constraints, that only use the a-wire. In general, it is beneficial to
+     leave the first wires free, as they are the most used by custom gates. *)
+  let wires = List.map snd this @ pad |> List.rev in
+  let this_constr_sels = List.rev CS.this_constr_linear_selectors in
+  let next_constr_sels = List.rev CS.next_constr_linear_selectors in
+  let this_sels = combine this_constr_sels (List.map fst this) in
+  let next_sels = combine next_constr_sels (List.map fst next) in
   CS.mk_linear_constr (wires, (("qc", qc) :: this_sels) @ next_sels)
 
 let dummy_linear_combination terms =
   let pad = List.init (nb_wires_arch - List.length terms) (fun _ -> 0) in
-  CS.mk_linear_constr (List.map snd terms @ pad, [])
+  CS.mk_linear_constr (List.map snd terms @ pad |> List.rev, [])
 
 (** Given a pseudo block, i.e., a list of pseudo constraints, transform it into
     a block. Thanks to the invariant that the pc_head of a pseudo constraint
@@ -673,36 +678,41 @@ let inline_renamings ~nb_inputs ~range_checked gates =
       gates
   in
   (* Create a map from wires to all the wires they are bound to be equal to *)
-  let renaming_partitions =
-    List.fold_left
-      (fun partitions (i, j) ->
-        let rec find_all_equal ~seen i =
-          let i_set =
-            Option.value ~default:ISet.empty @@ IMap.find_opt i partitions
+  let rec build_partitions ?(partitions = IMap.empty) () =
+    (* In just one iteration we may not be able to find all relations.
+       For example, if the list of renamings is [(i, j); (j, k)], we will not
+       realize that i and k are the same in the first iteration.
+       We can do this in two iterations, the first will result in the map:
+            i -> {i, j}   j -> {i, j, k}   k -> {j, k}
+       in the second iteration j has already been linked to i and k, so we will
+       realize the relationship between i and k and get:
+            i -> {i, j, k}   j -> {i, j, k}   k -> {i, j, k}
+       We iterate the function again and again until no new information is
+       obtained, i.e. until nothing is "changed".
+       The total number of iterations can be upper-bounded by the cardinality
+       of the largest partition of wires, but it will be much better than that
+       in most cases. *)
+    let partitions, changed =
+      List.fold_left
+        (fun (partitions, changed) (i, j) ->
+          let default = ISet.empty in
+          let i_set = Option.value ~default @@ IMap.find_opt i partitions in
+          let j_set = Option.value ~default @@ IMap.find_opt j partitions in
+          let ij_set =
+            ISet.union i_set j_set |> ISet.union (ISet.of_list [i; j])
           in
-          ISet.fold
-            (fun j (acc, seen) ->
-              if ISet.mem j seen then (acc, seen)
-              else
-                let j_set = find_all_equal ~seen j in
-                (ISet.union acc j_set, ISet.add j seen))
-            i_set
-            (i_set, ISet.add i seen)
-          |> fst
-        in
-        let ij_partition =
-          let ij = ISet.add i @@ ISet.singleton j in
-          let i_set = find_all_equal ~seen:ij i in
-          let j_set = find_all_equal ~seen:ij j in
-          ISet.union i_set j_set |> ISet.union ij
-        in
-        ISet.fold
-          (fun k partitions -> IMap.add k ij_partition partitions)
-          ij_partition
-          partitions)
-      IMap.empty
-      renaming_pairs
+          let i_or_j_changed =
+            not (ISet.equal i_set ij_set && ISet.equal j_set ij_set)
+          in
+          let partitions = IMap.add i ij_set partitions in
+          let partitions = IMap.add j ij_set partitions in
+          (partitions, changed || i_or_j_changed))
+        (partitions, false)
+        renaming_pairs
+    in
+    if changed then build_partitions ~partitions () else partitions
   in
+  let renaming_partitions = build_partitions () in
   (* Each wire will be renamed (if it is not an input wire) to the
      minimal wire of their partition. This makes sure that all the wire
      in the same partition get renamed to the same wire (when renamed) *)
