@@ -943,7 +943,7 @@ end = struct
            ]
           @ save_cmd)
 
-  let save_file i j = sf "ARG0.'save_%d_%d.option'" i j
+  let save_file i j = sf "ARG0.'.save_%d_%d.option'" i j
 
   let multiplot ~title ~matrix =
     let rows = Array.length matrix in
@@ -1023,7 +1023,25 @@ let x11 = X11_target
 
 let qt ?pixel_size () = Qt_target {pixel_size}
 
-module GP_run = struct
+module GP_run : sig
+  (** [run_script ~matrix_mode ~target ~plot ()] plots [plot] data using Gnuplot
+      with [matrix_mode] and [target].
+
+      [path] : The path of Gnuplot
+      [detach] : If [true], Gnuplot process does not block the main process
+      [filename] : If specified, the plot script is saved to this filename
+      [exec] : If [exec=false], the execution of Gnuplot is skipped
+  *)
+  val run_script :
+    ?path:string ->
+    ?detach:bool ->
+    ?filename:string ->
+    ?exec:bool ->
+    matrix_mode:bool ->
+    target:target ->
+    GP_script.t ->
+    unit
+end = struct
   let set_target (t : target) =
     let print_pixel_size pixel_size =
       Option.fold ~none:"" ~some:(fun (x, y) -> sf "size %d, %d" x y) pixel_size
@@ -1055,132 +1073,60 @@ module GP_run = struct
     | Png_target _ | Pdf_target _ -> false
     | X11_target | Qt_target _ -> true
 
-  let make_script ~matrix_mode ~target ~(plot : GP_script.t) =
+  let make_script ~matrix_mode ~target (plot : GP_script.t) =
     concat
       ([set_target target; (plot :> string)]
       @ (if is_target_interactive target then ["pause mouse close"] else [])
       @ if matrix_mode then ["do for [i=1:N]{system 'rm '.plots[i]}"] else [])
 
-  let write_script ~filename ~matrix_mode ~target ~(plot : GP_script.t) =
-    match open_out_gen [Open_wronly; Open_creat; Open_trunc] 0o666 filename with
-    | exception _ ->
-        Format.eprintf
-          "write_script: could not open file %s, exiting@."
-          filename ;
-        exit 1
-    | oc ->
-        let script = make_script ~matrix_mode ~target ~plot in
-        output_string oc script ;
-        close_out oc
-
-  let run_script ?(path = "gnuplot") ?(detach = false) ~matrix_mode ~target
-      ~(plot : GP_script.t) () =
-    let name, oc = Filename.open_temp_file ~perms:0o666 "gnuplot" ".gp" in
-    let full_command =
-      concat
-        ([set_target target; (plot :> string)]
-        @ (if is_target_interactive target then ["pause mouse close"] else [])
-        @ if matrix_mode then ["do for [i=1:N]{system 'rm '.plots[i]}"] else []
-        )
+  let write_script ?filename ~matrix_mode ~target (plot : GP_script.t) =
+    let script = make_script ~matrix_mode ~target plot in
+    let filename, oc =
+      match filename with
+      | None -> Filename.open_temp_file ~perms:0o666 "gnuplot" ".gp"
+      | Some filename -> (
+          match
+            open_out_gen [Open_wronly; Open_creat; Open_trunc] 0o666 filename
+          with
+          | exception _ ->
+              Format.eprintf
+                "write_script: could not open file %s, exiting@."
+                filename ;
+              exit 1
+          | oc -> (filename, oc))
     in
-    output_string oc full_command ;
+    output_string oc script ;
     close_out oc ;
+    filename
+
+  let exec_script ~path ~detach filename =
     match Unix.fork () with
     | 0 -> (
-        match Unix.system (sf "%s %s 2>/dev/null" path name) with
-        | WEXITED 0 ->
-            Unix.unlink name ;
-            exit 0
+        match Unix.system (sf "%s %s 2>/dev/null" path filename) with
+        | WEXITED 0 -> exit 0
         | _ ->
-            Unix.unlink name ;
-            Format.eprintf "run_script: call to gnuplot failed, exiting@." ;
+            Format.eprintf
+              "exec_script: call to gnuplot failed, exiting (wrote script to \
+               %s)@."
+              filename ;
             exit 1)
     | pid -> if not detach then ignore @@ Unix.waitpid [] pid else ()
 
-  let write_and_run_script ?(path = "gnuplot") ?(detach = false) ~filename
-      ~matrix_mode ~target ~(plot : GP_script.t) () =
-    match open_out_gen [Open_wronly; Open_creat; Open_trunc] 0o666 filename with
-    | exception _ ->
-        Format.eprintf
-          "write_script: could not open file %s, exiting@."
-          filename ;
-        exit 1
-    | oc -> (
-        let script = make_script ~matrix_mode ~target ~plot in
-        output_string oc script ;
-        close_out oc ;
-        match Unix.fork () with
-        | 0 -> (
-            match Unix.system (sf "%s %s 2>/dev/null" path filename) with
-            | WEXITED 0 -> exit 0
-            | _ ->
-                Format.eprintf
-                  "run_script: call to gnuplot failed, exiting (wrote script \
-                   to %s)@."
-                  filename ;
-                exit 1)
-        | pid -> if not detach then ignore @@ Unix.waitpid [] pid else ())
+  let run_script ?(path = "gnuplot") ?(detach = false) ?filename ?(exec = true)
+      ~matrix_mode ~target (plot : GP_script.t) =
+    let filename =
+      write_script ?filename ~matrix_mode ~target (plot : GP_script.t)
+    in
+    if exec then exec_script ~path ~detach filename
 end
 
-type action =
-  | Exec
-  | Save_to of string
-  | Exec_and_save_to of string
-  | Exec_detach
+let run ?path ?detach ?filename ?exec ~target plot =
+  GP_run.run_script ?path ?detach ?filename ?exec ~matrix_mode:false ~target
+  @@ GP_script.render plot
 
-let exec = Exec
-
-let exec_detach = Exec_detach
-
-let save_to filename = Save_to filename
-
-let exec_and_save_to filename = Exec_and_save_to filename
-
-let write_plot ~filename ~target ~plot =
-  let plot = GP_script.render plot in
-  GP_run.write_script ~filename ~matrix_mode:false ~target ~plot
-
-let run_plot ?path ?detach ~target ~plot () =
-  let plot = GP_script.render plot in
-  GP_run.run_script ?path ?detach ~matrix_mode:false ~target ~plot ()
-
-let write_and_run_plot ?path ~filename ~target ~plot () =
-  let plot = GP_script.render plot in
-  GP_run.write_and_run_script
-    ?path
-    ~filename
-    ~matrix_mode:false
-    ~target
-    ~plot
-    ()
-
-let write_matrix ~filename ~title ~target ~plots =
-  let plot = GP_script.render_matrix ~title plots in
-  GP_run.write_script ~filename ~matrix_mode:true ~target ~plot
-
-let run_matrix ?path ?detach ~title ~target ~plots () =
-  let plot = GP_script.render_matrix ~title plots in
-  GP_run.run_script ?path ?detach ~matrix_mode:true ~target ~plot ()
-
-let write_and_run_matrix ?path ~title ~filename ~target ~plots () =
-  let plot = GP_script.render_matrix ~title plots in
-  GP_run.write_and_run_script ?path ~filename ~matrix_mode:true ~target ~plot ()
-
-let run ?path ~target action plot =
-  match action with
-  | Exec -> run_plot ?path ~plot ~target ()
-  | Save_to filename -> write_plot ~filename ~target ~plot
-  | Exec_and_save_to filename ->
-      write_and_run_plot ?path ~filename ~target ~plot ()
-  | Exec_detach -> run_plot ?path ~detach:true ~plot ~target ()
-
-let run_matrix ?path ~target ?(title = "") action plots =
-  match action with
-  | Exec -> run_matrix ?path ~title ~plots ~target ()
-  | Save_to filename -> write_matrix ~filename ~title ~target ~plots
-  | Exec_and_save_to filename ->
-      write_and_run_matrix ?path ~title ~filename ~target ~plots ()
-  | Exec_detach -> run_matrix ?path ~detach:true ~title ~plots ~target ()
+let run_matrix ?path ?detach ?filename ?exec ~target ?(title = "") plots =
+  GP_run.run_script ?path ?detach ?filename ?exec ~matrix_mode:true ~target
+  @@ GP_script.render_matrix ~title plots
 
 let get_targets ?(path = "gnuplot") () =
   let for_reading_by_parent, for_writing_by_child =

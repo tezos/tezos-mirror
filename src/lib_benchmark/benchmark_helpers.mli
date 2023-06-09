@@ -35,3 +35,6 @@ val make_progress_printer : Format.formatter -> int -> string -> unit -> unit
 
 (** Data encoding of OCaml [int], using [Data-encoding.int64] *)
 val int_encoding : int Data_encoding.t
+
+(** Replace ['/'] characters in a local model name by ["__"] *)
+val filename_of_local_model_name : string -> string
