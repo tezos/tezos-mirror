@@ -234,10 +234,10 @@ let plot_scatter opts title input_columns outputs =
   let open Result_syntax in
   match input_columns with
   | [] ->
-      Format.kasprintf
-        Result.error
-        "Display.plot_scatter (%s): empty scatter data"
-        (Str.global_replace (Str.regexp {|\\n|}) " " title)
+      let rows = Array.length @@ Stdlib.List.hd outputs in
+      let column = ("constant axis", Array.init rows (fun _ -> 0.)) in
+      let plot = scatterplot_2d opts title column outputs in
+      return [plot]
   | [column] ->
       let plot = scatterplot_2d opts title column outputs in
       return [plot]
@@ -527,12 +527,17 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
     let kind =
       match index with None -> kind | Some i -> Format.asprintf "%s-%d" kind i
     in
+    let bench_name =
+      match List.rev (Namespace.to_list Bench.name) with
+      | "intercept" :: name :: _ -> name ^ "__intercept"
+      | name :: _ -> name
+      | [] -> assert false
+    in
     Filename.Infix.(
       dir
       // Format.asprintf
-           "%a_%s_%s"
-           Namespace.pp_short
-           Bench.name
+           "%s_%s_%s"
+           bench_name
            (Benchmark_helpers.filename_of_local_model_name model_name)
            kind)
   in
