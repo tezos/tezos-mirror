@@ -5453,14 +5453,13 @@ let hash = Protocol.hash
     in
     let test_helpers =
       only_if active @@ fun () ->
+      let name = sf "tezos-%s-test-helpers" name_dash in
       public_lib
-        (sf "tezos-%s-test-helpers" name_dash)
+        name
         ~path:
           (if active then path // "lib_protocol/test/helpers"
           else path // "lib_protocol")
-        ~opam:
-          (if active then sf "tezos-%s-test-helpers" name_dash
-          else sf "tezos-%s-test-helpers" name_dash)
+        ~opam:name
         ~internal_name:(sf "tezos_%s_test_helpers" name_underscore)
         ~synopsis:"Tezos/Protocol: protocol testing framework"
         ~opam_only_deps:[octez_protocol_environment; parameters |> if_some]
