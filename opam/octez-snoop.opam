@@ -19,6 +19,7 @@ depends: [
   "tezos-benchmarks-proto-alpha"
   "pyml"
   "prbnmcn-stats" { = "0.0.6" }
+  "tezos-version"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

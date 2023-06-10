@@ -197,7 +197,8 @@ let check_context_consistency store =
       let*! () = Node_event.(emit storage_corrupted_context_detected ()) in
       tzfail Non_recoverable_context
 
-let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
+let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess ~version
+    ~commit_info
     {
       genesis;
       chain_name;
@@ -230,7 +231,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       p2p_params
       disable_mempool
   in
-  Shell_metrics.Version.init p2p ;
+  Shell_metrics.Version.init ~version ~commit_info p2p ;
   let* validator_process, store =
     let open Block_validator_process in
     let validator_environment =
@@ -343,7 +344,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
 
 let shutdown node = node.shutdown ()
 
-let build_rpc_directory node =
+let build_rpc_directory ~version ~commit_info node =
   let dir : unit Tezos_rpc.Directory.t ref = ref Tezos_rpc.Directory.empty in
   let merge d = dir := Tezos_rpc.Directory.merge !dir d in
   let register0 s f =
@@ -355,6 +356,7 @@ let build_rpc_directory node =
        node.store) ;
   merge
     (Monitor_directory.build_rpc_directory
+       ~commit_info
        node.validator
        node.mainchain_validator) ;
   merge (Injection_directory.build_rpc_directory node.validator) ;
@@ -368,7 +370,7 @@ let build_rpc_directory node =
        ~user_activated_protocol_overrides:node.user_activated_protocol_overrides
        ~mainchain_validator:node.mainchain_validator
        node.store) ;
-  merge (Version_directory.rpc_directory node.p2p) ;
+  merge (Version_directory.rpc_directory ~version ~commit_info node.p2p) ;
   register0 Tezos_rpc.Service.error_service (fun () () ->
       Lwt.return_ok (Data_encoding.Json.schema Error_monad.error_encoding)) ;
   !dir

@@ -10,7 +10,8 @@
   tezos-base
   tezos-clic
   tezos-protocol-016-PtMumbai
-  octez_smart_rollup_client_PtMumbai)
+  octez_smart_rollup_client_PtMumbai
+  tezos-version.value)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)

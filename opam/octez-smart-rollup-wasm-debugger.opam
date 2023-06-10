@@ -19,6 +19,7 @@ depends: [
   "tezos-scoru-wasm-helpers"
   "tezos-webassembly-interpreter"
   "tezos-webassembly-interpreter-extra"
+  "tezos-version"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

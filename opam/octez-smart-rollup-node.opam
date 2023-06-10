@@ -17,6 +17,7 @@ depends: [
   "octez-node-config"
   "prometheus-app" { >= "1.2" }
   "octez-injector"
+  "tezos-version"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

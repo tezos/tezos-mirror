@@ -140,7 +140,7 @@ type driver = {
 let parse_options errflag s =
   Option.iter Location.(prerr_alert none) (Warnings.parse_options errflag s)
 
-let main {compile_ml; pack_objects; link_shared} =
+let main {compile_ml; pack_objects; link_shared} version =
   Random.self_init () ;
   parse_options false default_warnings ;
   parse_options true default_warn_error ;
@@ -173,7 +173,7 @@ let main {compile_ml; pack_objects; link_shared} =
       ( "--version",
         Unit
           (fun () ->
-            Format.printf "%s\n" Tezos_version.Bin_version.version_string ;
+            Format.printf "%s\n" version ;
             Stdlib.exit 0),
         " Display version information" );
       ( "-warning",

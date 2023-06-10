@@ -41,6 +41,7 @@ depends: [
   "tezos-scoru-wasm"
   "tezos-scoru-wasm-fast"
   "tezos-crypto-dal"
+  "tezos-version"
   "tezos-clic"
   "tezos-client-commands"
 ]

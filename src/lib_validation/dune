@@ -15,7 +15,8 @@
   tezos-shell-context
   tezos-shell-services
   tezos-protocol-updater
-  tezos-stdlib-unix)
+  tezos-stdlib-unix
+  tezos-version.value)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

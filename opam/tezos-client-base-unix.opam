@@ -24,6 +24,7 @@ depends: [
   "tezos-mockup-commands"
   "tezos-proxy"
   "tezos-signer-backends"
+  "tezos-version"
   "lwt-exit"
   "uri" { >= "3.1.0" }
   "tezt" { with-test & >= "3.1.0" }

@@ -9,7 +9,7 @@
   tezos-base
   tezos-rpc-http
   tezos-rpc-http-client-unix
-  tezos-version
+  tezos-version.value
   lwt-exit
   rlp
   rope)

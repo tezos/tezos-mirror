@@ -17,7 +17,8 @@
   tezos-benchmarks-proto-alpha
   str
   pyml
-  prbnmcn-stats)
+  prbnmcn-stats
+  tezos-version.value)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)

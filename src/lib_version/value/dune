@@ -4,13 +4,20 @@
 (env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
 
 (library
- (name tezos_version)
- (public_name tezos-version)
+ (name tezos_version_value)
+ (public_name tezos-version.value)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
+  tezos-version
   tezos-version.parser)
  (js_of_ocaml)
  (flags
   (:standard)
+  -opaque
   -open Tezos_base.TzPervasives))
+
+(rule
+ (targets generated_git_info.ml)
+ (deps (universe))
+ (action (run ../exe/get_git_info.exe)))

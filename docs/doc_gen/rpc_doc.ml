@@ -372,7 +372,15 @@ let pp_document ppf _name intro prefix rpc_dir version =
 
 let make_index node required_version =
   let open Lwt_syntax in
-  let shell_dir = Node.build_rpc_directory node in
+  let version = Tezos_version_value.Current_git_info.version in
+  let commit_info =
+    ({
+       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+       commit_date = Tezos_version_value.Current_git_info.committer_date;
+     }
+      : Tezos_version.Node_version.commit_info)
+  in
+  let shell_dir = Node.build_rpc_directory ~version ~commit_info node in
   let protocol_dirs =
     List.map
       (fun (version, name, intro, hash) ->

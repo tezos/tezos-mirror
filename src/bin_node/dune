@@ -10,6 +10,7 @@
   tezos-base
   tezos-base.unix
   tezos-version
+  tezos-version.value
   octez-node-config
   tezos-stdlib-unix
   tezos-shell-services

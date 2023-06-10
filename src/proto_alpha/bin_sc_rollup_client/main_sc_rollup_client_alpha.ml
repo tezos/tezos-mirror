@@ -45,7 +45,7 @@ let main () =
 let handle_error = function
   | Ok () -> Stdlib.exit 0
   | Error [Tezos_clic.Version] ->
-      let version = Tezos_version.Bin_version.version_string in
+      let version = Tezos_version_value.Bin_version.version_string in
       Format.printf "%s\n" version ;
       Stdlib.exit 0
   | Error [Tezos_clic.Help command] ->

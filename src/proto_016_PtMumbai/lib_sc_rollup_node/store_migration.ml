@@ -260,7 +260,7 @@ module V1_migrations = struct
         Format.asprintf
           "Rollup node %a"
           Tezos_version_parser.pp
-          Tezos_version.Current_git_info.version
+          Tezos_version_value.Current_git_info.version
       in
       let message = "Migration store from v0 to v1" in
       Irmin_store.Raw_irmin.Info.v ~author ~message date

@@ -112,7 +112,11 @@ module Chain_validator : sig
 end
 
 module Version : sig
-  val init : ('a, 'b, 'c) P2p.t -> unit
+  val init :
+    version:string ->
+    commit_info:Node_version.commit_info ->
+    ('a, 'b, 'c) P2p.t ->
+    unit
 end
 
 module Peer_validator : sig

@@ -93,8 +93,8 @@ module Baker = struct
       cctxt#message
         "Baker v%a (%s) for %a started."
         Tezos_version.Version.pp
-        Tezos_version.Current_git_info.version
-        Tezos_version.Current_git_info.abbreviated_commit_hash
+        Tezos_version_value.Current_git_info.version
+        Tezos_version_value.Current_git_info.abbreviated_commit_hash
         Protocol_hash.pp_short
         Protocol.hash
       >>= fun () ->
@@ -121,8 +121,8 @@ module Accuser = struct
       cctxt#message
         "Accuser v%a (%s) for %a started."
         Tezos_version.Version.pp
-        Tezos_version.Current_git_info.version
-        Tezos_version.Current_git_info.abbreviated_commit_hash
+        Tezos_version_value.Current_git_info.version
+        Tezos_version_value.Current_git_info.abbreviated_commit_hash
         Protocol_hash.pp_short
         Protocol.hash
       >>= fun () ->
@@ -160,8 +160,8 @@ module VDF = struct
         cctxt#message
           "VDF daemon v%a (%s) for %a started."
           Tezos_version.Version.pp
-          Tezos_version.Current_git_info.version
-          Tezos_version.Current_git_info.abbreviated_commit_hash
+          Tezos_version_value.Current_git_info.version
+          Tezos_version_value.Current_git_info.abbreviated_commit_hash
           Protocol_hash.pp_short
           Protocol.hash
       in

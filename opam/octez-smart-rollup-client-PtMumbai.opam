@@ -19,6 +19,7 @@ depends: [
   "tezos-smart-rollup-016-PtMumbai"
   "tezos-smart-rollup-layer2-016-PtMumbai"
   "tezos-clic"
+  "tezos-version"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

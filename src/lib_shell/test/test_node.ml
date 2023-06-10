@@ -111,11 +111,23 @@ let ( let*?? ) m f =
 (** Node creation in sandbox. Expects one event with status
     [p2p_layer_disabled]. *)
 let node_sandbox_initialization_events sandbox_parameters config _switch () =
+  let version =
+    Tezos_version.Version.to_string Tezos_version_value.Current_git_info.version
+  in
+  let commit_info =
+    ({
+       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+       commit_date = Tezos_version_value.Current_git_info.committer_date;
+     }
+      : Tezos_version.Node_version.commit_info)
+  in
   let*?? n =
     Node.create
       ~sandboxed:true
       ~sandbox_parameters
       ~singleprocess:true
+      ~version
+      ~commit_info
       (* Tezos_shell.Node.config *)
       config
       (* Tezos_shell.Node.peer_validator_limits *)
@@ -146,10 +158,22 @@ let node_sandbox_initialization_events sandbox_parameters config _switch () =
 (** Node creation. Expects two events with statuses
     [bootstrapping] and [p2p_maintain_started]. *)
 let node_initialization_events _sandbox_parameters config _switch () =
+  let version =
+    Tezos_version.Version.to_string Tezos_version_value.Current_git_info.version
+  in
+  let commit_info =
+    ({
+       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+       commit_date = Tezos_version_value.Current_git_info.committer_date;
+     }
+      : Tezos_version.Node_version.commit_info)
+  in
   let*?? n =
     Node.create
       ~sandboxed:false
       ~singleprocess:true
+      ~version
+      ~commit_info
       (* Tezos_shell.Node.config *)
       {config with p2p = default_p2p}
       (* Tezos_shell.Node.peer_validator_limits *)
@@ -186,10 +210,22 @@ let node_initialization_events _sandbox_parameters config _switch () =
   Node.shutdown n
 
 let node_store_known_protocol_events _sandbox_parameters config _switch () =
+  let version =
+    Tezos_version.Version.to_string Tezos_version_value.Current_git_info.version
+  in
+  let commit_info =
+    ({
+       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+       commit_date = Tezos_version_value.Current_git_info.committer_date;
+     }
+      : Tezos_version.Node_version.commit_info)
+  in
   let*?? n =
     Node.create
       ~sandboxed:false
       ~singleprocess:true
+      ~version
+      ~commit_info
       (* Tezos_shell.Node.config *)
       {config with p2p = default_p2p}
       (* Tezos_shell.Node.peer_validator_limits *)

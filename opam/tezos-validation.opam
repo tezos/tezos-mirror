@@ -19,6 +19,7 @@ depends: [
   "tezos-shell-services"
   "tezos-protocol-updater"
   "tezos-stdlib-unix"
+  "tezos-version"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

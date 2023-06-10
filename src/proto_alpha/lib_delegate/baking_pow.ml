@@ -29,8 +29,10 @@ let default_constant = "\x00\x00\x00\x05"
 
 let with_version_constant =
   let commit_hash =
-    match Hex.to_string (`Hex Tezos_version.Current_git_info.commit_hash) with
-    | None -> Tezos_version.Current_git_info.commit_hash
+    match
+      Hex.to_string (`Hex Tezos_version_value.Current_git_info.commit_hash)
+    with
+    | None -> Tezos_version_value.Current_git_info.commit_hash
     | Some s -> s
   in
   if String.length commit_hash >= 4 then String.sub commit_hash 0 4
