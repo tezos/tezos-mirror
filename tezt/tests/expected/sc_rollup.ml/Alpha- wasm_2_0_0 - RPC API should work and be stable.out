@@ -251,7 +251,7 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 null
 
 ./octez-smart-rollup-client-alpha rpc get '/global/block/head/durable/wasm_2_0_0/value?key=/readonly/wasm_version'
-"322e302e302d7231"
+"322e302e302d7232"
 
 ./octez-smart-rollup-client-alpha rpc get '/global/block/head/durable/wasm_2_0_0/length?key=/readonly/wasm_version'
 "8"
