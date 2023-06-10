@@ -4408,6 +4408,18 @@ Constraints: 254898
 SHA256.test_digestabcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq_optimized:
 Constraints: 253938
 
+SHA512.test_digestabc:
+Constraints: 324914
+
+SHA512.test_digestabc_optimized:
+Constraints: 323866
+
+SHA512.test_digestabcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu:
+Constraints: 649650
+
+SHA512.test_digestabcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu_optimized:
+Constraints: 647730
+
 SHA256.test_ch:
 Constraints: 72
 
