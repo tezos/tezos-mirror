@@ -45,17 +45,12 @@ include Daemon.Make (Parameters)
 
 let path = "./octez-evm-proxy-server"
 
-let connection_arguments ?rpc_addr ?rpc_port rollup_node_endpoint =
+let connection_arguments ?rpc_addr ?rpc_port () =
   let open Cli_arg in
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
   in
-  ( [
-      "--rollup-node-endpoint";
-      rollup_node_endpoint;
-      "--rpc-port";
-      string_of_int rpc_port;
-    ]
+  ( ["--rpc-port"; string_of_int rpc_port]
     @ optional_arg "--rpc-addr" Fun.id rpc_addr,
     Option.value ~default:"127.0.0.1" rpc_addr,
     rpc_port )
@@ -95,13 +90,8 @@ let wait_for_ready proxy_server =
       check_event proxy_server event_ready_name promise
 
 let create ?runner ?rpc_addr ?rpc_port rollup_node =
-  let rollup_node_endpoint =
-    match rollup_node with
-    | None -> "mockup"
-    | Some rollup_node -> Sc_rollup_node.endpoint rollup_node
-  in
   let arguments, rpc_addr, rpc_port =
-    connection_arguments ?rpc_addr ?rpc_port rollup_node_endpoint
+    connection_arguments ?rpc_addr ?rpc_port ()
   in
   let proxy_server =
     create
@@ -117,12 +107,19 @@ let mockup ?runner ?rpc_addr ?rpc_port () =
 let create ?runner ?rpc_addr ?rpc_port rollup_node =
   create ?runner ?rpc_addr ?rpc_port (Some rollup_node)
 
+let rollup_node_endpoint proxy_server =
+  match proxy_server.persistent_state.rollup_node with
+  | Some rollup_node -> Sc_rollup_node.endpoint rollup_node
+  | None -> "mockup"
+
 let run proxy_server =
   let* () =
     run
       proxy_server
       {ready = false}
-      (["run"] @ proxy_server.persistent_state.arguments)
+      (["run"; "with"; "endpoint"]
+      @ [rollup_node_endpoint proxy_server]
+      @ proxy_server.persistent_state.arguments)
   in
   let* () = wait_for_ready proxy_server in
   unit
@@ -131,7 +128,11 @@ let spawn_command proxy_server args =
   Process.spawn ?runner:proxy_server.persistent_state.runner path @@ args
 
 let spawn_run proxy_server =
-  spawn_command proxy_server (["run"] @ proxy_server.persistent_state.arguments)
+  spawn_command
+    proxy_server
+    (["run"; "with"; "endpoint"]
+    @ [rollup_node_endpoint proxy_server]
+    @ proxy_server.persistent_state.arguments)
 
 let endpoint (proxy_server : t) =
   Format.sprintf

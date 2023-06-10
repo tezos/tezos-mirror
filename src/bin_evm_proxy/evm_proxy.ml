@@ -47,10 +47,7 @@ let make_config ?rpc_addr ?rpc_port ?debug ~rollup_node_endpoint () =
     rpc_addr = Option.value ~default:default_config.rpc_addr rpc_addr;
     rpc_port = Option.value ~default:default_config.rpc_port rpc_port;
     debug = Option.value ~default:default_config.debug debug;
-    rollup_node_endpoint =
-      Option.value
-        ~default:default_config.rollup_node_endpoint
-        rollup_node_endpoint;
+    rollup_node_endpoint;
   }
 
 let install_finalizer server =
@@ -165,13 +162,12 @@ let rpc_port_arg =
     ~doc:"The EVM proxy server rpc port."
     Params.int
 
-let rollup_node_endpoint_arg =
-  Tezos_clic.arg
-    ~long:"rollup-node-endpoint"
-    ~placeholder:"ADDR:PORT"
-    ~doc:
-      "The smart rollup node endpoint address the proxy server will \
-       communicate with, or [mockup] if you want to use mock values."
+let rollup_node_endpoint_param =
+  Tezos_clic.param
+    ~name:"rollup-node-endpoint"
+    ~desc:
+      "The smart rollup node endpoint address (as ADDR:PORT) the proxy server \
+       will communicate with, or [mockup] if you want to use mock values."
     Params.rollup_node_endpoint
 
 let main_command =
@@ -179,9 +175,9 @@ let main_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the RPC server"
-    (args3 rpc_addr_arg rpc_port_arg rollup_node_endpoint_arg)
-    (prefixes ["run"] @@ stop)
-    (fun (rpc_addr, rpc_port, rollup_node_endpoint) () ->
+    (args2 rpc_addr_arg rpc_port_arg)
+    (prefixes ["run"; "with"; "endpoint"] @@ rollup_node_endpoint_param @@ stop)
+    (fun (rpc_addr, rpc_port) rollup_node_endpoint () ->
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
       let*! () = Internal_event.Simple.emit Event.event_starting () in
       let config = make_config ?rpc_addr ?rpc_port ~rollup_node_endpoint () in
@@ -196,38 +192,53 @@ let commands = [main_command]
 
 let global_options = Tezos_clic.no_options
 
+let executable_name = Filename.basename Sys.executable_name
+
+let argv () = Array.to_list Sys.argv |> List.tl |> Stdlib.Option.get
+
 let dispatch initial_ctx args =
   let open Lwt_result_syntax in
+  let commands =
+    Tezos_clic.add_manual
+      ~executable_name
+      ~global_options
+      (if Unix.isatty Unix.stdout then Tezos_clic.Ansi else Tezos_clic.Plain)
+      Format.std_formatter
+      commands
+  in
   let* ctx, remaining_args =
     Tezos_clic.parse_global_options global_options initial_ctx args
   in
   Tezos_clic.dispatch commands ctx remaining_args
 
-let () =
-  ignore
-    Tezos_clic.(
-      setup_formatter
-        Format.std_formatter
-        (if Unix.isatty Unix.stdout then Ansi else Plain)
-        Short) ;
-  let args = Array.to_list Sys.argv |> List.tl |> Option.value ~default:[] in
-  let result = Lwt_main.run (dispatch () args) in
-  match result with
+let handle_error = function
   | Ok _ -> ()
   | Error [Tezos_clic.Version] ->
       let version = Tezos_version_value.Bin_version.version_string in
       Format.printf "%s\n" version ;
       exit 0
-  | Error e ->
-      Format.eprintf
-        "%a\n%!"
-        Tezos_clic.(
-          fun ppf errs ->
-            pp_cli_errors
-              ppf
-              ~executable_name:"evm_proxy"
-              ~global_options:no_options
-              ~default:pp
-              errs)
-        e ;
-      exit 1
+  | Error [Tezos_clic.Help command] ->
+      Tezos_clic.usage
+        Format.std_formatter
+        ~executable_name
+        ~global_options
+        (match command with None -> [] | Some c -> [c]) ;
+      Stdlib.exit 0
+  | Error errs ->
+      Tezos_clic.pp_cli_errors
+        Format.err_formatter
+        ~executable_name
+        ~global_options
+        ~default:Error_monad.pp
+        errs ;
+      Stdlib.exit 1
+
+let () =
+  let _ =
+    Tezos_clic.(
+      setup_formatter
+        Format.std_formatter
+        (if Unix.isatty Unix.stdout then Ansi else Plain)
+        Short)
+  in
+  Lwt_main.run (dispatch () (argv ())) |> handle_error
