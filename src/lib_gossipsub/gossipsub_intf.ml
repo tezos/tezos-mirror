@@ -227,9 +227,9 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
           [PrunePeers] in the Go implementation.) *)
   unsubscribe_backoff : 'span;
       (** The duration that prevent reconnections after leaving a topic to our full connections. *)
-  graft_flood_backoff : 'span;
-      (** The duration added when a peer tries to graft our connection
-          too soon. *)
+  graft_flood_threshold : 'span;
+      (** If a graft comes before [graft_flood_threshold] has elapsed since the last prune,
+          then there is an extra score penalty applied to the peer through P7. *)
   prune_backoff : 'span;  (** The duration added when we prune a peer. *)
   retain_duration : 'span;
       (** The duration added to remove metadata about a disconnected peer. *)

@@ -353,7 +353,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let unsubscribe_backoff state = state.limits.unsubscribe_backoff
 
-    let graft_flood_backoff state = state.limits.graft_flood_backoff
+    let graft_flood_threshold state = state.limits.graft_flood_threshold
 
     let retain_duration state = state.limits.retain_duration
 
@@ -882,13 +882,16 @@ module Make (C : AUTOMATON_CONFIG) :
           if Time.(current >= backoff_expire) then unit
           else
             let score = Score.penalty score 1 in
-            let*! graft_flood_backoff in
+            let*! graft_flood_threshold in
+            let*! prune_backoff in
+            (* Calculate the last prune time
+               based on the recored backoff expire time and prune backoff. *)
+            let last_prune_time = Time.(sub backoff_expire prune_backoff) in
             let score =
-              if Time.(current < add backoff_expire graft_flood_backoff) then
+              if Time.(current < add last_prune_time graft_flood_threshold) then
                 Score.penalty score 1
               else score
             in
-            let*! prune_backoff in
             let* () = set_backoff_for_peer prune_backoff topic peer in
             let* () = add_score peer score in
             fail Peer_backed_off
@@ -1888,7 +1891,7 @@ module Make (C : AUTOMATON_CONFIG) :
      Graft messages:
      - Receiving a Graft message within the backoff period (given by
        [prune_backoff] or [unsubscribed_backoff]) is punished. Receiving such a
-       Graft very soon (before [prune_backoff + graft_flood_backoff]) is punished
+       Graft very soon (before [last_prune_time + graft_flood_threshold]) is punished
        further.
      - Receiving a duplicate of an accepted Graft request is not punished, the
        automaton simply returns [Peer_already_in_mesh]. In all other failure cases
