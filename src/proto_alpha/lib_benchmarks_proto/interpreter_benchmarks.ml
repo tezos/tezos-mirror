@@ -1138,7 +1138,7 @@ module Registration_section = struct
     let () =
       benchmark_with_fixed_stack
         ~name:Interpreter_workload.N_IOpt_map
-        ~salt:"none"
+        ~salt:"_none"
         ~stack:(None, ((), eos))
         ~stack_type:(option unit @$ unit @$ bot)
         ~kinstr:(IOpt_map {loc = dummy_loc; body = halt; k = halt})
@@ -1147,7 +1147,7 @@ module Registration_section = struct
     let () =
       benchmark_with_fixed_stack
         ~name:Interpreter_workload.N_IOpt_map
-        ~salt:"some"
+        ~salt:"_some"
         ~stack:(Some (), ((), eos))
         ~stack_type:(option unit @$ unit @$ bot)
         ~kinstr:(IOpt_map {loc = dummy_loc; body = halt; k = halt})

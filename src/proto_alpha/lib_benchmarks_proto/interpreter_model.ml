@@ -338,7 +338,13 @@ module Models = struct
   let empty_branch_model name =
     branching_model ~case_0:"empty" ~case_1:"nonempty" name
 
-  let apply_model name = branching_model ~case_0:"lam" ~case_1:"lamrec" name
+  let option_branch_model name =
+    (* This model takes a boolean argument representing whether it is some or none *)
+    branching_model ~case_0:"none" ~case_1:"some" name
+
+  let lambda_model name =
+    (* branch whether lambda is rec or nonrec *)
+    branching_model ~case_0:"lam" ~case_1:"lamrec" name
 
   let join_tickets_model name =
     let module M = struct
@@ -434,14 +440,14 @@ let ir_model instr_or_cont =
   | Instr_name instr -> (
       match instr with
       | N_IDrop | N_IDup | N_ISwap | N_IPush | N_IUnit | N_ICons_pair | N_ICar
-      | N_ICdr | N_ICons_some | N_ICons_none | N_IIf_none | N_IOpt_map | N_ILeft
-      | N_IRight | N_IIf_left | N_ICons_list | N_INil | N_IIf_cons
-      | N_IEmpty_set | N_IEmpty_map | N_IEmpty_big_map | N_IOr | N_IAnd | N_IXor
-      | N_INot | N_IIf | N_ILoop | N_ILoop_left | N_IDip | N_IExec | N_IView
-      | N_ILambda | N_IFailwith | N_IAddress | N_ICreate_contract
-      | N_ISet_delegate | N_INow | N_IMin_block_time | N_IBalance | N_IHash_key
-      | N_IUnpack | N_ISource | N_ISender | N_ISelf | N_IAmount | N_IChainId
-      | N_ILevel | N_ISelf_address | N_INever | N_IUnpair | N_IVoting_power
+      | N_ICdr | N_ICons_some | N_ICons_none | N_IIf_none | N_ILeft | N_IRight
+      | N_IIf_left | N_ICons_list | N_INil | N_IIf_cons | N_IEmpty_set
+      | N_IEmpty_map | N_IEmpty_big_map | N_IOr | N_IAnd | N_IXor | N_INot
+      | N_IIf | N_ILoop | N_ILoop_left | N_IDip | N_IExec | N_IView
+      | N_IFailwith | N_IAddress | N_ICreate_contract | N_ISet_delegate | N_INow
+      | N_IMin_block_time | N_IBalance | N_IHash_key | N_IUnpack | N_ISource
+      | N_ISender | N_ISelf | N_IAmount | N_IChainId | N_ILevel
+      | N_ISelf_address | N_INever | N_IUnpair | N_IVoting_power
       | N_ITotal_voting_power | N_IList_size | N_ISet_size | N_IMap_size
       | N_ISapling_empty_state ->
           const1_model name |> m
@@ -527,10 +533,12 @@ let ir_model instr_or_cont =
       | N_IMap_iter -> affine_model name |> m
       | N_ISet_iter -> affine_model name |> m
       | N_IHalt -> const1_model name |> m
-      | N_IApply -> apply_model name |> m
+      | N_IApply -> lambda_model name |> m
+      | N_ILambda -> lambda_model name |> m
       | N_ILog -> const1_model name |> m
       | N_IOpen_chest -> open_chest_model name |> m
-      | N_IEmit -> const1_model name |> m)
+      | N_IEmit -> const1_model name |> m
+      | N_IOpt_map -> option_branch_model name |> m)
   | Cont_name cont -> (
       match cont with
       | N_KNil -> const1_model name |> m
