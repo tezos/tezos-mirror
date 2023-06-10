@@ -289,8 +289,7 @@ a:hover {
 }
 
 .wy-nav-content {
-    max-width: unset;
-    height: 100vh;
+    min-height: 100vh;
     overflow-y: auto;
     overflow-x: hidden;
 }
