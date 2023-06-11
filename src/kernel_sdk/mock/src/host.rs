@@ -247,7 +247,7 @@ mod tests {
     use super::MockHost;
 
     use crate::state::HostState;
-    use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
+    use tezos_smart_rollup_core::{MAX_FILE_CHUNK_SIZE, MAX_INPUT_MESSAGE_SIZE};
     use tezos_smart_rollup_host::input::Message;
     use tezos_smart_rollup_host::{
         metadata::RollupMetadata,
@@ -374,5 +374,61 @@ mod tests {
         let value_size = state.handle_store_value_size(path).unwrap();
 
         assert_eq!(size, value_size)
+    }
+
+    #[test]
+    fn store_read_and_write_all() {
+        let mut mock = MockHost::default();
+        const PATH: RefPath = RefPath::assert_from(b"/path/value");
+
+        let value: Vec<u8> = (0..MAX_FILE_CHUNK_SIZE * 2 + 100)
+            .map(|v| (v % 100).try_into().unwrap())
+            .collect();
+
+        Runtime::store_write_all(&mut mock, &PATH, &value)
+            .expect("Could not write value to store");
+
+        let value_in_durable = Runtime::store_read_all(&mock, &PATH)
+            .expect("Could not read the value from the store");
+
+        let size = mock.store_value_size(&PATH);
+
+        assert_eq!(Ok(value.len()), size);
+        assert_eq!(value_in_durable, value);
+    }
+
+    #[test]
+    fn store_write_all_delete_previous_value() {
+        let mut mock = MockHost::default();
+        const PATH: RefPath = RefPath::assert_from(b"/path/value");
+
+        // First write a value of size ~4.2KB
+        let initial_value: Vec<u8> = (0..MAX_FILE_CHUNK_SIZE * 2 + 100)
+            .map(|v| (v % 100).try_into().unwrap())
+            .collect();
+
+        Runtime::store_write_all(&mut mock, &PATH, &initial_value)
+            .expect("Could not write value to store");
+        let initial_size = mock.store_value_size(&PATH).expect("Could not read size");
+        let initial_value_in_store = Runtime::store_read_all(&mock, &PATH)
+            .expect("Could not read the value from the store");
+
+        // Then write a new value of size ~2.1 KB
+        let smaller_value: Vec<u8> = (0..MAX_FILE_CHUNK_SIZE + 100)
+            .map(|v| (v % 50).try_into().unwrap())
+            .collect();
+
+        Runtime::store_write_all(&mut mock, &PATH, &smaller_value)
+            .expect("Could not write value to store");
+        let new_size = mock.store_value_size(&PATH).expect("Could not read size");
+        let new_value_in_store = Runtime::store_read_all(&mock, &PATH)
+            .expect("Could not read the value from the store");
+
+        // The size of the value in the storage should have been shrinked, and
+        // the new value read from the storage shouldn't be equal to the initial
+        // one.
+        assert!(new_size < initial_size);
+        assert_ne!(new_value_in_store, initial_value_in_store);
+        assert_eq!(new_value_in_store, smaller_value);
     }
 }
