@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,18 +26,28 @@
 
 open Runnable.Syntax
 
+type endpoint = Node of Dac_node.t | Foreign_endpoint of Foreign_endpoint.t
+
 type t = {
   name : string;
   path : string;
-  dac_node : Dac_node.t;
+  dac_node : endpoint;
   base_dir : string;
   color : Log.Color.t;
   runner : Runner.t option;
 }
 
+let rpc_host = function
+  | Node dac_node -> Dac_node.rpc_host dac_node
+  | Foreign_endpoint foreign -> Foreign_endpoint.rpc_host foreign
+
+let rpc_port = function
+  | Node dac_node -> Dac_node.rpc_port dac_node
+  | Foreign_endpoint foreign -> Foreign_endpoint.rpc_port foreign
+
 let next_name = ref 1
 
-let path = "./octez-dac-client"
+let default_path = "./octez-dac-client"
 
 let fresh_name () =
   let index = !next_name in
@@ -45,12 +56,17 @@ let fresh_name () =
 
 let () = Test.declare_reset_function @@ fun () -> next_name := 1
 
-let create ?runner ?name ?base_dir ?(color = Log.Color.FG.green) dac_node =
+let create_with_endpoint ?runner ?name ?path ?base_dir
+    ?(color = Log.Color.FG.green) endpoint =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
     match base_dir with None -> Temp.dir ?runner name | Some dir -> dir
   in
-  {name; path; dac_node; base_dir; color; runner}
+  let path = Option.value ~default:default_path path in
+  {name; path; dac_node = endpoint; base_dir; color; runner}
+
+let create ?runner ?name ?path ?base_dir ?color dac_node =
+  create_with_endpoint ?runner ?name ?path ?base_dir ?color (Node dac_node)
 
 let base_dir_arg dac_client = ["--base-dir"; dac_client.base_dir]
 
@@ -96,8 +112,8 @@ let send_hex_payload ?hooks ?threshold dac_client hex_payload =
   let coordinator_endpoint =
     Printf.sprintf
       "%s:%d"
-      (Dac_node.rpc_host dac_client.dac_node)
-      (Dac_node.rpc_port dac_client.dac_node)
+      (rpc_host dac_client.dac_node)
+      (rpc_port dac_client.dac_node)
   in
   let threshold_arg =
     match threshold with
@@ -127,8 +143,8 @@ let send_payload_from_file ?hooks ?threshold dac_client filename =
   let coordinator_endpoint =
     Printf.sprintf
       "%s:%d"
-      (Dac_node.rpc_host dac_client.dac_node)
-      (Dac_node.rpc_port dac_client.dac_node)
+      (rpc_host dac_client.dac_node)
+      (rpc_port dac_client.dac_node)
   in
   let threshold_arg =
     match threshold with
@@ -158,8 +174,8 @@ let get_certificate ?hooks dac_client hex_root_hash =
   let coordinator_endpoint =
     Printf.sprintf
       "%s:%d"
-      (Dac_node.rpc_host dac_client.dac_node)
-      (Dac_node.rpc_port dac_client.dac_node)
+      (rpc_host dac_client.dac_node)
+      (rpc_port dac_client.dac_node)
   in
   let*? process =
     spawn_command
