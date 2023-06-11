@@ -76,6 +76,10 @@ where
         self.host.store_read_slice(path, from_offset, buffer)
     }
 
+    fn store_read_all(&self, path: &impl Path) -> Result<Vec<u8>, RuntimeError> {
+        self.host.store_read_all(path)
+    }
+
     fn store_write<T: Path>(
         &mut self,
         path: &T,

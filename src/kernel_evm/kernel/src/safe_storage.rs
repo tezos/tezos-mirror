@@ -56,6 +56,11 @@ impl<Host: Runtime> Runtime for SafeStorage<&mut Host> {
         self.0.store_read_slice(&path, from_offset, buffer)
     }
 
+    fn store_read_all(&self, path: &impl Path) -> Result<Vec<u8>, RuntimeError> {
+        let path = safe_path(path)?;
+        self.0.store_read_all(&path)
+    }
+
     fn store_write<T: Path>(
         &mut self,
         path: &T,
