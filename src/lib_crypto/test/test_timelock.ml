@@ -153,16 +153,9 @@ let test_low_level_negative () =
 let test_sampler_and_get_plaintext_size () =
   let open Timelock in
   let rng_state = Random.get_state () in
-  (* used to check determinism*)
-  let rng_state_same = Random.get_state () in
   let time = Int.shift_left 1 10 in
   let chest, chest_key = chest_sampler ~rng_state ~plaintext_size:100 ~time in
   assert (get_plaintext_size chest = 100) ;
-  let chest_same, chest_key_same =
-    chest_sampler ~rng_state:rng_state_same ~plaintext_size:100 ~time
-  in
-  (* Check determinism*)
-  assert (chest = chest_same && chest_key = chest_key_same) ;
   match open_chest chest chest_key ~time with
   | Correct _ -> ()
   | _ -> assert false

@@ -347,7 +347,9 @@ let get_plaintext_size chest =
   Bytes.length chest.ciphertext.payload - Crypto_box.tag_length
 
 let open_chest chest chest_key ~time =
-  if time < 0 then failwith "Timelock: trying to open with a negative time"
+  if time <= 0 then
+    raise
+      (Invalid_argument "Timelock.open_chest: the time bound must be positive")
   else
     let sym_key_opt =
       locked_value_to_symmetric_key
@@ -384,55 +386,13 @@ end
 (* Those function are unsafe for wallet usage as they use the OCaml
    random generator. This is used to easily reproduce benchmarks. *)
 
-let vdf_tuples =
-  Array.map
-    (Data_encoding.Binary.of_string_exn vdf_tuple_encoding)
-    Timelock_precompute.vdf_tuples
-
-let gen_random_bytes_bench_unsafe size =
-  Bytes.init size (fun _ -> Char.chr (Random.int 256))
-
-let gen_random_z_unsafe size =
-  gen_random_bytes_bench_unsafe size |> Bytes.to_string |> Z.of_bits
-
-let encrypt_unsafe symmetric_key plaintext =
-  let nonce =
-    Data_encoding.Binary.of_bytes_exn
-      Crypto_box.nonce_encoding
-      (gen_random_bytes_bench_unsafe Crypto_box.nonce_size)
-  in
-  {
-    nonce;
-    payload = Crypto_box.Secretbox.secretbox symmetric_key plaintext nonce;
-  }
-
-let proof_of_vdf_tuple_unsafe rsa_public ~time vdf_tuple =
-  if verify_wesolowski rsa_public ~time vdf_tuple then
-    let nonce =
-      gen_random_z_unsafe (128 + (Z.to_bits rsa_public |> String.length))
-    in
-    let randomized_locked_value =
-      Z.powm vdf_tuple.locked_value nonce rsa_public
-    in
-    let proof = {vdf_tuple; nonce} in
-    (randomized_locked_value, proof)
-  else raise (Invalid_argument "Timelock tuple verification failed.")
+let gen_random_bytes_bench_unsafe ~rng_state size =
+  Bytes.init size (fun _ -> Char.chr (Random.State.int rng_state 256))
 
 let chest_sampler ~rng_state ~plaintext_size ~time =
-  Random.set_state rng_state ;
-  let plaintext = gen_random_bytes_bench_unsafe plaintext_size in
-  (* As we only benchmark the type encodings and the verification function,
-     it is safe to sample chests on known precomputed tuples in order to
-     generate them quickly. As such, we assert here that the time input is a
-     power of 2 lower than 30 (we only precomputed tuples up to that value). *)
-  let locked_value, proof =
-    let log_time = Float.(of_int time |> log2 |> to_int) in
-    let vdf_tuple =
-      if log_time < 30 then vdf_tuples.(log_time)
-      else failwith "Timelock: trying to sample chest with too high time."
-    in
-    proof_of_vdf_tuple_unsafe rsa2048 ~time vdf_tuple
-  in
-  let sym_key = timelock_proof_to_symmetric_key rsa2048 proof in
-  let ciphertext = encrypt_unsafe sym_key plaintext in
-  ({locked_value; rsa_public = rsa2048; ciphertext}, proof)
+  if time <= 0 then
+    raise
+      (Invalid_argument "Timelock.open_chest: the time bound must be positive") ;
+  let plaintext = gen_random_bytes_bench_unsafe ~rng_state plaintext_size in
+  (* [create_chest_and_chest_key] uses random not based on [rng_state] *)
+  create_chest_and_chest_key ~payload:plaintext ~time ()

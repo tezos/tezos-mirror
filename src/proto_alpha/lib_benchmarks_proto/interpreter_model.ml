@@ -272,7 +272,8 @@ module Models = struct
           lam ~name:"size1" @@ fun size1 ->
           lam ~name:"size2" @@ fun size2 ->
           free ~name:(fv (sf "%s_const" name))
-          + (free ~name:(fv (sf "%s_log_time_coeff" name)) * size1)
+          + free ~name:(fv (sf "%s_log_time_coeff" name))
+            * sat_sub size1 (int 1)
           + (free ~name:(fv (sf "%s_plaintext_coeff" name)) * size2)
       end
 
