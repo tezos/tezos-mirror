@@ -97,17 +97,6 @@ Breaking Changes
   baker's spendable balance to their frozen deposits. Bakers need to use the
   ``stake`` pseudo-operation to increase their frozen deposits. (MR :gl:`!8087`)
 
-- The Exponential Moving Average of the Liquidity Baking Toggle Vote
-  is now represented on 64 bits (instead of 32 bits in previous
-  versions of the protocol). This affects the binary and JSON
-  encodings of block receipts, the
-  ``liquidity_baking_toggle_ema_threshold`` parameter, and the
-  ``liquidity_baking_escape_ema`` field of the context. Note that in
-  JSON, 32-bit integers are represented as JSON numbers but 64-bit
-  integers are represented as JSON strings. (MR :gl:`!8987`)
-
-- The context field ``liquidity_baking_escape_ema`` is renamed
-  ``liquidity_baking_toggle_ema``. (MR :gl:`!8987`)
 
 RPC Changes
 -----------
