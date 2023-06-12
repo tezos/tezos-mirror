@@ -61,7 +61,8 @@ SDK
 - Add ``store_read_all`` and ``store_write_all`` to read (resp. write) a full value from (to) the
   storage, leveraging the need to chunk the reading (resp. writing).
 
-Installer client
+Installer client/kernel
 ----------------
 
 - Installer now reboots following successful upgrade, rather than proceeding directly to the next level.
+- make ``install_kernel`` public to allow non-installer kernels to re-use upgrade mechanism.
