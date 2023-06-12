@@ -2885,6 +2885,54 @@ end
 (** [Api_regression] is a module that encapsulates schema regression tests of
     the DAC API. Here we test the binding contracts of the versioned API. *)
 module Api_regression = struct
+  (** [rpc_call_with_regression_test] is used for SCHEMA regression testing the
+      RPCs. A call to this function in addition to calling an RPC, captures the
+      following arguments:
+        1. RPC_REQUEST_URI
+        2. RPC_REQUEST_HEADER
+        3. RPC_REQUEST_BODY 
+        4. RPC_RESPONSE_BODY
+
+      As such with the call to this function we:
+        1. Test binding contract of RPC request.
+        2. Test binding contract of RPC response. *)
+  let rpc_call_with_regression_test ?body_json ~path_and_query verb dac_node =
+    let url =
+      Format.sprintf
+        "http://%s:%d/%s"
+        (Dac_node.rpc_host dac_node)
+        (Dac_node.rpc_port dac_node)
+        path_and_query
+    in
+    let uri = Uri.of_string url in
+    let () =
+      Regression.capture
+        (sf
+           "RPC_REQUEST_URI: %s $SCHEME://$HOST:$PORT/%s"
+           (Cohttp.Code.string_of_method verb)
+           path_and_query)
+    in
+    let headers =
+      Cohttp.Header.of_list [("Content-Type", "application/json")]
+    in
+    let () =
+      Regression.capture
+      @@ sf "RPC_REQUEST_HEADER: %s" (Cohttp.Header.to_string headers)
+    in
+    let body =
+      Option.map
+        (fun body ->
+          let json = JSON.unannotate body in
+          let raw_json = JSON.encode_u json in
+          let () = Regression.capture @@ sf "RPC_REQUEST_BODY: %s" raw_json in
+          let request_body = Cohttp_lwt.Body.of_string raw_json in
+          request_body)
+        body_json
+    in
+    let* _respone, body = Cohttp_lwt_unix.Client.call ~headers ?body verb uri in
+    let* raw_body = Cohttp_lwt.Body.to_string body in
+    return @@ Regression.capture @@ sf "RPC_RESPONSE_BODY: %s" raw_body
+
   (** [V0] module is used for regression testing [V0] API. *)
   module V0 = struct end
 end
