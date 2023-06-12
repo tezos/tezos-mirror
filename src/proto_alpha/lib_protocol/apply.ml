@@ -45,6 +45,7 @@ type error +=
   | Invalid_self_transaction_destination
   | Staking_for_nondelegate_while_costaking_disabled
   | Staking_to_delegate_that_refuses_costaking
+  | Stake_modification_with_no_delegate_set
   | Invalid_nonzero_transaction_amount of Tez.t
   | Invalid_unstake_request_amount of {requested_amount : Z.t}
   | Invalid_staking_parameters_sender
@@ -240,6 +241,19 @@ let () =
     (function
       | Staking_for_nondelegate_while_costaking_disabled -> Some () | _ -> None)
     (fun () -> Staking_for_nondelegate_while_costaking_disabled) ;
+  let stake_modification_without_delegate_description =
+    "(Un)Stake operations are only allowed when delegate is set."
+  in
+  register_error_kind
+    `Permanent
+    ~id:"operations.stake_modification_wiht_no_delegate_set"
+    ~title:"(Un)staking without any delegate set"
+    ~description:stake_modification_without_delegate_description
+    ~pp:(fun ppf () ->
+      Format.pp_print_string ppf stake_modification_without_delegate_description)
+    Data_encoding.unit
+    (function Stake_modification_with_no_delegate_set -> Some () | _ -> None)
+    (fun () -> Stake_modification_with_no_delegate_set) ;
   let staking_to_delegate_that_refuses_costaking_description =
     "The delegate currently does not accept staking operations from sources \
      other than itself: its `staking_over_baking_limit` parameter is set to 0."
@@ -375,7 +389,7 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
   in
   let* delegate_opt = Contract.Delegate.find ctxt contract in
   match delegate_opt with
-  | None -> tzfail Staking_for_nondelegate_while_costaking_disabled
+  | None -> tzfail Stake_modification_with_no_delegate_set
   | Some delegate ->
       let allowed =
         Signature.Public_key_hash.(delegate = sender)
@@ -439,7 +453,7 @@ let apply_unstake ~ctxt ~sender ~amount ~requested_amount ~destination
   let sender_contract = Contract.Implicit sender in
   let* delegate_opt = Contract.Delegate.find ctxt sender_contract in
   match delegate_opt with
-  | None -> tzfail Staking_for_nondelegate_while_costaking_disabled
+  | None -> tzfail Stake_modification_with_no_delegate_set
   | Some delegate ->
       let* ctxt, balance_updates =
         Staking.request_unstake ctxt ~sender_contract ~delegate requested_amount
