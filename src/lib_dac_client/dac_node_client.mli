@@ -49,14 +49,11 @@ module V0 : sig
   val get_preimage :
     #cctxt -> page_hash:Dac_plugin.raw_hash -> bytes tzresult Lwt.t
 
-  (** [post_store_preimage cctxt ~payload ~pagination_scheme] posts a [payload]
-      to v0/store_preimage using a given [pagination_scheme]. It returns the hex
-      encoded root page hash and the raw bytes. *)
+  (** [post_store_preimage cctxt ~payload] posts a [payload]
+      to v0/store_preimage. It returns the hex encoded root page hash 
+      and the raw bytes. *)
   val post_store_preimage :
-    #cctxt ->
-    payload:bytes ->
-    pagination_scheme:Pagination_scheme.t ->
-    (Dac_plugin.raw_hash * bytes) tzresult Lwt.t
+    #cctxt -> payload:bytes -> (Dac_plugin.raw_hash * bytes) tzresult Lwt.t
 
   (** [get_verify_signature cctxt ~external_message] requests the DAC node to
       verify the signature of the external message [external_message] via

@@ -460,10 +460,8 @@ module Call_endpoint = struct
     let get_preimage dac_node page_hash =
       RPC.call dac_node (Dac_rpc.V0.get_preimage page_hash)
 
-    let post_store_preimage dac_node ~payload ~pagination_scheme =
-      RPC.call
-        dac_node
-        (Dac_rpc.V0.post_store_preimage ~payload ~pagination_scheme)
+    let post_store_preimage dac_node ~payload =
+      RPC.call dac_node (Dac_rpc.V0.post_store_preimage ~payload)
 
     let get_verify_signature dac_node external_message =
       RPC.call dac_node (Dac_rpc.V0.get_verify_signature external_message)

@@ -59,7 +59,7 @@ module V0 : sig
     Client_keys.aggregate_sk_uri option trace ->
     Page_store.Filesystem.t ->
     Dac_plugin.raw_hash Data_streamer.t ->
-    bytes * Pagination_scheme.t ->
+    bytes ->
     (Dac_plugin.raw_hash * bytes, tztrace) result Lwt.t
 
   (** [handle_get_verify_signature] is a handler for "GET v0/verify_signature". *)

@@ -28,15 +28,14 @@
     1M/tps demo. The plan is to remove it once we get rid of the 
     [Legacy] mode. Use at your own risk! *)
 module V0 : sig
-  (** "POST v0/store_preimage" stores a payload using a given
-    [pagination_scheme]. It returns the base58 encoded root page hash 
-    and the raw bytes. *)
+  (** "POST v0/store_preimage" stores a payload. It returns the 
+  base58 encoded root page hash and the raw bytes. *)
   val post_store_preimage :
     ( [`POST],
       unit,
       unit,
       unit,
-      Bytes.t * Pagination_scheme.t,
+      Bytes.t,
       Dac_plugin.raw_hash * Bytes.t )
     Tezos_rpc.Service.service
 

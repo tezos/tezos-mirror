@@ -169,17 +169,3 @@ module Merkle_tree : sig
   end
 end
 
-(** Encoding of DAC payload as a Hash Chain/Merkle List. The encoding
-    implementation is specific to the Arith PVM. *)
-module Hash_chain : sig
-  module V0 : sig
-    val serialize_payload :
-      Dac_plugin.t ->
-      for_each_page:(Dac_plugin.hash * bytes -> unit tzresult Lwt.t) ->
-      bytes ->
-      Dac_plugin.hash tzresult Lwt.t
-
-    val make_hash_chain :
-      Dac_plugin.t -> bytes -> ((Dac_plugin.hash * bytes) list, 'a) result
-  end
-end
