@@ -52,8 +52,11 @@ module V2_0_0 : sig
       | Waiting_for_input_message
       | Waiting_for_reveal of Sc_rollup_PVM_sig.reveal
 
-    (** [get_status state] gives you the current execution status for the PVM. *)
-    val get_status : state -> status Lwt.t
+    (** [get_status ~is_reveal_enabled state] gives you the current execution status for the PVM. *)
+    val get_status :
+      is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
+      state ->
+      status Lwt.t
 
     (** [get_outbox outbox_level state] returns the outbox in [state]
        for a given [outbox_level]. *)

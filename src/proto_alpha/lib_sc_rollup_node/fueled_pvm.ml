@@ -128,6 +128,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
         mode, they will be made. *)
   let eval_until_input (node_ctxt : _ Node_context.t) reveal_map level
       message_index ~fuel start_tick failing_ticks state =
+    let is_reveal_enabled _ _ = true in
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
     let module PVM = (val node_ctxt.pvm) in
@@ -185,6 +186,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
                 ~reveal_builtins
                 ~write_debug:(Printer node_ctxt.kernel_debug_logger)
                 ~max_steps
+                ~is_reveal_enabled
                 state
             in
             return (state, executed_ticks, failing_ticks))
@@ -231,7 +233,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
       return (Completed {state; fuel; current_tick; failing_ticks})
     in
     let rec go (fuel : fuel) current_tick failing_ticks state =
-      let*! input_request = PVM.is_input_state state in
+      let*! input_request = PVM.is_input_state ~is_reveal_enabled state in
       match input_request with
       | No_input_required when F.is_empty fuel -> abort state fuel current_tick
       | No_input_required -> (

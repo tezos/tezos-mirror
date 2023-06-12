@@ -44,8 +44,11 @@ module type S = sig
   (** PVM status *)
   type status
 
-  (** [get_status state] gives you the current execution status for the PVM. *)
-  val get_status : state -> status Lwt.t
+  (** [get_status ~is_reveal_enabled state] gives you the current execution status for the PVM. *)
+  val get_status :
+    is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
+    state ->
+    status Lwt.t
 
   (** [string_of_status status] returns a string representation of [status]. *)
   val string_of_status : status -> string
@@ -59,6 +62,7 @@ module type S = sig
   val eval_many :
     reveal_builtins:Tezos_scoru_wasm.Builtins.reveals ->
     write_debug:Tezos_scoru_wasm.Builtins.write_debug ->
+    is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
     ?stop_at_snapshot:bool ->
     max_steps:int64 ->
     state ->

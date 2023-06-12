@@ -159,7 +159,7 @@ module Impl : S = struct
 
   module Backend = Make_backend (Wasm_2_0_0_proof_format.Tree)
 
-  let eval_many ~reveal_builtins ~write_debug =
+  let eval_many ~reveal_builtins ~write_debug ~is_reveal_enabled:_ =
     Backend.compute_step_many ~reveal_builtins ~write_debug
 end
 

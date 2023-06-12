@@ -96,13 +96,15 @@ module type S = sig
   type status =
     | Halted
     | Waiting_for_input_message
-    | Waiting_for_reveal
-    | Waiting_for_metadata
+    | Waiting_for_reveal of Sc_rollup_PVM_sig.reveal
     | Parsing
     | Evaluating
 
-  (** [get_status state] returns the machine status in [state]. *)
-  val get_status : state -> status Lwt.t
+  (** [get_status ~is_reveal_enabled state] returns the machine status in [state]. *)
+  val get_status :
+    is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
+    state ->
+    status Lwt.t
 
   (** [get_outbox outbox_level state] returns the outbox in [state]
       for a given [outbox_level]. *)

@@ -231,6 +231,10 @@ let reveal_encoding =
   in
   union [case_raw_data; case_metadata; case_dal_page]
 
+(** [is_reveal_enabled] is the type of a predicate that tells if a kind of
+     reveal is activated at a certain block level. *)
+type is_reveal_enabled = Raw_level_repr.t -> reveal -> bool
+
 (** The PVM's current input expectations:
     - [No_input_required] if the machine is busy and has no need for new input.
 
@@ -464,10 +468,11 @@ module type S = sig
       the origination of the rollup. *)
   val install_boot_sector : state -> string -> state Lwt.t
 
-  (** [is_input_state state] returns the input expectations of the
+  (** [is_input_state ~is_reveal_enabled state] returns the input expectations of the
       [state]---does it need input, and if so, how far through the inbox
       has it read so far? *)
-  val is_input_state : state -> input_request Lwt.t
+  val is_input_state :
+    is_reveal_enabled:is_reveal_enabled -> state -> input_request Lwt.t
 
   (** [set_input input state] sets [input] in [state] as the next
       input to be processed. This must answer the [input_request]
@@ -478,21 +483,30 @@ module type S = sig
       execution of an atomic step of the rollup at state [s0]. *)
   val eval : state -> state Lwt.t
 
-  (** [verify_proof input p] checks the proof [p] with input [input] and returns
-      the [input_request] before the evaluation of the proof. See the doc-string
-      for the [proof] type.
+  (** [verify_proof ~is_reveal_enabled input p] checks the proof [p] with input [input]
+      and returns the [input_request] before the evaluation of the proof. See the
+      doc-string for the [proof] type.
 
       [verify_proof input p] fails when the proof is invalid in regards to the
       given input. *)
-  val verify_proof : input option -> proof -> input_request tzresult Lwt.t
+  val verify_proof :
+    is_reveal_enabled:is_reveal_enabled ->
+    input option ->
+    proof ->
+    input_request tzresult Lwt.t
 
-  (** [produce_proof ctxt input_given state] should return a [proof] for
-      the PVM step starting from [state], if possible. This may fail for
+  (** [produce_proof ctxt ~is_reveal_enabled input_given state] should return a [proof]
+      for the PVM step starting from [state], if possible. This may fail for
       a few reasons:
         - the [input_given] doesn't match the expectations of [state] ;
         - the [context] for this instance of the PVM doesn't have access
         to enough of the [state] to build the proof. *)
-  val produce_proof : context -> input option -> state -> proof tzresult Lwt.t
+  val produce_proof :
+    context ->
+    is_reveal_enabled:is_reveal_enabled ->
+    input option ->
+    state ->
+    proof tzresult Lwt.t
 
   (** The following type is inhabited by the proofs that a given [output]
       is part of the outbox of a given [state]. *)

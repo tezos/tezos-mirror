@@ -130,7 +130,7 @@ let boot boot_sector f =
 let test_boot () =
   let open Sc_rollup_PVM_sig in
   boot "" @@ fun _ctxt state ->
-  is_input_state state >>= function
+  is_input_state ~is_reveal_enabled:(fun _ _ -> true) state >>= function
   | Needs_reveal Reveal_metadata -> return ()
   | Initial | Needs_reveal _ | First_after _ ->
       failwith "After booting, the machine should be waiting for the metadata."
@@ -150,7 +150,9 @@ let test_metadata () =
   in
   let input = Reveal (Metadata metadata) in
   let*! state = set_input input state in
-  let*! input_request = is_input_state state in
+  let*! input_request =
+    is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+  in
   match input_request with
   | Initial -> return ()
   | Needs_reveal _ | First_after _ | No_input_required ->
@@ -164,7 +166,7 @@ let test_input_message () =
   let input = Sc_rollup_helpers.make_external_input_repr "MESSAGE" in
   set_input input state >>= fun state ->
   eval state >>= fun state ->
-  is_input_state state >>= function
+  is_input_state ~is_reveal_enabled:(fun _ _ -> true) state >>= function
   | Initial | Needs_reveal _ | First_after _ ->
       failwith
         "After receiving a message, the rollup must not be waiting for input."
@@ -177,7 +179,8 @@ let go ~max_steps target_status state =
     if i > max_steps then
       failwith "Maximum number of steps reached before target status."
     else
-      get_status state >>= fun current_status ->
+      get_status ~is_reveal_enabled:(fun _ _ -> true) state
+      >>= fun current_status ->
       if target_status = current_status then return state
       else eval state >>= aux (i + 1)
   in
@@ -320,7 +323,9 @@ let boot_then_reveal_metadata sc_rollup_address origination_level =
   in
   let input = Reveal (Metadata metadata) in
   let*! state = set_input input state in
-  let*! input_state = is_input_state state in
+  let*! input_state =
+    is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+  in
   match input_state with
   | Initial -> return state
   | No_input_required | Needs_reveal _ | First_after _ ->
@@ -340,7 +345,12 @@ let test_reveal () =
   let source = "hash:" ^ Sc_rollup_reveal_hash.to_hex raw_data_hash in
   let input = Sc_rollup_helpers.make_external_input_repr source in
   let*! state = set_input input state in
-  let* state = go ~max_steps:10_000 Waiting_for_reveal state in
+  let* state =
+    go
+      ~max_steps:10_000
+      (Waiting_for_reveal (Reveal_raw_data raw_data_hash))
+      state
+  in
   let*! state = set_input (Reveal (Raw_data raw_data)) state in
   let* state = go ~max_steps:10_000 Waiting_for_input_message state in
   get_stack state >>= function
@@ -533,7 +543,9 @@ let test_filter_internal_message () =
         }
     in
     let*! state = set_input input state in
-    let*! input_state = is_input_state state in
+    let*! input_state =
+      is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+    in
     match input_state with
     | No_input_required -> return ()
     | _ -> failwith "The arith pvm should be processing the internal transfer"
@@ -556,7 +568,9 @@ let test_filter_internal_message () =
         }
     in
     let*! state = set_input input state in
-    let*! input_state = is_input_state state in
+    let*! input_state =
+      is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+    in
     match input_state with
     | No_input_required ->
         failwith "The arith pvm should avoid ignored the internal transfer"

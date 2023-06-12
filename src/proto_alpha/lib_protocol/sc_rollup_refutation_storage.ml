@@ -453,6 +453,9 @@ let game_move ctxt rollup ~player ~opponent ~step ~choice =
   | None -> (
       let play_cost = Sc_rollup_game_repr.cost_play ~step ~choice in
       let*? ctxt = Raw_context.consume_gas ctxt play_cost in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5880
+         Fetch the real `is_reveal_enabled` definition from the context *)
+      let is_reveal_enabled _ _ = true in
       let* move_result =
         Sc_rollup_game_repr.play
           kind
@@ -463,6 +466,7 @@ let game_move ctxt rollup ~player ~opponent ~step ~choice =
           game
           ~step
           ~choice
+          ~is_reveal_enabled
       in
       match move_result with
       | Either.Left game_result -> return (Some game_result, ctxt)

@@ -122,3 +122,12 @@ let rpc_arg =
     ~destruct
     ~construct
     ()
+
+(** The preimage of {!well_known_reveal_hash}. *)
+let well_known_reveal_preimage = ""
+
+(** The hash requested by the WASM PVM if it cannot decode the input
+      provided by the WASM kernel, that is, if the bytes value cannot
+      be decoded with {!Sc_rollup_reveal_hash.encoding}. *)
+let well_known_reveal_hash =
+  hash_string ~scheme:Blake2B [well_known_reveal_preimage]
