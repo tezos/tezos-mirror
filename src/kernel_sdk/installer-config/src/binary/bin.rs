@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -6,6 +7,8 @@ use tezos_data_encoding::enc::{
     field, put_byte, put_bytes, BinError, BinResult, BinWriter,
 };
 use tezos_smart_rollup_host::path::Path;
+
+use crate::binary::SetInstruction;
 
 use super::{
     instr::{ConfigInstruction, MoveInstruction, RefBytes, RevealInstruction},
@@ -70,6 +73,16 @@ impl<P: Path, B: AsRef<[u8]>> BinWriter for RevealInstruction<P, B> {
     }
 }
 
+impl<P: Path, B: AsRef<[u8]>> BinWriter for SetInstruction<P, B> {
+    fn bin_write(&self, out: &mut Vec<u8>) -> tezos_data_encoding::enc::BinResult {
+        (|data: &Self, out: &mut Vec<u8>| {
+            field("SetInstruction::value", bytes_dynamic)(&data.value, out)?;
+            field("SetInstruction::to", path_dynamic)(&data.to, out)?;
+            Ok(())
+        })(self, out)
+    }
+}
+
 impl<P: Path, B: AsRef<[u8]>> BinWriter for ConfigInstruction<P, B> {
     fn bin_write(&self, out: &mut Vec<u8>) -> tezos_data_encoding::enc::BinResult {
         use tezos_data_encoding::enc::{u8, variant_with_field};
@@ -86,6 +99,11 @@ impl<P: Path, B: AsRef<[u8]>> BinWriter for ConfigInstruction<P, B> {
                     <MoveInstruction<P> as BinWriter>::bin_write,
                 )(&1, inner, out)
             }
+            ConfigInstruction::Set(inner) => variant_with_field(
+                "ConfigInstruction::Set",
+                u8,
+                <SetInstruction<P, B> as BinWriter>::bin_write,
+            )(&2, inner, out),
         }
     }
 }
