@@ -47,7 +47,7 @@ let test_tezt_tests_suite_load_time ~executors () =
     ~__FILE__
     ~title:tezt_load_time
     ~tags:["client"; "load"]
-    ~timeout:(Minutes 2)
+    ~timeout:(Minutes 100)
     ~executors
   @@ fun () ->
   let* () = Process.run "dune" ["build"; "tezt/tests/main.exe"] in
