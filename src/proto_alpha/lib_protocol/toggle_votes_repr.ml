@@ -90,13 +90,13 @@ let toggle_votes_encoding =
 module Liquidity_baking_toggle_EMA = Toggle_EMA.Make (struct
   let baker_contribution = Z.of_int 500_000
 
-  let ema_max = 2_000_000_000L
+  let ema_max = 2_000_000_000l
 end)
 
 module Adaptive_inflation_launch_EMA = Toggle_EMA.Make (struct
   let baker_contribution = Z.of_int 500_000
 
-  let ema_max = 2_000_000_000L
+  let ema_max = 2_000_000_000l
 end)
 
 let compute_new_liquidity_baking_ema ~toggle_vote ema =

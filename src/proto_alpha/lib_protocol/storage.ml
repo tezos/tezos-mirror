@@ -1649,7 +1649,7 @@ module Liquidity_baking = struct
       (struct
         let name = ["liquidity_baking_toggle_ema"]
       end)
-      (Encoding.Int64)
+      (Encoding.Int32)
 
   module Cpmm_address =
     Make_single_data_storage (Registered) (Raw_context)
@@ -1670,7 +1670,7 @@ module Adaptive_inflation = struct
       (struct
         let name = ["adaptive_inflation_ema"]
       end)
-      (Encoding.Int64)
+      (Encoding.Int32)
 
   module Activation =
     Make_single_data_storage (Registered) (Raw_context)

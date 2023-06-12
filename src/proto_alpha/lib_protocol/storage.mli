@@ -722,7 +722,7 @@ module Liquidity_baking : sig
     The liquidity baking subsidy is not sent to the CPMM if this EMA is above
     the threshold set in constants. **)
   module Toggle_ema :
-    Single_data_storage with type t := Raw_context.t and type value = Int64.t
+    Single_data_storage with type t := Raw_context.t and type value = Int32.t
 
   (** Constant product market maker contract that receives liquidity baking subsidy. **)
   module Cpmm_address :
@@ -736,7 +736,7 @@ module Adaptive_inflation : sig
       protocol_data.contents. Once the feature is activated, it can no
       longer be deactivated without a protocol amendment. **)
   module Launch_ema :
-    Single_data_storage with type t := Raw_context.t and type value = Int64.t
+    Single_data_storage with type t := Raw_context.t and type value = Int32.t
 
   (** Cycle [Some c] from which adaptive inflation is (or will be)
      active, or [None] if the feature is not yet planned to activate. **)

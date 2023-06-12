@@ -36,7 +36,7 @@
    We use exponential moving averages (EMA for short) because they can
    easily and efficiently be implemented because a single value needs to
    be stored in the context for each average. Each EMA is updated once per
-   block and stored in the context. It is represented using a 64-bit
+   block and stored in the context. It is represented using a 32-bit
    signed integer but it can only take non-negative values in a range
    of the form 0...ema_max where the constant ema_max, the maximum
    value of the EMA, is a parameter of this module. To update an EMA,
@@ -55,7 +55,7 @@
 module type EMA_PARAMETERS = sig
   val baker_contribution : Z.t
 
-  val ema_max : Int64.t
+  val ema_max : Int32.t
 
   (* We don't need to parameterize by the attenuation factor because
      it can be computed from the two other parameters with the
@@ -68,15 +68,15 @@ end
 module type T = sig
   type t
 
-  val of_int64 : Int64.t -> t tzresult Lwt.t
+  val of_int32 : Int32.t -> t tzresult Lwt.t
 
   val zero : t
 
-  val to_int64 : t -> Int64.t
+  val to_int32 : t -> Int32.t
 
   val encoding : t Data_encoding.t
 
-  val ( < ) : t -> Int64.t -> bool
+  val ( < ) : t -> Int32.t -> bool
 
   val update_ema_up : t -> t
 
@@ -84,29 +84,29 @@ module type T = sig
 end
 
 module Make (EMA_parameters : EMA_PARAMETERS) : T = struct
-  type t = Int64.t
-  (* Invariant 0L <= ema <= EMA_Parameters.ema_max *)
+  type t = Int32.t
+  (* Invariant 0l <= ema <= EMA_Parameters.ema_max *)
 
   (* This error is not registered because we don't expect it to be
      raised. *)
-  type error += Toggle_ema_out_of_bound of Int64.t
+  type error += Toggle_ema_out_of_bound of Int32.t
 
-  let check_bounds x = Compare.Int64.(0L <= x && x <= EMA_parameters.ema_max)
+  let check_bounds x = Compare.Int32.(0l <= x && x <= EMA_parameters.ema_max)
 
-  let of_int64 (x : Int64.t) : t tzresult Lwt.t =
+  let of_int32 (x : Int32.t) : t tzresult Lwt.t =
     if check_bounds x then return x else tzfail @@ Toggle_ema_out_of_bound x
 
-  let zero : t = Int64.zero
+  let zero : t = Int32.zero
 
   (* The conv_with_guard combinator of Data_encoding expects a (_, string) result. *)
-  let of_int64_for_encoding x =
+  let of_int32_for_encoding x =
     if check_bounds x then Ok x else Error "out of bounds"
 
-  let to_int64 (ema : t) : Int64.t = ema
+  let to_int32 (ema : t) : Int32.t = ema
 
   (* We perform the computations in Z to avoid overflows. *)
 
-  let ema_max_z = Z.of_int64 EMA_parameters.ema_max
+  let ema_max_z = Z.of_int32 EMA_parameters.ema_max
 
   let attenuation_numerator =
     Z.(sub ema_max_z (mul (of_int 2) EMA_parameters.baker_contribution))
@@ -118,7 +118,7 @@ module Make (EMA_parameters : EMA_PARAMETERS) : T = struct
 
   let half_ema_max_z = Z.(div ema_max_z (of_int 2))
 
-  (* Outside of this module, the EMA is always between 0L and ema_max.
+  (* Outside of this module, the EMA is always between 0l and ema_max.
      This [recenter] wrappers, puts it in between -ema_max/2 and
      ema_max/2.  The goal of this recentering around zero is to make
      [update_ema_off] and [update_ema_on] behave symmetrically with
@@ -126,21 +126,21 @@ module Make (EMA_parameters : EMA_PARAMETERS) : T = struct
   let recenter f ema = Z.(add half_ema_max_z (f (sub ema half_ema_max_z)))
 
   let update_ema_up (ema : t) : t =
-    let ema = Z.of_int64 ema in
+    let ema = Z.of_int32 ema in
     recenter
       (fun ema -> Z.add (attenuate ema) EMA_parameters.baker_contribution)
       ema
-    |> Z.to_int64
+    |> Z.to_int32
 
   let update_ema_down (ema : t) : t =
-    let ema = Z.of_int64 ema in
+    let ema = Z.of_int32 ema in
     recenter
       (fun ema -> Z.sub (attenuate ema) EMA_parameters.baker_contribution)
       ema
-    |> Z.to_int64
+    |> Z.to_int32
 
-  let ( < ) : t -> Int64.t -> bool = Compare.Int64.( < )
+  let ( < ) : t -> Int32.t -> bool = Compare.Int32.( < )
 
   let encoding : t Data_encoding.t =
-    Data_encoding.(conv_with_guard to_int64 of_int64_for_encoding int64)
+    Data_encoding.(conv_with_guard to_int32 of_int32_for_encoding int32)
 end

@@ -32,21 +32,21 @@ module type EMA_PARAMETERS = sig
 
   (* This is the maximum value that the EMA can take. The minimal
      value cannot be set, it is 0L. *)
-  val ema_max : Int64.t
+  val ema_max : Int32.t
 end
 
 module type T = sig
   type t
 
-  val of_int64 : Int64.t -> t tzresult Lwt.t
+  val of_int32 : Int32.t -> t tzresult Lwt.t
 
   val zero : t
 
-  val to_int64 : t -> Int64.t
+  val to_int32 : t -> Int32.t
 
   val encoding : t Data_encoding.t
 
-  val ( < ) : t -> Int64.t -> bool
+  val ( < ) : t -> Int32.t -> bool
 
   val update_ema_up : t -> t
 

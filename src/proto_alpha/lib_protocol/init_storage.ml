@@ -168,8 +168,7 @@ let init_delegates_pseudotokens_for_o ctxt =
 
 (** Migration of the context field storing the Liquidity Baking
     EMA. The key of the field is renamed from
-    "liquidity_baking_escape_ema" to "liquidity_baking_toggle_ema" and
-    it is now stored on an int64 instead of an int32. *)
+    "liquidity_baking_escape_ema" to "liquidity_baking_toggle_ema". *)
 let migrate_liquidity_baking_ema ctxt =
   let legacy_key = ["liquidity_baking_escape_ema"] in
   let get_and_remove_legacy_field ctxt =
@@ -202,7 +201,7 @@ let migrate_liquidity_baking_ema ctxt =
          (String.concat "/" legacy_key) ;
        (ctxt, 0l))
   >>= fun (ctxt, ema_i32) ->
-  Storage.Liquidity_baking.Toggle_ema.init ctxt (Int64.of_int32 ema_i32)
+  Storage.Liquidity_baking.Toggle_ema.init ctxt ema_i32
 
 let prepare_first_block _chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
