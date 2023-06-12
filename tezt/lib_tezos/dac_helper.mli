@@ -110,7 +110,6 @@ val with_observer :
 val with_fresh_rollup :
   ?pvm_name:string ->
   ?hooks:Process_hooks.t ->
-  protocol:Protocol.t ->
   Node.t ->
   Client.t ->
   string ->

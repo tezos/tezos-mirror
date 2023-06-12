@@ -156,8 +156,8 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f dal_parameters cryptobox node client bootstrap1_key
 
-let with_fresh_rollup ~protocol ?(pvm_name = "arith") ?dal_node f tezos_node
-    tezos_client bootstrap1_key =
+let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
+    bootstrap1_key =
   let* rollup_address =
     Client.Sc_rollup.originate
       ~hooks
@@ -171,7 +171,6 @@ let with_fresh_rollup ~protocol ?(pvm_name = "arith") ?dal_node f tezos_node
   in
   let sc_rollup_node =
     Sc_rollup_node.create
-      ~protocol
       ?dal_node
       Operator
       tezos_node
@@ -265,7 +264,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments ?attestation_lag
         ~dal_enable
       @@ fun parameters _cryptobox node client ->
       with_dal_node node client @@ fun key dal_node ->
-      ( with_fresh_rollup ~protocol ~pvm_name ~dal_node
+      ( with_fresh_rollup ~pvm_name ~dal_node
       @@ fun sc_rollup_address sc_rollup_node ->
         scenario
           protocol
@@ -2186,7 +2185,6 @@ let create_additional_nodes ~protocol ~extra_node_operators rollup_address
       in
       let sc_rollup_node =
         Sc_rollup_node.create
-          ~protocol
           ~dal_node:fresh_dal_node
           rollup_mode
           l1_node

@@ -300,7 +300,6 @@ let setup_classic ~commitment_period ~challenge_window protocol =
   let bootstrap1_key = Constant.bootstrap1.alias in
   let sc_rollup_node =
     Sc_rollup_node.create
-      ~protocol
       Operator
       node
       ~base_dir:(Client.base_dir client)
@@ -358,7 +357,6 @@ let setup_bootstrap ~commitment_period ~challenge_window protocol =
   in
   let sc_rollup_node =
     Sc_rollup_node.create
-      ~protocol
       Operator
       node
       ~data_dir

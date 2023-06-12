@@ -294,8 +294,8 @@ let handle_event sc_node {name; value; timestamp = _} =
       update_level sc_node level
   | _ -> ()
 
-let create_with_endpoint ?protocol ?runner ?path ?name ?color ?data_dir
-    ~base_dir ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?(operators = [])
+let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
+    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?(operators = [])
     ?default_operator ?(dal_node : Dal_node.t option) mode endpoint =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
@@ -304,11 +304,7 @@ let create_with_endpoint ?protocol ?runner ?path ?name ?color ?data_dir
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
   in
-  let path =
-    match path with
-    | Some path -> path
-    | None -> Protocol.sc_rollup_node (Option.get protocol)
-  in
+  let path = Option.value ~default:Constant.smart_rollup_node path in
   let sc_node =
     create
       ~path
@@ -334,11 +330,9 @@ let create_with_endpoint ?protocol ?runner ?path ?name ?color ?data_dir
   on_event sc_node (handle_event sc_node) ;
   sc_node
 
-let create ~protocol ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
-    ?rpc_host ?rpc_port ?operators ?default_operator ?dal_node mode
-    (node : Node.t) =
+let create ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe ?rpc_host
+    ?rpc_port ?operators ?default_operator ?dal_node mode (node : Node.t) =
   create_with_endpoint
-    ~protocol
     ?runner
     ?path
     ?name

@@ -63,7 +63,6 @@ val mode_of_string : string -> mode
 
 *)
 val create :
-  protocol:Protocol.t ->
   ?runner:Runner.t ->
   ?path:string ->
   ?name:string ->
@@ -82,7 +81,6 @@ val create :
 
 (** Do not assume we are running the rollup node against a local octez node. *)
 val create_with_endpoint :
-  ?protocol:Protocol.t ->
   ?runner:Runner.t ->
   ?path:string ->
   ?name:string ->

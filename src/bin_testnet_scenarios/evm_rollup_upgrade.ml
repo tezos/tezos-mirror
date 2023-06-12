@@ -175,7 +175,6 @@ let upgrade_kernel ~testnet () =
   let* smart_rollup_address, smart_rollup_node, _evm_proxy_server =
     Evm_rollup.setup_evm_infra
       ~mode
-      ~testnet
       ~operator
       ?preexisting_rollup:upgrade_config.smart_rollup
       node

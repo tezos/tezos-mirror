@@ -233,11 +233,10 @@ let with_observer ?name ?sc_rollup_node ?(pvm_name = "arith")
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4706
    Keep pvm name value in Sc_rollup.t. *)
-let with_fresh_rollup ?(pvm_name = "arith") ?hooks ~protocol tezos_node
-    tezos_client bootstrap1_key f =
+let with_fresh_rollup ?(pvm_name = "arith") ?hooks tezos_node tezos_client
+    bootstrap1_key f =
   let sc_rollup_node =
     Sc_rollup_node.create
-      ~protocol
       Operator
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
@@ -275,7 +274,7 @@ let scenario_with_full_dac_infrastructure ?(tags = ["dac"; "full"])
         ?node_arguments
         ~protocol
       @@ fun node client key ->
-      with_fresh_rollup ~protocol ~pvm_name node client key
+      with_fresh_rollup ~pvm_name node client key
       @@ fun sc_rollup_address sc_rollup_node ->
       let range i = List.init i Fun.id in
       let* committee_members =
@@ -339,7 +338,6 @@ let scenario_with_full_dac_infrastructure ?(tags = ["dac"; "full"])
                let rollup_node_i =
                  Sc_rollup_node.create
                    ~name:("observer-" ^ Int.to_string i ^ "-rollup-node")
-                   ~protocol
                    Operator
                    node
                    ~base_dir:(Client.base_dir client)
@@ -432,7 +430,6 @@ let scenario_with_layer1_legacy_and_rollup_nodes
         node
         client
         key
-        ~protocol
         ~pvm_name
         (fun sc_rollup_address sc_rollup_node ->
           with_legacy_dac_node
