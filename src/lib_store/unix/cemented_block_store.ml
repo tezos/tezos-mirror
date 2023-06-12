@@ -46,17 +46,29 @@ type cemented_metadata_file = {
   metadata_file : [`Cemented_blocks_metadata] Naming.file;
 }
 
+module Metadata_fd_cache =
+  Aches.Rache.Borrow
+    (Aches.Rache.LRU)
+    (struct
+      include String
+
+      let hash = Stdlib.Hashtbl.hash
+    end)
+
 type cemented_blocks_file = {
   start_level : int32;
   end_level : int32;
   file : [`Cemented_blocks_file] Naming.file;
 }
 
+type metadata_handler = {fd : Zip.in_file; waiter : Lwt_idle_waiter.t}
+
 type t = {
   cemented_blocks_dir : [`Cemented_blocks_dir] Naming.directory;
   cemented_block_level_index : Cemented_block_level_index.t;
   cemented_block_hash_index : Cemented_block_hash_index.t;
   mutable cemented_blocks_files : cemented_blocks_file array option;
+  metadata_fd_cache : metadata_handler Metadata_fd_cache.t;
 }
 
 type chunk_iterator = {
@@ -95,6 +107,27 @@ let cemented_block_hash_index {cemented_block_hash_index; _} =
 let default_index_log_size = 10_000
 
 let default_compression_level = 9
+
+(* Defines the maximum number of file descriptors that are cached to
+   speed up the read of metadata from the cemented store. As these
+   file descriptors are kept open, this limit should not be increased
+   too much to avoid resources starvation. *)
+let default_metadata_fd_cache_size = 5
+
+let init_metadata_fd_cache () =
+  let destroyer _key {fd; waiter} =
+    Unit.catch (fun () ->
+        Lwt.dont_wait
+          (fun () ->
+            (* [task] is lower priority than [force_idle], which is
+               used for reading part, closing fd won't occur until all
+               the scheduled reads are fully performed. *)
+            Lwt_idle_waiter.task waiter @@ fun () ->
+            Zip.close_in fd ;
+            Lwt.return_unit)
+          (fun _exn -> ()))
+  in
+  Metadata_fd_cache.create destroyer default_metadata_fd_cache_size
 
 let create ~log_size cemented_blocks_dir =
   let open Lwt_result_syntax in
@@ -137,12 +170,14 @@ let create ~log_size cemented_blocks_dir =
       in
       (* Empty table at first *)
       let cemented_blocks_files = None in
+      let metadata_fd_cache = init_metadata_fd_cache () in
       let cemented_store =
         {
           cemented_blocks_dir;
           cemented_block_level_index;
           cemented_block_hash_index;
           cemented_blocks_files;
+          metadata_fd_cache;
         }
       in
       return cemented_store)
@@ -277,12 +312,14 @@ let load ~readonly ~log_size cemented_blocks_dir =
      |> Naming.dir_path)
   in
   let* cemented_blocks_files = load_table cemented_blocks_dir in
+  let metadata_fd_cache = init_metadata_fd_cache () in
   let cemented_store =
     {
       cemented_blocks_dir;
       cemented_block_level_index;
       cemented_block_hash_index;
       cemented_blocks_files;
+      metadata_fd_cache;
     }
   in
   return cemented_store
@@ -309,8 +346,13 @@ let close cemented_store =
   (try
      Cemented_block_level_index.close cemented_store.cemented_block_level_index
    with Index.Closed -> ()) ;
-  try Cemented_block_hash_index.close cemented_store.cemented_block_hash_index
-  with Index.Closed -> ()
+  (try Cemented_block_hash_index.close cemented_store.cemented_block_hash_index
+   with Index.Closed -> ()) ;
+  (* The cache element's [destroyer] is asynchronous so this call
+     won't hang. In practice, this function is only called when the
+     store is closed which is one of the last component to be
+     terminated which means potential new reads won't be scheduled. *)
+  Metadata_fd_cache.clear cemented_store.metadata_fd_cache
 
 let offset_length = 4 (* file offset *)
 
@@ -391,6 +433,53 @@ let get_cemented_block_hash cemented_store level =
          level)
   with Not_found -> None
 
+let read_block_metadata cemented_store metadata_file_path block_level =
+  let open Lwt_result_syntax in
+  let*! b = Lwt_unix.file_exists metadata_file_path in
+  match b with
+  | false -> return_none
+  | true ->
+      Lwt.catch
+        (fun () ->
+          let cache = cemented_store.metadata_fd_cache in
+          (* Exceptions will be caught by the enclosing [catch] *)
+          let mk_metadata_handler path =
+            (* The file descriptor will be closed when the cache
+               clears the value and calls its finalizer defined at the
+               cache creation which will wait for the potential
+               metadata reads to be performed. *)
+            let fd = Zip.open_in path in
+            let waiter = Lwt_idle_waiter.create () in
+            {fd; waiter}
+          in
+          let {fd; waiter} =
+            Metadata_fd_cache.borrow_or_make
+              cache
+              metadata_file_path
+              mk_metadata_handler
+              Fun.id
+          in
+          let*! metadata =
+            (* Using [force_idle] prevents the cache's resource
+               cleaner to acquire the lock needed (through [task]) to
+               close the file descriptor while a read is happening. *)
+            Lwt_idle_waiter.force_idle waiter (fun () ->
+                Lwt_preemptive.detach
+                  (fun () ->
+                    let entry =
+                      (* Note that the `fd` here is used outside of the
+                         borrowed scope. In this specific case it is ok
+                         because the destructor for the resource is wrapped
+                         inside a `Lwt_ide_waiter.when_idle` which will
+                         only run after all the reads are done. *)
+                      Zip.find_entry fd (Int32.to_string block_level)
+                    in
+                    Zip.read_entry fd entry)
+                  ())
+          in
+          Block_repr.decode_metadata metadata |> return)
+        (fun _exn -> return_none)
+
 let read_block_metadata ?location cemented_store block_level =
   let open Lwt_result_syntax in
   let location =
@@ -400,35 +489,13 @@ let read_block_metadata ?location cemented_store block_level =
   in
   match location with
   | None -> return_none
-  | Some (cemented_file, _block_number) -> (
+  | Some (cemented_file, _block_number) ->
       let metadata_file =
         Naming.(
           cemented_store.cemented_blocks_dir |> cemented_blocks_metadata_dir
           |> fun d -> cemented_blocks_metadata_file d cemented_file |> file_path)
       in
-      let*! b = Lwt_unix.file_exists metadata_file in
-      match b with
-      | false -> return_none
-      | true ->
-          Lwt.catch
-            (fun () ->
-              let*! in_file = Lwt_preemptive.detach Zip.open_in metadata_file in
-              Lwt.finalize
-                (fun () ->
-                  let*! entry =
-                    Lwt_preemptive.detach
-                      (fun () ->
-                        Zip.find_entry in_file (Int32.to_string block_level))
-                      ()
-                  in
-                  let*! metadata =
-                    Lwt_preemptive.detach
-                      (fun () -> Zip.read_entry in_file entry)
-                      ()
-                  in
-                  Block_repr.decode_metadata metadata |> return)
-                (fun () -> Lwt_preemptive.detach Zip.close_in in_file))
-            (fun _ -> return_none))
+      read_block_metadata cemented_store metadata_file block_level
 
 let cement_blocks_metadata cemented_store blocks =
   let open Lwt_result_syntax in
@@ -757,6 +824,7 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
   if write_metadata then metadata_finalizer () else return_unit
 
 let trigger_full_gc cemented_store cemented_blocks_files offset =
+  let open Lwt_syntax in
   let nb_files = Array.length cemented_blocks_files in
   if nb_files <= offset then Lwt.return_unit
   else
@@ -774,7 +842,12 @@ let trigger_full_gc cemented_store cemented_blocks_files offset =
               file
             |> file_path)
         in
-        Unit.catch_s (fun () -> Lwt_unix.unlink metadata_file_path))
+        let* () = Unit.catch_s (fun () -> Lwt_unix.unlink metadata_file_path) in
+        (* Remove the metadata's fd from the cache *)
+        Metadata_fd_cache.remove
+          cemented_store.metadata_fd_cache
+          metadata_file_path ;
+        return_unit)
       files_to_remove
 
 let trigger_rolling_gc cemented_store cemented_blocks_files offset =
@@ -808,7 +881,14 @@ let trigger_rolling_gc cemented_store cemented_blocks_files offset =
             |> file_path)
         in
         let* () = Unit.catch_s (fun () -> Lwt_unix.unlink metadata_file_path) in
-        Unit.catch_s (fun () -> Lwt_unix.unlink (Naming.file_path file)))
+        (* Remove the metadata's fd from the cache *)
+        Metadata_fd_cache.remove
+          cemented_store.metadata_fd_cache
+          metadata_file_path ;
+        let* () =
+          Unit.catch_s (fun () -> Lwt_unix.unlink (Naming.file_path file))
+        in
+        return_unit)
       files_to_remove
 
 let trigger_gc cemented_store history_mode =
