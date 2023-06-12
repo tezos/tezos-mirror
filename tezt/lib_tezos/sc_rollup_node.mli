@@ -80,6 +80,25 @@ val create :
   Node.t ->
   t
 
+(** Do not assume we are running the rollup node against a local octez node. *)
+val create_with_endpoint :
+  ?protocol:Protocol.t ->
+  ?runner:Runner.t ->
+  ?path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?data_dir:string ->
+  base_dir:string ->
+  ?event_pipe:string ->
+  ?rpc_host:string ->
+  ?rpc_port:int ->
+  ?operators:(string * string) list ->
+  ?default_operator:string ->
+  ?dal_node:Dal_node.t ->
+  mode ->
+  Client.endpoint ->
+  t
+
 (** Get the name of an sc node. *)
 val name : t -> string
 

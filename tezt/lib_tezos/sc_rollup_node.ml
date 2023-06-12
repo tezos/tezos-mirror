@@ -37,7 +37,7 @@ module Parameters = struct
     rpc_port : int;
     mode : mode;
     dal_node : Dal_node.t option;
-    mutable node : Node.t;
+    mutable endpoint : Client.endpoint;
     mutable pending_ready : unit option Lwt.u list;
     mutable pending_level : (int * int option Lwt.u) list;
     runner : Runner.t option;
@@ -117,14 +117,10 @@ let operators_params sc_node =
     acc
     sc_node.persistent_state.operators
 
-let layer1_addr sc_node = Node.rpc_host sc_node.persistent_state.node
-
-let layer1_port sc_node = Node.rpc_port sc_node.persistent_state.node
-
 let make_arguments node =
   [
     "--endpoint";
-    Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
+    Client.string_of_endpoint ~hostname:true node.persistent_state.endpoint;
     "--base-dir";
     base_dir node;
   ]
@@ -275,9 +271,20 @@ let wait_for_level ?timeout sc_node level =
         ~where:("level >= " ^ string_of_int level)
         promise
 
-let wait_sync sc_node ~timeout =
-  let node_level = Node.get_level sc_node.persistent_state.node in
-  wait_for_level ~timeout sc_node node_level
+let unsafe_wait_sync ?timeout sc_node =
+  let* node_level =
+    match sc_node.persistent_state.endpoint with
+    | Node node -> return (Node.get_level node)
+    | endpoint ->
+        let* level =
+          RPC.Client.call (Client.create ~endpoint ())
+          @@ RPC.get_chain_block_helper_current_level ()
+        in
+        return level.level
+  in
+  wait_for_level ?timeout sc_node node_level
+
+let wait_sync sc_node ~timeout = unsafe_wait_sync sc_node ~timeout
 
 let handle_event sc_node {name; value; timestamp = _} =
   match name with
@@ -287,9 +294,9 @@ let handle_event sc_node {name; value; timestamp = _} =
       update_level sc_node level
   | _ -> ()
 
-let create ~protocol ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ?(operators = []) ?default_operator
-    ?(dal_node : Dal_node.t option) mode (node : Node.t) =
+let create_with_endpoint ?protocol ?runner ?path ?name ?color ?data_dir
+    ~base_dir ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?(operators = [])
+    ?default_operator ?(dal_node : Dal_node.t option) mode endpoint =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -297,7 +304,11 @@ let create ~protocol ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
   in
-  let path = Option.value ~default:(Protocol.sc_rollup_node protocol) path in
+  let path =
+    match path with
+    | Some path -> path
+    | None -> Protocol.sc_rollup_node (Option.get protocol)
+  in
   let sc_node =
     create
       ~path
@@ -313,7 +324,7 @@ let create ~protocol ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
         operators;
         default_operator;
         mode;
-        node;
+        endpoint;
         dal_node;
         pending_ready = [];
         pending_level = [];
@@ -322,6 +333,26 @@ let create ~protocol ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
   in
   on_event sc_node (handle_event sc_node) ;
   sc_node
+
+let create ~protocol ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
+    ?rpc_host ?rpc_port ?operators ?default_operator ?dal_node mode
+    (node : Node.t) =
+  create_with_endpoint
+    ~protocol
+    ?runner
+    ?path
+    ?name
+    ?color
+    ?data_dir
+    ~base_dir
+    ?event_pipe
+    ?rpc_host
+    ?rpc_port
+    ?operators
+    ?default_operator
+    ?dal_node
+    mode
+    (Node node)
 
 let do_runlike_command ?event_level ?event_sections_levels node arguments =
   if node.status <> Not_running then
@@ -373,5 +404,5 @@ let spawn_run node rollup_address extra_arguments =
 
 let change_node_and_restart ?event_level sc_rollup_node rollup_address node =
   let* () = terminate sc_rollup_node in
-  sc_rollup_node.persistent_state.node <- node ;
+  sc_rollup_node.persistent_state.endpoint <- Node node ;
   run ?event_level sc_rollup_node rollup_address []
