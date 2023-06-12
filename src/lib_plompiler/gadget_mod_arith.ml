@@ -663,3 +663,15 @@ module ArithMod25519 = Make (struct
 
   let moduli_mul = [base; Z.(base - one)]
 end)
+
+module ArithMod64 = Make (struct
+  let label = "64"
+
+  let modulus = Z.(shift_left one 64)
+
+  let base = Z.(shift_left one 64)
+
+  let moduli_add = []
+
+  let moduli_mul = []
+end)
