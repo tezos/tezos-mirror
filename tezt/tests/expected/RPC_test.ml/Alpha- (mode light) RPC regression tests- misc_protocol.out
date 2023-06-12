@@ -65,8 +65,8 @@
   "smart_rollup_max_number_of_cemented_commitments": 5,
   "smart_rollup_max_number_of_parallel_games": 32, "zk_rollup_enable": false,
   "zk_rollup_origination_size": 4000, "zk_rollup_min_pending_to_process": 10,
-  "adaptive_inflation_enable": false, "staking_over_baking_limit": 5,
-  "max_costaking_baker_count": 5, "staking_over_delegation_edge": 2,
+  "staking_over_baking_limit": 5, "max_costaking_baker_count": 5,
+  "staking_over_delegation_edge": 2,
   "adaptive_inflation_launch_ema_threshold": 1600000000 }
 
 ./octez-client --mode light rpc get /chains/main/blocks/head/helpers/baking_rights
