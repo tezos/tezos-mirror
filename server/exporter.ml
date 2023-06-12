@@ -164,104 +164,98 @@ let select_ops db_pool level =
      - one to detect received ops
      We then combine the results.
   *)
-  let q_missing =
+  let q_rights =
     Caqti_request.Infix.(
-      Caqti_type.(tup2 int32 int32)
+      Caqti_type.int32
       ->* Caqti_type.(
             tup3 Sql_requests.Type.public_key_hash (option string) int))
       "SELECT d.address, d.alias, e.endorsing_power FROM endorsing_rights e \
-       JOIN delegates d ON e.delegate = d.id WHERE e.level = ? AND e.delegate \
-       NOT IN (SELECT o.endorser FROM operations o WHERE o.level = ?)"
+       JOIN delegates d ON e.delegate = d.id WHERE e.level = ?"
   in
   let q_included =
     Caqti_request.Infix.(
-      Caqti_type.(tup2 int32 int32)
+      Caqti_type.int32
       ->* Caqti_type.(
-            tup2
-              (tup3 Sql_requests.Type.public_key_hash (option string) int)
-              (tup3 bool (option int32) Sql_requests.Type.block_hash)))
-      "SELECT d.address, d.alias, e.endorsing_power, o.endorsement, o.round, \
-       b.hash FROM operations o JOIN operations_inclusion i ON i.operation = \
-       o.id JOIN delegates d ON o.endorser = d.id JOIN blocks b ON i.block = \
-       b.id JOIN endorsing_rights e ON e.delegate = d.id WHERE o.level = ? AND \
-       e.level = ?"
+            tup4
+              Sql_requests.Type.public_key_hash
+              bool
+              (option int32)
+              Sql_requests.Type.block_hash))
+      "SELECT d.address, o.endorsement, o.round, b.hash FROM operations o JOIN \
+       operations_inclusion i ON i.operation = o.id JOIN delegates d ON \
+       o.endorser = d.id JOIN blocks b ON i.block = b.id WHERE o.level = ?"
   in
   let q_received =
     Caqti_request.Infix.(
-      Caqti_type.(tup2 int32 int32)
+      Caqti_type.int32
       ->* Caqti_type.(
             tup2
-              (tup4 Sql_requests.Type.public_key_hash (option string) int ptime)
+              (tup2 Sql_requests.Type.public_key_hash ptime)
               (tup4 Sql_requests.Type.errors string bool (option int32))))
-      "SELECT d.address, d.alias, e.endorsing_power, r.timestamp, r.errors, \
-       n.name, o.endorsement, o.round FROM operations o JOIN \
-       operations_reception r ON r.operation = o.id JOIN delegates d ON \
-       o.endorser = d.id JOIN endorsing_rights e ON e.delegate = d.id JOIN \
-       nodes n ON n.id = r.source WHERE o.level = ? AND e.level = ?"
+      "SELECT d.address, r.timestamp, r.errors, n.name, o.endorsement, o.round \
+       FROM operations o JOIN operations_reception r ON r.operation = o.id \
+       JOIN delegates d ON o.endorser = d.id JOIN nodes n ON n.id = r.source \
+       WHERE o.level = ?"
   in
   let module Ops = Tezos_crypto.Signature.Public_key_hash.Map in
-  let cb_missing (delegate, alias, power) info =
+  let cb_rights (delegate, alias, power) info =
     Ops.add delegate (alias, power, Pkh_ops.empty) info
   in
-  let cb_included ((delegate, alias, power), (endorsement, round, block_hash))
-      info =
+  let cb_included (delegate, endorsement, round, block_hash) info =
     let kind = kind_of_bool endorsement in
-    match Ops.find_opt delegate info with
-    | Some (alias, power, ops) ->
-        let op_key = Op_key.{kind; round} in
-        let op =
-          match Pkh_ops.find_opt op_key ops with
-          | Some op_info ->
-              {op_info with included = block_hash :: op_info.included}
-          | None -> {included = [block_hash]; received = []}
-        in
-        let ops' = Pkh_ops.add op_key op ops in
-        Ops.add delegate (alias, power, ops') info
-    | None ->
-        let op_key = Op_key.{kind; round} in
-        let op_info = {included = [block_hash]; received = []} in
-        let ops = Pkh_ops.singleton op_key op_info in
-        Ops.add delegate (alias, power, ops) info
+    Ops.update
+      delegate
+      (function
+        | Some (alias, power, ops) ->
+            let op_key = Op_key.{kind; round} in
+            let op =
+              match Pkh_ops.find_opt op_key ops with
+              | Some op_info ->
+                  {op_info with included = block_hash :: op_info.included}
+              | None -> {included = [block_hash]; received = []}
+            in
+            let ops' = Pkh_ops.add op_key op ops in
+            Some (alias, power, ops')
+        | None -> None)
+      info
   in
   let cb_received
-      ( (delegate, alias, power, reception_time),
-        (errors, source, endorsement, round) ) info =
+      ((delegate, reception_time), (errors, source, endorsement, round)) info =
     let kind = kind_of_bool endorsement in
     let received_info =
       Teztale_lib.Data.Delegate_operations.{source; reception_time; errors}
     in
-    match Ops.find_opt delegate info with
-    | Some (alias, power, ops) ->
-        let op_key = Op_key.{kind; round} in
-        let op =
-          match Pkh_ops.find_opt op_key ops with
-          | Some op_info ->
-              {op_info with received = received_info :: op_info.received}
-          | None -> {included = []; received = [received_info]}
-        in
-        let ops' = Pkh_ops.add op_key op ops in
-        Ops.add delegate (alias, power, ops') info
-    | None ->
-        let op_key = Op_key.{kind; round} in
-        let op_info = {included = []; received = [received_info]} in
-        let ops = Pkh_ops.singleton op_key op_info in
-        Ops.add delegate (alias, power, ops) info
+    Ops.update
+      delegate
+      (function
+        | Some (alias, power, ops) ->
+            let op_key = Op_key.{kind; round} in
+            let op =
+              match Pkh_ops.find_opt op_key ops with
+              | Some op_info ->
+                  {op_info with received = received_info :: op_info.received}
+              | None -> {included = []; received = [received_info]}
+            in
+            let ops' = Pkh_ops.add op_key op ops in
+            Some (alias, power, ops')
+        | None -> None)
+      info
   in
   let* out =
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
-        Db.fold q_missing cb_missing (level, level) Ops.empty)
+        Db.fold q_rights cb_rights level Ops.empty)
       db_pool
   in
   let* out =
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
-        Db.fold q_included cb_included (level, level) out)
+        Db.fold q_included cb_included level out)
       db_pool
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
-      Db.fold q_received cb_received (level, level) out)
+      Db.fold q_received cb_received level out)
     db_pool
 
 let translate_ops info =
