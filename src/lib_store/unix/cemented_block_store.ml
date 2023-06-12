@@ -478,7 +478,11 @@ let read_block_metadata cemented_store metadata_file_path block_level =
                   ())
           in
           Block_repr.decode_metadata metadata |> return)
-        (fun _exn -> return_none)
+        (fun exn ->
+          let*! () =
+            Store_events.(emit metadata_read_error (Printexc.to_string exn))
+          in
+          return_none)
 
 let read_block_metadata ?location cemented_store block_level =
   let open Lwt_result_syntax in
