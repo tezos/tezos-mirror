@@ -2934,7 +2934,28 @@ module Api_regression = struct
     return @@ Regression.capture @@ sf "RPC_RESPONSE_BODY: %s" raw_body
 
   (** [V0] module is used for regression testing [V0] API. *)
-  module V0 = struct end
+  module V0 = struct
+    let v0_api_prefix = Dac_rpc.V0.api_prefix
+
+    let encode_bytes_to_hex_string raw =
+      "\"" ^ match Hex.of_string raw with `Hex s -> s ^ "\""
+
+    (** [test_coordinator_post_preimage] tests Cooordinator's
+        "POST v0/preimage". *)
+    let test_coordinator_post_preimage Scenarios.{coordinator_node; _} =
+      (* [post_preimage_request] shape is binding. *)
+      let post_preimage_request =
+        JSON.parse
+          ~origin:"Dac_api_regression.V0.coordinator_post_preimage"
+          (encode_bytes_to_hex_string "test")
+      in
+      (* Test starts here. *)
+      rpc_call_with_regression_test
+        `POST
+        ~path_and_query:(sf "%s/preimage" v0_api_prefix)
+        ~body_json:post_preimage_request
+        coordinator_node
+  end
 end
 
 let register ~protocols =
@@ -3108,4 +3129,13 @@ let register ~protocols =
     ~tags:["dac"; "dac_node"]
     "test --allow_v1_api feature flag"
     V1_API.test_allow_v1_feature_flag
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:0
+    ~committee_size:0
+    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~allow_regression:true
+    "test Coordinator's post preimage"
+    Api_regression.V0.test_coordinator_post_preimage
     protocols
