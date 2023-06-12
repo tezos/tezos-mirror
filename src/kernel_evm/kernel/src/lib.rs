@@ -4,7 +4,10 @@
 // SPDX-License-Identifier: MIT
 
 use primitive_types::U256;
-use storage::{read_chain_id, read_last_info_per_level_timestamp, store_chain_id};
+use storage::{
+    read_chain_id, read_last_info_per_level_timestamp,
+    read_last_info_per_level_timestamp_stats, store_chain_id,
+};
 use tezos_ethereum::block::L2Block;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -34,11 +37,15 @@ pub const CHAIN_ID: u32 = 1337;
 
 /// Returns the current timestamp for the execution. Based on the last
 /// info per level read (or default timestamp if it was not set), plus the
-/// artifical block time of 8 seconds.
+/// artifical average block time.
 pub fn current_timestamp<Host: Runtime>(host: &mut Host) -> Timestamp {
     let timestamp =
         read_last_info_per_level_timestamp(host).unwrap_or_else(|_| Timestamp::from(0));
-    let seconds = timestamp.i64() + 8i64;
+    let (numbers, total) =
+        read_last_info_per_level_timestamp_stats(host).unwrap_or((1i64, 0i64));
+    let average_block_time = total / numbers;
+    let seconds = timestamp.i64() + average_block_time;
+
     Timestamp::from(seconds)
 }
 
