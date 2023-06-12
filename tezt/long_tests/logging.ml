@@ -27,7 +27,7 @@
    -------
    Component: Client
    Invocation: dune exec tezt/long_tests/main.exe -- --file logging.ml
-   Subject: check regressions in the duration it takes for the client to load.
+   Subject: check regressions in the duration it takes to emit log events.
 *)
 
 open Internal_event
