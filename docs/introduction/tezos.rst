@@ -19,7 +19,7 @@ Octez is an implementation of Tezos software, including a node, a client, a bake
 The source code is placed under the MIT Open Source License, and
 is available at https://gitlab.com/tezos/tezos.
 
-The current release of Octez is :doc:`../releases/version-15`.
+The current release of Octez is :doc:`../releases/version-17`.
 
 For installing instructions, see :doc:`./howtoget`.
 
@@ -65,13 +65,11 @@ risks.
 Test Networks
 ~~~~~~~~~~~~~
 
-There are several test networks for the Tezos blockchain with a
+There are several :ref:`test networks <test-networks>` for the Tezos blockchain with a
 faucet to obtain free tez (see :ref:`faucet`).
 These networks are intended for developers wanting to test their
 software before going to beta and for users who want to familiarize
 themselves with Tezos before using their real tez.
-
-See the list of test networks in :ref:`test network <test-networks>`.
 
 This website
 ~~~~~~~~~~~~
