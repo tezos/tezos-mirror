@@ -1000,7 +1000,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             max_costaking_baker_count = 5;
             staking_over_delegation_edge = 2;
             launch_ema_threshold =
-              (* 80% of the max ema (which is 2 billion) *) 1_600_000_000L;
+              (* 80% of the max ema (which is 2 billion) *) 1_600_000_000l;
           }
       in
 
@@ -1055,7 +1055,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             quorum_max = c.quorum_max;
             min_proposal_quorum = c.min_proposal_quorum;
             liquidity_baking_toggle_ema_threshold =
-              Int64.of_int32 c.liquidity_baking_toggle_ema_threshold;
+              c.liquidity_baking_toggle_ema_threshold;
             minimal_block_delay = c.minimal_block_delay;
             delay_increment_per_round = c.delay_increment_per_round;
             consensus_committee_size = c.consensus_committee_size;

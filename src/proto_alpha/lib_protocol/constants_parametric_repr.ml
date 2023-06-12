@@ -128,7 +128,7 @@ type adaptive_inflation = {
   staking_over_baking_limit : int;
   max_costaking_baker_count : int;
   staking_over_delegation_edge : int;
-  launch_ema_threshold : int64;
+  launch_ema_threshold : int32;
 }
 
 type reward_weights = {
@@ -160,7 +160,7 @@ type t = {
   quorum_min : int32;
   quorum_max : int32;
   min_proposal_quorum : int32;
-  liquidity_baking_toggle_ema_threshold : int64;
+  liquidity_baking_toggle_ema_threshold : int32;
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
   delay_increment_per_round : Period_repr.t;
@@ -369,7 +369,7 @@ let adaptive_inflation_encoding =
        (req "staking_over_baking_limit" uint8)
        (req "max_costaking_baker_count" uint16)
        (req "staking_over_delegation_edge" uint8)
-       (req "adaptive_inflation_launch_ema_threshold" int64))
+       (req "adaptive_inflation_launch_ema_threshold" int32))
 
 let reward_weights_encoding =
   let open Data_encoding in
@@ -563,7 +563,7 @@ let encoding =
              (obj8
                 (req "quorum_max" int32)
                 (req "min_proposal_quorum" int32)
-                (req "liquidity_baking_toggle_ema_threshold" int64)
+                (req "liquidity_baking_toggle_ema_threshold" int32)
                 (req "max_operations_time_to_live" int16)
                 (req "minimal_block_delay" Period_repr.encoding)
                 (req "delay_increment_per_round" Period_repr.encoding)

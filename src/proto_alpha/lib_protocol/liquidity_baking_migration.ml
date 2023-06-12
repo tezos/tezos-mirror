@@ -198,7 +198,7 @@ let init ctxt ~typecheck =
   (* We use a custom origination nonce because it is unset when stitching from 009 *)
   let nonce = Operation_hash.hash_string ["Drip, drip, drip."] in
   let ctxt = Raw_context.init_origination_nonce ctxt nonce in
-  Storage.Liquidity_baking.Toggle_ema.init ctxt 0L >>=? fun ctxt ->
+  Storage.Liquidity_baking.Toggle_ema.init ctxt 0l >>=? fun ctxt ->
   let current_level =
     Raw_level_repr.to_int32 (Level_storage.current ctxt).level
   in

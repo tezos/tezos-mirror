@@ -146,7 +146,7 @@ type adaptive_inflation = {
   max_costaking_baker_count :
     (* Maximal number of bakers an account can costake to. *) int;
   staking_over_delegation_edge : (* Weight of staking over delegation. *) int;
-  launch_ema_threshold : (* Threshold of the activation vote *) int64;
+  launch_ema_threshold : (* Threshold of the activation vote *) int32;
 }
 
 type reward_weights = {
@@ -185,7 +185,7 @@ type t = {
   (* in centile of a percentage *)
   quorum_max : int32;
   min_proposal_quorum : int32;
-  liquidity_baking_toggle_ema_threshold : int64;
+  liquidity_baking_toggle_ema_threshold : int32;
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
   delay_increment_per_round : Period_repr.t;

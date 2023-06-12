@@ -847,7 +847,7 @@ module Constants : sig
       staking_over_baking_limit : int;
       max_costaking_baker_count : int;
       staking_over_delegation_edge : int;
-      launch_ema_threshold : int64;
+      launch_ema_threshold : int32;
     }
 
     type reward_weights = {
@@ -879,7 +879,7 @@ module Constants : sig
       quorum_min : int32;
       quorum_max : int32;
       min_proposal_quorum : int32;
-      liquidity_baking_toggle_ema_threshold : int64;
+      liquidity_baking_toggle_ema_threshold : int32;
       max_operations_time_to_live : int;
       minimal_block_delay : Period.t;
       delay_increment_per_round : Period.t;
@@ -956,7 +956,7 @@ module Constants : sig
 
   val min_proposal_quorum : context -> int32
 
-  val liquidity_baking_toggle_ema_threshold : context -> int64
+  val liquidity_baking_toggle_ema_threshold : context -> int32
 
   val minimal_block_delay : context -> Period.t
 
@@ -4725,15 +4725,15 @@ module Toggle_EMA : sig
   module type T = sig
     type t
 
-    val of_int64 : Int64.t -> t tzresult Lwt.t
+    val of_int32 : Int32.t -> t tzresult Lwt.t
 
     val zero : t
 
-    val to_int64 : t -> Int64.t
+    val to_int32 : t -> Int32.t
 
     val encoding : t Data_encoding.t
 
-    val ( < ) : t -> Int64.t -> bool
+    val ( < ) : t -> Int32.t -> bool
 
     val update_ema_up : t -> t
 

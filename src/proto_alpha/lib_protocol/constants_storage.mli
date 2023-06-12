@@ -66,7 +66,7 @@ val quorum_max : Raw_context.t -> int32
 
 val min_proposal_quorum : Raw_context.t -> int32
 
-val liquidity_baking_toggle_ema_threshold : Raw_context.t -> int64
+val liquidity_baking_toggle_ema_threshold : Raw_context.t -> int32
 
 val parametric : Raw_context.t -> Constants_parametric_repr.t
 
@@ -168,6 +168,6 @@ val adaptive_inflation_staking_over_baking_limit : Raw_context.t -> int
 
 val adaptive_inflation_staking_over_delegation_edge : Raw_context.t -> int
 
-val adaptive_inflation_launch_ema_threshold : Raw_context.t -> int64
+val adaptive_inflation_launch_ema_threshold : Raw_context.t -> int32
 
 val freeze_rewards : Raw_context.t -> bool

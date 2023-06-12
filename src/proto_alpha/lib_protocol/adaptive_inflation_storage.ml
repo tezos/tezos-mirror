@@ -203,7 +203,7 @@ let load_reward_coeff ctxt =
 
 let init ctxt =
   let open Lwt_result_syntax in
-  let* ctxt = Storage.Adaptive_inflation.Launch_ema.init ctxt 0L in
+  let* ctxt = Storage.Adaptive_inflation.Launch_ema.init ctxt 0l in
   Storage.Adaptive_inflation.Activation.init ctxt None
 
 let activate ctxt ~cycle =
@@ -213,7 +213,7 @@ let launch_cycle ctxt = Storage.Adaptive_inflation.Activation.get ctxt
 
 let update_ema ctxt ~vote =
   Storage.Adaptive_inflation.Launch_ema.get ctxt >>=? fun old_ema ->
-  Toggle_votes_repr.Adaptive_inflation_launch_EMA.of_int64 old_ema
+  Toggle_votes_repr.Adaptive_inflation_launch_EMA.of_int32 old_ema
   >>=? fun old_ema ->
   let new_ema =
     Toggle_votes_repr.compute_new_adaptive_inflation_ema
@@ -222,7 +222,7 @@ let update_ema ctxt ~vote =
   in
   Storage.Adaptive_inflation.Launch_ema.update
     ctxt
-    (Toggle_votes_repr.Adaptive_inflation_launch_EMA.to_int64 new_ema)
+    (Toggle_votes_repr.Adaptive_inflation_launch_EMA.to_int32 new_ema)
   >>=? fun ctxt ->
   let open Constants_storage in
   (if

@@ -258,8 +258,8 @@ let liquidity_baking_toggle_ema n_vote_on n_vote_off level bake_after
   Assert.leq_int
     ~loc:__LOC__
     (toggle_ema
-   |> Alpha_context.Toggle_votes.Liquidity_baking_toggle_EMA.to_int64
-   |> Int64.to_int)
+   |> Alpha_context.Toggle_votes.Liquidity_baking_toggle_EMA.to_int32
+   |> Int32.to_int)
     expected_toggle_ema
   >>=? fun () -> return_unit
 

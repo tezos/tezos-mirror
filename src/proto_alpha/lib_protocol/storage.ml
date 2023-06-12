@@ -1647,9 +1647,10 @@ module Liquidity_baking = struct
   module Toggle_ema =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
-        let name = ["liquidity_baking_toggle_ema"]
+        (* The old "escape" name is kept here to avoid migrating this. *)
+        let name = ["liquidity_baking_escape_ema"]
       end)
-      (Encoding.Int64)
+      (Encoding.Int32)
 
   module Cpmm_address =
     Make_single_data_storage (Registered) (Raw_context)
@@ -1670,7 +1671,7 @@ module Adaptive_inflation = struct
       (struct
         let name = ["adaptive_inflation_ema"]
       end)
-      (Encoding.Int64)
+      (Encoding.Int32)
 
   module Activation =
     Make_single_data_storage (Registered) (Raw_context)
