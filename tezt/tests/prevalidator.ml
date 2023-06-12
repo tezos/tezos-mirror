@@ -794,7 +794,7 @@ module Revamped = struct
     let* (`OpHash _) =
       Operation.Manager.(
         inject
-          ~error:Operation.conflict_error
+          ~error:Operation.conflict_error_with_needed_fee
           ~signer
           [make ~source:source1 ~fee @@ transfer ~dest:Constant.bootstrap4 ()]
           client)

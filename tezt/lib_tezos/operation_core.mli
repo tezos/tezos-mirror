@@ -573,8 +573,16 @@ module Manager : sig
   val get_branch : ?chain:string -> ?offset:int -> Client.t -> string Lwt.t
 end
 
-(** Regular expression recognizing the mempool error that arises when
-    the operation conflicts with another previously validated operation.
+(** Regular expressions for specific error messages.
 
-    Intended to be provided as the [error] argument to {!val:inject}. *)
-val conflict_error : rex
+    Can be used as e.g.
+    - the [error] argument of {!val:inject}
+    - the [rex] argument of {!val:inject_and_capture2_stderr}
+    - the [msg] argument of {!val:Process.check_error}. *)
+
+(** Matches the message produced by
+    [Operation_conflict {new_hash; needed_fee_in_mutez = Some fee}]
+    from [src/lib_shell_services/validation_errors].
+
+    Captures [new_hash] and [fee]. *)
+val conflict_error_with_needed_fee : rex

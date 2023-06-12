@@ -706,6 +706,6 @@ module Manager = struct
     RPC.Client.call client @@ RPC.get_chain_block_hash ?chain ~block ()
 end
 
-let conflict_error =
+let conflict_error_with_needed_fee =
   rex
-    {|The operation [\w\d]+ cannot be added because the mempool already contains a conflicting operation that should not be replaced \(e\.g\. an operation from the same manager with better fees\)\.|}
+    {|The operation ([\w\d]+) cannot be added because the mempool already contains a conflicting operation\. To replace the latter, this particular operation would need a total fee of at least ([\d]+) mutez\.|}
