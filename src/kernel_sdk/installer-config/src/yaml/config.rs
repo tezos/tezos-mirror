@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -23,6 +24,15 @@ pub struct RevealArgs {
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct SetArgs {
+    // Value in hex form
+    pub value: String,
+    // Path
+    pub to: String,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 #[serde(try_from = "raw_encodings::InstrSerDeser")]
 #[serde(into = "raw_encodings::InstrSerDeser")]
 pub enum Instr {
@@ -33,6 +43,7 @@ pub enum Instr {
     // and remove InstrSerDeser workaround type
     // when this one is merged https://github.com/serde-rs/serde/pull/2403
     Reveal(RevealArgs),
+    Set(SetArgs),
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -69,13 +80,18 @@ mod raw_encodings {
 
         #[serde(flatten)]
         reveal: Option<RevealArgs>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
+        set: Option<SetArgs>,
     }
 
     impl TryFrom<InstrSerDeser> for Instr {
         type Error = String;
 
         fn try_from(value: InstrSerDeser) -> Result<Self, Self::Error> {
-            let sm = value.move_.is_some() as u32 + value.reveal.is_some() as u32;
+            let sm = value.move_.is_some() as u32
+                + value.reveal.is_some() as u32
+                + value.set.is_some() as u32;
 
             if sm == 0 {
                 Err("Neither of instructions deserialized".to_owned())
@@ -88,6 +104,8 @@ mod raw_encodings {
                 Ok(Instr::Move(value.move_.unwrap()))
             } else if value.reveal.is_some() {
                 Ok(Instr::Reveal(value.reveal.unwrap()))
+            } else if value.set.is_some() {
+                Ok(Instr::Set(value.set.unwrap()))
             } else {
                 Err(format!("Unknown instruction {:#?}", value))
             }
@@ -100,6 +118,7 @@ mod raw_encodings {
             let default = InstrSerDeser {
                 move_: None,
                 reveal: None,
+                set: None,
             };
             match self {
                 Instr::Move(m) => InstrSerDeser {
@@ -110,6 +129,10 @@ mod raw_encodings {
                     reveal: Some(r),
                     ..default
                 },
+                Instr::Set(s) => InstrSerDeser {
+                    set: Some(s),
+                    ..default
+                },
             }
         }
     }
@@ -118,9 +141,7 @@ mod raw_encodings {
 #[cfg(test)]
 mod test {
 
-    use super::{Instr, RevealArgs};
-
-    use super::{MoveArgs, YamlConfig};
+    use super::{Instr, MoveArgs, RevealArgs, SetArgs, YamlConfig};
     use std::fs::read_to_string;
 
     #[test]
@@ -134,6 +155,10 @@ mod test {
                 Instr::Reveal(RevealArgs {
                     reveal: "a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3".to_owned(),
                     to: "/path".to_owned(),
+                }),
+                Instr::Set(SetArgs {
+                    value: "556e20666573746976616c2064652047414454".to_owned(),
+                    to: "/path/machin".to_owned(),
                 }),
             ],
         };

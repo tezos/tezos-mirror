@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
-use crate::binary::owned::{OwnedConfigInstruction, OwnedConfigProgram};
+use crate::binary::owned::{OwnedBytes, OwnedConfigInstruction, OwnedConfigProgram};
 use crate::yaml::YamlConfig;
 use hex::FromHexError;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
@@ -49,6 +50,15 @@ pub fn move_instr_str(
     Ok(OwnedConfigInstruction::move_instr(from, to))
 }
 
+pub fn set_instr_hex(
+    value: String,
+    to: String,
+) -> Result<OwnedConfigInstruction, ConfigConversionError> {
+    let to = OwnedPath::try_from(to).map_err(ConfigConversionError::PathError)?;
+    let value = hex::decode(value.as_str()).map_err(ConfigConversionError::Hex)?;
+    Ok(OwnedConfigInstruction::set_instr(OwnedBytes(value), to))
+}
+
 impl TryFrom<YamlConfig> for OwnedConfigProgram {
     type Error = ConfigConversionError;
 
@@ -59,6 +69,7 @@ impl TryFrom<YamlConfig> for OwnedConfigProgram {
             .map(|instr| match instr {
                 Instr::Move(args) => move_instr_str(args.from, args.to),
                 Instr::Reveal(args) => reveal_instr_hex(args.reveal, args.to),
+                Instr::Set(args) => set_instr_hex(args.value, args.to),
             })
             .collect::<Result<Vec<OwnedConfigInstruction>, Self::Error>>()
             .map(OwnedConfigProgram)
@@ -69,7 +80,10 @@ impl TryFrom<YamlConfig> for OwnedConfigProgram {
 mod test {
     use crate::{
         binary::owned::OwnedConfigProgram,
-        yaml::{move_instr_str, reveal_instr_hex, ConfigConversionError, YamlConfig},
+        yaml::{
+            move_instr_str, reveal_instr_hex, set_instr_hex, ConfigConversionError,
+            YamlConfig,
+        },
     };
     use std::fs::read_to_string;
 
@@ -86,6 +100,11 @@ mod test {
                     "a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3"
                         .to_owned(),
                     "/path".to_owned()
+                )
+                .unwrap(),
+                set_instr_hex(
+                    "556e20666573746976616c2064652047414454".to_owned(),
+                    "/path/machin".to_owned()
                 )
                 .unwrap()
             ]))

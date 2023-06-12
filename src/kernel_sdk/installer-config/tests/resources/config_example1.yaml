@@ -4,3 +4,7 @@ instructions:
     to: /to/path
 - reveal: a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3
   to: /path
+- set:
+    value: 556e20666573746976616c2064652047414454
+    to: /path/machin
+

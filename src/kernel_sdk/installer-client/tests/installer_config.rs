@@ -111,10 +111,7 @@ fn empty_binary_config() {
     assert_eq!(kernel, boot_kernel);
 }
 
-#[test]
-fn yaml_config_execute() {
-    let mut host = MockHost::default();
-
+fn kernel_from_setup_file(host: &mut MockHost, setup_file: &str) -> Vec<u8> {
     let upgrade_to = OsString::from("tests/resources/single_page_kernel.wasm");
     let upgrade_to = Path::new(&upgrade_to);
 
@@ -127,19 +124,26 @@ fn yaml_config_execute() {
     let root_hash = prepare_preimages(&original_kernel, save_preimages).unwrap();
 
     // Create config consisting of reveal and following move, then move 2 more times from yaml config
-    let config = create_installer_config(
-        root_hash,
-        Some(OsString::from("tests/resources/move_config.yaml")),
-    )
-    .unwrap();
+    let config =
+        create_installer_config(root_hash, Some(OsString::from(setup_file))).unwrap();
     // Append config to the installer.wasm
     let kernel_with_config = with_config_program(config);
 
     // Write it to the boot path
-    write_kernel_to_boot_path(&mut host, kernel_with_config);
+    write_kernel_to_boot_path(host, kernel_with_config);
 
     // Execute config
-    installer_kernel::installer(&mut host);
+    installer_kernel::installer(host);
+
+    original_kernel
+}
+
+#[test]
+fn yaml_config_move_execute() {
+    let mut host = MockHost::default();
+
+    let original_kernel =
+        kernel_from_setup_file(&mut host, "tests/resources/move_config.yaml");
 
     let temporary_path = RefPath::assert_from(b"/temporary/kernel/boot.wasm");
     let boot_kernel = host
@@ -154,4 +158,22 @@ fn yaml_config_execute() {
         host.store_read(&AUXILIARY_KERNEL_BOOT_PATH, 0, MAX_FILE_CHUNK_SIZE),
         Err(RuntimeError::PathNotFound)
     );
+}
+
+#[test]
+fn yaml_config_set_execute() {
+    let mut host = MockHost::default();
+
+    let _original_kernel =
+        kernel_from_setup_file(&mut host, "tests/resources/set_config.yaml");
+
+    let to = RefPath::assert_from(b"/tmp/foo");
+    let expected = String::from("Un festival de GADT");
+
+    let mut buffer = vec![0; expected.len()];
+    host.store_read_slice(&to, 0, &mut buffer)
+        .expect("Failed to read previously set value");
+    let actual = String::from_utf8(buffer).unwrap();
+
+    assert_eq!(expected, actual)
 }

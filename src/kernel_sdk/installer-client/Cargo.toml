@@ -58,4 +58,3 @@ version = "0.9"
 installer-kernel = { path = "../installer-kernel", default-features = false }
 tezos-smart-rollup = { path = "../sdk", features = ["proto-nairobi"], default-features = false }
 tezos-smart-rollup-mock = { path = "../mock", features = ["proto-nairobi"] }
-
