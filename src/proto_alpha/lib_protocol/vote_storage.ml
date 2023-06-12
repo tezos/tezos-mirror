@@ -113,7 +113,15 @@ let update_listings ctxt =
       (ctxt, 0L)
       ~order:`Sorted
       ~f:(fun (delegate, stake) (ctxt, total) ->
-        let weight = Tez_repr.to_mutez stake in
+        let delegate_contract = Contract_repr.Implicit delegate in
+        let* deposits = Frozen_deposits_storage.get ctxt delegate_contract in
+        let frozen = deposits.current_amount in
+        let frozen = Tez_repr.min stake frozen in
+        (* Cannot fail:
+           frozen = min stake _ ⇒ frozen <= stake ⇒ stake - frozen >= 0. *)
+        let*? delegated = Tez_repr.(stake -? frozen) in
+        let stake = Stake_repr.make ~frozen ~delegated in
+        let weight = Stake_context.staking_weight ctxt stake in
         Storage.Vote.Listings.init ctxt delegate weight >>=? fun ctxt ->
         return (ctxt, Int64.add total weight))
   in
