@@ -128,11 +128,7 @@ fn log_error<Host: Runtime>(host: &mut Host, err: &Error) -> Result<(), Error> {
     let error_path = OwnedPath::try_from(raw_error_path)?;
     let error_path = concat(&ERRORS_PATH, &error_path)?;
 
-    evm_execution::account_storage::store_write_all(
-        host,
-        &error_path,
-        err_msg.as_bytes(),
-    )?;
+    host.store_write_all(&error_path, err_msg.as_bytes())?;
     Ok(())
 }
 

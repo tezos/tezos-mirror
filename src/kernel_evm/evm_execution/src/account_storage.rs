@@ -10,7 +10,6 @@ use host::path::{concat, OwnedPath, Path, RefPath};
 use host::runtime::{Runtime, RuntimeError, ValueType};
 use primitive_types::{H160, H256, U256};
 use sha3::{Digest, Keccak256};
-use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_storage::storage::Storage;
 use thiserror::Error;
 
@@ -197,48 +196,6 @@ pub fn account_path(address: &H160) -> Result<OwnedPath, AccountStorageError> {
     let path_string = alloc::format!("/{}", hex::encode(address.to_fixed_bytes()));
     OwnedPath::try_from(path_string).map_err(AccountStorageError::from)
 }
-
-/// Store larger than MAX_FILE_CHUNK_SIZE amount of data. Placeholder for future SDK feature.
-pub fn store_write_all<T>(
-    host: &mut impl Runtime,
-    path: &T,
-    code: &[u8],
-) -> Result<(), RuntimeError>
-where
-    T: Path,
-{
-    let chunk_iter = code.chunks(MAX_FILE_CHUNK_SIZE);
-
-    // If the value to write is empty, the path is not even created which
-    // contradicts the semantics of `store_write`. This is a placeholder until
-    // we have `store_create` in the SDK, that comes with Nairobi protocol.
-    if code.is_empty() {
-        host.store_write(path, code, 0)?;
-    };
-    // store chunks
-    for (i, chunk) in chunk_iter.enumerate() {
-        host.store_write(path, chunk, i * MAX_FILE_CHUNK_SIZE)?;
-    }
-    Ok(())
-}
-
-/// Read larger than MAX_FILE_CHUNK_SIZE data. Placeholder for future SDK feature.
-pub fn store_read_all<T>(host: &impl Runtime, path: &T) -> Result<Vec<u8>, RuntimeError>
-where
-    T: Path,
-{
-    let length = host.store_value_size(path)?;
-    let mut buffer = Vec::with_capacity(length);
-    // let mut offset = 0;
-    while buffer.len() < length {
-        let offset = buffer.len();
-        let max_length = usize::min(MAX_FILE_CHUNK_SIZE, length - offset);
-        let mut data2 = host.store_read(path, offset, max_length)?;
-        buffer.append(&mut data2);
-    }
-    Ok(buffer)
-}
-
 impl EthereumAccount {
     /// Get the **nonce** for the Ethereum account. Default value is zero, so an account will
     /// _always_ have this **nonce**.
@@ -415,9 +372,9 @@ impl EthereumAccount {
         let path = concat(&self.path, &CODE_PATH)?;
 
         match host.store_has(&path) {
-            Ok(Some(ValueType::Value | ValueType::ValueWithSubtree)) => {
-                store_read_all(host, &path).map_err(AccountStorageError::from)
-            }
+            Ok(Some(ValueType::Value | ValueType::ValueWithSubtree)) => host
+                .store_read_all(&path)
+                .map_err(AccountStorageError::from),
             Ok(_) => Ok(vec![]),
             Err(err) => Err(AccountStorageError::from(err)),
         }
@@ -472,7 +429,8 @@ impl EthereumAccount {
         if store_has_program.is_some() {
             host.store_delete(&code_path)?;
         }
-        store_write_all(host, &code_path, code).map_err(AccountStorageError::from)
+        host.store_write_all(&code_path, code)
+            .map_err(AccountStorageError::from)
     }
 
     /// Delete all code associated with a contract. Also sets code length and size accordingly
@@ -516,36 +474,6 @@ mod test {
     use host::path::RefPath;
     use primitive_types::U256;
     use tezos_smart_rollup_mock::MockHost;
-
-    #[test]
-    fn test_store_all_2049() {
-        let mut host = MockHost::default();
-
-        let path = RefPath::assert_from(b"/asdf");
-        let code = [1u8; MAX_FILE_CHUNK_SIZE + 1];
-        assert_eq!(Ok(()), store_write_all(&mut host, &path, &code));
-        assert_eq!(Ok(code.to_vec()), store_read_all(&host, &path));
-    }
-
-    #[test]
-    fn test_store_all_20480() {
-        let mut host = MockHost::default();
-
-        let path = RefPath::assert_from(b"/asdf");
-        let code = [1u8; MAX_FILE_CHUNK_SIZE * 10];
-        assert_eq!(Ok(()), store_write_all(&mut host, &path, &code));
-        assert_eq!(Ok(code.to_vec()), store_read_all(&host, &path));
-    }
-
-    #[test]
-    fn test_store_all_1() {
-        let mut host = MockHost::default();
-
-        let path = RefPath::assert_from(b"/asdf");
-        let code = [1u8];
-        assert_eq!(Ok(()), store_write_all(&mut host, &path, &code));
-        assert_eq!(Ok(code.to_vec()), store_read_all(&host, &path));
-    }
 
     #[test]
     fn test_account_nonce_update() {
