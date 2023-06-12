@@ -206,13 +206,31 @@ module Encodings = struct
             ~description:"PVM state values requested after the simulation")
 end
 
-let parse_insights (r : Data_encoding.json) =
+let parse_insights decode (r : Data_encoding.json) =
   let s = Data_encoding.Json.destruct Encodings.eval_result r in
   match s.insights with
-  | Some b :: _ ->
-      let v = b |> Hex.of_bytes |> Hex.show in
-      Lwt.return_ok (Hash v)
+  | Some b :: _ -> Lwt.return_ok (decode b)
   | _ ->
       Error_monad.failwith
         "Couldn't parse insights: %s"
         (Data_encoding.Json.to_string r)
+
+let call_result =
+  parse_insights (fun b ->
+      let v = b |> Hex.of_bytes |> Hex.show in
+      Hash v)
+
+let gas_estimation json =
+  let open Lwt_result_syntax in
+  let decode b = b |> Bytes.to_string |> Z.of_bits in
+  let* simulated_amount = parse_insights decode json in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5977
+     remove this once the gas is accounted correctly *)
+  (* minimum gas for any Ethereum transaction *)
+  let min_amount = Z.of_int 21000 in
+  let amount =
+    Z.(
+      if simulated_amount < min_amount then simulated_amount + min_amount
+      else simulated_amount)
+  in
+  return @@ quantity_of_z @@ Z.max simulated_amount amount

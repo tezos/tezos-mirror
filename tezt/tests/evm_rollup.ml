@@ -1228,6 +1228,36 @@ let test_eth_call_large =
 
       unit)
 
+let test_estimate_gas =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "eth_estimategas"; "simulate"]
+    ~title:"Try to estimate gas for contract creation"
+    (fun protocol ->
+      (* setup *)
+      let* {evm_proxy_server; _} =
+        setup_past_genesis protocol ~deposit_admin:None
+      in
+
+      (* large request *)
+      let data = read_file simple_storage.bin in
+      let eth_call = [("data", Ezjsonm.encode_string @@ "0x" ^ data)] in
+
+      (* make call to proxy *)
+      let* call_result =
+        Evm_proxy_server.(
+          call_evm_rpc
+            evm_proxy_server
+            {method_ = "eth_estimateGas"; parameters = `A [`O eth_call]})
+      in
+
+      (* Check the RPC returns a `result`. *)
+      let r = call_result |> Evm_proxy_server.extract_result in
+      Check.((JSON.as_int r = 21123) int)
+        ~error_msg:"Expected result greater than %R, but got %L" ;
+
+      unit)
+
 let test_eth_call_storage_contract_rollup_node =
   Protocol.register_test
     ~__FILE__
@@ -1538,6 +1568,7 @@ let register_evm_proxy_server ~protocols =
   test_eth_call_storage_contract_eth_cli protocols ;
   test_eth_call_large protocols ;
   test_preinitialized_evm_kernel protocols ;
-  test_deposit_fa12 protocols
+  test_deposit_fa12 protocols ;
+  test_estimate_gas protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols

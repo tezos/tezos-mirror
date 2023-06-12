@@ -482,7 +482,28 @@ module RPC = struct
         ()
         {messages; reveal_pages = None; insight_requests}
     in
-    Simulation.parse_insights r
+    Simulation.call_result r
+
+  let estimate_gas base call =
+    let open Lwt_result_syntax in
+    let*? messages = Simulation.encode call in
+    let insight_requests =
+      [
+        Simulation.Encodings.Durable_storage_key ["evm"; "simulation_gas"];
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5900
+           for now the status is not used but it should be for error handling *)
+        Simulation.Encodings.Durable_storage_key ["evm"; "simulation_status"];
+      ]
+    in
+    let* r =
+      call_service
+        ~base
+        simulation
+        ()
+        ()
+        {messages; reveal_pages = None; insight_requests}
+    in
+    Simulation.gas_estimation r
 end
 
 module type S = sig
@@ -518,6 +539,9 @@ module type S = sig
   val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
 
   val simulate_call : Ethereum_types.call -> Ethereum_types.hash tzresult Lwt.t
+
+  val estimate_gas :
+    Ethereum_types.call -> Ethereum_types.quantity tzresult Lwt.t
 end
 
 module Make (Base : sig
@@ -548,4 +572,6 @@ end) : S = struct
   let chain_id = RPC.chain_id Base.base
 
   let simulate_call = RPC.simulate_call Base.base
+
+  let estimate_gas = RPC.estimate_gas Base.base
 end

@@ -101,6 +101,11 @@ module type S = sig
   (** [simulate_call call_info] asks the rollup to simulate a call, and returns the
       result. *)
   val simulate_call : Ethereum_types.call -> Ethereum_types.hash tzresult Lwt.t
+
+  (** [estimate_gas call_info] asks the rollup to simulate a call, and returns the
+      gas used to execute the call. *)
+  val estimate_gas :
+    Ethereum_types.call -> Ethereum_types.quantity tzresult Lwt.t
 end
 
 (** Instantiate a module of type {!S} that communicates with a rollup

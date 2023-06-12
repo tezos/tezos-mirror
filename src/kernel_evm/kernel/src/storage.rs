@@ -58,6 +58,7 @@ const EVM_INFO_PER_LEVEL_STATS_TOTAL: RefPath =
 
 pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result");
 pub const SIMULATION_STATUS: RefPath = RefPath::assert_from(b"/simulation_status");
+pub const SIMULATION_GAS: RefPath = RefPath::assert_from(b"/simulation_gas");
 
 pub const KERNEL_UPGRADE_NONCE: RefPath = RefPath::assert_from(b"/upgrade_nonce");
 pub const DEPOSIT_NONCE: RefPath = RefPath::assert_from(b"/deposit_nonce");
@@ -312,6 +313,13 @@ pub fn store_simulation_result<Host: Runtime>(
             .map_err(Error::from)?;
     }
     Ok(())
+}
+
+pub fn store_simulation_gas<Host: Runtime>(
+    host: &mut Host,
+    result: u64,
+) -> Result<(), Error> {
+    write_u256(host, &SIMULATION_GAS.into(), U256::from(result))
 }
 
 pub fn store_simulation_status<Host: Runtime>(
