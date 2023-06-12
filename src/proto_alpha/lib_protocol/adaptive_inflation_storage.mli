@@ -39,7 +39,8 @@ val load_reward_coeff : Raw_context.t -> Raw_context.t tzresult Lwt.t
 val update_stored_rewards_at_cycle_end :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 
-(** [init ctxt] adds into the context an adaptive inflation vote EMA at 0 *)
+(** [init ctxt] adds into the context an adaptive inflation vote EMA
+    at 0, and and adaptive inflation launch cycle at None. *)
 val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** [update_ema ctxt ~vote] returns the new context with the new EMA *)
