@@ -2955,6 +2955,19 @@ module Api_regression = struct
         ~path_and_query:(sf "%s/preimage" v0_api_prefix)
         ~body_json:post_preimage_request
         coordinator_node
+
+    let test_get_preimage Scenarios.{coordinator_node; _} =
+      (* First we prepare Coordinator's node by posting a payload to it. *)
+      let* root_hash =
+        RPC.call
+          coordinator_node
+          (Dac_rpc.V0.Coordinator.post_preimage ~payload:"test")
+      in
+      (* Test starts here. *)
+      rpc_call_with_regression_test
+        `GET
+        ~path_and_query:(sf "%s/preimage/%s" v0_api_prefix root_hash)
+        coordinator_node
   end
 end
 
@@ -3138,4 +3151,13 @@ let register ~protocols =
     ~allow_regression:true
     "test Coordinator's post preimage"
     Api_regression.V0.test_coordinator_post_preimage
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:0
+    ~committee_size:0
+    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~allow_regression:true
+    "test GET v0/preimage"
+    Api_regression.V0.test_get_preimage
     protocols
