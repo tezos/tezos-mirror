@@ -124,7 +124,7 @@ let test_ema_increases_on () =
         ~loc:__LOC__
         old_ema
         (compute_new_ema ~toggle_vote:Toggle_vote_on ema))
-    (List.filter (fun ema -> Compare.Int64.(ema < 1_999_999_000L)) ema_range)
+    (List.filter (fun ema -> Compare.Int64.(ema < 1_999_000_000L)) ema_range)
 
 (* Test that the increase in EMA caused by an On vote is bounded by 1,000,000 *)
 let test_ema_increases_on_bound () =
@@ -157,7 +157,7 @@ let test_ema_decreases_off () =
         ~loc:__LOC__
         (compute_new_ema ~toggle_vote:Toggle_vote_off ema)
         old_ema)
-    (List.filter (fun ema -> Compare.Int64.(ema > 1000L)) ema_range)
+    (List.filter (fun ema -> Compare.Int64.(ema > 1_000_000L)) ema_range)
 
 (* Test that the decrease in EMA caused by an Off vote is bounded by 1,000,000 *)
 let test_ema_decreases_off_bound () =
@@ -170,14 +170,14 @@ let test_ema_decreases_off_bound () =
         1_000_000L)
     ema_range
 
-(* Test that 1385 On votes are needed to reach the threshold from 0. *)
+(* Test that 80642 On votes are needed to move from 0% to 50%. *)
 let test_ema_many_on () =
   let open Toggle_votes_repr in
   ema_of_int64 0L >>=? fun initial_ema ->
   Assert.leq_int64
     ~loc:__LOC__
     (compute_new_ema_n
-       (Stdlib.List.init 1385 (fun _ -> Toggle_vote_on))
+       (Stdlib.List.init 80641 (fun _ -> Toggle_vote_on))
        initial_ema)
     1_000_000_000L
   >>=? fun () ->
@@ -185,10 +185,10 @@ let test_ema_many_on () =
     ~loc:__LOC__
     1_000_000_000L
     (compute_new_ema_n
-       (Stdlib.List.init 1386 (fun _ -> Toggle_vote_on))
+       (Stdlib.List.init 80642 (fun _ -> Toggle_vote_on))
        initial_ema)
 
-(* Test that 1385 Off votes are needed to reach the threshold from the max value of the EMA (2,000,000,000). *)
+(* Test that 80642 Off votes are needed to move from 100% to 50%. *)
 let test_ema_many_off () =
   let open Toggle_votes_repr in
   ema_of_int64 2_000_000_000L >>=? fun initial_ema ->
@@ -196,15 +196,33 @@ let test_ema_many_off () =
     ~loc:__LOC__
     1_000_000_000L
     (compute_new_ema_n
-       (Stdlib.List.init 1385 (fun _ -> Toggle_vote_off))
+       (Stdlib.List.init 80641 (fun _ -> Toggle_vote_off))
        initial_ema)
   >>=? fun () ->
   Assert.leq_int64
     ~loc:__LOC__
     (compute_new_ema_n
-       (Stdlib.List.init 1386 (fun _ -> Toggle_vote_off))
+       (Stdlib.List.init 80642 (fun _ -> Toggle_vote_off))
        initial_ema)
     1_000_000_000L
+
+(* Test that 187259 On votes are needed to move from 0% to 80%. *)
+let test_ema_many_many_on () =
+  let open Toggle_votes_repr in
+  ema_of_int64 0L >>=? fun initial_ema ->
+  Assert.leq_int64
+    ~loc:__LOC__
+    (compute_new_ema_n
+       (Stdlib.List.init 187258 (fun _ -> Toggle_vote_on))
+       initial_ema)
+    1_600_000_000L
+  >>=? fun () ->
+  Assert.leq_int64
+    ~loc:__LOC__
+    1_600_000_000L
+    (compute_new_ema_n
+       (Stdlib.List.init 187259 (fun _ -> Toggle_vote_on))
+       initial_ema)
 
 (* Test that the EMA update function is symmetric:
    from two dual values of the EMA (that is, two values x and y such that
@@ -249,13 +267,17 @@ let tests =
       `Quick
       test_ema_decreases_off_bound;
     Tztest.tztest
-      "EMA goes from 0 to one billion in 1386 On votes"
+      "EMA goes from 0% to 50% in 80642 On votes"
       `Quick
       test_ema_many_on;
     Tztest.tztest
-      "EMA goes from two billions to one billion in 1386 Off votes"
+      "EMA goes from 100% to 50% in 80642 Off votes"
       `Quick
       test_ema_many_off;
+    Tztest.tztest
+      "EMA goes from 0% to 80% in 187259 On votes"
+      `Quick
+      test_ema_many_many_on;
     Tztest.tztest
       "voting On and Off have symmetric effects on the EMA"
       `Quick
