@@ -112,6 +112,11 @@ Node
   ``lwt-log`` library. Since it was believed to have low usage, no alternative
   implementation has been provided.
 
+- The configuration flag ``disable-mempool-precheck`` is now
+  deprecated, as well as the ``disable_precheck`` field of
+  ``prevalidator`` in the shell limits of the configuration file. They
+  already didn't do anything since V16-rc1. (MR :gl:`!8963`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.

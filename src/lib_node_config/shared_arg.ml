@@ -130,6 +130,16 @@ module Event = struct
       ~msg:"The command-line option `--enable-testchain` is deprecated."
       ()
 
+  let disable_mempool_precheck_is_deprecated =
+    Internal_event.Simple.declare_0
+      ~section
+      ~level:Warning
+      ~name:"disable_mempool_precheck_is_deprecated"
+      ~msg:
+        "The command-line option `--disable-mempool-precheck` is deprecated \
+         and has no effects."
+      ()
+
   let overriding_config_file_arg =
     declare_1
       ~section
@@ -606,15 +616,10 @@ module Term = struct
     in
     Arg.(value & flag & info ~docs ~doc ["disable-mempool"])
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5767
+     Remove this flag in Octez V19. *)
   let disable_mempool_precheck =
-    let doc =
-      "If set to [true], the node's prevalidator will fully execute operations \
-       before gossiping valid operations over the network. Default value is \
-       [false], in which case the node's prevalidator only performs a fast \
-       check over operations before gossiping them. If set to [true], this \
-       option can slow down your node and should be used for testing or \
-       debugging purposes."
-    in
+    let doc = "DEPRECATED. This flag no longer does anything." in
     Arg.(value & flag & info ~docs ~doc ["disable-mempool-precheck"])
 
   let enable_testchain =
@@ -993,6 +998,11 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     if enable_testchain then emit Event.testchain_is_deprecated ()
     else Lwt.return_unit
   in
+  let*! () =
+    if disable_mempool_precheck then
+      emit Event.disable_mempool_precheck_is_deprecated ()
+    else Lwt.return_unit
+  in
   Config_file.update
     ~disable_config_validation
     ?data_dir
@@ -1017,7 +1027,6 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ~disable_p2p_maintenance
     ~disable_p2p_swap
     ~disable_mempool
-    ~disable_mempool_precheck
     ~enable_testchain
     ~cors_origins
     ~cors_headers

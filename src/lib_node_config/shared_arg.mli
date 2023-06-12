@@ -65,10 +65,7 @@ type t = {
           swap of connections with its neighbors nor answer to a swap request.
           This flag is intended to be used for testing and debugging. *)
   disable_mempool : bool;
-  disable_mempool_precheck : bool;
-      (** If [disable_mempool_precheck] is [true] operations are executed by
-          the protocol before behing propagated. This flag is intended to be
-          used for testing and debugging. *)
+  disable_mempool_precheck : bool;  (** DEPRECATED. No longer does anything. *)
   enable_testchain : bool;
   cors_origins : string list;
   cors_headers : string list;

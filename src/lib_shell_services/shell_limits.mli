@@ -55,10 +55,6 @@ type prevalidator_limits = {
   operations_batch_size : int;
       (** Maximum number of pending operations processed (or classified) at the
           end of each request to the prevalidator worker. Default is [50] *)
-  disable_precheck : bool;
-      (** If [disable_precheck] is [true] (default is [false]) operations are
-          executed by the protocol before being propagated. This flag is
-          intended to be used for testing and debugging. *)
 }
 
 (** Sane default values for {!limits} *)
