@@ -10,7 +10,7 @@
 // TODO: <https://github.com/trilitech/tezedge/issues/17>
 //       lint triggered by issue in encoding macro
 #![allow(clippy::useless_format)]
-#![cfg(features = "alloc")]
+#![cfg(feature = "alloc")]
 
 use super::PreimageHash;
 use tezos_crypto_rs::hash::BlsSignature;
