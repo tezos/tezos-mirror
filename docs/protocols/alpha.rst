@@ -17,6 +17,7 @@ It requires protocol environment V10, compared to V9 for Nairobi.
 
 - Simplify the timelock ``opening_result`` type in the environment as we do not deal with ``Bogus_cipher`` any longer. (MR :gl:`!8404`)
 
+- Expose encoding with legacy attestation name. (MR :gl:`!8620`)
 
 Smart Rollups
 -------------
@@ -66,6 +67,10 @@ When the feature flag is enabled, the following extra changes happen:
   rewards) are paid on the frozen deposits balance rather than the spendable
   balance. Manager operations fees and denunciation rewards are still paid on
   the spendable balance. (MR :gl:`!8091`)
+
+- Multiplicative coefficient (with a dynamic part) applied to reward values. (MRs :gl:`!8860`, :gl:`!8861`)
+
+- Denunciation rewards computation updated to depend on ``staking_over_baking_limit``. (MR :gl:`!8939`)
 
 
 Gas improvements
@@ -201,3 +206,4 @@ Internal
 
 - Improve storage cleaning at the end of a refutation game. (MR :gl:`!8881`)
 
+- ``version_value`` moved from ``raw_context.ml`` to ``constants_repr.ml``. (MR :gl:`!8867`)
