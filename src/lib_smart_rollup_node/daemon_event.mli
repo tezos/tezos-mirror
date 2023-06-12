@@ -1,7 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -46,8 +48,9 @@ val new_heads_processed : Layer1.head list -> unit Lwt.t
 (** [included_operation op result] emits an event that an operation
     for the rollup was included in a block. *)
 val included_operation :
-  'kind Protocol.Alpha_context.manager_operation ->
-  'kind Protocol.Apply_results.manager_operation_result ->
+  ?errors:tztrace ->
+  [`Applied | `Backtracked | `Failed | `Skipped] ->
+  L1_operation.t ->
   unit Lwt.t
 
 (** Emit a fatal error for the daemon. *)
