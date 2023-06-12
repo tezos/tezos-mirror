@@ -27,8 +27,6 @@ type t = {frozen : Tez_repr.t; delegated : Tez_repr.t}
 
 let make ~frozen ~delegated = {frozen; delegated}
 
-let total {frozen; delegated} = Tez_repr.(frozen +? delegated)
-
 let get_frozen {frozen; _} = frozen
 
 let encoding =
