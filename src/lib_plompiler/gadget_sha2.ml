@@ -45,6 +45,7 @@ functor
   ->
   struct
     open L
+    module M64 = Gadget_mod_arith.ArithMod64 (L)
 
     (* Utils *)
     let split_exactly array size_chunk nb_chunks =
@@ -62,6 +63,21 @@ functor
     let debug_array s a =
       if debug_toggle then debug s unit >* iterM (debug "") (Array.to_list a)
       else ret unit
+
+    let bytes_add_list ?(ignore_carry = true) lb =
+      if V.word_size = 64 then
+        let mod_int_of_bytes x =
+          let* sx = Num.scalar_of_bytes x in
+          M64.mod_int_of_scalars (to_list [sx])
+        in
+        let* lm = mapM mod_int_of_bytes lb in
+        let* mres = foldM M64.add (List.hd lm) (List.tl lm) in
+        let* sres = M64.scalars_of_mod_int mres in
+        bits_of_scalar ~nb_bits:V.word_size (List.hd (of_list sres))
+      else foldM (Bytes.add ~ignore_carry) (List.hd lb) (List.tl lb)
+
+    let bytes_add ?(ignore_carry = true) a b =
+      bytes_add_list ~ignore_carry [a; b]
 
     (* Section 4.1.2
        use six logical functions, where each function operates on 32-bit words,
@@ -192,7 +208,6 @@ functor
     let schedule : Bytes.bl repr array -> Bytes.bl repr array t =
      fun message_block ->
       assert (Array.length message_block = 16) ;
-      let ( + ) = Bytes.add in
       with_label ~label:"Sha2.schedule"
       @@ let* rest =
            let* res =
@@ -206,16 +221,11 @@ functor
          let rec aux t =
            if t = V.loop_bound then ret ()
            else
+             (* res = sigma_1 ws.(t - 2) + ws.(t - 7) + sigma_0 ws.(t - 15) + ws.(t - 16) *)
              let* res =
-               let* tmp1 =
-                 let* tmp = sigma_1 ws.(t - 2) in
-                 tmp + ws.(t - 7)
-               in
-               let* tmp2 =
-                 let* tmp = sigma_0 ws.(t - 15) in
-                 tmp + ws.(t - 16)
-               in
-               tmp1 + tmp2
+               let* tmp1 = sigma_1 ws.(t - 2) in
+               let* tmp2 = sigma_0 ws.(t - 15) in
+               bytes_add_list [tmp1; ws.(t - 7); tmp2; ws.(t - 16)]
              in
              ws.(t) <- res ;
              aux (succ t)
@@ -248,22 +258,19 @@ functor
     (* Section 6.2.2 step 3. *)
     let step3_one_iteration t : vars -> Bytes.bl repr array -> vars t =
      fun (a, b, c, d, e, f, g, h) ws ->
-      let ( + ) = Bytes.add in
+      let ( + ) = bytes_add in
       with_label ~label:"Sha2.step3_one_iteration"
       @@ let* ks in
+         (* t1 <- h + tmp_sum + tmp_ch + ks.(t) + ws.(t) *)
          let* t1 =
            let* tmp_sum = sum_1 e in
            let* tmp_ch = ch e f g in
-
-           let* tmp = h + tmp_sum in
-           let* tmp = tmp + tmp_ch in
-           let* tmp = tmp + ks.(t) in
-           tmp + ws.(t)
+           bytes_add_list [h; tmp_sum; tmp_ch; ks.(t); ws.(t)]
          in
-         let* t2 =
+         let* t1_plus_t2 =
            let* tmp_sum = sum_0 a in
            let* tmp_maj = maj a b c in
-           tmp_sum + tmp_maj
+           bytes_add_list [t1; tmp_sum; tmp_maj]
          in
          let h = g in
          let g = f in
@@ -272,7 +279,7 @@ functor
          let d = c in
          let c = b in
          let b = a in
-         let* a = t1 + t2 in
+         let a = t1_plus_t2 in
          ret (a, b, c, d, e, f, g, h)
 
     let step3 : vars -> L.Bytes.bl repr array -> vars t =
@@ -299,7 +306,7 @@ functor
       @@
       let vars = [a; b; c; d; e; f; g; h] in
       let hs = Array.to_list hs in
-      let* res = map2M Bytes.add vars hs in
+      let* res = map2M bytes_add vars hs in
       ret @@ Array.of_list res
 
     let process_one_block :
