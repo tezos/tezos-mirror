@@ -738,11 +738,12 @@ module Adaptive_inflation : sig
   module Launch_ema :
     Single_data_storage with type t := Raw_context.t and type value = Int64.t
 
-  (** Cycle [c] at which adaptive inflation gets activated. **)
+  (** Cycle [Some c] from which adaptive inflation is (or will be)
+     active, or [None] if the feature is not yet planned to activate. **)
   module Activation :
     Single_data_storage
       with type t := Raw_context.t
-       and type value = Cycle_repr.t
+       and type value = Cycle_repr.t option
 end
 
 (** A map of [Script_repr.expr] values, indexed by their hash ([Script_expr_hash.t]).

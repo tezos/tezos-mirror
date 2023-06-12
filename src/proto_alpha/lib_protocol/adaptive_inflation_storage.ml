@@ -203,9 +203,10 @@ let load_reward_coeff ctxt =
 
 let init_ema ctxt = Storage.Adaptive_inflation.Launch_ema.init ctxt 0L
 
-let activate ctxt ~cycle = Storage.Adaptive_inflation.Activation.init ctxt cycle
+let activate ctxt ~cycle =
+  Storage.Adaptive_inflation.Activation.update ctxt (Some cycle)
 
-let launch_cycle ctxt = Storage.Adaptive_inflation.Activation.find ctxt
+let launch_cycle ctxt = Storage.Adaptive_inflation.Activation.get ctxt
 
 let update_ema ctxt ~vote =
   Storage.Adaptive_inflation.Launch_ema.get ctxt >>=? fun old_ema ->

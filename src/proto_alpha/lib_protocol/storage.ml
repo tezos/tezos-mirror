@@ -1677,7 +1677,11 @@ module Adaptive_inflation = struct
       (struct
         let name = ["adaptive_inflation_launch_cycle"]
       end)
-      (Cycle_repr)
+      (struct
+        type t = Cycle_repr.t option
+
+        let encoding = Data_encoding.option Cycle_repr.encoding
+      end)
 end
 
 module Ticket_balance = struct
