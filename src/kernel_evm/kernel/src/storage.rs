@@ -11,6 +11,7 @@ use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 
 use crate::error::{Error, StorageError};
+use crate::parsing::UPGRADE_NONCE_SIZE;
 use rlp::Encodable;
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::transaction::{
@@ -50,6 +51,8 @@ const EVM_INFO_PER_LEVEL_STATS_TOTAL: RefPath =
 
 pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result");
 pub const SIMULATION_STATUS: RefPath = RefPath::assert_from(b"/simulation_status");
+
+pub const KERNEL_UPGRADE_NONCE: RefPath = RefPath::assert_from(b"/upgrade_nonce");
 
 /// The size of an address. Size in bytes.
 const ADDRESS_SIZE: usize = 20;
@@ -621,6 +624,21 @@ pub fn read_last_info_per_level_timestamp<Host: Runtime>(
     host: &mut Host,
 ) -> Result<Timestamp, Error> {
     read_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into())
+}
+
+pub fn store_kernel_upgrade_nonce<Host: Runtime>(
+    host: &mut Host,
+    upgrade_nonce: u32,
+) -> Result<(), Error> {
+    host.store_write_all(&KERNEL_UPGRADE_NONCE, &upgrade_nonce.to_le_bytes())
+        .map_err(Error::from)
+}
+
+pub fn read_kernel_upgrade_nonce<Host: Runtime>(host: &mut Host) -> Result<u32, Error> {
+    let bytes = host.store_read_all(&KERNEL_UPGRADE_NONCE)?;
+    let slice_of_bytes: [u8; UPGRADE_NONCE_SIZE] =
+        bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
+    Ok(u32::from_le_bytes(slice_of_bytes))
 }
 
 pub(crate) mod internal_for_tests {

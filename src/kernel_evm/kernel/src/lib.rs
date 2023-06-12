@@ -6,7 +6,7 @@
 use primitive_types::U256;
 use storage::{
     read_chain_id, read_last_info_per_level_timestamp,
-    read_last_info_per_level_timestamp_stats, store_chain_id,
+    read_last_info_per_level_timestamp_stats, store_chain_id, store_kernel_upgrade_nonce,
 };
 use tezos_ethereum::block::L2Block;
 use tezos_smart_rollup_debug::debug_msg;
@@ -104,7 +104,10 @@ fn genesis_initialisation<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     let block_path = storage::block_path(U256::zero())?;
     match Runtime::store_has(host, &block_path) {
         Ok(Some(_)) => Ok(()),
-        _ => genesis::init_block(host),
+        _ => {
+            store_kernel_upgrade_nonce(host, 1)?;
+            genesis::init_block(host)
+        }
     }
 }
 
