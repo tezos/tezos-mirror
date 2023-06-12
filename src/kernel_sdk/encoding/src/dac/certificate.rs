@@ -13,11 +13,34 @@
 #![cfg(feature = "alloc")]
 
 use super::PreimageHash;
-use tezos_crypto_rs::hash::BlsSignature;
+use tezos_crypto_rs::hash::{BlsSignature, PublicKeyBls};
+use tezos_crypto_rs::CryptoError;
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::encoding::HasEncoding;
 use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding::types::Zarith;
+use thiserror::Error;
+
+/// Errors that can be obtained when verifying an invalid certificate
+#[derive(Debug, Error)]
+pub enum CertificateVerificationError {
+    /// Number of signatures is lower than the required threshold
+    #[error(
+        "Insufficient number of signatures - threshold: {threshold}, actual: {actual}"
+    )]
+    InsufficientNumberOfSignatures {
+        /// the threshold of signatures required for the certificate to be valid
+        threshold: usize,
+        /// the number of signatures provided by the certificate
+        actual: usize,
+    },
+    /// Cryptographic primitives result in error while verifying the signature
+    #[error("Error propagated by cryptographic primitives while verifying the aggregate signature: {0}")]
+    SignatureVerificationFailed(CryptoError),
+    /// Signature Verification failed
+    #[error("Verification of aggregate signature failed")]
+    InvalidAggregateSignature,
+}
 
 /// DAC certificates are signed by committee members to ensure validity.
 ///
@@ -43,6 +66,63 @@ pub struct V0Certificate {
     pub witnesses: Zarith,
 }
 
+impl Certificate {
+    /// Verifies that a certificate is valid.
+    ///
+    /// For a [`V0Certificate`], the aggregated signature is verified against the public keys
+    /// of the committee members that have signed the root hash.
+    /// This set is determined by the witness field of the certificate.
+    pub fn verify(
+        &self,
+        committee_members_pks: &[PublicKeyBls],
+        threshold: u8,
+    ) -> Result<(), CertificateVerificationError> {
+        match self {
+            Certificate::V0(V0Certificate {
+                root_hash,
+                aggregated_signature,
+                witnesses,
+            }) => {
+                let root_hash = root_hash.as_ref();
+                let root_hash_with_signing_committee_members: Vec<(
+                    &[u8],
+                    &PublicKeyBls,
+                )> = committee_members_pks
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, member)| {
+                        if witnesses.0.bit(i as u64) {
+                            Some((root_hash.as_slice(), member))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                let num_of_signatures = root_hash_with_signing_committee_members.len();
+                if num_of_signatures < threshold.into() {
+                    return Err(
+                        CertificateVerificationError::InsufficientNumberOfSignatures {
+                            threshold: threshold.into(),
+                            actual: num_of_signatures,
+                        },
+                    );
+                }
+                let is_valid_signature = aggregated_signature
+                    .aggregate_verify(
+                        &mut root_hash_with_signing_committee_members.into_iter(),
+                    )
+                    .map_err(|e| {
+                        CertificateVerificationError::SignatureVerificationFailed(e)
+                    })?;
+                if is_valid_signature {
+                    Ok(())
+                } else {
+                    Err(CertificateVerificationError::InvalidAggregateSignature)
+                }
+            }
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
