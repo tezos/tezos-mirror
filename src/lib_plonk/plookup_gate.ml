@@ -27,6 +27,8 @@ open Bls
 open Utils
 open Identities
 
+let nb_plookup_wires = 3
+
 module Plookup_gate_impl (PP : Polynomial_protocol.S) = struct
   module PP = PP
 
@@ -90,7 +92,9 @@ module Plookup_gate_impl (PP : Polynomial_protocol.S) = struct
     let f_name = prefix f in
     let h1_name = prefix h1 in
     let h2_name = prefix h2 in
-    let wires_names = List.map (fun x -> prefix x) wires_names in
+    let wires_names =
+      List.sub (List.map (fun x -> prefix x) wires_names) 0 nb_plookup_wires
+    in
     let ( @- ) a b = Scalar.sub a b in
     let one_p_b = Scalar.(one + beta) in
     let g_one_p_b = Scalar.(gamma * one_p_b) in
@@ -178,7 +182,9 @@ module Plookup_gate_impl (PP : Polynomial_protocol.S) = struct
     let h1 = prefix h1 in
     let h2 = prefix h2 in
     let f = prefix f in
-    let wires_names = List.map (fun n -> prefix n) wires_names in
+    let wires_names =
+      List.sub (List.map (fun x -> prefix x) wires_names) 0 nb_plookup_wires
+    in
     let fs = q_table :: wires_names in
     let z = Evaluations.find_evaluation evaluations z in
     let q = Evaluations.find_evaluation evaluations q in
@@ -534,8 +540,14 @@ module Plookup_gate_impl (PP : Polynomial_protocol.S) = struct
   (*TODO : do this in evaluation*)
   (*TODO : use mul z_s*)
   let f_map_contribution ~wires ~gates ~tables ~alpha ~beta ~gamma ~domain =
-    (* TODO : remove this conversion *)
-    let wires = SMap.map Evaluations.to_array wires in
+    let wires =
+      SMap.filter_map
+        (fun k w ->
+          if Csir.int_of_wire_name k >= nb_plookup_wires then None
+            (* TODO : remove this conversion *)
+          else Some (Evaluations.to_array w))
+        wires
+    in
     let size_domain = Domain.length domain in
     let alpha = get_alpha alpha in
     let t_agg = Plookup_poly.compute_aggregation tables alpha in
