@@ -45,9 +45,7 @@ let rlp_encode call =
       [
         of_opt of_addr call.from;
         of_opt of_addr call.to_;
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5863
-           evm_execution will fail a simulation without gas *)
-        of_qty (Option.value ~default:(Qty (Z.of_int 11111)) call.gas);
+        of_opt of_qty call.gas;
         of_opt of_qty call.gasPrice;
         of_opt of_qty call.value;
         of_opt of_hash call.data;
