@@ -108,14 +108,14 @@ let update_listings ctxt =
   let open Lwt_result_syntax in
   let*! ctxt = Storage.Vote.Listings.clear ctxt in
   let* ctxt, total =
-  Stake_storage.fold
-    ctxt
-    (ctxt, 0L)
-    ~order:`Sorted
-    ~f:(fun (delegate, stake) (ctxt, total) ->
-      let weight = Tez_repr.to_mutez stake in
-      Storage.Vote.Listings.init ctxt delegate weight >>=? fun ctxt ->
-      return (ctxt, Int64.add total weight))
+    Stake_storage.fold
+      ctxt
+      (ctxt, 0L)
+      ~order:`Sorted
+      ~f:(fun (delegate, stake) (ctxt, total) ->
+        let weight = Tez_repr.to_mutez stake in
+        Storage.Vote.Listings.init ctxt delegate weight >>=? fun ctxt ->
+        return (ctxt, Int64.add total weight))
   in
   let*! ctxt = Storage.Vote.Voting_power_in_listings.add ctxt total in
   return ctxt
