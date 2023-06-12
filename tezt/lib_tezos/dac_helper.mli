@@ -128,6 +128,7 @@ val scenario_with_full_dac_infrastructure :
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?node_arguments:Node.argument list ->
   ?allow_v1_api:bool ->
+  ?allow_regression:bool ->
   __FILE__:string ->
   committee_size:int ->
   observers:int ->
