@@ -72,6 +72,9 @@ Node
 - Fixed a bug where the node could freeze when an old block was
   requested during a store merge. (MR :gl:`!8952`)`
 
+- Improved performances of RPC responses on request for older blocks by
+  caching the archived metadata accesses. (MR :gl:`!8976`)
+
 Client
 ------
 
