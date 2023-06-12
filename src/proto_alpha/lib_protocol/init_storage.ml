@@ -263,7 +263,7 @@ let prepare_first_block _chain_id ctxt ~typecheck_smart_contract
       Storage.Pending_migration.Operation_results.init ctxt operation_results
       >>=? fun ctxt ->
       Sc_rollup_inbox_storage.init_inbox ~predecessor ctxt >>=? fun ctxt ->
-      Adaptive_inflation_storage.init_ema ctxt >>=? fun ctxt ->
+      Adaptive_inflation_storage.init ctxt >>=? fun ctxt ->
       return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
   | Nairobi_017
   (* Please update [next_protocol] and [previous_protocol] in
@@ -284,7 +284,7 @@ let prepare_first_block _chain_id ctxt ~typecheck_smart_contract
       Remove_zero_amount_ticket_migration_for_o.remove_zero_ticket_entries ctxt
       >>= fun ctxt ->
       migrate_liquidity_baking_ema ctxt >>=? fun ctxt ->
-      Adaptive_inflation_storage.init_ema ctxt >>=? fun ctxt ->
+      Adaptive_inflation_storage.init ctxt >>=? fun ctxt ->
       init_delegates_pseudotokens_for_o ctxt >>=? fun ctxt -> return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   List.fold_left_es patch_script ctxt Legacy_script_patches.addresses_to_patch

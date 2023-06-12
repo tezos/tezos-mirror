@@ -201,11 +201,15 @@ let update_stored_rewards_at_cycle_end ctxt ~new_cycle =
 let load_reward_coeff ctxt =
   load_reward_coeff ctxt ~cycle:(Raw_context.current_level ctxt).cycle
 
-let init_ema ctxt = Storage.Adaptive_inflation.Launch_ema.init ctxt 0L
+let init ctxt =
+  let open Lwt_result_syntax in
+  let* ctxt = Storage.Adaptive_inflation.Launch_ema.init ctxt 0L in
+  Storage.Adaptive_inflation.Activation.init ctxt None
 
-let activate ctxt ~cycle = Storage.Adaptive_inflation.Activation.init ctxt cycle
+let activate ctxt ~cycle =
+  Storage.Adaptive_inflation.Activation.update ctxt (Some cycle)
 
-let launch_cycle ctxt = Storage.Adaptive_inflation.Activation.find ctxt
+let launch_cycle ctxt = Storage.Adaptive_inflation.Activation.get ctxt
 
 let update_ema ctxt ~vote =
   Storage.Adaptive_inflation.Launch_ema.get ctxt >>=? fun old_ema ->
