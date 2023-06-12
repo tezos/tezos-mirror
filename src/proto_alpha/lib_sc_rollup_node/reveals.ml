@@ -94,6 +94,11 @@ let path data_dir pvm_name hash =
   let hash = Protocol.Sc_rollup_reveal_hash.to_hex hash in
   Filename.(concat (concat data_dir pvm_name) hash)
 
+let proto_hash_to_dac_hash ((module Plugin) : Dac_plugin.t) proto_reveal_hash =
+  proto_reveal_hash
+  |> Data_encoding.Binary.to_bytes_exn Protocol.Sc_rollup_reveal_hash.encoding
+  |> Data_encoding.Binary.of_bytes_exn Plugin.encoding
+
 let get ?dac_client ~data_dir ~pvm_kind hash =
   let open Lwt_result_syntax in
   let* contents =
@@ -104,7 +109,15 @@ let get ?dac_client ~data_dir ~pvm_kind hash =
     | None -> (
         match dac_client with
         | None -> tzfail (Could_not_open_preimage_file filename)
-        | Some dac_client -> Dac_observer_client.fetch_preimage dac_client hash)
+        | Some dac_client ->
+            let dac_plugin =
+              WithExceptions.Option.get ~loc:__LOC__
+              @@ Dac_plugin.get Protocol.hash
+            in
+            Dac_observer_client.fetch_preimage
+              dac_client
+              dac_plugin
+              (proto_hash_to_dac_hash dac_plugin hash))
   in
   let*? () =
     let contents_hash =
