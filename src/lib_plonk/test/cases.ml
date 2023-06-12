@@ -522,7 +522,7 @@ module Mod_Arith = struct
     in
     {name; circuit; witness; outcome = (if valid then Valid else Proof_error)}
 
-  let mod_add_tests =
+  let mod_add_tests_25519 =
     let ( ! ) = Z.of_int in
     let m = Z.(shift_left one 255 - of_int 19) in
     let tj = !32767 in
@@ -537,6 +537,50 @@ module Mod_Arith = struct
       add_mod_25519 "no_wrap_around" ~sub ~x:!8 ~y:!2 ~z:!6 ~qm:!1 ~tj;
       add_mod_25519 "wrap_around" ~sub ~x:!8 ~y:Z.(m - !2) ~z:!10 ~qm:!2 ~tj;
       add_mod_25519 ~valid:false ~sub "invalid" ~x:!0 ~y:!1 ~z:!1 ~qm:!1 ~tj;
+    ]
+
+  let add_mod_64 ?(valid = true) ?(sub = false) case_name ~x ~y ~z ~qm =
+    let prefix = if sub then "sub" else "add" in
+    let name = prefix ^ "_mod_2^64." ^ case_name in
+    let m = Z.(shift_left one 64) in
+    let xs = Plompiler.Utils.z_to_limbs ~len:1 ~base:m x in
+    let ys = Plompiler.Utils.z_to_limbs ~len:1 ~base:m y in
+    let zs = Plompiler.Utils.z_to_limbs ~len:1 ~base:m z in
+    let xs, zs = if sub then (zs, xs) else (xs, zs) in
+    (*
+       PlonK wires distribution:
+        row i   : x0 y0 0 0 0 0
+        row i+1 : z0 qm 0 0 0 0
+    *)
+    let witness =
+      (Z.zero :: xs) @ ys @ [qm] @ zs |> List.map Scalar.of_z |> Array.of_list
+    in
+    let circuit =
+      let wires =
+        let a = [1; 4] in
+        let b = [2; 3] in
+        let c = [0; 0] in
+        let d = [0; 0] in
+        let e = [0; 0] in
+        let f = [0; 0] in
+        [|a; b; c; d; e; f|]
+      in
+      let gates = Circuit.make_gates ~q_mod_add:[("64", ![1; 0])] () in
+      Circuit.make ~wires ~gates ~public_input_size:0 ()
+    in
+    {name; circuit; witness; outcome = (if valid then Valid else Proof_error)}
+
+  let mod_add_tests_64 =
+    let ( ! ) = Z.of_int in
+    let m = Z.(shift_left one 64) in
+    let sub = true in
+    [
+      add_mod_64 "no_wrap_around" ~x:!5 ~y:!6 ~z:!11 ~qm:!0;
+      add_mod_64 "wrap_around" ~x:Z.(m - !1) ~y:!2 ~z:!1 ~qm:!1;
+      add_mod_64 ~valid:false "invalid" ~x:!0 ~y:!1 ~z:!2 ~qm:!0;
+      add_mod_64 "no_wrap_around" ~sub ~x:!8 ~y:!2 ~z:!6 ~qm:!0;
+      add_mod_64 "wrap_around" ~sub ~x:!8 ~y:Z.(m - !2) ~z:!10 ~qm:!1;
+      add_mod_64 ~valid:false ~sub "invalid" ~x:!0 ~y:!1 ~z:!1 ~qm:!0;
     ]
 
   let mul_mod_25519 ?(valid = true) ?(div = false) case_name ~x ~y ~z ~qm ~t1
@@ -572,7 +616,7 @@ module Mod_Arith = struct
     in
     {name; circuit; witness; outcome = (if valid then Valid else Proof_error)}
 
-  let mod_mul_tests =
+  let mod_mul_tests_25519 =
     let ( ! ) = Z.of_int in
     let m = Z.(shift_left one 255 - of_int 19) in
     (* The correct t1, t2 when there is no wrap-around: *)
@@ -639,7 +683,43 @@ module Mod_Arith = struct
         ~t2;
     ]
 
-  let list = mod_add_tests @ mod_mul_tests
+  let mul_mod_64 ?(valid = true) case_name ~x ~y ~z ~qm =
+    let name = "mul_mod_2^64." ^ case_name in
+    let m = Z.(shift_left one 64) in
+    let xs = Plompiler.Utils.z_to_limbs ~len:1 ~base:m x in
+    let ys = Plompiler.Utils.z_to_limbs ~len:1 ~base:m y in
+    let zs = Plompiler.Utils.z_to_limbs ~len:1 ~base:m z in
+    let witness =
+      (Z.zero :: xs) @ ys @ [qm] @ zs |> List.map Scalar.of_z |> Array.of_list
+    in
+    let circuit =
+      let wires =
+        let a = [1; 4] in
+        let b = [2; 3] in
+        let c = [0; 0] in
+        let d = [0; 0] in
+        let e = [0; 0] in
+        let f = [0; 0] in
+        [|a; b; c; d; e; f|]
+      in
+      let gates = Circuit.make_gates ~q_mod_mul:[("64", ![1; 0])] () in
+      Circuit.make ~wires ~gates ~public_input_size:0 ()
+    in
+    {name; circuit; witness; outcome = (if valid then Valid else Proof_error)}
+
+  let mod_mul_tests_64 =
+    let ( ! ) = Z.of_int in
+    let m = Z.(shift_left one 64) in
+    [
+      mul_mod_64 "no_wrap_around" ~x:!7 ~y:!13 ~z:!91 ~qm:!0;
+      mul_mod_64 "wrap_around" ~x:Z.(m - !1) ~y:!2 ~z:Z.(m - !2) ~qm:!1;
+      mul_mod_64 ~valid:false "invalid" ~x:!0 ~y:!1 ~z:!1 ~qm:!1;
+      mul_mod_64 ~valid:false "invalid qm" ~x:!1 ~y:!2 ~z:!2 ~qm:!2;
+    ]
+
+  let list =
+    mod_add_tests_25519 @ mod_add_tests_64 @ mod_mul_tests_25519
+    @ mod_mul_tests_64
 end
 
 module Big_circuit = struct
