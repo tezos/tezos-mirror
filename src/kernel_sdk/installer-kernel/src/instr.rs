@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -7,15 +8,21 @@ use tezos_smart_rollup::storage::path::{Path, RefPath};
 use tezos_smart_rollup_installer_config::binary::{read_size, RefConfigInstruction};
 
 use crate::preimage::reveal_root_hash;
-use crate::KERNEL_BOOT_PATH;
 
-pub fn read_config_program_size(host: &impl Runtime) -> Result<u32, &'static str> {
+pub fn read_config_program_size(
+    host: &impl Runtime,
+    config_interpretation_path: &RefPath,
+) -> Result<u32, &'static str> {
     let kernel_size = host
-        .store_value_size(&KERNEL_BOOT_PATH)
+        .store_value_size(config_interpretation_path)
         .map_err(|_| "Couldn't read kernel boot path size")?;
     let mut config_program_size_start = kernel_size - 4;
 
-    read_size(host, &KERNEL_BOOT_PATH, &mut config_program_size_start)
+    read_size(
+        host,
+        config_interpretation_path,
+        &mut config_program_size_start,
+    )
 }
 
 pub fn read_instruction_bytes(
