@@ -172,6 +172,15 @@ let store_is_consistent =
     ~msg:"the store is consistent"
     ()
 
+let metadata_read_error =
+  declare_1
+    ~section
+    ~level:Debug
+    ~name:"error_while_reading_cemented_metadata"
+    ~msg:"unexpected error while reading cemented metadata: {exc}"
+    ~pp1:Format.pp_print_string
+    ("exc", Data_encoding.string)
+
 (* Notice *)
 let fork_testchain =
   declare_4
