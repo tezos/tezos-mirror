@@ -253,6 +253,27 @@ let run_command =
         configuration
         cctxt)
 
+let protocols_command =
+  let open Tezos_clic in
+  let open Lwt_result_syntax in
+  command
+    ~group
+    ~desc:"Shows the protocols supported by this rollup node."
+    no_options
+    (prefixes ["show"; "supported"; "protocols"] @@ stop)
+    (fun () (cctxt : #Client_context.full) ->
+      let protocols = Protocol_plugins.registered_protocols () in
+      let*! () =
+        match protocols with
+        | [] -> cctxt#error "No protocols supported by rollup node!"
+        | _ ->
+            cctxt#message
+              "@[<v>%a@]"
+              (Format.pp_print_list Protocol_hash.pp)
+              protocols
+      in
+      return_unit)
+
 (** Command to dump the rollup node metrics. *)
 let dump_metrics =
   let open Tezos_clic in
@@ -270,7 +291,13 @@ let dump_metrics =
       return_unit)
 
 let sc_rollup_commands () =
-  [config_init_command; run_command; legacy_run_command; dump_metrics]
+  [
+    config_init_command;
+    run_command;
+    legacy_run_command;
+    protocols_command;
+    dump_metrics;
+  ]
 
 let select_commands _ctxt _ =
   Lwt_result_syntax.return
