@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 use core::str::Utf8Error;
@@ -33,6 +34,7 @@ pub enum Error {
     Transfer(TransferError),
     Storage(StorageError),
     InvalidConversion,
+    InvalidRunTransaction,
     Simulation(EthereumError),
 }
 
