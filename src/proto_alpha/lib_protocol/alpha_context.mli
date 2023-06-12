@@ -2274,6 +2274,14 @@ module Delegate : sig
       context ->
       Signature.Public_key_hash.t ->
       Staking_parameters_repr.t tzresult Lwt.t
+
+    val pay_rewards :
+      context ->
+      ?active_stake:Stake_repr.t ->
+      source:[< Token.giver] ->
+      delegate:public_key_hash ->
+      Tez.t ->
+      (context * Receipt.balance_updates) tzresult Lwt.t
   end
 end
 

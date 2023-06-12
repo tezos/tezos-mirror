@@ -180,12 +180,12 @@ let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
       let rewards = Tez_repr.mul_exn endorsing_reward_per_slot expected_slots in
       if sufficient_participation && has_revealed_nonces then
         (* Sufficient participation: we pay the rewards *)
-        let receiver =
-          if Constants_storage.freeze_rewards ctxt then
-            `Frozen_deposits delegate
-          else `Contract (Contract_repr.Implicit delegate)
-        in
-        Token.transfer ctxt `Endorsing_rewards receiver rewards
+        Delegate_staking_parameters.pay_rewards
+          ctxt
+          ~active_stake
+          ~source:`Endorsing_rewards
+          ~delegate
+          rewards
         >|=? fun (ctxt, payed_rewards_receipts) ->
         (ctxt, payed_rewards_receipts @ balance_updates)
       else
