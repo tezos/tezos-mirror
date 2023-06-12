@@ -269,6 +269,7 @@ type back = {
      dummy slot headers. *)
   dal_attestation_slot_accountability : Dal_attestation_repr.Accountability.t;
   dal_committee : dal_committee;
+  adaptive_inflation_enable : bool;
 }
 
 (*
@@ -340,6 +341,9 @@ let[@inline] sampler_state ctxt = ctxt.back.sampler_state
 let[@inline] reward_coeff_for_current_cycle ctxt =
   ctxt.back.reward_coeff_for_current_cycle
 
+let[@inline] adaptive_inflation_enable ctxt =
+  ctxt.back.adaptive_inflation_enable
+
 let[@inline] update_back ctxt back = {ctxt with back}
 
 let[@inline] update_remaining_block_gas ctxt remaining_block_gas =
@@ -384,6 +388,9 @@ let[@inline] update_sampler_state ctxt sampler_state =
 let[@inline] update_reward_coeff_for_current_cycle ctxt
     reward_coeff_for_current_cycle =
   update_back ctxt {ctxt.back with reward_coeff_for_current_cycle}
+
+let[@inline] set_adaptive_inflation_enable ctxt =
+  update_back ctxt {ctxt.back with adaptive_inflation_enable = true}
 
 type error += Too_many_internal_operations (* `Permanent *)
 
@@ -804,7 +811,8 @@ let check_cycle_eras (cycle_eras : Level_repr.cycle_eras)
     Compare.Int32.(
       current_era.blocks_per_commitment = constants.blocks_per_commitment))
 
-let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
+let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_inflation_enable
+    ctxt =
   Raw_level_repr.of_int32 level >>?= fun level ->
   check_inited ctxt >>=? fun () ->
   get_constants ctxt >>=? fun constants ->
@@ -852,6 +860,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
           Dal_attestation_repr.Accountability.init
             ~length:constants.Constants_parametric_repr.dal.number_of_slots;
         dal_committee = empty_dal_committee;
+        adaptive_inflation_enable;
       };
   }
 
@@ -995,7 +1004,6 @@ let prepare_first_block ~level ~timestamp ctxt =
       let adaptive_inflation =
         Constants_parametric_repr.
           {
-            enable = false;
             staking_over_baking_limit = 5;
             max_costaking_baker_count = 5;
             staking_over_delegation_edge = 2;
@@ -1080,7 +1088,12 @@ let prepare_first_block ~level ~timestamp ctxt =
       in
       add_constants ctxt constants >>= fun ctxt -> return ctxt)
   >>=? fun ctxt ->
-  prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp
+  prepare
+    ctxt
+    ~level
+    ~predecessor_timestamp:timestamp
+    ~timestamp
+    ~adaptive_inflation_enable:false
   >|=? fun ctxt -> (previous_proto, ctxt)
 
 let activate ctxt h = Updater.activate (context ctxt) h >|= update_context ctxt

@@ -56,7 +56,12 @@ let init_context ?constants_overrides_json ?bootstrap_accounts_json parameters =
   let ctxt = mockup_init.rpc_context.context in
   let timestamp = Time.Protocol.of_seconds 0L in
   (* The timestamp is irrelevant for the rights *)
-  Raw_context.prepare ctxt ~level:1l ~predecessor_timestamp:timestamp ~timestamp
+  Raw_context.prepare
+    ctxt
+    ~level:1l
+    ~predecessor_timestamp:timestamp
+    ~timestamp
+    ~adaptive_inflation_enable:false
   >|= Environment.wrap_tzresult
 
 (* Change the initial seed for the first preserved cycles. This suppose that the

@@ -280,7 +280,7 @@ let zk_rollup_origination_size c =
 
 let adaptive_inflation c = (Raw_context.constants c).adaptive_inflation
 
-let adaptive_inflation_enable c = (adaptive_inflation c).enable
+let adaptive_inflation_enable c = Raw_context.adaptive_inflation_enable c
 
 let adaptive_inflation_staking_over_baking_limit c =
   (adaptive_inflation c).staking_over_baking_limit
