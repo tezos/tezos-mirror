@@ -33,6 +33,11 @@ type t = {
 
 let get mem = Array.get mem.raw
 
+let get_string mem ~address ~length =
+  (* TODO: Add bounds check *)
+  String.init length @@ fun i ->
+  get mem (i + address) |> Unsigned.UInt8.to_int |> Char.chr
+
 let set mem = Array.set mem.raw
 
 let length mem = Array.length mem.raw

@@ -23,6 +23,121 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let tests = []
+open Tezos_wasmer
+
+let hex_string =
+  Alcotest.testable
+    (fun fmt x -> Format.fprintf fmt "%a" Hex.pp (Hex.of_string x))
+    String.equal
+
+let page_size = 0x10000
+
+let alloc ?initial ~pages () =
+  let length = pages * page_size in
+  let raw = Memory.Array.make ?initial Ctypes.uint8_t length in
+  Memory.{raw; min = Unsigned.UInt32.of_int pages; max = None}
+
+let alloc_random ~pages =
+  let length = pages * page_size in
+  let mem = alloc ~pages () in
+  for i = 0 to length - 1 do
+    Random.int 256 |> Unsigned.UInt8.of_int |> Memory.Array.set mem.raw i
+  done ;
+  mem
+
+let test_get_string_behaves_like_get () =
+  let mem = alloc_random ~pages:1 in
+
+  let check ~offset ~length =
+    let a =
+      String.init length (fun i ->
+          Memory.get mem (offset + i) |> Unsigned.UInt8.to_int |> Char.chr)
+    in
+    let b = Memory.get_string mem ~address:offset ~length in
+    Alcotest.check hex_string "expected %L, got %R" a b
+  in
+
+  (* Reading the entire memory page should behave the same. *)
+  check ~offset:0x0 ~length:page_size ;
+
+  (* Reading parts of the memory should yield the same result. *)
+  check ~offset:(page_size / 4) ~length:(page_size / 2) ;
+
+  (* Reading each byte individually should be the same for both. *)
+  for i = 0 to page_size - 1 do
+    check ~offset:i ~length:1
+  done ;
+
+  (* Going out of bounds fails the same way. *)
+  let exn_get =
+    try
+      let _ = Memory.get mem (-10) in
+      assert false
+    with exn -> exn
+  in
+  let exn_get_string =
+    try
+      let _ = Memory.get_string mem ~address:(-10) ~length:1 in
+      assert false
+    with exn -> exn
+  in
+  assert (exn_get = exn_get_string) ;
+
+  (* Going out of bounds fails the same way. *)
+  let exn_get =
+    try
+      let _ = Memory.get mem (page_size + 1) in
+      assert false
+    with exn -> exn
+  in
+  let exn_get_string =
+    try
+      let _ = Memory.get_string mem ~address:(page_size + 1) ~length:1 in
+      assert false
+    with exn -> exn
+  in
+  assert (exn_get = exn_get_string) ;
+
+  (* Going out of bounds fails the same way. *)
+  let exn_get =
+    try
+      let _ = Memory.get mem page_size in
+      assert false
+    with exn -> exn
+  in
+  let exn_get_string =
+    try
+      let _ = Memory.get_string mem ~address:page_size ~length:1 in
+      assert false
+    with exn -> exn
+  in
+  assert (exn_get = exn_get_string) ;
+
+  (* Going out of bounds fails the same way. *)
+  let exn_get =
+    try
+      let _ =
+        for i = 0 to 9 do
+          ignore (Memory.get mem (page_size + i) : Unsigned.uint8)
+        done
+      in
+      assert false
+    with exn -> exn
+  in
+  let exn_get_string =
+    try
+      let _ = Memory.get_string mem ~address:page_size ~length:10 in
+      assert false
+    with exn -> exn
+  in
+  assert (exn_get = exn_get_string)
+
+let tests =
+  [
+    ( "Memory",
+      [
+        ("get_string behaves like get", `Quick, test_get_string_behaves_like_get);
+      ] );
+  ]
 
 let () = Alcotest.run ~__FILE__ "Wasmer" tests

@@ -150,6 +150,10 @@ module Memory : sig
   (** [get mem addr] reads a byte at address [addr]. *)
   val get : t -> int -> Unsigned.uint8
 
+  (** [get_string mem addr len] reads [len] bytes from address [addr] in
+      mmemory [mem]. *)
+  val get_string : t -> address:int -> length:int -> string
+
   (** [set mem addr value] sets a byte at address [addr] to [value]. *)
   val set : t -> int -> Unsigned.uint8 -> unit
 

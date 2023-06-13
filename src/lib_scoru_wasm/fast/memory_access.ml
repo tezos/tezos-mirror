@@ -37,14 +37,10 @@ module Wasmer : Host_funcs.Memory_access with type t = Memory.t = struct
     with Invalid_argument msg when msg = "index out of bounds" ->
       raise Out_of_bounds
 
-  let load_bytes memory addr size =
-    let addr = I32.to_int_u addr in
-    let char_at (ptr : int) =
-      translate_array_exception @@ fun () ->
-      Memory.get memory ptr |> Unsigned.UInt8.to_int |> Char.chr
-    in
-
-    Lwt.return @@ String.init size (fun idx -> char_at (addr + idx))
+  let load_bytes memory address length =
+    let address = I32.to_int_u address in
+    translate_array_exception @@ fun () ->
+    Lwt.return (Memory.get_string memory ~address ~length)
 
   let store_bytes memory addr data =
     let char_to_uint8 char = Char.code char |> Unsigned.UInt8.of_int in
