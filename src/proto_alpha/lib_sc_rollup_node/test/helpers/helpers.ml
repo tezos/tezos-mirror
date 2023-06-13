@@ -55,11 +55,7 @@ let default_constants =
 let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
   let open Lwt_result_syntax in
   let head =
-    Layer1.
-      {
-        hash = Block_hash.zero;
-        level = Raw_level.to_int32 node_ctxt.genesis_info.level;
-      }
+    Layer1.{hash = Block_hash.zero; level = node_ctxt.genesis_info.level}
   in
   let* () = Node_context.save_level node_ctxt head in
   let predecessor = head in
@@ -68,7 +64,7 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
     Sc_rollup.Inbox.genesis
       ~predecessor_timestamp
       ~predecessor:predecessor.hash
-      node_ctxt.genesis_info.level
+      (Raw_level.of_int32_exn node_ctxt.genesis_info.level)
   in
   let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
   let inbox_witness = Sc_rollup.Inbox.current_witness inbox in
@@ -83,7 +79,7 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
   let*! context_hash = Octez_smart_rollup_node.Context.commit ctxt in
   let commitment =
     Sc_rollup.Commitment.genesis_commitment
-      ~origination_level:node_ctxt.genesis_info.level
+      ~origination_level:(Raw_level.of_int32_exn node_ctxt.genesis_info.level)
       ~genesis_state_hash
   in
   let* commitment_hash = Node_context.save_commitment node_ctxt commitment in
@@ -92,7 +88,7 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
     Sc_rollup_block.
       {
         block_hash = head.hash;
-        level = Raw_level.to_int32 node_ctxt.genesis_info.level;
+        level = node_ctxt.genesis_info.level;
         predecessor = predecessor.hash;
         commitment_hash = Some commitment_hash;
         previous_commitment_hash;

@@ -98,9 +98,7 @@ let state_of_head node_ctxt ctxt Layer1.{hash; level} =
   let*! state = Context.PVMState.find ctxt in
   match state with
   | None ->
-      let genesis_level =
-        Raw_level.to_int32 node_ctxt.Node_context.genesis_info.level
-      in
+      let genesis_level = node_ctxt.Node_context.genesis_info.level in
       if level = genesis_level then genesis_state hash node_ctxt ctxt
       else tzfail (Sc_rollup_node_errors.Missing_PVM_state (hash, level))
   | Some state -> return (ctxt, state)
@@ -142,9 +140,7 @@ let process_head (node_ctxt : _ Node_context.t) ctxt
     ~(predecessor : Layer1.header) (head : Layer1.header) (inbox, inbox_messages)
     =
   let open Lwt_result_syntax in
-  let first_inbox_level =
-    Raw_level.to_int32 node_ctxt.genesis_info.level |> Int32.succ
-  in
+  let first_inbox_level = node_ctxt.genesis_info.level |> Int32.succ in
   if head.Layer1.level >= first_inbox_level then
     let*? inbox_messages =
       List.map_e Sc_rollup.Inbox_message.serialize inbox_messages
@@ -156,8 +152,7 @@ let process_head (node_ctxt : _ Node_context.t) ctxt
       (Layer1.head_of_header predecessor)
       (Layer1.head_of_header head)
       (inbox, inbox_messages)
-  else if head.Layer1.level = Raw_level.to_int32 node_ctxt.genesis_info.level
-  then
+  else if head.Layer1.level = node_ctxt.genesis_info.level then
     let* ctxt, state = genesis_state head.hash node_ctxt ctxt in
     let*! ctxt = Context.PVMState.set ctxt state in
     return (ctxt, 0, 0L, Sc_rollup.Tick.initial)

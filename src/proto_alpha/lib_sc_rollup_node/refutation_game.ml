@@ -160,6 +160,13 @@ let page_info_from_pvm_state (node_ctxt : _ Node_context.t) ~dal_attestation_lag
                 pages_per_slot))
   | _ -> return_none
 
+let metadata (node_ctxt : _ Node_context.t) =
+  let address =
+    Sc_rollup_proto_types.Address.of_octez node_ctxt.rollup_address
+  in
+  let origination_level = Raw_level.of_int32_exn node_ctxt.genesis_info.level in
+  Sc_rollup.Metadata.{address; origination_level}
+
 let generate_proof (node_ctxt : _ Node_context.t) game start_state =
   let open Lwt_result_syntax in
   let module PVM = (val node_ctxt.pvm) in
@@ -279,7 +286,7 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
       let page_info = page_info
     end
   end in
-  let metadata = Node_context.metadata node_ctxt in
+  let metadata = metadata node_ctxt in
   let*! start_tick = PVM.get_tick start_state in
   let is_reveal_enabled =
     Sc_rollup.is_reveal_enabled_predicate

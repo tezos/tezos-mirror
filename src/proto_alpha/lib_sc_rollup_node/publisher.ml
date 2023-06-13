@@ -63,7 +63,7 @@ end
 let add_level level increment =
   (* We only use this function with positive increments so it is safe *)
   if increment < 0 then invalid_arg "Commitment.add_level negative increment" ;
-  Raw_level.Internal_for_tests.add level increment
+  Int32.add level (Int32.of_int increment)
 
 let sub_level level decrement =
   (* We only use this function with positive increments so it is safe *)
@@ -78,7 +78,9 @@ let sc_rollup_challenge_window node_ctxt =
   node_ctxt.Node_context.protocol_constants.sc_rollup.challenge_window_in_blocks
 
 let next_commitment_level node_ctxt last_commitment_level =
-  add_level last_commitment_level (sc_rollup_commitment_period node_ctxt)
+  add_level
+    (Raw_level.to_int32 last_commitment_level)
+    (sc_rollup_commitment_period node_ctxt)
 
 type state = Node_context.ro
 
@@ -102,8 +104,7 @@ let build_commitment (node_ctxt : _ Node_context.t)
     | Some pvm_state -> Ok pvm_state
     | None ->
         error_with
-          "PVM state for commitment at level %a is not available"
-          Raw_level.pp
+          "PVM state for commitment at level %ld is not available"
           inbox_level
   in
   let*! compressed_state = PVM.state_hash pvm_state in
@@ -125,7 +126,7 @@ let build_commitment (node_ctxt : _ Node_context.t)
     Sc_rollup.Commitment.
       {
         predecessor = prev_commitment;
-        inbox_level;
+        inbox_level = Raw_level.of_int32_exn inbox_level;
         number_of_ticks;
         compressed_state;
       }
@@ -144,7 +145,7 @@ let genesis_commitment (node_ctxt : _ Node_context.t) ctxt =
     Sc_rollup.Commitment.
       {
         predecessor = Hash.zero;
-        inbox_level = node_ctxt.genesis_info.level;
+        inbox_level = Raw_level.of_int32_exn node_ctxt.genesis_info.level;
         number_of_ticks = Sc_rollup.Number_of_ticks.zero;
         compressed_state;
       }
@@ -168,7 +169,7 @@ let genesis_commitment (node_ctxt : _ Node_context.t) ctxt =
 let create_commitment_if_necessary (node_ctxt : _ Node_context.t) ~predecessor
     current_level ctxt =
   let open Lwt_result_syntax in
-  if Raw_level.(current_level = node_ctxt.genesis_info.level) then
+  if current_level = node_ctxt.genesis_info.level then
     let*! () = Commitment_event.compute_commitment current_level in
     let+ genesis_commitment = genesis_commitment node_ctxt ctxt in
     Some genesis_commitment
@@ -184,7 +185,7 @@ let create_commitment_if_necessary (node_ctxt : _ Node_context.t) ~predecessor
     let next_commitment_level =
       next_commitment_level node_ctxt last_commitment.inbox_level
     in
-    if Raw_level.(current_level = next_commitment_level) then
+    if current_level = next_commitment_level then
       let*! () = Commitment_event.compute_commitment current_level in
       let+ commitment =
         build_commitment
@@ -200,7 +201,7 @@ let create_commitment_if_necessary (node_ctxt : _ Node_context.t) ~predecessor
 let process_head (node_ctxt : _ Node_context.t) ~predecessor
     Layer1.{level; header = _; _} ctxt =
   let open Lwt_result_syntax in
-  let current_level = Raw_level.of_int32_exn level in
+  let current_level = level in
   let* commitment =
     create_commitment_if_necessary node_ctxt ~predecessor current_level ctxt
   in
@@ -217,7 +218,7 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
   let lpc_level =
     match Reference.get node_ctxt.lpc with
     | None -> node_ctxt.genesis_info.level
-    | Some lpc -> lpc.inbox_level
+    | Some lpc -> Raw_level.to_int32 lpc.inbox_level
   in
   let* head = Node_context.last_processed_head_opt node_ctxt in
   let next_head_level =
@@ -234,7 +235,8 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
     | Some commitment when Raw_level.(commitment.inbox_level <= lcc.level) ->
         (* Commitment is before or at the LCC, we have reached the end. *)
         return acc
-    | Some commitment when Raw_level.(commitment.inbox_level <= lpc_level) ->
+    | Some commitment
+      when Raw_level.to_int32 commitment.inbox_level <= lpc_level ->
         (* Commitment is before the last published one, we have also reached
            the end because we only publish commitments that are for the inbox
            of a finalized L1 block. *)

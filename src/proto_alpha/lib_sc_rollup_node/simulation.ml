@@ -54,15 +54,14 @@ let simulate_info_per_level (node_ctxt : [`Read] Node_context.t) predecessor =
 
 let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
   let open Lwt_result_syntax in
-  let*? level = Environment.wrap_tzresult @@ Raw_level.of_int32 level in
   let*? () =
     error_unless
-      Raw_level.(level >= node_ctxt.Node_context.genesis_info.level)
+      (level >= node_ctxt.Node_context.genesis_info.level)
       (Exn (Failure "Cannot simulate before origination level"))
   in
-  let first_inbox_level = Raw_level.succ node_ctxt.genesis_info.level in
+  let first_inbox_level = Int32.succ node_ctxt.genesis_info.level in
   let* ctxt =
-    if Raw_level.(level < first_inbox_level) then
+    if level < first_inbox_level then
       (* This is before we have interpreted the boot sector, so we start
          with an empty context in genesis *)
       return (Context.empty node_ctxt.context)
@@ -70,7 +69,7 @@ let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
   in
   let* ctxt, state = Interpreter.state_of_head node_ctxt ctxt head in
   let+ info_per_level = simulate_info_per_level node_ctxt hash in
-  let inbox_level = Raw_level.succ level in
+  let inbox_level = Raw_level.of_int32_exn (Int32.succ level) in
   {
     ctxt;
     inbox_level;

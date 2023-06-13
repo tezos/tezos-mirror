@@ -299,13 +299,13 @@ let process_l1_block_operations node_ctxt (head : Layer1.header) =
   return_unit
 
 let before_origination (node_ctxt : _ Node_context.t) (header : Layer1.header) =
-  let origination_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
+  let origination_level = node_ctxt.genesis_info.level in
   header.level < origination_level
 
 let previous_context (node_ctxt : _ Node_context.t)
     ~(predecessor : Layer1.header) =
   let open Lwt_result_syntax in
-  if predecessor.level < Raw_level.to_int32 node_ctxt.genesis_info.level then
+  if predecessor.level < node_ctxt.genesis_info.level then
     (* This is before we have interpreted the boot sector, so we start
        with an empty context in genesis *)
     return (Context.empty node_ctxt.context)
@@ -413,13 +413,11 @@ let rec process_head (daemon_components : (module Daemon_components.S))
           head.hash
           (Sc_rollup_proto_types.Inbox.to_octez inbox)
       in
-      let level = Raw_level.of_int32_exn head.level in
+      let level = head.level in
       let* previous_commitment_hash =
-        if level = node_ctxt.genesis_info.Sc_rollup.Commitment.level then
+        if level = node_ctxt.genesis_info.level then
           (* Previous commitment for rollup genesis is itself. *)
-          return
-            (Sc_rollup_proto_types.Commitment_hash.to_octez
-               node_ctxt.genesis_info.Sc_rollup.Commitment.commitment_hash)
+          return node_ctxt.genesis_info.commitment_hash
         else
           let+ pred = Node_context.get_l2_block node_ctxt predecessor.hash in
           Sc_rollup_block.most_recent_commitment pred.header
@@ -428,7 +426,7 @@ let rec process_head (daemon_components : (module Daemon_components.S))
         Sc_rollup_block.
           {
             block_hash = head.hash;
-            level = head.level;
+            level;
             predecessor = predecessor.hash;
             commitment_hash;
             previous_commitment_hash;
@@ -474,9 +472,7 @@ let on_layer_1_head (daemon_components : (module Daemon_components.S)) node_ctxt
     | None ->
         (* if no head has been processed yet, we want to handle all blocks
            since, and including, the rollup origination. *)
-        let origination_level =
-          Raw_level.to_int32 node_ctxt.genesis_info.level
-        in
+        let origination_level = node_ctxt.genesis_info.level in
         `Level (Int32.pred origination_level)
   in
   let stripped_head = Layer1.head_of_header head in
@@ -675,7 +671,7 @@ let run node_ctxt configuration
   Metrics.Info.init_rollup_node_info
     ~id:configuration.sc_rollup_address
     ~mode:configuration.mode
-    ~genesis_level:(Raw_level.to_int32 node_ctxt.genesis_info.level)
+    ~genesis_level:node_ctxt.genesis_info.level
     ~pvm_kind:(Sc_rollup.Kind.to_string node_ctxt.kind) ;
   let fatal_error_exit e =
     Format.eprintf "%!%a@.Exiting.@." pp_print_trace e ;
@@ -754,13 +750,11 @@ module Internal_for_tests = struct
     let commitment_hash =
       Option.map Sc_rollup_proto_types.Commitment_hash.to_octez commitment_hash
     in
-    let level = Raw_level.of_int32_exn head.level in
+    let level = head.level in
     let* previous_commitment_hash =
-      if level = node_ctxt.genesis_info.Sc_rollup.Commitment.level then
+      if level = node_ctxt.genesis_info.level then
         (* Previous commitment for rollup genesis is itself. *)
-        return
-          (Sc_rollup_proto_types.Commitment_hash.to_octez
-             node_ctxt.genesis_info.Sc_rollup.Commitment.commitment_hash)
+        return node_ctxt.genesis_info.commitment_hash
       else
         let+ pred = Node_context.get_l2_block node_ctxt predecessor.hash in
         Sc_rollup_block.most_recent_commitment pred.header
@@ -769,7 +763,7 @@ module Internal_for_tests = struct
       Sc_rollup_block.
         {
           block_hash = head.hash;
-          level = head.level;
+          level;
           predecessor = predecessor.hash;
           commitment_hash;
           previous_commitment_hash;
@@ -803,6 +797,18 @@ let retrieve_constants cctxt =
     Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
   in
   Layer1_helpers.constants_of_parametric parametric
+
+let retrieve_genesis_info cctxt rollup_address =
+  let open Lwt_result_syntax in
+  let+ {level; commitment_hash} =
+    RPC.Sc_rollup.genesis_info cctxt (cctxt#chain, `Head 0) rollup_address
+  in
+  Node_context.
+    {
+      level = Raw_level.to_int32 level;
+      commitment_hash =
+        Sc_rollup_proto_types.Commitment_hash.to_octez commitment_hash;
+    }
 
 module Rollup_node_daemon_components : Daemon_components.S = struct
   module Batcher = Batcher
@@ -840,7 +846,10 @@ let run
     Layer1.fetch_tezos_shell_header l1_ctxt head.header.predecessor
   in
   let*! () = Event.received_first_block head.hash Protocol.hash in
-  let* constants = retrieve_constants cctxt in
+  let* constants = retrieve_constants cctxt
+  and* genesis_info =
+    retrieve_genesis_info cctxt configuration.sc_rollup_address
+  in
   let* node_ctxt =
     Node_context.init
       cctxt
@@ -849,6 +858,7 @@ let run
       Read_write
       l1_ctxt
       constants
+      genesis_info
       ~proto_level:predecessor.proto_level
       configuration
   in

@@ -69,19 +69,15 @@ let inject_batches state = List.iter_es (inject_sequence state)
 
 let get_previous_delayed_inbox_size node_ctxt (head : Layer1.head) =
   let open Lwt_result_syntax in
-  let*? level = Environment.wrap_tzresult @@ Raw_level.of_int32 head.level in
   let*? () =
     error_unless
-      Raw_level.(level >= node_ctxt.Node_context.genesis_info.level)
+      (head.level >= node_ctxt.Node_context.genesis_info.level)
       (Exn (Failure "Cannot obtain delayed inbox before origination level"))
   in
   let* previous_head = Node_context.get_predecessor node_ctxt head in
-  let*? previous_level =
-    Environment.wrap_tzresult @@ Raw_level.of_int32 previous_head.level
-  in
-  let first_inbox_level = Raw_level.succ node_ctxt.genesis_info.level in
+  let first_inbox_level = Int32.succ node_ctxt.genesis_info.level in
   let* ctxt =
-    if Raw_level.(previous_level < first_inbox_level) then
+    if previous_head.level < first_inbox_level then
       (* This is before we have interpreted the boot sector, so we start
          with an empty context in genesis *)
       return (Context.empty node_ctxt.context)
@@ -205,8 +201,7 @@ let on_register_messages state (messages : string list) =
 let on_new_head state head =
   let open Lwt_result_syntax in
   let* () = produce_batch_sequences state head in
-  when_ (head.level >= Raw_level.to_int32 state.node_ctxt.genesis_info.level)
-  @@ fun () ->
+  when_ (head.level >= state.node_ctxt.genesis_info.level) @@ fun () ->
   let* simulation_ctxt =
     Simulation.start_simulation ~reveal_map:None state.node_ctxt head
   in

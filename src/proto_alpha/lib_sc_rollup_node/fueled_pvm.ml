@@ -119,6 +119,15 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
 
   exception Error_wrapper of tztrace
 
+  let metadata (node_ctxt : _ Node_context.t) =
+    let address =
+      Sc_rollup_proto_types.Address.of_octez node_ctxt.rollup_address
+    in
+    let origination_level =
+      Raw_level.of_int32_exn node_ctxt.genesis_info.level
+    in
+    Sc_rollup.Metadata.{address; origination_level}
+
   (** [eval_until_input node_ctxt reveal_map level message_index ~fuel
         start_tick failing_ticks state] advances a PVM [state] until it wants
         more inputs or there are no more [fuel] (if [Some fuel] is
@@ -139,7 +148,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
       |> Sc_rollup.is_reveal_enabled_predicate
     in
     let module PVM = (val node_ctxt.pvm) in
-    let metadata = Node_context.metadata node_ctxt in
+    let metadata = metadata node_ctxt in
     let dal_attestation_lag =
       node_ctxt.protocol_constants.dal.attestation_lag
     in

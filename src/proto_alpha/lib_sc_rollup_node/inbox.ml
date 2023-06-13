@@ -159,9 +159,7 @@ let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
 let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
     (head : Layer1.header) =
   let open Lwt_result_syntax in
-  let first_inbox_level =
-    Raw_level.to_int32 node_ctxt.genesis_info.level |> Int32.succ
-  in
+  let first_inbox_level = node_ctxt.genesis_info.level |> Int32.succ in
   if head.level >= first_inbox_level then
     (* We compute the inbox of this block using the inbox of its
        predecessor. That way, the computation of inboxes is robust to chain

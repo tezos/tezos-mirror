@@ -32,7 +32,7 @@ let ancestor_hash ~number_of_levels
   let genesis_level = genesis_info.level in
   let rec go number_of_levels (Layer1.{hash; level} as head) =
     let open Lwt_result_syntax in
-    if level < Raw_level.to_int32 genesis_level then return_none
+    if level < genesis_level then return_none
     else if number_of_levels = 0 then return_some hash
     else
       let* pred_head = Node_context.get_predecessor_opt node_ctxt head in
@@ -222,7 +222,7 @@ module Confirmed_slots_history = struct
       Int32.of_int node_ctxt.Node_context.protocol_constants.dal.attestation_lag
     in
     let block_level = Raw_level.to_int32 block_level in
-    let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
+    let genesis_level = node_ctxt.genesis_info.level in
     Int32.(block_level >= add lag genesis_level)
 
   let dal_entry_of_block_hash node_ctxt

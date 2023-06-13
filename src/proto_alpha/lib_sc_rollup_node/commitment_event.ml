@@ -92,7 +92,7 @@ module Simple = struct
       ~name:"sc_rollup_node_commitment_process_head"
       ~msg:"Computing and storing new commitment for level {level}"
       ~level:Notice
-      ("level", Raw_level.encoding)
+      ("level", Data_encoding.int32)
 
   let publish_commitment =
     declare_2
