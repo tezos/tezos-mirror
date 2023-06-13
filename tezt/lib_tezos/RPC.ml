@@ -263,11 +263,14 @@ let post_private_injection_operation ?(async = false) data =
     Fun.id
 
 let post_chain_block_helpers_scripts_run_operation ?(chain = "main")
-    ?(block = "head") ?(async = false) data =
+    ?(block = "head") ?version ?(async = false) data =
+  let query_string =
+    Query_arg.opt "version" Fun.id version @ Query_arg.switch "async" async
+  in
   make
     POST
     ["chains"; chain; "blocks"; block; "helpers"; "scripts"; "run_operation"]
-    ~query_string:(Query_arg.switch "async" async)
+    ~query_string
     ~data
     Fun.id
 
@@ -520,8 +523,10 @@ let post_chain_block_helpers_parse_operations ?(chain = "main")
     Fun.id
 
 let post_chain_block_helpers_scripts_simulate_operation ?(chain = "main")
-    ?(block = "head") ~data () =
+    ?(block = "head") ?version ~data () =
+  let query_string = Query_arg.opt "version" Fun.id version in
   make
+    ~query_string
     ~data
     POST
     [

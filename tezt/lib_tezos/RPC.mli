@@ -267,7 +267,12 @@ val post_private_injection_operation : ?async:bool -> data -> JSON.t t
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val post_chain_block_helpers_scripts_run_operation :
-  ?chain:string -> ?block:string -> ?async:bool -> data -> JSON.t t
+  ?chain:string ->
+  ?block:string ->
+  ?version:string ->
+  ?async:bool ->
+  data ->
+  JSON.t t
 
 (** RPC: [GET /chains/<chain>/chain_id]
 
@@ -539,7 +544,12 @@ val post_chain_block_helpers_parse_operations :
     [block] defaults to ["head"].
 *)
 val post_chain_block_helpers_scripts_simulate_operation :
-  ?chain:string -> ?block:string -> data:data -> unit -> JSON.t t
+  ?chain:string ->
+  ?block:string ->
+  ?version:string ->
+  data:data ->
+  unit ->
+  JSON.t t
 
 (** RPC: [POST /chains/<chain>/blocks/<block>/helpers/scripts/event_address]
 

@@ -30,6 +30,25 @@ open Environment
 open Alpha_context
 open Environment.Error_monad
 
+type version = Version_0 | Version_1
+
+let string_of_version = function Version_0 -> "0" | Version_1 -> "1"
+
+let version_of_string = function
+  | "0" -> Ok Version_0
+  | "1" -> Ok Version_1
+  | _ -> Error "Cannot parse version (supported versions \"0\" and \"1\")"
+
+let default_operations_version = Version_0
+
+let version_arg =
+  let open RPC_arg in
+  make
+    ~name:"version"
+    ~destruct:version_of_string
+    ~construct:string_of_version
+    ()
+
 (** The assumed number of blocks between operation-creation time and
     the actual time when the operation is included in a block. *)
 let default_operation_inclusion_latency = 3
@@ -409,6 +428,16 @@ module Scripts = struct
         ~query:RPC_query.empty
         RPC_path.(path / "normalize_type")
 
+    let run_operation_query =
+      let open RPC_query in
+      query (fun version ->
+          object
+            method version = version
+          end)
+      |+ field "version" version_arg default_operations_version (fun t ->
+             t#version)
+      |> seal
+
     let operations_encodings =
       union
         [
@@ -426,6 +455,26 @@ module Scripts = struct
             Fun.id;
         ]
 
+    let run_operation_output_encoding =
+      union
+        [
+          case
+            ~title:"new_encoding_run_operation_output"
+            (Tag 1)
+            Apply_results.operation_data_and_metadata_encoding
+            (function
+              | Version_1, operation -> Some operation | Version_0, _ -> None)
+            (fun operation -> (Version_1, operation));
+          case
+            ~title:"old_encoding_run_operation_output"
+            (Tag 0)
+            Apply_results
+            .operation_data_and_metadata_encoding_with_legacy_attestation_name
+            (function
+              | Version_0, operation -> Some operation | Version_1, _ -> None)
+            (fun operation -> (Version_0, operation));
+        ]
+
     let run_operation =
       RPC_service.post_service
         ~description:
@@ -433,22 +482,24 @@ module Scripts = struct
            signature checks. Return the operation application result, \
            including the consumed gas. This RPC does not support consensus \
            operations."
-        ~query:RPC_query.empty
+        ~query:run_operation_query
         ~input:
           (obj2
              (req "operation" operations_encodings)
              (req "chain_id" Chain_id.encoding))
-        ~output:
-          Apply_results
-          .operation_data_and_metadata_encoding_with_legacy_attestation_name
+        ~output:run_operation_output_encoding
         RPC_path.(path / "run_operation")
 
     let simulate_query =
       let open RPC_query in
-      query (fun successor_level ->
+      query (fun version successor_level ->
           object
+            method version = version
+
             method successor_level = successor_level
           end)
+      |+ field "version" version_arg default_operations_version (fun t ->
+             t#version)
       |+ flag
            ~descr:
              "If true, the simulation is done on the successor level of the \
@@ -474,9 +525,7 @@ module Scripts = struct
              (req "operation" operations_encodings)
              (req "chain_id" Chain_id.encoding)
              (dft "latency" int16 default_operation_inclusion_latency))
-        ~output:
-          Apply_results
-          .operation_data_and_metadata_encoding_with_legacy_attestation_name
+        ~output:run_operation_output_encoding
         RPC_path.(path / "simulate_operation")
 
     let entrypoint_type =
@@ -953,23 +1002,26 @@ module Scripts = struct
       Return the unchanged operation protocol data, and the operation
       receipt ie. metadata containing balance updates, consumed gas,
       application success or failure, etc. *)
-  let run_operation_service rpc_ctxt () (packed_operation, chain_id) =
+  let run_operation_service rpc_ctxt params (packed_operation, chain_id) =
+    let open Lwt_result_syntax in
     let {Services_registration.context; block_header; _} = rpc_ctxt in
-    (match packed_operation.protocol_data with
-    | Operation_data {contents = Single (Preendorsement _); _}
-    | Operation_data {contents = Single (Endorsement _); _}
-    | Operation_data {contents = Single (Dal_attestation _); _} ->
-        error Run_operation_does_not_support_consensus_operations
-    | _ -> ok ())
-    >>?= fun () ->
+    let*? () =
+      match packed_operation.protocol_data with
+      | Operation_data {contents = Single (Preendorsement _); _}
+      | Operation_data {contents = Single (Endorsement _); _}
+      | Operation_data {contents = Single (Dal_attestation _); _} ->
+          error Run_operation_does_not_support_consensus_operations
+      | _ -> ok ()
+    in
     let oph = Operation.hash_packed packed_operation in
     let validity_state = Validate.begin_no_predecessor_info context chain_id in
-    Validate.validate_operation
-      ~check_signature:false
-      validity_state
-      oph
-      packed_operation
-    >>=? fun _validate_operation_state ->
+    let* _validate_operation_state =
+      Validate.validate_operation
+        ~check_signature:false
+        validity_state
+        oph
+        packed_operation
+    in
     let application_mode =
       Apply.Partial_construction {predecessor_fitness = block_header.fitness}
     in
@@ -988,9 +1040,10 @@ module Scripts = struct
           implicit_operations_results = [];
         }
     in
-    Apply.apply_operation application_state oph packed_operation
-    >|=? fun (_ctxt, op_metadata) ->
-    (packed_operation.protocol_data, op_metadata)
+    let* _ctxt, op_metadata =
+      Apply.apply_operation application_state oph packed_operation
+    in
+    return (params#version, (packed_operation.protocol_data, op_metadata))
 
   (*
 
@@ -1007,16 +1060,22 @@ module Scripts = struct
        time of the operation.
 
     *)
-  let simulate_operation_service rpc_ctxt
-      (_simulate_query : < successor_level : bool >)
+  let simulate_operation_service rpc_ctxt params
       (blocks_before_activation, op, chain_id, time_in_blocks) =
+    let open Lwt_result_syntax in
     let {Services_registration.context; _} = rpc_ctxt in
-    Cache.Admin.future_cache_expectation
-      context
-      ~time_in_blocks
-      ?blocks_before_activation
-    >>=? fun context ->
-    run_operation_service {rpc_ctxt with context} () (op, chain_id)
+    let* context =
+      Cache.Admin.future_cache_expectation
+        context
+        ~time_in_blocks
+        ?blocks_before_activation
+    in
+    run_operation_service
+      {rpc_ctxt with context}
+      (object
+         method version = params#version
+      end)
+      (op, chain_id)
 
   let default_from_context ctxt get = function
     | None -> get ctxt
@@ -1770,19 +1829,38 @@ module Scripts = struct
   let normalize_type ~ty ctxt block =
     RPC_context.make_call0 S.normalize_type ctxt block () ty
 
-  let run_operation ~op ~chain_id ctxt block =
-    RPC_context.make_call0 S.run_operation ctxt block () (op, chain_id)
+  let run_operation ~op ~chain_id ?(version = default_operations_version) ctxt
+      block =
+    let open Lwt_result_syntax in
+    let* (Version_0 | Version_1), run_operation =
+      RPC_context.make_call0
+        S.run_operation
+        ctxt
+        block
+        (object
+           method version = version
+        end)
+        (op, chain_id)
+    in
+    return run_operation
 
-  let simulate_operation ~op ~chain_id ~latency ?(successor_level = false)
+  let simulate_operation ~op ~chain_id ~latency
+      ?(version = default_operations_version) ?(successor_level = false)
       ?blocks_before_activation ctxt block =
-    RPC_context.make_call0
-      S.simulate_operation
-      ctxt
-      block
-      (object
-         method successor_level = successor_level
-      end)
-      (blocks_before_activation, op, chain_id, latency)
+    let open Lwt_result_syntax in
+    let* (Version_0 | Version_1), simulate_operation =
+      RPC_context.make_call0
+        S.simulate_operation
+        ctxt
+        block
+        (object
+           method version = version
+
+           method successor_level = successor_level
+        end)
+        (blocks_before_activation, op, chain_id, latency)
+    in
+    return simulate_operation
 
   let entrypoint_type ~script ~entrypoint ctxt block =
     RPC_context.make_call0 S.entrypoint_type ctxt block () (script, entrypoint)
@@ -2876,32 +2954,13 @@ module Parse = struct
 
     let path = RPC_path.(path / "parse")
 
-    type version = Version_0 | Version_1
-
-    let string_of_version = function Version_0 -> "0" | Version_1 -> "1"
-
-    let version_of_string = function
-      | "0" -> Ok Version_0
-      | "1" -> Ok Version_1
-      | _ -> Error "Cannot parse version (supported versions \"0\" and \"1\")"
-
-    let default_parse_operations_version = Version_0
-
-    let version_arg =
-      let open RPC_arg in
-      make
-        ~name:"version"
-        ~destruct:version_of_string
-        ~construct:string_of_version
-        ()
-
     let operations_query =
       let open RPC_query in
       query (fun version ->
           object
             method version = version
           end)
-      |+ field "version" version_arg default_parse_operations_version (fun t ->
+      |+ field "version" version_arg default_operations_version (fun t ->
              t#version)
       |> seal
 
@@ -2993,8 +3052,8 @@ module Parse = struct
     Registration.register0_noctxt ~chunked:false S.block (fun () raw_block ->
         return @@ parse_protocol_data raw_block.protocol_data)
 
-  let operations ctxt block ?(version = S.default_parse_operations_version)
-      ?check operations =
+  let operations ctxt block ?(version = default_operations_version) ?check
+      operations =
     let open Lwt_result_syntax in
     let*! v =
       RPC_context.make_call0
