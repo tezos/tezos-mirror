@@ -1159,19 +1159,20 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         circuits_map
         SMap.(empty, empty, empty)
 
-    let compute_sizes
-        Circuit.
-          {
-            public_input_size;
-            input_com_sizes;
-            circuit_size;
-            table_size;
-            nb_lookups;
-            ultra;
-            gates;
-            range_checks;
-            _;
-          } nb_proofs =
+    let compute_sizes circuit_name
+        ( Circuit.
+            {
+              public_input_size;
+              input_com_sizes;
+              circuit_size;
+              table_size;
+              nb_lookups;
+              ultra;
+              gates;
+              range_checks;
+              _;
+            },
+          nb_proofs ) =
       (* Computing domain *)
       (* For TurboPlonk, we want a domain of size a power of two
          higher than or equal to the number of constraints plus public inputs.
@@ -1180,15 +1181,36 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
          For range-checks, we want to ensure that the domain size is greater than the "size" of the "biggest" range-checks
       *)
       let nb_max_constraints =
-        let l = List.fold_left ( + ) public_input_size input_com_sizes in
-        SMap.fold
-          (fun _ r acc ->
-            let sum_bounds =
-              (List.fold_left (fun sum (_, bound) -> sum + bound)) 0 r
-            in
-            max acc sum_bounds)
-          range_checks
-          (circuit_size + l + if ultra then 1 else 0)
+        let base_size =
+          circuit_size
+          + List.fold_left ( + ) public_input_size input_com_sizes
+          + if ultra then 1 else 0
+        in
+        let size_with_rc, biggest_rc_wire =
+          SMap.fold
+            (fun wire r (acc, rc_wire) ->
+              let sum_bounds =
+                (List.fold_left (fun sum (_, bound) -> sum + bound)) 0 r
+              in
+              if sum_bounds > acc then (sum_bounds, wire) else (acc, rc_wire))
+            range_checks
+            (base_size, "")
+        in
+        (* if the circuit size has been increased because of the range checks we raise a warning *)
+        let _print_warning =
+          match biggest_rc_wire with
+          | "" -> ()
+          | w ->
+              Printf.printf
+                "\n\
+                 WARNING: Circuit %s's size has been increased to %d (initial \
+                 size was %d) because of the range-checks on the %s wire."
+                circuit_name
+                size_with_rc
+                base_size
+                w
+        in
+        size_with_rc
       in
       (* For UltraPlonk, we want a domain of size a power of two
          higher than the number of records and strictly higher than the number of lookups *)
@@ -1216,8 +1238,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
     let get_sizes ~zero_knowledge circuits_map =
       let log, n, total_pack, some_ultra =
         SMap.fold
-          (fun _ (c, nb_proofs) (acc_log, acc_n, acc_pack_size, acc_ultra) ->
-            let log, n, pack_size = compute_sizes c nb_proofs in
+          (fun k (c, nb_proofs) (acc_log, acc_n, acc_pack_size, acc_ultra) ->
+            let log, n, pack_size = compute_sizes k (c, nb_proofs) in
             ( max acc_log log,
               max acc_n n,
               acc_pack_size + pack_size,
