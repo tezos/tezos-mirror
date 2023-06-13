@@ -38,5 +38,6 @@ You can also install Octez using Opam by running ``opam install octez``.
 Changelog
 ---------
 
+- `Version 17.1 <../CHANGES.html#version-17-1>`_
 - `Version 17.0 <../CHANGES.html#version-17-0>`_
 - `Version 17.0~rc1 <../CHANGES.html#version-17-0-rc1>`_

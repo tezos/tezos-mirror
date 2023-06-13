@@ -117,9 +117,6 @@ Node
   ``prevalidator`` in the shell limits of the configuration file. They
   already didn't do anything since V16-rc1. (MR :gl:`!8963`)
 
-- Improved performances of RPC responses on request for older blocks by
-  caching the archived metadata accesses. (MR :gl:`!8976`)
-
 - Added version ``1`` to RPCs ``POST ../helpers/scripts/run_operation`` and
   ``POST ../helpers/scripts/simulate_operation``. It can be used by calling the
   RPC with the parameter ``?version=1`` (default version is still ``0``).
