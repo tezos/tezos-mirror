@@ -25,6 +25,8 @@ depends: [
   "tezos-dal-node-services"
   "tezos-dal-node-lib"
   "tezos-dac-alpha"
+  "tezos-dac-lib"
+  "tezos-dac-client-lib"
   "tezos-shell-services"
   "tezos-smart-rollup-alpha"
   "tezos-smart-rollup-layer2-alpha"

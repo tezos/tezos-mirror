@@ -6037,10 +6037,11 @@ let hash = Protocol.hash
             octez_workers |> open_;
             octez_dal_node_services;
             octez_dal_node_lib |> open_;
-            dac |> if_some
-            |> if_ N.(number >= 018)
-            (* [dac] is needed for the DAC observer client which is not available in Nairobi and earlier. *)
-            |> open_;
+            (* [dac] is needed for the DAC observer client which is not
+               available in Nairobi and earlier. *)
+            dac |> if_some |> if_ N.(number >= 018) |> open_;
+            octez_dac_lib |> if_ N.(number >= 018) |> open_;
+            octez_dac_client_lib |> if_ N.(number >= 018) |> open_;
             octez_shell_services |> open_;
             octez_sc_rollup |> if_some |> open_;
             octez_sc_rollup_layer2 |> if_some |> open_;
