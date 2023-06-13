@@ -105,17 +105,27 @@ let listings_encoding =
          (req "voting_power" int64)))
 
 let update_listings ctxt =
-  Storage.Vote.Listings.clear ctxt >>= fun ctxt ->
-  Stake_storage.fold
-    ctxt
-    (ctxt, 0L)
-    ~order:`Sorted
-    ~f:(fun (delegate, stake) (ctxt, total) ->
-      let weight = Tez_repr.to_mutez stake in
-      Storage.Vote.Listings.init ctxt delegate weight >>=? fun ctxt ->
-      return (ctxt, Int64.add total weight))
-  >>=? fun (ctxt, total) ->
-  Storage.Vote.Voting_power_in_listings.add ctxt total >>= fun ctxt ->
+  let open Lwt_result_syntax in
+  let*! ctxt = Storage.Vote.Listings.clear ctxt in
+  let* ctxt, total =
+    Stake_storage.fold
+      ctxt
+      (ctxt, 0L)
+      ~order:`Sorted
+      ~f:(fun (delegate, stake) (ctxt, total) ->
+        let delegate_contract = Contract_repr.Implicit delegate in
+        let* deposits = Frozen_deposits_storage.get ctxt delegate_contract in
+        let frozen = deposits.current_amount in
+        let frozen = Tez_repr.min stake frozen in
+        (* Cannot fail:
+           frozen = min stake _ ⇒ frozen <= stake ⇒ stake - frozen >= 0. *)
+        let*? delegated = Tez_repr.(stake -? frozen) in
+        let stake = Stake_repr.make ~frozen ~delegated in
+        let weight = Stake_context.staking_weight ctxt stake in
+        Storage.Vote.Listings.init ctxt delegate weight >>=? fun ctxt ->
+        return (ctxt, Int64.add total weight))
+  in
+  let*! ctxt = Storage.Vote.Voting_power_in_listings.add ctxt total in
   return ctxt
 
 type delegate_info = {
