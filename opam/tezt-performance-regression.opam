@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezt" { >= "3.1.0" }
   "uri" { >= "3.1.0" }
-  "cohttp-lwt-unix" { >= "4.0.0" }
+  "cohttp-lwt-unix" { >= "4.0.0" & != "5.1.0" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

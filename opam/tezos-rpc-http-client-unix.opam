@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezos-stdlib-unix"
   "tezos-base"
-  "cohttp-lwt-unix" { >= "4.0.0" }
+  "cohttp-lwt-unix" { >= "4.0.0" & != "5.1.0" }
   "resto-cohttp-client" { >= "1.0" }
   "tezos-rpc"
   "tezos-rpc-http-client"
