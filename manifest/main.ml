@@ -1813,7 +1813,12 @@ let octez_base_p2p_identity_file =
 let _octez_base_tests =
   tezt
     [
-      "test_bounded"; "test_time"; "test_protocol"; "test_p2p_addr"; "test_sized";
+      "test_bounded";
+      "test_time";
+      "test_protocol";
+      "test_p2p_addr";
+      "test_sized";
+      "test_skip_list";
     ]
     ~path:"src/lib_base/test"
     ~opam:"tezos-base"
