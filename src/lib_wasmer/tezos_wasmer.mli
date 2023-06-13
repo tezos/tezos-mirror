@@ -157,6 +157,10 @@ module Memory : sig
   (** [set mem addr value] sets a byte at address [addr] to [value]. *)
   val set : t -> int -> Unsigned.uint8 -> unit
 
+  (** [set_string mem ~address ~data] writes a series of bytes represented by [data]
+      at address [address] in the provided memory [mem]. *)
+  val set_string : t -> address:int -> data:string -> unit
+
   (** [length mem] gives you the memory size in bytes. *)
   val length : t -> int
 

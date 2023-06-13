@@ -40,6 +40,15 @@ let get_string mem ~address ~length =
 
 let set mem = Array.set mem.raw
 
+let set_string mem ~address ~data =
+  (* TODO: Add bounds check *)
+  for offset = 0 to String.length data - 1 do
+    set
+      mem
+      (offset + address)
+      (String.get_uint8 data offset |> Unsigned.UInt8.of_int)
+  done
+
 let length mem = Array.length mem.raw
 
 module Internal_for_tests = struct

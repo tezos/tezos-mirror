@@ -42,15 +42,10 @@ module Wasmer : Host_funcs.Memory_access with type t = Memory.t = struct
     translate_array_exception @@ fun () ->
     Lwt.return (Memory.get_string memory ~address ~length)
 
-  let store_bytes memory addr data =
-    let char_to_uint8 char = Char.code char |> Unsigned.UInt8.of_int in
-    let addr = I32.to_int_u addr in
-    let set_char idx chr =
-      translate_array_exception @@ fun () ->
-      Memory.set memory (addr + idx) @@ char_to_uint8 chr
-    in
-
-    String.iteri set_char data ;
+  let store_bytes memory address data =
+    let address = I32.to_int_u address in
+    translate_array_exception @@ fun () ->
+    Memory.set_string memory ~address ~data ;
     Lwt.return ()
 
   let to_bits (num : Tezos_webassembly_interpreter.Values.num) : int * int64 =

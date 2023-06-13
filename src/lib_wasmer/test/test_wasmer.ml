@@ -132,11 +132,89 @@ let test_get_string_behaves_like_get () =
   in
   assert (exn_get = exn_get_string)
 
+let test_set_string_behaves_like_set () =
+  let mem = alloc ~initial:(Unsigned.UInt8.of_int 0) ~pages:1 () in
+
+  let data = String.init 256 (fun _ -> Random.int 256 |> Char.chr) in
+
+  (* Both mechanisms should write the same data. *)
+  let base_addr = page_size / 4 in
+  for i = 0 to String.length data - 1 do
+    String.get_uint8 data i |> Unsigned.UInt8.of_int
+    |> Memory.set mem (base_addr + i)
+  done ;
+  Memory.set_string mem ~address:base_addr ~data ;
+  let read_data =
+    Memory.get_string mem ~address:base_addr ~length:(String.length data)
+  in
+  Alcotest.check hex_string "expected %L, got %R" data read_data ;
+
+  (* Going out of bounds fails the same way. *)
+  let exn_get =
+    try
+      let _ =
+        for i = 0 to String.length data - 1 do
+          String.get_uint8 data i |> Unsigned.UInt8.of_int
+          |> Memory.set mem (-10 + i)
+        done
+      in
+      assert false
+    with exn -> exn
+  in
+  let exn_get_string =
+    try
+      let _ = Memory.set_string mem ~address:(-10) ~data in
+      assert false
+    with exn -> exn
+  in
+  assert (exn_get = exn_get_string) ;
+
+  (* Going out of bounds fails the same way. *)
+  let exn_get =
+    try
+      let _ =
+        for i = 0 to String.length data - 1 do
+          String.get_uint8 data i |> Unsigned.UInt8.of_int
+          |> Memory.set mem (page_size + 1 + i)
+        done
+      in
+      assert false
+    with exn -> exn
+  in
+  let exn_get_string =
+    try
+      let _ = Memory.set_string mem ~address:(page_size + 1) ~data in
+      assert false
+    with exn -> exn
+  in
+  assert (exn_get = exn_get_string) ;
+
+  (* Going out of bounds fails the same way. *)
+  let exn_get =
+    try
+      let _ =
+        for i = 0 to String.length data - 1 do
+          String.get_uint8 data i |> Unsigned.UInt8.of_int
+          |> Memory.set mem (page_size + i)
+        done
+      in
+      assert false
+    with exn -> exn
+  in
+  let exn_get_string =
+    try
+      let _ = Memory.set_string mem ~address:page_size ~data in
+      assert false
+    with exn -> exn
+  in
+  assert (exn_get = exn_get_string)
+
 let tests =
   [
     ( "Memory",
       [
         ("get_string behaves like get", `Quick, test_get_string_behaves_like_get);
+        ("set_string behaves like set", `Quick, test_set_string_behaves_like_set);
       ] );
   ]
 
