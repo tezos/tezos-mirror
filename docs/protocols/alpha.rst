@@ -60,8 +60,6 @@ Adaptive Inflation (ongoing)
 
 - Add parameter ``staking_over_baking_limit`` as the limit of co-staked tokens over the baked tokens for a given baker. (MR :gl:`!8744`)
 
-- Add parameter ``max_costaking_baker_count`` to limit the number of bakers an account can co-stake to. (MR :gl:`!8766`)
-
 When the feature flag is enabled, the following extra changes happen:
 
 - Most rewards (baking rewards, baking bonuses, attestation rewards, revelation

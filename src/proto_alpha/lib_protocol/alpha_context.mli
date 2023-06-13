@@ -846,7 +846,6 @@ module Constants : sig
 
     type adaptive_inflation = {
       staking_over_baking_limit : int;
-      max_costaking_baker_count : int;
       staking_over_delegation_edge : int;
       launch_ema_threshold : int32;
     }
