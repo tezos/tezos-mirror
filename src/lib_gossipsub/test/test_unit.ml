@@ -2083,6 +2083,98 @@ let test_scoring_p2 rng _limits parameters =
     state ;
   unit
 
+(** Test for P7 (Behavioural Penalty - Grafts before backoff).
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L4203 *)
+let test_scoring_p7_grafts_before_backoff rng _limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Scoring P7 grafts before backoff"
+    ~tags:["gossipsub"; "scoring"; "p7"; "graft"]
+  @@ fun () ->
+  let prune_backoff = Milliseconds.of_int_ms 200 in
+  let graft_flood_threshold = Milliseconds.of_int_ms 100 in
+  let behaviour_penalty_weight = -2.0 in
+  let behaviour_penalty_decay = 0.9 in
+  let limits =
+    {
+      (Default_limits.default_limits
+         ~behaviour_penalty_weight
+         ~behaviour_penalty_decay
+         ())
+      with
+      prune_backoff;
+      graft_flood_threshold;
+    }
+  in
+  let peers = make_peers ~number:2 in
+  let topic = "topic" in
+  (* Build mesh with two peers. *)
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> false)
+      ()
+  in
+  let peers = Array.of_list peers in
+  let add_prune_backoff peer state =
+    (* Introduce prune backoff to [peer] by setting the [peer] score to negative and
+       handling a graft from the [peer]. *)
+    let state, _ = GS.set_application_score {peer; score = -99.0} state in
+    let state, _ = GS.handle_graft {peer; topic} state in
+    let state, _ = GS.set_application_score {peer; score = 0.0} state in
+    state
+  in
+  (* Add prune backoff to the peers. *)
+  let state = add_prune_backoff peers.(0) state in
+  let state = add_prune_backoff peers.(1) state in
+  (* Wait [graft_flood_threshold - 1] ms. *)
+  Time.elapse Milliseconds.(sub graft_flood_threshold (of_int_ms 1)) ;
+  (* First peer tries to graft. *)
+  let state, _ = GS.handle_graft {peer = peers.(0); topic} state in
+  (* Since the time since last prune is below [graft_flood_threshold],
+     the first peer should have double behaviour penalty (squared). *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:(2.0 *. 2.0 *. behaviour_penalty_weight)
+    peers.(0)
+    state ;
+  (* Wait for 2 more ms millisecs.
+     Total time passed since last prune is now [graft_flood_threshold + 1] *)
+  Time.elapse @@ Milliseconds.of_int_ms 2 ;
+  (* Second peer tries to graft. *)
+  let state, _ = GS.handle_graft {peer = peers.(1); topic} state in
+  (* Since the time since last prune is above [graft_flood_threshold],
+     the second peer should have a single behaviour penalty (squared). *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:(1.0 *. 1.0 *. behaviour_penalty_weight)
+    peers.(1)
+    state ;
+  (* Test decay. *)
+  let state, _ = GS.heartbeat state in
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:
+      (2.0 *. behaviour_penalty_decay
+      *. (2.0 *. behaviour_penalty_decay)
+      *. behaviour_penalty_weight)
+    peers.(0)
+    state ;
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:
+      (1.0 *. behaviour_penalty_decay
+      *. (1.0 *. behaviour_penalty_decay)
+      *. behaviour_penalty_weight)
+    peers.(1)
+    state ;
+  unit
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/5293
    Add test the described test scenario *)
 
@@ -2120,4 +2212,5 @@ let register rng limits parameters =
   test_ignore_too_many_messages_in_ihave rng limits parameters ;
   test_heartbeat_scenario rng limits parameters ;
   test_scoring_p1 rng limits parameters ;
-  test_scoring_p2 rng limits parameters
+  test_scoring_p2 rng limits parameters ;
+  test_scoring_p7_grafts_before_backoff rng limits parameters

@@ -29,7 +29,8 @@ module Milliseconds = Test_gossipsub_shared.Milliseconds
 let default_limits ?mesh_message_deliveries_activation ?time_in_mesh_weight
     ?time_in_mesh_quantum ?time_in_mesh_cap ?first_message_deliveries_weight
     ?first_message_deliveries_cap ?first_message_deliveries_decay
-    ?mesh_message_deliveries_weight () :
+    ?mesh_message_deliveries_weight ?(behaviour_penalty_weight = ~-.10.0)
+    ?(behaviour_penalty_decay = 0.2) () :
     (string, int, int, Milliseconds.t) limits =
   let per_topic_score_limits =
     {
@@ -64,9 +65,9 @@ let default_limits ?mesh_message_deliveries_activation ?time_in_mesh_weight
     {
       topics = topic_score_limits;
       topic_score_cap = Some 3600.;
-      behaviour_penalty_weight = ~-.10.0;
+      behaviour_penalty_weight;
       behaviour_penalty_threshold = 0.0;
-      behaviour_penalty_decay = 0.2;
+      behaviour_penalty_decay;
       app_specific_weight = 10.;
       decay_zero = 0.1;
     }
