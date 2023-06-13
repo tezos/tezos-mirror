@@ -263,6 +263,9 @@ let replay_one_block strict main_chain_store validator_process block =
       Event.(emit block_validation_start)
         (block_alias, Store.Block.hash block, Store.Block.level block)
     in
+    let bv_operations =
+      List.map (List.map Block_validation.mk_operation) operations
+    in
     let* result =
       Block_validator_process.apply_block
         ~simulate:true
@@ -270,7 +273,7 @@ let replay_one_block strict main_chain_store validator_process block =
         main_chain_store
         ~predecessor
         header
-        operations
+        bv_operations
     in
     let now = Time.System.now () in
     let*! () = Event.(emit block_validation_end) (Ptime.diff now start_time) in

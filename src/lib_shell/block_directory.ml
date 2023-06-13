@@ -316,6 +316,9 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
     let predecessor_ops_metadata_hash =
       Store.Block.all_operations_metadata_hash predecessor_block
     in
+    let operations =
+      List.map (List.map Block_validation.mk_operation) operations
+    in
     let* _block_metadata, ops_metadata =
       Block_validation.recompute_metadata
         ~chain_id

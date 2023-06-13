@@ -45,7 +45,7 @@ type request =
       predecessor_ops_metadata_hash :
         Operation_metadata_list_list_hash.t option;
       predecessor_resulting_context_hash : Context_hash.t;
-      operations : Operation.t list list;
+      operations : Block_validation.operation list list;
       max_operations_ttl : int;
       should_precheck : bool;
       simulate : bool;
@@ -63,7 +63,7 @@ type request =
       predecessor_ops_metadata_hash :
         Operation_metadata_list_list_hash.t option;
       predecessor_resulting_context_hash : Context_hash.t;
-      operations : Operation.t list list;
+      operations : Block_validation.operation list list;
     }
   | Precheck of {
       chain_id : Chain_id.t;
@@ -71,7 +71,7 @@ type request =
       predecessor_block_hash : Block_hash.t;
       predecessor_resulting_context_hash : Context_hash.t;
       header : Block_header.t;
-      operations : Operation.t list list;
+      operations : Block_validation.operation list list;
       hash : Block_hash.t;
     }
   | Commit_genesis of {chain_id : Chain_id.t}
@@ -204,7 +204,9 @@ let case_validate tag =
        (opt "pred_ops_metadata_hash" Operation_metadata_list_list_hash.encoding)
        (req "predecessor_resulting_context_hash" Context_hash.encoding)
        (req "max_operations_ttl" int31)
-       (req "operations" (list (list (dynamic_size Operation.encoding))))
+       (req
+          "operations"
+          (list (list (dynamic_size Block_validation.operation_encoding))))
        (req "should_precheck" bool)
        (req "simulate" bool))
     (function
@@ -278,7 +280,9 @@ let case_preapply tag =
              Operation_metadata_list_list_hash.encoding))
        (obj2
           (req "predecessor_resulting_context_hash" Context_hash.encoding)
-          (req "operations" (list (list (dynamic_size Operation.encoding))))))
+          (req
+             "operations"
+             (list (list (dynamic_size Block_validation.operation_encoding))))))
     (function
       | Preapply
           {
@@ -347,7 +351,9 @@ let case_precheck tag =
        (req "predecessor_resulting_context_hash" Context_hash.encoding)
        (req "header" (dynamic_size Block_header.encoding))
        (req "hash" Block_hash.encoding)
-       (req "operations" (list (list (dynamic_size Operation.encoding)))))
+       (req
+          "operations"
+          (list (list (dynamic_size Block_validation.operation_encoding)))))
     (function
       | Precheck
           {

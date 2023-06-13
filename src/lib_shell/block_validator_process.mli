@@ -77,7 +77,7 @@ val close : t -> unit Lwt.t
 val reconfigure_event_logging :
   t -> Internal_event_unix.Configuration.t -> unit tzresult Lwt.t
 
-(** [apply_block bvp predecessor header os] checks the liveness of the
+(** [apply_block bvp predecessor header ops] checks the liveness of the
     operations and then call [Block_validation.apply]
 
     [should_precheck] when set, triggers the block prechecking before applying
@@ -93,27 +93,29 @@ val apply_block :
   Store.chain_store ->
   predecessor:Store.Block.t ->
   Block_header.t ->
-  Operation.t list list ->
+  Block_validation.operation list list ->
   Block_validation.result tzresult Lwt.t
 
+(** [preapply_block bvp chain_store ~predecessor ~protocol_data ~timestamp ops]
+    is a wrapper for [Block_validation.preapply]. *)
 val preapply_block :
   t ->
   Store.chain_store ->
   predecessor:Store.Block.t ->
   protocol_data:bytes ->
   timestamp:Time.Protocol.t ->
-  Operation.t list list ->
+  Block_validation.operation list list ->
   (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
 
-(** [precheck_block bvp chain_store ~predecessor header hash os] is a
-   wrapper for [Block_validation.precheck]. *)
+(** [precheck_block bvp chain_store ~predecessor header hash ops] is a wrapper
+    for [Block_validation.precheck]. *)
 val precheck_block :
   t ->
   Store.chain_store ->
   predecessor:Store.Block.t ->
   Block_header.t ->
   Block_hash.t ->
-  Operation.t trace trace ->
+  Block_validation.operation trace trace ->
   unit tzresult Lwt.t
 
 (** [context_garbage_collection bvp context_index context_hash]

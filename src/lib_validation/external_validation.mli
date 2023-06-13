@@ -45,7 +45,7 @@ type request =
       predecessor_ops_metadata_hash :
         Operation_metadata_list_list_hash.t option;
       predecessor_resulting_context_hash : Context_hash.t;
-      operations : Operation.t list list;
+      operations : Block_validation.operation list list;
       max_operations_ttl : int;
       should_precheck : bool;
       simulate : bool;
@@ -63,7 +63,7 @@ type request =
       predecessor_ops_metadata_hash :
         Operation_metadata_list_list_hash.t option;
       predecessor_resulting_context_hash : Context_hash.t;
-      operations : Operation.t list list;
+      operations : Block_validation.operation list list;
     }
   | Precheck of {
       chain_id : Chain_id.t;
@@ -71,7 +71,7 @@ type request =
       predecessor_block_hash : Block_hash.t;
       predecessor_resulting_context_hash : Context_hash.t;
       header : Block_header.t;
-      operations : Operation.t list list;
+      operations : Block_validation.operation list list;
       hash : Block_hash.t;
     }
   | Commit_genesis of {chain_id : Chain_id.t}

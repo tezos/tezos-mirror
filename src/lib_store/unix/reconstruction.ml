@@ -199,6 +199,9 @@ let apply_context context_index chain_id ~user_activated_upgrades
       operation_metadata_size_limit;
     }
   in
+  let operations =
+    List.map (List.map Block_validation.mk_operation) operations
+  in
   let* {
          result =
            {Block_validation.validation_store; block_metadata; ops_metadata; _};

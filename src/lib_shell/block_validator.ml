@@ -142,7 +142,7 @@ let check_chain_liveness chain_db hash (header : Block_header.t) =
   | None | Some _ -> return_unit
 
 let precheck_block bvp chain_db chain_store ~predecessor block_header block_hash
-    operations =
+    operations bv_operations =
   let open Lwt_result_syntax in
   let*! () = Events.(emit prechecking_block) block_hash in
   let* () =
@@ -152,7 +152,7 @@ let precheck_block bvp chain_db chain_store ~predecessor block_header block_hash
       ~predecessor
       block_header
       block_hash
-      operations
+      bv_operations
   in
   let*! () = Events.(emit prechecked_block) block_hash in
   (* Add the block and operations to the cache of the ddb to make them
@@ -219,6 +219,14 @@ let on_validation_request w
                         f ()
                     | _ -> Lwt.return r
                   in
+                  let*! mempool = Store.Chain.mempool chain_store in
+                  let bv_operations =
+                    List.map
+                      (List.map
+                         (Block_validation.mk_operation
+                            ~known_valid_operation_set:mempool.known_valid))
+                      operations
+                  in
                   let*! r =
                     protect ~canceler:(Worker.canceler w) (fun () ->
                         protect ?canceler (fun () ->
@@ -230,7 +238,8 @@ let on_validation_request w
                                   ~predecessor:pred
                                   header
                                   hash
-                                  operations)))
+                                  operations
+                                  bv_operations)))
                   in
                   match r with
                   | Error errs -> return (Precheck_failed errs)
@@ -252,7 +261,7 @@ let on_validation_request w
                                       chain_store
                                       ~predecessor:pred
                                       header
-                                      operations)))
+                                      bv_operations)))
                       in
                       Shell_metrics.Block_validator
                       .set_operation_per_pass_collector
@@ -312,6 +321,14 @@ let on_preapplication_request w
   let* r =
     protect ~canceler:(Worker.canceler w) (fun () ->
         protect ?canceler (fun () ->
+            let* mempool = Store.Chain.mempool chain_store in
+            let operations =
+              List.map
+                (List.map
+                   (Block_validation.mk_operation
+                      ~known_valid_operation_set:mempool.known_valid))
+                operations
+            in
             Block_validator_process.preapply_block
               bv.validation_process
               chain_store
