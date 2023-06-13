@@ -11,7 +11,7 @@ trace
     [ (Pair (Pair 1 4 2) 0) ]
   - location: 10 (just consumed gas: 0.010)
     [ (Pair 1 4 2) ]
-  - location: 11 (just consumed gas: 0.037)
+  - location: 11 (just consumed gas: 0.029)
     [ 1
       4
       2 ]

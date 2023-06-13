@@ -135,26 +135,27 @@ let cost_N_ICheck_signature_bls size =
   S.safe_int 1_570_000 + (v0 lsl 1) + v0
 
 (* model N_IComb *)
-(* Approximating 3.531001 x term *)
+(* Approximating 25.816900 + 3.531001 * (x - 2) term *)
 (* Note: size >= 2, so the cost is never 0 *)
 let cost_N_IComb size =
   let open S_syntax in
-  let v0 = S.safe_int size in
-  (S.safe_int 3 * v0) + (v0 lsr 1) + (v0 lsr 5)
+  let size = S.safe_int size in
+  let v0 = S.sub size (S.safe_int 2) in
+  S.safe_int 30 + (S.safe_int 3 * v0) + (v0 lsr 1) + (v0 lsr 5)
 
 (* model N_IComb_get *)
-(* Approximating 0.573180 x term *)
+(* Approximating 19.706849 + 0.573180 x term *)
 let cost_N_IComb_get size =
   let open S_syntax in
   let v0 = S.safe_int size in
   S.safe_int 20 + (v0 lsr 1) + (v0 lsr 4)
 
 (* model N_IComb_set *)
-(* Approximating 1.287531 x term *)
+(* Approximating 25.010232 + 1.287531 x term *)
 let cost_N_IComb_set size =
   let open S_syntax in
   let v0 = S.safe_int size in
-  S.safe_int 20 + (v0 + (v0 lsr 2) + (v0 lsr 5))
+  S.safe_int 30 + (v0 + (v0 lsr 2) + (v0 lsr 5))
 
 (* Model N_ICompare *)
 (* Approximating 0.024413 x term *)
@@ -514,10 +515,11 @@ let cost_N_ITicket = S.safe_int 10
 let cost_N_ITotal_voting_power = S.safe_int 450
 
 (* model N_IUncomb *)
-(* Approximating 3.944710 x term *)
+(* Approximating 23.875723 + 3.944710 (x - 2) term *)
 let cost_N_IUncomb size =
   let open S_syntax in
-  let v0 = S.safe_int size in
+  let size = S.safe_int size in
+  let v0 = S.sub size (S.safe_int 2) in
   S.safe_int 25 + (S.safe_int 4 * v0)
 
 (* model N_IUnpair *)

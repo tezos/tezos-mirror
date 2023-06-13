@@ -14,17 +14,17 @@ trace
   - location: 17 (just consumed gas: 0.010)
     [ 2
       (Pair 1 4 2 Unit) ]
-  - location: 20 (just consumed gas: 0.021)
+  - location: 20 (just consumed gas: 0.031)
     [ (Pair 2 4 2 Unit) ]
   - location: 22 (just consumed gas: 0.010)
     [ "toto"
       (Pair 2 4 2 Unit) ]
-  - location: 25 (just consumed gas: 0.026)
+  - location: 25 (just consumed gas: 0.036)
     [ (Pair 2 4 "toto" Unit) ]
   - location: 27 (just consumed gas: 0.010)
     [ 0x01
       (Pair 2 4 "toto" Unit) ]
-  - location: 30 (just consumed gas: 0.027)
+  - location: 30 (just consumed gas: 0.037)
     [ (Pair 2 4 "toto" 0x01) ]
   - location: 32 (just consumed gas: 0.010)
     [ (Some (Pair 2 4 "toto" 0x01)) ]
