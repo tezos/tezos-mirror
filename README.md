@@ -11,7 +11,7 @@ It is splitted in 2 parts:
 ## Building
 
 - Install dependencies by doing `opam install octez caqti-lwt
-  caqti-dynload caqti-driver-sqlite`
+  caqti-driver-sqlite`
 - clone this repo, `cd teztale` and do `make`
 
 (As an alternative to install dependencies, clone this repo at the
