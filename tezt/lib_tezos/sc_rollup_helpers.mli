@@ -38,10 +38,30 @@ val hex_encode : string -> string
 *)
 val read_kernel : ?base:string -> string -> string
 
-(** [prepare_installer_kernel ~base_installee ~preimages_dir installee] feeds the
-    [smart-rollup-installer] with a kernel ([installee]), and returns the boot
-    sector corresponding to the installer for this specific kernel. [installee] is read
-    from [base_installee] on the disk.
+module Installer_kernel_config : sig
+  (** Moves path [from] at path [to_]. *)
+  type move_args = {from : string; to_ : string}
+
+  (** Reveals hash [hash] at path [to_]. *)
+  type reveal_args = {hash : string; to_ : string}
+
+  (** Sets value [value] at path [to_]. *)
+  type set_args = {value : string; to_ : string}
+
+  type instr = Move of move_args | Reveal of reveal_args | Set of set_args
+
+  (** Set of instructions used by the installer-client. *)
+  type t = instr list
+end
+
+(** [prepare_installer_kernel ~base_installee ~preimages_dir ?config
+    installee] feeds the [smart-rollup-installer] with a kernel
+    ([installee]), and returns the boot sector corresponding to the
+    installer for this specific kernel. [installee] is read from
+    [base_installee] on the disk.
+
+    A {!Installer_kernel_config.t} can optionally be provided to the installer
+    via [config].
 
     The preimages of the [installee] are saved to [preimages_dir]. This should be the
     reveal data directory of the rollup node.
@@ -53,6 +73,7 @@ val prepare_installer_kernel :
   ?runner:Runner.t ->
   ?base_installee:string ->
   preimages_dir:string ->
+  ?config:Installer_kernel_config.t ->
   string ->
   string Lwt.t
 
