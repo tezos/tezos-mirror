@@ -63,6 +63,16 @@ let create_blocks_reception =
   \  FOREIGN KEY (source) REFERENCES nodes(id),\n\
   \  UNIQUE (block, source))"
 
+let create_blocks_validation =
+  "CREATE TABLE IF NOT EXISTS blocks_validation(\n\
+  \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \  timestamp TEXT NOT NULL, -- ISO8601 string\n\
+  \  block INTEGER NOT NULL,\n\
+  \  source INTEGER NOT NULL,\n\
+  \  FOREIGN KEY (block) REFERENCES blocks(id),\n\
+  \  FOREIGN KEY (source) REFERENCES nodes(id),\n\
+  \  UNIQUE (block, source))"
+
 let create_operations =
   "CREATE TABLE IF NOT EXISTS operations(\n\
   \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
@@ -114,6 +124,10 @@ let create_blocks_reception_block_idx =
   "CREATE INDEX IF NOT EXISTS blocks_reception_block_idx ON \
    blocks_reception(block)"
 
+let create_blocks_validation_block_idx =
+  "CREATE INDEX IF NOT EXISTS blocks_validation_block_idx ON \
+   blocks_validation(block)"
+
 let create_operations_reception_operation_idx =
   "CREATE INDEX IF NOT EXISTS operations_reception_operation_idx ON \
    operations_reception(operation)"
@@ -128,6 +142,7 @@ let create_tables =
     create_nodes;
     create_blocks;
     create_blocks_reception;
+    create_blocks_validation;
     create_operations;
     create_operations_reception;
     create_operations_inclusion;
@@ -135,6 +150,7 @@ let create_tables =
     create_endorsing_rights_level_idx;
     create_operations_level_idx;
     create_blocks_reception_block_idx;
+    create_blocks_validation_block_idx;
     create_operations_reception_operation_idx;
     create_operations_inclusion_operation_idx;
   ]
