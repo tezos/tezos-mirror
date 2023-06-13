@@ -36,7 +36,7 @@ const KERNEL_BOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/boot.wasm");
 
 // Installer kernel will copy to this path before execution of config.
 // This is done in order avoid rewriting kernel during config execution.
-const AUXILIARY_KERNEL_BOOT_PATH: RefPath =
+const AUXILIARY_CONFIG_INTERPRETATION_PATH: RefPath =
     RefPath::assert_from(b"/__installer_kernel/auxiliary/kernel/boot.wasm");
 
 // Support 3 levels of hashes pages, and then bottom layer of content.
@@ -87,17 +87,23 @@ pub fn install_kernel(
             .store_value_size(&config_interpretation_path)
             .map_err(|_| "Failed to read kernel boot path size")?;
 
-        host.store_copy(&config_interpretation_path, &AUXILIARY_KERNEL_BOOT_PATH)
-            .map_err(|_| "Failed to copy kernel boot before config execution")?;
+        host.store_copy(
+            &config_interpretation_path,
+            &AUXILIARY_CONFIG_INTERPRETATION_PATH,
+        )
+        .map_err(|_| "Failed to copy kernel boot before config execution")?;
 
         let end_offset = kernel_size - 4;
         let mut instr_offset = end_offset - (config_program_size as usize);
         while instr_offset < end_offset {
-            let instr_size =
-                read_size(host, &AUXILIARY_KERNEL_BOOT_PATH, &mut instr_offset)? as usize;
+            let instr_size = read_size(
+                host,
+                &AUXILIARY_CONFIG_INTERPRETATION_PATH,
+                &mut instr_offset,
+            )? as usize;
             read_instruction_bytes(
                 host,
-                &AUXILIARY_KERNEL_BOOT_PATH,
+                &AUXILIARY_CONFIG_INTERPRETATION_PATH,
                 &mut instr_offset,
                 &mut config_instruction_buffer[..instr_size],
             )?;
@@ -108,7 +114,7 @@ pub fn install_kernel(
             handle_instruction(host, instr)?;
         }
 
-        host.store_delete(&AUXILIARY_KERNEL_BOOT_PATH)
+        host.store_delete(&AUXILIARY_CONFIG_INTERPRETATION_PATH)
             .map_err(|_| {
                 "Failed to delete auxiliary kernel boot after config execution"
             })?;
