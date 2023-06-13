@@ -580,9 +580,20 @@ end
     - the [rex] argument of {!val:inject_and_capture2_stderr}
     - the [msg] argument of {!val:Process.check_error}. *)
 
+(** Matches the client message for the [Operation_quota_exceeded]
+    protocol error. *)
+val gas_limit_exceeded : rex
+
 (** Matches the message produced by
     [Operation_conflict {new_hash; needed_fee_in_mutez = Some fee}]
     from [src/lib_shell_services/validation_errors].
 
     Captures [new_hash] and [fee]. *)
 val conflict_error_with_needed_fee : rex
+
+(** Matches the message produced by
+    [Rejected_by_full_mempool {hash; needed_fee_in_mutez = Some fee}]
+    from [src/lib_shell_services/validation_errors].
+
+    Captures [hash] and [fee]. *)
+val rejected_by_full_mempool_with_needed_fee : rex

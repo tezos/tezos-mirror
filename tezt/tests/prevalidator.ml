@@ -1615,7 +1615,7 @@ module Revamped = struct
     in
     let* _oph, recommended_fee =
       Operation.inject_and_capture2_stderr
-        ~rex:Constant.Error_msg.rejected_by_full_mempool
+        ~rex:Operation.rejected_by_full_mempool_with_needed_fee
         op4
         client1
     in

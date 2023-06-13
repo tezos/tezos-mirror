@@ -674,7 +674,7 @@ module Dry_run = struct
           ~dry_run:false
           client
       in
-      let msg = Constant.Error_msg.gas_limit_exceeded in
+      let msg = Operation.gas_limit_exceeded in
       let* () = Process.check_error ~msg originate_res_ko in
       Log.info
         "Originate the contract with a gas_limit of %d and check that the \
