@@ -27,6 +27,46 @@
 open Data_encoding
 module Proof = Tezos_context_sigs.Context.Proof_types
 
+type version = Version_0 | Version_1 | Version_2
+
+let string_of_version = function
+  | Version_0 -> "0"
+  | Version_1 -> "1"
+  | Version_2 -> "2"
+
+let unsupported_version_msg version supported =
+  Format.asprintf
+    "Unsupported version %s (supported versions %a)"
+    version
+    (Format.pp_print_list
+       ~pp_sep:(fun fmt () -> Format.fprintf fmt ",")
+       (fun fmt version ->
+         Format.fprintf fmt "\"%s\"" (string_of_version version)))
+    supported
+
+let is_supported_version version supported =
+  List.mem ~equal:( == ) version supported
+
+let version_of_string supported version =
+  let open Result_syntax in
+  let* version_t =
+    match version with
+    | "0" -> Ok Version_0
+    | "1" -> Ok Version_1
+    | "2" -> Ok Version_2
+    | _ -> Error (unsupported_version_msg version supported)
+  in
+  if is_supported_version version_t supported then Ok version_t
+  else Error (unsupported_version_msg version supported)
+
+let version_arg supported =
+  let open Tezos_rpc.Arg in
+  make
+    ~name:"version"
+    ~destruct:(version_of_string supported)
+    ~construct:string_of_version
+    ()
+
 (* TODO: V2.Tree32 has been chosen arbitrarily ; maybe it's not the best option *)
 module Merkle_proof_encoding =
   Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree32
@@ -484,7 +524,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
   let next_operation_encoding_with_legacy_attestation_name =
     let open Data_encoding in
-    def "next_operation"
+    def "next_operation_with_legacy_attestation_name"
     @@ conv
          (fun Next_proto.{shell; protocol_data} -> ((), (shell, protocol_data)))
          (fun ((), (shell, protocol_data)) -> {shell; protocol_data})
@@ -1190,30 +1230,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       (* This encoding should be always the one by default. *)
       let encoding = version_1_encoding
 
-      type version = Version_0 | Version_1 | Version_2
-
-      let string_of_version = function
-        | Version_0 -> "0"
-        | Version_1 -> "1"
-        | Version_2 -> "2"
-
-      let version_of_string = function
-        | "0" -> Ok Version_0
-        | "1" -> Ok Version_1
-        | "2" -> Ok Version_2
-        | _ ->
-            Error
-              "Cannot parse version (supported versions \"0\", \"1\" and \"2\")"
-
       let default_pending_operations_version = Version_1
 
-      let version_arg =
-        let open Tezos_rpc.Arg in
-        make
-          ~name:"version"
-          ~destruct:version_of_string
-          ~construct:string_of_version
-          ()
+      let pending_operations_supported_versions =
+        [Version_0; Version_1; Version_2]
 
       let pending_query =
         let open Tezos_rpc.Query in
@@ -1244,7 +1264,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             end)
         |+ field
              "version"
-             version_arg
+             (version_arg pending_operations_supported_versions)
              default_pending_operations_version
              (fun t -> t#version)
         |+ field
@@ -1355,10 +1375,15 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ~output:unit
           Tezos_rpc.Path.(path / "unban_all_operations")
 
+      let default_monitoring_operations_version = Version_0
+
+      let monitoring_operations_supported_versions = [Version_0; Version_1]
+
       let mempool_query =
         let open Tezos_rpc.Query in
         query
           (fun
+            version
             validated
             refused
             outdated
@@ -1367,6 +1392,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             validation_passes
           ->
             object
+              method version = version
+
               method validated = validated
 
               method refused = refused
@@ -1379,6 +1406,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
               method validation_passes = validation_passes
             end)
+        |+ field
+             "version"
+             (version_arg monitoring_operations_supported_versions)
+             default_monitoring_operations_version
+             (fun t -> t#version)
         |+ field
            (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5720
               This RPC still uses the old term "applied", whereas the
@@ -1422,18 +1454,49 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
       (* We extend the object so that the fields of 'next_operation'
          stay toplevel, for backward compatibility. *)
-      let processed_operation_encoding =
+
+      let monitor_operations_encoding ~use_legacy_name =
         merge_objs
           (merge_objs
              (obj1 (req "hash" Operation_hash.encoding))
-             next_operation_encoding_with_legacy_attestation_name)
+             (if use_legacy_name then
+              next_operation_encoding_with_legacy_attestation_name
+             else next_operation_encoding))
           (obj1 (dft "error" Tezos_rpc.Error.opt_encoding None))
+
+      let processed_operation_encoding =
+        union
+          [
+            case
+              ~title:"monitor_operations_with_attestation"
+              (Tag 1)
+              (list (monitor_operations_encoding ~use_legacy_name:false))
+              (function
+                | Version_1, monitor_operations -> Some monitor_operations
+                | ( ( Version_0
+                    | Version_2
+                      (* The same [version] type is used for versioning all the
+                         RPC. Even though this version is not supported for this
+                         RPC we need to handle it. We rely on the supported
+                         version list to fail at parsing for this version *) ),
+                    _ ) ->
+                    None)
+              (fun monitor_operations -> (Version_1, monitor_operations));
+            case
+              ~title:"old_encoding_monitor_operations"
+              (Tag 0)
+              (list (monitor_operations_encoding ~use_legacy_name:true))
+              (function
+                | Version_0, monitor_operations -> Some monitor_operations
+                | (Version_1 | Version_2), _ -> None)
+              (fun monitor_operations -> (Version_0, monitor_operations));
+          ]
 
       let monitor_operations path =
         Tezos_rpc.Service.get_service
           ~description:"Monitor the mempool operations."
           ~query:mempool_query
-          ~output:(list processed_operation_encoding)
+          ~output:processed_operation_encoding
           Tezos_rpc.Path.(path / "monitor_operations")
 
       let get_filter_query =
@@ -1736,14 +1799,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       unprocessed : Next_proto.operation Operation_hash.Map.t;
     }
 
-    type version = S.Mempool.version = Version_0 | Version_1 | Version_2
-
     let pending_operations ctxt ?(chain = `Main)
         ?(version = S.Mempool.default_pending_operations_version)
         ?(validated = true) ?(branch_delayed = true) ?(branch_refused = true)
         ?(refused = true) ?(outdated = true) ?(validation_passes = []) () =
       let open Lwt_result_syntax in
-      let* v =
+      let* _version, pending_operations =
         Tezos_rpc.Context.make_call1
           (S.Mempool.pending_operations (mempool_path chain_path))
           ctxt
@@ -1765,9 +1826,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           end)
           ()
       in
-      match v with
-      | (Version_2 | Version_1 | Version_0), pending_operations ->
-          return pending_operations
+      return pending_operations
 
     let ban_operation ctxt ?(chain = `Main) op_hash =
       let s = S.Mempool.ban_operation (mempool_path chain_path) in
@@ -1781,28 +1840,45 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       let s = S.Mempool.unban_all_operations (mempool_path chain_path) in
       Tezos_rpc.Context.make_call1 s ctxt chain () ()
 
-    let monitor_operations ctxt ?(chain = `Main) ?(validated = true)
-        ?(branch_delayed = true) ?(branch_refused = false) ?(refused = false)
-        ?(outdated = false) ?(validation_passes = []) () =
+    let monitor_operations ctxt ?(chain = `Main)
+        ?(version = S.Mempool.default_monitoring_operations_version)
+        ?(validated = true) ?(branch_delayed = true) ?(branch_refused = false)
+        ?(refused = false) ?(outdated = false) ?(validation_passes = []) () =
+      let open Lwt_result_syntax in
       let s = S.Mempool.monitor_operations (mempool_path chain_path) in
-      Tezos_rpc.Context.make_streamed_call
-        s
-        ctxt
-        ((), chain)
-        (object
-           method validated = validated
+      let* stream, stopper =
+        Tezos_rpc.Context.make_streamed_call
+          s
+          ctxt
+          ((), chain)
+          (object
+             method version = version
 
-           method refused = refused
+             method validated = validated
 
-           method outdated = outdated
+             method refused = refused
 
-           method branch_refused = branch_refused
+             method outdated = outdated
 
-           method branch_delayed = branch_delayed
+             method branch_refused = branch_refused
 
-           method validation_passes = validation_passes
-        end)
-        ()
+             method branch_delayed = branch_delayed
+
+             method validation_passes = validation_passes
+          end)
+          ()
+      in
+      return
+        ( Lwt_stream.map
+            (fun ( ( Version_0 | Version_1
+                   | Version_2
+                     (* The same [version] type is used for versioning all the
+                        RPC. Even though this version is not supported for this
+                        RPC we need to handle it. We rely on the supported
+                        version list to fail at parsing for this version *) ),
+                   operations ) -> operations)
+            stream,
+          stopper )
 
     let request_operations ctxt ?(chain = `Main) ?peer_id () =
       let s = S.Mempool.request_operations (mempool_path chain_path) in

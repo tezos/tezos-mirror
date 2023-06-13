@@ -458,6 +458,26 @@ let get_chain_mempool_pending_operations ?(chain = "main") ?version ?applied
     ["chains"; chain; "mempool"; "pending_operations"]
     Fun.id
 
+let get_chain_mempool_monitor_operations ?(chain = "main") ?version ?applied
+    ?branch_delayed ?branch_refused ?refused ?outdated ?validation_passes () =
+  let query_string =
+    Query_arg.opt "version" Fun.id version
+    @ Query_arg.opt_bool "applied" applied
+    @ Query_arg.opt_bool "refused" refused
+    @ Query_arg.opt_bool "outdated" outdated
+    @ Query_arg.opt_bool "branch_delayed" branch_delayed
+    @ Query_arg.opt_bool "branch_refused" branch_refused
+    @ Query_arg.opt_list
+        "validation_pass"
+        (fun name vp -> (name, string_of_int vp))
+        validation_passes
+  in
+  make
+    ~query_string
+    GET
+    ["chains"; chain; "mempool"; "monitor_operations"]
+    Fun.id
+
 let post_chain_mempool_request_operations ?(chain = "main") ?peer () =
   make
     ~query_string:(Query_arg.opt "peer_id" Fun.id peer)

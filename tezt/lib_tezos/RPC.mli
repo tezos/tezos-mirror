@@ -460,6 +460,22 @@ val get_chain_mempool_pending_operations :
   unit ->
   JSON.t t
 
+(** RPC: [GET /chains/<chain>/mempool/monitor_operations]
+
+    [chain] defaults to ["main"].
+*)
+val get_chain_mempool_monitor_operations :
+  ?chain:string ->
+  ?version:string ->
+  ?applied:bool ->
+  ?branch_delayed:bool ->
+  ?branch_refused:bool ->
+  ?refused:bool ->
+  ?outdated:bool ->
+  ?validation_passes:int list ->
+  unit ->
+  JSON.t t
+
 (** RPC: [POST /chains/<chain>/mempool/request_operations]
 
     [chain] defaults to ["main"].

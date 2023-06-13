@@ -136,6 +136,12 @@ Node
   the "reverting its effect if it was applied" part since operations
   are never applied.) (MR :gl:`!8857`)
 
+- Added version ``1`` to RPC ``POST ../mempool/monitor_operations``. It can be
+  used by calling the RPC with the parameter ``?version=1`` (default version is
+  still ``0``). Version ``1`` allows the RPC to output ``attestation``,
+  ``preattestation``, ``double_attestation_evidence`` and
+  ``double_preattestation_evidence`` kinds in the JSON result. (MR :gl:`!8980`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.

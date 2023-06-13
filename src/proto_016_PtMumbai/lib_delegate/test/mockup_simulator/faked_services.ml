@@ -65,11 +65,14 @@ module type Mocked_services_hooks = sig
      endorsements. Invariant: the stream becomes empty when the node changes
      head. *)
   val monitor_operations :
+    version:Block_services.version ->
     validated:bool ->
     branch_delayed:bool ->
     branch_refused:bool ->
     refused:bool ->
-    ((Operation_hash.t * Mockup.M.Protocol.operation) * error trace option) list
+    (Block_services.version
+    * ((Operation_hash.t * Mockup.M.Protocol.operation) * error trace option)
+      list)
     Tezos_rpc.Answer.stream
 
   (** Lists block hashes from the chain, up to the last checkpoint, sorted
@@ -280,6 +283,7 @@ module Make (Hooks : Mocked_services_hooks) = struct
       (fun ((), _chain) flags () ->
         let stream =
           Hooks.monitor_operations
+            ~version:flags#version
             ~validated:flags#validated
             ~branch_delayed:flags#branch_delayed
             ~branch_refused:flags#branch_refused

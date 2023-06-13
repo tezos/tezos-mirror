@@ -1121,7 +1121,7 @@ module Make
               match !current_mempool with
               | Some mempool ->
                   current_mempool := None ;
-                  Lwt.return_some mempool
+                  Lwt.return_some (params#version, mempool)
               | None -> (
                   let* o = Lwt_stream.get op_stream in
                   match o with
@@ -1135,7 +1135,8 @@ module Make
                         | `Outdated errors ->
                             Some errors
                       in
-                      Lwt.return_some [((op.hash, op.protocol), errors)]
+                      Lwt.return_some
+                        (params#version, [((op.hash, op.protocol), errors)])
                   | Some _ -> next ()
                   | None -> Lwt.return_none)
             in
