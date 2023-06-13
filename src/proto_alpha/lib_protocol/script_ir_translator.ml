@@ -312,7 +312,6 @@ let ty_eq :
       (((ta, tac) ty, (tb, tbc) ty) eq, error_trace) Gas_monad.t =
    fun ty1 ty2 ->
     let open Gas_monad.Syntax in
-    let* () = Gas_monad.consume_gas Typecheck_costs.merge_cycle in
     let not_equal () =
       Gas_monad.of_result
       @@ Error
@@ -433,6 +432,8 @@ let ty_eq :
     | Chest_key_t, Chest_key_t -> return Eq
     | Chest_key_t, _ -> not_equal ()
   in
+  let open Gas_monad.Syntax in
+  let* () = Gas_monad.consume_gas (Typecheck_costs.ty_eq ty1 ty2) in
   help ty1 ty2
 
 (* Same as ty_eq but for stacks.
@@ -4583,7 +4584,7 @@ and parse_contract :
                or (ticket cty). *)
             let typecheck =
               let open Gas_monad.Syntax in
-              let* () = Gas_monad.consume_gas Typecheck_costs.merge_cycle in
+              let* () = Gas_monad.consume_gas Typecheck_costs.ty_eq_prim in
               match arg with
               | Unit_t ->
                   return (Typed_implicit destination : arg typed_contract)

@@ -83,12 +83,8 @@ let cost_N_KList_enter_body xs size_ys =
       S.safe_int 30 + (v0 + (v0 lsr 1) + (v0 lsr 2) + (v0 lsr 4))
   | _ :: _ -> S.safe_int 30
 
-(* model TY_EQ
-   This is the estimated cost of one iteration of ty_eq, extracted
-   and copied manually from the parameter fit for the TY_EQ benchmark
-   (the model is parametric on the size of the type, which we don't have
-   access to in O(1)). *)
-let cost_TY_EQ = S.safe_int 60
+(* model TY_EQ *)
+let cost_TY_EQ size = S.mul size (S.safe_int 60)
 
 (* model PARSE_TYPE
    This is the cost of one iteration of parse_ty, extracted by hand from the
