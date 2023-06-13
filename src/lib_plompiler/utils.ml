@@ -217,6 +217,43 @@ let mod_add_limbs ~modulus ~base xs ys =
 let mod_sub_limbs ~modulus ~base xs ys =
   mod_add_limbs ~modulus ~base xs (List.map Z.neg ys)
 
+(* [mod_mul_limbs ~modulus ~base xs ys] returns the result of multiplying [xs]
+   by [ys] modulo [modulus], where the inputs and the output are in big-endian
+   form in base [base]. *)
+let mod_mul_limbs ~modulus ~base xs ys =
+  let nb_limbs = List.length xs in
+  assert (List.compare_length_with ys nb_limbs = 0) ;
+  let x = z_of_limbs ~base xs in
+  let y = z_of_limbs ~base ys in
+  let z = Z.(x * y %! modulus) in
+  let z = if z < Z.zero then Z.(z + modulus) else z in
+  z_to_limbs ~len:nb_limbs ~base z
+
+(* [mod_div_limbs ~modulus ~base xs ys] returns the result of dividing [xs]
+   by [ys] modulo [modulus], where the inputs and the output are in big-endian
+   form in base [base]. Dividing [x] by [y] raises a failure if the division cannot be
+   performed, i.e. if there does not exist [z] s.t. [x = z * y (mod modulus)].
+   Note that division may be performed even if the divisor is not invertible
+   with respect to the given modulus, e.g., dividing [10] by [2] will always
+   be possible (and result in [5]), even if the modulus is even. *)
+let mod_div_limbs ~modulus ~base xs ys =
+  let nb_limbs = List.length xs in
+  assert (List.compare_length_with ys nb_limbs = 0) ;
+  let x = z_of_limbs ~base xs in
+  let y = z_of_limbs ~base ys in
+  let d, y_inv, _v = Z.gcdext y modulus in
+  if Z.(rem x d <> zero) then
+    raise
+    @@ Failure
+         (Format.sprintf
+            "mod_div_limbs: %s is not divisible by %s (modulo %s)"
+            (Z.to_string x)
+            (Z.to_string y)
+            (Z.to_string modulus)) ;
+  let z = Z.(divexact x d * y_inv %! modulus) in
+  let z = if z < Z.zero then Z.(z + modulus) else z in
+  z_to_limbs ~len:nb_limbs ~base z
+
 let rec transpose = function
   | [] | [] :: _ -> []
   | rows -> List.(map hd rows :: (transpose @@ map tl rows))

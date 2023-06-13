@@ -131,6 +131,7 @@ module Aggregator = struct
          (CondSwap.q_label, (module CondSwap));
          (AnemoiDouble.q_label, (module AnemoiDouble));
          (AddMod25519.q_label, (module AddMod25519));
+         (MulMod25519.q_label, (module MulMod25519));
        ]
       @ List.map (fun (q, i) -> (q, linear_monomial i q)) linear_monomials
       @ List.map

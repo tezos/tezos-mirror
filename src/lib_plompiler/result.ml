@@ -369,6 +369,30 @@ module Mod_arith = struct
     in
     let z = List.map (fun z -> S.of_z z |> to_s) zs |> to_list in
     ret z
+
+  let mul ?(division = false) ~label:_ ~modulus ~nb_limbs:_ ~base ~moduli:_
+      ~qm_bound:_ ~ts_bounds:_ x y =
+    let xs = List.map (fun s -> of_s s |> S.to_z) (of_list x) in
+    let ys = List.map (fun s -> of_s s |> S.to_z) (of_list y) in
+    let zs =
+      if division then Utils.mod_div_limbs ~modulus ~base xs ys
+      else Utils.mod_mul_limbs ~modulus ~base xs ys
+    in
+    let z = List.map (fun z -> S.of_z z |> to_s) zs |> to_list in
+    ret z
+
+  let assert_non_zero ~label:_ ~modulus ~is_prime:_ ~nb_limbs:_ ~base ~moduli:_
+      ~qm_bound:_ ~ts_bounds:_ x =
+    let xs = List.map (fun s -> of_s s |> S.to_z) (of_list x) in
+    let x = Utils.z_of_limbs ~base xs in
+    assert (not Z.(rem x modulus = zero)) ;
+    ret unit
+
+  let is_zero ~label:_ ~modulus ~is_prime:_ ~nb_limbs:_ ~base ~moduli:_
+      ~qm_bound:_ ~ts_bounds:_ x =
+    let xs = List.map (fun s -> of_s s |> S.to_z) (of_list x) in
+    let x = Utils.z_of_limbs ~base xs in
+    ret @@ B Z.(rem x modulus = zero)
 end
 
 module Poseidon = struct

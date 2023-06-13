@@ -2176,6 +2176,216 @@ Constraints: 5
 ModArith.test_mod_constant_optimized:
 Constraints: 3
 
+ModArith.test_mod_mul:
+Constraints: 5
+
+ModArith.test_mod_mul_optimized:
+Constraints: 5
+
+ModArith.test_mod_mul:
+Constraints: 5
+
+ModArith.test_mod_mul_optimized:
+Constraints: 5
+
+ModArith.test_mod_mul:
+Constraints: 5
+
+ModArith.test_mod_mul_optimized:
+Constraints: 5
+
+ModArith.test_mod_mul:
+Constraints: 5
+
+ModArith.test_mod_mul_optimized:
+Constraints: 5
+
+ModArith.test_mod_mul:
+Constraints: 5
+
+ModArith.test_mod_mul_optimized:
+Constraints: 5
+
+ModArith.test_mod_mul:
+Constraints: 5
+
+ModArith.test_mod_mul_optimized:
+Constraints: 5
+
+ModArith.test_mod_mul:
+Constraints: 5
+
+ModArith.test_mod_mul_optimized:
+Constraints: 5
+
+ModArith.test_mod_mul:
+Constraints: 5
+
+ModArith.test_mod_mul_optimized:
+Constraints: 5
+
+ModArith.test_mod_mul:
+Constraints: 5
+
+ModArith.test_mod_mul_optimized:
+Constraints: 5
+
+ModArith.test_mod_mul:
+Constraints: 5
+
+ModArith.test_mod_mul_optimized:
+Constraints: 5
+
+ModArith.test_mod_mul:
+Constraints: 7
+
+ModArith.test_mod_mul_optimized:
+Constraints: 7
+
+ModArith.test_mod_mul:
+Constraints: 9
+
+ModArith.test_mod_mul_optimized:
+Constraints: 9
+
+ModArith.test_mod_mul:
+Constraints: 11
+
+ModArith.test_mod_mul_optimized:
+Constraints: 11
+
+ModArith.test_mod_mul:
+Constraints: 5
+
+ModArith.test_mod_mul_optimized:
+Constraints: 5
+
+ModArith.test_mod_mul:
+Constraints: 11
+
+ModArith.test_mod_mul_optimized:
+Constraints: 11
+
+ModArith.test_mod_div:
+Constraints: 9
+
+ModArith.test_mod_div_optimized:
+Constraints: 9
+
+ModArith.test_mod_div:
+Constraints: 9
+
+ModArith.test_mod_div_optimized:
+Constraints: 9
+
+ModArith.test_mod_div:
+Constraints: 9
+
+ModArith.test_mod_div_optimized:
+Constraints: 9
+
+ModArith.test_mod_div:
+Constraints: 9
+
+ModArith.test_mod_div_optimized:
+Constraints: 9
+
+ModArith.test_mod_div:
+Constraints: 9
+
+ModArith.test_mod_div_optimized:
+Constraints: 9
+
+ModArith.test_mod_div:
+Constraints: 9
+
+ModArith.test_mod_div_optimized:
+Constraints: 9
+
+ModArith.test_mod_div:
+Constraints: 9
+
+ModArith.test_mod_div_optimized:
+Constraints: 9
+
+ModArith.test_mod_div:
+Constraints: 9
+
+ModArith.test_mod_div_optimized:
+Constraints: 9
+
+ModArith.test_mod_inv:
+Constraints: 7
+
+ModArith.test_mod_inv_optimized:
+Constraints: 7
+
+ModArith.test_mod_inv:
+Constraints: 7
+
+ModArith.test_mod_inv_optimized:
+Constraints: 7
+
+ModArith.test_mod_inv:
+Constraints: 7
+
+ModArith.test_mod_inv_optimized:
+Constraints: 7
+
+ModArith.test_mod_inv:
+Constraints: 7
+
+ModArith.test_mod_inv_optimized:
+Constraints: 7
+
+ModArith.test_mod_equal:
+Constraints: 14
+
+ModArith.test_mod_equal_optimized:
+Constraints: 12
+
+ModArith.test_mod_equal:
+Constraints: 14
+
+ModArith.test_mod_equal_optimized:
+Constraints: 12
+
+ModArith.test_mod_equal:
+Constraints: 14
+
+ModArith.test_mod_equal_optimized:
+Constraints: 12
+
+ModArith.test_mod_equal:
+Constraints: 14
+
+ModArith.test_mod_equal_optimized:
+Constraints: 12
+
+ModArith.test_mod_equal:
+Constraints: 14
+
+ModArith.test_mod_equal_optimized:
+Constraints: 12
+
+ModArith.test_mod_equal:
+Constraints: 14
+
+ModArith.test_mod_equal_optimized:
+Constraints: 12
+
+ModArith.test_mod_equal:
+Constraints: 14
+
+ModArith.test_mod_equal_optimized:
+Constraints: 12
+
+ModArith.test_mod_equal:
+Constraints: 14
+
+ModArith.test_mod_equal_optimized:
+Constraints: 12
+
 Edwards.test_add:
 Constraints: 4
 

@@ -539,7 +539,107 @@ module Mod_Arith = struct
       add_mod_25519 ~valid:false ~sub "invalid" ~x:!0 ~y:!1 ~z:!1 ~qm:!1 ~tj;
     ]
 
-  let list = mod_add_tests
+  let mul_mod_25519 ?(valid = true) ?(div = false) case_name ~x ~y ~z ~qm ~t1
+      ~t2 =
+    let prefix = if div then "div" else "mul" in
+    let name = prefix ^ "_mod_2^255-19." ^ case_name in
+    (* multiplication mod 2^255-19, we have;
+        |moduli| = [base; base-1] = [2^85; 2^85-1]
+        qm_shift := -1
+        t1_shift := -1237940039285380274899123616
+        t2_shift := -1237940039285380274899123649
+    *)
+    let base = Z.(shift_left one 85) in
+    let xs = Plompiler.Utils.z_to_limbs ~len:3 ~base x in
+    let ys = Plompiler.Utils.z_to_limbs ~len:3 ~base y in
+    let zs = Plompiler.Utils.z_to_limbs ~len:3 ~base z in
+    let xs, zs = if div then (zs, xs) else (xs, zs) in
+    let witness =
+      xs @ ys @ [qm; t1; t2] @ zs |> List.map Scalar.of_z |> Array.of_list
+    in
+    let circuit =
+      let wires =
+        let a = [0; 9] in
+        let b = [1; 10] in
+        let c = [2; 11] in
+        let d = [3; 6] in
+        let e = [4; 7] in
+        let f = [5; 8] in
+        [|a; b; c; d; e; f|]
+      in
+      let gates = Circuit.make_gates ~q_mod_mul:[("25519", ![1; 0])] () in
+      Circuit.make ~wires ~gates ~public_input_size:0 ()
+    in
+    {name; circuit; witness; outcome = (if valid then Valid else Proof_error)}
+
+  let mod_mul_tests =
+    let ( ! ) = Z.of_int in
+    let m = Z.(shift_left one 255 - of_int 19) in
+    (* The correct t1, t2 when there is no wrap-around: *)
+    let t1 = Z.of_string "1237940039285380274899123616" in
+    let t2 = Z.of_string "1237940039285380274899123649" in
+    let div = true in
+    [
+      mul_mod_25519 "no_wrap_around" ~x:!7 ~y:!13 ~z:!91 ~qm:!1 ~t1 ~t2;
+      mul_mod_25519
+        "wrap_around"
+        ~x:Z.(m - !1)
+        ~y:!2
+        ~z:Z.(m - !2)
+        ~qm:!2
+        ~t1
+        ~t2:(Z.of_string "1237940039285380274899123651");
+      mul_mod_25519
+        "non-std out"
+        ~x:Z.(m - !1)
+        ~y:Z.(m - !3)
+        ~z:Z.(m + !3)
+        ~qm:(Z.of_string "116056878683004400771792871")
+        ~t1:(Z.of_string "2630622583481433084160638332")
+        ~t2:(Z.of_string "3559077612945468290334981463");
+      mul_mod_25519 ~valid:false "invalid" ~x:!0 ~y:!1 ~z:!1 ~qm:!1 ~t1 ~t2;
+      mul_mod_25519 ~valid:false "invalid qm" ~x:!1 ~y:!2 ~z:!2 ~qm:!2 ~t1 ~t2;
+      mul_mod_25519
+        ~valid:false
+        "invalid t1"
+        ~x:!1
+        ~y:!2
+        ~z:!2
+        ~qm:!1
+        ~t1:!0
+        ~t2;
+      mul_mod_25519
+        ~valid:false
+        "invalid t2"
+        ~x:!1
+        ~y:!2
+        ~z:!2
+        ~qm:!1
+        ~t1
+        ~t2:!0;
+      mul_mod_25519 "no_wrap_around" ~div ~x:!9009 ~y:!9 ~z:!1001 ~qm:!1 ~t1 ~t2;
+      mul_mod_25519
+        "wrap_around"
+        ~div
+        ~x:!8
+        ~y:Z.(m - !2)
+        ~z:Z.(m - !4)
+        ~qm:(Z.of_string "116056878683004400771792870")
+        ~t1:(Z.of_string "2630622583481433084160638332")
+        ~t2:(Z.of_string "3559077612945468290334981461");
+      mul_mod_25519
+        "invalid"
+        ~valid:false
+        ~div
+        ~x:!10
+        ~y:!2
+        ~z:!3
+        ~qm:!1
+        ~t1
+        ~t2;
+    ]
+
+  let list = mod_add_tests @ mod_mul_tests
 end
 
 module Big_circuit = struct

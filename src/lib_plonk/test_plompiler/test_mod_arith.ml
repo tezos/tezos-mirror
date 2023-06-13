@@ -40,6 +40,12 @@ module ModArith (L : LIB) = struct
   let random_mod_int ~modulus () =
     Z.rem (Z.of_bits @@ random_bits (128 + Z.log2 modulus)) modulus
 
+  let ( ! ) = Z.of_int
+
+  let ( %! ) = Z.rem
+
+  let name_suffix valid = if valid then "" else " (negative)"
+
   let add_circuit ~expected xs () =
     let* z_exp = ModArith.input_mod_int ~kind:`Public expected in
     let* xs = L.mapM ModArith.input_mod_int xs in
@@ -50,10 +56,6 @@ module ModArith (L : LIB) = struct
        equal assertion for mod_int that ensures that the mod_ints we
        compare are both in canonical form. *)
     assert_equal z z_exp
-
-  let ( ! ) = Z.of_int
-
-  let name_suffix valid = if valid then "" else " (negative)"
 
   let tests_mod_add =
     let m = ModArith.modulus in
@@ -157,7 +159,128 @@ module ModArith (L : LIB) = struct
         (!(-2), Z.(m - !1), false);
       ]
 
-  let tests = tests_mod_add @ tests_mod_sub @ tests_mod_neg @ tests_mod_constant
+  let mul_circuit ~expected xs () =
+    let* z_exp = ModArith.input_mod_int ~kind:`Public expected in
+    let* xs = L.mapM ModArith.input_mod_int xs in
+    let* z = L.foldM ModArith.mul (List.hd xs) (List.tl xs) in
+    assert_equal z z_exp
+
+  let tests_mod_mul =
+    let m = ModArith.modulus in
+    let r = random_mod_int ~modulus:m () in
+    let r' = random_mod_int ~modulus:m () in
+    List.map
+      (fun (xs, expected, valid) ->
+        let name = "ModArith.test_mod_mul" ^ name_suffix valid in
+        test ~valid ~name (mul_circuit ~expected xs))
+      [
+        ([!3; !5], !15, true);
+        ([r; r'], Z.(r * r' %! m), true);
+        ([!0; !1], !0, true);
+        ([!1; !0], !0, true);
+        ([m; !1], !0, true);
+        ([!1; m], !0, true);
+        ([m; m], !0, true);
+        ([!1; !1], !1, true);
+        ([!1; r], r, true);
+        ([!(-1); r], Z.neg r, true);
+        ([!1; !2; !3], !6, true);
+        ([!1; !2; !3; !4], !24, true);
+        ([!1; !2; !3; !4; !5], !120, true);
+        ([Z.(m - r); Z.neg r], Z.(r * r), true);
+        ([!1; !1; !1; !1; !1], !1, true);
+        ([m; !2], !1, false);
+        ([!0; !1], !1, false);
+        ([!1; !0], !1, false);
+        ([!(-1); !2], !2, false);
+      ]
+
+  let div_circuit ~expected x y () =
+    let* z_exp = ModArith.input_mod_int ~kind:`Public expected in
+    let* x = ModArith.input_mod_int x in
+    let* y = ModArith.input_mod_int y in
+    let* z = ModArith.div x y in
+    assert_equal z z_exp
+
+  let tests_mod_div =
+    let m = ModArith.modulus in
+    let r = random_mod_int ~modulus:m () in
+    List.map
+      (fun (x, y, expected, valid) ->
+        let name = "ModArith.test_mod_div" ^ name_suffix valid in
+        test ~valid ~name (div_circuit ~expected x y))
+      [
+        (r, !1, r, true);
+        (r, r, !1, true);
+        (Z.(r * r), r, r, true);
+        (!10, !(-2), !(-5), true);
+        (!91, !13, !7, true);
+        (m, r, !0, true);
+        (m, !1, m, true);
+        (r, !(-1), Z.neg r, true);
+        (r, !2, r, false);
+        (!0, !1, !1, false);
+        (r, !0, !0, false);
+      ]
+
+  let inv_circuit ~expected x () =
+    let* z_exp = ModArith.input_mod_int ~kind:`Public expected in
+    let* x = ModArith.input_mod_int x in
+    let* z = ModArith.inv x in
+    assert_equal z z_exp
+
+  let tests_mod_inv =
+    let m = ModArith.modulus in
+    let r = random_mod_int ~modulus:m () in
+    let inverse r =
+      let d, u, _v = Z.gcdext r m in
+      assert (Z.(d = one)) ;
+      u
+    in
+    List.map
+      (fun (x, expected, valid) ->
+        let name = "ModArith.test_mod_inv" ^ name_suffix valid in
+        test ~valid ~name (inv_circuit ~expected x))
+      [
+        (!1, !1, true);
+        (!(-1), !(-1), true);
+        (Z.(m - !1), !(-1), true);
+        (r, inverse r, true);
+        (!1, !(-1), false);
+        (!1, !2, false);
+        (!0, !0, false);
+      ]
+
+  let equal_circuit ~expected_equal x y () =
+    let* x = ModArith.input_mod_int x in
+    let* y = ModArith.input_mod_int y in
+    let* b = ModArith.equal x y in
+    if expected_equal then Bool.assert_true b else Bool.assert_false b
+
+  let tests_mod_equal =
+    let m = ModArith.modulus in
+    let r = random_mod_int ~modulus:m () in
+    let equal, different = (true, false) in
+    List.map
+      (fun (x, y, expected_equal, valid) ->
+        let name = "ModArith.test_mod_equal" ^ name_suffix valid in
+        test ~valid ~name (equal_circuit ~expected_equal x y))
+      [
+        (!1, !1, equal, true);
+        (!0, !0, equal, true);
+        (m, !0, equal, true);
+        (!(-1), !(-1), equal, true);
+        (r, r, equal, true);
+        (Z.(m - !1), !(-1), equal, true);
+        (!1, !0, different, true);
+        (!1, !(-1), different, true);
+        (!1, !2, equal, false);
+        (r, r, different, false);
+      ]
+
+  let tests =
+    tests_mod_add @ tests_mod_sub @ tests_mod_neg @ tests_mod_constant
+    @ tests_mod_mul @ tests_mod_div @ tests_mod_inv @ tests_mod_equal
 end
 
 open Plonk_test.Helpers

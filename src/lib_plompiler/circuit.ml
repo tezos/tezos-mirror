@@ -1016,7 +1016,7 @@ module Mod_arith = struct
     assert (List.compare_length_with xs nb_limbs = 0) ;
     assert (List.compare_length_with ys nb_limbs = 0) ;
     (* Assert that all bounds are compatible with our range-check protocol,
-       which is design to check membership in intervals of the form [0, 2^k) *)
+       which is designed to check membership in intervals of the form [0, 2^k) *)
     let qm_ubound = snd qm_bound in
     let ts_ubounds = List.map snd ts_bounds in
     assert (List.for_all Utils.is_power_of_2 (base :: qm_ubound :: ts_ubounds)) ;
@@ -1077,6 +1077,160 @@ module Mod_arith = struct
             ts_ubounds
             scalar_ts
        >* append gate ~solver >* ret zs
+
+  (* This function is also used for division, since we implement division
+     [z = x / y] as a multiplication [x = z * y]. However, one must be careful,
+     as this does not prevent "division by 0", i.e., when [y = 0], constraint
+     [x = z * y] is satisfiable for [x = 0]. Therefore, in the gadget for
+     division we will need to explicitly assert that [y <> 0]. *)
+  let mul ?(division = false) ~label ~modulus ~nb_limbs ~base ~moduli ~qm_bound
+      ~ts_bounds (List xs) (List ys) =
+    (* This is just a sanity check, inputs are assumed to be well-formed,
+       in particular, their limb values are in the range [0, base) *)
+    assert (List.compare_length_with xs nb_limbs = 0) ;
+    assert (List.compare_length_with ys nb_limbs = 0) ;
+    (* Assert that all bounds are compatible with our range-check protocol,
+       which is designed to check membership in intervals of the form [0, 2^k) *)
+    let qm_ubound = snd qm_bound in
+    let ts_ubounds = List.map snd ts_bounds in
+    assert (List.for_all Utils.is_power_of_2 (base :: qm_ubound :: ts_ubounds)) ;
+    let label_suffix = if division then "div" else "mul" in
+    (* Create the corresponding constraints *)
+    with_label ~label:("Mod_arith." ^ label_suffix)
+    @@ let* zs = fresh @@ Dummy.list nb_limbs Dummy.scalar in
+       let* qm = fresh Dummy.scalar in
+       let* ts = fresh @@ Dummy.list (List.length moduli) Dummy.scalar in
+       let inp1 = List.map unscalar xs in
+       let inp2 = List.map unscalar ys in
+       let out = List.map unscalar (of_list zs) in
+       let scalar_qm = qm in
+       let scalar_ts = of_list ts in
+       let qm = unscalar qm in
+       let ts = List.map unscalar scalar_ts in
+       let gate =
+         (* Divisions zs = xs / ys are modeled as multiplications xs = zs * ys.
+            Thus, we swap inp1 (xs) and out (zs) when division = true. *)
+         let left_row1 = if division then out else inp1 in
+         let left_row2 = if division then inp1 else out in
+         [|
+           CS.new_constraint
+             ~wires:(left_row1 @ inp2)
+             ~q_mod_mul:[(label, one)]
+             ("mod_arith-" ^ label_suffix ^ ".1");
+           CS.new_constraint
+             ~wires:(left_row2 @ [qm] @ ts)
+             ("mod_arith-" ^ label_suffix ^ ".2");
+         |]
+       in
+       let solver =
+         Mod_Mul
+           {
+             modulus;
+             base;
+             nb_limbs;
+             moduli;
+             qm_bound;
+             ts_bounds;
+             inp1;
+             inp2;
+             out;
+             qm;
+             ts;
+             inverse = division;
+           }
+       in
+       (* The output is not assumed to be well-formed, we need to enforce this
+          with constraints. In particular, we need to range-check every limb
+          in the output in the range [0, base). *)
+       iterM (Num.range_check ~nb_bits:(Z.log2 base)) (of_list zs)
+       (* qm needs to be range-checked in the interval [0, qm_ubound) *)
+       >* Num.range_check ~nb_bits:(Z.log2 qm_ubound) scalar_qm
+          (* every tj needs to be range-checked in the interval [0, tj_ubound) *)
+       >* iter2M
+            (fun tj_ubound tj -> Num.range_check ~nb_bits:(Z.log2 tj_ubound) tj)
+            ts_ubounds
+            scalar_ts
+       >* append gate ~solver >* ret zs
+
+  (* In order to show that [x] is non-zero, we exhibit a value [r] such that
+     [x * r = 1]. This is a characterization of non-zero elements when
+     [modulus] is prime. More generally, when modulus is a prime power
+     [modulus = p^k], [x] is non-zero iff there exists [r] such that
+     [x * r = p^(k-1)]. For other moduli, this algorithm could be generalized
+     when the prime factorization of [modulus] is known. *)
+  let assert_non_zero ~label ~modulus ~is_prime ~nb_limbs ~base ~moduli
+      ~qm_bound ~ts_bounds xs =
+    (* For now we focus on the case when the modulus is prime, this allows us
+       to characterize non-zero elements as elements which have an inverse. *)
+    if not is_prime then
+      raise
+      @@ Failure
+           (Format.sprintf
+              "assert_non_zero: this function does not support arbitrary \
+               moduli yet; for now, the modulus is required to be prime; %s is \
+               composite."
+              (Z.to_string modulus)) ;
+    let* o = Num.constant S.one in
+    let* z = Num.constant S.zero in
+    let one =
+      o :: List.init (nb_limbs - 1) (Fun.const z) |> List.rev |> to_list
+    in
+    let* _ =
+      mul
+        ~division:true
+        ~label
+        ~modulus
+        ~nb_limbs
+        ~base
+        ~moduli
+        ~qm_bound
+        ~ts_bounds
+        one
+        xs
+    in
+    ret unit
+
+  let is_zero ~label ~modulus ~is_prime ~nb_limbs ~base ~moduli ~qm_bound
+      ~ts_bounds (List xs) =
+    let mul ?(division = false) =
+      mul ~division ~label ~modulus ~nb_limbs ~base ~moduli ~qm_bound ~ts_bounds
+    in
+    let assert_non_zero =
+      assert_non_zero
+        ~label
+        ~modulus
+        ~is_prime
+        ~nb_limbs
+        ~base
+        ~moduli
+        ~qm_bound
+        ~ts_bounds
+    in
+    with_label ~label:"Mod_arith.is_zero"
+    @@ (* b is the output of [is_zero]: b = 1 if x = 0 and b = 0 otherwise *)
+    let* b = fresh Dummy.bool in
+    let* rs = fresh @@ Dummy.list nb_limbs Dummy.scalar in
+    let (Bool out) = b in
+    let inp = List.map unscalar xs in
+    let aux = List.map unscalar (of_list rs) in
+    let solver = Mod_IsZero {modulus; base; nb_limbs; inp; aux; out} in
+    let* (Bool not_b) = add_solver ~solver >* Bool.bnot b in
+    let* z = Num.constant S.zero in
+    (* [zero_or_one] represents the modular integer [0] if [x] is zero
+       (b = 1) or the modular integer [1] if [x] is non-zero (b = 0) *)
+    let zero_or_one =
+      Scalar not_b :: List.init (nb_limbs - 1) (Fun.const z)
+      |> List.rev |> to_list
+    in
+    (* We enforce the constraint [x * r = zero_or_one] for some [r <> 0].
+       Note that if [x] is zero, the only way to satisfy the above equation
+       is to set [zero_or_one] to be [zero], that is, set [b = 1].
+       On the other hand, if [x <> 0], because we will enforce the constraint
+       [r <> 0] and we are over an integral domain, the only way to satisfy
+       the above constraint is to set [zero_or_one] to be [one], i.e. [b = 0],
+       as desired. *)
+    let* x_times_r = mul (List xs) rs in
+    assert_non_zero rs >* assert_equal x_times_r zero_or_one >* ret b
 end
 
 module Poseidon = struct
