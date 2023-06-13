@@ -1,4 +1,4 @@
-Version 17.0
+Version 17.1
 ============
 
 Version 17.0 contains a new version (V9) of the protocol environment,
@@ -14,6 +14,8 @@ The node now outputs less verbose and clearer logs.
 Only essential information is displayed, while a more detailed log is written to disk in the background.
 More details can be found in a recent `blog post <https://research-development.nomadic-labs.com/introducing-new-octez-node-logs-for-better-ux.html>`_, and in the :doc:`Logging <../user/logging>` entry.
 
+Version 17.1 fixes an issue causing file descriptor leaks for streamed RPCs.
+In addition, it improves the performance of RPC responses when requesting older blocks.
 
 Update Instructions
 -------------------
@@ -21,14 +23,14 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout v17.0
+  git checkout v17.1
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v17.0`` Docker images of Octez.
+If you are using Docker instead, use the ``v17.1`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
