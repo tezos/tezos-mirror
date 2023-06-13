@@ -1473,7 +1473,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
               (list (monitor_operations_encoding ~use_legacy_name:false))
               (function
                 | Version_1, monitor_operations -> Some monitor_operations
-                | (Version_0 | Version_2), _ -> None)
+                | ( ( Version_0
+                    | Version_2
+                      (* The same [version] type is used for versioning all the
+                         RPC. Even though this version is not supported for this
+                         RPC we need to handle it. We rely on the supported
+                         version list to fail at parsing for this version *) ),
+                    _ ) ->
+                    None)
               (fun monitor_operations -> (Version_1, monitor_operations));
             case
               ~title:"old_encoding_monitor_operations"
@@ -1862,7 +1869,15 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ()
       in
       return
-        ( Lwt_stream.map (fun (_version, operations) -> operations) stream,
+        ( Lwt_stream.map
+            (fun ( ( Version_0 | Version_1
+                   | Version_2
+                     (* The same [version] type is used for versioning all the
+                        RPC. Even though this version is not supported for this
+                        RPC we need to handle it. We rely on the supported
+                        version list to fail at parsing for this version *) ),
+                   operations ) -> operations)
+            stream,
           stopper )
 
     let request_operations ctxt ?(chain = `Main) ?peer_id () =
