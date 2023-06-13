@@ -26,7 +26,7 @@ path = "../../kernel_sdk/entrypoint"
 [dependencies.tezos-smart-rollup-debug]
 path = "../../kernel_sdk/debug"
 
-[dev-dependencies.tezos-smart-rollup-encoding]
+[dependencies.tezos-smart-rollup-encoding]
 path = "../../kernel_sdk/encoding"
 
 [dev-dependencies.tezos-smart-rollup-mock]

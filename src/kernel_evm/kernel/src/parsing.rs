@@ -8,6 +8,10 @@ use crate::inbox::Transaction;
 use tezos_ethereum::{
     signatures::EthereumTransactionCommon, transaction::TransactionHash,
 };
+use tezos_smart_rollup_encoding::{
+    inbox::{InboxMessage, InfoPerLevel, InternalInboxMessage},
+    michelson::MichelsonUnit,
+};
 use tezos_smart_rollup_host::input::Message;
 
 /// On an option, either the value, or if `None`, interrupt and return the
@@ -37,8 +41,6 @@ pub fn split_at(bytes: &[u8], mid: usize) -> Option<(&[u8], &[u8])> {
 
 pub const SIMULATION_TAG: u8 = u8::MAX;
 
-pub const EXTERNAL_TAG: u8 = 1;
-
 const SIMPLE_TRANSACTION_TAG: u8 = 0;
 
 const NEW_CHUNKED_TRANSACTION_TAG: u8 = 1;
@@ -64,6 +66,7 @@ pub enum Input {
         data: Vec<u8>,
     },
     Simulation,
+    Info(InfoPerLevel),
 }
 
 #[derive(Debug, PartialEq, Default)]
@@ -153,12 +156,21 @@ impl InputResult {
     pub fn parse(input: Message, smart_rollup_address: [u8; 20]) -> Self {
         let bytes = Message::as_ref(&input);
         let (input_tag, remaining) = parsable!(bytes.split_first());
-        // External messages starts with the tag 1, Internal with 0,
-        // Simulation with FF
-        match *input_tag {
-            SIMULATION_TAG => Self::parse_simulation(remaining),
-            EXTERNAL_TAG => Self::parse_external(remaining, &smart_rollup_address),
-            _ => InputResult::Unparsable,
+        if *input_tag == SIMULATION_TAG {
+            return Self::parse_simulation(remaining);
+        };
+
+        match InboxMessage::<MichelsonUnit>::parse(bytes) {
+            Ok((_remaing, message)) => match message {
+                InboxMessage::External(message) => {
+                    Self::parse_external(message, &smart_rollup_address)
+                }
+                InboxMessage::Internal(InternalInboxMessage::InfoPerLevel(info)) => {
+                    InputResult::Input(Input::Info(info))
+                }
+                InboxMessage::Internal(_) => InputResult::Unparsable,
+            },
+            Err(_) => InputResult::Unparsable,
         }
     }
 }

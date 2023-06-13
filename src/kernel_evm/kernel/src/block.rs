@@ -4,13 +4,14 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint::{Blueprint, Queue};
+use crate::current_timestamp;
 use crate::error::Error;
 use crate::error::StorageError::AccountInitialisation;
 use crate::error::TransferError::{
     CumulativeGasUsedOverflow, InvalidCallerAddress, InvalidNonce,
 };
 use crate::inbox::Transaction;
-use crate::storage;
+use crate::storage::{self};
 use evm_execution::account_storage::init_account_storage;
 use evm_execution::account_storage::EthereumAccountStorage;
 use evm_execution::handler::ExecutionOutcome;
@@ -294,7 +295,8 @@ fn compute<Host: Runtime>(
         receipts_infos.push(receipt_info)
     }
 
-    let new_block = L2Block::new(next_level, valid_txs);
+    let timestamp = current_timestamp(host);
+    let new_block = L2Block::new(next_level, valid_txs, timestamp);
     storage::store_current_block(host, &new_block)?;
     storage::store_transaction_receipts(
         host,
