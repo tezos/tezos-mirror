@@ -117,6 +117,9 @@ Node
   ``prevalidator`` in the shell limits of the configuration file. They
   already didn't do anything since V16-rc1. (MR :gl:`!8963`)
 
+- Improved performances of RPC responses on request for older blocks by
+  caching the archived metadata accesses. (MR :gl:`!8976`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
