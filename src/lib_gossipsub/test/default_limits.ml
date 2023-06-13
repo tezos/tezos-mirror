@@ -82,7 +82,7 @@ let default_limits ?mesh_message_deliveries_activation ?time_in_mesh_weight
     peers_to_px = 16;
     accept_px_threshold = 0.;
     unsubscribe_backoff = Milliseconds.Span.of_int_s 10;
-    graft_flood_backoff = Milliseconds.Span.of_int_s ~-50;
+    graft_flood_threshold = Milliseconds.Span.of_int_s 10;
     prune_backoff = Milliseconds.Span.of_int_s 60;
     retain_duration = Milliseconds.Span.of_int_s 10;
     fanout_ttl = Milliseconds.Span.of_int_s 60;

@@ -105,7 +105,7 @@ module Limits = struct
 
   let unsubscribe_backoff = Span.of_int_s 10
 
-  let graft_flood_backoff = Span.of_int_s ~-50
+  let graft_flood_threshold = Span.of_int_s 10
 
   let prune_backoff = Span.of_int_s 60
 

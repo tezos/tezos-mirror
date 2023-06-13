@@ -233,7 +233,7 @@ let pp_limits fmtr
     peers_to_px;
     accept_px_threshold;
     unsubscribe_backoff;
-    graft_flood_backoff;
+    graft_flood_threshold;
     prune_backoff;
     retain_duration;
     fanout_ttl;
@@ -269,7 +269,7 @@ let pp_limits fmtr
      peers_to_px = %d;@;\
      accept_px_threshold = %f;@;\
      unsubscribe_backoff = %a;@;\
-     graft_flood_backoff = %a;@;\
+     graft_flood_threshold = %a;@;\
      prune_backoff = %a;@;\
      retain_duration = %a;@;\
      fanout_ttl = %a;@;\
@@ -301,7 +301,7 @@ let pp_limits fmtr
     GS.Span.pp
     unsubscribe_backoff
     GS.Span.pp
-    graft_flood_backoff
+    graft_flood_threshold
     GS.Span.pp
     prune_backoff
     GS.Span.pp

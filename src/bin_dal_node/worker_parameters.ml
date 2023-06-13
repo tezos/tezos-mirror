@@ -48,7 +48,7 @@ let limits =
     peers_to_px;
     accept_px_threshold;
     unsubscribe_backoff;
-    graft_flood_backoff;
+    graft_flood_threshold;
     prune_backoff;
     retain_duration;
     fanout_ttl;
