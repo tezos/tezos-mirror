@@ -517,6 +517,7 @@ dependencies = [
  "tezos-smart-rollup-installer-config",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-panic-hook",
+ "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_ethereum",
 ]
