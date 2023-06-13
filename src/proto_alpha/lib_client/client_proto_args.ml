@@ -844,6 +844,39 @@ module Zk_rollup_params = struct
       Zk_rollup.Account.circuits_info_encoding
 end
 
+module Dal = struct
+  let commitment_parameter =
+    Tezos_clic.parameter (fun (cctxt : #Client_context.full) commitment_hash ->
+        match Dal_slot_repr.Commitment.of_b58check_opt commitment_hash with
+        | None ->
+            cctxt#error
+              "Parameter '%s' is not a valid B58-encoded DAL commitment"
+              commitment_hash
+        | Some commitment -> return commitment)
+
+  let commitment_proof_parameter =
+    Tezos_clic.parameter
+      (fun (cctxt : #Client_context.full) commitment_proof_hex ->
+        match Hex.to_string (`Hex commitment_proof_hex) with
+        | None ->
+            cctxt#error
+              "Commitment proof parameter '%s' is not a valid hexadecimal \
+               string"
+              commitment_proof_hex
+        | Some commitment_proof_bin -> (
+            match
+              Data_encoding.Binary.of_string_opt
+                Dal_slot_repr.Commitment_proof.encoding
+                commitment_proof_bin
+            with
+            | None ->
+                cctxt#error
+                  "Commitment proof parameter '%s' is not a valid DAL \
+                   commitment proof"
+                  commitment_proof_hex
+            | Some commitment_proof -> return commitment_proof))
+end
+
 let fee_parameter_args =
   let open Tezos_clic in
   let force_low_fee_arg =
