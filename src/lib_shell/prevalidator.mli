@@ -26,23 +26,31 @@
 
 (** Tezos Shell - Prevalidation of pending operations (a.k.a Mempool) *)
 
-(** The prevalidator is in charge of the [mempool] (a.k.a. the
-    set of known not-invalid-for-sure operations that are not yet
-    included in the blockchain).
+(** The prevalidator is the worker in charge of the [mempool], that
+    is, the operations that are not yet included in a block. It keeps
+    track of which operations are valid (according to the economic
+    protocol), maybe-valid-later, or invalid. The prevalidator is also
+    responsible for deciding which operations are appropriate to
+    broadcast to peers.
 
-    The prevalidator also maintains a sorted subset of the mempool that
-    might correspond to a valid block on top of the current head. The
-    "in-progress" context produced by the application of those
-    operations is called the (pre)validation context.
+    Before including an operation into the mempool, the prevalidator
+    performs a few preliminary checks: [unparsable] operations are
+    noted down so that they will never be considered again; already
+    handled operations or operations that are not branched on any
+    [live_block] are simply ignored; operations which do not meet some
+    configurable requirements (e.g. minimal fees) are [refused] at this
+    point.
 
-    Before including an operation into the mempool, the prevalidation
-    worker tries to append (in application mode)/evaluate (precheck mode)
-    the operation to/in the prevalidation context. Only an operation that passes
-    the application/precheck will be broadcast. If the operation is ill-formed,
-    it will not be added into the mempool and then it will
-    be ignored by the node and will never be broadcast. If the operation is
-    only [branch_refused] or [branch_delayed], it may be added to the mempool
-    if it passes the application/precheck in the future.
+    If the operation passes these preliminary checks, the prevalidator
+    then asks the protocol to validate the operation in its maintained
+    mempool context. Only an operation that passes this validation gets
+    added to the mempool context and broadcast. If the operation is
+    flat-out [refused] by the protocol, it is noted down to be ignored
+    by the node from now on. If the operation is only [branch_refused]
+    or [branch_delayed], it is kept for later: it may be evaluated
+    again in the future when the mempool's head (a.k.a. the last block
+    it is built on) changes, then added to the mempool and broadcast if
+    it passes this new validation.
 
     See the {{!page-prevalidator} prevalidator implementation overview} to
     learn more.

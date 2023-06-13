@@ -45,7 +45,7 @@ type error_classification =
   | `Refused of tztrace
   | `Outdated of tztrace ]
 
-type classification = [`Applied | `Prechecked | error_classification]
+type classification = [`Validated | error_classification]
 
 module Map = Operation_hash.Map
 module Sized_map = Tezos_base.Sized.MakeSizedMap (Map)
@@ -77,7 +77,7 @@ type parameters = {
   on_discarded_operation : Operation_hash.t -> unit;
 }
 
-(** Note that [applied] and [in_mempool] are intentionally unbounded.
+(** Note that [validated] and [in_mempool] are intentionally unbounded.
     See the mli for detailed documentation.
     All operations must maintain the invariant about [in_mempool]
     described in the mli. *)
@@ -87,8 +87,7 @@ type 'protocol_data t = {
   outdated : 'protocol_data bounded_map;
   branch_refused : 'protocol_data bounded_map;
   branch_delayed : 'protocol_data bounded_map;
-  mutable applied_rev : 'protocol_data operation list;
-  mutable prechecked : 'protocol_data operation Sized_map.t;
+  mutable validated : 'protocol_data operation Sized_map.t;
   mutable unparsable : Operation_hash.Set.t;
   mutable in_mempool : ('protocol_data operation * classification) Map.t;
 }
@@ -100,10 +99,9 @@ let create parameters =
     outdated = mk_empty_bounded_map parameters.map_size_limit;
     branch_refused = mk_empty_bounded_map parameters.map_size_limit;
     branch_delayed = mk_empty_bounded_map parameters.map_size_limit;
-    prechecked = Sized_map.empty;
+    validated = Sized_map.empty;
     unparsable = Operation_hash.Set.empty;
     in_mempool = Map.empty;
-    applied_rev = [];
   }
 
 let is_empty
@@ -116,8 +114,7 @@ let is_empty
       outdated = _;
       branch_refused = _;
       branch_delayed = _;
-      prechecked = _;
-      applied_rev = _;
+      validated = _;
       unparsable;
       in_mempool;
     } =
@@ -141,13 +138,6 @@ let flush (classes : 'protocol_data t) ~handle_branch_refused =
         map
         classes.in_mempool
   in
-  let remove_list_from_in_mempool list =
-    classes.in_mempool <-
-      List.fold_left
-        (fun mempool op -> Map.remove op.hash mempool)
-        classes.in_mempool
-        list
-  in
   if handle_branch_refused then (
     remove_map_from_in_mempool classes.branch_refused.map ;
     Ringo.Ring.clear classes.branch_refused.ring ;
@@ -155,11 +145,9 @@ let flush (classes : 'protocol_data t) ~handle_branch_refused =
   remove_map_from_in_mempool classes.branch_delayed.map ;
   Ringo.Ring.clear classes.branch_delayed.ring ;
   classes.branch_delayed.map <- Map.empty ;
-  remove_list_from_in_mempool classes.applied_rev ;
-  classes.applied_rev <- [] ;
-  remove_map_from_in_mempool (Sized_map.to_map classes.prechecked) ;
+  remove_map_from_in_mempool (Sized_map.to_map classes.validated) ;
   classes.unparsable <- Operation_hash.Set.empty ;
-  classes.prechecked <- Sized_map.empty
+  classes.validated <- Sized_map.empty
 
 let is_in_mempool oph classes = Map.find oph classes.in_mempool
 
@@ -168,14 +156,7 @@ let is_known_unparsable oph classes =
 
 (* Removing an operation is currently used for operations which are
    banned (this can only be achieved by the adminstrator of the
-   node). However, removing an operation which is applied invalidates
-   the classification of all the operations. Hence, the
-   classifications of all the operations should be reset. Currently,
-   this is not enforced by the function and has to be done by the
-   caller.
-
-   Later on, it would be probably better if this function returns a
-   set of pending operations instead. *)
+   node). *)
 let remove oph classes =
   match Map.find oph classes.in_mempool with
   | None -> None
@@ -191,22 +172,13 @@ let remove oph classes =
        | `Branch_delayed _ ->
            classes.branch_delayed.map <-
              Map.remove oph classes.branch_delayed.map
-       | `Prechecked ->
-           classes.prechecked <- Sized_map.remove oph classes.prechecked
-       | `Applied ->
-           classes.applied_rev <-
-             List.filter
-               (fun op -> Operation_hash.(op.hash <> oph))
-               classes.applied_rev) ;
+       | `Validated ->
+           classes.validated <- Sized_map.remove oph classes.validated) ;
       Some (op, classification)
 
-let handle_applied oph op classes =
-  classes.applied_rev <- op :: classes.applied_rev ;
-  classes.in_mempool <- Map.add oph (op, `Applied) classes.in_mempool
-
-let handle_prechecked oph op classes =
-  classes.prechecked <- Sized_map.add oph op classes.prechecked ;
-  classes.in_mempool <- Map.add oph (op, `Prechecked) classes.in_mempool
+let handle_validated oph op classes =
+  classes.validated <- Sized_map.add oph op classes.validated ;
+  classes.in_mempool <- Map.add oph (op, `Validated) classes.in_mempool
 
 (* 1. Add the operation to the ring underlying the corresponding
    error map class.
@@ -249,14 +221,13 @@ let add_unparsable oph classes =
 
 let add classification op classes =
   match classification with
-  | `Applied -> handle_applied op.hash op classes
-  | `Prechecked -> handle_prechecked op.hash op classes
+  | `Validated -> handle_validated op.hash op classes
   | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as
     classification ->
       handle_error op.hash op classification classes
 
-let to_map ~applied ~prechecked ~branch_delayed ~branch_refused ~refused
-    ~outdated classes : 'protocol_data operation Map.t =
+let to_map ~validated ~branch_delayed ~branch_refused ~refused ~outdated classes
+    : 'protocol_data operation Map.t =
   let ( +> ) accum to_add =
     let merge_fun _k accum_v_opt to_add_v_opt =
       match (accum_v_opt, to_add_v_opt) with
@@ -276,12 +247,8 @@ let to_map ~applied ~prechecked ~branch_delayed ~branch_refused ~refused
   in
   Map.union
     (fun _oph op _ -> Some op)
-    (if prechecked then Sized_map.to_map classes.prechecked else Map.empty)
-  @@ (if applied then
-      List.to_seq classes.applied_rev
-      |> Seq.map (fun op -> (op.hash, op))
-      |> Map.of_seq
-     else Map.empty)
+    (if validated then Sized_map.to_map classes.validated else Map.empty)
+  @@ Map.empty
      +> (if branch_delayed then classes.branch_delayed.map else Map.empty)
      +> (if branch_refused then classes.branch_refused.map else Map.empty)
      +> (if refused then classes.refused.map else Map.empty)
@@ -399,8 +366,7 @@ let recycle_operations ~from_branch ~to_branch ~live_blocks ~classes ~parse
       (Map.union
          (fun _key v _ -> Some v)
          (to_map
-            ~applied:true
-            ~prechecked:true
+            ~validated:true
             ~branch_delayed:true
             ~branch_refused:handle_branch_refused
             ~refused:false
@@ -435,8 +401,7 @@ module Internal_for_tests = struct
       outdated = copy_bounded_map t.outdated;
       branch_refused = copy_bounded_map t.branch_refused;
       branch_delayed = copy_bounded_map t.branch_delayed;
-      applied_rev = t.applied_rev;
-      prechecked = t.prechecked;
+      validated = t.validated;
       unparsable = t.unparsable;
       in_mempool = t.in_mempool;
     }
@@ -453,22 +418,16 @@ module Internal_for_tests = struct
         outdated;
         branch_refused;
         branch_delayed;
-        applied_rev;
-        prechecked;
+        validated;
         unparsable;
         in_mempool;
       } =
-    let applied_pp ppf applied =
-      applied
-      |> List.map (fun op -> op.hash)
-      |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
-    in
     let in_mempool_pp ppf in_mempool =
       in_mempool |> Map.bindings |> List.map fst
       |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
     in
-    let prechecked_pp ppf prechecked =
-      prechecked |> Sized_map.bindings |> List.map fst
+    let validated_pp ppf validated =
+      validated |> Sized_map.bindings |> List.map fst
       |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
     in
     let unparsable_pp ppf unparsable =
@@ -479,8 +438,7 @@ module Internal_for_tests = struct
       ppf
       "Map_size_limit:@.%i@.On discarded operation: \
        <function>@.Refused:%a@.Outdated:%a@.Branch refused:@.%a@.Branch \
-       delayed:@.%a@.Applied:@.%a@.Prechecked:@.%a@.Unparsable:@.%a@.In \
-       Mempool:@.%a"
+       delayed:@.%a@.Validated:@.%a@.Unparsable:@.%a@.In Mempool:@.%a"
       parameters.map_size_limit
       bounded_map_pp
       refused
@@ -490,10 +448,8 @@ module Internal_for_tests = struct
       branch_refused
       bounded_map_pp
       branch_delayed
-      applied_pp
-      applied_rev
-      prechecked_pp
-      prechecked
+      validated_pp
+      validated
       unparsable_pp
       unparsable
       in_mempool_pp
@@ -515,14 +471,13 @@ module Internal_for_tests = struct
     in
     Format.fprintf
       pp
-      "map_size_limit: %d\n%s\n%s\n%s\n%s\n%sapplied_rev: %d\nin_mempool: %d"
+      "map_size_limit: %d\n%s\n%s\n%s\n%s\n%s\nin_mempool: %d"
       t.parameters.map_size_limit
       (show_bounded_map "refused" t.refused)
       (show_bounded_map "outdated" t.outdated)
       (show_bounded_map "branch_refused" t.branch_refused)
       (show_bounded_map "branch_delayed" t.branch_delayed)
-      (show_map "prechecked" t.prechecked)
-      (List.length t.applied_rev)
+      (show_map "validated" t.validated)
       (Map.cardinal t.in_mempool)
 
   let to_map = to_map

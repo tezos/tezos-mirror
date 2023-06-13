@@ -24,19 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A newly received block is validated by replaying locally the block
-    creation, applying each operation and its finalization to ensure their
-    consistency. This module is stateless and creates and manipulates the
-    prevalidation_state. *)
+(** This module is used by the prevalidator worker to determine
+    whether an operation should be added to the mempool. To do so, it
+    calls on the protocol's [Mempool] to validate the operation, as
+    well as the {!Prevalidator_bounding} to ensure that the mempool
+    remains bounded. It also retrieves relevant information from the
+    protocol plugin. *)
 
 module type T = sig
   (** Similar to the same type in the protocol,
       see {!Tezos_protocol_environment.PROTOCOL.operation} *)
   type protocol_operation
-
-  (** Similar to the same type in the protocol,
-      see {!Tezos_protocol_environment.PROTOCOL} *)
-  type validation_state
 
   (** Mempool configuration that groups both the plugin config
       (e.g. minimal fee to pass the {!pre_filter}) and the bounding
@@ -158,7 +156,6 @@ end
 module Make : functor (Filter : Shell_plugin.FILTER) ->
   T
     with type protocol_operation = Filter.Proto.operation
-     and type validation_state = Filter.Proto.validation_state
      and type chain_store = Store.chain_store
 
 (**/**)
@@ -191,7 +188,6 @@ module Internal_for_tests : sig
     ->
     T
       with type protocol_operation = Filter.Proto.operation
-       and type validation_state = Filter.Proto.validation_state
        and type chain_store = Chain_store.chain_store
        and type Internal_for_tests.mempool = Filter.Proto.Mempool.t
        and type Internal_for_tests.bounding_state = Bounding.state

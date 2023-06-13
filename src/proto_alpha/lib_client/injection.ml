@@ -1149,7 +1149,7 @@ let reveal_error (cctxt : #Protocol_client_context.full) =
 let pending_applied_operations_of_source (cctxt : #full) chain src :
     packed_contents_list list Lwt.t =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2273
-     Be able to get pending/applied/prechecked operation of an implicit account.
+     Be able to get pending/validated operation of an implicit account.
   *)
   Alpha_block_services.Mempool.pending_operations cctxt ~chain () >>= function
   | Error e ->
@@ -1171,7 +1171,7 @@ let pending_applied_operations_of_source (cctxt : #full) chain src :
                  Contents_list contents :: acc
              | _ -> acc)
            []
-           ops.Alpha_block_services.Mempool.applied
+           ops.Alpha_block_services.Mempool.validated
 
 (* Given the gas and fee of an applied operation in the mempool, and the
    estimated gas of a new operation to inject, this function returns
@@ -1288,15 +1288,15 @@ let replace_operation (type kind) (cctxt : #full) chain source
       pending_applied_operations_of_source cctxt chain source >>= function
       | [] ->
           cctxt#error
-            "Cannot replace! No applied manager operation found for %a in \
+            "Cannot replace! No validated manager operation found for %a in \
              mempool@."
             Signature.Public_key_hash.pp
             source
           >>= fun () -> exit 1
       | _ :: _ :: _ as l ->
           cctxt#error
-            "More than one applied manager operation found for %a in mempool. \
-             Found %d operations. Are you sure the node is in precheck mode?@."
+            "More than one validated manager operation found for %a in \
+             mempool. Found %d operations.@."
             Signature.Public_key_hash.pp
             source
             (List.length l)

@@ -468,7 +468,7 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
       Lwt.return
         Mockup.M.Block_services.Mempool.
           {
-            applied = ops;
+            validated = ops;
             refused = Operation_hash.Map.empty;
             outdated = Operation_hash.Map.empty;
             branch_refused = Operation_hash.Map.empty;
@@ -476,8 +476,8 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
             unprocessed = Operation_hash.Map.empty;
           }
 
-    let monitor_operations ~applied ~branch_delayed ~branch_refused ~refused =
-      ignore applied ;
+    let monitor_operations ~validated ~branch_delayed ~branch_refused ~refused =
+      ignore validated ;
       ignore branch_delayed ;
       ignore branch_refused ;
       ignore refused ;

@@ -338,7 +338,7 @@ module Make (E : MENV) = struct
   module Mempool = Rw (Files.Mempool)
   module Trashpool = Rw (Files.Trashpool)
 
-  let to_applied (shell_header, operation_data) =
+  let to_validated (shell_header, operation_data) =
     let open Lwt_result_syntax in
     let op =
       {E.Protocol.shell = shell_header; protocol_data = operation_data}
@@ -367,10 +367,10 @@ module Make (E : MENV) = struct
         let*! pending_operations =
           let* () = check_chain chain in
           let* pooled_operations = Mempool.read () in
-          let* applied = List.map_es to_applied pooled_operations in
+          let* validated = List.map_es to_validated pooled_operations in
           let pending_operations =
             {
-              E.Block_services.Mempool.applied;
+              E.Block_services.Mempool.validated;
               refused = Operation_hash.Map.empty;
               outdated = Operation_hash.Map.empty;
               branch_refused = Operation_hash.Map.empty;
@@ -972,7 +972,7 @@ module Make (E : MENV) = struct
             let* () = on o#branch_delayed "branch_delayed ignored" in
             let* () = on o#branch_refused "branch_refused ignored" in
             let* () = on o#refused "refused ignored" in
-            let _ = o#applied in
+            let _ = o#validated in
             Tezos_rpc.Answer.(
               return_stream
                 {next = (fun () -> Lwt.return_none); shutdown = (fun () -> ())})))

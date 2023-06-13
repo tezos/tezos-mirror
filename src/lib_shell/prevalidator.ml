@@ -142,7 +142,7 @@ let empty_rpc_directory : unit Tezos_rpc.Directory.t =
     (fun _pv params () ->
       let pending_operations =
         {
-          Block_services.Empty.Mempool.applied = [];
+          Block_services.Empty.Mempool.validated = [];
           refused = Operation_hash.Map.empty;
           outdated = Operation_hash.Map.empty;
           branch_refused = Operation_hash.Map.empty;

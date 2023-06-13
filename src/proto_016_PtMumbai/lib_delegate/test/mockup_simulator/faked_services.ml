@@ -65,7 +65,7 @@ module type Mocked_services_hooks = sig
      endorsements. Invariant: the stream becomes empty when the node changes
      head. *)
   val monitor_operations :
-    applied:bool ->
+    validated:bool ->
     branch_delayed:bool ->
     branch_refused:bool ->
     refused:bool ->
@@ -280,7 +280,7 @@ module Make (Hooks : Mocked_services_hooks) = struct
       (fun ((), _chain) flags () ->
         let stream =
           Hooks.monitor_operations
-            ~applied:flags#applied
+            ~validated:flags#validated
             ~branch_delayed:flags#branch_delayed
             ~branch_refused:flags#branch_refused
             ~refused:flags#refused

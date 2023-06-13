@@ -401,7 +401,7 @@ let start_ops_monitor cctxt =
   Alpha_block_services.Mempool.monitor_operations
     cctxt
     ~chain:cctxt#chain
-    ~applied:true
+    ~validated:true
     ~branch_delayed:true
     ~branch_refused:true
     ~refused:true

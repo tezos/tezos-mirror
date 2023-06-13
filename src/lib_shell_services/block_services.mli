@@ -398,7 +398,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
 
   module Mempool : sig
     type t = {
-      applied : (Operation_hash.t * Next_proto.operation) list;
+      validated : (Operation_hash.t * Next_proto.operation) list;
       refused : (Next_proto.operation * error list) Operation_hash.Map.t;
       outdated : (Next_proto.operation * error list) Operation_hash.Map.t;
       branch_refused : (Next_proto.operation * error list) Operation_hash.Map.t;
@@ -411,7 +411,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     (** Call RPC GET /chains/[chain]/mempool/pending_operations
 
     - Default [version] is [0].
-    - Default [applied] is [true].
+    - Default [validated] is [true].
     - Default [branch_delayed] is [true].
     - Default [branch_refused] is [true].
     - Default [refused] is [true].
@@ -421,7 +421,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       #simple ->
       ?chain:chain ->
       ?version:version ->
-      ?applied:bool ->
+      ?validated:bool ->
       ?branch_delayed:bool ->
       ?branch_refused:bool ->
       ?refused:bool ->
@@ -455,7 +455,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     val monitor_operations :
       #streamed ->
       ?chain:chain ->
-      ?applied:bool ->
+      ?validated:bool ->
       ?branch_delayed:bool ->
       ?branch_refused:bool ->
       ?refused:bool ->
@@ -726,7 +726,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           'a,
           'b,
           < version : Mempool.version
-          ; applied : bool
+          ; validated : bool
           ; branch_delayed : bool
           ; branch_refused : bool
           ; refused : bool
@@ -757,7 +757,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ( [`GET],
           'a,
           'b,
-          < applied : bool
+          < validated : bool
           ; branch_delayed : bool
           ; branch_refused : bool
           ; refused : bool

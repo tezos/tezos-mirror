@@ -125,7 +125,8 @@ module Request = struct
           P2p_peer.Id.pp
           id ;
         List.iter
-          (fun oph -> Format.fprintf ppf "@,%a (applied)" Operation_hash.pp oph)
+          (fun oph ->
+            Format.fprintf ppf "@,%a (known_valid)" Operation_hash.pp oph)
           known_valid ;
         List.iter
           (fun oph -> Format.fprintf ppf "@,%a (pending)" Operation_hash.pp oph)
