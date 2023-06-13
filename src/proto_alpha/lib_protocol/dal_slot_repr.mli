@@ -68,6 +68,10 @@ module Commitment : sig
   (** A dummy value for a commitment. This commitment does not
      correspond to any valid pre-image. *)
   val zero : t
+
+  (** Attempt to convert the input representing a commitment encoded as a b58
+      string. *)
+  val of_b58check_opt : string -> t option
 end
 
 module Commitment_proof : sig
