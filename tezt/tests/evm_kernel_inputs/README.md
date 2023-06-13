@@ -23,7 +23,15 @@ External message:
     Raw transaction: f869018204e282520894b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a76400008026a0e05675c80f386c2c3e52db9b4a8b32773b5828bcec5dc9387c4a7ec109f01686a0192d4db23677d74299b9a5892db9b4e97896bdcb1c165513abaaa50f791faab9
 ```
 
-# Smart contracts inputs
+# Inputs for the Proxy
+
+The file `100-inputs-for-proxy` is a list of signed transactions generated with `signer.js`. It can be regenerated with the following command:
+```
+npm install @ethereumjs/common @ethereumjs/tx
+./signer.js > 100-inputs-for-proxy
+```
+
+#Smart contracts inputs
 
 To deploy a solidity contract on the rollup two files are necessary:
 - the ABI (interface), in a JSON format,

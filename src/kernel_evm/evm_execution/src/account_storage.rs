@@ -209,6 +209,12 @@ where
 {
     let chunk_iter = code.chunks(MAX_FILE_CHUNK_SIZE);
 
+    // If the value to write is empty, the path is not even created which
+    // contradicts the semantics of `store_write`. This is a placeholder until
+    // we have `store_create` in the SDK, that comes with Nairobi protocol.
+    if code.is_empty() {
+        host.store_write(path, code, 0)?;
+    };
     // store chunks
     for (i, chunk) in chunk_iter.enumerate() {
         host.store_write(path, chunk, i * MAX_FILE_CHUNK_SIZE)?;

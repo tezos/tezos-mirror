@@ -62,10 +62,6 @@ const TRANSACTION_RECEIPT_TYPE_SIZE: usize = 1;
 /// The size of one 256 bit word. Size in bytes
 pub const WORD_SIZE: usize = 32usize;
 
-// We can read/store at most [128] transaction hashes per block.
-// TRANSACTION_HASH_SIZE * 128 = 4096.
-const MAX_TRANSACTION_HASHES: usize = TRANSACTION_HASH_SIZE * 128;
-
 // This function should be used when it makes sense that the value
 // stored under [path] can be empty.
 fn store_read_empty_safe<Host: Runtime>(
@@ -173,8 +169,7 @@ fn read_nth_block_transactions<Host: Runtime>(
 ) -> Result<Vec<TransactionHash>, Error> {
     let path = concat(block_path, &BLOCK_TRANSACTIONS)?;
 
-    let transactions_bytes =
-        store_read_empty_safe(host, &path, 0, MAX_TRANSACTION_HASHES)?;
+    let transactions_bytes = evm_execution::account_storage::store_read_all(host, &path)?;
 
     Ok(transactions_bytes
         .chunks(TRANSACTION_HASH_SIZE)
@@ -248,7 +243,7 @@ fn store_block_transactions<Host: Runtime>(
 ) -> Result<(), Error> {
     let path = concat(block_path, &BLOCK_TRANSACTIONS)?;
     let block_transactions = &block_transactions.concat()[..];
-    host.store_write(&path, block_transactions, 0)
+    evm_execution::account_storage::store_write_all(host, &path, block_transactions)
         .map_err(Error::from)
 }
 
