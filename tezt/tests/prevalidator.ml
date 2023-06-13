@@ -754,6 +754,7 @@ module Revamped = struct
     let source1 = Constant.bootstrap1 in
     let source2 = Constant.bootstrap2 in
     let fee = 1_000 in
+    let expected_fee_needed_to_replace = 1_050 in
     log_step
       2
       "Inject transfers from [source1] and [source2] with fee [%d] and correct \
@@ -791,14 +792,23 @@ module Revamped = struct
        operation). Check that it fails and the mempool is unchanged. Indeed, \
        the [force] argument of [inject] defaults to [false] so the faulty \
        injected operation is discarded." ;
-    let* (`OpHash _) =
+    let* op3 =
       Operation.Manager.(
-        inject
-          ~error:Operation.conflict_error_with_needed_fee
+        operation
           ~signer
-          [make ~source:source1 ~fee @@ transfer ~dest:Constant.bootstrap4 ()]
-          client)
+          [make ~source:source1 ~fee (transfer ~dest:Constant.bootstrap4 ())])
+        client
     in
+    let* _oph3, fee_needed_to_replace =
+      Operation.inject_and_capture2_stderr
+        ~rex:Operation.conflict_error_with_needed_fee
+        op3
+        client
+    in
+    Check.(
+      (int_of_string fee_needed_to_replace = expected_fee_needed_to_replace)
+        int
+        ~error_msg:"The recommended fee is %L but expected %R.") ;
     let* () = check_mempool ~applied:[oph1; oph2] client in
 
     log_step
