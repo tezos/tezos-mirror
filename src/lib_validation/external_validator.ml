@@ -255,7 +255,7 @@ let run ~readonly ~using_std_channel input output =
     (* if the external validator is spawned in a standalone way and communicates
        with the node through stdin/stdoud, we do no start the logging system. *)
     if using_std_channel then Lwt.return_unit
-    else Tezos_base_unix.Internal_event_unix.init ~internal_events ()
+    else Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
   (* Main loop waiting for request to be processed, forever, until the
      [Terminate] request is received.

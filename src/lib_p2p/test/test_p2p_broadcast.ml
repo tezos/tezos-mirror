@@ -50,12 +50,14 @@ let no_check = false
 
 let init_logs =
   let log_cfg =
-    Some
-      (Tezos_base_unix.Logs_simple_config.create_cfg
-         ~rules:"test.p2p.connection-pool -> info; p2p.connection-pool -> info"
-         ())
+    Tezos_base_unix.Logs_simple_config.create_cfg
+      ~rules:"test.p2p.connection-pool -> info; p2p.connection-pool -> info"
+      ()
   in
-  lazy (Tezos_base_unix.Internal_event_unix.init ?log_cfg ())
+  let config =
+    Tezos_base_unix.Internal_event_unix.make_with_defaults ~log_cfg ()
+  in
+  lazy (Tezos_base_unix.Internal_event_unix.init ~config ())
 
 (** Detaches [!client] nodes. Each of them will send a [BigPing] to each
     other node, then await for reading one from each other node.

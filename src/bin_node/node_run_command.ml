@@ -516,7 +516,9 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
           ~log_cfg:config.log
           ()
   in
-  let*! () = Tezos_base_unix.Internal_event_unix.init ~internal_events () in
+  let*! () =
+    Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
+  in
   let*! () =
     Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings
   in
