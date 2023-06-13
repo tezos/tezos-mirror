@@ -292,7 +292,8 @@ module Make_s
         shell.advertisement <-
           `Pending
             {
-              known_valid = known_valid @ mempool.Mempool.known_valid;
+              known_valid =
+                Operation_hash.Set.union known_valid mempool.Mempool.known_valid;
               pending = Operation_hash.Set.union pending mempool.pending;
             }
     | `None ->
@@ -454,21 +455,17 @@ module Make_s
     else
       (* We only advertise newly classified operations. *)
       let mempool_to_advertise =
-        Mempool.
-          {delta_mempool with known_valid = List.rev delta_mempool.known_valid}
+        Mempool.{delta_mempool with known_valid = delta_mempool.known_valid}
       in
       advertise pv_shell mempool_to_advertise ;
       let our_mempool =
         let validated_hashes =
-          (* Outputs hashes in "decreasing" order which should not matter *)
           Classification.Sized_map.fold
-            (fun x _ acc -> x :: acc)
+            (fun x _ acc -> Operation_hash.Set.add x acc)
             pv_shell.classification.validated
-            []
+            Operation_hash.Set.empty
         in
         {
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2065
-             This field does not need to be a list. *)
           Mempool.known_valid = validated_hashes;
           pending = Pending_ops.hashes pv_shell.pending;
         }
@@ -701,7 +698,11 @@ module Make_s
         =
       let open Lwt_syntax in
       let may_fetch_operation = may_fetch_operation shell (Some peer) in
-      let* () = List.iter_s may_fetch_operation mempool.Mempool.known_valid in
+      let* () =
+        Operation_hash.Set.iter_s
+          may_fetch_operation
+          mempool.Mempool.known_valid
+      in
       Seq.S.iter
         may_fetch_operation
         (Operation_hash.Set.to_seq mempool.Mempool.pending)
@@ -1261,12 +1262,7 @@ module Make
       let* validation_state =
         Prevalidation_t.create chain_store ~head ~timestamp
       in
-      let fetching =
-        List.fold_left
-          (fun s h -> Operation_hash.Set.add h s)
-          Operation_hash.Set.empty
-          mempool.known_valid
-      in
+      let fetching = mempool.known_valid in
       let classification_parameters =
         Classification.
           {

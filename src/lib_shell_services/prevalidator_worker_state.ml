@@ -124,13 +124,13 @@ module Request = struct
           "@[<v 2>notified by %a of operations"
           P2p_peer.Id.pp
           id ;
-        List.iter
+        Operation_hash.Set.iter
           (fun oph ->
             Format.fprintf ppf "@,%a (known_valid)" Operation_hash.pp oph)
           known_valid ;
-        List.iter
+        Operation_hash.Set.iter
           (fun oph -> Format.fprintf ppf "@,%a (pending)" Operation_hash.pp oph)
-          (Operation_hash.Set.elements pending) ;
+          pending ;
         Format.fprintf ppf "@]"
     | Leftover -> Format.fprintf ppf "process next batch of operation"
     | Inject {op; force} ->
