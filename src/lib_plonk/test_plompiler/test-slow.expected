@@ -8560,17 +8560,11 @@ Constraints: 7
 Bool.test_bor_lookup_optimized:
 Constraints: 4
 
-Bool.test_bor_lookup:
-Constraints: 7
+Bool.test_bor_bytes:
+Constraints: 96
 
-Bool.test_bor_lookup_optimized:
-Constraints: 4
-
-Bool.test_bor_lookup:
-Proof size: 3.66 KB
-Proof hash: c8ce43e30a77b7e74ea9fec79a3cffdd90988633b4fbe528faba93247bb04aa7
-Prover_pp hash: 8d6883945117acbe432d00e6a5b155364a9984a19e74da29a8fa5ad65d64f048
-Verifier_pp hash: afeaf57d8057a1179ca730366f8b6383794ef89eac73c18b2848265ec7739910
+Bool.test_bor_bytes_optimized:
+Constraints: 48
 
 Bool.test_bor_lookup:
 Constraints: 7
@@ -8580,9 +8574,9 @@ Constraints: 4
 
 Bool.test_bor_lookup:
 Proof size: 3.66 KB
-Proof hash: f4afa2a42d580f02f70d419480a61e285663f13b6c531254cdea661c666b0e77
-Prover_pp hash: 66461f298812ee25a859200b23d1a9cd900495db22849dd34b09be549ff26222
-Verifier_pp hash: c6f7dc43eef9451b81be212460146274c43b3250ec769c2f3b191dc249954ecc
+Proof hash: b9b6bec9068b0599348d6eea51ce62c5fcd17cef7bd871354e5681f14443d95c
+Prover_pp hash: dc6b3f65ca13d459bb0560b181fb8b180d5c19588429c91221ccd99eeff8d85e
+Verifier_pp hash: 51320d657e9c54e0323ae8ee0f2d2dbdee56dc8ddbbb9e9e72c26bb52e3561ca
 
 Bool.test_bor_lookup:
 Constraints: 7
@@ -8592,9 +8586,9 @@ Constraints: 4
 
 Bool.test_bor_lookup:
 Proof size: 3.66 KB
-Proof hash: 684cee1733487f6354625a7f632f96f1abbf066b41773e36b58f0797352be390
-Prover_pp hash: f1a286c6cf2666c740301c536ceb9d7d99bfe5e6d5d635445f71105f05902e1d
-Verifier_pp hash: c9104305486fec3b4f9a5ed25bfb53b807101925823c8b3579a6e596b8d86ff4
+Proof hash: 3c738fe634f6edafdfa54d08bb5f7b6995e29e2861495f3dd85520fe9ba35909
+Prover_pp hash: e26bfb9f024b78b212a573bab386a58ed96533de080e54ca95c0d6142157192a
+Verifier_pp hash: d63d83d149abfa613188d872dc7083942ffc26b28cb8e26a12504fbe9fc29edf
 
 Bool.test_bor_lookup:
 Constraints: 7
@@ -8604,9 +8598,33 @@ Constraints: 4
 
 Bool.test_bor_lookup:
 Proof size: 3.66 KB
-Proof hash: 20ba97e06352a44d958a462897905d77d94cb41775937b874ffb77cded3a09d7
-Prover_pp hash: fd2a5532972df9c0791386c9975847235684d2dec79bc9227de1a5bc9bc6b9aa
-Verifier_pp hash: 7836a7b47dbfca083de236b531353f42cf8f45a19b0b478765893e68d5d523ca
+Proof hash: b2db9cc7e3147a909287e471e877cc6af312a10fcedb464ce74484bda9da8e8d
+Prover_pp hash: 7695810e7633aea31470a217839614778f3e6c840233affa02b7ef589908b76a
+Verifier_pp hash: 77ec01701ee78507e7fa56e3ea2b8d97e5b5bdab2b8dbf54238ed4b005515cd4
+
+Bool.test_bor_lookup:
+Constraints: 7
+
+Bool.test_bor_lookup_optimized:
+Constraints: 4
+
+Bool.test_bor_lookup:
+Proof size: 3.66 KB
+Proof hash: 661abb8ab0f7dea186ccf658321ece87311bb007c9f567b94add9ff050fef8b1
+Prover_pp hash: 81a450c69eae052f700d027d8264662cbd5190dfcc0f70caf60475be8edb4f9a
+Verifier_pp hash: 6662174005caa9eb0867c0e184a073e76a81748973e9d56b61a2a793e3682ece
+
+Bool.test_bor_bytes:
+Constraints: 96
+
+Bool.test_bor_bytes_optimized:
+Constraints: 48
+
+Bool.test_bor_bytes:
+Proof size: 3.61 KB
+Proof hash: 39b5a59a68f7899814b5d8683a0fb37748e3bc379b0c0dafd25525cbdf5b867d
+Prover_pp hash: df3e377870b4155912b2eccde9a784143b8143a6d027e363d0588b9afd9a2ba6
+Verifier_pp hash: 7b8efec2d67122f09696fa6666e83bc7ea4b04269a2f2b420767d634eade5e56
 
 Range-checks:
 Constraints: 12
