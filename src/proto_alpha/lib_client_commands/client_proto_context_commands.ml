@@ -3219,6 +3219,92 @@ let commands_rw () =
               cctxt#error "Error opening: incorrect proof or unlocked value."
         in
         return_unit);
+    command
+      ~group
+      ~desc:"Publish a DAL commitment on L1 for the given level and slot index"
+      (args7
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         storage_limit_arg
+         counter_arg
+         fee_parameter_args)
+      (prefixes ["publish"; "dal"; "commitment"]
+      @@ param
+           ~name:"commitment"
+           ~desc:"The DAL commitment to publish."
+           Dal.commitment_parameter
+      @@ prefixes ["from"]
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"Name of the source contract."
+      @@ prefixes ["for"; "slot"]
+      @@ param
+           ~name:"DAL slot index"
+           ~desc:"The index of the DAL slot."
+           int_parameter
+      @@ prefixes ["at"; "level"]
+      @@ param
+           ~name:"publication level"
+           ~desc:
+             "The publication level is the level at which the commitment is \
+              expected to be included in an L1 block."
+           raw_level_parameter
+      @@ prefixes ["with"; "proof"]
+      @@ param
+           ~name:"commitment proof"
+           ~desc:"The proof of the DAL commitment to publish."
+           Dal.commitment_proof_parameter
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             storage_limit,
+             counter,
+             fee_parameter )
+           commitment
+           source
+           slot_index
+           published_level
+           commitment_proof
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* slot_index =
+          match Alpha_context.Dal.Slot_index.of_int slot_index with
+          | Ok i -> return i
+          | Error err ->
+              cctxt#error
+                "Bad slot index: %a"
+                Environment.Error_monad.pp_trace
+                err
+        in
+        let slot_header =
+          Alpha_context.Dal.Operations.Publish_slot_header.
+            {published_level; slot_index; commitment; commitment_proof}
+        in
+        let* _res =
+          dal_publish
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~dry_run
+            ~verbose_signing
+            ?fee
+            ?storage_limit
+            ?counter
+            ?confirmations:cctxt#confirmations
+            ~simulation
+            ~source
+            ~slot_header
+            ~src_pk
+            ~src_sk
+            ~fee_parameter
+            ()
+        in
+        return_unit);
   ]
 
 let commands network () =
