@@ -108,7 +108,6 @@ module Delegate_operations = struct
 
   type t = {
     delegate : Tezos_crypto.Signature.public_key_hash;
-    delegate_alias : string option;
     endorsing_power : int;
     operations : operation list;
   }
@@ -117,10 +116,9 @@ module Delegate_operations = struct
     let open Data_encoding in
     conv
       (fun _ -> assert false)
-      (fun (delegate, delegate_alias, reception_time, errors, block_inclusion) ->
+      (fun (delegate, reception_time, errors, block_inclusion) ->
         match (reception_time, block_inclusion) with
-        | None, [] ->
-            {delegate; delegate_alias; endorsing_power = 0; operations = []}
+        | None, [] -> {delegate; endorsing_power = 0; operations = []}
         | _, _ ->
             let mempool_inclusion =
               match reception_time with
@@ -130,7 +128,6 @@ module Delegate_operations = struct
             in
             {
               delegate;
-              delegate_alias;
               endorsing_power = 0;
               operations =
                 [
@@ -142,9 +139,8 @@ module Delegate_operations = struct
                   };
                 ];
             })
-      (obj5
+      (obj4
          (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
-         (opt "delegate_alias" string)
          (opt "reception_time" Time.System.encoding)
          (opt "errors" (list error_encoding))
          (dft "included_in_blocks" (list Block_hash.encoding) []))
@@ -152,13 +148,12 @@ module Delegate_operations = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {delegate; delegate_alias; endorsing_power; operations} ->
-        (delegate, delegate_alias, endorsing_power, operations))
-      (fun (delegate, delegate_alias, endorsing_power, operations) ->
-        {delegate; delegate_alias; endorsing_power; operations})
-      (obj4
+      (fun {delegate; endorsing_power; operations} ->
+        (delegate, endorsing_power, operations))
+      (fun (delegate, endorsing_power, operations) ->
+        {delegate; endorsing_power; operations})
+      (obj3
          (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
-         (opt "delegate_alias" string)
          (dft "endorsing_power" int16 0)
          (dft "operations" (list operation_encoding) []))
 
@@ -184,7 +179,6 @@ module Block = struct
     hash : Block_hash.t;
     predecessor : Block_hash.t option;
     delegate : Tezos_crypto.Signature.public_key_hash;
-    delegate_alias : string option;
     round : Int32.t;
     timestamp : Time.Protocol.t;
     reception_times : (string * Time.System.t) list;
@@ -198,46 +192,27 @@ module Block = struct
              hash;
              predecessor;
              delegate;
-             delegate_alias;
              round;
              reception_times;
              timestamp;
              nonce;
            } ->
-        ( hash,
-          predecessor,
-          delegate,
-          delegate_alias,
-          round,
-          reception_times,
-          timestamp,
-          nonce ))
+        (hash, predecessor, delegate, round, reception_times, timestamp, nonce))
       (fun ( hash,
              predecessor,
              delegate,
-             delegate_alias,
              round,
              reception_times,
              timestamp,
              nonce ) ->
-        {
-          hash;
-          predecessor;
-          delegate;
-          delegate_alias;
-          round;
-          reception_times;
-          timestamp;
-          nonce;
-        })
-      (obj8
+        {hash; predecessor; delegate; round; reception_times; timestamp; nonce})
+      (obj7
          (req "hash" Block_hash.encoding)
          (opt "predecessor" Block_hash.encoding)
          (dft
             "delegate"
             Tezos_crypto.Signature.Public_key_hash.encoding
             Tezos_crypto.Signature.Public_key_hash.zero)
-         (opt "delegate_alias" string)
          (dft "round" int32 0l)
          (dft
             "reception_times"
@@ -288,7 +263,6 @@ module Anomaly = struct
     round : Int32.t option;
     kind : Consensus_ops.operation_kind;
     delegate : Tezos_crypto.Signature.Public_key_hash.t;
-    delegate_alias : string option;
     problem : problem;
   }
 
@@ -304,11 +278,11 @@ module Anomaly = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {level; round; kind; delegate; delegate_alias; problem} ->
-        (level, round, kind, delegate, delegate_alias, problem))
-      (fun (level, round, kind, delegate, delegate_alias, problem) ->
-        {level; round; kind; delegate; delegate_alias; problem})
-      (obj6
+      (fun {level; round; kind; delegate; problem} ->
+        (level, round, kind, delegate, problem))
+      (fun (level, round, kind, delegate, problem) ->
+        {level; round; kind; delegate; problem})
+      (obj5
          (req "level" int32)
          (opt "round" int32)
          (dft
@@ -316,6 +290,5 @@ module Anomaly = struct
             Consensus_ops.operation_kind_encoding
             Consensus_ops.Endorsement)
          (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
-         (opt "delegate_alias" string)
          (req "problem" problem_encoding))
 end

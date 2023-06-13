@@ -122,7 +122,7 @@ let extract_anomalies path level infos =
       List.fold_left
         (fun acc
              Data.Delegate_operations.
-               {delegate; delegate_alias; endorsing_power = _; operations} ->
+               {delegate; endorsing_power = _; operations} ->
           List.fold_left
             (fun acc
                  Data.Delegate_operations.
@@ -135,7 +135,6 @@ let extract_anomalies path level infos =
                       round;
                       kind;
                       delegate;
-                      delegate_alias;
                       problem = Data.Anomaly.Missed;
                     }
                   :: acc
@@ -143,36 +142,15 @@ let extract_anomalies path level infos =
                   match errors with
                   | Some (_ :: _) ->
                       Data.Anomaly.
-                        {
-                          level;
-                          round;
-                          kind;
-                          delegate;
-                          delegate_alias;
-                          problem = Incorrect;
-                        }
+                        {level; round; kind; delegate; problem = Incorrect}
                       :: acc
                   | None | Some [] ->
                       Data.Anomaly.
-                        {
-                          level;
-                          round;
-                          kind;
-                          delegate;
-                          delegate_alias;
-                          problem = Forgotten;
-                        }
+                        {level; round; kind; delegate; problem = Forgotten}
                       :: acc)
               | Endorsement, [], _ :: _ ->
                   Data.Anomaly.
-                    {
-                      level;
-                      round;
-                      kind;
-                      delegate;
-                      delegate_alias;
-                      problem = Sequestered;
-                    }
+                    {level; round; kind; delegate; problem = Sequestered}
                   :: acc
               | Endorsement, _ :: _, _ :: _ -> acc
               | Preendorsement, _, _ -> acc)
@@ -224,13 +202,12 @@ let add_to_operations block_hash ops_kind ?ops_round operations =
 
 (* [validators] are those delegates whose operations (either preendorsements or
    endorsements) have been included in the given block.*)
-let add_inclusion_in_block aliases block_hash validators delegate_operations =
+let add_inclusion_in_block block_hash validators delegate_operations =
   let updated_known, unknown =
     List.fold_left
       (fun (acc, missing)
            Data.Delegate_operations.(
-             {delegate; delegate_alias; endorsing_power; operations} as
-             delegate_ops) ->
+             {delegate; endorsing_power; operations} as delegate_ops) ->
         match
           List.partition
             (fun op ->
@@ -244,7 +221,6 @@ let add_inclusion_in_block aliases block_hash validators delegate_operations =
             ( Data.Delegate_operations.
                 {
                   delegate;
-                  delegate_alias;
                   endorsing_power;
                   operations =
                     add_to_operations
@@ -268,7 +244,6 @@ let add_inclusion_in_block aliases block_hash validators delegate_operations =
           Data.Delegate_operations.
             {
               delegate;
-              delegate_alias = Wallet.alias_of_pkh aliases delegate;
               endorsing_power = op.Consensus_ops.power;
               operations =
                 [
@@ -284,17 +259,9 @@ let add_inclusion_in_block aliases block_hash validators delegate_operations =
         updated_known
         unknown
 
-let dump_included_in_block cctxt path block_level block_hash block_predecessor
+let dump_included_in_block path block_level block_hash block_predecessor
     block_round timestamp reception_times baker consensus_ops =
   let open Lwt.Infix in
-  Wallet.of_context cctxt >>= fun aliases_opt ->
-  let aliases =
-    match aliases_opt with
-    | Ok aliases -> aliases
-    | Error err ->
-        let () = Error_monad.pp_print_trace Format.err_formatter err in
-        Wallet.empty
-  in
   (let endorsements_level = Int32.pred block_level in
    let filename = filename_of_level path endorsements_level in
    let mutex = get_file_mutex filename in
@@ -302,7 +269,6 @@ let dump_included_in_block cctxt path block_level block_hash block_predecessor
        let* infos = load filename Data.encoding Data.empty in
        let delegate_operations =
          add_inclusion_in_block
-           aliases
            block_hash
            consensus_ops
            infos.Data.delegate_operations
@@ -343,7 +309,6 @@ let dump_included_in_block cctxt path block_level block_hash block_predecessor
             hash = block_hash;
             predecessor = block_predecessor;
             delegate = baker;
-            delegate_alias = Wallet.alias_of_pkh aliases baker;
             round = block_round;
             reception_times;
             timestamp;
@@ -405,7 +370,7 @@ let merge_operations =
           }
           :: acc)
 
-let dump_received cctxt path ?unaccurate level received_ops =
+let dump_received path ?unaccurate level received_ops =
   let filename = filename_of_level path level in
   let mutex = get_file_mutex filename in
   let*! out =
@@ -415,8 +380,7 @@ let dump_received cctxt path ?unaccurate level received_ops =
           List.fold_left
             (fun (acc, missing)
                  Data.Delegate_operations.(
-                   {delegate; delegate_alias; endorsing_power; operations} as
-                   delegate_ops) ->
+                   {delegate; endorsing_power; operations} as delegate_ops) ->
               match
                 List.partition
                   (fun (pkh, _) ->
@@ -428,7 +392,6 @@ let dump_received cctxt path ?unaccurate level received_ops =
                   ( Data.Delegate_operations.
                       {
                         delegate;
-                        delegate_alias;
                         endorsing_power;
                         operations = merge_operations operations new_operations;
                       }
@@ -442,14 +405,12 @@ let dump_received cctxt path ?unaccurate level received_ops =
           match unknown with
           | [] -> return updated_known
           | _ :: _ ->
-              let* aliases = Wallet.of_context cctxt in
               return
                 (List.fold_left
                    (fun acc (delegate, ops) ->
                      Data.Delegate_operations.
                        {
                          delegate;
-                         delegate_alias = Wallet.alias_of_pkh aliases delegate;
                          endorsing_power = 0;
                          operations =
                            List.rev_map
@@ -511,7 +472,7 @@ type chunk =
 
 let chunk_stream, chunk_feeder = Lwt_stream.create ()
 
-let launch cctxt prefix =
+let launch _cctx prefix =
   Lwt_stream.iter_p
     (function
       | Block
@@ -524,7 +485,6 @@ let launch cctxt prefix =
             baker,
             block_info ) ->
           dump_included_in_block
-            cctxt
             prefix
             level
             block_hash
@@ -535,7 +495,7 @@ let launch cctxt prefix =
             baker
             block_info
       | Mempool (unaccurate, level, items) ->
-          dump_received cctxt prefix ?unaccurate level items)
+          dump_received prefix ?unaccurate level items)
     chunk_stream
 
 let stop () = chunk_feeder None
@@ -557,4 +517,4 @@ let add_block ~level (block, (endos, preendos)) =
             endos @ preendos )))
 
 (* not used *)
-let add_rights ~level:_ _rights _aliases = ()
+let add_rights ~level:_ _rights = ()

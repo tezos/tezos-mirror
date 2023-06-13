@@ -34,8 +34,7 @@ let env driver_info s =
 let create_delegates =
   "CREATE TABLE IF NOT EXISTS delegates(\n\
   \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
-  \  address $(BYTES) UNIQUE NOT NULL,\n\
-  \  alias TEXT)"
+  \  address $(BYTES) UNIQUE NOT NULL)"
 
 let create_nodes =
   "CREATE TABLE IF NOT EXISTS nodes(\n\

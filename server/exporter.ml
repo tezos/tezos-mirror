@@ -25,8 +25,7 @@
 
 open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
 
-let parse_block_row
-    ((hash, predecessor, delegate, delegate_alias), (round, timestamp)) acc =
+let parse_block_row ((hash, predecessor, delegate), (round, timestamp)) acc =
   Tezos_crypto.Hashed.Block_hash.Map.add
     hash
     Teztale_lib.Data.Block.
@@ -34,7 +33,6 @@ let parse_block_row
         hash;
         predecessor;
         delegate;
-        delegate_alias;
         round;
         reception_times = [];
         timestamp;
@@ -52,7 +50,6 @@ let parse_block_reception_row (hash, reception_time, source) acc =
               hash;
               predecessor;
               delegate;
-              delegate_alias;
               round;
               reception_times;
               timestamp;
@@ -64,7 +61,6 @@ let parse_block_reception_row (hash, reception_time, source) acc =
                 hash;
                 predecessor;
                 delegate;
-                delegate_alias;
                 round;
                 reception_times = (source, reception_time) :: reception_times;
                 timestamp;
@@ -79,15 +75,14 @@ let select_blocks db_pool level =
       Caqti_type.int32
       ->* Caqti_type.(
             tup2
-              (tup4
+              (tup3
                  Sql_requests.Type.block_hash
                  (option Sql_requests.Type.block_hash)
-                 Sql_requests.Type.public_key_hash
-                 (option string))
+                 Sql_requests.Type.public_key_hash)
               (tup2 int32 Sql_requests.Type.time_protocol)))
-      "SELECT b.hash, p.hash, d.address, d.alias, b.round, b.timestamp FROM \
-       blocks b JOIN delegates d ON d.id = b.baker LEFT JOIN blocks p ON p.id \
-       = b.predecessor WHERE b.level = ?"
+      "SELECT b.hash, p.hash, d.address, b.round, b.timestamp FROM blocks b \
+       JOIN delegates d ON d.id = b.baker LEFT JOIN blocks p ON p.id = \
+       b.predecessor WHERE b.level = ?"
   in
   let* blocks =
     Caqti_lwt.Pool.use
@@ -167,10 +162,9 @@ let select_ops db_pool level =
   let q_rights =
     Caqti_request.Infix.(
       Caqti_type.int32
-      ->* Caqti_type.(
-            tup3 Sql_requests.Type.public_key_hash (option string) int))
-      "SELECT d.address, d.alias, e.endorsing_power FROM endorsing_rights e \
-       JOIN delegates d ON e.delegate = d.id WHERE e.level = ?"
+      ->* Caqti_type.(tup2 Sql_requests.Type.public_key_hash int))
+      "SELECT d.address, e.endorsing_power FROM endorsing_rights e JOIN \
+       delegates d ON e.delegate = d.id WHERE e.level = ?"
   in
   let q_included =
     Caqti_request.Infix.(
@@ -198,15 +192,15 @@ let select_ops db_pool level =
        WHERE o.level = ?"
   in
   let module Ops = Tezos_crypto.Signature.Public_key_hash.Map in
-  let cb_rights (delegate, alias, power) info =
-    Ops.add delegate (alias, power, Pkh_ops.empty) info
+  let cb_rights (delegate, power) info =
+    Ops.add delegate (power, Pkh_ops.empty) info
   in
   let cb_included (delegate, endorsement, round, block_hash) info =
     let kind = kind_of_bool endorsement in
     Ops.update
       delegate
       (function
-        | Some (alias, power, ops) ->
+        | Some (power, ops) ->
             let op_key = Op_key.{kind; round} in
             let op =
               match Pkh_ops.find_opt op_key ops with
@@ -215,7 +209,7 @@ let select_ops db_pool level =
               | None -> {included = [block_hash]; received = []}
             in
             let ops' = Pkh_ops.add op_key op ops in
-            Some (alias, power, ops')
+            Some (power, ops')
         | None -> None)
       info
   in
@@ -228,7 +222,7 @@ let select_ops db_pool level =
     Ops.update
       delegate
       (function
-        | Some (alias, power, ops) ->
+        | Some (power, ops) ->
             let op_key = Op_key.{kind; round} in
             let op =
               match Pkh_ops.find_opt op_key ops with
@@ -237,7 +231,7 @@ let select_ops db_pool level =
               | None -> {included = []; received = [received_info]}
             in
             let ops' = Pkh_ops.add op_key op ops in
-            Some (alias, power, ops')
+            Some (power, ops')
         | None -> None)
       info
   in
@@ -274,11 +268,10 @@ let translate_ops info =
       []
   in
   Tezos_crypto.Signature.Public_key_hash.Map.fold
-    (fun pkh (alias, power, pkh_ops) acc ->
+    (fun pkh (power, pkh_ops) acc ->
       Teztale_lib.Data.Delegate_operations.
         {
           delegate = pkh;
-          delegate_alias = alias;
           endorsing_power = power;
           operations = translate pkh_ops;
         }
@@ -291,7 +284,7 @@ let translate_ops info =
      operations for old/future round/level" errors should be seen as a
      "per block anomaly" rather than a "per delegate anomaly". *)
 let anomalies level ops =
-  let extract_anomalies delegate delegate_alias pkh_ops =
+  let extract_anomalies delegate pkh_ops =
     let open Teztale_lib.Data.Anomaly in
     Pkh_ops.fold
       (fun Op_key.{kind; round} {received; included} acc ->
@@ -304,14 +297,12 @@ let anomalies level ops =
         in
         match problem with
         | None -> acc
-        | Some problem ->
-            {level; kind; round; delegate; delegate_alias; problem} :: acc)
+        | Some problem -> {level; kind; round; delegate; problem} :: acc)
       pkh_ops
       []
   in
   Tezos_crypto.Signature.Public_key_hash.Map.fold
-    (fun pkh (alias, _power, pkh_ops) acc ->
-      extract_anomalies pkh alias pkh_ops @ acc)
+    (fun pkh (_power, pkh_ops) acc -> extract_anomalies pkh pkh_ops @ acc)
     ops
     []
 

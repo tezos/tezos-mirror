@@ -42,14 +42,6 @@ let split_endorsements_preendorsements operations =
     ([], [])
     operations
 
-let wallet cctx =
-  let*! wallet_res = Wallet.of_context cctx in
-  match wallet_res with
-  | Ok aliases -> Lwt.return aliases
-  | Error err ->
-      let () = Error_monad.pp_print_trace Format.err_formatter err in
-      Lwt.return Wallet.empty
-
 module Ring =
   Aches.Vache.Set (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
     (struct
@@ -70,15 +62,15 @@ let endorsement_machine = Protocol_hash.Table.create 10
 
 let live_block_machine = Protocol_hash.Table.create 10
 
-let maybe_add_rights (module A : Archiver.S) level rights wallet =
+let maybe_add_rights (module A : Archiver.S) level rights =
   if Ring.mem registered_rights_levels level then ()
   else
     let () = Ring.add registered_rights_levels level in
-    A.add_rights ~level rights wallet
+    A.add_rights ~level rights
 
-let dump_my_current_endorsements (module A : Archiver.S) wallet ~unaccurate
-    ~level rights endorsements =
-  let () = maybe_add_rights (module A) level rights wallet in
+let dump_my_current_endorsements (module A : Archiver.S) ~unaccurate ~level
+    rights endorsements =
+  let () = maybe_add_rights (module A) level rights in
   let () = A.add_mempool ~unaccurate ~level endorsements in
   return_unit
 
@@ -101,7 +93,6 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
             hash;
             predecessor;
             nonce = None;
-            delegate_alias = None;
             reception_times;
           },
         split_endorsements_preendorsements operations )
@@ -136,7 +127,6 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     | [] -> [(i, [e])]
 
   let endorsements_recorder (module A : Archiver.S) cctx current_level =
-    let*! wallet = wallet cctx in
     let cctx' = Services.wrap_full cctx in
     let* op_stream, _stopper = Services.consensus_operation_stream cctx' in
     let*! out =
@@ -174,7 +164,6 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
         in
         dump_my_current_endorsements
           (module A)
-          wallet
           ~unaccurate:(not full)
           ~level
           rights
@@ -221,12 +210,11 @@ module Loops (Archiver : Archiver.S) = struct
     loop starting ending
 
   let rights chain starting cctx =
-    let*! wallet = wallet cctx in
     mecanism chain starting cctx (fun {next_protocol; _} level ->
         match Protocol_hash.Table.find rights_machine next_protocol with
         | Some deal_with ->
             let* rights = deal_with cctx level in
-            let () = maybe_add_rights (module Archiver) level rights wallet in
+            let () = maybe_add_rights (module Archiver) level rights in
             return_unit
         | None -> return_unit)
 
@@ -311,7 +299,6 @@ module Loops (Archiver : Archiver.S) = struct
         let () = Error_monad.pp_print_trace Format.err_formatter e in
         Lwt.return_unit
     | Ok (block_stream, _stopper) ->
-        let*! wallet = wallet cctx in
         let*! _ =
           Lwt_stream.fold_s
             (fun (_chain_id, hash, header, _operations) acc ->
@@ -368,7 +355,6 @@ module Loops (Archiver : Archiver.S) = struct
                                         (module Archiver)
                                         (Int32.pred level)
                                         rights
-                                        wallet
                                     in
                                     return_unit
                                 in
@@ -382,7 +368,6 @@ module Loops (Archiver : Archiver.S) = struct
                                         (module Archiver)
                                         level
                                         rights
-                                        wallet
                                     in
                                     return_unit
                                 in

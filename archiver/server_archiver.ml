@@ -115,5 +115,4 @@ let add_mempool ?unaccurate:(_ : bool option) ~level items =
 
 let add_block ~level block = chunk_feeder (Some (Block (level, block)))
 
-let add_rights ~level rights _wallet =
-  chunk_feeder (Some (Rights (level, rights)))
+let add_rights ~level rights = chunk_feeder (Some (Rights (level, rights)))

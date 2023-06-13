@@ -49,5 +49,5 @@ module type S = sig
     Data.Block.t * (Consensus_ops.block_op list * Consensus_ops.block_op list) ->
     unit
 
-  val add_rights : level:Int32.t -> Consensus_ops.rights -> Wallet.t -> unit
+  val add_rights : level:Int32.t -> Consensus_ops.rights -> unit
 end

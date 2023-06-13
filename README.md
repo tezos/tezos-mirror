@@ -56,10 +56,6 @@ archiver/main.exe feed <teztale-server-endpoint-including-login:password>
 options as the client (especially the `--endpoint` option to specify
 where to reach octez node RPC endpoint).
 
-<!--
-if run on public (test)network, it will use tzkt api to find delegate aliases.
--->
-
 ## Docker images
 
 Docker images containing the binaries are available in the docker
