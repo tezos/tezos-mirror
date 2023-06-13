@@ -179,8 +179,7 @@ let test_sc_rollup_max_commitment_storage_size () =
 let liquidity_baking_subsidy_param () =
   let constants = Default_parameters.constants_mainnet in
   let get_reward =
-    Protocol.Alpha_context.Delegate.Rewards.Internal_for_tests
-    .reward_from_constants
+    Protocol.Alpha_context.Delegate.Rewards.For_RPC.reward_from_constants
       constants
   in
   let baking_reward_bonus_per_slot =

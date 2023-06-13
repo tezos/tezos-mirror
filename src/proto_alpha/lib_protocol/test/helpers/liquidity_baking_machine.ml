@@ -381,7 +381,7 @@ let default_subsidy =
   let open Tezos_protocol_alpha_parameters in
   let c = Default_parameters.constants_test in
   Tez.to_mutez
-  @@ Delegate.Rewards.Internal_for_tests.reward_from_constants
+  @@ Delegate.Rewards.For_RPC.reward_from_constants
        c
        ~reward_kind:Liquidity_baking_subsidy
 

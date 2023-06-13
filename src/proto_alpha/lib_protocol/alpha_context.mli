@@ -275,6 +275,8 @@ module Cycle : sig
 
   val to_int32 : cycle -> int32
 
+  val ( ---> ) : cycle -> cycle -> cycle list
+
   module Map : Map.S with type key = cycle
 end
 
@@ -2229,7 +2231,7 @@ module Delegate : sig
 
     val vdf_revelation_tip : t -> Tez.t
 
-    module Internal_for_tests : sig
+    module For_RPC : sig
       type reward_kind =
         | Baking_reward_fixed_portion
         | Baking_reward_bonus_per_slot
@@ -2246,9 +2248,7 @@ module Delegate : sig
           coeff * reward_from_constants csts ~reward_kind]. *)
       val reward_from_constants :
         ?coeff:Q.t -> Constants.Parametric.t -> reward_kind:reward_kind -> Tez.t
-    end
 
-    module For_RPC : sig
       (** [get_reward_coeff ctxt cycle] reads the reward coeff for the given cycle
           from the storage.
           Returns [Q.one] if the given cycle is not between [current_cycle] and

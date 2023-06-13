@@ -119,7 +119,7 @@ let test_valid_double_endorsement_evidence () =
      - baking_reward_fixed_portion for baking and,
      - half of the frozen_deposits for including the evidence *)
   let baking_reward =
-    Delegate.Rewards.Internal_for_tests.reward_from_constants
+    Delegate.Rewards.For_RPC.reward_from_constants
       csts.parametric
       ~reward_kind:Baking_reward_fixed_portion
   in

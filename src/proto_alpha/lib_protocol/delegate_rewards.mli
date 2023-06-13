@@ -37,8 +37,7 @@ val seed_nonce_revelation_tip : Raw_context.t -> Tez_repr.t
 
 val vdf_revelation_tip : Raw_context.t -> Tez_repr.t
 
-(* For testing purposes *)
-module Internal_for_tests : sig
+module For_RPC : sig
   type reward_kind =
     | Baking_reward_fixed_portion
     | Baking_reward_bonus_per_slot
@@ -52,7 +51,7 @@ module Internal_for_tests : sig
       given parameters in [csts]. The (optional) value [coeff] is a
       multiplicative factor applied to the rewards (default = 1).
       It verifies [reward_from_constants ~coeff csts ~reward_kind =
-      coeff * reward_from_constants csts ~reward_kind]. *)
+      coeff * reward_from_constants csts ~reward_kind].*)
   val reward_from_constants :
     ?coeff:Q.t ->
     Constants_parametric_repr.t ->

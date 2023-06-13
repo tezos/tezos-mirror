@@ -502,7 +502,11 @@ module Delegate = struct
 
   module Rewards = struct
     include Delegate_rewards
-    module For_RPC = Adaptive_inflation_storage.For_RPC
+
+    module For_RPC = struct
+      include Delegate_rewards.For_RPC
+      include Adaptive_inflation_storage.For_RPC
+    end
   end
 
   module Staking_parameters = Delegate_staking_parameters
