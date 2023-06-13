@@ -61,8 +61,9 @@ module Events = struct
       ~msg:"Callback failed for message id {message_id}. Failure is {failure}"
       ~level:Warning
       ~pp1:Worker.GS.Message_id.pp
+      ~pp2:pp_print_trace
       ("message_id", Gs_interface.message_id_encoding)
-      ("failure", Data_encoding.string)
+      ("failure", trace_encoding)
 end
 
 (** This module implements a cache of alternative peers (alternative PX)
@@ -330,11 +331,7 @@ let app_messages_handler gs_worker ~app_messages_callback =
     let* () =
       match res with
       | Ok () -> Events.(emit message_notified_to_app message_id)
-      | Error err ->
-          Events.(
-            emit
-              app_message_callback_failed
-              (message_id, Format.asprintf "%a" pp_print_trace err))
+      | Error err -> Events.(emit app_message_callback_failed (message_id, err))
     in
     loop app_output_stream
   in
