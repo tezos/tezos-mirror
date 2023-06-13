@@ -730,3 +730,84 @@ let breakdown2_const_offset ~name ~coeff1 ~coeff2 ~coeff3 ~const ~break1 ~break2
     end
   end in
   (module M : Model_impl with type arg_type = int * unit)
+
+module type Binary_operation = sig
+  module Def (X : Costlang.S) : sig
+    val op : X.size X.repr -> X.size X.repr -> X.size X.repr
+  end
+end
+
+module Synthesize
+    (B : Binary_operation)
+    (X : Model_impl)
+    (Y : Model_impl with type arg_type = X.arg_type) (Names : sig
+      val name : Namespace.t
+
+      val x_label : string
+
+      val y_label : string
+    end) : Model_impl with type arg_type = X.arg_type = struct
+  type arg_type = X.arg_type
+
+  let name = Names.name
+
+  module Def (C : Costlang.S) = struct
+    module Args = X.Def (Costlang.Arg_names)
+    module BinOp = B.Def (C)
+    module X = X.Def (C)
+    module Y = Y.Def (C)
+
+    type model_type = X.model_type
+
+    let arity = X.arity
+
+    let rec synthesize :
+        type a args_model x_model y_model.
+        (Costlang.Arg_names.size, args_model, a) arity ->
+        args_model Costlang.Arg_names.repr ->
+        (C.size, x_model, a) arity ->
+        x_model C.repr ->
+        (C.size, y_model, a) arity ->
+        y_model C.repr ->
+        x_model C.repr =
+     fun arg_arity args arity1 term1 arity2 term2 ->
+      match arg_arity with
+      | Zero_arity ->
+          (* These bindings of Zero_arity are necessary for type checking *)
+          let Zero_arity = arity1 in
+          let Zero_arity = arity2 in
+          let open C in
+          let_ ~name:Names.x_label term1 @@ fun term1 ->
+          let_ ~name:Names.y_label term2 @@ fun term2 -> BinOp.op term1 term2
+      | Succ_arity arg_arity ->
+          let (Succ_arity arity1) = arity1 in
+          let (Succ_arity arity2) = arity2 in
+          let open C in
+          lam ~name:(Costlang.Arg_names.arg_name args) @@ fun arg ->
+          synthesize
+            arg_arity
+            (Costlang.Arg_names.unwrap_size args)
+            arity1
+            (app term1 arg)
+            arity2
+            (app term2 arg)
+
+    let model = synthesize Args.arity Args.model X.arity X.model Y.arity Y.model
+  end
+end
+
+let synthesize (type a) ~name ~binop ~x_label ~x_model ~y_label ~y_model =
+  let (module B : Binary_operation) = binop in
+  let ((module X) : a model) = x_model in
+  let ((module Y) : a model) = y_model in
+  let module M =
+    Synthesize (B) (X) (Y)
+      (struct
+        let x_label = x_label
+
+        let y_label = y_label
+
+        let name = name
+      end)
+  in
+  ((module M) : a model)

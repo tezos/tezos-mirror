@@ -432,11 +432,20 @@ module Models = struct
     (module M : Model.Model_impl with type arg_type = int * (int * unit))
 end
 
+type ir_model =
+  | TimeModel : 'a Model.model -> ir_model
+  | TimeAllocModel : {
+      name : Namespace.t; (* name for synthesized model *)
+      time : 'a Model.model;
+      alloc : 'a Model.model;
+    }
+      -> ir_model
+
 let ir_model instr_or_cont =
   let open Interpreter_workload in
   let open Models in
   let name = name_of_instr_or_cont instr_or_cont in
-  let m s = Model.Model s in
+  let m s = TimeModel s in
   match instr_or_cont with
   | Instr_name instr -> (
       match instr with
@@ -557,6 +566,26 @@ let ir_model instr_or_cont =
       | N_KMap_exit_body -> nlogm_model name |> m
       | N_KLog -> const1_model name |> m)
 
+let gas_unit_per_allocation_word = 4
+
+module SynthesizeTimeAlloc : Model.Binary_operation = struct
+  module Def (X : Costlang.S) = struct
+    let op time alloc = X.(max time (alloc * int gas_unit_per_allocation_word))
+  end
+end
+
+let pack_ir_model = function
+  | TimeModel m -> Model.Model m
+  | TimeAllocModel {name; time; alloc} ->
+      Model.Model
+        (Model.synthesize
+           ~binop:(module SynthesizeTimeAlloc)
+           ~name
+           ~x_label:"time"
+           ~x_model:time
+           ~y_label:"alloc"
+           ~y_model:alloc)
+
 let amplification_loop_iteration = fv "amplification_loop_iteration"
 
 let amplification_loop_model =
@@ -589,7 +618,7 @@ let interpreter_model ?amplification sub_model =
           List.fold_left
             (fun (acc : X.size X.repr) instr_trace ->
               let name = instr_trace.Interpreter_workload.name in
-              let (Model.Model model) = ir_model name in
+              let (Model.Model model) = pack_ir_model (ir_model name) in
               let (module Applied_instr) =
                 Model.apply (model_with_conv name model) instr_trace
               in
@@ -603,4 +632,4 @@ let interpreter_model ?amplification sub_model =
 
 let make_model ?amplification instr_name =
   let ir_model = ir_model instr_name in
-  [("interpreter", interpreter_model ?amplification ir_model)]
+  [("interpreter", interpreter_model ?amplification (pack_ir_model ir_model))]
