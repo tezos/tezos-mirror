@@ -23,151 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let group =
-  {Tezos_clic.name = "dal-node"; title = "Commands related to the DAL node"}
-
-let data_dir_arg =
-  let default = Configuration.default_data_dir in
-  Tezos_clic.default_arg
-    ~long:"data-dir"
-    ~placeholder:"data-dir"
-    ~doc:
-      (Format.sprintf
-         "The path to the DAL node data directory. Default value is %s"
-         default)
-    ~default
-    (Client_config.string_parameter ())
-
-let rpc_addr_arg =
-  let default = Configuration.default_rpc_addr in
-  Tezos_clic.default_arg
-    ~long:"rpc-addr"
-    ~placeholder:"rpc-address|ip"
-    ~doc:
-      (Format.sprintf
-         "The address the DAL node listens to. Default value is %s"
-         default)
-    ~default
-    (Client_config.string_parameter ())
-
-let int_parameter =
-  let open Tezos_clic in
-  parameter (fun _ p ->
-      let open Lwt_result_syntax in
-      let* i =
-        try Lwt.return_ok (int_of_string p)
-        with _ -> failwith "Cannot read int"
-      in
-      if i < 0 then failwith "Parameter must be non-negative" else return i)
-
-let float_parameter =
-  let open Tezos_clic in
-  parameter (fun _ p ->
-      let open Lwt_result_syntax in
-      let* i =
-        try Lwt.return_ok (float_of_string p)
-        with _ -> failwith "Cannot read float"
-      in
-      if i < 0. then failwith "Parameter must be non-negative" else return i)
-
-let rpc_port_arg =
-  let default = Configuration.default_rpc_port |> string_of_int in
-  Tezos_clic.default_arg
-    ~long:"rpc-port"
-    ~placeholder:"rpc-port"
-    ~doc:
-      (Format.sprintf
-         "The port the DAL node listens to. Default value is %s"
-         default)
-    ~default
-    int_parameter
-
-let expected_pow_arg =
-  let default = string_of_float Configuration.default_expected_pow in
-  Tezos_clic.default_arg
-    ~long:"expected-pow"
-    ~placeholder:"expected-pow"
-    ~doc:
-      (Format.sprintf
-         "Expected PoW difficulty to generate nodes' P2P identities. Default \
-          value is %s"
-         default)
-    ~default
-    float_parameter
-
-let listen_addr_arg =
-  let default = P2p_point.Id.to_string Configuration.default_listen_addr in
-  Tezos_clic.default_arg
-    ~long:"net-addr"
-    ~placeholder:"ADDR:PORT"
-    ~doc:
-      (Format.sprintf
-         "The TCP address and port at which this instance can be reached. \
-          Default value is %s"
-         default)
-    ~default
-    (Client_config.string_parameter ())
-
-let use_unsafe_srs_for_tests_arg =
-  Tezos_clic.switch
-    ~long:"use-unsafe-srs-for-tests"
-    ~doc:
-      (Format.sprintf
-         "Run dal-node in test mode with an unsafe SRS (Trusted setup)")
-    ()
-
-let config_init_command =
-  let open Lwt_result_syntax in
-  let open Tezos_clic in
-  command
-    ~group
-    ~desc:"Configure DAL node."
-    (args6
-       data_dir_arg
-       rpc_addr_arg
-       rpc_port_arg
-       listen_addr_arg
-       use_unsafe_srs_for_tests_arg
-       expected_pow_arg)
-    (prefixes ["init-config"] stop)
-    (fun
-      (data_dir, rpc_addr, rpc_port, listen_addr, use_unsafe_srs, expected_pow)
-      cctxt
-    ->
-      let open Configuration in
-      let listen_addr = P2p_point.Id.of_string_exn listen_addr in
+let run subcommand
+    Cli.
+      {
+        data_dir;
+        octez_node;
+        rpc_addr;
+        expected_pow;
+        net_addr;
+        use_unsafe_srs_for_tests;
+      } =
+  match subcommand with
+  | Cli.Run ->
+      let rpc_context = Rpc_context.make octez_node in
+      Lwt_main.run @@ Daemon.run ~data_dir rpc_context
+  | Config_init ->
       let config =
-        {
-          data_dir;
-          rpc_addr;
-          rpc_port;
-          use_unsafe_srs;
-          neighbors = [];
-          peers = [];
-          listen_addr;
-          expected_pow;
-          network_name = default_network_name;
-        }
+        Configuration.
+          {
+            data_dir;
+            rpc_addr;
+            use_unsafe_srs = use_unsafe_srs_for_tests;
+            neighbors = [];
+            peers = [];
+            listen_addr = net_addr;
+            expected_pow;
+            network_name = default_network_name;
+          }
       in
-      let* () = save config in
-      let*! _ =
-        cctxt#message "DAL node configuration written in %s" (filename config)
-      in
-      return ())
+      Lwt_main.run @@ Configuration.save config
 
-let run_command =
-  let open Tezos_clic in
-  command
-    ~group
-    ~desc:"Run the DAL node."
-    (args1 data_dir_arg)
-    (prefixes ["run"] @@ stop)
-    (fun data_dir cctxt -> Daemon.run ~data_dir cctxt)
-
-let commands () = [run_command; config_init_command]
-
-let select_commands _ _ =
-  let open Lwt_result_syntax in
-  return (commands ())
-
-let () = Client_main_run.run (module Client_config) ~select_commands
+let _ =
+  let commands = Cli.make ~run in
+  Cmdliner.Cmd.eval commands

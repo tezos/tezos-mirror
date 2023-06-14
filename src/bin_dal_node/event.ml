@@ -25,6 +25,14 @@
 
 include Event_legacy
 
+let configuration_loaded =
+  declare_0
+    ~section
+    ~name:"configuration_loaded"
+    ~msg:"Configuration loaded successfully"
+    ~level:Notice
+    ()
+
 let stored_slot_content =
   declare_1
     ~section

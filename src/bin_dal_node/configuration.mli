@@ -29,8 +29,7 @@ type t = {
   use_unsafe_srs : bool;
       (** Run dal-node in test mode with an unsafe SRS (Trusted setup) *)
   data_dir : string;  (** The path to the DAL node data directory *)
-  rpc_addr : string;  (** The address the DAL node listens to *)
-  rpc_port : int;  (** The port the DAL node listens to *)
+  rpc_addr : P2p_point.Id.t;  (** The address the DAL node listens to *)
   neighbors : neighbor list;  (** List of neighbors to reach withing the DAL *)
   listen_addr : P2p_point.Id.t;
       (** The TCP address and port at which this instance can be reached. *)
@@ -50,9 +49,7 @@ val data_dir_path : t -> string -> string
 
 val default_data_dir : string
 
-val default_rpc_addr : string
-
-val default_rpc_port : int
+val default_rpc_addr : P2p_point.Id.t
 
 val default_expected_pow : float
 

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,26 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include module type of Event_legacy
+type t = Tezos_rpc.Context.generic
 
-(** An event emitted at startup when the configuration of the node is read from
-    disk. *)
-val configuration_loaded : unit t
-
-(** Storing a slot content event. The given parameter is the slot's commitment
-    hash. *)
-val stored_slot_content : Cryptobox.Commitment.t t
-
-(** Storing a slot's shards event. The given parameters are the slot's
-    commitment hash and the number of its shards. *)
-val stored_slot_shards : (Cryptobox.Commitment.t * int) t
-
-(** Decoding a value failed. See {!Types.kind} for kind of considered
-    values. *)
-val decoding_data_failed : Types.kind t
-
-(** Loading shard data from disk failed. *)
-val loading_shard_data_failed : string t
-
-(** Validating a message received via Gossipsub/P2P failed. *)
-val message_validation_error : (Gossipsub.message_id * string) t
+(** [make endpoint] constructs an rpc context out of an endpoint
+    represented as an URI. *)
+val make : Uri.t -> t

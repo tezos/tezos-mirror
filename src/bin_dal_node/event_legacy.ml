@@ -52,13 +52,12 @@ let store_is_ready =
     ()
 
 let rpc_server_is_ready =
-  declare_2
+  declare_1
     ~section
     ~name:"dal_node_rpc_server_is_ready"
-    ~msg:"The DAL node is listening to {addr}:{port}"
+    ~msg:"The DAL node is listening to {point}"
     ~level:Notice
-    ("addr", Data_encoding.string)
-    ("port", Data_encoding.uint16)
+    ("point", P2p_point.Id.encoding)
 
 let node_is_ready =
   declare_0

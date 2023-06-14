@@ -92,8 +92,7 @@ val is_running_not_ready : t -> bool
     running, make the test fail. *)
 val wait : t -> Unix.process_status Lwt.t
 
-(** Run [octez-dal-node init-config]. Returns the name of the resulting
-    configuration file.
+(** Run [octez-dal-node config init].
 
     If [use_unsafe_srs] is [true], the dal node runs with unsafe computed SRS
     allowing tests to run faster, without the need of large file. Default is
@@ -101,8 +100,7 @@ val wait : t -> Unix.process_status Lwt.t
 
     [expected_pow] allows to change the PoW difficulty. Default value is 0.
 *)
-val init_config :
-  ?use_unsafe_srs:bool -> ?expected_pow:float -> t -> string Lwt.t
+val init_config : ?use_unsafe_srs:bool -> ?expected_pow:float -> t -> unit Lwt.t
 
 module Config_file : sig
   (** DAL node configuration files. *)

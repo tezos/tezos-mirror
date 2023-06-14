@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,26 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include module type of Event_legacy
+(** {2 Command-line options} *)
 
-(** An event emitted at startup when the configuration of the node is read from
-    disk. *)
-val configuration_loaded : unit t
+(** This module declares the main commands of the DAL node. For each
+    command, a set of options is recognized. The function [commands]
+    can be used to register a function when the user invokes the
+    command. *)
 
-(** Storing a slot content event. The given parameter is the slot's commitment
-    hash. *)
-val stored_slot_content : Cryptobox.Commitment.t t
+type options = {
+  data_dir : string;  (** Directory containing files related to the DAL node. *)
+  rpc_addr : P2p_point.Id.t;
+      (** The endpoint on which the DAL node can be contacted for RPCs. *)
+  expected_pow : float;  (** The expected proof of work for the P2P identity. *)
+  net_addr : P2p_point.Id.t;
+      (** The endpoint on which the DAL node can be contacted by other DAL nodes. *)
+  octez_node : Uri.t;  (** The endpoint on which to contact the L1 node. *)
+  use_unsafe_srs_for_tests : bool;
+}
 
-(** Storing a slot's shards event. The given parameters are the slot's
-    commitment hash and the number of its shards. *)
-val stored_slot_shards : (Cryptobox.Commitment.t * int) t
+(** Subcommands that can be used by the DAL node. In the future this type
+    could be generalized if a command recgonizes a different set of
+    options. *)
+type t = Run | Config_init
 
-(** Decoding a value failed. See {!Types.kind} for kind of considered
-    values. *)
-val decoding_data_failed : Types.kind t
-
-(** Loading shard data from disk failed. *)
-val loading_shard_data_failed : string t
-
-(** Validating a message received via Gossipsub/P2P failed. *)
-val message_validation_error : (Gossipsub.message_id * string) t
+(** [commands ~run] attaches a callback to each subcommands of the DAL
+    node. *)
+val make : run:(t -> options -> 'res tzresult) -> 'res Cmdliner.Cmd.t

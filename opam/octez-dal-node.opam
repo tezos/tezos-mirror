@@ -11,7 +11,8 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "tezos-base"
-  "tezos-clic"
+  "tezos-version"
+  "cmdliner" { >= "1.1.0" }
   "tezos-client-base"
   "tezos-client-base-unix"
   "tezos-client-commands"
