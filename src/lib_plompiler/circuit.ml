@@ -333,10 +333,7 @@ let append_lookup :
         ({s with tables}, i)
   in
   let s, index = use_table s table in
-  let wires =
-    let pad_length = Csir.nb_wires_arch - List.length wires in
-    wires @ List.init pad_length (Fun.const @@ Input 0) |> Array.of_list
-  in
+  let wires = Array.of_list wires in
   let solver = Lookup {wires; table} in
   let wires = Array.map untag wires in
   let cstr =

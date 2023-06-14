@@ -3124,6 +3124,12 @@ Constraints: 7
 Bool.test_bor_lookup_optimized:
 Constraints: 4
 
+Bool.test_bor_bytes:
+Constraints: 96
+
+Bool.test_bor_bytes_optimized:
+Constraints: 48
+
 Range-checks:
 Constraints: 24
 

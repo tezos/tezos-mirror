@@ -59,7 +59,27 @@ functor
             test_bor (bool true) (bool true) (bool true);
           ]
 
-    let tests = tests_bor
+    let bor_lookup a b =
+      let* l = map2M Bool.bor_lookup (of_list a) (of_list b) in
+      ret @@ to_list l
+
+    let test_bor_bytes a b z () =
+      let* a = input ~kind:`Public a in
+      let* b = input b in
+      let* z = input z in
+      let* z' = bor_lookup a b in
+      assert_equal z z'
+
+    let tests_bor_bytes =
+      List.map
+        (fun (valid, a, b, o) ->
+          let a = Bytes.(input_bytes @@ Stdlib.Bytes.of_string a) in
+          let b = Bytes.(input_bytes @@ Stdlib.Bytes.of_string b) in
+          let o = Bytes.(input_bytes @@ Stdlib.Bytes.of_string o) in
+          test ~valid ~name:"Bool.test_bor_bytes" @@ test_bor_bytes a b o)
+        [(true, "\0011", "\0101", "\0111"); (false, "\0000", "\0000", "\0001")]
+
+    let tests = tests_bor @ tests_bor_bytes
   end
 
 let tests =
