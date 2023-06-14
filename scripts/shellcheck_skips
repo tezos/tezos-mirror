@@ -8,7 +8,6 @@ scripts/opam-check.sh
 scripts/snapshot_alpha_and_link.sh
 scripts/snapshot_alpha.sh
 scripts/update_hashes.sh
-scripts/update_opam_repo.sh
 scripts/user_activated_upgrade.sh
 src/bin_snoop/bash-completion.sh
 src/bin_client/bash-completion.sh
