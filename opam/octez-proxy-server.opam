@@ -57,6 +57,8 @@ depopts: [
   "tezos-protocol-plugin-016-PtMumbai"
   "tezos-client-017-PtNairob"
   "tezos-protocol-plugin-017-PtNairob"
+  "tezos-client-018-Proxford"
+  "tezos-protocol-plugin-018-Proxford"
   "tezos-client-alpha"
   "tezos-protocol-plugin-alpha"
 ]

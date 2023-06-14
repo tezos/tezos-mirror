@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_alpha_lib_protocol_test_integration_tezt_lib)
+ (name src_proto_018_Proxford_lib_protocol_test_integration_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -10,10 +10,10 @@
   tezos-context
   octez-alcotezt
   tezos-base
-  tezos-client-alpha
+  tezos-client-018-Proxford
   tezos-protocol-018-Proxford
   tezos-protocol-018-Proxford.parameters
-  tezos-alpha-test-helpers
+  tezos-018-Proxford-test-helpers
   tezos-base-test-helpers)
  (library_flags (:standard -linkall))
  (flags
@@ -23,14 +23,15 @@
   -open Octez_alcotezt
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_client_alpha
+  -open Tezos_client_018_Proxford
   -open Tezos_protocol_018_Proxford
   -open Tezos_protocol_018_Proxford_parameters
-  -open Tezos_alpha_test_helpers
+  -open Tezos_018_Proxford_test_helpers
   -open Tezos_base_test_helpers)
  (modules
   test_constants
   test_frozen_bonds
+  test_adaptive_inflation_launch
   test_liquidity_baking
   test_storage_functions
   test_storage
@@ -40,7 +41,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_alpha_lib_protocol_test_integration_tezt_lib
+  src_proto_018_Proxford_lib_protocol_test_integration_tezt_lib
   tezt)
  (link_flags
   (:standard)

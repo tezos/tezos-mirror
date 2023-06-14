@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_alpha_test_helpers)
- (public_name tezos-alpha-test-helpers)
+ (name tezos_018_Proxford_test_helpers)
+ (public_name tezos-018-Proxford-test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
   qcheck-alcotest
@@ -12,10 +12,10 @@
   tezos-micheline
   tezos-stdlib-unix
   tezos-protocol-018-Proxford
-  tezos-client-alpha
+  tezos-client-018-Proxford
   tezos-protocol-018-Proxford.parameters
   tezos-protocol-environment
-  tezos-protocol-plugin-alpha
+  tezos-protocol-plugin-018-Proxford
   tezos-shell-services
   octez-plompiler
   tezos-crypto-dal)
@@ -27,7 +27,7 @@
   -open Tezos_micheline
   -open Tezos_stdlib_unix
   -open Tezos_protocol_018_Proxford
-  -open Tezos_client_alpha
-  -open Tezos_protocol_plugin_alpha
+  -open Tezos_client_018_Proxford
+  -open Tezos_protocol_plugin_018_Proxford
   -open Tezos_shell_services
   -open Tezos_crypto_dal))

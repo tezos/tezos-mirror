@@ -2,17 +2,17 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_alpha_lib_sc_rollup_node_test_tezt_lib)
+ (name src_proto_018_Proxford_lib_sc_rollup_node_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
   tezos-base
-  tezos-protocol-alpha
+  tezos-protocol-018-Proxford
   tezos-test-helpers
-  tezos-smart-rollup-layer2-alpha
-  octez_smart_rollup_node_alpha
+  tezos-smart-rollup-layer2-018-Proxford
+  octez_smart_rollup_node_Proxford
   octez-alcotezt
-  octez_smart_rollup_node_alpha_test_helpers)
+  octez_smart_rollup_node_Proxford_test_helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -20,19 +20,19 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_protocol_alpha
+  -open Tezos_protocol_018_Proxford
   -open Tezos_test_helpers
-  -open Tezos_smart_rollup_layer2_alpha
-  -open Octez_smart_rollup_node_alpha
+  -open Tezos_smart_rollup_layer2_018_Proxford
+  -open Octez_smart_rollup_node_Proxford
   -open Octez_alcotezt
-  -open Octez_smart_rollup_node_alpha_test_helpers)
- (modules canary))
+  -open Octez_smart_rollup_node_Proxford_test_helpers)
+ (modules canary test_octez_conversions))
 
 (executable
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_alpha_lib_sc_rollup_node_test_tezt_lib
+  src_proto_018_Proxford_lib_sc_rollup_node_test_tezt_lib
   tezt)
  (link_flags
   (:standard)

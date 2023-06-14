@@ -2,21 +2,21 @@
 ; Edit file manifest/main.ml instead.
 
 (executable
- (name main_sc_rollup_node_alpha)
- (public_name octez-smart-rollup-node-alpha)
- (package octez-smart-rollup-node-alpha)
+ (name main_sc_rollup_node_018_Proxford)
+ (public_name octez-smart-rollup-node-Proxford)
+ (package octez-smart-rollup-node-Proxford)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
   tezos-clic
-  tezos-protocol-alpha
+  tezos-protocol-018-Proxford
   tezos-shell-services
   tezos-client-base
   tezos-client-base-unix
   tezos-client-commands
-  tezos-client-alpha
+  tezos-client-018-Proxford
   octez-smart-rollup-node
-  octez_smart_rollup_node_alpha)
+  octez_smart_rollup_node_Proxford)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -26,11 +26,11 @@
   -open Tezos_base
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_protocol_alpha
+  -open Tezos_protocol_018_Proxford
   -open Tezos_shell_services
   -open Tezos_client_base
   -open Tezos_client_base_unix
   -open Tezos_client_commands
-  -open Tezos_client_alpha
+  -open Tezos_client_018_Proxford
   -open Octez_smart_rollup_node
-  -open Octez_smart_rollup_node_alpha))
+  -open Octez_smart_rollup_node_Proxford))

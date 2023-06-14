@@ -11,11 +11,11 @@
   tezos-base
   tezos-micheline
   tezos-micheline-rewriting
-  tezos-protocol-alpha
+  tezos-protocol-018-Proxford
   tezos-benchmark
-  tezos-benchmark-type-inference-alpha
-  tezos-benchmark-alpha
-  tezos-alpha-test-helpers
+  tezos-benchmark-type-inference-018-Proxford
+  tezos-benchmark-018-Proxford
+  tezos-018-Proxford-test-helpers
   tezos-error-monad
   prbnmcn-stats)
  (link_flags
@@ -25,11 +25,11 @@
   (:standard)
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_micheline
-  -open Tezos_protocol_alpha
+  -open Tezos_protocol_018_Proxford
   -open Tezos_benchmark
-  -open Tezos_benchmark_type_inference_alpha
-  -open Tezos_benchmark_alpha
-  -open Tezos_alpha_test_helpers))
+  -open Tezos_benchmark_type_inference_018_Proxford
+  -open Tezos_benchmark_018_Proxford
+  -open Tezos_018_Proxford_test_helpers))
 
 (rule
  (alias runtest_micheline_rewriting_data)

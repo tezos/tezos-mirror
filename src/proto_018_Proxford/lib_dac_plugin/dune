@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_dac_alpha)
- (public_name tezos-dac-alpha)
+ (name tezos_dac_018_Proxford)
+ (public_name tezos-dac-018-Proxford)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -11,9 +11,9 @@
   tezos-stdlib-unix
   tezos-dac-lib
   tezos-dac-client-lib
-  tezos-client-alpha
-  tezos-embedded-protocol-alpha
-  tezos-protocol-alpha)
+  tezos-client-018-Proxford
+  tezos-embedded-protocol-018-Proxford
+  tezos-protocol-018-Proxford)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
@@ -25,6 +25,6 @@
   -open Tezos_stdlib_unix
   -open Tezos_dac_lib
   -open Tezos_dac_client_lib
-  -open Tezos_client_alpha
-  -open Tezos_embedded_protocol_alpha
-  -open Tezos_protocol_alpha))
+  -open Tezos_client_018_Proxford
+  -open Tezos_embedded_protocol_018_Proxford
+  -open Tezos_protocol_018_Proxford))
