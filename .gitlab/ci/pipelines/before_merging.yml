@@ -4,8 +4,17 @@ include:
   - .gitlab/ci/jobs/sanity/docker_hadolint.yml
 
   # Stage: package
+  # For all pipelines, we only run the subset of packages that contain
+  # executables (`opam_package_executables.yml`).
+  # For pipelines triggered by marge-bot, we run all the opam packaging
+  # tests (`opam_package.yml`).
   - .gitlab/ci/jobs/packaging/opam_prepare.yml
-  - .gitlab/ci/jobs/packaging/opam_package.yml
+  -  local: .gitlab/ci/jobs/packaging/opam_package_executables.yml
+     rules:
+      - if: '$GITLAB_USER_LOGIN != "nomadic-margebot"'
+  -  local: .gitlab/ci/jobs/packaging/opam_package.yml
+     rules:
+      - if: '$GITLAB_USER_LOGIN == "nomadic-margebot"'
 
   # Stage: build
   - .gitlab/ci/jobs/build/check.yml
