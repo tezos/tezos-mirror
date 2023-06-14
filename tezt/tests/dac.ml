@@ -2804,6 +2804,7 @@ module Api_regression = struct
       [
         ("tz[1234]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
         ("(BLsig|asig)\\w{137}\\b", "[AGGREGATED_SIG]");
+        ("http://127.0.0.1:\\d{4,5}/", "$SCHEME://$HOST:$PORT/");
       ]
     in
     List.fold_left
@@ -2814,7 +2815,34 @@ module Api_regression = struct
 
   let capture text = text |> replace_variables |> Regression.capture
 
-  (** [rpc_call_with_regression_test] is used for SCHEMA regression testing the
+  let create_uri ~path_and_query dac_node =
+    let url =
+      Format.sprintf
+        "http://%s:%d/%s"
+        (Dac_node.rpc_host dac_node)
+        (Dac_node.rpc_port dac_node)
+        path_and_query
+    in
+    Uri.of_string url
+
+  let capture_rpc_request headers ?body verb uri =
+    let () =
+      capture
+        (sf
+           "RPC_REQUEST_URI: %s %s"
+           (Cohttp.Code.string_of_method verb)
+           (Uri.to_string uri))
+    in
+    let () =
+      capture @@ sf "RPC_REQUEST_HEADER: %s" (Cohttp.Header.to_string headers)
+    in
+    match body with
+    | Some body ->
+        let* body = Cohttp_lwt.Body.to_string body in
+        return @@ capture @@ sf "RPC_REQUEST_BODY: %s" body
+    | None -> Lwt.return_unit
+
+  (** [rpc_call_with_regression_test] is used for SCHEMA regression testing of the
       RPCs. A call to this function in addition to calling an RPC, captures the
       following arguments:
         1. RPC_REQUEST_URI
@@ -2826,40 +2854,31 @@ module Api_regression = struct
         1. Test binding contract of RPC request.
         2. Test binding contract of RPC response. *)
   let rpc_call_with_regression_test ?body_json ~path_and_query verb dac_node =
-    let url =
-      Format.sprintf
-        "http://%s:%d/%s"
-        (Dac_node.rpc_host dac_node)
-        (Dac_node.rpc_port dac_node)
-        path_and_query
-    in
-    let uri = Uri.of_string url in
-    let () =
-      capture
-        (sf
-           "RPC_REQUEST_URI: %s $SCHEME://$HOST:$PORT/%s"
-           (Cohttp.Code.string_of_method verb)
-           path_and_query)
-    in
+    let uri = create_uri ~path_and_query dac_node in
     let headers =
       Cohttp.Header.of_list [("Content-Type", "application/json")]
-    in
-    let () =
-      capture @@ sf "RPC_REQUEST_HEADER: %s" (Cohttp.Header.to_string headers)
     in
     let body =
       Option.map
         (fun body ->
           let json = JSON.unannotate body in
           let raw_json = JSON.encode_u json in
-          let () = capture @@ sf "RPC_REQUEST_BODY: %s" raw_json in
           let request_body = Cohttp_lwt.Body.of_string raw_json in
           request_body)
         body_json
     in
+    let* () = capture_rpc_request headers ?body verb uri in
     let* _respone, body = Cohttp_lwt_unix.Client.call ~headers ?body verb uri in
     let* raw_body = Cohttp_lwt.Body.to_string body in
     return @@ capture @@ sf "RPC_RESPONSE_BODY: %s" raw_body
+
+  let rpc_curl_with_regression_test ~path_and_query verb dac_node =
+    let uri = create_uri ~path_and_query dac_node in
+    let headers =
+      Cohttp.Header.of_list [("Content-Type", "application/json")]
+    in
+    let* () = capture_rpc_request headers verb uri in
+    return @@ (RPC.Curl.get_raw (Uri.to_string uri) |> Runnable.map capture)
 
   (** [V0] module is used for regression testing [V0] API. *)
   module V0 = struct
