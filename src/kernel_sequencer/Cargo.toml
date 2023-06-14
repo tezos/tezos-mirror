@@ -14,20 +14,20 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies.tezos-smart-rollup-core]
 path = "../kernel_sdk/core"
-version = "0.1.0"
+version = "0.2.0"
 default-features = false
 
 [dependencies.tezos-smart-rollup-host]
 path = "../kernel_sdk/host"
-version = "0.1.0"
+version = "0.2.0"
 
 [dev-dependencies.tezos-smart-rollup-mock]
 path = "../kernel_sdk/mock"
-version = "0.1.0"
+version = "0.2.0"
 
 [dev-dependencies.tezos-smart-rollup-encoding]
 path = "../kernel_sdk/encoding"
-version = "0.1.0"
+version = "0.2.0"
 
 [dev-dependencies.tezos_crypto_rs]
 version = "0.5.0"

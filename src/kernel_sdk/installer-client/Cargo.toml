@@ -4,7 +4,7 @@
 
 [package]
 name = "tezos-smart-rollup-installer"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["TriliTech <contact@trili.tech>"]
 include = ["src/", "installer.wasm", "README.md"]
@@ -24,7 +24,7 @@ features = ["portable"]
 
 [dependencies.tezos-smart-rollup-encoding]
 path = "../encoding"
-version = "0.1.0"
+version = "0.2.0"
 
 [dependencies.clap]
 version = "4.1"
@@ -41,12 +41,14 @@ version = "0.1.4"
 
 [dependencies.tezos-smart-rollup-installer-config]
 path = "../installer-config"
+version = "0.2.0"
 
 [dependencies.tezos_data_encoding]
 version = "0.5"
 
 [dependencies.tezos-smart-rollup-host]
 path = "../host"
+version = "0.2.0"
 
 [dependencies.serde_yaml]
 version = "0.9"

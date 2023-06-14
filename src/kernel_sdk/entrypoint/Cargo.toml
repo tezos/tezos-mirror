@@ -5,7 +5,7 @@
 
 [package]
 name = "tezos-smart-rollup-entrypoint"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 authors = ["TriliTech <contact@trili.tech>"]
@@ -22,23 +22,23 @@ dlmalloc = { version = "0.2.3", features = ["global"], optional = true}
 
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
-version = "0.1.0"
+version = "0.2.0"
 default-features = false
 
 [dependencies.tezos-smart-rollup-panic-hook]
 path = "../panic-hook"
-version = "0.1.0"
+version = "0.2.0"
 default-features = false
 optional = true
 
 [dependencies.tezos-smart-rollup-host]
 path = "../host"
-version = "0.1.0"
+version = "0.2.0"
 default-features = false
 
 [dependencies.tezos-smart-rollup-debug]
 path = "../debug"
-version = "0.1.0"
+version = "0.2.0"
 default-features = false
 
 [features]
