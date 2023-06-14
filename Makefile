@@ -42,6 +42,10 @@ DEV_EXECUTABLES := octez-protocol-compiler octez-snoop
 
 ALL_EXECUTABLES := $(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES) $(DEV_EXECUTABLES)
 
+# Set of Dune targets to build, in addition to OCTEZ_EXECUTABLES, in
+# the `build` target's Dune invocation.
+BUILD_EXTRA :=
+
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifndef TEZOS_WITHOUT_OPAM
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
@@ -87,7 +91,7 @@ endif
 # This is more efficient than 'make octez-node octez-client'
 # because it only calls 'dune' once.
 #
-# Targets 'all', 'release', 'experimental-release' and 'static' define different
+# Targets 'all', 'release', 'experimental-release', 'static' and 'all-extras' define different
 # default lists of executables to build but they all can be overridden from the command-line.
 .PHONY: all
 all:
@@ -100,6 +104,13 @@ release:
 .PHONY: experimental-release
 experimental-release:
 	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES)"
+
+# all-extras is targetted by the CI build jobs 'x86_64' and 'arm64',
+# and builds test executables in addition to the default set of
+# executables.
+.PHONY: all-extras
+all-extras:
+	@$(MAKE) all BUILD_EXTRA="src/bin_tps_evaluation tezt/tests/main.exe"
 
 .PHONY: strip
 strip: all
@@ -178,6 +189,7 @@ ifeq (${OCTEZ_EXECUTABLES},)
 endif
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) \
 		$(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) \
+		$(BUILD_EXTRA) \
 		@copy-parameters
 	@mkdir -p $(OCTEZ_BIN_DIR)/
 	@cp -f $(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) $(OCTEZ_BIN_DIR)/
