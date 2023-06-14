@@ -1,0 +1,22 @@
+{ parameter (pair (pair %set_pair int (option int)) (pair %check_pair int (option int))) ;
+  storage (pair (big_map int int) unit) ;
+  code { DUP ;
+         DIP { { CDR ; CAR } } ;
+         DUP ;
+         DIP { { CAR ; CDR } ; DUP ; CAR ; DIP { CDR } ; UPDATE ; DUP } ;
+         { CAR ; CDR } ;
+         DUP ;
+         CDR ;
+         DIP { CAR ; GET } ;
+         { IF_NONE
+             { { IF_NONE {} { { UNIT ; FAILWITH } } } }
+             { SWAP ;
+               { IF_NONE
+                   { { UNIT ; FAILWITH } }
+                   { { { COMPARE ; EQ } ; IF {} { { UNIT ; FAILWITH } } } } } } } ;
+         UNIT ;
+         SWAP ;
+         PAIR ;
+         NIL operation ;
+         PAIR } }
+

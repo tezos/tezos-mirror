@@ -1,0 +1,49 @@
+
+./octez-client --protocol ProxfordLcjScHFgpTURyTjcKR88D5juu1jGgT18pPUoGTVgxiA --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/set_car.tz on storage '(Pair "hello" 0)' and input '""' --level 1 --trace-stack
+storage
+  (Pair "" 0)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (just consumed gas: 10.929)
+    [ (Pair "" "hello" 0) ]
+  - location: 9 (just consumed gas: 0.010)
+    [ (Pair "" "hello" 0)
+      (Pair "" "hello" 0) ]
+  - location: 10 (just consumed gas: 0.010)
+    [ (Pair "hello" 0)
+      (Pair "" "hello" 0) ]
+  - location: 11 (just consumed gas: 0)
+    [ (Pair "" "hello" 0) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ "" ]
+  - location: 11 (just consumed gas: 0.025)
+    [ (Pair "hello" 0)
+      "" ]
+  - location: 15 (just consumed gas: 0.010)
+    [ (Pair "hello" 0)
+      (Pair "hello" 0)
+      "" ]
+  - location: 16 (just consumed gas: 0.010)
+    [ "hello"
+      (Pair "hello" 0)
+      "" ]
+  - location: 17 (just consumed gas: 0.010)
+    [ (Pair "hello" 0)
+      "" ]
+  - location: 18 (just consumed gas: 0.010)
+    [ 0
+      "" ]
+  - location: 19 (just consumed gas: 0.010)
+    [ ""
+      0 ]
+  - location: 20 (just consumed gas: 0.010)
+    [ (Pair "" 0) ]
+  - location: 21 (just consumed gas: 0.010)
+    [ {}
+      (Pair "" 0) ]
+  - location: 23 (just consumed gas: 0.010)
+    [ (Pair {} "" 0) ]
+

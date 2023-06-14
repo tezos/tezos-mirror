@@ -1,0 +1,93 @@
+
+./octez-client --protocol ProxfordLcjScHFgpTURyTjcKR88D5juu1jGgT18pPUoGTVgxiA --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/self_with_entrypoint.tz on storage Unit and input 'Left (Left 0)' --level 1 --trace-stack
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 13 (just consumed gas: 39.854)
+    [ (Pair (Left (Left 0)) Unit) ]
+  - location: 13 (just consumed gas: 0.010)
+    [  ]
+  - location: 14 (just consumed gas: 0.010)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%A" ]
+  - location: 15 (just consumed gas: 0.526)
+    [ 0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041 ]
+  - location: 16 (just consumed gas: 0.010)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"
+      0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041 ]
+  - location: 17 (just consumed gas: 0.516)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
+      0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041 ]
+  - location: 18 (just consumed gas: 0.010)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
+      0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041 ]
+  - location: 19 (just consumed gas: 0)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
+      0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041 ]
+  - location: 21 (just consumed gas: 0.010)
+    [ 0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 19 (just consumed gas: 0.025)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
+      0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 24 (just consumed gas: 0.035)
+    [ -1
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 25 (just consumed gas: 0.010)
+    [ True
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 26 (just consumed gas: 0)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 26 (just consumed gas: 0.015)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 32 (just consumed gas: 0.010)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 33 (just consumed gas: 0.516)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 36 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 37 (just consumed gas: 0.010)
+    [ True ]
+  - location: 38 (just consumed gas: 0)
+    [  ]
+  - location: 38 (just consumed gas: 0.015)
+    [  ]
+  - location: 44 (just consumed gas: 0.010)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%A" ]
+  - location: 48 (just consumed gas: 0.010)
+    [  ]
+  - location: 49 (just consumed gas: 0.010)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%B" ]
+  - location: 53 (just consumed gas: 0.010)
+    [  ]
+  - location: 54 (just consumed gas: 0.010)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%maybe_C" ]
+  - location: 60 (just consumed gas: 0.010)
+    [  ]
+  - location: 61 (just consumed gas: 0.010)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%Z" ]
+  - location: 65 (just consumed gas: 0.010)
+    [  ]
+  - location: 66 (just consumed gas: 0.010)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" ]
+  - location: 76 (just consumed gas: 0.010)
+    [  ]
+  - location: 77 (just consumed gas: 0.010)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" ]
+  - location: 87 (just consumed gas: 0.010)
+    [  ]
+  - location: 88 (just consumed gas: 0.010)
+    [ Unit ]
+  - location: 89 (just consumed gas: 0.010)
+    [ {}
+      Unit ]
+  - location: 91 (just consumed gas: 0.010)
+    [ (Pair {} Unit) ]
+

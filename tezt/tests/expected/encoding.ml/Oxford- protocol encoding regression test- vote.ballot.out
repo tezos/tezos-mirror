@@ -1,0 +1,18 @@
+
+./octez-codec encode 018-Proxford.vote.ballot from '"nay"'
+01
+
+./octez-codec decode 018-Proxford.vote.ballot from 01
+"nay"
+
+./octez-codec encode 018-Proxford.vote.ballot from '"pass"'
+02
+
+./octez-codec decode 018-Proxford.vote.ballot from 02
+"pass"
+
+./octez-codec encode 018-Proxford.vote.ballot from '"yay"'
+00
+
+./octez-codec decode 018-Proxford.vote.ballot from 00
+"yay"

@@ -1,0 +1,21 @@
+
+./octez-client --protocol ProxfordLcjScHFgpTURyTjcKR88D5juu1jGgT18pPUoGTVgxiA --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/pair_id.tz on storage None and input '(Pair False False)' --level 1 --trace-stack
+storage
+  (Some (Pair False False))
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 12 (just consumed gas: 5.501)
+    [ (Pair (Pair False False) None) ]
+  - location: 12 (just consumed gas: 0.010)
+    [ (Pair False False) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ (Some (Pair False False)) ]
+  - location: 14 (just consumed gas: 0.010)
+    [ {}
+      (Some (Pair False False)) ]
+  - location: 16 (just consumed gas: 0.010)
+    [ (Pair {} (Some (Pair False False))) ]
+
