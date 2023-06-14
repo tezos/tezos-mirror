@@ -157,16 +157,7 @@ module Self_identification = struct
     Test.register
       ~__FILE__
       ~title:"p2p socket self connection message"
-      ~tags:
-        [
-          "p2p";
-          "socket";
-          "self_identification";
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5868
-
-             This test is flaky and has been disabled. *)
-          "ci_disable";
-        ]
+      ~tags:["p2p"; "socket"; "self_identification"]
     @@ fun () ->
     let server _ch sched socket =
       let open Lwt_result_syntax in
