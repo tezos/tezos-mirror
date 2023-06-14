@@ -23,7 +23,7 @@ endif
 SDK_VERSION := "0.1.0"
 
 .PHONY: check
-check: installer-template publish-check
+check: installer-template publish-check doc
 	@cargo fmt --check
 	@cargo clippy --all-targets --all-features -- --deny warnings
 	@cargo check --no-default-features

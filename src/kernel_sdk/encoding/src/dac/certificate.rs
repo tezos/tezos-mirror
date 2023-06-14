@@ -34,6 +34,8 @@ pub enum Certificate {
 #[derive(Debug, HasEncoding, NomReader, BinWriter)]
 pub struct V0Certificate {
     /// The preimage hash of the root [`V0HashPage`].
+    ///
+    /// [`V0HashPage`]: crate::dac::pages::V0HashPage
     pub root_hash: PreimageHash,
     /// Aggregated signature of the DAC committee.
     pub aggregated_signature: BlsSignature,
