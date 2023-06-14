@@ -1502,11 +1502,11 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-core"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "tezos-smart-rollup-debug"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
@@ -1514,7 +1514,7 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-encoding"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hex",
  "nom 7.1.3",
@@ -1531,7 +1531,7 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-entrypoint"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dlmalloc",
  "tezos-smart-rollup-core",
@@ -1542,7 +1542,7 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-host"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "tezos-smart-rollup-core",
  "tezos_crypto_rs",
@@ -1552,7 +1552,7 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-mock"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hex",
  "tezos-smart-rollup-core",
@@ -1564,14 +1564,14 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-panic-hook"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "tezos-smart-rollup-core",
 ]
 
 [[package]]
 name = "tezos-smart-rollup-storage"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",

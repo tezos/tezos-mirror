@@ -1,5 +1,37 @@
 # Changelog
 
+## Version next
+
+### SDK
+
+### Installer client/kernel
+
+## Version 0.2.0
+
+### SDK
+
+- Implements trait `Error` and `Display` for `PathError` in `tezos-smart-rollup-host`.
+- Upgrade dependencies:
+  - `tezos_crypto_rs`, `tezos_data_encoding` to `v0.5.0`.
+  - `nom` to `7.1`.
+- Rework `dac` module in `tezos-smart-rollup-encoding`:
+  -  Keep `PreimageHash` in `dac` module.
+  -  Move all other functions/structs move to `dac::pages` submodule. Deprecate importing from them `dac` directly.
+- Introduce `dac::certificate` submodule for handling serialization and deserialization of DAC certificates.
+- Add `inbox::ExternalMessageFrame` to `tezos-smart-rollup-encoding`, to define a shared framing protocol for
+  Smart Rollup external messages.
+- Add a feature flag `proto-nairobi` to enable host functions introduced in the `Nairobi`
+  protocol.
+- Implement host function `store_delete_value` introduced in the `Nairobi` protocol.
+- Introduce `PublicKey` definition in `tezos-smart-rollup-encoding`
+- Add `store_read_all` and `store_write_all` to read (write) a full value from (to) the
+  storage, leveraging the need to chunk the reading (writing).
+
+### Installer client/kernel
+
+- Installer now reboots following successful upgrade, rather than proceeding directly to the next level.
+- make `install_kernel` public to allow non-installer kernels to re-use upgrade mechanism.
+
 ## Version 0.1.0
 
 ### SDK
@@ -31,29 +63,3 @@ The installer client enables installation of kernels which are too big to fit in
 operation. Instead, the client generates an installer which immediately upgrades to desired kernel. This
 *installer kernel* may then be used to originate the rollup with.
 
-
-## Version next
-
-### SDK
-
-- Implements trait `Error` and `Display` for `PathError` in `tezos-smart-rollup-host`.
-- Upgrade dependencies:
-  - `tezos_crypto_rs`, `tezos_data_encoding` to `v0.5.0`.
-  - `nom` to `7.1`.
-- Rework `dac` module in `tezos-smart-rollup-encoding`:
-  -  Keep `PreimageHash` in `dac` module.
-  -  Move all other functions/structs move to `dac::pages` submodule. Deprecate importing from them `dac` directly.
-- Introduce `dac::certificate` submodule for handling serialization and deserialization of DAC certificates.
-- Add `inbox::ExternalMessageFrame` to `tezos-smart-rollup-encoding`, to define a shared framing protocol for
-  Smart Rollup external messages.
-- Add a feature flag `proto-nairobi` to enable host functions introduced in the `Nairobi`
-  protocol.
-- Implement host function `store_delete_value` introduced in the `Nairobi` protocol.
-- Introduce `PublicKey` definition in `tezos-smart-rollup-encoding`
-- Add `store_read_all` and `store_write_all` to read (write) a full value from (to) the
-  storage, leveraging the need to chunk the reading (writing).
-
-### Installer client/kernel
-
-- Installer now reboots following successful upgrade, rather than proceeding directly to the next level.
-- make `install_kernel` public to allow non-installer kernels to re-use upgrade mechanism.

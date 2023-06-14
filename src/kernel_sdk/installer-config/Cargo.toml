@@ -4,7 +4,7 @@
 
 [package]
 name = "tezos-smart-rollup-installer-config"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["TriliTech <contact@trili.tech>"]
 license = "MIT"
@@ -20,14 +20,17 @@ categories = [
 
 [dependencies.tezos-smart-rollup-host]
 path = "../host"
+version = "0.2.0"
 default-features = false
 
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
+version = "0.2.0"
 default-features = false
 
 [dependencies.tezos-smart-rollup-encoding]
 path = "../encoding"
+version = "0.2.0"
 default-features = false
 
 [dependencies.nom]

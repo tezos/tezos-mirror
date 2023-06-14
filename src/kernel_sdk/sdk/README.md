@@ -1,9 +1,12 @@
-Rust SDK for Tezos Smart Optimistic Rollups.
+SDK for Tezos Smart Optimistic Rollups.
 
 To learn more about how Smart Rollups work in Tezos, see the
 [Smart Rollup Documentation](https://tezos.gitlab.io/alpha/smart_rollups.html).
 
 The purpose of this SDK is to make writing Smart Rollup kernels in Rust simpler.
+
+To learn about the changes in the current version of the SDK, see the
+[CHANGELOG](https://gitlab.com/tezos/tezos/-/blob/master/src/kernel_sdk/CHANGES.md).
 
 ## Smart Rollup Kernels
 
@@ -76,13 +79,13 @@ rust-version = "1.66"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-tezos-smart-rollup = { git = "https://gitlab.com/tezos/tezos.git" }
+tezos-smart-rollup = "0.2.0"
 tezos_data_encoding = "0.5"
 tezos_crypto_rs = { version = "0.5", default-features = false }
 nom = "7.1"
 
 [dev-dependencies]
-tezos-smart-rollup = { git = "https://gitlab.com/tezos/tezos.git", features = ["testing"] }
+tezos-smart-rollup = { version = "0.2.0", features = ["testing"] }
 ```
 
 Note that the `cdylib` crate type is required to enable compilation to wasm.

@@ -5,7 +5,7 @@
 
 [package]
 name = "tezos-smart-rollup-storage"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 authors = ["TriliTech <contact@trili.tech>"]
@@ -19,30 +19,30 @@ thiserror = "1.0"
 
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
-version = "0.1.0"
+version = "0.2.0"
 default-features = false
 
 [dependencies.tezos-smart-rollup-host]
 path = "../host"
-version = "0.1.0"
+version = "0.2.0"
 default-features = false
 
 [dependencies.tezos-smart-rollup-debug]
 path = "../debug"
-version = "0.1.0"
+version = "0.2.0"
 
 [dependencies.tezos-smart-rollup-encoding]
 path = "../encoding"
-version = "0.1.0"
+version = "0.2.0"
 
 [dev-dependencies.tezos-smart-rollup-core]
 path = "../core"
-version = "0.1.0"
+version = "0.2.0"
 features = ["testing"]
 
 [dev-dependencies.tezos-smart-rollup-mock]
 path = "../mock"
-version = "0.1.0"
+version = "0.2.0"
 
 [features]
 default = ["tezos-smart-rollup-host/default"]

@@ -20,7 +20,7 @@ ifneq ($(NATIVE_TARGET),)
 NATIVE_OPT := --target "$(NATIVE_TARGET)"
 endif
 
-SDK_VERSION := "0.1.0"
+SDK_VERSION := "0.2.0"
 
 .PHONY: check
 check: installer-template publish-check doc
@@ -84,7 +84,6 @@ build-dev-deps: build-deps
 clean:
 	@cargo clean
 	@rm -rf installer-client/installer.wasm
-	@rm -rf sdk/README.md
 
 .PHONY: publish-deps
 publish-deps: build-deps
