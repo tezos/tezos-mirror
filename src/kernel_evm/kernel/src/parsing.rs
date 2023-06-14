@@ -5,7 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::inbox::{KernelUpgrade, Transaction};
+use crate::inbox::{KernelUpgrade, Transaction, TransactionContent};
 use tezos_ethereum::{
     signatures::EthereumTransactionCommon, transaction::TransactionHash,
 };
@@ -97,7 +97,7 @@ impl InputResult {
         let tx: EthereumTransactionCommon = parsable!(remaining.try_into().ok());
         InputResult::Input(Input::SimpleTransaction(Box::new(Transaction {
             tx_hash,
-            tx,
+            content: TransactionContent::Ethereum(tx),
         })))
     }
 

@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
+use primitive_types::{H160, U256};
 use tezos_ethereum::signatures::EthereumTransactionCommon;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_debug::debug_msg;
@@ -21,9 +22,22 @@ use crate::Error;
 use tezos_ethereum::transaction::TransactionHash;
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct Deposit {
+    pub amount: U256,
+    pub gas_price: U256,
+    pub receiver: H160,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum TransactionContent {
+    Ethereum(EthereumTransactionCommon),
+    Deposit(Deposit),
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct Transaction {
     pub tx_hash: TransactionHash,
-    pub tx: EthereumTransactionCommon,
+    pub content: TransactionContent,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -68,7 +82,8 @@ fn handle_transaction_chunk<Host: Runtime>(
     if let Some(data) = crate::storage::store_transaction_chunk(host, &tx_hash, i, data)?
     {
         if let Ok(tx) = EthereumTransactionCommon::from_rlp_bytes(&data) {
-            return Ok(Some(Transaction { tx_hash, tx }));
+            let content = TransactionContent::Ethereum(tx);
+            return Ok(Some(Transaction { tx_hash, content }));
         }
     }
     Ok(None)
@@ -149,6 +164,7 @@ pub fn read_inbox<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::inbox::TransactionContent::Ethereum;
     use tezos_data_encoding::types::Bytes;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
     use tezos_smart_rollup_mock::MockHost;
@@ -166,7 +182,13 @@ mod tests {
                 // Simple transaction tag
                 buffer.push(0);
                 buffer.extend_from_slice(&tx.tx_hash);
-                let mut tx_bytes = tx.tx.into();
+                let mut tx_bytes = match tx.content {
+                    Ethereum(tx) => tx.into(),
+                    _ => panic!(
+                        "Simple transaction can contain only ethereum transactions"
+                    ),
+                };
+
                 buffer.append(&mut tx_bytes)
             }
             Input::NewChunkedTransaction {
@@ -232,7 +254,7 @@ mod tests {
             EthereumTransactionCommon::from_rlp_bytes(&hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap()).unwrap();
         let input = Input::SimpleTransaction(Box::new(Transaction {
             tx_hash: ZERO_TX_HASH,
-            tx: tx.clone(),
+            content: Ethereum(tx.clone()),
         }));
 
         host.add_external(Bytes::from(input_to_bytes(
@@ -243,7 +265,7 @@ mod tests {
         let inbox_content = read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
-            tx,
+            content: Ethereum(tx),
         }];
         assert_eq!(inbox_content.transactions, expected_transactions);
     }
@@ -267,7 +289,7 @@ mod tests {
         let inbox_content = read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
-            tx,
+            content: Ethereum(tx),
         }];
         assert_eq!(inbox_content.transactions, expected_transactions);
     }
