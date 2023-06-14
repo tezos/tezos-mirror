@@ -27,24 +27,6 @@ type error +=
   | RPC_Process_Port_already_in_use of P2p_point.Id.t list
   | Missing_socket_dir
 
-type parameters = {
-  rpc : Config_file.rpc;
-  rpc_comm_socket_path : string;
-  internal_events : Tezos_base.Internal_event_config.t;
-}
-
-let parameters_encoding =
-  let open Data_encoding in
-  conv
-    (fun {rpc; rpc_comm_socket_path; internal_events} ->
-      (rpc, rpc_comm_socket_path, internal_events))
-    (fun (rpc, rpc_comm_socket_path, internal_events) ->
-      {rpc; rpc_comm_socket_path; internal_events})
-    (obj3
-       (req "rpc" Config_file.rpc_encoding)
-       (req "rpc_comm_socket_path" Data_encoding.string)
-       (req "internal_events" Tezos_base.Internal_event_config.encoding))
-
 let () =
   register_error_kind
     `Permanent
@@ -101,7 +83,7 @@ let sanitize_cors_headers ~default headers =
   |> String.Set.(union (of_list default))
   |> String.Set.elements
 
-let launch_rpc_server (config : parameters) (addr, port) =
+let launch_rpc_server (config : Parameters.t) (addr, port) =
   let open Lwt_result_syntax in
   let media_types = config.rpc.media_type in
   let*! acl_policy = RPC_server.Acl.resolve_domain_names config.rpc.acl in
@@ -176,7 +158,7 @@ let init_rpc parameters =
   let open Lwt_result_syntax in
   let* server =
     let* p2p_point =
-      match parameters.rpc.listen_addrs with
+      match parameters.Parameters.rpc.Config_file.listen_addrs with
       | [addr] -> Config_file.resolve_rpc_listening_addrs addr
       | _ ->
           (* We assume that the config contains only one listening
@@ -223,7 +205,7 @@ let create_init_socket socket_dir =
 let run socket_dir =
   let open Lwt_result_syntax in
   let* init_socket_fd = create_init_socket socket_dir in
-  let* parameters = Socket.recv init_socket_fd parameters_encoding in
+  let* parameters = Socket.recv init_socket_fd Parameters.parameters_encoding in
   let*! () =
     Tezos_base_unix.Internal_event_unix.init
       ~config:parameters.internal_events
