@@ -8,6 +8,7 @@ use nom::{
     combinator::{all_consuming, map},
     sequence::preceded,
 };
+use tezos_crypto_rs::PublicKeySignatureVerifier;
 use tezos_crypto_rs::{blake2b, hash::Signature};
 use tezos_data_encoding::{
     enc::{self, BinResult, BinWriter},
@@ -22,8 +23,8 @@ pub struct UnverifiedSigned<A>
 where
     A: NomReader + BinWriter,
 {
-    pub body: A,
-    pub signature: Signature,
+    body: A,
+    signature: Signature,
 }
 
 impl<A> UnverifiedSigned<A>
@@ -46,6 +47,16 @@ where
     /// It's equivalent of the body's hash.
     pub fn hash(&self) -> Result<Vec<u8>, RuntimeError> {
         UnverifiedSigned::hash_body(&self.body)
+    }
+
+    /// Returns the body of the message and verifies the signature.
+    pub fn body(self, public_key: &PublicKey) -> Result<A, RuntimeError> {
+        let hash = &self.hash()?;
+        let is_correct = public_key.verify_signature(&self.signature, hash);
+        match is_correct {
+            Ok(true) => Ok(self.body),
+            _ => Err(RuntimeError::DecodingError),
+        }
     }
 }
 
