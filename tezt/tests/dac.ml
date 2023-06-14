@@ -2789,6 +2789,21 @@ end
 (** [Api_regression] is a module that encapsulates schema regression tests of
     the DAC API. Here we test the binding contracts of the versioned API. *)
 module Api_regression = struct
+  let replace_variables string =
+    let replacements =
+      [
+        ("tz[1234]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
+        ("(BLsig|asig)\\w{137}\\b", "[AGGREGATED_SIG]");
+      ]
+    in
+    List.fold_left
+      (fun string (replace, by) ->
+        replace_string ~all:true (rex replace) ~by string)
+      string
+      replacements
+
+  let capture text = text |> replace_variables |> Regression.capture
+
   (** [rpc_call_with_regression_test] is used for SCHEMA regression testing the
       RPCs. A call to this function in addition to calling an RPC, captures the
       following arguments:
@@ -2810,7 +2825,7 @@ module Api_regression = struct
     in
     let uri = Uri.of_string url in
     let () =
-      Regression.capture
+      capture
         (sf
            "RPC_REQUEST_URI: %s $SCHEME://$HOST:$PORT/%s"
            (Cohttp.Code.string_of_method verb)
@@ -2820,22 +2835,21 @@ module Api_regression = struct
       Cohttp.Header.of_list [("Content-Type", "application/json")]
     in
     let () =
-      Regression.capture
-      @@ sf "RPC_REQUEST_HEADER: %s" (Cohttp.Header.to_string headers)
+      capture @@ sf "RPC_REQUEST_HEADER: %s" (Cohttp.Header.to_string headers)
     in
     let body =
       Option.map
         (fun body ->
           let json = JSON.unannotate body in
           let raw_json = JSON.encode_u json in
-          let () = Regression.capture @@ sf "RPC_REQUEST_BODY: %s" raw_json in
+          let () = capture @@ sf "RPC_REQUEST_BODY: %s" raw_json in
           let request_body = Cohttp_lwt.Body.of_string raw_json in
           request_body)
         body_json
     in
     let* _respone, body = Cohttp_lwt_unix.Client.call ~headers ?body verb uri in
     let* raw_body = Cohttp_lwt.Body.to_string body in
-    return @@ Regression.capture @@ sf "RPC_RESPONSE_BODY: %s" raw_body
+    return @@ capture @@ sf "RPC_RESPONSE_BODY: %s" raw_body
 
   (** [V0] module is used for regression testing [V0] API. *)
   module V0 = struct
