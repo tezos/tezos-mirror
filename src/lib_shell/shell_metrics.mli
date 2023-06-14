@@ -41,9 +41,7 @@ module Mempool : sig
 
   val init : string list -> t
 
-  val set_applied_collector : (unit -> float) -> unit
-
-  val set_prechecked_collector : (unit -> float) -> unit
+  val set_validated_collector : (unit -> float) -> unit
 
   val set_refused_collector : (unit -> float) -> unit
 
