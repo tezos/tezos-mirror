@@ -416,6 +416,10 @@ module type SCORE = sig
 
     (** Convert a score value into a float.  *)
     val to_float : value -> float
+
+    (** [is_active topic t] returns [true] if the peer's score for [topic] is marked as active,
+        and [false] otherwise. *)
+    val is_active : topic -> t -> bool
   end
 end
 
@@ -527,7 +531,7 @@ module type AUTOMATON = sig
   module Span : SPAN
 
   (** Module for peers scores *)
-  module Score : SCORE with type time = Time.t
+  module Score : SCORE with type time = Time.t and type topic = Topic.t
 
   type message = Message.t
 
