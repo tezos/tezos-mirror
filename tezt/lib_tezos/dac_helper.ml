@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let hooks = Tezos_regression.hooks
-
 module Scenarios = struct
   type full = {
     protocol : Protocol.t;
@@ -52,9 +50,9 @@ let test ~__FILE__ ?(tags = []) ?supports title f =
   let tags = "dac" :: tags in
   Protocol.register_test ~__FILE__ ~title ~tags ?supports f
 
-let regression_test ~__FILE__ ?(tags = []) title f =
+let regression_test ~__FILE__ ?(tags = []) ?supports title f =
   let tags = "dac" :: tags in
-  Protocol.register_regression_test ~__FILE__ ~title ~tags f
+  Protocol.register_regression_test ~__FILE__ ~title ~tags ?supports f
 
 (* Some initialization functions to start needed nodes. *)
 
@@ -235,8 +233,8 @@ let with_observer ?name ?sc_rollup_node ?(pvm_name = "arith")
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4706
    Keep pvm name value in Sc_rollup.t. *)
-let with_fresh_rollup ?(pvm_name = "arith") ~protocol tezos_node tezos_client
-    bootstrap1_key f =
+let with_fresh_rollup ?(pvm_name = "arith") ?hooks ~protocol tezos_node
+    tezos_client bootstrap1_key f =
   let sc_rollup_node =
     Sc_rollup_node.create
       ~protocol
@@ -247,7 +245,7 @@ let with_fresh_rollup ?(pvm_name = "arith") ~protocol tezos_node tezos_client
   in
   let* rollup_address =
     Client.Sc_rollup.originate
-      ~hooks
+      ?hooks
       ~burn_cap:Tez.(of_int 9999999)
       ~alias:"rollup"
       ~src:bootstrap1_key
@@ -262,10 +260,10 @@ let with_fresh_rollup ?(pvm_name = "arith") ~protocol tezos_node tezos_client
 let scenario_with_full_dac_infrastructure ?(tags = ["dac"; "full"])
     ?(pvm_name = "arith") ?(custom_committee_members = []) ?commitment_period
     ?challenge_window ?event_sections_levels ?node_arguments
-    ?(allow_v1_api = false) ~__FILE__ ~committee_size ~observers variant
-    scenario =
+    ?(allow_v1_api = false) ?(allow_regression = false) ~__FILE__
+    ~committee_size ~observers variant scenario =
   let description = "Testing Full DAC infrastructure" in
-  test
+  (if allow_regression then regression_test else test)
     ~__FILE__
     ~tags
     (Printf.sprintf "%s (%s)" description variant)
@@ -419,8 +417,8 @@ let scenario_with_layer1_and_legacy_dac_nodes
 
 let scenario_with_layer1_legacy_and_rollup_nodes
     ?(tags = ["dac"; "dac_node"; "legacy"]) ?(pvm_name = "arith")
-    ?commitment_period ?challenge_window ?committee_member_address ~__FILE__
-    ~threshold ~committee_size variant scenario =
+    ?commitment_period ?challenge_window ?committee_member_address ?hooks
+    ~__FILE__ ~threshold ~committee_size variant scenario =
   let description = "Testing DAC rollup and node with L1" in
   regression_test
     ~__FILE__
@@ -430,6 +428,7 @@ let scenario_with_layer1_legacy_and_rollup_nodes
       with_layer1 ?commitment_period ?challenge_window ~protocol
       @@ fun node client key ->
       with_fresh_rollup
+        ?hooks
         node
         client
         key

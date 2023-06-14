@@ -2882,12 +2882,102 @@ module V1_API = struct
     return @@ RPC.check_string_response ~code:404 response
 end
 
+(** [Api_regression] is a module that encapsulates schema regression tests of
+    the DAC API. Here we test the binding contracts of the versioned API. *)
+module Api_regression = struct
+  (** [rpc_call_with_regression_test] is used for SCHEMA regression testing the
+      RPCs. A call to this function in addition to calling an RPC, captures the
+      following arguments:
+        1. RPC_REQUEST_URI
+        2. RPC_REQUEST_HEADER
+        3. RPC_REQUEST_BODY 
+        4. RPC_RESPONSE_BODY
+
+      As such with the call to this function we:
+        1. Test binding contract of RPC request.
+        2. Test binding contract of RPC response. *)
+  let rpc_call_with_regression_test ?body_json ~path_and_query verb dac_node =
+    let url =
+      Format.sprintf
+        "http://%s:%d/%s"
+        (Dac_node.rpc_host dac_node)
+        (Dac_node.rpc_port dac_node)
+        path_and_query
+    in
+    let uri = Uri.of_string url in
+    let () =
+      Regression.capture
+        (sf
+           "RPC_REQUEST_URI: %s $SCHEME://$HOST:$PORT/%s"
+           (Cohttp.Code.string_of_method verb)
+           path_and_query)
+    in
+    let headers =
+      Cohttp.Header.of_list [("Content-Type", "application/json")]
+    in
+    let () =
+      Regression.capture
+      @@ sf "RPC_REQUEST_HEADER: %s" (Cohttp.Header.to_string headers)
+    in
+    let body =
+      Option.map
+        (fun body ->
+          let json = JSON.unannotate body in
+          let raw_json = JSON.encode_u json in
+          let () = Regression.capture @@ sf "RPC_REQUEST_BODY: %s" raw_json in
+          let request_body = Cohttp_lwt.Body.of_string raw_json in
+          request_body)
+        body_json
+    in
+    let* _respone, body = Cohttp_lwt_unix.Client.call ~headers ?body verb uri in
+    let* raw_body = Cohttp_lwt.Body.to_string body in
+    return @@ Regression.capture @@ sf "RPC_RESPONSE_BODY: %s" raw_body
+
+  (** [V0] module is used for regression testing [V0] API. *)
+  module V0 = struct
+    let v0_api_prefix = Dac_rpc.V0.api_prefix
+
+    let encode_bytes_to_hex_string raw =
+      "\"" ^ match Hex.of_string raw with `Hex s -> s ^ "\""
+
+    (** [test_coordinator_post_preimage] tests Cooordinator's
+        "POST v0/preimage". *)
+    let test_coordinator_post_preimage Scenarios.{coordinator_node; _} =
+      (* [post_preimage_request] shape is binding. *)
+      let post_preimage_request =
+        JSON.parse
+          ~origin:"Dac_api_regression.V0.coordinator_post_preimage"
+          (encode_bytes_to_hex_string "test")
+      in
+      (* Test starts here. *)
+      rpc_call_with_regression_test
+        `POST
+        ~path_and_query:(sf "%s/preimage" v0_api_prefix)
+        ~body_json:post_preimage_request
+        coordinator_node
+
+    let test_get_preimage Scenarios.{coordinator_node; _} =
+      (* First we prepare Coordinator's node by posting a payload to it. *)
+      let* root_hash =
+        RPC.call
+          coordinator_node
+          (Dac_rpc.V0.Coordinator.post_preimage ~payload:"test")
+      in
+      (* Test starts here. *)
+      rpc_call_with_regression_test
+        `GET
+        ~path_and_query:(sf "%s/preimage/%s" v0_api_prefix root_hash)
+        coordinator_node
+  end
+end
+
 let register ~protocols =
   (* Tests with layer1 and dac nodes *)
   Legacy.test_dac_node_startup protocols ;
   Legacy.test_dac_node_imports_committee_members protocols ;
   Legacy.test_dac_node_dac_threshold_not_reached protocols ;
   scenario_with_layer1_legacy_and_rollup_nodes
+    ~hooks
     ~__FILE__
     ~tags:["dac"; "dac_node"]
     "dac_reveals_data_merkle_tree_v0"
@@ -2896,6 +2986,7 @@ let register ~protocols =
     ~threshold:1
     ~committee_size:1 ;
   scenario_with_layer1_legacy_and_rollup_nodes
+    ~hooks
     ~__FILE__
     ~tags:["dac"; "dac_node"]
     "dac_reveals_data_hash_chain_v0"
@@ -2904,6 +2995,7 @@ let register ~protocols =
     ~threshold:1
     ~committee_size:1 ;
   scenario_with_layer1_legacy_and_rollup_nodes
+    ~hooks
     ~__FILE__
     ~tags:["dac"; "dac_node"]
     ~threshold:0
@@ -2912,6 +3004,7 @@ let register ~protocols =
     Legacy.test_dac_node_handles_dac_retrieve_preimage_merkle_V0
     protocols ;
   scenario_with_layer1_legacy_and_rollup_nodes
+    ~hooks
     ~__FILE__
     ~tags:["dac"; "dac_node"]
     "dac_rollup_arith_uses_reveals"
@@ -2920,6 +3013,7 @@ let register ~protocols =
     ~threshold:1
     ~committee_size:1 ;
   scenario_with_layer1_legacy_and_rollup_nodes
+    ~hooks
     ~__FILE__
     ~tags:["dac"; "dac_node"]
     "dac_rollup_arith_wrong_hash"
@@ -3048,4 +3142,22 @@ let register ~protocols =
     ~tags:["dac"; "dac_node"]
     "test --allow_v1_api feature flag"
     V1_API.test_allow_v1_feature_flag
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:0
+    ~committee_size:0
+    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~allow_regression:true
+    "test Coordinator's post preimage"
+    Api_regression.V0.test_coordinator_post_preimage
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:0
+    ~committee_size:0
+    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~allow_regression:true
+    "test GET v0/preimage"
+    Api_regression.V0.test_get_preimage
     protocols
