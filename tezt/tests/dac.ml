@@ -1189,11 +1189,21 @@ module Full_infrastructure = struct
      Once we introduce DAC API ("v1"),  [Full_infrastructure] test suite should
      be refactored to use [v1] api as well. *)
 
-  let coordinator_serializes_payload coordinator ~payload ~expected_rh =
+  (** [coordinator_serializes_payload ?payload ?expected_rh] serializes
+      provided optional [?payload] to [coordinator] node. Else it serializes
+      "test" string as a payload. If [?expected_rh] is provided, it also checks
+      that the actual root hash produced during serialization matches it. *)
+  let coordinator_serializes_payload ?(payload = "test") ?expected_rh
+      coordinator =
     let* actual_rh =
       Dac_helper.Call_endpoint.V0.Coordinator.post_preimage coordinator ~payload
     in
-    return @@ check_valid_root_hash expected_rh actual_rh
+    let () =
+      Option.iter
+        (fun expected_rh -> check_valid_root_hash expected_rh actual_rh)
+        expected_rh
+    in
+    return (`Hex actual_rh)
 
   let test_coordinator_post_preimage_endpoint Scenarios.{coordinator_node; _} =
     (* 1. Send the [payload] to coordinator.
@@ -1284,7 +1294,7 @@ module Full_infrastructure = struct
            (committee_members_nodes @ observer_nodes)
     in
     (* 2. Post a preimage to the coordinator. *)
-    let* () =
+    let* _root_hash =
       coordinator_serializes_payload coordinator_node ~payload ~expected_rh
     in
     (* Assert [coordinator] emitted event that [expected_rh] was pushed
@@ -1341,7 +1351,7 @@ module Full_infrastructure = struct
         (committee_members_nodes @ observer_nodes)
     in
     (* 2. Post a preimage to the coordinator. *)
-    let* () =
+    let* _root_hash =
       coordinator_serializes_payload coordinator_node ~payload ~expected_rh
     in
     (* Assert [coordinator] emitted event that [expected_rh] was pushed
@@ -2877,14 +2887,12 @@ module Api_regression = struct
     let test_get_preimage Scenarios.{coordinator_node; _} =
       (* First we prepare Coordinator's node by posting a payload to it. *)
       let* root_hash =
-        RPC.call
-          coordinator_node
-          (Dac_rpc.V0.Coordinator.post_preimage ~payload:"test")
+        Full_infrastructure.coordinator_serializes_payload coordinator_node
       in
       (* Test starts here. *)
       rpc_call_with_regression_test
         `GET
-        ~path_and_query:(sf "%s/preimage/%s" v0_api_prefix root_hash)
+        ~path_and_query:(sf "%s/preimage/%s" v0_api_prefix (Hex.show root_hash))
         coordinator_node
   end
 end
