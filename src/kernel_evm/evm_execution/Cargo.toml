@@ -38,9 +38,11 @@ path = "../ethereum"
 
 [dependencies.tezos-smart-rollup-core]
 path = "../../kernel_sdk/core"
+features = ["proto-nairobi"]
 
 [dependencies.tezos-smart-rollup-host]
 path = "../../kernel_sdk/host"
+features = ["proto-nairobi"]
 
 [dependencies.tezos-smart-rollup-debug]
 path = "../../kernel_sdk/debug"
@@ -53,6 +55,7 @@ path = "../../kernel_sdk/encoding"
 
 [dependencies.tezos-smart-rollup-mock]
 path = "../../kernel_sdk/mock"
+features = ["proto-nairobi"]
 
 [features]
 default = ["evm_execution"]

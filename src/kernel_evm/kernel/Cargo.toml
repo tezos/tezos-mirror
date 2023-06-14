@@ -13,9 +13,11 @@ crate-type = ["cdylib"]
 
 [dependencies.tezos-smart-rollup-core]
 path = "../../kernel_sdk/core"
+features = ["proto-nairobi"]
 
 [dependencies.tezos-smart-rollup-host]
 path = "../../kernel_sdk/host"
+features = ["proto-nairobi"]
 
 [dependencies.tezos-smart-rollup-panic-hook]
 path = "../../kernel_sdk/panic-hook"
@@ -31,6 +33,7 @@ path = "../../kernel_sdk/encoding"
 
 [dev-dependencies.tezos-smart-rollup-mock]
 path = "../../kernel_sdk/mock"
+features = ["proto-nairobi"]
 
 [dev-dependencies.tezos_data_encoding]
 version = "0.5"

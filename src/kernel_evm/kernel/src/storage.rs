@@ -11,7 +11,6 @@ use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 
 use crate::error::{Error, StorageError};
-use evm_execution::account_storage::{store_read_all, store_write_all};
 use rlp::Encodable;
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::transaction::{
@@ -169,7 +168,7 @@ fn read_nth_block_transactions<Host: Runtime>(
 ) -> Result<Vec<TransactionHash>, Error> {
     let path = concat(block_path, &BLOCK_TRANSACTIONS)?;
 
-    let transactions_bytes = evm_execution::account_storage::store_read_all(host, &path)?;
+    let transactions_bytes = host.store_read_all(&path)?;
 
     Ok(transactions_bytes
         .chunks(TRANSACTION_HASH_SIZE)
@@ -243,7 +242,7 @@ fn store_block_transactions<Host: Runtime>(
 ) -> Result<(), Error> {
     let path = concat(block_path, &BLOCK_TRANSACTIONS)?;
     let block_transactions = &block_transactions.concat()[..];
-    evm_execution::account_storage::store_write_all(host, &path, block_transactions)
+    host.store_write_all(&path, block_transactions)
         .map_err(Error::from)
 }
 
@@ -325,7 +324,7 @@ pub fn store_transaction_receipt<Host: Runtime>(
     receipt: &TransactionReceipt,
 ) -> Result<(), Error> {
     let bytes = receipt.rlp_bytes();
-    store_write_all(host, receipt_path, &bytes)?;
+    host.store_write_all(receipt_path, &bytes)?;
     Ok(())
 }
 
@@ -335,7 +334,7 @@ pub fn store_transaction_object<Host: Runtime>(
     object: &TransactionObject,
 ) -> Result<(), Error> {
     let bytes = object.rlp_bytes();
-    store_write_all(host, object_path, &bytes)?;
+    host.store_write_all(object_path, &bytes)?;
     Ok(())
 }
 
@@ -642,7 +641,7 @@ pub(crate) mod internal_for_tests {
         tx_hash: &TransactionHash,
     ) -> Result<TransactionReceipt, Error> {
         let receipt_path = receipt_path(tx_hash)?;
-        let bytes = store_read_all(host, &receipt_path)?;
+        let bytes = host.store_read_all(&receipt_path)?;
         let receipt = TransactionReceipt::from_rlp_bytes(&bytes)?;
         Ok(receipt)
     }
