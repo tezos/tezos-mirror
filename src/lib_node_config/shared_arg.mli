@@ -71,6 +71,7 @@ type t = {
   cors_headers : string list;
   rpc_tls : Config_file.tls option;
   log_output : Logs_simple_config.Output.t option;
+  log_coloring : bool option;
   bootstrap_threshold : int option;
   history_mode : History_mode.t option;
   synchronisation_threshold : int option;

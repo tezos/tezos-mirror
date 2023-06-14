@@ -842,8 +842,8 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?(disable_p2p_swap = Option.is_none default_p2p.limits.swap_linger)
     ?(disable_mempool = default_p2p.disable_mempool)
     ?(enable_testchain = default_p2p.enable_testchain) ?(cors_origins = [])
-    ?(cors_headers = []) ?rpc_tls ?log_output ?synchronisation_threshold
-    ?history_mode ?network ?latency cfg =
+    ?(cors_headers = []) ?rpc_tls ?log_output ?log_coloring
+    ?synchronisation_threshold ?history_mode ?network ?latency cfg =
   let open Lwt_result_syntax in
   let disable_config_validation =
     cfg.disable_config_validation || disable_config_validation
@@ -924,7 +924,11 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     }
   and metrics_addr = unopt_list ~default:cfg.metrics_addr metrics_addr
   and log : Logs_simple_config.cfg =
-    {cfg.log with output = Option.value ~default:cfg.log.output log_output}
+    {
+      cfg.log with
+      colors = Option.value ~default:cfg.log.colors log_coloring;
+      output = Option.value ~default:cfg.log.output log_output;
+    }
   and shell =
     Shell_limits.
       {

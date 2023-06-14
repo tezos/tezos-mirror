@@ -108,20 +108,23 @@ type cfg = {
   output : Output.t;
   default_level : Internal_event.level;
   rules : string option;
+  colors : bool;
 }
 
 let create_cfg ?(output = Output.Stderr)
-    ?(default_level = Internal_event.Notice) ?rules () =
-  {output; default_level; rules}
+    ?(default_level = Internal_event.Notice) ?(colors = true) ?rules () =
+  {output; default_level; rules; colors}
 
 let default_cfg = create_cfg ()
 
 let cfg_encoding =
   let open Data_encoding in
   conv
-    (fun {output; default_level; rules} -> (output, default_level, rules))
-    (fun (output, default_level, rules) -> {output; default_level; rules})
-    (obj3
+    (fun {output; default_level; rules; colors} ->
+      (output, default_level, colors, rules))
+    (fun (output, default_level, colors, rules) ->
+      {output; default_level; rules; colors})
+    (obj4
        (dft
           "output"
           ~description:
@@ -136,6 +139,11 @@ let cfg_encoding =
              'info', 'debug'."
           Internal_event.Level.encoding
           default_cfg.default_level)
+       (dft
+          "colors"
+          ~description:"Enables light coloring in logs."
+          Data_encoding.bool
+          default_cfg.colors)
        (opt
           "rules"
           ~description:

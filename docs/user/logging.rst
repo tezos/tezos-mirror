@@ -303,11 +303,13 @@ Command Line Options
 ~~~~~~~~~~~~~~~~~~~~
 
 See ``octez-node run --help``, the default ``file-descriptor-stdout://`` sink
-configuration can be also changed with 2 options:
+configuration can be also be changed with the following options:
 
 -  ``-v`` / ``-vv``: set the global log level to ``Info`` or ``Debug``
    respectively.
 -  ``--log-output``: set the output file.
+- ``--log-coloring=<bool>``: enable or disable colors in the default stdout
+   logs. The default value is ``true``.
 
 RPC ``/config/logging``
 ~~~~~~~~~~~~~~~~~~~~~~~
