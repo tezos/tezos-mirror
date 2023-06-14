@@ -142,6 +142,9 @@ Node
   ``preattestation``, ``double_attestation_evidence`` and
   ``double_preattestation_evidence`` kinds in the JSON result. (MR :gl:`!8980`)
 
+- Improved the performances of JSON RPC calls by optimizing the
+  serialization to JSON. (MR :gl:`!9072`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.

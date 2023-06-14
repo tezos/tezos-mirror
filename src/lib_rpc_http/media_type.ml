@@ -29,6 +29,77 @@ include Resto_cohttp.Media_type.Make (Tezos_rpc.Encoding)
 (* emits chunks of size approx chunk_size_hint but occasionally a bit bigger *)
 let chunk_size_hint = 4096
 
+(* This function is an ad-hoc optimization that should, in a near
+   future, be addressed in [Data_encoding]. For the sake of practicity
+   and performances, this function is temporarly defined here. *)
+let json_to_string json =
+  let repr_to_string json =
+    let escape_and_add_string b s =
+      Buffer.add_char b '"' ;
+      for i = 0 to String.length s - 1 do
+        match s.[i] with
+        | '\"' ->
+            Buffer.add_char b '\\' ;
+            Buffer.add_char b '"'
+        | '\n' ->
+            Buffer.add_char b '\\' ;
+            Buffer.add_char b 'n'
+        | '\r' ->
+            Buffer.add_char b '\\' ;
+            Buffer.add_char b 'r'
+        | '\b' ->
+            Buffer.add_char b '\\' ;
+            Buffer.add_char b 'b'
+        | '\t' ->
+            Buffer.add_char b '\\' ;
+            Buffer.add_char b 't'
+        | '\\' ->
+            Buffer.add_char b '\\' ;
+            Buffer.add_char b '\\'
+        | '\x00' .. '\x1F' as c -> Printf.bprintf b "\\u%04x" (Char.code c)
+        | c -> Buffer.add_char b c
+      done ;
+      Buffer.add_char b '"'
+    in
+    let rec iter_sep b f = function
+      | [] -> ()
+      | [x] -> f x
+      | x :: t ->
+          f x ;
+          Buffer.add_char b ',' ;
+          (iter_sep [@tailcall]) b f t
+    in
+    let rec write b = function
+      | `Bool true -> Buffer.add_string b "true"
+      | `Bool false -> Buffer.add_string b "false"
+      | `Null -> Buffer.add_string b "null"
+      | `String s -> escape_and_add_string b s
+      | `Float f ->
+          let fract, intr = modf f in
+          if fract = 0.0 then Printf.bprintf b "%.0f" intr
+          else Printf.bprintf b "%g" f
+      | `O ol ->
+          Buffer.add_char b '{' ;
+          iter_sep
+            b
+            (fun (s, v) ->
+              escape_and_add_string b s ;
+              Buffer.add_char b ':' ;
+              write b v)
+            ol ;
+          Buffer.add_char b '}'
+      | `A l ->
+          Buffer.add_char b '[' ;
+          iter_sep b (fun v -> write b v) l ;
+          Buffer.add_char b ']'
+    in
+    let b = Buffer.create 4096 in
+    write b json ;
+    Buffer.add_char b '\n' ;
+    Buffer.contents b
+  in
+  repr_to_string json
+
 let json =
   {
     name = Cohttp.Accept.MediaType ("application", "json");
@@ -46,8 +117,8 @@ let json =
         | Ok json -> Data_encoding.Json.pp ppf json);
     construct =
       (fun enc v ->
-        Data_encoding.Json.to_string ~newline:true ~minify:true
-        @@ Data_encoding.Json.construct enc v);
+        let json = Data_encoding.Json.construct enc v in
+        json_to_string json);
     construct_seq =
       (fun enc v ->
         let buffer = Bytes.create chunk_size_hint in
