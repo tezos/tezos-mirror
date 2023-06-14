@@ -94,6 +94,28 @@ module Basic_fragments = struct
       (publish_message ~gen_topic ~gen_message_id ~gen_message)
       (fun publish_message -> [I.publish_message publish_message])
 
+  let leave ~gen_topic : t =
+    of_input_gen (leave ~gen_topic) (fun leave -> [I.leave leave])
+
+  let join ~gen_topic : t =
+    of_input_gen (join ~gen_topic) (fun join -> [I.join join])
+
+  let subscribe ~gen_topic ~gen_peer : t =
+    of_input_gen (subscribe ~gen_topic ~gen_peer) (fun subscribe ->
+        [I.subscribe subscribe])
+
+  let unsubscribe ~gen_topic ~gen_peer : t =
+    of_input_gen (unsubscribe ~gen_topic ~gen_peer) (fun unsubscribe ->
+        [I.unsubscribe unsubscribe])
+
+  let add_peer ~gen_peer ~gen_direct ~gen_outbound : t =
+    of_input_gen (add_peer ~gen_peer ~gen_direct ~gen_outbound) (fun add_peer ->
+        [I.add_peer add_peer])
+
+  let remove_peer ~gen_peer : t =
+    of_input_gen (remove_peer ~gen_peer) (fun remove_peer ->
+        [I.remove_peer remove_peer])
+
   let set_application_score ~gen_peer ~gen_score : t =
     of_input_gen
       (set_application_score ~gen_peer ~gen_score)
@@ -110,7 +132,10 @@ module Basic_fragments = struct
       |> List.map (fun peer_id ->
              let open M in
              let+ add_peer =
-               add_peer ~gen_peer:(M.return peer_id) ~gen_direct ~gen_outbound
+               Gossipsub_pbt_generators.add_peer
+                 ~gen_peer:(M.return peer_id)
+                 ~gen_direct
+                 ~gen_outbound
              in
              (peer_id, add_peer))
       |> M.flatten_l
@@ -139,7 +164,10 @@ module Basic_fragments = struct
           (* Setting [direct=false] otherwise the peers won't be grafted. *)
           let gen_direct = M.return false in
           let gen_outbound = M.return (i < count_outbound) in
-          add_peer ~gen_peer:(M.return i) ~gen_direct ~gen_outbound)
+          Gossipsub_pbt_generators.add_peer
+            ~gen_peer:(M.return i)
+            ~gen_direct
+            ~gen_outbound)
       |> WithExceptions.Result.get_ok ~loc:__LOC__
       |> M.flatten_l
     in
@@ -1378,7 +1406,7 @@ module Test_opportunistic_grafting = struct
             (* Set [direct = false] otherwise the peer won't be grafted. *)
             let gen_direct = M.return false in
             let gen_outbound = M.bool in
-            add_peer
+            Gossipsub_pbt_generators.add_peer
               ~gen_peer:(return (first_peer + i))
               ~gen_direct
               ~gen_outbound)
