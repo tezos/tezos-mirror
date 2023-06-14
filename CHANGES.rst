@@ -146,6 +146,10 @@ Node
   Only operation that were in the mempool before the RPC call were filtered by
   validation passes. (MR :gl:`!9012`)
 
+- **Breaking change** Removed the ``octez_mempool_pending_applied``
+  metric, and renamed the ``octez_mempool_pending_prechecked`` one to
+  ``octez_mempool_pending_validated``. (MR :gl:`!9137`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
