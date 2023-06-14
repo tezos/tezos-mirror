@@ -3005,6 +3005,28 @@ module Api_regression = struct
         ~path_and_query:
           (sf "%s/missing_page/%s" v0_api_prefix (Hex.show root_hash))
         observer_node
+
+    (** [test_monitor_root_hashes] regression tests "GET v0/monitor/root_hashes". *)
+    let test_monitor_root_hashes Scenarios.{coordinator_node; _} =
+      let* monitor_root_hashes_client =
+        rpc_curl_with_regression_test
+          `GET
+          ~path_and_query:(sf "%s/monitor/root_hashes" v0_api_prefix)
+          coordinator_node
+      in
+      let _streamed_root_hashes_client =
+        Runnable.run monitor_root_hashes_client
+      in
+      (* TODO https://gitlab.com/tezos/tezos/-/issues/5909
+         Schema regression testing of response body has been proven out difficult,
+         since a call to it is blocking. Currently we have no way to send an end
+         signal to the streaming component unless shutting down a node.
+         Unfortunately, in such case tezt propagates the error, resulting in
+         regression test to fail. *)
+      let _root_hash =
+        Full_infrastructure.coordinator_serializes_payload coordinator_node
+      in
+      Lwt.return_unit
   end
 end
 
@@ -3224,4 +3246,13 @@ let register ~protocols =
     ~allow_regression:true
     "test GET v0/missing_page"
     Api_regression.V0.test_observer_get_missing_page
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:0
+    ~committee_size:0
+    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~allow_regression:true
+    "test GET v0/monitor/root_hashes"
+    Api_regression.V0.test_monitor_root_hashes
     protocols
