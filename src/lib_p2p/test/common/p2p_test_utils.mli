@@ -99,9 +99,7 @@ val run_nodes :
 val raw_accept :
   P2p_io_scheduler.t ->
   Lwt_unix.file_descr ->
-  ( P2p_io_scheduler.connection * (P2p_addr.t * int),
-    [`Socket_error of exn | `System_error of exn | `Unexpected_error of exn] )
-  result
+  (P2p_io_scheduler.connection * (P2p_addr.t * int), P2p_fd.accept_error) result
   Lwt.t
 
 val accept :
@@ -118,10 +116,7 @@ val raw_connect :
   P2p_io_scheduler.t ->
   P2p_addr.t ->
   int ->
-  ( P2p_io_scheduler.connection,
-    [`Connection_refused | `Unexpected_error of exn] )
-  result
-  Lwt.t
+  (P2p_io_scheduler.connection, P2p_fd.connect_error) result Lwt.t
 
 val connect :
   ?proof_of_work_target:Tezos_crypto.Crypto_box.pow_target ->

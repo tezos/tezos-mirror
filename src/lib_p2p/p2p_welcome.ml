@@ -74,6 +74,8 @@ let rec worker_loop st =
                 in
                 Lwt.return (Ok ())
             | `Unexpected_error ex ->
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/5632
+                   Losing some information here... *)
                 Lwt.return_error (TzTrace.make (error_of_exn ex)))
           r)
   in

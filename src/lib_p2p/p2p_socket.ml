@@ -723,25 +723,36 @@ let private_node {conn; _} = conn.info.private_node
 let accept ?incoming_message_queue_size ?outgoing_message_queue_size
     ?binary_chunks_size ~canceler conn encoding =
   let open Lwt_result_syntax in
+  let on_error err =
+    let rw_trace =
+      match err with
+      | [P2p_errors.Connection_closed] ->
+          TzTrace.cons P2p_errors.Rejected_socket_connection err
+      | [P2p_errors.Decipher_error] -> TzTrace.cons P2p_errors.Invalid_auth err
+      | _ -> err
+    in
+    let*! close_tzr = P2p_io_scheduler.close conn.scheduled_conn in
+    match close_tzr with
+    | Error close_trace ->
+        (* If an error occurs when closing the scheduled_conn, errors from read or
+           write is kept and combined with it. *)
+        Lwt.return_error (TzTrace.conp rw_trace close_trace)
+    | Ok () -> Lwt.return_error rw_trace
+  in
+  let* () =
+    protect
+      (fun () ->
+        Ack.write ~canceler conn.scheduled_conn conn.cryptobox_data Ack)
+      ~on_error
+  in
   let* ack =
     protect
       (fun () ->
-        let* () =
-          Ack.write ~canceler conn.scheduled_conn conn.cryptobox_data Ack
-        in
         Ack.read
           ~canceler
           (P2p_io_scheduler.to_readable conn.scheduled_conn)
           conn.cryptobox_data)
-      ~on_error:(fun err ->
-        let*! (_ : unit tzresult) =
-          P2p_io_scheduler.close conn.scheduled_conn
-        in
-        match err with
-        | [P2p_errors.Connection_closed] ->
-            tzfail P2p_errors.Rejected_socket_connection
-        | [P2p_errors.Decipher_error] -> tzfail P2p_errors.Invalid_auth
-        | err -> Lwt.return_error err)
+      ~on_error
   in
   match ack with
   | Ack ->

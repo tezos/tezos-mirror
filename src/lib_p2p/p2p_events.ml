@@ -423,6 +423,16 @@ module P2p_fd = struct
       ("nread", Data_encoding.int31)
       ("nwrit", Data_encoding.int31)
 
+  let close_fd_error =
+    declare_2
+      ~section
+      ~name:"close_fd_error"
+      ~msg:
+        "socket related to connection {connection_id} failed to close:{error}"
+      ~level:Warning
+      ("connection_id", Data_encoding.int31)
+      ("error", Data_encoding.string)
+
   let try_read =
     declare_2
       ~section
