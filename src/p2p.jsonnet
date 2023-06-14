@@ -199,7 +199,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       },
     ).addTarget(
       prometheus.target(
-        namespace + '_mempool_pending_prechecked' + node_instance,
+        namespace + '_mempool_pending_validated' + node_instance,
         legendFormat=applied,
       )
     ).addTarget(
