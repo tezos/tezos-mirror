@@ -970,7 +970,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           union
             [
               case
-                ~title:"new_encoding_preapplied_operations"
+                ~title:"preapplied_operations_encoding"
                 (Tag 1)
                 (list
                    (dynamic_size Next_proto.operation_data_and_receipt_encoding))
@@ -979,7 +979,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                   | (Version_0 | Version_2), _ -> None)
                 (fun preapply_operations -> (Version_1, preapply_operations));
               case
-                ~title:"old_encoding_preapplied_operations"
+                ~title:
+                  "preapplied_operations_encoding_with_legacy_attestation_name"
                 (Tag 0)
                 (list
                    (dynamic_size
@@ -1364,7 +1365,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         union
           [
             case
-              ~title:"new_encoding_pending_operations_with_attestation"
+              ~title:"pending_operations_encoding"
               (Tag 2)
               version_2_encoding
               (function
@@ -1372,7 +1373,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                 | (Version_0 | Version_1), _ -> None)
               (fun pending_operations -> (Version_2, pending_operations));
             case
-              ~title:"new_encoding_pending_operations"
+              ~title:"pending_operations_encoding_with_legacy_attestation_name"
               (Tag 1)
               version_1_encoding
               (function
@@ -1520,7 +1521,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         union
           [
             case
-              ~title:"monitor_operations_with_attestation"
+              ~title:"monitor_operations_encoding"
               (Tag 1)
               (list (monitor_operations_encoding ~use_legacy_name:false))
               (function
@@ -1535,7 +1536,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                     None)
               (fun monitor_operations -> (Version_1, monitor_operations));
             case
-              ~title:"old_encoding_monitor_operations"
+              ~title:"monitor_operations_encoding_with_legacy_attestation_name"
               (Tag 0)
               (list (monitor_operations_encoding ~use_legacy_name:true))
               (function
