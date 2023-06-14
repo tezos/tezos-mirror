@@ -3027,6 +3027,35 @@ module Api_regression = struct
         Full_infrastructure.coordinator_serializes_payload coordinator_node
       in
       Lwt.return_unit
+
+    (** [test_monitor_certificates] regression tests "GET v0/monitor/root_hashes". *)
+    let test_monitor_certificates
+        Scenarios.{coordinator_node; committee_members_nodes; _} =
+      let* () =
+        Full_infrastructure.init_run_and_subscribe_nodes
+          coordinator_node
+          committee_members_nodes
+      in
+      let expected_rh =
+        "00a3703854279d2f377d689163d1ec911a840d84b56c4c6f6cafdf0610394df7c6"
+      in
+      let* monitor_certificate_updates_client =
+        rpc_curl_with_regression_test
+          `GET
+          ~path_and_query:
+            (sf "%s/monitor/certificate/%s" v0_api_prefix expected_rh)
+          coordinator_node
+      in
+      let streamed_certificate_updates =
+        Runnable.run monitor_certificate_updates_client
+      in
+      let* _root_hash =
+        Full_infrastructure.coordinator_serializes_payload
+          coordinator_node
+          ~expected_rh
+      in
+      let* () = streamed_certificate_updates in
+      Lwt.return_unit
   end
 end
 
@@ -3255,4 +3284,13 @@ let register ~protocols =
     ~allow_regression:true
     "test GET v0/monitor/root_hashes"
     Api_regression.V0.test_monitor_root_hashes
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:0
+    ~committee_size:1
+    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~allow_regression:true
+    "test GET v0/monitor/certificate"
+    Api_regression.V0.test_monitor_certificates
     protocols
