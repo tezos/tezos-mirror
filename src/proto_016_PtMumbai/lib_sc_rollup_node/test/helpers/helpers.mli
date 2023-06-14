@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Octez_smart_rollup
 open Protocol
 open Alpha_context
 

@@ -31,6 +31,7 @@
     Subject:    Canary unit tests to make sure the test helpers work as intended
 *)
 
+open Octez_smart_rollup
 open Protocol.Alpha_context
 
 let build_chain node_ctxt ~genesis ~length =
@@ -55,9 +56,7 @@ let canary_test node_ctxt ~genesis =
           Node_context.get_l2_block node_ctxt block.header.block_hash
         in
         let* store_block_by_level =
-          Node_context.get_l2_block_by_level
-            node_ctxt
-            (Raw_level.to_int32 block.header.level)
+          Node_context.get_l2_block_by_level node_ctxt block.header.level
         in
         Helpers.Assert.L2_block.equal
           ~loc:__LOC__
