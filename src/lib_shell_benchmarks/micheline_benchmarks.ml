@@ -158,23 +158,19 @@ module Micheline_strip_locations : Benchmark.S = struct
     Sparse_vec.String.of_list
       [("nodes", float_of_int nodes); ("bytes", float_of_int bytes)]
 
-  let models =
-    [
-      ( "strip_locations_model",
-        Model.(
-          make
-            ~conv:(fun {nodes; bytes = _} -> (nodes, ()))
-            ~model:(linear ~name ~coeff:(fv "nodes"))) );
-    ]
+  let model ~name =
+    Model.(
+      make
+        ~conv:(fun {nodes; bytes = _} -> (nodes, ()))
+        ~model:(linear ~name ~coeff:(fv "nodes")))
 
-  let create_benchmark rng_state () =
+  let group = Benchmark.Standalone
+
+  let create_benchmark ~rng_state () =
     let term = sample rng_state in
     let size = micheline_size term in
     let closure () = ignore (Micheline.strip_locations term) in
     Generator.Plain {workload = size; closure}
-
-  let create_benchmarks ~rng_state ~bench_num _cfg =
-    List.repeat bench_num (create_benchmark rng_state)
 end
 
 let () = Registration.register (module Micheline_strip_locations)
