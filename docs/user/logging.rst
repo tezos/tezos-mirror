@@ -91,6 +91,9 @@ Common options:
    - ``pp-short`` to output the events pretty-printed in a shorter and more
      user-friendly fashion.
 
+- ``color=true`` enables logs coloring. It only works on ttys, in conjunction with
+  ``format=pp-short``.
+
 Options available only for the ``file-descriptor-path://`` case:
 
 -  ``with-pid=<bool>`` when ``true`` adds the current process-id to the
