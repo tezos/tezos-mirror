@@ -2894,6 +2894,37 @@ module Api_regression = struct
         `GET
         ~path_and_query:(sf "%s/preimage/%s" v0_api_prefix (Hex.show root_hash))
         coordinator_node
+
+    let create_sample_signature committee_members root_hash =
+      let i = Random.int (List.length committee_members) in
+      let member = List.nth committee_members i in
+      (bls_sign_hex_hash member root_hash, member)
+
+    (** [test_put_dac_member_signature] tests "PUT v0/dac_member_signature". *)
+    let test_put_dac_member_signature
+        Scenarios.{coordinator_node; committee_members; _} =
+      (* First we prepare Coordinator's node by posting a payload to it. *)
+      let* root_hash =
+        Full_infrastructure.coordinator_serializes_payload coordinator_node
+      in
+      let signature, member =
+        create_sample_signature committee_members root_hash
+      in
+      let request_body =
+        Dac_rpc.V0.make_put_dac_member_signature_request_body
+          ~dac_member_pkh:member.aggregate_public_key_hash
+          ~root_hash
+          signature
+      in
+      let body_json =
+        JSON.annotate ~origin:"Dac_api_regression.V0.put_signature" request_body
+      in
+      (* Test starts here. *)
+      rpc_call_with_regression_test
+        `PUT
+        ~body_json
+        ~path_and_query:(sf "%s/dac_member_signature" v0_api_prefix)
+        coordinator_node
   end
 end
 
@@ -3086,4 +3117,13 @@ let register ~protocols =
     ~allow_regression:true
     "test GET v0/preimage"
     Api_regression.V0.test_get_preimage
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:0
+    ~committee_size:2
+    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~allow_regression:true
+    "test PUT v0/dac_member_signature"
+    Api_regression.V0.test_put_dac_member_signature
     protocols

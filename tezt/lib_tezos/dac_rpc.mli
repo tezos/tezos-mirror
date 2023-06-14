@@ -49,6 +49,14 @@ module V0 : sig
       be the same that was used to produce the [external_message]. *)
   val get_verify_signature : string -> (Dac_node.t, bool) RPC_core.t
 
+  (** [make_put_dac_member_sigature_request_body ~dac_member_pkh ~root_hash signature]
+      creates a JSON body for "PUT v0/dac_member_signature". *)
+  val make_put_dac_member_signature_request_body :
+    dac_member_pkh:string ->
+    root_hash:Hex.t ->
+    Tezos_crypto.Aggregate_signature.signature ->
+    Ezjsonm.value
+
   (** [put_dac_member_signature hex_root_hash dac_member_pkh signature]
       stores the [signature] generated from signing [hex_root_hash] by
       [dac_member_pkh]. *)
