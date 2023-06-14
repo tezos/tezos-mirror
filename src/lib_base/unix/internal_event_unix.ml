@@ -166,13 +166,7 @@ let make_with_defaults ?verbosity ?enable_default_daily_logs_at
     ~log_output:log_cfg.output
     ~daily_logs_path:enable_default_daily_logs_at
 
-let init ?internal_events ?verbosity ?enable_default_daily_logs_at ?log_cfg () =
+let init ?config:(internal_events = make_with_defaults ()) () =
   let open Lwt_syntax in
-  let internal_events =
-    match internal_events with
-    | Some internal_events -> internal_events
-    | None ->
-        make_with_defaults ?verbosity ?enable_default_daily_logs_at ?log_cfg ()
-  in
   let* () = init_raw ~internal_events () in
   return_unit

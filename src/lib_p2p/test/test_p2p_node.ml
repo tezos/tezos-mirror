@@ -103,8 +103,11 @@ let main () =
     | Info | Debug -> Some "test.p2p.node -> info;"
   in
   let log_cfg = Tezos_base_unix.Logs_simple_config.create_cfg ?rules () in
+  let config =
+    Tezos_base_unix.Internal_event_unix.make_with_defaults ~log_cfg ()
+  in
   let () =
-    Lwt_main.run (Tezos_base_unix.Internal_event_unix.init ~log_cfg ())
+    Tezos_base_unix.Internal_event_unix.init ~config () |> Lwt_main.run
   in
   let addr = Node.default_ipv6_addr in
   Lwt_main.run

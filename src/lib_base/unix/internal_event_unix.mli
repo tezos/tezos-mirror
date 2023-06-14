@@ -72,15 +72,13 @@ val make_with_defaults :
   unit ->
   Internal_event_config.t
 
-(** [init] initializes the internal-event sinks using either
+(** [init ?config ()] initializes the internal-event sinks using either
   - ["TEZOS_EVENTS_CONFIG"] environment variable,
-  - [internal_events], the value of configured sinks of command calling
+  - [config], the value of configured sinks of command calling
     init, if provided,
-  - internally build an [Internal_event_config.t] using [make_with_defaults]
-    with the same arguments,
 
-  Note that if [internal_events] is provided, other parameters are ignored and
-  [TEZOS_LOG] environment variable aswell.
+  Note that if [config] is provided,the environment variable
+  [TEZOS_LOG] is ignored.
 
   ["TEZOS_EVENTS_CONFIG"] is expected to be a (whitespace separated) list of
   URIs. If an URI does not have a scheme it is expected to be a path to a
@@ -88,10 +86,4 @@ val make_with_defaults :
   TEZOS_EVENTS_CONFIG="unix-files:///tmp/events-unix debug://"], or [export
   TEZOS_EVENTS_CONFIG="debug:// /path/to/config.json"].
 *)
-val init :
-  ?internal_events:Internal_event_config.t ->
-  ?verbosity:Internal_event.level ->
-  ?enable_default_daily_logs_at:string ->
-  ?log_cfg:Logs_simple_config.cfg ->
-  unit ->
-  unit Lwt.t
+val init : ?config:Internal_event_config.t -> unit -> unit Lwt.t

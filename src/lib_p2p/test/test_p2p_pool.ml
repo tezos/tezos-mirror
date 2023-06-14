@@ -724,7 +724,10 @@ let init_logs =
       ~rules:"test.p2p.connection-pool -> info; p2p.connection-pool -> info"
       ()
   in
-  lazy (Tezos_base_unix.Internal_event_unix.init ~log_cfg ())
+  let config =
+    Tezos_base_unix.Internal_event_unix.make_with_defaults ~log_cfg ()
+  in
+  lazy (Tezos_base_unix.Internal_event_unix.init ~config ())
 
 let wrap ?(clients = 10) n f =
   let addr = Node.default_ipv6_addr in
