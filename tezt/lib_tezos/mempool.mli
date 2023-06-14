@@ -25,7 +25,7 @@
 
 (** The mempool type description. *)
 type t = {
-  applied : string list;
+  validated : string list;
   branch_delayed : string list;
   branch_refused : string list;
   refused : string list;
@@ -55,7 +55,7 @@ val get_mempool :
   ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
-  ?applied:bool ->
+  ?validated:bool ->
   ?branch_delayed:bool ->
   ?branch_refused:bool ->
   ?refused:bool ->
@@ -69,7 +69,7 @@ val get_mempool :
     arguments default to the empty list. This is useful when we expect a
     sparse mempool. *)
 val check_mempool :
-  ?applied:string list ->
+  ?validated:string list ->
   ?branch_delayed:string list ->
   ?branch_refused:string list ->
   ?refused:string list ->
