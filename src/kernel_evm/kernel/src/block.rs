@@ -3,71 +3,25 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::apply::{apply_transaction, TransactionObjectInfo, TransactionReceiptInfo};
 use crate::blueprint::{Blueprint, Queue};
 use crate::current_timestamp;
 use crate::error::Error;
 use crate::error::StorageError::AccountInitialisation;
-use crate::error::TransferError::{
-    CumulativeGasUsedOverflow, InvalidCallerAddress, InvalidNonce,
-};
-use crate::inbox::Transaction;
+use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::storage::{self};
 use evm_execution::account_storage::init_account_storage;
 use evm_execution::account_storage::EthereumAccountStorage;
-use evm_execution::handler::ExecutionOutcome;
+use evm_execution::precompiles;
 use evm_execution::precompiles::PrecompileBTreeMap;
-use evm_execution::EthereumError::{
-    EthereumAccountError, EthereumStorageError, InternalTrapError,
-};
-use evm_execution::{precompiles, run_transaction};
-use tezos_ethereum::transaction::{TransactionHash, TransactionObject};
-use tezos_smart_rollup_debug::debug_msg;
+use tezos_ethereum::transaction::TransactionObject;
 use tezos_smart_rollup_host::runtime::Runtime;
 
-use primitive_types::{H160, H256, U256};
+use primitive_types::{H256, U256};
 use tezos_ethereum::block::{BlockConstants, L2Block};
 use tezos_ethereum::transaction::{
     TransactionReceipt, TransactionStatus, TransactionType,
 };
-
-struct TransactionReceiptInfo {
-    tx_hash: TransactionHash,
-    index: u32,
-    execution_outcome: Option<ExecutionOutcome>,
-    caller: H160,
-    to: Option<H160>,
-}
-
-struct TransactionObjectInfo {
-    from: H160,
-    gas_used: U256,
-    gas_price: U256,
-    hash: TransactionHash,
-    input: Vec<u8>,
-    nonce: U256,
-    to: Option<H160>,
-    index: u32,
-    value: U256,
-    v: U256,
-    r: H256,
-    s: H256,
-}
-
-fn make_receipt_info(
-    tx_hash: TransactionHash,
-    index: u32,
-    execution_outcome: Option<ExecutionOutcome>,
-    caller: H160,
-    to: Option<H160>,
-) -> TransactionReceiptInfo {
-    TransactionReceiptInfo {
-        tx_hash,
-        index,
-        execution_outcome,
-        caller,
-        to,
-    }
-}
 
 fn make_receipt(
     block: &L2Block,
@@ -122,29 +76,6 @@ fn make_receipt(
     Ok(tx_receipt)
 }
 
-#[inline(always)]
-fn make_object_info(
-    transaction: Transaction,
-    from: H160,
-    index: u32,
-    gas_used: U256,
-) -> TransactionObjectInfo {
-    TransactionObjectInfo {
-        from,
-        gas_used,
-        gas_price: transaction.tx.gas_price,
-        hash: transaction.tx_hash,
-        input: transaction.tx.data,
-        nonce: transaction.tx.nonce,
-        to: transaction.tx.to,
-        index,
-        value: transaction.tx.value,
-        v: transaction.tx.v,
-        r: transaction.tx.r,
-        s: transaction.tx.s,
-    }
-}
-
 fn make_receipts(
     block: &L2Block,
     receipt_infos: Vec<TransactionReceiptInfo>,
@@ -182,33 +113,6 @@ fn make_objects(
         .collect()
 }
 
-fn check_nonce<Host: Runtime>(
-    host: &mut Host,
-    tx_nonce: U256,
-    caller: H160,
-    evm_account_storage: &mut EthereumAccountStorage,
-) -> Result<(), Error> {
-    let caller_account_path = evm_execution::account_storage::account_path(&caller)
-        .map_err(|_| Error::Storage(AccountInitialisation))?;
-    let caller_account = evm_account_storage
-        .get(host, &caller_account_path)
-        .map_err(|_| Error::Storage(AccountInitialisation))?;
-    let caller_nonce = match caller_account {
-        Some(account) => account
-            .nonce(host)
-            .map_err(|_| Error::Storage(AccountInitialisation))?,
-        None => U256::zero(),
-    };
-    if tx_nonce != caller_nonce {
-        Err(Error::Transfer(InvalidNonce {
-            expected: tx_nonce,
-            actual: caller_nonce,
-        }))
-    } else {
-        Ok(())
-    }
-}
-
 fn compute<Host: Runtime>(
     host: &mut Host,
     proposal: Blueprint,
@@ -220,79 +124,28 @@ fn compute<Host: Runtime>(
     let mut valid_txs = Vec::new();
     let mut receipts_infos = Vec::new();
     let mut object_infos = Vec::new();
-    let mut skip_shift = 0;
+    let mut index = 0;
     let transactions = proposal.transactions;
 
-    for (transaction, index) in transactions.into_iter().zip(0u32..) {
-        let caller = transaction
-            .tx
-            .caller()
-            .map_err(|_| Error::Transfer(InvalidCallerAddress))?;
-        match check_nonce(host, transaction.tx.nonce, caller, evm_account_storage) {
-            Err(Error::Transfer(InvalidNonce { expected, actual })) =>
-            // Because the proposal's state is unclear, and we do not have a sequencer,
-            // for now in order to avoid a user with bad intention messing every proposal
-            // we ignore transaction with invalid nonce in order to process other valid
-            // transactions from the current proposal.
-            {
-                debug_msg!(
-                        host,
-                        "Transaction ignored because nonce is incorrect, {} was expected, but got {}.",
-                        expected,
-                        actual
-                    );
-                skip_shift += 1;
-                continue;
-            }
-            check_nonce_outcome => check_nonce_outcome,
-        }?;
-        let receipt_info = match run_transaction(
+    for transaction in transactions.into_iter() {
+        let tx_hash = transaction.tx_hash;
+
+        // If `apply_transaction` returns `None`, the transaction should be
+        // ignored, i.e. invalid signature or nonce.
+        if let Some((receipt_info, object_info)) = apply_transaction(
             host,
             block_constants,
-            evm_account_storage,
             precompiles,
-            transaction.tx.to,
-            caller,
-            transaction.tx.data.clone(),
-            Some(transaction.tx.gas_limit),
-            Some(transaction.tx.value),
-        ) {
-            Ok(outcome) => {
-                valid_txs.push(transaction.tx_hash);
-                Ok(make_receipt_info(
-                    transaction.tx_hash,
-                    index - skip_shift,
-                    Some(outcome),
-                    caller,
-                    transaction.tx.to,
-                ))
-            }
-            Err(
-                InternalTrapError | EthereumAccountError(_) | EthereumStorageError(_),
-            ) => {
-                // TODO: https://gitlab.com/tezos/tezos/-/issues/5665
-                // Because the proposal's state is unclear, and we do not have a sequencer
-                // if an error that leads to a durable storage corruption is caught, we
-                // invalidate the entire proposal.
-                Err(Error::InvalidRunTransaction)
-            }
-            Err(_) => Ok(make_receipt_info(
-                transaction.tx_hash,
-                index - skip_shift,
-                None,
-                caller,
-                transaction.tx.to,
-            )),
-        }?;
-
-        let gas_used = match &receipt_info.execution_outcome {
-            Some(execution_outcome) => execution_outcome.gas_used.into(),
-            None => U256::zero(),
-        };
-        let object_info =
-            make_object_info(transaction, caller, index - skip_shift, gas_used);
-        object_infos.push(object_info);
-        receipts_infos.push(receipt_info)
+            transaction.tx,
+            tx_hash,
+            index,
+            evm_account_storage,
+        )? {
+            valid_txs.push(tx_hash);
+            receipts_infos.push(receipt_info);
+            object_infos.push(object_info);
+            index += 1
+        }
     }
 
     let timestamp = current_timestamp(host);
@@ -338,6 +191,7 @@ mod tests {
     use super::*;
     use crate::blueprint::Blueprint;
     use crate::genesis;
+    use crate::inbox::Transaction;
     use crate::storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
     };
