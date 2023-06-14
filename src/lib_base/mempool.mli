@@ -26,8 +26,8 @@
 (** Tezos Shell Module - Mempool, a.k.a. the operations safe to be broadcast. *)
 
 type t = {
-  known_valid : Tezos_crypto.Hashed.Operation_hash.t list;
-      (** A valid sequence of operations on top of the current head. *)
+  known_valid : Tezos_crypto.Hashed.Operation_hash.Set.t;
+      (** Set of valid operations on top of the current head. *)
   pending : Tezos_crypto.Hashed.Operation_hash.Set.t;
       (** Set of known not-invalid operation. *)
 }
