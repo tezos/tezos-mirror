@@ -112,3 +112,8 @@ val last_cemented_commitment_hash_with_level :
     context. *)
 val genesis_commitment :
   sc_rollup:string -> Client.t -> Sc_rollup_client.commitment Lwt.t
+
+(** [call_rpc ~smart_rollup_node ~service] call the RPC for [service] on
+    [smart_rollup_node]. *)
+val call_rpc :
+  smart_rollup_node:Sc_rollup_node.t -> service:string -> JSON.t Lwt.t

@@ -182,11 +182,6 @@ let get_sc_rollup_commitment_period_in_blocks client =
   let* constants = get_sc_rollup_constants client in
   return constants.commitment_period_in_blocks
 
-let sc_rollup_node_rpc sc_node service =
-  let url = Printf.sprintf "%s/%s" (Sc_rollup_node.endpoint sc_node) service in
-  let*! response = RPC.Curl.get url in
-  return response
-
 type test = {variant : string option; tags : string list; description : string}
 
 let originate_sc_rollups ~kind n client =
@@ -634,7 +629,9 @@ let test_rollup_node_running ~kind =
     Sc_rollup_node.run rollup_node sc_rollup ["--metrics-addr"; metrics_addr]
   in
   let* sc_rollup_from_rpc =
-    sc_rollup_node_rpc rollup_node "global/smart_rollup_address"
+    Sc_rollup_helpers.call_rpc
+      ~smart_rollup_node:rollup_node
+      ~service:"global/smart_rollup_address"
   in
   let sc_rollup_from_rpc = JSON.as_string sc_rollup_from_rpc in
   let*! sc_rollup_from_client =
@@ -872,7 +869,11 @@ let get_inbox_from_tezos_node client =
   parse_inbox inbox
 
 let get_inbox_from_sc_rollup_node sc_rollup_node =
-  let* inbox = sc_rollup_node_rpc sc_rollup_node "global/block/head/inbox" in
+  let* inbox =
+    Sc_rollup_helpers.call_rpc
+      ~smart_rollup_node:sc_rollup_node
+      ~service:"global/block/head/inbox"
+  in
   parse_inbox inbox
 
 (** Configure the rollup node to pay more fees for its refute operations. *)
