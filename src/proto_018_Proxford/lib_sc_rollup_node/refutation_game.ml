@@ -272,8 +272,14 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
     end
   end in
   let metadata = Node_context.metadata node_ctxt in
+  let*! start_tick = PVM.get_tick start_state in
   let* proof =
-    trace (Sc_rollup_node_errors.Cannot_produce_proof game)
+    trace
+      (Sc_rollup_node_errors.Cannot_produce_proof
+         {
+           inbox_level = Raw_level.to_int32 game.inbox_level;
+           start_tick = Sc_rollup.Tick.to_z start_tick;
+         })
     @@ (Sc_rollup.Proof.produce ~metadata (module P) game.inbox_level
        >|= Environment.wrap_tzresult)
   in

@@ -23,28 +23,39 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
-
 let make_id id = String.concat "." [Protocol.name; id]
 
 let register_error_kind ~id = register_error_kind ~id:(make_id id)
 
+type lost_result = Draw | Timeout | Conflict_resolved
+
+let lost_result_to_string = function
+  | Draw -> "draw"
+  | Timeout -> "timeout"
+  | Conflict_resolved -> "conflict resolved"
+
+let lost_result_encoding =
+  Data_encoding.string_enum
+    (List.map
+       (fun r -> (lost_result_to_string r, r))
+       [Draw; Timeout; Conflict_resolved])
+
 type error +=
-  | Cannot_produce_proof of Sc_rollup.Game.t
+  | Cannot_produce_proof of {inbox_level : int32; start_tick : Z.t}
   | Bad_minimal_fees of string
   | Disagree_with_cemented of {
-      inbox_level : Raw_level.t;
-      ours : Sc_rollup.Commitment.Hash.t option;
-      on_l1 : Sc_rollup.Commitment.Hash.t;
+      inbox_level : int32;
+      ours : Commitment.Hash.t option;
+      on_l1 : Commitment.Hash.t;
     }
   | Unreliable_tezos_node_returning_inconsistent_game
   | Wrong_initial_pvm_state of {
-      initial_state_hash : Sc_rollup.State_hash.t;
-      expected_state_hash : Sc_rollup.State_hash.t;
+      initial_state_hash : State_hash.t;
+      expected_state_hash : State_hash.t;
     }
   | Inconsistent_inbox of {
-      layer1_inbox : Sc_rollup.Inbox.t;
-      inbox : Sc_rollup.Inbox.t;
+      layer1_inbox : Octez_smart_rollup.Inbox.t;
+      inbox : Octez_smart_rollup.Inbox.t;
     }
   | Missing_PVM_state of Block_hash.t * Int32.t
   | Cannot_checkout_context of Block_hash.t * Smart_rollup_context_hash.t option
@@ -55,11 +66,11 @@ type error +=
   | Could_not_acquire_lock of string
 
 type error +=
-  | Lost_game of Protocol.Alpha_context.Sc_rollup.Game.game_result
+  | Lost_game of lost_result
   | Unparsable_boot_sector of {path : string}
   | Invalid_genesis_state of {
-      expected : Sc_rollup.Commitment.Hash.t;
-      actual : Sc_rollup.Commitment.Hash.t;
+      expected : Commitment.Hash.t;
+      actual : Commitment.Hash.t;
     }
 
 let () =
@@ -83,21 +94,20 @@ let () =
     ~pp:(fun ppf (inbox_level, ours, on_l1) ->
       Format.fprintf
         ppf
-        "Internal error: The node has commitment %a for inbox level %a but \
+        "Internal error: The node has commitment %a for inbox level %ld but \
          this level is cemented on L1 with commitment %a"
         (Format.pp_print_option
            ~none:(fun ppf () -> Format.pp_print_string ppf "[None]")
-           Sc_rollup.Commitment.Hash.pp)
+           Commitment.Hash.pp)
         ours
-        Raw_level.pp
         inbox_level
-        Sc_rollup.Commitment.Hash.pp
+        Commitment.Hash.pp
         on_l1)
     Data_encoding.(
       obj3
-        (req "inbox_level" Raw_level.encoding)
-        (req "ours" (option Sc_rollup.Commitment.Hash.encoding))
-        (req "on_l1" Sc_rollup.Commitment.Hash.encoding))
+        (req "inbox_level" int32)
+        (req "ours" (option Commitment.Hash.encoding))
+        (req "on_l1" Commitment.Hash.encoding))
     (function
       | Disagree_with_cemented {inbox_level; ours; on_l1} ->
           Some (inbox_level, ours, on_l1)
@@ -130,15 +140,20 @@ let () =
     ~description:
       "The rollup node is in a state that prevents it from producing \
        refutation proofs."
-    ~pp:(fun ppf game ->
+    ~pp:(fun ppf (inbox_level, start_tick) ->
       Format.fprintf
         ppf
-        "cannot produce proof for game %a"
-        Sc_rollup.Game.pp
-        game)
-    Data_encoding.(obj1 (req "game" Sc_rollup.Game.encoding))
-    (function Cannot_produce_proof game -> Some game | _ -> None)
-    (fun game -> Cannot_produce_proof game) ;
+        "cannot produce proof for inbox level %ld starting at tick %a"
+        inbox_level
+        Z.pp_print
+        start_tick)
+    Data_encoding.(obj2 (req "inbox_level" int32) (req "start_tick" z))
+    (function
+      | Cannot_produce_proof {inbox_level; start_tick} ->
+          Some (inbox_level, start_tick)
+      | _ -> None)
+    (fun (inbox_level, start_tick) ->
+      Cannot_produce_proof {inbox_level; start_tick}) ;
 
   register_error_kind
     ~id:"sc_rollup.node.Wrong_initial_pvm_state"
@@ -149,15 +164,15 @@ let () =
         ppf
         "The initial state hash produced by the PVM %a is not consistent\n\
         \     with the one expected by the Layer 1 PVM implementation %a"
-        Sc_rollup.State_hash.pp
+        State_hash.pp
         actual
-        Sc_rollup.State_hash.pp
+        State_hash.pp
         expected)
     `Permanent
     Data_encoding.(
       obj2
-        (req "initial_state_hash" Sc_rollup.State_hash.encoding)
-        (req "expected_state_hash" Sc_rollup.State_hash.encoding))
+        (req "initial_state_hash" State_hash.encoding)
+        (req "expected_state_hash" State_hash.encoding))
     (function
       | Wrong_initial_pvm_state {initial_state_hash; expected_state_hash} ->
           Some (initial_state_hash, expected_state_hash)
@@ -174,15 +189,15 @@ let () =
       Format.fprintf
         ppf
         "@[Rollup inbox:@;%a@]@;should be equal to @[Layer1 inbox:@;%a@]"
-        Sc_rollup.Inbox.pp
+        Octez_smart_rollup.Inbox.pp
         inbox
-        Sc_rollup.Inbox.pp
+        Octez_smart_rollup.Inbox.pp
         layer1_inbox)
     `Permanent
     Data_encoding.(
       obj2
-        (req "layer1_inbox" Sc_rollup.Inbox.encoding)
-        (req "inbox" Sc_rollup.Inbox.encoding))
+        (req "layer1_inbox" Octez_smart_rollup.Inbox.encoding)
+        (req "inbox" Octez_smart_rollup.Inbox.encoding))
     (function
       | Inconsistent_inbox {layer1_inbox; inbox} -> Some (layer1_inbox, inbox)
       | _ -> None)
@@ -238,14 +253,9 @@ let () =
     ~pp:(fun ppf result ->
       Format.fprintf
         ppf
-        "The rollup node lost the refutation game (%a)"
-        Protocol.Alpha_context.Sc_rollup.Game.pp_game_result
-        result)
-    Data_encoding.(
-      obj1
-        (req
-           "result"
-           Protocol.Alpha_context.Sc_rollup.Game.game_result_encoding))
+        "The rollup node lost the refutation game (%s)"
+        (lost_result_to_string result))
+    Data_encoding.(obj1 (req "result" lost_result_encoding))
     (function Lost_game result -> Some result | _ -> None)
     (fun result -> Lost_game result) ;
 
@@ -273,16 +283,14 @@ let () =
          (%a) commitment. The rollup node cannot continue. If you used the \
          argument `--boot-sector-file` you probably provided the wrong boot \
          sector. If not, please report the bug."
-        Sc_rollup.Commitment.Hash.pp
+        Commitment.Hash.pp
         expected
-        Sc_rollup.Commitment.Hash.pp
+        Commitment.Hash.pp
         actual)
     Data_encoding.(
       obj2
-        (req
-           "expected"
-           Protocol.Alpha_context.Sc_rollup.Commitment.Hash.encoding)
-        (req "actual" Protocol.Alpha_context.Sc_rollup.Commitment.Hash.encoding))
+        (req "expected" Commitment.Hash.encoding)
+        (req "actual" Commitment.Hash.encoding))
     (function
       | Invalid_genesis_state {expected; actual} -> Some (expected, actual)
       | _ -> None)
