@@ -48,7 +48,7 @@ Shell RPCs
 The node provide some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
-- `rpc-openapi.json (version 17.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
+- `rpc-openapi.json (version 17.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
@@ -58,12 +58,12 @@ Nairobi RPCs
 The OpenAPI specification for RPCs which are specific to the Nairobi (``PtNairob``)
 protocol can be found at:
 
-- `nairobi-openapi.json (version 17.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-openapi.json>`_
+- `nairobi-openapi.json (version 17.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-openapi.json>`_
 
 The OpenAPI specification for RPCs which are related to the mempool
 and specific to the Nairobi protocol can be found at:
 
-- `nairobi-mempool-openapi.json (version 17.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-mempool-openapi.json>`_
+- `nairobi-mempool-openapi.json (version 17.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-mempool-openapi.json>`_
 
 Mumbai RPCs
 -----------

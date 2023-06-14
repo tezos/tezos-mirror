@@ -3,6 +3,21 @@
 Changelog
 '''''''''
 
+Version 17.1
+============
+
+Node
+----
+
+- Improved performances of RPC responses on request for older blocks by
+  caching the archived metadata accesses. (MR :gl:`!8976`)
+
+Miscellaneous
+-------------
+
+- Prevent cohttp-lwt.5.1.0 incompatibility with Resto,
+  which causes leakage of file descriptors for streamed RPCs. (MR :gl:`!9059`)
+
 Version 17.0
 ============
 
@@ -189,7 +204,7 @@ Smart Rollup WASM Debugger
 - Automatically ``load inputs`` when ``step inbox`` is called. (MR :gl:`!8444`)
 
 - Added a command ``show function symbols`` to inspect the custom section
-  ``name`` of unstripped kernels (MR :gl:`!8522`)
+  ``name`` of unstripped kernels (MR :gl:`!8522`)
 
 - Added a command ``profile`` that runs a full ``kernel_run`` and produces a
   flamegraph of the execution (MR :gl:`!8510`).
