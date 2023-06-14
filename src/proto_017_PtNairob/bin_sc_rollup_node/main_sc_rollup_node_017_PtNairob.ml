@@ -24,6 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+include Cli.Binary_dependent_args (struct
+  let binary_name = "smart rollup node"
+end)
+
 let group =
   {
     Tezos_clic.name = "sc_rollup.node";

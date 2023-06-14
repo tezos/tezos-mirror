@@ -26,6 +26,7 @@
 
 open Tezos_rpc_http_server
 open RPC_directory_helpers
+open Octez_smart_rollup_node
 
 module Local_directory = Make_directory (struct
   include Sc_rollup_services.Local

@@ -24,4 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {rpc_addr : string; rpc_port : int}
+module Sc_rollup_node = Octez_smart_rollup_node_alpha
+
+module Daemon_components = struct
+  module Batcher = Sc_rollup_node.Batcher
+  module RPC_server = Sc_rollup_node.RPC_server
+end

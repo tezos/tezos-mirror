@@ -42,6 +42,8 @@ let sc_rollup_address_arg : (_, Client_context.full) Tezos_clic.arg =
     ~doc:"The smart rollup address (required when no configuration file exists)"
     (Smart_rollup_alias.Address.parameter ())
 
+(* Rollup node only arguments *)
+
 let sc_rollup_node_operator_param next =
   let open Lwt_result_syntax in
   Tezos_clic.param
@@ -114,34 +116,6 @@ let mode_arg =
     ~doc:(mode_doc ^ "\n(required when no configuration file exists)")
     mode_parameter
 
-let string_parameter =
-  Tezos_clic.parameter (fun (_cctxt : Client_context.full) x ->
-      Lwt_result.return x)
-
-let int_parameter =
-  Tezos_clic.parameter (fun (cctxt : Client_context.full) p ->
-      try Lwt_result.return (int_of_string p)
-      with _ -> cctxt#error "Cannot read int")
-
-let rpc_addr_arg =
-  let default = Configuration.default_rpc_addr in
-  Tezos_clic.arg
-    ~long:"rpc-addr"
-    ~placeholder:"rpc-address|ip"
-    ~doc:
-      (Format.sprintf
-         "The address the smart rollup node listens to. Default value is %s"
-         default)
-    string_parameter
-
-let metrics_addr_arg =
-  Tezos_clic.arg
-    ~long:"metrics-addr"
-    ~placeholder:
-      "ADDR:PORT or :PORT (by default ADDR is localhost and PORT is 9933)"
-    ~doc:"The address of the smart rollup node metrics server."
-    string_parameter
-
 let dal_node_endpoint_arg =
   Tezos_clic.arg
     ~long:"dal-node"
@@ -155,57 +129,6 @@ let dal_node_endpoint_arg =
     (Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
          Lwt.return_ok (Uri.of_string s)))
 
-let dac_observer_endpoint_arg =
-  Tezos_clic.arg
-    ~long:"dac-observer"
-    ~placeholder:"dac-observer-endpoint"
-    ~doc:
-      (Format.sprintf
-         "The address of the DAC observer node from which the smart rollup \
-          node downloads preimages requested through the reveal channel.")
-    (Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
-         Lwt.return_ok (Uri.of_string s)))
-
-let z_parameter =
-  Tezos_clic.parameter (fun (cctxt : Client_context.full) s ->
-      try
-        let open Lwt_result_syntax in
-        let v = Z.of_string s in
-        return v
-      with _ -> cctxt#error "Invalid number, must be a non negative number.")
-
-let dac_timeout_arg =
-  Tezos_clic.arg
-    ~long:"dac-timeout"
-    ~placeholder:"seconds"
-    ~doc:
-      "Timeout in seconds for which the DAC observer client will wait for a \
-       preimage"
-    z_parameter
-
-let rpc_port_arg =
-  let default = Configuration.default_rpc_port |> string_of_int in
-  Tezos_clic.arg
-    ~long:"rpc-port"
-    ~placeholder:"rpc-port"
-    ~doc:
-      (Format.sprintf
-         "The port the smart rollup node listens to. Default value is %s"
-         default)
-    int_parameter
-
-let data_dir_arg =
-  let default = Configuration.default_data_dir in
-  Tezos_clic.default_arg
-    ~long:"data-dir"
-    ~placeholder:"data-dir"
-    ~doc:
-      (Format.sprintf
-         "The path to the smart rollup node data directory. Default value is %s"
-         default)
-    ~default
-    string_parameter
-
 let loser_mode_arg =
   Tezos_clic.arg
     ~long:"loser-mode"
@@ -215,6 +138,114 @@ let loser_mode_arg =
          match Loser_mode.make s with
          | Some t -> Lwt_result.return t
          | None -> failwith "Invalid syntax for failure points"))
+
+(* Primitive argument parsers *)
+let string_parameter =
+  Tezos_clic.parameter (fun (_cctxt : Client_context.full) x ->
+      Lwt_result.return x)
+
+let int_parameter =
+  Tezos_clic.parameter (fun (cctxt : Client_context.full) p ->
+      try Lwt_result.return (int_of_string p)
+      with _ -> cctxt#error "Cannot read int")
+
+let z_parameter =
+  Tezos_clic.parameter (fun (cctxt : Client_context.full) s ->
+      try
+        let open Lwt_result_syntax in
+        let v = Z.of_string s in
+        return v
+      with _ -> cctxt#error "Invalid number, must be a non negative number.")
+
+module Binary_dependent_args (P : sig
+  val binary_name : string
+end) =
+struct
+  open P
+
+  let rpc_addr_arg =
+    let default = Configuration.default_rpc_addr in
+    Tezos_clic.arg
+      ~long:"rpc-addr"
+      ~placeholder:"rpc-address|ip"
+      ~doc:
+        (Format.sprintf
+           "The address the %s listens to. Default value is %s"
+           binary_name
+           default)
+      string_parameter
+
+  let metrics_addr_arg =
+    Tezos_clic.arg
+      ~long:"metrics-addr"
+      ~placeholder:
+        "ADDR:PORT or :PORT (by default ADDR is localhost and PORT is 9933)"
+      ~doc:(Format.sprintf "The address of the %s metrics server." binary_name)
+      string_parameter
+
+  let dac_observer_endpoint_arg =
+    Tezos_clic.arg
+      ~long:"dac-observer"
+      ~placeholder:"dac-observer-endpoint"
+      ~doc:
+        (Format.sprintf
+           "The address of the DAC observer node from which the %s downloads \
+            preimages requested through the reveal channel."
+           P.binary_name)
+      (Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
+           Lwt.return_ok (Uri.of_string s)))
+
+  let rpc_port_arg =
+    let default = Configuration.default_rpc_port |> string_of_int in
+    Tezos_clic.arg
+      ~long:"rpc-port"
+      ~placeholder:"rpc-port"
+      ~doc:
+        (Format.sprintf
+           "The port the %s listens to. Default value is %s"
+           binary_name
+           default)
+      int_parameter
+
+  let data_dir_arg =
+    let default = Configuration.default_data_dir in
+    Tezos_clic.default_arg
+      ~long:"data-dir"
+      ~placeholder:"data-dir"
+      ~doc:
+        (Format.sprintf
+           "The path to the %s data directory. Default value is %s"
+           binary_name
+           default)
+      ~default
+      string_parameter
+
+  let boot_sector_file_arg =
+    Tezos_clic.arg
+      ~long:"boot-sector-file"
+      ~placeholder:"file"
+      ~doc:
+        (Format.sprintf
+           "Path to the boot sector. The argument is optional, if the rollup \
+            was originated via the smart rollup originate operation, the %s \
+            will fetch the boot sector itself. This argument is required only \
+            if it's a bootstrapped smart rollup."
+           binary_name)
+      (Tezos_clic.parameter (fun (_cctxt : Client_context.full) path ->
+           let open Lwt_result_syntax in
+           let*! exists = Lwt_unix.file_exists path in
+           if exists then return path
+           else failwith "Boot sector not found at path %S" path))
+end
+
+let dac_timeout_arg =
+  Tezos_clic.arg
+    ~long:"dac-timeout"
+    ~placeholder:"seconds"
+    ~doc:
+      "Timeout in seconds for which the DAC observer client will wait for a \
+       preimage"
+    z_parameter
 
 let reconnection_delay_arg =
   let default =
@@ -296,18 +327,3 @@ let log_kernel_debug_file_arg =
     ~placeholder:"file"
     ~doc:""
     string_parameter
-
-let boot_sector_file_arg =
-  Tezos_clic.arg
-    ~long:"boot-sector-file"
-    ~placeholder:"file"
-    ~doc:
-      "Path to the boot sector. The argument is optional, if the rollup node \
-       was originated via the smart rollup originate operation, the rollup \
-       node will fetch the boot sector itself. This argument is required only \
-       if it's a bootstrapped smart rollup."
-    (Tezos_clic.parameter (fun (_cctxt : Client_context.full) path ->
-         let open Lwt_result_syntax in
-         let*! exists = Lwt_unix.file_exists path in
-         if exists then return path
-         else failwith "Boot sector not found at path %S" path))

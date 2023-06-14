@@ -1,0 +1,34 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main_sequencer_node)
+ (public_name octez-smart-rollup-sequencer-node)
+ (package octez-smart-rollup-sequencer-node)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-clic
+  tezos-client-base
+  tezos-client-base-unix
+  tezos-client-commands
+  octez-smart-rollup-node
+  tezos-client-alpha
+  octez_smart_rollup_node_alpha
+  octez_smart_rollup_sequencer)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_client_base
+  -open Tezos_client_base_unix
+  -open Tezos_client_commands
+  -open Octez_smart_rollup_node
+  -open Tezos_client_alpha
+  -open Octez_smart_rollup_node_alpha
+  -open Octez_smart_rollup_sequencer))
