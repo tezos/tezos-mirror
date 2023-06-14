@@ -509,3 +509,5 @@ end
 
 module AddMod25519 = Make_ModAdd (Plompiler.ArithMod25519)
 module MulMod25519 = Make_ModMul (Plompiler.ArithMod25519)
+module AddMod64 = Make_ModAdd (Plompiler.ArithMod64)
+module MulMod64 = Make_ModMul (Plompiler.ArithMod64)

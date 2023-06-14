@@ -29,8 +29,8 @@ module Helpers = Plonk_test.Helpers.Make (Plonk.Main_protocol)
 
 open Plonk_test.Helpers.Utils (LibCircuit)
 
-module ModArith (L : LIB) = struct
-  module ModArith = ArithMod25519 (L)
+module ModArith (M : Plompiler__.Gadget_mod_arith.MOD_ARITH) (L : LIB) = struct
+  module ModArith = M (L)
   open L
 
   let random_bits len =
@@ -44,7 +44,8 @@ module ModArith (L : LIB) = struct
 
   let ( %! ) = Z.rem
 
-  let name_suffix valid = if valid then "" else " (negative)"
+  let name_suffix valid =
+    "_" ^ ModArith.label ^ if valid then "" else " (negative)"
 
   let add_circuit ~expected xs () =
     let* z_exp = ModArith.input_mod_int ~kind:`Public expected in
@@ -195,6 +196,17 @@ module ModArith (L : LIB) = struct
         ([!(-1); !2], !2, false);
       ]
 
+  let tests =
+    tests_mod_add @ tests_mod_sub @ tests_mod_neg @ tests_mod_constant
+    @ tests_mod_mul
+end
+
+module ModArith_prime (M : Plompiler__.Gadget_mod_arith.MOD_ARITH) (L : LIB) =
+struct
+  open ModArith (M) (L)
+
+  open L
+
   let div_circuit ~expected x y () =
     let* z_exp = ModArith.input_mod_int ~kind:`Public expected in
     let* x = ModArith.input_mod_int x in
@@ -278,18 +290,24 @@ module ModArith (L : LIB) = struct
         (r, r, different, false);
       ]
 
-  let tests =
-    tests_mod_add @ tests_mod_sub @ tests_mod_neg @ tests_mod_constant
-    @ tests_mod_mul @ tests_mod_div @ tests_mod_inv @ tests_mod_equal
+  let tests = tests_mod_div @ tests_mod_inv @ tests_mod_equal
 end
 
 open Plonk_test.Helpers
 
 let tests =
-  [
-    Alcotest.test_case "ModArith" `Quick (to_test (module ModArith : Test));
-    Alcotest.test_case
-      "ModArith plonk"
-      `Slow
-      (to_test ~plonk:(module Plonk.Main_protocol) (module ModArith : Test));
-  ]
+  let both =
+    [
+      ("ModArith 25519", (module ModArith (ArithMod25519) : Test));
+      ("ModArith_prime 25519", (module ModArith_prime (ArithMod25519) : Test));
+      ("ModArith 64", (module ModArith (ArithMod64) : Test));
+    ]
+  in
+  List.map (fun (name, m) -> Alcotest.test_case name `Quick (to_test m)) both
+  @ List.map
+      (fun (name, m) ->
+        Alcotest.test_case
+          (name ^ " plonk")
+          `Slow
+          (to_test ~plonk:(module Plonk.Main_protocol) m))
+      both

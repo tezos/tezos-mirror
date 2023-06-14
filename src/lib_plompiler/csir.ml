@@ -236,7 +236,7 @@ module CS = struct
              (* We list all the labels defined in the MOD_ARITH instantiations
                 at the end of [lib_plompiler/gadget_mod_arith.ml] for which we
                 want to enable addition. *)
-           ["25519"])
+           ["25519"; "64"])
       ~q_mod_mul:
         (List.map
            (fun label ->
@@ -244,7 +244,7 @@ module CS = struct
              (* We list all the labels defined in the MOD_ARITH instantiations
                 at the end of [lib_plompiler/gadget_mod_arith.ml] for which we
                 want to enable multiplication. *)
-           ["25519"])
+           ["25519"; "64"])
       ~q_plookup:[ThisConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
       ~q_table:[ThisConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
       ()

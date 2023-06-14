@@ -78,6 +78,7 @@ module Gadget = struct
   module Schnorr = Gadget_schnorr.Make (Mec.Curve.Jubjub.AffineEdwards)
   module Blake2s = Gadget_blake2s.Blake2s
   module ArithMod25519 = Gadget_mod_arith.ArithMod25519
+  module ArithMod64 = Gadget_mod_arith.ArithMod64
   module Sha256 = Gadget_sha2.SHA256
   module Sha512 = Gadget_sha2.SHA512
 end

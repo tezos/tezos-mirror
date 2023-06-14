@@ -134,6 +134,10 @@ module type MOD_ARITH = functor (L : LIB) -> sig
 
   val input_mod_int : ?kind:input_kind -> Z.t -> mod_int repr t
 
+  val mod_int_of_scalars : scalar list repr -> mod_int repr t
+
+  val scalars_of_mod_int : mod_int repr -> scalar list repr t
+
   val constant : Z.t -> mod_int repr t
 
   val zero : mod_int repr t
@@ -546,6 +550,13 @@ functor
       assert (Utils.is_power_of_2 Params.base) ;
       iterM (Num.range_check ~nb_bits:(Z.log2 Params.base)) (of_list i) >* ret i
 
+    let mod_int_of_scalars ls =
+      assert (List.compare_length_with (of_list ls) nb_limbs = 0) ;
+      iterM (Num.range_check ~nb_bits:(Z.log2 Params.base)) (of_list ls)
+      >* ret ls
+
+    let scalars_of_mod_int n = ret n
+
     let constant n = mapM Num.constant @@ scalar_limbs_of_z n <$> to_list
 
     let zero = constant Z.zero
@@ -662,4 +673,16 @@ module ArithMod25519 = Make (struct
   let moduli_add = [base]
 
   let moduli_mul = [base; Z.(base - one)]
+end)
+
+module ArithMod64 = Make (struct
+  let label = "64"
+
+  let modulus = Z.(shift_left one 64)
+
+  let base = Z.(shift_left one 64)
+
+  let moduli_add = []
+
+  let moduli_mul = []
 end)

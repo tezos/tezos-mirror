@@ -317,7 +317,7 @@ let tests =
   (* This test uses plonk and it is marked quick so that it
      is always run by the CI *)
   List.map
-    (fun (name, m) -> Alcotest.test_case name `Quick (to_test m))
+    (fun (name, m) -> Alcotest.test_case name `Slow (to_test m))
     (sha256 @ sha512)
   @ List.map
       (fun (name, m) ->
