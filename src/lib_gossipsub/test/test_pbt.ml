@@ -1018,7 +1018,8 @@ module Test_handle_ihave = struct
         return
           {
             (Default_limits.default_limits
-               ~mesh_message_deliveries_activation
+               ~mesh_message_deliveries_activation:
+                 (Milliseconds.of_int_s mesh_message_deliveries_activation)
                ())
             with
             max_sent_iwant_per_heartbeat;

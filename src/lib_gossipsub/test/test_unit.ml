@@ -185,6 +185,14 @@ let init_state ~rng ~limits ~parameters ~peers ~topics
   in
   state
 
+let gen_message =
+  let counter = ref 0 in
+  fun () ->
+    let message_id = !counter in
+    let message = "message" ^ string_of_int message_id in
+    incr counter ;
+    (message_id, message)
+
 (** Test that grafting an unknown topic is ignored.
 
     Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L4367 *)
@@ -2012,14 +2020,6 @@ let test_scoring_p2 rng _limits parameters =
           ~__LOC__
           "Output should have been Route_message or Already_received"
   in
-  let gen_message =
-    let counter = ref 0 in
-    fun () ->
-      let message_id = !counter in
-      let message = "message" ^ string_of_int message_id in
-      incr counter ;
-      (message_id, message)
-  in
   (* peer 0 delivers message first *)
   let message_id, message = gen_message () in
   let state = receive_message ~__LOC__ peers.(0) message_id message state in
@@ -2081,6 +2081,82 @@ let test_scoring_p2 rng _limits parameters =
       *. first_message_deliveries_weight)
     peers.(1)
     state ;
+  unit
+
+(** Test for P4 (Invalid Messages).
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L3895
+    and https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L3979 *)
+let test_scoring_p4 rng _limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Scoring P4"
+    ~tags:["gossipsub"; "scoring"; "p4"]
+  @@ fun () ->
+  let invalid_message_deliveries_weight = -2.0 in
+  let invalid_message_deliveries_decay = 0.9 in
+  let limits =
+    Default_limits.default_limits
+      ~time_in_mesh_weight:0.0 (* deactivate time in mesh *)
+      ~first_message_deliveries_weight:0.0
+        (* deactivate first time deliveries *)
+      ~mesh_message_deliveries_weight:0.0 (* deactivate message deliveries *)
+      ~mesh_failure_penalty_weight:0.0 (* deactivate mesh failure penalties *)
+      ~invalid_message_deliveries_weight
+      ~invalid_message_deliveries_decay
+      ()
+  in
+  let peers = make_peers ~number:1 in
+  let peer = Stdlib.List.hd peers in
+  let topic = "topic" in
+  (* build mesh with one peer *)
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  (* We remember the old validity function so we can recover it later.
+     We must recover the validity function as it is shared between the tests. *)
+  let validity_function_before = !Validity_hook.validity in
+  (* set validity function so all messages are invalid *)
+  Validity_hook.set (fun _ _ -> `Invalid) ;
+  (* peer sends us three invalid messages *)
+  let state =
+    Stdlib.List.init 3 (fun _i -> ())
+    |> List.fold_left
+         (fun state () ->
+           let message_id, message = gen_message () in
+           let state, _ =
+             GS.handle_receive_message
+               {sender = peer; topic; message_id; message}
+               state
+           in
+           state)
+         state
+  in
+  (* score should be
+     invalid_message_deliveries_weight * (number of invalid messages)^2 *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:(invalid_message_deliveries_weight *. 9.0)
+    peer
+    state ;
+  (* test decaying *)
+  (* refresh scores *)
+  let state, _ = GS.heartbeat state in
+  (* the number of invalids gets decayed by 0.9 and then squared in the score *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:
+      (invalid_message_deliveries_weight *. (3.0 *. 0.9) *. (3.0 *. 0.9))
+    peer
+    state ;
+  Validity_hook.set validity_function_before ;
   unit
 
 (** Test for P7 (Behavioural Penalty - Grafts before backoff).
@@ -2213,4 +2289,5 @@ let register rng limits parameters =
   test_heartbeat_scenario rng limits parameters ;
   test_scoring_p1 rng limits parameters ;
   test_scoring_p2 rng limits parameters ;
+  test_scoring_p4 rng limits parameters ;
   test_scoring_p7_grafts_before_backoff rng limits parameters

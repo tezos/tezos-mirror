@@ -151,7 +151,7 @@ struct
     mesh_failure_penalty *. mesh_failure_penalty_weight
 
   let p4 {invalid_message_deliveries_weight; _} {invalid_messages; _} =
-    invalid_messages *. invalid_message_deliveries_weight
+    invalid_messages *. invalid_messages *. invalid_message_deliveries_weight
 
   let topic_scores {parameters; topic_status; _} =
     Topic.Map.fold
