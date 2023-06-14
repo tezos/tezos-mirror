@@ -11,6 +11,12 @@ combinators.
 Examples/Tutorial
 -----------------
 
+The following is a very brief introduction to the data-encoding library.
+
+.. note::
+
+    A more complete documentation, including a full tutorial with many examples and a reference of all available combinators, is available in `data-encoding's API documentation <https://nomadic-labs.gitlab.io/data-encoding/data-encoding/tutorial.html>`__.
+
 Encoding an integer
 ~~~~~~~~~~~~~~~~~~~
 
