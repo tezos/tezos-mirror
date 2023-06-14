@@ -1412,6 +1412,85 @@ let test_preinitialized_evm_kernel =
       (sf "Expected to read %%L as dictator key, but found %%R instead") ;
   unit
 
+let test_deposit_fa12 =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "deposit"]
+    ~title:"Deposit FA1.2 token"
+  @@ fun protocol ->
+  let admin = Constant.bootstrap5 in
+  let* {
+         client;
+         sc_rollup_address;
+         deposit_addresses;
+         sc_rollup_node;
+         node;
+         endpoint;
+         _;
+       } =
+    setup_evm_kernel ~deposit_admin:(Some admin) protocol
+  in
+  let {fa12; bridge} =
+    match deposit_addresses with
+    | Some x -> x
+    | None -> Test.fail ~__LOC__ "The test needs the L1 bridge"
+  in
+
+  (* Asserts that L1 bridge targets the EVM rollup. *)
+  let* bridge_evm_storage =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_storage ~id:bridge ()
+  in
+  let bridge_evm_rollup =
+    match JSON.encode bridge_evm_storage =~* rex "\"(sr1.+)\"" with
+    | Some rollup -> rollup
+    | None ->
+        Test.fail ~__LOC__ "EVM rollup address not found in bridge contract"
+  in
+  Check.((sc_rollup_address = bridge_evm_rollup) string)
+    ~error_msg:
+      (sf
+         "The bridge does not target the expected EVM rollup, found %%R \
+          expected %%L") ;
+
+  (* Gives enough allowance to the bridge. *)
+  let amount_cmutez = 100_000_000 in
+  let amount_ctez = 100 in
+  let* () =
+    Client.from_fa1_2_contract_approve
+      ~burn_cap:Tez.one
+      ~contract:fa12
+      ~as_:admin.public_key_hash
+      ~amount:amount_cmutez
+      ~from:bridge
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+
+  (* Deposit tokens to the EVM rollup. *)
+  let receiver = "0x119811f34EF4491014Fbc3C969C426d37067D6A4" in
+  let* () =
+    Client.transfer
+      ~entrypoint:"deposit"
+      ~arg:(sf {|Pair (Pair %d %s) 1|} amount_cmutez receiver)
+      ~amount:Tez.zero
+      ~giver:admin.public_key_hash
+      ~receiver:bridge
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = next_evm_level ~sc_rollup_node ~node ~client in
+
+  (* Check the balance in the EVM rollup. *)
+  let* balance = Eth_cli.balance ~account:receiver ~endpoint in
+  Check.((balance = Wei.of_eth_int amount_ctez) Wei.typ)
+    ~error_msg:
+      (sf
+         "Expected balance of %s should be %%R, but got %%L"
+         Eth_account.bootstrap_accounts.(0).address) ;
+
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -1437,6 +1516,7 @@ let register_evm_proxy_server ~protocols =
   test_eth_call_storage_contract_proxy protocols ;
   test_eth_call_storage_contract_eth_cli protocols ;
   test_eth_call_large protocols ;
-  test_preinitialized_evm_kernel protocols
+  test_preinitialized_evm_kernel protocols ;
+  test_deposit_fa12 protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
