@@ -987,6 +987,12 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let handle sender topic message_id message =
       let open Monad.Syntax in
+      let*! mesh_opt = find_mesh topic in
+      let*? peers_in_mesh =
+        match mesh_opt with
+        | Some peers -> pass peers
+        | None -> fail Not_subscribed
+      in
       let*? () =
         let*! message_cache in
         match Message_cache.get_first_seen_time message_id message_cache with
@@ -999,12 +1005,6 @@ module Make (C : AUTOMATON_CONFIG) :
             fail Already_received
       in
       let*? () = check_valid sender topic message message_id in
-      let*! mesh_opt = find_mesh topic in
-      let*? peers_in_mesh =
-        match mesh_opt with
-        | Some peers -> pass peers
-        | None -> fail Not_subscribed
-      in
       let peers = Peer.Set.remove sender peers_in_mesh in
       let* () = put_message_in_cache message_id message topic in
       let* () =
