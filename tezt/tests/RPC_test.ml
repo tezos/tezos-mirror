@@ -774,8 +774,8 @@ let bake_empty_block ?endpoint client =
 
    Testing RPCs monitor_operations and pending_operations:
 
-   We create an applied operation and three operations that fail
-   to be applied. Each one of these failed operations has a different
+   We create a validated operation and three operations that fail
+   to be validated. Each one of these failed operations has a different
    classification to test every possibility of the monitor_operations and
    pending_operations RPCs. The error classifications are the following :
    - Branch_refused (Branch error classification in protocol)
@@ -865,7 +865,7 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
         ]
         client)
   in
-  (* Applied op *)
+  (* Validated op *)
   let* _ =
     Operation.Manager.(
       inject
@@ -911,7 +911,7 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
   let expected_manager_mempool =
     {
       Mempool.empty with
-      applied = complete_mempool.applied;
+      validated = complete_mempool.validated;
       refused = complete_mempool.refused;
       branch_refused = complete_mempool.branch_refused;
       branch_delayed = complete_mempool.branch_delayed;
@@ -953,7 +953,7 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
           Mempool.get_mempool
             ?endpoint
             ~hooks:mempool_hooks
-            ~applied:(i = `Applied)
+            ~validated:(i = `Validated)
             ~refused:(i = `Refused)
             ~branch_delayed:(i = `Branch_delayed)
             ~branch_refused:(i = `Branch_refused)
@@ -964,7 +964,7 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
         let expected_mempool =
           Mempool.
             {
-              applied = may_get_field `Applied complete_mempool.applied;
+              validated = may_get_field `Validated complete_mempool.validated;
               refused = may_get_field `Refused complete_mempool.refused;
               outdated = may_get_field `Outdated complete_mempool.outdated;
               branch_refused =
@@ -979,7 +979,7 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
             Mempool.classified_typ
             ~error_msg:"Expected mempool %L, got %R") ;
         unit)
-      [`Applied; `Refused; `Branch_delayed; `Branch_refused; `Outdated]
+      [`Validated; `Refused; `Branch_delayed; `Branch_refused; `Outdated]
   in
   (* We spawn a second monitor_operation RPC that monitor operations
      reclassified with errors. *)

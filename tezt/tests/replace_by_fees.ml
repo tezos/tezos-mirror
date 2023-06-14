@@ -61,8 +61,8 @@ type two_nodes = Manager_operations.two_nodes = {
 }
 
 (* Some local helper and wapper functions *)
-let check_applied ~__LOC__ nodes inject =
-  Memchecks.with_applied_checks
+let check_validated ~__LOC__ nodes inject =
+  Memchecks.with_validated_checks
     ~__LOC__
     nodes
     ~expected_statuses:[]
@@ -75,11 +75,11 @@ let check_branch_delayed ~__LOC__ nodes inject =
 let check_refused ~__LOC__ nodes inject =
   Memchecks.with_refused_checks ~__LOC__ ~bake:false nodes inject
 
-let op_is_applied ~__LOC__ nodes opH =
+let op_is_validated ~__LOC__ nodes opH =
   Lwt_list.iter_s
     (fun client ->
       let* mempool = Mempool.get_mempool client in
-      Memchecks.check_operation_is_in_mempool ~__LOC__ `Applied mempool opH ;
+      Memchecks.check_operation_is_in_mempool ~__LOC__ `Validated mempool opH ;
       unit)
     [nodes.main.client; nodes.observer.client]
 
@@ -180,14 +180,14 @@ let mk_batch client op_data size =
      forge and inject it, and monitor its propagation through a main and an
      observer nodes using function [incheck2],
    - use function [postcheck2] to make some checks about the operations
-     once the second one is injected (eg. is the first operation applied or
+     once the second one is injected (eg. is the first operation validated or
      removed ? ...)
    - if a third operation and its checkers are provided:
    + construct a third (eventually batched) operation with the same manager,
      forge and inject it, and monitor its propagation through a main and an
      observer nodes using function [incheck3],
    + use function [postcheck3] to make some checks about the operations (eg.
-   to check which one is applied, which one is removed, ...)
+   to check which one is validated, which one is removed, ...)
 *)
 let replacement_test_helper ~title ~__LOC__ ~op1 ?(size1 = 1) ~op2 ?(size2 = 1)
     ~incheck1 ~incheck2 ~postcheck2 ?op3 ?(size3 = 1) ?incheck3 ?postcheck3 () =
@@ -226,8 +226,8 @@ let identical_operations =
     ~title:"Injecting the same operation twice"
     ~op1:default_op
     ~op2:default_op
-    ~incheck1:check_applied
-    ~incheck2:check_applied
+    ~incheck1:check_validated
+    ~incheck2:check_validated
     ~postcheck2:(fun _nodes h1 h2 ->
       assert (h1 = h2) ;
       unit)
@@ -240,9 +240,9 @@ let same_gas_and_fees_but_different_ops =
     ~title:"Inject two different operations with same gas and fee"
     ~op1:default_op
     ~op2:{default_op with amount = default_amount + 1}
-    ~incheck1:check_applied
+    ~incheck1:check_validated
     ~incheck2:check_branch_delayed
-    ~postcheck2:(fun nodes h1 _h2 -> op_is_applied ~__LOC__ nodes h1)
+    ~postcheck2:(fun nodes h1 _h2 -> op_is_validated ~__LOC__ nodes h1)
     ()
 
 (* Fees of 2nd operation just below replacement threshold. *)
@@ -252,9 +252,9 @@ let replacement_fees_below_threshold =
     ~title:"Second op's fees are below threshold by 1 mutez"
     ~op1:default_op
     ~op2:{replacement_op with fee = replacement_op.fee - 1}
-    ~incheck1:check_applied
+    ~incheck1:check_validated
     ~incheck2:check_branch_delayed
-    ~postcheck2:(fun nodes h1 _h2 -> op_is_applied ~__LOC__ nodes h1)
+    ~postcheck2:(fun nodes h1 _h2 -> op_is_validated ~__LOC__ nodes h1)
     ()
 
 (* Fees of 2nd operation equal to replacement threshold. *)
@@ -264,8 +264,8 @@ let replacement_fees_equal_to_threshold =
     ~title:"Second op's fees are equal to replacement fees threshold"
     ~op1:default_op
     ~op2:replacement_op
-    ~incheck1:check_applied
-    ~incheck2:check_applied
+    ~incheck1:check_validated
+    ~incheck2:check_validated
     ~postcheck2:(fun nodes h1 _h2 -> op_is_outdated ~__LOC__ nodes h1)
     ()
 
@@ -276,8 +276,8 @@ let replacement_fees_above_threshold =
     ~title:"Second op's fees are above replacement fees threshold by 1 mutez"
     ~op1:default_op
     ~op2:{replacement_op with fee = replacement_op.fee + 1}
-    ~incheck1:check_applied
-    ~incheck2:check_applied
+    ~incheck1:check_validated
+    ~incheck2:check_validated
     ~postcheck2:(fun nodes h1 _h2 -> op_is_outdated ~__LOC__ nodes h1)
     ()
 
@@ -291,12 +291,12 @@ let third_operation_fees_below_replacement_threshold =
     ~title:"Replace a replacement requires bumping fees again"
     ~op1:default_op
     ~op2
-    ~incheck1:check_applied
-    ~incheck2:check_applied
+    ~incheck1:check_validated
+    ~incheck2:check_validated
     ~postcheck2:(fun nodes h1 _h2 -> op_is_outdated ~__LOC__ nodes h1)
     ~op3:{default_op with fee = minimal_replacement_fee op2.fee - 1}
     ~incheck3:check_branch_delayed
-    ~postcheck3:(fun nodes _h1 h2 _h3 -> op_is_applied ~__LOC__ nodes h2)
+    ~postcheck3:(fun nodes _h1 h2 _h3 -> op_is_validated ~__LOC__ nodes h2)
     ()
 
 (* Fees of 2nd operation just above replacement threshold of the
@@ -309,11 +309,11 @@ let third_operation_fees_equal_to_replacement_threshold =
     ~title:"Replace a replacement op with enough fees"
     ~op1:default_op
     ~op2
-    ~incheck1:check_applied
-    ~incheck2:check_applied
+    ~incheck1:check_validated
+    ~incheck2:check_validated
     ~postcheck2:(fun nodes h1 _h2 -> op_is_outdated ~__LOC__ nodes h1)
     ~op3:{op2 with fee = minimal_replacement_fee op2.fee}
-    ~incheck3:check_applied
+    ~incheck3:check_validated
     ~postcheck3:(fun nodes _h1 h2 _h3 -> op_is_outdated ~__LOC__ nodes h2)
     ()
 
@@ -325,9 +325,9 @@ let replacement_fees_equal_to_threshold_but_gas_increased =
     ~title:"Second op's fees are equal to replacement fees. But gas increased"
     ~op1:default_op
     ~op2:{replacement_op with gas = replacement_op.gas + 1}
-    ~incheck1:check_applied
+    ~incheck1:check_validated
     ~incheck2:check_branch_delayed
-    ~postcheck2:(fun nodes h1 _h2 -> op_is_applied ~__LOC__ nodes h1)
+    ~postcheck2:(fun nodes h1 _h2 -> op_is_validated ~__LOC__ nodes h1)
     ()
 
 (* Fees of 2nd operation just below replacement threshold. Even if the gas
@@ -341,9 +341,9 @@ let replacement_fees_below_threshold_even_if_gas_is_decreased =
       "Second op's gas descreased by 1, but still no enough replacement fees"
     ~op1:default_op
     ~op2:{op2 with fee = op2.fee - 1; gas = op2.gas - 1}
-    ~incheck1:check_applied
+    ~incheck1:check_validated
     ~incheck2:check_branch_delayed
-    ~postcheck2:(fun nodes h1 _h2 -> op_is_applied ~__LOC__ nodes h1)
+    ~postcheck2:(fun nodes h1 _h2 -> op_is_validated ~__LOC__ nodes h1)
     ()
 
 (* The ratio fee/gas is far better than the first one, but the current
@@ -358,14 +358,14 @@ let fees_of_second_op_below_fees_of_first_one =
     ~title:"Op2's gas/fee is more important, but fees are not higher than max"
     ~op1
     ~op2
-    ~incheck1:check_applied
+    ~incheck1:check_validated
     ~incheck2:check_branch_delayed
-    ~postcheck2:(fun nodes h1 _h2 -> op_is_applied ~__LOC__ nodes h1)
+    ~postcheck2:(fun nodes h1 _h2 -> op_is_validated ~__LOC__ nodes h1)
     ()
 
 (* The second operation has much more fees than the first one, and a
    better fee/gas ratio. But its counter is in the future. It cannot be
-   applied, and thus replace the first operation *)
+   validated, and thus replace the first operation *)
 let cannot_replace_with_an_op_having_diffrent_counter =
   let get_counter client =
     let* counter = get_counter client in
@@ -378,14 +378,14 @@ let cannot_replace_with_an_op_having_diffrent_counter =
     ~title:"Much more fees in second op, but counter in the future"
     ~op1:default_op
     ~op2
-    ~incheck1:check_applied
+    ~incheck1:check_validated
     ~incheck2:check_branch_delayed
-    ~postcheck2:(fun nodes h1 _h2 -> op_is_applied ~__LOC__ nodes h1)
+    ~postcheck2:(fun nodes h1 _h2 -> op_is_validated ~__LOC__ nodes h1)
     ()
 
-(* The first operation is not applied. So the second operation doesn't need to
-   have fees at least equal to "replacement fees threshold" to be applied. *)
-let cannot_replace_a_non_applied_operation =
+(* The first operation is not validated. So the second operation doesn't need to
+   have fees at least equal to "replacement fees threshold" to be validated. *)
+let cannot_replace_a_non_validated_operation =
   let get_counter client =
     let* counter = get_counter client in
     (* counter in the future*)
@@ -394,11 +394,12 @@ let cannot_replace_a_non_applied_operation =
   let op1 = {default_op with get_counter} in
   replacement_test_helper
     ~__LOC__
-    ~title:"First operation not applied, second one applied with default fees"
+    ~title:
+      "First operation not validated, second one validated with default fees"
     ~op1
     ~op2:default_op
     ~incheck1:check_branch_delayed
-    ~incheck2:check_applied
+    ~incheck2:check_validated
     ~postcheck2:(fun _nodes _h1 _h2 -> unit)
     ()
 
@@ -411,9 +412,9 @@ let replace_simple_op_with_a_batched_low_fees =
     ~op1:default_op
     ~op2:{default_op with fee = (replacement_fee / 2) + 1}
     ~size2:2
-    ~incheck1:check_applied
+    ~incheck1:check_validated
     ~incheck2:check_branch_delayed
-    ~postcheck2:(fun nodes h1 _h2 -> op_is_applied ~__LOC__ nodes h1)
+    ~postcheck2:(fun nodes h1 _h2 -> op_is_validated ~__LOC__ nodes h1)
     ()
 
 (* Sum of fees of the second operation is ok, and gas is ok in the
@@ -425,8 +426,8 @@ let replace_simple_op_with_a_batched =
     ~op1:{default_op with gas = default_gas * 2}
     ~op2:{default_op with gas = default_gas; fee = (replacement_fee / 2) + 1}
     ~size2:2
-    ~incheck1:check_applied
-    ~incheck2:check_applied
+    ~incheck1:check_validated
+    ~incheck2:check_validated
     ~postcheck2:(fun nodes h1 _h2 -> op_is_outdated ~__LOC__ nodes h1)
     ()
 
@@ -438,9 +439,9 @@ let replace_batched_op_with_simple_one_low_fees =
     ~op1:default_op
     ~size1:2
     ~op2:replacement_op
-    ~incheck1:check_applied
+    ~incheck1:check_validated
     ~incheck2:check_branch_delayed
-    ~postcheck2:(fun nodes h1 _h2 -> op_is_applied ~__LOC__ nodes h1)
+    ~postcheck2:(fun nodes h1 _h2 -> op_is_validated ~__LOC__ nodes h1)
     ()
 
 (* Replacing a batched op is possible if enough fees are provided *)
@@ -451,8 +452,8 @@ let replace_batched_op_with_simple_one =
     ~op1:{default_op with fee = default_op.fee / 2}
     ~size1:2
     ~op2:replacement_op
-    ~incheck1:check_applied
-    ~incheck2:check_applied
+    ~incheck1:check_validated
+    ~incheck2:check_validated
     ~postcheck2:(fun nodes h1 _h2 -> op_is_outdated ~__LOC__ nodes h1)
     ()
 
@@ -464,9 +465,9 @@ let low_balance_to_pay_fees =
     ~op1:default_op
     ~op2:{default_op with fee = max_int}
     ~size2:2
-    ~incheck1:check_applied
+    ~incheck1:check_validated
     ~incheck2:check_branch_delayed
-    ~postcheck2:(fun nodes h1 _h2 -> op_is_applied ~__LOC__ nodes h1)
+    ~postcheck2:(fun nodes h1 _h2 -> op_is_validated ~__LOC__ nodes h1)
     ()
 
 (* Sum of fees of the 2nd operation overflow on int64. *)
@@ -477,12 +478,12 @@ let sum_fees_overflow =
     ~op1:default_op
     ~op2:{default_op with fee = max_int}
     ~size2:10
-    ~incheck1:check_applied
+    ~incheck1:check_validated
       (* We notice that the source cannot afford the fees before finding
          out that the fees overflow, hence the branch_delayed
          classification instead of refused. *)
     ~incheck2:check_branch_delayed
-    ~postcheck2:(fun nodes h1 _h2 -> op_is_applied ~__LOC__ nodes h1)
+    ~postcheck2:(fun nodes h1 _h2 -> op_is_validated ~__LOC__ nodes h1)
     ()
 
 let register ~protocols =
@@ -497,7 +498,7 @@ let register ~protocols =
   replacement_fees_below_threshold_even_if_gas_is_decreased protocols ;
   fees_of_second_op_below_fees_of_first_one protocols ;
   cannot_replace_with_an_op_having_diffrent_counter protocols ;
-  cannot_replace_a_non_applied_operation protocols ;
+  cannot_replace_a_non_validated_operation protocols ;
   replace_simple_op_with_a_batched_low_fees protocols ;
   replace_simple_op_with_a_batched protocols ;
   replace_batched_op_with_simple_one_low_fees protocols ;

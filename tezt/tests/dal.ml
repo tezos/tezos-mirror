@@ -677,7 +677,7 @@ let test_slot_management_logic _protocol parameters cryptobox node client
   in
   let* mempool = Mempool.get_mempool client in
   let expected_mempool =
-    Mempool.{empty with applied = [oph1; oph2; oph3; oph4; oph5; oph6]}
+    Mempool.{empty with validated = [oph1; oph2; oph3; oph4; oph5; oph6]}
   in
   Check.(
     (mempool = expected_mempool)
@@ -803,18 +803,18 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
   let outdated = [h1; h2] in
   let* () = mempool_is ~__LOC__ Mempool.{empty with outdated} in
   let* (`OpHash h3) = attest ~level:(now + 1) in
-  let applied = [h3] in
-  let* () = mempool_is ~__LOC__ Mempool.{empty with outdated; applied} in
+  let validated = [h3] in
+  let* () = mempool_is ~__LOC__ Mempool.{empty with outdated; validated} in
   let* (`OpHash h4) = attest ~level:(now + 2) in
   let branch_delayed = [h4] in
   let* () =
-    mempool_is ~__LOC__ Mempool.{empty with outdated; applied; branch_delayed}
+    mempool_is ~__LOC__ Mempool.{empty with outdated; validated; branch_delayed}
   in
   let* () = Client.bake_for_and_wait client in
-  let applied = [h4] in
+  let validated = [h4] in
   let branch_delayed = [] in
   let* () =
-    mempool_is ~__LOC__ Mempool.{empty with outdated; applied; branch_delayed}
+    mempool_is ~__LOC__ Mempool.{empty with outdated; validated; branch_delayed}
   in
   let* () = check_slots_availability ~__LOC__ ~attested:[] in
   (* Part B.
@@ -835,9 +835,9 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
       node
       client
   in
-  let applied = h5 :: applied in
+  let validated = h5 :: validated in
   let* () =
-    mempool_is ~__LOC__ Mempool.{empty with outdated; applied; branch_delayed}
+    mempool_is ~__LOC__ Mempool.{empty with outdated; validated; branch_delayed}
   in
   let* () = Client.bake_for_and_wait client in
   let now = Node.get_level node in
@@ -846,23 +846,23 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
     let* hashes = dal_attestations ~force:true ~nb_slots ~level [10] client in
     return @@ List.map (fun (`OpHash h) -> h) hashes
   in
-  let applied = [] in
+  let validated = [] in
   let branch_delayed = attestation_ops in
   let* () =
-    mempool_is ~__LOC__ Mempool.{empty with outdated; applied; branch_delayed}
+    mempool_is ~__LOC__ Mempool.{empty with outdated; validated; branch_delayed}
   in
   let* () = repeat (lag - 1) (fun () -> Client.bake_for_and_wait client) in
-  let applied = attestation_ops in
+  let validated = attestation_ops in
   let branch_delayed = [] in
   let* () =
-    mempool_is ~__LOC__ Mempool.{empty with outdated; applied; branch_delayed}
+    mempool_is ~__LOC__ Mempool.{empty with outdated; validated; branch_delayed}
   in
   let* () = check_slots_availability ~__LOC__ ~attested:[] in
   let* () = Client.bake_for_and_wait client in
-  let applied = [] in
+  let validated = [] in
   let branch_delayed = [] in
   let* () =
-    mempool_is ~__LOC__ Mempool.{empty with outdated; applied; branch_delayed}
+    mempool_is ~__LOC__ Mempool.{empty with outdated; validated; branch_delayed}
   in
   check_slots_availability ~__LOC__ ~attested:[10]
 

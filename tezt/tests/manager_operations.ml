@@ -305,7 +305,7 @@ end
     their inclusion in a block. *)
 module Memchecks = struct
   let string_of_classification = function
-    | `Applied -> "applied"
+    | `Validated -> "validated"
     | `Refused -> "refused"
     | `Branch_refused -> "branch_refused"
     | `Branch_delayed -> "branch_delayed"
@@ -315,7 +315,7 @@ module Memchecks = struct
   let string_of_ext_classification = function
     | `Absent -> "absent"
     | `Not c -> "not " ^ string_of_classification c
-    | ( `Applied | `Refused | `Branch_refused | `Branch_delayed | `Outdated
+    | ( `Validated | `Refused | `Branch_refused | `Branch_delayed | `Outdated
       | `Unprocessed ) as c ->
         string_of_classification c
 
@@ -324,7 +324,7 @@ module Memchecks = struct
     | None ->
         List.concat
           [
-            mempool.applied;
+            mempool.validated;
             mempool.refused;
             mempool.branch_refused;
             mempool.branch_delayed;
@@ -333,7 +333,7 @@ module Memchecks = struct
           ]
     | Some c -> (
         match c with
-        | `Applied -> mempool.applied
+        | `Validated -> mempool.validated
         | `Refused -> mempool.refused
         | `Branch_refused -> mempool.branch_refused
         | `Branch_delayed -> mempool.branch_delayed
@@ -367,7 +367,7 @@ module Memchecks = struct
         (sf "expected %%L to not be in %s = %%R %s" classification_str explain)
 
   type classification =
-    [ `Applied
+    [ `Validated
     | `Branch_delayed
     | `Branch_refused
     | `Outdated
@@ -380,7 +380,7 @@ module Memchecks = struct
   let check_operation_classification ~__LOC__ classification ?explain mempool
       oph =
     match classification with
-    | ( `Applied | `Refused | `Branch_refused | `Branch_delayed | `Outdated
+    | ( `Validated | `Refused | `Branch_refused | `Branch_delayed | `Outdated
       | `Unprocessed ) as classification ->
         check_operation_is_in_mempool
           ~__LOC__
@@ -553,9 +553,9 @@ module Memchecks = struct
       - Check that the operation is included in said block
       - Check that the operation is not in the mempool anymore
   *)
-  let with_applied_checks ~__LOC__ nodes ~expected_statuses ?expected_errors
-      ?(bake = true) ?(observer_classification = `Applied) inject =
-    Log.subsection "Checking applied operation" ;
+  let with_validated_checks ~__LOC__ nodes ~expected_statuses ?expected_errors
+      ?(bake = true) ?(observer_classification = `Validated) inject =
+    Log.subsection "Checking validated operation" ;
     let* _ = Events.wait_sync nodes in
     let client = nodes.main.client in
     let wait_observer = Events.wait_for_notify nodes.observer.node in
@@ -563,7 +563,7 @@ module Memchecks = struct
     let* (`OpHash oph) = inject () in
     let* mempool_after_injection = Mempool.get_mempool client in
     check_operation_is_in_mempool
-      `Applied
+      `Validated
       ~__LOC__
       ~explain:"after injection"
       mempool_after_injection
@@ -579,7 +579,7 @@ module Memchecks = struct
     let* mempool_observer = Mempool.get_mempool nodes.observer.client in
     let check_observer_mempool =
       match observer_classification with
-      | ( `Applied | `Refused | `Branch_refused | `Branch_delayed | `Outdated
+      | ( `Validated | `Refused | `Branch_refused | `Branch_delayed | `Outdated
         | `Unprocessed ) as classification ->
           check_operation_is_in_mempool classification
       | `Absent -> check_operation_not_in_mempool ?classification:None
@@ -600,7 +600,7 @@ module Memchecks = struct
       let* mempool_after_baking = Mempool.get_mempool client in
       check_operation_not_in_mempool
         ~__LOC__
-        ~classification:`Applied
+        ~classification:`Validated
         ~explain:"after baking"
         mempool_after_baking
         oph ;
@@ -764,7 +764,7 @@ module Illtyped_originations = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* _oph =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:["failed"]
@@ -787,7 +787,7 @@ module Illtyped_originations = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* _oph =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:["failed"]
@@ -810,7 +810,7 @@ module Illtyped_originations = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* _oph =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:["failed"]
@@ -900,7 +900,7 @@ module Deserialisation = struct
     let gas_for_the_rest = gas_to_execute_rest_noop protocol in
     (* This is specific to this contract, obtained empirically *)
     let* _ =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:["applied"]
@@ -955,7 +955,7 @@ module Deserialisation = struct
     let gas_for_the_rest = gas_to_execute_rest_noop protocol in
     (* This is specific to this contract, obtained empirically *)
     let* _ =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:["failed"]
@@ -1004,7 +1004,7 @@ module Gas_limits = struct
         nodes.main.client
     in
     let* _oph =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:["applied"; "applied"]
@@ -1257,7 +1257,7 @@ module Simple_transfers = struct
     in
     let bal = Tez.to_mutez bal in
     let* _ =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:["failed"]
@@ -1428,7 +1428,7 @@ module Simple_transfers = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* _ =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:[]
@@ -1460,7 +1460,7 @@ module Simple_transfers = struct
     let to_transfer = balance - fee - 1 in
     (* In theory, if the operation succeeds, there will remain 1 mutez on the account *)
     let* _ =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:["backtracked"]
@@ -1500,7 +1500,7 @@ module Simple_transfers = struct
     let to_transfer = balance - fee in
     (* In theory, if the operation succeeds, there will remain 0 mutez on the account *)
     let* _ =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:["backtracked"]
@@ -1538,7 +1538,7 @@ module Simple_transfers = struct
     (* subtract revelation fees *)
     let to_transfer = balance - fee in
     let* _ =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:["applied"]
@@ -1570,7 +1570,7 @@ module Simple_transfers = struct
       Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
     in
     let* _ =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:[]
@@ -1599,7 +1599,7 @@ module Simple_transfers = struct
         nodes.main.client
     in
     let* _ =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:[]
@@ -1616,8 +1616,8 @@ module Simple_transfers = struct
     let* _ =
       Memchecks.with_branch_delayed_checks
         ~__LOC__ (* ~classification_after_flush:`Branch_delayed *)
-        ~classification_after_flush:`Applied
-        ~should_include:false (* applied after flush *)
+        ~classification_after_flush:`Validated
+        ~should_include:false (* validated after flush *)
         nodes
       @@ fun () ->
       Operation.inject_transfer
@@ -1710,7 +1710,7 @@ module Simple_contract_calls = struct
         ["mini_scenarios"; "parsable_contract"]
     in
     let* _ =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:["applied"]
@@ -1739,7 +1739,7 @@ module Simple_contract_calls = struct
         ["mini_scenarios"; "parsable_contract"]
     in
     let* _ =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:["failed"]
@@ -1769,7 +1769,7 @@ module Simple_contract_calls = struct
         ["mini_scenarios"; "parsable_contract"]
     in
     let* _ =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:["failed"]
@@ -1800,7 +1800,7 @@ module Simple_contract_calls = struct
         ["mini_scenarios"; "parsable_contract"]
     in
     let* _ =
-      Memchecks.with_applied_checks
+      Memchecks.with_validated_checks
         ~__LOC__
         nodes
         ~expected_statuses:["failed"]

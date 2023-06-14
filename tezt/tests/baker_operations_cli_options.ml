@@ -126,7 +126,7 @@ let test_ignore_node_mempool =
   in
   let* () = Client.bake_for_and_wait ~ignore_node_mempool:true client in
   let* mempool = Mempool.get_mempool client in
-  Mempool.check_mempool ~applied:[oph] mempool ;
+  Mempool.check_mempool ~validated:[oph] mempool ;
   let* balance1 = Client.get_balance_for ~account:sender.alias client in
   Check.(
     (balance1 = balance0)
@@ -138,7 +138,7 @@ let test_ignore_node_mempool =
      next block *)
   let* () = Client.bake_for_and_wait ~ignore_node_mempool:false client in
   let* mempool = Mempool.get_mempool client in
-  Mempool.check_mempool ~applied:[] mempool ;
+  Mempool.check_mempool ~validated:[] mempool ;
   let* balance2 = Client.get_balance_for ~account:sender.alias client in
   Check.(
     (balance2 = Tez.(balance0 - amount - fee))
@@ -252,18 +252,19 @@ let test_bake_empty_operations protocols =
 type mempool_op = {branch : string; contents : JSON.t list; signature : string}
 
 let get_operations client =
-  let to_op applied_op =
+  let to_op validated_op =
     JSON.
       {
-        branch = applied_op |-> "branch" |> as_string;
-        contents = applied_op |-> "contents" |> as_list;
-        signature = applied_op |-> "signature" |> as_string;
+        branch = validated_op |-> "branch" |> as_string;
+        contents = validated_op |-> "contents" |> as_list;
+        signature = validated_op |-> "signature" |> as_string;
       }
   in
   let* mempool =
-    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+    RPC.Client.call client
+    @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
   in
-  return JSON.(mempool |-> "applied" |> as_list |> List.map to_op)
+  return JSON.(mempool |-> "validated" |> as_list |> List.map to_op)
 
 let encode_operations ops =
   let encode_operation op =
