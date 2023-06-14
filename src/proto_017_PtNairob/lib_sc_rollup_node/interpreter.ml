@@ -150,7 +150,7 @@ let process_head (node_ctxt : _ Node_context.t) ctxt
     the messages the block ([remaining_messages]). *)
 let start_state_of_block node_ctxt (block : Sc_rollup_block.t) =
   let open Lwt_result_syntax in
-  let pred_level = Raw_level.to_int32 block.header.level |> Int32.pred in
+  let pred_level = Int32.pred block.header.level in
   let* ctxt =
     Node_context.checkout_context node_ctxt block.header.predecessor
   in
@@ -160,9 +160,16 @@ let start_state_of_block node_ctxt (block : Sc_rollup_block.t) =
       ctxt
       Layer1.{hash = block.header.predecessor; level = pred_level}
   in
-  let* inbox = Node_context.get_inbox node_ctxt block.header.inbox_hash in
+  let* inbox =
+    Node_context.get_inbox
+      node_ctxt
+      (Sc_rollup_proto_types.Inbox_hash.of_octez block.header.inbox_hash)
+  in
   let* {is_first_block; predecessor; predecessor_timestamp; messages} =
-    Node_context.get_messages node_ctxt block.header.inbox_witness
+    Node_context.get_messages
+      node_ctxt
+      (Sc_rollup_proto_types.Merkelized_payload_hashes_hash.of_octez
+         block.header.inbox_witness)
   in
   let inbox_level = Sc_rollup.Inbox.inbox_level inbox in
   let module PVM = (val node_ctxt.pvm) in
@@ -215,9 +222,8 @@ let state_of_tick_aux node_ctxt ~start_state (event : Sc_rollup_block.t) tick =
   let* start_state =
     match start_state with
     | Some start_state
-      when Raw_level.(
-             start_state.Fueled_pvm.Accounted.inbox_level = event.header.level)
-      ->
+      when Raw_level.to_int32 start_state.Fueled_pvm.Accounted.inbox_level
+           = event.header.level ->
         return start_state
     | _ ->
         (* Recompute start state on level change or if we don't have a
@@ -266,7 +272,7 @@ let state_of_tick node_ctxt ?start_state tick level =
   match event with
   | None -> return_none
   | Some event ->
-      assert (Raw_level.(event.header.level <= level)) ;
+      assert (event.header.level <= Raw_level.to_int32 level) ;
       let* result_state =
         if Node_context.is_loser node_ctxt then
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/5253
