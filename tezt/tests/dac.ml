@@ -2952,6 +2952,40 @@ module Api_regression = struct
         ~path_and_query:
           (sf "%s/certificates/%s" v0_api_prefix (Hex.show root_hash))
         coordinator_node
+
+    (** [test_observer_get_missing_page] regression tests "GET v0/missing_page". *)
+    let test_observer_get_missing_page
+        Scenarios.{coordinator_node; observer_nodes; committee_members_nodes; _}
+        =
+      let* () =
+        Full_infrastructure.init_run_and_subscribe_nodes
+          coordinator_node
+          (committee_members_nodes @ observer_nodes)
+      in
+      let expected_rh =
+        "00a3703854279d2f377d689163d1ec911a840d84b56c4c6f6cafdf0610394df7c6"
+      in
+      let committee_members_processed_rh_promise =
+        List.map
+          (fun committee_member_node ->
+            wait_for_received_root_hash_processed
+              committee_member_node
+              expected_rh)
+          committee_members_nodes
+      in
+      let* root_hash =
+        Full_infrastructure.coordinator_serializes_payload
+          coordinator_node
+          ~expected_rh
+      in
+      let* () = Lwt.join committee_members_processed_rh_promise in
+      let observer_node = List.hd observer_nodes in
+      (* Test starts here. *)
+      rpc_call_with_regression_test
+        `GET
+        ~path_and_query:
+          (sf "%s/missing_page/%s" v0_api_prefix (Hex.show root_hash))
+        observer_node
   end
 end
 
@@ -3162,4 +3196,13 @@ let register ~protocols =
     ~allow_regression:true
     "test GET v0/certificate"
     Api_regression.V0.test_get_certificate
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:1
+    ~committee_size:3
+    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~allow_regression:true
+    "test GET v0/missing_page"
+    Api_regression.V0.test_observer_get_missing_page
     protocols
