@@ -684,23 +684,40 @@ let block_with_tick ({store; _} as node_ctxt) ~max_level tick =
      in
      tick_search ~big_step_blocks:4096 node_ctxt head (Sc_rollup.Tick.to_z tick)
 
-let get_commitment {store; _} commitment_hash =
+let find_octez_commitment {store; _} commitment_hash =
   let open Lwt_result_syntax in
-  let* commitment = Store.Commitments.read store.commitments commitment_hash in
+  let+ commitment = Store.Commitments.read store.commitments commitment_hash in
+  Option.map fst commitment
+
+let find_commitment node_ctxt commitment_hash =
+  let open Lwt_result_syntax in
+  let commitment_hash =
+    Sc_rollup_proto_types.Commitment_hash.to_octez commitment_hash
+  in
+  let+ commitment = find_octez_commitment node_ctxt commitment_hash in
+  Option.map Sc_rollup_proto_types.Commitment.of_octez commitment
+
+let get_octez_commitment node_ctxt commitment_hash =
+  let open Lwt_result_syntax in
+  let* commitment = find_octez_commitment node_ctxt commitment_hash in
+  match commitment with
+  | None ->
+      failwith
+        "Could not retrieve commitment %a"
+        Octez_smart_rollup.Commitment.Hash.pp
+        commitment_hash
+  | Some i -> return i
+
+let get_commitment node_ctxt commitment_hash =
+  let open Lwt_result_syntax in
+  let* commitment = find_commitment node_ctxt commitment_hash in
   match commitment with
   | None ->
       failwith
         "Could not retrieve commitment %a"
         Sc_rollup.Commitment.Hash.pp
         commitment_hash
-  | Some (c, ()) -> return (Sc_rollup_proto_types.Commitment.of_octez c)
-
-let find_commitment {store; _} hash =
-  let open Lwt_result_syntax in
-  let+ commitment = Store.Commitments.read store.commitments hash in
-  Option.map
-    (fun (c, ()) -> Sc_rollup_proto_types.Commitment.of_octez c)
-    commitment
+  | Some i -> return i
 
 let commitment_exists {store; _} hash =
   let hash = Sc_rollup_proto_types.Commitment_hash.to_octez hash in
@@ -749,18 +766,35 @@ let commitment_was_published {store; _} ~source commitment_hash =
       | Some {published_at_level = Some _; _} -> true
       | _ -> false)
 
-let get_inbox {store; _} inbox_hash =
+let find_octez_inbox {store; _} inbox_hash =
   let open Lwt_result_syntax in
-  let* inbox = Store.Inboxes.read store.inboxes inbox_hash in
+  let+ inbox = Store.Inboxes.read store.inboxes inbox_hash in
+  Option.map fst inbox
+
+let find_inbox node_ctxt inbox_hash =
+  let open Lwt_result_syntax in
+  let inbox_hash = Sc_rollup_proto_types.Inbox_hash.to_octez inbox_hash in
+  let+ inbox = find_octez_inbox node_ctxt inbox_hash in
+  Option.map Sc_rollup_proto_types.Inbox.of_octez inbox
+
+let get_octez_inbox node_ctxt inbox_hash =
+  let open Lwt_result_syntax in
+  let* inbox = find_octez_inbox node_ctxt inbox_hash in
+  match inbox with
+  | None ->
+      failwith
+        "Could not retrieve inbox %a"
+        Octez_smart_rollup.Inbox.Hash.pp
+        inbox_hash
+  | Some i -> return i
+
+let get_inbox node_ctxt inbox_hash =
+  let open Lwt_result_syntax in
+  let* inbox = find_inbox node_ctxt inbox_hash in
   match inbox with
   | None ->
       failwith "Could not retrieve inbox %a" Sc_rollup.Inbox.Hash.pp inbox_hash
-  | Some (i, ()) -> return (Sc_rollup_proto_types.Inbox.of_octez i)
-
-let find_inbox {store; _} hash =
-  let open Lwt_result_syntax in
-  let+ inbox = Store.Inboxes.read store.inboxes hash in
-  Option.map (fun (i, ()) -> Sc_rollup_proto_types.Inbox.of_octez i) inbox
+  | Some i -> return i
 
 let save_inbox {store; _} inbox =
   let open Lwt_result_syntax in
@@ -915,15 +949,11 @@ let save_messages {store; _} key ~block_hash messages =
 let get_full_l2_block node_ctxt block_hash =
   let open Lwt_result_syntax in
   let* block = get_l2_block node_ctxt block_hash in
-  let* inbox = get_inbox node_ctxt block.header.inbox_hash
+  let* inbox = get_octez_inbox node_ctxt block.header.inbox_hash
   and* messages =
     get_messages_without_proto_messages node_ctxt block.header.inbox_witness
   and* commitment =
-    Option.map_es (get_commitment node_ctxt) block.header.commitment_hash
-  in
-  let inbox = Sc_rollup_proto_types.Inbox.to_octez inbox in
-  let commitment =
-    Option.map Sc_rollup_proto_types.Commitment.to_octez commitment
+    Option.map_es (get_octez_commitment node_ctxt) block.header.commitment_hash
   in
   return {block with content = {Sc_rollup_block.inbox; messages; commitment}}
 
