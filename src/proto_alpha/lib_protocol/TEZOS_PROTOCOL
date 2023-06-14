@@ -17,7 +17,6 @@
         "Merkle_list",
         "Bitset",
         "Bounded_history_repr",
-        "Skip_list_repr",
         "Context_binary_proof",
 
 

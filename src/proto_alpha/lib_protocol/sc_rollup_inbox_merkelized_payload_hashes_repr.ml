@@ -41,7 +41,7 @@ module Skip_list_parameters = struct
   let basis = 4
 end
 
-module Skip_list = Skip_list_repr.Make (Skip_list_parameters)
+module Skip_list = Skip_list.Make (Skip_list_parameters)
 module Hash = Smart_rollup.Merkelized_payload_hashes_hash
 
 type t = (Sc_rollup_inbox_message_repr.Hash.t, Hash.t) Skip_list.cell

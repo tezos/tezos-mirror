@@ -29,7 +29,7 @@
 open Protocol
 open Benchmarks_proto
 
-module Skip_list = Skip_list_repr.Make (struct
+module Skip_list = Skip_list.Make (struct
   (** The benchmarks must be run again if [basis] is changed. *)
   let basis = 4
 end)

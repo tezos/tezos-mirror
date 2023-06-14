@@ -137,5 +137,7 @@ module type T = sig
 
   module Dal : [%sig "v10/dal.mli"]
 
+  module Skip_list : [%sig "v10/skip_list.mli"]
+
   module Smart_rollup : [%sig "v10/smart_rollup.mli"]
 end

@@ -105,7 +105,7 @@ module Skip_list_parameters = struct
   let basis = 4
 end
 
-module Skip_list = Skip_list_repr.Make (Skip_list_parameters)
+module Skip_list = Skip_list.Make (Skip_list_parameters)
 
 module V1 = struct
   type level_proof = {
