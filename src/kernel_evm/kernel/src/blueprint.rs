@@ -7,6 +7,7 @@
 use crate::inbox::{read_inbox, KernelUpgrade, Transaction, TransactionContent};
 use crate::Error;
 use primitive_types::U256;
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 /// The blueprint of a block is a list of transactions.
@@ -55,8 +56,9 @@ pub fn fetch<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     chain_id: U256,
+    ticketer: Option<ContractKt1Hash>,
 ) -> Result<Queue, Error> {
-    let inbox_content = read_inbox(host, smart_rollup_address)?;
+    let inbox_content = read_inbox(host, smart_rollup_address, ticketer)?;
     let transactions = filter_invalid_chain_id(inbox_content.transactions, chain_id);
     let blueprint = Blueprint { transactions };
     Ok(Queue {

@@ -4,6 +4,8 @@
 //
 // SPDX-License-Identifier: MIT
 use primitive_types::{H160, U256};
+use sha3::{Digest, Keccak256};
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::signatures::EthereumTransactionCommon;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_debug::debug_msg;
@@ -13,7 +15,10 @@ use crate::parsing::{
     Input, InputResult, MAX_SIZE_PER_CHUNK, SIGNATURE_HASH_SIZE, UPGRADE_NONCE_SIZE,
 };
 use crate::simulation;
-use crate::storage::{read_kernel_upgrade_nonce, store_last_info_per_level_timestamp};
+use crate::storage::{
+    get_and_increment_deposit_nonce, read_kernel_upgrade_nonce,
+    store_last_info_per_level_timestamp,
+};
 
 use crate::error::UpgradeProcessError::InvalidUpgradeNonce;
 use crate::upgrade::check_dictator_signature;
@@ -55,11 +60,17 @@ pub struct InboxContent {
 pub fn read_input<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
+    ticketer: &Option<ContractKt1Hash>,
 ) -> Result<InputResult, Error> {
     let input = host.read_input()?;
 
     match input {
-        Some(input) => Ok(InputResult::parse(input, smart_rollup_address)),
+        Some(input) => Ok(InputResult::parse(
+            host,
+            input,
+            smart_rollup_address,
+            ticketer,
+        )),
         None => Ok(InputResult::NoInput),
     }
 }
@@ -108,16 +119,46 @@ fn handle_kernel_upgrade<Host: Runtime>(
     }
 }
 
+fn handle_deposit<Host: Runtime>(
+    host: &mut Host,
+    deposit: Deposit,
+) -> Result<Transaction, Error> {
+    let deposit_nonce = get_and_increment_deposit_nonce(host)?;
+
+    let mut buffer_amount = [0; 32];
+    deposit.amount.to_little_endian(&mut buffer_amount);
+    let mut buffer_gas_price = [0; 32];
+    deposit.gas_price.to_little_endian(&mut buffer_gas_price);
+
+    let mut to_hash = vec![];
+    to_hash.extend_from_slice(&buffer_amount);
+    to_hash.extend_from_slice(&buffer_gas_price);
+    to_hash.extend_from_slice(&deposit.receiver.to_fixed_bytes());
+    to_hash.extend_from_slice(&deposit_nonce.to_le_bytes());
+
+    let kec = Keccak256::digest(to_hash);
+    let tx_hash = kec
+        .as_slice()
+        .try_into()
+        .map_err(|_| Error::InvalidConversion)?;
+
+    Ok(Transaction {
+        tx_hash,
+        content: TransactionContent::Deposit(deposit),
+    })
+}
+
 pub fn read_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
+    ticketer: Option<ContractKt1Hash>,
 ) -> Result<InboxContent, Error> {
     let mut res = InboxContent {
         kernel_upgrade: None,
         transactions: vec![],
     };
     loop {
-        match read_input(host, smart_rollup_address)? {
+        match read_input(host, smart_rollup_address, &ticketer)? {
             InputResult::NoInput => {
                 return Ok(res);
             }
@@ -156,6 +197,9 @@ pub fn read_inbox<Host: Runtime>(
             }
             InputResult::Input(Input::Info(info)) => {
                 store_last_info_per_level_timestamp(host, info.predecessor_timestamp)?;
+            }
+            InputResult::Input(Input::Deposit(deposit)) => {
+                res.transactions.push(handle_deposit(host, deposit)?)
             }
         }
     }
@@ -262,7 +306,8 @@ mod tests {
             input,
         )));
 
-        let inbox_content = read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS).unwrap();
+        let inbox_content =
+            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
             content: Ethereum(tx),
@@ -286,7 +331,8 @@ mod tests {
             )))
         }
 
-        let inbox_content = read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS).unwrap();
+        let inbox_content =
+            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
             content: Ethereum(tx),
@@ -320,7 +366,8 @@ mod tests {
             input,
         )));
 
-        let inbox_content = read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS).unwrap();
+        let inbox_content =
+            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
         let expected_upgrade = Some(kernel_upgrade);
         assert_eq!(inbox_content.kernel_upgrade, expected_upgrade);
     }

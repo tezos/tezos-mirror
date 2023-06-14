@@ -60,6 +60,7 @@ pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result
 pub const SIMULATION_STATUS: RefPath = RefPath::assert_from(b"/simulation_status");
 
 pub const KERNEL_UPGRADE_NONCE: RefPath = RefPath::assert_from(b"/upgrade_nonce");
+pub const DEPOSIT_NONCE: RefPath = RefPath::assert_from(b"/deposit_nonce");
 
 /// Path where Ethereum accounts are stored
 const EVM_ACCOUNTS_INDEX: RefPath = RefPath::assert_from(b"/evm/indexes/accounts");
@@ -679,6 +680,24 @@ pub fn read_ticketer<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> 
     store_read_slice(host, &TICKETER, &mut buffer, 36).ok()?;
     let kt1_b58 = String::from_utf8(buffer.to_vec()).ok()?;
     ContractKt1Hash::from_b58check(&kt1_b58).ok()
+}
+
+pub fn get_and_increment_deposit_nonce<Host: Runtime>(
+    host: &mut Host,
+) -> Result<u32, Error> {
+    let current_nonce = || -> Option<u32> {
+        let bytes = host.store_read_all(&DEPOSIT_NONCE).ok()?;
+        let slice_of_bytes: [u8; 4] = bytes[..]
+            .try_into()
+            .map_err(|_| Error::InvalidConversion)
+            .ok()?;
+        Some(u32::from_le_bytes(slice_of_bytes))
+    };
+
+    let nonce = current_nonce().unwrap_or(0u32);
+    let new_nonce = nonce + 1;
+    host.store_write_all(&DEPOSIT_NONCE, &new_nonce.to_le_bytes())?;
+    Ok(nonce)
 }
 
 pub(crate) mod internal_for_tests {

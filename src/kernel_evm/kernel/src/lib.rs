@@ -71,7 +71,7 @@ pub fn stage_one<Host: Runtime>(
         ),
     }
 
-    let queue = fetch(host, smart_rollup_address, chain_id)?;
+    let queue = fetch(host, smart_rollup_address, chain_id, ticketer)?;
 
     for (i, blueprint) in queue.proposals.iter().enumerate() {
         debug_msg!(
