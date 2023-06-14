@@ -205,7 +205,7 @@ let synchronisation_heuristic_encoding default_latency default_threshold =
 type chain_validator_limits = {synchronisation : synchronisation_limits}
 
 let default_chain_validator_limits =
-  {synchronisation = {latency = 150; threshold = 4}}
+  {synchronisation = {latency = 75; threshold = 4}}
 
 let chain_validator_limits_encoding =
   let open Data_encoding in
