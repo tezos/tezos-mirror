@@ -9,7 +9,8 @@
   tezos-base
   tezos-base.unix
   tezos-stdlib-unix
-  tezos-crypto)
+  tezos-crypto
+  tezos-crypto-dal)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

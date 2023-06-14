@@ -13,6 +13,7 @@ depends: [
   "tezos-base"
   "tezos-stdlib-unix"
   "tezos-crypto"
+  "tezos-crypto-dal"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
