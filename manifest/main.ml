@@ -154,7 +154,10 @@ let hacl_star =
     ~js_compatible:true
     ~npm_deps:[Npm.make "hacl-wasm" V.(at_least "1.3.0" && less_than "1.4.0")]
     "hacl-star"
-    V.(at_least "0.7.0" && less_than "0.8")
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5906
+       We need exactly hacl-star 0.7.0 since version 0.7.1 requires a
+       new release of the hacl-wasm npm package. *)
+    V.(exactly "0.7.0")
 
 let hacl_star_raw = external_lib ~js_compatible:true "hacl-star-raw" V.True
 

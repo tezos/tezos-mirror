@@ -14,7 +14,7 @@ depends: [
   "ppx_deriving"
   "repr"
   "stdint"
-  "hacl-star" { >= "0.7.0" & < "0.8" }
+  "hacl-star" { = "0.7.0" }
   "octez-bls12-381-hash"
   "octez-polynomial"
   "octez-mec"
