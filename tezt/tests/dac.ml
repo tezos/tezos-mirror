@@ -2925,6 +2925,33 @@ module Api_regression = struct
         ~body_json
         ~path_and_query:(sf "%s/dac_member_signature" v0_api_prefix)
         coordinator_node
+
+    (** [test_get_certificate] tests "PUT v0/certificate". *)
+    let test_get_certificate Scenarios.{coordinator_node; committee_members; _}
+        =
+      (* First we prepare Coordinator's node by posting a payload to it. *)
+      let* root_hash =
+        Full_infrastructure.coordinator_serializes_payload coordinator_node
+      in
+      (* Then we create a sample signature for a random member. *)
+      let signature, member =
+        create_sample_signature committee_members root_hash
+      in
+      (* We put the sample signature to Coordinator node. *)
+      let* () =
+        RPC.call
+          coordinator_node
+          (Dac_rpc.V0.put_dac_member_signature
+             ~hex_root_hash:root_hash
+             ~dac_member_pkh:member.aggregate_public_key_hash
+             ~signature)
+      in
+      (* Test starts here. *)
+      rpc_call_with_regression_test
+        `GET
+        ~path_and_query:
+          (sf "%s/certificates/%s" v0_api_prefix (Hex.show root_hash))
+        coordinator_node
   end
 end
 
@@ -3126,4 +3153,13 @@ let register ~protocols =
     ~allow_regression:true
     "test PUT v0/dac_member_signature"
     Api_regression.V0.test_put_dac_member_signature
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:0
+    ~committee_size:2
+    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~allow_regression:true
+    "test GET v0/certificate"
+    Api_regression.V0.test_get_certificate
     protocols
