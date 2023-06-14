@@ -35,7 +35,7 @@ let default_limits ?(time_in_mesh_weight = 1.0)
     ?(mesh_message_deliveries_weight = ~-.1.0)
     ?(mesh_failure_penalty_weight = ~-.1.)
     ?(invalid_message_deliveries_weight = ~-.1.)
-    ?(invalid_message_deliveries_decay = 0.3)
+    ?(invalid_message_deliveries_decay = 0.3) ?(app_specific_weight = 10.)
     ?(behaviour_penalty_weight = ~-.10.0) ?(behaviour_penalty_decay = 0.2) () :
     (string, int, int, Milliseconds.t) limits =
   let per_topic_score_limits =
@@ -66,7 +66,7 @@ let default_limits ?(time_in_mesh_weight = 1.0)
       behaviour_penalty_weight;
       behaviour_penalty_threshold = 0.0;
       behaviour_penalty_decay;
-      app_specific_weight = 10.;
+      app_specific_weight;
       decay_zero = 0.1;
     }
   in
