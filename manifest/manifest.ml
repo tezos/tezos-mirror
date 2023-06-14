@@ -2319,7 +2319,6 @@ type opam_release_status =
 
 (* [height] is 1 for leaves, 1 + max dependency height for nodes. *)
 type opam_dependency_graph_node = {
-  mutable contain_executables : bool;
   mutable dependencies : String_set.t;
   mutable release_status : opam_release_status;
   mutable propagated : bool;
@@ -2337,13 +2336,6 @@ let compute_opam_release_graph () : opam_dependency_graph_node String_map.t =
     let node_of_internals package_name internals =
       let released_example = ref None in
       let unreleased_example = ref None in
-      let executable internal =
-        match internal.Target.kind with
-        | Public_executable _ -> true
-        | Public_library _ | Private_library _ | Private_executable _
-        | Test_executable _ ->
-            false
-      in
       let add_status internal =
         match internal.Target.release_status with
         | Auto_opam -> ()
@@ -2382,14 +2374,7 @@ let compute_opam_release_graph () : opam_dependency_graph_node String_map.t =
         in
         List.fold_left add_internal_dependency String_set.empty internals
       in
-      let contain_executables = List.exists executable internals in
-      {
-        dependencies;
-        release_status;
-        propagated = false;
-        height = 0;
-        contain_executables;
-      }
+      {dependencies; release_status; propagated = false; height = 0}
     in
     String_map.mapi node_of_internals !Target.by_opam
   in
@@ -3273,14 +3258,9 @@ let packages_dir, release, remove_extra_files =
   in
   (!packages_dir, release, !remove_extra_files)
 
-let generate_opam_ci ?(executable_only = false) opam_release_graph =
+let generate_opam_ci opam_release_graph =
   (* We only need to test released packages, since those are the only one
      that will need to pass the public Opam CI. *)
-  let contain_executables package =
-    match String_map.find_opt package opam_release_graph with
-    | None -> false
-    | Some node -> node.contain_executables
-  in
   let released_packages, unreleased_packages =
     List.partition
       (fun (_, node) ->
@@ -3319,23 +3299,12 @@ let generate_opam_ci ?(executable_only = false) opam_release_graph =
   in
   (* Merge and sort by name for nicer diffs. *)
   let packages =
-    let l =
-      if executable_only then
-        List.filter
-          (fun (_, name) -> contain_executables name)
-          (released_packages @ unreleased_packages)
-      else released_packages @ unreleased_packages
-    in
     let by_name (_, a) (_, b) = String.compare a b in
-    List.sort by_name l
-  in
-  let yamlfile =
-    if executable_only then "opam_package_executables.yml"
-    else "opam_package.yml"
+    List.sort by_name (released_packages @ unreleased_packages)
   in
   (* Now [packages] is a list of [batch_index, package_name]
      where [batch_index] is 0 for packages that we do not need to test. *)
-  write (".gitlab/ci/jobs/packaging" // yamlfile) @@ fun fmt ->
+  write ".gitlab/ci/jobs/packaging/opam_package.yml" @@ fun fmt ->
   pp_do_not_edit ~comment_start:"#" fmt () ;
   (* Output one template per batch. *)
   for i = 1 to batch_count do
@@ -3517,8 +3486,7 @@ let generate ~make_tezt_exe ~default_profile ~add_to_meta_package =
     generate_dune_project_files () ;
     generate_package_json_file () ;
     let opam_release_graph = compute_opam_release_graph () in
-    generate_opam_ci ~executable_only:false opam_release_graph ;
-    generate_opam_ci ~executable_only:true opam_release_graph ;
+    generate_opam_ci opam_release_graph ;
     generate_executable_list "script-inputs/released-executables" Released ;
     generate_executable_list
       "script-inputs/experimental-executables"
