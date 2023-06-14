@@ -1,0 +1,107 @@
+
+trace
+  - CAR (interp) @ location: 15
+    [ (Pair (Pair (Pair (Pair (Pair 0 1) 2) 3) 4) 7) ]
+  - CAR (entry) @ location: 15
+    [ (Pair (Pair (Pair (Pair (Pair 0 1) 2) 3) 4) 7) ]
+    - log/UNPAIR (exit) @ location: 15
+      [ (Pair (Pair (Pair (Pair 0 1) 2) 3) 4) ]
+  - UNPAIR (entry) @ location: 16
+    [ (Pair (Pair (Pair (Pair 0 1) 2) 3) 4) ]
+    - log/UNPAIR (exit) @ location: 16
+      [ (Pair (Pair (Pair 0 1) 2) 3)
+        4 ]
+  - UNPAIR (entry) @ location: 17
+    [ (Pair (Pair (Pair 0 1) 2) 3)
+      4 ]
+    - log/UNPAIR (exit) @ location: 17
+      [ (Pair (Pair 0 1) 2)
+        3
+        4 ]
+  - UNPAIR (entry) @ location: 18
+    [ (Pair (Pair 0 1) 2)
+      3
+      4 ]
+    - log/UNPAIR (exit) @ location: 18
+      [ (Pair 0 1)
+        2
+        3
+        4 ]
+  - UNPAIR (entry) @ location: 19
+    [ (Pair 0 1)
+      2
+      3
+      4 ]
+    - log/DIG (exit) @ location: 19
+      [ 0
+        1
+        2
+        3
+        4 ]
+  - DIG (entry) @ location: 20
+    [ 0
+      1
+      2
+      3
+      4 ]
+    - log/DIP (exit) @ location: 20
+      [ 4
+        0
+        1
+        2
+        3 ]
+  - DIP (entry) @ location: 22
+    [ 4
+      0
+      1
+      2
+      3 ]
+    - log/DROP (exit) @ location: 22
+      [ 0
+        1
+        2
+        3 ]
+  - DROP (entry) @ location: 24
+    [ 0
+      1
+      2
+      3 ]
+    - log/DROP (exit) @ location: 24
+      [ 1
+        2
+        3 ]
+  - DROP (entry) @ location: 25
+    [ 1
+      2
+      3 ]
+    - log/DROP (exit) @ location: 25
+      [ 2
+        3 ]
+  - DROP (entry) @ location: 26
+    [ 2
+      3 ]
+    - log/DROP (exit) @ location: 26
+      [ 3 ]
+  - DROP (entry) @ location: 27
+    [ 3 ]
+    - log/[halt] (exit) @ location: 27
+      [  ]
+  - [halt] (entry) @ location: 23
+    [  ]
+    - control: KUndip
+    - control: KCons
+    - log/NIL (exit) @ location: 22
+      [ 4 ]
+  - NIL (entry) @ location: 28
+    [ 4 ]
+    - log/PAIR (exit) @ location: 28
+      [ {}
+        4 ]
+  - PAIR (entry) @ location: 30
+    [ {}
+      4 ]
+    - log/[halt] (exit) @ location: 30
+      [ (Pair {} 4) ]
+  - [halt] (entry) @ location: 14
+    [ (Pair {} 4) ]
+    - control: KNil
