@@ -72,7 +72,11 @@ let chain_config_file dir =
 
 let lockfile dir = mk_file dir "lock"
 
+let block_store_lockfile dir = mk_file dir "lockblock"
+
 let gc_lockfile dir = mk_file dir "gc_lock"
+
+let stored_data_lockfile dir = mk_file dir "stored_data_lock"
 
 let reconstruction_lock_file dir = mk_file dir "reconstruction_lock"
 
