@@ -638,6 +638,7 @@ module Make (C : AUTOMATON_CONFIG) :
   module Unsubscribe = struct
     let remove_peer_from_mesh topic peer =
       let open Monad.Syntax in
+      let* () = update_score peer (fun s -> Score.prune s topic) in
       let*! mesh in
       let mesh =
         Topic.Map.update
