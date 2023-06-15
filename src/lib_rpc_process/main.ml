@@ -121,27 +121,7 @@ let launch_rpc_server (config : Parameters.t) (addr, port) =
       ~media_types:(Media_type.Command_line.of_command_line media_types)
       dir
   in
-  let callback (conn : Cohttp_lwt_unix.Server.conn) req body =
-    Tezos_rpc_http_server.RPC_server.resto_callback server conn req body
-  in
-  let callback =
-    let resolver_handle = "octez-node-unix-socket" in
-    let localhost = Format.asprintf "http://%s" resolver_handle in
-    let forwarding_endpoint = Uri.of_string localhost in
-    let resolver =
-      let h = Stdlib.Hashtbl.create 1 in
-      Stdlib.Hashtbl.add
-        h
-        resolver_handle
-        (`Unix_domain_socket config.rpc_comm_socket_path) ;
-      Resolver_lwt_unix.static h
-    in
-    let ctx = Cohttp_lwt_unix.Client.custom_ctx ~resolver () in
-    RPC_middleware.proxy_server_query_forwarder
-      ~ctx
-      forwarding_endpoint
-      callback
-  in
+  let callback = Forward_handler.callback server config.rpc_comm_socket_path in
   Lwt.catch
     (fun () ->
       let*! () = RPC_server.launch ~host server ~callback mode in
