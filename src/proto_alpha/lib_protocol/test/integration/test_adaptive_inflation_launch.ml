@@ -35,9 +35,28 @@ let assert_level ~loc (blk : Block.t) expected =
   let current_level = blk.header.shell.level in
   Assert.equal_int32 ~loc current_level expected
 
+let get_launch_cycle ~loc blk =
+  let open Lwt_result_syntax in
+  let* launch_cycle_opt = Context.get_adaptive_inflation_launch_cycle (B blk) in
+  Assert.get_some ~loc launch_cycle_opt
+
+let assert_is_not_yet_set_to_launch ~loc blk =
+  let open Lwt_result_syntax in
+  let* launch_cycle_opt = Context.get_adaptive_inflation_launch_cycle (B blk) in
+  Assert.is_none
+    ~loc
+    ~pp:(fun fmt cycle ->
+      Format.fprintf
+        fmt
+        "Activation cycle is set to %a but we expected it to be unset"
+        Protocol.Alpha_context.Cycle.pp
+        cycle)
+    launch_cycle_opt
+
 (* Test that the EMA of the adaptive inflation vote reaches the
-   threshold after the expected duration. *)
-let test_ema_reaches_threshold threshold expected_vote_duration () =
+   threshold after the expected duration. Also test that the launch
+   cycle is set as soon as the threshold is reached. *)
+let test_launch threshold expected_vote_duration () =
   let open Lwt_result_syntax in
   let assert_ema_above_threshold ~loc
       (metadata : Protocol.Main.block_header_metadata) =
@@ -59,6 +78,7 @@ let test_ema_reaches_threshold threshold expected_vote_duration () =
     Context.init_with_constants1
       {default_constants with consensus_threshold; adaptive_inflation}
   in
+  let* () = assert_is_not_yet_set_to_launch ~loc:__LOC__ block in
   let* block =
     Block.bake_while_with_metadata
       ~adaptive_inflation_vote:Toggle_vote_on
@@ -74,27 +94,29 @@ let test_ema_reaches_threshold threshold expected_vote_duration () =
   let* () =
     assert_level ~loc:__LOC__ block (Int32.pred expected_vote_duration)
   in
+  let* () = assert_is_not_yet_set_to_launch ~loc:__LOC__ block in
   let* block, metadata =
     Block.bake_n_with_metadata ~adaptive_inflation_vote:Toggle_vote_on 1 block
   in
   let* () = assert_ema_above_threshold ~loc:__LOC__ metadata in
   let* () = assert_level ~loc:__LOC__ block expected_vote_duration in
+  let* _launch_cycle = get_launch_cycle ~loc:__LOC__ block in
   return_unit
 
 let tests =
   [
     Tztest.tztest
-      "the EMA reaches the vote threshold at the expected level (very low \
-       threshold)"
+      "the EMA reaches the vote threshold at the expected level and adaptive \
+       inflation launch cycle is set (very low threshold)"
       `Quick
-      (test_ema_reaches_threshold
+      (test_launch
          1000000l (* This means that the threshold is set at 0.05% *)
          59l);
     Tztest.tztest
-      "the EMA reaches the vote threshold at the expected level (realistic \
-       threshold)"
+      "the EMA reaches the vote threshold at the expected level and adaptive \
+       inflation launch cycle is set (realistic threshold)"
       `Slow
-      (test_ema_reaches_threshold
+      (test_launch
          Default_parameters.constants_test.adaptive_inflation
            .launch_ema_threshold
          187259l
