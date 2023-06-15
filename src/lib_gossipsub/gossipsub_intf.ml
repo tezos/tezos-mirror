@@ -884,6 +884,8 @@ module type AUTOMATON = sig
       val fold : (Peer.t -> connection -> 'b -> 'b) -> t -> 'b -> 'b
 
       val iter : (Peer.t -> connection -> unit) -> t -> unit
+
+      val peers_in_topic : Topic.t -> t -> Peer.Set.t
     end
 
     module Message_cache : sig

@@ -177,7 +177,15 @@ module Make (C : AUTOMATON_CONFIG) :
             this notion to fit its needs. *)
   }
 
-  (** [Connections] implements a map from peers to connections. *)
+  (** [Connections] implements a bidirectional map from peers to connections and from
+      topics to peer.
+
+      Invariant:
+        forall (c : Connections.t),
+        forall (p : Peer.t),
+        forall (t : Topic.t),
+        t \in (Connections.find p c).topics <=> p \in (Connections.peers_in_topic topic c)
+  *)
   module Connections : sig
     type t
 
@@ -206,33 +214,51 @@ module Make (C : AUTOMATON_CONFIG) :
     val fold : (Peer.t -> connection -> 'b -> 'b) -> t -> 'b -> 'b
 
     val iter : (Peer.t -> connection -> unit) -> t -> unit
+
+    val peers_in_topic : Topic.t -> t -> Peer.Set.t
   end = struct
-    type t = connection Peer.Map.t
+    type t = {
+      peer_to_conn : connection Peer.Map.t;
+      topic_to_peer : Peer.Set.t Topic.Map.t;
+    }
 
-    let empty = Peer.Map.empty
+    let empty = {peer_to_conn = Peer.Map.empty; topic_to_peer = Topic.Map.empty}
 
-    let bindings = Peer.Map.bindings
+    let bindings map = Peer.Map.bindings map.peer_to_conn
 
-    let find = Peer.Map.find
+    let find peer map = Peer.Map.find peer map.peer_to_conn
 
-    let mem = Peer.Map.mem
+    let mem peer map = Peer.Map.mem peer map.peer_to_conn
 
     let add_peer peer ~direct ~outbound map =
       if mem peer map then `already_known
       else
-        let map =
-          Peer.Map.add peer {topics = Topic.Set.empty; direct; outbound} map
+        let peer_to_conn =
+          Peer.Map.add
+            peer
+            {topics = Topic.Set.empty; direct; outbound}
+            map.peer_to_conn
         in
-        `added map
+        `added {map with peer_to_conn}
 
     let subscribe peer topic map =
       match find peer map with
       | None -> `unknown_peer
       | Some connection ->
+          (* We could detect that [peer] is already subscribed to [topic]. *)
           let connection =
             {connection with topics = Topic.Set.add topic connection.topics}
           in
-          `subscribed (Peer.Map.add peer connection map)
+          let peer_to_conn = Peer.Map.add peer connection map.peer_to_conn in
+          let topic_to_peer =
+            Topic.Map.update
+              topic
+              (function
+                | None -> Some (Peer.Set.singleton peer)
+                | Some peers_in_topic -> Some (Peer.Set.add peer peers_in_topic))
+              map.topic_to_peer
+          in
+          `subscribed {peer_to_conn; topic_to_peer}
 
     let unsubscribe peer topic map =
       match find peer map with
@@ -241,13 +267,48 @@ module Make (C : AUTOMATON_CONFIG) :
           let connection =
             {connection with topics = Topic.Set.remove topic connection.topics}
           in
-          `unsubscribed (Peer.Map.add peer connection map)
+          let peer_to_conn = Peer.Map.add peer connection map.peer_to_conn in
+          let topic_to_peer =
+            Topic.Map.update
+              topic
+              (function
+                | None -> None
+                | Some peers_in_topic ->
+                    Some (Peer.Set.remove peer peers_in_topic))
+              map.topic_to_peer
+          in
+          `unsubscribed {peer_to_conn; topic_to_peer}
 
-    let remove = Peer.Map.remove
+    let remove peer map =
+      match find peer map with
+      | None -> map
+      | Some conn ->
+          let topics = conn.topics in
+          let peer_to_conn = Peer.Map.remove peer map.peer_to_conn in
+          let topic_to_peer =
+            Topic.Set.fold
+              (fun topic topic_to_peer ->
+                Topic.Map.update
+                  topic
+                  (function
+                    | None ->
+                        (* Should never happen by invariant on type [t]. *)
+                        None
+                    | Some peers_in_topic ->
+                        Some (Peer.Set.remove peer peers_in_topic))
+                  topic_to_peer)
+              topics
+              map.topic_to_peer
+          in
+          {peer_to_conn; topic_to_peer}
 
-    let fold = Peer.Map.fold
+    let fold f map acc = Peer.Map.fold f map.peer_to_conn acc
 
-    let iter = Peer.Map.iter
+    let iter f map = Peer.Map.iter f map.peer_to_conn
+
+    let peers_in_topic topic map =
+      Topic.Map.find topic map.topic_to_peer
+      |> Option.value ~default:Peer.Set.empty
   end
 
   type fanout_peers = {peers : Peer.Set.t; last_published_time : time}
