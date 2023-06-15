@@ -297,8 +297,8 @@ let test_l1_scenario ?regression ?hooks ~kind ?boot_sector ?commitment_period
   scenario protocol sc_rollup tezos_node tezos_client
 
 let test_l1_migration_scenario ?parameters_ty ?(src = Constant.bootstrap1.alias)
-    ?variant ?(tags = []) ~kind ~migrate_from ~migrate_to ~scenario_prior
-    ~scenario_after ~description () =
+    ?variant ?(tags = []) ?(timeout = 10) ?(commitment_period = 10) ~kind
+    ~migrate_from ~migrate_to ~scenario_prior ~scenario_after ~description () =
   let tags =
     Protocol.tag migrate_from :: Protocol.tag migrate_to :: kind :: "migration"
     :: tags
@@ -314,7 +314,7 @@ let test_l1_migration_scenario ?parameters_ty ?(src = Constant.bootstrap1.alias)
          (format_title_scenario kind {variant; tags; description}))
   @@ fun () ->
   let* tezos_node, tezos_client =
-    setup_l1 ~commitment_period:10 ~challenge_window:10 ~timeout:10 migrate_from
+    setup_l1 ~commitment_period ~challenge_window:10 ~timeout migrate_from
   in
   let* sc_rollup = originate_sc_rollup ?parameters_ty ~kind ~src tezos_client in
   let* prior_res = scenario_prior tezos_client ~sc_rollup in
@@ -5072,6 +5072,131 @@ let test_migration_refute ~kind ~migrate_from ~migrate_to =
     ~description
     ()
 
+let test_migration_removes_dead_games ~kind ~migrate_from ~migrate_to =
+  let tags = ["refutation"; "clean"] in
+  let description = "dead games are cleaned during migration" in
+  let scenario_prior tezos_client ~sc_rollup =
+    (* 3 stakers are in conflict: A, B and C.
+
+       A vs B, A vs C and B vs C.
+       A wins against B and C, slashing them. The outcome of B vs C then
+       is a draw.
+    *)
+    let* commitment1, hash1 =
+      bake_period_then_publish_commitment
+        ~sc_rollup
+        ~number_of_ticks:1
+        ~src:Constant.bootstrap1.public_key_hash
+        tezos_client
+    in
+    let* _commitment2, hash2 =
+      forge_and_publish_commitment
+        ~inbox_level:commitment1.inbox_level
+        ~predecessor:commitment1.predecessor
+        ~sc_rollup
+        ~number_of_ticks:2
+        ~src:Constant.bootstrap2.public_key_hash
+        tezos_client
+    in
+    let* _commitment3, hash3 =
+      forge_and_publish_commitment
+        ~inbox_level:commitment1.inbox_level
+        ~predecessor:commitment1.predecessor
+        ~sc_rollup
+        ~number_of_ticks:3
+        ~src:Constant.bootstrap3.public_key_hash
+        tezos_client
+    in
+    let* () =
+      start_refute
+        tezos_client
+        ~sc_rollup
+        ~source:Constant.bootstrap2
+        ~opponent:Constant.bootstrap1.public_key_hash
+        ~player_commitment_hash:hash2
+        ~opponent_commitment_hash:hash1
+    in
+    let* () =
+      start_refute
+        tezos_client
+        ~sc_rollup
+        ~source:Constant.bootstrap3
+        ~opponent:Constant.bootstrap1.public_key_hash
+        ~player_commitment_hash:hash3
+        ~opponent_commitment_hash:hash1
+    in
+    let* () =
+      start_refute
+        tezos_client
+        ~sc_rollup
+        ~source:Constant.bootstrap2
+        ~opponent:Constant.bootstrap3.public_key_hash
+        ~player_commitment_hash:hash2
+        ~opponent_commitment_hash:hash3
+    in
+
+    let* {timeout_period_in_blocks = timeout_period; _} =
+      get_sc_rollup_constants tezos_client
+    in
+    let* () =
+      repeat (timeout_period + 1) (fun () ->
+          Client.bake_for_and_wait tezos_client)
+    in
+    let* () =
+      timeout
+        ~sc_rollup
+        ~staker1:Constant.bootstrap1.public_key_hash
+        ~staker2:Constant.bootstrap2.public_key_hash
+        tezos_client
+    in
+    let* () =
+      timeout
+        ~sc_rollup
+        ~staker1:Constant.bootstrap1.public_key_hash
+        ~staker2:Constant.bootstrap3.public_key_hash
+        tezos_client
+    in
+    return (Constant.bootstrap2, Constant.bootstrap3)
+  in
+  let scenario_after tezos_client ~sc_rollup (playerB, playerC) =
+    let* opponents =
+      RPC.Client.call tezos_client
+      @@ RPC.get_chain_block_context_raw_json
+           ~path:
+             [
+               "smart_rollup";
+               "index";
+               sc_rollup;
+               "game";
+               playerB.Account.public_key_hash;
+               "opponents";
+             ]
+           ()
+    in
+    let opponents = JSON.as_list opponents |> List.map JSON.as_string in
+    let expected_opponents =
+      if Protocol.number migrate_to > 017 then []
+      else [playerC.Account.public_key_hash]
+    in
+    Check.((expected_opponents = opponents) (list string))
+      ~error_msg:
+        (sf
+           "After migration %s should have %%L as opponents, but found %%R"
+           playerB.Account.public_key_hash) ;
+    unit
+  in
+  test_l1_migration_scenario
+    ~kind
+    ~migrate_from
+    ~migrate_to
+    ~scenario_prior
+    ~scenario_after
+    ~tags
+    ~description
+    ~timeout:1
+    ~commitment_period:1
+    ()
+
 (* Test to refute a commitment pre-migration. *)
 let test_cont_refute_pre_migration ~kind ~migrate_from ~migrate_to =
   let tags = ["refutation"]
@@ -5471,7 +5596,8 @@ let register_migration ~kind ~migrate_from ~migrate_to =
   test_migration_recover ~kind ~migrate_from ~migrate_to ;
   test_migration_refute ~kind ~migrate_from ~migrate_to ;
   test_cont_refute_pre_migration ~kind ~migrate_from ~migrate_to ;
-  test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to
+  test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to ;
+  test_migration_removes_dead_games ~kind ~migrate_from ~migrate_to
 
 let register_migration ~migrate_from ~migrate_to =
   register_migration ~kind:"arith" ~migrate_from ~migrate_to ;

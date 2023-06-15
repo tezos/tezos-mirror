@@ -190,6 +190,11 @@ val apply_game_result :
   tzresult
   Lwt.t
 
+(** Removes pending refutation games in the context where the players
+    are no longer staked. *)
+val migrate_clean_refutation_games :
+  Raw_context.t -> Raw_context.t tzresult Lwt.t
+
 (**/**)
 
 module Internal_for_tests : sig

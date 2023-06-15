@@ -246,7 +246,10 @@ let prepare_first_block _chain_id ctxt ~typecheck_smart_contract
       Remove_zero_amount_ticket_migration_for_o.remove_zero_ticket_entries ctxt
       >>= fun ctxt ->
       Adaptive_inflation_storage.init ctxt >>=? fun ctxt ->
-      init_delegates_pseudotokens_for_o ctxt >>=? fun ctxt -> return (ctxt, []))
+      init_delegates_pseudotokens_for_o ctxt >>=? fun ctxt ->
+      (* Migration of refutation games needs to be kept for each protocol. *)
+      Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
+      >>=? fun ctxt -> return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   List.fold_left_es patch_script ctxt Legacy_script_patches.addresses_to_patch
   >>=? fun ctxt ->
