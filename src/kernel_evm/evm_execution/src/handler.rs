@@ -248,7 +248,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                         .map_err(EthereumError::from)?;
                     Ok(ExitReason::Succeed(ExitSucceed::Returned))
                 }
-                Err(AccountStorageError::BalanceUnderflow) => {
+                Err(AccountStorageError::BalanceUnderflow(_)) => {
                     debug_msg!(
                         self.host,
                         "Transaction failture - balance underflow on account {:?} - withdraw {:?}",
@@ -443,20 +443,13 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 self.config,
             );
 
-            let result = self.execute(&mut runtime)?;
+            let result = self.execute(&mut runtime);
 
-            match result {
-                ExitReason::Error(err) => {
-                    return Ok((
-                        ExitReason::Fatal(ExitFatal::CallErrorAsFatal(err)),
-                        None,
-                        runtime.machine().return_value(),
-                    ));
-                }
-                _ => {
-                    return Ok((result, None, runtime.machine().return_value()));
-                }
-            }
+            return Ok((result?, None, runtime.machine().return_value()));
+        } else {
+            // Contract must be empty since it was deleted, so there are no
+            // instructions to run.
+            return Ok((ExitReason::Succeed(ExitSucceed::Stopped), None, vec![]));
         }
     }
 
@@ -826,6 +819,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
                 self.rollback_initial_transaction()
             }
+            Ok((ExitReason::Fatal(ExitFatal::Other(cow_str)), _, _)) => {
+                self.rollback_initial_transaction()?;
+                Err(EthereumError::WrappedError(cow_str))
+            }
             Ok((ExitReason::Fatal(fatal_error), _, _)) => {
                 debug_msg!(
                     self.host,
@@ -836,12 +833,12 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 self.rollback_initial_transaction()
             }
             Err(EthereumError::EthereumAccountError(
-                AccountStorageError::BalanceUnderflow,
+                AccountStorageError::BalanceUnderflow(path),
             )) => {
-                // TODO add account data to error message
                 debug_msg!(
                     self.host,
-                    "Initial transaction failed because of account underflow"
+                    "Initial transaction failed because of account underflow at {:?}",
+                    path
                 );
 
                 self.rollback_initial_transaction()
@@ -964,9 +961,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     fn end_inter_transaction<T>(
         &mut self,
         execution_result: Result<CreateOutcome, EthereumError>,
+        promote_error: bool,
     ) -> Capture<CreateOutcome, T> {
         if let Ok((ref r @ ExitReason::Succeed(_), _, _)) = execution_result {
-            debug_msg!(self.host, "Intermediate transaction with: {:?}", r);
+            debug_msg!(self.host, "Intermediate transaction ended with: {:?}", r);
 
             if let Err(err) = self.commit_inter_transaction() {
                 debug_msg!(
@@ -988,6 +986,17 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
 
         match execution_result {
+            Ok((ExitReason::Error(err), _, _)) => {
+                if promote_error {
+                    Capture::Exit((
+                        ExitReason::Fatal(ExitFatal::CallErrorAsFatal(err)),
+                        None,
+                        vec![],
+                    ))
+                } else {
+                    Capture::Exit((ExitReason::Error(err), None, vec![]))
+                }
+            }
             Ok(res) => Capture::Exit(res),
             Err(err) => Capture::Exit((ethereum_error_to_exit_reason(err), None, vec![])),
         }
@@ -1181,7 +1190,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             let result =
                 self.execute_create(caller, scheme, value, init_code, target_gas);
 
-            self.end_inter_transaction(result)
+            self.end_inter_transaction(result, false)
         }
     }
 
@@ -1206,7 +1215,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             TransactionContext::from_context(context),
         );
 
-        match self.end_inter_transaction(result) {
+        match self.end_inter_transaction(result, true) {
             Capture::Exit((reason, _, value)) => {
                 debug_msg!(self.host, "Call ended with reason: {:?}", reason);
                 Capture::Exit((reason, value))

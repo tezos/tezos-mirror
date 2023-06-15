@@ -42,7 +42,7 @@ pub enum Error {
     Transfer(TransferError),
     Storage(StorageError),
     InvalidConversion,
-    InvalidRunTransaction,
+    InvalidRunTransaction(EthereumError),
     Simulation(EthereumError),
     UpgradeError(UpgradeProcessError),
     InvalidSignature(SigError),

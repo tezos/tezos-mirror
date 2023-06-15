@@ -18,7 +18,7 @@ pub const WORD_SIZE: usize = 32_usize;
 
 /// All errors that may happen as result of using the Ethereum account
 /// interface.
-#[derive(Error, Copy, Eq, PartialEq, Clone, Debug)]
+#[derive(Error, Eq, PartialEq, Clone, Debug)]
 pub enum AccountStorageError {
     /// Some runtime error happened while using durable storage
     #[error("Runtime error: {0:?}")]
@@ -36,9 +36,11 @@ pub enum AccountStorageError {
     #[error("Account balance overflow")]
     BalanceOverflow,
     /// Some account balance became less than zero. Only positive
-    /// integers in 256 bit range can be stored.
+    /// integers in 256 bit range can be stored. Error parameter is
+    /// the string representation of the path to the account where
+    /// underflow happened.
     #[error("Account balance underflow")]
-    BalanceUnderflow,
+    BalanceUnderflow(String),
     /// Technically, the Ethereum account nonce can overflow if
     /// an account does an incredible number of transactions.
     #[error("Nonce overflow")]
@@ -286,7 +288,7 @@ impl EthereumAccount {
             host.store_write(&path, &new_value_bytes, 0)
                 .map_err(AccountStorageError::from)
         } else {
-            Err(AccountStorageError::BalanceUnderflow)
+            Err(AccountStorageError::BalanceUnderflow(self.path.to_string()))
         }
     }
 
@@ -665,7 +667,7 @@ mod test {
             .expect("Could not add first value to balance");
         assert_eq!(
             a1.balance_remove(&mut host, v2).unwrap_err(),
-            AccountStorageError::BalanceUnderflow
+            AccountStorageError::BalanceUnderflow("/eth_accounts.2/dfkjd".to_string())
         );
 
         storage

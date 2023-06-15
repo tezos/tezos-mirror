@@ -39,6 +39,11 @@ use precompiles::PrecompileSet;
 /// transfer for instance.
 #[derive(Error, Debug, Eq, PartialEq)]
 pub enum EthereumError {
+    /// An ethereum error happened inside a callback and we had to print it to
+    /// a string so we could wrap it in a `ExitFatal` error. We have lost the
+    /// exact variant, but we can retain the message.
+    #[error("Wrapped Ethereum error: {0}")]
+    WrappedError(Cow<'static, str>),
     /// Calling a precompiled failed (implies there was a precompiled contract
     /// at the call address.
     #[error("Precompile call failed")]
