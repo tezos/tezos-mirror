@@ -528,5 +528,11 @@ struct
     let get_topic_params = get_topic_params
 
     let to_float = Fun.id
+
+    let is_active topic {stats; score = _} =
+      match Topic.Map.find topic stats.topic_status with
+      | None -> false
+      | Some {mesh_status; _} -> (
+          match mesh_status with Active _ -> true | Inactive -> false)
   end
 end

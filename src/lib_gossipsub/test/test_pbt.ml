@@ -94,6 +94,28 @@ module Basic_fragments = struct
       (publish_message ~gen_topic ~gen_message_id ~gen_message)
       (fun publish_message -> [I.publish_message publish_message])
 
+  let leave ~gen_topic : t =
+    of_input_gen (leave ~gen_topic) (fun leave -> [I.leave leave])
+
+  let join ~gen_topic : t =
+    of_input_gen (join ~gen_topic) (fun join -> [I.join join])
+
+  let subscribe ~gen_topic ~gen_peer : t =
+    of_input_gen (subscribe ~gen_topic ~gen_peer) (fun subscribe ->
+        [I.subscribe subscribe])
+
+  let unsubscribe ~gen_topic ~gen_peer : t =
+    of_input_gen (unsubscribe ~gen_topic ~gen_peer) (fun unsubscribe ->
+        [I.unsubscribe unsubscribe])
+
+  let add_peer ~gen_peer ~gen_direct ~gen_outbound : t =
+    of_input_gen (add_peer ~gen_peer ~gen_direct ~gen_outbound) (fun add_peer ->
+        [I.add_peer add_peer])
+
+  let remove_peer ~gen_peer : t =
+    of_input_gen (remove_peer ~gen_peer) (fun remove_peer ->
+        [I.remove_peer remove_peer])
+
   let set_application_score ~gen_peer ~gen_score : t =
     of_input_gen
       (set_application_score ~gen_peer ~gen_score)
@@ -110,7 +132,10 @@ module Basic_fragments = struct
       |> List.map (fun peer_id ->
              let open M in
              let+ add_peer =
-               add_peer ~gen_peer:(M.return peer_id) ~gen_direct ~gen_outbound
+               Gossipsub_pbt_generators.add_peer
+                 ~gen_peer:(M.return peer_id)
+                 ~gen_direct
+                 ~gen_outbound
              in
              (peer_id, add_peer))
       |> M.flatten_l
@@ -139,7 +164,10 @@ module Basic_fragments = struct
           (* Setting [direct=false] otherwise the peers won't be grafted. *)
           let gen_direct = M.return false in
           let gen_outbound = M.return (i < count_outbound) in
-          add_peer ~gen_peer:(M.return i) ~gen_direct ~gen_outbound)
+          Gossipsub_pbt_generators.add_peer
+            ~gen_peer:(M.return i)
+            ~gen_direct
+            ~gen_outbound)
       |> WithExceptions.Result.get_ok ~loc:__LOC__
       |> M.flatten_l
     in
@@ -1378,7 +1406,7 @@ module Test_opportunistic_grafting = struct
             (* Set [direct = false] otherwise the peer won't be grafted. *)
             let gen_direct = M.return false in
             let gen_outbound = M.bool in
-            add_peer
+            Gossipsub_pbt_generators.add_peer
               ~gen_peer:(return (first_peer + i))
               ~gen_direct
               ~gen_outbound)
@@ -1824,6 +1852,184 @@ module Test_handle_graft = struct
     unit
 end
 
+(** Check that the score's topic status matches the topic mesh.
+    Namely we check that:
+    - Peer is in mesh of a topic
+      => The score of the peer+topic should be active.
+    - Peer is not in mesh of a topic
+      => The score of the peer+topic should be inactive. *)
+module Test_score_status_matches_mesh = struct
+  open Gossipsub_pbt_generators
+
+  let topics = ["topicA"; "topicB"; "topicC"; "topicD"; "topicE"]
+
+  let peers = range 0 10
+
+  let pp_state fmtr state =
+    let v = GS.Introspection.view state in
+    Fmt.Dump.record
+      Fmt.Dump.
+        [
+          field
+            "mesh"
+            (fun v -> v.GS.Introspection.mesh)
+            GS.Introspection.(pp_topic_map pp_peer_set);
+          field
+            "scores"
+            (fun v -> v.GS.Introspection.scores)
+            GS.Introspection.(pp_peer_map GS.Score.pp);
+        ]
+      fmtr
+      v
+
+  let predicate _limits
+      (Transition {time = _; input = _; state = _; state'; output = _} :
+        transition) () =
+    let open Result_syntax in
+    let view' = GS.Introspection.view state' in
+    let all_peers = Peer.Set.of_list peers in
+    let check_score_status topic =
+      let peers_in_mesh =
+        Peer.Set.of_list @@ GS.Introspection.get_peers_in_topic_mesh topic view'
+      in
+      let peers_not_in_mesh = Peer.Set.diff all_peers peers_in_mesh in
+      (* Peer is in mesh of a topic
+         => The score of the peer+topic should be active. *)
+      let* () =
+        peers_in_mesh
+        |> Peer.Set.iter_e (fun peer ->
+               match Peer.Map.find peer view'.scores with
+               | None -> fail @@ `should_be_tracked peer
+               | Some score ->
+                   if not @@ GS.Score.Internal_for_tests.is_active topic score
+                   then fail @@ `should_be_active (peer, topic)
+                   else return_unit)
+      in
+      (* Peer is not in mesh of a topic
+         => The score of the peer+topic should be inactive. *)
+      let* () =
+        peers_not_in_mesh
+        |> Peer.Set.iter_e (fun peer ->
+               match Peer.Map.find peer view'.scores with
+               | None -> return_unit
+               | Some score ->
+                   if GS.Score.Internal_for_tests.is_active topic score then
+                     fail @@ `should_be_inactive (peer, topic)
+                   else return_unit)
+      in
+      return_unit
+    in
+    List.iter_e (fun topic -> check_score_status topic) topics
+
+  let test rng _limits parameters =
+    Tezt_core.Test.register
+      ~__FILE__
+      ~title:"Gossipsub: Test score status matches mesh"
+      ~tags:["gossipsub"; "scoring"]
+    @@ fun () ->
+    let scenario =
+      let open M in
+      let* limits =
+        return
+          (Default_limits.default_limits
+             ~mesh_message_deliveries_weight:0.0 (* Disable p3. *)
+             ())
+      in
+      let state = GS.make rng limits parameters in
+      let* scenario =
+        let open M in
+        let open Fragment in
+        let open Basic_fragments in
+        let gen_peer = M.oneofl peers in
+        let gen_topic = M.oneofl topics in
+        let gen_message_id = M.int_range 1 100 in
+        let gen_message = M.string in
+        let gen_backoff =
+          let* seconds = M.int_range 1 10 in
+          return @@ GS.Span.of_int_s seconds
+        in
+        let gen_px_count = M.int_range 0 10 in
+        return
+        @@ of_list (List.map (fun topic -> I.join {topic}) topics)
+        @% add_distinct_peers_and_subscribe
+             ~all_peers:peers
+             ~topics_to_subscribe:topics
+             ~gen_outbound:M.bool
+             ~gen_direct:(M.return false)
+        @% interleave
+             [
+               repeat_at_most 100 (heartbeat @% tick);
+               (* Diversify the scores so that the heartbeat prunes/graft peers. *)
+               repeat_at_most
+                 100
+                 (set_application_score
+                    ~gen_peer
+                    ~gen_score:(M.float_range (-10.0) 10.0));
+               repeat_at_most 10 (leave ~gen_topic);
+               repeat_at_most 10 (join ~gen_topic);
+               repeat_at_most 10 (unsubscribe ~gen_topic ~gen_peer);
+               repeat_at_most 10 (subscribe ~gen_topic ~gen_peer);
+               repeat_at_most 10 (remove_peer ~gen_peer);
+               repeat_at_most
+                 10
+                 (add_peer
+                    ~gen_peer
+                    ~gen_direct:(return false)
+                    ~gen_outbound:M.bool);
+               repeat_at_most
+                 10
+                 (prune ~gen_peer ~gen_topic ~gen_backoff ~gen_px_count);
+               repeat_at_most
+                 50
+                 (receive_message
+                    ~gen_peer
+                    ~gen_topic
+                    ~gen_message_id
+                    ~gen_message);
+             ]
+      in
+      let+ trace = run state scenario in
+      (trace, limits)
+    in
+    let test =
+      QCheck2.Test.make
+        ~count:100
+        ~name:"Gossipsub: Test score status matches mesh"
+        scenario
+      @@ fun (trace, limits) ->
+      match check_fold (predicate limits) () trace with
+      | Ok () -> true
+      | Error (e, prefix) ->
+          let msg =
+            match e with
+            | `should_be_active (peer, topic) ->
+                Format.asprintf
+                  "Expected the score status of peer %a for topic %a to be \
+                   active"
+                  Peer.pp
+                  peer
+                  Topic.pp
+                  topic
+            | `should_be_inactive (peer, topic) ->
+                Format.asprintf
+                  "Expected the score status of peer %a for topic %a to be \
+                   inactive"
+                  Peer.pp
+                  peer
+                  Topic.pp
+                  topic
+            | `should_be_tracked peer ->
+                Format.asprintf
+                  "Expected to track the score of peer %a."
+                  Peer.pp
+                  peer
+          in
+          dump_trace_and_fail prefix limits pp_state msg
+    in
+    QCheck2.Test.check_exn ~rand:rng test ;
+    unit
+end
+
 let register rng limits parameters =
   Test_remove_peer.test rng limits parameters ;
   Test_message_cache.test rng ;
@@ -1831,3 +2037,7 @@ let register rng limits parameters =
   Test_handle_ihave.test rng limits parameters ;
   Test_opportunistic_grafting.test rng limits parameters ;
   Test_handle_graft.test rng limits parameters
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/5879
+
+   Uncomment the following line once we fix the bugs related to score status. *)
+(* Test_score_status_matches_mesh.test rng limits parameters *)
