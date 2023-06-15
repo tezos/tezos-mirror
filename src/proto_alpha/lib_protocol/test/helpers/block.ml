@@ -887,19 +887,19 @@ let bake_n ?(baking_mode = Application) ?policy ?liquidity_baking_toggle_vote
     b
     (1 -- n)
 
-let rec bake_while ?(baking_mode = Application) ?policy
+let rec bake_while_with_metadata ?(baking_mode = Application) ?policy
     ?liquidity_baking_toggle_vote ?adaptive_inflation_vote predicate b =
   let open Lwt_result_syntax in
-  let* new_block =
-    bake
+  let* new_block, metadata =
+    bake_with_metadata
       ~baking_mode
       ?policy
       ?liquidity_baking_toggle_vote
       ?adaptive_inflation_vote
       b
   in
-  if predicate new_block then
-    (bake_while [@ocaml.tailcall])
+  if predicate new_block metadata then
+    (bake_while_with_metadata [@ocaml.tailcall])
       ~baking_mode
       ?policy
       ?liquidity_baking_toggle_vote
@@ -907,6 +907,16 @@ let rec bake_while ?(baking_mode = Application) ?policy
       predicate
       new_block
   else return b
+
+let bake_while ?baking_mode ?policy ?liquidity_baking_toggle_vote
+    ?adaptive_inflation_vote predicate b =
+  bake_while_with_metadata
+    ?baking_mode
+    ?policy
+    ?liquidity_baking_toggle_vote
+    ?adaptive_inflation_vote
+    (fun block _metadata -> predicate block)
+    b
 
 let bake_until_level ?(baking_mode = Application) ?policy
     ?liquidity_baking_toggle_vote ?adaptive_inflation_vote level b =
