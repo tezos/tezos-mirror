@@ -1293,8 +1293,7 @@ module Make
           worker = mk_worker_tools w;
         }
       in
-      Shell_metrics.Mempool.set_applied_collector (fun () -> 0.) ;
-      Shell_metrics.Mempool.set_prechecked_collector (fun () ->
+      Shell_metrics.Mempool.set_validated_collector (fun () ->
           Prevalidator_classification.Sized_map.cardinal
             shell.classification.validated
           |> float_of_int) ;
