@@ -178,9 +178,16 @@ let start_state_of_block node_ctxt (block : Sc_rollup_block.t) =
       ctxt
       Layer1.{hash = block.header.predecessor; level = pred_level}
   in
-  let* inbox = Node_context.get_inbox node_ctxt block.header.inbox_hash in
+  let* inbox =
+    Node_context.get_inbox
+      node_ctxt
+      (Sc_rollup_proto_types.Inbox_hash.of_octez block.header.inbox_hash)
+  in
   let* {is_first_block; predecessor; predecessor_timestamp; messages} =
-    Node_context.get_messages node_ctxt block.header.inbox_witness
+    Node_context.get_messages
+      node_ctxt
+      (Sc_rollup_proto_types.Merkelized_payload_hashes_hash.of_octez
+         block.header.inbox_witness)
   in
   let inbox_level = Sc_rollup.Inbox.inbox_level inbox in
   let module PVM = (val node_ctxt.pvm) in

@@ -24,15 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
 include Store_sigs
 include Store_utils
 include Store_v1
 
 let version = Store_version.V2
 
-module Make_hash_index_key (H : Environment.S.HASH) =
+module Make_hash_index_key (H : Tezos_crypto.Intfs.HASH) =
 Indexed_store.Make_index_key (struct
   include Indexed_store.Make_fixed_encodable (H)
 
@@ -45,7 +43,7 @@ module Messages =
     (struct
       let name = "messages"
     end)
-    (Make_hash_index_key (Sc_rollup.Inbox_merkelized_payload_hashes.Hash))
+    (Make_hash_index_key (Merkelized_payload_hashes_hash))
     (struct
       type t = string list
 
@@ -88,25 +86,15 @@ module Inboxes =
     (struct
       let name = "inboxes"
     end)
-    (Make_hash_index_key (Sc_rollup.Inbox.Hash))
+    (Make_hash_index_key (Octez_smart_rollup.Inbox.Hash))
     (struct
-      type t = Sc_rollup.Inbox.t
-
-      let to_repr inbox =
-        inbox
-        |> Data_encoding.Binary.to_string_exn Sc_rollup.Inbox.encoding
-        |> Data_encoding.Binary.of_string_exn Sc_rollup_inbox_repr.encoding
-
-      let of_repr inbox =
-        inbox
-        |> Data_encoding.Binary.to_string_exn Sc_rollup_inbox_repr.encoding
-        |> Data_encoding.Binary.of_string_exn Sc_rollup.Inbox.encoding
+      type t = Octez_smart_rollup.Inbox.t
 
       let encoding =
         Data_encoding.conv
-          (fun x -> to_repr x |> Sc_rollup_inbox_repr.to_versioned)
-          (fun x -> Sc_rollup_inbox_repr.of_versioned x |> of_repr)
-          Sc_rollup_inbox_repr.versioned_encoding
+          Octez_smart_rollup.Inbox.to_versioned
+          Octez_smart_rollup.Inbox.of_versioned
+          Octez_smart_rollup.Inbox.versioned_encoding
 
       let name = "inbox"
 
@@ -119,25 +107,15 @@ module Commitments =
     (struct
       let name = "commitments"
     end)
-    (Make_hash_index_key (Sc_rollup.Commitment.Hash))
+    (Make_hash_index_key (Octez_smart_rollup.Commitment.Hash))
     (struct
-      type t = Sc_rollup.Commitment.t
-
-      let to_repr commitment =
-        commitment
-        |> Data_encoding.Binary.to_string_exn Sc_rollup.Commitment.encoding
-        |> Data_encoding.Binary.of_string_exn Sc_rollup_commitment_repr.encoding
-
-      let of_repr commitment =
-        commitment
-        |> Data_encoding.Binary.to_string_exn Sc_rollup_commitment_repr.encoding
-        |> Data_encoding.Binary.of_string_exn Sc_rollup.Commitment.encoding
+      type t = Octez_smart_rollup.Commitment.t
 
       let encoding =
         Data_encoding.conv
-          (fun x -> to_repr x |> Sc_rollup_commitment_repr.to_versioned)
-          (fun x -> Sc_rollup_commitment_repr.of_versioned x |> of_repr)
-          Sc_rollup_commitment_repr.versioned_encoding
+          Octez_smart_rollup.Commitment.to_versioned
+          Octez_smart_rollup.Commitment.of_versioned
+          Octez_smart_rollup.Commitment.versioned_encoding
 
       let name = "commitment"
 

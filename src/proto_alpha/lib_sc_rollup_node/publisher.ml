@@ -177,6 +177,7 @@ let create_commitment_if_necessary (node_ctxt : _ Node_context.t) ~predecessor
     let* last_commitment_hash =
       let+ pred = Node_context.get_l2_block node_ctxt predecessor in
       Sc_rollup_block.most_recent_commitment pred.header
+      |> Sc_rollup_proto_types.Commitment_hash.of_octez
     in
     let* last_commitment =
       Node_context.get_commitment node_ctxt last_commitment_hash
@@ -247,9 +248,7 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
           match (published_info, next_head_level) with
           | None, _ | _, None -> false
           | Some {first_published_at_level; _}, Some next_head_level ->
-              Int32.sub
-                next_head_level
-                (Raw_level.to_int32 first_published_at_level)
+              Int32.sub next_head_level first_published_at_level
               > sc_rollup_challenge_window_int32
         in
         let acc = if past_curfew then acc else commitment :: acc in
@@ -264,6 +263,7 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
          commitments that are missing. *)
       let commitment =
         Sc_rollup_block.most_recent_commitment finalized.header
+        |> Sc_rollup_proto_types.Commitment_hash.of_octez
       in
       gather [] commitment
 
@@ -320,7 +320,9 @@ let earliest_cementing_level node_ctxt commitment_hash =
     Node_context.commitment_published_at_level node_ctxt commitment_hash
   in
   return_some
-  @@ add_level first_published_at_level (sc_rollup_challenge_window node_ctxt)
+  @@ Int32.add
+       first_published_at_level
+       (sc_rollup_challenge_window node_ctxt |> Int32.of_int)
 
 (** [latest_cementable_commitment node_ctxt head] is the most recent commitment
       hash that could be cemented in [head]'s successor if:
@@ -333,7 +335,10 @@ let earliest_cementing_level node_ctxt commitment_hash =
 let latest_cementable_commitment (node_ctxt : _ Node_context.t)
     (head : Sc_rollup_block.t) =
   let open Lwt_result_option_syntax in
-  let commitment_hash = Sc_rollup_block.most_recent_commitment head.header in
+  let commitment_hash =
+    Sc_rollup_block.most_recent_commitment head.header
+    |> Sc_rollup_proto_types.Commitment_hash.of_octez
+  in
   let** commitment = Node_context.find_commitment node_ctxt commitment_hash in
   let** cementable_level_bound =
     return
@@ -349,6 +354,7 @@ let latest_cementable_commitment (node_ctxt : _ Node_context.t)
     in
     let cementable_commitment =
       Sc_rollup_block.most_recent_commitment cementable_bound_block.header
+      |> Sc_rollup_proto_types.Commitment_hash.of_octez
     in
     return_some cementable_commitment
 
@@ -374,7 +380,7 @@ let cementable_commitments (node_ctxt : _ Node_context.t) =
           match earliest_cementing_level with
           | None -> acc
           | Some earliest_cementing_level ->
-              if Raw_level.to_int32 earliest_cementing_level > head_level then
+              if earliest_cementing_level > head_level then
                 (* Commitments whose cementing level are after the head's
                    successor won't be cementable in the next block. *)
                 acc

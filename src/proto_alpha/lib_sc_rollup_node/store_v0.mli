@@ -32,8 +32,6 @@
     layout for the Mumbai rollup node.
 *)
 
-open Protocol
-open Alpha_context
 open Indexed_store
 
 module Irmin_store : sig
@@ -53,32 +51,32 @@ module L2_blocks :
 (** Storage for persisting messages downloaded from the L1 node. *)
 module Messages :
   INDEXED_FILE
-    with type key := Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+    with type key := Octez_smart_rollup.Merkelized_payload_hashes_hash.t
      and type value := string list
-     and type header := Block_hash.t * Timestamp.t * int
+     and type header := Block_hash.t * Time.Protocol.t * int
 
 (** Aggregated collection of messages from the L1 inbox *)
 module Inboxes :
   SIMPLE_INDEXED_FILE
-    with type key := Sc_rollup.Inbox.Hash.t
-     and type value := Sc_rollup.Inbox.t
+    with type key := Octez_smart_rollup.Inbox.Hash.t
+     and type value := Octez_smart_rollup.Inbox.V1.t
      and type header := unit
 
 (** Storage containing commitments and corresponding commitment hashes that the
     rollup node has knowledge of. *)
 module Commitments :
   INDEXABLE_STORE
-    with type key := Sc_rollup.Commitment.Hash.t
-     and type value := Sc_rollup.Commitment.t
+    with type key := Octez_smart_rollup.Commitment.Hash.t
+     and type value := Octez_smart_rollup.Commitment.t
 
 (** Storage mapping commitment hashes to the level when they were published by
     the rollup node. It only contains hashes of commitments published by this
     rollup node. *)
 module Commitments_published_at_level : sig
   type element = {
-    first_published_at_level : Raw_level.t;
+    first_published_at_level : int32;
         (** The level at which this commitment was first published. *)
-    published_at_level : Raw_level.t option;
+    published_at_level : int32 option;
         (** The level at which we published this commitment. If
             [first_published_at_level <> published_at_level] it means that the
             commitment is republished. *)
@@ -86,7 +84,7 @@ module Commitments_published_at_level : sig
 
   include
     INDEXABLE_STORE
-      with type key := Sc_rollup.Commitment.Hash.t
+      with type key := Octez_smart_rollup.Commitment.Hash.t
        and type value := element
 end
 
@@ -105,13 +103,13 @@ module Dal_slots_headers :
   Store_sigs.Nested_map
     with type primary_key := Block_hash.t
      and type secondary_key := Dal.Slot_index.t
-     and type value := Dal.Slot.Header.t
+     and type value := Dal.Slot_header.V1.t
      and type 'a store := 'a Irmin_store.t
 
 module Dal_confirmed_slots_history :
   Store_sigs.Append_only_map
     with type key := Block_hash.t
-     and type value := Dal.Slots_history.t
+     and type value := Dal.Slot_history.V1.t
      and type 'a store := 'a Irmin_store.t
 
 (** Confirmed DAL slots histories cache. See documentation of
@@ -119,7 +117,7 @@ module Dal_confirmed_slots_history :
 module Dal_confirmed_slots_histories :
   Store_sigs.Append_only_map
     with type key := Block_hash.t
-     and type value := Dal.Slots_history.History_cache.t
+     and type value := Dal.Slot_history_cache.V1.t
      and type 'a store := 'a Irmin_store.t
 
 (** [Dal_slot_pages] is a [Store_utils.Nested_map] used to store the contents
@@ -131,8 +129,8 @@ module Dal_confirmed_slots_histories :
 module Dal_slot_pages :
   Store_sigs.Nested_map
     with type primary_key := Block_hash.t
-     and type secondary_key := Dal.Slot_index.t * Dal.Page.Index.t
-     and type value := Dal.Page.content
+     and type secondary_key := Dal.Slot_index.t * Dal.Page_index.t
+     and type value := bytes
      and type 'a store := 'a Irmin_store.t
 
 (** [Dal_processed_slots] is a [Store_utils.Nested_map] used to store the processing

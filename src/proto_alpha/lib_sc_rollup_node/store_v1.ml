@@ -24,15 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
 include Store_sigs
 include Store_utils
 include Store_v0
 
 let version = Store_version.V1
 
-module Make_hash_index_key (H : Environment.S.HASH) =
+module Make_hash_index_key (H : Tezos_crypto.Intfs.HASH) =
 Indexed_store.Make_index_key (struct
   include Indexed_store.Make_fixed_encodable (H)
 
@@ -45,7 +43,7 @@ module Messages =
     (struct
       let name = "messages"
     end)
-    (Make_hash_index_key (Sc_rollup.Inbox_merkelized_payload_hashes.Hash))
+    (Make_hash_index_key (Merkelized_payload_hashes_hash))
     (struct
       type t = string list
 
@@ -54,7 +52,7 @@ module Messages =
       let encoding = Data_encoding.(list @@ dynamic_size Variable.(string' Hex))
 
       module Header = struct
-        type t = bool * Block_hash.t * Timestamp.t * int
+        type t = bool * Block_hash.t * Time.Protocol.t * int
 
         let name = "messages_inbox_info"
 
@@ -63,7 +61,7 @@ module Messages =
           obj4
             (req "is_first_block" bool)
             (req "predecessor" Block_hash.encoding)
-            (req "predecessor_timestamp" Timestamp.encoding)
+            (req "predecessor_timestamp" Time.Protocol.encoding)
             (req "num_messages" int31)
 
         let fixed_size =
@@ -96,7 +94,7 @@ module Dal_slots_statuses =
 
       let encoding = Dal.Slot_index.encoding
 
-      let compare = Dal.Slot_index.compare
+      let compare = Compare.Int.compare
 
       let name = "slot_index"
     end)

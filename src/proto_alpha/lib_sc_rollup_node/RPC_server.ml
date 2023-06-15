@@ -122,7 +122,10 @@ module Common = struct
     let open Lwt_result_syntax in
     let* l2_block = Node_context.get_l2_block node_ctxt block in
     let+ num_messages =
-      Node_context.get_num_messages node_ctxt l2_block.header.inbox_witness
+      Node_context.get_num_messages
+        node_ctxt
+        (Sc_rollup_proto_types.Merkelized_payload_hashes_hash.of_octez
+           l2_block.header.inbox_witness)
     in
     Z.of_int num_messages
 
@@ -269,6 +272,7 @@ let () =
   | Some head ->
       let commitment_hash =
         Sc_rollup_block.most_recent_commitment head.header
+        |> Sc_rollup_proto_types.Commitment_hash.of_octez
       in
       let+ commitment =
         Node_context.find_commitment node_ctxt commitment_hash
@@ -457,6 +461,7 @@ let () =
                           WithExceptions.Option.get
                             ~loc:__LOC__
                             block.header.commitment_hash
+                          |> Sc_rollup_proto_types.Commitment_hash.of_octez
                         in
                         (* Commitment computed *)
                         let* published_at =

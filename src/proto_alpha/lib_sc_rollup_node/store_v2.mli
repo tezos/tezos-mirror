@@ -27,8 +27,6 @@
 (** This version of the store is used for the rollup nodes for protocols for and
     after Nairobi, i.e. >= 17. *)
 
-open Protocol
-open Alpha_context
 open Indexed_store
 
 include module type of struct
@@ -38,23 +36,23 @@ end
 (** Storage for persisting messages downloaded from the L1 node. *)
 module Messages :
   INDEXED_FILE
-    with type key := Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+    with type key := Merkelized_payload_hashes_hash.t
      and type value := string list
      and type header := Block_hash.t
 
 (** Storage for persisting inboxes. *)
 module Inboxes :
   SIMPLE_INDEXED_FILE
-    with type key := Sc_rollup.Inbox.Hash.t
-     and type value := Sc_rollup.Inbox.t
+    with type key := Octez_smart_rollup.Inbox.Hash.t
+     and type value := Octez_smart_rollup.Inbox.t
      and type header := unit
 
 (** Storage containing commitments and corresponding commitment hashes that the
     rollup node has knowledge of. *)
 module Commitments :
   SIMPLE_INDEXED_FILE
-    with type key := Sc_rollup.Commitment.Hash.t
-     and type value := Sc_rollup.Commitment.t
+    with type key := Octez_smart_rollup.Commitment.Hash.t
+     and type value := Octez_smart_rollup.Commitment.t
      and type header := unit
 
 module Protocols : sig

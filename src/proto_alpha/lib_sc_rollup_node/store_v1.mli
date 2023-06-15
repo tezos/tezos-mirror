@@ -27,8 +27,6 @@
 (** This version of the store is used for the rollup nodes for protocols for and
     after Nairobi, i.e. >= 17. *)
 
-open Protocol
-open Alpha_context
 open Indexed_store
 
 include module type of struct
@@ -38,9 +36,9 @@ end
 (** Storage for persisting messages downloaded from the L1 node. *)
 module Messages :
   INDEXED_FILE
-    with type key := Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+    with type key := Merkelized_payload_hashes_hash.t
      and type value := string list
-     and type header := bool * Block_hash.t * Timestamp.t * int
+     and type header := bool * Block_hash.t * Time.Protocol.t * int
 
 module Dal_pages : sig
   type removed_in_v1
