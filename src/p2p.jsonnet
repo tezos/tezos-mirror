@@ -167,7 +167,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     ),
 
   mempoolPending:
-    local applied = 'Applied';
+    local validated = 'Validated';
     local refused = 'Refused';
     local outdated = 'Outdated';
     local branch_refused = 'Branch refused';
@@ -190,7 +190,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       legend_values=true,
       logBase1Y=10,
       aliasColors={
-        [applied]: 'green',
+        [validated]: 'green',
         [refused]: 'red',
         [outdated]: 'blue',
         [branch_refused]: 'light-orange',
@@ -199,8 +199,8 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       },
     ).addTarget(
       prometheus.target(
-        namespace + '_mempool_pending_prechecked' + node_instance,
-        legendFormat=applied,
+        namespace + '_mempool_pending_validated' + node_instance,
+        legendFormat=validated,
       )
     ).addTarget(
       prometheus.target(
