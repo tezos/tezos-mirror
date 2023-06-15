@@ -183,7 +183,7 @@ cd "$GPD_DIR" || exit 1
 eval "$(opam env)"
 
 # This is just to build gas_parameter_diff.
-$DUNE exec gas_parameter_diff -- 2> /dev/null
+$DUNE exec gas_parameter_diff -- &> /dev/null
 
 PREV_DIR="$LAST_KNOWN_DIR"
 
