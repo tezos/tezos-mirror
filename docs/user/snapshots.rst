@@ -211,3 +211,4 @@ download. These include:
 * `XTZ-Shots <https://xtz-shots.io/mainnet/>`_
 * `Lambs on acid <https://lambsonacid.nl/>`_
 * `Marigold snapshots <https://snapshots.tezos.marigold.dev/>`_
+* `Tzinit snapshots <https://snapshots.tzinit.org/>`_
