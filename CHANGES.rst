@@ -142,6 +142,10 @@ Node
 - Improved the performances of JSON RPC calls by optimizing the
   serialization to JSON. (MR :gl:`!9072`)
 
+- Fixed the ``validation_pass`` argument usage of ``monitor_operations`` RPC.
+  Only operation that were in the mempool before the RPC call were filtered by
+  validation passes. (MR :gl:`!9012`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
