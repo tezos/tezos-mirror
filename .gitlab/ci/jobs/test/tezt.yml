@@ -17,6 +17,7 @@ include: .gitlab/ci/jobs/test/common.yml
       junit: $JUNIT
     paths:
       - tezt.log
+      - tezt-*.log
       - tezt-results-$CI_NODE_INDEX.json
       - $BISECT_FILE
       - $JUNIT
