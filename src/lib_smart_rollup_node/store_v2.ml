@@ -122,6 +122,86 @@ module Commitments =
       include Add_empty_header
     end)
 
+(** Versioned slot headers *)
+module Dal_slots_headers =
+  Irmin_store.Make_nested_map
+    (struct
+      let path = ["dal"; "slot_headers"]
+    end)
+    (struct
+      type key = Block_hash.t
+
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type key = Octez_smart_rollup.Dal.Slot_index.t
+
+      let encoding = Octez_smart_rollup.Dal.Slot_index.encoding
+
+      let compare = Compare.Int.compare
+
+      let name = "slot_index"
+    end)
+    (struct
+      type value = Octez_smart_rollup.Dal.Slot_header.t
+
+      let name = "slot_header"
+
+      let encoding =
+        Data_encoding.conv
+          Octez_smart_rollup.Dal.Slot_header.to_versioned
+          Octez_smart_rollup.Dal.Slot_header.of_versioned
+          Octez_smart_rollup.Dal.Slot_header.versioned_encoding
+    end)
+
+(** Versioned Confirmed DAL slots history *)
+module Dal_confirmed_slots_history =
+  Irmin_store.Make_append_only_map
+    (struct
+      let path = ["dal"; "confirmed_slots_history"]
+    end)
+    (struct
+      type key = Block_hash.t
+
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type value = Octez_smart_rollup.Dal.Slot_history.t
+
+      let name = "dal_slot_histories"
+
+      let encoding =
+        Data_encoding.conv
+          Octez_smart_rollup.Dal.Slot_history.to_versioned
+          Octez_smart_rollup.Dal.Slot_history.of_versioned
+          Octez_smart_rollup.Dal.Slot_history.versioned_encoding
+    end)
+
+(** Versioned Confirmed DAL slots histories cache. *)
+module Dal_confirmed_slots_histories =
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4390
+     Store single history points in map instead of whole history. *)
+    Irmin_store.Make_append_only_map
+      (struct
+        let path = ["dal"; "confirmed_slots_histories_cache"]
+      end)
+      (struct
+        type key = Block_hash.t
+
+        let to_path_representation = Block_hash.to_b58check
+      end)
+    (struct
+      type value = Octez_smart_rollup.Dal.Slot_history_cache.t
+
+      let name = "dal_slot_histories"
+
+      let encoding =
+        Data_encoding.conv
+          Octez_smart_rollup.Dal.Slot_history_cache.to_versioned
+          Octez_smart_rollup.Dal.Slot_history_cache.of_versioned
+          Octez_smart_rollup.Dal.Slot_history_cache.versioned_encoding
+    end)
+
 module Protocols = struct
   type level = First_known of int32 | Activation_level of int32
 
