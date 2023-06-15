@@ -25,7 +25,7 @@ Node
 ----
 
 - Fixed a bug where the node could freeze when an old block was
-  requested during a store merge. (MR :gl:`!8952`)`
+  requested during a store merge. (MR :gl:`!8952`)
 
 Version 17.0-rc1
 ================
@@ -204,7 +204,7 @@ Smart Rollup WASM Debugger
 - Automatically ``load inputs`` when ``step inbox`` is called. (MR :gl:`!8444`)
 
 - Added a command ``show function symbols`` to inspect the custom section
-  ``name`` of unstripped kernels (MR :gl:`!8522`)
+  ``name`` of unstripped kernels. (MR :gl:`!8522`)
 
 - Added a command ``profile`` that runs a full ``kernel_run`` and produces a
   flamegraph of the execution (MR :gl:`!8510`).
