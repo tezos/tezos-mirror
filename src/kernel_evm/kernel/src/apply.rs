@@ -16,7 +16,7 @@ use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::signatures::EthereumTransactionCommon;
 use tezos_ethereum::transaction::TransactionHash;
-use tezos_smart_rollup_debug::Runtime;
+use tezos_smart_rollup_debug::{debug_msg, Runtime};
 
 use crate::error::{Error, TransferError};
 
@@ -196,7 +196,20 @@ pub fn apply_transaction<Host: Runtime>(
     index: u32,
     evm_account_storage: &mut EthereumAccountStorage,
 ) -> Result<Option<(TransactionReceiptInfo, TransactionObjectInfo)>, Error> {
-    let caller = transaction.caller()?;
+    let caller = match transaction.caller() {
+        Ok(caller) => caller,
+        Err(err) => {
+            debug_msg!(
+                host,
+                "{} ignored because of {:?}\n",
+                hex::encode(transaction_hash),
+                err
+            );
+            // Transaction with undefined caller are ignored, i.e. the caller
+            // could not be derived from the signature.
+            return Ok(None);
+        }
+    };
     if !transaction.check_nonce(caller, host, evm_account_storage) {
         // Transactions with invalid nonces are ignored.
         return Ok(None);
