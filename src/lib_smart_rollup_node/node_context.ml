@@ -103,7 +103,7 @@ let lock ~data_dir =
     in
     return lockfile
   in
-  trace (Sc_rollup_node_errors.Could_not_acquire_lock lockfile_path)
+  trace (Rollup_node_errors.Could_not_acquire_lock lockfile_path)
   @@ lock_aux ~data_dir
 
 let unlock {lockfile; _} =
@@ -237,16 +237,17 @@ let checkout_context node_ctxt block_hash =
     Store.L2_blocks.header node_ctxt.store.l2_blocks block_hash
   in
   let*? context_hash =
+    let open Result_syntax in
     match l2_header with
     | None ->
-        error (Sc_rollup_node_errors.Cannot_checkout_context (block_hash, None))
-    | Some {context; _} -> ok context
+        tzfail (Rollup_node_errors.Cannot_checkout_context (block_hash, None))
+    | Some {context; _} -> return context
   in
   let*! ctxt = Context.checkout node_ctxt.context context_hash in
   match ctxt with
   | None ->
       tzfail
-        (Sc_rollup_node_errors.Cannot_checkout_context
+        (Rollup_node_errors.Cannot_checkout_context
            (block_hash, Some context_hash))
   | Some ctxt -> return ctxt
 
@@ -531,7 +532,6 @@ let get_commitment node_ctxt commitment_hash =
   | Some i -> return i
 
 let commitment_exists {store; _} hash =
-  let hash = Sc_rollup_proto_types.Commitment_hash.to_octez hash in
   Store.Commitments.mem store.commitments hash
 
 let save_commitment {store; _} commitment =
@@ -640,9 +640,6 @@ type messages_info = {
 
 let find_messages node_ctxt messages_hash =
   let open Lwt_result_syntax in
-  let messages_hash =
-    Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez messages_hash
-  in
   let* msg = Store.Messages.read node_ctxt.store.messages messages_hash in
   match msg with
   | None -> return_none
@@ -690,9 +687,6 @@ let get_messages_without_proto_messages node_ctxt =
 
 let get_num_messages {store; _} hash =
   let open Lwt_result_syntax in
-  let hash =
-    Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez hash
-  in
   let* msg = Store.Messages.read store.messages hash in
   match msg with
   | None ->
@@ -703,7 +697,6 @@ let get_num_messages {store; _} hash =
   | Some (messages, _block_hash) -> return (List.length messages)
 
 let save_messages {store; _} key ~block_hash messages =
-  let key = Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez key in
   Store.Messages.append
     store.messages
     ~key

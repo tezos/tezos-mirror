@@ -32,6 +32,7 @@
 *)
 
 open Octez_smart_rollup
+open Octez_smart_rollup_node
 
 let build_chain node_ctxt ~genesis ~length =
   let open Lwt_result_syntax in

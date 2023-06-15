@@ -26,6 +26,7 @@
 open Octez_smart_rollup
 open Protocol
 open Alpha_context
+open Octez_smart_rollup_node
 
 (** {1 Helper functions to build and run unit tests for the rollup node} *)
 
