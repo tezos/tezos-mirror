@@ -127,8 +127,8 @@ aws s3 sync s3://snoop-playground/mclaren/inference_csvs/snoop_results/ "$INPUT_
 rm -rf "$OUTPUT_CSV_DIR"
 mkdir -p "$OUTPUT_CSV_DIR"
 
-ALERT_FILE="$OCTEZ_DIR/alerts"
-SELECTION_FILE="$OCTEZ_DIR/selected.csv"
+ALERT_FILE="$OUTPUT_CSV_DIR/alerts"
+SELECTION_FILE="$OUTPUT_CSV_DIR/selected.csv"
 
 rm -f "$ALERT_FILE"
 rm -f "$SELECTION_FILE"
