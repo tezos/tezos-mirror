@@ -1177,6 +1177,15 @@ module Make (C : AUTOMATON_CONFIG) :
         let get_score = get_scores_score_or_zero scores in
         Peer.Set.filter (fun peer -> Score.(get_score peer < zero)) mesh
       in
+      (* Notify scoring about the prunes. *)
+      let* () =
+        Peer.Set.fold
+          (fun peer scores ->
+            update_scores_score peer (fun s -> Score.prune s topic) scores)
+          mesh
+          scores
+        |> set_scores
+      in
       Leaving_topic {to_prune = mesh; noPX_peers} |> return
 
     let handle topic : [`Leave] output Monad.t =
