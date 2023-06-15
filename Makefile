@@ -38,13 +38,15 @@ EXPERIMENTAL_EXECUTABLES := $(shell cat script-inputs/experimental-executables)
 # are not useful for users.
 # - scripts/snapshot_alpha.sh expects octez-protocol-compiler to be at the root.
 # - Some tests expect octez-snoop to be at the root.
-DEV_EXECUTABLES := octez-protocol-compiler octez-snoop
+DEV_EXECUTABLES := $(shell cat script-inputs/dev-executables)
 
 ALL_EXECUTABLES := $(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES) $(DEV_EXECUTABLES)
 
 # Set of Dune targets to build, in addition to OCTEZ_EXECUTABLES, in
-# the `build` target's Dune invocation.
-BUILD_EXTRA :=
+# the `build` target's Dune invocation. This is used in the CI to
+# build the TPS evaluation tool and the Tezt test suite in the
+# 'build_x86_64-dev-exp-misc' job.
+BUILD_EXTRA ?=
 
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifndef TEZOS_WITHOUT_OPAM
@@ -91,8 +93,9 @@ endif
 # This is more efficient than 'make octez-node octez-client'
 # because it only calls 'dune' once.
 #
-# Targets 'all', 'release', 'experimental-release', 'static' and 'all-extras' define different
-# default lists of executables to build but they all can be overridden from the command-line.
+# Targets 'all', 'release', 'experimental-release' and 'static' define
+# different default lists of executables to build but they all can be
+# overridden from the command-line.
 .PHONY: all
 all:
 	@$(MAKE) build OCTEZ_EXECUTABLES?="$(ALL_EXECUTABLES)"
@@ -104,13 +107,6 @@ release:
 .PHONY: experimental-release
 experimental-release:
 	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES)"
-
-# all-extras is targetted by the CI build jobs 'x86_64' and 'arm64',
-# and builds test executables in addition to the default set of
-# executables.
-.PHONY: all-extras
-all-extras:
-	@$(MAKE) all BUILD_EXTRA="src/bin_tps_evaluation tezt/tests/main.exe"
 
 .PHONY: strip
 strip: all

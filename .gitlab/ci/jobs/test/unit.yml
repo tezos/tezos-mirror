@@ -16,7 +16,9 @@
 
 .unit_test_template_x86_64:
   extends: .unit_test_template
-  needs: ["build_x86_64"]
+  needs:
+    - "build_x86_64-released"
+    - "build_x86_64-exp-dev-extra"
   variables:
     ARCH: "x86_64"
 
