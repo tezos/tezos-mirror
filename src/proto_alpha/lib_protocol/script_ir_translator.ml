@@ -287,38 +287,41 @@ let ty_eq :
     (a, ac) ty ->
     (b, bc) ty ->
     (((a, ac) ty, (b, bc) ty) eq, error_trace) Gas_monad.t =
- fun ~error_details ty1 ty2 ->
+ fun ~(error_details : (_, error_trace) error_details) ty1 ty2 ->
+  let record_trace_eval :
+      type a.
+      (Script.location -> error) ->
+      (a, error_trace) result ->
+      (a, error_trace) result =
+    match error_details with
+    | Fast -> fun _f m -> m
+    | Informative loc -> fun f m -> record_trace_eval (fun () -> f loc) m
+  in
   let type_metadata_eq meta1 meta2 =
-    Gas_monad.of_result (type_metadata_eq ~error_details meta1 meta2)
-    |> Gas_monad.record_trace_eval ~error_details (fun loc ->
-           default_ty_eq_error loc ty1 ty2)
+    type_metadata_eq ~error_details meta1 meta2
+    |> record_trace_eval (fun loc -> default_ty_eq_error loc ty1 ty2)
   in
-  let memo_size_eq ms1 ms2 =
-    Gas_monad.of_result (memo_size_eq ~error_details ms1 ms2)
-  in
+  let memo_size_eq ms1 ms2 = memo_size_eq ~error_details ms1 ms2 in
   let rec help :
       type ta tac tb tbc.
       (ta, tac) ty ->
       (tb, tbc) ty ->
-      (((ta, tac) ty, (tb, tbc) ty) eq, error_trace) Gas_monad.t =
+      (((ta, tac) ty, (tb, tbc) ty) eq, error_trace) result =
    fun ty1 ty2 ->
     help0 ty1 ty2
-    |> Gas_monad.record_trace_eval ~error_details (fun loc ->
-           default_ty_eq_error loc ty1 ty2)
+    |> record_trace_eval (fun loc -> default_ty_eq_error loc ty1 ty2)
   and help0 :
       type ta tac tb tbc.
       (ta, tac) ty ->
       (tb, tbc) ty ->
-      (((ta, tac) ty, (tb, tbc) ty) eq, error_trace) Gas_monad.t =
+      (((ta, tac) ty, (tb, tbc) ty) eq, error_trace) result =
    fun ty1 ty2 ->
-    let open Gas_monad.Syntax in
+    let open Result_syntax in
     let not_equal () =
-      Gas_monad.of_result
-      @@ Error
-           (match error_details with
-           | Fast -> (Inconsistent_types_fast : error_trace)
-           | Informative loc ->
-               trace_of_error @@ default_ty_eq_error loc ty1 ty2)
+      Error
+        (match error_details with
+        | Fast -> (Inconsistent_types_fast : error_trace)
+        | Informative loc -> trace_of_error @@ default_ty_eq_error loc ty1 ty2)
     in
     match (ty1, ty2) with
     | Unit_t, Unit_t -> return (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
@@ -434,7 +437,7 @@ let ty_eq :
   in
   let open Gas_monad.Syntax in
   let* () = Gas_monad.consume_gas (Typecheck_costs.ty_eq ty1 ty2) in
-  help ty1 ty2
+  Gas_monad.of_result @@ help ty1 ty2
 
 (* Same as ty_eq but for stacks.
    A single error monad is used here because there is no need to
