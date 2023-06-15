@@ -53,6 +53,20 @@ let assert_is_not_yet_set_to_launch ~loc blk =
         cycle)
     launch_cycle_opt
 
+let assert_cycle_eq ~loc c1 c2 =
+  Assert.equal
+    ~loc
+    Protocol.Alpha_context.Cycle.( = )
+    "cycle equality"
+    Protocol.Alpha_context.Cycle.pp
+    c1
+    c2
+
+let assert_current_cycle ~loc (blk : Block.t) expected =
+  let open Lwt_result_syntax in
+  let* current_cycle = Block.current_cycle blk in
+  assert_cycle_eq ~loc current_cycle expected
+
 (* Test that the EMA of the adaptive inflation vote reaches the
    threshold after the expected duration. Also test that the launch
    cycle is set as soon as the threshold is reached. *)
@@ -100,7 +114,11 @@ let test_launch threshold expected_vote_duration () =
   in
   let* () = assert_ema_above_threshold ~loc:__LOC__ metadata in
   let* () = assert_level ~loc:__LOC__ block expected_vote_duration in
-  let* _launch_cycle = get_launch_cycle ~loc:__LOC__ block in
+  let* launch_cycle = get_launch_cycle ~loc:__LOC__ block in
+  let* block = Block.bake_until_cycle launch_cycle block in
+  let* launch_cycle_bis = get_launch_cycle ~loc:__LOC__ block in
+  let* () = assert_cycle_eq ~loc:__LOC__ launch_cycle launch_cycle_bis in
+  let* () = assert_current_cycle ~loc:__LOC__ block launch_cycle in
   return_unit
 
 let tests =
