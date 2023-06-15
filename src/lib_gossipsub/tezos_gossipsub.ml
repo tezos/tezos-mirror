@@ -177,6 +177,45 @@ module Make (C : AUTOMATON_CONFIG) :
             this notion to fit its needs. *)
   }
 
+  (** [Connections] implements a map from peers to connections. *)
+  module Connections : sig
+    type t
+
+    val empty : t
+
+    val bindings : t -> (Peer.t * connection) list
+
+    val find : Peer.t -> t -> connection option
+
+    val mem : Peer.t -> t -> bool
+
+    val add : Peer.t -> connection -> t -> t
+
+    val remove : Peer.t -> t -> t
+
+    val fold : (Peer.t -> connection -> 'b -> 'b) -> t -> 'b -> 'b
+
+    val iter : (Peer.t -> connection -> unit) -> t -> unit
+  end = struct
+    type t = connection Peer.Map.t
+
+    let empty = Peer.Map.empty
+
+    let bindings = Peer.Map.bindings
+
+    let find = Peer.Map.find
+
+    let mem = Peer.Map.mem
+
+    let add = Peer.Map.add
+
+    let remove = Peer.Map.remove
+
+    let fold = Peer.Map.fold
+
+    let iter = Peer.Map.iter
+  end
+
   type fanout_peers = {peers : Peer.Set.t; last_published_time : time}
 
   module Message_cache = Message_cache.Make (C.Subconfig) (Time)
@@ -184,7 +223,7 @@ module Make (C : AUTOMATON_CONFIG) :
   type state = {
     limits : limits;  (** Statically known parameters of the algorithm. *)
     parameters : parameters;  (** Other parameters of the algorithm. *)
-    connections : connection Peer.Map.t;
+    connections : Connections.t;
         (** [connections] is the set of active connections. A connection is added
             through the `Add_peer` message and removed through the `Remove_peer`
             message. *)
@@ -309,7 +348,7 @@ module Make (C : AUTOMATON_CONFIG) :
     {
       limits;
       parameters;
-      connections = Peer.Map.empty;
+      connections = Connections.empty;
       scores = Peer.Map.empty;
       ihave_per_heartbeat = Peer.Map.empty;
       iwant_per_heartbeat = Peer.Map.empty;
@@ -472,14 +511,14 @@ module Make (C : AUTOMATON_CONFIG) :
       get_scores_score_or_zero state.scores peer
 
     let peer_has_outbound_connection peers ~default peer =
-      Peer.Map.find_opt peer peers
+      Connections.find peer peers
       |> Option.map (fun connection -> connection.outbound)
       |> Option.value ~default
 
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5391
        Optimize by having a topic to peers map *)
     let select_connections_peers connections scores rng topic ~filter ~max =
-      Peer.Map.bindings connections
+      Connections.bindings connections
       |> List.filter_map (fun (peer, connection) ->
              let score = get_scores_score_or_zero scores peer in
              let topics = connection.topics in
@@ -619,13 +658,13 @@ module Make (C : AUTOMATON_CONFIG) :
     let handle topic peer =
       let open Monad.Syntax in
       let*! connections in
-      match Peer.Map.find peer connections with
+      match Connections.find peer connections with
       | None -> return Subscribe_to_unknown_peer
       | Some connection ->
           let connection =
             {connection with topics = Topic.Set.add topic connection.topics}
           in
-          let connections = Peer.Map.add peer connection connections in
+          let connections = Connections.add peer connection connections in
           let* () = set_connections connections in
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/5143
              rust-libp2p adds the peer to the mesh if needed here. *)
@@ -666,13 +705,13 @@ module Make (C : AUTOMATON_CONFIG) :
     let handle topic peer =
       let open Monad.Syntax in
       let*! connections in
-      match Peer.Map.find peer connections with
+      match Connections.find peer connections with
       | None -> return @@ Unsubscribe_from_unknown_peer
       | Some connection ->
           let connection =
             {connection with topics = Topic.Set.remove topic connection.topics}
           in
-          let peers = Peer.Map.add peer connection connections in
+          let peers = Connections.add peer connection connections in
           let* () = set_connections peers in
           (* Remove the peer from mesh as done in the rust implementation
              but not go implementation. *)
@@ -840,7 +879,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_active peer =
       let open Monad.Syntax in
       let*! connections in
-      match Peer.Map.find peer connections with
+      match Connections.find peer connections with
       | None -> Unexpected_grafting_peer |> fail
       | Some connection -> pass connection
 
@@ -1089,7 +1128,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let*! backoff in
       let*! scores in
       let is_valid peer =
-        match Peer.Map.find peer connections with
+        match Connections.find peer connections with
         | None ->
             (* FIXME https://gitlab.com/tezos/tezos/-/issues/5005
 
@@ -1721,7 +1760,7 @@ module Make (C : AUTOMATON_CONFIG) :
         let peers_to_keep, peers_to_remove =
           Peer.Set.fold
             (fun peer acc ->
-              match Peer.Map.find peer connections with
+              match Connections.find peer connections with
               | None ->
                   (* impossible, given the global invariants on the state *)
                   assert false
@@ -1835,10 +1874,10 @@ module Make (C : AUTOMATON_CONFIG) :
       let*! connections in
       let*! scores in
       let*! score_limits in
-      match Peer.Map.find peer connections with
+      match Connections.find peer connections with
       | None ->
           let connection = {direct; topics = Topic.Set.empty; outbound} in
-          let connections = Peer.Map.add peer connection connections in
+          let connections = Connections.add peer connection connections in
           let scores =
             Peer.Map.update
               peer
@@ -1873,7 +1912,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let*! retain_duration in
       let*! scores in
       let*! connections in
-      let* () = Peer.Map.remove peer connections |> set_connections in
+      let* () = Connections.remove peer connections |> set_connections in
       let* () =
         Peer.Map.update
           peer
@@ -2309,11 +2348,12 @@ module Make (C : AUTOMATON_CONFIG) :
     }
 
     module Message_cache = Message_cache
+    module Connections = Connections
 
     type view = state = {
       limits : limits;
       parameters : parameters;
-      connections : connection Peer.Map.t;
+      connections : Connections.t;
       scores : Score.t Peer.Map.t;
       ihave_per_heartbeat : int Peer.Map.t;
       iwant_per_heartbeat : int Peer.Map.t;
@@ -2346,7 +2386,7 @@ module Make (C : AUTOMATON_CONFIG) :
             && filter_rec peer connection score filters
       in
       fun ?(filters = []) view ->
-        Peer.Map.fold
+        Connections.fold
           (fun peer connection acc ->
             let score = get_score_or_zero peer view in
             if filter_rec peer connection score filters then peer :: acc
@@ -2360,7 +2400,7 @@ module Make (C : AUTOMATON_CONFIG) :
       | Some peers -> Peer.Set.elements peers
 
     let get_subscribed_topics peer state =
-      match Peer.Map.find peer state.connections with
+      match Connections.find peer state.connections with
       | None -> []
       | Some connection -> Topic.Set.elements connection.topics
 
@@ -2406,12 +2446,12 @@ module Make (C : AUTOMATON_CONFIG) :
       | Some topic_mesh -> Peer.Set.mem peer topic_mesh
 
     let is_direct peer {connections; _} =
-      match Peer.Map.find peer connections with
+      match Connections.find peer connections with
       | None -> false
       | Some {direct; _} -> direct
 
     let is_outbound peer {connections; _} =
-      match Peer.Map.find peer connections with
+      match Connections.find peer connections with
       | None -> false
       | Some {outbound; _} -> outbound
 
@@ -2428,7 +2468,7 @@ module Make (C : AUTOMATON_CONFIG) :
       Fmt.record fields fmtr c
 
     let pp_connections =
-      Fmt.Dump.iter_bindings Peer.Map.iter Fmt.nop Peer.pp pp_connection
+      Fmt.Dump.iter_bindings Connections.iter Fmt.nop Peer.pp pp_connection
 
     let pp_scores =
       Fmt.Dump.iter_bindings Peer.Map.iter Fmt.nop Peer.pp Score.pp_value

@@ -481,6 +481,14 @@ module Test_remove_peer = struct
 
   let all_peers = [0; 1; 2; 3]
 
+  let fail_if_in_connections peers map ~on_error =
+    let fail =
+      List.find_opt
+        (fun peer -> GS.Introspection.Connections.mem peer map)
+        peers
+    in
+    match fail with None -> Ok () | Some peer -> Error (on_error peer)
+
   let fail_if_in_map peers map ~on_error =
     let fail = List.find_opt (fun peer -> GS.Peer.Map.mem peer map) peers in
     match fail with None -> Ok () | Some peer -> Error (on_error peer)
@@ -501,7 +509,10 @@ module Test_remove_peer = struct
       fail_if_in_set peers set ~on_error:(fun peer ->
           `peer_not_removed_correctly (view, str, peer))
     in
-    let* () = check_map "connections" view.connections in
+    let* () =
+      fail_if_in_connections peers view.connections ~on_error:(fun peer ->
+          `peer_not_removed_correctly (view, "connections", peer))
+    in
     let* () = check_map "scores" view.scores in
     let* () =
       Topic.Map.iter_e
