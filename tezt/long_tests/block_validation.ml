@@ -517,7 +517,7 @@ let register ~executors () =
   Long_test.register
     ~__FILE__
     ~title:Benchmark.chunk_title
-    ~tags:["shell"; "validation"; "block"; "chunk"; "ci_disabled"]
+    ~tags:["shell"; "validation"; "block"; "chunk"; Tag.ci_disabled]
     ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir
@@ -526,7 +526,7 @@ let register ~executors () =
   Long_test.register
     ~__FILE__
     ~title:Benchmark.specific_title
-    ~tags:["shell"; "validation"; "block"; "specific"; "ci_disabled"]
+    ~tags:["shell"; "validation"; "block"; "specific"; Tag.ci_disabled]
     ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir
@@ -538,7 +538,7 @@ let register ~executors () =
   Long_test.register
     ~__FILE__
     ~title:Benchmark.subparts_title
-    ~tags:["shell"; "validation"; "block"; "subpart"; "ci_disabled"]
+    ~tags:["shell"; "validation"; "block"; "subpart"; Tag.ci_disabled]
     ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir

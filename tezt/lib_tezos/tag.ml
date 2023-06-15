@@ -23,6 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ci_disable = "ci_disable"
+let ci_disabled = "ci_disabled"
 
 let flaky = "flaky"

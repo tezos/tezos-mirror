@@ -84,10 +84,8 @@ let test_kill =
         "external";
         "validator";
         "kill";
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5467
-
-           This test is flaky and has been disabled. *)
-        "ci_disable";
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5467 *)
+        Tag.flaky;
       ]
   @@ fun protocol ->
   let node = Node.create [] in

@@ -28,12 +28,13 @@
 (** The following values are string constants that can be added to [~tags]
     in [Test.register]. They have specific semantics that is documented here.
     By using [Tag.x] instead of ["x"] in [~tags], you allow developers
-    to jump to the definition of [Tag.x] and thus see the documentation of the tag. *)
+    to jump to the definition of [Tag.x] and thus see the documentation of the tag.
+    You also avoid mistakes like using ["ci_disable"] instead of ["ci_disabled"]. *)
 
 (** ["flaky"]: the test is flaky.
 
-    This disables the test in the CI just like {!ci_disable}.
-    Contrary to {!ci_disable} however, this also gives the reason why the test
+    This disables the test in the CI just like {!ci_disabled}.
+    Contrary to {!ci_disabled} however, this also gives the reason why the test
     is disabled: the test is flaky.
 
     Tip: you can list tests that are declared as flaky with [tezt --list flaky].
@@ -45,9 +46,9 @@
     it is not necessarily needed to create an issue for each flaky test. *)
 val flaky : string
 
-(** ["ci_disable"]: disable test in the CI.
+(** ["ci_disabled"]: disable test in the CI.
 
     The test is not to be run in the CI.
     You must provide a comment to explain why the test is disabled.
-    For flaky tests, {!flaky} should be preferred to [ci_disable]. *)
-val ci_disable : string
+    For flaky tests, {!flaky} should be preferred to [ci_disabled]. *)
+val ci_disabled : string
