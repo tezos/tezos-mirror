@@ -495,6 +495,12 @@ struct
       else M.set_shrink shrink_raw fragment
   end
 
+  let fold fragment f init =
+    let open M in
+    let* raw = Fragment.raw_generator fragment in
+    let seq = SeqM.M.unfold Fragment.next raw in
+    SeqM.fold_left (fun acc event -> f event acc) init seq
+
   let run state fragment : trace t =
     let open M in
     let* raw = Fragment.raw_generator fragment in
