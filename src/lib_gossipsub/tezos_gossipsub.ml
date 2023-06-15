@@ -610,17 +610,16 @@ module Make (C : AUTOMATON_CONFIG) :
       |> Option.map (fun connection -> connection.outbound)
       |> Option.value ~default
 
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5391
-       Optimize by having a topic to peers map *)
     let select_connections_peers connections scores rng topic ~filter ~max =
-      Connections.bindings connections
-      |> List.filter_map (fun (peer, connection) ->
-             let score = get_scores_score_or_zero scores peer in
-             let topics = connection.topics in
-             if filter peer connection score && Topic.Set.mem topic topics then
-               Some peer
-             else None)
-      |> List.shuffle ~rng |> List.take_n max
+      Connections.peers_in_topic topic connections
+      |> Peer.Set.to_seq
+      |> Seq.filter_map (fun peer ->
+             match Connections.find peer connections with
+             | None -> assert false
+             | Some connection ->
+                 let score = get_scores_score_or_zero scores peer in
+                 if filter peer connection score then Some peer else None)
+      |> List.of_seq |> List.shuffle ~rng |> List.take_n max
 
     let select_peers topic ~filter ~max =
       let open Monad.Syntax in

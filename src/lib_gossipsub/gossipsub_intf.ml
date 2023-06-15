@@ -879,6 +879,19 @@ module type AUTOMATON = sig
 
       val mem : Peer.t -> t -> bool
 
+      val add_peer :
+        Peer.t ->
+        direct:bool ->
+        outbound:bool ->
+        t ->
+        [`added of t | `already_known]
+
+      val subscribe :
+        Peer.t -> Topic.t -> t -> [`unknown_peer | `subscribed of t]
+
+      val unsubscribe :
+        Peer.t -> Topic.t -> t -> [`unknown_peer | `unsubscribed of t]
+
       val remove : Peer.t -> t -> t
 
       val fold : (Peer.t -> connection -> 'b -> 'b) -> t -> 'b -> 'b
