@@ -215,15 +215,14 @@ struct
 
   let set_connected {stats; _} = make {stats with peer_status = Connected}
 
-  let fresh_mesh_status () =
+  let fresh_active_mesh_status () =
     let since = Time.now () in
     let during = Span.zero in
     Active {since; during}
 
   let fresh_topic_stats () =
-    let mesh_status = fresh_mesh_status () in
     {
-      mesh_status;
+      mesh_status = Inactive;
       first_message_deliveries = 0.0;
       mesh_message_deliveries_active = false;
       mesh_message_deliveries = 0.0;
@@ -241,11 +240,14 @@ struct
       Topic.Map.update
         topic
         (function
-          | None -> Some (fresh_topic_stats ())
+          | None ->
+              let status = fresh_topic_stats () in
+              let mesh_status = fresh_active_mesh_status () in
+              Some {status with mesh_status}
           | Some status ->
               (* This should not happen: the automaton prevents grafting
                  a peer twice on the same topic. *)
-              let mesh_status = fresh_mesh_status () in
+              let mesh_status = fresh_active_mesh_status () in
               Some {status with mesh_status})
         stats.topic_status
     in

@@ -638,6 +638,7 @@ module Make (C : AUTOMATON_CONFIG) :
   module Unsubscribe = struct
     let remove_peer_from_mesh topic peer =
       let open Monad.Syntax in
+      let* () = update_score peer (fun s -> Score.prune s topic) in
       let*! mesh in
       let mesh =
         Topic.Map.update
@@ -1175,6 +1176,15 @@ module Make (C : AUTOMATON_CONFIG) :
         (* no PX for peers with negative score. *)
         let get_score = get_scores_score_or_zero scores in
         Peer.Set.filter (fun peer -> Score.(get_score peer < zero)) mesh
+      in
+      (* Notify scoring about the prunes. *)
+      let* () =
+        Peer.Set.fold
+          (fun peer scores ->
+            update_scores_score peer (fun s -> Score.prune s topic) scores)
+          mesh
+          scores
+        |> set_scores
       in
       Leaving_topic {to_prune = mesh; noPX_peers} |> return
 
@@ -1763,6 +1773,32 @@ module Make (C : AUTOMATON_CONFIG) :
       (* Update the fanout map. *)
       update_fanout fanout ~to_add ~to_remove
 
+    let prune_scores to_prune =
+      let open Monad.Syntax in
+      let*! scores in
+      Peer.Map.fold
+        (fun peer topics ->
+          Topic.Set.fold
+            (fun topic ->
+              update_scores_score peer (fun score -> Score.prune score topic))
+            topics)
+        to_prune
+        scores
+      |> set_scores
+
+    let graft_scores to_graft =
+      let open Monad.Syntax in
+      let*! scores in
+      Peer.Map.fold
+        (fun peer topics ->
+          Topic.Set.fold
+            (fun topic ->
+              update_scores_score peer (fun score -> Score.graft score topic))
+            topics)
+        to_graft
+        scores
+      |> set_scores
+
     let handle =
       let open Monad.Syntax in
       let*! heartbeat_ticks in
@@ -1785,6 +1821,9 @@ module Make (C : AUTOMATON_CONFIG) :
       let*! message_cache in
       let* () = Message_cache.shift message_cache |> set_message_cache in
 
+      (* Notify scoring about the prunes/grafts. *)
+      let* () = prune_scores to_prune in
+      let* () = graft_scores to_graft in
       Heartbeat {to_graft; to_prune; noPX_peers} |> return
   end
 

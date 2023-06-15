@@ -2036,8 +2036,5 @@ let register rng limits parameters =
   Test_peers_below_degree_high.test rng limits parameters ;
   Test_handle_ihave.test rng limits parameters ;
   Test_opportunistic_grafting.test rng limits parameters ;
-  Test_handle_graft.test rng limits parameters
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/5879
-
-   Uncomment the following line once we fix the bugs related to score status. *)
-(* Test_score_status_matches_mesh.test rng limits parameters *)
+  Test_handle_graft.test rng limits parameters ;
+  Test_score_status_matches_mesh.test rng limits parameters
