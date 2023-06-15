@@ -879,8 +879,6 @@ module type AUTOMATON = sig
 
       val mem : Peer.t -> t -> bool
 
-      val add : Peer.t -> connection -> t -> t
-
       val remove : Peer.t -> t -> t
 
       val fold : (Peer.t -> connection -> 'b -> 'b) -> t -> 'b -> 'b

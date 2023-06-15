@@ -189,7 +189,17 @@ module Make (C : AUTOMATON_CONFIG) :
 
     val mem : Peer.t -> t -> bool
 
-    val add : Peer.t -> connection -> t -> t
+    val add_peer :
+      Peer.t ->
+      direct:bool ->
+      outbound:bool ->
+      t ->
+      [`added of t | `already_known]
+
+    val subscribe : Peer.t -> Topic.t -> t -> [`unknown_peer | `subscribed of t]
+
+    val unsubscribe :
+      Peer.t -> Topic.t -> t -> [`unknown_peer | `unsubscribed of t]
 
     val remove : Peer.t -> t -> t
 
@@ -207,7 +217,31 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let mem = Peer.Map.mem
 
-    let add = Peer.Map.add
+    let add_peer peer ~direct ~outbound map =
+      if mem peer map then `already_known
+      else
+        let map =
+          Peer.Map.add peer {topics = Topic.Set.empty; direct; outbound} map
+        in
+        `added map
+
+    let subscribe peer topic map =
+      match find peer map with
+      | None -> `unknown_peer
+      | Some connection ->
+          let connection =
+            {connection with topics = Topic.Set.add topic connection.topics}
+          in
+          `subscribed (Peer.Map.add peer connection map)
+
+    let unsubscribe peer topic map =
+      match find peer map with
+      | None -> `unknown_peer
+      | Some connection ->
+          let connection =
+            {connection with topics = Topic.Set.remove topic connection.topics}
+          in
+          `unsubscribed (Peer.Map.add peer connection map)
 
     let remove = Peer.Map.remove
 
@@ -658,13 +692,9 @@ module Make (C : AUTOMATON_CONFIG) :
     let handle topic peer =
       let open Monad.Syntax in
       let*! connections in
-      match Connections.find peer connections with
-      | None -> return Subscribe_to_unknown_peer
-      | Some connection ->
-          let connection =
-            {connection with topics = Topic.Set.add topic connection.topics}
-          in
-          let connections = Connections.add peer connection connections in
+      match Connections.subscribe peer topic connections with
+      | `unknown_peer -> return Subscribe_to_unknown_peer
+      | `subscribed connections ->
           let* () = set_connections connections in
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/5143
              rust-libp2p adds the peer to the mesh if needed here. *)
@@ -705,14 +735,10 @@ module Make (C : AUTOMATON_CONFIG) :
     let handle topic peer =
       let open Monad.Syntax in
       let*! connections in
-      match Connections.find peer connections with
-      | None -> return @@ Unsubscribe_from_unknown_peer
-      | Some connection ->
-          let connection =
-            {connection with topics = Topic.Set.remove topic connection.topics}
-          in
-          let peers = Connections.add peer connection connections in
-          let* () = set_connections peers in
+      match Connections.unsubscribe peer topic connections with
+      | `unknown_peer -> return @@ Unsubscribe_from_unknown_peer
+      | `unsubscribed connections ->
+          let* () = set_connections connections in
           (* Remove the peer from mesh as done in the rust implementation
              but not go implementation. *)
           let* () = remove_peer_from_mesh topic peer in
@@ -1874,10 +1900,8 @@ module Make (C : AUTOMATON_CONFIG) :
       let*! connections in
       let*! scores in
       let*! score_limits in
-      match Connections.find peer connections with
-      | None ->
-          let connection = {direct; topics = Topic.Set.empty; outbound} in
-          let connections = Connections.add peer connection connections in
+      match Connections.add_peer peer ~direct ~outbound connections with
+      | `added connections ->
           let scores =
             Peer.Map.update
               peer
@@ -1889,7 +1913,7 @@ module Make (C : AUTOMATON_CONFIG) :
           let* () = set_connections connections in
           let* () = set_scores scores in
           return Peer_added
-      | Some _ -> return Peer_already_known
+      | `already_known -> return Peer_already_known
   end
 
   let add_peer : add_peer -> [`Add_peer] output Monad.t =
