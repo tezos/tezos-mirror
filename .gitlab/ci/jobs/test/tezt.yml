@@ -39,9 +39,9 @@ tezt:
     - .template__coverage_files
     - .tezt_template
   variables:
-    # Do not tests with the tag 'ci_disable'. See the registration of
+    # Do not tests with the tag 'ci_disable' and 'flaky'. See the registration of
     # the individual test for the disabling rationale.
-    TESTS: "/ci_disable"
+    TESTS: "/ci_disable /flaky"
   dependencies:
     - "build_x86_64-released"
     - "build_x86_64-exp-dev-extra"
