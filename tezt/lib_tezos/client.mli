@@ -1936,6 +1936,7 @@ val spawn_from_fa1_2_contract_get_total_supply_callback :
 
 (** Run [octez-client from fa1.2 contract <contract> transfer <amount> from <from> to <to>]. *)
 val from_fa1_2_contract_transfer :
+  ?wait:string ->
   ?burn_cap:Tez.t ->
   contract:string ->
   amount:int ->
@@ -1947,6 +1948,7 @@ val from_fa1_2_contract_transfer :
 
 (** Same as [from_fa1_2_contract_transfer], but do not wait for the process to exit. *)
 val spawn_from_fa1_2_contract_transfer :
+  ?wait:string ->
   ?burn_cap:Tez.t ->
   contract:string ->
   amount:int ->
@@ -1958,6 +1960,7 @@ val spawn_from_fa1_2_contract_transfer :
 
 (** Run [octez-client from fa1.2 contract <contract> as <as> approve <amount> from <from>]. *)
 val from_fa1_2_contract_approve :
+  ?wait:string ->
   ?burn_cap:Tez.t ->
   contract:string ->
   as_:string ->
@@ -1968,6 +1971,7 @@ val from_fa1_2_contract_approve :
 
 (** Same as [from_fa1_2_contract_approve], but do not wait for the process to exit. *)
 val spawn_from_fa1_2_contract_approve :
+  ?wait:string ->
   ?burn_cap:Tez.t ->
   contract:string ->
   as_:string ->
