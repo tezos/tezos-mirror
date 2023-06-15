@@ -2,6 +2,7 @@ KERNELS = evm_kernel.wasm
 SDK_DIR=src/kernel_sdk
 EVM_DIR=src/kernel_evm
 SEQUENCER_DIR=src/kernel_sequencer
+EVM_KERNEL_PREIMAGES = _evm_installer_preimages
 
 .PHONY: all
 all: build-dev-deps check test build
@@ -16,6 +17,12 @@ evm_kernel.wasm::
 	@make -C src/kernel_evm build
 	@cp src/kernel_evm/target/wasm32-unknown-unknown/release/evm_kernel.wasm $@
 	@wasm-strip $@
+
+evm_installer.wasm:: kernel_sdk evm_kernel.wasm
+	@scripts/evm_installer.sh \
+	--evm-kernel evm_kernel.wasm \
+	--preimages-dir ${EVM_KERNEL_PREIMAGES} \
+	--output $@
 
 sequenced_kernel.wasm:
 	@make -C src/kernel_sequencer build
@@ -63,3 +70,4 @@ clean:
 	@make -C ${SDK_DIR} clean
 	@make -C ${EVM_DIR} clean
 	@make -C ${SEQUENCER_DIR} clean
+	@rm -rf ${EVM_KERNEL_PREIMAGES}
