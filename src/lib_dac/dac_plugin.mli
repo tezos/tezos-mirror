@@ -46,6 +46,10 @@ val raw_compare : hash -> hash -> int
     the RPC APIs. *)
 type raw_hash
 
+(** [raw_hash_to_hex raw_hash] returns the Hex representation of 
+    the provided [raw_hash]. *)
+val raw_hash_to_hex : raw_hash -> Hex.t
+
 (** Protocol independent encoding of Dac_plugin.hash values.
     Only use in situations where the plugin is not available,
     and for reporting purposes (e.g. when emitting an event or registering

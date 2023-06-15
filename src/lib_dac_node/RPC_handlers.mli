@@ -77,10 +77,9 @@ module V0 : sig
 
   (** [handle_get_certificate] is a handler for "GET v0/certificate". *)
   val handle_get_certificate :
-    Dac_plugin.t ->
     [> `Read] Store.Irmin_store.t ->
     Dac_plugin.raw_hash ->
-    (Certificate_repr.t option, tztrace) result Lwt.t
+    (Certificate_repr.t, tztrace) result Lwt.t
 
   (** [handle_get_serialized_certificate] is the handler for "GET v0/serialized_certificates". *)
   val handle_get_serialized_certificate :

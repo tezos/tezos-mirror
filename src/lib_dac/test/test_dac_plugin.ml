@@ -46,25 +46,21 @@ let test_encode_decode_json () =
   in
   assert (raw_hash = decoded_raw_hash)
 
-let test_cannot_encode_binary () =
+let test_encode_decode_binary () =
   let raw_hash =
     Dac_plugin.raw_hash_of_bytes
       (Bytes.of_string
          "00dce42551fb786c51b29b723f4abba3ea04eb3d239a9a59ec5a5434e151e105e4")
   in
   let encoded_raw_hash =
-    Data_encoding.Binary.to_string Dac_plugin.raw_hash_encoding raw_hash
+    Data_encoding.Binary.to_string_exn Dac_plugin.raw_hash_encoding raw_hash
   in
-  match encoded_raw_hash with Error _ -> () | Ok _ -> assert false
-
-let test_cannot_decode_binary () =
-  let raw_hash =
-    "00dce42551fb786c51b29b723f4abba3ea04eb3d239a9a59ec5a5434e151e105e4"
+  let decoded_raw_hash =
+    Data_encoding.Binary.of_string Dac_plugin.raw_hash_encoding encoded_raw_hash
   in
-  let encoded_raw_hash =
-    Data_encoding.Binary.of_string Dac_plugin.raw_hash_encoding raw_hash
-  in
-  match encoded_raw_hash with Error _ -> () | Ok _ -> assert false
+  match decoded_raw_hash with
+  | Error _ -> assert false
+  | Ok decoded_raw_hash -> assert (raw_hash = decoded_raw_hash)
 
 let tests =
   [
@@ -73,13 +69,9 @@ let tests =
       `Quick
       test_encode_decode_json;
     Alcotest.test_case
-      "Cannot encode a raw_hash to binary"
+      "Encode and decode to binary leads to the same Dac_plugin.raw_hash"
       `Quick
-      test_cannot_encode_binary;
-    Alcotest.test_case
-      "Cannot decode a raw_hash to binary"
-      `Quick
-      test_cannot_decode_binary;
+      test_encode_decode_binary;
   ]
 
 let () = Alcotest.run ~__FILE__ "lib_dac" [("Dac_plugin.ml", tests)]

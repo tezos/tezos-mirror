@@ -43,7 +43,7 @@ let raw_hash_encoding =
   union
     [
       case
-        Json_only
+        (Tag 0)
         Data_encoding.bytes
         ~title:"raw_hash"
         (fun raw_hash -> Some raw_hash)

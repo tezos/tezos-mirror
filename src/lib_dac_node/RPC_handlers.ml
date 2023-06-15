@@ -159,29 +159,27 @@ module V0 = struct
     let* () = Event.(emit handle_new_subscription_to_hash_streamer ()) in
     Tezos_rpc.Answer.return_stream {next; shutdown}
 
-  let handle_get_certificate dac_plugin node_store raw_root_hash =
+  let handle_get_certificate node_store raw_root_hash =
     let open Lwt_result_syntax in
-    let*? root_hash = Dac_plugin.raw_to_hash dac_plugin raw_root_hash in
-    let+ value_opt = Store.Certificate_store.find node_store root_hash in
-    Option.map
-      (fun Store.{aggregate_signature; witnesses} ->
-        Certificate_repr.(
-          V0 (V0.make raw_root_hash aggregate_signature witnesses)))
-      value_opt
+    let+ value_opt = Store.Certificate_store.find node_store raw_root_hash in
+    match value_opt with
+    | Some certificate -> certificate
+    | None -> raise Not_found
 
   let handle_get_serialized_certificate dac_plugin node_store raw_root_hash =
     let open Lwt_result_syntax in
     let ((module Plugin) : Dac_plugin.t) = dac_plugin in
     let*? root_hash = Dac_plugin.raw_to_hash dac_plugin raw_root_hash in
-    let* value_opt = Store.Certificate_store.find node_store root_hash in
+    let* value_opt = Store.Certificate_store.find node_store raw_root_hash in
     Option.map_es
-      (fun Store.{aggregate_signature; witnesses} ->
+      (fun certificate ->
         let serialized_certificate =
           Certificate_repr.V0.Protocol_dependant.serialize_certificate
             Plugin.encoding
             ~root_hash
-            ~aggregate_signature
-            ~witnesses
+            ~aggregate_signature:
+              (Certificate_repr.get_aggregate_signature certificate)
+            ~witnesses:(Certificate_repr.get_witnesses certificate)
         in
         return @@ String.of_bytes serialized_certificate)
       value_opt
@@ -220,17 +218,13 @@ module V0 = struct
          a certificate is returned even in the case that no updates to the
          certificate happen for a long time. *)
       let*! current_certificate_store_value_res =
-        Store.Certificate_store.find ro_node_store root_hash
+        Store.Certificate_store.find ro_node_store raw_root_hash
       in
       match current_certificate_store_value_res with
       | Ok current_certificate_store_value ->
           let () =
             Option.iter
-              (fun Store.{aggregate_signature; witnesses} ->
-                let certificate =
-                  Certificate_repr.(
-                    V0 (V0.make raw_root_hash aggregate_signature witnesses))
-                in
+              (fun certificate ->
                 let _ =
                   Certificate_streamers.push
                     dac_plugin

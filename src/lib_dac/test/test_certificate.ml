@@ -62,7 +62,7 @@ let test_version_is_0 () =
   in
   assert (Certificate_repr.get_version certificate = 0)
 
-(** Encode to binary a certificate fails. *)
+(** Encode and decode to/from binary a certificate leads to the same certificate. *)
 let binary_encode () =
   let certificate =
     create_certificate
@@ -71,10 +71,14 @@ let binary_encode () =
       1
   in
   let encoded_certificate =
-    Data_encoding.Binary.to_bytes Certificate_repr.encoding certificate
+    Data_encoding.Binary.to_bytes_exn Certificate_repr.encoding certificate
   in
-
-  match encoded_certificate with Ok _ -> assert false | Error _ -> assert true
+  let decoded_certificate =
+    Data_encoding.Binary.of_bytes_exn
+      Certificate_repr.encoding
+      encoded_certificate
+  in
+  assert (assert_equal_certificate certificate decoded_certificate)
 
 let json_encode_decode () =
   let certificate =
@@ -148,7 +152,7 @@ let tests =
       "Verify Certificate_repr.version is equal to 0"
       `Quick
       test_version_is_0;
-    Alcotest.test_case "Simple Binary encode" `Quick binary_encode;
+    Alcotest.test_case "Simple Binary encode decode" `Quick binary_encode;
     Alcotest.test_case "Simple JSON encode decode" `Quick json_encode_decode;
     Alcotest.test_case "Simple JSON decode" `Quick json_decode;
     Alcotest.test_case "Simple JSON encode" `Quick json_encode;
