@@ -1216,6 +1216,44 @@ module Full_infrastructure = struct
     let* () = root_hash_pushed_to_data_streamer_promise in
     Lwt.return_unit
 
+  (** [init_config_of_nodes dac_nodes] initializes the configuration of all
+      [dac_nodes]. *)
+  let init_config_of_nodes dac_nodes =
+    Lwt_list.iter_s
+      (fun dac_node ->
+        let* _ = Dac_node.init_config dac_node in
+        return ())
+      dac_nodes
+
+  (** [run_and_subscribe_nodes coordinator_node dac_nodes] runs all [dac_nodes].
+      Additionally, it blocks until all nodes are successfully subscribed to
+      [coordinator_node]. *)
+  let run_and_subscribe_nodes coordinator_node dac_nodes =
+    let wait_for_node_subscribed_to_data_streamer () =
+      wait_for_handle_new_subscription_to_hash_streamer coordinator_node
+    in
+    (* Run all dac nodes and wait for their subscription to coordinator.
+       Because the event resolution loop in the Daemon always resolves
+       all promises matching an event filter, when a new event is received,
+       we cannot wait for multiple subscription to the hash streamer, as
+       events of this kind are indistinguishable one from the other.
+       Instead, we wait for the subscription of one observer/committe_member
+       node to be notified before running the next node. *)
+    Lwt_list.iter_s
+      (fun node ->
+        let node_is_subscribed = wait_for_node_subscribed_to_data_streamer () in
+        let* () = Dac_node.run ~wait_ready:true node in
+        let* () = check_liveness_and_readiness node in
+        node_is_subscribed)
+      dac_nodes
+
+  (** [init_run_and_subscribe_nodes coordinator_node dac_nodes] initializes
+      the configuration, runs, and synchronizes all [dac_nodes], to be
+      subscribed to the streaming of root hashes of [coordinator_node]. *)
+  let init_run_and_subscribe_nodes coordinator_node dac_nodes =
+    let* () = init_config_of_nodes dac_nodes in
+    run_and_subscribe_nodes coordinator_node dac_nodes
+
   let test_download_and_retrieval_of_pages
       Scenarios.{coordinator_node; committee_members_nodes; observer_nodes; _} =
     (* 0. Coordinator node is already running when the this function is
@@ -1229,46 +1267,15 @@ module Full_infrastructure = struct
     let push_promise =
       wait_for_root_hash_pushed_to_data_streamer coordinator_node expected_rh
     in
-    let wait_for_node_subscribed_to_data_streamer () =
-      wait_for_handle_new_subscription_to_hash_streamer coordinator_node
-    in
     let wait_for_root_hash_processed_promises nodes =
       List.map
         (fun dac_node ->
           wait_for_received_root_hash_processed dac_node expected_rh)
         nodes
     in
-    (* Initialize configuration of all nodes. *)
-    let* _ =
-      Lwt_list.iter_s
-        (fun committee_member_node ->
-          let* _ = Dac_node.init_config committee_member_node in
-          return ())
-        committee_members_nodes
-    in
-    let* _ =
-      Lwt_list.iter_s
-        (fun observer_node ->
-          let* _ = Dac_node.init_config observer_node in
-          return ())
-        observer_nodes
-    in
-    (* 1. Run committee member and observer nodes.
-       Because the event resolution loop in the Daemon always resolves
-       all promises matching an event filter, when a new event is received,
-       we cannot wait for multiple subscription to the hash streamer, as
-       events of this kind are indistinguishable one from the other.
-       Instead, we wait for the subscription of one observer/committe_member
-       node to be notified before running the next node. *)
     let* () =
-      Lwt_list.iter_s
-        (fun node ->
-          let node_is_subscribed =
-            wait_for_node_subscribed_to_data_streamer ()
-          in
-          let* () = Dac_node.run ~wait_ready:true node in
-          let* () = check_liveness_and_readiness node in
-          node_is_subscribed)
+      init_run_and_subscribe_nodes
+        coordinator_node
         (committee_members_nodes @ observer_nodes)
     in
     let all_nodes_have_processed_root_hash =
@@ -1328,40 +1335,9 @@ module Full_infrastructure = struct
     let push_promise =
       wait_for_root_hash_pushed_to_data_streamer coordinator_node expected_rh
     in
-    let wait_for_node_subscribed_to_data_streamer () =
-      wait_for_handle_new_subscription_to_hash_streamer coordinator_node
-    in
-    (* Initialize configuration of all nodes. *)
-    let* _ =
-      Lwt_list.iter_s
-        (fun committee_member_node ->
-          let* _ = Dac_node.init_config committee_member_node in
-          return ())
-        committee_members_nodes
-    in
-    let* _ =
-      Lwt_list.iter_s
-        (fun observer_node ->
-          let* _ = Dac_node.init_config observer_node in
-          return ())
-        observer_nodes
-    in
-    (* 1. Run committee member and observer nodes.
-       Because the event resolution loop in the Daemon always resolves
-       all promises matching an event filter, when a new event is received,
-       we cannot wait for multiple subscription to the hash streamer, as
-       events of this kind are indistinguishable one from the other.
-       Instead, we wait for the subscription of one observer/committe_member
-       node to be notified before running the next node. *)
     let* () =
-      Lwt_list.iter_s
-        (fun node ->
-          let node_is_subscribed =
-            wait_for_node_subscribed_to_data_streamer ()
-          in
-          let* () = Dac_node.run ~wait_ready:true node in
-          let* () = check_liveness_and_readiness node in
-          node_is_subscribed)
+      init_run_and_subscribe_nodes
+        coordinator_node
         (committee_members_nodes @ observer_nodes)
     in
     (* 2. Post a preimage to the coordinator. *)
@@ -1528,40 +1504,9 @@ module Full_infrastructure = struct
         committee_members_opt
         (Hex.to_bytes (`Hex expected_rh))
     in
-    let wait_for_node_subscribed_to_data_streamer () =
-      wait_for_handle_new_subscription_to_hash_streamer coordinator_node
-    in
-    (* Initialize configuration of all nodes. *)
-    let* _ =
-      Lwt_list.iter_s
-        (fun committee_member_node ->
-          let* _ = Dac_node.init_config committee_member_node in
-          return ())
-        committee_members_nodes
-    in
-    let* _ =
-      Lwt_list.iter_s
-        (fun observer_node ->
-          let* _ = Dac_node.init_config observer_node in
-          return ())
-        observer_nodes
-    in
-    (* 1. Run committee member and observer nodes.
-       Because the event resolution loop in the Daemon always resolves
-       all promises matching an event filter, when a new event is received,
-       we cannot wait for multiple subscription to the hash streamer, as
-       events of this kind are indistinguishable one from the other.
-       Instead, we wait for the subscription of one observer/committe_member
-       node to be notified before running the next node. *)
     let* () =
-      Lwt_list.iter_s
-        (fun node ->
-          let node_is_subscribed =
-            wait_for_node_subscribed_to_data_streamer ()
-          in
-          let* () = Dac_node.run ~wait_ready:true node in
-          let* () = check_liveness_and_readiness node in
-          node_is_subscribed)
+      init_run_and_subscribe_nodes
+        coordinator_node
         (committee_members_nodes @ observer_nodes)
     in
     (* 2. Dac client posts a preimage to coordinator, and waits for all
@@ -1642,40 +1587,9 @@ module Full_infrastructure = struct
         committee_members_opt
         (Hex.to_bytes (`Hex expected_rh))
     in
-    let wait_for_node_subscribed_to_data_streamer () =
-      wait_for_handle_new_subscription_to_hash_streamer coordinator_node
-    in
-    (* Initialize configuration of all nodes. *)
-    let* _ =
-      Lwt_list.iter_s
-        (fun committee_member_node ->
-          let* _ = Dac_node.init_config committee_member_node in
-          return ())
-        committee_members_nodes
-    in
-    let* _ =
-      Lwt_list.iter_s
-        (fun observer_node ->
-          let* _ = Dac_node.init_config observer_node in
-          return ())
-        observer_nodes
-    in
-    (* 1. Run committee member and observer nodes.
-       Because the event resolution loop in the Daemon always resolves
-       all promises matching an event filter, when a new event is received,
-       we cannot wait for multiple subscription to the hash streamer, as
-       events of this kind are indistinguishable one from the other.
-       Instead, we wait for the subscription of one observer/committe_member
-       node to be notified before running the next node. *)
     let* () =
-      Lwt_list.iter_s
-        (fun node ->
-          let node_is_subscribed =
-            wait_for_node_subscribed_to_data_streamer ()
-          in
-          let* () = Dac_node.run ~wait_ready:true node in
-          let* () = check_liveness_and_readiness node in
-          node_is_subscribed)
+      init_run_and_subscribe_nodes
+        coordinator_node
         (committee_members_nodes @ observer_nodes)
     in
     (* 2. Dac client posts a preimage to coordinator, and waits for all
@@ -1728,19 +1642,9 @@ module Full_infrastructure = struct
     let payload, expected_rh = sample_payload "preimage" in
     (* Initialize Committee Member nodes and wait for each node to subscribe to Coordinator's
        root hash stream. *)
-    let* _ =
-      Lwt_list.iter_s
-        (fun committee_member_node ->
-          let* _ = Dac_node.init_config committee_member_node in
-          let wait_subscribe =
-            wait_for_handle_new_subscription_to_hash_streamer coordinator_node
-          in
-          let* () = Dac_node.run ~wait_ready:true committee_member_node in
-          let* _ = wait_subscribe in
-          return ())
-        committee_members_nodes
+    let* () =
+      init_run_and_subscribe_nodes coordinator_node committee_members_nodes
     in
-
     let committee_members_processed_rh_promise =
       List.map
         (fun committee_member_node ->
