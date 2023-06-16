@@ -30,7 +30,7 @@ opam:prepare:
   extends:
     - .default_settings_template
     - .image_template__runtime_prebuild_dependencies_template
-    - .rules_template__trigger_opam_batch_1
+    - .rules_template__trigger_exec_opam_batch_1
   stage: packaging
   needs: [trigger]
   script:
