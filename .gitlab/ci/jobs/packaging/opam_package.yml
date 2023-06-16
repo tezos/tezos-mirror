@@ -389,6 +389,13 @@ opam:octez-signer:
   variables:
     package: octez-signer
 
+opam:octez-smart-rollup:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_6
+  variables:
+    package: octez-smart-rollup
+
 opam:octez-smart-rollup-client-PtMumbai:
   extends:
     - .opam_template
@@ -1705,6 +1712,6 @@ opam:tezt-performance-regression:
 opam:tezt-tezos:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezt-tezos

@@ -8,7 +8,8 @@
  (libraries
   tezos-base
   tezos-protocol-alpha
-  octez-injector)
+  octez-injector
+  octez-smart-rollup)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))

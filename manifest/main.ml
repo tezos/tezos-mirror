@@ -4069,6 +4069,21 @@ let octez_injector =
         octez_crawler |> open_;
       ]
 
+let octez_smart_rollup_lib =
+  public_lib
+    "octez-smart-rollup"
+    ~path:"src/lib_smart_rollup"
+    ~synopsis:"Octez: library for Smart Rollups "
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives"
+        |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
+        |> open_;
+        octez_base_unix;
+        octez_stdlib_unix |> open_;
+        octez_crypto |> open_;
+      ]
+
 let octez_smart_rollup_node_lib =
   public_lib
     "octez-smart-rollup-node"
@@ -4086,6 +4101,7 @@ let octez_smart_rollup_node_lib =
         octez_injector |> open_;
         octez_version_value |> open_;
         octez_client_base |> open_;
+        octez_smart_rollup_lib |> open_;
       ]
 
 let octez_scoru_wasm_helpers =
@@ -6021,6 +6037,7 @@ let hash = Protocol.hash
             octez_base |> open_ ~m:"TzPervasives";
             main |> open_;
             octez_injector |> open_;
+            octez_smart_rollup_lib;
           ]
         ~inline_tests:ppx_expect
         ~linkall:true
@@ -6101,7 +6118,7 @@ let hash = Protocol.hash
             ]
       in
       tezt
-        ["canary"]
+        ["canary"; "test_octez_conversions"]
         ~path:(path // "lib_sc_rollup_node/test")
         ~opam:"tezos-sc-rollup-node-test"
         ~synopsis:"Tests for the smart rollup node library"
