@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -54,6 +55,10 @@ pub fn handle_instruction(
             let to_path: RefPath = instr.to;
             Runtime::store_move(host, &from_path, &to_path)
                 .map_err(|_| "Couldn't move path during config application")
+        }
+        RefConfigInstruction::Set(instr) => {
+            Runtime::store_write(host, &instr.to, instr.value.0, 0)
+                .map_err(|_| "Couldn't set key during config application")
         }
     }
 }
