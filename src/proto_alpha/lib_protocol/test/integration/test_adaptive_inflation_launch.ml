@@ -53,7 +53,18 @@ let assert_ema_above_threshold ~loc
 *)
 let test_ema_reaches_threshold () =
   let open Lwt_result_syntax in
-  let* block, _contract = Context.init1 ~consensus_threshold:0 () in
+  let* block, _contract =
+    let default_constants = Default_parameters.constants_test in
+    let adaptive_inflation =
+      {
+        default_constants.adaptive_inflation with
+        launch_ema_threshold = threshold;
+      }
+    in
+    let consensus_threshold = 0 in
+    Context.init_with_constants1
+      {default_constants with consensus_threshold; adaptive_inflation}
+  in
   let* block =
     Block.bake_while_with_metadata
       ~adaptive_inflation_vote:Toggle_vote_on
