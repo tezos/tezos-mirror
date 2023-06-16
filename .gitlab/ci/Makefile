@@ -16,11 +16,6 @@ new_proto_version := $(shell if [ "${new_proto_version_int}" -lt "100" ]; then e
 CI_NODE_INDEX ?= 1
 CI_NODE_TOTAL ?= 1
 
-.PHONY: test-protocol-compiles
-test-protocol-compiles:
-	cd ${CI_PROJECT_DIR} && \
-		dune build @runtest_compile_protocol
-
 # For Tezt tests, there are multiple timeouts:
 # - --global-timeout is the internal timeout of Tezt, which only works if tests
 #   are cooperative;
