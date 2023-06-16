@@ -472,7 +472,7 @@ The rollup node can then be run with:
 
 .. code:: sh
 
-   octez-smart-rollup-node-alpha --base-dir "${OCLIENT_DIR}" \
+   octez-smart-rollup-node --base-dir "${OCLIENT_DIR}" \
                     run operator for "${SOR_ALIAS_OR_ADDR}" \
                     with operators "${OPERATOR_ADDR}" \
                     --data-dir "${ROLLUP_NODE_DIR}"
@@ -545,7 +545,7 @@ uses the same arguments as the ``run`` command:
 
 .. code:: sh
 
-   octez-smart-rollup-node-alpha --base-dir "${OCLIENT_DIR}" \
+   octez-smart-rollup-node --base-dir "${OCLIENT_DIR}" \
                     init operator config for "${SOR_ALIAS_OR_ADDR}" \
                     with operators "${OPERATOR_ADDR}" \
                     --data-dir "${ROLLUP_NODE_DIR}"
@@ -577,7 +577,7 @@ The rollup node can now be run with just:
 
 .. code:: sh
 
-   octez-smart-rollup-node-alpha -d "${OCLIENT_DIR}" run --data-dir ${ROLLUP_NODE_DIR}
+   octez-smart-rollup-node -d "${OCLIENT_DIR}" run --data-dir ${ROLLUP_NODE_DIR}
 
 The configuration will be read from ``${ROLLUP_NODE_DIR}/config.json``.
 
@@ -586,7 +586,7 @@ Rollup node in a sandbox
 
 The node can also be tested locally with a sandbox environment. (See :doc:`sandbox documentation <../user/sandbox>`.)
 
-Once you initialized the "sandboxed" client data with ``./src/bin_client/octez-init-sandboxed-client.sh``, you can run a sandboxed rollup node with ``octez-smart-rollup-node-alpha run``.
+Once you initialized the "sandboxed" client data with ``./src/bin_client/octez-init-sandboxed-client.sh``, you can run a sandboxed rollup node with ``octez-smart-rollup-node run``.
 
 A temporary directory ``/tmp/tezos-smart-rollup-node.xxxxxxxx`` will be used. However, a specific data directory can be set with the environment variable ``SCORU_DATA_DIR``.
 

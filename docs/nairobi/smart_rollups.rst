@@ -456,38 +456,23 @@ Now that the rollup is originated, anyone can make it progress by deploying a
 rollup node.
 
 First, we need to decide on a directory where the rollup node stores
-its data. Let us assign ``${ROLLUP_NODE_DIR}`` with this path. The
-rollup node is configured with the following command:
+its data. Let us assign ``${ROLLUP_NODE_DIR}`` with this path, by default
+``~/.tezos-smart-rollup-node``.
+
+
+The rollup node can then be run with:
 
 .. code:: sh
 
-   octez-smart-rollup-node-alpha --base-dir "${OCLIENT_DIR}" \
-                    init operator config for "${SOR_ALIAS_OR_ADDR}" \
+   octez-smart-rollup-node --base-dir "${OCLIENT_DIR}" \
+                    run operator for "${SOR_ALIAS_OR_ADDR}" \
                     with operators "${OPERATOR_ADDR}" \
                     --data-dir "${ROLLUP_NODE_DIR}"
 
-This creates a configuration file:
+where ``${OCLIENT_DIR}`` is the data directory of the Octez client, by default  ``~/.tezos-client``.
 
-::
-
-   Smart rollup node configuration written in ${ROLLUP_NODE_DIR}/config.json
-
-Here is the content of the file:
-
-::
-
-  {
-    "data-dir": "${ROLLUP_NODE_DIR}",
-    "smart-rollup-address": "${SOR_ADDR}",
-    "smart-rollup-node-operator": {
-      "publish": "${OPERATOR_ADDR}",
-      "add_messages": "${OPERATOR_ADDR}",
-      "cement": "${OPERATOR_ADDR}",
-      "refute": "${OPERATOR_ADDR}"
-    },
-    "fee-parameters": {},
-    "mode": "operator"
-  }
+The log should show that the rollup node follows the Layer 1 chain and
+processes the inbox of each level.
 
 Notice that distinct Layer 1 adresses could be used for the Layer 1
 operations issued by the rollup node simply by editing the
@@ -543,23 +528,57 @@ operations which are injected by the rollup node in each mode.
 .. [*] An accuser node will publish commitments only when it detects
        conflicts; for such cases it must make a deposit of 10,000 tez.
 
-Second, the configured rollup node can be run:
+
+Configuration file
+""""""""""""""""""
+
+The rollup node can also be configured with the following command that
+uses the same arguments as the ``run`` command:
 
 .. code:: sh
 
-   octez-smart-rollup-node-alpha -d "${OCLIENT_DIR}" run --data-dir ${ROLLUP_NODE_DIR}
+   octez-smart-rollup-node --base-dir "${OCLIENT_DIR}" \
+                    init operator config for "${SOR_ALIAS_OR_ADDR}" \
+                    with operators "${OPERATOR_ADDR}" \
+                    --data-dir "${ROLLUP_NODE_DIR}"
 
-where ``${OCLIENT_DIR}`` is the data directory of the Octez client.
+This creates a configuration file:
 
-The log should show that the rollup node follows the Layer 1 chain and
-processes the inbox of each level.
+::
+
+   Smart rollup node configuration written in ${ROLLUP_NODE_DIR}/config.json
+
+Here is the content of the file:
+
+::
+
+  {
+    "data-dir": "${ROLLUP_NODE_DIR}",
+    "smart-rollup-address": "${SOR_ADDR}",
+    "smart-rollup-node-operator": {
+      "publish": "${OPERATOR_ADDR}",
+      "add_messages": "${OPERATOR_ADDR}",
+      "cement": "${OPERATOR_ADDR}",
+      "refute": "${OPERATOR_ADDR}"
+    },
+    "fee-parameters": {},
+    "mode": "operator"
+  }
+
+The rollup node can now be run with just:
+
+.. code:: sh
+
+   octez-smart-rollup-node -d "${OCLIENT_DIR}" run --data-dir ${ROLLUP_NODE_DIR}
+
+The configuration will be read from ``${ROLLUP_NODE_DIR}/config.json``.
 
 Rollup node in a sandbox
 """"""""""""""""""""""""
 
 The node can also be tested locally with a sandbox environment. (See :doc:`sandbox documentation <../user/sandbox>`.)
 
-Once you initialized the "sandboxed" client data with ``./src/bin_client/octez-init-sandboxed-client.sh``, you can run a sandboxed rollup node with ``octez-smart-rollup-node-alpha run``.
+Once you initialized the "sandboxed" client data with ``./src/bin_client/octez-init-sandboxed-client.sh``, you can run a sandboxed rollup node with ``octez-smart-rollup-node run``.
 
 A temporary directory ``/tmp/tezos-smart-rollup-node.xxxxxxxx`` will be used. However, a specific data directory can be set with the environment variable ``SCORU_DATA_DIR``.
 
@@ -606,7 +625,7 @@ can encode an outbox transaction using the Octez rollup client as follows:
       "entrypoint" : "%default" } ]'
 
 
-    EMESSAGE=$(octez-smart-rollup-client-alpha encode outbox message "${MESSAGE}")
+    EMESSAGE=$(octez-smart-rollup-client-PtNairob encode outbox message "${MESSAGE}")
 
 
 .. _triggering_execution_outbox_message:
@@ -626,7 +645,7 @@ populated as follows:
 
 .. code:: sh
 
-   octez-smart-rollup-client-alpha rpc get \
+   octez-smart-rollup-client-PtNairob rpc get \
      /global/block/cemented/outbox/${L}/messages
 
 Here is the output for this command:
@@ -648,7 +667,7 @@ proof is retrieved as follows:
 
 .. code:: sh
 
-   PROOF=$(octez-smart-rollup-client-alpha get proof for message 0 \
+   PROOF=$(octez-smart-rollup-client-PtNairob get proof for message 0 \
      of outbox at level "${L}" \
      transferring "${MESSAGE}")
 

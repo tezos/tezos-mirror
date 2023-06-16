@@ -269,6 +269,10 @@ Smart Rollup node
 -----------------
 
 - Faster bootstrapping process. (MR :gl:`!8618`, MR :gl:`!8767`)
+- Single, protocol-agnostic, rollup node binary. The rollup node
+  ``octez-smart-rollup-node`` works with any protocol and supports protocol
+  upgrades. The other protocol specific rollup nodes still exist but will be
+  deprecated. (MR :gl:`!9105`)
 
 - Added a new metrics ``head_inbox_process_time`` to report the time the rollup
   node spent to process a new Layer 1 head. (MR :gl:`!8971`)
