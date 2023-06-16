@@ -3,11 +3,6 @@ ifndef CI_PROJECT_DIR
 	$(error This Makefile must be called from a Gitlab runner)
 endif
 
-.PHONY: lint-misc-check
-lint-misc-check: gitlab-take-ownership
-	cd ${CI_PROJECT_DIR} && \
-		./scripts/ci/lint_misc_check.sh
-
 .PHONY: check-precommit
 check-precommit:
 	cd ${CI_PROJECT_DIR} && \

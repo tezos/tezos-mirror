@@ -10,5 +10,6 @@ misc_checks:
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci lint-misc-check
+    - ./scripts/ci/take_ownership.sh
+    - ./scripts/ci/lint_misc_check.sh
     - scripts/check_wasm_pvm_regressions.sh check
