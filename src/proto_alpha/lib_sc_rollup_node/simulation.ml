@@ -36,7 +36,7 @@ type info_per_level = {
 
 type t = {
   ctxt : Context.ro;
-  inbox_level : Raw_level.t;
+  inbox_level : int32;
   state : Context.tree;
   reveal_map : string Sc_rollup_reveal_hash.Map.t option;
   nb_messages_inbox : int;
@@ -69,7 +69,7 @@ let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
   in
   let* ctxt, state = Interpreter.state_of_head node_ctxt ctxt head in
   let+ info_per_level = simulate_info_per_level node_ctxt hash in
-  let inbox_level = Raw_level.of_int32_exn (Int32.succ level) in
+  let inbox_level = Int32.succ level in
   {
     ctxt;
     inbox_level;

@@ -52,7 +52,7 @@ type eval_result = {
   state_hash : Sc_rollup.State_hash.t;
   status : string;
   output : Sc_rollup.output list;
-  inbox_level : Raw_level.t;
+  inbox_level : int32;
   num_ticks : Z.t;
   insights : bytes option list;
       (** The simulation can ask to look at values on the state after
@@ -98,8 +98,8 @@ type message_status =
       l1_level : int32;
       finalized : bool;
       cemented : bool;
-      commitment : Sc_rollup.Commitment.t;
-      commitment_hash : Sc_rollup.Commitment.Hash.t;
+      commitment : Octez_smart_rollup.Commitment.t;
+      commitment_hash : Octez_smart_rollup.Commitment.Hash.t;
       first_published_at_level : int32;
       published_at_level : int32;
     }
@@ -109,13 +109,13 @@ module Encodings = struct
 
   let commitment_with_hash =
     obj2
-      (req "commitment" Sc_rollup.Commitment.encoding)
-      (req "hash" Sc_rollup.Commitment.Hash.encoding)
+      (req "commitment" Octez_smart_rollup.Commitment.encoding)
+      (req "hash" Octez_smart_rollup.Commitment.Hash.encoding)
 
   let commitment_with_hash_and_level_infos =
     obj4
-      (req "commitment" Sc_rollup.Commitment.encoding)
-      (req "hash" Sc_rollup.Commitment.Hash.encoding)
+      (req "commitment" Octez_smart_rollup.Commitment.encoding)
+      (req "hash" Octez_smart_rollup.Commitment.Hash.encoding)
       (opt "first_published_at_level" int32)
       (opt "published_at_level" int32)
 
@@ -141,7 +141,7 @@ module Encodings = struct
             ~description:"Output produced by evaluation of the messages")
          (req
             "inbox_level"
-            Raw_level.encoding
+            int32
             ~description:"Level of the inbox that would contain these messages")
          (req
             "num_ticks"
@@ -320,8 +320,8 @@ module Encodings = struct
                    (req "level" int32)))
              (req "finalized" bool)
              (req "cemented" bool)
-             (req "commitment" Sc_rollup.Commitment.encoding)
-             (req "hash" Sc_rollup.Commitment.Hash.encoding)
+             (req "commitment" Octez_smart_rollup.Commitment.encoding)
+             (req "hash" Octez_smart_rollup.Commitment.Hash.encoding)
              (req "first_published_at_level" int32)
              (req "published_at_level" int32))
           (function
@@ -606,7 +606,7 @@ module Global = struct
       Tezos_rpc.Service.get_service
         ~description:"Rollup inbox for block"
         ~query:Tezos_rpc.Query.empty
-        ~output:Sc_rollup.Inbox.encoding
+        ~output:Octez_smart_rollup.Inbox.encoding
         (path / "inbox")
 
     let ticks =
@@ -721,9 +721,7 @@ module Global = struct
         ~output:
           Data_encoding.(
             list
-            @@ obj2
-                 (req "index" Dal.Slot_index.encoding)
-                 (req "status" dal_slot_status_encoding))
+            @@ obj2 (req "index" int31) (req "status" dal_slot_status_encoding))
         (path / "dal" / "processed_slots")
 
     module Outbox = struct

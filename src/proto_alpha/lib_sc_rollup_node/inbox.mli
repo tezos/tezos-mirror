@@ -44,9 +44,9 @@ val process_head :
   Node_context.rw ->
   predecessor:Layer1.header ->
   Layer1.header ->
-  (Sc_rollup.Inbox.Hash.t
-  * Sc_rollup.Inbox.t
-  * Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+  (Octez_smart_rollup.Inbox.Hash.t
+  * Octez_smart_rollup.Inbox.t
+  * Merkelized_payload_hashes_hash.t
   * string list)
   tzresult
   Lwt.t
@@ -99,9 +99,9 @@ module Internal_for_tests : sig
     predecessor:Layer1.header ->
     Layer1.header ->
     string list ->
-    (Sc_rollup.Inbox.Hash.t
-    * Sc_rollup.Inbox.t
-    * Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+    (Octez_smart_rollup.Inbox.Hash.t
+    * Octez_smart_rollup.Inbox.t
+    * Merkelized_payload_hashes_hash.t
     * string list)
     tzresult
     Lwt.t

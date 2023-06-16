@@ -209,24 +209,21 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
       insight_requests
   in
   let num_ticks = Z.(num_ticks_0 + num_ticks_end) in
-  let*! outbox = PVM.get_outbox inbox_level state in
+  let level = Raw_level.of_int32_exn inbox_level in
+  let*! outbox = PVM.get_outbox level state in
   let output =
-    List.filter
-      (fun Sc_rollup.{outbox_level; _} -> outbox_level = inbox_level)
-      outbox
+    List.filter (fun Sc_rollup.{outbox_level; _} -> outbox_level = level) outbox
   in
   let*! state_hash = PVM.state_hash state in
-  let* parametric_constants =
-    let cctxt = node_ctxt.cctxt in
-    Protocol.Constants_services.parametric cctxt (cctxt#chain, `Level level)
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5871
+     Use constants for correct protocol. *)
+  let is_reveal_enabled =
+    node_ctxt.protocol_constants.sc_rollup.reveal_activation_level
+    |> WithExceptions.Option.get ~loc:__LOC__
+    |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
+    |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
   in
-  let*! status =
-    PVM.get_status
-      ~is_reveal_enabled:
-        (Sc_rollup.is_reveal_enabled_predicate
-           parametric_constants.sc_rollup.reveal_activation_level)
-      state
-  in
+  let*! status = PVM.get_status ~is_reveal_enabled state in
   let status = PVM.string_of_status status in
   return
     Sc_rollup_services.
@@ -282,7 +279,6 @@ let () =
   | Some head ->
       let commitment_hash =
         Sc_rollup_block.most_recent_commitment head.header
-        |> Sc_rollup_proto_types.Commitment_hash.of_octez
       in
       let+ commitment =
         Node_context.find_commitment node_ctxt commitment_hash
@@ -296,9 +292,7 @@ let () =
   match Reference.get node_ctxt.lpc with
   | None -> return_none
   | Some commitment ->
-      let hash =
-        Alpha_context.Sc_rollup.Commitment.hash_uncarbonated commitment
-      in
+      let hash = Octez_smart_rollup.Commitment.hash commitment in
       (* The corresponding level in Store.Commitments.published_at_level is
          available only when the commitment has been published and included
          in a block. *)
@@ -319,30 +313,29 @@ let () =
   let open Lwt_result_syntax in
   let* state = get_state node_ctxt block in
   let module PVM = (val node_ctxt.pvm) in
-  let* current_level = Node_context.level_of_hash node_ctxt block in
-  let* parametric_constants =
-    let cctxt = node_ctxt.cctxt in
-    Protocol.Constants_services.parametric
-      cctxt
-      (cctxt#chain, `Level current_level)
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5871
+     Use constants for correct protocol. *)
+  let is_reveal_enabled =
+    node_ctxt.protocol_constants.sc_rollup.reveal_activation_level
+    |> WithExceptions.Option.get ~loc:__LOC__
+    |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
+    |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
   in
-  let*! status =
-    PVM.get_status
-      ~is_reveal_enabled:
-        (Alpha_context.Sc_rollup.is_reveal_enabled_predicate
-           parametric_constants.sc_rollup.reveal_activation_level)
-      state
-  in
+  let*! status = PVM.get_status ~is_reveal_enabled state in
   return (PVM.string_of_status status)
 
 let () =
   Block_directory.register0 Sc_rollup_services.Global.Block.dal_slots
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
-  let* slots =
+  let+ slots =
     Node_context.get_all_slot_headers node_ctxt ~published_in_block_hash:block
   in
-  return slots
+  List.rev_map
+    (Sc_rollup_proto_types.Dal.Slot_header.of_octez
+       ~number_of_slots:node_ctxt.protocol_constants.dal.number_of_slots)
+    slots
+  |> List.rev
 
 let () =
   Block_directory.register0 Sc_rollup_services.Global.Block.dal_processed_slots
@@ -398,20 +391,17 @@ let commitment_level_of_inbox_level (node_ctxt : _ Node_context.t) inbox_level =
     Int32.of_int
       node_ctxt.protocol_constants.sc_rollup.commitment_period_in_blocks
   in
-  let last_published =
-    Raw_level.to_int32 last_published_commitment.inbox_level
-  in
+  let last_published = last_published_commitment.inbox_level in
   let open Int32 in
   div (sub last_published inbox_level) commitment_period
   |> mul commitment_period |> sub last_published |> Raw_level.of_int32_exn
 
 let inbox_info_of_level (node_ctxt : _ Node_context.t) inbox_level =
-  let open Alpha_context in
   let open Lwt_result_syntax in
   let+ finalized_level = Node_context.get_finalized_level node_ctxt in
   let finalized = Compare.Int32.(inbox_level <= finalized_level) in
   let lcc = Reference.get node_ctxt.lcc in
-  let cemented = Compare.Int32.(inbox_level <= Raw_level.to_int32 lcc.level) in
+  let cemented = Compare.Int32.(inbox_level <= lcc.level) in
   (finalized, cemented)
 
 let () =

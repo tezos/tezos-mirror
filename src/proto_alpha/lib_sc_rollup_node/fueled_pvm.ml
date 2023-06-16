@@ -39,8 +39,7 @@ module type S = sig
     state : pvm_state;  (** The actual PVM state. *)
     state_hash : Sc_rollup.State_hash.t;  (** Hash of [state]. *)
     tick : Sc_rollup.Tick.t;  (** Tick of [state]. *)
-    inbox_level : Raw_level.t;
-        (** Inbox level in which messages are evaluated. *)
+    inbox_level : int32;  (** Inbox level in which messages are evaluated. *)
     message_counter_offset : int;
         (** Offset for message index, which corresponds to the number of
             messages of the inbox already evaluated.  *)
@@ -61,7 +60,7 @@ module type S = sig
   val eval_block_inbox :
     fuel:fuel ->
     _ Node_context.t ->
-    Sc_rollup.Inbox.t * string list ->
+    Octez_smart_rollup.Inbox.t * string list ->
     pvm_state ->
     eval_result Node_context.delayed_write tzresult Lwt.t
 
@@ -90,7 +89,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
     state : pvm_state;
     state_hash : Sc_rollup.State_hash.t;
     tick : Sc_rollup.Tick.t;
-    inbox_level : Raw_level.t;
+    inbox_level : int32;
     message_counter_offset : int;
     remaining_fuel : fuel;
     remaining_messages : string list;
@@ -381,7 +380,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
   let eval_messages ~reveal_map ~fuel node_ctxt ~message_counter_offset state
       inbox_level messages =
     let open Delayed_write_monad.Lwt_result_syntax in
-    let level = Raw_level.to_int32 inbox_level |> Int32.to_int in
+    let level = Int32.to_int inbox_level in
     (* Iterate the PVM state with all the messages. *)
     let rec feed_messages (state, fuel) message_index = function
       | [] ->
@@ -393,7 +392,14 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
       | message :: messages -> (
           let payload = Sc_rollup.Inbox_message.unsafe_of_string message in
           let message_counter = Z.of_int message_index in
-          let input = Sc_rollup.{inbox_level; message_counter; payload} in
+          let input =
+            Sc_rollup.
+              {
+                inbox_level = Raw_level.of_int32_exn inbox_level;
+                message_counter;
+                payload;
+              }
+          in
           let failing_ticks =
             Loser_mode.is_failure
               node_ctxt.Node_context.loser_mode
@@ -436,7 +442,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
     let open Delayed_write_monad.Lwt_result_syntax in
     let module PVM = (val node_ctxt.pvm) in
     (* Obtain inbox and its messages for this block. *)
-    let inbox_level = Inbox.inbox_level inbox in
+    let inbox_level = Octez_smart_rollup.Inbox.inbox_level inbox in
     let*! initial_tick = PVM.get_tick state in
     (* Evaluate all the messages for this level. *)
     let>* state, remaining_fuel, num_messages, remaining_messages =
@@ -481,7 +487,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
     let>* state, remaining_fuel, num_messages, remaining_messages =
       match messages with
       | [] ->
-          let level = Raw_level.to_int32 inbox_level |> Int32.to_int in
+          let level = Int32.to_int inbox_level in
           let message_index = message_counter_offset - 1 in
           let failing_ticks =
             Loser_mode.is_failure

@@ -93,6 +93,7 @@ let same_as_layer_1 node_ctxt head_hash inbox =
   let open Lwt_result_syntax in
   let head_block = `Hash (head_hash, 0) in
   let Node_context.{cctxt; _} = node_ctxt in
+  let cctxt = new Protocol_client_context.wrap_full cctxt in
   let* layer1_inbox =
     Plugin.RPC.Sc_rollup.inbox cctxt (cctxt#chain, head_block)
   in
@@ -138,6 +139,8 @@ let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
   let predecessor_timestamp = predecessor.header.timestamp in
   let inbox_metrics = Metrics.Inbox.metrics in
   Prometheus.Gauge.set inbox_metrics.head_inbox_level @@ Int32.to_float level ;
+  let inbox = Sc_rollup_proto_types.Inbox.of_octez inbox in
+  let serialized_messages = messages in
   let*? messages =
     Environment.wrap_tzresult
     @@ List.map_e
@@ -166,9 +169,13 @@ let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
       node_ctxt
       witness_hash
       ~block_hash:head.hash
-      messages
+      serialized_messages
   in
+  let inbox = Sc_rollup_proto_types.Inbox.to_octez inbox in
   let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
+  let witness_hash =
+    Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez witness_hash
+  in
   let*? messages_with_protocol_internal_messages =
     Environment.wrap_tzresult
     @@ List.map_e
@@ -205,8 +212,14 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
       head
       collected_messages
   else
-    let* inbox = Node_context.genesis_inbox node_ctxt in
-    let witness = Sc_rollup.Inbox.current_witness inbox in
+    let* inbox =
+      Layer1_helpers.genesis_inbox
+        (new Protocol_client_context.wrap_full node_ctxt.cctxt)
+        ~genesis_level:node_ctxt.genesis_info.level
+    in
+    let Octez_smart_rollup.Inbox.{hash = witness; _} =
+      Octez_smart_rollup.Inbox.Skip_list.content inbox.old_levels_messages
+    in
     let* () =
       Node_context.save_messages node_ctxt witness ~block_hash:head.hash []
     in

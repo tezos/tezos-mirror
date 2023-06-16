@@ -102,10 +102,15 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
           node_ctxt
           ~published_in_block_hash:published_block_hash
       in
+      let number_of_slots =
+        node_ctxt.Node_context.protocol_constants.dal.number_of_slots
+      in
       let confirmed_slots_indexes_list =
         List.filter
           (Dal.Attestation.is_attested confirmed_slots)
-          published_slots_indexes
+          (List.filter_map
+             (Dal.Slot_index.of_int_opt ~number_of_slots)
+             published_slots_indexes)
       in
       let*? confirmed_slots_indexes =
         Environment.wrap_tzresult
@@ -119,16 +124,8 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
    avoid going back and forth between bitsets and lists of slot indexes. *)
 let to_slot_index_list (constants : Rollup_constants.protocol_constants) bitset
     =
-  let open Result_syntax in
-  let number_of_slots = constants.dal.number_of_slots in
-  let all_slots = Misc.(0 --> (number_of_slots - 1)) in
-  let+ filtered = List.filter_e (Bitset.mem bitset) all_slots in
-  (* Because the maximum slot index is smaller than the number_of_slots protocol
-     constants, and this value is smaller than the hard limit imposed for slots,
-     then Dal.Slot_index.to_int will always return a defined value. See
-     `src/proto_alpha/lib_protocol/constants_repr.ml`.
-  *)
-  List.filter_map (Dal.Slot_index.of_int_opt ~number_of_slots) filtered
+  let all_slots = Misc.(0 --> (constants.dal.number_of_slots - 1)) in
+  List.filter_e (Bitset.mem bitset) all_slots
 
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/4139.
    Use a shared storage between dal and rollup node to store slots data.
@@ -175,7 +172,9 @@ let download_and_save_slots
       in
       let*! () =
         Dal_slots_tracker_event.slot_has_been_confirmed
-          s_slot
+          (Sc_rollup_proto_types.Dal.Slot_index.of_octez
+             ~number_of_slots:protocol_constants.dal.number_of_slots
+             s_slot)
           published_block_hash
           current_block_hash
       in
@@ -197,17 +196,24 @@ module Confirmed_slots_history = struct
     in
     List.map_ep
       (fun slot_index ->
-        Node_context.get_slot_header
-          node_ctxt
-          ~published_in_block_hash:published_block_hash
-          slot_index)
+        let+ h =
+          Node_context.get_slot_header
+            node_ctxt
+            ~published_in_block_hash:published_block_hash
+            slot_index
+        in
+        Sc_rollup_proto_types.Dal.Slot_header.of_octez
+          ~number_of_slots:node_ctxt.protocol_constants.dal.number_of_slots
+          h)
       relevant_slots_indexes
 
   let read_slots_history_from_l1 {Node_context.cctxt; _} block =
     let open Lwt_result_syntax in
     (* We return the empty Slots_history if DAL is not enabled. *)
     let* slots_list_opt =
-      RPC.Dal.dal_confirmed_slots_history cctxt (cctxt#chain, `Hash (block, 0))
+      RPC.Dal.dal_confirmed_slots_history
+        (new Protocol_client_context.wrap_full cctxt)
+        (cctxt#chain, `Hash (block, 0))
     in
     return @@ Option.value slots_list_opt ~default:Dal.Slots_history.genesis
 
@@ -257,19 +263,29 @@ module Confirmed_slots_history = struct
           block_level
 
   let slots_history_of_hash node_ctxt block =
+    let find node_ctxt block =
+      let open Lwt_result_syntax in
+      let+ hist = Node_context.find_confirmed_slots_history node_ctxt block in
+      Option.map Sc_rollup_proto_types.Dal.Slot_history.of_octez hist
+    in
     dal_entry_of_block_hash
       node_ctxt
       block
       ~entry_kind:"slots history"
-      ~find:Node_context.find_confirmed_slots_history
+      ~find
       ~default:read_slots_history_from_l1
 
   let slots_history_cache_of_hash node_ctxt block =
+    let find node_ctxt block =
+      let open Lwt_result_syntax in
+      let+ hist = Node_context.find_confirmed_slots_histories node_ctxt block in
+      Option.map Sc_rollup_proto_types.Dal.Slot_history_cache.of_octez hist
+    in
     dal_entry_of_block_hash
       node_ctxt
       block
       ~entry_kind:"slots history cache"
-      ~find:Node_context.find_confirmed_slots_histories
+      ~find
       ~default:(fun node_ctxt _block ->
         let num_slots =
           node_ctxt.Node_context.protocol_constants.dal.number_of_slots
@@ -320,13 +336,13 @@ module Confirmed_slots_history = struct
       Node_context.save_confirmed_slots_history
         node_ctxt
         head_hash
-        slots_history
+        (Sc_rollup_proto_types.Dal.Slot_history.to_octez slots_history)
     in
     let* () =
       Node_context.save_confirmed_slots_histories
         node_ctxt
         head_hash
-        slots_cache
+        (Sc_rollup_proto_types.Dal.Slot_history_cache.to_octez slots_cache)
     in
     return ()
 end

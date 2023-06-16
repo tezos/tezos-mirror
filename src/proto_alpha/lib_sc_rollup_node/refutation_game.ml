@@ -204,7 +204,7 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
   let* parametric_constants =
     let cctxt = node_ctxt.cctxt in
     Protocol.Constants_services.parametric
-      cctxt
+      (new Protocol_client_context.wrap_full cctxt)
       (cctxt#chain, `Level snapshot_level_int32)
   in
   let dal_l1_parameters = parametric_constants.dal in
@@ -231,7 +231,7 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
         Reveals.get
           ?dac_client:node_ctxt.dac_client
           ~data_dir:node_ctxt.data_dir
-          ~pvm_kind:PVM.kind
+          ~pvm_kind:(Sc_rollup_proto_types.Kind.to_octez PVM.kind)
           hash
       in
       match res with Ok data -> return @@ Some data | Error _ -> return None
@@ -251,7 +251,12 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
               inbox_hash
               pp_print_trace
               err
-        | Ok inbox -> Option.map Sc_rollup.Inbox.take_snapshot inbox
+        | Ok inbox ->
+            Option.map
+              (fun i ->
+                Sc_rollup.Inbox.take_snapshot
+                  (Sc_rollup_proto_types.Inbox.of_octez i))
+              inbox
 
       let get_payloads_history witness =
         Lwt.map
@@ -261,11 +266,6 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
         let open Lwt_result_syntax in
         let* {is_first_block; predecessor; predecessor_timestamp; messages} =
           Node_context.get_messages node_ctxt witness
-        in
-        let*? messages =
-          (List.map_e Sc_rollup.Inbox_message.serialize messages
-           |> Environment.wrap_tzresult
-            :> string list tzresult)
         in
         let*? hist =
           Inbox.payloads_history_of_messages
@@ -505,7 +505,7 @@ let timeout_reached ~self head_block node_ctxt staker1 staker2 =
   let Node_context.{rollup_address; cctxt; _} = node_ctxt in
   let* game_result =
     Plugin.RPC.Sc_rollup.timeout_reached
-      cctxt
+      (new Protocol_client_context.wrap_full cctxt)
       (cctxt#chain, head_block)
       rollup_address
       staker1

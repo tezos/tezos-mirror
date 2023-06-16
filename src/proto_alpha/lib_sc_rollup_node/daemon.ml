@@ -94,10 +94,12 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
       let save_lpc =
         match Reference.get node_ctxt.lpc with
         | None -> true
-        | Some lpc -> Raw_level.(commitment.inbox_level >= lpc.inbox_level)
+        | Some lpc ->
+            Raw_level.to_int32 commitment.inbox_level >= lpc.inbox_level
       in
+      let commitment = Sc_rollup_proto_types.Commitment.to_octez commitment in
       if save_lpc then Reference.set node_ctxt.lpc (Some commitment) ;
-      let commitment_hash = Sc_rollup.Commitment.hash_uncarbonated commitment in
+      let commitment_hash = Octez_smart_rollup.Commitment.hash commitment in
       let* () =
         Node_context.set_commitment_published_at_level
           node_ctxt
@@ -155,7 +157,6 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
   | ( Sc_rollup_cement _,
       Sc_rollup_cement_result {inbox_level; commitment_hash; _} ) ->
       (* Cemented commitment ---------------------------------------------- *)
-      let proto_inbox_level = inbox_level in
       let proto_commitment_hash = commitment_hash in
       let inbox_level = Raw_level.to_int32 inbox_level in
       let commitment_hash =
@@ -177,10 +178,10 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
       in
       let lcc = Reference.get node_ctxt.lcc in
       let*! () =
-        if inbox_level > Raw_level.to_int32 lcc.level then (
+        if inbox_level > lcc.level then (
           Reference.set
             node_ctxt.lcc
-            {commitment = proto_commitment_hash; level = proto_inbox_level} ;
+            {commitment = proto_commitment_hash; level = inbox_level} ;
           Commitment_event.last_cemented_commitment_updated
             proto_commitment_hash
             inbox_level)
@@ -218,7 +219,7 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
         Node_context.save_slot_header
           node_ctxt
           ~published_in_block_hash:head.Layer1.hash
-          slot_header
+          (Sc_rollup_proto_types.Dal.Slot_header.to_octez slot_header)
       in
       return_unit
   | _, _ ->
@@ -408,10 +409,7 @@ let rec process_head (daemon_components : (module Daemon_components.S))
       in
       let* () =
         unless (catching_up && Option.is_none commitment_hash) @@ fun () ->
-        Inbox.same_as_layer_1
-          node_ctxt
-          head.hash
-          (Sc_rollup_proto_types.Inbox.to_octez inbox)
+        Inbox.same_as_layer_1 node_ctxt head.hash inbox
       in
       let level = head.level in
       let* previous_commitment_hash =
@@ -574,7 +572,7 @@ let check_initial_state_hash {Node_context.cctxt; rollup_address; pvm; _} =
   let module PVM = (val pvm) in
   let* l1_reference_initial_state_hash =
     RPC.Sc_rollup.initial_pvm_state_hash
-      cctxt
+      (new Protocol_client_context.wrap_full cctxt)
       (cctxt#chain, cctxt#block)
       rollup_address
   in
@@ -672,7 +670,7 @@ let run node_ctxt configuration
     ~id:configuration.sc_rollup_address
     ~mode:configuration.mode
     ~genesis_level:node_ctxt.genesis_info.level
-    ~pvm_kind:(Sc_rollup.Kind.to_string node_ctxt.kind) ;
+    ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind) ;
   let fatal_error_exit e =
     Format.eprintf "%!%a@.Exiting.@." pp_print_trace e ;
     let*! _ = Lwt_exit.exit_and_wait 1 in
@@ -699,8 +697,9 @@ let run node_ctxt configuration
     match head with
     | Some head ->
         if
-          Sc_rollup_block.most_recent_commitment head.header
-          = node_ctxt.genesis_info.commitment_hash
+          Octez_smart_rollup.Commitment.Hash.(
+            Sc_rollup_block.most_recent_commitment head.header
+            = node_ctxt.genesis_info.commitment_hash)
         then fatal_error_exit e
         else error_to_degraded_mode e
     | None -> fatal_error_exit e
@@ -785,31 +784,6 @@ module Internal_for_tests = struct
     return l2_block
 end
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2901
-   The constants are retrieved from the latest tezos block. These constants can
-   be different from the ones used at the creation at the rollup because of a
-   protocol amendment that modifies some of them. This need to be fixed when the
-   rollup nodes will be able to handle the migration of protocol.
-*)
-let retrieve_constants cctxt =
-  let open Lwt_result_syntax in
-  let+ {parametric; _} =
-    Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
-  in
-  Layer1_helpers.constants_of_parametric parametric
-
-let retrieve_genesis_info cctxt rollup_address =
-  let open Lwt_result_syntax in
-  let+ {level; commitment_hash} =
-    RPC.Sc_rollup.genesis_info cctxt (cctxt#chain, `Head 0) rollup_address
-  in
-  Node_context.
-    {
-      level = Raw_level.to_int32 level;
-      commitment_hash =
-        Sc_rollup_proto_types.Commitment_hash.to_octez commitment_hash;
-    }
-
 module Rollup_node_daemon_components : Daemon_components.S = struct
   module Batcher = Batcher
   module RPC_server = RPC_server
@@ -846,10 +820,25 @@ let run
     Layer1.fetch_tezos_shell_header l1_ctxt head.header.predecessor
   in
   let*! () = Event.received_first_block head.hash Protocol.hash in
-  let* constants = retrieve_constants cctxt
-  and* genesis_info =
-    retrieve_genesis_info cctxt configuration.sc_rollup_address
+  let publisher =
+    Configuration.Operator_purpose_map.find
+      Publish
+      configuration.sc_rollup_node_operators
   in
+  let* constants = Layer1_helpers.retrieve_constants cctxt
+  and* genesis_info =
+    Layer1_helpers.retrieve_genesis_info cctxt configuration.sc_rollup_address
+  and* lcc =
+    Layer1_helpers.get_last_cemented_commitment
+      cctxt
+      configuration.sc_rollup_address
+  and* lpc =
+    Option.filter_map_es
+      (Layer1_helpers.get_last_published_commitment
+         cctxt
+         configuration.sc_rollup_address)
+      publisher
+  and* kind = Layer1_helpers.get_kind cctxt configuration.sc_rollup_address in
   let* node_ctxt =
     Node_context.init
       cctxt
@@ -859,6 +848,9 @@ let run
       l1_ctxt
       constants
       genesis_info
+      ~lcc
+      ~lpc
+      kind
       ~proto_level:predecessor.proto_level
       configuration
   in

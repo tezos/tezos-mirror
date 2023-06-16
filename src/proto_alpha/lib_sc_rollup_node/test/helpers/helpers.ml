@@ -66,7 +66,11 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
       ~predecessor:predecessor.hash
       (Raw_level.of_int32_exn node_ctxt.genesis_info.level)
   in
-  let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
+  let* inbox_hash =
+    Node_context.save_inbox
+      node_ctxt
+      (Sc_rollup_proto_types.Inbox.to_octez inbox)
+  in
   let inbox_witness = Sc_rollup.Inbox.current_witness inbox in
   let ctxt = Octez_smart_rollup_node.Context.empty node_ctxt.context in
   let num_ticks = 0L in
@@ -82,7 +86,11 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
       ~origination_level:(Raw_level.of_int32_exn node_ctxt.genesis_info.level)
       ~genesis_state_hash
   in
-  let* commitment_hash = Node_context.save_commitment node_ctxt commitment in
+  let* commitment_hash =
+    Node_context.save_commitment
+      node_ctxt
+      (Sc_rollup_proto_types.Commitment.to_octez commitment)
+  in
   let previous_commitment_hash = node_ctxt.genesis_info.commitment_hash in
   let header =
     Sc_rollup_block.
@@ -215,10 +223,7 @@ let append_dummy_l2_chain node_ctxt ~length =
   in
   let batches =
     Stdlib.List.init length (fun i ->
-        [
-          Sc_rollup.Inbox_message.External
-            (Z.to_bits (Z.of_int (i + head_level + 1)));
-        ])
+        ["\001" (* External tag *) ^ Z.to_bits (Z.of_int (i + head_level + 1))])
   in
   append_l2_blocks node_ctxt batches
 

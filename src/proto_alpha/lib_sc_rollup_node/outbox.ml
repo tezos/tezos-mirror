@@ -24,14 +24,11 @@
 (*****************************************************************************)
 
 open Node_context
-open Protocol.Alpha_context
 
 let get_state_of_lcc node_ctxt =
   let open Lwt_result_syntax in
   let lcc = Reference.get node_ctxt.lcc in
-  let* block_hash =
-    Node_context.hash_of_level node_ctxt (Raw_level.to_int32 lcc.level)
-  in
+  let* block_hash = Node_context.hash_of_level node_ctxt lcc.level in
   let* ctxt = Node_context.checkout_context node_ctxt block_hash in
   let*! state = Context.PVMState.find ctxt in
   return state

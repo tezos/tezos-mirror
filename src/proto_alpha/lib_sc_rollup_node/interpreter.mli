@@ -38,7 +38,7 @@ val process_head :
   'a Context.t ->
   predecessor:Layer1.header ->
   Layer1.header ->
-  Sc_rollup.Inbox.t * string list ->
+  Octez_smart_rollup.Inbox.t * string list ->
   ('a Context.t * int * int64 * Sc_rollup.Tick.t) tzresult Lwt.t
 
 (** [state_of_tick node_ctxt ?start_state tick level] returns [Some (state,

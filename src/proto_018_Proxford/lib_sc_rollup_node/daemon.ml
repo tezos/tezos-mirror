@@ -706,8 +706,9 @@ let run node_ctxt configuration
     match head with
     | Some head ->
         if
-          Sc_rollup_block.most_recent_commitment head.header
-          = node_ctxt.genesis_info.commitment_hash
+          Octez_smart_rollup.Commitment.Hash.(
+            Sc_rollup_block.most_recent_commitment head.header
+            = node_ctxt.genesis_info.commitment_hash)
         then fatal_error_exit e
         else error_to_degraded_mode e
     | None -> fatal_error_exit e

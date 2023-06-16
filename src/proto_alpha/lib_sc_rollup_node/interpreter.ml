@@ -44,7 +44,8 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
         match (operation, result) with
         | ( Sc_rollup_originate {kind; boot_sector; _},
             Sc_rollup_originate_result {address; _} )
-          when node_ctxt.rollup_address = address && node_ctxt.kind = kind ->
+          when node_ctxt.rollup_address = address
+               && node_ctxt.kind = Sc_rollup_proto_types.Kind.to_octez kind ->
             raise (Found_boot_sector boot_sector)
         | _ -> accu
       in
@@ -130,11 +131,7 @@ let transition_pvm node_ctxt ctxt predecessor Layer1.{hash = _; _}
   let*! initial_tick = PVM.get_tick predecessor_state in
   (* Produce events. *)
   let*! () =
-    Interpreter_event.transitioned_pvm
-      (Raw_level.to_int32 inbox_level)
-      state_hash
-      tick
-      num_messages
+    Interpreter_event.transitioned_pvm inbox_level state_hash tick num_messages
   in
   return (ctxt, num_messages, Z.to_int64 num_ticks, initial_tick)
 
@@ -183,15 +180,10 @@ let start_state_of_block node_ctxt (block : Sc_rollup_block.t) =
       (Sc_rollup_proto_types.Merkelized_payload_hashes_hash.of_octez
          block.header.inbox_witness)
   in
-  let inbox_level = Sc_rollup.Inbox.inbox_level inbox in
+  let inbox_level = Octez_smart_rollup.Inbox.inbox_level inbox in
   let module PVM = (val node_ctxt.pvm) in
   let*! tick = PVM.get_tick state in
   let*! state_hash = PVM.state_hash state in
-  let*? messages =
-    (List.map_e Sc_rollup.Inbox_message.serialize messages
-     |> Environment.wrap_tzresult
-      :> string list tzresult)
-  in
   let messages =
     let open Sc_rollup_inbox_message_repr in
     unsafe_to_string start_of_level_serialized
@@ -236,8 +228,7 @@ let state_of_tick_aux node_ctxt ~start_state (event : Sc_rollup_block.t) tick =
   let* start_state =
     match start_state with
     | Some start_state
-      when Raw_level.to_int32 start_state.Fueled_pvm.Accounted.inbox_level
-           = event.header.level ->
+      when start_state.Fueled_pvm.Accounted.inbox_level = event.header.level ->
         return start_state
     | _ ->
         (* Recompute start state on level change or if we don't have a
@@ -282,11 +273,14 @@ let memo_state_of_tick_aux node_ctxt ~start_state (event : Sc_rollup_block.t)
       returns [None].*)
 let state_of_tick node_ctxt ?start_state tick level =
   let open Lwt_result_syntax in
+  let level = Raw_level.to_int32 level in
+  let tick = Sc_rollup.Tick.to_z tick in
   let* event = Node_context.block_with_tick node_ctxt ~max_level:level tick in
   match event with
   | None -> return_none
   | Some event ->
-      assert (event.header.level <= Raw_level.to_int32 level) ;
+      assert (event.header.level <= level) ;
+      let tick = Sc_rollup.Tick.of_z tick in
       let* result_state =
         if Node_context.is_loser node_ctxt then
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/5253

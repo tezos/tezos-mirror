@@ -37,7 +37,7 @@ type info_per_level = {
 (** Type of the state for a simulation. *)
 type t = {
   ctxt : Context.ro;
-  inbox_level : Raw_level.t;
+  inbox_level : int32;
   state : Context.tree;
   reveal_map : string Sc_rollup_reveal_hash.Map.t option;
   nb_messages_inbox : int;
