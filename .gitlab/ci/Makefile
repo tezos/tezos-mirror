@@ -8,11 +8,6 @@ last_proto_version := $(shell echo ${last_proto_name} | cut -d'_' -f2 | sed 's/^
 new_proto_version_int:=$(shell echo $$(($(last_proto_version)+1)))
 new_proto_version := $(shell if [ "${new_proto_version_int}" -lt "100" ]; then echo 0${new_proto_version_int}; else echo ${new_proto_version_int}; fi)
 
-.PHONY: test-tezt-fetch-records
-test-tezt-fetch-records:
-	cd ${CI_PROJECT_DIR} && \
-		dune exec scripts/ci/update_records/update.exe -- --log-file tezt-fetch-records.log --test-arg from=last-merged-pipeline --info
-
 .PHONY: integration-test-compiler-rejections
 integration-test-compiler-rejections:
 	cd ${CI_PROJECT_DIR} && \
