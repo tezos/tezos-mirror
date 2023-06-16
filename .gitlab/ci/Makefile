@@ -13,15 +13,6 @@ opam-prepare:
 		git -C _opam-repo-for-release commit -m "tezos packages"
 endif
 
-ifndef TEZOS_WITHOUT_OPAM
-.PHONY: opam-configure
-opam-configure:
-	cd ${CI_PROJECT_DIR} && \
-		opam remote add dev-repo ./_opam-repo-for-release  && \
-		opam install --yes ${package}.dev && \
-		opam reinstall --yes --with-test ${package}.dev
-endif
-
 .PHONY: doc-build-all
 doc-build-all:
 	cd ${CI_PROJECT_DIR} && \
