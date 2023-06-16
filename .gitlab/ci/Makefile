@@ -3,11 +3,6 @@ ifndef CI_PROJECT_DIR
 	$(error This Makefile must be called from a Gitlab runner)
 endif
 
-.PHONY: sanity-ci
-sanity-ci: gitlab-take-ownership
-	${MAKE} -C ${CI_PROJECT_DIR}/manifest check
-	${CI_PROJECT_DIR}/scripts/lint.sh --check-gitlab-ci-yml
-
 ifndef TEZOS_WITHOUT_OPAM
 .PHONY: opam-prepare
 opam-prepare:
