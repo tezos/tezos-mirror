@@ -82,7 +82,7 @@ module Micheline_nodes_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let size_based_model =
     Model.make
@@ -125,7 +125,7 @@ module Script_repr_strip_annotations : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let strip_annotations_model =
     Model.(

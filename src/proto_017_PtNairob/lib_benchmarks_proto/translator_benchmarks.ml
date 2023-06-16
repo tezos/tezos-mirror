@@ -29,7 +29,7 @@ module Encodings =
 Tezos_shell_benchmarks.Encoding_benchmarks_helpers.Make (struct
   let file = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 end)
 
 module Size = Gas_input_size
@@ -205,7 +205,7 @@ module Typechecking_data : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let typechecking_data_benchmark rng_state (node : Protocol.Script_repr.expr)
       (michelson_type : Script_repr.expr) =
@@ -281,7 +281,7 @@ module Unparsing_data : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let unparsing_data_benchmark rng_state (node : Protocol.Script_repr.expr)
       (michelson_type : Protocol.Script_repr.expr) =
@@ -364,7 +364,7 @@ module Typechecking_code : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let typechecking_code_benchmark rng_state (node : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =
@@ -444,7 +444,7 @@ module Unparsing_code : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let unparsing_code_benchmark rng_state (node : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =
@@ -577,7 +577,7 @@ module Ty_eq : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let tags = [Tags.translator]
 
@@ -726,7 +726,7 @@ module Parse_type_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let make_bench rng_state config () =
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
@@ -782,7 +782,7 @@ module Unparse_type_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let make_bench rng_state config () =
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->

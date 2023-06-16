@@ -298,7 +298,7 @@ module Set_add : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let tags = ["global_constants"]
 
@@ -353,7 +353,7 @@ module Set_elements : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let tags = ["global_constants"]
 
@@ -410,7 +410,7 @@ module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let tags = ["global_constants"]
 
@@ -482,7 +482,7 @@ struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let tags = ["global_constants"]
 
@@ -566,7 +566,7 @@ module Global_constants_storage_expand_models = struct
 
     let module_filename = __FILE__
 
-    let generated_code_destination = None
+    let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
     let tags = ["global_constants"]
 
@@ -641,7 +641,7 @@ module Global_constants_storage_expand_models = struct
 
     let module_filename = __FILE__
 
-    let generated_code_destination = None
+    let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
     let tags = ["global_constants"]
 
