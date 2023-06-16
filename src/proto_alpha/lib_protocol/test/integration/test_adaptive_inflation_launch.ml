@@ -84,7 +84,15 @@ let test_ema_reaches_threshold threshold expected_vote_duration () =
 let tests =
   [
     Tztest.tztest
-      "the EMA reaches the vote threshold at the expected level"
+      "the EMA reaches the vote threshold at the expected level (very low \
+       threshold)"
+      `Quick
+      (test_ema_reaches_threshold
+         1000000l (* This means that the threshold is set at 0.05% *)
+         59l);
+    Tztest.tztest
+      "the EMA reaches the vote threshold at the expected level (realistic \
+       threshold)"
       `Slow
       (test_ema_reaches_threshold
          Default_parameters.constants_test.adaptive_inflation
