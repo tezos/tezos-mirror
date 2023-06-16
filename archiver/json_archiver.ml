@@ -259,7 +259,7 @@ let add_inclusion_in_block block_hash validators delegate_operations =
         updated_known
         unknown
 
-let dump_included_in_block path block_level block_hash block_predecessor
+let dump_included_in_block path validated block_level block_hash block_predecessor
     block_round timestamp reception_times baker consensus_ops =
   let open Lwt.Infix in
   (let endorsements_level = Int32.pred block_level in
@@ -460,6 +460,7 @@ let dump_received path ?unaccurate level received_ops =
 
 type chunk =
   | Block of
+  bool *
       Int32.t
       * Block_hash.t
       * Block_hash.t option
@@ -476,7 +477,7 @@ let launch _cctx prefix =
   Lwt_stream.iter_p
     (function
       | Block
-          ( level,
+          ( validated, level,
             block_hash,
             predecessor,
             round,
@@ -486,6 +487,7 @@ let launch _cctx prefix =
             block_info ) ->
           dump_included_in_block
             prefix
+            validated
             level
             block_hash
             predecessor
@@ -503,11 +505,24 @@ let stop () = chunk_feeder None
 let add_mempool ?unaccurate ~level items =
   chunk_feeder (Some (Mempool (unaccurate, level, items)))
 
-let add_block ~level (block, (endos, preendos)) =
+let add_applied_block ~level (block, (endos, preendos)) =
   chunk_feeder
     (Some
        (Block
-          ( level,
+          ( false, level,
+            block.Data.Block.hash,
+            block.Data.Block.predecessor,
+            block.round,
+            block.timestamp,
+            block.reception_times,
+            block.delegate,
+            endos @ preendos )))
+
+let add_validated_block ~level (block, (endos, preendos)) =
+  chunk_feeder
+    (Some
+       (Block
+          ( true, level,
             block.Data.Block.hash,
             block.Data.Block.predecessor,
             block.round,

@@ -218,13 +218,13 @@ module Loops (Archiver : Archiver.S) = struct
             return_unit
         | None -> return_unit)
 
-  let blocks chain starting cctx =
+  let applied_blocks chain starting cctx =
     mecanism chain starting cctx (fun {current_protocol; next_protocol} level ->
         if Protocol_hash.equal current_protocol next_protocol then
           match Protocol_hash.Table.find block_machine current_protocol with
           | Some deal_with ->
               let* block_data = deal_with cctx level in
-              let () = Archiver.add_block ~level block_data in
+              let () = Archiver.add_applied_block ~level block_data in
               return_unit
           | None -> return_unit
         else return_unit
@@ -290,7 +290,7 @@ module Loops (Archiver : Archiver.S) = struct
         in
         Lwt.return_unit
 
-  let blocks_loop cctx =
+  let reception_blocks_loop cctx =
     let*! block_stream =
       Shell_services.Monitor.applied_blocks cctx ~chains:[cctx#chain] ()
     in
@@ -371,7 +371,7 @@ module Loops (Archiver : Archiver.S) = struct
                                     in
                                     return_unit
                                 in
-                                let () = Archiver.add_block ~level block_data in
+                                let () = Archiver.add_applied_block ~level block_data in
                                 return_unit
                               in
                               Lwt.return
@@ -410,6 +410,133 @@ module Loops (Archiver : Archiver.S) = struct
             None
         in
         Lwt.return_unit
+
+  let validation_blocks_loop cctx =
+    let*! block_stream =
+      Shell_services.Monitor.validated_blocks cctx ~chains:[cctx#chain] ()
+    in
+    match block_stream with
+    | Error e ->
+        let () = Error_monad.pp_print_trace Format.err_formatter e in
+        Lwt.return_unit
+    | Ok (block_stream, _stopper) ->
+        let*! wallet = wallet cctx in
+        let*! _ =
+          Lwt_stream.fold_s
+            (fun (_chain_id, hash, header, _operations) acc ->
+              let*! block_recorder, acc' =
+                match acc with
+                | Some (f, proto_level)
+                  when proto_level
+                       = header.Block_header.shell.Block_header.proto_level ->
+                    Lwt.return (f, acc)
+                | _ -> (
+                    let*! proto_result =
+                      Shell_services.Blocks.protocols
+                        cctx
+                        ~chain:cctx#chain
+                        ~block:(`Hash (hash, 0))
+                        ()
+                    in
+                    match proto_result with
+                    | Error e -> Lwt.return ((fun _ _ _ _ _ -> fail e), None)
+                    | Ok Shell_services.Blocks.{current_protocol; next_protocol}
+                      ->
+                        if Protocol_hash.equal current_protocol next_protocol
+                        then
+                          let recorder =
+                            Protocol_hash.Table.find
+                              live_block_machine
+                              next_protocol
+                          in
+                          match recorder with
+                          | None ->
+                              let*! () =
+                                Lwt_fmt.eprintf
+                                  "no block recorder found for protocol %a@."
+                                  Protocol_hash.pp
+                                  current_protocol
+                              in
+                              Lwt.return ((fun _ _ _ _ _ -> return_unit), None)
+                          | Some (rights_of, get_block) ->
+                              let recorder cctx level hash header reception_time
+                                  =
+                                let* (( _block_info,
+                                        (endorsements, preendorsements) ) as
+                                     block_data) =
+                                  get_block cctx hash header reception_time
+                                in
+                                let* () =
+                                  if List.is_empty endorsements then return_unit
+                                  else
+                                    let* rights =
+                                      rights_of cctx (Int32.pred level)
+                                    in
+                                    let () =
+                                      maybe_add_rights
+                                        (module Archiver)
+                                        (Int32.pred level)
+                                        rights
+                                        wallet
+                                    in
+                                    return_unit
+                                in
+                                let* () =
+                                  if List.is_empty preendorsements then
+                                    return_unit
+                                  else
+                                    let* rights = rights_of cctx level in
+                                    let () =
+                                      maybe_add_rights
+                                        (module Archiver)
+                                        level
+                                        rights
+                                        wallet
+                                    in
+                                    return_unit
+                                in
+                                let () = Archiver.add_validated_block ~level block_data in
+                                return_unit
+                              in
+                              Lwt.return
+                                ( recorder,
+                                  Some
+                                    ( recorder,
+                                      header.Block_header.shell
+                                        .Block_header.proto_level ) )
+                        else
+                          let*! () =
+                            Lwt_fmt.eprintf
+                              "skipping block %a, migrating from protocol %a \
+                               to %a@."
+                              Block_hash.pp
+                              hash
+                              Protocol_hash.pp
+                              current_protocol
+                              Protocol_hash.pp
+                              next_protocol
+                          in
+                          Lwt.return ((fun _ _ _ _ _ -> return_unit), None))
+              in
+              let reception_time = Time.System.now () in
+              let block_level = header.Block_header.shell.Block_header.level in
+              let*! () =
+                print_failures
+                  (block_recorder
+                     cctx
+                     block_level
+                     hash
+                     header
+                     [("archiver", reception_time)])
+              in
+              Lwt.return acc')
+            block_stream
+            None
+        in
+        Lwt.return_unit
+
+  let blocks_loop cctx =
+    Lwt.Infix.(reception_blocks_loop cctx <&> validation_blocks_loop cctx)
 end
 
 module Json_loops = Loops (Json_archiver)
