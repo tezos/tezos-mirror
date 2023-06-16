@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,8 +24,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type state = {
+  cctxt : Client_context.full;
+  fee_parameters : Configuration.fee_parameters;
+  minimal_block_delay : int64;
+  delay_increment_per_round : int64;
+}
+
 include
   Injector_sigs.S
-    with type state := Node_context.ro
+    with type state := state
      and type tag := Configuration.purpose
      and type operation := L1_operation.t

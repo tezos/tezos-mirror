@@ -13,12 +13,13 @@ depends: [
   "tezos-base"
   "tezos-stdlib-unix"
   "tezos-crypto"
+  "tezos-client-base"
+  "tezos-client-base-unix"
   "cohttp-lwt-unix" { >= "4.0.0" & != "5.1.0" }
   "octez-node-config"
   "prometheus-app" { >= "1.2" }
   "octez-injector"
   "tezos-version"
-  "tezos-client-base"
   "octez-smart-rollup"
 ]
 build: [

@@ -70,7 +70,13 @@ let inject_next_move node_ctxt source ~refutation ~opponent =
   let open Lwt_result_syntax in
   let refute_operation =
     L1_operation.Refute
-      {rollup = node_ctxt.Node_context.rollup_address; refutation; opponent}
+      {
+        rollup =
+          Sc_rollup_proto_types.Address.to_octez
+            node_ctxt.Node_context.rollup_address;
+        refutation = Sc_rollup_proto_types.Game.refutation_to_octez refutation;
+        opponent;
+      }
   in
   let* _hash = Injector.add_pending_operation ~source refute_operation in
   return_unit
@@ -444,7 +450,11 @@ let play_next_move node_ctxt game self opponent =
 let play_timeout (node_ctxt : _ Node_context.t) self stakers =
   let open Lwt_result_syntax in
   let timeout_operation =
-    L1_operation.Timeout {rollup = node_ctxt.rollup_address; stakers}
+    L1_operation.Timeout
+      {
+        rollup = Sc_rollup_proto_types.Address.to_octez node_ctxt.rollup_address;
+        stakers = Sc_rollup_proto_types.Game.index_to_octez stakers;
+      }
   in
   let source =
     Node_context.get_operator node_ctxt Timeout |> Option.value ~default:self

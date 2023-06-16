@@ -23,18 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
-
 type t =
   | Add_messages of {messages : string list}
-  | Cement of {rollup : Sc_rollup.t; commitment : Sc_rollup.Commitment.Hash.t}
-  | Publish of {rollup : Sc_rollup.t; commitment : Sc_rollup.Commitment.t}
+  | Cement of {rollup : Address.t; commitment : Commitment.Hash.t}
+  | Publish of {rollup : Address.t; commitment : Commitment.t}
   | Refute of {
-      rollup : Sc_rollup.t;
-      opponent : Sc_rollup.Staker.t;
-      refutation : Sc_rollup.Game.refutation;
+      rollup : Address.t;
+      opponent : Signature.Public_key_hash.t;
+      refutation : Game.refutation;
     }
-  | Timeout of {rollup : Sc_rollup.t; stakers : Sc_rollup.Game.Index.t}
+  | Timeout of {rollup : Address.t; stakers : Game.index}
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
@@ -59,8 +57,8 @@ let encoding : t Data_encoding.t =
            1
            "cement"
            (obj2
-              (req "rollup" Sc_rollup.Address.encoding)
-              (req "commitment" Sc_rollup.Commitment.Hash.encoding))
+              (req "rollup" Address.encoding)
+              (req "commitment" Commitment.Hash.encoding))
            (function
              | Cement {rollup; commitment} -> Some (rollup, commitment)
              | _ -> None)
@@ -69,8 +67,8 @@ let encoding : t Data_encoding.t =
            2
            "publish"
            (obj2
-              (req "rollup" Sc_rollup.Address.encoding)
-              (req "commitment" Sc_rollup.Commitment.encoding))
+              (req "rollup" Address.encoding)
+              (req "commitment" Commitment.encoding))
            (function
              | Publish {rollup; commitment} -> Some (rollup, commitment)
              | _ -> None)
@@ -79,9 +77,9 @@ let encoding : t Data_encoding.t =
            3
            "refute"
            (obj3
-              (req "rollup" Sc_rollup.Address.encoding)
-              (req "opponent" Sc_rollup.Staker.encoding)
-              (req "refutation" Sc_rollup.Game.refutation_encoding))
+              (req "rollup" Address.encoding)
+              (req "opponent" Signature.Public_key_hash.encoding)
+              (req "refutation" Game.refutation_encoding))
            (function
              | Refute {rollup; opponent; refutation} ->
                  Some (rollup, opponent, refutation)
@@ -92,8 +90,8 @@ let encoding : t Data_encoding.t =
            4
            "timeout"
            (obj2
-              (req "rollup" Sc_rollup.Address.encoding)
-              (req "stakers" Sc_rollup.Game.Index.encoding))
+              (req "rollup" Address.encoding)
+              (req "stakers" Game.index_encoding))
            (function
              | Timeout {rollup; stakers} -> Some (rollup, stakers) | _ -> None)
            (fun (rollup, stakers) -> Timeout {rollup; stakers});
@@ -105,18 +103,14 @@ let pp ppf = function
         ppf
         "publishing %d messages to smart rollups' inbox"
         (List.length messages)
+  | Cement {rollup = _; commitment} when Commitment.Hash.(commitment = zero) ->
+      (* We use zero as a default value for protocol alpha which does
+         not need the commitment to be specified. *)
+      Format.fprintf ppf "cementing cementable commitment"
   | Cement {rollup = _; commitment} ->
-      Format.fprintf
-        ppf
-        "cementing commitment %a"
-        Sc_rollup.Commitment.Hash.pp
-        commitment
-  | Publish {rollup = _; commitment = Sc_rollup.Commitment.{inbox_level; _}} ->
-      Format.fprintf
-        ppf
-        "publish commitment for level %a"
-        Raw_level.pp
-        inbox_level
+      Format.fprintf ppf "cementing commitment %a" Commitment.Hash.pp commitment
+  | Publish {rollup = _; commitment = Commitment.{inbox_level; _}} ->
+      Format.fprintf ppf "publish commitment for level %ld" inbox_level
   | Refute {rollup = _; opponent; refutation = Start _} ->
       Format.fprintf
         ppf
@@ -133,9 +127,9 @@ let pp ppf = function
       Format.fprintf
         ppf
         "dissection between ticks %a and %a (against %a)"
-        Sc_rollup.Tick.pp
+        Z.pp_print
         first.tick
-        Sc_rollup.Tick.pp
+        Z.pp_print
         last.tick
         Signature.Public_key_hash.pp
         opponent
@@ -150,33 +144,12 @@ let pp ppf = function
       Format.fprintf
         ppf
         "proof for tick %a  (against %a)"
-        Sc_rollup.Tick.pp
+        Z.pp_print
         choice
         Signature.Public_key_hash.pp
         opponent
   | Timeout {rollup = _; stakers = _} -> Format.fprintf ppf "timeout"
 
-let to_manager_operation : t -> packed_manager_operation = function
-  | Add_messages {messages} -> Manager (Sc_rollup_add_messages {messages})
-  | Cement {rollup; commitment} ->
-      Manager (Sc_rollup_cement {rollup; commitment})
-  | Publish {rollup; commitment} ->
-      Manager (Sc_rollup_publish {rollup; commitment})
-  | Refute {rollup; opponent; refutation} ->
-      Manager (Sc_rollup_refute {rollup; opponent; refutation})
-  | Timeout {rollup; stakers} -> Manager (Sc_rollup_timeout {rollup; stakers})
-
-let of_manager_operation : type kind. kind manager_operation -> t option =
-  function
-  | Sc_rollup_add_messages {messages} -> Some (Add_messages {messages})
-  | Sc_rollup_cement {rollup; commitment} -> Some (Cement {rollup; commitment})
-  | Sc_rollup_publish {rollup; commitment} ->
-      Some (Publish {rollup; commitment})
-  | Sc_rollup_refute {rollup; opponent; refutation} ->
-      Some (Refute {rollup; opponent; refutation})
-  | Sc_rollup_timeout {rollup; stakers} -> Some (Timeout {rollup; stakers})
-  | _ -> None
-
 let unique = function
-  | Add_messages _ -> false
-  | Cement _ | Publish _ | Refute _ | Timeout _ -> true
+  | Add_messages _ | Cement _ -> false
+  | Publish _ | Refute _ | Timeout _ -> true

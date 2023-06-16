@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,8 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include
-  Injector_sigs.S
-    with type state := Node_context.ro
-     and type tag := Configuration.purpose
-     and type operation := L1_operation.t
+(** L1 operations produced (and injected) by the rollup node. *)
+type t =
+  | Add_messages of {messages : string list}
+  | Cement of {rollup : Address.t; commitment : Commitment.Hash.t}
+  | Publish of {rollup : Address.t; commitment : Commitment.t}
+  | Refute of {
+      rollup : Address.t;
+      opponent : Signature.Public_key_hash.t;
+      refutation : Game.refutation;
+    }
+  | Timeout of {rollup : Address.t; stakers : Game.index}
+
+(** Encoding for L1 operations (used by injector for on-disk persistence). *)
+val encoding : t Data_encoding.t
+
+(** Pretty printer (human readable) for L1 operations. *)
+val pp : Format.formatter -> t -> unit
+
+(** [false] if the injector will accept duplicate such operations. *)
+val unique : t -> bool
