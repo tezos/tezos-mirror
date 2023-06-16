@@ -3,13 +3,6 @@ ifndef CI_PROJECT_DIR
 	$(error This Makefile must be called from a Gitlab runner)
 endif
 
-.PHONY: check-precommit
-check-precommit:
-	cd ${CI_PROJECT_DIR} && \
-		poetry run pylint scripts/pre_commit/pre_commit.py && \
-		poetry run pycodestyle scripts/pre_commit/pre_commit.py && \
-		poetry run mypy scripts/pre_commit/pre_commit.py
-
 .PHONY: check-scripts-b58-prefix
 check-scripts-b58-prefix:
 	cd ${CI_PROJECT_DIR} && \
