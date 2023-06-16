@@ -42,7 +42,7 @@ type header = {
       (** Previous commitment hash in the chain. If there is a commitment for this
           block, this field contains the commitment that was previously
           computed. *)
-  context : Sc_rollup_context_hash.t;
+  context : Smart_rollup_context_hash.t;
       (** Hash of the layer 2 context for this block. *)
   inbox_witness : Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t;
       (** Witness for the inbox for this block, i.e. the Merkle hash of payloads

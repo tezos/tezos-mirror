@@ -274,41 +274,6 @@ index 7e01854acc..caf342d8c6 100644
          amount is zero.
        }
        {li [Zk_rollup.Errors.Invalid_deposit_amount] if the amount of the ticket
-diff --git a/src/proto_016_PtMumbai/lib_sc_rollup_node/context.mli b/src/proto_016_PtMumbai/lib_sc_rollup_node/context.mli
-index 636bb700d1..1a54302fd8 100644
---- a/src/proto_016_PtMumbai/lib_sc_rollup_node/context.mli
-+++ b/src/proto_016_PtMumbai/lib_sc_rollup_node/context.mli
-@@ -29,10 +29,10 @@ open Store_sigs
-     index can be written or only read. *)
- type 'a index constraint 'a = [< `Read | `Write > `Read]
- 
--(** Read/write {!index}. *)
-+(** Read/write {!type:index}. *)
- type rw_index = [`Read | `Write] index
- 
--(** Read only {!index}. *)
-+(** Read only {!type:index}. *)
- type ro_index = [`Read] index
- 
- (** The type of trees stored in the context, i.e. the actual data. *)
-@@ -48,7 +48,7 @@ type rw = [`Read | `Write] t
- type ro = [`Read] t
- 
- (** A context hash is the hash produced when the data of the context is
--    committed to disk, i.e. the {!commit} hash. *)
-+    committed to disk, i.e. the {!type:commit} hash. *)
- type hash = Sc_rollup_context_hash.t
- 
- (** The type of commits for the context. *)
-@@ -156,7 +156,7 @@ module PVMState : sig
- 
-   (** [set context state] saves the PVM state [state] in the context and returns
-       the updated context. Note: [set] does not perform any write on disk, this
--      information must be committed using {!commit}. *)
-+      information must be committed using {!val:commit}. *)
-   val set : 'a t -> value -> 'a t Lwt.t
- end
- 
 diff --git a/src/proto_016_PtMumbai/lib_sc_rollup_node/dal_pages_request.mli b/src/proto_016_PtMumbai/lib_sc_rollup_node/dal_pages_request.mli
 index 2a9a69a71b..f7247a51e3 100644
 --- a/src/proto_016_PtMumbai/lib_sc_rollup_node/dal_pages_request.mli
@@ -357,41 +322,6 @@ index ca8e5769b9..90a3c81f2f 100644
      val set : 'a Context.t -> state -> 'a Context.t Lwt.t
    end
  end
-diff --git a/src/proto_017_PtNairob/lib_sc_rollup_node/context.mli b/src/proto_017_PtNairob/lib_sc_rollup_node/context.mli
-index 636bb700d1..1a54302fd8 100644
---- a/src/proto_017_PtNairob/lib_sc_rollup_node/context.mli
-+++ b/src/proto_017_PtNairob/lib_sc_rollup_node/context.mli
-@@ -29,10 +29,10 @@ open Store_sigs
-     index can be written or only read. *)
- type 'a index constraint 'a = [< `Read | `Write > `Read]
- 
--(** Read/write {!index}. *)
-+(** Read/write {!type:index}. *)
- type rw_index = [`Read | `Write] index
- 
--(** Read only {!index}. *)
-+(** Read only {!type:index}. *)
- type ro_index = [`Read] index
- 
- (** The type of trees stored in the context, i.e. the actual data. *)
-@@ -48,7 +48,7 @@ type rw = [`Read | `Write] t
- type ro = [`Read] t
- 
- (** A context hash is the hash produced when the data of the context is
--    committed to disk, i.e. the {!commit} hash. *)
-+    committed to disk, i.e. the {!type:commit} hash. *)
- type hash = Sc_rollup_context_hash.t
- 
- (** The type of commits for the context. *)
-@@ -156,7 +156,7 @@ module PVMState : sig
- 
-   (** [set context state] saves the PVM state [state] in the context and returns
-       the updated context. Note: [set] does not perform any write on disk, this
--      information must be committed using {!commit}. *)
-+      information must be committed using {!val:commit}. *)
-   val set : 'a t -> value -> 'a t Lwt.t
- end
- 
 diff --git a/src/proto_017_PtNairob/lib_sc_rollup_node/dal_pages_request.mli b/src/proto_017_PtNairob/lib_sc_rollup_node/dal_pages_request.mli
 index 3be2cdb1f5..f27d737fbc 100644
 --- a/src/proto_017_PtNairob/lib_sc_rollup_node/dal_pages_request.mli

@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,19 +24,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_crypto
-
-include
-  Blake2B.Make
-    (Base58)
-    (struct
-      let name = "Smart_rollup_context_hash"
-
-      let title = "A base58-check encoded hash of a Smart rollup node context"
-
-      let b58check_prefix = "\008\209\216\166"
-
-      let size = None
-    end)
-
-let () = Base58.check_encoded_prefix b58check_encoding "SRCo" 54
+include Tezos_crypto.Intfs.HASH

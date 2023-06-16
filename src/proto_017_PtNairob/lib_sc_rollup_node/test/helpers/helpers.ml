@@ -68,7 +68,7 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
   in
   let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
   let inbox_witness = Sc_rollup.Inbox.current_witness inbox in
-  let ctxt = Context.empty node_ctxt.context in
+  let ctxt = Octez_smart_rollup_node.Context.empty node_ctxt.context in
   let num_ticks = 0L in
   let module PVM = (val node_ctxt.pvm) in
   let initial_tick = Sc_rollup.Tick.initial in
@@ -76,7 +76,7 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
   let*! state = PVM.install_boot_sector initial_state boot_sector in
   let*! genesis_state_hash = PVM.state_hash state in
   let*! ctxt = PVM.State.set ctxt state in
-  let*! context_hash = Context.commit ctxt in
+  let*! context_hash = Octez_smart_rollup_node.Context.commit ctxt in
   let commitment =
     Sc_rollup.Commitment.genesis_commitment
       ~origination_level:node_ctxt.genesis_info.level

@@ -32,7 +32,7 @@ type header = {
   predecessor : Block_hash.t;
   commitment_hash : Sc_rollup.Commitment.Hash.t option;
   previous_commitment_hash : Sc_rollup.Commitment.Hash.t;
-  context : Sc_rollup_context_hash.t;
+  context : Smart_rollup_context_hash.t;
   inbox_witness : Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t;
   inbox_hash : Sc_rollup.Inbox.Hash.t;
 }
@@ -129,7 +129,7 @@ let header_encoding =
              previously computed.")
        (req
           "context"
-          Sc_rollup_context_hash.encoding
+          Smart_rollup_context_hash.encoding
           ~description:"Hash of the layer 2 context for this block.")
        (req
           "inbox_witness"

@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
 open Store_sigs
 module Context_encoding = Tezos_context_encoding.Context_binary
 
@@ -33,6 +31,38 @@ module Context_encoding = Tezos_context_encoding.Context_binary
    [Tezos_context_encoding.Context_binary] during a future
    refactoring.*)
 module Tezos_context_encoding = struct end
+
+type error +=
+  | Unexpected_rollup of {
+      rollup_address : Octez_smart_rollup.Address.t;
+      saved_address : Octez_smart_rollup.Address.t;
+    }
+
+let () =
+  register_error_kind
+    ~id:"sc_rollup.node.unexpected_rollup"
+    ~title:"Unexpected rollup for rollup node"
+    ~description:"This rollup node is already set up for another rollup."
+    ~pp:(fun ppf (rollup_address, saved_address) ->
+      Format.fprintf
+        ppf
+        "This rollup node was already set up for rollup %a, it cannot be run \
+         for a different rollup %a."
+        Octez_smart_rollup.Address.pp
+        saved_address
+        Octez_smart_rollup.Address.pp
+        rollup_address)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "rollup_address" Octez_smart_rollup.Address.encoding)
+        (req "saved_address" Octez_smart_rollup.Address.encoding))
+    (function
+      | Unexpected_rollup {rollup_address; saved_address} ->
+          Some (rollup_address, saved_address)
+      | _ -> None)
+    (fun (rollup_address, saved_address) ->
+      Unexpected_rollup {rollup_address; saved_address})
 
 module Maker = Irmin_pack_unix.Maker (Context_encoding.Conf)
 
@@ -62,17 +92,17 @@ type ro = [`Read] t
 
 type commit = IStore.commit
 
-type hash = Sc_rollup_context_hash.t
+type hash = Smart_rollup_context_hash.t
 
 type path = string list
 
-let () = assert (Sc_rollup_context_hash.size = IStore.Hash.hash_size)
+let () = assert (Smart_rollup_context_hash.size = IStore.Hash.hash_size)
 
 let hash_to_istore_hash h =
-  Sc_rollup_context_hash.to_string h |> IStore.Hash.unsafe_of_raw_string
+  Smart_rollup_context_hash.to_string h |> IStore.Hash.unsafe_of_raw_string
 
 let istore_hash_to_hash h =
-  IStore.Hash.to_raw_string h |> Sc_rollup_context_hash.of_string_exn
+  IStore.Hash.to_raw_string h |> Smart_rollup_context_hash.of_string_exn
 
 let load : type a. a mode -> string -> a raw_index Lwt.t =
  fun mode path ->
@@ -121,7 +151,9 @@ module Proof (Hash : sig
   val of_context_hash : Context_hash.t -> t
 end) (Proof_encoding : sig
   val proof_encoding :
-    Environment.Context.Proof.tree Environment.Context.Proof.t Data_encoding.t
+    Tezos_context_sigs.Context.Proof_types.tree
+    Tezos_context_sigs.Context.Proof_types.t
+    Data_encoding.t
 end) =
 struct
   module IStoreProof =
@@ -178,11 +210,6 @@ struct
         return None
 end
 
-module Inbox = struct
-  include Sc_rollup.Inbox
-  module Message = Sc_rollup.Inbox_message
-end
-
 (** State of the PVM that this rollup node deals with. *)
 module PVMState = struct
   type value = tree
@@ -214,7 +241,7 @@ module Rollup = struct
       IStore.Info.v date
     in
     let value =
-      Data_encoding.Binary.to_bytes_exn Sc_rollup.Address.encoding addr
+      Data_encoding.Binary.to_bytes_exn Octez_smart_rollup.Address.encoding addr
     in
     let*! store = IStore.main index.repo in
     let*! () = IStore.set_exn ~info store path value in
@@ -227,7 +254,7 @@ module Rollup = struct
     let*! value = IStore.find store path in
     return
     @@ Option.map
-         (Data_encoding.Binary.of_bytes_exn Sc_rollup.Address.encoding)
+         (Data_encoding.Binary.of_bytes_exn Octez_smart_rollup.Address.encoding)
          value
 
   let check_or_set_address (type a) (mode : a mode) (index : a raw_index)
@@ -236,9 +263,8 @@ module Rollup = struct
     let* saved_address = get_address index in
     match saved_address with
     | Some saved_address ->
-        fail_unless Sc_rollup.Address.(rollup_address = saved_address)
-        @@ Sc_rollup_node_errors.Unexpected_rollup
-             {rollup_address; saved_address}
+        fail_unless Octez_smart_rollup.Address.(rollup_address = saved_address)
+        @@ Unexpected_rollup {rollup_address; saved_address}
     | None -> (
         (* Address was never saved, we set it permanently if not in read-only
            mode. *)

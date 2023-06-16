@@ -46,12 +46,8 @@ type error +=
       layer1_inbox : Sc_rollup.Inbox.t;
       inbox : Sc_rollup.Inbox.t;
     }
-  | Unexpected_rollup of {
-      rollup_address : Sc_rollup.Address.t;
-      saved_address : Sc_rollup.Address.t;
-    }
   | Missing_PVM_state of Block_hash.t * Int32.t
-  | Cannot_checkout_context of Block_hash.t * Sc_rollup_context_hash.t option
+  | Cannot_checkout_context of Block_hash.t * Smart_rollup_context_hash.t option
   | No_batcher
   | No_publisher
   | Refutation_player_failed_to_start
@@ -193,31 +189,6 @@ let () =
     (fun (layer1_inbox, inbox) -> Inconsistent_inbox {layer1_inbox; inbox}) ;
 
   register_error_kind
-    ~id:"sc_rollup.node.unexpected_rollup"
-    ~title:"Unexpected rollup for rollup node"
-    ~description:"This rollup node is already set up for another rollup."
-    ~pp:(fun ppf (rollup_address, saved_address) ->
-      Format.fprintf
-        ppf
-        "This rollup node was already set up for rollup %a, it cannot be run \
-         for a different rollup %a."
-        Sc_rollup.Address.pp
-        saved_address
-        Sc_rollup.Address.pp
-        rollup_address)
-    `Permanent
-    Data_encoding.(
-      obj2
-        (req "rollup_address" Sc_rollup.Address.encoding)
-        (req "saved_address" Sc_rollup.Address.encoding))
-    (function
-      | Unexpected_rollup {rollup_address; saved_address} ->
-          Some (rollup_address, saved_address)
-      | _ -> None)
-    (fun (rollup_address, saved_address) ->
-      Unexpected_rollup {rollup_address; saved_address}) ;
-
-  register_error_kind
     `Permanent
     ~id:"internal.missing_pvm_state"
     ~title:"Internal error: Missing PVM state"
@@ -246,14 +217,14 @@ let () =
         "The context %sfor block %a cannot be checkouted"
         (Option.fold
            ~none:""
-           ~some:Sc_rollup_context_hash.to_b58check
+           ~some:Smart_rollup_context_hash.to_b58check
            context_hash)
         Block_hash.pp
         block)
     Data_encoding.(
       obj2
         (req "block" Block_hash.encoding)
-        (opt "context" Sc_rollup_context_hash.encoding))
+        (opt "context" Smart_rollup_context_hash.encoding))
     (function
       | Cannot_checkout_context (block, context) -> Some (block, context)
       | _ -> None)
