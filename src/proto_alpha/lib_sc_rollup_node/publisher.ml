@@ -281,7 +281,7 @@ let publish_commitment (node_ctxt : _ Node_context.t) ~source
   let*! () =
     Commitment_event.publish_commitment
       (Sc_rollup.Commitment.hash_uncarbonated commitment)
-      commitment.inbox_level
+      (Raw_level.to_int32 commitment.inbox_level)
   in
   let* _hash = Injector.add_pending_operation ~source publish_operation in
   return_unit

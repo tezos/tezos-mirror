@@ -72,8 +72,8 @@ module Simple = struct
         "Last cemented commitment was updated to hash {hash} at inbox level \
          {level}"
       ~level:Debug
-      ("hash", Sc_rollup.Commitment.Hash.encoding)
-      ("level", Raw_level.encoding)
+      ("hash", Octez_smart_rollup.Commitment.Hash.encoding)
+      ("level", Data_encoding.int32)
 
   let last_published_commitment_updated =
     declare_2
@@ -83,8 +83,8 @@ module Simple = struct
         "Last published commitment was updated to hash {hash} at inbox level \
          {level}"
       ~level:Debug
-      ("hash", Sc_rollup.Commitment.Hash.encoding)
-      ("level", Raw_level.encoding)
+      ("hash", Octez_smart_rollup.Commitment.Hash.encoding)
+      ("level", Data_encoding.int32)
 
   let compute_commitment =
     declare_1
@@ -100,8 +100,8 @@ module Simple = struct
       ~name:"sc_rollup_node_publish_commitment"
       ~msg:"Publishing commitment {hash} for inbox level {level}"
       ~level:Notice
-      ("hash", Sc_rollup.Commitment.Hash.encoding)
-      ("level", Raw_level.encoding)
+      ("hash", Octez_smart_rollup.Commitment.Hash.encoding)
+      ("level", Data_encoding.int32)
 
   let commitment_parent_is_not_lcc =
     declare_3

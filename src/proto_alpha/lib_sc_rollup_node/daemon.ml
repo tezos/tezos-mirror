@@ -110,7 +110,7 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
       let*! () =
         Commitment_event.last_published_commitment_updated
           commitment_hash
-          (Raw_level.of_int32_exn head.Layer1.level)
+          head.Layer1.level
       in
       return_unit
   | ( Sc_rollup_publish {commitment = their_commitment; rollup},
@@ -183,7 +183,7 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
             {commitment = proto_commitment_hash; level = proto_inbox_level} ;
           Commitment_event.last_cemented_commitment_updated
             proto_commitment_hash
-            proto_inbox_level)
+            inbox_level)
         else Lwt.return_unit
       in
       return_unit

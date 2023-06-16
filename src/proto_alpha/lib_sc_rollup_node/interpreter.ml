@@ -130,7 +130,11 @@ let transition_pvm node_ctxt ctxt predecessor Layer1.{hash = _; _}
   let*! initial_tick = PVM.get_tick predecessor_state in
   (* Produce events. *)
   let*! () =
-    Interpreter_event.transitioned_pvm inbox_level state_hash tick num_messages
+    Interpreter_event.transitioned_pvm
+      (Raw_level.to_int32 inbox_level)
+      state_hash
+      tick
+      num_messages
   in
   return (ctxt, num_messages, Z.to_int64 num_ticks, initial_tick)
 
