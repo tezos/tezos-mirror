@@ -47,7 +47,7 @@ module Next : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let tags = ["skip_list"]
 
@@ -103,7 +103,7 @@ module Hash_cell = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let tags = ["skip_list"]
 

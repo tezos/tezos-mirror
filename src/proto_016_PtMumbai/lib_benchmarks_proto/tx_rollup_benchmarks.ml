@@ -36,7 +36,7 @@ module Inbox_add_message : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let tags = ["tx_rollup"; "merkle"; "inbox"; "add_message"]
 
@@ -122,7 +122,7 @@ module Commitment_full_compact_bench : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let tags = ["tx_rollup"; "merkle"; "commitment"; "compact"]
 
@@ -555,7 +555,7 @@ module Verify_proof_compute_bench : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let tags = ["tx_rollup"; "merkle"; "verify"; "proof"]
 

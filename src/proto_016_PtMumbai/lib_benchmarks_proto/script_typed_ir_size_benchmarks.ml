@@ -79,7 +79,7 @@ end = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let value_size_benchmark rng_state (node : Protocol.Script_repr.expr)
       (michelson_type : Script_repr.expr) =
@@ -154,7 +154,7 @@ module Type_size_benchmark : Tezos_benchmark.Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let models = [(model_name, size_based_model (Namespace.basename name))]
 
@@ -200,7 +200,7 @@ end = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let kinstr_size_benchmark rng_state (expr : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =
@@ -281,7 +281,7 @@ module Node_size_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let size_based_model =
     Model.make

@@ -314,7 +314,9 @@ let make_benchmark :
 
     let module_filename = __FILE__
 
-    let generated_code_destination = None
+    let purpose =
+      Benchmark.Generate_code
+        "src/proto_alpha/lib_protocol/michelson_v1_gas_costs_generated.ml"
 
     let benchmark kinstr_and_stack_sampler ctxt step_constants () =
       let stack_instr = kinstr_and_stack_sampler () in
@@ -598,7 +600,9 @@ let make_continuation_benchmark :
 
     let module_filename = __FILE__
 
-    let generated_code_destination = None
+    let purpose =
+      Benchmark.Generate_code
+        "src/proto_alpha/lib_protocol/michelson_v1_gas_costs_generated.ml"
 
     let benchmark cont_and_stack_sampler ctxt step_constants () =
       let stack_instr = cont_and_stack_sampler () in
@@ -697,7 +701,9 @@ module Registration_section = struct
 
       let module_filename = __FILE__
 
-      let generated_code_destination = None
+      let purpose =
+        Benchmark.Generate_code
+          "src/proto_alpha/lib_protocol/michelson_v1_gas_costs_generated.ml"
 
       let tags = [Tags.interpreter]
 
@@ -2860,7 +2866,9 @@ module Registration_section = struct
 
         let module_filename = __FILE__
 
-        let generated_code_destination = None
+        let purpose =
+          Benchmark.Generate_code
+            "src/proto_alpha/lib_protocol/michelson_v1_gas_costs_generated.ml"
 
         include Default_config
         include Default_boilerplate

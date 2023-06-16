@@ -62,7 +62,7 @@ end
 module Make (Info : sig
   val file : string
 
-  val generated_code_destination : string option
+  val purpose : Benchmark.purpose
 end) =
 struct
   (* Generic function to cook benchmarks for fixed-size encodings *)
@@ -88,7 +88,7 @@ struct
 
       let module_filename = Info.file
 
-      let generated_code_destination = Info.generated_code_destination
+      let purpose = Info.purpose
 
       let tags = ["encoding"]
 
@@ -119,7 +119,7 @@ struct
 
       let module_filename = Info.file
 
-      let generated_code_destination = Info.generated_code_destination
+      let purpose = Info.purpose
 
       let tags = ["encoding"]
 
@@ -151,7 +151,7 @@ struct
 
       let module_filename = Info.file
 
-      let generated_code_destination = Info.generated_code_destination
+      let purpose = Info.purpose
 
       let tags = ["encoding"]
 
@@ -171,7 +171,7 @@ struct
 
       let module_filename = Info.file
 
-      let generated_code_destination = Info.generated_code_destination
+      let purpose = Info.purpose
 
       let tags = ["encoding"]
 

@@ -87,7 +87,7 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "ticket_costs"
 
   let group = Benchmark.Group "compare_tickets"
 
@@ -139,7 +139,7 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "ticket_costs"
 
   let group = Benchmark.Group "compare_tickets"
 
@@ -198,7 +198,7 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "ticket_costs"
 
   let group = Benchmark.Standalone
 
@@ -245,7 +245,7 @@ module Collect_tickets_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "ticket_costs"
 
   let group = Benchmark.Standalone
 

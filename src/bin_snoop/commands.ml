@@ -1473,12 +1473,14 @@ module Display_info_cmd = struct
   let pp_models () = Format.pp_print_list pp_model_bench
 
   let pp_fancy_benchmark fmt (module B : Benchmark.S) =
+    let purpose =
+      match B.purpose with
+      | Generate_code x -> Format.sprintf "Generate code to %s" x
+      | Other_purpose x -> x
+    in
     bold_block fmt "Name" Namespace.pp B.name ;
     bold_block fmt "Filename" Format.pp_print_string B.module_filename ;
-    bold_block fmt "Generated code destination" Format.pp_print_string
-    @@ Option.value
-         ~default:"Destination not specified"
-         B.generated_code_destination ;
+    bold_block fmt "Purpose" Format.pp_print_string purpose ;
     bold_block fmt "Info" Format.pp_print_string B.info ;
     bold_block fmt "Tags" pp_tags B.tags ;
     bold_block fmt "Models" (pp_models ()) B.models

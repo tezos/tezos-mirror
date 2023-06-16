@@ -47,7 +47,7 @@ module Config_and_workload = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let tags = ["carbonated_map"]
 
@@ -167,7 +167,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let module_filename = __FILE__
 
-    let generated_code_destination = None
+    let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
     let models =
       [
@@ -308,7 +308,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let module_filename = __FILE__
 
-    let generated_code_destination = None
+    let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
     let models =
       [

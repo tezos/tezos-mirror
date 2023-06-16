@@ -65,13 +65,8 @@ module Registration = struct
     let module B : Benchmark_base.S = struct
       include Bench
 
-      let generated_code_destination =
-        Option.map
-          (fun destination ->
-            Filename.concat
-              "src/proto_alpha/lib_protocol"
-              (destination ^ "_costs_generated.ml"))
-          Bench.generated_code_destination
+      let purpose =
+        Benchmark_base.Other_purpose "No longer used to generate code"
 
       let models =
         [(Namespace.(cons name "model" |> to_string), Bench.model ~name)]

@@ -50,7 +50,7 @@ module Blake2b_bench : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose info
 
   let tags = ["example"]
 

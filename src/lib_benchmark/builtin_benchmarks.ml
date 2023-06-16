@@ -42,7 +42,11 @@ module Timer_latency_bench : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose =
+    Benchmark.Other_purpose
+      "Measuring the time spent to query the system for the current time. \
+       Indeed, it needs to be deducted from the total benchmark time of a \
+       function."
 
   let tags = ["misc"; "builtin"]
 

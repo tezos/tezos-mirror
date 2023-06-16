@@ -27,6 +27,13 @@ type group = Standalone | Group of string | Generic
 
 type 'config parameters = {bench_number : int; config : 'config}
 
+type purpose = Other_purpose of string | Generate_code of string
+
+let pp_purpose ppf t =
+  match t with
+  | Other_purpose s -> Format.fprintf ppf "Other purpose: %s" s
+  | Generate_code s -> Format.fprintf ppf "Generate code: %s" s
+
 (* The module type of benchmarks *)
 module type S = sig
   val name : Namespace.t
@@ -35,7 +42,11 @@ module type S = sig
 
   val module_filename : string
 
-  val generated_code_destination : string option
+  (** Described the purpose of the benchmark.
+      * [Generate_code of destination]: generates code at the given [destination] file.
+      * [Other_purpose of purpose]: any other purpose. The goal is to explain why the function is benchmarked since it does not produce a cost function.
+  *)
+  val purpose : purpose
 
   val tags : string list
 
@@ -62,10 +73,6 @@ let pp ppf (module Bench : S) =
   let open Bench in
   let open Format in
   let f fmt = fprintf ppf fmt in
-  let pp_option f ppf = function
-    | None -> pp_print_string ppf "None"
-    | Some x -> fprintf ppf "Some@ (@[%a@])" f x
-  in
   let pp_config fmt config =
     Data_encoding.Json.pp fmt
     @@ Data_encoding.Json.construct config_encoding config
@@ -74,10 +81,7 @@ let pp ppf (module Bench : S) =
   f "name: %a@;" Namespace.pp name ;
   f "info: %s@;" info ;
   f "module_filename: %s@;" module_filename ;
-  f
-    "generated_code_destination: %a@;"
-    (pp_option pp_print_string)
-    generated_code_destination ;
+  f "purpose: %a@;" pp_purpose purpose ;
   f
     "tags: [%a]@;"
     (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf "; ") pp_print_string)

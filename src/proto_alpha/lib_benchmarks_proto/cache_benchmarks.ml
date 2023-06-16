@@ -137,9 +137,9 @@ module Cache_update_benchmark : Benchmarks_proto.Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
-
   let group = Benchmark.Standalone
+
+  let purpose = Benchmark.Generate_code "cache_repr"
 
   (** It is expected that cache keys are non-adversarial,
       ie do not share a long common prefix. This is the case for [Script_cache],
