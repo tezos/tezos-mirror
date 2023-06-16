@@ -177,12 +177,13 @@ module Bootstrap_contract = struct
     let open Data_encoding in
     let open Parameters in
     conv
-      (fun {delegate; amount; script} -> (delegate, amount, script))
-      (fun (delegate, amount, script) -> {delegate; amount; script})
-      (obj3
+      (fun {delegate; amount; script; hash} -> (delegate, amount, script, hash))
+      (fun (delegate, amount, script, hash) -> {delegate; amount; script; hash})
+      (obj4
          (opt "delegate" Signature.Public_key_hash.encoding)
          (req "amount" Tez.encoding)
-         (req "script" Script.encoding))
+         (req "script" Script.encoding)
+         (opt "hash" Contract_hash.encoding))
 end
 
 module Protocol_parameters = struct

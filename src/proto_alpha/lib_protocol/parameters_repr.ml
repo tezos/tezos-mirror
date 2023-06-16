@@ -36,6 +36,7 @@ type bootstrap_contract = {
   delegate : Signature.Public_key_hash.t option;
   amount : Tez_repr.t;
   script : Script_repr.t;
+  hash : Contract_hash.t option;
 }
 
 type bootstrap_smart_rollup = {
@@ -210,12 +211,13 @@ let bootstrap_account_encoding =
 let bootstrap_contract_encoding =
   let open Data_encoding in
   conv
-    (fun {delegate; amount; script} -> (delegate, amount, script))
-    (fun (delegate, amount, script) -> {delegate; amount; script})
-    (obj3
+    (fun {delegate; amount; script; hash} -> (delegate, amount, script, hash))
+    (fun (delegate, amount, script, hash) -> {delegate; amount; script; hash})
+    (obj4
        (opt "delegate" Signature.Public_key_hash.encoding)
        (req "amount" Tez_repr.encoding)
-       (req "script" Script_repr.encoding))
+       (req "script" Script_repr.encoding)
+       (opt "hash" Contract_hash.encoding))
 
 let bootstrap_smart_rollup_encoding =
   let open Data_encoding in

@@ -287,7 +287,13 @@ let undelegated_originated_bootstrap_contract () =
   Context.init1
     ~bootstrap_contracts:
       [
-        Parameters.{delegate = None; amount = Tez.zero; script = Op.dummy_script};
+        Parameters.
+          {
+            delegate = None;
+            amount = Tez.zero;
+            script = Op.dummy_script;
+            hash = None;
+          };
       ]
     ()
   >>=? fun (b, _contract) ->
