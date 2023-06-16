@@ -35,24 +35,18 @@ let assert_level ~loc (blk : Block.t) expected =
   let current_level = blk.header.shell.level in
   Assert.equal_int32 ~loc current_level expected
 
-let threshold =
-  Default_parameters.constants_test.adaptive_inflation.launch_ema_threshold
-
-let assert_ema_above_threshold ~loc
-    (metadata : Protocol.Main.block_header_metadata) =
-  let ema =
-    Protocol.Alpha_context.Toggle_votes.Adaptive_inflation_launch_EMA.to_int32
-      metadata.adaptive_inflation_toggle_ema
-  in
-  Assert.lt_int32 ~loc threshold ema
-
 (* Test that the EMA of the adaptive inflation vote reaches the
-   threshold after exactly 187259 blocks, which is consistent with the
-   result of the unit test for this EMA in
-   ../unit/test_adaptive_inflation_ema.ml
-*)
-let test_ema_reaches_threshold () =
+   threshold after the expected duration. *)
+let test_ema_reaches_threshold threshold expected_vote_duration () =
   let open Lwt_result_syntax in
+  let assert_ema_above_threshold ~loc
+      (metadata : Protocol.Main.block_header_metadata) =
+    let ema =
+      Protocol.Alpha_context.Toggle_votes.Adaptive_inflation_launch_EMA.to_int32
+        metadata.adaptive_inflation_toggle_ema
+    in
+    Assert.lt_int32 ~loc threshold ema
+  in
   let* block, _contract =
     let default_constants = Default_parameters.constants_test in
     let adaptive_inflation =
@@ -77,12 +71,14 @@ let test_ema_reaches_threshold () =
         Compare.Int32.(ema < threshold))
       block
   in
-  let* () = assert_level ~loc:__LOC__ block 187258l in
+  let* () =
+    assert_level ~loc:__LOC__ block (Int32.pred expected_vote_duration)
+  in
   let* block, metadata =
     Block.bake_n_with_metadata ~adaptive_inflation_vote:Toggle_vote_on 1 block
   in
   let* () = assert_ema_above_threshold ~loc:__LOC__ metadata in
-  let* () = assert_level ~loc:__LOC__ block 187259l in
+  let* () = assert_level ~loc:__LOC__ block expected_vote_duration in
   return_unit
 
 let tests =
@@ -90,7 +86,13 @@ let tests =
     Tztest.tztest
       "the EMA reaches the vote threshold at the expected level"
       `Slow
-      test_ema_reaches_threshold;
+      (test_ema_reaches_threshold
+         Default_parameters.constants_test.adaptive_inflation
+           .launch_ema_threshold
+         187259l
+         (* This vote duration is consistent with the result of the
+            unit test for this EMA in
+            ../unit/test_adaptive_inflation_ema.ml*));
   ]
 
 let () =
