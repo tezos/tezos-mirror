@@ -575,8 +575,7 @@ end) : Internal_event.SINK with type t = t = struct
         match format with
         | `Pp_RFC5424 -> make_with_pp_rfc5424 M.pp wrapped_event M.name
         | `Pp_short -> make_with_pp_short M.pp wrapped_event
-        | `One_per_line ->
-            Data_encoding.Json.to_string ~newline:true ~minify:true (json ())
+        | `One_per_line -> Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
         | `Netstring ->
             let bytes = Ezjsonm.value_to_string ~minify:true (json ()) in
             Format.asprintf "%d:%s," (String.length bytes) bytes
