@@ -28,9 +28,7 @@ open Benchmarks_shell
 open Encoding_benchmarks_helpers.Make (struct
   let file = __FILE__
 
-  let purpose =
-    Benchmark.Generate_code
-      "src/proto_alpha/lib_protocol/michelson_v1_gas_costs_generated.ml"
+  let purpose = Benchmark.Generate_code "michelson_v1_gas"
 end)
 (* ------------------------------------------------------------------------- *)
 

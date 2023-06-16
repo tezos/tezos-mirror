@@ -29,9 +29,7 @@ module Encodings =
 Tezos_shell_benchmarks.Encoding_benchmarks_helpers.Make (struct
   let file = __FILE__
 
-  let purpose =
-    Benchmark.Generate_code
-      "src/proto_alpha/lib_protocol/michelson_v1_gas_costs_generated.ml"
+  let purpose = Benchmark.Generate_code "michelson_v1_gas"
 end)
 
 module Size = Gas_input_size
@@ -141,9 +139,7 @@ module Encoding_micheline : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let purpose =
-    Benchmark.Generate_code
-      "src/proto_alpha/lib_protocol/script_repr_costs_generated.ml"
+  let purpose = Benchmark.Generate_code "script_repr"
 
   let micheline_serialization_trace (micheline_node : Alpha_context.Script.node)
       =
@@ -213,9 +209,7 @@ module Decoding_micheline : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let purpose =
-    Benchmark.Generate_code
-      "src/proto_alpha/lib_protocol/script_repr_costs_generated.ml"
+  let purpose = Benchmark.Generate_code "script_repr"
 
   let micheline_deserialization_trace (micheline_str : string) =
     match

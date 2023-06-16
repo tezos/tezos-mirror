@@ -75,9 +75,7 @@ module Value_size_benchmark : Tezos_benchmark.Benchmark.S = struct
 
   let info = "Benchmarking Script_typed_ir_size.value_size"
 
-  let purpose =
-    Benchmark.Generate_code
-      "src/proto_alpha/lib_protocol/script_typed_ir_size_costs_generated.ml"
+  let purpose = Benchmark.Generate_code "script_typed_ir_size"
 
   let module_filename = __FILE__
 
@@ -195,9 +193,7 @@ module Kinstr_size_benchmark : Tezos_benchmark.Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let purpose =
-    Benchmark.Generate_code
-      "src/proto_alpha/lib_protocol/script_typed_ir_size_costs_generated.ml"
+  let purpose = Benchmark.Generate_code "script_typed_ir_size"
 
   let kinstr_size_benchmark rng_state (expr : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =

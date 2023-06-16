@@ -74,15 +74,6 @@ module Registration = struct
     let module B : Benchmark_base.S = struct
       include Bench
 
-      let purpose =
-        match Bench.purpose with
-        | Generate_code s ->
-            Benchmark.Generate_code
-              (Filename.concat
-                 "src/proto_alpha/lib_protocol"
-                 (s ^ "_costs_generated.ml"))
-        | Other_purpose _ as x -> x
-
       let models =
         [
           ( (match Bench.group with
