@@ -3,11 +3,6 @@ ifndef CI_PROJECT_DIR
 	$(error This Makefile must be called from a Gitlab runner)
 endif
 
-.PHONY: doc-publish
-doc-publish:
-	cd ${CI_PROJECT_DIR} && \
-		./scripts/ci/doc_publish.sh
-
 .PHONY: doc-linkcheck
 doc-linkcheck:
 	cd ${CI_PROJECT_DIR} && \
