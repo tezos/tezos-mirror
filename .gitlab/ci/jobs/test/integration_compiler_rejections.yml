@@ -5,4 +5,4 @@
 integration:compiler-rejections:
   extends: .test_template
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci integration-test-compiler-rejections
+    - dune build @runtest_rejections

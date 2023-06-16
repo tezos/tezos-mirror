@@ -8,11 +8,6 @@ last_proto_version := $(shell echo ${last_proto_name} | cut -d'_' -f2 | sed 's/^
 new_proto_version_int:=$(shell echo $$(($(last_proto_version)+1)))
 new_proto_version := $(shell if [ "${new_proto_version_int}" -lt "100" ]; then echo 0${new_proto_version_int}; else echo ${new_proto_version_int}; fi)
 
-.PHONY: integration-test-compiler-rejections
-integration-test-compiler-rejections:
-	cd ${CI_PROJECT_DIR} && \
-		dune build @runtest_rejections
-
 .PHONY: integration-test-snapshot-alpha-and-link
 integration-test-snapshot-alpha-and-link: gitlab-take-ownership
 	cd ${CI_PROJECT_DIR} && \
