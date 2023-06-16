@@ -3,22 +3,6 @@ ifndef CI_PROJECT_DIR
 	$(error This Makefile must be called from a Gitlab runner)
 endif
 
-last_proto_name := $(shell find ${CI_PROJECT_DIR}/src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $$NF}' | sort -r | head -1)
-last_proto_version := $(shell echo ${last_proto_name} | cut -d'_' -f2 | sed 's/^0*//')
-new_proto_version_int:=$(shell echo $$(($(last_proto_version)+1)))
-new_proto_version := $(shell if [ "${new_proto_version_int}" -lt "100" ]; then echo 0${new_proto_version_int}; else echo ${new_proto_version_int}; fi)
-
-.PHONY: integration-test-snapshot-alpha-and-link
-integration-test-snapshot-alpha-and-link: gitlab-take-ownership
-	cd ${CI_PROJECT_DIR} && \
-		$(MAKE) octez-protocol-compiler && \
-		./scripts/snapshot_alpha_and_link.sh "${new_proto_version}" next && \
-	        ./scripts/remove-old-protocols.sh && \
-		$(MAKE) && \
-		dune build src/proto_"${new_proto_version}"_*/ && \
-		./scripts/user_activated_upgrade.sh src/proto_"${new_proto_version}"_*/ 1 && \
-		dune build src/lib_node_config # `user_activated_upgrade.sh` only modifies `lib_node_config`
-
 .PHONY: integration-test-liquidity-baking-scripts
 integration-test-liquidity-baking-scripts:
 	cd ${CI_PROJECT_DIR} && \
