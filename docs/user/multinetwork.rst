@@ -130,7 +130,7 @@ Here is an example configuration file for Mainnet::
           "replacement_protocol": "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
         }
       ],
-      "default_bootstrap_peers": [ "boot.tzbeta.net" ]
+      "default_bootstrap_peers": ["boot.tzinit.org"; "boot.tzboot.net"; "boot.tzbeta.net"; "boot.mainnet.oxheadhosted.com"]
     }
   }
 
