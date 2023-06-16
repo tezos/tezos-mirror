@@ -83,7 +83,7 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
 
   let info = "Compare cost for Ticket_hash"
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let module_filename = __FILE__
 
@@ -145,7 +145,7 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let compare_model =
     Model.make
@@ -212,7 +212,7 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let make_bench_helper rng_state config () =
     let open Result_syntax in
@@ -279,7 +279,7 @@ module Collect_tickets_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let make_bench_helper rng_state config () =
     let open Script_typed_ir in

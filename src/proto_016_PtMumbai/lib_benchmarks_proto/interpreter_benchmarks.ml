@@ -262,7 +262,7 @@ let make_benchmark :
 
     let module_filename = __FILE__
 
-    let generated_code_destination = None
+    let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
     let models =
       (* [intercept = true] implies there's a benchmark with [intercept = false].
@@ -547,7 +547,7 @@ let make_continuation_benchmark :
 
     let module_filename = __FILE__
 
-    let generated_code_destination = None
+    let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
     let tags = tags @ more_tags
 
@@ -656,7 +656,7 @@ module Registration_section = struct
 
       let module_filename = __FILE__
 
-      let generated_code_destination = None
+      let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
       let tags = [Tags.interpreter]
 
@@ -2709,7 +2709,7 @@ module Registration_section = struct
 
         let module_filename = __FILE__
 
-        let generated_code_destination = None
+        let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
         include Default_config
         include Default_boilerplate

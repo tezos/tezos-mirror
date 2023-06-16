@@ -147,7 +147,7 @@ module List_key_values_benchmark_boilerplate = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let config_encoding =
     let open Data_encoding in

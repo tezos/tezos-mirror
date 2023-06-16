@@ -88,7 +88,7 @@ module Fold_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let fold_model =
     Model.make
@@ -176,7 +176,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let module_filename = __FILE__
 
-    let generated_code_destination = None
+    let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
     let models =
       [
@@ -216,7 +216,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let module_filename = __FILE__
 
-    let generated_code_destination = None
+    let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
     (**
        Given the cost of comparing keys, the model is used for deducing [intercept]
@@ -320,7 +320,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let module_filename = __FILE__
 
-    let generated_code_destination = None
+    let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
     let models =
       [
