@@ -292,3 +292,9 @@ let insert_received_block =
     "INSERT INTO blocks_reception (timestamp, block, source) SELECT ?, \
      blocks.id, nodes.id FROM blocks,nodes WHERE blocks.hash = ? AND \
      nodes.name = ? ON CONFLICT DO NOTHING"
+
+let insert_validated_block =
+  Caqti_request.Infix.(Caqti_type.(tup3 ptime Type.block_hash string ->. unit))
+    "INSERT INTO blocks_application (timestamp, block, source) SELECT ?, \
+     blocks.id, nodes.id FROM blocks,nodes WHERE blocks.hash = ? AND \
+     nodes.name = ? ON CONFLICT DO NOTHING"

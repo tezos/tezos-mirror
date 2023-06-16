@@ -92,3 +92,9 @@ val insert_received_block :
     unit,
     [`Zero] )
   Caqti_request.t
+
+val insert_validated_block :
+  ( Ptime.t * Tezos_crypto.Hashed.Block_hash.t * string,
+    unit,
+    [`Zero] )
+  Caqti_request.t
