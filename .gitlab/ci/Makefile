@@ -3,13 +3,6 @@ ifndef CI_PROJECT_DIR
 	$(error This Makefile must be called from a Gitlab runner)
 endif
 
-.PHONY: doc-linkcheck
-doc-linkcheck:
-	cd ${CI_PROJECT_DIR} && \
-		make all && \
-		make -C docs redirectcheck && \
-		make -C docs linkcheck
-
 .PHONY: opam-release
 opam-release:
 	cd ${CI_PROJECT_DIR} && \
