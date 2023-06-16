@@ -881,6 +881,23 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       module Preapply = struct
         let path = Tezos_rpc.Path.(path / "preapply")
 
+        let preapply_operation_encoding =
+          union
+            [
+              case
+                ~title:"operation_data_encoding"
+                (Tag 0)
+                next_operation_encoding
+                Option.some
+                Fun.id;
+              case
+                ~title:"operation_data_encoding_with_legacy_attestation_name"
+                Json_only
+                next_operation_encoding_with_legacy_attestation_name
+                Option.some
+                Fun.id;
+            ]
+
         let block_result_encoding =
           obj2
             (req "shell_header" Block_header.shell_header_encoding)
@@ -908,10 +925,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                         (dynamic_size Next_proto.block_header_data_encoding))))
                (req
                   "operations"
-                  (list
-                     (dynamic_size
-                        (list
-                           next_operation_encoding_with_legacy_attestation_name)))))
+                  (list (dynamic_size (list preapply_operation_encoding)))))
 
         let block_query =
           let open Tezos_rpc.Query in
@@ -935,19 +949,58 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             ~output:block_result_encoding
             Tezos_rpc.Path.(path / "block")
 
+        let default_preapply_operations_version = Version_0
+
+        let preapply_supported_versions = [Version_0; Version_1]
+
+        let operations_query =
+          let open Tezos_rpc.Query in
+          query (fun version ->
+              object
+                method version = version
+              end)
+          |+ field
+               "version"
+               (version_arg preapply_supported_versions)
+               default_preapply_operations_version
+               (fun t -> t#version)
+          |> seal
+
+        let preapplied_operations_encoding =
+          union
+            [
+              case
+                ~title:"preapplied_operations_encoding"
+                (Tag 1)
+                (list
+                   (dynamic_size Next_proto.operation_data_and_receipt_encoding))
+                (function
+                  | Version_1, preapply_operations -> Some preapply_operations
+                  | (Version_0 | Version_2), _ -> None)
+                (fun preapply_operations -> (Version_1, preapply_operations));
+              case
+                ~title:
+                  "preapplied_operations_encoding_with_legacy_attestation_name"
+                (Tag 0)
+                (list
+                   (dynamic_size
+                      Next_proto
+                      .operation_data_and_receipt_encoding_with_legacy_attestation_name))
+                (function
+                  | Version_0, preapply_operations -> Some preapply_operations
+                  | (Version_1 | Version_2), _ -> None)
+                (fun preapply_operations -> (Version_0, preapply_operations));
+            ]
+
         let operations =
           Tezos_rpc.Service.post_service
             ~description:
               "Simulate the application of the operations with the context of \
                the given block and return the result of each operation \
                application."
-            ~query:Tezos_rpc.Query.empty
-            ~input:(list next_operation_encoding_with_legacy_attestation_name)
-            ~output:
-              (list
-                 (dynamic_size
-                    Next_proto
-                    .operation_data_and_receipt_encoding_with_legacy_attestation_name))
+            ~query:operations_query
+            ~input:(list preapply_operation_encoding)
+            ~output:preapplied_operations_encoding
             Tezos_rpc.Path.(path / "operations")
       end
 
@@ -1312,7 +1365,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         union
           [
             case
-              ~title:"new_encoding_pending_operations_with_attestation"
+              ~title:"pending_operations_encoding"
               (Tag 2)
               version_2_encoding
               (function
@@ -1320,7 +1373,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                 | (Version_0 | Version_1), _ -> None)
               (fun pending_operations -> (Version_2, pending_operations));
             case
-              ~title:"new_encoding_pending_operations"
+              ~title:"pending_operations_encoding_with_legacy_attestation_name"
               (Tag 1)
               version_1_encoding
               (function
@@ -1468,7 +1521,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         union
           [
             case
-              ~title:"monitor_operations_with_attestation"
+              ~title:"monitor_operations_encoding"
               (Tag 1)
               (list (monitor_operations_encoding ~use_legacy_name:false))
               (function
@@ -1483,7 +1536,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                     None)
               (fun monitor_operations -> (Version_1, monitor_operations));
             case
-              ~title:"old_encoding_monitor_operations"
+              ~title:"monitor_operations_encoding_with_legacy_attestation_name"
               (Tag 0)
               (list (monitor_operations_encoding ~use_legacy_name:true))
               (function
@@ -1765,10 +1818,21 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             end)
             {protocol_data; operations}
 
-      let operations ctxt =
-        let f = make_call0 S.operations ctxt in
-        fun ?(chain = `Main) ?(block = `Head 0) operations ->
-          f chain block () operations
+      let operations ctxt ?(chain = `Main) ?(block = `Head 0)
+          ?(version = S.default_preapply_operations_version) operations =
+        let open Lwt_result_syntax in
+        let* (Version_0 | Version_1 | Version_2), preapply_operations =
+          make_call0
+            S.operations
+            ctxt
+            chain
+            block
+            (object
+               method version = version
+            end)
+            operations
+        in
+        return preapply_operations
     end
 
     let complete ctxt =

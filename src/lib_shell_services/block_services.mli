@@ -385,6 +385,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         #simple ->
         ?chain:chain ->
         ?block:block ->
+        ?version:version ->
         Next_proto.operation list ->
         (Next_proto.operation_data * Next_proto.operation_receipt) list tzresult
         Lwt.t
@@ -701,9 +702,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           ( [`POST],
             prefix,
             prefix,
-            unit,
+            < version : version >,
             Next_proto.operation list,
-            (Next_proto.operation_data * Next_proto.operation_receipt) list )
+            version
+            * (Next_proto.operation_data * Next_proto.operation_receipt) list
+          )
           Tezos_rpc.Service.t
       end
 

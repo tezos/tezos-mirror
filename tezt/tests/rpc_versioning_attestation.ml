@@ -75,20 +75,45 @@ let check_kind json kind =
   if not (String.equal json_kind kind) then
     Test.fail ~__LOC__ "Operation should have %s kind, got: %s" kind json_kind
 
-let use_legacy_name_from_version = function `Old -> true | `New -> false
+let check_version ~version ~use_legacy_name ~check ~rpc ~get_name ~data client =
+  let* t = RPC.Client.call client @@ rpc ~version data in
+  return (check t (get_name use_legacy_name))
 
-let check_version ~version ~check ~rpc ~name ~data client =
-  let* t =
-    RPC.Client.call client
-    @@ rpc ~version:(match version with `Old -> "0" | `New -> "1") data
-  in
-  return (check t name)
-
-let check_unknown_version ~rpc ~data client =
-  let version = "2" in
+let check_unknown_version ~version ~rpc ~data client =
   let*? p = RPC.Client.spawn client @@ rpc ~version data in
   let msg = rex "Failed to parse argument 'version'" in
   Process.check_error ~msg p
+
+let check_rpc_versions ?(old = "0") ?(new_ = "1") ?(unknown = "2") ~check ~rpc
+    ~get_name ~data client =
+  Log.info
+    "Call the rpc with the old version and check that the operations returned \
+     contain endorsement kinds" ;
+  let* () =
+    check_version
+      ~version:old
+      ~use_legacy_name:true
+      ~check
+      ~rpc
+      ~get_name
+      ~data
+      client
+  in
+  Log.info
+    "Call the rpc with the new version and check that the operations returned \
+     contain attestation kinds" ;
+  let* () =
+    check_version
+      ~version:new_
+      ~use_legacy_name:false
+      ~check
+      ~rpc
+      ~get_name
+      ~data
+      client
+  in
+  Log.info "Call the rpc with an unknown version and check that the call fails" ;
+  check_unknown_version ~version:unknown ~rpc ~data client
 
 let create_consensus_op ?slot ?level ?round ?block_payload_hash ~use_legacy_name
     ~signer ~kind client =
@@ -377,24 +402,12 @@ module Parse = struct
     in
     let* raw = create_raw_op ~protocol consensus_op client in
 
-    let check_version ~version =
-      let name =
-        Operation.Consensus.kind_to_string
-          kind
-          (use_legacy_name_from_version version)
-      in
-      check_version
-        ~version
-        ~check:check_parsed_kind
-        ~rpc
-        ~name
-        ~data:raw
-        client
-    in
-
-    let* () = check_version ~version:`Old in
-    let* () = check_version ~version:`New in
-    check_unknown_version ~rpc ~data:raw client
+    check_rpc_versions
+      ~check:check_parsed_kind
+      ~rpc
+      ~get_name:(Operation.Consensus.kind_to_string kind)
+      ~data:raw
+      client
 
   let test_parse_consensus =
     register_test
@@ -423,24 +436,12 @@ module Parse = struct
     in
     let* raw = create_raw_double_consensus_evidence () in
 
-    let check_version ~version =
-      let name =
-        Operation.Anonymous.kind_to_string
-          double_evidence_kind
-          (use_legacy_name_from_version version)
-      in
-      check_version
-        ~version
-        ~check:check_parsed_kind
-        ~rpc
-        ~name
-        ~data:raw
-        client
-    in
-
-    let* () = check_version ~version:`Old in
-    let* () = check_version ~version:`New in
-    check_unknown_version ~rpc ~data:raw client
+    check_rpc_versions
+      ~check:check_parsed_kind
+      ~rpc
+      ~get_name:(Operation.Anonymous.kind_to_string double_evidence_kind)
+      ~data:raw
+      client
 
   let test_parse_double_consensus_evidence =
     register_test
@@ -470,6 +471,8 @@ module Parse = struct
 end
 
 module Mempool = struct
+  let rpc ~version () = RPC.get_chain_mempool_pending_operations ~version ()
+
   let test_pending_operations_consensus kind protocol =
     let* _node, client = Client.init_with_protocol ~protocol `Client () in
     let signer = Constant.bootstrap1 in
@@ -481,20 +484,19 @@ module Mempool = struct
       Operation.inject ~force:true ~request:`Inject consensus_op client
     in
 
-    let check_mempool ~use_legacy_name =
-      let* mempool_json =
-        RPC.Client.call client
-        @@ RPC.get_chain_mempool_pending_operations
-             ~version:(if use_legacy_name then "1" else "2")
-             ()
-      in
-      return
-        (check_kind
-           JSON.(mempool_json |-> "refused" |> as_list |> List.hd)
-           (Operation.Consensus.kind_to_string kind use_legacy_name))
+    let check json =
+      check_kind JSON.(json |-> "refused" |> as_list |> List.hd)
     in
-    let* () = check_mempool ~use_legacy_name:true in
-    check_mempool ~use_legacy_name:false
+    let get_name = Operation.Consensus.kind_to_string kind in
+    check_rpc_versions
+      ~old:"1"
+      ~new_:"2"
+      ~unknown:"3"
+      ~check
+      ~rpc
+      ~get_name
+      ~data:()
+      client
 
   let test_pending_consensus =
     register_test
@@ -525,22 +527,19 @@ module Mempool = struct
       Operation.inject ~force:true ~request:`Inject consensus_op client
     in
 
-    let check_mempool ~use_legacy_name =
-      let* mempool_json =
-        RPC.Client.call client
-        @@ RPC.get_chain_mempool_pending_operations
-             ~version:(if use_legacy_name then "1" else "2")
-             ()
-      in
-      return
-        (check_kind
-           JSON.(mempool_json |-> "applied" |> as_list |> List.hd)
-           (Operation.Anonymous.kind_to_string
-              double_evidence_kind
-              use_legacy_name))
+    let check json =
+      check_kind JSON.(json |-> "applied" |> as_list |> List.hd)
     in
-    let* () = check_mempool ~use_legacy_name:true in
-    check_mempool ~use_legacy_name:false
+    let get_name = Operation.Anonymous.kind_to_string double_evidence_kind in
+    check_rpc_versions
+      ~old:"1"
+      ~new_:"2"
+      ~unknown:"3"
+      ~check
+      ~rpc
+      ~get_name
+      ~data:()
+      client
 
   let test_pending_double_consensus_evidence =
     register_test
@@ -818,17 +817,12 @@ module Run_Simulate = struct
       let* op_json = Operation.make_run_operation_input consensus_op client in
 
       let rpc ~version data = get_rpc rpc ~version data in
-      let check_version ~version =
-        let name =
-          Operation.Anonymous.kind_to_string
-            double_evidence_kind
-            (use_legacy_name_from_version version)
-        in
-        check_version ~version ~check:check_kind ~name ~rpc ~data:op_json client
-      in
-      let* () = check_version ~version:`Old in
-      let* () = check_version ~version:`New in
-      check_unknown_version ~rpc ~data:op_json client
+      check_rpc_versions
+        ~check:check_kind
+        ~rpc
+        ~get_name:(Operation.Anonymous.kind_to_string double_evidence_kind)
+        ~data:op_json
+        client
     in
     let* () = call_and_check_versions ~use_legacy_name_in_input:true in
     call_and_check_versions ~use_legacy_name_in_input:false
@@ -884,8 +878,111 @@ module Run_Simulate = struct
     test_simulate_operation_double_preconsensus_evidence protocols
 end
 
+module Preapply = struct
+  let rpc ~version data =
+    RPC.post_chain_block_helpers_preapply_operations
+      ~data:(Data (`A [data]))
+      ~version
+      ()
+
+  let test_consensus kind protocol =
+    let* node, client = Client.init_with_protocol ~protocol `Client () in
+    let* () = Client.bake_for_and_wait ~node client in
+    let signer = Constant.bootstrap1 in
+    let* level, slots, block_payload_hash =
+      get_consensus_info signer.public_key_hash client
+    in
+
+    let preapply_op ~use_legacy_name =
+      let* consensus_op =
+        create_consensus_op
+          ~level
+          ~slot:(List.hd slots)
+          ~block_payload_hash
+          ~use_legacy_name
+          ~signer
+          ~kind
+          client
+      in
+      let* signature = Operation.sign consensus_op client in
+      let consensus_json =
+        Operation.make_preapply_operation_input
+          ~protocol
+          ~signature
+          consensus_op
+      in
+      let get_name = Operation.Consensus.kind_to_string kind in
+      let check json = check_kind JSON.(json |> as_list |> List.hd) in
+      check_rpc_versions ~check ~rpc ~get_name ~data:consensus_json client
+    in
+    let* () = preapply_op ~use_legacy_name:true in
+    preapply_op ~use_legacy_name:false
+
+  let test_preapply_consensus =
+    register_test
+      ~title:"Preapply operation with consensus operations"
+      ~additionnal_tags:["preapply"; "operations"; "consensus"]
+    @@ fun protocol -> test_consensus Operation.Attestation protocol
+
+  let test_preapply_preconsensus =
+    register_test
+      ~title:"Preapply operation with preconsensus operations"
+      ~additionnal_tags:["preapply"; "operations"; "pre"; "consensus"]
+    @@ fun protocol -> test_consensus Operation.Preattestation protocol
+
+  let test_double_consensus_evidence double_evidence_kind protocol =
+    let* node, client = Client.init_with_protocol ~protocol `Client () in
+    let* () = Client.bake_for_and_wait ~node client in
+
+    let preapply_op ~use_legacy_name =
+      let* double_consensus_evidence_op =
+        create_double_consensus_evidence
+          ~use_legacy_name
+          ~double_evidence_kind
+          client
+      in
+      let* signature = Operation.sign double_consensus_evidence_op client in
+      let consensus_json =
+        Operation.make_preapply_operation_input
+          ~protocol
+          ~signature
+          double_consensus_evidence_op
+      in
+      let get_name = Operation.Anonymous.kind_to_string double_evidence_kind in
+      let check json = check_kind JSON.(json |> as_list |> List.hd) in
+      check_rpc_versions ~check ~rpc ~get_name ~data:consensus_json client
+    in
+    let* () = preapply_op ~use_legacy_name:true in
+    preapply_op ~use_legacy_name:false
+
+  let test_preapply_double_consensus_evidence =
+    register_test
+      ~title:"Preapply operation with double consensus evidence operations"
+      ~additionnal_tags:["preapply"; "double"; "operations"; "consensus"]
+    @@ fun protocol ->
+    test_double_consensus_evidence
+      Operation.Anonymous.Double_attestation_evidence
+      protocol
+
+  let test_preapply_double_preconsensus_evidence =
+    register_test
+      ~title:"Preapply operation with duoble preconsensus evidence operations"
+      ~additionnal_tags:["preapply"; "double"; "operations"; "pre"; "consensus"]
+    @@ fun protocol ->
+    test_double_consensus_evidence
+      Operation.Anonymous.Double_preattestation_evidence
+      protocol
+
+  let register ~protocols =
+    test_preapply_consensus protocols ;
+    test_preapply_preconsensus protocols ;
+    test_preapply_double_consensus_evidence protocols ;
+    test_preapply_double_preconsensus_evidence protocols
+end
+
 let register ~protocols =
   Forge.register ~protocols ;
   Parse.register ~protocols ;
   Mempool.register ~protocols ;
-  Run_Simulate.register ~protocols
+  Run_Simulate.register ~protocols ;
+  Preapply.register ~protocols
