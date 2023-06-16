@@ -8,11 +8,6 @@ last_proto_version := $(shell echo ${last_proto_name} | cut -d'_' -f2 | sed 's/^
 new_proto_version_int:=$(shell echo $$(($(last_proto_version)+1)))
 new_proto_version := $(shell if [ "${new_proto_version_int}" -lt "100" ]; then echo 0${new_proto_version_int}; else echo ${new_proto_version_int}; fi)
 
-.PHONY: test-tezt-build-long
-test-tezt-build-long:
-	cd ${CI_PROJECT_DIR} && \
-		dune build @tezt/long_tests/check
-
 .PHONY: test-tezt-fetch-records
 test-tezt-fetch-records:
 	cd ${CI_PROJECT_DIR} && \

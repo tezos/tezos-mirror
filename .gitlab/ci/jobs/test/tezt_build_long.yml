@@ -5,4 +5,4 @@ tezt:build-long:
     - .build_template
   stage: test
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-tezt-build-long
+    - dune build @tezt/long_tests/check
