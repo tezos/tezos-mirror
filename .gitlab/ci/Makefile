@@ -3,11 +3,6 @@ ifndef CI_PROJECT_DIR
 	$(error This Makefile must be called from a Gitlab runner)
 endif
 
-.PHONY: opam-release
-opam-release:
-	cd ${CI_PROJECT_DIR} && \
-		./scripts/ci/opam-release.sh
-
 .PHONY: gitlab-release
 gitlab-release:
 	cd ${CI_PROJECT_DIR} && \
