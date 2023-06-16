@@ -3,12 +3,6 @@ ifndef CI_PROJECT_DIR
 	$(error This Makefile must be called from a Gitlab runner)
 endif
 
-.PHONY: check-scripts-b58-prefix
-check-scripts-b58-prefix:
-	cd ${CI_PROJECT_DIR} && \
-		poetry run pylint scripts/b58_prefix/b58_prefix.py --disable=missing-docstring --disable=invalid-name && \
-		poetry run pytest scripts/b58_prefix/test_b58_prefix.py -v
-
 .PHONY: build-static-binaries
 build-static-binaries: gitlab-take-ownership
 	cd ${CI_PROJECT_DIR} && \
