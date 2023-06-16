@@ -58,10 +58,7 @@ val start_simulation :
     simulation state, the remaining fuel (when [?fuel] is provided) and the
     number of ticks that happened. *)
 val simulate_messages :
-  Node_context.ro ->
-  t ->
-  Sc_rollup.Inbox_message.serialized list ->
-  (t * Z.t) tzresult Lwt.t
+  Node_context.ro -> t -> string list -> (t * Z.t) tzresult Lwt.t
 
 (** [end_simulation node_ctxt sim] adds and [End_of_level] message and marks the
     simulation as ended. *)

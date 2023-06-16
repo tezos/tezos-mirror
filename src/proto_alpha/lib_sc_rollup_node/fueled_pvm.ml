@@ -46,7 +46,7 @@ module type S = sig
             messages of the inbox already evaluated.  *)
     remaining_fuel : fuel;
         (** Fuel remaining for the evaluation of the inbox. *)
-    remaining_messages : Sc_rollup.Inbox_message.serialized list;
+    remaining_messages : string list;
         (** Messages of the inbox that remain to be evaluated.  *)
   }
 
@@ -61,7 +61,7 @@ module type S = sig
   val eval_block_inbox :
     fuel:fuel ->
     _ Node_context.t ->
-    Sc_rollup.Inbox.t * Sc_rollup.Inbox_message.serialized list ->
+    Sc_rollup.Inbox.t * string list ->
     pvm_state ->
     eval_result Node_context.delayed_write tzresult Lwt.t
 
@@ -93,7 +93,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
     inbox_level : Raw_level.t;
     message_counter_offset : int;
     remaining_fuel : fuel;
-    remaining_messages : Sc_rollup.Inbox_message.serialized list;
+    remaining_messages : string list;
   }
 
   type eval_result = {state : eval_state; num_ticks : Z.t; num_messages : int}
@@ -391,10 +391,9 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
           (* Consumed all fuel *)
           return (state, fuel, message_index - message_counter_offset, messages)
       | message :: messages -> (
+          let payload = Sc_rollup.Inbox_message.unsafe_of_string message in
           let message_counter = Z.of_int message_index in
-          let input =
-            Sc_rollup.{inbox_level; message_counter; payload = message}
-          in
+          let input = Sc_rollup.{inbox_level; message_counter; payload} in
           let failing_ticks =
             Loser_mode.is_failure
               node_ctxt.Node_context.loser_mode

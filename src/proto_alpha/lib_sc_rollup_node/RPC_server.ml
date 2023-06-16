@@ -365,9 +365,6 @@ let () =
 let () =
   Block_directory.register0 Sc_rollup_services.Global.Block.simulate
   @@ fun (node_ctxt, block) () {messages; reveal_pages; insight_requests} ->
-  let messages =
-    List.map Alpha_context.Sc_rollup.Inbox_message.unsafe_of_string messages
-  in
   simulate_messages node_ctxt block ~reveal_pages ~insight_requests messages
 
 let () =

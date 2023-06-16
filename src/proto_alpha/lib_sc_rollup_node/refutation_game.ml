@@ -262,6 +262,11 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
         let* {is_first_block; predecessor; predecessor_timestamp; messages} =
           Node_context.get_messages node_ctxt witness
         in
+        let*? messages =
+          (List.map_e Sc_rollup.Inbox_message.serialize messages
+           |> Environment.wrap_tzresult
+            :> string list tzresult)
+        in
         let*? hist =
           Inbox.payloads_history_of_messages
             ~is_first_block

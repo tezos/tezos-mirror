@@ -141,21 +141,16 @@ let transition_pvm node_ctxt ctxt predecessor Layer1.{hash = _; _}
 (** [process_head node_ctxt ctxt ~predecessor head] runs the PVM for the given
     head. *)
 let process_head (node_ctxt : _ Node_context.t) ctxt
-    ~(predecessor : Layer1.header) (head : Layer1.header) (inbox, inbox_messages)
-    =
+    ~(predecessor : Layer1.header) (head : Layer1.header) inbox_and_messages =
   let open Lwt_result_syntax in
   let first_inbox_level = node_ctxt.genesis_info.level |> Int32.succ in
   if head.Layer1.level >= first_inbox_level then
-    let*? inbox_messages =
-      List.map_e Sc_rollup.Inbox_message.serialize inbox_messages
-      |> Environment.wrap_tzresult
-    in
     transition_pvm
       node_ctxt
       ctxt
       (Layer1.head_of_header predecessor)
       (Layer1.head_of_header head)
-      (inbox, inbox_messages)
+      inbox_and_messages
   else if head.Layer1.level = node_ctxt.genesis_info.level then
     let* ctxt, state = genesis_state head.hash node_ctxt ctxt in
     let*! ctxt = Context.PVMState.set ctxt state in
@@ -192,20 +187,22 @@ let start_state_of_block node_ctxt (block : Sc_rollup_block.t) =
   let module PVM = (val node_ctxt.pvm) in
   let*! tick = PVM.get_tick state in
   let*! state_hash = PVM.state_hash state in
+  let*? messages =
+    (List.map_e Sc_rollup.Inbox_message.serialize messages
+     |> Environment.wrap_tzresult
+      :> string list tzresult)
+  in
   let messages =
-    let open Sc_rollup.Inbox_message in
-    Internal Start_of_level
+    let open Sc_rollup_inbox_message_repr in
+    unsafe_to_string start_of_level_serialized
     ::
     (if is_first_block then
-     [Internal Sc_rollup.Inbox_message.protocol_migration_internal_message]
+     [unsafe_to_string Raw_context.protocol_migration_serialized_message]
     else [])
-    @ Internal (Info_per_level {predecessor; predecessor_timestamp})
+    @ unsafe_to_string
+        (info_per_level_serialized ~predecessor ~predecessor_timestamp)
       :: messages
-    @ [Internal End_of_level]
-  in
-  let*? messages =
-    List.map_e Sc_rollup.Inbox_message.serialize messages
-    |> Environment.wrap_tzresult
+    @ [unsafe_to_string end_of_level_serialized]
   in
   return
     Fueled_pvm.Accounted.

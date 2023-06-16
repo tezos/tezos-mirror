@@ -47,7 +47,7 @@ val process_head :
   (Sc_rollup.Inbox.Hash.t
   * Sc_rollup.Inbox.t
   * Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
-  * Sc_rollup.Inbox_message.t list)
+  * string list)
   tzresult
   Lwt.t
 
@@ -79,7 +79,7 @@ val payloads_history_of_messages :
   is_first_block:bool ->
   predecessor:Block_hash.t ->
   predecessor_timestamp:Timestamp.time ->
-  Sc_rollup.Inbox_message.t list ->
+  string list ->
   Sc_rollup.Inbox_merkelized_payload_hashes.History.t tzresult
 
 (** [same_as_layer_1 node_ctxt block node_inbox] ensures that the rollup
@@ -98,11 +98,11 @@ module Internal_for_tests : sig
     is_first_block:bool ->
     predecessor:Layer1.header ->
     Layer1.header ->
-    Sc_rollup.Inbox_message.t list ->
+    string list ->
     (Sc_rollup.Inbox.Hash.t
     * Sc_rollup.Inbox.t
     * Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
-    * Sc_rollup.Inbox_message.t list)
+    * string list)
     tzresult
     Lwt.t
 end

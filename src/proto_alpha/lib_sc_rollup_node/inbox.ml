@@ -78,7 +78,16 @@ let get_messages Node_context.{l1_ctxt; _} head =
         block.operations
         {apply; apply_internal})
   in
-  return (List.rev rev_messages)
+  let*? messages =
+    Environment.wrap_tzresult
+    @@ List.rev_map_e
+         (fun msg ->
+           let open Result_syntax in
+           let+ msg = Sc_rollup.Inbox_message.serialize msg in
+           Sc_rollup.Inbox_message.unsafe_to_string msg)
+         rev_messages
+  in
+  return messages
 
 let same_as_layer_1 node_ctxt head_hash inbox =
   let open Lwt_result_syntax in
@@ -129,6 +138,13 @@ let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
   let predecessor_timestamp = predecessor.header.timestamp in
   let inbox_metrics = Metrics.Inbox.metrics in
   Prometheus.Gauge.set inbox_metrics.head_inbox_level @@ Int32.to_float level ;
+  let*? messages =
+    Environment.wrap_tzresult
+    @@ List.map_e
+         (fun msg ->
+           Sc_rollup.Inbox_message.(deserialize @@ unsafe_of_string msg))
+         messages
+  in
   let* ( _messages_history,
          witness_hash,
          inbox,
@@ -153,6 +169,15 @@ let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
       messages
   in
   let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
+  let*? messages_with_protocol_internal_messages =
+    Environment.wrap_tzresult
+    @@ List.map_e
+         (fun msg ->
+           let open Result_syntax in
+           let+ msg = Sc_rollup.Inbox_message.serialize msg in
+           Sc_rollup.Inbox_message.unsafe_to_string msg)
+         messages_with_protocol_internal_messages
+  in
   return
     (inbox_hash, inbox, witness_hash, messages_with_protocol_internal_messages)
 
@@ -196,6 +221,13 @@ let payloads_history_of_messages ~is_first_block ~predecessor
   let dummy_inbox =
     (* The inbox is not necessary to compute the payloads *)
     Sc_rollup.Inbox.genesis ~predecessor_timestamp ~predecessor Raw_level.root
+  in
+  let* messages =
+    Environment.wrap_tzresult
+    @@ List.map_e
+         (fun msg ->
+           Sc_rollup.Inbox_message.(deserialize @@ unsafe_of_string msg))
+         messages
   in
   let+ ( payloads_history,
          _history,
