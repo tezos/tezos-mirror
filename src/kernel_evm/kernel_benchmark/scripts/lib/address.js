@@ -7,6 +7,7 @@
 
 var Wallet = require('ethereumjs-wallet');
 
+
 const create_wallet = function () {
     if (process.argv.length <= 2) {
         return Wallet.default.generate();
