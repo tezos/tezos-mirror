@@ -11,7 +11,9 @@ script:snapshot_alpha_and_link:
   stage: test
   before_script:
     - . ./scripts/version.sh
-  needs: ["build_x86_64"]
+  needs:
+    - "build_x86_64-released"
+    - "build_x86_64-exp-dev-extra"
   script:
     - make -C ${CI_PROJECT_DIR}/.gitlab/ci integration-test-snapshot-alpha-and-link
   rules:

@@ -1,4 +1,5 @@
 #!/bin/sh
+
 set -eu
 
 if [ -z "${build_deps_image_name}" ]; then echo "build_deps_image_name is unset" && exit 3; fi
@@ -20,15 +21,27 @@ diff poetry.lock /home/tezos/poetry.lock
 diff pyproject.toml /home/tezos/pyproject.toml
 
 # 2. Actually build.
-#    Build the 'all-extras' target instead of the default, which also
-#    build the tps evaluation tool which is not part of the default
-#    build, and the tezt main entrypoint for integration tests.
 #    NOTE: This makes one call to `dune build`, as calling `dune`
 #    several time would otherwise need to reconstruct its rules. Do
 #    not split this invocation.
 #    NOTE: This ensure that $COVERAGE_OPTIONS is used consistently.
-make all-extras
 
-# 3. Strip the built binaries
-chmod +w octez-* _build/default/tezt/tests/main.exe _build/default/src/lib_protocol_compiler/bin/main_native.exe
-strip -s octez-* _build/default/tezt/tests/main.exe _build/default/src/lib_protocol_compiler/bin/main_native.exe
+# EXECUTABLE_FILES may contain multiple paths and so must be split.
+# shellcheck disable=SC2086
+OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
+make build OCTEZ_EXECUTABLES="$OCTEZ_EXECUTABLES"
+
+# 3. Strip the built binaries in OCTEZ_EXECUTABLES and in BUILD_EXTRA.
+# shellcheck disable=SC2086
+chmod +w ${OCTEZ_EXECUTABLES}
+# shellcheck disable=SC2086
+strip -s ${OCTEZ_EXECUTABLES}
+
+if [ -n "${BUILD_EXTRA:-}" ]; then
+    paths=$(for executable in ${BUILD_EXTRA}; do echo _build/default/"$executable"; done)
+    # Paths must be split so disable shellcheck's SC2086 here.
+    # shellcheck disable=SC2086
+    chmod +w $paths
+    # shellcheck disable=SC2086
+    strip -s $paths
+fi

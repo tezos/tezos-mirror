@@ -43,11 +43,13 @@ tezt:
     # the individual test for the disabling rationale.
     TESTS: "/ci_disable"
   dependencies:
-    - "build_x86_64"
+    - "build_x86_64-released"
+    - "build_x86_64-exp-dev-extra"
     - "build_kernels"
     - "tezt:fetch-records"
   needs:
-    - "build_x86_64"
+    - "build_x86_64-released"
+    - "build_x86_64-exp-dev-extra"
     - "build_kernels"
     - "tezt:fetch-records"
   # WARNING: if you increase the number of parallel jobs, you need to
@@ -62,13 +64,13 @@ tezt:static-binaries:
     - .image_template__runtime_build_test_dependencies_template
     - .tezt_template
   dependencies:
-    # Fetch src/proto_*/parameters/*.json from build_x86_64
-    - build_x86_64
+    # Fetch src/proto_*/parameters/*.json from build_x86_64-released
+    - build_x86_64-released
     # And fetch the static executables from build:static
     - build:static-x86_64-linux-binaries
     - tezt:fetch-records
   needs:
-    - build_x86_64
+    - build_x86_64-released
     - build:static-x86_64-linux-binaries
     - tezt:fetch-records
   # WARNING: if you increase the number of parallel jobs, you need to
