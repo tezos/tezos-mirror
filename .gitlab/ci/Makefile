@@ -3,16 +3,6 @@ ifndef CI_PROJECT_DIR
 	$(error This Makefile must be called from a Gitlab runner)
 endif
 
-.PHONY: build-static-binaries
-build-static-binaries: gitlab-take-ownership
-	cd ${CI_PROJECT_DIR} && \
-		./scripts/ci/build_static_binaries.sh
-
-.PHONY: build-full-unreleased
-build-full-unreleased:
-	cd ${CI_PROJECT_DIR} && \
-		./scripts/ci/build_full_unreleased.sh
-
 .PHONY: sanity-ci
 sanity-ci: gitlab-take-ownership
 	${MAKE} -C ${CI_PROJECT_DIR}/manifest check
