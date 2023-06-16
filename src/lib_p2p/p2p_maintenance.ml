@@ -106,14 +106,17 @@ let classify pool private_mode start_time seen_points point pi =
     connections *)
 let establish t contactable =
   let open Lwt_syntax in
-  let try_to_connect count point =
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6140
+     Allow to restrict how many connections are opened at a given time *)
+  let try_to_connect point =
     let+ r =
       protect ~canceler:t.canceler (fun () ->
           P2p_connect_handler.connect t.connect_handler point)
     in
-    match r with Ok _ -> succ count | Error _ -> count
+    match r with Ok _ -> 1 | Error _ -> 0
   in
-  List.fold_left_s try_to_connect 0 contactable
+  let+ contacted = List.map_p try_to_connect contactable in
+  List.fold_left Int.add 0 contacted
 
 (* [connectable t start_time expected seen_points] selects at most
    [expected] connections candidates from the known points, not in [seen]
