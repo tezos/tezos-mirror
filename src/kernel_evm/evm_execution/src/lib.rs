@@ -225,6 +225,16 @@ mod test {
         account.set_code(host, code).unwrap();
     }
 
+    fn bump_nonce(
+        host: &mut impl Runtime,
+        evm_account_storage: &mut EthereumAccountStorage,
+        address: &H160,
+    ) {
+        let path = account_path(address).unwrap();
+        let mut account = evm_account_storage.get_or_create(host, &path).unwrap();
+        account.increment_nonce(host).unwrap();
+    }
+
     #[test]
     fn transfer_without_sufficient_funds_fails() {
         let mut mock_runtime = MockHost::default();
@@ -1365,5 +1375,201 @@ mod test {
         });
 
         assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn contract_selfdestruct_deletes_contract() {
+        let mut mock_runtime = MockHost::default();
+        let block = BlockConstants::first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+        let target = H160::from_low_u64_be(42_u64);
+        let caller = H160::from_low_u64_be(115_u64);
+        let data = [0u8; 32]; // Need some data to make it a contract call
+        let selfdestructing_contract = H160::from_low_u64_be(100_u64);
+        let all_the_gas = 1_000_000_u64;
+
+        // This contract selfdestructs and gives its funds to `caller`
+        let selfdestructing_code = vec![
+            Opcode::PUSH1.as_u8(), // push address of beneficiary
+            115,
+            Opcode::SUICIDE.as_u8(), // this also stops execution
+        ];
+
+        set_account_code(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &selfdestructing_contract,
+            &selfdestructing_code,
+        );
+
+        set_balance(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &selfdestructing_contract,
+            1_000_000.into(),
+        );
+
+        // contract that does call to contract above
+        let code = vec![
+            Opcode::PUSH1.as_u8(), // push return data size
+            0,
+            Opcode::PUSH1.as_u8(), // push return data offset
+            0,
+            Opcode::PUSH1.as_u8(), // push arg size
+            0,
+            Opcode::PUSH1.as_u8(), // push arg offset
+            0,
+            Opcode::PUSH1.as_u8(), // push value
+            0,
+            Opcode::PUSH1.as_u8(), // push address
+            100,
+            Opcode::PUSH2.as_u8(), // push gas
+            0xFF,
+            0xFF,
+            Opcode::CALL.as_u8(),
+        ];
+
+        set_account_code(&mut mock_runtime, &mut evm_account_storage, &target, &code);
+
+        let result = run_transaction(
+            &mut mock_runtime,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            Some(target),
+            caller,
+            data.to_vec(),
+            Some(all_the_gas),
+            None,
+        );
+
+        let expected_result = Ok(ExecutionOutcome {
+            gas_used: 30124,
+            is_success: true,
+            new_address: None,
+            logs: vec![],
+            result: Some(vec![]),
+        });
+
+        assert_eq!(result, expected_result);
+
+        assert_eq!(
+            evm_account_storage
+                .get(
+                    &mock_runtime,
+                    &account_path(&selfdestructing_contract).unwrap()
+                )
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            get_balance(&mut mock_runtime, &mut evm_account_storage, &caller),
+            1_000_000.into()
+        );
+    }
+
+    #[test]
+    fn selfdestruct_is_ignored_when_call_fails() {
+        let mut mock_runtime = MockHost::default();
+        let block = BlockConstants::first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+        let target = H160::from_low_u64_be(42_u64);
+        let caller = H160::from_low_u64_be(115_u64);
+        let data = [0u8; 32]; // Need some data to make it a contract call
+        let selfdestructing_contract = H160::from_low_u64_be(100_u64);
+        let all_the_gas = 1_000_000_u64;
+
+        // This contract selfdestructs and gives its funds to `caller`
+        let selfdestructing_code = vec![
+            Opcode::PUSH1.as_u8(), // push address of beneficiary
+            115,
+            Opcode::SUICIDE.as_u8(), // this also stops execution
+        ];
+
+        set_account_code(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &selfdestructing_contract,
+            &selfdestructing_code,
+        );
+
+        set_balance(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &selfdestructing_contract,
+            1_000_000.into(),
+        );
+
+        bump_nonce(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &selfdestructing_contract,
+        );
+
+        // contract that does call to contract above
+        let code = vec![
+            Opcode::PUSH1.as_u8(), // push return data size
+            0,
+            Opcode::PUSH1.as_u8(), // push return data offset
+            0,
+            Opcode::PUSH1.as_u8(), // push arg size
+            0,
+            Opcode::PUSH1.as_u8(), // push arg offset
+            0,
+            Opcode::PUSH1.as_u8(), // push value
+            0,
+            Opcode::PUSH1.as_u8(), // push address
+            100,
+            Opcode::PUSH2.as_u8(), // push gas
+            0xFF,
+            0xFF,
+            Opcode::CALL.as_u8(), // call the contract that selfdestructs
+            Opcode::INVALID.as_u8(), // fail the entire transaction
+        ];
+
+        set_account_code(&mut mock_runtime, &mut evm_account_storage, &target, &code);
+
+        let result = run_transaction(
+            &mut mock_runtime,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            Some(target),
+            caller,
+            data.to_vec(),
+            Some(all_the_gas),
+            None,
+        );
+
+        let expected_result = Ok(ExecutionOutcome {
+            gas_used: all_the_gas,
+            is_success: false,
+            new_address: None,
+            logs: vec![],
+            result: None,
+        });
+
+        assert_eq!(result, expected_result);
+
+        let account = evm_account_storage
+            .get_or_create(
+                &mock_runtime,
+                &account_path(&selfdestructing_contract).unwrap(),
+            )
+            .unwrap();
+
+        assert_eq!(
+            account.balance(&mock_runtime).unwrap(),
+            U256::from(1_000_000)
+        );
+        assert_eq!(account.code(&mock_runtime).unwrap(), selfdestructing_code);
+        assert_eq!(account.nonce(&mock_runtime).unwrap(), U256::one());
+
+        assert_eq!(
+            get_balance(&mut mock_runtime, &mut evm_account_storage, &caller),
+            0.into()
+        );
     }
 }
