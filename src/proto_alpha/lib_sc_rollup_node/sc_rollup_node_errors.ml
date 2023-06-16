@@ -46,10 +46,6 @@ type error +=
       layer1_inbox : Sc_rollup.Inbox.t;
       inbox : Sc_rollup.Inbox.t;
     }
-  | Unexpected_rollup of {
-      rollup_address : Octez_smart_rollup.Address.t;
-      saved_address : Octez_smart_rollup.Address.t;
-    }
   | Missing_PVM_state of Block_hash.t * Int32.t
   | Cannot_checkout_context of Block_hash.t * Smart_rollup_context_hash.t option
   | No_batcher
@@ -191,31 +187,6 @@ let () =
       | Inconsistent_inbox {layer1_inbox; inbox} -> Some (layer1_inbox, inbox)
       | _ -> None)
     (fun (layer1_inbox, inbox) -> Inconsistent_inbox {layer1_inbox; inbox}) ;
-
-  register_error_kind
-    ~id:"sc_rollup.node.unexpected_rollup"
-    ~title:"Unexpected rollup for rollup node"
-    ~description:"This rollup node is already set up for another rollup."
-    ~pp:(fun ppf (rollup_address, saved_address) ->
-      Format.fprintf
-        ppf
-        "This rollup node was already set up for rollup %a, it cannot be run \
-         for a different rollup %a."
-        Octez_smart_rollup.Address.pp
-        saved_address
-        Octez_smart_rollup.Address.pp
-        rollup_address)
-    `Permanent
-    Data_encoding.(
-      obj2
-        (req "rollup_address" Octez_smart_rollup.Address.encoding)
-        (req "saved_address" Octez_smart_rollup.Address.encoding))
-    (function
-      | Unexpected_rollup {rollup_address; saved_address} ->
-          Some (rollup_address, saved_address)
-      | _ -> None)
-    (fun (rollup_address, saved_address) ->
-      Unexpected_rollup {rollup_address; saved_address}) ;
 
   register_error_kind
     `Permanent

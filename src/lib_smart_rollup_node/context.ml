@@ -32,6 +32,38 @@ module Context_encoding = Tezos_context_encoding.Context_binary
    refactoring.*)
 module Tezos_context_encoding = struct end
 
+type error +=
+  | Unexpected_rollup of {
+      rollup_address : Octez_smart_rollup.Address.t;
+      saved_address : Octez_smart_rollup.Address.t;
+    }
+
+let () =
+  register_error_kind
+    ~id:"sc_rollup.node.unexpected_rollup"
+    ~title:"Unexpected rollup for rollup node"
+    ~description:"This rollup node is already set up for another rollup."
+    ~pp:(fun ppf (rollup_address, saved_address) ->
+      Format.fprintf
+        ppf
+        "This rollup node was already set up for rollup %a, it cannot be run \
+         for a different rollup %a."
+        Octez_smart_rollup.Address.pp
+        saved_address
+        Octez_smart_rollup.Address.pp
+        rollup_address)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "rollup_address" Octez_smart_rollup.Address.encoding)
+        (req "saved_address" Octez_smart_rollup.Address.encoding))
+    (function
+      | Unexpected_rollup {rollup_address; saved_address} ->
+          Some (rollup_address, saved_address)
+      | _ -> None)
+    (fun (rollup_address, saved_address) ->
+      Unexpected_rollup {rollup_address; saved_address})
+
 module Maker = Irmin_pack_unix.Maker (Context_encoding.Conf)
 
 module IStore = struct
@@ -232,8 +264,7 @@ module Rollup = struct
     match saved_address with
     | Some saved_address ->
         fail_unless Octez_smart_rollup.Address.(rollup_address = saved_address)
-        @@ Sc_rollup_node_errors.Unexpected_rollup
-             {rollup_address; saved_address}
+        @@ Unexpected_rollup {rollup_address; saved_address}
     | None -> (
         (* Address was never saved, we set it permanently if not in read-only
            mode. *)
