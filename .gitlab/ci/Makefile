@@ -3,10 +3,6 @@ ifndef CI_PROJECT_DIR
 	$(error This Makefile must be called from a Gitlab runner)
 endif
 
-.PHONY: gitlab-release
-gitlab-release:
-	cd ${CI_PROJECT_DIR} && \
-		./scripts/ci/gitlab-release.sh
 
 .PHONY: gitlab-take-ownership
 gitlab-take-ownership:

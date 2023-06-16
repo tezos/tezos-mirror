@@ -11,4 +11,4 @@ gitlab:release:
     - build:static-arm64-linux-binaries
     - docker:merge_manifests
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci gitlab-release
+    - ./scripts/ci/gitlab-release.sh
