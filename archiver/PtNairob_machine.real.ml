@@ -116,10 +116,12 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       Block_services.Mempool.monitor_operations
         cctxt
         ~chain:cctxt#chain
-        ~applied:true
+        ~validated:true
         ~refused:false
         ~branch_delayed:true
         ~branch_refused:true
+        ~outdated:false
+        ~validation_passes:[0]
         ()
     in
     let op_stream = Lwt_stream.flatten ops_stream in
