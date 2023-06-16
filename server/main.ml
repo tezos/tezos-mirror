@@ -255,7 +255,7 @@ let endorsing_rights_callback db_pool g rights =
         ~body:"Endorsing_right noted"
         ())
 
-let block_callback db_pool g source
+let block_callback db_pool g insert_request source
     ( Teztale_lib.Data.Block.
         {delegate; timestamp; reception_times; round; hash; predecessor; _},
       (endorsements, preendorsements) ) =
@@ -275,9 +275,7 @@ let block_callback db_pool g source
             let* () =
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
                 (fun (_, reception_time) ->
-                  Db.exec
-                    Sql_requests.insert_received_block
-                    (reception_time, hash, source))
+                  Db.exec insert_request (reception_time, hash, source))
                 reception_times
             in
             let* () =
@@ -370,13 +368,28 @@ let routes :
               Teztale_lib.Consensus_ops.rights_encoding
               body
               (endorsing_rights_callback db_pool g)) );
-    ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block"],
+    ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block/applied"],
       fun g rights db_pool header meth body ->
         post_only_endpoint rights header meth (fun source ->
             with_data
               Teztale_lib.Data.block_data_encoding
               body
-              (block_callback db_pool g source)) );
+              (block_callback
+                 db_pool
+                 g
+                 Sql_requests.insert_received_block
+                 source)) );
+    ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block/validated"],
+      fun g rights db_pool header meth body ->
+        post_only_endpoint rights header meth (fun source ->
+            with_data
+              Teztale_lib.Data.block_data_encoding
+              body
+              (block_callback
+                 db_pool
+                 g
+                 Sql_requests.insert_received_block
+                 source)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/mempool"],
       fun g rights db_pool header meth body ->
         post_only_endpoint rights header meth (fun source ->
