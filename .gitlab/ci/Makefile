@@ -3,16 +3,6 @@ ifndef CI_PROJECT_DIR
 	$(error This Makefile must be called from a Gitlab runner)
 endif
 
-ifndef TEZOS_WITHOUT_OPAM
-.PHONY: opam-prepare
-opam-prepare:
-	cd ${CI_PROJECT_DIR} && \
-		git init _opam-repo-for-release && \
-		./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release && \
-		git -C _opam-repo-for-release add packages && \
-		git -C _opam-repo-for-release commit -m "tezos packages"
-endif
-
 .PHONY: doc-build-all
 doc-build-all:
 	cd ${CI_PROJECT_DIR} && \
