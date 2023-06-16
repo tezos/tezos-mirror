@@ -3,12 +3,6 @@ ifndef CI_PROJECT_DIR
 	$(error This Makefile must be called from a Gitlab runner)
 endif
 
-.PHONY: integration-test-liquidity-baking-scripts
-integration-test-liquidity-baking-scripts:
-	cd ${CI_PROJECT_DIR} && \
-		./scripts/ci/test_liquidity_baking_scripts.sh && \
-		./scripts/ci/merge_coverage.sh
-
 .PHONY: lint-misc-check
 lint-misc-check: gitlab-take-ownership
 	cd ${CI_PROJECT_DIR} && \
