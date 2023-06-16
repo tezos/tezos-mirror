@@ -52,11 +52,6 @@ test-tezt-build-long:
 	cd ${CI_PROJECT_DIR} && \
 		dune build @tezt/long_tests/check
 
-.PHONY: test-tezt-self-test
-test-tezt-self-test:
-	cd ${CI_PROJECT_DIR} && \
-		dune runtest tezt/self_tests/
-
 .PHONY: test-tezt-fetch-records
 test-tezt-fetch-records:
 	cd ${CI_PROJECT_DIR} && \
