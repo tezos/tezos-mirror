@@ -256,7 +256,8 @@ type continuation_name =
   | N_KIter_nonempty
   | N_KList_enter_body
   | N_KList_exit_body
-  | N_KMap_enter_body
+  | N_KMap_enter_body_empty
+  | N_KMap_enter_body_singleton
   | N_KMap_exit_body
   | N_KLog
 
@@ -461,7 +462,8 @@ let string_of_continuation_name : continuation_name -> string =
   | N_KIter_nonempty -> "N_KIter_nonempty"
   | N_KList_enter_body -> "N_KList_enter_body"
   | N_KList_exit_body -> "N_KList_exit_body"
-  | N_KMap_enter_body -> "N_KMap_enter_body"
+  | N_KMap_enter_body_empty -> "N_KMap_enter_body_empty"
+  | N_KMap_enter_body_singleton -> "N_KMap_enter_body_singleton"
   | N_KMap_exit_body -> "N_KMap_exit_body"
   | N_KLog -> "N_KLog"
 
@@ -701,7 +703,8 @@ let all_continuations =
     N_KIter_nonempty;
     N_KList_enter_body;
     N_KList_exit_body;
-    N_KMap_enter_body;
+    N_KMap_enter_body_empty;
+    N_KMap_enter_body_singleton;
     N_KMap_exit_body;
     N_KLog;
   ]
@@ -1223,7 +1226,8 @@ module Control = struct
   let list_exit_body = cont_sized_step N_KList_exit_body nullary
 
   let map_enter_body size =
-    cont_sized_step N_KMap_enter_body (unary "size" size)
+    if size = 0 then cont_sized_step N_KMap_enter_body_empty nullary
+    else cont_sized_step N_KMap_enter_body_singleton nullary
 
   let map_exit_body key_size map_size =
     cont_sized_step N_KMap_exit_body (binary "key" key_size "map" map_size)

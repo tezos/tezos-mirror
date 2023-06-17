@@ -593,7 +593,8 @@ let ir_model instr_or_cont =
       | N_KIter_nonempty -> const1_model name |> m
       | N_KList_enter_body -> list_enter_body_model name |> m
       | N_KList_exit_body -> const1_model name |> m
-      | N_KMap_enter_body -> empty_branch_model name |> m
+      | N_KMap_enter_body_empty -> const1_model name |> m
+      | N_KMap_enter_body_singleton -> const1_model name |> m
       | N_KMap_exit_body -> nlogm_model name |> m
       | N_KLog -> const1_model name |> m)
 
