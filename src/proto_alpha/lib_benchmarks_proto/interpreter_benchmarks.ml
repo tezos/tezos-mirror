@@ -595,6 +595,11 @@ let continuation_benchmark ?amplification ?intercept ?salt ?more_tags ?check
   in
   Registration_helpers.register bench
 
+(* Register only a model for code generation *)
+let register_model_for_code_generation model =
+  let model = Model.make ~conv:Fun.id ~model in
+  Registration.register_model_for_code_generation "interpreter" model
+
 (* ------------------------------------------------------------------------- *)
 (* Sampling helpers *)
 
@@ -1114,16 +1119,13 @@ module Registration_section = struct
         ()
 
     let () =
-      (* Register only a model for code generation *)
-      let name = "N_IOpt_map" in
       let model =
         Interpreter_model.Models.max_branching_model
           ~case_0:"none_const"
           ~case_1:"some_const"
-          name
+          "N_IOpt_map"
       in
-      let model = Model.make ~conv:Fun.id ~model in
-      Registration.register_model_for_code_generation "interpreter" model
+      register_model_for_code_generation model
   end
 
   module Ors = struct
@@ -2262,16 +2264,13 @@ module Registration_section = struct
         ()
 
     let () =
-      (* Register only a model for code generation *)
-      let name = "N_ILoop" in
       let model =
         Interpreter_model.Models.max_branching_model
           ~case_0:"in_const"
           ~case_1:"out_const"
-          name
+          "N_ILoop"
       in
-      let model = Model.make ~conv:Fun.id ~model in
-      Registration.register_model_for_code_generation "interpreter" model
+      register_model_for_code_generation model
 
     let () =
       (*
@@ -2301,16 +2300,13 @@ module Registration_section = struct
         ()
 
     let () =
-      (* Register only a model for code generation *)
-      let name = "N_ILoop_left" in
       let model =
         Interpreter_model.Models.max_branching_model
           ~case_0:"in_const"
           ~case_1:"out_const"
-          name
+          "N_ILoop_left"
       in
-      let model = Model.make ~conv:Fun.id ~model in
-      Registration.register_model_for_code_generation "interpreter" model
+      register_model_for_code_generation model
 
     let () =
       (*
@@ -2434,16 +2430,13 @@ module Registration_section = struct
         ()
 
     let () =
-      (* Register only a model for code generation *)
-      let name = "N_ILambda" in
       let model =
         Interpreter_model.Models.max_branching_model
           ~case_0:"lam_const"
           ~case_1:"lamrec_const"
-          name
+          "N_ILambda"
       in
-      let model = Model.make ~conv:Fun.id ~model in
-      Registration.register_model_for_code_generation "interpreter" model
+      register_model_for_code_generation model
 
     let () =
       (*
@@ -3514,16 +3507,13 @@ module Registration_section = struct
         ()
 
     let () =
-      (* Register only a model for code generation *)
-      let name = "N_KIter" in
       let model =
         Interpreter_model.Models.max_branching_model
           ~case_0:"empty_const"
           ~case_1:"nonempty_const"
-          name
+          "N_KIter"
       in
-      let model = Model.make ~conv:Fun.id ~model in
-      Registration.register_model_for_code_generation "interpreter" model
+      register_model_for_code_generation model
 
     let () =
       (*
@@ -3664,16 +3654,13 @@ module Registration_section = struct
         ()
 
     let () =
-      (* Register only a model for code generation *)
-      let name = "N_KMap_enter_body" in
       let model =
         Interpreter_model.Models.max_branching_model
           ~case_0:"empty_const"
           ~case_1:"singleton_const"
-          name
+          "N_KMap_enter_body"
       in
-      let model = Model.make ~conv:Fun.id ~model in
-      Registration.register_model_for_code_generation "interpreter" model
+      register_model_for_code_generation model
 
     let () =
       (*
