@@ -63,6 +63,9 @@ type parameter_info = Namespace.t list
 *)
 val register : ?add_timer:bool -> Benchmark.t -> unit
 
+(** Register only a model. Use [register] unless there is a special reason *)
+val register_model : Namespace.t -> string -> 'a Model.t -> unit
+
 (** Register a {!type:Tezos_clic.command} for the command line *)
 val add_command : unit Tezos_clic.command -> unit
 

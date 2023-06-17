@@ -1099,8 +1099,7 @@ module Registration_section = struct
 
     let () =
       benchmark_with_fixed_stack
-        ~name:Interpreter_workload.N_IOpt_map
-        ~salt:"_none"
+        ~name:Interpreter_workload.N_IOpt_map_none
         ~stack:(None, ((), eos))
         ~stack_type:(option unit @$ unit @$ bot)
         ~kinstr:(IOpt_map {loc = dummy_loc; body = halt; k = halt})
@@ -1108,12 +1107,26 @@ module Registration_section = struct
 
     let () =
       benchmark_with_fixed_stack
-        ~name:Interpreter_workload.N_IOpt_map
-        ~salt:"_some"
+        ~name:Interpreter_workload.N_IOpt_map_some
         ~stack:(Some (), ((), eos))
         ~stack_type:(option unit @$ unit @$ bot)
         ~kinstr:(IOpt_map {loc = dummy_loc; body = halt; k = halt})
         ()
+
+    let () =
+      (* Register only a model for code generation *)
+      let name = "N_IOpt_map" in
+      let model =
+        Interpreter_model.Models.max_branching_model
+          ~case_0:"none_const"
+          ~case_1:"some_const"
+          name
+      in
+      let model = Model.make ~conv:Fun.id ~model in
+      Registration.register_model
+        (Namespace.of_string "dummy")
+        "interpreter"
+        model
   end
 
   module Ors = struct
@@ -2356,7 +2369,7 @@ module Registration_section = struct
         IHalt
        *)
       simple_benchmark
-        ~name:Interpreter_workload.N_ILambda
+        ~name:Interpreter_workload.N_ILambda_lam
         ~stack_type:(unit @$ bot)
         ~kinstr:(ILambda (dummy_loc, dummy_lambda, halt))
         ()
@@ -2367,11 +2380,25 @@ module Registration_section = struct
         IHalt
        *)
       simple_benchmark
-        ~name:Interpreter_workload.N_ILambda
-        ~salt:"_rec"
+        ~name:Interpreter_workload.N_ILambda_lamrec
         ~stack_type:(unit @$ bot)
         ~kinstr:(ILambda (dummy_loc, dummy_lambda_rec, halt))
         ()
+
+    let () =
+      (* Register only a model for code generation *)
+      let name = "N_ILambda" in
+      let model =
+        Interpreter_model.Models.max_branching_model
+          ~case_0:"lam_const"
+          ~case_1:"lamrec_const"
+          name
+      in
+      let model = Model.make ~conv:Fun.id ~model in
+      Registration.register_model
+        (Namespace.of_string "dummy")
+        "interpreter"
+        model
 
     let () =
       (*
@@ -3415,8 +3442,7 @@ module Registration_section = struct
        *)
       continuation_benchmark
         ~amplification:100
-        ~name:Interpreter_workload.N_KIter
-        ~salt:"_empty"
+        ~name:Interpreter_workload.N_KIter_empty
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
           let cont = KIter (IDrop (dummy_loc, halt), Some unit, [], KNil) in
           let stack = ((), eos) in
@@ -3434,14 +3460,28 @@ module Registration_section = struct
        *)
       continuation_benchmark
         ~amplification:100
-        ~name:Interpreter_workload.N_KIter
-        ~salt:"_nonempty"
+        ~name:Interpreter_workload.N_KIter_nonempty
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
           let cont = KIter (IDrop (dummy_loc, halt), Some unit, [()], KNil) in
           let stack = ((), eos) in
           let stack_type = unit @$ bot in
           fun () -> Ex_stack_and_cont {stack; cont; stack_type})
         ()
+
+    let () =
+      (* Register only a model for code generation *)
+      let name = "N_KIter" in
+      let model =
+        Interpreter_model.Models.max_branching_model
+          ~case_0:"empty_const"
+          ~case_1:"nonempty_const"
+          name
+      in
+      let model = Model.make ~conv:Fun.id ~model in
+      Registration.register_model
+        (Namespace.of_string "dummy")
+        "interpreter"
+        model
 
     let () =
       (*

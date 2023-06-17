@@ -55,7 +55,8 @@ type instruction_name =
   | N_ICons_some
   | N_ICons_none
   | N_IIf_none
-  | N_IOpt_map
+  | N_IOpt_map_none
+  | N_IOpt_map_some
   (* ors *)
   | N_ILeft
   | N_IRight
@@ -153,7 +154,8 @@ type instruction_name =
   | N_IDip
   | N_IExec
   | N_IApply
-  | N_ILambda
+  | N_ILambda_lam
+  | N_ILambda_lamrec
   | N_IFailwith
   (* comparison, warning: ad-hoc polymorphic instruction *)
   | N_ICompare
@@ -248,7 +250,8 @@ type continuation_name =
   | N_KUndip
   | N_KLoop_in
   | N_KLoop_in_left
-  | N_KIter
+  | N_KIter_empty
+  | N_KIter_nonempty
   | N_KList_enter_body
   | N_KList_exit_body
   | N_KMap_enter_body
@@ -276,7 +279,8 @@ let string_of_instruction_name : instruction_name -> string =
   | N_ICons_some -> "N_ICons_some"
   | N_ICons_none -> "N_ICons_none"
   | N_IIf_none -> "N_IIf_none"
-  | N_IOpt_map -> "N_IOpt_map"
+  | N_IOpt_map_none -> "N_IOpt_map_none"
+  | N_IOpt_map_some -> "N_IOpt_map_some"
   | N_ILeft -> "N_ILeft"
   | N_IRight -> "N_IRight"
   | N_IIf_left -> "N_IIf_left"
@@ -360,7 +364,8 @@ let string_of_instruction_name : instruction_name -> string =
   | N_IDip -> "N_IDip"
   | N_IExec -> "N_IExec"
   | N_IApply -> "N_IApply"
-  | N_ILambda -> "N_ILambda"
+  | N_ILambda_lam -> "N_ILambda_lam"
+  | N_ILambda_lamrec -> "N_ILambda_lamrec"
   | N_IFailwith -> "N_IFailwith"
   | N_ICompare -> "N_ICompare"
   | N_IEq -> "N_IEq"
@@ -448,7 +453,8 @@ let string_of_continuation_name : continuation_name -> string =
   | N_KUndip -> "N_KUndip"
   | N_KLoop_in -> "N_KLoop_in"
   | N_KLoop_in_left -> "N_KLoop_in_left"
-  | N_KIter -> "N_KIter"
+  | N_KIter_empty -> "N_KIter_empty"
+  | N_KIter_nonempty -> "N_KIter_nonempty"
   | N_KList_enter_body -> "N_KList_enter_body"
   | N_KList_exit_body -> "N_KList_exit_body"
   | N_KMap_enter_body -> "N_KMap_enter_body"
@@ -509,7 +515,8 @@ let all_instructions =
     N_ICons_some;
     N_ICons_none;
     N_IIf_none;
-    N_IOpt_map;
+    N_IOpt_map_none;
+    N_IOpt_map_some;
     N_ILeft;
     N_IRight;
     N_IIf_left;
@@ -587,7 +594,8 @@ let all_instructions =
     N_IDip;
     N_IExec;
     N_IApply;
-    N_ILambda;
+    N_ILambda_lam;
+    N_ILambda_lamrec;
     N_IFailwith;
     N_ICompare;
     N_IEq;
@@ -683,7 +691,8 @@ let all_continuations =
     N_KUndip;
     N_KLoop_in;
     N_KLoop_in_left;
-    N_KIter;
+    N_KIter_empty;
+    N_KIter_nonempty;
     N_KList_enter_body;
     N_KList_exit_body;
     N_KMap_enter_body;
@@ -774,7 +783,8 @@ module Instructions = struct
   let if_none = ir_sized_step N_IIf_none nullary
 
   let opt_map ~is_some =
-    ir_sized_step N_IOpt_map (unary "is_some" (if is_some then 1 else 0))
+    if is_some then ir_sized_step N_IOpt_map_some nullary
+    else ir_sized_step N_IOpt_map_none nullary
 
   let left = ir_sized_step N_ILeft nullary
 
@@ -985,7 +995,8 @@ module Instructions = struct
     ir_sized_step N_IApply (unary "rec" (if rec_flag then 1 else 0))
 
   let lambda ~(rec_flag : bool) =
-    ir_sized_step N_ILambda (unary "rec" (if rec_flag then 1 else 0))
+    if rec_flag then ir_sized_step N_ILambda_lamrec nullary
+    else ir_sized_step N_ILambda_lam nullary
 
   let failwith_ = ir_sized_step N_IFailwith nullary
 
@@ -1190,7 +1201,9 @@ module Control = struct
 
   let loop_in_left = cont_sized_step N_KLoop_in_left nullary
 
-  let iter size = cont_sized_step N_KIter (unary "size" size)
+  let iter size =
+    if size = 0 then cont_sized_step N_KIter_empty nullary
+    else cont_sized_step N_KIter_nonempty nullary
 
   let list_enter_body xs_size ys_size =
     cont_sized_step

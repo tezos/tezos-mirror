@@ -347,12 +347,29 @@ module Models = struct
     end in
     (module M : Model.Model_impl with type arg_type = int * unit)
 
+  let max_branching_model ~case_0 ~case_1 name =
+    let module M = struct
+      type arg_type = unit
+
+      module Def (X : Costlang.S) = struct
+        open X
+
+        type model_type = size
+
+        let arity = Model.arity_0
+
+        let model =
+          max
+            (free ~name:(fv (sf "%s_%s" name case_0)))
+            (free ~name:(fv (sf "%s_%s" name case_1)))
+      end
+
+      let name = ns name
+    end in
+    (module M : Model.Model_impl with type arg_type = unit)
+
   let empty_branch_model name =
     branching_model ~case_0:"empty" ~case_1:"nonempty" name
-
-  let option_branch_model name =
-    (* This model takes a boolean argument representing whether it is some or none *)
-    branching_model ~case_0:"none" ~case_1:"some" name
 
   let lambda_model name =
     (* branch whether lambda is rec or nonrec *)
@@ -555,11 +572,13 @@ let ir_model instr_or_cont =
       | N_ISet_iter -> affine_model name |> m
       | N_IHalt -> const1_model name |> m
       | N_IApply -> lambda_model name |> m
-      | N_ILambda -> lambda_model name |> m
+      | N_ILambda_lam -> const1_model name |> m
+      | N_ILambda_lamrec -> const1_model name |> m
       | N_ILog -> const1_model name |> m
       | N_IOpen_chest -> open_chest_model name |> m
       | N_IEmit -> const1_model name |> m
-      | N_IOpt_map -> option_branch_model name |> m)
+      | N_IOpt_map_none -> const1_model name |> m
+      | N_IOpt_map_some -> const1_model name |> m)
   | Cont_name cont -> (
       match cont with
       | N_KNil -> const1_model name |> m
@@ -570,7 +589,8 @@ let ir_model instr_or_cont =
       | N_KUndip -> const1_model name |> m
       | N_KLoop_in -> const1_model name |> m
       | N_KLoop_in_left -> const1_model name |> m
-      | N_KIter -> empty_branch_model name |> m
+      | N_KIter_empty -> const1_model name |> m
+      | N_KIter_nonempty -> const1_model name |> m
       | N_KList_enter_body -> list_enter_body_model name |> m
       | N_KList_exit_body -> const1_model name |> m
       | N_KMap_enter_body -> empty_branch_model name |> m
