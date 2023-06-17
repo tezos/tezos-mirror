@@ -2237,25 +2237,22 @@ module Registration_section = struct
         ()
 
     let () =
+      let push_false = IPush (dummy_loc, bool, false, halt) in
       (* The case true is on top of stack
          ILoop ->
          IPush false ->
          IHalt
       *)
-      let push_false = IPush (dummy_loc, bool, false, halt) in
       benchmark_with_fixed_stack
         ~name:Interpreter_workload.N_ILoop_in
         ~stack:(true, eos)
         ~stack_type:(bool @$ bot)
         ~kinstr:(ILoop (dummy_loc, push_false, halt))
-        ()
-
-    let () =
+        () ;
       (* The case false is on top of stack
          ILoop ->
          IHalt
       *)
-      let push_false = IPush (dummy_loc, bool, false, halt) in
       benchmark_with_fixed_stack
         ~name:Interpreter_workload.N_ILoop_out
         ~stack:(false, eos)
@@ -2273,25 +2270,22 @@ module Registration_section = struct
       register_model_for_code_generation model
 
     let () =
+      let cons_r = ICons_right (dummy_loc, unit, halt) in
       (*
           ILoop_left ->
           ICons_right ->
           IHalt
        *)
-      let cons_r = ICons_right (dummy_loc, unit, halt) in
       benchmark_with_fixed_stack
         ~name:Interpreter_workload.N_ILoop_left_in
         ~stack:(L (), eos)
         ~stack_type:(cor unit unit @$ bot)
         ~kinstr:(ILoop_left (dummy_loc, cons_r, halt))
-        ()
-
-    let () =
+        () ;
       (*
         ILoop_left ->
         IHalt
        *)
-      let cons_r = ICons_right (dummy_loc, unit, halt) in
       benchmark_with_fixed_stack
         ~name:Interpreter_workload.N_ILoop_left_out
         ~stack:(R (), eos)
