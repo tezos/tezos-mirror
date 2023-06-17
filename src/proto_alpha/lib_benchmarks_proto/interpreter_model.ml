@@ -368,9 +368,6 @@ module Models = struct
     end in
     (module M : Model.Model_impl with type arg_type = unit)
 
-  let empty_branch_model name =
-    branching_model ~case_0:"empty" ~case_1:"nonempty" name
-
   let lambda_model name =
     (* branch whether lambda is rec or nonrec *)
     branching_model ~case_0:"lam" ~case_1:"lamrec" name
