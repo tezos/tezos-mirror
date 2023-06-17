@@ -130,6 +130,11 @@ let register_model (type a) bench_name local_model_name (model : a Model.t) :
   | Aggregate {sub_models; _} -> List.iter register_packed_model sub_models
   | Abstract {model; _} -> register_packed_model (Model.Model model)
 
+let register_model_for_code_generation local_model_name model =
+  (* Expected there is no benchmark has this model.
+     So it gives the benchmark name as "dummy" *)
+  register_model (Namespace.of_string "dummy") local_model_name model
+
 let register ?(add_timer = true) ((module Bench) : Benchmark.t) =
   if Name_table.mem bench_table Bench.name then (
     Format.eprintf

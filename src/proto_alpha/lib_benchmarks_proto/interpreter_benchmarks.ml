@@ -1123,10 +1123,7 @@ module Registration_section = struct
           name
       in
       let model = Model.make ~conv:Fun.id ~model in
-      Registration.register_model
-        (Namespace.of_string "dummy")
-        "interpreter"
-        model
+      Registration.register_model_for_code_generation "interpreter" model
   end
 
   module Ors = struct
@@ -2395,10 +2392,7 @@ module Registration_section = struct
           name
       in
       let model = Model.make ~conv:Fun.id ~model in
-      Registration.register_model
-        (Namespace.of_string "dummy")
-        "interpreter"
-        model
+      Registration.register_model_for_code_generation "interpreter" model
 
     let () =
       (*
@@ -3478,10 +3472,7 @@ module Registration_section = struct
           name
       in
       let model = Model.make ~conv:Fun.id ~model in
-      Registration.register_model
-        (Namespace.of_string "dummy")
-        "interpreter"
-        model
+      Registration.register_model_for_code_generation "interpreter" model
 
     let () =
       (*
