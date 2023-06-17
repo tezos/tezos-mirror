@@ -149,8 +149,10 @@ type instruction_name =
   | N_INot_int
   (* control *)
   | N_IIf
-  | N_ILoop
-  | N_ILoop_left
+  | N_ILoop_in
+  | N_ILoop_out
+  | N_ILoop_left_in
+  | N_ILoop_left_out
   | N_IDip
   | N_IExec
   | N_IApply
@@ -359,8 +361,10 @@ let string_of_instruction_name : instruction_name -> string =
   | N_IXor_nat -> "N_IXor_nat"
   | N_INot_int -> "N_INot_int"
   | N_IIf -> "N_IIf"
-  | N_ILoop -> "N_ILoop"
-  | N_ILoop_left -> "N_ILoop_left"
+  | N_ILoop_in -> "N_ILoop_in"
+  | N_ILoop_out -> "N_ILoop_out"
+  | N_ILoop_left_in -> "N_ILoop_left_in"
+  | N_ILoop_left_out -> "N_ILoop_left_out"
   | N_IDip -> "N_IDip"
   | N_IExec -> "N_IExec"
   | N_IApply -> "N_IApply"
@@ -589,8 +593,10 @@ let all_instructions =
     N_IXor_nat;
     N_INot_int;
     N_IIf;
-    N_ILoop;
-    N_ILoop_left;
+    N_ILoop_in;
+    N_ILoop_out;
+    N_ILoop_left_in;
+    N_ILoop_left_out;
     N_IDip;
     N_IExec;
     N_IApply;
@@ -983,9 +989,13 @@ module Instructions = struct
 
   let if_ = ir_sized_step N_IIf nullary
 
-  let loop = ir_sized_step N_ILoop nullary
+  let loop bool =
+    if bool then ir_sized_step N_ILoop_in nullary
+    else ir_sized_step N_ILoop_out nullary
 
-  let loop_left = ir_sized_step N_ILoop_left nullary
+  let loop_left or_ =
+    if or_ then ir_sized_step N_ILoop_left_in nullary
+    else ir_sized_step N_ILoop_left_out nullary
 
   let dip = ir_sized_step N_IDip nullary
 
@@ -1401,8 +1411,10 @@ let extract_ir_sized_step :
       Instructions.xor_nat (Size.integer x) (Size.integer y)
   | INot_int (_, _), (x, _) -> Instructions.not_int (Size.integer x)
   | IIf _, _ -> Instructions.if_
-  | ILoop (_, _, _), _ -> Instructions.loop
-  | ILoop_left (_, _, _), _ -> Instructions.loop_left
+  | ILoop (_, _, _), (b, _) -> Instructions.loop b
+  | ILoop_left (_, _, _), (or_, _) ->
+      let or_ = match or_ with L _ -> true | R _ -> false in
+      Instructions.loop_left or_
   | IDip (_, _, _, _), _ -> Instructions.dip
   | IExec (_, _, _), _ -> Instructions.exec
   | IApply (_, _, _), (_, (l, _)) ->

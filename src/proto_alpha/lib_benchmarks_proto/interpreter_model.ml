@@ -481,13 +481,13 @@ let ir_model instr_or_cont =
       | N_ICdr | N_ICons_some | N_ICons_none | N_IIf_none | N_ILeft | N_IRight
       | N_IIf_left | N_ICons_list | N_INil | N_IIf_cons | N_IEmpty_set
       | N_IEmpty_map | N_IEmpty_big_map | N_IOr | N_IAnd | N_IXor | N_INot
-      | N_IIf | N_ILoop | N_ILoop_left | N_IDip | N_IExec | N_IView
-      | N_IFailwith | N_IAddress | N_ICreate_contract | N_ISet_delegate | N_INow
-      | N_IMin_block_time | N_IBalance | N_IHash_key | N_IUnpack | N_ISource
-      | N_ISender | N_ISelf | N_IAmount | N_IChainId | N_ILevel
-      | N_ISelf_address | N_INever | N_IUnpair | N_IVoting_power
-      | N_ITotal_voting_power | N_IList_size | N_ISet_size | N_IMap_size
-      | N_ISapling_empty_state ->
+      | N_IIf | N_ILoop_in | N_ILoop_out | N_ILoop_left_in | N_ILoop_left_out
+      | N_IDip | N_IExec | N_IView | N_IFailwith | N_IAddress
+      | N_ICreate_contract | N_ISet_delegate | N_INow | N_IMin_block_time
+      | N_IBalance | N_IHash_key | N_IUnpack | N_ISource | N_ISender | N_ISelf
+      | N_IAmount | N_IChainId | N_ILevel | N_ISelf_address | N_INever
+      | N_IUnpair | N_IVoting_power | N_ITotal_voting_power | N_IList_size
+      | N_ISet_size | N_IMap_size | N_ISapling_empty_state ->
           const1_model name |> m
       | N_ISet_mem | N_ISet_update | N_IMap_mem | N_IMap_get | N_IMap_update
       | N_IBig_map_mem | N_IBig_map_get | N_IBig_map_update

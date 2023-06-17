@@ -2235,31 +2235,82 @@ module Registration_section = struct
         ()
 
     let () =
-      (*
-        ILoop ->
-        either
-        - IHalt (false on top of stack)
-        - IPush false ; IHalt (true on top of stack)
-       *)
+      (* The case true is on top of stack
+         ILoop ->
+         IPush false ->
+         IHalt
+      *)
       let push_false = IPush (dummy_loc, bool, false, halt) in
-      simple_benchmark
-        ~name:Interpreter_workload.N_ILoop
+      benchmark_with_fixed_stack
+        ~name:Interpreter_workload.N_ILoop_in
+        ~stack:(true, eos)
         ~stack_type:(bool @$ bot)
         ~kinstr:(ILoop (dummy_loc, push_false, halt))
         ()
 
     let () =
+      (* The case false is on top of stack
+         ILoop ->
+         IHalt
+      *)
+      let push_false = IPush (dummy_loc, bool, false, halt) in
+      benchmark_with_fixed_stack
+        ~name:Interpreter_workload.N_ILoop_out
+        ~stack:(false, eos)
+        ~stack_type:(bool @$ bot)
+        ~kinstr:(ILoop (dummy_loc, push_false, halt))
+        ()
+
+    let () =
+      (* Register only a model for code generation *)
+      let name = "N_ILoop" in
+      let model =
+        Interpreter_model.Models.max_branching_model
+          ~case_0:"in_const"
+          ~case_1:"out_const"
+          name
+      in
+      let model = Model.make ~conv:Fun.id ~model in
+      Registration.register_model_for_code_generation "interpreter" model
+
+    let () =
       (*
-        ILoop_left ->
-        ICons_right ->
-        IHalt
+          ILoop_left ->
+          ICons_right ->
+          IHalt
        *)
       let cons_r = ICons_right (dummy_loc, unit, halt) in
-      simple_benchmark
-        ~name:Interpreter_workload.N_ILoop_left
+      benchmark_with_fixed_stack
+        ~name:Interpreter_workload.N_ILoop_left_in
+        ~stack:(L (), eos)
         ~stack_type:(cor unit unit @$ bot)
         ~kinstr:(ILoop_left (dummy_loc, cons_r, halt))
         ()
+
+    let () =
+      (*
+        ILoop_left ->
+        IHalt
+       *)
+      let cons_r = ICons_right (dummy_loc, unit, halt) in
+      benchmark_with_fixed_stack
+        ~name:Interpreter_workload.N_ILoop_left_out
+        ~stack:(R (), eos)
+        ~stack_type:(cor unit unit @$ bot)
+        ~kinstr:(ILoop_left (dummy_loc, cons_r, halt))
+        ()
+
+    let () =
+      (* Register only a model for code generation *)
+      let name = "N_ILoop_left" in
+      let model =
+        Interpreter_model.Models.max_branching_model
+          ~case_0:"in_const"
+          ~case_1:"out_const"
+          name
+      in
+      let model = Model.make ~conv:Fun.id ~model in
+      Registration.register_model_for_code_generation "interpreter" model
 
     let () =
       (*
