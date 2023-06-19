@@ -75,9 +75,19 @@ When the feature flag is enabled, the following extra changes happen:
 
 - Denunciation rewards computation updated to depend on ``staking_over_baking_limit``. (MR :gl:`!8939`)
 
+- EMA and launch cycle. (MRs :gl:`!8967`, :gl:`!9002`, :gl:`!9025`, :gl:`!9058`)
+
+- Staking and deposits. (MRs :gl:`!8940`, :gl:`!8957`, :gl:`!8958`, :gl:`!8965`, :gl:`!8966`, :gl:`!8973`,
+  :gl:`!9000`, :gl:`!9014`, :gl:`!9018`, :gl:`!9022`, :gl:`!9023`, :gl:`!9031`, :gl:`!9033`, :gl:`!9039`,
+  :gl:`!9040`, :gl:`!9052`, :gl:`!9054`, :gl:`!9055`, :gl:`!9069`)
+
+- New RPCs introduced: total supply, total frozen stake, launch cycle.
+  (MRs :gl:`!8982`, :gl:`!8995`, :gl:`!8997`, :gl:`!9057`)
 
 Gas improvements
 ----------------
+
+- Gas model improved for origination function. (MR :gl:`!9020`)
 
 Breaking Changes
 ----------------
