@@ -1,27 +1,20 @@
 # CI guideline
 
-This document describes the operating principles of the source code around the CI
+This document describes the operating principles of the source code
+around the CI.
 
-# Implementation of scripts linked to jobs
+# Implementation of job `script`s
 
-**Calling a script directly**
+These rules also apply to `before_script` and `after_script`.
 
-2 cases :
+## Inline scripts
 
--   `Make` is not available in the base image
--   This is a legacy approach that is not recommended for new jobs
+I.e., having the `script` in the YAML definition of the job. Inline
+scripts MUST only be used for small job definitions (less than 5
+lines) that do not use any control flow.
 
-Special case for command `.venv/bin/activate` because it must be done in same shell as the core script, doing it from Makefile would be would be heavy and without any added value.
+## Calling out to a script
 
-**Calling a `make` target that does everything directly**
+`script` definitions longer than 5 lines of code OR that use
+control-flow MUST be placed in a separate shell script.
 
-Only up to 3 or 4 lines of code and no comments between lines.
-`make` spins up a subshell for each script line so we use `; \` after each line to maintain the location reached by the previous `cd ${CI_PROJECT_DIR}` command.
-
-**Calling a `make` target that itself calls a script**
-
-It's the prefered approach.
-
-**Having everything in the YAML**
-
-SHOULD be the exception and MUST be explained in a comment.
