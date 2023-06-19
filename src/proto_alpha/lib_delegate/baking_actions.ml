@@ -434,7 +434,7 @@ let inject_preendorsements state ~preendorsements =
        in
        Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
       else
-        fail (Baking_highwatermarks.Block_previously_preendorsed {round; level}))
+        fail (Baking_highwatermarks.Block_previously_preattested {round; level}))
       >>= function
       | Error err ->
           Events.(emit skipping_preendorsement (delegate, err)) >>= fun () ->
@@ -514,7 +514,7 @@ let sign_endorsements state endorsements =
            unsigned_operation
        in
        Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
-      else fail (Baking_highwatermarks.Block_previously_endorsed {round; level}))
+      else fail (Baking_highwatermarks.Block_previously_attested {round; level}))
       >>= function
       | Error err ->
           Events.(emit skipping_endorsement (delegate, err)) >>= fun () ->

@@ -29,9 +29,9 @@ type highwatermark = {round : Round.t; level : int32}
 
 type error += Block_previously_baked of highwatermark
 
-type error += Block_previously_preendorsed of highwatermark
+type error += Block_previously_preattested of highwatermark
 
-type error += Block_previously_endorsed of highwatermark
+type error += Block_previously_attested of highwatermark
 
 type t
 
