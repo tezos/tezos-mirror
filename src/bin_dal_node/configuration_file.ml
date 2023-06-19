@@ -41,10 +41,6 @@ let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
 
 let data_dir_path config subpath = Filename.concat config.data_dir subpath
 
-let relative_filename data_dir = Filename.concat data_dir "config.json"
-
-let filename config = relative_filename config.data_dir
-
 let default_rpc_addr =
   P2p_point.Id.of_string_exn ~default_port:10732 "127.0.0.1"
 
@@ -207,9 +203,11 @@ let () =
       | _ -> None)
     (fun path -> DAL_node_unable_to_write_configuration_file path)
 
+let filename ~data_dir = Filename.concat data_dir "config.json"
+
 let save config =
   let open Lwt_syntax in
-  let file = filename config in
+  let file = filename ~data_dir:config.data_dir in
   protect @@ fun () ->
   let* v =
     let* () = Lwt_utils_unix.create_dir config.data_dir in
@@ -226,7 +224,7 @@ let save config =
 let load ~data_dir =
   let open Lwt_result_syntax in
   let+ json =
-    let*! json = Lwt_utils_unix.Json.read_file (relative_filename data_dir) in
+    let*! json = Lwt_utils_unix.Json.read_file (filename ~data_dir) in
     match json with
     | Ok json -> return json
     | Error (Exn _ :: _ as e) ->

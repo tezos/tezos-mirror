@@ -44,9 +44,6 @@ type t = {
 (** [default] is the default configuration. *)
 val default : t
 
-(** [filename config] gets the path to config file *)
-val filename : t -> string
-
 (** [data_dir_path config subpath] builds a subpath relatively to the
     [config] *)
 val data_dir_path : t -> string -> string
