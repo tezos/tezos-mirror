@@ -21,6 +21,7 @@ use crate::blueprint::{fetch, Queue};
 use crate::error::Error;
 use crate::storage::{read_smart_rollup_address, store_smart_rollup_address};
 
+mod apply;
 mod block;
 mod blueprint;
 mod error;

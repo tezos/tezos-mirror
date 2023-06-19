@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::apply::ApplicableTransaction;
 use crate::inbox::read_inbox;
 use crate::inbox::Transaction;
 use crate::Error;
@@ -40,7 +41,7 @@ fn filter_invalid_chain_id(
 ) -> Vec<Transaction> {
     transactions
         .into_iter()
-        .filter(|transaction| U256::eq(&transaction.tx.chain_id, &chain_id))
+        .filter(|transaction| U256::eq(&transaction.tx.chain_id(), &chain_id))
         .collect()
 }
 
