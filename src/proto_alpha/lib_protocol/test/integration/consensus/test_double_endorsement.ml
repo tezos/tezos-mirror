@@ -234,7 +234,7 @@ let test_invalid_double_endorsement () =
   Block.bake ~operation b >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
       | Validate_errors.Anonymous.Invalid_denunciation kind
-        when kind = Validate_errors.Anonymous.Endorsement ->
+        when kind = Validate_errors.Anonymous.Attestation ->
           true
       | _ -> false)
 
@@ -257,7 +257,7 @@ let test_invalid_double_endorsement_variant () =
   Block.bake ~operation genesis >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
       | Validate_errors.Anonymous.Invalid_denunciation kind
-        when kind = Validate_errors.Anonymous.Endorsement ->
+        when kind = Validate_errors.Anonymous.Attestation ->
           true
       | _ -> false)
 
@@ -274,7 +274,7 @@ let test_too_early_double_endorsement_evidence () =
   Block.bake ~operation genesis >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
       | Validate_errors.Anonymous.Too_early_denunciation {kind; _}
-        when kind = Validate_errors.Anonymous.Endorsement ->
+        when kind = Validate_errors.Anonymous.Attestation ->
           true
       | _ -> false)
 
@@ -296,7 +296,7 @@ let test_too_late_double_endorsement_evidence () =
   Block.bake ~operation blk >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
       | Validate_errors.Anonymous.Outdated_denunciation {kind; _}
-        when kind = Validate_errors.Anonymous.Endorsement ->
+        when kind = Validate_errors.Anonymous.Attestation ->
           true
       | _ -> false)
 
@@ -317,7 +317,7 @@ let test_different_delegates () =
   Block.bake ~operation blk_b >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
       | Validate_errors.Anonymous.Inconsistent_denunciation {kind; _}
-        when kind = Validate_errors.Anonymous.Endorsement ->
+        when kind = Validate_errors.Anonymous.Attestation ->
           true
       | _ -> false)
 
@@ -341,7 +341,7 @@ let test_wrong_delegate () =
   Block.bake ~operation blk_b >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
       | Validate_errors.Anonymous.Inconsistent_denunciation {kind; _}
-        when kind = Validate_errors.Anonymous.Endorsement ->
+        when kind = Validate_errors.Anonymous.Attestation ->
           true
       | _ -> false)
 
@@ -504,7 +504,7 @@ let test_two_double_endorsement_evidences_leads_to_duplicate_denunciation () =
   >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e (function
       | Validate_errors.Anonymous.Conflicting_denunciation {kind; _}
-        when kind = Validate_errors.Anonymous.Endorsement ->
+        when kind = Validate_errors.Anonymous.Attestation ->
           true
       | _ -> false)
   >>=? fun () ->
@@ -514,7 +514,7 @@ let test_two_double_endorsement_evidences_leads_to_duplicate_denunciation () =
   >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e (function
       | Validate_errors.Anonymous.Already_denounced {kind; _}
-        when kind = Validate_errors.Anonymous.Endorsement ->
+        when kind = Validate_errors.Anonymous.Attestation ->
           true
       | _ -> false)
 

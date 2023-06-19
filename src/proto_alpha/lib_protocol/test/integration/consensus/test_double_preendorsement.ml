@@ -64,7 +64,7 @@ end = struct
   let invalid_denunciation loc res =
     Assert.proto_error ~loc res (function
         | Validate_errors.Anonymous.Invalid_denunciation kind
-          when kind = Validate_errors.Anonymous.Preendorsement ->
+          when kind = Validate_errors.Anonymous.Preattestation ->
             true
         | _ -> false)
 
@@ -93,21 +93,21 @@ end = struct
   let already_denounced loc res =
     Assert.proto_error ~loc res (function
         | Validate_errors.Anonymous.Already_denounced {kind; _}
-          when kind = Validate_errors.Anonymous.Preendorsement ->
+          when kind = Validate_errors.Anonymous.Preattestation ->
             true
         | _ -> false)
 
   let inconsistent_denunciation loc res =
     Assert.proto_error ~loc res (function
         | Validate_errors.Anonymous.Inconsistent_denunciation {kind; _}
-          when kind = Validate_errors.Anonymous.Preendorsement ->
+          when kind = Validate_errors.Anonymous.Preattestation ->
             true
         | _ -> false)
 
   let outdated_denunciation loc res =
     Assert.proto_error ~loc res (function
         | Validate_errors.Anonymous.Outdated_denunciation {kind; _}
-          when kind = Validate_errors.Anonymous.Preendorsement ->
+          when kind = Validate_errors.Anonymous.Preattestation ->
             true
         | _ -> false)
 
@@ -330,7 +330,7 @@ end = struct
     >>= fun e ->
     Assert.proto_error ~loc:__LOC__ e (function
         | Validate_errors.Anonymous.Conflicting_denunciation {kind; _}
-          when kind = Validate_errors.Anonymous.Preendorsement ->
+          when kind = Validate_errors.Anonymous.Preattestation ->
             true
         | _ -> false)
     >>=? fun () ->
