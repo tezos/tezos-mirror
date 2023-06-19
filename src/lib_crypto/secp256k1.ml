@@ -317,6 +317,10 @@ let sign ?watermark sk msg =
   in
   Sign.sign_exn context ~sk (Bigstring.of_bytes msg)
 
+let sign_keccak256 sk msg =
+  let msg = Hacl.Hash.Keccak_256.digest msg in
+  Sign.sign_exn context ~sk (Bigstring.of_bytes msg)
+
 let check ?watermark public_key signature msg =
   let msg =
     Blake2B.to_bytes @@ Blake2B.hash_bytes

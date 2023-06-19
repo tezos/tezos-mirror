@@ -28,3 +28,6 @@
 include S.SIGNATURE with type watermark = Bytes.t
 
 include S.RAW_DATA with type t := t
+
+(** Signs the Keccak256 hash of bytes, instead of BLAKE2b. *)
+val sign_keccak256 : Secret_key.t -> bytes -> t
