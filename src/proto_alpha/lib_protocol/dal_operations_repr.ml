@@ -75,7 +75,9 @@ module Publish_slot_header = struct
       ({published_level; slot_index; commitment; commitment_proof} as operation)
       =
     let open Result_syntax in
-    let* max_slot_index = Dal_slot_index_repr.of_int (number_of_slots - 1) in
+    let* max_slot_index =
+      Dal_slot_index_repr.of_int ~number_of_slots (number_of_slots - 1)
+    in
     let* () =
       error_unless
         Compare.Int.(

@@ -31,8 +31,6 @@
    accommodate for higher values. *)
 type t
 
-val max_value : t
-
 val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit
@@ -41,16 +39,16 @@ val zero : t
 
 type error += Invalid_slot_index of {given : t; min : t; max : t}
 
-val check_is_in_range : t -> unit tzresult
+val check_is_in_range : number_of_slots:int -> t -> unit tzresult
 
-(** [of_int n] constructs a value of type {!t} from [n]. Returns
+(** [of_int ~number_of_slots n] constructs a value of type {!t} from [n]. Returns
       {!Invalid_slot_index} in case the given value is not in the interval
-      [[zero, max_value]]. *)
-val of_int : int -> t tzresult
+      [[zero, number_of_slots-1]]. *)
+val of_int : number_of_slots:int -> int -> t tzresult
 
-(** [of_int_opt n] constructs a value of type {!t} from [n]. Returns [None]
-      in case the given value is not in the interval [[zero, max_value]]. *)
-val of_int_opt : int -> t option
+(** [of_int_opt ~number_of_slots n] constructs a value of type {!t} from [n]. Returns [None]
+      in case the given value is not in the interval [[zero, number_of_slots-1]]. *)
+val of_int_opt : number_of_slots:int -> int -> t option
 
 val to_int : t -> int
 
@@ -60,13 +58,15 @@ val compare : t -> t -> int
 
 val equal : t -> t -> bool
 
-(** [slots_range ~lower ~upper] returns the list of slots indexes between
+(** [slots_range ~number_of_slots ~lower ~upper] returns the list of slots indexes between
       [lower] and [upper].
 
-      If [lower] is negative or [upper] is bigger than [max_value], the function
+      If [lower] is negative or [upper] is bigger than or equal to [number_of_slots], the function
       returns {!Invalid_slot_index}. *)
-val slots_range : lower:int -> upper:int -> t list tzresult
+val slots_range :
+  number_of_slots:int -> lower:int -> upper:int -> t list tzresult
 
-(** [slots_range_opt ~lower ~upper] is similar to {!slots_range}, but return
+(** [slots_range_opt ~number_of_slots ~lower ~upper] is similar to {!slots_range}, but return
     [None] instead of an error. *)
-val slots_range_opt : lower:int -> upper:int -> t list option
+val slots_range_opt :
+  number_of_slots:int -> lower:int -> upper:int -> t list option

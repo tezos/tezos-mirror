@@ -650,12 +650,15 @@ let get_dal_attestations state ~level =
         []
         delegates
       >>=? fun attestations ->
+      let number_of_slots =
+        state.global_state.constants.parametric.dal.number_of_slots
+      in
       List.map
         (fun (delegate, attestation_flags) ->
           let attestation =
             List.fold_left_i
               (fun i acc flag ->
-                match Dal.Slot_index.of_int_opt i with
+                match Dal.Slot_index.of_int_opt ~number_of_slots i with
                 | Some index when flag -> Dal.Attestation.commit acc index
                 | None | Some _ -> acc)
               Dal.Attestation.empty

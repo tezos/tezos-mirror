@@ -189,9 +189,12 @@ let gen_inbox =
       | Error e ->
           Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e))
 
+let number_of_slots = 256
+
 let gen_slot_index =
   let open QCheck2.Gen in
-  graft_corners (int_bound 0xff) [0; 1; 2; 0xff] ()
+  let max = number_of_slots - 1 in
+  graft_corners (int_bound max) [0; 1; 2; max] ()
 
 let gen_page_index =
   let open QCheck2.Gen in
@@ -232,7 +235,9 @@ let gen_slot_history =
   let open QCheck2.Gen in
   let h = Dal.Slots_history.genesis in
   let+ l = gen_slot_headers in
-  let l = List.map Sc_rollup_proto_types.Dal.Slot_header.of_octez l in
+  let l =
+    List.map (Sc_rollup_proto_types.Dal.Slot_header.of_octez ~number_of_slots) l
+  in
   Dal.Slots_history.add_confirmed_slot_headers_no_cache h l |> function
   | Error e ->
       Stdlib.failwith (Format.asprintf "%a" Environment.Error_monad.pp_trace e)
@@ -244,7 +249,9 @@ let gen_slot_history_cache =
   let h = Dal.Slots_history.genesis in
   let c = Dal.Slots_history.History_cache.empty ~capacity:Int64.max_int in
   let+ l = gen_slot_headers in
-  let l = List.map Sc_rollup_proto_types.Dal.Slot_header.of_octez l in
+  let l =
+    List.map (Sc_rollup_proto_types.Dal.Slot_header.of_octez ~number_of_slots) l
+  in
   Dal.Slots_history.add_confirmed_slot_headers h c l |> function
   | Error e ->
       Stdlib.failwith (Format.asprintf "%a" Environment.Error_monad.pp_trace e)
@@ -373,7 +380,7 @@ let test_slot_index =
     "dal_slot_index"
     gen_slot_index
     Sc_rollup_proto_types.Dal.Slot_index.to_octez
-    Sc_rollup_proto_types.Dal.Slot_index.of_octez
+    (Sc_rollup_proto_types.Dal.Slot_index.of_octez ~number_of_slots)
     Octez_smart_rollup.Dal.Slot_index.encoding
     Protocol.Alpha_context.Dal.Slot_index.encoding
 
@@ -393,7 +400,7 @@ let test_slot_header =
     "dal_slot_header"
     gen_slot_header
     Sc_rollup_proto_types.Dal.Slot_header.to_octez
-    Sc_rollup_proto_types.Dal.Slot_header.of_octez
+    (Sc_rollup_proto_types.Dal.Slot_header.of_octez ~number_of_slots)
     Octez_smart_rollup.Dal.Slot_header.encoding
     Protocol.Alpha_context.Dal.Slot.Header.encoding
 

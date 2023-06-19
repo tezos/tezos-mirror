@@ -121,7 +121,8 @@ module Dal : sig
   module Slot_index : sig
     type t = Dal.Slot_index.t
 
-    val of_octez : Octez_smart_rollup.Dal.Slot_index.t -> t
+    val of_octez :
+      number_of_slots:int -> Octez_smart_rollup.Dal.Slot_index.t -> t
 
     val to_octez : t -> Octez_smart_rollup.Dal.Slot_index.t
   end
@@ -137,7 +138,8 @@ module Dal : sig
   module Slot_header : sig
     type t = Dal.Slot.Header.t
 
-    val of_octez : Octez_smart_rollup.Dal.Slot_header.t -> t
+    val of_octez :
+      number_of_slots:int -> Octez_smart_rollup.Dal.Slot_header.t -> t
 
     val to_octez : t -> Octez_smart_rollup.Dal.Slot_header.t
   end

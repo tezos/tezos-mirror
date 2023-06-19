@@ -3272,14 +3272,23 @@ let commands_rw () =
            cctxt ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* {parametric = {dal = {number_of_slots; _}; _}; _} =
+          Alpha_services.Constants.all
+            cctxt
+            (cctxt#chain, `Level (Raw_level.to_int32 published_level))
+        in
         let* slot_index =
-          match Alpha_context.Dal.Slot_index.of_int slot_index with
+          match
+            Alpha_context.Dal.Slot_index.of_int ~number_of_slots slot_index
+          with
           | Ok i -> return i
           | Error err ->
               cctxt#error
-                "Bad slot index: %a"
+                "Bad slot index: %a. A slot index should be in the interval \
+                 [0;%d]."
                 Environment.Error_monad.pp_trace
                 err
+                (number_of_slots - 1)
         in
         let slot_header =
           Alpha_context.Dal.Operations.Publish_slot_header.

@@ -1105,7 +1105,8 @@ let save_protocol_info node_ctxt (block : Layer1.header)
       in
       Store.Protocols.write node_ctxt.store.protocols protocols
 
-let get_slot_header {store; _} ~published_in_block_hash slot_index =
+let get_slot_header {store; protocol_constants; _} ~published_in_block_hash
+    slot_index =
   Error.trace_lwt_result_with
     "Could not retrieve slot header for slot index %a published in block %a"
     Dal.Slot_index.pp
@@ -1120,26 +1121,36 @@ let get_slot_header {store; _} ~published_in_block_hash slot_index =
       ~primary_key:published_in_block_hash
       ~secondary_key:(Sc_rollup_proto_types.Dal.Slot_index.to_octez slot_index)
   in
-  Sc_rollup_proto_types.Dal.Slot_header.of_octez header
+  Sc_rollup_proto_types.Dal.Slot_header.of_octez
+    ~number_of_slots:protocol_constants.parametric.dal.number_of_slots
+    header
 
-let get_all_slot_headers {store; _} ~published_in_block_hash =
+let get_all_slot_headers {store; protocol_constants; _} ~published_in_block_hash
+    =
   let open Lwt_result_syntax in
   let+ headers =
     Store.Dal_slots_headers.list_values
       store.irmin_store
       ~primary_key:published_in_block_hash
   in
-  List.rev_map Sc_rollup_proto_types.Dal.Slot_header.of_octez headers
+  List.rev_map
+    (Sc_rollup_proto_types.Dal.Slot_header.of_octez
+       ~number_of_slots:protocol_constants.parametric.dal.number_of_slots)
+    headers
   |> List.rev
 
-let get_slot_indexes {store; _} ~published_in_block_hash =
+let get_slot_indexes {store; protocol_constants; _} ~published_in_block_hash =
   let open Lwt_result_syntax in
   let+ indexes =
     Store.Dal_slots_headers.list_secondary_keys
       store.irmin_store
       ~primary_key:published_in_block_hash
   in
-  List.rev_map Sc_rollup_proto_types.Dal.Slot_index.of_octez indexes |> List.rev
+  List.rev_map
+    (Sc_rollup_proto_types.Dal.Slot_index.of_octez
+       ~number_of_slots:protocol_constants.parametric.dal.number_of_slots)
+    indexes
+  |> List.rev
 
 let save_slot_header {store; _} ~published_in_block_hash
     (slot_header : Dal.Slot.Header.t) =
@@ -1156,7 +1167,8 @@ let find_slot_status {store; _} ~confirmed_in_block_hash slot_index =
     ~primary_key:confirmed_in_block_hash
     ~secondary_key:(Sc_rollup_proto_types.Dal.Slot_index.to_octez slot_index)
 
-let list_slots_statuses {store; _} ~confirmed_in_block_hash =
+let list_slots_statuses {store; protocol_constants; _} ~confirmed_in_block_hash
+    =
   let open Lwt_result_syntax in
   let+ statuses =
     Store.Dal_slots_statuses.list_secondary_keys_with_values
@@ -1165,7 +1177,10 @@ let list_slots_statuses {store; _} ~confirmed_in_block_hash =
   in
   List.rev_map
     (fun (index, status) ->
-      (Sc_rollup_proto_types.Dal.Slot_index.of_octez index, status))
+      ( Sc_rollup_proto_types.Dal.Slot_index.of_octez
+          ~number_of_slots:protocol_constants.parametric.dal.number_of_slots
+          index,
+        status ))
     statuses
   |> List.rev
 

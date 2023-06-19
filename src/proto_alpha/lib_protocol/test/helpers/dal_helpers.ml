@@ -154,7 +154,10 @@ struct
 
   let succ_slot_index index =
     Option.value_f
-      Slot_index.(of_int_opt (to_int index + 1))
+      Slot_index.(
+        of_int_opt
+          ~number_of_slots:Parameters.dal_parameters.number_of_slots
+          (to_int index + 1))
       ~default:(fun () -> Slot_index.zero)
 
   let next_char c = Char.(chr ((code c + 1) mod 255))

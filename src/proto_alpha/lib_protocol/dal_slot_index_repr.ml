@@ -25,8 +25,6 @@
 
 type t = int
 
-let max_value = 255
-
 let encoding = Data_encoding.uint8
 
 let pp = Format.pp_print_int
@@ -56,17 +54,19 @@ let () =
       | _ -> None)
     (fun (given, min, max) -> Invalid_slot_index {given; min; max})
 
-let check_is_in_range slot_index =
+let check_is_in_range ~number_of_slots slot_index =
   error_unless
-    Compare.Int.(slot_index >= zero && slot_index <= max_value)
-    (Invalid_slot_index {given = slot_index; min = zero; max = max_value})
+    Compare.Int.(slot_index >= zero && slot_index < number_of_slots)
+    (Invalid_slot_index
+       {given = slot_index; min = zero; max = number_of_slots + 1})
 
-let of_int slot_index =
+let of_int ~number_of_slots slot_index =
   let open Result_syntax in
-  let* () = check_is_in_range slot_index in
+  let* () = check_is_in_range ~number_of_slots slot_index in
   return slot_index
 
-let of_int_opt slot_index = Option.of_result @@ of_int slot_index
+let of_int_opt ~number_of_slots slot_index =
+  Option.of_result @@ of_int ~number_of_slots slot_index
 
 let to_int slot_index = slot_index [@@ocaml.inline always]
 
@@ -76,11 +76,11 @@ let compare = Compare.Int.compare
 
 let equal = Compare.Int.equal
 
-let slots_range ~lower ~upper =
+let slots_range ~number_of_slots ~lower ~upper =
   let open Result_syntax in
-  let* () = check_is_in_range lower in
-  let* () = check_is_in_range upper in
+  let* () = check_is_in_range ~number_of_slots lower in
+  let* () = check_is_in_range ~number_of_slots upper in
   return Misc.(lower --> upper)
 
-let slots_range_opt ~lower ~upper =
-  Option.of_result @@ slots_range ~lower ~upper
+let slots_range_opt ~number_of_slots ~lower ~upper =
+  Option.of_result @@ slots_range ~number_of_slots ~lower ~upper

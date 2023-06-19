@@ -121,7 +121,10 @@ module Plugin = struct
         metadata.protocol_data.dal_attestation
     in
     let* all_slots =
-      Dal.Slot_index.slots_range ~lower:0 ~upper:(number_of_slots - 1)
+      Dal.Slot_index.slots_range
+        ~number_of_slots
+        ~lower:0
+        ~upper:(number_of_slots - 1)
       |> Environment.wrap_tzresult
     in
     List.filter (Dal.Attestation.is_attested confirmed_slots) all_slots
