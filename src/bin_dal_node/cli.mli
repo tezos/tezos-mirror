@@ -35,7 +35,7 @@ type options = {
   rpc_addr : P2p_point.Id.t;
       (** The endpoint on which the DAL node can be contacted for RPCs. *)
   expected_pow : float;  (** The expected proof of work for the P2P identity. *)
-  net_addr : P2p_point.Id.t;
+  listen_addr : P2p_point.Id.t;
       (** The endpoint on which the DAL node can be contacted by other DAL nodes. *)
   endpoint : Uri.t;  (** The endpoint on which to contact the L1 node. *)
   use_unsafe_srs_for_tests : bool;

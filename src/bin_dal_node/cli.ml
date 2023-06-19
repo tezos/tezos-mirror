@@ -168,7 +168,7 @@ type options = {
   data_dir : string;
   rpc_addr : P2p_point.Id.t;
   expected_pow : float;
-  net_addr : P2p_point.Id.t;
+  listen_addr : P2p_point.Id.t;
   endpoint : Uri.t;
   use_unsafe_srs_for_tests : bool;
 }
@@ -176,7 +176,7 @@ type options = {
 type t = Run | Config_init
 
 let make ~run =
-  let run subcommand data_dir rpc_addr expected_pow net_addr endpoint
+  let run subcommand data_dir rpc_addr expected_pow listen_addr endpoint
       use_unsafe_srs_for_tests =
     run
       subcommand
@@ -184,7 +184,7 @@ let make ~run =
         data_dir;
         rpc_addr;
         expected_pow;
-        net_addr;
+        listen_addr;
         endpoint;
         use_unsafe_srs_for_tests;
       }

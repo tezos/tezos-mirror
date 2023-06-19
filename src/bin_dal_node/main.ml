@@ -30,7 +30,7 @@ let run subcommand
         endpoint;
         rpc_addr;
         expected_pow;
-        net_addr;
+        listen_addr;
         use_unsafe_srs_for_tests;
       } =
   match subcommand with
@@ -46,7 +46,7 @@ let run subcommand
             use_unsafe_srs = use_unsafe_srs_for_tests;
             neighbors = default.neighbors;
             peers = default.peers;
-            listen_addr = net_addr;
+            listen_addr;
             expected_pow;
             network_name = default.network_name;
             endpoint = default.endpoint;
