@@ -913,6 +913,7 @@ val test :
   ?dep_globs_rec:string list ->
   ?locks:string ->
   ?enabled_if:Dune.s_expr ->
+  ?lib_deps:target list ->
   string maker
 
 (** Same as {!test} but with several names, to define multiple tests at once. *)
@@ -923,6 +924,7 @@ val tests :
   ?dep_globs_rec:string list ->
   ?locks:string ->
   ?enabled_if:Dune.s_expr ->
+  ?lib_deps:target list ->
   string list maker
 
 (** Register a Tezt test.

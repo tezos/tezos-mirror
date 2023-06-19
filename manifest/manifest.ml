@@ -1003,18 +1003,6 @@ module Target = struct
      name for [public_name] stanzas in [dune] and the name in [.opam] files. *)
   type full_name = {internal_name : string; public_name : string}
 
-  type kind =
-    | Public_library of full_name
-    | Private_library of string
-    | Public_executable of full_name Ne_list.t
-    | Private_executable of string Ne_list.t
-    | Test_executable of {
-        names : string Ne_list.t;
-        runtest_alias : string option;
-        locks : string option;
-        enabled_if : Dune.s_expr option;
-      }
-
   type preprocessor_dep = File of string
 
   type release_status = Unreleased | Experimental | Released | Auto_opam
@@ -1027,12 +1015,26 @@ module Target = struct
     | Released -> "Released"
     | Auto_opam -> "Auto_opam"
 
-  type internal = {
+  type kind =
+    | Public_library of full_name
+    | Private_library of string
+    | Public_executable of full_name Ne_list.t
+    | Private_executable of string Ne_list.t
+    | Test_executable of {
+        names : string Ne_list.t;
+        runtest_alias : string option;
+        locks : string option;
+        enabled_if : Dune.s_expr option;
+        lib_deps : t option list;
+      }
+
+  and internal = {
     bisect_ppx : bisect_ppx;
     time_measurement_ppx : bool;
     c_library_flags : string list option;
     conflicts : t list;
     deps : t list;
+    tests_deps : t option list;
     dune : Dune.s_expr;
     flags : Flags.t option;
     foreign_stubs : Dune.foreign_stubs option;
@@ -1531,6 +1533,9 @@ module Target = struct
     let bisect_ppx =
       Option.value bisect_ppx ~default:(if not_a_test then Yes else No)
     in
+    let tests_deps =
+      match kind with Test_executable {lib_deps; _} -> lib_deps | _ -> []
+    in
     let runtest_rules =
       let run_js = js_compatible in
       let run_native =
@@ -1539,7 +1544,8 @@ module Target = struct
         | Some modes -> List.mem Dune.Native modes
       in
       match (kind, opam, dep_files) with
-      | ( Test_executable {names; runtest_alias = Some alias; locks; enabled_if},
+      | ( Test_executable
+            {names; runtest_alias = Some alias; locks; enabled_if; _},
           package,
           _ ) ->
           let runtest_js_rules =
@@ -1576,7 +1582,13 @@ module Target = struct
           in
           runtest_rules @ runtest_js_rules
       | ( Test_executable
-            {names = name, _; runtest_alias = None; locks = _; enabled_if = _},
+            {
+              names = name, _;
+              runtest_alias = None;
+              locks = _;
+              enabled_if = _;
+              lib_deps = _;
+            },
           _,
           _ :: _ ) ->
           invalid_argf
@@ -1636,6 +1648,7 @@ module Target = struct
         extra_authors;
         ctypes;
         with_macos_security_framework;
+        tests_deps;
       }
 
   let public_lib ?internal_name =
@@ -1695,7 +1708,7 @@ module Target = struct
     | head :: tail -> Private_executable (head, tail)
 
   let test ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec ?locks
-      ?enabled_if =
+      ?enabled_if ?(lib_deps = []) =
     (match (alias, enabled_if, locks) with
     | "", Some _, _ | "", _, Some _ ->
         invalid_arg
@@ -1703,10 +1716,11 @@ module Target = struct
     | _ -> ()) ;
     let runtest_alias = if alias = "" then None else Some alias in
     internal ?dep_files ?dep_globs ?dep_globs_rec @@ fun test_name ->
-    Test_executable {names = (test_name, []); runtest_alias; locks; enabled_if}
+    Test_executable
+      {names = (test_name, []); runtest_alias; locks; enabled_if; lib_deps}
 
   let tests ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec ?locks
-      ?enabled_if =
+      ?enabled_if ?(lib_deps = []) =
     (match (alias, enabled_if, locks) with
     | "", Some _, _ | "", _, Some _ ->
         invalid_arg
@@ -1717,7 +1731,8 @@ module Target = struct
     match test_names with
     | [] -> invalid_arg "Target.tests: at least one name must be given"
     | head :: tail ->
-        Test_executable {names = (head, tail); runtest_alias; locks; enabled_if}
+        Test_executable
+          {names = (head, tail); runtest_alias; locks; enabled_if; lib_deps}
 
   let vendored_lib ?(released_on_opam = true) ?main_module
       ?(js_compatible = false) ?(npm_deps = []) name version =
@@ -1924,6 +1939,7 @@ let register_tezt_targets ~make_tezt_exe =
         tezt_local_test_lib;
         preprocess;
         preprocessor_deps;
+        lib_deps;
         _;
       } =
     tezt_test_libs := tezt_local_test_lib :: !tezt_test_libs ;
@@ -1949,6 +1965,7 @@ let register_tezt_targets ~make_tezt_exe =
                Tezt worker processes are collected. *)
           ~bisect_ppx:With_sigterm
           ~deps:(tezt_local_test_lib :: deps)
+          ~lib_deps
           ~dep_globs
           ~dep_globs_rec
           ~dep_files
@@ -2377,8 +2394,25 @@ let compute_opam_release_graph () : opam_dependency_graph_node String_map.t =
           | Some {opam = Some pkg; _} ->
               if pkg = package_name then acc else String_set.add pkg acc
         in
+        let add_tests_dependency acc (target : Target.t option) =
+          match target with
+          | Some target -> (
+              match Target.get_internal target with
+              | None | Some {opam = None; _} -> acc
+              | Some {opam = Some pkg; _} ->
+                  if pkg = package_name then acc else String_set.add pkg acc)
+          | None -> acc
+        in
         let add_internal_dependency acc internal =
-          List.fold_left add_dependency acc (Target.all_internal_deps internal)
+          let tests_deps =
+            List.fold_left add_tests_dependency acc internal.Target.tests_deps
+          in
+          String_set.union
+            (List.fold_left
+               add_dependency
+               acc
+               (Target.all_internal_deps internal))
+            tests_deps
         in
         List.fold_left add_internal_dependency String_set.empty internals
       in
