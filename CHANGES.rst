@@ -224,6 +224,11 @@ Smart Rollup node
 - Added a new metrics ``head_inbox_process_time`` to report the time the rollup
   node spent to process a new Layer 1 head. (MR :gl:`!8971`)
 
+- **Breaking change** Field ``"messages"`` of RPC ``/global/block/{block_id}``
+  now contains *serialized* messages (external messages start with ``01`` and
+  internal start with ``00``). (MR :gl:`!8876`)
+
+
 Smart Rollup client
 -------------------
 
