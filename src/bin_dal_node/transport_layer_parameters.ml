@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let init_identity_file ~data_dir ~expected_pow =
+let init_identity_file configuration =
   let open Lwt_result_syntax in
   let check_data_dir ~data_dir:_ =
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5566
@@ -33,20 +33,25 @@ let init_identity_file ~data_dir ~expected_pow =
        node ? *)
     return_unit
   in
-  let identity_file = Configuration_file.identity_file ~data_dir in
-  Identity_file.init ~check_data_dir ~identity_file ~expected_pow
+  let identity_file = Configuration_file.identity_file configuration in
+  Identity_file.init
+    ~check_data_dir
+    ~identity_file
+    ~expected_pow:configuration.expected_pow
 
-let p2p_config Configuration_file.{expected_pow; data_dir; listen_addr; _} =
+let p2p_config configuration =
   let open Lwt_result_syntax in
   let open Gossipsub.Transport_layer.Default_parameters in
-  let* identity = init_identity_file ~data_dir ~expected_pow in
-  let p2p_addr, p2p_port = listen_addr in
+  let* identity = init_identity_file configuration in
+  let p2p_addr, p2p_port = configuration.listen_addr in
   let reconnection_config =
     let open P2p_reconnection_config in
     Point_reconnection_config.
       {factor; initial_delay; disconnection_delay; increase_cap}
   in
-  let proof_of_work_target' = Crypto_box.make_pow_target expected_pow in
+  let proof_of_work_target' =
+    Crypto_box.make_pow_target configuration.expected_pow
+  in
   let config =
     let open P2p_config in
     {
@@ -56,7 +61,7 @@ let p2p_config Configuration_file.{expected_pow; data_dir; listen_addr; _} =
       discovery_addr;
       advertised_port = Some p2p_port;
       trusted_points;
-      peers_file = Configuration_file.peers_file ~data_dir;
+      peers_file = Configuration_file.peers_file configuration;
       private_mode;
       identity;
       proof_of_work_target = proof_of_work_target';

@@ -235,6 +235,6 @@ let load ~data_dir =
   let config = Data_encoding.Json.destruct encoding json in
   {config with data_dir}
 
-let identity_file ~data_dir = Filename.concat data_dir "identity.json"
+let identity_file {data_dir; _} = Filename.concat data_dir "identity.json"
 
-let peers_file ~data_dir = Filename.concat data_dir "peers.json"
+let peers_file {data_dir; _} = Filename.concat data_dir "peers.json"
