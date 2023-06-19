@@ -2659,7 +2659,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     ~(block_producer : Consensus_key.t) ~(payload_producer : Consensus_key.t) =
   let open Lwt_result_syntax in
   let level = Level.current ctxt in
-  let endorsing_power = Consensus.current_endorsement_power ctxt in
+  let attestation_power = Consensus.current_endorsement_power ctxt in
   let* required_endorsements =
     are_endorsements_required ctxt ~level:level.level
   in
@@ -2692,7 +2692,9 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
   let* ctxt, reward_bonus =
     if required_endorsements then
       let* ctxt = record_endorsing_participation ctxt in
-      let*? rewards_bonus = Baking.bonus_baking_reward ctxt ~endorsing_power in
+      let*? rewards_bonus =
+        Baking.bonus_baking_reward ctxt ~attestation_power
+      in
       return (ctxt, Some rewards_bonus)
     else return (ctxt, None)
   in
