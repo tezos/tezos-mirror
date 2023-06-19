@@ -1052,16 +1052,10 @@ Operations on timelock
 Events
 ~~~~~~
 
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
+
 - ``EMIT %tag 'ty``: constructs an operation that will write an event into
-  the transaction receipt after the successful execution of this contract.
-  It accepts as arguments an annotation as a tag to the emitted event and
-  the type of data attachment.
-
-  See :doc:`Event <event>` for more information.
-
-::
-
-    :: 'ty : 'S -> operation : 'S
+  the transaction receipt (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EMIT>`__).
 
 
 Removed instructions and types
