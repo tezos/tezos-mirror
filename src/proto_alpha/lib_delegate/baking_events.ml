@@ -569,23 +569,12 @@ module Actions = struct
 
   let section = section @ ["actions"]
 
-  let skipping_preendorsement =
+  let skipping_preattestation =
     declare_2
       ~section
-      ~name:"skipping_preendorsement"
+      ~name:"skipping_preattestation"
       ~level:Error
-      ~msg:"unable to sign preendorsement for {delegate} -- {trace}"
-      ~pp1:Baking_state.pp_consensus_key_and_delegate
-      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp2:Error_monad.pp_print_trace
-      ("trace", Error_monad.trace_encoding)
-
-  let skipping_endorsement =
-    declare_2
-      ~section
-      ~name:"skipping_endorsement"
-      ~level:Error
-      ~msg:"unable to sign endorsement for {delegate} -- {trace}"
+      ~msg:"unable to sign preattestation for {delegate} -- {trace}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Error_monad.pp_print_trace
@@ -602,23 +591,34 @@ module Actions = struct
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
-  let failed_to_inject_preendorsement =
+  let skipping_dal_attestation =
     declare_2
       ~section
-      ~name:"failed_to_inject_preendorsement"
+      ~name:"skipping_dal_attestation"
       ~level:Error
-      ~msg:"failed to inject preendorsement for {delegate} -- {trace}"
+      ~msg:"unable to sign dal attestation for {delegate} -- {trace}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
-  let failed_to_inject_endorsement =
+  let failed_to_inject_preattestation =
     declare_2
       ~section
-      ~name:"failed_to_inject_endorsement"
+      ~name:"failed_to_inject_preattestation"
       ~level:Error
-      ~msg:"failed to inject endorsement for {delegate} -- {trace}"
+      ~msg:"failed to inject preattestation for {delegate} -- {trace}"
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp2:Error_monad.pp_print_trace
+      ("trace", Error_monad.trace_encoding)
+
+  let failed_to_inject_attestation =
+    declare_2
+      ~section
+      ~name:"failed_to_inject_attestation"
+      ~level:Error
+      ~msg:"failed to inject attestation for {delegate} -- {trace}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Error_monad.pp_print_trace
@@ -635,13 +635,13 @@ module Actions = struct
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
 
-  let preendorsement_injected =
+  let preattestation_injected =
     declare_4
       ~section
-      ~name:"preendorsement_injected"
+      ~name:"preattestation_injected"
       ~level:Notice
       ~msg:
-        "injected preendorsement {ophash} for {delegate} for level {level}, \
+        "injected preattestation {ophash} for {delegate} for level {level}, \
          round {round}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
@@ -652,13 +652,13 @@ module Actions = struct
       ~pp4:Round.pp
       ("round", Round.encoding)
 
-  let endorsement_injected =
+  let attestation_injected =
     declare_4
       ~section
-      ~name:"endorsement_injected"
+      ~name:"attestation_injected"
       ~level:Notice
       ~msg:
-        "injected endorsement {ophash} for {delegate} for level {level}, round \
+        "injected attestation {ophash} for {delegate} for level {level}, round \
          {round}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
@@ -669,12 +669,13 @@ module Actions = struct
       ~pp4:Round.pp
       ("round", Round.encoding)
 
-  let attestation_injected =
+  let dal_attestation_injected =
     declare_3
       ~section
-      ~name:"attestation_injected"
+      ~name:"dal_attestation_injected"
       ~level:Notice
-      ~msg:"injected attestation {ophash} with bitset {bitset} for {delegate}"
+      ~msg:
+        "injected dal attestation {ophash} with bitset {bitset} for {delegate}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
       ~pp2:Baking_state.pp_consensus_key_and_delegate
@@ -747,21 +748,21 @@ module Actions = struct
       ("round", Round.encoding)
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
-  let signing_preendorsement =
+  let signing_preattestation =
     declare_1
       ~section
-      ~name:"signing_preendorsement"
+      ~name:"signing_preattestation"
       ~level:Info
-      ~msg:"signing preendorsement for {delegate}"
+      ~msg:"signing preattestation for {delegate}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
-  let signing_endorsement =
+  let signing_attestation =
     declare_1
       ~section
-      ~name:"signing_endorsement"
+      ~name:"signing_attestation"
       ~level:Info
-      ~msg:"signing endorsement for {delegate}"
+      ~msg:"signing attestation for {delegate}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 

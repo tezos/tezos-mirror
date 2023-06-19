@@ -155,8 +155,8 @@ type t = action
 let pp_action fmt = function
   | Do_nothing -> Format.fprintf fmt "do nothing"
   | Inject_block _ -> Format.fprintf fmt "inject block"
-  | Inject_preendorsements _ -> Format.fprintf fmt "inject preendorsements"
-  | Inject_endorsements _ -> Format.fprintf fmt "inject endorsements"
+  | Inject_preendorsements _ -> Format.fprintf fmt "inject preattestations"
+  | Inject_endorsements _ -> Format.fprintf fmt "inject attestations"
   | Update_to_level _ -> Format.fprintf fmt "update to level"
   | Synchronize_round _ -> Format.fprintf fmt "synchronize round"
   | Watch_proposal -> Format.fprintf fmt "watch proposal"
@@ -394,7 +394,7 @@ let inject_preendorsements state ~preendorsements =
   in
   List.filter_map_es
     (fun (((consensus_key, _) as delegate), consensus_content) ->
-      Events.(emit signing_preendorsement delegate) >>= fun () ->
+      Events.(emit signing_preattestation delegate) >>= fun () ->
       let shell =
         (* The branch is the latest finalized block. *)
         {
@@ -437,7 +437,7 @@ let inject_preendorsements state ~preendorsements =
         fail (Baking_highwatermarks.Block_previously_preattested {round; level}))
       >>= function
       | Error err ->
-          Events.(emit skipping_preendorsement (delegate, err)) >>= fun () ->
+          Events.(emit skipping_preattestation (delegate, err)) >>= fun () ->
           return_none
       | Ok signature ->
           let protocol_data =
@@ -452,12 +452,12 @@ let inject_preendorsements state ~preendorsements =
     (fun (delegate, operation, level, round) ->
       protect
         ~on_error:(fun err ->
-          Events.(emit failed_to_inject_preendorsement (delegate, err))
+          Events.(emit failed_to_inject_preattestation (delegate, err))
           >>= fun () -> return_unit)
         (fun () ->
           Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
           >>=? fun oph ->
-          Events.(emit preendorsement_injected (oph, delegate, level, round))
+          Events.(emit preattestation_injected (oph, delegate, level, round))
           >>= fun () -> return_unit))
     signed_operations
 
@@ -472,7 +472,7 @@ let sign_endorsements state endorsements =
   in
   List.filter_map_es
     (fun (((consensus_key, _) as delegate), consensus_content) ->
-      Events.(emit signing_endorsement delegate) >>= fun () ->
+      Events.(emit signing_attestation delegate) >>= fun () ->
       let shell =
         (* The branch is the latest finalized block. *)
         {
@@ -517,7 +517,7 @@ let sign_endorsements state endorsements =
       else fail (Baking_highwatermarks.Block_previously_attested {round; level}))
       >>= function
       | Error err ->
-          Events.(emit skipping_endorsement (delegate, err)) >>= fun () ->
+          Events.(emit skipping_attestation (delegate, err)) >>= fun () ->
           return_none
       | Ok signature ->
           let protocol_data =
@@ -556,7 +556,7 @@ let sign_dal_attestations state attestations =
         unsigned_operation_bytes
       >>= function
       | Error err ->
-          Events.(emit skipping_attestation (delegate, err)) >>= fun () ->
+          Events.(emit skipping_dal_attestation (delegate, err)) >>= fun () ->
           return_none
       | Ok signature ->
           let protocol_data =
@@ -576,12 +576,12 @@ let inject_endorsements state ~endorsements =
     (fun (delegate, operation, level, round) ->
       protect
         ~on_error:(fun err ->
-          Events.(emit failed_to_inject_endorsement (delegate, err))
+          Events.(emit failed_to_inject_attestation (delegate, err))
           >>= fun () -> return_unit)
         (fun () ->
           Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
           >>=? fun oph ->
-          Events.(emit endorsement_injected (oph, delegate, level, round))
+          Events.(emit attestation_injected (oph, delegate, level, round))
           >>= fun () -> return_unit))
     signed_operations
 
@@ -602,7 +602,7 @@ let inject_dal_attestations state attestations =
         encoded_op
       >>=? fun oph ->
       let bitset_int = Bitset.to_z (attestation :> Bitset.t) in
-      Events.(emit attestation_injected (oph, delegate, bitset_int))
+      Events.(emit dal_attestation_injected (oph, delegate, bitset_int))
       >>= fun () -> return_unit)
     signed_operations
 
