@@ -237,6 +237,22 @@ let%expect_test _ =
   in
   print_endline (make_with_pp_short ~color:Disabled pp_string ev) ;
   [%expect {| Apr 27 08:29:09.000: toto |}] ;
+  let ev_line_cut =
+    {ev with event = "totototototototototototototototo before_cut after_cut"}
+  in
+  print_endline
+    (String.escaped
+    @@ make_with_pp_short ~color:(Enabled None) pp_string ev_line_cut) ;
+  [%expect
+    {|
+       \027[1mApr 27 08:29:09.000: \027[0mtotototototototototototototototo before_cut\nApr 27 08:29:09.000: after_cut\n|}] ;
+  print_endline
+    (String.escaped @@ make_with_pp_short ~color:(Enabled None) pp_string ev) ;
+  [%expect {| \027[1mApr 27 08:29:09.000: \027[0mtoto\n|}] ;
+  print_endline
+    (String.escaped
+    @@ make_with_pp_short ~color:(Enabled (Some Color.FG.red)) pp_string ev) ;
+  [%expect {| \027[1mApr 27 08:29:09.000: \027[0m\027[31mtoto\027[0m\n|}] ;
   let ev = {ev with time_stamp = make_timestamp ts} in
   print_endline (make_with_pp_rfc5424 pp_string ev "my-event") ;
   [%expect {| 2023-04-27T08:29:09.777-00:00 [my.section.my-event] toto |}] ;
