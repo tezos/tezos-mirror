@@ -60,6 +60,8 @@ functor
 
     let debug_toggle = false
 
+    let debug msg v = if debug_toggle then debug msg v else ret unit
+
     let debug_array s a =
       if debug_toggle then debug s unit >* iterM (debug "") (Array.to_list a)
       else ret unit
