@@ -554,6 +554,7 @@ module External_validator_process = struct
 
   type validator_process = {
     process : Lwt_process.process_none;
+    process_socket : Lwt_unix.file_descr;
     input : Lwt_io.output_channel;
     output : Lwt_io.input_channel;
     canceler : Lwt_canceler.t;
@@ -726,7 +727,7 @@ module External_validator_process = struct
       Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
           clean_process_fd socket_path)
     in
-    let* process_socket, _ =
+    let* process_socket =
       Lwt.finalize
         (fun () ->
           let* process_socket =
@@ -735,7 +736,8 @@ module External_validator_process = struct
               ~max_requests:1
               ~socket_path
           in
-          let*! v = Lwt_unix.accept process_socket in
+          let*! v, _ = Lwt_unix.accept process_socket in
+          let*! () = Lwt_unix.close process_socket in
           return v)
         (fun () ->
           (* As the external validation process is now started, we can
@@ -761,6 +763,7 @@ module External_validator_process = struct
       Running
         {
           process;
+          process_socket;
           input = process_input;
           output = process_output;
           canceler;
@@ -779,6 +782,7 @@ module External_validator_process = struct
     | Running
         {
           process;
+          process_socket;
           input = process_input;
           output = process_output;
           canceler;
@@ -791,6 +795,11 @@ module External_validator_process = struct
                it automatically. *)
             let*! () = Error_monad.cancel_with_exceptions canceler in
             Lwt_exit.unregister_clean_up_callback clean_up_callback_id ;
+            let*! () =
+              Lwt.catch
+                (fun () -> Lwt_unix.close process_socket)
+                (fun _ -> Lwt.return_unit)
+            in
             vp.validator_process <- Uninitialized ;
             let*! () = Events.(emit process_exited_abnormally status) in
             start_process vp)
