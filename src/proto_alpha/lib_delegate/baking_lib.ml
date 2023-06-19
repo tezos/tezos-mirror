@@ -66,7 +66,7 @@ let preendorse (cctxt : Protocol_client_context.full) ?(force = false) delegates
   let proposal = state.level_state.latest_proposal in
   let*! () =
     Events.(
-      emit attempting_preendorse_proposal state.level_state.latest_proposal)
+      emit attempting_preattest_proposal state.level_state.latest_proposal)
   in
   let* () =
     if force then return_unit
@@ -98,7 +98,7 @@ let endorse (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   create_state cctxt ~config ~current_proposal delegates >>=? fun state ->
   let proposal = state.level_state.latest_proposal in
   let*! () =
-    Events.(emit attempting_endorse_proposal state.level_state.latest_proposal)
+    Events.(emit attempting_attest_proposal state.level_state.latest_proposal)
   in
   let* () =
     if force then return_unit

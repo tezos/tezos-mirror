@@ -279,12 +279,12 @@ module State_transitions = struct
       ~msg:"different branch proposal has the same prequorum"
       ()
 
-  let attempting_preendorse_proposal =
+  let attempting_preattest_proposal =
     declare_1
       ~section
-      ~name:"attempting_preendorsing_proposal"
+      ~name:"attempting_preattest_proposal"
       ~level:Info
-      ~msg:"attempting to preendorse proposal {block_hash}"
+      ~msg:"attempting to preattest proposal {block_hash}"
       ~pp1:Block_hash.pp
       ("block_hash", Block_hash.encoding)
 
@@ -316,12 +316,12 @@ module State_transitions = struct
       ~pp2:Round.pp
       ("round", Round.encoding)
 
-  let no_endorsable_payload_fresh_block =
+  let no_attestable_payload_fresh_block =
     declare_0
       ~section
-      ~name:"no_endorsable_payload_fresh_block"
+      ~name:"no_attestable_payload_fresh_block"
       ~level:Info
-      ~msg:"no endorsable payload, proposing fresh block"
+      ~msg:"no attestable payload, proposing fresh block"
       ()
 
   let repropose_block =
@@ -545,21 +545,21 @@ module Lib = struct
 
   let section = section @ ["lib"]
 
-  let attempting_preendorse_proposal =
+  let attempting_preattest_proposal =
     declare_1
       ~section
-      ~name:"attempting_preendorsing_proposal"
+      ~name:"attempting_preattest_proposal"
       ~level:Debug
-      ~msg:"attempting to preendorse proposal {proposal}"
+      ~msg:"attempting to preattest proposal {proposal}"
       ~pp1:Baking_state.pp_proposal
       ("proposal", Baking_state.proposal_encoding)
 
-  let attempting_endorse_proposal =
+  let attempting_attest_proposal =
     declare_1
       ~section
-      ~name:"attempting_endorsing_proposal"
+      ~name:"attempting_attest_proposal"
       ~level:Debug
-      ~msg:"attempting to endorse proposal {proposal}"
+      ~msg:"attempting to attest proposal {proposal}"
       ~pp1:Baking_state.pp_proposal
       ("proposal", Baking_state.proposal_encoding)
 end

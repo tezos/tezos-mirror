@@ -130,7 +130,7 @@ let preendorse state proposal =
     let new_state = update_current_phase state Idle in
     Lwt.return (new_state, Do_nothing)
   else
-    Events.(emit attempting_preendorse_proposal proposal.block.hash)
+    Events.(emit attempting_preattest_proposal proposal.block.hash)
     >>= fun () ->
     let new_state =
       (* We await for the block to be applied before updating its
@@ -510,7 +510,7 @@ let propose_block_action state delegate round (proposal : proposal) =
      may be older. *)
   match state.level_state.endorsable_payload with
   | None ->
-      Events.(emit no_endorsable_payload_fresh_block ()) >>= fun () ->
+      Events.(emit no_attestable_payload_fresh_block ()) >>= fun () ->
       (* For case 1, we may re-inject with the same payload or a fresh
          one. We make the choice of baking a fresh one: the previous
          proposal may have been rejected because the block may have been
