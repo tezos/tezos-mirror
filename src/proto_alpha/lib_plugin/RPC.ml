@@ -44,6 +44,11 @@ let default_operations_version = Version_0
 let version_arg =
   let open RPC_arg in
   make
+    ~descr:
+      "Supported RPC versions are version '0' (default but deprecated) that \
+       will output attestation operations as \"endorsement\" in the \"kind\" \
+       field and version '1' that will output \"attestation\" in the \"kind\" \
+       field"
     ~name:"version"
     ~destruct:version_of_string
     ~construct:string_of_version
