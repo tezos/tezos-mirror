@@ -156,6 +156,12 @@ Node
   ``preattestation``, ``double_attestation_evidence`` and
   ``double_preattestation_evidence`` kinds in the JSON result. (MR :gl:`!8891`)
 
+- Changed default stdout logs by adding simple coloration. The log header
+  header is now bold and warning and errors are highlighted. The
+  ``--log-coloring`` command line argument can be used to enable or
+  disable logs coloration on default stdout logs; it is enabled by
+  default. (MR :gl:`!8685`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
