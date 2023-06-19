@@ -64,7 +64,16 @@ let nack_test () =
   Test.register
     ~__FILE__
     ~title:"p2p socket nack"
-    ~tags:["p2p"; "socket"; "nack"]
+    ~tags:
+      [
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5903
+           The tests using forked processes are flaky, EBADF error is raised.
+        *)
+        "flaky";
+        "p2p";
+        "socket";
+        "nack";
+      ]
   @@ fun () ->
   let open Lwt_result_syntax in
   let encoding = Data_encoding.bytes in
@@ -109,7 +118,16 @@ module Self_identification = struct
     Test.register
       ~__FILE__
       ~title:"p2p socket self peer id"
-      ~tags:["p2p"; "socket"; "self_identification"]
+      ~tags:
+        [
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5903
+             The tests using forked processes are flaky, EBADF error is raised.
+          *)
+          "flaky";
+          "p2p";
+          "socket";
+          "self_identification";
+        ]
     @@ fun () ->
     let server _ch sched socket =
       let open Lwt_result_syntax in
@@ -157,7 +175,16 @@ module Self_identification = struct
     Test.register
       ~__FILE__
       ~title:"p2p socket self connection message"
-      ~tags:["p2p"; "socket"; "self_identification"]
+      ~tags:
+        [
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5903
+             The tests using forked processes are flaky, EBADF error is raised.
+          *)
+          "flaky";
+          "p2p";
+          "socket";
+          "self_identification";
+        ]
     @@ fun () ->
     let server _ch sched socket =
       let open Lwt_result_syntax in
