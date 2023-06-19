@@ -93,7 +93,9 @@ let sf = Format.asprintf
 
 let division_cost name =
   let const = fv (sf "%s_const" name) in
-  let coeff = fv (sf "%s_coeff" name) in
+  let size1_coeff = fv (sf "%s_size1_coeff" name) in
+  let q_coeff = fv (sf "%s_q_coeff" name) in
+  let q_size2_coeff = fv (sf "%s_q_size2_coeff" name) in
   let module M = struct
     type arg_type = int * (int * unit)
 
@@ -104,6 +106,12 @@ let division_cost name =
 
       let arity = Model.arity_2
 
+      (* Actual [ediv] implementation uses different algorithms
+         depending on the size of the arguments.
+         Ideally, the cost function should be the combination of
+         multiple affine functions branching on the arguments,
+         but the current model fits with only one affine function for simplicity.
+         For more discussion, see https://gitlab.com/tezos/tezos/-/issues/5480 *)
       let model =
         lam ~name:"size1" @@ fun size1 ->
         lam ~name:"size2" @@ fun size2 ->
@@ -111,7 +119,10 @@ let division_cost name =
            saturated subtraction. When [size1 < size2], the model evaluates to
            [const] as expected. *)
         let_ ~name:"q" (sat_sub size1 size2) @@ fun q ->
-        (free ~name:coeff * q * size2) + free ~name:const
+        (free ~name:q_size2_coeff * q * size2)
+        + (free ~name:size1_coeff * size1)
+        + (free ~name:q_coeff * q)
+        + free ~name:const
     end
 
     let name = ns name

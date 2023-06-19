@@ -170,7 +170,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 9001 from bootstrap1 to KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 --burn-cap 10 --entrypoint addLiquidity --arg '(Pair "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 1000000000 "2050-01-01T00:00:00Z")'
 Node is bootstrapped.
-Estimated gas: 9525.659 units (will add 100 for safety)
+Estimated gas: 9525.805 units (will add 100 for safety)
 Estimated storage: 147 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is 'oogW2v1pKn3Dtvr1iu5VcnLcaaWeYSd6rjA8m9VjjTHWzw5Tnnb'
@@ -203,7 +203,7 @@ This sequence of operations was run:
           0x0115eb0104481a6d7921160bc982c5e0a561cd8a3a00 }
       Storage size: 4635 bytes
       Paid storage size diff: 6 bytes
-      Consumed gas: 1450.678
+      Consumed gas: 1450.824
       Balance updates:
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.0015
         storage fees ........................... +ꜩ0.0015
@@ -332,7 +332,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup call KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 from bootstrap2 --entrypoint removeLiquidity --arg '(Pair "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN" 1000 0 0 "2050-01-01T00:00:00Z")' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 9130.753 units (will add 100 for safety)
+Estimated gas: 9130.898 units (will add 100 for safety)
 Estimated storage: 67 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is 'onxpVHHvvzyh4xFEMXTMyFMdpzrvmkd4MfgSwMpE5vtJRa4KzXn'
@@ -364,7 +364,7 @@ This sequence of operations was run:
           0x01e927f00ef734dfc85919635e9afc9166c83ef9fc00 ;
           0x0115eb0104481a6d7921160bc982c5e0a561cd8a3a00 }
       Storage size: 4635 bytes
-      Consumed gas: 1452.184
+      Consumed gas: 1452.329
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
