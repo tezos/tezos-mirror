@@ -107,7 +107,7 @@ let close () =
 
 open Filename.Infix
 
-let make_default_internal_events ~rules ~verbosity
+let make_default_internal_events ~rules ~verbosity ~colors
     ~(log_output : Logs_simple_config.Output.t) ~daily_logs_path =
   (* By default the node has two logs output:
      - on the configured [log_output] using the configured [verbosity] and
@@ -138,6 +138,7 @@ let make_default_internal_events ~rules ~verbosity
     Internal_event_config.make_config_uri
       ~level:verbosity
       ~section_prefixes
+      ~colors
       ~format:"pp-short"
       kind
   in
@@ -163,6 +164,7 @@ let make_with_defaults ?verbosity ?enable_default_daily_logs_at
   make_default_internal_events
     ~rules:log_cfg.rules
     ~verbosity:(Option.value verbosity ~default:log_cfg.default_level)
+    ~colors:log_cfg.colors
     ~log_output:log_cfg.output
     ~daily_logs_path:enable_default_daily_logs_at
 

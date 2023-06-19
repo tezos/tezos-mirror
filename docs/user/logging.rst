@@ -91,6 +91,9 @@ Common options:
    - ``pp-short`` to output the events pretty-printed in a shorter and more
      user-friendly fashion.
 
+- ``color=true`` enables logs coloring. It only works on ttys, in conjunction with
+  ``format=pp-short``.
+
 Options available only for the ``file-descriptor-path://`` case:
 
 -  ``with-pid=<bool>`` when ``true`` adds the current process-id to the
@@ -300,11 +303,13 @@ Command Line Options
 ~~~~~~~~~~~~~~~~~~~~
 
 See ``octez-node run --help``, the default ``file-descriptor-stdout://`` sink
-configuration can be also changed with 2 options:
+configuration can be also be changed with the following options:
 
 -  ``-v`` / ``-vv``: set the global log level to ``Info`` or ``Debug``
    respectively.
 -  ``--log-output``: set the output file.
+- ``--log-coloring=<bool>``: enable or disable colors in the default stdout
+   logs. The default value is ``true``.
 
 RPC ``/config/logging``
 ~~~~~~~~~~~~~~~~~~~~~~~

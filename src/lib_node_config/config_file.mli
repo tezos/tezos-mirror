@@ -129,6 +129,7 @@ val update :
   ?cors_headers:string list ->
   ?rpc_tls:tls ->
   ?log_output:Logs_simple_config.Output.t ->
+  ?log_coloring:bool ->
   ?synchronisation_threshold:int ->
   ?history_mode:History_mode.t ->
   ?network:blockchain_network ->

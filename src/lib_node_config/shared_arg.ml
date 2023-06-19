@@ -59,6 +59,7 @@ type t = {
   cors_headers : string list;
   rpc_tls : Config_file.tls option;
   log_output : Logs_simple_config.Output.t option;
+  log_coloring : bool option;
   bootstrap_threshold : int option;
   history_mode : History_mode.t option;
   synchronisation_threshold : int option;
@@ -195,9 +196,9 @@ let wrap data_dir config_file network connections max_download_speed
     advertised_net_port discovery_addr peers no_bootstrap_peers
     bootstrap_threshold private_mode disable_p2p_maintenance disable_p2p_swap
     disable_mempool disable_mempool_precheck enable_testchain expected_pow
-    rpc_listen_addrs rpc_tls cors_origins cors_headers log_output history_mode
-    synchronisation_threshold latency disable_config_validation allow_all_rpc
-    media_type metrics_addr operation_metadata_size_limit =
+    rpc_listen_addrs rpc_tls cors_origins cors_headers log_output log_coloring
+    history_mode synchronisation_threshold latency disable_config_validation
+    allow_all_rpc media_type metrics_addr operation_metadata_size_limit =
   let actual_data_dir =
     Option.value ~default:Config_file.default_data_dir data_dir
   in
@@ -235,6 +236,7 @@ let wrap data_dir config_file network connections max_download_speed
     cors_headers;
     rpc_tls;
     log_output;
+    log_coloring;
     peer_table_size;
     bootstrap_threshold;
     history_mode;
@@ -389,6 +391,13 @@ module Term = struct
       value
       & opt (some log_output_converter) None
       & info ~docs ~docv:"OUTPUT" ~doc ["log-output"])
+
+  let log_coloring =
+    let doc =
+      "Enable or disable light coloring in default stdout logs. Coloring is \
+       enabled by default."
+    in
+    Arg.(value & opt (some bool) None & info ~docs ~doc ["log-coloring"])
 
   let data_dir =
     let doc =
@@ -728,7 +737,7 @@ module Term = struct
     $ disable_p2p_maintenance $ disable_p2p_swap $ disable_mempool
     $ disable_mempool_precheck $ enable_testchain $ expected_pow
     $ rpc_listen_addrs $ rpc_tls $ cors_origins $ cors_headers $ log_output
-    $ history_mode $ synchronisation_threshold $ latency
+    $ log_coloring $ history_mode $ synchronisation_threshold $ latency
     $ disable_config_validation $ allow_all_rpc $ media_type $ metrics_addr
     $ operation_metadata_size_limit
 end
@@ -866,6 +875,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     cors_origins;
     cors_headers;
     log_output;
+    log_coloring;
     bootstrap_threshold;
     history_mode;
     network = network_arg;
@@ -1032,6 +1042,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ~cors_headers
     ?rpc_tls
     ?log_output
+    ?log_coloring
     ?synchronisation_threshold
     ?history_mode
     ?latency

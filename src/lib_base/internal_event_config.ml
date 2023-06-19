@@ -31,7 +31,7 @@ let make_section_prefix ~pattern level =
   Format.sprintf "%s:%s" pattern (Internal_event.Level.to_string level)
 
 let make_config_uri ?level ?daily_logs ?create_dirs ?format ?chmod ?with_pid
-    ?fresh ?(section_prefixes = []) kind =
+    ?colors ?fresh ?(section_prefixes = []) kind =
   let scheme, path =
     match kind with
     | `Stdout -> ("file-descriptor-stdout", None)
@@ -57,7 +57,7 @@ let make_config_uri ?level ?daily_logs ?create_dirs ?format ?chmod ?with_pid
       |> add "level-at-least" Internal_event.Level.to_string level
       |> add "create-dirs" bool create_dirs
       |> add "daily-logs" string_of_int daily_logs
-      |> add "fresh" bool fresh
+      |> add "fresh" bool fresh |> add "colors" bool colors
       |> add "chmod" string_of_int chmod
       |> add "with_pid" bool with_pid)
     ()
