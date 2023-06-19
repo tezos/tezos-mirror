@@ -291,10 +291,10 @@ let process_consensus_op (type kind) state cctxt
               Events.(
                 match op_kind with
                 | Endorsement ->
-                    (double_endorsement_detected, double_endorsement_denounced)
+                    (double_attestation_detected, double_attestation_denounced)
                 | Preendorsement ->
-                    ( double_preendorsement_detected,
-                      double_preendorsement_denounced ))
+                    ( double_preattestation_detected,
+                      double_preattestation_denounced ))
             in
             let*! () =
               Events.(emit double_op_detected) (new_op_hash, existing_op_hash)
