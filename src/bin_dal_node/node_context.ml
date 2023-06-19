@@ -36,7 +36,7 @@ type status = Ready of ready_ctxt | Starting
 
 type t = {
   mutable status : status;
-  config : Configuration.t;
+  config : Configuration_file.t;
   store : Store.node_store;
   tezos_node_cctxt : Tezos_rpc.Context.generic;
   neighbors_cctxts : Dal_node_client.cctxt list;
@@ -48,12 +48,12 @@ type t = {
 let init config store gs_worker transport_layer cctxt =
   let neighbors_cctxts =
     List.map
-      (fun Configuration.{addr; port} ->
+      (fun Configuration_file.{addr; port} ->
         let endpoint =
           Uri.of_string ("http://" ^ addr ^ ":" ^ string_of_int port)
         in
         Dal_node_client.make_unix_cctxt endpoint)
-      config.Configuration.neighbors
+      config.Configuration_file.neighbors
   in
   {
     status = Starting;

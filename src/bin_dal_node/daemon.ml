@@ -161,7 +161,9 @@ module Handler = struct
             Dal_plugin.get_constants `Main (`Head 0) cctxt
           in
           let* cryptobox =
-            init_cryptobox config.Configuration.use_unsafe_srs proto_parameters
+            init_cryptobox
+              config.Configuration_file.use_unsafe_srs
+              proto_parameters
           in
           Node_context.set_ready ctxt plugin cryptobox proto_parameters ;
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4441
@@ -333,7 +335,7 @@ let run ~data_dir cctxt =
   in
   let*! () = Event.(emit starting_node) () in
   let* ({network_name; rpc_addr; peers; _} as config) =
-    Configuration.load ~data_dir
+    Configuration_file.load ~data_dir
   in
   let*! () = Event.(emit configuration_loaded) () in
   let config = {config with data_dir} in

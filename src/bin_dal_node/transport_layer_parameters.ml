@@ -33,10 +33,10 @@ let init_identity_file ~data_dir ~expected_pow =
        node ? *)
     return_unit
   in
-  let identity_file = Configuration.identity_file ~data_dir in
+  let identity_file = Configuration_file.identity_file ~data_dir in
   Identity_file.init ~check_data_dir ~identity_file ~expected_pow
 
-let p2p_config Configuration.{expected_pow; data_dir; listen_addr; _} =
+let p2p_config Configuration_file.{expected_pow; data_dir; listen_addr; _} =
   let open Lwt_result_syntax in
   let open Gossipsub.Transport_layer.Default_parameters in
   let* identity = init_identity_file ~data_dir ~expected_pow in
@@ -56,7 +56,7 @@ let p2p_config Configuration.{expected_pow; data_dir; listen_addr; _} =
       discovery_addr;
       advertised_port = Some p2p_port;
       trusted_points;
-      peers_file = Configuration.peers_file ~data_dir;
+      peers_file = Configuration_file.peers_file ~data_dir;
       private_mode;
       identity;
       proof_of_work_target = proof_of_work_target';

@@ -38,7 +38,7 @@ module Term = struct
 
   let data_dir =
     let open Cmdliner in
-    let default = Configuration.default_data_dir in
+    let default = Configuration_file.default_data_dir in
     let doc =
       Format.sprintf
         "The directory where the octez DAL node will store all its data. \
@@ -49,7 +49,7 @@ module Term = struct
 
   let rpc_addr =
     let open Cmdliner in
-    let default = Configuration.default_rpc_addr in
+    let default = Configuration_file.default_rpc_addr in
     let doc =
       Format.asprintf
         "The TCP socket point at which this RPC server of this instance can be \
@@ -64,14 +64,14 @@ module Term = struct
 
   let expected_pow =
     let open Cmdliner in
-    let default = Configuration.default_expected_pow in
+    let default = Configuration_file.default_expected_pow in
     let doc = "Expected level of proof-of-work for peers identity." in
     Arg.(
       value & opt float default & info ~docs ~doc ~docv:"FLOAT" ["expected-pow"])
 
   let net_addr =
     let open Cmdliner in
-    let default = Configuration.default_listen_addr in
+    let default = Configuration_file.default_listen_addr in
     let doc =
       Format.asprintf
         "The TCP address and port at which this instance can be reached by \

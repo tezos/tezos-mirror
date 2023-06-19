@@ -39,7 +39,7 @@ let run subcommand
       Lwt_main.run @@ Daemon.run ~data_dir rpc_context
   | Config_init ->
       let config =
-        Configuration.
+        Configuration_file.
           {
             data_dir;
             rpc_addr;
@@ -51,7 +51,7 @@ let run subcommand
             network_name = default_network_name;
           }
       in
-      Lwt_main.run @@ Configuration.save config
+      Lwt_main.run @@ Configuration_file.save config
 
 let _ =
   let commands = Cli.make ~run in

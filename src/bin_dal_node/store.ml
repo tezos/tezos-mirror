@@ -125,7 +125,7 @@ let open_shards_stream {shards_watcher; _} =
     given [config] and [gs_worker]. *)
 let init gs_worker config =
   let open Lwt_result_syntax in
-  let base_dir = Configuration.data_dir_path config path in
+  let base_dir = Configuration_file.data_dir_path config path in
   let shards_watcher = Lwt_watcher.create_input () in
   let*! repo = Repo.v (Irmin_pack.config base_dir) in
   let*! store = main repo in
