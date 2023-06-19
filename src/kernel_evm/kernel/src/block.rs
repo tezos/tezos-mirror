@@ -37,26 +37,29 @@ fn make_receipt(
     let effective_gas_price = block.constants().gas_price;
 
     let tx_receipt = match receipt_info.execution_outcome {
-        Some(outcome) => TransactionReceipt {
-            hash,
-            index,
-            block_hash,
-            block_number,
-            from,
-            to,
-            cumulative_gas_used: cumulative_gas_used
+        Some(outcome) => {
+            *cumulative_gas_used = cumulative_gas_used
                 .checked_add(U256::from(outcome.gas_used))
-                .ok_or(Error::Transfer(CumulativeGasUsedOverflow))?,
-            effective_gas_price,
-            gas_used: U256::from(outcome.gas_used),
-            contract_address: outcome.new_address,
-            type_: TransactionType::Legacy,
-            status: if outcome.is_success {
-                TransactionStatus::Success
-            } else {
-                TransactionStatus::Failure
-            },
-        },
+                .ok_or(Error::Transfer(CumulativeGasUsedOverflow))?;
+            TransactionReceipt {
+                hash,
+                index,
+                block_hash,
+                block_number,
+                from,
+                to,
+                cumulative_gas_used: *cumulative_gas_used,
+                effective_gas_price,
+                gas_used: U256::from(outcome.gas_used),
+                contract_address: outcome.new_address,
+                type_: TransactionType::Legacy,
+                status: if outcome.is_success {
+                    TransactionStatus::Success
+                } else {
+                    TransactionStatus::Failure
+                },
+            }
+        }
         None => TransactionReceipt {
             hash,
             index,
@@ -568,9 +571,7 @@ mod tests {
         ];
 
         let queue = Queue {
-            proposals: vec![Blueprint {
-                transactions: transactions.clone(),
-            }],
+            proposals: vec![Blueprint { transactions }],
             kernel_upgrade: None,
         };
 
@@ -584,13 +585,16 @@ mod tests {
         );
 
         produce(&mut host, queue).expect("The block production failed.");
+        let receipt0 = read_transaction_receipt(&mut host, &tx_hash_0)
+            .expect("should have found receipt");
+        let receipt1 = read_transaction_receipt(&mut host, &tx_hash_1)
+            .expect("should have found receipt");
 
-        for transaction in transactions {
-            let receipt = read_transaction_receipt(&mut host, &transaction.tx_hash)
-                .expect("should have found receipt");
-            // NB: we do not use any gas for now, hence the following assertion
-            assert_eq!(receipt.cumulative_gas_used, base_gas);
-        }
+        assert_eq!(receipt0.cumulative_gas_used, base_gas);
+        assert_eq!(
+            receipt1.cumulative_gas_used,
+            receipt0.cumulative_gas_used + base_gas
+        );
     }
 
     #[test]
