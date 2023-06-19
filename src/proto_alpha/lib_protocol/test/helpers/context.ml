@@ -254,6 +254,9 @@ let get_liquidity_baking_cpmm_address ctxt =
 let get_adaptive_inflation_launch_cycle ctxt =
   Adaptive_inflation_services.launch_cycle rpc_ctxt ctxt
 
+let get_total_frozen_stake ctxt =
+  Adaptive_inflation_services.total_frozen_stake rpc_ctxt ctxt
+
 let get_seed_nonce_revelation_tip ctxt =
   get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
   return
