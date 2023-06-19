@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 DaiLambda, Inc. <contact@dailambda.jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -180,7 +181,7 @@ let assert_fp_is_correct (x : float) =
       raise (Bad_floating_point_number (Bad_fpclass fpcl))
   | FP_normal when x <= 0.0 ->
       raise (Bad_floating_point_number Negative_or_zero_fp)
-  | _ -> ()
+  | _ -> fpcl
 
 let cast_to_int max_relative_error mode f : int =
   let i = int_of_float mode f in
@@ -209,6 +210,8 @@ module type Fixed_point_lang_sig = sig
   val shift_left : size repr -> int -> size repr
 
   val ( + ) : size repr -> size repr -> size repr
+
+  val int : int -> size repr
 end
 
 module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) = struct
@@ -271,31 +274,38 @@ module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) = struct
   let approx_mult (precision : int) (i : Lang.size Lang.repr) (x : float) :
       Lang.size Lang.repr =
     assert (precision > 0) ;
-    assert_fp_is_correct x ;
-    let _sign, exp, mant = decompose x in
-    let exp = Int64.to_int @@ exponent_bits_to_int exp in
-    let bits, _ = take precision mant in
-    (* the mantissa is always implicitly prefixed by one (except for
-       denormalized numbers, excluded here) *)
-    let bits = 1L :: bits in
-    (* convert mantissa to sum of powers of 2 computed with shifts *)
-    let _, result_opt =
-      List.fold_left
-        (fun (k, term_opt) bit ->
-          if bit = 1L then
-            let new_term =
-              if exp - k < 0 then Lang.shift_right i (k - exp)
-              else if exp - k > 0 then Lang.shift_left i (exp - k)
-              else i
-            in
-            match term_opt with
-            | None -> (k + 1, Some new_term)
-            | Some term -> (k + 1, Some Lang.(term + new_term))
-          else (k + 1, term_opt))
-        (0, None)
-        bits
-    in
-    WithExceptions.Option.get ~loc:__LOC__ result_opt
+    let fpcl = assert_fp_is_correct x in
+    match fpcl with
+    | FP_zero -> Lang.int 0
+    | _ -> (
+        let _sign, exp, mant = decompose x in
+        let exp = Int64.to_int @@ exponent_bits_to_int exp in
+        let bits, _ = take precision mant in
+        (* The mantissa is always implicitly prefixed by one (except for
+           denormalized numbers, excluded here).
+           Therefore, we have at most precision + 1 ones in [bits]. *)
+        let bits = 1L :: bits in
+        (* convert mantissa to sum of powers of 2 computed with shifts *)
+        let _, terms =
+          List.fold_left
+            (fun (k, acc) bit ->
+              let acc =
+                if bit = 1L then
+                  let new_term =
+                    if exp - k < 0 then Lang.shift_right i (k - exp)
+                    else if exp - k > 0 then Lang.shift_left i (exp - k)
+                    else i
+                  in
+                  new_term :: acc
+                else acc
+              in
+              (k + 1, acc))
+            (0, [])
+            bits
+        in
+        match List.rev terms with
+        | [] -> assert false (* impossible *)
+        | t :: ts -> List.fold_left (fun sum t -> Lang.(sum + t)) t ts)
 end
 
 (* ------------------------------------------------------------------------- *)
