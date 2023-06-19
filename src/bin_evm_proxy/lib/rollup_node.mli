@@ -97,6 +97,10 @@ module type S = sig
 
   (** [chain_id ()] returns chain id defined by the rollup. *)
   val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
+
+  (** [simulate_call call_info] asks the rollup to simulate a call, and returns the
+      result. *)
+  val simulate_call : Ethereum_types.call -> Ethereum_types.hash tzresult Lwt.t
 end
 
 (** Instantiate a module of type {!S} that communicates with a rollup

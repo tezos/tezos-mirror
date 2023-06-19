@@ -15,7 +15,7 @@ use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Rlp};
 use tezos_ethereum::rlp_helpers::{decode_field, decode_option, next};
-use tezos_smart_rollup_debug::Runtime;
+use tezos_smart_rollup_debug::{debug_msg, Runtime};
 
 // SIMULATION/SIMPLE/RLP_ENCODED_SIMULATION
 pub const SIMULATION_SIMPLE_TAG: u8 = 1;
@@ -44,19 +44,20 @@ pub struct Simulation {
     /// (optional) The address the transaction is sent from.\
     /// Encoding: 20 bytes or empty (0x80)
     pub from: Option<H160>,
-    /// The address the transaction is directed to.\
+    /// The address the transaction is directed to.
+    /// Some indexer seem to expect it to be optionnal\
     /// Encoding: 20 bytes
-    pub to: H160,
+    pub to: Option<H160>,
     /// (optional) Integer of the gas provided for the transaction execution.
     /// eth_call consumes zero gas, but this parameter may be needed by some
     /// executions.\
-    /// Encoding: big endian
+    /// Encoding: little endian
     pub gas: Option<u64>,
     /// (optional) Integer of the gasPrice used for each paid gas\
-    /// Encoding: big endian
+    /// Encoding: little endian
     pub gas_price: Option<u64>,
     /// (optional) Integer of the value sent with this transaction (in Wei)\
-    /// Encoding: big endian
+    /// Encoding: little endian
     pub value: Option<U256>,
     /// (optional) Hash of the method signature and encoded parameters.
     pub data: Vec<u8>,
@@ -81,7 +82,7 @@ impl Simulation {
             &current_block.constants(),
             &mut evm_account_storage,
             &precompiles,
-            Some(self.to),
+            self.to,
             self.from.unwrap_or(default_caller),
             self.data.clone(),
             self.gas,
@@ -94,14 +95,20 @@ impl Simulation {
 
 impl Decodable for Simulation {
     fn decode(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+        // the proxynode works preferably with little endian
+        let u64_from_le = |v: Vec<u8>| u64::from_le_bytes(parsable!(v.try_into().ok()));
+        let u256_from_le = |v: Vec<u8>| U256::from_little_endian(&v);
         if decoder.is_list() {
             if Ok(6) == decoder.item_count() {
                 let mut it = decoder.iter();
                 let from: Option<H160> = decode_option(&next(&mut it)?, "from")?;
-                let to: H160 = decode_field(&next(&mut it)?, "to")?;
-                let gas: Option<u64> = decode_option(&next(&mut it)?, "gas")?;
-                let gas_price: Option<u64> = decode_option(&next(&mut it)?, "gas_price")?;
-                let value: Option<U256> = decode_option(&next(&mut it)?, "value")?;
+                let to: Option<H160> = decode_option(&next(&mut it)?, "to")?;
+                let gas: Option<u64> =
+                    decode_option(&next(&mut it)?, "gas")?.map(u64_from_le);
+                let gas_price: Option<u64> =
+                    decode_option(&next(&mut it)?, "gas_price")?.map(u64_from_le);
+                let value: Option<U256> =
+                    decode_option(&next(&mut it)?, "value")?.map(u256_from_le);
                 let data: Vec<u8> = decode_field(&next(&mut it)?, "data")?;
                 Ok(Self {
                     from,
@@ -220,8 +227,11 @@ fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Simulation, Error> {
 }
 
 pub fn start_simulation_mode<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+    debug_msg!(host, "Starting simulation mode ");
     let simulation = parse_inbox(host)?;
     let outcome = simulation.run(host)?;
+    debug_msg!(host, "outcome={:?} ", outcome);
+    storage::store_simulation_status(host, outcome.is_success)?;
     storage::store_simulation_result(host, outcome.result)
 }
 
@@ -244,9 +254,9 @@ mod tests {
         }
     }
 
-    fn address_of_str(s: &str) -> H160 {
+    fn address_of_str(s: &str) -> Option<H160> {
         let data = &hex::decode(s).unwrap();
-        H160::from_slice(data)
+        Some(H160::from_slice(data))
     }
 
     #[test]
@@ -276,9 +286,9 @@ mod tests {
     #[test]
     fn test_decode_non_empty() {
         let input_string =
-            "f6942424242424242424242424242424242424242424943535353535353535353535353535353535353535822b678256ce828235821616".to_string();
+            "f84894242424242424242424242424242424242424242494353535353535353535353535353535353535353588672b00000000000088ce56000000000000883582000000000000821616".to_string();
         let to = address_of_str("3535353535353535353535353535353535353535");
-        let from = Some(address_of_str("2424242424242424242424242424242424242424"));
+        let from = address_of_str("2424242424242424242424242424242424242424");
         let data = hex::decode("1616").unwrap();
         let expected = Simulation {
             from,
@@ -349,7 +359,7 @@ mod tests {
         let simulation = Simulation {
             from: None,
             gas_price: None,
-            to: new_address,
+            to: Some(new_address),
             data: hex::decode(STORAGE_CONTRACT_CALL_NUM).unwrap(),
             gas: Some(10000),
             value: None,
@@ -368,7 +378,7 @@ mod tests {
         let simulation = Simulation {
             from: None,
             gas_price: None,
-            to: new_address,
+            to: Some(new_address),
             data: hex::decode(STORAGE_CONTRACT_CALL_GET).unwrap(),
             gas: Some(10000),
             value: None,
@@ -387,7 +397,7 @@ mod tests {
     #[test]
     fn parse_simulation() {
         let to = address_of_str("3535353535353535353535353535353535353535");
-        let from = Some(address_of_str("2424242424242424242424242424242424242424"));
+        let from = address_of_str("2424242424242424242424242424242424242424");
         let data = hex::decode("1616").unwrap();
         let expected = Simulation {
             from,
@@ -399,7 +409,7 @@ mod tests {
         };
 
         let mut encoded =
-            hex::decode("f6942424242424242424242424242424242424242424943535353535353535353535353535353535353535822b678256ce828235821616").unwrap();
+            hex::decode("f84894242424242424242424242424242424242424242494353535353535353535353535353535353535353588672b00000000000088ce56000000000000883582000000000000821616").unwrap();
         let mut input = vec![parsing::SIMULATION_TAG, SIMULATION_SIMPLE_TAG];
         input.append(&mut encoded);
 
@@ -410,6 +420,44 @@ mod tests {
             parsed,
             "should have been parsed as complete simulation"
         );
+    }
+
+    #[test]
+    fn parse_simulation2() {
+        // setup
+        let mut host = MockHost::default();
+        let new_address = create_contract(&mut host);
+
+        let to = Some(new_address);
+        let data = hex::decode(STORAGE_CONTRACT_CALL_GET).unwrap();
+        let gas = Some(11111);
+        let expected = Simulation {
+            from: None,
+            to,
+            gas,
+            gas_price: None,
+            value: None,
+            data,
+        };
+
+        let encoded = hex::decode(
+            "ff01e68094907823e0a92f94355968feb2cbf0fbb594fe321488672b0000000000008080846d4ce63c",
+        )
+        .unwrap();
+
+        let parsed = Input::parse(&encoded);
+        assert_eq!(
+            Input::SimpleSimulation(expected),
+            parsed,
+            "should have been parsed as complete simulation"
+        );
+
+        if let Input::SimpleSimulation(s) = parsed {
+            let res = s.run(&mut host).expect("simulation should run");
+            assert!(res.is_success, "simulation should have succeeded");
+        } else {
+            panic!("Parsing failed")
+        }
     }
 
     #[test]

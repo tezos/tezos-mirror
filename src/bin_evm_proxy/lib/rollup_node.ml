@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,11 +26,6 @@
 
 open Ethereum_types
 
-let u16_to_bytes n =
-  let bytes = Bytes.make 2 'a' in
-  Bytes.set_uint16_le bytes 0 n ;
-  Bytes.to_string bytes
-
 (* The hard limit is 4096 but it needs to add the external message tag. *)
 let max_input_size = 4095
 
@@ -45,7 +41,7 @@ let encode_transaction ~smart_rollup_address kind =
     match kind with
     | Simple data -> "\000" ^ data
     | NewChunked (hash, len) ->
-        let number_of_chunks_bytes = u16_to_bytes len in
+        let number_of_chunks_bytes = Ethereum_types.u16_to_bytes len in
         "\001" ^ hash ^ number_of_chunks_bytes
     | Chunk data -> "\002" ^ data
   in
@@ -74,7 +70,9 @@ let make_evm_inbox_transactions tx_raw =
     let* chunks = String.chunk_bytes size_per_chunk (Bytes.of_string tx_raw) in
     let new_chunk_transaction = NewChunked (tx_hash, List.length chunks) in
     let chunks =
-      List.mapi (fun i chunk -> Chunk (tx_hash ^ u16_to_bytes i ^ chunk)) chunks
+      List.mapi
+        (fun i chunk -> Chunk (tx_hash ^ Ethereum_types.u16_to_bytes i ^ chunk))
+        chunks
     in
     return (tx_hash, new_chunk_transaction :: chunks)
 
@@ -211,6 +209,16 @@ module RPC = struct
             ~description:"Hashes of injected L2 messages"
             (list string))
       (open_root / "local" / "batcher" / "injection")
+
+  let simulation =
+    Tezos_rpc.Service.post_service
+      ~description:
+        "Simulate messages evaluation by the PVM, and find result in durable \
+         storage"
+      ~query:Tezos_rpc.Query.empty
+      ~input:Simulation.Encodings.simulate_input
+      ~output:Data_encoding.Json.encoding
+      (open_root / "global" / "block" / "head" / "simulate")
 
   let call_service ~base ?(media_types = Media_type.all_media_types) =
     Tezos_rpc_http_client_unix.RPC_client_unix.call_service media_types ~base
@@ -454,6 +462,27 @@ module RPC = struct
 
   let chain_id base () =
     inspect_durable_and_decode base Durable_storage_path.chain_id decode_number
+
+  let simulate_call base call =
+    let open Lwt_result_syntax in
+    let*? messages = Simulation.encode call in
+    let insight_requests =
+      [
+        Simulation.Encodings.Durable_storage_key ["evm"; "simulation_result"];
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5900
+           for now the status is not used but it should be for error handling *)
+        Simulation.Encodings.Durable_storage_key ["evm"; "simulation_status"];
+      ]
+    in
+    let* r =
+      call_service
+        ~base
+        simulation
+        ()
+        ()
+        {messages; reveal_pages = None; insight_requests}
+    in
+    Simulation.parse_insights r
 end
 
 module type S = sig
@@ -487,6 +516,8 @@ module type S = sig
   val txpool : unit -> Ethereum_types.txpool tzresult Lwt.t
 
   val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
+
+  val simulate_call : Ethereum_types.call -> Ethereum_types.hash tzresult Lwt.t
 end
 
 module Make (Base : sig
@@ -515,4 +546,6 @@ end) : S = struct
   let txpool = RPC.txpool Base.base
 
   let chain_id = RPC.chain_id Base.base
+
+  let simulate_call = RPC.simulate_call Base.base
 end

@@ -49,6 +49,7 @@ const EVM_INFO_PER_LEVEL_STATS_TOTAL: RefPath =
     RefPath::assert_from(b"/evm/info_per_level/stats/total");
 
 pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result");
+pub const SIMULATION_STATUS: RefPath = RefPath::assert_from(b"/simulation_status");
 
 /// The size of an address. Size in bytes.
 const ADDRESS_SIZE: usize = 20;
@@ -316,6 +317,14 @@ pub fn store_simulation_result<Host: Runtime>(
             .map_err(Error::from)?;
     }
     Ok(())
+}
+
+pub fn store_simulation_status<Host: Runtime>(
+    host: &mut Host,
+    result: bool,
+) -> Result<(), Error> {
+    host.store_write(&SIMULATION_STATUS, &[result.into()], 0)
+        .map_err(Error::from)
 }
 
 pub fn store_transaction_receipt<Host: Runtime>(

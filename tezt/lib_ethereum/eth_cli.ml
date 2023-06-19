@@ -108,8 +108,8 @@ let deploy ~source_private_key ~endpoint ~abi ~bin =
     ]
     decode
 
-let call ?(expect_failure = false) ~source_private_key ~endpoint ~abi_label
-    ~address ~method_call () =
+let contract_send ?(expect_failure = false) ~source_private_key ~endpoint
+    ~abi_label ~address ~method_call () =
   let command =
     [
       "contract:send";
@@ -123,6 +123,19 @@ let call ?(expect_failure = false) ~source_private_key ~endpoint ~abi_label
   in
   if expect_failure then spawn_command_and_read_string ~expect_failure command
   else spawn_command_and_read_json command JSON.as_string
+
+let contract_call ?(expect_failure = false) ~endpoint ~abi_label ~address
+    ~method_call () =
+  let command =
+    [
+      "contract:call";
+      "--network";
+      endpoint;
+      Format.sprintf "%s@%s" abi_label address;
+      method_call;
+    ]
+  in
+  spawn_command_and_read_string ~expect_failure command
 
 let get_receipt ~endpoint ~tx =
   spawn_command_and_read_json_opt

@@ -68,22 +68,51 @@ val deploy :
   bin:string ->
   (string * string) Lwt.t
 
-(** [call  ~source_private_key ~endpoint ~abi_label ~address ~method_call ()]
-    make a call to a contract found at [address], with interface registered as
+(** [contract_send  ~source_private_key ~endpoint ~abi_label ~address ~method_call ()]
+    makes a call to a contract found at [address], with interface registered as
     [abi_labbel] in the client, signed with a user's [source_private_key].
     [method_call] is the call data, as a solidity expression.
 
+    This is a transaction to be included in a block.
+
     example:
-    [call
+    [contract_send
       ~source_private_key
       ~endpoint
       ~abi_label:"storage"
       ~address:"0xaaaa....aaaa"
       ~method_call:"set(42)"
       ()]*)
-val call :
+val contract_send :
   ?expect_failure:bool ->
   source_private_key:string ->
+  endpoint:string ->
+  abi_label:string ->
+  address:string ->
+  method_call:string ->
+  unit ->
+  string Lwt.t
+
+(** [contract_call ~endpoint ~abi_label ~address ~method_call ()]
+    makes a call to a contract found at [address], with interface registered as
+    [abi_label] in the client, signed with a user's [source_private_key].
+    [method_call] is the call data, as a solidity expression.
+
+    This is a NOT transaction to be included in a block, but a simulation. It
+    can be a state modifying transaction, in which case the modification are not
+    included in a block. It can still be useful to test the result of a
+    transaction before executing it "for real", however the result might be
+    different as the state could change between testing and execution.
+
+    example:
+    [contract_call
+      ~endpoint
+      ~abi_label:"storage"
+      ~address:"0xaaaa....aaaa"
+      ~method_call:"get()"
+      ()]*)
+val contract_call :
+  ?expect_failure:bool ->
   endpoint:string ->
   abi_label:string ->
   address:string ->

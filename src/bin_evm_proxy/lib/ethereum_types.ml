@@ -26,6 +26,13 @@
 (** Transaction hash size is 32 bytes. *)
 let transaction_hash_size = 32
 
+(** Translate an int in a binary string of two bytes (little endian).
+    Ints greater than 2 bytes are truncated. *)
+let u16_to_bytes n =
+  let bytes = Bytes.make 2 'a' in
+  Bytes.set_uint16_le bytes 0 n ;
+  Bytes.to_string bytes
+
 (** Append the [0x] prefix to a string. *)
 let append_0x s = "0x" ^ s
 
@@ -116,7 +123,7 @@ let block_hash_encoding =
   Data_encoding.(
     conv (fun (Block_hash h) -> append_0x h) block_hash_of_string string)
 
-(** Ethereum any hash. *)
+(** Ethereum hash or data, that would encoded with a 0x prefix. *)
 type hash = Hash of string [@@ocaml.unboxed]
 
 (** [hash_of_string s] takes a string [s] representing a hash in
