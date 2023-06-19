@@ -34,6 +34,7 @@ type t = {
   peers : P2p_point.Id.t list;
   expected_pow : float;
   network_name : string;
+  endpoint : Uri.t;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -64,6 +65,8 @@ let default_expected_pow =
 
 let default_network_name = "dal-sandbox"
 
+let default_endpoint = Uri.of_string "http://localhost:9732"
+
 let default =
   {
     use_unsafe_srs = false;
@@ -74,6 +77,7 @@ let default =
     peers = default_peers;
     expected_pow = default_expected_pow;
     network_name = default_network_name;
+    endpoint = default_endpoint;
   }
 
 let neighbor_encoding : neighbor Data_encoding.t =
@@ -82,6 +86,20 @@ let neighbor_encoding : neighbor Data_encoding.t =
     (fun {addr; port} -> (addr, port))
     (fun (addr, port) -> {addr; port})
     (obj2 (req "rpc-addr" string) (req "rpc-port" uint16))
+
+let endpoint_encoding : Uri.t Data_encoding.t =
+  let open Data_encoding in
+  conv_with_guard
+    (fun uri -> Uri.to_string uri)
+    (fun str ->
+      try Uri.of_string str |> Result.ok
+      with exn ->
+        Format.asprintf
+          "endpoint decoding failed:@.%a@."
+          Error_monad.pp_print_trace
+          [Exn exn]
+        |> Result.error)
+    string
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
@@ -95,6 +113,7 @@ let encoding : t Data_encoding.t =
            peers;
            expected_pow;
            network_name;
+           endpoint;
          } ->
       ( use_unsafe_srs,
         data_dir,
@@ -103,7 +122,8 @@ let encoding : t Data_encoding.t =
         neighbors,
         peers,
         expected_pow,
-        network_name ))
+        network_name,
+        endpoint ))
     (fun ( use_unsafe_srs,
            data_dir,
            rpc_addr,
@@ -111,7 +131,8 @@ let encoding : t Data_encoding.t =
            neighbors,
            peers,
            expected_pow,
-           network_name ) ->
+           network_name,
+           endpoint ) ->
       {
         use_unsafe_srs;
         data_dir;
@@ -121,8 +142,9 @@ let encoding : t Data_encoding.t =
         peers;
         expected_pow;
         network_name;
+        endpoint;
       })
-    (obj8
+    (obj9
        (dft
           "use_unsafe_srs"
           ~description:"use unsafe srs for tests"
@@ -162,7 +184,12 @@ let encoding : t Data_encoding.t =
           "network-name"
           ~description:"The name that identifies the network"
           string
-          default_network_name))
+          default_network_name)
+       (dft
+          "endpoint"
+          ~description:"The Tezos node endpoint"
+          endpoint_encoding
+          default_endpoint))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 

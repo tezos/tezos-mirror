@@ -27,7 +27,7 @@ let run subcommand
     Cli.
       {
         data_dir;
-        octez_node;
+        endpoint;
         rpc_addr;
         expected_pow;
         net_addr;
@@ -35,7 +35,7 @@ let run subcommand
       } =
   match subcommand with
   | Cli.Run ->
-      let rpc_context = Rpc_context.make octez_node in
+      let rpc_context = Rpc_context.make endpoint in
       Lwt_main.run @@ Daemon.run ~data_dir rpc_context
   | Config_init ->
       let config =
@@ -49,6 +49,7 @@ let run subcommand
             listen_addr = net_addr;
             expected_pow;
             network_name = default_network_name;
+            endpoint = default_endpoint;
           }
       in
       Lwt_main.run @@ Configuration_file.save config

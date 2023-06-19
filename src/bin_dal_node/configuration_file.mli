@@ -38,6 +38,7 @@ type t = {
   expected_pow : float;  (** Expected P2P identity's PoW. *)
   network_name : string;
       (** A string that identifies the network's name. E.g. dal-sandbox. *)
+  endpoint : Uri.t;  (** Endpoint of a Tezos node *)
 }
 
 (** [default] is the default configuration. *)
@@ -57,6 +58,8 @@ val default_rpc_addr : P2p_point.Id.t
 val default_expected_pow : float
 
 val default_network_name : string
+
+val default_endpoint : Uri.t
 
 (** The default TCP address and port at which this instance can be reached. *)
 val default_listen_addr : P2p_point.Id.t

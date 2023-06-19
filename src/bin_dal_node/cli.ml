@@ -95,7 +95,7 @@ module Term = struct
 
   let endpoint =
     let open Cmdliner in
-    let doc = "The octez-node that the DAL node should connect to." in
+    let doc = "The Tezos node that the DAL node should connect to." in
     Arg.(
       value
       & opt endpoint_arg (Uri.of_string "http://localhost:9732")
@@ -169,14 +169,14 @@ type options = {
   rpc_addr : P2p_point.Id.t;
   expected_pow : float;
   net_addr : P2p_point.Id.t;
-  octez_node : Uri.t;
+  endpoint : Uri.t;
   use_unsafe_srs_for_tests : bool;
 }
 
 type t = Run | Config_init
 
 let make ~run =
-  let run subcommand data_dir rpc_addr expected_pow net_addr octez_node
+  let run subcommand data_dir rpc_addr expected_pow net_addr endpoint
       use_unsafe_srs_for_tests =
     run
       subcommand
@@ -185,7 +185,7 @@ let make ~run =
         rpc_addr;
         expected_pow;
         net_addr;
-        octez_node;
+        endpoint;
         use_unsafe_srs_for_tests;
       }
     |> function
