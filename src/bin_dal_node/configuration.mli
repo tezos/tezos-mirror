@@ -40,6 +40,9 @@ type t = {
       (** A string that identifies the network's name. E.g. dal-sandbox. *)
 }
 
+(** [default] is the default configuration. *)
+val default : t
+
 (** [filename config] gets the path to config file *)
 val filename : t -> string
 

@@ -64,6 +64,18 @@ let default_expected_pow =
 
 let default_network_name = "dal-sandbox"
 
+let default =
+  {
+    use_unsafe_srs = false;
+    data_dir = default_data_dir;
+    rpc_addr = default_rpc_addr;
+    neighbors = default_neighbors;
+    listen_addr = default_listen_addr;
+    peers = default_peers;
+    expected_pow = default_expected_pow;
+    network_name = default_network_name;
+  }
+
 let neighbor_encoding : neighbor Data_encoding.t =
   let open Data_encoding in
   conv
