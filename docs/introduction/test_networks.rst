@@ -16,7 +16,7 @@ former is obviously important as users need to test their development
 with the current protocol. The latter is also needed to test the proposed
 protocol and its new features, both to decide whether to vote yes and
 to prepare for its activation. After the intended protocol of a test
-network is activated (such as Mumbai for mumbainet), the protocol
+network is activated (such as Nairobi for nairobinet), the protocol
 no longer changes because this could break the workflow of some users
 while they are testing their development, as they may not be ready for
 the new protocol. So every time a new protocol is proposed on Mainnet,
@@ -32,21 +32,6 @@ Faucets can be accessed from https://teztnets.xyz/. Each of the test
 network listed there, including the active test networks described
 below, have independent faucets. Enter the public key hash of any test
 account on the website to receive test tokens.
-
-Mumbainet
-=========
-
-- Built-in network alias: ``mumbainet`` (see :ref:`builtin_networks`)
-
-  * Available from version 16.0.
-
-Mumbainet is a test network which runs the Mumbai protocol.
-Mumbainet will run until Mumbai is refused through the amendment process
-or (accepted and then) replaced by another protocol on Mainnet.
-
-On Mumbainet, some constants differ from Mainnet.
-This results in a faster chain than Mainnet.
-See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
 
 Future Networks
 ===============
@@ -75,6 +60,13 @@ An external description of the various test networks available can be found on h
 
 Old Networks
 ============
+
+Mumbainet
+-------
+
+Mumbainet was a test network running the Mumbai protocol.
+Following the activation of the Nairobi protocol replacing Mumbai on Mainnet,
+Mumbainet was deprecated and block production stopped on June 23rd, 2023.
 
 Limanet
 -------
