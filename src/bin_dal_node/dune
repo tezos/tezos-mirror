@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (executable
- (name main_dal)
+ (name main)
  (public_name octez-dal-node)
  (package octez-dal-node)
  (instrumentation (backend bisect_ppx))

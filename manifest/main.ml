@@ -7242,7 +7242,7 @@ let _octez_dal_node =
   public_exe
     "octez-dal-node"
     ~path:"src/bin_dal_node"
-    ~internal_name:"main_dal"
+    ~internal_name:"main"
     ~synopsis:"Tezos: `octez-dal-node` binary"
     ~release_status:Experimental
     ~with_macos_security_framework:true
