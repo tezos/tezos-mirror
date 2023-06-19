@@ -20,5 +20,6 @@ publish_kernel_sdk:
   variables:
     CARGO_HOME: $CI_PROJECT_DIR/cargo
   cache:
-    - paths:
+    - key: kernels
+      paths:
         - cargo/
