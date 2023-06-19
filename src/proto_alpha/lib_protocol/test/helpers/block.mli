@@ -271,6 +271,35 @@ val bake_n_with_liquidity_baking_toggle_ema :
   (block * Alpha_context.Toggle_votes.Liquidity_baking_toggle_EMA.t) tzresult
   Lwt.t
 
+(** Variant of [bake_n] that returns the block metadata of the last
+    baked block. [n] must be positive, otherwise a single block is baked. **)
+val bake_n_with_metadata :
+  ?locked_round:Round.t option ->
+  ?policy:baker_policy ->
+  ?timestamp:Timestamp.time ->
+  ?payload_round:Round.t option ->
+  ?check_size:bool ->
+  ?baking_mode:baking_mode ->
+  ?allow_manager_failures:bool ->
+  ?liquidity_baking_toggle_vote:Toggle_votes_repr.toggle_vote ->
+  ?adaptive_inflation_vote:Toggle_votes_repr.toggle_vote ->
+  int ->
+  block ->
+  (block * block_header_metadata, Error_monad.tztrace) result Lwt.t
+
+(* Bake blocks while a predicate over the block and its metadata
+   holds. The returned block is the last one for which the predicate
+   holds; in case the predicate never holds, the input block is
+   returned. *)
+val bake_while_with_metadata :
+  ?baking_mode:baking_mode ->
+  ?policy:baker_policy ->
+  ?liquidity_baking_toggle_vote:Toggle_votes_repr.toggle_vote ->
+  ?adaptive_inflation_vote:Toggle_votes_repr.toggle_vote ->
+  (block -> block_header_metadata -> bool) ->
+  block ->
+  block tzresult Lwt.t
+
 val current_cycle : t -> Cycle.t tzresult Lwt.t
 
 (** Given a block [b] at level [l] bakes enough blocks to complete a cycle,
