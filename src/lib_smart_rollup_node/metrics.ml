@@ -192,6 +192,17 @@ module Inbox = struct
         l
   end
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5897
+     Use a Prometheus histogram instead of a Gauge to report the processing
+     time of each inbox level. *)
+  let head_process_time =
+    v_gauge
+      ~help:"The time the rollup node spent processing the head"
+      "head_inbox_process_time"
+
+  let set_process_time pt =
+    Prometheus.Gauge.set head_process_time (Ptime.Span.to_float_s pt)
+
   let metrics =
     let head_inbox_level =
       v_gauge ~help:"The level of the last inbox" "head_inbox_level"
