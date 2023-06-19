@@ -44,9 +44,8 @@ type t = {
 (** [default] is the default configuration. *)
 val default : t
 
-(** [data_dir_path config subpath] builds a subpath relatively to the
-    [config] *)
-val data_dir_path : t -> string -> string
+(** [store_path config] returns a path for the store *)
+val store_path : t -> string
 
 (** [save config] writes config file in [config.data_dir] *)
 val save : t -> unit tzresult Lwt.t

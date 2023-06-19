@@ -39,7 +39,7 @@ type t = {
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
 
-let data_dir_path config subpath = Filename.concat config.data_dir subpath
+let store_path {data_dir; _} = Filename.concat data_dir "store"
 
 let default_rpc_addr =
   P2p_point.Id.of_string_exn ~default_port:10732 "127.0.0.1"
