@@ -44,6 +44,13 @@ module Basic_fragments = struct
 
   let prune_backoff = Milliseconds.Span.of_int_s 10
 
+  let add_peer_do_stuff_then_remove_peer ~gen_peer f : t =
+    bind_gen (add_peer ~gen_peer ~gen_direct:M.bool ~gen_outbound:M.bool)
+    @@ fun ap ->
+    of_list [I.add_peer ap]
+    @% f ap.peer
+    @% of_list [I.remove_peer {peer = ap.peer}]
+
   let add_then_remove_peer ~gen_peer : t =
     of_input_gen (add_peer ~gen_peer ~gen_direct:M.bool ~gen_outbound:M.bool)
     @@ fun ap -> [I.add_peer ap; I.remove_peer {peer = ap.peer}]
@@ -51,6 +58,10 @@ module Basic_fragments = struct
   let join_then_leave_topic ~gen_topic : t =
     of_input_gen (join ~gen_topic) @@ fun jp ->
     [I.join jp; I.leave {topic = jp.topic}]
+
+  let subscribe_then_unsubscribe_from_topic ~gen_topic ~gen_peer : t =
+    of_input_gen (subscribe ~gen_topic ~gen_peer) @@ fun sub ->
+    [I.subscribe sub; I.unsubscribe {topic = sub.topic; peer = sub.peer}]
 
   let graft_then_prune ~gen_peer ~gen_topic : t =
     of_input_gen (graft ~gen_peer ~gen_topic) @@ fun g ->
@@ -475,11 +486,141 @@ module Test_message_cache = struct
     unit
 end
 
+(** Test that the [Connections] map verifies its invariant:
+
+        forall (c : Connections.t),
+        forall (p : Peer.t),
+        forall (t : Topic.t),
+        t \in (Connections.find p c).topics <=> p \in (Connections.peers_in_topic topic c)
+ *)
+module Test_connections = struct
+  module Connections = GS.Introspection.Connections
+
+  let gen_peer = QCheck2.Gen.int_bound 10
+
+  let gen_topic = QCheck2.Gen.oneofl ["A"; "B"; "C"; "D"; "E"; "F"; "G"]
+
+  let scenario =
+    let open Gossipsub_pbt_generators in
+    let open Basic_fragments in
+    let sub_unsub peer =
+      List.repeat
+        10
+        (subscribe_then_unsubscribe_from_topic
+           ~gen_topic
+           ~gen_peer:(M.return peer))
+      |> Fragment.interleave
+    in
+    Fragment.(
+      interleave
+        (List.repeat
+           10
+           (add_peer_do_stuff_then_remove_peer ~gen_peer sub_unsub)))
+
+  let property (c : Connections.t) =
+    let bindings = Connections.bindings c in
+    let topics =
+      List.fold_left
+        (fun acc (_peer, conn) ->
+          Topic.Set.union acc conn.GS.Introspection.topics)
+        GS.Topic.Set.empty
+        bindings
+    in
+    let peers_correct =
+      Topic.Set.for_all
+        (fun topic ->
+          let peers_in_topic = Connections.peers_in_topic topic c in
+          Peer.Set.for_all
+            (fun peer ->
+              match Connections.find peer c with
+              | None -> false
+              | Some conn -> Topic.Set.mem topic conn.topics)
+            peers_in_topic)
+        topics
+    in
+    let topics_correct =
+      List.for_all
+        (fun (peer, conn) ->
+          Topic.Set.for_all
+            (fun topic ->
+              Peer.Set.mem peer (Connections.peers_in_topic topic c))
+            conn.GS.Introspection.topics)
+        bindings
+    in
+    topics_correct && peers_correct
+
+  let test rng =
+    Tezt_core.Test.register
+      ~__FILE__
+      ~title:"Gossipsub: check correction of Connections bidirectional map"
+      ~tags:["gossipsub"; "connections"]
+    @@ fun () ->
+    let scenario =
+      Gossipsub_pbt_generators.fold
+        scenario
+        (fun ev ((conns, rev_trace) as acc) ->
+          match conns with
+          | Error _ -> acc
+          | Ok conns -> (
+              match ev with
+              | Gossipsub_pbt_generators.Input i ->
+                  let conns =
+                    match i with
+                    | Add_peer {peer; direct; outbound} -> (
+                        match
+                          Connections.add_peer peer ~direct ~outbound conns
+                        with
+                        | `added conns -> conns
+                        | `already_known -> conns)
+                    | Remove_peer {peer} -> Connections.remove peer conns
+                    | Subscribe {peer; topic} -> (
+                        match Connections.subscribe peer topic conns with
+                        | `subscribed conns -> conns
+                        | `unknown_peer -> conns)
+                    | Unsubscribe {peer; topic} -> (
+                        match Connections.unsubscribe peer topic conns with
+                        | `unsubscribed conns -> conns
+                        | `unknown_peer -> conns)
+                    | _ -> assert false
+                  in
+                  if property conns then
+                    (Ok conns, Gossipsub_pbt_generators.I i :: rev_trace)
+                  else
+                    ( Error (`Bug_found conns),
+                      Gossipsub_pbt_generators.I i :: rev_trace )
+              | Gossipsub_pbt_generators.Elapse _ -> acc))
+        (Result.Ok Connections.empty, [])
+    in
+    let test =
+      QCheck2.Test.make ~count:1000 ~name:"Gossipsub: connections" scenario
+      @@ fun (conns, rev_trace) ->
+      match conns with
+      | Error (`Bug_found _conns) ->
+          Tezt.Test.fail
+            ~__LOC__
+            "@[<v 2>Bug found in Connections implementation.@;Trace: %a\n@]"
+            (Fmt.Dump.list (fun fmtr (Gossipsub_pbt_generators.I i) ->
+                 Gossipsub_pbt_generators.pp_input fmtr i))
+            (List.rev rev_trace)
+      | Ok _conns -> true
+    in
+    QCheck2.Test.check_exn ~rand:rng test ;
+    unit
+end
+
 (** Test that removing a peer really removes it from the state *)
 module Test_remove_peer = struct
   open Gossipsub_pbt_generators
 
   let all_peers = [0; 1; 2; 3]
+
+  let fail_if_in_connections peers map ~on_error =
+    let fail =
+      List.find_opt
+        (fun peer -> GS.Introspection.Connections.mem peer map)
+        peers
+    in
+    match fail with None -> Ok () | Some peer -> Error (on_error peer)
 
   let fail_if_in_map peers map ~on_error =
     let fail = List.find_opt (fun peer -> GS.Peer.Map.mem peer map) peers in
@@ -501,7 +642,10 @@ module Test_remove_peer = struct
       fail_if_in_set peers set ~on_error:(fun peer ->
           `peer_not_removed_correctly (view, str, peer))
     in
-    let* () = check_map "connections" view.connections in
+    let* () =
+      fail_if_in_connections peers view.connections ~on_error:(fun peer ->
+          `peer_not_removed_correctly (view, "connections", peer))
+    in
     let* () = check_map "scores" view.scores in
     let* () =
       Topic.Map.iter_e
@@ -2037,4 +2181,5 @@ let register rng limits parameters =
   Test_handle_ihave.test rng limits parameters ;
   Test_opportunistic_grafting.test rng limits parameters ;
   Test_handle_graft.test rng limits parameters ;
-  Test_score_status_matches_mesh.test rng limits parameters
+  Test_score_status_matches_mesh.test rng limits parameters ;
+  Test_connections.test rng

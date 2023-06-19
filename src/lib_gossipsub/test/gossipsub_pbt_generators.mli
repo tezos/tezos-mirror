@@ -221,6 +221,9 @@ module Fragment : sig
   val fork_at_most : int -> t -> t
 end
 
+(** [fold fragment f init] folds [f] on the events generated from [fragment]. *)
+val fold : Fragment.t -> (event -> 'a -> 'a) -> 'a -> 'a t
+
 (** [run s0 f] constructs a {!trace} generator by running the gossipsub automaton on inputs
     generated from [f]. *)
 val run : GS.state -> Fragment.t -> trace t

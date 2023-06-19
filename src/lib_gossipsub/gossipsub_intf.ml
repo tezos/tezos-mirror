@@ -868,6 +868,39 @@ module type AUTOMATON = sig
 
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 
+    module Connections : sig
+      type t
+
+      val empty : t
+
+      val bindings : t -> (Peer.t * connection) list
+
+      val find : Peer.t -> t -> connection option
+
+      val mem : Peer.t -> t -> bool
+
+      val add_peer :
+        Peer.t ->
+        direct:bool ->
+        outbound:bool ->
+        t ->
+        [`added of t | `already_known]
+
+      val subscribe :
+        Peer.t -> Topic.t -> t -> [`unknown_peer | `subscribed of t]
+
+      val unsubscribe :
+        Peer.t -> Topic.t -> t -> [`unknown_peer | `unsubscribed of t]
+
+      val remove : Peer.t -> t -> t
+
+      val fold : (Peer.t -> connection -> 'b -> 'b) -> t -> 'b -> 'b
+
+      val iter : (Peer.t -> connection -> unit) -> t -> unit
+
+      val peers_in_topic : Topic.t -> t -> Peer.Set.t
+    end
+
     module Message_cache : sig
       type t
 
@@ -884,7 +917,7 @@ module type AUTOMATON = sig
     type view = {
       limits : limits;
       parameters : parameters;
-      connections : connection Peer.Map.t;
+      connections : Connections.t;
       scores : Score.t Peer.Map.t;
       ihave_per_heartbeat : int Peer.Map.t;
       iwant_per_heartbeat : int Peer.Map.t;
@@ -960,7 +993,7 @@ module type AUTOMATON = sig
 
     val pp_connection : connection Fmt.t
 
-    val pp_connections : connection Peer.Map.t Fmt.t
+    val pp_connections : Connections.t Fmt.t
 
     val pp_scores : Score.value Peer.Map.t Fmt.t
 
