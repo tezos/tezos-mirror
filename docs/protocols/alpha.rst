@@ -140,6 +140,8 @@ Minor Changes
 
 - Add a Total supply counter in the storage. (MRs :gl:`!8732`, :gl:`!8739`)
 
+- Allow to choose the bootstrapped contracts hashes. (MR :gl:`!9176`)
+
 Internal
 --------
 

@@ -88,6 +88,13 @@ type parameter_overrides =
 let default_bootstrap_accounts =
   Array.to_list Account.Bootstrap.keys |> List.map @@ fun key -> (key, None)
 
+type bootstrap_contract = {
+  delegate : string option;
+  amount : Tez.t;
+  script : Ezjsonm.value;
+  hash : string option;
+}
+
 type bootstrap_smart_rollup = {
   address : string;
   pvm_kind : string;
@@ -99,12 +106,14 @@ let write_parameter_file :
     ?bootstrap_accounts:(Account.key * int option) list ->
     ?additional_bootstrap_accounts:(Account.key * int option * bool) list ->
     ?bootstrap_smart_rollups:bootstrap_smart_rollup list ->
+    ?bootstrap_contracts:bootstrap_contract list ->
     base:(string, t * constants option) Either.t ->
     parameter_overrides ->
     string Lwt.t =
  fun ?(bootstrap_accounts = default_bootstrap_accounts)
      ?(additional_bootstrap_accounts = [])
      ?(bootstrap_smart_rollups = [])
+     ?(bootstrap_contracts = [])
      ~base
      parameter_overrides ->
   (* make a copy of the parameters file and update the given constants *)
@@ -159,6 +168,34 @@ let write_parameter_file :
           parameter_overrides
       | bootstrap_smart_rollups ->
           (["bootstrap_smart_rollups"], `A bootstrap_smart_rollups)
+          :: parameter_overrides
+  in
+  let parameter_overrides =
+    if List.mem_assoc ["bootstrap_contracts"] parameter_overrides then
+      parameter_overrides
+    else
+      let bootstrap_contracts =
+        List.map
+          (fun {delegate; amount; script; hash} ->
+            let delegate =
+              match delegate with
+              | Some delegate -> [("delegate", `String delegate)]
+              | None -> []
+            in
+            let hash =
+              match hash with
+              | Some hash -> [("hash", `String hash)]
+              | None -> []
+            in
+            `O
+              ([("amount", `String (Tez.to_string amount)); ("script", script)]
+              @ delegate @ hash))
+          bootstrap_contracts
+      in
+      match bootstrap_contracts with
+      | [] -> parameter_overrides
+      | bootstrap_contracts ->
+          (["bootstrap_contracts"], `A bootstrap_contracts)
           :: parameter_overrides
   in
   let parameters =

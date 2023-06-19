@@ -4694,6 +4694,7 @@ module Parameters : sig
     delegate : public_key_hash option;
     amount : Tez.t;
     script : Script.t;
+    hash : Contract_hash.t option;
   }
 
   type bootstrap_smart_rollup = {

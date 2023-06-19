@@ -106,8 +106,10 @@ let init_account (ctxt, balance_updates)
   (ctxt, freeze_balance_updates @ new_balance_updates @ balance_updates)
 
 let init_contract ~typecheck_smart_contract (ctxt, balance_updates)
-    ({delegate; amount; script} : Parameters_repr.bootstrap_contract) =
-  Contract_storage.fresh_contract_from_current_nonce ctxt
+    ({delegate; amount; script; hash} : Parameters_repr.bootstrap_contract) =
+  (match hash with
+  | None -> Contract_storage.fresh_contract_from_current_nonce ctxt
+  | Some hash -> Result.return (ctxt, hash))
   >>?= fun (ctxt, contract_hash) ->
   typecheck_smart_contract ctxt script >>=? fun (script, ctxt) ->
   Contract_storage.raw_originate

@@ -41,6 +41,8 @@ type bootstrap_contract = {
   delegate : Signature.Public_key_hash.t option;
   amount : Tez_repr.t;
   script : Script_repr.t;
+  hash : Contract_hash.t option;
+      (** If the contract hash is not provided, generate a fresh hash. *)
 }
 
 (** An originated smart rollup initially existing on a chain since genesis. *)

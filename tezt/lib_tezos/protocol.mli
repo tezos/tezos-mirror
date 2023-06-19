@@ -114,6 +114,13 @@ type bootstrap_smart_rollup = {
   parameters_ty : Ezjsonm.value;
 }
 
+type bootstrap_contract = {
+  delegate : string option;
+  amount : Tez.t;
+  script : Ezjsonm.value;
+  hash : string option;
+}
+
 (** Write a protocol parameter file.
 
     This function first builds a default parameter file from the [base]
@@ -131,11 +138,14 @@ type bootstrap_smart_rollup = {
       [(key, balance, revealed)]. If [revealed] the public key is added,
       else the public key hash is added. Revealed keys are expected to bake
       from the start. Default [balance] is 4000000 tez.
-    - [bootstrap_smart_rollups] when given. *)
+    - [bootstrap_smart_rollups] when given.
+    - [bootstrap_contracts] when given.
+*)
 val write_parameter_file :
   ?bootstrap_accounts:(Account.key * int option) list ->
   ?additional_bootstrap_accounts:(Account.key * int option * bool) list ->
   ?bootstrap_smart_rollups:bootstrap_smart_rollup list ->
+  ?bootstrap_contracts:bootstrap_contract list ->
   base:(string, t * constants option) Either.t ->
   parameter_overrides ->
   string Lwt.t
