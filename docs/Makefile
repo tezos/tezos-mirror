@@ -117,17 +117,18 @@ xrefscheck:
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
-	scripts/test_doc_scripts.sh install-bin-bionic
 	scripts/test_doc_scripts.sh install-bin-focal
-	scripts/test_doc_scripts.sh install-bin-fedora36
-	scripts/test_doc_scripts.sh install-bin-rc-bionic
+	scripts/test_doc_scripts.sh install-bin-jammy
+	scripts/test_doc_scripts.sh install-bin-fedora37
+	scripts/test_doc_scripts.sh install-bin-fedora38
 	scripts/test_doc_scripts.sh install-bin-rc-focal
-	scripts/test_doc_scripts.sh install-bin-rc-fedora36
+	scripts/test_doc_scripts.sh install-bin-rc-jammy
+	scripts/test_doc_scripts.sh install-bin-rc-fedora37
+	scripts/test_doc_scripts.sh install-bin-rc-fedora38
 	scripts/test_doc_scripts.sh install-opam-scratch
-	scripts/test_doc_scripts.sh install-opam-bionic
 	scripts/test_doc_scripts.sh install-opam-focal
-	scripts/test_doc_scripts.sh compile-release-sources-buster
-	scripts/test_doc_scripts.sh compile-sources-buster
+	scripts/test_doc_scripts.sh compile-release-sources-bullseye
+	scripts/test_doc_scripts.sh compile-sources-bullseye
 
 # build dune targets together to avoid concurrent dunes
 docexes:

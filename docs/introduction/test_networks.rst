@@ -62,7 +62,7 @@ Old Networks
 ============
 
 Mumbainet
--------
+---------
 
 Mumbainet was a test network running the Mumbai protocol.
 Following the activation of the Nairobi protocol replacing Mumbai on Mainnet,

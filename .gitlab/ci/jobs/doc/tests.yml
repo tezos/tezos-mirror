@@ -37,12 +37,12 @@
   script:
     - ./docs/introduction/install-bin-ubuntu.sh
 
-install_bin_bionic:
-  image: public.ecr.aws/lts/ubuntu:18.04_stable
-  extends: .install_bin_ubuntu_template
-
 install_bin_focal:
   image: public.ecr.aws/lts/ubuntu:20.04_stable
+  extends: .install_bin_ubuntu_template
+
+install_bin_jammy:
+  image: public.ecr.aws/lts/ubuntu:22.04_stable
   extends: .install_bin_ubuntu_template
 
 .install_bin_rc_ubuntu_template:
@@ -52,12 +52,12 @@ install_bin_focal:
   script:
     - ./docs/introduction/install-bin-ubuntu.sh rc
 
-install_bin_rc_bionic:
-  image: public.ecr.aws/lts/ubuntu:18.04_stable
-  extends: .install_bin_rc_ubuntu_template
-
 install_bin_rc_focal:
   image: public.ecr.aws/lts/ubuntu:20.04_stable
+  extends: .install_bin_rc_ubuntu_template
+
+install_bin_rc_jammy:
+  image: public.ecr.aws/lts/ubuntu:22.04_stable
   extends: .install_bin_rc_ubuntu_template
 
 .install_bin_fedora_template:
@@ -67,8 +67,8 @@ install_bin_rc_focal:
   script:
     - ./docs/introduction/install-bin-fedora.sh
 
-install_bin_fedora_36:
-  image: fedora:36
+install_bin_fedora_37:
+  image: fedora:37
   extends: .install_bin_fedora_template
 
 .install_bin_rc_fedora_template:
@@ -78,8 +78,8 @@ install_bin_fedora_36:
   script:
     - ./docs/introduction/install-bin-fedora.sh rc
 
-install_bin_rc_fedora_36:
-  image: fedora:36
+install_bin_rc_fedora_37:
+  image: fedora:37
   extends: .install_bin_rc_fedora_template
 
 .install_opam_ubuntu_template:
@@ -88,10 +88,6 @@ install_bin_rc_fedora_36:
     - .base-test-doc-scripts-template
   script:
     - ./docs/introduction/install-opam.sh
-
-install_opam_bionic:
-  image: ocaml/opam:ubuntu-18.04
-  extends: .install_opam_ubuntu_template
 
 install_opam_focal:
   image: ocaml/opam:ubuntu-20.04
@@ -102,14 +98,14 @@ install_opam_focal:
     - .default_settings_template
     - .base-test-doc-scripts-template
 
-compile_release_sources_buster:
-  image: ocaml/opam:debian-10
+compile_release_sources_bullseye:
+  image: ocaml/opam:debian-11
   extends: .compile_sources_template
   script:
     - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
 
-compile_sources_buster:
-  image: ocaml/opam:debian-10
+compile_sources_bullseye:
+  image: ocaml/opam:debian-11
   extends: .compile_sources_template
   script:
     - ./docs/introduction/compile-sources.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos} ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
@@ -121,14 +117,14 @@ compile_sources_buster:
   script:
     - ./docs/developer/install-python-debian-ubuntu.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos} ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
 
-install_python_bionic:
-  image: public.ecr.aws/lts/ubuntu:18.04_stable
-  extends: .install_python_debian_ubuntu_template
-
 install_python_focal:
   image: public.ecr.aws/lts/ubuntu:20.04_stable
   extends: .install_python_debian_ubuntu_template
 
-install_python_buster:
-  image: debian:buster
+install_python_jammy:
+  image: public.ecr.aws/lts/ubuntu:22.04_stable
+  extends: .install_python_debian_ubuntu_template
+
+install_python_bullseye:
+  image: debian:bullseye
   extends: .install_python_debian_ubuntu_template
