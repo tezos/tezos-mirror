@@ -44,12 +44,12 @@ let run subcommand
             data_dir;
             rpc_addr;
             use_unsafe_srs = use_unsafe_srs_for_tests;
-            neighbors = [];
-            peers = [];
+            neighbors = default.neighbors;
+            peers = default.peers;
             listen_addr = net_addr;
             expected_pow;
-            network_name = default_network_name;
-            endpoint = default_endpoint;
+            network_name = default.network_name;
+            endpoint = default.endpoint;
           }
       in
       Lwt_main.run @@ Configuration_file.save config

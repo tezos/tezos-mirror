@@ -51,19 +51,6 @@ val filename : t -> string
     [config] *)
 val data_dir_path : t -> string -> string
 
-val default_data_dir : string
-
-val default_rpc_addr : P2p_point.Id.t
-
-val default_expected_pow : float
-
-val default_network_name : string
-
-val default_endpoint : Uri.t
-
-(** The default TCP address and port at which this instance can be reached. *)
-val default_listen_addr : P2p_point.Id.t
-
 (** [save config] writes config file in [config.data_dir] *)
 val save : t -> unit tzresult Lwt.t
 
