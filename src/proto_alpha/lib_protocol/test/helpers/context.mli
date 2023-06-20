@@ -60,8 +60,11 @@ val get_endorser_slot :
 (** Return the [n]th element of the list returns by [get_endorsers]. *)
 val get_endorser_n : t -> int -> (public_key_hash * Slot.t list) tzresult Lwt.t
 
+(** Counts the number of endorsing slots that the given delegate has
+    in the requested level. If ommited, [level] defaults to the next
+    level. *)
 val get_endorsing_power_for_delegate :
-  t -> ?levels:Raw_level.t list -> public_key_hash -> int tzresult Lwt.t
+  t -> ?level:Raw_level.t -> public_key_hash -> int tzresult Lwt.t
 
 val get_voting_power :
   t -> public_key_hash -> int64 Environment.Error_monad.shell_tzresult Lwt.t

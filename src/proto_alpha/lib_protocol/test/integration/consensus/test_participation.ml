@@ -89,7 +89,7 @@ let test_participation ~sufficient_participation () =
     (fun (b_pred, b_crt, endorsing_power) level ->
       let int_level = Int32.of_int level in
       Environment.wrap_tzresult (Raw_level.of_int32 int_level) >>?= fun level ->
-      Context.get_endorsing_power_for_delegate (B b_crt) ~levels:[level] del1
+      Context.get_endorsing_power_for_delegate (B b_crt) ~level del1
       >>=? fun endorsing_power_for_level ->
       let endorser, new_endorsing_power =
         if sufficient_participation && endorsing_power < minimal_nb_active_slots
@@ -186,7 +186,7 @@ let test_participation_rpc () =
       level_int |> Int32.of_int |> Raw_level.of_int32
       |> Environment.wrap_tzresult
       >>?= fun level ->
-      Context.get_endorsing_power_for_delegate (B b_crt) ~levels:[level] del2
+      Context.get_endorsing_power_for_delegate (B b_crt) ~level del2
       >>=? fun endorsing_power ->
       return (b_crt, b, total_endorsing_power + endorsing_power))
     (b0, b1, 0)
