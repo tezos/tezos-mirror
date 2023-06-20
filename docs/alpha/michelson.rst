@@ -1002,7 +1002,7 @@ Sapling operations
 Please see the :doc:`Sapling integration<sapling>` page for a more
 comprehensive description of the Sapling protocol.
 
--  ``SAPLING_VERIFY_UPDATE``: verify and apply a transaction on a Sapling state.
+-  ``SAPLING_VERIFY_UPDATE``: Verify and apply a transaction on a Sapling state.
 
 ::
 
@@ -1014,7 +1014,7 @@ comprehensive description of the Sapling protocol.
     > SAPLING_VERIFY_UPDATE / t : s : S  =>  None : S
         iff the transaction t is invalid with respect to the state
 
--  ``SAPLING_EMPTY_STATE ms``: Pushes an empty state on the stack.
+-  ``SAPLING_EMPTY_STATE ms``: Push an empty state on the stack.
 
    ::
 
