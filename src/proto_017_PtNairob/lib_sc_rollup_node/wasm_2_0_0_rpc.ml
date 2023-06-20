@@ -24,13 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open RPC_directory_helpers
+open Rpc_directory_helpers
 
 module Make_RPC
     (Durable_state : Wasm_2_0_0_pvm.Durable_state with type state = Context.tree) =
 struct
-  module Block_directory = Make_directory (struct
-    include Sc_rollup_services.Global.Block
+  module Block_directory = Make_sub_directory (struct
+    include Sc_rollup_services.Block
 
     type context = Node_context.rw
 
@@ -51,7 +51,7 @@ struct
   let register () =
     let open Protocol.Alpha_context.Sc_rollup in
     ( Block_directory.register0
-        (Sc_rollup_services.Global.Block.durable_state_value Kind.Wasm_2_0_0)
+        (Sc_rollup_services.Block.durable_state_value Kind.Wasm_2_0_0)
     @@ fun (node_ctxt, block) {key} () ->
       let open Lwt_result_syntax in
       let* state = get_state node_ctxt block in
@@ -59,7 +59,7 @@ struct
       return value ) ;
 
     ( Block_directory.register0
-        (Sc_rollup_services.Global.Block.durable_state_length Kind.Wasm_2_0_0)
+        (Sc_rollup_services.Block.durable_state_length Kind.Wasm_2_0_0)
     @@ fun (node_ctxt, block) {key} () ->
       let open Lwt_result_syntax in
       let* state = get_state node_ctxt block in
@@ -67,14 +67,14 @@ struct
       return leng ) ;
 
     Block_directory.register0
-      (Sc_rollup_services.Global.Block.durable_state_subkeys Kind.Wasm_2_0_0)
+      (Sc_rollup_services.Block.durable_state_subkeys Kind.Wasm_2_0_0)
     @@ fun (node_ctxt, block) {key} () ->
     let open Lwt_result_syntax in
     let* state = get_state node_ctxt block in
     let*! subkeys = Durable_state.list state key in
     return subkeys
 
-  let build_directory node_ctxt =
+  let build_sub_directory node_ctxt =
     register () ;
-    Block_directory.build_directory node_ctxt
+    Block_directory.build_sub_directory node_ctxt
 end
