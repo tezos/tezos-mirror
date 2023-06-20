@@ -57,21 +57,21 @@ module Events = struct
       ~name:"pqc_reached"
       ~level:Debug
       ~msg:
-        "prequorum reached (voting power: {voting_power}, {preendorsements} \
-         preendorsements)"
+        "prequorum reached (voting power: {voting_power}, {preattestations} \
+         preattestations)"
       ~pp1:pp_int
       ("voting_power", Data_encoding.int31)
       ~pp2:pp_int
-      ("preendorsements", Data_encoding.int31)
+      ("preattestations", Data_encoding.int31)
 
-  let preendorsements_received =
+  let preattestations_received =
     declare_4
       ~section
-      ~name:"preendorsements_received"
+      ~name:"preattestations_received"
       ~level:Debug
       ~msg:
-        "received {count} preendorsements (power: {delta_power}) (total voting \
-         power: {voting_power}, {preendorsements} preendorsements)"
+        "received {count} preattestations (power: {delta_power}) (total voting \
+         power: {voting_power}, {preattestations} preattestations)"
       ~pp1:pp_int
       ("count", Data_encoding.int31)
       ~pp2:pp_int
@@ -79,7 +79,7 @@ module Events = struct
       ~pp3:pp_int
       ("voting_power", Data_encoding.int31)
       ~pp4:pp_int
-      ("preendorsements", Data_encoding.int31)
+      ("preattestations", Data_encoding.int31)
 
   let qc_reached =
     declare_2
@@ -87,21 +87,21 @@ module Events = struct
       ~name:"qc_reached"
       ~level:Debug
       ~msg:
-        "quorum reached (voting power: {voting_power}, {endorsements} \
-         endorsements)"
+        "quorum reached (voting power: {voting_power}, {attestations} \
+         attestations)"
       ~pp1:pp_int
       ("voting_power", Data_encoding.int31)
       ~pp2:pp_int
-      ("endorsements", Data_encoding.int31)
+      ("attestations", Data_encoding.int31)
 
-  let endorsements_received =
+  let attestations_received =
     declare_4
       ~section
-      ~name:"endorsements_received"
+      ~name:"attestations_received"
       ~level:Debug
       ~msg:
-        "received {count} endorsements (power: {delta_power}) (total voting \
-         power: {voting_power}, {endorsements} endorsements)"
+        "received {count} attestations (power: {delta_power}) (total voting \
+         power: {voting_power}, {attestations} attestations)"
       ~pp1:pp_int
       ("count", Data_encoding.int31)
       ~pp2:pp_int
@@ -109,7 +109,7 @@ module Events = struct
       ~pp3:pp_int
       ("voting_power", Data_encoding.int31)
       ~pp4:pp_int
-      ("endorsements", Data_encoding.int31)
+      ("attestations", Data_encoding.int31)
 
   let starting_new_monitoring =
     declare_0
@@ -364,7 +364,7 @@ let update_monitoring ?(should_lock = true) state ops =
       else
         Events.(
           emit
-            preendorsements_received
+            preattestations_received
             ( preendorsements_count,
               voting_power,
               proposal_watched.current_voting_power,
@@ -436,7 +436,7 @@ let update_monitoring ?(should_lock = true) state ops =
       else
         Events.(
           emit
-            endorsements_received
+            attestations_received
             ( endorsements_count,
               voting_power,
               proposal_watched.current_voting_power,
