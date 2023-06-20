@@ -26,4 +26,4 @@
 (** Private module for internal benchmarks *)
 
 (** A "benchmark" for the timer itself. *)
-module Timer_latency_bench : Benchmark.S
+module Timer_latency_bench : Benchmark.Simple

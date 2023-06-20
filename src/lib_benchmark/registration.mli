@@ -63,6 +63,15 @@ type parameter_info = Namespace.t list
 *)
 val register : ?add_timer:bool -> Benchmark.t -> unit
 
+(** Register a [Benchmark.Simple]. Recursively registers any relevant model and parameter
+    included in it. *)
+val register_simple : ?add_timer:bool -> Benchmark.simple -> unit
+
+(** Register a [Benchmark.Simple_with_num]. Recursively registers any relevant model and parameter
+        included in it. *)
+val register_simple_with_num :
+  ?add_timer:bool -> Benchmark.simple_with_num -> unit
+
 (** [register_model_for_code_generation s model] registers a model [model] with
     a local model name [s] for code generation.
     Use [register] if a model is associated with a benchmark. *)

@@ -34,18 +34,13 @@ let pp_purpose ppf t =
   | Other_purpose s -> Format.fprintf ppf "Other purpose: %s" s
   | Generate_code s -> Format.fprintf ppf "Generate code: %s" s
 
-(* The module type of benchmarks *)
-module type S = sig
+module type Benchmark_base = sig
   val name : Namespace.t
 
   val info : string
 
   val module_filename : string
 
-  (** Described the purpose of the benchmark.
-      * [Generate_code of destination]: generates code at the given [destination] file.
-      * [Other_purpose of purpose]: any other purpose. The goal is to explain why the function is benchmarked since it does not produce a cost function.
-  *)
   val purpose : purpose
 
   val tags : string list
@@ -61,13 +56,42 @@ module type S = sig
   val workload_encoding : workload Data_encoding.t
 
   val workload_to_vector : workload -> Sparse_vec.String.t
+end
+
+module type S = sig
+  include Benchmark_base
 
   val models : (string * workload Model.t) list
 
   include Generator.S with type config := config and type workload := workload
 end
 
+module type Simple = sig
+  include Benchmark_base
+
+  val group : group
+
+  val model : workload Model.t
+
+  val create_benchmark :
+    rng_state:Random.State.t -> config -> workload Generator.benchmark
+end
+
+module type Simple_with_num = sig
+  include Benchmark_base
+
+  val group : group
+
+  val model : workload Model.t
+
+  include Generator.S with type workload := workload and type config := config
+end
+
 type t = (module S)
+
+type simple = (module Simple)
+
+type simple_with_num = (module Simple_with_num)
 
 let pp ppf (module Bench : S) =
   let open Bench in
