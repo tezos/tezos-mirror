@@ -38,7 +38,7 @@ module Term = struct
 
   let data_dir =
     let open Cmdliner in
-    let default = Configuration.default_data_dir in
+    let default = Configuration_file.default.data_dir in
     let doc =
       Format.sprintf
         "The directory where the octez DAL node will store all its data. \
@@ -49,7 +49,7 @@ module Term = struct
 
   let rpc_addr =
     let open Cmdliner in
-    let default = Configuration.default_rpc_addr in
+    let default = Configuration_file.default.rpc_addr in
     let doc =
       Format.asprintf
         "The TCP socket point at which this RPC server of this instance can be \
@@ -64,14 +64,14 @@ module Term = struct
 
   let expected_pow =
     let open Cmdliner in
-    let default = Configuration.default_expected_pow in
+    let default = Configuration_file.default.expected_pow in
     let doc = "Expected level of proof-of-work for peers identity." in
     Arg.(
       value & opt float default & info ~docs ~doc ~docv:"FLOAT" ["expected-pow"])
 
   let net_addr =
     let open Cmdliner in
-    let default = Configuration.default_listen_addr in
+    let default = Configuration_file.default.listen_addr in
     let doc =
       Format.asprintf
         "The TCP address and port at which this instance can be reached by \
@@ -95,7 +95,7 @@ module Term = struct
 
   let endpoint =
     let open Cmdliner in
-    let doc = "The octez-node that the DAL node should connect to." in
+    let doc = "The Tezos node that the DAL node should connect to." in
     Arg.(
       value
       & opt endpoint_arg (Uri.of_string "http://localhost:9732")
@@ -168,15 +168,15 @@ type options = {
   data_dir : string;
   rpc_addr : P2p_point.Id.t;
   expected_pow : float;
-  net_addr : P2p_point.Id.t;
-  octez_node : Uri.t;
+  listen_addr : P2p_point.Id.t;
+  endpoint : Uri.t;
   use_unsafe_srs_for_tests : bool;
 }
 
 type t = Run | Config_init
 
 let make ~run =
-  let run subcommand data_dir rpc_addr expected_pow net_addr octez_node
+  let run subcommand data_dir rpc_addr expected_pow listen_addr endpoint
       use_unsafe_srs_for_tests =
     run
       subcommand
@@ -184,8 +184,8 @@ let make ~run =
         data_dir;
         rpc_addr;
         expected_pow;
-        net_addr;
-        octez_node;
+        listen_addr;
+        endpoint;
         use_unsafe_srs_for_tests;
       }
     |> function

@@ -227,7 +227,7 @@ let merge dir plugin_dir = Tezos_rpc.Directory.merge dir plugin_dir
 
 let start configuration ctxt =
   let open Lwt_syntax in
-  let Configuration.{rpc_addr; _} = configuration in
+  let Configuration_file.{rpc_addr; _} = configuration in
   let dir = register ctxt in
   let rpc_port = snd rpc_addr in
   let rpc_addr = fst rpc_addr in

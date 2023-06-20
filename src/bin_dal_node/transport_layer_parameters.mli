@@ -24,6 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val p2p_config : Configuration.t -> (P2p.config, tztrace) result Lwt.t
+val p2p_config : Configuration_file.t -> (P2p.config, tztrace) result Lwt.t
 
 val p2p_limits : P2p_limits.t

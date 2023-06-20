@@ -27,31 +27,32 @@ let run subcommand
     Cli.
       {
         data_dir;
-        octez_node;
+        endpoint;
         rpc_addr;
         expected_pow;
-        net_addr;
+        listen_addr;
         use_unsafe_srs_for_tests;
       } =
   match subcommand with
   | Cli.Run ->
-      let rpc_context = Rpc_context.make octez_node in
+      let rpc_context = Rpc_context.make endpoint in
       Lwt_main.run @@ Daemon.run ~data_dir rpc_context
   | Config_init ->
       let config =
-        Configuration.
+        Configuration_file.
           {
             data_dir;
             rpc_addr;
             use_unsafe_srs = use_unsafe_srs_for_tests;
-            neighbors = [];
-            peers = [];
-            listen_addr = net_addr;
+            neighbors = default.neighbors;
+            peers = default.peers;
+            listen_addr;
             expected_pow;
-            network_name = default_network_name;
+            network_name = default.network_name;
+            endpoint = default.endpoint;
           }
       in
-      Lwt_main.run @@ Configuration.save config
+      Lwt_main.run @@ Configuration_file.save config
 
 let _ =
   let commands = Cli.make ~run in

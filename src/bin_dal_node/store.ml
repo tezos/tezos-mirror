@@ -29,9 +29,6 @@
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4097
    Add an interface to this module *)
 
-(* Relative path to store directory from base-dir *)
-let path = "store"
-
 module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
 include StoreMaker.Make (Irmin.Contents.String)
 
@@ -125,7 +122,7 @@ let open_shards_stream {shards_watcher; _} =
     given [config] and [gs_worker]. *)
 let init gs_worker config =
   let open Lwt_result_syntax in
-  let base_dir = Configuration.data_dir_path config path in
+  let base_dir = Configuration_file.store_path config in
   let shards_watcher = Lwt_watcher.create_input () in
   let*! repo = Repo.v (Irmin_pack.config base_dir) in
   let*! store = main repo in

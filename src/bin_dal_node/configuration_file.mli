@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,35 +38,25 @@ type t = {
   expected_pow : float;  (** Expected P2P identity's PoW. *)
   network_name : string;
       (** A string that identifies the network's name. E.g. dal-sandbox. *)
+  endpoint : Uri.t;  (** Endpoint of a Tezos node *)
 }
 
-(** [filename config] gets the path to config file *)
-val filename : t -> string
+(** [default] is the default configuration. *)
+val default : t
 
-(** [data_dir_path config subpath] builds a subpath relatively to the
-    [config] *)
-val data_dir_path : t -> string -> string
-
-val default_data_dir : string
-
-val default_rpc_addr : P2p_point.Id.t
-
-val default_expected_pow : float
-
-val default_network_name : string
-
-(** The default TCP address and port at which this instance can be reached. *)
-val default_listen_addr : P2p_point.Id.t
+(** [store_path config] returns a path for the store *)
+val store_path : t -> string
 
 (** [save config] writes config file in [config.data_dir] *)
 val save : t -> unit tzresult Lwt.t
 
 val load : data_dir:string -> (t, Error_monad.tztrace) result Lwt.t
 
-(** [identity_file data_dir] returns the absolute path to the "identity.json"
-    file of the DAL node, based on the given [data_dir]. *)
-val identity_file : data_dir:string -> string
+(** [identity_file t] returns the absolute path to the "identity.json"
+    file of the DAL node, based on the configuration [t]. *)
+val identity_file : t -> string
 
-(** [peers_file data_dir] returns the absolute path to the "peers.json" file of
-    the DAL node, based on the given [data_dir]. *)
-val peers_file : data_dir:string -> string
+(** [peers_file data_dir] returns the absolute path to the
+    "peers.json" file of the DAL node, based on the configuration
+    [t]. *)
+val peers_file : t -> string

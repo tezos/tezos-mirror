@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2021-2023 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,15 +34,12 @@ type t = {
   peers : P2p_point.Id.t list;
   expected_pow : float;
   network_name : string;
+  endpoint : Uri.t;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
 
-let data_dir_path config subpath = Filename.concat config.data_dir subpath
-
-let relative_filename data_dir = Filename.concat data_dir "config.json"
-
-let filename config = relative_filename config.data_dir
+let store_path {data_dir; _} = Filename.concat data_dir "store"
 
 let default_rpc_addr =
   P2p_point.Id.of_string_exn ~default_port:10732 "127.0.0.1"
@@ -64,12 +61,41 @@ let default_expected_pow =
 
 let default_network_name = "dal-sandbox"
 
+let default_endpoint = Uri.of_string "http://localhost:9732"
+
+let default =
+  {
+    use_unsafe_srs = false;
+    data_dir = default_data_dir;
+    rpc_addr = default_rpc_addr;
+    neighbors = default_neighbors;
+    listen_addr = default_listen_addr;
+    peers = default_peers;
+    expected_pow = default_expected_pow;
+    network_name = default_network_name;
+    endpoint = default_endpoint;
+  }
+
 let neighbor_encoding : neighbor Data_encoding.t =
   let open Data_encoding in
   conv
     (fun {addr; port} -> (addr, port))
     (fun (addr, port) -> {addr; port})
     (obj2 (req "rpc-addr" string) (req "rpc-port" uint16))
+
+let endpoint_encoding : Uri.t Data_encoding.t =
+  let open Data_encoding in
+  conv_with_guard
+    (fun uri -> Uri.to_string uri)
+    (fun str ->
+      try Uri.of_string str |> Result.ok
+      with exn ->
+        Format.asprintf
+          "endpoint decoding failed:@.%a@."
+          Error_monad.pp_print_trace
+          [Exn exn]
+        |> Result.error)
+    string
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
@@ -83,6 +109,7 @@ let encoding : t Data_encoding.t =
            peers;
            expected_pow;
            network_name;
+           endpoint;
          } ->
       ( use_unsafe_srs,
         data_dir,
@@ -91,7 +118,8 @@ let encoding : t Data_encoding.t =
         neighbors,
         peers,
         expected_pow,
-        network_name ))
+        network_name,
+        endpoint ))
     (fun ( use_unsafe_srs,
            data_dir,
            rpc_addr,
@@ -99,7 +127,8 @@ let encoding : t Data_encoding.t =
            neighbors,
            peers,
            expected_pow,
-           network_name ) ->
+           network_name,
+           endpoint ) ->
       {
         use_unsafe_srs;
         data_dir;
@@ -109,8 +138,9 @@ let encoding : t Data_encoding.t =
         peers;
         expected_pow;
         network_name;
+        endpoint;
       })
-    (obj8
+    (obj9
        (dft
           "use_unsafe_srs"
           ~description:"use unsafe srs for tests"
@@ -150,7 +180,12 @@ let encoding : t Data_encoding.t =
           "network-name"
           ~description:"The name that identifies the network"
           string
-          default_network_name))
+          default_network_name)
+       (dft
+          "endpoint"
+          ~description:"The Tezos node endpoint"
+          endpoint_encoding
+          default_endpoint))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 
@@ -168,9 +203,11 @@ let () =
       | _ -> None)
     (fun path -> DAL_node_unable_to_write_configuration_file path)
 
+let filename ~data_dir = Filename.concat data_dir "config.json"
+
 let save config =
   let open Lwt_syntax in
-  let file = filename config in
+  let file = filename ~data_dir:config.data_dir in
   protect @@ fun () ->
   let* v =
     let* () = Lwt_utils_unix.create_dir config.data_dir in
@@ -187,7 +224,7 @@ let save config =
 let load ~data_dir =
   let open Lwt_result_syntax in
   let+ json =
-    let*! json = Lwt_utils_unix.Json.read_file (relative_filename data_dir) in
+    let*! json = Lwt_utils_unix.Json.read_file (filename ~data_dir) in
     match json with
     | Ok json -> return json
     | Error (Exn _ :: _ as e) ->
@@ -198,6 +235,6 @@ let load ~data_dir =
   let config = Data_encoding.Json.destruct encoding json in
   {config with data_dir}
 
-let identity_file ~data_dir = Filename.concat data_dir "identity.json"
+let identity_file {data_dir; _} = Filename.concat data_dir "identity.json"
 
-let peers_file ~data_dir = Filename.concat data_dir "peers.json"
+let peers_file {data_dir; _} = Filename.concat data_dir "peers.json"

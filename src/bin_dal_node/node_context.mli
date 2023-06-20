@@ -49,7 +49,7 @@ type t
     node store [store], gossipsub worker instance [gs_worker], transport layer
     instance [transport_layer], and tezos node client context [cctx]. *)
 val init :
-  Configuration.t ->
+  Configuration_file.t ->
   Store.node_store ->
   Gossipsub.Worker.t ->
   Gossipsub.Transport_layer.t ->
@@ -79,7 +79,7 @@ type error += Node_not_ready
 val get_ready : t -> ready_ctxt tzresult
 
 (** [get_config ctxt] returns the dal node configuration *)
-val get_config : t -> Configuration.t
+val get_config : t -> Configuration_file.t
 
 (** [get_status ctxt] returns the dal node status *)
 val get_status : t -> status
