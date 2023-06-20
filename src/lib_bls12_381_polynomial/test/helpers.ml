@@ -23,11 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let rec repeat n f =
-  if n < 0 then ()
-  else (
+let rec repeat n f () =
+  if n > 0 then (
     f () ;
-    repeat (n - 1) f)
+    repeat (n - 1) f ())
 
 let must_fail f =
   let exception Local in

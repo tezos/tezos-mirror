@@ -120,7 +120,7 @@ let tests =
   let repetitions = 100 in
   List.map
     (fun (name, f) ->
-      Alcotest.test_case name `Quick (fun () -> Helpers.repeat repetitions f))
+      Alcotest.test_case name `Quick (Helpers.repeat repetitions f))
     [
       ("test_generator", test_generator);
       ("build_domain", test_build_domain);

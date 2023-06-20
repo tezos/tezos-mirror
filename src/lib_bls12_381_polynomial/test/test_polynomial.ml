@@ -60,13 +60,19 @@ let test_get_random () =
   let degree = 1 + Random.int 100 in
   let p = Poly_c.of_coefficients [(Fr.one, degree)] in
   assert (Poly_c.length p = degree + 1) ;
-  Helpers.repeat 10 (fun () ->
-      assert (Fr.eq (Poly_c.get p (Random.int (Poly_c.length p - 1))) Fr.zero)) ;
+  Helpers.repeat
+    10
+    (fun () ->
+      assert (Fr.eq (Poly_c.get p (Random.int (Poly_c.length p - 1))) Fr.zero))
+    () ;
   Helpers.(
-    repeat 10 (fun () ->
+    repeat
+      10
+      (fun () ->
         let i = Random.int 10 in
         must_fail (fun () -> ignore @@ Poly_c.get p (-i - 1)) ;
-        must_fail (fun () -> ignore @@ Poly_c.get p (Poly_c.length p + i))))
+        must_fail (fun () -> ignore @@ Poly_c.get p (Poly_c.length p + i)))
+      ())
 
 let test_one () =
   let p = Poly_c.one in
@@ -797,7 +803,7 @@ let tests =
   let repetitions = 100 in
   List.map
     (fun (name, f) ->
-      Alcotest.test_case name `Quick (fun () -> Helpers.repeat repetitions f))
+      Alcotest.test_case name `Quick (Helpers.repeat repetitions f))
     [
       ("build_erase", test_erase);
       ("vectors_fft", test_vectors_fft);
