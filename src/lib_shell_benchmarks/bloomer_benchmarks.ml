@@ -36,8 +36,9 @@ let const_time_model ~const_name ~name =
     ~conv:(fun () -> ())
     ~model:(Model.unknown_const1 ~name ~const:(fv const_name))
 
-let make_bench ~name ~info ~model ~generator ~make_bench : Benchmark.t =
-  let module Bench : Benchmark.S = struct
+let make_bench ~name ~info ~model ~generator ~make_bench :
+    (module Benchmark.Simple) =
+  let module Bench = struct
     type config = unit
 
     let default_config = ()
@@ -82,11 +83,14 @@ let make_bloomer () =
 (* This is a feature of the peer-to-peer layer.
    The benchmark is not used to generate values for the protocol. *)
 let () =
-  Registration.register
+  Registration.register_simple
   @@ make_bench
        ~name:"bloomer_mem"
        ~info:"Benchmarking Bloomer.mem"
-       ~model:(const_time_model ~const_name:"bloomer_mem_const")
+       ~model:
+         (const_time_model
+            ~name:(ns "bloomer_mem")
+            ~const_name:"bloomer_mem_const")
        ~generator:(fun _rng_state ->
          let bloomer = make_bloomer () in
          let string = "test" in
@@ -100,11 +104,14 @@ let () =
 (* This is a feature of the peer-to-peer layer.
    The benchmark is not used to generate values for the protocol. *)
 let () =
-  Registration.register
+  Registration.register_simple
   @@ make_bench
        ~name:"bloomer_add"
        ~info:"Benchmarking Bloomer.add"
-       ~model:(const_time_model ~const_name:"bloomer_add_const")
+       ~model:
+         (const_time_model
+            ~name:(ns "bloomer_add")
+            ~const_name:"bloomer_add_const")
        ~generator:(fun _rng_state -> make_bloomer ())
        ~make_bench:(fun generator ->
          let bloomer = generator () in

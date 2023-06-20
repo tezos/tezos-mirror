@@ -128,7 +128,7 @@ let micheline_size (n : node) =
   in
   micheline_size n {nodes = 0; bytes = 0}
 
-module Micheline_strip_locations : Benchmark.S = struct
+module Micheline_strip_locations : Benchmark.Simple = struct
   let name = ns "strip_locations_micheline"
 
   let info = "Benchmarking Micheline.strip_locations"
@@ -158,7 +158,7 @@ module Micheline_strip_locations : Benchmark.S = struct
     Sparse_vec.String.of_list
       [("nodes", float_of_int nodes); ("bytes", float_of_int bytes)]
 
-  let model ~name =
+  let model =
     Model.(
       make
         ~conv:(fun {nodes; bytes = _} -> (nodes, ()))
@@ -173,4 +173,4 @@ module Micheline_strip_locations : Benchmark.S = struct
     Generator.Plain {workload = size; closure}
 end
 
-let () = Registration.register (module Micheline_strip_locations)
+let () = Registration.register_simple (module Micheline_strip_locations)

@@ -255,7 +255,7 @@ module Context_size_dependent_shared = struct
   let group = Benchmark.Group "io_read"
 end
 
-module Context_size_dependent_read_bench : Benchmark.S = struct
+module Context_size_dependent_read_bench : Benchmark.Simple = struct
   (* ----------------------------------------------------------------------- *)
   (* Benchmark def *)
 
@@ -338,12 +338,12 @@ module Context_size_dependent_read_bench : Benchmark.S = struct
     in
     Generator.With_context {workload; closure; with_context}
 
-  let model ~name:_ = read_access
+  let model = read_access
 end
 
-let () = Registration.register (module Context_size_dependent_read_bench)
+let () = Registration.register_simple (module Context_size_dependent_read_bench)
 
-module Context_size_dependent_write_bench : Benchmark.S = struct
+module Context_size_dependent_write_bench : Benchmark.Simple = struct
   include Context_size_dependent_shared
 
   (* ----------------------------------------------------------------------- *)
@@ -364,7 +364,7 @@ module Context_size_dependent_write_bench : Benchmark.S = struct
   let write_storage context key bytes =
     Lwt_main.run (Tezos_protocol_environment.Context.add context key bytes)
 
-  let model ~name:_ = read_access
+  let model = read_access
 
   let create_benchmark ~rng_state cfg =
     let insertions =
@@ -428,7 +428,8 @@ module Context_size_dependent_write_bench : Benchmark.S = struct
     Generator.With_context {workload; closure; with_context}
 end
 
-let () = Registration.register (module Context_size_dependent_write_bench)
+let () =
+  Registration.register_simple (module Context_size_dependent_write_bench)
 
 module Irmin_pack_shared = struct
   open Base_samplers
@@ -542,7 +543,7 @@ module Irmin_pack_shared = struct
       (prefix, directories)
 end
 
-module Irmin_pack_read_bench : Benchmark.S = struct
+module Irmin_pack_read_bench : Benchmark.Simple = struct
   include Irmin_pack_shared
 
   let prepare_irmin_directory rng_state ~cfg ~key_set =
@@ -602,14 +603,12 @@ module Irmin_pack_read_bench : Benchmark.S = struct
         in
         Sparse_vec.String.of_list keys
 
-  let read_access =
+  let model =
     Model.make
       ~conv:(function
         | Irmin_pack_read {depth; storage_bytes; _} ->
             (depth, (storage_bytes, ())))
       ~model:read_model
-
-  let model ~name:_ = read_access
 
   let group = Benchmark.Group "io_read"
 
@@ -691,9 +690,9 @@ module Irmin_pack_read_bench : Benchmark.S = struct
     Generator.With_context {workload; closure; with_context}
 end
 
-let () = Registration.register (module Irmin_pack_read_bench)
+let () = Registration.register_simple (module Irmin_pack_read_bench)
 
-module Irmin_pack_write_bench : Benchmark.S = struct
+module Irmin_pack_write_bench : Benchmark.Simple = struct
   include Irmin_pack_shared
 
   let prepare_irmin_directory rng_state ~cfg ~key_set ~bench_init =
@@ -782,14 +781,12 @@ module Irmin_pack_write_bench : Benchmark.S = struct
         in
         Sparse_vec.String.of_list keys
 
-  let write_access =
+  let model =
     Model.make
       ~conv:(function
         | Irmin_pack_write {keys_written; storage_bytes; _} ->
             (keys_written, (storage_bytes, ())))
       ~model:write_model
-
-  let model ~name:_ = write_access
 
   let group = Benchmark.Group "io_write"
 
@@ -880,9 +877,9 @@ module Irmin_pack_write_bench : Benchmark.S = struct
     Generator.With_context {workload; closure; with_context}
 end
 
-let () = Registration.register (module Irmin_pack_write_bench)
+let () = Registration.register_simple (module Irmin_pack_write_bench)
 
-module Read_random_key_bench : Benchmark_base.S = struct
+module Read_random_key_bench : Benchmark.Simple_with_num = struct
   type config = {
     existing_context : string * Context_hash.t;
     subdirectory : string list;
@@ -933,13 +930,13 @@ module Read_random_key_bench : Benchmark_base.S = struct
         in
         Sparse_vec.String.of_list keys
 
-  let read_access =
+  let group = Benchmark.Group "io_read"
+
+  let model =
     Model.make
       ~conv:(function
         | Read_random_key {depth; storage_bytes} -> (depth, (storage_bytes, ())))
       ~model:read_model
-
-  let models = [("io_read", read_access)]
 
   let make_bench rng_state config keys () =
     let card = Array.length keys in
@@ -986,9 +983,9 @@ module Read_random_key_bench : Benchmark_base.S = struct
     List.repeat bench_num (make_bench rng_state config keys)
 end
 
-let () = Registration.register_base (module Read_random_key_bench)
+let () = Registration.register_simple_with_num (module Read_random_key_bench)
 
-module Write_random_keys_bench : Benchmark_base.S = struct
+module Write_random_keys_bench : Benchmark.Simple_with_num = struct
   open Base_samplers
 
   type config = {
@@ -1083,14 +1080,14 @@ module Write_random_keys_bench : Benchmark_base.S = struct
         in
         Sparse_vec.String.of_list keys
 
-  let write_access =
+  let group = Benchmark.Group "io_write"
+
+  let model =
     Model.make
       ~conv:(function
         | Write_random_keys {keys_written; storage_bytes; _} ->
             (keys_written, (storage_bytes, ())))
       ~model:write_model
-
-  let models = [("io_write", write_access)]
 
   let write_storage context key bytes =
     Lwt_main.run (Context.add context key bytes)
@@ -1174,4 +1171,4 @@ module Write_random_keys_bench : Benchmark_base.S = struct
     List.repeat bench_num (make_bench rng_state config keys)
 end
 
-let () = Registration.register_base (module Write_random_keys_bench)
+let () = Registration.register_simple_with_num (module Write_random_keys_bench)

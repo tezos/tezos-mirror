@@ -22,76 +22,30 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-module Benchmark_base = Benchmark
-
-module Benchmark = struct
-  type group = Benchmark.group = Standalone | Group of string | Generic
-
-  type purpose = Benchmark_base.purpose =
-    | Other_purpose of string
-    | Generate_code of string
-
-  module type S = sig
-    val name : Namespace.t
-
-    val info : string
-
-    val module_filename : string
-
-    val purpose : Benchmark.purpose
-
-    val group : group
-
-    val tags : string list
-
-    type config
-
-    val default_config : config
-
-    val config_encoding : config Data_encoding.t
-
-    type workload
-
-    val workload_encoding : workload Data_encoding.t
-
-    val workload_to_vector : workload -> Sparse_vec.String.t
-
-    val model : name:Namespace.t -> workload Model.t
-
-    val create_benchmark :
-      rng_state:Random.State.t -> config -> workload Generator.benchmark
-  end
-
-  type t = (module S)
-end
 
 module Registration = struct
-  let register ((module Bench) : Benchmark.t) =
-    let module B : Benchmark_base.S = struct
+  let register ?add_timer ((module Bench) : Benchmark.t) =
+    let module B : Benchmark.S = struct
       include Bench
 
       let tags = "shell" :: Bench.tags
-
-      let models =
-        [
-          ( (match Bench.group with
-            | Generic -> "*"
-            | Group g -> g
-            | Standalone -> Namespace.(cons Bench.name "model" |> to_string)),
-            Bench.model ~name );
-        ]
-
-      let create_benchmarks ~rng_state ~bench_num config =
-        List.repeat bench_num (fun () ->
-            Bench.create_benchmark ~rng_state config)
     end in
-    Registration.register (module B)
+    Registration.register ?add_timer (module B)
 
-  let register_base (module B : Benchmark_base.S) =
-    let module Bench : Benchmark_base.S = struct
-      include B
+  let register_simple ?add_timer (module Bench : Benchmark.Simple) =
+    let module B = struct
+      include Bench
 
-      let tags = "shell" :: B.tags
+      let tags = "shell" :: Bench.tags
     end in
-    Registration.register (module Bench)
+    Registration.register_simple ?add_timer (module B)
+
+  let register_simple_with_num ?add_timer
+      (module Bench : Benchmark.Simple_with_num) =
+    let module B = struct
+      include Bench
+
+      let tags = "shell" :: Bench.tags
+    end in
+    Registration.register_simple_with_num ?add_timer (module B)
 end
