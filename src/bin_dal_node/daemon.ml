@@ -34,7 +34,7 @@ let resolve_plugin
   Option.map_s
     (fun dal_plugin ->
       let (module Dal_plugin : Dal_plugin.T) = dal_plugin in
-      let* () = Event.emit_protocol_plugin_resolved Dal_plugin.Proto.hash in
+      let* () = Event.(emit protocol_plugin_resolved) Dal_plugin.Proto.hash in
       return dal_plugin)
     plugin_opt
 

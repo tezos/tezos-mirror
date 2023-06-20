@@ -109,7 +109,8 @@ let protocol_plugin_resolved =
     ~name:"dal_node_plugin_resolved"
     ~msg:"Resolved plugin on protocol {proto_hash}"
     ~level:Notice
-    ("proto_hash", Data_encoding.string)
+    ~pp1:Protocol_hash.pp_short
+    ("proto_hash", Protocol_hash.encoding)
 
 let daemon_error =
   declare_1
@@ -119,9 +120,3 @@ let daemon_error =
     ~level:Notice
     ~pp1:Error_monad.pp_print_trace
     ("error", Error_monad.trace_encoding)
-
-let proto_short_hash_string hash =
-  Format.asprintf "%a" Protocol_hash.pp_short hash
-
-let emit_protocol_plugin_resolved hash =
-  emit protocol_plugin_resolved @@ proto_short_hash_string hash
