@@ -1,7 +1,7 @@
-Protocol Alpha
-==============
+Protocol Oxford
+===============
 
-This page documents the changes brought by protocol Alpha with respect
+This page documents the changes brought by protocol Oxford with respect
 to Nairobi (see :ref:`naming_convention`).
 
 The code can be found in directory :src:`src/proto_018_Proxford` of the ``master``

@@ -67,9 +67,9 @@ operations included in newly received blocks, whose validation is
 triggered by the :ref:`block validator<block_validator>`, in order to
 localize validation rules as needed. The resulting concrete API is
 specified by the :package-api:`Protocol
-<tezos-protocol-environment/Tezos_protocol_environment/V8/module-type-T/Updater/module-type-PROTOCOL/index.html>`
+<tezos-protocol-environment/Tezos_protocol_environment/V10/module-type-T/Updater/module-type-PROTOCOL/index.html>`
 module in the :doc:`protocol
-environment<../shell/protocol_environment>` ``V8``, and it is
+environment<../shell/protocol_environment>` ``V10``, and it is
 implemented by this protocol in the
 :package-api:`Main<tezos-protocol-018-Proxford/Tezos_raw_protocol_018_Proxford/Main/index.html>`
 module.
