@@ -479,6 +479,10 @@ let perform_benchmark (type c t) (options : options)
           {workload; measures; allocated_words} :: workload_data
         in
         match benchmark_fun () with
+        | Generator.Calculated {workload; measure} ->
+            let measures = Array.init options.nsamples (fun _ -> measure ()) in
+            let measures = Maths.vector_of_array measures in
+            {workload; measures; allocated_words = None} :: workload_data
         | Generator.Plain {workload; closure} ->
             measure_plain_benchmark workload closure None
         | Generator.PlainWithAllocation {workload; closure; measure_allocation}
