@@ -197,6 +197,7 @@ module MakeAbstract
     | Temporary -> `Branch_delayed trace
     | Outdated -> `Outdated trace
 
+  (* Wrapper around [Proto.Mempool.add_operation]. *)
   let proto_add_operation ~conflict_handler state op :
       (Proto.Mempool.t * Proto.Mempool.add_result) tzresult Lwt.t =
     Proto.Mempool.add_operation
@@ -241,60 +242,37 @@ module MakeAbstract
         in
         error [Operation_conflict {new_hash = op.hash; needed_fee_in_mutez}]
 
-  let bounding_add_operation bounding_state bounding_config op =
-    Result.map_error
-      (fun op_to_overtake ->
-        let needed_fee_in_mutez =
-          Option.bind op_to_overtake (fun op_to_overtake ->
-              Filter.Mempool.fee_needed_to_overtake
-                ~op_to_overtake:op_to_overtake.protocol
-                ~candidate_op:op.protocol)
-        in
-        [
-          Validation_errors.Rejected_by_full_mempool
-            {hash = op.hash; needed_fee_in_mutez};
-        ])
-      (Bounding.add_operation bounding_state bounding_config op)
-
-  (* Analyze the output of [Proto.Mempool.add_operation] to handle a
-     potential operation conflict. Then use the [Bounding] module to
-     ensure that the mempool remains bounded.
-
-     If successful, return the updated [mempool] and [bounding_state],
-     as well as any operation [replacements] caused by either the
-     protocol mempool or the [Bounding] module.
-
-     Note that the [mempool] argument, as part of the output of
-     [Proto.Mempool.add_operation], already contains the new operation
-     (if it has been accepted). So the only update it may need is the
-     removal of any operations replaced during [Bounding.add]. *)
-  let check_conflict_and_bound (mempool, proto_add_result)
-      {bounding_state; conflict_map; _} (filter_config, bounding_config) op :
-      (Proto.Mempool.t * Bounding.state * replacements) tzresult =
+  let update_bounding_state bounding_state bounding_config op ~proto_replacement
+      =
     let open Result_syntax in
-    let* proto_replacement =
-      translate_proto_add_result proto_add_result op conflict_map filter_config
-    in
     let bounding_state =
       match proto_replacement with
       | None -> bounding_state
       | Some (replaced, _) -> Bounding.remove_operation bounding_state replaced
     in
-    let* bounding_state, removed_by_bounding =
-      bounding_add_operation bounding_state bounding_config op
+    let* bounding_state, removed_operation_hashes =
+      Result.map_error
+        (fun op_to_overtake ->
+          let needed_fee_in_mutez =
+            Option.bind op_to_overtake (fun op_to_overtake ->
+                Filter.Mempool.fee_needed_to_overtake
+                  ~op_to_overtake:op_to_overtake.protocol
+                  ~candidate_op:op.protocol)
+          in
+          [
+            Validation_errors.Rejected_by_full_mempool
+              {hash = op.hash; needed_fee_in_mutez};
+          ])
+        (Bounding.add_operation bounding_state bounding_config op)
     in
-    let mempool =
-      List.fold_left Proto.Mempool.remove_operation mempool removed_by_bounding
+    let bounding_replacements =
+      List.map
+        (fun removed ->
+          let err = [Validation_errors.Removed_from_full_mempool removed] in
+          (removed, classification_of_trace err))
+        removed_operation_hashes
     in
-    let replacements =
-      Option.to_list proto_replacement
-      @ List.map
-          (fun removed ->
-            let err = [Validation_errors.Removed_from_full_mempool removed] in
-            (removed, classification_of_trace err))
-          removed_by_bounding
-    in
-    return (mempool, bounding_state, replacements)
+    return (bounding_state, bounding_replacements)
 
   let update_conflict_map conflict_map ~mempool_before op replacements =
     (* [mempool_before] is the protocol's mempool representation
@@ -317,10 +295,13 @@ module MakeAbstract
       ~new_operation:op.protocol
       ~replacements
 
-  let add_operation_result state config op : add_result tzresult Lwt.t =
+  (* Implements [add_operation] but inside the [tzresult] monad. *)
+  let add_operation_result state (filter_config, bounding_config) op =
     let open Lwt_result_syntax in
-    let conflict_handler = Filter.Mempool.conflict_handler (fst config) in
-    let* proto_output = proto_add_operation ~conflict_handler state op in
+    let conflict_handler = Filter.Mempool.conflict_handler filter_config in
+    let* mempool, proto_add_result =
+      proto_add_operation ~conflict_handler state op
+    in
     (* The operation might still be rejected because of a conflict
        with a previously validated operation, or if the mempool is
        full and the operation does not have enough fees. Nevertheless,
@@ -331,23 +312,49 @@ module MakeAbstract
     let valid_op = record_successful_signature_check op in
     let res =
       catch_e @@ fun () ->
-      check_conflict_and_bound proto_output state config valid_op
+      let open Result_syntax in
+      let* proto_replacement =
+        translate_proto_add_result
+          proto_add_result
+          op
+          state.conflict_map
+          filter_config
+      in
+      let* bounding_state, bounding_replacements =
+        update_bounding_state
+          state.bounding_state
+          bounding_config
+          op
+          ~proto_replacement
+      in
+      let mempool =
+        List.fold_left
+          (fun mempool (replaced_oph, _) ->
+            Proto.Mempool.remove_operation mempool replaced_oph)
+          mempool
+          bounding_replacements
+      in
+      let all_replacements =
+        match proto_replacement with
+        | None -> bounding_replacements
+        | Some proto_replacement -> proto_replacement :: bounding_replacements
+      in
+      let conflict_map =
+        update_conflict_map
+          state.conflict_map
+          ~mempool_before:state.mempool
+          op
+          all_replacements
+      in
+      let state = {state with mempool; bounding_state; conflict_map} in
+      return (state, valid_op, `Validated, all_replacements)
     in
     match res with
-    | Ok (mempool, bounding_state, replacements) ->
-        let conflict_map =
-          update_conflict_map
-            state.conflict_map
-            ~mempool_before:state.mempool
-            op
-            replacements
-        in
-        let state = {state with mempool; bounding_state; conflict_map} in
-        return (state, valid_op, `Validated, replacements)
+    | Ok add_result -> return add_result
     | Error trace ->
-        (* We convert any error from [check_conflict_and_bound] into an
-           [add_result] here, rather than let [add_operation] below do
-           the same, so that we can return the updated [valid_op]. *)
+        (* When [res] is an error, we convert it to an [add_result]
+           here (instead of letting [add_operation] do it below) so
+           that we can return the updated [valid_op]. *)
         return (state, valid_op, classification_of_trace trace, [])
 
   let add_operation state config op : add_result Lwt.t =
