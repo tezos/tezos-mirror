@@ -58,7 +58,7 @@ module Parameters = struct
     rpc_host : string;
     rpc_port : int;
     mode : mode_settings;
-    node : Node.t;
+    endpoint : Client.endpoint;
     client : Client.t;
     mutable pending_ready : unit option Lwt.u list;
     allow_v1_api : bool;
@@ -100,9 +100,11 @@ let rpc_host dac_node = dac_node.persistent_state.rpc_host
 
 let rpc_port dac_node = dac_node.persistent_state.rpc_port
 
-let layer1_addr dac_node = Node.rpc_host dac_node.persistent_state.node
+let layer1_scheme dac_node = Client.scheme dac_node.persistent_state.endpoint
 
-let layer1_port dac_node = Node.rpc_port dac_node.persistent_state.node
+let layer1_addr dac_node = Client.address dac_node.persistent_state.endpoint
+
+let layer1_port dac_node = Client.rpc_port dac_node.persistent_state.endpoint
 
 let endpoint dac_node =
   Printf.sprintf "http://%s:%d" (rpc_host dac_node) (rpc_port dac_node)
@@ -286,9 +288,9 @@ let wait_for_ready dac_node =
 let handle_event dac_node {name; value = _; timestamp = _} =
   match name with "dac_node_is_ready.v0" -> set_ready dac_node | _ -> ()
 
-let create ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir ~mode ~node ~client
-    ?(allow_v1_api = false) () =
+let create_with_endpoint ?(path = Constant.dac_node) ?name ?color ?data_dir
+    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir ~mode
+    ~endpoint ~client ?(allow_v1_api = false) () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -314,7 +316,7 @@ let create ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
         rpc_port;
         mode;
         pending_ready = [];
-        node;
+        endpoint;
         client;
         allow_v1_api;
       }
@@ -322,8 +324,25 @@ let create ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
   on_event dac_node (handle_event dac_node) ;
   dac_node
 
+let create ?path ?name ?color ?data_dir ?event_pipe ?rpc_host ?rpc_port
+    ?reveal_data_dir ~mode ~node ~client ?allow_v1_api () =
+  create_with_endpoint
+    ?path
+    ?name
+    ?color
+    ?data_dir
+    ?event_pipe
+    ?rpc_host
+    ?rpc_port
+    ?reveal_data_dir
+    ~mode
+    ~endpoint:(Client.Node node)
+    ~client
+    ?allow_v1_api
+    ()
+
 let create_legacy ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir ~threshold
+    ?(rpc_host = localhost) ?rpc_port ?reveal_data_dir ~threshold
     ~committee_members ?committee_member_address ~node ~client () =
   let mode =
     Legacy
@@ -347,54 +366,92 @@ let create_legacy ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
     ~client
     ()
 
-let create_coordinator ?(path = Constant.dac_node) ?name ?color ?data_dir
-    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir
-    ?(allow_v1_api = false) ~committee_members ~node ~client () =
+let create_coordinator_with_endpoint ?path ?name ?color ?data_dir ?event_pipe
+    ?rpc_host ?rpc_port ?reveal_data_dir ?allow_v1_api ~committee_members
+    ~endpoint ~client () =
   let mode = Coordinator {committee_members} in
-  create
-    ~path
+  create_with_endpoint
+    ?path
     ?name
     ?color
     ?data_dir
     ?event_pipe
-    ~rpc_host
+    ?rpc_host
     ?rpc_port
     ?reveal_data_dir
     ~mode
-    ~node
+    ~endpoint
     ~client
-    ~allow_v1_api
+    ?allow_v1_api
     ()
 
-let create_committee_member ?(path = Constant.dac_node) ?name ?color ?data_dir
-    ?event_pipe ?(rpc_host = localhost) ?rpc_port ?reveal_data_dir
-    ?(coordinator_rpc_host = localhost) ?coordinator_rpc_port
-    ?(allow_v1_api = false) ~address ~node ~client () =
+let create_coordinator ?path ?name ?color ?data_dir ?event_pipe ?rpc_host
+    ?rpc_port ?reveal_data_dir ?allow_v1_api ~committee_members ~node ~client ()
+    =
+  create_coordinator_with_endpoint
+    ?path
+    ?name
+    ?color
+    ?data_dir
+    ?event_pipe
+    ?rpc_host
+    ?rpc_port
+    ?reveal_data_dir
+    ?allow_v1_api
+    ~committee_members
+    ~endpoint:(Node node)
+    ~client
+    ()
+
+let create_committee_member_with_endpoint ?path ?name ?color ?data_dir
+    ?event_pipe ?rpc_host ?rpc_port ?reveal_data_dir
+    ?(coordinator_rpc_host = localhost) ?coordinator_rpc_port ?allow_v1_api
+    ~address ~endpoint ~client () =
   let coordinator_rpc_port =
     match coordinator_rpc_port with None -> Port.fresh () | Some port -> port
   in
   let mode =
     Committee_member {address; coordinator_rpc_host; coordinator_rpc_port}
   in
-  create
-    ~path
+  create_with_endpoint
+    ?path
     ?name
     ?color
     ?data_dir
     ?event_pipe
-    ~rpc_host
+    ?rpc_host
     ?rpc_port
     ?reveal_data_dir
     ~mode
-    ~node
+    ~endpoint
     ~client
-    ~allow_v1_api
+    ?allow_v1_api
     ()
 
-let create_observer ?(path = Constant.dac_node) ?name ?color ?data_dir
-    ?event_pipe ?(rpc_host = localhost) ?rpc_port ?reveal_data_dir
-    ?(coordinator_rpc_host = localhost) ?coordinator_rpc_port ?timeout
-    ?(allow_v1_api = false) ~committee_member_rpcs ~node ~client () =
+let create_committee_member ?path ?name ?color ?data_dir ?event_pipe ?rpc_host
+    ?rpc_port ?reveal_data_dir ?coordinator_rpc_host ?coordinator_rpc_port
+    ?allow_v1_api ~address ~node ~client () =
+  create_committee_member_with_endpoint
+    ?path
+    ?name
+    ?color
+    ?data_dir
+    ?event_pipe
+    ?rpc_host
+    ?rpc_port
+    ?reveal_data_dir
+    ?coordinator_rpc_host
+    ?coordinator_rpc_port
+    ?allow_v1_api
+    ~address
+    ~endpoint:(Node node)
+    ~client
+    ()
+
+let create_observer_with_endpoint ?path ?name ?color ?data_dir ?event_pipe
+    ?rpc_host ?rpc_port ?reveal_data_dir ?(coordinator_rpc_host = localhost)
+    ?coordinator_rpc_port ?timeout ?allow_v1_api ~committee_member_rpcs
+    ~endpoint ~client () =
   let coordinator_rpc_port =
     match coordinator_rpc_port with None -> Port.fresh () | Some port -> port
   in
@@ -407,19 +464,40 @@ let create_observer ?(path = Constant.dac_node) ?name ?color ?data_dir
         timeout;
       }
   in
-  create
-    ~path
+  create_with_endpoint
+    ?path
     ?name
     ?color
     ?data_dir
     ?event_pipe
-    ~rpc_host
+    ?rpc_host
     ?rpc_port
     ?reveal_data_dir
     ~mode
-    ~node
+    ~endpoint
     ~client
-    ~allow_v1_api
+    ?allow_v1_api
+    ()
+
+let create_observer ?path ?name ?color ?data_dir ?event_pipe ?rpc_host ?rpc_port
+    ?reveal_data_dir ?coordinator_rpc_host ?coordinator_rpc_port ?timeout
+    ?allow_v1_api ~committee_member_rpcs ~node ~client () =
+  create_observer_with_endpoint
+    ?path
+    ?name
+    ?color
+    ?data_dir
+    ?event_pipe
+    ?rpc_host
+    ?rpc_port
+    ?reveal_data_dir
+    ?coordinator_rpc_host
+    ?coordinator_rpc_port
+    ?timeout
+    ?allow_v1_api
+    ~committee_member_rpcs
+    ~endpoint:(Node node)
+    ~client
     ()
 
 let make_arguments node =
@@ -429,7 +507,11 @@ let make_arguments node =
   let endpoint_args =
     [
       "--endpoint";
-      Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
+      Printf.sprintf
+        "%s://%s:%d"
+        (layer1_scheme node)
+        (layer1_addr node)
+        (layer1_port node);
     ]
   in
   base_dir_args @ endpoint_args

@@ -52,6 +52,16 @@ val time_of_timestamp : timestamp -> Time.t
     when doing RPC calls. *)
 val rpc_port : endpoint -> int
 
+(** [address ?from endpoint] returns the address at which [endpoint] can be
+    contacted. If [from] is provided, and if [from] and [endpoint] live in the
+    same address, then ["127.0.0.1"] is returned (or ["localhost"] if
+    [hostname] is [true]. *)
+val address : ?hostname:bool -> ?from:endpoint -> endpoint -> string
+
+(** [scheme endpoint] returns “http” or “https” depending on the configuration
+    of the endpoint. *)
+val scheme : endpoint -> string
+
 (** Mode of the client *)
 type mode =
   | Client of endpoint option * media_type option
