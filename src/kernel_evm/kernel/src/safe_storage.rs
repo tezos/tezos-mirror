@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
 use crate::upgrade::CONFIG_INTERPRETER_PATH;
+use crate::upgrade::KERNEL_BOOT_PATH;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_host::{
     input::Message,
@@ -11,7 +13,6 @@ use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, Path, RefPath},
     runtime::{Runtime, RuntimeError, ValueType},
 };
-use tezos_smart_rollup_installer::KERNEL_BOOT_PATH;
 
 pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
 

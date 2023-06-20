@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 use core::str::Utf8Error;
@@ -33,6 +34,7 @@ pub enum StorageError {
 #[derive(Debug)]
 pub enum UpgradeProcessError {
     InvalidUpgradeNonce,
+    ConfigSerialisation(tezos_data_encoding::enc::BinError),
 }
 
 #[derive(Debug)]
@@ -67,5 +69,11 @@ impl From<TransferError> for Error {
 impl From<DecoderError> for Error {
     fn from(_: DecoderError) -> Self {
         Self::InvalidConversion
+    }
+}
+
+impl From<UpgradeProcessError> for Error {
+    fn from(e: UpgradeProcessError) -> Self {
+        Self::UpgradeError(e)
     }
 }
