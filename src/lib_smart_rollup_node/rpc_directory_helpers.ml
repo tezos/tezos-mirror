@@ -29,8 +29,6 @@
 module type PARAM = sig
   type prefix
 
-  val prefix : (unit, prefix) Tezos_rpc.Path.t
-
   type context
 
   type subcontext
@@ -38,7 +36,13 @@ module type PARAM = sig
   val context_of_prefix : context -> prefix -> subcontext tzresult Lwt.t
 end
 
-module Make_directory (S : PARAM) = struct
+module type PARAM_PREFIX = sig
+  include PARAM
+
+  val prefix : (unit, prefix) Tezos_rpc.Path.t
+end
+
+module Make_sub_directory (S : PARAM) = struct
   open S
 
   let directory : subcontext tzresult Tezos_rpc.Directory.t ref =
@@ -60,9 +64,17 @@ module Make_directory (S : PARAM) = struct
     let*? ctxt in
     f ctxt arg query input
 
-  let build_directory node_ctxt =
+  let build_sub_directory node_ctxt =
     !directory
     |> Tezos_rpc.Directory.map (fun prefix ->
            context_of_prefix node_ctxt prefix)
-    |> Tezos_rpc.Directory.prefix prefix
+end
+
+module Make_directory (S : PARAM_PREFIX) = struct
+  include Make_sub_directory (S)
+
+  let of_subdirectory = Tezos_rpc.Directory.prefix S.prefix
+
+  let build_directory node_ctxt =
+    build_sub_directory node_ctxt |> Tezos_rpc.Directory.prefix S.prefix
 end
