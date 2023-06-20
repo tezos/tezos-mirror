@@ -125,10 +125,12 @@ module Term = struct
       let* root = root config_file data_dir in
       let*! () =
         Tezos_context.Context.Checks.Pack.Integrity_check.run
+          ~ppf:Format.std_formatter
           ~root
           ~auto_repair
           ~always:false
           ~heads:None
+          ()
       in
       return_unit)
 
