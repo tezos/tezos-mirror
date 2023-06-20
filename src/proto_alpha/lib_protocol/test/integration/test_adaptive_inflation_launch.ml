@@ -115,7 +115,7 @@ let test_launch threshold expected_vote_duration () =
     Assert.lt_int32 ~loc threshold ema
   in
   (* Initialize the state with a single delegate. *)
-  let* block, delegate =
+  let constants =
     let default_constants = Default_parameters.constants_test in
     let adaptive_inflation =
       {
@@ -124,9 +124,9 @@ let test_launch threshold expected_vote_duration () =
       }
     in
     let consensus_threshold = 0 in
-    Context.init_with_constants1
-      {default_constants with consensus_threshold; adaptive_inflation}
+    {default_constants with consensus_threshold; adaptive_inflation}
   in
+  let* block, delegate = Context.init_with_constants1 constants in
   let delegate_pkh = Context.Contract.pkh delegate in
   let* () = assert_is_not_yet_set_to_launch ~loc:__LOC__ block in
 
