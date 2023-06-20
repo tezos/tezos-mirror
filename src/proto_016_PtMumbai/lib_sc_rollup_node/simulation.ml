@@ -38,7 +38,7 @@ type t = {
   ctxt : Context.ro;
   inbox_level : int32;
   state : Context.tree;
-  reveal_map : string Sc_rollup_reveal_hash.Map.t option;
+  reveal_map : string Utils.Reveal_hash_map.t option;
   nb_messages_inbox : int;
   level_position : level_position;
   info_per_level : info_per_level;
@@ -95,11 +95,11 @@ let simulate_messages_no_checks (node_ctxt : Node_context.ro)
   let*! state_hash = PVM.state_hash state in
   let*! tick = PVM.get_tick state in
   let eval_state =
-    Fueled_pvm.
+    Pvm_plugin_sig.
       {
         state;
-        state_hash;
-        tick;
+        state_hash = Sc_rollup_proto_types.State_hash.to_octez state_hash;
+        tick = Sc_rollup.Tick.to_z tick;
         inbox_level;
         message_counter_offset = nb_messages_inbox;
         remaining_fuel = Fuel.Free.of_ticks 0L;
@@ -110,7 +110,7 @@ let simulate_messages_no_checks (node_ctxt : Node_context.ro)
   let* eval_result =
     Fueled_pvm.eval_messages ?reveal_map node_ctxt eval_state
   in
-  let Fueled_pvm.{state = {state; _}; num_ticks; num_messages; _} =
+  let Pvm_plugin_sig.{state = {state; _}; num_ticks; num_messages; _} =
     Delayed_write_monad.ignore eval_result
   in
   let*! ctxt = PVM.State.set ctxt state in

@@ -26,48 +26,23 @@
 open Protocol
 open Alpha_context
 
-(** [get_boot_sector block_hash node_ctxt] fetches the operations in the
-    [block_hash] and looks for the bootsector used to originate the rollup we're
-    following.  It must be called with [block_hash.level] =
-    [node_ctxt.genesis_info.level].  *)
 let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
-  let exception Found_boot_sector of string in
-  let* block = Layer1_helpers.fetch_tezos_block node_ctxt.l1_ctxt block_hash in
-  let missing_boot_sector () =
-    failwith "Boot sector not found in Tezos block %a" Block_hash.pp block_hash
-  in
-  Lwt.catch
-    (fun () ->
-      let apply (type kind) accu ~source:_ (operation : kind manager_operation)
-          (result : kind Apply_results.successful_manager_operation_result) =
-        match (operation, result) with
-        | ( Sc_rollup_originate {kind; boot_sector; _},
-            Sc_rollup_originate_result {address; _} )
-          when Octez_smart_rollup.Address.(
-                 node_ctxt.rollup_address
-                 = Sc_rollup_proto_types.Address.to_octez address)
-               && node_ctxt.kind = Sc_rollup_proto_types.Kind.to_octez kind ->
-            raise (Found_boot_sector boot_sector)
-        | _ -> accu
+  match node_ctxt.boot_sector_file with
+  | None -> Layer1_helpers.get_boot_sector block_hash node_ctxt
+  | Some boot_sector_file ->
+      let module PVM = (val Pvm.of_kind node_ctxt.kind) in
+      let*! boot_sector = Lwt_utils_unix.read_file boot_sector_file in
+      let*? boot_sector =
+        Option.value_e
+          ~error:
+            [
+              Sc_rollup_node_errors.Unparsable_boot_sector
+                {path = boot_sector_file};
+            ]
+          (PVM.parse_boot_sector boot_sector)
       in
-      let apply_internal (type kind) accu ~source:_
-          (_operation : kind Apply_internal_results.internal_operation)
-          (_result :
-            kind Apply_internal_results.successful_internal_operation_result) =
-        accu
-      in
-      let*? () =
-        Layer1_services.(
-          process_applied_manager_operations
-            (Ok ())
-            block.operations
-            {apply; apply_internal})
-      in
-      missing_boot_sector ())
-    (function
-      | Found_boot_sector boot_sector -> return boot_sector
-      | _ -> missing_boot_sector ())
+      return boot_sector
 
 let genesis_state block_hash node_ctxt ctxt =
   let open Lwt_result_syntax in
@@ -110,8 +85,6 @@ let transition_pvm node_ctxt ctxt predecessor Layer1.{hash = _; _}
        } =
     Delayed_write_monad.apply node_ctxt eval_result
   in
-  let state_hash = Sc_rollup_proto_types.State_hash.to_octez state_hash in
-  let tick = Sc_rollup.Tick.to_z tick in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! ctxt = PVM.State.set ctxt state in
   let*! initial_tick = PVM.get_tick predecessor_state in
@@ -178,12 +151,12 @@ let start_state_of_block node_ctxt (block : Sc_rollup_block.t) =
     @ [unsafe_to_string end_of_level_serialized]
   in
   return
-    Fueled_pvm.Accounted.
+    Pvm_plugin_sig.
       {
         state;
-        state_hash;
+        state_hash = Sc_rollup_proto_types.State_hash.to_octez state_hash;
         inbox_level;
-        tick;
+        tick = Sc_rollup.Tick.to_z tick;
         message_counter_offset = 0;
         remaining_fuel = Fuel.Accounted.of_ticks 0L;
         remaining_messages = messages;
@@ -194,8 +167,7 @@ let start_state_of_block node_ctxt (block : Sc_rollup_block.t) =
 let run_to_tick node_ctxt start_state tick =
   let open Delayed_write_monad.Lwt_result_syntax in
   let tick_distance =
-    Sc_rollup.Tick.distance tick start_state.Fueled_pvm.Accounted.tick
-    |> Z.to_int64
+    Z.sub tick start_state.Pvm_plugin_sig.tick |> Z.to_int64
   in
   let>+ eval_result =
     Fueled_pvm.Accounted.eval_messages
@@ -209,7 +181,7 @@ let state_of_tick_aux node_ctxt ~start_state (event : Sc_rollup_block.t) tick =
   let* start_state =
     match start_state with
     | Some start_state
-      when start_state.Fueled_pvm.Accounted.inbox_level = event.header.level ->
+      when start_state.Pvm_plugin_sig.inbox_level = event.header.level ->
         return start_state
     | _ ->
         (* Recompute start state on level change or if we don't have a
@@ -229,13 +201,11 @@ module Tick_state_cache =
     (Aches.Rache.Transfer
        (Aches.Rache.LRU)
        (struct
-         type t = Sc_rollup.Tick.t * Block_hash.t
+         type t = Z.t * Block_hash.t
 
-         let equal (t1, b1) (t2, b2) =
-           Sc_rollup.Tick.(t1 = t2) && Block_hash.(b1 = b2)
+         let equal (t1, b1) (t2, b2) = Z.equal t1 t2 && Block_hash.(b1 = b2)
 
-         let hash (tick, block) =
-           ((Sc_rollup.Tick.to_z tick |> Z.hash) * 13) + Block_hash.hash block
+         let hash (tick, block) = (Z.hash tick * 13) + Block_hash.hash block
        end))
 
 let tick_state_cache = Tick_state_cache.create 64 (* size of 2 dissections *)
@@ -252,16 +222,14 @@ let memo_state_of_tick_aux node_ctxt ~start_state (event : Sc_rollup_block.t)
 (** [state_of_tick node_ctxt ?start_state tick level] returns [Some end_state]
       for a given [tick] if this [tick] happened before [level]. Otherwise,
       returns [None].*)
-let state_of_tick node_ctxt ?start_state tick level =
+let state_of_tick node_ctxt ?start_state ~tick level =
   let open Lwt_result_syntax in
   let level = Raw_level.to_int32 level in
-  let tick = Sc_rollup.Tick.to_z tick in
   let* event = Node_context.block_with_tick node_ctxt ~max_level:level tick in
   match event with
   | None -> return_none
   | Some event ->
       assert (event.header.level <= level) ;
-      let tick = Sc_rollup.Tick.of_z tick in
       let* result_state =
         if Node_context.is_loser node_ctxt then
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/5253
