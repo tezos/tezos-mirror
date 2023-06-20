@@ -7,6 +7,8 @@
 - Add functionality in `dac::certificate` to verify that a certificate has been a signed by a number of
 - Add `Certificate::verify` to verify that a *DAC* certificate has been a signed by a number of
   committee members greater than a given threshold.
+- Implement `core::fmt::Display` for `OwnedPath` and `RefPath` to get paths as strings for tests, errors, etc.
+- Adjust `Path` trait to require `Display` on types that implement it.
 
 ### Installer client/kernel
 
