@@ -99,19 +99,12 @@ To expose the features of this library, the Michelson language provides the foll
 
 and the following opcode:
 
-``open_chest ::  chest_key → chest → time → or (bytes, bool)``
+``open_chest ::  chest_key → chest → time → bytes option``
 
-``open_chest`` takes a ``chest`` and ``chest_key``, and produces either the underlying plaintext
-or indicates that the ``chest`` or the ``chest_key`` is malicious.
-
-If we open the chest with a correctly generated chest key, the instruction pushes
-``Some bytes`` on top of the stack where the bytes are
-cryptographically guaranteed to be the bytes the chest provider time-locked, otherwise ``None``.
-Note that the implementation uses an authenticated encryption scheme,
-so one can detect if someone provides a wrong key while fooling the time-lock proof.
-This is doable only by someone knowing the factorization of the RSA modulus.
-However, this cannot prevent someone from encrypting a wrong key, or putting
-a wrong message authentication code, so this is why a proof of correctness is still needed.
+``open_chest`` takes a ``chest`` and a ``chest_key``, and produces either the underlying plaintext
+or indicates that the ``chest_key`` is malicious.
+If the ``chest`` is not well-formed (which is possible since we use authenticated encryption),
+the empty Byte is returned.
 
 
 Implementation of the time-lock puzzle
