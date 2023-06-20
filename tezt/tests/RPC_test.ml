@@ -90,13 +90,14 @@ let endpoint_of_test_mode_tag node = function
    - [sub_group] is a short identifier for your test, used in the test title and as a tag.
    Additionally, since this uses [Protocol.register_regression_test], this has an
    implicit argument to specify the list of protocols to test. *)
-let check_rpc_regression ~test_mode_tag ~test_function ?parameter_overrides
-    ?nodes_args sub_group =
+let check_rpc_regression ~test_mode_tag ~test_function ?supports
+    ?parameter_overrides ?nodes_args sub_group =
   let client_mode_tag, title_tag = title_tag_of_test_mode test_mode_tag in
   Protocol.register_regression_test
     ~__FILE__
     ~title:(sf "(mode %s) RPC regression tests: %s" title_tag sub_group)
     ~tags:["rpc"; title_tag; sub_group]
+    ?supports
   @@ fun protocol ->
   let* parameter_file =
     patch_protocol_parameters protocol parameter_overrides
@@ -1451,14 +1452,15 @@ let register protocols =
     ~tags:["rpc"; "regression"; "binary"]
     binary_regression_test ;
   let register protocols test_mode_tag =
-    let check_rpc_regression ?parameter_overrides ?nodes_args ~test_function
-        sub_group =
+    let check_rpc_regression ?parameter_overrides ?supports ?nodes_args
+        ~test_function sub_group =
       check_rpc_regression
         ~test_mode_tag
         ?parameter_overrides
         ?nodes_args
         ~test_function
         sub_group
+        ?supports
         protocols
     in
     let check_rpc ?parameter_overrides ?nodes_args ~test_function sub_group =
