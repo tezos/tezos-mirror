@@ -10,6 +10,9 @@
   tezos-smart-rollup-layer2-alpha
   tezos-protocol-alpha
   octez_smart_rollup_node_alpha
+  tezos-workers
+  octez-smart-rollup-node
+  octez-smart-rollup
   tezos-rpc
   tezos-rpc-http
   tezos-rpc-http-server)
@@ -19,4 +22,7 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_smart_rollup_layer2_alpha
-  -open Tezos_protocol_alpha))
+  -open Tezos_protocol_alpha
+  -open Tezos_workers
+  -open Octez_smart_rollup_node
+  -open Octez_smart_rollup))

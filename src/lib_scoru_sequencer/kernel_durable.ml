@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,4 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Octez_smart_rollup_node_alpha.Daemon_components.RPC_server_sig
+let sequencer_prefix = "/__sequencer"
+
+let delayed_inbox_prefix = String.concat "/" [sequencer_prefix; "delayed-inbox"]
+
+module Delayed_inbox_pointer = struct
+  let path = String.concat "/" [delayed_inbox_prefix; "pointer"]
+
+  type t = {head : int32; tail : int32}
+
+  let encoding =
+    let open Data_encoding in
+    conv (fun {head; tail} -> (head, tail)) (fun (head, tail) -> {head; tail})
+    @@ obj2 (req "head" int32) (req "tail" int32)
+end
