@@ -36,7 +36,7 @@ pub enum ParityError {
 }
 
 #[derive(Error, Debug, PartialEq)]
-pub enum TransactionError {
+pub enum SigError {
     #[error("Error reading a hex string: {0}")]
     HexError(#[from] FromHexError),
 
@@ -53,22 +53,20 @@ pub enum TransactionError {
     Parity(ParityError),
 }
 
-impl From<libsecp256k1::Error> for TransactionError {
+impl From<libsecp256k1::Error> for SigError {
     fn from(e: libsecp256k1::Error) -> Self {
         Self::ECDSAError(e)
     }
 }
 
-impl From<TryFromSliceError> for TransactionError {
+impl From<TryFromSliceError> for SigError {
     fn from(_: TryFromSliceError) -> Self {
         Self::SlicingError
     }
 }
 
 /// produces address from a secret key
-pub fn string_to_sk_and_address(
-    s: String,
-) -> Result<(SecretKey, H160), TransactionError> {
+pub fn string_to_sk_and_address(s: String) -> Result<(SecretKey, H160), SigError> {
     let mut data: [u8; 32] = [0u8; 32];
     hex::decode_to_slice(s, &mut data)?;
     let sk = SecretKey::parse(&data)?;
@@ -90,6 +88,56 @@ pub enum EthereumTransactionType {
     EthereumCreate,
     /// call
     EthereumCall,
+}
+
+fn compute_parity(chain_id: U256, v: U256, is_eth_tx: bool) -> Option<U256> {
+    if !is_eth_tx {
+        v.checked_sub(U256::from(27))
+    } else {
+        let chain_id_encoding = chain_id
+            .checked_mul(U256::from(2))?
+            .checked_add(U256::from(35))?;
+        v.checked_sub(chain_id_encoding)
+    }
+}
+
+/// Extracts the signature from r, s, v and chain_id.
+pub fn signature(
+    r: [u8; 32],
+    s: [u8; 32],
+    v: U256,
+    chain_id: U256,
+    is_eth_tx: bool,
+) -> Result<(Signature, RecoveryId), SigError> {
+    // copy `r` to Scalar
+    let mut r_ = Scalar([0; 8]);
+    let _ = r_.set_b32(&r);
+    // copy `s` to Scalar
+    let mut s_ = Scalar([0; 8]);
+    let _ = s_.set_b32(&s);
+    if s_.is_high() {
+        // if `s_` > secp256k1n / 2 the signature is invalid
+        // cf EIP2 (part 2) https://eips.ethereum.org/EIPS/eip-2
+        Err(SigError::ECDSAError(libsecp256k1::Error::InvalidSignature))
+    } else {
+        // recompute parity from `v` and `chain_id`
+        let ri_val = compute_parity(chain_id, v, is_eth_tx)
+            .ok_or(SigError::Parity(ParityError::V(v)))?;
+        let ri = RecoveryId::parse(ri_val.byte(0))?;
+        Ok((Signature { r: r_, s: s_ }, ri))
+    }
+}
+
+/// Find the caller address from r and s of the common data
+/// for a message, ie, what address is associated the signature
+/// of the message.
+pub fn caller(mes: Message, sig: Signature, ri: RecoveryId) -> Result<H160, SigError> {
+    let pk = recover(&mes, &sig, &ri)?;
+    let serialised = &pk.serialize()[1..];
+    let kec = Keccak256::digest(serialised);
+    let value: [u8; 20] = kec.as_slice()[12..].try_into()?;
+
+    Ok(value.into())
 }
 
 /// Data common to all Ethereum transaction types
@@ -146,56 +194,19 @@ impl EthereumTransactionCommon {
         Message::parse(&hash)
     }
 
-    /// recompute parity from v and chain_id
-    fn compute_parity(&self) -> Option<U256> {
-        let chain_id_encoding = self
-            .chain_id
-            .checked_mul(U256::from(2))?
-            .checked_add(U256::from(35))?;
-        self.v.checked_sub(chain_id_encoding)
-    }
-
     /// Extracts the signature from an EthereumTransactionCommon
-    pub fn signature(&self) -> Result<(Signature, RecoveryId), TransactionError> {
-        // copy r to Scalar
-        let r: H256 = self.r;
-        let r1: [u8; 32] = r.into();
-        let mut r = Scalar([0; 8]);
-        let _ = r.set_b32(&r1);
-        // copy s to Scalar
-        let s: H256 = self.s;
-        let s1: [u8; 32] = s.into();
-        let mut s = Scalar([0; 8]);
-        let _ = s.set_b32(&s1);
-        if s.is_high() {
-            // if s > secp256k1n / 2 the signature is invalid
-            // cf EIP2 (part 2) https://eips.ethereum.org/EIPS/eip-2
-            Err(TransactionError::ECDSAError(
-                libsecp256k1::Error::InvalidSignature,
-            ))
-        } else {
-            // recompute parity from v and chain_id
-            let ri_val = self
-                .compute_parity()
-                .ok_or(TransactionError::Parity(ParityError::V(self.v)))?;
-            let ri = RecoveryId::parse(ri_val.byte(0))?;
-            Ok((Signature { r, s }, ri))
-        }
+    pub fn signature(&self) -> Result<(Signature, RecoveryId), SigError> {
+        signature(self.r.into(), self.s.into(), self.v, self.chain_id, true)
     }
 
     /// Find the caller address from r and s of the common data
     /// for an Ethereum transaction, ie, what address is associated
     /// with the signature of the message.
-    /// TODO <https://gitlab.com/tezos/tezos/-/milestones/115>
-    pub fn caller(&self) -> Result<H160, TransactionError> {
+    pub fn caller(&self) -> Result<H160, SigError> {
         let mes = self.message();
         let (sig, ri) = self.signature()?;
-        let pk = recover(&mes, &sig, &ri)?;
-        let serialised = &pk.serialize()[1..];
-        let kec = Keccak256::digest(serialised);
-        let value: [u8; 20] = kec.as_slice()[12..].try_into()?;
 
-        Ok(value.into())
+        caller(mes, sig, ri)
     }
 
     /// compute v from parity and chain_id
@@ -214,7 +225,7 @@ impl EthereumTransactionCommon {
 
     ///produce a signed EthereumTransactionCommon. If the initial one was signed
     ///  you should get the same thing.
-    pub fn sign_transaction(&self, string_sk: String) -> Result<Self, TransactionError> {
+    pub fn sign_transaction(&self, string_sk: String) -> Result<Self, SigError> {
         let hex: &[u8] = &hex::decode(string_sk)?;
         let sk = SecretKey::parse_slice(hex)?;
         let mes = self.message();
@@ -223,9 +234,9 @@ impl EthereumTransactionCommon {
         let (r, s) = (H256::from(r.b32()), H256::from(s.b32()));
 
         let parity: u8 = ri.into();
-        let v = self.compute_v(parity).ok_or(TransactionError::Parity(
-            ParityError::ChainId(self.chain_id),
-        ))?;
+        let v = self
+            .compute_v(parity)
+            .ok_or(SigError::Parity(ParityError::ChainId(self.chain_id)))?;
         Ok(EthereumTransactionCommon {
             v,
             r,
@@ -235,7 +246,7 @@ impl EthereumTransactionCommon {
     }
 
     /// verifies the signature
-    pub fn verify_signature(self) -> Result<bool, TransactionError> {
+    pub fn verify_signature(self) -> Result<bool, SigError> {
         let mes = self.message();
         let (sig, ri) = self.signature()?;
         let pk = recover(&mes, &sig, &ri)?;
@@ -932,9 +943,7 @@ mod test {
         // and the caller should be the same, if EIP2 is not implemented
         // but with EIP2 s should be too big, and the transaction should be rejected
         assert_eq!(
-            Err(TransactionError::ECDSAError(
-                libsecp256k1::Error::InvalidSignature
-            )),
+            Err(SigError::ECDSAError(libsecp256k1::Error::InvalidSignature)),
             flipped_transaction.caller()
         )
     }

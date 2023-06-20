@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 #
 # SPDX-License-Identifier: MIT
 
@@ -31,6 +32,15 @@ path = "../../kernel_sdk/debug"
 [dependencies.tezos-smart-rollup-encoding]
 path = "../../kernel_sdk/encoding"
 
+[dependencies.installer-kernel]
+path = "../../kernel_sdk/installer-kernel"
+
+[dependencies.tezos-smart-rollup-installer-config]
+path = "../../kernel_sdk/installer-config"
+
+[dependencies.tezos-smart-rollup-installer]
+path = "../../kernel_sdk/installer-client"
+
 [dev-dependencies.tezos-smart-rollup-mock]
 path = "../../kernel_sdk/mock"
 features = ["proto-nairobi"]
@@ -42,9 +52,12 @@ version = "0.5"
 tezos_ethereum = { path = "../ethereum" }
 primitive-types = { version = "0.11.1", default-features = false }
 hex = "0.4"
+hex-literal = "0.4.1"
 num-traits = "0.2.8"
 evm-execution = { path = "../evm_execution" }
 rlp = "0.5.2"
+sha3 = { version = "0.10.6", default-features = false }
+libsecp256k1 = { version = "0.7", default-features = false, features = ["static-context", "hmac"] }
 
 [features]
 default = ["panic-hook"]

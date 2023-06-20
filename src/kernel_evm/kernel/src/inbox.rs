@@ -1,13 +1,21 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 use tezos_ethereum::signatures::EthereumTransactionCommon;
+use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::runtime::Runtime;
 
-use crate::parsing::{Input, InputResult, MAX_SIZE_PER_CHUNK};
+use crate::parsing::{
+    Input, InputResult, MAX_SIZE_PER_CHUNK, SIGNATURE_HASH_SIZE, UPGRADE_NONCE_SIZE,
+};
 use crate::simulation;
-use crate::storage::store_last_info_per_level_timestamp;
+use crate::storage::{read_kernel_upgrade_nonce, store_last_info_per_level_timestamp};
+
+use crate::error::UpgradeProcessError::InvalidUpgradeNonce;
+use crate::upgrade::check_dictator_signature;
 use crate::Error;
 
 use tezos_ethereum::transaction::TransactionHash;
@@ -16,6 +24,18 @@ use tezos_ethereum::transaction::TransactionHash;
 pub struct Transaction {
     pub tx_hash: TransactionHash,
     pub tx: EthereumTransactionCommon,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct KernelUpgrade {
+    pub nonce: [u8; UPGRADE_NONCE_SIZE],
+    pub preimage_hash: [u8; PREIMAGE_HASH_SIZE],
+    pub signature: [u8; SIGNATURE_HASH_SIZE],
+}
+
+pub struct InboxContent {
+    pub kernel_upgrade: Option<KernelUpgrade>,
+    pub transactions: Vec<Transaction>,
 }
 
 pub fn read_input<Host: Runtime>(
@@ -54,26 +74,59 @@ fn handle_transaction_chunk<Host: Runtime>(
     Ok(None)
 }
 
+fn handle_kernel_upgrade<Host: Runtime>(
+    host: &mut Host,
+    smart_rollup_address: [u8; 20],
+    kernel_upgrade: &KernelUpgrade,
+) -> Result<(), Error> {
+    let current_kernel_upgrade_nonce = read_kernel_upgrade_nonce(host)?;
+    let incoming_nonce = u32::from_le_bytes(kernel_upgrade.nonce);
+    if incoming_nonce == current_kernel_upgrade_nonce + 1 {
+        check_dictator_signature(
+            kernel_upgrade.signature,
+            smart_rollup_address,
+            kernel_upgrade.nonce,
+            kernel_upgrade.preimage_hash,
+        )
+    } else {
+        Err(Error::UpgradeError(InvalidUpgradeNonce))
+    }
+}
+
 pub fn read_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
-) -> Result<Vec<Transaction>, Error> {
-    let mut res = Vec::new();
+) -> Result<InboxContent, Error> {
+    let mut res = InboxContent {
+        kernel_upgrade: None,
+        transactions: vec![],
+    };
     loop {
         match read_input(host, smart_rollup_address)? {
             InputResult::NoInput => {
                 return Ok(res);
             }
             InputResult::Unparsable => (),
-
-            InputResult::Input(Input::SimpleTransaction(tx)) => res.push(*tx),
+            InputResult::Input(Input::SimpleTransaction(tx)) => {
+                res.transactions.push(*tx)
+            }
             InputResult::Input(Input::NewChunkedTransaction {
                 tx_hash,
                 num_chunks,
             }) => crate::storage::create_chunked_transaction(host, &tx_hash, num_chunks)?,
             InputResult::Input(Input::TransactionChunk { tx_hash, i, data }) => {
                 if let Some(tx) = handle_transaction_chunk(host, tx_hash, i, data)? {
-                    res.push(tx)
+                    res.transactions.push(tx)
+                }
+            }
+            InputResult::Input(Input::Upgrade(kernel_upgrade)) => {
+                match handle_kernel_upgrade(host, smart_rollup_address, &kernel_upgrade) {
+                    Ok(()) => res.kernel_upgrade = Some(kernel_upgrade),
+                    Err(e) => debug_msg!(
+                        host,
+                        "Error while processing the kernel upgrade: {:?}\n",
+                        e
+                    ),
                 }
             }
             InputResult::Input(Input::Simulation) => {
@@ -81,7 +134,10 @@ pub fn read_inbox<Host: Runtime>(
                 // simulation and all the previous and next transactions are
                 // discarded.
                 simulation::start_simulation_mode(host)?;
-                return Ok(Vec::new());
+                return Ok(InboxContent {
+                    kernel_upgrade: None,
+                    transactions: vec![],
+                });
             }
             InputResult::Input(Input::Info(info)) => {
                 store_last_info_per_level_timestamp(host, info.predecessor_timestamp)?;
@@ -129,6 +185,17 @@ mod tests {
                 buffer.extend_from_slice(&u16::to_le_bytes(i));
                 buffer.extend_from_slice(&data);
             }
+            Input::Upgrade(KernelUpgrade {
+                nonce,
+                preimage_hash,
+                signature,
+            }) => {
+                // Kernel upgrade tag
+                buffer.push(3);
+                buffer.extend_from_slice(&nonce);
+                buffer.extend_from_slice(&preimage_hash);
+                buffer.extend_from_slice(&signature)
+            }
             _ => (),
         };
         buffer
@@ -173,12 +240,12 @@ mod tests {
             input,
         )));
 
-        let transactions = read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS).unwrap();
+        let inbox_content = read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
             tx,
         }];
-        assert_eq!(transactions, expected_transactions);
+        assert_eq!(inbox_content.transactions, expected_transactions);
     }
 
     #[test]
@@ -197,11 +264,42 @@ mod tests {
             )))
         }
 
-        let transactions = read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS).unwrap();
+        let inbox_content = read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
             tx,
         }];
-        assert_eq!(transactions, expected_transactions);
+        assert_eq!(inbox_content.transactions, expected_transactions);
+    }
+
+    #[test]
+    fn parse_valid_kernel_upgrade() {
+        let mut host = MockHost::default();
+        crate::storage::store_kernel_upgrade_nonce(&mut host, 1).unwrap();
+
+        let preimage_hash = hex::decode(
+            "004b28109df802cb1885ab29461bc1b410057a9f3a848d122ac7a742351a3a1f4e",
+        )
+        .unwrap()
+        .try_into()
+        .unwrap();
+        let nonce = hex::decode("02000000").unwrap().try_into().unwrap();
+        let signature = hex::decode("12ac7109f062badf77055608c11bd097eccd480bf99e615ac765c6275161ce2401c88232786c49fceb56e0c5caa3d5998337fc7e29946fa8733cf55fbd7b387e1b").unwrap().try_into().unwrap();
+
+        let kernel_upgrade = KernelUpgrade {
+            nonce,
+            preimage_hash,
+            signature,
+        };
+        let input = Input::Upgrade(kernel_upgrade.clone());
+
+        host.add_external(Bytes::from(input_to_bytes(
+            ZERO_SMART_ROLLUP_ADDRESS,
+            input,
+        )));
+
+        let inbox_content = read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS).unwrap();
+        let expected_upgrade = Some(kernel_upgrade);
+        assert_eq!(inbox_content.kernel_upgrade, expected_upgrade);
     }
 }

@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
 use crate::apply::ApplicableTransaction;
-use crate::inbox::read_inbox;
-use crate::inbox::Transaction;
+use crate::inbox::{read_inbox, KernelUpgrade, Transaction};
 use crate::Error;
 use primitive_types::U256;
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -21,12 +21,14 @@ pub struct Queue {
     // an array of pendings transactions even though it'll be only a
     // singleton for our needs.
     pub proposals: Vec<Blueprint>,
+    pub kernel_upgrade: Option<KernelUpgrade>,
 }
 
 impl Queue {
     pub fn new() -> Queue {
         Queue {
             proposals: Vec::new(),
+            kernel_upgrade: None,
         }
     }
 
@@ -50,11 +52,12 @@ pub fn fetch<Host: Runtime>(
     smart_rollup_address: [u8; 20],
     chain_id: U256,
 ) -> Result<Queue, Error> {
-    let transactions = read_inbox(host, smart_rollup_address)?;
-    let transactions = filter_invalid_chain_id(transactions, chain_id);
+    let inbox_content = read_inbox(host, smart_rollup_address)?;
+    let transactions = filter_invalid_chain_id(inbox_content.transactions, chain_id);
     let blueprint = Blueprint { transactions };
     Ok(Queue {
         proposals: vec![blueprint],
+        kernel_upgrade: inbox_content.kernel_upgrade,
     })
 }
 

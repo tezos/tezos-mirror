@@ -1,13 +1,15 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
-use crate::inbox::Transaction;
+use crate::inbox::{KernelUpgrade, Transaction};
 use tezos_ethereum::{
     signatures::EthereumTransactionCommon, transaction::TransactionHash,
 };
+use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::{
     inbox::{InboxMessage, InfoPerLevel, InternalInboxMessage},
     michelson::MichelsonUnit,
@@ -47,15 +49,22 @@ const NEW_CHUNKED_TRANSACTION_TAG: u8 = 1;
 
 const TRANSACTION_CHUNK_TAG: u8 = 2;
 
+const KERNEL_UPGRADE_TAG: u8 = 3;
+
 pub const MAX_SIZE_PER_CHUNK: usize = 4095 // Max input size minus external tag
             - 20 // Smart rollup address size
             - 1  // Transaction chunk tag
             - 2  // Number of chunks (u16)
             - 32; // Transaction hash size
 
+pub const SIGNATURE_HASH_SIZE: usize = 65;
+
+pub const UPGRADE_NONCE_SIZE: usize = 4;
+
 #[derive(Debug, PartialEq)]
 pub enum Input {
     SimpleTransaction(Box<Transaction>),
+    Upgrade(KernelUpgrade),
     NewChunkedTransaction {
         tx_hash: TransactionHash,
         num_chunks: u16,
@@ -123,6 +132,29 @@ impl InputResult {
         })
     }
 
+    fn parse_kernel_upgrade(bytes: &[u8]) -> Self {
+        // Next UPGRADE_NONCE_SIZE bytes is the incoming kernel upgrade nonce
+        let (nonce, remaining) = parsable!(split_at(bytes, UPGRADE_NONCE_SIZE));
+        let nonce: [u8; UPGRADE_NONCE_SIZE] = parsable!(nonce.try_into().ok());
+        // Next PREIMAGE_HASH_SIZE bytes is the preimage hash
+        let (preimage_hash, remaining) =
+            parsable!(split_at(remaining, PREIMAGE_HASH_SIZE));
+        let preimage_hash: [u8; PREIMAGE_HASH_SIZE] =
+            parsable!(preimage_hash.try_into().ok());
+        // Next SIGNATURE_HASH_SIZE bytes is the preimage hash
+        let (signature, remaining) = parsable!(split_at(remaining, SIGNATURE_HASH_SIZE));
+        let signature: [u8; SIGNATURE_HASH_SIZE] = parsable!(signature.try_into().ok());
+        if remaining.is_empty() {
+            Self::Input(Input::Upgrade(KernelUpgrade {
+                nonce,
+                preimage_hash,
+                signature,
+            }))
+        } else {
+            Self::Unparsable
+        }
+    }
+
     // External message structure :
     // EXTERNAL_TAG 1B / ROLLUP_ADDRESS 20B / MESSAGE_TAG 1B / DATA
     fn parse_external(input: &[u8], smart_rollup_address: &[u8]) -> Self {
@@ -141,6 +173,7 @@ impl InputResult {
             SIMPLE_TRANSACTION_TAG => Self::parse_simple_transaction(remaining),
             NEW_CHUNKED_TRANSACTION_TAG => Self::parse_new_chunked_transaction(remaining),
             TRANSACTION_CHUNK_TAG => Self::parse_transaction_chunk(remaining),
+            KERNEL_UPGRADE_TAG => Self::parse_kernel_upgrade(remaining),
             _ => InputResult::Unparsable,
         }
     }

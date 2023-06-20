@@ -1,12 +1,13 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
 use primitive_types::U256;
 use storage::{
     read_chain_id, read_last_info_per_level_timestamp,
-    read_last_info_per_level_timestamp_stats, store_chain_id,
+    read_last_info_per_level_timestamp_stats, store_chain_id, store_kernel_upgrade_nonce,
 };
 use tezos_ethereum::block::L2Block;
 use tezos_smart_rollup_debug::debug_msg;
@@ -15,11 +16,13 @@ use tezos_smart_rollup_entrypoint::kernel_entry;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
 
+use crate::inbox::KernelUpgrade;
 use crate::safe_storage::{SafeStorage, TMP_PATH};
 
 use crate::blueprint::{fetch, Queue};
 use crate::error::Error;
 use crate::storage::{read_smart_rollup_address, store_smart_rollup_address};
+use crate::upgrade::upgrade_kernel;
 
 mod apply;
 mod block;
@@ -31,6 +34,7 @@ mod parsing;
 mod safe_storage;
 mod simulation;
 mod storage;
+mod upgrade;
 
 /// The chain id will need to be unique when the EVM rollup is deployed in
 /// production.
@@ -69,9 +73,37 @@ pub fn stage_one<Host: Runtime>(
     Ok(queue)
 }
 
+fn produce_and_upgrade<Host: Runtime>(
+    host: &mut Host,
+    queue: Queue,
+    kernel_upgrade: KernelUpgrade,
+) -> Result<(), Error> {
+    // Since a kernel upgrade was detected, in case an error is thrown
+    // by the block production, we exceptionally "recover" from it and
+    // still process the kernel upgrade.
+    if let Err(e) = block::produce(host, queue) {
+        debug_msg!(
+                host,
+                "Error {:?} happened during block production but a kernel upgrade was detected.\n",
+                e
+            );
+    }
+    let upgrade_status = upgrade_kernel(host, kernel_upgrade.preimage_hash);
+    if upgrade_status.is_ok() {
+        let kernel_upgrade_nonce = u32::from_le_bytes(kernel_upgrade.nonce);
+        store_kernel_upgrade_nonce(host, kernel_upgrade_nonce)?;
+    }
+    upgrade_status
+}
+
 pub fn stage_two<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error> {
     debug_msg!(host, "Stage two\n");
-    block::produce(host, queue)
+    let kernel_upgrade = queue.kernel_upgrade.clone();
+    if let Some(kernel_upgrade) = kernel_upgrade {
+        produce_and_upgrade(host, queue, kernel_upgrade)
+    } else {
+        block::produce(host, queue)
+    }
 }
 
 fn retrieve_smart_rollup_address<Host: Runtime>(
@@ -103,16 +135,20 @@ fn genesis_initialisation<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     let block_path = storage::block_path(U256::zero())?;
     match Runtime::store_has(host, &block_path) {
         Ok(Some(_)) => Ok(()),
-        _ => genesis::init_block(host),
+        _ => {
+            store_kernel_upgrade_nonce(host, 1)?;
+            genesis::init_block(host)
+        }
     }
 }
 
 pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     let smart_rollup_address = retrieve_smart_rollup_address(host)?;
     let chain_id = retrieve_chain_id(host)?;
+    genesis_initialisation(host)?;
+
     let queue = stage_one(host, smart_rollup_address, chain_id)?;
 
-    genesis_initialisation(host)?;
     stage_two(host, queue)
 }
 
@@ -150,9 +186,12 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
 
     let mut host = SafeStorage(host);
     match main(&mut host) {
-        Ok(()) => host
-            .promote(&EVM_PATH)
-            .expect("The kernel failed to promote the temporary directory"),
+        Ok(()) => {
+            host.promote_upgrade()
+                .expect("Potential kernel upgrade promotion failed");
+            host.promote(&EVM_PATH)
+                .expect("The kernel failed to promote the temporary directory")
+        }
         Err(e) => {
             log_error(host.0, &e).expect("The kernel failed to write the error");
             debug_msg!(host, "The kernel produced an error: {:?}\n", e);

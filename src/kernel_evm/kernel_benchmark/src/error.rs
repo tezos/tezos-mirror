@@ -1,7 +1,7 @@
 use evm_execution::storage::blocks::EvmBlockStorageError;
 use evm_execution::EthereumError;
 use rlp::DecoderError;
-use tezos_ethereum::signatures::TransactionError;
+use tezos_ethereum::signatures::SigError;
 use thiserror::Error;
 // TODO:  https://gitlab.com/tezos/tezos/-/issues/5557
 // to be replaced by anyhow
@@ -23,5 +23,5 @@ pub enum ApplicationError {
     MalformedRlpTransaction(DecoderError),
     /// Error executing ethereum transaction
     #[error("Failed to use transaction operations: {0:?}")]
-    TransactionError(#[from] TransactionError),
+    TransactionError(#[from] SigError),
 }
