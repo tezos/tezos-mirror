@@ -38,15 +38,9 @@ path = "../../kernel_sdk/installer-kernel"
 [dependencies.tezos-smart-rollup-installer-config]
 path = "../../kernel_sdk/installer-config"
 
-[dependencies.tezos-smart-rollup-installer]
-path = "../../kernel_sdk/installer-client"
-
 [dev-dependencies.tezos-smart-rollup-mock]
 path = "../../kernel_sdk/mock"
 features = ["proto-nairobi"]
-
-[dev-dependencies.tezos_data_encoding]
-version = "0.5"
 
 [dependencies]
 tezos_ethereum = { path = "../ethereum" }
@@ -58,6 +52,7 @@ evm-execution = { path = "../evm_execution" }
 rlp = "0.5.2"
 sha3 = { version = "0.10.6", default-features = false }
 libsecp256k1 = { version = "0.7", default-features = false, features = ["static-context", "hmac"] }
+tezos_data_encoding = "0.5"
 
 [features]
 default = ["panic-hook"]

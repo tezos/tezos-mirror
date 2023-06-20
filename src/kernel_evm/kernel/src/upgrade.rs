@@ -7,18 +7,18 @@
 use std::str::FromStr;
 
 use crate::error::Error;
+use crate::error::UpgradeProcessError;
 use crate::parsing::{SIGNATURE_HASH_SIZE, UPGRADE_NONCE_SIZE};
 use crate::CHAIN_ID;
 use libsecp256k1::Message;
 use primitive_types::{H160, U256};
 use sha3::{Digest, Keccak256};
+use tezos_data_encoding::enc::BinWriter;
 use tezos_ethereum::signatures::{caller, signature};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
-use tezos_smart_rollup_installer::installer::with_config_program;
-use tezos_smart_rollup_installer::{KERNEL_BOOT_PATH, PREPARE_KERNEL_PATH};
 use tezos_smart_rollup_installer_config::binary::owned::{
     OwnedConfigInstruction, OwnedConfigProgram,
 };
@@ -83,6 +83,8 @@ pub fn check_dictator_signature(
     }
 }
 
+// Boot path for kernels
+pub const KERNEL_BOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/boot.wasm");
 // Path that will contain the config interpretation.
 pub const CONFIG_INTERPRETER_PATH: RefPath =
     RefPath::assert_from(b"/installer/config_interpreter");
@@ -96,19 +98,16 @@ pub fn upgrade_kernel<Host: Runtime>(
     debug_msg!(host, "Kernel upgrade initialisation.\n");
     let root_hash = root_hash.to_vec();
 
-    // Create config consisting of a reveal instruction, followed by a move one.
-    let reveal_instructions = vec![
-        OwnedConfigInstruction::reveal_instr(
-            root_hash.into(),
-            OwnedPath::from(PREPARE_KERNEL_PATH),
-        ),
-        OwnedConfigInstruction::move_instr(
-            OwnedPath::from(PREPARE_KERNEL_PATH),
-            OwnedPath::from(KERNEL_BOOT_PATH),
-        ),
-    ];
+    // Create config consisting of a reveal instruction.
+    let reveal_instructions = vec![OwnedConfigInstruction::reveal_instr(
+        root_hash.into(),
+        OwnedPath::from(KERNEL_BOOT_PATH),
+    )];
 
-    let kernel_config = with_config_program(OwnedConfigProgram(reveal_instructions));
+    let mut kernel_config = Vec::new();
+    OwnedConfigProgram(reveal_instructions)
+        .bin_write(&mut kernel_config)
+        .map_err(UpgradeProcessError::ConfigSerialisation)?;
 
     host.store_write_all(&CONFIG_INTERPRETER_PATH, &kernel_config)?;
 
