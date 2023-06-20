@@ -104,14 +104,13 @@ module Event = struct
       ()
 
   let starting_rpc_server =
-    declare_4
+    declare_3
       ~section
       ~name:"starting_rpc_server"
       ~msg:"starting RPC server on {host}:{port} (acl = {acl_policy})"
       ~level:Notice
       ("host", Data_encoding.string)
       ("port", Data_encoding.uint16)
-      ("tls", Data_encoding.bool)
       ("acl_policy", Data_encoding.string)
 
   let starting_metrics_server =
@@ -400,8 +399,7 @@ let launch_rpc_server ~acl_policy ~media_types (config : Config_file.t) node
     |> Option.value_f ~default:(fun () -> default addr)
   in
   let*! () =
-    Event.(emit starting_rpc_server)
-      (host, port, rpc_config.tls <> None, RPC_server.Acl.policy_type acl)
+    Event.(emit starting_rpc_server) (host, port, RPC_server.Acl.policy_type acl)
   in
   let cors_headers =
     sanitize_cors_headers ~default:["Content-Type"] rpc_config.cors_headers
