@@ -284,7 +284,7 @@ mod tests {
         .try_into()
         .unwrap();
         let nonce = 2u16.to_le_bytes();
-        let signature = hex::decode("cde1dc4afe9d3ba955f65b27c88522a1d7becc6cc1f248e5e13def50874edbd064fc5605ade7debcfde6df25b986466ec9f2e781bef6c1e0b3ff4e71e1aa4acf1b").unwrap().try_into().unwrap();
+        let signature = hex::decode("518510c99979b8c9854302d05167beac2a96aeded627e240f30583e1d445f4fc7ba2e83a09c377a0eb46018f3dda049f0b48bd3d10202d997e6e13f9e21d31a6").unwrap().try_into().unwrap();
 
         let kernel_upgrade = KernelUpgrade {
             nonce,

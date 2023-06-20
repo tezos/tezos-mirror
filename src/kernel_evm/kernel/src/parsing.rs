@@ -57,7 +57,7 @@ pub const MAX_SIZE_PER_CHUNK: usize = 4095 // Max input size minus external tag
             - 2  // Number of chunks (u16)
             - 32; // Transaction hash size
 
-pub const SIGNATURE_HASH_SIZE: usize = 65;
+pub const SIGNATURE_HASH_SIZE: usize = 64;
 
 pub const UPGRADE_NONCE_SIZE: usize = 2;
 
