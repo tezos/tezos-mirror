@@ -66,6 +66,11 @@ val get_endorser_n : t -> int -> (public_key_hash * Slot.t list) tzresult Lwt.t
 val get_endorsing_power_for_delegate :
   t -> ?level:Raw_level.t -> public_key_hash -> int tzresult Lwt.t
 
+(** Sums the result of [get_endorsing_power_for_delegate] over a list
+    of levels. *)
+val get_cumulated_endorsing_power_for_delegate :
+  t -> levels:Raw_level.t list -> public_key_hash -> int tzresult Lwt.t
+
 val get_voting_power :
   t -> public_key_hash -> int64 Environment.Error_monad.shell_tzresult Lwt.t
 

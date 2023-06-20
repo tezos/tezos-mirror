@@ -159,6 +159,15 @@ let get_endorsing_power_for_delegate ctxt ?level pkh =
   in
   find_slots_for_delegate endorsers
 
+let get_cumulated_endorsing_power_for_delegate ctxt ~levels pkh =
+  let open Lwt_result_syntax in
+  List.fold_left_es
+    (fun accu level ->
+      let+ power = get_endorsing_power_for_delegate ctxt ~level pkh in
+      accu + power)
+    0
+    levels
+
 let get_voting_power = Delegate_services.voting_power rpc_ctxt
 
 let get_total_voting_power = Alpha_services.Voting.total_voting_power rpc_ctxt
