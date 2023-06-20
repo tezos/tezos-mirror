@@ -158,7 +158,7 @@ let prequorum_encoding =
        (req "round" Round.encoding)
        (req "block_payload_hash" Block_payload_hash.encoding)
        (req
-          "preendorsements"
+          "attestations"
           (list (dynamic_size Operation.encoding_with_legacy_attestation_name))))
 
 let block_info_encoding =
@@ -324,9 +324,9 @@ let phase_encoding =
         (function Idle -> Some () | _ -> None)
         (fun () -> Idle);
       case
-        ~title:"Awaiting_preendorsements"
+        ~title:"Awaiting_preattestations"
         (Tag 1)
-        (constant "Awaiting_preendorsements")
+        (constant "Awaiting_preattestations")
         (function Awaiting_preendorsements -> Some () | _ -> None)
         (fun () -> Awaiting_preendorsements);
       case
@@ -336,9 +336,9 @@ let phase_encoding =
         (function Awaiting_application -> Some () | _ -> None)
         (fun () -> Awaiting_application);
       case
-        ~title:"Awaiting_endorsements"
+        ~title:"Awaiting_attestationss"
         (Tag 3)
-        (constant "Awaiting_endorsements")
+        (constant "Awaiting_attestationss")
         (function Awaiting_endorsements -> Some () | _ -> None)
         (fun () -> Awaiting_endorsements);
     ]
@@ -484,7 +484,7 @@ let state_data_encoding =
     (obj3
        (req "level" int32)
        (req "locked_round" (option locked_round_encoding))
-       (req "endorsable_payload" (option endorsable_payload_encoding)))
+       (req "attestable_payload" (option endorsable_payload_encoding)))
 
 let record_state (state : state) =
   let cctxt = state.global_state.cctxt in
@@ -732,7 +732,7 @@ let pp_option pp fmt = function
 let pp_prequorum fmt {level; round; block_payload_hash; preendorsements} =
   Format.fprintf
     fmt
-    "level: %ld, round: %a, payload_hash: %a, preendorsements: %d"
+    "level: %ld, round: %a, payload_hash: %a, preattestations: %d"
     level
     Round.pp
     round
@@ -755,7 +755,7 @@ let pp_block_info fmt
   Format.fprintf
     fmt
     "@[<v 2>Block:@ hash: %a@ payload_hash: %a@ level: %ld@ round: %a@ \
-     prequorum: %a@ quorum: %d endorsements@ dal_attestations: %d@ payload: \
+     prequorum: %a@ quorum: %d attestations@ dal_attestations: %d@ payload: \
      %a@ payload round: %a@]"
     Block_hash.pp
     hash
@@ -796,7 +796,7 @@ let pp_endorsable_payload fmt {proposal; prequorum} =
 let pp_elected_block fmt {proposal; endorsement_qc} =
   Format.fprintf
     fmt
-    "@[<v 2>%a@ nb quorum endorsements: %d@]"
+    "@[<v 2>%a@ nb quorum attestations: %d@]"
     pp_block_info
     proposal.block
     (List.length endorsement_qc)
@@ -805,7 +805,7 @@ let pp_endorsing_slot fmt
     (consensus_key_and_delegate, {first_slot; endorsing_power}) =
   Format.fprintf
     fmt
-    "slots: @[<h>first_slot: %a@],@ delegate: %a,@ endorsing_power: %d"
+    "slots: @[<h>first_slot: %a@],@ delegate: %a,@ attestation_power: %d"
     Slot.pp
     first_slot
     pp_consensus_key_and_delegate
@@ -842,7 +842,7 @@ let pp_level_state fmt
   Format.fprintf
     fmt
     "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal (applied:%b):@ \
-     %a@]@ locked round: %a@ endorsable payload: %a@ elected block: %a@ @[<v \
+     %a@]@ locked round: %a@ attestable payload: %a@ elected block: %a@ @[<v \
      2>own delegate slots:@ %a@]@ @[<v 2>next level own delegate slots:@ %a@]@ \
      next level proposed round: %a@]"
     current_level
@@ -864,9 +864,9 @@ let pp_level_state fmt
 
 let pp_phase fmt = function
   | Idle -> Format.fprintf fmt "idle"
-  | Awaiting_preendorsements -> Format.fprintf fmt "awaiting preendorsements"
+  | Awaiting_preendorsements -> Format.fprintf fmt "awaiting preattestations"
   | Awaiting_application -> Format.fprintf fmt "awaiting application"
-  | Awaiting_endorsements -> Format.fprintf fmt "awaiting endorsements"
+  | Awaiting_endorsements -> Format.fprintf fmt "awaiting attestations"
 
 let pp_round_state fmt {current_round; current_phase; delayed_prequorum} =
   Format.fprintf
@@ -911,7 +911,7 @@ let pp_event fmt = function
   | Prequorum_reached (candidate, preendos) ->
       Format.fprintf
         fmt
-        "prequorum reached with %d preendorsements for %a at round %a"
+        "prequorum reached with %d preattestations for %a at round %a"
         (List.length preendos)
         Block_hash.pp
         candidate.Operation_worker.hash
@@ -920,7 +920,7 @@ let pp_event fmt = function
   | Quorum_reached (candidate, endos) ->
       Format.fprintf
         fmt
-        "quorum reached with %d endorsements for %a at round %a"
+        "quorum reached with %d attestations for %a at round %a"
         (List.length endos)
         Block_hash.pp
         candidate.Operation_worker.hash
