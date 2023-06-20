@@ -66,6 +66,11 @@ let path data_dir pvm_name hash =
   let hash = Protocol.Sc_rollup_reveal_hash.to_hex hash in
   Filename.(concat (concat data_dir pvm_name) hash)
 
+let proto_hash_to_dac_hash ((module Plugin) : Dac_plugin.t) proto_reveal_hash =
+  proto_reveal_hash
+  |> Data_encoding.Binary.to_bytes_exn Protocol.Sc_rollup_reveal_hash.encoding
+  |> Data_encoding.Binary.of_bytes_exn Plugin.encoding
+
 let get ~data_dir ~pvm_kind ~hash =
   let open Lwt_result_syntax in
   let filename =
@@ -94,3 +99,9 @@ let get ~data_dir ~pvm_kind ~hash =
     |> return
   in
   return contents
+
+let proto_hash_to_dac_hash proto_reveal_hash =
+  let dac_plugin =
+    WithExceptions.Option.get ~loc:__LOC__ @@ Dac_plugin.get Protocol.hash
+  in
+  proto_hash_to_dac_hash dac_plugin proto_reveal_hash

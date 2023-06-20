@@ -23,53 +23,60 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Protocol
+open Alpha_context
 
-open Octez_smart_rollup_node.Layer1
+let get_tick kind state =
+  let open Lwt_syntax in
+  let module PVM = (val Pvm.of_kind kind) in
+  let+ tick = PVM.get_tick state in
+  Sc_rollup.Tick.to_z tick
 
-(** [fetch_tezos_block cctxt hash] returns a block info given a block hash.
-    Looks for the block in the blocks cache first, and fetches it from the L1
-    node otherwise. *)
-val fetch_tezos_block :
-  t ->
-  Block_hash.t ->
-  Protocol_client_context.Alpha_block_services.block_info tzresult Lwt.t
+let state_hash kind state =
+  let open Lwt_syntax in
+  let module PVM = (val Pvm.of_kind kind) in
+  let+ hash = PVM.state_hash state in
+  Sc_rollup_proto_types.State_hash.to_octez hash
 
-(** [prefetch_tezos_blocks l1_ctxt blocks] prefetches the blocks
-    asynchronously. NOTE: the number of blocks to prefetch must not be greater
-    than the size of the blocks cache otherwise they will be lost. *)
-val prefetch_tezos_blocks : t -> head list -> unit
+let initial_state kind =
+  let module PVM = (val Pvm.of_kind kind) in
+  PVM.initial_state ~empty:(PVM.State.empty ())
 
-val get_last_cemented_commitment :
-  #Client_context.full -> Address.t -> Node_context.lcc tzresult Lwt.t
+let parse_boot_sector kind =
+  let module PVM = (val Pvm.of_kind kind) in
+  PVM.parse_boot_sector
 
-val get_last_published_commitment :
-  #Client_context.full ->
-  Address.t ->
-  Signature.public_key_hash ->
-  Commitment.t option tzresult Lwt.t
+let install_boot_sector kind state boot_sector =
+  let module PVM = (val Pvm.of_kind kind) in
+  PVM.install_boot_sector state boot_sector
 
-val get_kind : #Client_context.full -> Address.t -> Kind.t tzresult Lwt.t
+let get_status node_ctxt state =
+  let open Lwt_syntax in
+  let module PVM = (val Pvm.of_kind node_ctxt.Node_context.kind) in
+  let+ status = PVM.get_status state in
+  PVM.string_of_status status
 
-val genesis_inbox :
-  #Client_context.full ->
-  genesis_level:int32 ->
-  Octez_smart_rollup.Inbox.t tzresult Lwt.t
+let get_current_level kind state =
+  let open Lwt_option_syntax in
+  let module PVM = (val Pvm.of_kind kind) in
+  let+ current_level = PVM.get_current_level state in
+  Raw_level.to_int32 current_level
 
-(** Convert protocol constants to their protocol agnostic representation. *)
-val constants_of_parametric :
-  Protocol.Alpha_context.Constants.Parametric.t ->
-  Rollup_constants.protocol_constants
+module Fueled = Fueled_pvm
 
-(** Retrieve protocol agnotic constants for the head of the chain. *)
-val retrieve_constants :
-  ?block:Block_services.block ->
-  #Client_context.full ->
-  Rollup_constants.protocol_constants tzresult Lwt.t
+let start_of_level_serialized =
+  let open Sc_rollup_inbox_message_repr in
+  unsafe_to_string start_of_level_serialized
 
-val retrieve_genesis_info :
-  #Client_context.full -> Address.t -> Node_context.genesis_info tzresult Lwt.t
+let end_of_level_serialized =
+  let open Sc_rollup_inbox_message_repr in
+  unsafe_to_string end_of_level_serialized
 
-(** [get_boot_sector block_hash node_ctxt] retrieves the boot sector from the
-    rollup origination operation in block [block_hash]. Precondition:
-    [block_hash] has to be the block where the rollup was originated. *)
-val get_boot_sector : Block_hash.t -> _ Node_context.t -> string tzresult Lwt.t
+let protocol_migration_serialized =
+  let open Sc_rollup_inbox_message_repr in
+  Some (unsafe_to_string Raw_context.protocol_migration_serialized_message)
+
+let info_per_level_serialized ~predecessor ~predecessor_timestamp =
+  let open Sc_rollup_inbox_message_repr in
+  unsafe_to_string
+    (info_per_level_serialized ~predecessor ~predecessor_timestamp)
