@@ -87,10 +87,10 @@ let register_protocol_migration_tests () =
 let register_old_protocol_migration_tests () =
   List.iter
     (fun p ->
-      match (Protocol.previous_protocol p, p) with
-      | _, Alpha -> () (* Already in register_protocol_migration_tests *)
-      | None, _ -> ()
-      | Some migrate_from, migrate_to ->
+      match (p, Protocol.next_protocol p) with
+      | _, Some Alpha -> () (* Already in register_protocol_migration_tests *)
+      | _, None -> ()
+      | migrate_from, Some migrate_to ->
           Sc_rollup.register_migration ~migrate_from ~migrate_to)
     Protocol.all
 
