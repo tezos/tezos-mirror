@@ -237,7 +237,11 @@ let start configuration ctxt =
   let rpc_addr = fst rpc_addr in
   let host = Ipaddr.V6.to_string rpc_addr in
   let node = `TCP (`Port rpc_port) in
-  let acl = RPC_server.Acl.default rpc_addr in
+  (* FIXME https://gitlab.com/tezos/tezos/-/issues/5918
+
+     We should probably configure a better ACL policy.
+  *)
+  let acl = RPC_server.Acl.allow_all in
   let server =
     RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
   in
