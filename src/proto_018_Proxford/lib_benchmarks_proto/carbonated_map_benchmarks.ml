@@ -51,7 +51,7 @@ module Config_and_workload = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "carbonated_map"
 
   let tags = ["carbonated_map"]
 
@@ -167,7 +167,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let module_filename = __FILE__
 
-    let generated_code_destination = None
+    let purpose = Benchmark.Generate_code "carbonated_map"
 
     let group = group
 
@@ -296,7 +296,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let module_filename = __FILE__
 
-    let generated_code_destination = None
+    let purpose = Benchmark.Generate_code "carbonated_map"
 
     let group = group
 

@@ -84,7 +84,7 @@ module Micheline_nodes_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "script_repr"
 
   let group = Benchmark.Group "size_translator_model"
 
@@ -123,7 +123,7 @@ module Script_repr_strip_annotations : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "script_repr"
 
   let group = Benchmark.Group "strip_annotations_model"
 

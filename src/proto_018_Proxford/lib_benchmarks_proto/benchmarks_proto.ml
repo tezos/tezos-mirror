@@ -29,14 +29,16 @@ module Benchmark_base = Benchmark
 module Benchmark = struct
   type group = Benchmark_base.group = Standalone | Group of string | Generic
 
+  type purpose = Benchmark_base.purpose =
+    | Other_purpose of string
+    | Generate_code of string
+
   module type S = sig
     val name : Namespace.t
 
     val info : string
 
     val module_filename : string
-
-    val generated_code_destination : string option
 
     val group : group
 
@@ -56,6 +58,8 @@ module Benchmark = struct
 
     val model : name:Namespace.t -> workload Model.t
 
+    val purpose : purpose
+
     val create_benchmark :
       rng_state:Random.State.t -> config -> workload Generator.benchmark
   end
@@ -70,13 +74,14 @@ module Registration = struct
     let module B : Benchmark_base.S = struct
       include Bench
 
-      let generated_code_destination =
-        Option.map
-          (fun destination ->
-            Filename.concat
-              "src/proto_alpha/lib_protocol"
-              (destination ^ "_costs_generated.ml"))
-          Bench.generated_code_destination
+      let purpose =
+        match Bench.purpose with
+        | Other_purpose _ -> Bench.purpose
+        | Generate_code x ->
+            Generate_code
+              (Filename.concat
+                 "src/proto_alpha/lib_protocol"
+                 (x ^ "_costs_generated.ml"))
 
       let models =
         [
@@ -91,7 +96,7 @@ module Registration = struct
         List.repeat bench_num (fun () ->
             Bench.create_benchmark ~rng_state config)
     end in
-    Registration_helpers.register (module B)
+    Registration_helpers.register (module B : Benchmark_base.S)
 end
 
 module Model = struct

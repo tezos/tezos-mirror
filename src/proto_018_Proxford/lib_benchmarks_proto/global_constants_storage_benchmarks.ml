@@ -299,7 +299,9 @@ module Set_add : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose =
+    Benchmark.Other_purpose
+      "Validate assumptions about functions using Set.add."
 
   let group = Benchmark.Standalone
 
@@ -346,7 +348,9 @@ module Set_elements : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose =
+    Benchmark.Other_purpose
+      "Validate assumptions about functions using Set.elements."
 
   let group = Benchmark.Standalone
 
@@ -395,7 +399,10 @@ module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose =
+    Benchmark.Other_purpose
+      "Validate assumptions about functions using \
+       Script_expr_hash.of_b58check_opt."
 
   let group = Benchmark.Standalone
 
@@ -457,7 +464,7 @@ struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "global_constants"
 
   let group = Benchmark.Standalone
 
@@ -533,7 +540,7 @@ module Global_constants_storage_expand_models = struct
 
     let module_filename = __FILE__
 
-    let generated_code_destination = None
+    let purpose = Benchmark.Generate_code "global_constants"
 
     let group = Benchmark.Standalone
 
@@ -600,7 +607,7 @@ module Global_constants_storage_expand_models = struct
 
     let module_filename = __FILE__
 
-    let generated_code_destination = None
+    let purpose = Benchmark.Generate_code "global_constants"
 
     let group = Benchmark.Standalone
 

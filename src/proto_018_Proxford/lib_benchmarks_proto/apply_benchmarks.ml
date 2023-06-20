@@ -69,7 +69,8 @@ module Take_fees_benchmark = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose =
+    Benchmark.Other_purpose "Measuring the time spent for Apply.take_fees"
 
   let group = Benchmark.Standalone
 

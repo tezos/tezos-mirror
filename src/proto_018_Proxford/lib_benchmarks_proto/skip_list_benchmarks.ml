@@ -41,7 +41,7 @@ let fv s = Free_variable.of_namespace (ns s)
 (** Benchmark for the [Skip_list_repr.next] function. It is used for estimating
     the parameters for [Skip_list_cost_model.model_next]. *)
 module Next : Benchmark.S = struct
-  let generated_code_destination = Some "skip_list"
+  let purpose = Benchmark.Generate_code "skip_list"
 
   include Skip_list
 
@@ -101,7 +101,7 @@ end
    [Skip_list_cost_model.model_hash_cell]. The model estimates hashing
    a skip_list cell content and all its back pointers. *)
 module Hash_cell : Benchmark.S = struct
-  let generated_code_destination = Some "skip_list"
+  let purpose = Benchmark.Generate_code "skip_list"
 
   let name = ns "hash_cell"
 
