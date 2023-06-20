@@ -101,10 +101,10 @@ and the following opcode:
 
 ``open_chest ::  chest_key → chest → time → bytes option``
 
-``open_chest`` takes a ``chest`` and ``chest_key``, and produces either the underlying plaintext
+``open_chest`` takes a ``chest`` and a ``chest_key``, and produces either the underlying plaintext
 or indicates that the ``chest_key`` is malicious.
 If the ``chest`` is not well-formed (which is possible since we use authenticated encryption),
-the empty bytes is returned.
+the empty Byte is returned.
 
 
 Implementation of the time-lock puzzle
