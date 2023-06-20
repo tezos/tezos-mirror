@@ -50,6 +50,7 @@ let run subcommand
             expected_pow;
             network_name = default.network_name;
             endpoint = default.endpoint;
+            profile = None;
           }
       in
       Lwt_main.run @@ Configuration_file.save config
