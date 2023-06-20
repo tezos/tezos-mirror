@@ -31,11 +31,6 @@
     Subject:      Test lib mec
 *)
 
-let rec repeat n f () =
-  if n > 0 then (
-    f () ;
-    repeat (n - 1) f ())
-
 module BaseParameters = struct
   let width = 3
 
@@ -111,13 +106,13 @@ let () =
           Alcotest.test_case
             "On random values with a fixed batch size"
             `Quick
-            (repeat
+            (Mec.Curve.Utils.PBT.repeat
                100
                test_consistency_between_optimised_and_naive_with_a_fixed_batch_size);
           Alcotest.test_case
             "On random values with a random batch size"
             `Quick
-            (repeat
+            (Mec.Curve.Utils.PBT.repeat
                100
                test_consistency_between_optimised_and_naive_with_a_random_batch_size);
         ] );

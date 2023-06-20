@@ -456,7 +456,7 @@ let tests =
   let repetitions = 30 in
   List.map
     (fun (name, f) ->
-      Alcotest.test_case name `Quick (fun () -> Helpers.repeat repetitions f))
+      Alcotest.test_case name `Quick (Helpers.repeat repetitions f))
     [
       ("test_of_array_zero", test_of_array_zero);
       ("test_of_array_const", test_of_array_const);

@@ -124,11 +124,10 @@ let srs =
   | None -> make_fake_srs ()
   | Some prefix -> load_real_srs prefix
 
-let rec repeat n f =
-  if n <= 0 then ()
-  else (
+let rec repeat n f () =
+  if n > 0 then (
     f () ;
-    repeat (n - 1) f)
+    repeat (n - 1) f ())
 
 let must_fail f =
   let exception Local in
@@ -261,7 +260,7 @@ module Time = struct
 
   let bench_test_circuit ~nb_rep func () =
     reset () ;
-    repeat nb_rep func ;
+    repeat nb_rep func () ;
     assert (nb_rep = !setup.n && nb_rep = !prove.n && nb_rep = !verify.n) ;
     Printf.printf
       "\nTimes over %d repetitions (95%% confidence interval):\n\n"

@@ -28,14 +28,6 @@ let rec non_null_int bound =
   let r = Random.int bound in
   if r = 0 then non_null_int bound else r
 
-let rec repeat n f =
-  if n <= 0 then
-    let f () = () in
-    f
-  else (
-    f () ;
-    repeat (n - 1) f)
-
 module Scalar = Bls12_381.Fr
 module Domain = Octez_bls12_381_polynomial.Domain.Domain_unsafe
 module Poly = Octez_bls12_381_polynomial.Polynomial
@@ -289,23 +281,25 @@ let tests =
       test_case
         "evaluation at any point of the zero polynomial"
         `Quick
-        (repeat 100 test_eval_random_point_zero_polynomial);
+        (Helpers.repeat 100 test_eval_random_point_zero_polynomial);
       test_case
         "evaluation at any point of a random constant polynomial"
         `Quick
-        (repeat 100 test_eval_random_point_constant_polynomial);
+        (Helpers.repeat 100 test_eval_random_point_constant_polynomial);
       test_case
         "evaluation at zero of a random constant polynomial"
         `Quick
-        (repeat 100 test_eval_at_zero_point_of_random_constant_polynomial);
+        (Helpers.repeat
+           100
+           test_eval_at_zero_point_of_random_constant_polynomial);
       test_case
         "evaluation at zero of the zero polynomial"
         `Quick
-        (repeat 100 test_eval_at_zero_of_zero_polynomial);
+        (Helpers.repeat 100 test_eval_at_zero_of_zero_polynomial);
       test_case
         "evaluation at any point of the polynomial X"
         `Quick
-        (repeat 100 test_eval_x_to_random_point);
+        (Helpers.repeat 100 test_eval_x_to_random_point);
       test_case
         "of_coeff_to_dense_vectors"
         `Quick
@@ -313,20 +307,20 @@ let tests =
       test_case
         "test properties nullifier 0 * P = P * 0 = 0"
         `Quick
-        (repeat 10 test_multiply_by_zero_is_zero);
+        (Helpers.repeat 10 test_multiply_by_zero_is_zero);
       test_case
         "test properties commutativity p * q = p * q"
         `Quick
-        (repeat 10 test_communitativity);
+        (Helpers.repeat 10 test_communitativity);
       test_case
         "test properties distributivity and communtativity a p * b q = (a * b) \
          (p * q) = (b p) * (a q) = p * (a * b) q"
         `Quick
-        (repeat 10 test_distributivity);
+        (Helpers.repeat 10 test_distributivity);
       test_case
         "test interpolation with only roots"
         `Quick
-        (repeat 10 (test_interpolation_fft_with_only_roots ~power:32));
+        (Helpers.repeat 10 (test_interpolation_fft_with_only_roots ~power:32));
       test_case
         "test evaluation with zero polynomial"
         `Quick
@@ -334,14 +328,14 @@ let tests =
       test_case
         "test evaluation with smaller polynomial"
         `Quick
-        (repeat
+        (Helpers.repeat
            10
            (test_evaluation_fft_random_values_with_smaller_polynomial
               ~power:1024));
       (*       test_case *)
       (*         "test evaluation with larger polynomial" *)
       (*         `Quick *)
-      (*         (repeat *)
+      (*         (Helpers.repeat *)
       (*            10 *)
       (*            (test_evaluation_fft_random_values_with_larger_polynomial *)
       (*               ~generator *)
