@@ -25,6 +25,8 @@
 
 type additional_info = Tezos_version_parser.additional_info =
   | Dev
+  | Beta of int
+  | Beta_dev of int
   | RC of int
   | RC_dev of int
   | Release
@@ -39,6 +41,8 @@ let parse_version s = Tezos_version_parser.version_tag (Lexing.from_string s)
 
 let string_of_additional_info = function
   | Dev -> "+dev"
+  | Beta n -> Format.asprintf "~beta%d" n
+  | Beta_dev n -> Format.asprintf "~beta%d+dev" n
   | RC n -> Format.asprintf "~rc%d" n
   | RC_dev n -> Format.asprintf "~rc%d+dev" n
   | Release -> ""
