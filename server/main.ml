@@ -120,33 +120,6 @@ let reply_public_json encoding data =
   let headers = Cohttp.Header.add headers "Access-Control-Allow-Origin" "*" in
   Cohttp_lwt_unix.Server.respond_string ~headers ~status:`OK ~body ()
 
-let one_level_json =
-  Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str ".json"]
-  |> Re.whole_string |> Re.compile
-
-let anomalies_range =
-  Re.seq
-    [
-      Re.str "/";
-      Re.group (Re.rep1 Re.digit);
-      Re.str "-";
-      Re.group (Re.rep1 Re.digit);
-      Re.str "/anomalies.json";
-    ]
-  |> Re.whole_string |> Re.compile
-
-let level_rights =
-  Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/rights"]
-  |> Re.whole_string |> Re.compile
-
-let level_block =
-  Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block"]
-  |> Re.whole_string |> Re.compile
-
-let level_mempool =
-  Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/mempool"]
-  |> Re.whole_string |> Re.compile
-
 let get_stats db_pool =
   let query =
     Caqti_request.Infix.(
@@ -363,115 +336,124 @@ let operations_callback db_pool g source operations =
         ~body:"Received operations stored"
         ())
 
+let routes :
+    (Re.re
+    * (Re.Group.t ->
+      (string * string) list ->
+      (Caqti_lwt.connection, Caqti_error.t) Caqti_lwt.Pool.t ->
+      Cohttp.Header.t ->
+      Cohttp.Code.meth ->
+      Cohttp_lwt.Body.t ->
+      (Cohttp.Response.t * Cohttp_lwt.Body.t) Lwt.t))
+    list =
+  [
+    ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/rights"],
+      fun g rights db_pool header meth body ->
+        post_only_endpoint rights header meth (fun _source ->
+            with_data
+              Teztale_lib.Consensus_ops.rights_encoding
+              body
+              (endorsing_rights_callback db_pool g)) );
+    ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block"],
+      fun g rights db_pool header meth body ->
+        post_only_endpoint rights header meth (fun source ->
+            with_data
+              Teztale_lib.Data.block_data_encoding
+              body
+              (block_callback db_pool g source)) );
+    ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/mempool"],
+      fun g rights db_pool header meth body ->
+        post_only_endpoint rights header meth (fun source ->
+            with_data
+              Teztale_lib.Consensus_ops.delegate_ops_encoding
+              body
+              (operations_callback db_pool g source)) );
+    ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str ".json"],
+      fun g _rights db_pool _header meth _body ->
+        let methods = [`GET; `OPTIONS] in
+        match meth with
+        | `GET ->
+            let level = Int32.of_string (Re.Group.get g 1) in
+            with_caqti_error (Exporter.data_at_level db_pool level) (fun data ->
+                reply_public_json Teztale_lib.Data.encoding data)
+        | `OPTIONS -> options_respond methods
+        | _ -> method_not_allowed_respond methods );
+    ( Re.seq
+        [
+          Re.str "/";
+          Re.group (Re.rep1 Re.digit);
+          Re.str "-";
+          Re.group (Re.rep1 Re.digit);
+          Re.str "/anomalies.json";
+        ],
+      fun g _rights db_pool _header meth _body ->
+        let methods = [`GET; `OPTIONS] in
+        match meth with
+        | `GET ->
+            let first_level = int_of_string (Re.Group.get g 1) in
+            let last_level = int_of_string (Re.Group.get g 2) in
+            with_caqti_error
+              (let levels =
+                 Stdlib.List.init
+                   (last_level - first_level + 1)
+                   (fun i -> Int32.of_int (first_level + i))
+               in
+               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.concat_map_es
+                 (Exporter.anomalies_at_level db_pool)
+                 levels)
+              (fun data ->
+                let body =
+                  Ezjsonm.value_to_string
+                    (Data_encoding.Json.construct
+                       (Data_encoding.list Teztale_lib.Data.Anomaly.encoding)
+                       data)
+                in
+                Cohttp_lwt_unix.Server.respond_string
+                  ~headers:
+                    (Cohttp.Header.init_with
+                       "content-type"
+                       "application/json; charset=UTF-8")
+                  ~status:`OK
+                  ~body
+                  ())
+        | `OPTIONS -> options_respond methods
+        | _ -> method_not_allowed_respond methods );
+    ( Re.str "/stats.json",
+      fun _g _rights db_pool _header _meth _body -> get_stats db_pool );
+    ( Re.str "/head.json",
+      fun _g _rights db_pool _header _meth _body -> get_head db_pool );
+  ]
+  |> List.map (fun (r, fn) -> (r |> Re.whole_string |> Re.compile, fn))
+
 let callback ~public rights db_pool _connection request body =
   let header = Cohttp.Request.headers request in
   let meth = Cohttp.Request.meth request in
   let uri = Cohttp.Request.uri request in
   let path = Uri.path uri in
-  match Re.exec_opt level_rights path with
-  | Some g ->
-      post_only_endpoint rights header meth (fun _source ->
-          with_data
-            Teztale_lib.Consensus_ops.rights_encoding
-            body
-            (endorsing_rights_callback db_pool g))
+  match
+    List.find_map
+      (fun (r, fn) ->
+        match Re.exec_opt r path with Some g -> Some (fn g) | None -> None)
+      routes
+  with
+  | Some fn -> fn rights db_pool header meth body
   | None -> (
-      match Re.exec_opt level_block path with
-      | Some g ->
-          post_only_endpoint rights header meth (fun source ->
-              with_data
-                Teztale_lib.Data.block_data_encoding
-                body
-                (block_callback db_pool g source))
-      | None -> (
-          match Re.exec_opt level_mempool path with
-          | Some g ->
-              post_only_endpoint rights header meth (fun source ->
-                  with_data
-                    Teztale_lib.Consensus_ops.delegate_ops_encoding
-                    body
-                    (operations_callback db_pool g source))
-          | None -> (
-              match Re.exec_opt one_level_json path with
-              | Some g -> (
-                  let methods = [`GET; `OPTIONS] in
-                  match meth with
-                  | `GET ->
-                      let level = Int32.of_string (Re.Group.get g 1) in
-                      with_caqti_error
-                        (Exporter.data_at_level db_pool level)
-                        (fun data ->
-                          reply_public_json Teztale_lib.Data.encoding data)
-                  | `OPTIONS -> options_respond methods
-                  | _ -> method_not_allowed_respond methods)
-              | None -> (
-                  match Re.exec_opt anomalies_range path with
-                  | Some g -> (
-                      let methods = [`GET; `OPTIONS] in
-                      match meth with
-                      | `GET ->
-                          let first_level = int_of_string (Re.Group.get g 1) in
-                          let last_level = int_of_string (Re.Group.get g 2) in
-                          with_caqti_error
-                            (let levels =
-                               Stdlib.List.init
-                                 (last_level - first_level + 1)
-                                 (fun i -> Int32.of_int (first_level + i))
-                             in
-                             Tezos_lwt_result_stdlib.Lwtreslib.Bare.List
-                             .concat_map_es
-                               (Exporter.anomalies_at_level db_pool)
-                               levels)
-                            (fun data ->
-                              let body =
-                                Ezjsonm.value_to_string
-                                  (Data_encoding.Json.construct
-                                     (Data_encoding.list
-                                        Teztale_lib.Data.Anomaly.encoding)
-                                     data)
-                              in
-                              Cohttp_lwt_unix.Server.respond_string
-                                ~headers:
-                                  (Cohttp.Header.init_with
-                                     "content-type"
-                                     "application/json; charset=UTF-8")
-                                ~status:`OK
-                                ~body
-                                ())
-                      | `OPTIONS -> options_respond methods
-                      | _ -> method_not_allowed_respond methods)
-                  | None -> (
-                      match path with
-                      | "/stats.json" -> get_stats db_pool
-                      | "/head.json" -> get_head db_pool
-                      | _ -> (
-                          match public with
-                          | None -> Cohttp_lwt_unix.Server.respond_not_found ()
-                          | Some docroot ->
-                              let path =
-                                match path with
-                                | "" | "/" -> "/index.html"
-                                | _ -> path
-                              in
-                              let uri = Uri.of_string path in
-                              let fname =
-                                Cohttp.Path.resolve_local_file ~docroot ~uri
-                              in
-                              (* Resolving symlink here in order to have Magic_mime works with targeted file extension *)
-                              let fname =
-                                try
-                                  Filename.concat
-                                    (Filename.dirname fname)
-                                    (Unix.readlink fname)
-                                with _ -> fname
-                              in
-                              Cohttp_lwt_unix.Server.respond_file
-                                ~headers:
-                                  (Cohttp.Header.init_with
-                                     "content-type"
-                                     (Magic_mime.lookup fname))
-                                ~fname
-                                ()))))))
+      match public with
+      | None -> Cohttp_lwt_unix.Server.respond_not_found ()
+      | Some docroot ->
+          let path = match path with "" | "/" -> "/index.html" | _ -> path in
+          let uri = Uri.of_string path in
+          let fname = Cohttp.Path.resolve_local_file ~docroot ~uri in
+          (* Resolving symlink here in order to have Magic_mime works with targeted file extension *)
+          let fname =
+            try Filename.concat (Filename.dirname fname) (Unix.readlink fname)
+            with _ -> fname
+          in
+          Cohttp_lwt_unix.Server.respond_file
+            ~headers:
+              (Cohttp.Header.init_with "content-type" (Magic_mime.lookup fname))
+            ~fname
+            ())
 
 (* Must exists somewhere but where ! *)
 let print_location f ((fl, fc), (tl, tc)) =
