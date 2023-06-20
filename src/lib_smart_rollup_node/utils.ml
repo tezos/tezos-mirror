@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,42 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
-module Fueled_pvm = Fueled_pvm.Free
+module Reveal_hash_map = Map.Make (struct
+  type t = Dac_plugin.hash
 
-type level_position = Start | Middle | End
-
-type info_per_level = {
-  predecessor_timestamp : Timestamp.time;
-  predecessor : Block_hash.t;
-}
-
-(** Type of the state for a simulation. *)
-type t = {
-  ctxt : Context.ro;
-  inbox_level : int32;
-  state : Context.tree;
-  reveal_map : string Utils.Reveal_hash_map.t option;
-  nb_messages_inbox : int;
-  level_position : level_position;
-  info_per_level : info_per_level;
-}
-
-(** [start_simulation node_ctxt reveal_source block] starts a new simulation {e
-    on top} of [block], i.e. for an hypothetical new inbox (level).  *)
-val start_simulation :
-  Node_context.ro ->
-  reveal_map:string Utils.Reveal_hash_map.t option ->
-  Layer1.head ->
-  t tzresult Lwt.t
-
-(** [simulate_messages node_ctxt sim messages] runs a simulation of new
-    [messages] in the given simulation (state) [sim] and returns a new
-    simulation state, the remaining fuel (when [?fuel] is provided) and the
-    number of ticks that happened. *)
-val simulate_messages :
-  Node_context.ro -> t -> string list -> (t * Z.t) tzresult Lwt.t
-
-(** [end_simulation node_ctxt sim] adds and [End_of_level] message and marks the
-    simulation as ended. *)
-val end_simulation : Node_context.ro -> t -> (t * Z.t) tzresult Lwt.t
+  let compare = Dac_plugin.raw_compare
+end)

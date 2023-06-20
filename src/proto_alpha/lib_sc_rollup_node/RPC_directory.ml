@@ -119,14 +119,15 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
   let reveal_map =
     match reveal_pages with
     | Some pages ->
+        let (module DAC_plugin) =
+          WithExceptions.Option.get ~loc:__LOC__ @@ Dac_plugin.get Protocol.hash
+        in
         let map =
           List.fold_left
             (fun map page ->
-              let hash =
-                Sc_rollup_reveal_hash.(hash_string ~scheme:Blake2B [page])
-              in
-              Sc_rollup_reveal_hash.Map.add hash page map)
-            Sc_rollup_reveal_hash.Map.empty
+              let hash = DAC_plugin.hash_string ~scheme:Blake2B [page] in
+              Utils.Reveal_hash_map.add hash page map)
+            Utils.Reveal_hash_map.empty
             pages
         in
         Some map

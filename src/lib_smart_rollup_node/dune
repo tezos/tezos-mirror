@@ -16,6 +16,7 @@
   octez-node-config
   prometheus-app
   tezos-dal-node-lib
+  tezos-dac-lib
   tezos-dac-client-lib
   octez-injector
   tezos-version.value
@@ -30,6 +31,7 @@
   -open Tezos_client_base
   -open Tezos_client_base_unix
   -open Tezos_dal_node_lib
+  -open Tezos_dac_lib
   -open Tezos_dac_client_lib
   -open Octez_injector
   -open Tezos_version_value

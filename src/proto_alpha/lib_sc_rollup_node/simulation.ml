@@ -38,7 +38,7 @@ type t = {
   ctxt : Context.ro;
   inbox_level : int32;
   state : Context.tree;
-  reveal_map : string Sc_rollup_reveal_hash.Map.t option;
+  reveal_map : string Utils.Reveal_hash_map.t option;
   nb_messages_inbox : int;
   level_position : level_position;
   info_per_level : info_per_level;

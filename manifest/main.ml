@@ -4335,6 +4335,7 @@ let octez_smart_rollup_node_lib =
         octez_node_config;
         prometheus_app;
         octez_dal_node_lib |> open_;
+        octez_dac_lib |> open_;
         octez_dac_client_lib |> open_;
         octez_injector |> open_;
         octez_version_value |> open_;

@@ -72,7 +72,7 @@ module type S = sig
       inboxes, such as during simulation. When [reveal_map] is provided, it is
       used as an additional source of data for revelation ticks. *)
   val eval_messages :
-    ?reveal_map:string Sc_rollup_reveal_hash.Map.t ->
+    ?reveal_map:string Utils.Dac_plugin_hash_map.t ->
     _ Node_context.t ->
     eval_state ->
     eval_result Node_context.delayed_write tzresult Lwt.t
@@ -99,7 +99,10 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
     let found_in_map =
       match reveal_map with
       | None -> None
-      | Some map -> Sc_rollup_reveal_hash.Map.find_opt hash map
+      | Some map ->
+          Utils.Reveal_hash_map.find_opt
+            (Reveals.proto_hash_to_dac_hash hash)
+            map
     in
     match found_in_map with
     | Some data -> return data
