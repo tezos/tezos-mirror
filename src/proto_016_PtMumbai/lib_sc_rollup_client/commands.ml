@@ -40,7 +40,7 @@ let block_arg =
          (String.concat ", " possible_block_ids))
     (Tezos_clic.parameter
        (fun _ s ->
-         match Sc_rollup_services.Arg.destruct_block_id s with
+         match Rollup_node_services.Arg.destruct_block_id s with
          | Ok b -> return b
          | Error reason -> failwith "Invalid block id: %s" reason)
        ~autocomplete:(fun _ -> return possible_block_ids))
@@ -52,7 +52,7 @@ let get_sc_rollup_addresses_command () =
     (Tezos_clic.fixed ["get"; "smart"; "rollup"; "address"])
     (fun () (cctxt : #Configuration.sc_client_context) ->
       RPC.get_sc_rollup_addresses_command cctxt >>=? fun addr ->
-      cctxt#message "@[%a@]" Sc_rollup.Address.pp addr >>= fun () -> return_unit)
+      cctxt#message "@[%a@]" Address.pp addr >>= fun () -> return_unit)
 
 let get_state_value_command () =
   Tezos_clic.command
