@@ -30,7 +30,7 @@ type t = {
       (** Run dal-node in test mode with an unsafe SRS (Trusted setup) *)
   data_dir : string;  (** The path to the DAL node data directory *)
   rpc_addr : P2p_point.Id.t;  (** The address the DAL node listens to *)
-  neighbors : neighbor list;  (** List of neighbors to reach withing the DAL *)
+  neighbors : neighbor list;  (** List of neighbors to reach within the DAL *)
   listen_addr : P2p_point.Id.t;
       (** The TCP address and port at which this instance can be reached. *)
   peers : P2p_point.Id.t list;

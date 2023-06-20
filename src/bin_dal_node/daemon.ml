@@ -189,7 +189,8 @@ module Handler = struct
             Option.iter_es
               (Profile_manager.add_profile
                  proto_parameters
-                 (Node_context.get_store ctxt))
+                 (Node_context.get_store ctxt)
+                 (Node_context.get_gs_worker ctxt))
               config.profile
           in
           Node_context.set_ready
