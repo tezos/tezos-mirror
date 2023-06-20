@@ -31,6 +31,7 @@ type t = {
   db_uri : string;
   network_interfaces : connection list;
   public_directory : string option;
+  admins : (string * string) list;
   users : (string * string) list;
 }
 
@@ -57,18 +58,18 @@ let connection_encoding =
           "tls"
           tls_conf_encoding))
 
-let user_encoding =
+let login_encoding =
   let open Data_encoding in
   obj2 (req "login" string) (req "password" string)
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun {db_uri; network_interfaces; public_directory; users} ->
-      (db_uri, network_interfaces, public_directory, users))
-    (fun (db_uri, network_interfaces, public_directory, users) ->
-      {db_uri; network_interfaces; public_directory; users})
-    (obj4
+    (fun {db_uri; network_interfaces; public_directory; admins; users} ->
+      (db_uri, network_interfaces, public_directory, admins, users))
+    (fun (db_uri, network_interfaces, public_directory, admins, users) ->
+      {db_uri; network_interfaces; public_directory; admins; users})
+    (obj5
        (req
           ~description:
             "Uri to reach the database: sqlite3:path or postgresql://host:port"
@@ -82,4 +83,5 @@ let encoding =
              frontend application). If none provided this feature will not be \
              used (i.e. no default value)."
           string)
-       (req "users" (list user_encoding)))
+       (req "admins" (list login_encoding))
+       (req "users" (list login_encoding)))

@@ -58,18 +58,34 @@ let options_respond methods =
     ~body:Cohttp_lwt.Body.empty
     ()
 
-let with_source_authentification users header f =
+let with_authentification wrong_login need_auth users header f =
   match Cohttp.Header.get_authorization header with
-  | Some (`Basic ((user, _) as login)) when List.mem login users -> f user
-  | Some (`Basic _) ->
-      Cohttp_lwt_unix.Server.respond_string
-        ~headers:
-          (Cohttp.Header.init_with "content-type" "text/plain; charset=UTF-8")
-        ~status:`Forbidden
-        ~body:"Unknown source/Wrong login"
-        ()
+  | Some (`Basic (u, p)) ->
+      if List.exists (fun (u', p') -> u = u' && Bcrypt.verify p p') users then
+        f u
+      else
+        Cohttp_lwt_unix.Server.respond_string
+          ~headers:
+            (Cohttp.Header.init_with "content-type" "text/plain; charset=UTF-8")
+          ~status:`Forbidden
+          ~body:wrong_login
+          ()
   | Some _ | None ->
-      Cohttp_lwt_unix.Server.respond_need_auth ~auth:(`Basic "Who are you?") ()
+      Cohttp_lwt_unix.Server.respond_need_auth ~auth:(`Basic need_auth) ()
+
+(** [with_source_authentification users header f]
+    For a given [users] allowed login list,
+    checks that header contains authentification for an element of this list,
+    and call [f] with the login used to login.
+*)
+let with_source_authentification =
+  with_authentification "Unknown source/Wrong login" "Who are you?"
+
+(** [with_admin_authentification users header f]
+    Same as [with_source_authentification], but [users] is a list of admins instead of regular users.
+*)
+let with_admin_authentification =
+  with_authentification "Wrong login" "Who are you?"
 
 (** [post_only_endpoint] checks authorization and runs the callback passed as parameter if allowed,
     or returns an error responses.
@@ -126,15 +142,25 @@ let with_caqti_error x f =
           let body = Caqti_error.show e in
           Cohttp_lwt_unix.Server.respond_error ~body ())
 
-let reply_public_json encoding data =
+(** Returns [data] as JSON (encoded via [encoding]) to the client *)
+let reply_json ?(status = `OK) ?headers:(headers_arg = []) encoding data =
   let body =
     Ezjsonm.value_to_string (Data_encoding.Json.construct encoding data)
   in
   let headers =
     Cohttp.Header.init_with "content-type" "application/json; charset=UTF-8"
   in
-  let headers = Cohttp.Header.add headers "Access-Control-Allow-Origin" "*" in
-  Cohttp_lwt_unix.Server.respond_string ~headers ~status:`OK ~body ()
+  let headers =
+    List.fold_left
+      (fun acc (k, v) -> Cohttp.Header.add acc k v)
+      headers
+      headers_arg
+  in
+  Cohttp_lwt_unix.Server.respond_string ~headers ~status ~body ()
+
+(** Same as {!reply_json} with extra "Access-Control-Allow-Origin: *" header. *)
+let reply_public_json encoding data =
+  reply_json ~headers:[("Access-Control-Allow-Origin", "*")] encoding data
 
 let get_stats db_pool =
   let query =
@@ -172,16 +198,63 @@ let get_head db_pool =
     (fun head_level ->
       reply_public_json Data_encoding.(obj1 (opt "level" int32)) head_level)
 
+(** Fetch allowed users' logins from db. *)
 let get_users db_pool =
   let query =
-    Caqti_request.Infix.(Caqti_type.(unit ->* string))
-      "SELECT username FROM users"
+    Caqti_request.Infix.(Caqti_type.(unit ->* string)) "SELECT login FROM users"
   in
   with_caqti_error
     (Caqti_lwt.Pool.use
        (fun (module Db : Caqti_lwt.CONNECTION) -> Db.collect_list query ())
        db_pool)
     (fun users -> reply_public_json Data_encoding.(list string) users)
+
+(** Fetch the list of allowed logins from db and update the list ref given as parameter. *)
+let refresh_users =
+  let mutex = Lwt_mutex.create () in
+  fun db_pool users ->
+    Lwt_mutex.with_lock mutex (fun () ->
+        let query =
+          Caqti_request.Infix.(Caqti_type.(unit ->* tup2 string string))
+            "SELECT login, password FROM users"
+        in
+        Lwt.map
+          (function
+            | Ok users_from_db ->
+                users :=
+                  List.map
+                    (fun (u, p) -> (u, Bcrypt.hash_of_string p))
+                    users_from_db ;
+                Ok ()
+            | Error _ as e -> e)
+          (Caqti_lwt.Pool.use
+             (fun (module Db : Caqti_lwt.CONNECTION) ->
+               Db.collect_list query ())
+             db_pool))
+
+(** Insert a new user (i.e. a teztale archiver) into the database.
+    If the user already exists, password is updated.
+  *)
+let upsert_user db_pool login password =
+  let password = Bcrypt.string_of_hash password in
+  let query =
+    Caqti_request.Infix.(Caqti_type.(tup2 string string ->. unit))
+      "INSERT INTO users(login, password) VALUES ($1, $2) ON CONFLICT (login) \
+       DO UPDATE SET password = $2"
+  in
+  Caqti_lwt.Pool.use
+    (fun (module Db : Caqti_lwt.CONNECTION) -> Db.exec query (login, password))
+    db_pool
+
+(** Delete a user from db (i.e. removes feeder permissions) *)
+let delete_user db_pool login =
+  let query =
+    Caqti_request.Infix.(Caqti_type.(string ->. unit))
+      "DELETE FROM users WHERE login = $1"
+  in
+  Caqti_lwt.Pool.use
+    (fun (module Db : Caqti_lwt.CONNECTION) -> Db.exec query login)
+    db_pool
 
 let maybe_create_tables db_pool =
   Caqti_lwt.Pool.use
@@ -366,7 +439,8 @@ let operations_callback db_pool g source operations =
 let routes :
     (Re.re
     * (Re.Group.t ->
-      (string * string) list ->
+      admins:(string * Bcrypt.hash) list ->
+      users:(string * Bcrypt.hash) list ref ->
       (Caqti_lwt.connection, Caqti_error.t) Caqti_lwt.Pool.t ->
       Cohttp.Header.t ->
       Cohttp.Code.meth ->
@@ -375,28 +449,28 @@ let routes :
     list =
   [
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/rights"],
-      fun g rights db_pool header meth body ->
-        post_only_endpoint rights header meth (fun _source ->
+      fun g ~admins:_ ~users db_pool header meth body ->
+        post_only_endpoint !users header meth (fun _source ->
             with_data
               Teztale_lib.Consensus_ops.rights_encoding
               body
               (endorsing_rights_callback db_pool g)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block"],
-      fun g rights db_pool header meth body ->
-        post_only_endpoint rights header meth (fun source ->
+      fun g ~admins:_ ~users db_pool header meth body ->
+        post_only_endpoint !users header meth (fun source ->
             with_data
               Teztale_lib.Data.block_data_encoding
               body
               (block_callback db_pool g source)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/mempool"],
-      fun g rights db_pool header meth body ->
-        post_only_endpoint rights header meth (fun source ->
+      fun g ~admins:_ ~users db_pool header meth body ->
+        post_only_endpoint !users header meth (fun source ->
             with_data
               Teztale_lib.Consensus_ops.delegate_ops_encoding
               body
               (operations_callback db_pool g source)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str ".json"],
-      fun g _users db_pool _header meth _body ->
+      fun g ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () ->
             let level = Int32.of_string (Re.Group.get g 1) in
             with_caqti_error (Exporter.data_at_level db_pool level) (fun data ->
@@ -409,7 +483,7 @@ let routes :
           Re.group (Re.rep1 Re.digit);
           Re.str "/anomalies.json";
         ],
-      fun g _users db_pool _header meth _body ->
+      fun g ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () ->
             let first_level = int_of_string (Re.Group.get g 1) in
             let last_level = int_of_string (Re.Group.get g 2) in
@@ -437,17 +511,48 @@ let routes :
                   ~status:`OK
                   ~body
                   ())) );
+    ( Re.str "/user",
+      fun _g ~admins ~users db_pool header meth body ->
+        let reply_ok login () =
+          reply_json
+            Data_encoding.(obj2 (req "status" string) (req "login" string))
+            ("OK", login)
+        in
+        with_admin_authentification admins header (fun _admin ->
+            let methods = [`DELETE; `OPTIONS; `PUT] in
+            match meth with
+            | `PUT ->
+                with_data Config.login_encoding body (fun (login, password) ->
+                    let password = Bcrypt.hash password in
+                    with_caqti_error
+                      (Lwt_result.bind
+                         (upsert_user db_pool login password)
+                         (fun () -> refresh_users db_pool users))
+                      (reply_ok login))
+            | `DELETE ->
+                with_data
+                  Data_encoding.(obj1 (req "login" string))
+                  body
+                  (fun login ->
+                    with_caqti_error
+                      (Lwt_result.bind (delete_user db_pool login) (fun () ->
+                           refresh_users db_pool users))
+                      (reply_ok login))
+            | `OPTIONS -> options_respond methods
+            | _ -> method_not_allowed_respond methods) );
     ( Re.str "/users",
-      fun _g _users db_pool _header meth _body ->
+      fun _g ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () -> get_users db_pool) );
     ( Re.str "/stats.json",
-      fun _g _users db_pool _header _meth _body -> get_stats db_pool );
+      fun _g ~admins:_ ~users:_ db_pool _header _meth _body -> get_stats db_pool
+    );
     ( Re.str "/head.json",
-      fun _g _users db_pool _header _meth _body -> get_head db_pool );
+      fun _g ~admins:_ ~users:_ db_pool _header _meth _body -> get_head db_pool
+    );
   ]
   |> List.map (fun (r, fn) -> (r |> Re.whole_string |> Re.compile, fn))
 
-let callback ~public users db_pool _connection request body =
+let callback ~public ~admins ~users db_pool _connection request body =
   let header = Cohttp.Request.headers request in
   let meth = Cohttp.Request.meth request in
   let uri = Cohttp.Request.uri request in
@@ -458,7 +563,7 @@ let callback ~public users db_pool _connection request body =
         match Re.exec_opt r path with Some g -> Some (fn g) | None -> None)
       routes
   with
-  | Some fn -> fn users db_pool header meth body
+  | Some fn -> fn ~admins ~users db_pool header meth body
   | None -> (
       match public with
       | None -> Cohttp_lwt_unix.Server.respond_not_found ()
@@ -521,6 +626,10 @@ let config =
 
 let () =
   let uri = Uri.of_string config.Config.db_uri in
+  let users = ref [] in
+  let admins =
+    List.map (fun (u, p) -> (u, Bcrypt.hash p)) config.Config.admins
+  in
   Lwt_main.run
     (match Caqti_lwt.connect_pool ~env:Sql_requests.env uri with
     | Error e -> Lwt_io.eprintl (Caqti_error.show e)
@@ -531,42 +640,66 @@ let () =
                 let stop, paf = Lwt.task () in
                 let shutdown _ = Lwt.wakeup paf () in
                 let _ = Sys.signal Sys.sigint (Sys.Signal_handle shutdown) in
-                let servers =
-                  List.map
-                    (fun con ->
-                      Lwt.bind
-                        (Conduit_lwt_unix.init ?src:con.Config.source ())
-                        (fun ctx ->
-                          let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
-                          let mode =
-                            match con.Config.tls with
-                            | Some Config.{crt; key} ->
-                                `TLS
-                                  ( `Crt_file_path crt,
-                                    `Key_file_path key,
-                                    `No_password,
-                                    `Port con.Config.port )
-                            | None -> `TCP (`Port con.Config.port)
-                          in
-                          Format.printf
-                            "Server listening at %a:%d@."
-                            (Format.pp_print_option
-                               ~none:(fun f () ->
-                                 Format.pp_print_string f "<default>")
-                               Format.pp_print_string)
-                            con.Config.source
-                            con.port ;
-                          Cohttp_lwt_unix.Server.create
-                            ~stop
-                            ~ctx
-                            ~mode
-                            (Cohttp_lwt_unix.Server.make
-                               ~callback:
-                                 (callback
-                                    ~public:config.Config.public_directory
-                                    config.Config.users
-                                    pool)
-                               ())))
-                    config.Config.network_interfaces
-                in
-                Lwt.join servers))
+                Lwt.bind
+                  (Lwt.map
+                     (List.find_map (function Error e -> Some e | _ -> None))
+                     (Lwt_list.map_s
+                        (fun (login, password) ->
+                          let password = Bcrypt.hash password in
+                          upsert_user pool login password)
+                        config.Config.users))
+                  (function
+                    | Some e -> Lwt_io.eprintl (Caqti_error.show e)
+                    | None ->
+                        Lwt.bind (refresh_users pool users) (function
+                            | Error e -> Lwt_io.eprintl (Caqti_error.show e)
+                            | Ok () ->
+                                let servers =
+                                  List.map
+                                    (fun con ->
+                                      Lwt.bind
+                                        (Conduit_lwt_unix.init
+                                           ?src:con.Config.source
+                                           ())
+                                        (fun ctx ->
+                                          let ctx =
+                                            Cohttp_lwt_unix.Net.init ~ctx ()
+                                          in
+                                          let mode =
+                                            match con.Config.tls with
+                                            | Some Config.{crt; key} ->
+                                                `TLS
+                                                  ( `Crt_file_path crt,
+                                                    `Key_file_path key,
+                                                    `No_password,
+                                                    `Port con.Config.port )
+                                            | None ->
+                                                `TCP (`Port con.Config.port)
+                                          in
+                                          Format.printf
+                                            "Server listening at %a:%d@."
+                                            (Format.pp_print_option
+                                               ~none:(fun f () ->
+                                                 Format.pp_print_string
+                                                   f
+                                                   "<default>")
+                                               Format.pp_print_string)
+                                            con.Config.source
+                                            con.port ;
+                                          Cohttp_lwt_unix.Server.create
+                                            ~stop
+                                            ~ctx
+                                            ~mode
+                                            (Cohttp_lwt_unix.Server.make
+                                               ~callback:
+                                                 (callback
+                                                    ~public:
+                                                      config
+                                                        .Config.public_directory
+                                                    ~admins
+                                                    ~users
+                                                    pool)
+                                               ())))
+                                    config.Config.network_interfaces
+                                in
+                                Lwt.join servers))))

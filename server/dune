@@ -4,4 +4,4 @@
  (public_name teztale-server)
  (promote (until-clean))
  (libraries cohttp-lwt-unix caqti-lwt caqti-driver-sqlite3
-   caqti-driver-postgresql teztale.lib))
+   caqti-driver-postgresql safepass teztale.lib))

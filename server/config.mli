@@ -31,7 +31,11 @@ type t = {
   db_uri : string;
   network_interfaces : connection list;
   public_directory : string option;
+  admins : (string * string) list;
   users : (string * string) list;
 }
+
+(** Encoding driver for a structure with two required fields: "login" and "password" *)
+val login_encoding : (string * string) Data_encoding.t
 
 val encoding : t Data_encoding.t

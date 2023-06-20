@@ -12,6 +12,7 @@ depends: [
   "caqti-lwt"
   "caqti-driver-sqlite3"
   "caqti-driver-postgresql"
+  "safepass"
 ]
 depopts: [
   "tezos-client-001-PtCJ7pwo"

@@ -6,6 +6,12 @@
             "port": 8880
         }
     ],
+    "admins": [
+        {
+            "login": "admin",
+            "password": "secret"
+        }
+    ],
     "users": [
         {
             "login": "archiver",

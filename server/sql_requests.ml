@@ -107,7 +107,7 @@ let create_endorsing_rights =
 let create_users =
   "CREATE TABLE IF NOT EXISTS users(\n\
   \   id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
-  \   username $(BYTES) UNIQUE NOT NULL,\n\
+  \   login $(BYTES) UNIQUE NOT NULL,\n\
   \   password $(BYTES) UNIQUE NOT NULL)"
 
 let create_endorsing_rights_level_idx =
