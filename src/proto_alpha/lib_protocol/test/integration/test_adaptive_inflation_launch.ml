@@ -105,7 +105,7 @@ let set_delegate_parameters ctxt delegate ~staking_over_baking_limit
    - the launch cycle is not reset before it is reached,
    - once the launch cycle is reached, costaking is allowed. *)
 let test_launch threshold expected_vote_duration () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let assert_ema_above_threshold ~loc
       (metadata : Protocol.Main.block_header_metadata) =
     let ema =
@@ -259,14 +259,13 @@ let test_launch threshold expected_vote_duration () =
      planned to happen. *)
   let* () = assert_current_cycle ~loc:__LOC__ block launch_cycle in
 
-  (* Test that the wannabe costaker is now allowed to stake a few
-     mutez. *)
-  let* operation =
-    stake
-      (B block)
-      wannabe_costaker
-      (Protocol.Alpha_context.Tez.of_mutez_exn 10L)
-  in
+  (* Test that the wannabe costaker is now allowed to stake almost all
+     its balance. It cannot totally costake it however because this is
+     considered by the protocol as an attempt to empty the account, and
+     emptying delegated accounts is forbidden. *)
+  let* balance = Context.Contract.balance (B block) wannabe_costaker in
+  let*?@ balance_to_stake = Protocol.Alpha_context.Tez.(balance -? one) in
+  let* operation = stake (B block) wannabe_costaker balance_to_stake in
   let* (_block : Block.t) = Block.bake ~operation block in
   return_unit
 
