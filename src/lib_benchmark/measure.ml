@@ -34,11 +34,7 @@ type options = {
   config_file : string option;
 }
 
-type 'workload timed_workload = {
-  workload : 'workload;
-  measures : Maths.vector;
-  allocated_words : int option;
-}
+type 'workload timed_workload = {workload : 'workload; measures : Maths.vector}
 
 type 'workload workload_data = 'workload timed_workload list
 
@@ -118,14 +114,9 @@ let vec_encoding : Maths.vector Data_encoding.t =
 let timed_workload_encoding workload_encoding =
   let open Data_encoding in
   conv
-    (fun {workload; measures; allocated_words} ->
-      (workload, measures, allocated_words))
-    (fun (workload, measures, allocated_words) ->
-      {workload; measures; allocated_words})
-    (obj3
-       (req "workload" workload_encoding)
-       (req "measures" vec_encoding)
-       (req "allocated_words" (option int31)))
+    (fun {workload; measures} -> (workload, measures))
+    (fun (workload, measures) -> {workload; measures})
+    (obj2 (req "workload" workload_encoding) (req "measures" vec_encoding))
 
 let workload_data_encoding workload_encoding =
   Data_encoding.list (timed_workload_encoding workload_encoding)
@@ -465,7 +456,7 @@ let perform_benchmark (type c t) (options : options)
         progress () ;
         set_gc_increment () ;
         Gc.compact () ;
-        let measure_plain_benchmark workload closure measure_allocation =
+        let measure_plain_benchmark workload closure =
           let measures =
             compute_empirical_timing_distribution
               ~closure
@@ -473,21 +464,15 @@ let perform_benchmark (type c t) (options : options)
               ~buffer
               ~index
           in
-          let allocated_words =
-            Option.bind measure_allocation (fun f -> f ())
-          in
-          {workload; measures; allocated_words} :: workload_data
+          {workload; measures} :: workload_data
         in
         match benchmark_fun () with
         | Generator.Calculated {workload; measure} ->
             let measures = Array.init options.nsamples (fun _ -> measure ()) in
             let measures = Maths.vector_of_array measures in
-            {workload; measures; allocated_words = None} :: workload_data
+            {workload; measures} :: workload_data
         | Generator.Plain {workload; closure} ->
-            measure_plain_benchmark workload closure None
-        | Generator.PlainWithAllocation {workload; closure; measure_allocation}
-          ->
-            measure_plain_benchmark workload closure (Some measure_allocation)
+            measure_plain_benchmark workload closure
         | Generator.With_context {workload; closure; with_context} ->
             with_context (fun context ->
                 let measures =
@@ -497,7 +482,7 @@ let perform_benchmark (type c t) (options : options)
                     ~buffer
                     ~index
                 in
-                {workload; measures; allocated_words = None} :: workload_data)
+                {workload; measures} :: workload_data)
         | Generator.With_probe {workload; probe; closure} ->
             Tezos_stdlib.Utils.do_n_times options.nsamples (fun () ->
                 closure probe) ;
@@ -507,7 +492,7 @@ let perform_benchmark (type c t) (options : options)
                 let results = probe.Generator.get aspect in
                 let measures = Maths.vector_of_array (Array.of_list results) in
                 let workload = workload aspect in
-                {workload; measures; allocated_words = None} :: acc)
+                {workload; measures} :: acc)
               workload_data
               aspects)
       []
