@@ -188,6 +188,16 @@ let test_launch threshold expected_vote_duration () =
     in
     Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
   in
+  (* Self-staking most of the remaining balance. *)
+  let* block =
+    let* operation =
+      stake
+        (B block)
+        delegate
+        (Protocol.Alpha_context.Tez.of_mutez_exn 1_800_000_000_000L)
+    in
+    Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
+  in
 
   (* We are now ready to activate the feature through by baking many
      more blocks voting in favor of the activation until the EMA
