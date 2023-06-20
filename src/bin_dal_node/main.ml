@@ -35,27 +35,26 @@ let run subcommand
         use_unsafe_srs_for_tests;
         peers;
       } =
+  let default_configuration =
+    Configuration_file.
+      {
+        data_dir;
+        rpc_addr;
+        use_unsafe_srs = use_unsafe_srs_for_tests;
+        neighbors = [];
+        peers;
+        listen_addr;
+        expected_pow;
+        network_name = default.network_name;
+        endpoint = default.endpoint;
+        profile;
+      }
+  in
   match subcommand with
   | Cli.Run ->
       let rpc_context = Rpc_context.make endpoint in
-      Lwt_main.run @@ Daemon.run ~data_dir rpc_context
-  | Config_init ->
-      let config =
-        Configuration_file.
-          {
-            data_dir;
-            rpc_addr;
-            use_unsafe_srs = use_unsafe_srs_for_tests;
-            neighbors = default.neighbors;
-            peers;
-            listen_addr;
-            expected_pow;
-            network_name = default.network_name;
-            endpoint = default.endpoint;
-            profile;
-          }
-      in
-      Lwt_main.run @@ Configuration_file.save config
+      Lwt_main.run @@ Daemon.run default_configuration rpc_context
+  | Config_init -> Lwt_main.run @@ Configuration_file.save default_configuration
 
 let _ =
   let commands = Cli.make ~run in

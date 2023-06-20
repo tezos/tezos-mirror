@@ -361,12 +361,14 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store =
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
 *)
-let run ~data_dir cctxt =
+let run default_configuration cctxt =
   let open Lwt_result_syntax in
   let log_cfg = Tezos_base_unix.Logs_simple_config.default_cfg in
   let internal_events =
     Tezos_base_unix.Internal_event_unix.make_with_defaults
-      ~enable_default_daily_logs_at:Filename.Infix.(data_dir // "daily_logs")
+      ~enable_default_daily_logs_at:
+        Filename.Infix.(
+          default_configuration.Configuration_file.data_dir // "daily_logs")
       ~log_cfg
       ()
   in
@@ -375,10 +377,17 @@ let run ~data_dir cctxt =
   in
   let*! () = Event.(emit starting_node) () in
   let* ({network_name; rpc_addr; peers; _} as config) =
-    Configuration_file.load ~data_dir
+    let*! result =
+      Configuration_file.(load ~data_dir:default_configuration.data_dir)
+    in
+    match result with
+    | Ok configuration -> return configuration
+    | Error _ ->
+        (* Store the default configuration if no configuration were found. *)
+        let* () = Configuration_file.save default_configuration in
+        return default_configuration
   in
   let*! () = Event.(emit configuration_loaded) () in
-  let config = {config with data_dir} in
   (* Create and start a GS worker *)
   let gs_worker =
     let rng =
