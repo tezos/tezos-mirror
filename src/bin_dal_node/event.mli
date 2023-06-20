@@ -23,7 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include module type of Event_legacy
+type 'a t
+
+val emit : 'a t -> 'a -> unit Lwt.t
+
+val emit__dont_wait__use_with_care : 'a t -> 'a -> unit
+
+val starting_node : unit t
+
+val shutdown_node : int t
+
+val store_is_ready : unit t
+
+val rpc_server_is_ready : P2p_point.Id.t t
+
+val node_is_ready : unit t
+
+val data_dir_not_found : string t
+
+val fetched_slot : (int * int) t
+
+val layer1_node_new_head : (Block_hash.t * int32) t
+
+val layer1_node_tracking_started : unit t
+
+val protocol_plugin_resolved : Protocol_hash.t t
+
+val daemon_error : Error_monad.tztrace t
 
 (** An event emitted at startup when the configuration of the node is read from
     disk. *)
