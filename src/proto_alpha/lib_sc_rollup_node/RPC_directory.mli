@@ -24,7 +24,9 @@
 (*****************************************************************************)
 
 (** The RPC directory, specific to blocks, for this rollup node. *)
-val block_directory : Node_context.rw -> unit Tezos_rpc.Directory.t
+val block_directory :
+  Node_context.rw ->
+  (unit * Rollup_node_services.Arg.block_id) Tezos_rpc.Directory.t
 
 (** The RPC top level directory (without the block directory) for this rollup
     node. *)

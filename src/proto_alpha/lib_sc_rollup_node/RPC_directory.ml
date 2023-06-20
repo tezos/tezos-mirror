@@ -50,7 +50,7 @@ let get_dal_processed_slots node_ctxt block =
   Node_context.list_slots_statuses node_ctxt ~confirmed_in_block_hash:block
 
 module Global_directory = Make_directory (struct
-  include Sc_rollup_services.Global
+  include Rollup_node_services.Global
 
   type context = Node_context.rw
 
@@ -60,7 +60,7 @@ module Global_directory = Make_directory (struct
 end)
 
 module Local_directory = Make_directory (struct
-  include Sc_rollup_services.Local
+  include Rollup_node_services.Local
 
   type context = Node_context.rw
 
@@ -69,8 +69,8 @@ module Local_directory = Make_directory (struct
   let context_of_prefix node_ctxt () = return (Node_context.readonly node_ctxt)
 end)
 
-module Block_directory = Make_directory (struct
-  include Sc_rollup_services.Global.Block
+module Block_directory = Make_sub_directory (struct
+  include Sc_rollup_services.Block
 
   type context = Node_context.rw
 
@@ -82,21 +82,8 @@ module Block_directory = Make_directory (struct
     (Node_context.readonly node_ctxt, block)
 end)
 
-module Outbox_directory = Make_directory (struct
-  include Sc_rollup_services.Global.Block.Outbox
-
-  type context = Node_context.rw
-
-  type subcontext = Node_context.ro * Block_hash.t * Alpha_context.Raw_level.t
-
-  let context_of_prefix node_ctxt (((), block), level) =
-    let open Lwt_result_syntax in
-    let+ block = Block_directory_helpers.block_of_prefix node_ctxt block in
-    (Node_context.readonly node_ctxt, block, level)
-end)
-
-module Block_helpers_directory = Make_directory (struct
-  include Sc_rollup_services.Global.Block.Helpers
+module Block_helpers_directory = Make_sub_directory (struct
+  include Sc_rollup_services.Block.Helpers
 
   (* The context needs to be accessed with write permissions because we need to
      commit on disk to generate the proofs. *)
@@ -114,12 +101,12 @@ end)
 
 module Common = struct
   let () =
-    Block_directory.register0 Sc_rollup_services.Global.Block.block
+    Block_directory.register0 Sc_rollup_services.Block.block
     @@ fun (node_ctxt, block) () () ->
     Node_context.get_full_l2_block node_ctxt block
 
   let () =
-    Block_directory.register0 Sc_rollup_services.Global.Block.num_messages
+    Block_directory.register0 Sc_rollup_services.Block.num_messages
     @@ fun (node_ctxt, block) () () ->
     let open Lwt_result_syntax in
     let* l2_block = Node_context.get_l2_block node_ctxt block in
@@ -129,34 +116,34 @@ module Common = struct
     Z.of_int num_messages
 
   let () =
-    Global_directory.register0 Sc_rollup_services.Global.sc_rollup_address
+    Global_directory.register0 Rollup_node_services.Global.sc_rollup_address
     @@ fun node_ctxt () () ->
     return @@ Sc_rollup_proto_types.Address.of_octez node_ctxt.rollup_address
 
   let () =
-    Global_directory.register0 Sc_rollup_services.Global.current_tezos_head
+    Global_directory.register0 Rollup_node_services.Global.current_tezos_head
     @@ fun node_ctxt () () -> get_head_hash_opt node_ctxt
 
   let () =
-    Global_directory.register0 Sc_rollup_services.Global.current_tezos_level
+    Global_directory.register0 Rollup_node_services.Global.current_tezos_level
     @@ fun node_ctxt () () -> get_head_level_opt node_ctxt
 
   let () =
-    Block_directory.register0 Sc_rollup_services.Global.Block.hash
+    Block_directory.register0 Sc_rollup_services.Block.hash
     @@ fun (_node_ctxt, block) () () -> return block
 
   let () =
-    Block_directory.register0 Sc_rollup_services.Global.Block.level
+    Block_directory.register0 Sc_rollup_services.Block.level
     @@ fun (node_ctxt, block) () () ->
     Node_context.level_of_hash node_ctxt block
 
   let () =
-    Block_directory.register0 Sc_rollup_services.Global.Block.inbox
+    Block_directory.register0 Sc_rollup_services.Block.inbox
     @@ fun (node_ctxt, block) () () ->
     Node_context.get_inbox_by_block_hash node_ctxt block
 
   let () =
-    Block_directory.register0 Sc_rollup_services.Global.Block.ticks
+    Block_directory.register0 Sc_rollup_services.Block.ticks
     @@ fun (node_ctxt, block) () () ->
     let open Lwt_result_syntax in
     let+ l2_block = Node_context.get_l2_block node_ctxt block in
@@ -230,7 +217,7 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
       {state_hash; status; output; inbox_level; num_ticks; insights}
 
 let () =
-  Block_directory.register0 Sc_rollup_services.Global.Block.total_ticks
+  Block_directory.register0 Sc_rollup_services.Block.total_ticks
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
   let* state = get_state node_ctxt block in
@@ -239,7 +226,7 @@ let () =
   return tick
 
 let () =
-  Block_directory.register0 Sc_rollup_services.Global.Block.state_hash
+  Block_directory.register0 Sc_rollup_services.Block.state_hash
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
   let* state = get_state node_ctxt block in
@@ -248,7 +235,7 @@ let () =
   return hash
 
 let () =
-  Block_directory.register0 Sc_rollup_services.Global.Block.state_current_level
+  Block_directory.register0 Sc_rollup_services.Block.state_current_level
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
   let* state = get_state node_ctxt block in
@@ -257,7 +244,7 @@ let () =
   return current_level
 
 let () =
-  Block_directory.register0 Sc_rollup_services.Global.Block.state_value
+  Block_directory.register0 Sc_rollup_services.Block.state_value
   @@ fun (node_ctxt, block) {key} () ->
   let open Lwt_result_syntax in
   let* state = get_state node_ctxt block in
@@ -270,7 +257,7 @@ let () =
       return value
 
 let () =
-  Global_directory.register0 Sc_rollup_services.Global.last_stored_commitment
+  Global_directory.register0 Rollup_node_services.Global.last_stored_commitment
   @@ fun node_ctxt () () ->
   let open Lwt_result_syntax in
   let* head = Node_context.last_processed_head_opt node_ctxt in
@@ -286,7 +273,7 @@ let () =
       Option.map (fun c -> (c, commitment_hash)) commitment
 
 let () =
-  Local_directory.register0 Sc_rollup_services.Local.last_published_commitment
+  Local_directory.register0 Rollup_node_services.Local.last_published_commitment
   @@ fun node_ctxt () () ->
   let open Lwt_result_syntax in
   match Reference.get node_ctxt.lpc with
@@ -308,7 +295,7 @@ let () =
       return_some (commitment, hash, first_published, published)
 
 let () =
-  Block_directory.register0 Sc_rollup_services.Global.Block.status
+  Block_directory.register0 Sc_rollup_services.Block.status
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
   let* state = get_state node_ctxt block in
@@ -325,7 +312,7 @@ let () =
   return (PVM.string_of_status status)
 
 let () =
-  Block_directory.register0 Sc_rollup_services.Global.Block.dal_slots
+  Block_directory.register0 Sc_rollup_services.Block.dal_slots
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
   let+ slots =
@@ -338,12 +325,12 @@ let () =
   |> List.rev
 
 let () =
-  Block_directory.register0 Sc_rollup_services.Global.Block.dal_processed_slots
+  Block_directory.register0 Sc_rollup_services.Block.dal_processed_slots
   @@ fun (node_ctxt, block) () () -> get_dal_processed_slots node_ctxt block
 
 let () =
-  Outbox_directory.register0 Sc_rollup_services.Global.Block.Outbox.messages
-  @@ fun (node_ctxt, block, outbox_level) () () ->
+  Block_directory.register1 Sc_rollup_services.Block.outbox_messages
+  @@ fun (node_ctxt, block) outbox_level () () ->
   let open Lwt_result_syntax in
   let* state = get_state node_ctxt block in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
@@ -352,23 +339,23 @@ let () =
 
 let () =
   Block_helpers_directory.register0
-    Sc_rollup_services.Global.Block.Helpers.outbox_proof
+    Sc_rollup_services.Block.Helpers.outbox_proof
   @@ fun (node_ctxt, _block_hash) output () ->
   let open Lwt_result_syntax in
   let+ commitment, proof = Outbox.proof_of_output node_ctxt output in
   (Sc_rollup_proto_types.Commitment_hash.of_octez commitment, proof)
 
 let () =
-  Block_directory.register0 Sc_rollup_services.Global.Block.simulate
+  Block_directory.register0 Sc_rollup_services.Block.simulate
   @@ fun (node_ctxt, block) () {messages; reveal_pages; insight_requests} ->
   simulate_messages node_ctxt block ~reveal_pages ~insight_requests messages
 
 let () =
-  Local_directory.register0 Sc_rollup_services.Local.injection
+  Local_directory.register0 Rollup_node_services.Local.injection
   @@ fun _node_ctxt () messages -> Batcher.register_messages messages
 
 let () =
-  Local_directory.register0 Sc_rollup_services.Local.batcher_queue
+  Local_directory.register0 Rollup_node_services.Local.batcher_queue
   @@ fun _node_ctxt () () ->
   let open Lwt_result_syntax in
   let*? queue = Batcher.get_queue () in
@@ -408,25 +395,25 @@ let inbox_info_of_level (node_ctxt : _ Node_context.t) inbox_level =
   (finalized, cemented)
 
 let () =
-  Local_directory.register1 Sc_rollup_services.Local.batcher_message
+  Local_directory.register1 Rollup_node_services.Local.batcher_message
   @@ fun node_ctxt hash () () ->
   let open Lwt_result_syntax in
   let*? batch_status = Batcher.message_status hash in
   let* status =
     match batch_status with
-    | None -> return (None, Sc_rollup_services.Unknown)
+    | None -> return (None, Rollup_node_services.Unknown)
     | Some (batch_status, msg) -> (
         let return status = return (Some msg, status) in
         match batch_status with
-        | Pending_batch -> return Sc_rollup_services.Pending_batch
+        | Pending_batch -> return Rollup_node_services.Pending_batch
         | Batched l1_hash -> (
             match Injector.operation_status l1_hash with
-            | None -> return Sc_rollup_services.Unknown
+            | None -> return Rollup_node_services.Unknown
             | Some (Pending op) ->
-                return (Sc_rollup_services.Pending_injection op)
+                return (Rollup_node_services.Pending_injection op)
             | Some (Injected {op; oph; op_index}) ->
                 return
-                  (Sc_rollup_services.Injected
+                  (Rollup_node_services.Injected
                      {op = op.operation; oph; op_index})
             | Some (Included {op; oph; op_index; l1_block; l1_level}) -> (
                 let* finalized, cemented =
@@ -438,7 +425,7 @@ let () =
                 match commitment_level with
                 | None ->
                     return
-                      (Sc_rollup_services.Included
+                      (Rollup_node_services.Included
                          {
                            op = op.operation;
                            oph;
@@ -458,7 +445,7 @@ let () =
                     | None ->
                         (* Commitment not computed yet for inbox *)
                         return
-                          (Sc_rollup_services.Included
+                          (Rollup_node_services.Included
                              {
                                op = op.operation;
                                oph;
@@ -484,7 +471,7 @@ let () =
                         | None | Some {published_at_level = None; _} ->
                             (* Commitment not published yet *)
                             return
-                              (Sc_rollup_services.Included
+                              (Rollup_node_services.Included
                                  {
                                    op = op.operation;
                                    oph;
@@ -506,7 +493,7 @@ let () =
                                 commitment_hash
                             in
                             return
-                              (Sc_rollup_services.Committed
+                              (Rollup_node_services.Committed
                                  {
                                    op = op.operation;
                                    oph;
@@ -530,10 +517,9 @@ let block_directory (node_ctxt : _ Node_context.t) =
     (fun dir f -> Tezos_rpc.Directory.merge dir (f node_ctxt))
     Tezos_rpc.Directory.empty
     [
-      Block_directory.build_directory;
-      Block_helpers_directory.build_directory;
-      Outbox_directory.build_directory;
-      PVM.build_directory;
+      Block_directory.build_sub_directory;
+      Block_helpers_directory.build_sub_directory;
+      PVM.build_sub_directory;
     ]
 
 let top_directory (node_ctxt : _ Node_context.t) =
@@ -545,4 +531,6 @@ let top_directory (node_ctxt : _ Node_context.t) =
 let directory (node_ctxt : _ Node_context.t) =
   Tezos_rpc.Directory.merge
     (top_directory node_ctxt)
-    (block_directory node_ctxt)
+    (Tezos_rpc.Directory.prefix
+       Sc_rollup_services.Block.prefix
+       (block_directory node_ctxt))
