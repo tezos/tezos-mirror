@@ -174,7 +174,7 @@ let test_launch threshold expected_vote_duration () =
         (B block)
         delegate
         wannabe_costaker
-        (Protocol.Alpha_context.Tez.of_mutez_exn 1_000_000_000L)
+        (Protocol.Alpha_context.Tez.of_mutez_exn 2_000_000_000_000L)
     in
     Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
   in
