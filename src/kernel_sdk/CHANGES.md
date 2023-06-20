@@ -4,6 +4,10 @@
 
 ### SDK
 
+- Add functionality in `dac::certificate` to verify that a certificate has been a signed by a number of
+- Add `Certificate::verify` to verify that a *DAC* certificate has been a signed by a number of
+  committee members greater than a given threshold.
+
 ### Installer client/kernel
 
 ## Version 0.2.0
