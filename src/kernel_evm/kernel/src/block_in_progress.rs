@@ -8,16 +8,20 @@ use crate::apply::{TransactionObjectInfo, TransactionReceiptInfo};
 use crate::current_timestamp;
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
+use crate::inbox::Transaction;
 use crate::storage;
 use primitive_types::{H256, U256};
+use std::collections::VecDeque;
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::transaction::*;
-use tezos_smart_rollup_debug::Runtime;
+use tezos_smart_rollup_host::runtime::Runtime;
 
 /// Container for all data needed during block computation
 pub struct BlockInProgress {
     /// block number
     pub number: U256,
+    /// queue containing the transactions to execute
+    tx_queue: VecDeque<Transaction>,
     /// list of transactions executed without issue
     valid_txs: Vec<[u8; 32]>,
     /// gas accumulator
@@ -32,9 +36,14 @@ pub struct BlockInProgress {
 }
 
 impl BlockInProgress {
-    pub fn new(number: U256, gas_price: U256) -> Result<BlockInProgress, Error> {
+    pub fn new(
+        number: U256,
+        gas_price: U256,
+        transactions: VecDeque<Transaction>,
+    ) -> Result<BlockInProgress, Error> {
         let block_in_progress = BlockInProgress {
             number,
+            tx_queue: transactions,
             valid_txs: Vec::new(),
             cumulative_gas: U256::zero(),
             index: 0,
@@ -70,6 +79,14 @@ impl BlockInProgress {
         let new_block = L2Block::new(self.number, self.valid_txs, timestamp);
         storage::store_current_block(host, &new_block)?;
         Ok(new_block)
+    }
+
+    pub fn pop_tx(&mut self) -> Option<Transaction> {
+        self.tx_queue.pop_front()
+    }
+
+    pub fn has_tx(&self) -> bool {
+        !self.tx_queue.is_empty()
     }
 
     pub fn make_receipt(

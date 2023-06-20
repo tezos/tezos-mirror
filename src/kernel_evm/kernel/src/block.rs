@@ -5,7 +5,7 @@
 
 use crate::apply::apply_transaction;
 use crate::block_in_progress;
-use crate::blueprint::{Blueprint, Queue};
+use crate::blueprint::Queue;
 use crate::current_timestamp;
 use crate::error::Error;
 use crate::error::StorageError::AccountInitialisation;
@@ -22,17 +22,17 @@ use tezos_ethereum::block::BlockConstants;
 
 fn compute<Host: Runtime>(
     host: &mut Host,
-    proposal: Blueprint,
     block_in_progress: &mut BlockInProgress,
     block_constants: &BlockConstants,
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
 ) -> Result<(), Error> {
-    let transactions = proposal.transactions;
-
-    for transaction in transactions.into_iter() {
+    while block_in_progress.has_tx() {
+        let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
         let tx_hash = transaction.tx_hash;
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
+        // if there is no more gas for the transaction, initiate reboot
 
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.
@@ -70,20 +70,32 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
     let mut accounts_index = init_account_index()?;
     let precompiles = precompiles::precompile_set::<Host>();
 
+    // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
+    // if there is no more gas for the transaction,
+    // reload current container in progress and rest of queue
+
     for proposal in queue.proposals {
+        // proposal is turn into a ring to allow poping from the front
+        let ring = proposal.transactions.into();
         // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
         // add proposal to the container
-        let mut block_in_progress =
-            BlockInProgress::new(current_block_number, current_constants.gas_price)?;
+        let mut block_in_progress = BlockInProgress::new(
+            current_block_number,
+            current_constants.gas_price,
+            ring,
+        )?;
         compute(
             host,
-            proposal,
             &mut block_in_progress,
             &current_constants,
             &precompiles,
             &mut evm_account_storage,
             &mut accounts_index,
         )?;
+
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
+        // if reboot initiated, store container in progress and exit
+        // else store block
         let new_block = block_in_progress.finalize_and_store(host)?;
         current_block_number = new_block.number + 1;
         current_constants = new_block.constants();

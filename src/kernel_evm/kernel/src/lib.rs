@@ -73,7 +73,8 @@ pub fn stage_one<Host: Runtime>(
             "Ticketer not specified, the kernel ignores internal transfers"
         ),
     }
-
+    // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
+    // if rebooted, don't fetch inbox
     let queue = fetch(host, smart_rollup_address, chain_id, ticketer)?;
 
     for (i, blueprint) in queue.proposals.iter().enumerate() {
