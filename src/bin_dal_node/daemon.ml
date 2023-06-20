@@ -165,6 +165,13 @@ module Handler = struct
               config.Configuration_file.use_unsafe_srs
               proto_parameters
           in
+          let* () =
+            Option.iter_es
+              (Profile_manager.add_profile
+                 proto_parameters
+                 (Node_context.get_store ctxt))
+              config.profile
+          in
           Node_context.set_ready ctxt plugin cryptobox proto_parameters ;
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4441
 
