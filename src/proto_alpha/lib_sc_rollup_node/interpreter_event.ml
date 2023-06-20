@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context.Sc_rollup
-
 module Simple = struct
   include Internal_event.Simple
 
@@ -40,7 +38,7 @@ module Simple = struct
       ~level:Notice
       ("inbox_level", Data_encoding.int32)
       ("state_hash", Octez_smart_rollup.State_hash.encoding)
-      ("ticks", Tick.encoding)
+      ("ticks", Data_encoding.z)
       ("num_messages", Data_encoding.int31)
 
   let intended_failure =

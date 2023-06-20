@@ -26,8 +26,6 @@
 open Protocol
 open Alpha_context
 module Inbox = Sc_rollup.Inbox
-open Protocol
-open Alpha_context
 
 module type S = sig
   type fuel
@@ -37,8 +35,8 @@ module type S = sig
   (** Evaluation state for the PVM.  *)
   type eval_state = {
     state : pvm_state;  (** The actual PVM state. *)
-    state_hash : Sc_rollup.State_hash.t;  (** Hash of [state]. *)
-    tick : Sc_rollup.Tick.t;  (** Tick of [state]. *)
+    state_hash : Octez_smart_rollup.State_hash.t;  (** Hash of [state]. *)
+    tick : Z.t;  (** Tick of [state]. *)
     inbox_level : int32;  (** Inbox level in which messages are evaluated. *)
     message_counter_offset : int;
         (** Offset for message index, which corresponds to the number of
@@ -87,8 +85,8 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
 
   type eval_state = {
     state : pvm_state;
-    state_hash : Sc_rollup.State_hash.t;
-    tick : Sc_rollup.Tick.t;
+    state_hash : Octez_smart_rollup.State_hash.t;
+    tick : Z.t;
     inbox_level : int32;
     message_counter_offset : int;
     remaining_fuel : fuel;
@@ -462,8 +460,8 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
     let eval_state =
       {
         state;
-        state_hash;
-        tick = final_tick;
+        state_hash = Sc_rollup_proto_types.State_hash.to_octez state_hash;
+        tick = Sc_rollup.Tick.to_z final_tick;
         inbox_level;
         message_counter_offset = num_messages;
         remaining_fuel;
@@ -524,12 +522,13 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
             messages
     in
     let*! final_tick = PVM.get_tick state in
+    let final_tick = Sc_rollup.Tick.to_z final_tick in
     let*! state_hash = PVM.state_hash state in
-    let num_ticks = Sc_rollup.Tick.distance initial_tick final_tick in
+    let num_ticks = Z.sub final_tick initial_tick in
     let eval_state =
       {
         state;
-        state_hash;
+        state_hash = Sc_rollup_proto_types.State_hash.to_octez state_hash;
         tick = final_tick;
         inbox_level;
         message_counter_offset = message_counter_offset + num_messages;

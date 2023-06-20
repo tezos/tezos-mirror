@@ -203,7 +203,7 @@ let start_state_of_block node_ctxt (block : Sc_rollup_block.t) =
         state;
         state_hash;
         inbox_level;
-        tick;
+        tick = Sc_rollup.Tick.to_z tick;
         message_counter_offset = 0;
         remaining_fuel = Fuel.Accounted.of_ticks 0L;
         remaining_messages = messages;
@@ -214,8 +214,7 @@ let start_state_of_block node_ctxt (block : Sc_rollup_block.t) =
 let run_to_tick node_ctxt start_state tick =
   let open Delayed_write_monad.Lwt_result_syntax in
   let tick_distance =
-    Sc_rollup.Tick.distance tick start_state.Fueled_pvm.Accounted.tick
-    |> Z.to_int64
+    Z.sub tick start_state.Fueled_pvm.Accounted.tick |> Z.to_int64
   in
   let>+ eval_result =
     Fueled_pvm.Accounted.eval_messages
@@ -249,13 +248,11 @@ module Tick_state_cache =
     (Aches.Rache.Transfer
        (Aches.Rache.LRU)
        (struct
-         type t = Sc_rollup.Tick.t * Block_hash.t
+         type t = Z.t * Block_hash.t
 
-         let equal (t1, b1) (t2, b2) =
-           Sc_rollup.Tick.(t1 = t2) && Block_hash.(b1 = b2)
+         let equal (t1, b1) (t2, b2) = Z.equal t1 t2 && Block_hash.(b1 = b2)
 
-         let hash (tick, block) =
-           ((Sc_rollup.Tick.to_z tick |> Z.hash) * 13) + Block_hash.hash block
+         let hash (tick, block) = (Z.hash tick * 13) + Block_hash.hash block
        end))
 
 let tick_state_cache = Tick_state_cache.create 64 (* size of 2 dissections *)
@@ -272,16 +269,14 @@ let memo_state_of_tick_aux node_ctxt ~start_state (event : Sc_rollup_block.t)
 (** [state_of_tick node_ctxt ?start_state tick level] returns [Some end_state]
       for a given [tick] if this [tick] happened before [level]. Otherwise,
       returns [None].*)
-let state_of_tick node_ctxt ?start_state tick level =
+let state_of_tick node_ctxt ?start_state ~tick level =
   let open Lwt_result_syntax in
   let level = Raw_level.to_int32 level in
-  let tick = Sc_rollup.Tick.to_z tick in
   let* event = Node_context.block_with_tick node_ctxt ~max_level:level tick in
   match event with
   | None -> return_none
   | Some event ->
       assert (event.header.level <= level) ;
-      let tick = Sc_rollup.Tick.of_z tick in
       let* result_state =
         if Node_context.is_loser node_ctxt then
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/5253

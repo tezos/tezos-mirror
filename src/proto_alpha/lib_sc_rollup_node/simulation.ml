@@ -98,8 +98,8 @@ let simulate_messages_no_checks (node_ctxt : Node_context.ro)
     Fueled_pvm.
       {
         state;
-        state_hash;
-        tick;
+        state_hash = Sc_rollup_proto_types.State_hash.to_octez state_hash;
+        tick = Sc_rollup.Tick.to_z tick;
         inbox_level;
         message_counter_offset = nb_messages_inbox;
         remaining_fuel = Fuel.Free.of_ticks 0L;

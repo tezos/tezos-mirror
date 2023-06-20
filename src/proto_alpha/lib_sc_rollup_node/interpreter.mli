@@ -41,14 +41,14 @@ val process_head :
   Octez_smart_rollup.Inbox.t * string list ->
   ('a Context.t * int * int64 * Z.t) tzresult Lwt.t
 
-(** [state_of_tick node_ctxt ?start_state tick level] returns [Some (state,
+(** [state_of_tick node_ctxt ?start_state ~tick level] returns [Some (state,
     hash)] for a given [tick] if this [tick] happened before [level]. Otherwise,
     returns [None]. If provided, the evaluation is resumed from
     [start_state]. *)
 val state_of_tick :
   _ Node_context.t ->
   ?start_state:Fueled_pvm.Accounted.eval_state ->
-  Sc_rollup.Tick.t ->
+  tick:Z.t ->
   Raw_level.t ->
   Fueled_pvm.Accounted.eval_state option tzresult Lwt.t
 

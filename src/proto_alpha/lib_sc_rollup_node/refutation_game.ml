@@ -339,7 +339,11 @@ let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level ok
     our_view =
   let open Lwt_result_syntax in
   let state_of_tick ?start_state tick =
-    Interpreter.state_of_tick node_ctxt ?start_state tick last_level
+    Interpreter.state_of_tick
+      node_ctxt
+      ?start_state
+      ~tick:(Sc_rollup.Tick.to_z tick)
+      last_level
   in
   let state_hash_of_eval_state Fueled_pvm.Accounted.{state_hash; _} =
     state_hash
@@ -408,7 +412,11 @@ let generate_next_dissection ~default_number_of_sections node_ctxt ~opponent
           | Evaluated ok_state, _ -> Some ok_state
         in
         let* our =
-          Interpreter.state_of_tick node_ctxt ?start_state tick game.inbox_level
+          Interpreter.state_of_tick
+            node_ctxt
+            ?start_state
+            ~tick:(Sc_rollup.Tick.to_z tick)
+            game.inbox_level
         in
         match (their_hash, our) with
         | None, None ->
@@ -450,7 +458,10 @@ let next_move node_ctxt ~opponent game =
   let open Lwt_result_syntax in
   let final_move start_tick =
     let* start_state =
-      Interpreter.state_of_tick node_ctxt start_tick game.inbox_level
+      Interpreter.state_of_tick
+        node_ctxt
+        ~tick:(Sc_rollup.Tick.to_z start_tick)
+        game.inbox_level
     in
     match start_state with
     | None ->
