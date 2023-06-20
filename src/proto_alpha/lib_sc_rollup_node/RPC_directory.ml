@@ -59,20 +59,6 @@ module Global_directory = Make_directory (struct
   let context_of_prefix node_ctxt () = return (Node_context.readonly node_ctxt)
 end)
 
-module Proof_helpers_directory = Make_directory (struct
-  include Sc_rollup_services.Global.Helpers
-
-  (* The context needs to be accessed with write permissions because we need to
-     commit on disk to generate the proofs. *)
-  type context = Node_context.rw
-
-  (* The context needs to be accessed with write permissions because we need to
-     commit on disk to generate the proofs. *)
-  type subcontext = Node_context.rw
-
-  let context_of_prefix node_ctxt () = return node_ctxt
-end)
-
 module Local_directory = Make_directory (struct
   include Sc_rollup_services.Local
 
@@ -107,6 +93,23 @@ module Outbox_directory = Make_directory (struct
     let open Lwt_result_syntax in
     let+ block = Block_directory_helpers.block_of_prefix node_ctxt block in
     (Node_context.readonly node_ctxt, block, level)
+end)
+
+module Block_helpers_directory = Make_directory (struct
+  include Sc_rollup_services.Global.Block.Helpers
+
+  (* The context needs to be accessed with write permissions because we need to
+     commit on disk to generate the proofs. *)
+  type context = Node_context.rw
+
+  (* The context needs to be accessed with write permissions because we need to
+     commit on disk to generate the proofs. *)
+  type subcontext = Node_context.rw * Block_hash.t
+
+  let context_of_prefix node_ctxt (((), block) : prefix) =
+    let open Lwt_result_syntax in
+    let+ block = Block_directory_helpers.block_of_prefix node_ctxt block in
+    (node_ctxt, block)
 end)
 
 module Common = struct
@@ -348,9 +351,9 @@ let () =
   return outbox
 
 let () =
-  Proof_helpers_directory.register0
-    Sc_rollup_services.Global.Helpers.outbox_proof
-  @@ fun node_ctxt output () ->
+  Block_helpers_directory.register0
+    Sc_rollup_services.Global.Block.Helpers.outbox_proof
+  @@ fun (node_ctxt, _block_hash) output () ->
   let open Lwt_result_syntax in
   let+ commitment, proof = Outbox.proof_of_output node_ctxt output in
   (Sc_rollup_proto_types.Commitment_hash.of_octez commitment, proof)
@@ -521,16 +524,25 @@ let () =
 
   return status
 
-let directory (node_ctxt : _ Node_context.t) =
+let block_directory (node_ctxt : _ Node_context.t) =
   let module PVM = (val Pvm_rpc.of_kind node_ctxt.kind) in
   List.fold_left
     (fun dir f -> Tezos_rpc.Directory.merge dir (f node_ctxt))
     Tezos_rpc.Directory.empty
     [
-      Global_directory.build_directory;
-      Local_directory.build_directory;
       Block_directory.build_directory;
-      Proof_helpers_directory.build_directory;
+      Block_helpers_directory.build_directory;
       Outbox_directory.build_directory;
       PVM.build_directory;
     ]
+
+let top_directory (node_ctxt : _ Node_context.t) =
+  List.fold_left
+    (fun dir f -> Tezos_rpc.Directory.merge dir (f node_ctxt))
+    Tezos_rpc.Directory.empty
+    [Global_directory.build_directory; Local_directory.build_directory]
+
+let directory (node_ctxt : _ Node_context.t) =
+  Tezos_rpc.Directory.merge
+    (top_directory node_ctxt)
+    (block_directory node_ctxt)

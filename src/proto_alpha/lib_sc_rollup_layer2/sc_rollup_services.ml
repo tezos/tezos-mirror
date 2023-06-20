@@ -553,25 +553,6 @@ module Global = struct
       ~output:(Data_encoding.option Encodings.commitment_with_hash)
       (path / "last_stored_commitment")
 
-  module Helpers = struct
-    include Make_services (struct
-      type prefix = unit
-
-      let prefix = open_root / "helpers"
-    end)
-
-    let outbox_proof =
-      Tezos_rpc.Service.get_service
-        ~description:"Generate serialized output proof for some outbox message"
-        ~query:Query.outbox_proof_query
-        ~output:
-          Data_encoding.(
-            obj2
-              (req "commitment" Sc_rollup.Commitment.Hash.encoding)
-              (req "proof" Encodings.hex_string))
-        (path / "proofs" / "outbox")
-  end
-
   module Block = struct
     include Make_services (struct
       type prefix = unit * Arg.block_id
@@ -749,6 +730,26 @@ module Global = struct
           ~query:Tezos_rpc.Query.empty
           ~output:Data_encoding.(list Sc_rollup.output_encoding)
           (path / "messages")
+    end
+
+    module Helpers = struct
+      include Make_services (struct
+        type nonrec prefix = prefix
+
+        let prefix = prefix / "helpers"
+      end)
+
+      let outbox_proof =
+        Tezos_rpc.Service.get_service
+          ~description:
+            "Generate serialized output proof for some outbox message"
+          ~query:Query.outbox_proof_query
+          ~output:
+            Data_encoding.(
+              obj2
+                (req "commitment" Sc_rollup.Commitment.Hash.encoding)
+                (req "proof" Encodings.hex_string))
+          (path / "proofs" / "outbox")
     end
   end
 end
