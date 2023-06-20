@@ -628,17 +628,17 @@ pub fn read_last_info_per_level_timestamp<Host: Runtime>(
 
 pub fn store_kernel_upgrade_nonce<Host: Runtime>(
     host: &mut Host,
-    upgrade_nonce: u32,
+    upgrade_nonce: u16,
 ) -> Result<(), Error> {
     host.store_write_all(&KERNEL_UPGRADE_NONCE, &upgrade_nonce.to_le_bytes())
         .map_err(Error::from)
 }
 
-pub fn read_kernel_upgrade_nonce<Host: Runtime>(host: &mut Host) -> Result<u32, Error> {
+pub fn read_kernel_upgrade_nonce<Host: Runtime>(host: &mut Host) -> Result<u16, Error> {
     let bytes = host.store_read_all(&KERNEL_UPGRADE_NONCE)?;
     let slice_of_bytes: [u8; UPGRADE_NONCE_SIZE] =
         bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
-    Ok(u32::from_le_bytes(slice_of_bytes))
+    Ok(u16::from_le_bytes(slice_of_bytes))
 }
 
 pub(crate) mod internal_for_tests {

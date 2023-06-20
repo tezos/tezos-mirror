@@ -80,7 +80,7 @@ fn handle_kernel_upgrade<Host: Runtime>(
     kernel_upgrade: &KernelUpgrade,
 ) -> Result<(), Error> {
     let current_kernel_upgrade_nonce = read_kernel_upgrade_nonce(host)?;
-    let incoming_nonce = u32::from_le_bytes(kernel_upgrade.nonce);
+    let incoming_nonce = u16::from_le_bytes(kernel_upgrade.nonce);
     if incoming_nonce == current_kernel_upgrade_nonce + 1 {
         check_dictator_signature(
             kernel_upgrade.signature,
@@ -283,8 +283,8 @@ mod tests {
         .unwrap()
         .try_into()
         .unwrap();
-        let nonce = hex::decode("02000000").unwrap().try_into().unwrap();
-        let signature = hex::decode("12ac7109f062badf77055608c11bd097eccd480bf99e615ac765c6275161ce2401c88232786c49fceb56e0c5caa3d5998337fc7e29946fa8733cf55fbd7b387e1b").unwrap().try_into().unwrap();
+        let nonce = 2u16.to_le_bytes();
+        let signature = hex::decode("cde1dc4afe9d3ba955f65b27c88522a1d7becc6cc1f248e5e13def50874edbd064fc5605ade7debcfde6df25b986466ec9f2e781bef6c1e0b3ff4e71e1aa4acf1b").unwrap().try_into().unwrap();
 
         let kernel_upgrade = KernelUpgrade {
             nonce,

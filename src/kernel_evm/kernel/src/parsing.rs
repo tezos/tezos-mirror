@@ -59,7 +59,7 @@ pub const MAX_SIZE_PER_CHUNK: usize = 4095 // Max input size minus external tag
 
 pub const SIGNATURE_HASH_SIZE: usize = 65;
 
-pub const UPGRADE_NONCE_SIZE: usize = 4;
+pub const UPGRADE_NONCE_SIZE: usize = 2;
 
 #[derive(Debug, PartialEq)]
 pub enum Input {

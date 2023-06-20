@@ -51,8 +51,8 @@ fn upgrade_caller(
         .map_err(|_| Error::InvalidConversion)?;
     let v = &sig[64..65];
     let v = U256::from(v);
-    // smart_rollup_address length + upgrade_nonce length + preimage_hash length = 57
-    let prefix = "\x19Ethereum Signed Message:\n57";
+    // smart_rollup_address length + upgrade_nonce length + preimage_hash length = 55
+    let prefix = "\x19Ethereum Signed Message:\n55";
     let mut signed_msg = vec![];
     signed_msg.extend(prefix.as_bytes());
     signed_msg.extend(smart_rollup_address);
@@ -138,15 +138,14 @@ mod tests {
     // and if we can properly extract the phk of the caller
     fn test_check_dictator_upgrade_signature() {
         let smart_rollup_address: [u8; 20] = [0; 20];
-        let upgrade_nonce: [u8; UPGRADE_NONCE_SIZE] =
-            hex::decode("02000000").unwrap().try_into().unwrap();
+        let upgrade_nonce: [u8; UPGRADE_NONCE_SIZE] = 2u16.to_le_bytes();
         let preimage_hash: [u8; PREIMAGE_HASH_SIZE] = hex::decode(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         )
         .unwrap()
         .try_into()
         .unwrap();
-        let signature: [u8; SIGNATURE_HASH_SIZE] = hex::decode("d53b02f4b8075c9caad49fc1dc08eacf8678153004c6e0b078bf13fcce7038f221475b445a9fa56fc5a4569d2161f6b4ca77fa61194f0bd54e3198daa18471641b").unwrap().try_into().unwrap();
+        let signature: [u8; SIGNATURE_HASH_SIZE] = hex::decode("b3c502530ce20dbf6a7a1d89a470033ce6e829f9812992edc5e19cca028039ed7e3421ba97e3a498af222c99e6921c134f39338a7e21cdcbbe42882b0d81678b1c").unwrap().try_into().unwrap();
         check_dictator_signature(
             signature,
             smart_rollup_address,
