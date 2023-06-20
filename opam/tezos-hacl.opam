@@ -10,7 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "hacl-star" { = "0.7.0" }
+  "hacl-star" { >= "0.7.1" & < "0.8" }
   "hacl-star-raw"
   "ctypes_stubs_js"
   "ctypes" { >= "0.18.0" }

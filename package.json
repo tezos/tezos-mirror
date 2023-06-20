@@ -7,6 +7,6 @@
   "dependencies": {
     "@nomadic-labs/ocaml-bls12-381": ">=6.1.0 <6.2.0",
     "@nomadic-labs/secp256k1-wasm": ">=0.4.0",
-    "hacl-wasm": ">=1.3.0 <1.4.0"
+    "hacl-wasm": ">=1.4.0 <1.5.0"
   }
 }

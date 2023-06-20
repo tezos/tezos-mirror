@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "ppx_repr" { >= "0.6.0" }
   "repr"
-  "hacl-star" { = "0.7.0" }
+  "hacl-star" { >= "0.7.1" & < "0.8" }
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "octez-bls12-381-polynomial"
   "octez-plompiler"
