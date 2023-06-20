@@ -74,9 +74,6 @@ tezt:static-binaries:
     - build_x86_64-exp-dev-extra
     - build:static-x86_64-linux-binaries
     - tezt:fetch-records
-  # WARNING: if you increase the number of parallel jobs, you need to
-  # update test_coverage.yml with the new list of jobs.
-  parallel: 2
   variables:
     TESTS: "cli"
   before_script:

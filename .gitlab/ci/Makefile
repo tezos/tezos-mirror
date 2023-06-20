@@ -8,6 +8,14 @@ last_proto_version := $(shell echo ${last_proto_name} | cut -d'_' -f2 | sed 's/^
 new_proto_version_int:=$(shell echo $$(($(last_proto_version)+1)))
 new_proto_version := $(shell if [ "${new_proto_version_int}" -lt "100" ]; then echo 0${new_proto_version_int}; else echo ${new_proto_version_int}; fi)
 
+# CI_NODE_INDEX and CI_NODE_TOTAL are only available in jobs whose
+# definition contains 'parallel:'. Give them a default value of 1, so
+# that they can be used as argument to Tezt's '--job' regardless of
+# whether 'parallel:' is used or not (since '--job 1/1' is noop to
+# tezt).
+CI_NODE_INDEX ?= 1
+CI_NODE_TOTAL ?= 1
+
 .PHONY: test-protocol-compiles
 test-protocol-compiles:
 	cd ${CI_PROJECT_DIR} && \
