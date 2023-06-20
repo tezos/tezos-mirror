@@ -42,6 +42,8 @@ Smart Rollups
   rollups will see their PVM automatically upgrade, and newly originated smart
   rollups will use this version directly (MR :gl:`!9051`)
 
+- Add one new host function to the WASM PVM: ``store_exists`` (MR :gl:`!9204`).
+
 - Remove dead refutation games at migration time. A game is dead if both players
   are no longer staking. (MMR :gl:`!8975`)
 

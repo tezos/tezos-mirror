@@ -69,6 +69,17 @@ let make ~version ~reveal_builtins ~write_debug state =
           ~src
           ~num_bytes)
   in
+  let store_exists =
+    fn
+      (i32 @-> i32 @-> returning1 i32)
+      (fun key_offset key_length ->
+        with_mem @@ fun memory ->
+        Host_funcs.Aux.store_exists
+          ~durable:state.durable
+          ~memory
+          ~key_offset
+          ~key_length)
+  in
   let store_has =
     fn
       (i32 @-> i32 @-> returning1 i32)
@@ -294,15 +305,18 @@ let make ~version ~reveal_builtins ~write_debug state =
       ("reveal_metadata", reveal_metadata);
     ]
   in
+  let v1 =
+    [
+      ("__internal_store_get_hash", store_get_hash);
+      ("store_delete_value", store_delete_value);
+      ("store_create", store_create);
+    ]
+  in
   let extra =
     match version with
     | Wasm_pvm_state.V0 -> []
-    | V1 | V2 ->
-        [
-          ("__internal_store_get_hash", store_get_hash);
-          ("store_delete_value", store_delete_value);
-          ("store_create", store_create);
-        ]
+    | V1 -> v1
+    | V2 -> v1 @ [("store_exists", store_exists)]
   in
   List.map
     (fun (name, impl) -> (Constants.wasm_host_funcs_virual_module, name, impl))

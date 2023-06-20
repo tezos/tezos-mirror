@@ -87,6 +87,10 @@ val key_of_string_exn : string -> key
 
 val key_of_string_opt : string -> key option
 
+(** [exists tree key] returns [true] iff there exists a value or a directory
+    under [key] in [tree], and [false] otherwise. *)
+val exists : t -> key -> bool Lwt.t
+
 (** [find_value durable key] optionally looks for the value encoded at [key]
     in [durable]. *)
 val find_value :

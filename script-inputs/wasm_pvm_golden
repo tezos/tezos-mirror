@@ -1,4 +1,5 @@
 29ba7bff3c7c7a393c6a04f4940448063d3e18ee36649c9b8c30baba78dbc95d  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel echo run (hash- v0).out
+30fa228f195dc3028a4015f50bfb3b80720dcbde4b4aa70c5b086bc8e7853af6  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel link_store_exists run (hash- v0).out
 596fcb69efa87b91a8cbff250291e9d5daedbc9149664caf2aaba18a03061e3b  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel link_store_delete_value run (hash- v0).out
 863f63c96f5d7fca01bdda358ec1ea8fd49fb7a9716ee55abb3a2daae638406b  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel link_store_get_hash run (hash- v0).out
 ac9dbd968c7e78abd6d28ef649a8eb98e75c3bc61ccc5b8afb93cdd0e37dbe90  src/lib_scoru_wasm/regressions/expected/tezos_scoru_wasm_regressions.ml/kernel link_store_create run (hash- v0).out

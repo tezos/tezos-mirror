@@ -323,6 +323,13 @@ let test_v1_and_above ~version test =
       Lwt.return_ok ()
   | V1 | V2 -> test ~version
 
+let test_v2_and_above ~version test =
+  match version with
+  | Wasm_pvm_state.V0 | V1 ->
+      (* the host function is not available before [V1]. *)
+      Lwt.return_ok ()
+  | V2 -> test ~version
+
 let test_store_get_hash ~version =
   let open Lwt_syntax in
   let* durable_storage = make_durable [("/foo/bar", "/foobar")] in
@@ -389,6 +396,52 @@ let test_store_get_hash ~version =
 
 let test_store_get_hash ~version () =
   test_v1_and_above ~version test_store_get_hash
+
+let test_store_exists ~version =
+  let open Lwt_syntax in
+  let* durable_storage = make_durable [("/foo/bar", "/foobar")] in
+  let src_valid = 20l in
+  let key_valid = "/foo" in
+  let key_valid_len = Int32.of_int @@ String.length key_valid in
+  let src_invalid = Int32.add src_valid key_valid_len in
+  let key_invalid = "/bar" in
+  let key_invalid_len = Int32.of_int @@ String.length key_invalid in
+  let module_reg, module_key, host_funcs_registry =
+    make_module_inst ~version [key_valid; key_invalid] src_valid
+  in
+  let call_host_func values =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable:durable_storage
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_exists
+      values
+  in
+  (* Test valid access *)
+  let values = Values.[Num (I32 src_valid); Num (I32 key_valid_len)] in
+  let* _durable, result = call_host_func values in
+  assert (result = Values.[Num (I32 1l)]) ;
+  (* Test wrong access for keys *)
+  let values =
+    Values.
+      [
+        (* We allocate 20 pages of 64KiB in [make_module_inst], so this
+           value is out of the bound of the memory. *)
+        Num (I32 Int32.(mul 21l 0x10000l));
+        Num (I32 5l);
+      ]
+  in
+  let* _durable, result = call_host_func values in
+  assert (
+    result = Values.[Num (I32 (Host_funcs.Error.code Memory_invalid_access))]) ;
+  (* valid access, invalid key *)
+  let values = Values.[Num (I32 src_invalid); Num (I32 key_invalid_len)] in
+  let* _durable, result = call_host_func values in
+  assert (result = Values.[Num (I32 0l)]) ;
+  Lwt.return_ok ()
+
+let test_store_exists ~version () = test_v2_and_above ~version test_store_exists
 
 let test_store_delete_generic ~kind ~version =
   let open Lwt_syntax in
@@ -1273,6 +1326,7 @@ let tests =
       ("store_get_hash", `Quick, test_store_get_hash);
       ("store_delete_value removes only value", `Quick, test_store_delete_value);
       ("store_create", `Quick, test_store_create);
+      ("store_exists", `Quick, test_store_exists);
     ]
   @ [
       tztest "Durable: find value" `Quick test_durable_find_value;
