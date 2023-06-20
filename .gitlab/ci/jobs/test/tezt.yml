@@ -64,13 +64,14 @@ tezt:static-binaries:
     - .image_template__runtime_build_test_dependencies_template
     - .tezt_template
   dependencies:
-    # Fetch src/proto_*/parameters/*.json from build_x86_64-released
-    - build_x86_64-released
+    # Fetch src/proto_*/parameters/*.json and tezt/tests/main.exe from
+    # build_x86_64-exp-dev-extra
+    - build_x86_64-exp-dev-extra
     # And fetch the static executables from build:static
     - build:static-x86_64-linux-binaries
     - tezt:fetch-records
   needs:
-    - build_x86_64-released
+    - build_x86_64-exp-dev-extra
     - build:static-x86_64-linux-binaries
     - tezt:fetch-records
   # WARNING: if you increase the number of parallel jobs, you need to
