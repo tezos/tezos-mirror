@@ -424,7 +424,7 @@ let replay ~internal_events ~singleprocess ~strict
                protocol_root;
                process_path = Sys.executable_name;
                sandbox_parameters = None;
-               dal_config = Tezos_crypto_dal.Cryptobox.Config.default;
+               dal_config = config.blockchain_network.dal;
                internal_events;
              })
       in

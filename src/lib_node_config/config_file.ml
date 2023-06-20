@@ -53,12 +53,14 @@ type blockchain_network = {
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   default_bootstrap_peers : string list;
+  dal : Tezos_crypto_dal.Cryptobox.Config.t;
 }
 
 let make_blockchain_network ~alias ~chain_name ?old_chain_name
     ?incompatible_chain_name ~sandboxed_chain_name
     ?(user_activated_upgrades = []) ?(user_activated_protocol_overrides = [])
-    ?(default_bootstrap_peers = []) ?genesis_parameters genesis =
+    ?(default_bootstrap_peers = []) ?genesis_parameters
+    ?(dal = Tezos_crypto_dal.Cryptobox.Config.default) genesis =
   let of_string = Distributed_db_version.Name.of_string in
   {
     alias = Some alias;
@@ -78,6 +80,7 @@ let make_blockchain_network ~alias ~chain_name ?old_chain_name
           (Protocol_hash.of_b58check_exn a, Protocol_hash.of_b58check_exn b))
         user_activated_protocol_overrides;
     default_bootstrap_peers;
+    dal;
   }
 
 (* The script in scripts/user_activated_upgrade.sh patches the following lines
@@ -240,6 +243,7 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
            user_activated_upgrades;
            user_activated_protocol_overrides;
            default_bootstrap_peers;
+           dal;
          } ->
       ( genesis,
         genesis_parameters,
@@ -249,7 +253,8 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
         sandboxed_chain_name,
         user_activated_upgrades,
         user_activated_protocol_overrides,
-        default_bootstrap_peers ))
+        default_bootstrap_peers,
+        dal ))
     (fun ( genesis,
            genesis_parameters,
            chain_name,
@@ -258,7 +263,8 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
            sandboxed_chain_name,
            user_activated_upgrades,
            user_activated_protocol_overrides,
-           default_bootstrap_peers ) ->
+           default_bootstrap_peers,
+           dal ) ->
       {
         alias = None;
         genesis;
@@ -270,9 +276,10 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
         user_activated_upgrades;
         user_activated_protocol_overrides;
         default_bootstrap_peers;
+        dal;
       })
     (let chain = Distributed_db_version.Name.encoding in
-     obj9
+     obj10
        (req "genesis" Genesis.encoding)
        (opt "genesis_parameters" Genesis.Parameters.encoding)
        (req "chain_name" chain)
@@ -289,7 +296,14 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
           ~description:
             "List of hosts to use if p2p.bootstrap_peers is unspecified."
           (list string)
-          []))
+          [])
+       (dft
+          "dal"
+          ~description:
+            "USE FOR TESTING PURPOSE ONLY. Configuration for the \
+             data-availibility layer"
+          Tezos_crypto_dal.Cryptobox.Config.encoding
+          Tezos_crypto_dal.Cryptobox.Config.default))
 
 let builtin_blockchain_networks_with_tags =
   [
@@ -350,7 +364,6 @@ type t = {
   shell : Shell_limits.limits;
   blockchain_network : blockchain_network;
   metrics_addr : string list;
-  dal : Tezos_crypto_dal.Cryptobox.Config.t;
 }
 
 and p2p = {
@@ -416,7 +429,6 @@ let default_config =
     blockchain_network = blockchain_network_mainnet;
     disable_config_validation = default_disable_config_validation;
     metrics_addr = [];
-    dal = Tezos_crypto_dal.Cryptobox.Config.default;
   }
 
 let p2p =
@@ -653,7 +665,6 @@ let encoding =
            shell;
            blockchain_network;
            metrics_addr;
-           dal;
          } ->
       ( data_dir,
         disable_config_validation,
@@ -663,8 +674,7 @@ let encoding =
         internal_events,
         shell,
         blockchain_network,
-        metrics_addr,
-        dal ))
+        metrics_addr ))
     (fun ( data_dir,
            disable_config_validation,
            rpc,
@@ -673,8 +683,7 @@ let encoding =
            internal_events,
            shell,
            blockchain_network,
-           metrics_addr,
-           dal ) ->
+           metrics_addr ) ->
       {
         disable_config_validation;
         data_dir;
@@ -685,9 +694,8 @@ let encoding =
         shell;
         blockchain_network;
         metrics_addr;
-        dal;
       })
-    (obj10
+    (obj9
        (dft
           "data-dir"
           ~description:"Location of the data dir on disk."
@@ -732,14 +740,7 @@ let encoding =
           "metrics_addr"
           ~description:"Configuration of the Prometheus metrics endpoint"
           (list string)
-          default_config.metrics_addr)
-       (dft
-          "dal"
-          ~description:
-            "USE FOR TESTING PURPOSE ONLY. Configuration for the \
-             data-availibility layer"
-          Tezos_crypto_dal.Cryptobox.Config.encoding
-          Tezos_crypto_dal.Cryptobox.Config.default))
+          default_config.metrics_addr))
 
 (* Abstract version of [Json_encoding.Cannot_destruct]: first argument is the
    string representation of the path, second argument is the error message

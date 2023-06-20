@@ -38,6 +38,7 @@ type blockchain_network = {
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   default_bootstrap_peers : string list;
+  dal : Tezos_crypto_dal.Cryptobox.Config.t;
 }
 
 (** List of built-in networks with their alias. *)
@@ -56,7 +57,6 @@ type t = {
   shell : Shell_limits.limits;
   blockchain_network : blockchain_network;
   metrics_addr : string list;
-  dal : Tezos_crypto_dal.Cryptobox.Config.t;
 }
 
 and p2p = {
