@@ -8,13 +8,21 @@ use crate::apply::{TransactionObjectInfo, TransactionReceiptInfo};
 use crate::current_timestamp;
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
-use crate::inbox::Transaction;
+use crate::inbox::{Transaction, TransactionContent};
 use crate::storage;
 use primitive_types::{H256, U256};
 use std::collections::VecDeque;
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::transaction::*;
 use tezos_smart_rollup_host::runtime::Runtime;
+
+/// DO NOT TOUCH //////////////////////////////////////////////////////////////
+/// Those constants where derived from benchmarking
+pub const TICK_PER_GAS: u64 = 2000;
+pub const TICK_FOR_CRYPTO: u64 = 25_000_000;
+pub const MAX_TICKS: u64 = 10_000_000_000;
+pub const TICK_FOR_DEPOSIT: u64 = TICK_FOR_CRYPTO;
+/// DO NOT TOUCH //////////////////////////////////////////////////////////////
 
 /// Container for all data needed during block computation
 pub struct BlockInProgress {
@@ -33,6 +41,8 @@ pub struct BlockInProgress {
     /// hash to use for receipt
     /// (computed from number, not the correct way to do it)
     pub hash: H256,
+    /// Cumulative number of ticks used
+    pub estimated_ticks: u64,
 }
 
 impl BlockInProgress {
@@ -52,6 +62,7 @@ impl BlockInProgress {
             // it should be computed at the end, and not included in the receipt
             // the block is referenced in the storage by the block number anyway
             hash: H256(number.into()),
+            estimated_ticks: 0,
         };
 
         Ok(block_in_progress)
@@ -91,6 +102,28 @@ impl BlockInProgress {
 
     pub fn has_tx(&self) -> bool {
         !self.tx_queue.is_empty()
+    }
+
+    pub fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
+        match &transaction.content {
+            TransactionContent::Ethereum(eth) => {
+                eth.gas_limit * TICK_PER_GAS + TICK_FOR_CRYPTO
+            }
+            TransactionContent::Deposit(_) => TICK_FOR_DEPOSIT,
+        }
+    }
+
+    pub fn would_overflow(&self) -> bool {
+        match self.tx_queue.front() {
+            Some(transaction) => {
+                self.estimated_ticks + transaction.estimate_ticks() > MAX_TICKS
+            }
+            None => false, // should not happen, but false is a safe value anyway
+        }
+    }
+
+    pub fn account_for_transaction(&mut self, transaction: &Transaction) {
+        self.estimated_ticks += transaction.estimate_ticks();
     }
 
     pub fn make_receipt(
