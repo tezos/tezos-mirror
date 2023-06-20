@@ -101,6 +101,29 @@ module Term = struct
       & opt endpoint_arg (Uri.of_string "http://localhost:9732")
       & info ~docs ~doc ~docv:"[ADDR:PORT]" ["endpoint"])
 
+  let profile_arg =
+    let open Cmdliner in
+    let decoder string =
+      match Signature.Public_key_hash.of_b58check_opt string with
+      | None -> Error (`Msg "Unrecognized profile")
+      | Some pkh -> Services.Types.Attestor pkh |> Result.ok
+    in
+    let printer fmt profile =
+      let (Services.Types.Attestor pkh) = profile in
+      Signature.Public_key_hash.pp fmt pkh
+    in
+    Arg.conv (decoder, printer)
+
+  let profile =
+    let open Cmdliner in
+    let doc =
+      "The Octez DAL node profile allowing to decide the data of interest."
+    in
+    Arg.(
+      value
+      & opt (some profile_arg) None
+      & info ~docs ~doc ~docv:"[PKH]" ["profile"])
+
   (* This is provided as a command line option for facility but
      eventually it should not appear to the user. *)
   let use_unsafe_srs_for_tests =
@@ -111,7 +134,7 @@ module Term = struct
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
-       $ endpoint $ use_unsafe_srs_for_tests))
+       $ endpoint $ profile $ use_unsafe_srs_for_tests))
 end
 
 module Run = struct
@@ -170,13 +193,14 @@ type options = {
   expected_pow : float;
   listen_addr : P2p_point.Id.t;
   endpoint : Uri.t;
+  profile : Services.Types.profile option;
   use_unsafe_srs_for_tests : bool;
 }
 
 type t = Run | Config_init
 
 let make ~run =
-  let run subcommand data_dir rpc_addr expected_pow listen_addr endpoint
+  let run subcommand data_dir rpc_addr expected_pow listen_addr endpoint profile
       use_unsafe_srs_for_tests =
     run
       subcommand
@@ -186,6 +210,7 @@ let make ~run =
         expected_pow;
         listen_addr;
         endpoint;
+        profile;
         use_unsafe_srs_for_tests;
       }
     |> function

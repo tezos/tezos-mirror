@@ -31,6 +31,7 @@ let run subcommand
         rpc_addr;
         expected_pow;
         listen_addr;
+        profile;
         use_unsafe_srs_for_tests;
       } =
   match subcommand with
@@ -50,7 +51,7 @@ let run subcommand
             expected_pow;
             network_name = default.network_name;
             endpoint = default.endpoint;
-            profile = None;
+            profile;
           }
       in
       Lwt_main.run @@ Configuration_file.save config
