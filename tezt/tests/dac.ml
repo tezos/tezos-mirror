@@ -1189,11 +1189,21 @@ module Full_infrastructure = struct
      Once we introduce DAC API ("v1"),  [Full_infrastructure] test suite should
      be refactored to use [v1] api as well. *)
 
-  let coordinator_serializes_payload coordinator ~payload ~expected_rh =
+  (** [coordinator_serializes_payload ?payload ?expected_rh] serializes
+      provided optional [?payload] to [coordinator] node. Else it serializes
+      "test" string as a payload. If [?expected_rh] is provided, it also checks
+      that the actual root hash produced during serialization matches it. *)
+  let coordinator_serializes_payload ?(payload = "test") ?expected_rh
+      coordinator =
     let* actual_rh =
       Dac_helper.Call_endpoint.V0.Coordinator.post_preimage coordinator ~payload
     in
-    return @@ check_valid_root_hash expected_rh actual_rh
+    let () =
+      Option.iter
+        (fun expected_rh -> check_valid_root_hash expected_rh actual_rh)
+        expected_rh
+    in
+    return (`Hex actual_rh)
 
   let test_coordinator_post_preimage_endpoint Scenarios.{coordinator_node; _} =
     (* 1. Send the [payload] to coordinator.
@@ -1284,7 +1294,7 @@ module Full_infrastructure = struct
            (committee_members_nodes @ observer_nodes)
     in
     (* 2. Post a preimage to the coordinator. *)
-    let* () =
+    let* _root_hash =
       coordinator_serializes_payload coordinator_node ~payload ~expected_rh
     in
     (* Assert [coordinator] emitted event that [expected_rh] was pushed
@@ -1341,7 +1351,7 @@ module Full_infrastructure = struct
         (committee_members_nodes @ observer_nodes)
     in
     (* 2. Post a preimage to the coordinator. *)
-    let* () =
+    let* _root_hash =
       coordinator_serializes_payload coordinator_node ~payload ~expected_rh
     in
     (* Assert [coordinator] emitted event that [expected_rh] was pushed
@@ -2789,7 +2799,50 @@ end
 (** [Api_regression] is a module that encapsulates schema regression tests of
     the DAC API. Here we test the binding contracts of the versioned API. *)
 module Api_regression = struct
-  (** [rpc_call_with_regression_test] is used for SCHEMA regression testing the
+  let replace_variables string =
+    let replacements =
+      [
+        ("tz[1234]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
+        ("(BLsig|asig)\\w{137}\\b", "[AGGREGATED_SIG]");
+        ("http://127.0.0.1:\\d{4,5}/", "$SCHEME://$HOST:$PORT/");
+      ]
+    in
+    List.fold_left
+      (fun string (replace, by) ->
+        replace_string ~all:true (rex replace) ~by string)
+      string
+      replacements
+
+  let capture text = text |> replace_variables |> Regression.capture
+
+  let create_uri ~path_and_query dac_node =
+    let url =
+      Format.sprintf
+        "http://%s:%d/%s"
+        (Dac_node.rpc_host dac_node)
+        (Dac_node.rpc_port dac_node)
+        path_and_query
+    in
+    Uri.of_string url
+
+  let capture_rpc_request headers ?body verb uri =
+    let () =
+      capture
+        (sf
+           "RPC_REQUEST_URI: %s %s"
+           (Cohttp.Code.string_of_method verb)
+           (Uri.to_string uri))
+    in
+    let () =
+      capture @@ sf "RPC_REQUEST_HEADER: %s" (Cohttp.Header.to_string headers)
+    in
+    match body with
+    | Some body ->
+        let* body = Cohttp_lwt.Body.to_string body in
+        return @@ capture @@ sf "RPC_REQUEST_BODY: %s" body
+    | None -> Lwt.return_unit
+
+  (** [rpc_call_with_regression_test] is used for SCHEMA regression testing of the
       RPCs. A call to this function in addition to calling an RPC, captures the
       following arguments:
         1. RPC_REQUEST_URI
@@ -2801,41 +2854,31 @@ module Api_regression = struct
         1. Test binding contract of RPC request.
         2. Test binding contract of RPC response. *)
   let rpc_call_with_regression_test ?body_json ~path_and_query verb dac_node =
-    let url =
-      Format.sprintf
-        "http://%s:%d/%s"
-        (Dac_node.rpc_host dac_node)
-        (Dac_node.rpc_port dac_node)
-        path_and_query
-    in
-    let uri = Uri.of_string url in
-    let () =
-      Regression.capture
-        (sf
-           "RPC_REQUEST_URI: %s $SCHEME://$HOST:$PORT/%s"
-           (Cohttp.Code.string_of_method verb)
-           path_and_query)
-    in
+    let uri = create_uri ~path_and_query dac_node in
     let headers =
       Cohttp.Header.of_list [("Content-Type", "application/json")]
-    in
-    let () =
-      Regression.capture
-      @@ sf "RPC_REQUEST_HEADER: %s" (Cohttp.Header.to_string headers)
     in
     let body =
       Option.map
         (fun body ->
           let json = JSON.unannotate body in
           let raw_json = JSON.encode_u json in
-          let () = Regression.capture @@ sf "RPC_REQUEST_BODY: %s" raw_json in
           let request_body = Cohttp_lwt.Body.of_string raw_json in
           request_body)
         body_json
     in
+    let* () = capture_rpc_request headers ?body verb uri in
     let* _respone, body = Cohttp_lwt_unix.Client.call ~headers ?body verb uri in
     let* raw_body = Cohttp_lwt.Body.to_string body in
-    return @@ Regression.capture @@ sf "RPC_RESPONSE_BODY: %s" raw_body
+    return @@ capture @@ sf "RPC_RESPONSE_BODY: %s" raw_body
+
+  let rpc_curl_with_regression_test ~path_and_query verb dac_node =
+    let uri = create_uri ~path_and_query dac_node in
+    let headers =
+      Cohttp.Header.of_list [("Content-Type", "application/json")]
+    in
+    let* () = capture_rpc_request headers verb uri in
+    return @@ (RPC.Curl.get_raw (Uri.to_string uri) |> Runnable.map capture)
 
   (** [V0] module is used for regression testing [V0] API. *)
   module V0 = struct
@@ -2863,15 +2906,156 @@ module Api_regression = struct
     let test_get_preimage Scenarios.{coordinator_node; _} =
       (* First we prepare Coordinator's node by posting a payload to it. *)
       let* root_hash =
-        RPC.call
-          coordinator_node
-          (Dac_rpc.V0.Coordinator.post_preimage ~payload:"test")
+        Full_infrastructure.coordinator_serializes_payload coordinator_node
       in
       (* Test starts here. *)
       rpc_call_with_regression_test
         `GET
-        ~path_and_query:(sf "%s/preimage/%s" v0_api_prefix root_hash)
+        ~path_and_query:(sf "%s/preimage/%s" v0_api_prefix (Hex.show root_hash))
         coordinator_node
+
+    let create_sample_signature committee_members root_hash =
+      let i = Random.int (List.length committee_members) in
+      let member = List.nth committee_members i in
+      (bls_sign_hex_hash member root_hash, member)
+
+    (** [test_put_dac_member_signature] tests "PUT v0/dac_member_signature". *)
+    let test_put_dac_member_signature
+        Scenarios.{coordinator_node; committee_members; _} =
+      (* First we prepare Coordinator's node by posting a payload to it. *)
+      let* root_hash =
+        Full_infrastructure.coordinator_serializes_payload coordinator_node
+      in
+      let signature, member =
+        create_sample_signature committee_members root_hash
+      in
+      let request_body =
+        Dac_rpc.V0.make_put_dac_member_signature_request_body
+          ~dac_member_pkh:member.aggregate_public_key_hash
+          ~root_hash
+          signature
+      in
+      let body_json =
+        JSON.annotate ~origin:"Dac_api_regression.V0.put_signature" request_body
+      in
+      (* Test starts here. *)
+      rpc_call_with_regression_test
+        `PUT
+        ~body_json
+        ~path_and_query:(sf "%s/dac_member_signature" v0_api_prefix)
+        coordinator_node
+
+    (** [test_get_certificate] tests "PUT v0/certificate". *)
+    let test_get_certificate Scenarios.{coordinator_node; committee_members; _}
+        =
+      (* First we prepare Coordinator's node by posting a payload to it. *)
+      let* root_hash =
+        Full_infrastructure.coordinator_serializes_payload coordinator_node
+      in
+      (* Then we create a sample signature for a random member. *)
+      let signature, member =
+        create_sample_signature committee_members root_hash
+      in
+      (* We put the sample signature to Coordinator node. *)
+      let* () =
+        RPC.call
+          coordinator_node
+          (Dac_rpc.V0.put_dac_member_signature
+             ~hex_root_hash:root_hash
+             ~dac_member_pkh:member.aggregate_public_key_hash
+             ~signature)
+      in
+      (* Test starts here. *)
+      rpc_call_with_regression_test
+        `GET
+        ~path_and_query:
+          (sf "%s/certificates/%s" v0_api_prefix (Hex.show root_hash))
+        coordinator_node
+
+    (** [test_observer_get_missing_page] regression tests "GET v0/missing_page". *)
+    let test_observer_get_missing_page
+        Scenarios.{coordinator_node; observer_nodes; committee_members_nodes; _}
+        =
+      let* () =
+        Full_infrastructure.init_run_and_subscribe_nodes
+          coordinator_node
+          (committee_members_nodes @ observer_nodes)
+      in
+      let expected_rh =
+        "00a3703854279d2f377d689163d1ec911a840d84b56c4c6f6cafdf0610394df7c6"
+      in
+      let committee_members_processed_rh_promise =
+        List.map
+          (fun committee_member_node ->
+            wait_for_received_root_hash_processed
+              committee_member_node
+              expected_rh)
+          committee_members_nodes
+      in
+      let* root_hash =
+        Full_infrastructure.coordinator_serializes_payload
+          coordinator_node
+          ~expected_rh
+      in
+      let* () = Lwt.join committee_members_processed_rh_promise in
+      let observer_node = List.hd observer_nodes in
+      (* Test starts here. *)
+      rpc_call_with_regression_test
+        `GET
+        ~path_and_query:
+          (sf "%s/missing_page/%s" v0_api_prefix (Hex.show root_hash))
+        observer_node
+
+    (** [test_monitor_root_hashes] regression tests "GET v0/monitor/root_hashes". *)
+    let test_monitor_root_hashes Scenarios.{coordinator_node; _} =
+      let* monitor_root_hashes_client =
+        rpc_curl_with_regression_test
+          `GET
+          ~path_and_query:(sf "%s/monitor/root_hashes" v0_api_prefix)
+          coordinator_node
+      in
+      let _streamed_root_hashes_client =
+        Runnable.run monitor_root_hashes_client
+      in
+      (* TODO https://gitlab.com/tezos/tezos/-/issues/5909
+         Schema regression testing of response body has been proven out difficult,
+         since a call to it is blocking. Currently we have no way to send an end
+         signal to the streaming component unless shutting down a node.
+         Unfortunately, in such case tezt propagates the error, resulting in
+         regression test to fail. *)
+      let _root_hash =
+        Full_infrastructure.coordinator_serializes_payload coordinator_node
+      in
+      Lwt.return_unit
+
+    (** [test_monitor_certificates] regression tests "GET v0/monitor/root_hashes". *)
+    let test_monitor_certificates
+        Scenarios.{coordinator_node; committee_members_nodes; _} =
+      let* () =
+        Full_infrastructure.init_run_and_subscribe_nodes
+          coordinator_node
+          committee_members_nodes
+      in
+      let expected_rh =
+        "00a3703854279d2f377d689163d1ec911a840d84b56c4c6f6cafdf0610394df7c6"
+      in
+      let* monitor_certificate_updates_client =
+        rpc_curl_with_regression_test
+          `GET
+          ~path_and_query:
+            (sf "%s/monitor/certificate/%s" v0_api_prefix expected_rh)
+          coordinator_node
+      in
+      let streamed_certificate_updates =
+        Runnable.run monitor_certificate_updates_client
+      in
+      let* _root_hash =
+        Full_infrastructure.coordinator_serializes_payload
+          coordinator_node
+          ~expected_rh
+      in
+      let* () = streamed_certificate_updates in
+      Lwt.return_unit
   end
 end
 
@@ -3064,4 +3248,49 @@ let register ~protocols =
     ~allow_regression:true
     "test GET v0/preimage"
     Api_regression.V0.test_get_preimage
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:0
+    ~committee_size:2
+    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~allow_regression:true
+    "test PUT v0/dac_member_signature"
+    Api_regression.V0.test_put_dac_member_signature
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:0
+    ~committee_size:2
+    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~allow_regression:true
+    "test GET v0/certificate"
+    Api_regression.V0.test_get_certificate
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:1
+    ~committee_size:3
+    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~allow_regression:true
+    "test GET v0/missing_page"
+    Api_regression.V0.test_observer_get_missing_page
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:0
+    ~committee_size:0
+    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~allow_regression:true
+    "test GET v0/monitor/root_hashes"
+    Api_regression.V0.test_monitor_root_hashes
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:0
+    ~committee_size:1
+    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~allow_regression:true
+    "test GET v0/monitor/certificate"
+    Api_regression.V0.test_monitor_certificates
     protocols

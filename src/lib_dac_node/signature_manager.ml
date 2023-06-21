@@ -233,15 +233,16 @@ let verify_signature ((module Plugin) : Dac_plugin.t) pk signature root_hash =
     (Aggregate_signature.check pk signature root_hash_bytes)
     (Signature_verification_failed (pk, signature, Plugin.to_hex root_hash))
 
-let add_dac_member_signature dac_plugin signature_store
-    Signature_repr.{root_hash; signer_pkh; signature} =
+let add_dac_member_signature dac_plugin signature_store signature =
   let open Lwt_result_syntax in
-  let*? root_hash = Dac_plugin.raw_to_hash dac_plugin root_hash in
+  let*? root_hash =
+    Dac_plugin.raw_to_hash dac_plugin (Signature_repr.get_root_hash signature)
+  in
   Store.Signature_store.add
     signature_store
     ~primary_key:root_hash
-    ~secondary_key:signer_pkh
-    signature
+    ~secondary_key:(Signature_repr.get_signer_pkh signature)
+    (Signature_repr.get_signature signature)
 
 let rev_find_indexed_signatures node_store dac_members_pkh root_hash =
   let open Lwt_result_syntax in
@@ -310,10 +311,13 @@ let check_coordinator_knows_root_hash dac_plugin page_store root_hash =
   | Ok true -> return ()
 
 let should_update_certificate dac_plugin get_public_key_opt ro_node_store
-    committee_members Signature_repr.{signer_pkh; root_hash; signature} =
+    committee_members signature =
   let open Lwt_result_syntax in
   let ((module Plugin) : Dac_plugin.t) = dac_plugin in
-  let*? root_hash = Dac_plugin.raw_to_hash dac_plugin root_hash in
+  let*? root_hash =
+    Dac_plugin.raw_to_hash dac_plugin (Signature_repr.get_root_hash signature)
+  in
+  let signer_pkh = Signature_repr.get_signer_pkh signature in
   let* () =
     fail_unless
       (check_is_dac_member committee_members signer_pkh)
@@ -332,7 +336,13 @@ let should_update_certificate dac_plugin get_public_key_opt ro_node_store
   in
   if dac_member_has_signed then return false
   else
-    let* () = verify_signature dac_plugin pub_key signature root_hash in
+    let* () =
+      verify_signature
+        dac_plugin
+        pub_key
+        (Signature_repr.get_signature signature)
+        root_hash
+    in
     return true
 
 let stream_certificate_update dac_plugin committee_members certificate
@@ -362,9 +372,7 @@ let handle_put_dac_member_signature dac_plugin get_public_key_opt
     committee_member_signature =
   let open Lwt_result_syntax in
   let ((module Plugin) : Dac_plugin.t) = dac_plugin in
-  let Signature_repr.{root_hash = raw_root_hash; _} =
-    committee_member_signature
-  in
+  let raw_root_hash = Signature_repr.get_root_hash committee_member_signature in
   let*? root_hash = Dac_plugin.raw_to_hash dac_plugin raw_root_hash in
   let* () = check_coordinator_knows_root_hash dac_plugin page_store root_hash in
   let* should_update_certificate =

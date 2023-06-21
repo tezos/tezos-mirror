@@ -150,8 +150,10 @@ module Committee_member = struct
         bytes_to_sign
     in
     let signature_repr =
-      Signature_repr.
-        {root_hash = Dac_plugin.hash_to_raw root_hash; signature; signer_pkh}
+      Signature_repr.make
+        (Dac_plugin.hash_to_raw root_hash)
+        signature
+        signer_pkh
     in
     let* () =
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/5627
@@ -291,12 +293,10 @@ module Legacy = struct
             bytes_to_sign
         in
         let signature_repr =
-          Signature_repr.
-            {
-              root_hash = Dac_plugin.hash_to_raw root_hash;
-              signature;
-              signer_pkh;
-            }
+          Signature_repr.make
+            (Dac_plugin.hash_to_raw root_hash)
+            signature
+            signer_pkh
         in
         let* () =
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/5627

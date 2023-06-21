@@ -69,16 +69,23 @@ module V0 = struct
     in
     make ~query_string GET [api_prefix; "verify_signature"] JSON.as_bool
 
+  let make_put_dac_member_signature_request_body ~dac_member_pkh ~root_hash
+      signature =
+    let (`Hex root_hash) = root_hash in
+    `O
+      [
+        ("root_hash", `String root_hash);
+        ("signer_pkh", `String dac_member_pkh);
+        ( "signature",
+          `String (Tezos_crypto.Aggregate_signature.to_b58check signature) );
+      ]
+
   let put_dac_member_signature ~hex_root_hash ~dac_member_pkh ~signature =
-    let (`Hex root_hash) = hex_root_hash in
     let payload =
-      `O
-        [
-          ("root_hash", `String root_hash);
-          ("signer_pkh", `String dac_member_pkh);
-          ( "signature",
-            `String (Tezos_crypto.Aggregate_signature.to_b58check signature) );
-        ]
+      make_put_dac_member_signature_request_body
+        ~dac_member_pkh
+        ~root_hash:hex_root_hash
+        signature
     in
     let data : RPC_core.data = Data payload in
     make ~data PUT [api_prefix; "dac_member_signature"] @@ fun _resp -> ()
