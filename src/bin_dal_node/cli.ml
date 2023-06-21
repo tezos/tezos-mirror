@@ -63,10 +63,11 @@ module Term = struct
 
   let expected_pow =
     let open Cmdliner in
-    let default = Configuration_file.default.expected_pow in
     let doc = "Expected level of proof-of-work for peers identity." in
     Arg.(
-      value & opt float default & info ~docs ~doc ~docv:"FLOAT" ["expected-pow"])
+      value
+      & opt (some float) None
+      & info ~docs ~doc ~docv:"FLOAT" ["expected-pow"])
 
   let net_addr =
     let open Cmdliner in
@@ -199,7 +200,7 @@ end
 type options = {
   data_dir : string option;
   rpc_addr : P2p_point.Id.t option;
-  expected_pow : float;
+  expected_pow : float option;
   listen_addr : P2p_point.Id.t;
   endpoint : Uri.t;
   profile : Services.Types.profile option;

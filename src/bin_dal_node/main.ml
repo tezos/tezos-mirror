@@ -46,7 +46,10 @@ let run subcommand
         neighbors = [];
         peers;
         listen_addr;
-        expected_pow;
+        expected_pow =
+          Option.value
+            ~default:Configuration_file.default.expected_pow
+            expected_pow;
         network_name = default.network_name;
         endpoint = default.endpoint;
         profile;
