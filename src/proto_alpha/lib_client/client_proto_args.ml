@@ -36,8 +36,6 @@ type error += Bad_minimal_fees of string
 
 type error += Bad_max_waiting_time of string
 
-type error += Bad_endorsement_delay of string
-
 type error += Bad_preserved_levels of string
 
 type error += Forbidden_Negative_int of string
@@ -93,20 +91,6 @@ let () =
     Data_encoding.(obj1 (req "parameter" string))
     (function Bad_max_waiting_time parameter -> Some parameter | _ -> None)
     (fun parameter -> Bad_max_waiting_time parameter) ;
-  register_error_kind
-    `Permanent
-    ~id:"badEndorsementDelayArg"
-    ~title:"Bad -endorsement-delay arg"
-    ~description:"invalid duration in -endorsement-delay"
-    ~pp:(fun ppf literal ->
-      Format.fprintf
-        ppf
-        "Bad argument value for -endorsement-delay. Expected an integer, but \
-         given '%s'"
-        literal)
-    Data_encoding.(obj1 (req "parameter" string))
-    (function Bad_endorsement_delay parameter -> Some parameter | _ -> None)
-    (fun parameter -> Bad_endorsement_delay parameter) ;
   register_error_kind
     `Permanent
     ~id:"badPreservedLevelsArg"
