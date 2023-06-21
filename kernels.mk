@@ -19,10 +19,17 @@ evm_kernel.wasm::
 	@wasm-strip $@
 
 evm_installer.wasm:: kernel_sdk evm_kernel.wasm
-	@scripts/evm_installer.sh \
-	--evm-kernel evm_kernel.wasm \
+ifdef EVM_CONFIG
+	$(eval CONFIG := --setup-file ${EVM_CONFIG})
+endif
+	@./smart-rollup-installer get-reveal-installer \
+	--upgrade-to evm_kernel.wasm \
 	--preimages-dir ${EVM_KERNEL_PREIMAGES} \
-	--output $@
+	--output $@ \
+	${CONFIG}
+
+evm_installer_dev.wasm::
+	@${MAKE} -f kernels.mk EVM_CONFIG=src/kernel_evm/config/dev.yaml evm_installer.wasm
 
 sequenced_kernel.wasm:
 	@make -C src/kernel_sequencer build
