@@ -28,18 +28,6 @@
 open Rpc_directory_helpers
 open Protocol
 
-let get_head_hash_opt node_ctxt =
-  let open Lwt_result_syntax in
-  let+ res = Node_context.last_processed_head_opt node_ctxt in
-  Option.map
-    (fun Sc_rollup_block.{header = {block_hash; _}; _} -> block_hash)
-    res
-
-let get_head_level_opt node_ctxt =
-  let open Lwt_result_syntax in
-  let+ res = Node_context.last_processed_head_opt node_ctxt in
-  Option.map (fun Sc_rollup_block.{header = {level; _}; _} -> level) res
-
 module Slot_pages_map = struct
   open Protocol
   open Alpha_context
@@ -48,26 +36,6 @@ end
 
 let get_dal_processed_slots node_ctxt block =
   Node_context.list_slots_statuses node_ctxt ~confirmed_in_block_hash:block
-
-module Global_directory = Make_directory (struct
-  include Rollup_node_services.Global
-
-  type context = Node_context.rw
-
-  type subcontext = Node_context.ro
-
-  let context_of_prefix node_ctxt () = return (Node_context.readonly node_ctxt)
-end)
-
-module Local_directory = Make_directory (struct
-  include Rollup_node_services.Local
-
-  type context = Node_context.rw
-
-  type subcontext = Node_context.ro
-
-  let context_of_prefix node_ctxt () = return (Node_context.readonly node_ctxt)
-end)
 
 module Block_directory = Make_sub_directory (struct
   include Sc_rollup_services.Block
@@ -114,19 +82,6 @@ module Common = struct
       Node_context.get_num_messages node_ctxt l2_block.header.inbox_witness
     in
     Z.of_int num_messages
-
-  let () =
-    Global_directory.register0 Rollup_node_services.Global.sc_rollup_address
-    @@ fun node_ctxt () () ->
-    return @@ Sc_rollup_proto_types.Address.of_octez node_ctxt.rollup_address
-
-  let () =
-    Global_directory.register0 Rollup_node_services.Global.current_tezos_head
-    @@ fun node_ctxt () () -> get_head_hash_opt node_ctxt
-
-  let () =
-    Global_directory.register0 Rollup_node_services.Global.current_tezos_level
-    @@ fun node_ctxt () () -> get_head_level_opt node_ctxt
 
   let () =
     Block_directory.register0 Sc_rollup_services.Block.hash
@@ -257,44 +212,6 @@ let () =
       return value
 
 let () =
-  Global_directory.register0 Rollup_node_services.Global.last_stored_commitment
-  @@ fun node_ctxt () () ->
-  let open Lwt_result_syntax in
-  let* head = Node_context.last_processed_head_opt node_ctxt in
-  match head with
-  | None -> return_none
-  | Some head ->
-      let commitment_hash =
-        Sc_rollup_block.most_recent_commitment head.header
-      in
-      let+ commitment =
-        Node_context.find_commitment node_ctxt commitment_hash
-      in
-      Option.map (fun c -> (c, commitment_hash)) commitment
-
-let () =
-  Local_directory.register0 Rollup_node_services.Local.last_published_commitment
-  @@ fun node_ctxt () () ->
-  let open Lwt_result_syntax in
-  match Reference.get node_ctxt.lpc with
-  | None -> return_none
-  | Some commitment ->
-      let hash = Octez_smart_rollup.Commitment.hash commitment in
-      (* The corresponding level in Store.Commitments.published_at_level is
-         available only when the commitment has been published and included
-         in a block. *)
-      let* published_at_level_info =
-        Node_context.commitment_published_at_level node_ctxt hash
-      in
-      let first_published, published =
-        match published_at_level_info with
-        | None -> (None, None)
-        | Some {first_published_at_level; published_at_level} ->
-            (Some first_published_at_level, published_at_level)
-      in
-      return_some (commitment, hash, first_published, published)
-
-let () =
   Block_directory.register0 Sc_rollup_services.Block.status
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
@@ -350,167 +267,6 @@ let () =
   @@ fun (node_ctxt, block) () {messages; reveal_pages; insight_requests} ->
   simulate_messages node_ctxt block ~reveal_pages ~insight_requests messages
 
-let () =
-  Local_directory.register0 Rollup_node_services.Local.injection
-  @@ fun _node_ctxt () messages -> Batcher.register_messages messages
-
-let () =
-  Local_directory.register0 Rollup_node_services.Local.batcher_queue
-  @@ fun _node_ctxt () () ->
-  let open Lwt_result_syntax in
-  let*? queue = Batcher.get_queue () in
-  return queue
-
-(** [commitment_level_of_inbox_level node_ctxt inbox_level] returns the level
-      of the commitment which should include the inbox of level
-      [inbox_level].
-
-      It is computed with the following formula:
-      {v
-      commitment_level(inbox_level) =
-        last_commitment -
-         ((last_commitment - inbox_level) / commitment_period
-          * commitment_period)
-      v}
-  *)
-let commitment_level_of_inbox_level (node_ctxt : _ Node_context.t) inbox_level =
-  let open Alpha_context in
-  let open Option_syntax in
-  let+ last_published_commitment = Reference.get node_ctxt.lpc in
-  let commitment_period =
-    Int32.of_int
-      node_ctxt.current_protocol.constants.sc_rollup.commitment_period_in_blocks
-  in
-  let last_published = last_published_commitment.inbox_level in
-  let open Int32 in
-  div (sub last_published inbox_level) commitment_period
-  |> mul commitment_period |> sub last_published |> Raw_level.of_int32_exn
-
-let inbox_info_of_level (node_ctxt : _ Node_context.t) inbox_level =
-  let open Lwt_result_syntax in
-  let+ finalized_level = Node_context.get_finalized_level node_ctxt in
-  let finalized = Compare.Int32.(inbox_level <= finalized_level) in
-  let lcc = Reference.get node_ctxt.lcc in
-  let cemented = Compare.Int32.(inbox_level <= lcc.level) in
-  (finalized, cemented)
-
-let () =
-  Local_directory.register1 Rollup_node_services.Local.batcher_message
-  @@ fun node_ctxt hash () () ->
-  let open Lwt_result_syntax in
-  let*? batch_status = Batcher.message_status hash in
-  let* status =
-    match batch_status with
-    | None -> return (None, Rollup_node_services.Unknown)
-    | Some (batch_status, msg) -> (
-        let return status = return (Some msg, status) in
-        match batch_status with
-        | Pending_batch -> return Rollup_node_services.Pending_batch
-        | Batched l1_hash -> (
-            match Injector.operation_status l1_hash with
-            | None -> return Rollup_node_services.Unknown
-            | Some (Pending op) ->
-                return (Rollup_node_services.Pending_injection op)
-            | Some (Injected {op; oph; op_index}) ->
-                return
-                  (Rollup_node_services.Injected
-                     {op = op.operation; oph; op_index})
-            | Some (Included {op; oph; op_index; l1_block; l1_level}) -> (
-                let* finalized, cemented =
-                  inbox_info_of_level node_ctxt l1_level
-                in
-                let commitment_level =
-                  commitment_level_of_inbox_level node_ctxt l1_level
-                in
-                match commitment_level with
-                | None ->
-                    return
-                      (Rollup_node_services.Included
-                         {
-                           op = op.operation;
-                           oph;
-                           op_index;
-                           l1_block;
-                           l1_level;
-                           finalized;
-                           cemented;
-                         })
-                | Some commitment_level -> (
-                    let* block =
-                      Node_context.find_l2_block_by_level
-                        node_ctxt
-                        (Alpha_context.Raw_level.to_int32 commitment_level)
-                    in
-                    match block with
-                    | None ->
-                        (* Commitment not computed yet for inbox *)
-                        return
-                          (Rollup_node_services.Included
-                             {
-                               op = op.operation;
-                               oph;
-                               op_index;
-                               l1_block;
-                               l1_level;
-                               finalized;
-                               cemented;
-                             })
-                    | Some block -> (
-                        let commitment_hash =
-                          WithExceptions.Option.get
-                            ~loc:__LOC__
-                            block.header.commitment_hash
-                        in
-                        (* Commitment computed *)
-                        let* published_at =
-                          Node_context.commitment_published_at_level
-                            node_ctxt
-                            commitment_hash
-                        in
-                        match published_at with
-                        | None | Some {published_at_level = None; _} ->
-                            (* Commitment not published yet *)
-                            return
-                              (Rollup_node_services.Included
-                                 {
-                                   op = op.operation;
-                                   oph;
-                                   op_index;
-                                   l1_block;
-                                   l1_level;
-                                   finalized;
-                                   cemented;
-                                 })
-                        | Some
-                            {
-                              first_published_at_level;
-                              published_at_level = Some published_at_level;
-                            } ->
-                            (* Commitment published *)
-                            let* commitment =
-                              Node_context.get_commitment
-                                node_ctxt
-                                commitment_hash
-                            in
-                            return
-                              (Rollup_node_services.Committed
-                                 {
-                                   op = op.operation;
-                                   oph;
-                                   op_index;
-                                   l1_block;
-                                   l1_level;
-                                   finalized;
-                                   cemented;
-                                   commitment;
-                                   commitment_hash;
-                                   first_published_at_level;
-                                   published_at_level;
-                                 }))))))
-  in
-
-  return status
-
 let block_directory (node_ctxt : _ Node_context.t) =
   let module PVM = (val Pvm_rpc.of_kind node_ctxt.kind) in
   List.fold_left
@@ -522,15 +278,9 @@ let block_directory (node_ctxt : _ Node_context.t) =
       PVM.build_sub_directory;
     ]
 
-let top_directory (node_ctxt : _ Node_context.t) =
-  List.fold_left
-    (fun dir f -> Tezos_rpc.Directory.merge dir (f node_ctxt))
-    Tezos_rpc.Directory.empty
-    [Global_directory.build_directory; Local_directory.build_directory]
-
 let directory (node_ctxt : _ Node_context.t) =
   Tezos_rpc.Directory.merge
-    (top_directory node_ctxt)
+    (Octez_smart_rollup_node.Rpc_directory.top_directory node_ctxt)
     (Tezos_rpc.Directory.prefix
        Sc_rollup_services.Block.prefix
        (block_directory node_ctxt))
