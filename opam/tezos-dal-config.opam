@@ -10,18 +10,11 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-base"
-  "tezos-rpc"
-  "tezos-p2p-services"
-  "tezos-version"
-  "tezos-context"
-  "tezos-dal-config"
-  "tezt" { with-test & >= "3.1.1" }
-  "octez-alcotezt" {with-test}
+  "data-encoding" { >= "0.7.1" & < "1.0.0" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: descriptions of RPCs exported by `tezos-shell`"
+synopsis: "Tezos: DAL configuration"

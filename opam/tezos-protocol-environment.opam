@@ -20,6 +20,7 @@ depends: [
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
   "tezos-crypto-dal"
+  "tezos-dal-config"
   "class_group_vdf" { >= "0.0.4" }
   "aches" { >= "1.0.0" }
   "aches-lwt" { >= "1.0.0" }

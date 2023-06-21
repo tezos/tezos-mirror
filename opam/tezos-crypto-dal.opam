@@ -13,6 +13,7 @@ depends: [
   "tezos-stdlib"
   "tezos-error-monad"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
+  "tezos-dal-config"
   "tezos-crypto"
   "octez-bls12-381-polynomial"
   "lwt" { >= "5.6.0" }

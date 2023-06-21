@@ -11,6 +11,7 @@
   bls12-381
   octez-plonk
   tezos-crypto-dal
+  tezos-dal-config
   class_group_vdf
   aches
   aches-lwt

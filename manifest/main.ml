@@ -1569,6 +1569,14 @@ let _octez_epoxy_tx_tests =
     ~deps:[octez_epoxy_tx; octez_plonk_test_helpers; octez_aplonk]
     ~dune:(make_plonk_runtest_invocation ~package:"octez-epoxy-tx")
 
+let octez_dal_config =
+  public_lib
+    "tezos-dal-config"
+    ~path:"src/lib_dal_config"
+    ~synopsis:"Tezos: DAL configuration"
+    ~deps:[data_encoding |> open_]
+    ~js_compatible:true
+
 let octez_crypto_dal =
   public_lib
     "tezos-crypto-dal"
@@ -1580,6 +1588,7 @@ let octez_crypto_dal =
         octez_stdlib |> open_;
         octez_error_monad |> open_;
         data_encoding |> open_;
+        octez_dal_config |> open_;
         octez_crypto;
         octez_bls12_381_polynomial;
         lwt_unix;
@@ -1595,6 +1604,7 @@ let _octez_crypto_dal_tests =
       [
         octez_stdlib |> open_;
         octez_crypto_dal |> open_;
+        octez_dal_config |> open_;
         octez_error_monad |> open_;
         data_encoding |> open_;
         alcotezt;
@@ -2115,6 +2125,7 @@ let octez_shell_services =
         octez_version |> open_;
         octez_context_sigs;
         octez_merkle_proof_encoding;
+        octez_dal_config |> open_;
       ]
     ~linkall:true
     ~js_compatible:true
@@ -2726,6 +2737,7 @@ protocols.|}
         bls12_381;
         octez_plonk |> open_;
         octez_crypto_dal;
+        octez_dal_config;
         vdf;
         aches;
         aches_lwt;
@@ -3184,6 +3196,7 @@ let octez_shell =
         octez_workers |> open_;
         octez_validation |> open_;
         octez_version |> open_;
+        octez_dal_config |> open_;
         lwt_exit;
       ]
 
@@ -7274,6 +7287,7 @@ let _octez_dal_node =
          octez_p2p_services |> open_;
          octez_crypto |> open_;
          octez_base_p2p_identity_file |> open_;
+         octez_shell_services |> open_;
          irmin_pack;
          irmin_pack_unix;
          irmin;
