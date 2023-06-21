@@ -605,17 +605,13 @@ module SynthesizeTimeAlloc : Model.Binary_operation = struct
   end
 end
 
-let pack_ir_model = function
+let pack_time_model = function
   | TimeModel m -> Model.Model m
-  | TimeAllocModel {name; time; alloc} ->
-      Model.Model
-        (Model.synthesize
-           ~binop:(module SynthesizeTimeAlloc)
-           ~name
-           ~x_label:"time"
-           ~x_model:time
-           ~y_label:"alloc"
-           ~y_model:alloc)
+  | TimeAllocModel {time; _} -> Model.Model time
+
+let pack_alloc_model = function
+  | TimeModel _ -> assert false
+  | TimeAllocModel {alloc; _} -> Model.Model alloc
 
 let amplification_loop_iteration = fv "amplification_loop_iteration"
 
@@ -629,7 +625,7 @@ let amplification_loop_model =
 
 (* The following model stitches together the per-instruction models and
    adds a term corresponding to the amplification (if needed). *)
-let interpreter_model ?amplification sub_model =
+let interpreter_model ?amplification pack_model sub_model =
   Model.make_aggregated
     ~model:(fun trace ->
       let module Def (X : Costlang.S) = struct
@@ -649,7 +645,7 @@ let interpreter_model ?amplification sub_model =
           List.fold_left
             (fun (acc : X.size X.repr) instr_trace ->
               let name = instr_trace.Interpreter_workload.name in
-              let (Model.Model model) = pack_ir_model (ir_model name) in
+              let (Model.Model model) = pack_model (ir_model name) in
               let (module Applied_instr) =
                 Model.apply (model_with_conv name model) instr_trace
               in
@@ -659,8 +655,23 @@ let interpreter_model ?amplification sub_model =
             trace
       end in
       ((module Def) : Model.applied))
-    ~sub_models:[sub_model]
+    ~sub_models:[pack_model sub_model]
 
-let make_model ?amplification instr_name =
+type benchmark_type = Registration_helpers.benchmark_type = Time | Alloc
+
+let make_time_model ?amplification instr_name =
   let ir_model = ir_model instr_name in
-  [("interpreter", interpreter_model ?amplification (pack_ir_model ir_model))]
+  [("interpreter", interpreter_model ?amplification pack_time_model ir_model)]
+
+let make_alloc_model instr_name =
+  let ir_model = ir_model instr_name in
+  [("interpreter", interpreter_model pack_alloc_model ir_model)]
+
+let make_model ?amplification benchmark_type instr_name =
+  match benchmark_type with
+  | Time -> make_time_model ?amplification instr_name
+  | Alloc ->
+      (* amplification wouldn't make sense,
+         because the measurement resolution doesn't matter for the allocation *)
+      assert (amplification = None) ;
+      make_alloc_model instr_name
