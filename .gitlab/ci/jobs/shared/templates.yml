@@ -25,3 +25,27 @@
     # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
     - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     - . ./scripts/version.sh
+
+.kernels_template:
+  extends:
+    - .default_settings_template
+  stage: build
+  image: "${PROD_AWS_ECR}/rust-toolchain:v1.0.3"
+  needs: [trigger]
+  before_script:
+    - make -f kernels.mk build-dev-deps
+  variables:
+    CC: clang
+    CARGO_HOME: $CI_PROJECT_DIR/cargo
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+  cache:
+    - key: kernels
+      paths:
+        - cargo/
+  artifacts:
+    name: "build-kernels-$CI_COMMIT_REF_SLUG"
+    paths:
+      - evm_kernel.wasm
+      - smart-rollup-installer
+    expire_in: 1 day
+    when: on_success
