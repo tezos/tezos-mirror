@@ -147,7 +147,8 @@ let get_endorser_n ctxt n =
   in
   (endorser.consensus_key, endorser.slots)
 
-let get_endorsing_power_for_delegate ctxt ?levels pkh =
+let get_endorsing_power_for_delegate ctxt ?level pkh =
+  let levels = Option.map (fun level -> [level]) level in
   Plugin.RPC.Validators.get rpc_ctxt ?levels ctxt >>=? fun endorsers ->
   let rec find_slots_for_delegate = function
     | [] -> return 0
@@ -157,6 +158,15 @@ let get_endorsing_power_for_delegate ctxt ?levels pkh =
         else find_slots_for_delegate t
   in
   find_slots_for_delegate endorsers
+
+let get_cumulated_endorsing_power_for_delegate ctxt ~levels pkh =
+  let open Lwt_result_syntax in
+  List.fold_left_es
+    (fun accu level ->
+      let+ power = get_endorsing_power_for_delegate ctxt ~level pkh in
+      accu + power)
+    0
+    levels
 
 let get_voting_power = Delegate_services.voting_power rpc_ctxt
 
