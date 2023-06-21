@@ -162,6 +162,10 @@ Node
   disable logs coloration on default stdout logs; it is enabled by
   default. (MR :gl:`!8685`)
 
+- Improved the performance of block validation: the block validation time has
+  been reduced by half on average, resulting in a reduced propagation time
+  through the network. (MR :gl:`!9100`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.

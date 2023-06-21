@@ -64,7 +64,7 @@ module type S = sig
     predecessor:Store.Block.t ->
     max_operations_ttl:int ->
     Block_header.t ->
-    Operation.t list list ->
+    Block_validation.operation list list ->
     Block_validation.result tzresult Lwt.t
 
   val preapply_block :
@@ -80,7 +80,7 @@ module type S = sig
     predecessor_block_metadata_hash:Block_metadata_hash.t option ->
     predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
     predecessor_resulting_context_hash:Context_hash.t ->
-    Operation.t list list ->
+    Block_validation.operation list list ->
     (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
 
   val precheck_block :
@@ -89,7 +89,7 @@ module type S = sig
     predecessor:Store.Block.t ->
     Block_header.t ->
     Block_hash.t ->
-    Operation.t trace trace ->
+    Block_validation.operation trace trace ->
     unit tzresult Lwt.t
 
   val context_garbage_collection :

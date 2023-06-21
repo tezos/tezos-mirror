@@ -41,6 +41,35 @@ module Event = struct
       ("hash", Block_hash.encoding)
 end
 
+type operation = {
+  hash : Operation_hash.t;
+  operation : Operation.t;
+  check_signature : bool;
+}
+
+let mk_operation ?known_valid_operation_set operation =
+  let hash = Operation.hash operation in
+  let check_signature =
+    match known_valid_operation_set with
+    | None -> true
+    | Some known_valid -> not (Operation_hash.Set.mem hash known_valid)
+    (* We do not check the signature of the operation
+       if the operation is already known valid *)
+  in
+  {hash; operation; check_signature}
+
+let operation_encoding =
+  let open Data_encoding in
+  conv
+    (fun {hash; operation; check_signature} ->
+      (hash, operation, check_signature))
+    (fun (hash, operation, check_signature) ->
+      {hash; operation; check_signature})
+    (obj3
+       (req "hash" Operation_hash.encoding)
+       (req "operation" Operation.encoding)
+       (req "check_signature" bool))
+
 type validation_store = {
   resulting_context_hash : Context_hash.t;
   timestamp : Time.Protocol.t;
@@ -293,6 +322,7 @@ module Make (Proto : Registered_protocol.T) = struct
   type 'operation_data preapplied_operation = {
     hash : Operation_hash.t;
     raw : Operation.t;
+    check_signature : bool;
     protocol_data : 'operation_data;
   }
 
@@ -393,18 +423,14 @@ module Make (Proto : Registered_protocol.T) = struct
            (Too_many_operations {pass; found = List.length ops; max}))
     in
     List.iter_ep
-      (fun op ->
-        let size = Data_encoding.Binary.length Operation.encoding op in
+      (fun {hash; operation; _} ->
+        let size = Data_encoding.Binary.length Operation.encoding operation in
         fail_unless
           (size <= Proto.max_operation_data_length)
           (invalid_block
              block_hash
              (Oversized_operation
-                {
-                  operation = Operation.hash op;
-                  size;
-                  max = Proto.max_operation_data_length;
-                })))
+                {operation = hash; size; max = Proto.max_operation_data_length})))
       ops
 
   let check_operation_quota block_hash operations =
@@ -430,18 +456,16 @@ module Make (Proto : Registered_protocol.T) = struct
     List.mapi_es
       (fun pass ->
         let open Lwt_result_syntax in
-        List.map_es (fun op ->
-            let op_hash = Operation.hash op in
+        List.map_es (fun {hash; operation; check_signature} ->
             match
               Data_encoding.Binary.of_bytes_opt
                 Proto.operation_data_encoding_with_legacy_attestation_name
-                op.Operation.proto
+                operation.Operation.proto
             with
             | None ->
-                tzfail
-                  (invalid_block block_hash (Cannot_parse_operation op_hash))
+                tzfail (invalid_block block_hash (Cannot_parse_operation hash))
             | Some protocol_data ->
-                let op = {Proto.shell = op.shell; protocol_data} in
+                let op = {Proto.shell = operation.shell; protocol_data} in
                 let allowed_pass = Proto.acceptable_pass op in
                 let is_pass_consistent =
                   match allowed_pass with
@@ -453,9 +477,9 @@ module Make (Proto : Registered_protocol.T) = struct
                     is_pass_consistent
                     (invalid_block
                        block_hash
-                       (Unallowed_pass {operation = op_hash; pass; allowed_pass}))
+                       (Unallowed_pass {operation = hash; pass; allowed_pass}))
                 in
-                return (op_hash, op)))
+                return (hash, op, check_signature)))
       operations
 
   (* FIXME: This code is used by preapply but emitting time
@@ -580,7 +604,7 @@ module Make (Proto : Registered_protocol.T) = struct
             (fun (state, acc) ops ->
               let* state, ops_metadata =
                 List.fold_left_es
-                  (fun (state, acc) (oph, op) ->
+                  (fun (state, acc) (oph, op, _check_signature) ->
                     let* state, op_metadata =
                       Proto.apply_operation state oph op
                     in
@@ -872,7 +896,11 @@ module Make (Proto : Registered_protocol.T) = struct
             in
             let open Lwt_result_syntax in
             let* validation_state =
-              Proto.validate_operation pv.validation_state op.hash operation
+              Proto.validate_operation
+                ~check_signature:op.check_signature
+                pv.validation_state
+                op.hash
+                operation
             in
             let* application_state, receipt =
               Proto.apply_operation pv.application_state op.hash operation
@@ -924,15 +952,14 @@ module Make (Proto : Registered_protocol.T) = struct
       Proto.operation_data_encoding_with_legacy_attestation_name
       proto
 
-  let parse (raw : Operation.t) =
+  let parse {hash; operation = raw; check_signature} =
     let open Result_syntax in
-    let hash = Operation.hash raw in
     let size = Data_encoding.Binary.length Operation.encoding raw in
     if size > Proto.max_operation_data_length then
       tzfail (Oversized_operation {size; max = Proto.max_operation_data_length})
     else
       let* protocol_data = parse_unsafe raw.proto in
-      return {hash; raw; protocol_data}
+      return {hash; check_signature; raw; protocol_data}
 
   let preapply ~chain_id ~cache ~user_activated_upgrades
       ~user_activated_protocol_overrides ~operation_metadata_size_limit
@@ -1048,8 +1075,9 @@ module Make (Proto : Registered_protocol.T) = struct
              operations ->
           let*! new_validation_result, new_validation_state, rev_receipts =
             List.fold_left_s
-              (fun (acc_validation_result, acc_validation_state, receipts) op ->
-                match parse op with
+              (fun (acc_validation_result, acc_validation_state, receipts)
+                   operation ->
+                match parse operation with
                 | Error _ ->
                     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1721  *)
                     Lwt.return
@@ -1251,8 +1279,10 @@ module Make (Proto : Registered_protocol.T) = struct
       List.fold_left_es
         (fun state ops ->
           List.fold_left_es
-            (fun state (oph, op) ->
-              let* state = Proto.validate_operation state oph op in
+            (fun state (oph, op, check_signature) ->
+              let* state =
+                Proto.validate_operation ~check_signature state oph op
+              in
               return state)
             state
             ops)
@@ -1286,11 +1316,11 @@ let assert_no_duplicate_operations block_hash live_operations operations =
   try
     return
       (List.fold_left
-         (List.fold_left (fun live_operations op ->
-              let oph = Operation.hash op in
-              if Operation_hash.Set.mem oph live_operations then
-                raise (Duplicate (Replayed_operation oph))
-              else Operation_hash.Set.add oph live_operations))
+         (List.fold_left
+            (fun live_operations {hash; operation = _; check_signature = _} ->
+              if Operation_hash.Set.mem hash live_operations then
+                raise (Duplicate (Replayed_operation hash))
+              else Operation_hash.Set.add hash live_operations))
          live_operations
          operations)
   with Duplicate err -> tzfail (invalid_block block_hash err)
@@ -1301,14 +1331,18 @@ let assert_operation_liveness block_hash live_blocks operations =
   try
     return
       (List.iter
-         (List.iter (fun op ->
-              if not (Block_hash.Set.mem op.Operation.shell.branch live_blocks)
+         (List.iter (fun {hash; operation; check_signature = _} ->
+              if
+                not
+                  (Block_hash.Set.mem
+                     operation.Operation.shell.branch
+                     live_blocks)
               then
                 let error =
                   Outdated_operation
                     {
-                      operation = Operation.hash op;
-                      originating_block = op.shell.branch;
+                      operation = hash;
+                      originating_block = operation.shell.branch;
                     }
                 in
                 raise (Outdated error)))
