@@ -23,20 +23,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [resolve_plugin protocols] tries to load [Dal_plugin.T] for either
+    [protocols.current_protocol], if it is equal to [protocols.next_protocol],
+    or [protocols.next_protocol] otherwise.
+    It is an error to use the plugin of [next_protocol] to track a block in
+    [current_protocol] when these are distinct. To avoid this error,
+    the wrapping polymorphic variant allows to decide whether we should start
+    to track the current block or the wait until the next one.  *)
 let resolve_plugin
-    (protocols : Tezos_shell_services.Chain_services.Blocks.protocols) =
+    (protocols : Tezos_shell_services.Chain_services.Blocks.protocols) :
+    [ `Current of (module Dal_plugin.T)
+    | `Next of (module Dal_plugin.T)
+    | `No_plugin ]
+    Lwt.t =
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
+     The current design does not handle protocol switches. *)
   let open Lwt_syntax in
   let plugin_opt =
-    Option.either
-      (Dal_plugin.get protocols.current_protocol)
-      (Dal_plugin.get protocols.next_protocol)
+    if Protocol_hash.equal protocols.current_protocol protocols.next_protocol
+    then
+      Dal_plugin.get protocols.current_protocol
+      |> Option.map (fun plugin -> `Current plugin)
+    else
+      Dal_plugin.get protocols.next_protocol
+      |> Option.map (fun plugin -> `Next plugin)
   in
-  Option.map_s
-    (fun dal_plugin ->
+  match plugin_opt with
+  | None -> return `No_plugin
+  | Some ((`Current dal_plugin | `Next dal_plugin) as arg) ->
       let (module Dal_plugin : Dal_plugin.T) = dal_plugin in
       let* () = Event.(emit protocol_plugin_resolved) Dal_plugin.Proto.hash in
-      return dal_plugin)
-    plugin_opt
+      return arg
 
 type error +=
   | Cryptobox_initialisation_failed of string
@@ -143,19 +160,22 @@ module Handler = struct
   let resolve_plugin_and_set_ready config ctxt cctxt =
     (* Monitor heads and try resolve the DAL protocol plugin corresponding to
        the protocol of the targeted node. *)
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
-       Handle situtation where plugin is not found *)
     let open Lwt_result_syntax in
-    let handler stopper
-        (_block_hash, (_block_header : Tezos_base.Block_header.t)) =
+    let handler stopper (_block_hash, (block_header : Tezos_base.Block_header.t))
+        =
       let* protocols =
         Tezos_shell_services.Chain_services.Blocks.protocols cctxt ()
       in
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/4627
          Register only one plugin according to mode of operation. *)
-      let*! plugin_opt = resolve_plugin protocols in
-      match plugin_opt with
-      | Some plugin ->
+      let*! resolved_plugin = resolve_plugin protocols in
+      match resolved_plugin with
+      | (`Current plugin | `Next plugin) as resolved ->
+          let plugin_activation_level =
+            match resolved with
+            | `Current _ -> block_header.shell.level
+            | `Next _ -> Int32.succ block_header.shell.level
+          in
           let (module Dal_plugin : Dal_plugin.T) = plugin in
           let* proto_parameters =
             Dal_plugin.get_constants `Main (`Head 0) cctxt
@@ -172,7 +192,12 @@ module Handler = struct
                  (Node_context.get_store ctxt))
               config.profile
           in
-          Node_context.set_ready ctxt plugin cryptobox proto_parameters ;
+          Node_context.set_ready
+            ctxt
+            plugin
+            cryptobox
+            proto_parameters
+            plugin_activation_level ;
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4441
 
              The hook below should be called each time cryptobox parameters
@@ -182,7 +207,10 @@ module Handler = struct
           let*! () = Event.(emit node_is_ready ()) in
           stopper () ;
           return_unit
-      | _ -> return_unit
+      | `No_plugin ->
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
+             Handle situtation where plugin is not found *)
+          return_unit
     in
     let handler stopper el =
       match Node_context.get_status ctxt with
@@ -206,45 +234,48 @@ module Handler = struct
             proto_parameters;
             cryptobox;
             shards_proofs_precomputation = _;
+            activation_level;
           } ->
           let block_level = header.shell.level in
-          let* block_info =
-            Dal_plugin.block_info
-              cctxt
-              ~block:(`Hash (block_hash, 0))
-              ~metadata:`Always
-          in
-          let* slot_headers =
-            Dal_plugin.get_published_slot_headers block_info
-          in
-          let* () =
-            Slot_manager.store_slot_headers
-              ~level_committee:(Node_context.fetch_committee ctxt)
-              cryptobox
-              proto_parameters
-              ~block_level
-              ~block_hash
-              slot_headers
-              (Node_context.get_store ctxt)
-          in
-          let*? attested_slots =
-            Dal_plugin.attested_slot_headers
-              block_hash
-              block_info
-              ~number_of_slots:proto_parameters.number_of_slots
-          in
-          let*! () =
-            Slot_manager.update_selected_slot_headers_statuses
-              ~block_level
-              ~attestation_lag:proto_parameters.attestation_lag
-              ~number_of_slots:proto_parameters.number_of_slots
-              attested_slots
-              (Node_context.get_store ctxt)
-          in
-          let*! () =
-            Event.(emit layer1_node_new_head (block_hash, block_level))
-          in
-          return_unit
+          if Compare.Int32.(block_level < activation_level) then return_unit
+          else
+            let* block_info =
+              Dal_plugin.block_info
+                cctxt
+                ~block:(`Hash (block_hash, 0))
+                ~metadata:`Always
+            in
+            let* slot_headers =
+              Dal_plugin.get_published_slot_headers block_info
+            in
+            let* () =
+              Slot_manager.store_slot_headers
+                ~level_committee:(Node_context.fetch_committee ctxt)
+                cryptobox
+                proto_parameters
+                ~block_level
+                ~block_hash
+                slot_headers
+                (Node_context.get_store ctxt)
+            in
+            let*? attested_slots =
+              Dal_plugin.attested_slot_headers
+                block_hash
+                block_info
+                ~number_of_slots:proto_parameters.number_of_slots
+            in
+            let*! () =
+              Slot_manager.update_selected_slot_headers_statuses
+                ~block_level
+                ~attestation_lag:proto_parameters.attestation_lag
+                ~number_of_slots:proto_parameters.number_of_slots
+                attested_slots
+                (Node_context.get_store ctxt)
+            in
+            let*! () =
+              Event.(emit layer1_node_new_head (block_hash, block_level))
+            in
+            return_unit
     in
     let*! () = Event.(emit layer1_node_tracking_started ()) in
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3517
