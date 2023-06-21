@@ -37,7 +37,9 @@
 
 .unit_test_template_arm64:
   extends: .unit_test_template
-  needs: ["build_arm64"]
+  needs:
+    - "build_arm64-released"
+    - "build_arm64-exp-dev-extra"
   variables:
     ARCH: "arm64"
   tags:
