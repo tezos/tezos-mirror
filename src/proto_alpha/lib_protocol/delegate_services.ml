@@ -230,6 +230,15 @@ let participation_info_encoding =
        (req "remaining_allowed_missed_slots" int31)
        (req "expected_endorsing_rewards" Tez.encoding))
 
+type deposit_per_cycle = {cycle : Cycle.t; deposit : Tez.t}
+
+let deposit_per_cycle_encoding : deposit_per_cycle Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {cycle; deposit} -> (cycle, deposit))
+    (fun (cycle, deposit) -> {cycle; deposit})
+    (obj2 (req "cycle" Cycle.encoding) (req "deposit" Tez.encoding))
+
 module S = struct
   let raw_path = RPC_path.(open_root / "context" / "delegates")
 
@@ -302,6 +311,16 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "frozen_deposits")
+
+  let unstaked_frozen_deposits =
+    RPC_service.get_service
+      ~description:
+        "Returns, for each cycle, the sum of unstaked-but-frozen deposits for \
+         this cycle. Cycles go from the last unslashable cycle to the current \
+         cycle."
+      ~query:RPC_query.empty
+      ~output:(Data_encoding.list deposit_per_cycle_encoding)
+      RPC_path.(path / "unstaked_frozen_deposits")
 
   let staking_balance =
     RPC_service.get_service
@@ -478,6 +497,22 @@ let register () =
       check_delegate_registered ctxt pkh >>=? fun () ->
       Delegate.frozen_deposits ctxt pkh >>=? fun deposits ->
       return deposits.initial_amount) ;
+  register1 ~chunked:false S.unstaked_frozen_deposits (fun ctxt pkh () () ->
+      check_delegate_registered ctxt pkh >>=? fun () ->
+      let ctxt_cycle = (Alpha_context.Level.current ctxt).cycle in
+      let csts = (Constants.all ctxt).parametric in
+      let last_unslashable_cycle =
+        Option.value ~default:Cycle.root
+        @@ Cycle.sub
+             ctxt_cycle
+             (csts.preserved_cycles + csts.max_slashing_period)
+      in
+      let cycles = Cycle.(last_unslashable_cycle ---> ctxt_cycle) in
+      List.map_es
+        (fun cycle ->
+          Unstaked_frozen_deposits.balance ctxt pkh cycle >>=? fun deposit ->
+          return {cycle; deposit})
+        cycles) ;
   register1 ~chunked:false S.staking_balance (fun ctxt pkh () () ->
       check_delegate_registered ctxt pkh >>=? fun () ->
       Delegate.staking_balance ctxt pkh) ;
@@ -537,6 +572,9 @@ let current_frozen_deposits ctxt block pkh =
 
 let frozen_deposits ctxt block pkh =
   RPC_context.make_call1 S.frozen_deposits ctxt block pkh () ()
+
+let unstaked_frozen_deposits ctxt block pkh =
+  RPC_context.make_call1 S.unstaked_frozen_deposits ctxt block pkh () ()
 
 let staking_balance ctxt block pkh =
   RPC_context.make_call1 S.staking_balance ctxt block pkh () ()
