@@ -8,6 +8,14 @@
   # their dependencies locally.
   dependencies: []
 
+# Default runner tags for jobs in the build stage
+.tags_template__build:
+  tags: []
+
+# Default runner tags for arm64 jobs in the build stage
+.tags_template__build_arm64:
+  tags: ["arm64"]
+
 # Add variables for bisect_ppx instrumentation
 .template__coverage:
   variables:
