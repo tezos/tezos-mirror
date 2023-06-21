@@ -58,9 +58,9 @@ let options_respond methods =
     ~body:Cohttp_lwt.Body.empty
     ()
 
-let with_source_authentification rights header f =
+let with_source_authentification users header f =
   match Cohttp.Header.get_authorization header with
-  | Some (`Basic ((user, _) as login)) when List.mem login rights -> f user
+  | Some (`Basic ((user, _) as login)) when List.mem login users -> f user
   | Some (`Basic _) ->
       Cohttp_lwt_unix.Server.respond_string
         ~headers:
@@ -71,10 +71,26 @@ let with_source_authentification rights header f =
   | Some _ | None ->
       Cohttp_lwt_unix.Server.respond_need_auth ~auth:(`Basic "Who are you?") ()
 
-let post_only_endpoint rights header meth f =
+(** [post_only_endpoint] checks authorization and runs the callback passed as parameter if allowed,
+    or returns an error responses.
+    Also handles OPTIONS method.
+    Other methods return an error response.
+  *)
+let post_only_endpoint users header meth f =
   let methods = [`POST; `OPTIONS] in
   match meth with
-  | `POST -> with_source_authentification rights header f
+  | `POST -> with_source_authentification users header f
+  | `OPTIONS -> options_respond methods
+  | _ -> method_not_allowed_respond methods
+
+(** [get_only_endpoint] runs the callback passed as parameter if method is GET.
+    Also handles OPTIONS method.
+    Other methods return an error response.
+  *)
+let get_only_endpoint meth f =
+  let methods = [`GET; `OPTIONS] in
+  match meth with
+  | `GET -> f ()
   | `OPTIONS -> options_respond methods
   | _ -> method_not_allowed_respond methods
 
@@ -369,15 +385,11 @@ let routes :
               body
               (operations_callback db_pool g source)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str ".json"],
-      fun g _rights db_pool _header meth _body ->
-        let methods = [`GET; `OPTIONS] in
-        match meth with
-        | `GET ->
+      fun g _users db_pool _header meth _body ->
+        get_only_endpoint meth (fun () ->
             let level = Int32.of_string (Re.Group.get g 1) in
             with_caqti_error (Exporter.data_at_level db_pool level) (fun data ->
-                reply_public_json Teztale_lib.Data.encoding data)
-        | `OPTIONS -> options_respond methods
-        | _ -> method_not_allowed_respond methods );
+                reply_public_json Teztale_lib.Data.encoding data)) );
     ( Re.seq
         [
           Re.str "/";
@@ -386,10 +398,8 @@ let routes :
           Re.group (Re.rep1 Re.digit);
           Re.str "/anomalies.json";
         ],
-      fun g _rights db_pool _header meth _body ->
-        let methods = [`GET; `OPTIONS] in
-        match meth with
-        | `GET ->
+      fun g _users db_pool _header meth _body ->
+        get_only_endpoint meth (fun () ->
             let first_level = int_of_string (Re.Group.get g 1) in
             let last_level = int_of_string (Re.Group.get g 2) in
             with_caqti_error
@@ -415,17 +425,15 @@ let routes :
                        "application/json; charset=UTF-8")
                   ~status:`OK
                   ~body
-                  ())
-        | `OPTIONS -> options_respond methods
-        | _ -> method_not_allowed_respond methods );
+                  ())) );
     ( Re.str "/stats.json",
-      fun _g _rights db_pool _header _meth _body -> get_stats db_pool );
+      fun _g _users db_pool _header _meth _body -> get_stats db_pool );
     ( Re.str "/head.json",
-      fun _g _rights db_pool _header _meth _body -> get_head db_pool );
+      fun _g _users db_pool _header _meth _body -> get_head db_pool );
   ]
   |> List.map (fun (r, fn) -> (r |> Re.whole_string |> Re.compile, fn))
 
-let callback ~public rights db_pool _connection request body =
+let callback ~public users db_pool _connection request body =
   let header = Cohttp.Request.headers request in
   let meth = Cohttp.Request.meth request in
   let uri = Cohttp.Request.uri request in
@@ -436,7 +444,7 @@ let callback ~public rights db_pool _connection request body =
         match Re.exec_opt r path with Some g -> Some (fn g) | None -> None)
       routes
   with
-  | Some fn -> fn rights db_pool header meth body
+  | Some fn -> fn users db_pool header meth body
   | None -> (
       match public with
       | None -> Cohttp_lwt_unix.Server.respond_not_found ()
