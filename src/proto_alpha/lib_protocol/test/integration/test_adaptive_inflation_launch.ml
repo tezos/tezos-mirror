@@ -270,6 +270,15 @@ let test_launch threshold expected_vote_duration () =
   (* Check that the current cycle is the one at which the launch is
      planned to happen. *)
   let* () = assert_current_cycle ~loc:__LOC__ block launch_cycle in
+  (* At this point, only the delegate has frozen any stake and its
+     frozen balance is about 2 million tez (it started with 4 million,
+     sent half to its delegate, and staked the rest). *)
+  let* () =
+    assert_total_frozen_stake
+      ~loc:__LOC__
+      block
+      (Protocol.Alpha_context.Tez.of_mutez_exn 2_000_000_000_000L)
+  in
 
   (* Test that the wannabe costaker is now allowed to stake almost all
      its balance. It cannot totally costake it however because this is
