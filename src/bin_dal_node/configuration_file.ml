@@ -35,6 +35,7 @@ type t = {
   expected_pow : float;
   network_name : string;
   endpoint : Uri.t;
+  profile : Services.Types.profile option;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -74,6 +75,7 @@ let default =
     expected_pow = default_expected_pow;
     network_name = default_network_name;
     endpoint = default_endpoint;
+    profile = None;
   }
 
 let neighbor_encoding : neighbor Data_encoding.t =
@@ -110,6 +112,7 @@ let encoding : t Data_encoding.t =
            expected_pow;
            network_name;
            endpoint;
+           profile;
          } ->
       ( use_unsafe_srs,
         data_dir,
@@ -119,7 +122,8 @@ let encoding : t Data_encoding.t =
         peers,
         expected_pow,
         network_name,
-        endpoint ))
+        endpoint,
+        profile ))
     (fun ( use_unsafe_srs,
            data_dir,
            rpc_addr,
@@ -128,7 +132,8 @@ let encoding : t Data_encoding.t =
            peers,
            expected_pow,
            network_name,
-           endpoint ) ->
+           endpoint,
+           profile ) ->
       {
         use_unsafe_srs;
         data_dir;
@@ -139,8 +144,9 @@ let encoding : t Data_encoding.t =
         expected_pow;
         network_name;
         endpoint;
+        profile;
       })
-    (obj9
+    (obj10
        (dft
           "use_unsafe_srs"
           ~description:"use unsafe srs for tests"
@@ -185,7 +191,12 @@ let encoding : t Data_encoding.t =
           "endpoint"
           ~description:"The Tezos node endpoint"
           endpoint_encoding
-          default_endpoint))
+          default_endpoint)
+       (dft
+          "profile"
+          ~description:"The Octez DAL node profile"
+          (option Services.Types.profile_encoding)
+          None))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 

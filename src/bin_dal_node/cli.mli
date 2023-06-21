@@ -38,6 +38,8 @@ type options = {
   listen_addr : P2p_point.Id.t;
       (** The endpoint on which the DAL node can be contacted by other DAL nodes. *)
   endpoint : Uri.t;  (** The endpoint on which to contact the L1 node. *)
+  profile : Services.Types.profile option;
+      (** Profile of the DAL node used for tracking shards. *)
   use_unsafe_srs_for_tests : bool;
 }
 
