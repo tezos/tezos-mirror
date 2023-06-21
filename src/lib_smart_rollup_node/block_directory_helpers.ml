@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,9 +23,45 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module is a helper to extract a block hash
-    from block reference and Node_context *)
-val block_of_prefix :
-  _ Node_context.t ->
-  [< `Cemented | `Finalized | `Hash of Block_hash.t | `Head | `Level of int32] ->
-  Block_hash.t tzresult Lwt.t
+(* Conveniences to construct RPC directory
+   against a subcontext of the Node_context *)
+
+let get_head store =
+  let open Lwt_result_syntax in
+  let* head = Node_context.last_processed_head_opt store in
+  match head with
+  | None -> failwith "No head"
+  | Some {header = {block_hash; _}; _} -> return block_hash
+
+let get_head_level store =
+  let open Lwt_result_syntax in
+  let* head = Node_context.last_processed_head_opt store in
+  match head with
+  | None -> failwith "No head"
+  | Some {header = {level; _}; _} -> return level
+
+let get_finalized node_ctxt =
+  let open Lwt_result_syntax in
+  let* level = Node_context.get_finalized_level node_ctxt in
+  Node_context.hash_of_level node_ctxt level
+
+let get_last_cemented (node_ctxt : _ Node_context.t) =
+  protect @@ fun () ->
+  let lcc = Reference.get node_ctxt.lcc in
+  Node_context.hash_of_level node_ctxt lcc.level
+
+let block_of_prefix node_ctxt block =
+  match block with
+  | `Head -> get_head node_ctxt
+  | `Hash b -> Lwt_result.return b
+  | `Level l -> Node_context.hash_of_level node_ctxt l
+  | `Finalized -> get_finalized node_ctxt
+  | `Cemented -> get_last_cemented node_ctxt
+
+let block_level_of_id node_ctxt block =
+  match block with
+  | `Head -> get_head_level node_ctxt
+  | `Hash b -> Node_context.level_of_hash node_ctxt b
+  | `Level l -> Lwt_result.return l
+  | `Finalized -> Node_context.get_finalized_level node_ctxt
+  | `Cemented -> Lwt_result.return (Reference.get node_ctxt.lcc).level
