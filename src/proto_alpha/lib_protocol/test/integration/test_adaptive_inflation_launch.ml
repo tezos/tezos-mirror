@@ -72,7 +72,13 @@ let stake ctxt contract amount =
   let*?@ entrypoint =
     Protocol.Alpha_context.Entrypoint.of_string_strict ~loc:0 "stake"
   in
-  Op.transaction ctxt ~entrypoint contract contract amount
+  Op.transaction
+    ctxt
+    ~entrypoint
+    ~fee:Protocol.Alpha_context.Tez.zero
+    contract
+    contract
+    amount
 
 let set_delegate_parameters ctxt delegate ~staking_over_baking_limit
     ~baking_over_staking_edge =
