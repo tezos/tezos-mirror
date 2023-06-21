@@ -414,6 +414,38 @@ module Config_file = struct
     in
     JSON.put ("network", network) old_config
 
+  let set_sandbox_network_with_dal_config
+      (dal_config : Tezos_crypto_dal.Cryptobox.Config.t) old_config =
+    let dal_config_json =
+      let parameters =
+        match dal_config.use_mock_srs_for_testing with
+        | Some parameters ->
+            `O
+              [
+                ("slot_size", `Float (float_of_int parameters.slot_size));
+                ("page_size", `Float (float_of_int parameters.page_size));
+                ( "redundancy_factor",
+                  `Float (float_of_int parameters.redundancy_factor) );
+                ( "number_of_shards",
+                  `Float (float_of_int parameters.number_of_shards) );
+              ]
+        | None -> `Null
+      in
+      JSON.annotate
+        ~origin:"dal_initialisation"
+        (`O
+          [
+            ("activated", `Bool dal_config.activated);
+            ("use_mock_srs_for_testing", parameters);
+          ])
+    in
+    let network =
+      sandbox_network_config
+      |> JSON.annotate ~origin:"set_sandbox_network_with_dal_config"
+      |> JSON.put ("dal", dal_config_json)
+    in
+    JSON.put ("network", network) old_config
+
   let set_ghostnet_sandbox_network ?user_activated_upgrades () old_config =
     let may_patch_user_activated_upgrades =
       match user_activated_upgrades with

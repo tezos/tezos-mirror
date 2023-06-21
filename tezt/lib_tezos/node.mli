@@ -307,6 +307,10 @@ module Config_file : sig
   val set_sandbox_network_with_user_activated_overrides :
     (string * string) list -> JSON.t -> JSON.t
 
+  (** Set the network config to a sandbox with the given dal config. *)
+  val set_sandbox_network_with_dal_config :
+    Tezos_crypto_dal.Cryptobox.Config.t -> JSON.t -> JSON.t
+
   (** Set the prevalidator configuration in the given configuration. *)
   val set_prevalidator :
     ?operations_request_timeout:float ->
