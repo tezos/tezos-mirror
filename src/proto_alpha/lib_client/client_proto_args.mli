@@ -76,8 +76,6 @@ val successor_level_arg : (bool, full) Tezos_clic.arg
 
 val force_switch : (bool, full) Tezos_clic.arg
 
-val no_endorse_switch : (bool, full) Tezos_clic.arg
-
 val minimal_timestamp_switch : (bool, full) Tezos_clic.arg
 
 val preserved_levels_arg : (int, full) Tezos_clic.arg
@@ -120,14 +118,6 @@ val global_constant_param :
   (string -> 'a, full) Tezos_clic.params
 
 val signature_parameter : (Signature.t, full) Tezos_clic.parameter
-
-module Daemon : sig
-  val baking_switch : (bool, full) Tezos_clic.arg
-
-  val endorsement_switch : (bool, full) Tezos_clic.arg
-
-  val denunciation_switch : (bool, full) Tezos_clic.arg
-end
 
 val int_parameter : (int, full) Tezos_clic.parameter
 

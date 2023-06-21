@@ -323,12 +323,6 @@ let force_switch =
        of block without a fitness greater than the  current head."
     ()
 
-let no_endorse_switch =
-  Tezos_clic.switch
-    ~long:"no-endorse"
-    ~doc:"Do not let the client automatically endorse a block that it baked."
-    ()
-
 let minimal_timestamp_switch =
   Tezos_clic.switch
     ~long:"minimal-timestamp"
@@ -682,25 +676,6 @@ let display_names_flag =
     ~long:"display-names"
     ~doc:"Print names of scripts passed to this command"
     ()
-
-module Daemon = struct
-  let baking_switch =
-    Tezos_clic.switch ~long:"baking" ~short:'B' ~doc:"run the baking daemon" ()
-
-  let endorsement_switch =
-    Tezos_clic.switch
-      ~long:"endorsement"
-      ~short:'E'
-      ~doc:"run the endorsement daemon"
-      ()
-
-  let denunciation_switch =
-    Tezos_clic.switch
-      ~long:"denunciation"
-      ~short:'D'
-      ~doc:"run the denunciation daemon"
-      ()
-end
 
 module Sc_rollup_params = struct
   let rollup_kind_parameter =
