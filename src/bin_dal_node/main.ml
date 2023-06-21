@@ -40,7 +40,8 @@ let run subcommand
       {
         data_dir =
           Option.value ~default:Configuration_file.default.data_dir data_dir;
-        rpc_addr;
+        rpc_addr =
+          Option.value ~default:Configuration_file.default.rpc_addr rpc_addr;
         use_unsafe_srs = use_unsafe_srs_for_tests;
         neighbors = [];
         peers;

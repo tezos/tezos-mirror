@@ -50,17 +50,15 @@ module Term = struct
 
   let rpc_addr =
     let open Cmdliner in
-    let default = Configuration_file.default.rpc_addr in
+    let default_port = Configuration_file.default.rpc_addr |> snd in
     let doc =
       Format.asprintf
         "The TCP socket point at which this RPC server of this instance can be \
-         reached. Default value is %a."
-        P2p_point.Id.pp
-        default
+         reached."
     in
     Arg.(
       value
-      & opt (p2p_point_arg ~default_port:(snd default)) default
+      & opt (some (p2p_point_arg ~default_port)) None
       & info ~docs ~doc ~docv:"ADDR:PORT" ["rpc-addr"])
 
   let expected_pow =
@@ -200,7 +198,7 @@ end
 
 type options = {
   data_dir : string option;
-  rpc_addr : P2p_point.Id.t;
+  rpc_addr : P2p_point.Id.t option;
   expected_pow : float;
   listen_addr : P2p_point.Id.t;
   endpoint : Uri.t;
