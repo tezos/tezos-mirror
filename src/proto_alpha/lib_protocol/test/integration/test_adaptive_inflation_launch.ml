@@ -298,6 +298,16 @@ let test_launch threshold expected_vote_duration () =
       i
       "Staking for a non-delegate while co-staking is disabled"
   in
+  let* () =
+    assert_voting_power
+      ~loc:__LOC__
+      block
+      delegate_pkh
+      ~ai_enabled:false
+      ~expected_staked:2_000_000_000_000L
+      ~expected_delegated:2_000_000_000_000L
+      ~expected_costaked:0L
+  in
 
   let* launch_cycle = get_launch_cycle ~loc:__LOC__ block in
   (* Bake until the activation. *)
@@ -319,6 +329,16 @@ let test_launch threshold expected_vote_duration () =
       ~loc:__LOC__
       block
       (Protocol.Alpha_context.Tez.of_mutez_exn 2_000_000_000_000L)
+  in
+  let* () =
+    assert_voting_power
+      ~loc:__LOC__
+      block
+      delegate_pkh
+      ~ai_enabled:true
+      ~expected_staked:2_000_000_000_000L
+      ~expected_delegated:2_000_000_000_000L
+      ~expected_costaked:0L
   in
 
   (* Test that the wannabe costaker is now allowed to stake almost all
@@ -352,6 +372,16 @@ let test_launch threshold expected_vote_duration () =
       ~loc:__LOC__
       block
       (Protocol.Alpha_context.Tez.of_mutez_exn 3_999_999_000_000L)
+  in
+  let* () =
+    assert_voting_power
+      ~loc:__LOC__
+      block
+      delegate_pkh
+      ~ai_enabled:true
+      ~expected_staked:2_000_000_000_000L
+      ~expected_delegated:1_000_000L
+      ~expected_costaked:1_999_999_000_000L
   in
   return_unit
 
