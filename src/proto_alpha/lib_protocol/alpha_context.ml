@@ -635,6 +635,7 @@ end
 module Token = Token
 module Cache = Cache_repr
 module Unstake_requests = Unstake_requests_storage
+module Unstaked_frozen_deposits = Unstaked_frozen_deposits_storage
 
 module Staking_pseudotokens = struct
   include Staking_pseudotoken_repr

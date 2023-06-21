@@ -4873,6 +4873,10 @@ module Unstake_requests : sig
     context tzresult Lwt.t
 end
 
+module Unstaked_frozen_deposits : sig
+  val balance : context -> public_key_hash -> Cycle.t -> Tez.t tzresult Lwt.t
+end
+
 (** This module re-exports definitions from {!Staking_pseudotoken_repr} and
     {!Staking_pseudotokens_storage}. *)
 module Staking_pseudotokens : sig
