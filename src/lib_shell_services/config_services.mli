@@ -41,6 +41,8 @@ module Network : sig
       unit,
       User_activated.protocol_overrides )
     Tezos_rpc.Service.t
+
+  val dal : ([`GET], unit, unit, unit, unit, Dal_config.t) Tezos_rpc.Service.t
 end
 
 val history_mode :
@@ -66,3 +68,5 @@ end
 
 val user_activated_upgrades :
   #Tezos_rpc.Context.simple -> User_activated.upgrades tzresult Lwt.t
+
+val dal : #Tezos_rpc.Context.simple -> Dal_config.t tzresult Lwt.t

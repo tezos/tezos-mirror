@@ -68,6 +68,7 @@ type t = {
   p2p : Distributed_db.p2p;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
+  dal : Tezos_crypto_dal.Cryptobox.Config.t;
   operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
   (* For P2P RPCs *)
   shutdown : unit -> unit Lwt.t;
@@ -338,6 +339,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess ~version
       p2p;
       user_activated_upgrades;
       user_activated_protocol_overrides;
+      dal;
       operation_metadata_size_limit;
       shutdown;
     }
@@ -368,6 +370,7 @@ let build_rpc_directory ~version ~commit_info node =
     (Config_directory.build_rpc_directory
        ~user_activated_upgrades:node.user_activated_upgrades
        ~user_activated_protocol_overrides:node.user_activated_protocol_overrides
+       ~dal:node.dal
        ~mainchain_validator:node.mainchain_validator
        node.store) ;
   merge (Version_directory.rpc_directory ~version ~commit_info node.p2p) ;
