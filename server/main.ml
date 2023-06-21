@@ -277,7 +277,7 @@ let block_callback db_pool g source
                   let open Teztale_lib.Data.Block in
                   Db.exec
                     Sql_requests.insert_received_block
-                    (r.validation_time, r.application_time, hash, source))
+                    (r.application_time, r.validation_time, hash, source))
                 reception_times
             in
             let* () =

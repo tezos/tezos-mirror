@@ -40,7 +40,7 @@ let parse_block_row ((hash, predecessor, delegate), (round, timestamp)) acc =
       }
     acc
 
-let parse_block_reception_row (hash, validation_time, application_time, source)
+let parse_block_reception_row (hash, application_time, validation_time, source)
     acc =
   Tezos_crypto.Hashed.Block_hash.Map.update
     hash
@@ -64,7 +64,7 @@ let parse_block_reception_row (hash, validation_time, application_time, source)
                 delegate;
                 round;
                 reception_times =
-                  {source; validation_time; application_time} :: reception_times;
+                  {source; application_time; validation_time} :: reception_times;
                 timestamp;
                 nonce;
               }
@@ -105,7 +105,7 @@ let select_blocks db_pool level =
               (option ptime)
               (option ptime)
               string))
-      "SELECT b.hash, r.validation_timestamp, r.application_timestamp, n.name \
+      "SELECT b.hash, r.application_timestamp, r.validation_timestamp, n.name \
        FROM blocks b JOIN blocks_reception r ON r.block = b.id JOIN nodes n ON \
        n.id = r.source WHERE b.level = ?"
   in

@@ -177,8 +177,8 @@ end
 module Block = struct
   type reception = {
     source : string;
-    validation_time : Time.System.t option;
     application_time : Time.System.t option;
+    validation_time : Time.System.t option;
   }
 
   type t = {
@@ -194,14 +194,14 @@ module Block = struct
   let reception_encoding =
     let open Data_encoding in
     conv
-      (fun {source; validation_time; application_time} ->
-        (source, validation_time, application_time))
-      (fun (source, validation_time, application_time) ->
-        {source; validation_time; application_time})
+      (fun {source; application_time; validation_time} ->
+        (source, application_time, validation_time))
+      (fun (source, application_time, validation_time) ->
+        {source; application_time; validation_time})
       (obj3
          (req "source" string)
-         (opt "validation" Time.System.encoding)
-         (opt "application" Time.System.encoding))
+         (opt "application" Time.System.encoding)
+         (opt "validation" Time.System.encoding))
 
   let encoding =
     let open Data_encoding in

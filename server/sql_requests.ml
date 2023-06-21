@@ -56,8 +56,8 @@ let create_blocks =
 let create_blocks_reception =
   "CREATE TABLE IF NOT EXISTS blocks_reception(\n\
   \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
-  \  validation_timestamp TEXT, -- ISO8601 string\n\
   \  application_timestamp TEXT, -- ISO8601 string\n\
+  \  validation_timestamp TEXT, -- ISO8601 string\n\
   \  block INTEGER NOT NULL,\n\
   \  source INTEGER NOT NULL,\n\
   \  FOREIGN KEY (block) REFERENCES blocks(id),\n\
@@ -276,9 +276,9 @@ let insert_received_block =
   Caqti_request.Infix.(
     Caqti_type.(
       tup4 (option ptime) (option ptime) Type.block_hash string ->. unit))
-    "INSERT INTO blocks_reception (validation_timestamp, \
-     application_timestamp, block, source) SELECT ?, ?, blocks.id, nodes.id \
+    "INSERT INTO blocks_reception (application_timestamp, \
+     validation_timestamp, block, source) SELECT ?, ?, blocks.id, nodes.id \
      FROM blocks, nodes WHERE blocks.hash = ? AND nodes.name = ? ON CONFLICT \
-     DO UPDATE SET validation_timestamp = COALESCE(validation_timestamp, \
-     excluded.validation_timestamp), application_timestamp = \
-     COALESCE(application_timestamp, excluded.application_timestamp)"
+     DO UPDATE SET application_timestamp = COALESCE(application_timestamp, \
+     excluded.application_timestamp), validation_timestamp = \
+     COALESCE(validation_timestamp, excluded.validation_timestamp)"
