@@ -175,15 +175,33 @@ module Delegate_operations = struct
 end
 
 module Block = struct
+  type reception = {
+    source : string;
+    validation_time : Time.System.t option;
+    application_time : Time.System.t option;
+  }
+
   type t = {
     hash : Block_hash.t;
     predecessor : Block_hash.t option;
     delegate : Tezos_crypto.Signature.public_key_hash;
     round : Int32.t;
     timestamp : Time.Protocol.t;
-    reception_times : (string * Time.System.t) list;
+    reception_times : reception list;
     nonce : unit option;
   }
+
+  let reception_encoding =
+    let open Data_encoding in
+    conv
+      (fun {source; validation_time; application_time} ->
+        (source, validation_time, application_time))
+      (fun (source, validation_time, application_time) ->
+        {source; validation_time; application_time})
+      (obj3
+         (req "source" string)
+         (opt "validation" Time.System.encoding)
+         (opt "application" Time.System.encoding))
 
   let encoding =
     let open Data_encoding in
@@ -214,13 +232,7 @@ module Block = struct
             Tezos_crypto.Signature.Public_key_hash.encoding
             Tezos_crypto.Signature.Public_key_hash.zero)
          (dft "round" int32 0l)
-         (dft
-            "reception_times"
-            (list
-               (obj2
-                  (req "source" string)
-                  (req "timestamp" Time.System.encoding)))
-            [])
+         (dft "reception_times" (list reception_encoding) [])
          (dft "timestamp" Time.Protocol.encoding Time.Protocol.epoch)
          (opt "nonce" unit))
 end
