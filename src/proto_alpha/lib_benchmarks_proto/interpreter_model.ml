@@ -474,6 +474,17 @@ let ir_model instr_or_cont =
   let open Models in
   let name = name_of_instr_or_cont instr_or_cont in
   let m s = TimeModel s in
+  let m2 name (time, alloc) =
+    (* Naming convention for backward compatibility.
+       When we finally switch to the time-allocation model,
+       "_synthesized" should be removed and the time model should be qualified with "_time" *)
+    TimeAllocModel
+      {
+        name = ns (name ^ "_synthesized");
+        time = time name;
+        alloc = alloc (name ^ "_alloc");
+      }
+  in
   match instr_or_cont with
   | Instr_name instr -> (
       match instr with
@@ -570,7 +581,7 @@ let ir_model instr_or_cont =
       | N_IMap_map -> affine_model name |> m
       | N_IMap_iter -> affine_model name |> m
       | N_ISet_iter -> affine_model name |> m
-      | N_IHalt -> const1_model name |> m
+      | N_IHalt -> (const1_model, const1_model) |> m2 name
       | N_IApply -> lambda_model name |> m
       | N_ILambda_lam -> const1_model name |> m
       | N_ILambda_lamrec -> const1_model name |> m

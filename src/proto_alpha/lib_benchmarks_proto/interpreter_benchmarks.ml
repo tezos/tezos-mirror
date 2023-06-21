@@ -783,7 +783,7 @@ module Registration_section = struct
 
   let () =
     (* KHalt *)
-    simple_benchmark
+    simple_time_alloc_benchmark
       ~amplification:100
       ~name:Interpreter_workload.N_IHalt
       ~stack_type:(unit @$ bot)
