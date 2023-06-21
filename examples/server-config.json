@@ -1,5 +1,15 @@
 {
-    "db":"sqlite3:db",
-    "interfaces":[{"port":8880}],
-    "users":[ { "login":"archiver", "password":"secret" } ]
+    "db": "sqlite3:db",
+    "interfaces": [
+        {
+            "address": "0.0.0.0",
+            "port": 8880
+        }
+    ],
+    "users": [
+        {
+            "login": "archiver",
+            "password": "secret"
+        }
+    ]
 }
