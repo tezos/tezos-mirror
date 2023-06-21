@@ -34,9 +34,12 @@ type options = {
   config_file : string option;
 }
 
-type 'workload timed_workload = {workload : 'workload; measures : Maths.vector}
+type 'workload measured_workload = {
+  workload : 'workload;
+  measures : Maths.vector;
+}
 
-type 'workload workload_data = 'workload timed_workload list
+type 'workload workload_data = 'workload measured_workload list
 
 type 'workload measurement = {
   bench_opts : options;
@@ -55,9 +58,9 @@ type serialized_workload = {
 }
 
 type workloads_stats = {
-  max_time : float;
-  min_time : float;
-  mean_time : float;
+  max : float;
+  min : float;
+  mean : float;
   variance : float;
 }
 
@@ -111,7 +114,7 @@ let rfc3339_encoding =
 let vec_encoding : Maths.vector Data_encoding.t =
   Data_encoding.(conv Maths.vector_to_array Maths.vector_of_array (array float))
 
-let timed_workload_encoding workload_encoding =
+let measured_workload_encoding workload_encoding =
   let open Data_encoding in
   conv
     (fun {workload; measures} -> (workload, measures))
@@ -119,7 +122,7 @@ let timed_workload_encoding workload_encoding =
     (obj2 (req "workload" workload_encoding) (req "measures" vec_encoding))
 
 let workload_data_encoding workload_encoding =
-  Data_encoding.list (timed_workload_encoding workload_encoding)
+  Data_encoding.list (measured_workload_encoding workload_encoding)
 
 let measurement_encoding workload_encoding =
   let open Data_encoding in
@@ -171,13 +174,13 @@ let pp_options fmtr (options : options) =
     config_file
 
 let pp_stats : Format.formatter -> workloads_stats -> unit =
- fun fmtr {max_time; min_time; mean_time; variance} ->
+ fun fmtr {max; min; mean; variance} ->
   Format.fprintf
     fmtr
-    "@[{ max_time = %f ; min_time = %f ; mean_time = %f ; sigma = %f }@]"
-    max_time
-    min_time
-    mean_time
+    "@[{ max = %f ; min = %f ; mean = %f ; sigma = %f }@]"
+    max
+    min
+    mean
     (sqrt variance)
 
 (* ------------------------------------------------------------------------- *)
@@ -320,7 +323,7 @@ let to_csv :
   Csv.export ~filename csv
 
 (* ------------------------------------------------------------------------- *)
-(* Stats on execution times *)
+(* Stats on measures *)
 
 let fmin (x : float) (y : float) = if x < y then x else y
 
@@ -337,17 +340,17 @@ let farray_min_max (arr : float array) =
 
 let collect_stats : 'a workload_data -> workloads_stats =
  fun workload_data ->
-  let time_dist_data =
+  let dist_data =
     List.rev_map
       (fun {measures; _} -> Array.of_seq (Maths.vector_to_seq measures))
       workload_data
     |> Array.concat
   in
-  let min, max = farray_min_max time_dist_data in
-  let dist = Emp.of_raw_data time_dist_data in
+  let min, max = farray_min_max dist_data in
+  let dist = Emp.of_raw_data dist_data in
   let mean = Emp.Float.empirical_mean dist in
   let var = Emp.Float.empirical_variance dist in
-  {max_time = max; min_time = min; mean_time = mean; variance = var}
+  {max; min; mean; variance = var}
 
 (* ------------------------------------------------------------------------- *)
 (* Benchmarking *)
