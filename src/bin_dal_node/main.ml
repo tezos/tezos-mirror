@@ -45,7 +45,10 @@ let run subcommand
         use_unsafe_srs = use_unsafe_srs_for_tests;
         neighbors = [];
         peers;
-        listen_addr;
+        listen_addr =
+          Option.value
+            ~default:Configuration_file.default.listen_addr
+            listen_addr;
         expected_pow =
           Option.value
             ~default:Configuration_file.default.expected_pow

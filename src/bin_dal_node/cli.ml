@@ -71,17 +71,15 @@ module Term = struct
 
   let net_addr =
     let open Cmdliner in
-    let default = Configuration_file.default.listen_addr in
+    let default_port = Configuration_file.default.listen_addr |> snd in
     let doc =
       Format.asprintf
         "The TCP address and port at which this instance can be reached by \
-         other P2P nodes. Default value is %a"
-        P2p_point.Id.pp
-        default
+         other P2P nodes."
     in
     Arg.(
       value
-      & opt (p2p_point_arg ~default_port:(snd default)) default
+      & opt (some (p2p_point_arg ~default_port)) None
       & info ~docs ~doc ~docv:"ADDR:PORT" ["net-addr"])
 
   let endpoint_arg =
@@ -201,7 +199,7 @@ type options = {
   data_dir : string option;
   rpc_addr : P2p_point.Id.t option;
   expected_pow : float option;
-  listen_addr : P2p_point.Id.t;
+  listen_addr : P2p_point.Id.t option;
   endpoint : Uri.t;
   profile : Services.Types.profile option;
   use_unsafe_srs_for_tests : bool;

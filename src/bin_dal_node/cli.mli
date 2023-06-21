@@ -37,7 +37,7 @@ type options = {
       (** The endpoint on which the DAL node can be contacted for RPCs. *)
   expected_pow : float option;
       (** The expected proof of work for the P2P identity. *)
-  listen_addr : P2p_point.Id.t;
+  listen_addr : P2p_point.Id.t option;
       (** The endpoint on which the DAL node can be contacted by other DAL nodes. *)
   endpoint : Uri.t;  (** The endpoint on which to contact the L1 node. *)
   profile : Services.Types.profile option;
