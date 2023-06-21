@@ -345,7 +345,7 @@ let pp_balance_updates ppf balance_updates =
                 Cycle.pp
                 cycle
           | Nonce_revelation_rewards -> "nonce revelation rewards"
-          | Endorsing_rewards -> "endorsing rewards"
+          | Endorsing_rewards -> "attesting rewards"
           | Baking_rewards -> "baking rewards"
           | Baking_bonuses -> "baking bonuses"
           | Storage_fees -> "storage fees"
@@ -358,7 +358,7 @@ let pp_balance_updates ppf balance_updates =
                 | true, false -> ",participation"
                 | true, true -> ",participation,revelation"
               in
-              Format.asprintf "lost endorsing rewards(%a%s)" pp_baker pkh reason
+              Format.asprintf "lost attesting rewards(%a%s)" pp_baker pkh reason
           | Liquidity_baking_subsidies -> "liquidity baking subsidies"
           | Burned -> "burned"
           | Commitments bpkh ->
@@ -893,7 +893,7 @@ let pp_contents_and_result :
         {balance_updates; delegate; consensus_key; consensus_power} ) ->
       Format.fprintf
         ppf
-        "@[<v 2>Endorsement:@,\
+        "@[<v 2>Attestation:@,\
          Level: %a@,\
          Balance updates:%a@,\
          Delegate: %a@,\
@@ -915,7 +915,7 @@ let pp_contents_and_result :
       Double_endorsement_evidence_result bus ) ->
       Format.fprintf
         ppf
-        "@[<v 2>Double endorsement evidence:@,\
+        "@[<v 2>Double attestation evidence:@,\
          Exhibit A: %a@,\
          Exhibit B: %a@,\
          Balance updates:@,\
@@ -930,7 +930,7 @@ let pp_contents_and_result :
       Double_preendorsement_evidence_result bus ) ->
       Format.fprintf
         ppf
-        "@[<v 2>Double preendorsement evidence:@,\
+        "@[<v 2>Double preattestation evidence:@,\
          Exhibit A: %a@,\
          Exhibit B: %a@,\
          Balance updates:@,\
