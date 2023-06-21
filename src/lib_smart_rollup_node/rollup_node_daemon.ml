@@ -27,7 +27,7 @@
 
 type state = {
   mutable plugin : (module Protocol_plugin_sig.S);
-  mutable rpc_server : Rpc_server.t;
+  rpc_server : Rpc_server.t;
   configuration : Configuration.t;
   node_ctxt : Node_context.rw;
 }
@@ -89,13 +89,8 @@ let handle_protocol_migration ?degraded ~catching_up state
   let*? constants, new_plugin =
     protocol_info state.node_ctxt.cctxt new_protocol head.hash
   in
-  let module New_plugin = (val new_plugin) in
-  let* rpc_server =
-    Rpc_server.change_directory
-      state.rpc_server
-      (New_plugin.RPC_directory.directory state.node_ctxt)
-  and* constants in
-  let* () =
+  let* constants
+  and* () =
     start_workers ?degraded state.configuration new_plugin state.node_ctxt
   in
   let new_protocol =
@@ -106,7 +101,6 @@ let handle_protocol_migration ?degraded ~catching_up state
     }
   in
   state.plugin <- new_plugin ;
-  state.rpc_server <- rpc_server ;
   state.node_ctxt.current_protocol <- new_protocol ;
   return_unit
 
@@ -578,7 +572,7 @@ let run ~data_dir ?log_kernel_debug_file (configuration : Configuration.t)
   in
   let* () = Plugin.L1_processing.check_pvm_initial_state_hash node_ctxt in
   let* rpc_server =
-    Rpc_server.start configuration (Plugin.RPC_directory.directory node_ctxt)
+    Rpc_server.start configuration (Rpc_directory.directory node_ctxt)
   in
   let state = {node_ctxt; rpc_server; configuration; plugin} in
   let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer state in

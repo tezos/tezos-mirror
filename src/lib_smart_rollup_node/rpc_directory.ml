@@ -39,20 +39,18 @@ let get_head_level_opt node_ctxt =
   let+ res = Node_context.last_processed_head_opt node_ctxt in
   Option.map (fun Sc_rollup_block.{header = {level; _}; _} -> level) res
 
-let get_last_proto node_ctxt =
+let get_proto_plugin_of_level node_ctxt level =
+  let open Lwt_result_syntax in
+  let* proto = Node_context.protocol_of_level node_ctxt level in
+  let*? plugin = Protocol_plugins.proto_plugin_for_protocol proto.protocol in
+  return plugin
+
+let get_last_proto_plugin node_ctxt =
   let open Lwt_result_syntax in
   let* head = Node_context.last_processed_head_opt node_ctxt in
   match head with
   | None -> failwith "No processed head, could not determine last protocol"
-  | Some head ->
-      let+ proto = Node_context.protocol_of_level node_ctxt head.header.level in
-      proto.protocol
-
-let get_last_proto_plugin node_ctxt =
-  let open Lwt_result_syntax in
-  let* protocol = get_last_proto node_ctxt in
-  let*? plugin = Protocol_plugins.proto_plugin_for_protocol protocol in
-  return plugin
+  | Some head -> get_proto_plugin_of_level node_ctxt head.header.level
 
 module Global_directory = Make_directory (struct
   include Rollup_node_services.Global
@@ -296,3 +294,32 @@ let top_directory (node_ctxt : _ Node_context.t) =
     (fun dir f -> Tezos_rpc.Directory.merge dir (f node_ctxt))
     Tezos_rpc.Directory.empty
     [Global_directory.build_directory; Local_directory.build_directory]
+
+let directory node_ctxt =
+  let path =
+    Tezos_rpc.Path.(
+      open_root / "global" / "block" /: Rollup_node_services.Arg.block_id)
+  in
+  Tezos_rpc.Directory.register_dynamic_directory
+    ~descr:"Dynamic protocol specific RPC directory for the rollup node"
+    (top_directory node_ctxt)
+    path
+    (fun ((), block_id) ->
+      let open Lwt_syntax in
+      let+ dir =
+        let open Lwt_result_syntax in
+        let* level =
+          Block_directory_helpers.block_level_of_id node_ctxt block_id
+        in
+        let+ (module Plugin) = get_proto_plugin_of_level node_ctxt level in
+        Plugin.RPC_directory.block_directory node_ctxt
+      in
+      match dir with
+      | Ok dir -> dir
+      | Error e ->
+          Format.kasprintf
+            Stdlib.failwith
+            "Could not load block directory for block %s: %a"
+            (Rollup_node_services.Arg.construct_block_id block_id)
+            pp_print_trace
+            e)

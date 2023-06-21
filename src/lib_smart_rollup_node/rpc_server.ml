@@ -58,19 +58,3 @@ let start configuration dir =
   return {server; host; node; acl}
 
 let shutdown {server; _} = RPC_server.shutdown server
-
-let change_directory {server; host; node; acl} dir =
-  let open Lwt_result_syntax in
-  let*! () = RPC_server.shutdown server in
-  let server =
-    RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
-  in
-  protect @@ fun () ->
-  let*! () =
-    RPC_server.launch
-      ~host
-      server
-      ~callback:(RPC_server.resto_callback server)
-      node
-  in
-  return {server; host; node; acl}

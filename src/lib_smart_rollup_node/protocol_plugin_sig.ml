@@ -23,10 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Protocol specific RPC directory.  *)
+(** Protocol specific RPC directory, used as a dynamic directory in the protocol
+    agnostic rollup node. *)
 module type RPC_DIRECTORY = sig
-  (** The RPC directory for the rollup node of this protocol *)
-  val directory : Node_context.rw -> unit Tezos_rpc.Directory.t
+  (** The RPC directory, specific to blocks of the protocol, for this rollup
+      node. *)
+  val block_directory :
+    Node_context.rw ->
+    (unit * Rollup_node_services.Arg.block_id) Tezos_rpc.Directory.t
 end
 
 (** Protocol specific functions to track endorsed DAL slots of L1 blocks. *)
