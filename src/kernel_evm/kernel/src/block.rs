@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
 
@@ -28,35 +29,41 @@ fn compute<Host: Runtime>(
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
 ) -> Result<(), anyhow::Error> {
+    // iteration over all remaining transaction in the block
     while block_in_progress.has_tx() {
+        // is reboot necessary ?
         if block_in_progress.would_overflow() {
+            // TODO: https://gitlab.com/tezos/tezos/-/issues/6094
+            // there should be an upper bound on gasLimit
             // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
             // store the block in progress
             return Ok(());
         }
         let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
-        block_in_progress.account_for_transaction(&transaction);
-        let tx_hash = transaction.tx_hash;
 
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.
-        if let Some((receipt_info, object_info)) = apply_transaction(
+        match apply_transaction(
             host,
             block_constants,
             precompiles,
-            transaction,
+            &transaction,
             block_in_progress.index,
             evm_account_storage,
             accounts_index,
         )? {
-            block_in_progress.register_transaction(tx_hash, object_info.gas_used)?;
-            let receipt = block_in_progress.make_receipt(receipt_info);
-            storage::store_transaction_receipt(host, &receipt)
-                .context("Failed to store the receipt")?;
-            let object = block_in_progress.make_object(object_info);
-            storage::store_transaction_object(host, &object)
-                .context("Failed to store the transaction object")?;
-        }
+            Some((receipt_info, object_info)) => {
+                block_in_progress.register_valid_transaction(
+                    &transaction,
+                    object_info,
+                    receipt_info,
+                    host,
+                )?;
+            }
+            None => {
+                block_in_progress.account_for_invalid_transaction();
+            }
+        };
     }
     Ok(())
 }
@@ -115,13 +122,15 @@ pub fn produce<Host: Runtime>(
 mod tests {
     use super::*;
     use crate::blueprint::Blueprint;
+    use crate::inbox::Transaction;
     use crate::inbox::TransactionContent;
-    use crate::inbox::{Transaction, TransactionContent::Ethereum};
+    use crate::inbox::TransactionContent::Ethereum;
     use crate::indexable_storage::internal_for_tests::{get_value, length};
     use crate::storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
     };
     use crate::storage::{init_blocks_index, init_transaction_hashes_index};
+    use crate::tick_model;
     use evm_execution::account_storage::{
         account_path, init_account_storage, EthereumAccountStorage,
     };
@@ -228,8 +237,11 @@ mod tests {
         dummy_eth_gen_transaction(nonce, v, r, s)
     }
 
-    fn dummy_eth_transaction_deploy() -> EthereumTransactionCommon {
-        let nonce = U256::from(0);
+    fn dummy_eth_transaction_deploy_from_nonce_and_pk(
+        nonce: u64,
+        private_key: &str,
+    ) -> EthereumTransactionCommon {
+        let nonce = U256::from(nonce);
         let gas_price = U256::from(40000000000u64);
         let gas_limit = 42000u64;
         let value = U256::zero();
@@ -249,12 +261,15 @@ mod tests {
             s: H256::zero(),
         };
 
+        tx.sign_transaction(private_key.to_string()).unwrap()
+    }
+
+    fn dummy_eth_transaction_deploy() -> EthereumTransactionCommon {
         // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
-        tx.sign_transaction(
-            "dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701"
-                .to_string(),
+        dummy_eth_transaction_deploy_from_nonce_and_pk(
+            0,
+            "dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701",
         )
-        .unwrap()
     }
 
     fn produce_block_with_several_valid_txs(
@@ -742,7 +757,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ticks_transaction() {
+    fn test_ticks_valid_transaction() {
         // init host
         let mut host = MockHost::default();
 
@@ -762,7 +777,7 @@ mod tests {
             content: TransactionContent::Ethereum(dummy_eth_transaction_deploy()),
         };
 
-        let transactions = vec![valid_tx.clone()].into();
+        let transactions = vec![valid_tx].into();
 
         // act
         let block_in_progress =
@@ -780,7 +795,48 @@ mod tests {
             "Gas used for contract creation"
         );
 
-        assert_eq!(ticks, valid_tx.estimate_ticks());
+        assert_eq!(
+            ticks,
+            tick_model::ticks_of_gas(21123) + tick_model::block_overhead_ticks()
+        );
+    }
+
+    #[test]
+    fn test_ticks_invalid() {
+        // init host
+        let mut host = MockHost::default();
+        let evm_account_storage = init_account_storage().unwrap();
+
+        // tx is invalid because wrong nonce
+        let valid_tx = Transaction {
+            tx_hash: [0; TRANSACTION_HASH_SIZE],
+            content: TransactionContent::Ethereum(
+                dummy_eth_transaction_deploy_from_nonce_and_pk(
+                    42,
+                    "e922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158",
+                ),
+            ),
+        };
+
+        let transactions = vec![valid_tx].into();
+
+        // act
+        let block_in_progress =
+            compute_block(transactions, &mut host, evm_account_storage);
+
+        // assert
+        let ticks = block_in_progress.estimated_ticks;
+        let block = block_in_progress
+            .finalize_and_store(&mut host)
+            .expect("should be able to finalize block");
+
+        assert_eq!(block.gas_used, U256::zero(), "no gas used");
+        // crypto + tx overhead + init overhead
+        assert_eq!(
+            ticks,
+            tick_model::ticks_of_invalid_transaction()
+                + tick_model::block_overhead_ticks()
+        );
     }
 
     #[test]
@@ -812,7 +868,7 @@ mod tests {
         let mut block_in_progress =
             BlockInProgress::new(U256::from(1), U256::from(1), transactions);
         // block is almost full wrt ticks
-        block_in_progress.estimated_ticks = block_in_progress::MAX_TICKS - 1000;
+        block_in_progress.estimated_ticks = tick_model::MAX_TICKS - 1000;
 
         // act
         compute::<MockHost>(
@@ -835,7 +891,7 @@ mod tests {
         );
         assert_eq!(
             block_in_progress.estimated_ticks,
-            block_in_progress::MAX_TICKS - 1000,
+            tick_model::MAX_TICKS - 1000,
             "should not have consumed any tick"
         );
 

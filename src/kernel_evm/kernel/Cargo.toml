@@ -27,6 +27,7 @@ sha3.workspace = true
 libsecp256k1.workspace = true
 tezos_crypto_rs.workspace = true
 
+evm.workspace = true
 evm-execution.workspace = true
 tezos_ethereum.workspace = true
 tezos-evm-logging.workspace = true

@@ -8,22 +8,17 @@ use crate::apply::{TransactionObjectInfo, TransactionReceiptInfo};
 use crate::current_timestamp;
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
-use crate::inbox::{Transaction, TransactionContent};
+use crate::inbox::Transaction;
 use crate::storage;
+use crate::tick_model;
 use anyhow::Context;
 use primitive_types::{H256, U256};
 use std::collections::VecDeque;
 use tezos_ethereum::block::L2Block;
-use tezos_ethereum::transaction::*;
+use tezos_ethereum::transaction::{
+    TransactionObject, TransactionReceipt, TransactionStatus, TransactionType,
+};
 use tezos_smart_rollup_host::runtime::Runtime;
-
-/// DO NOT TOUCH //////////////////////////////////////////////////////////////
-/// Those constants where derived from benchmarking
-pub const TICK_PER_GAS: u64 = 2000;
-pub const TICK_FOR_CRYPTO: u64 = 25_000_000;
-pub const MAX_TICKS: u64 = 10_000_000_000;
-pub const TICK_FOR_DEPOSIT: u64 = TICK_FOR_CRYPTO;
-/// DO NOT TOUCH //////////////////////////////////////////////////////////////
 
 /// Container for all data needed during block computation
 pub struct BlockInProgress {
@@ -63,22 +58,41 @@ impl BlockInProgress {
             // it should be computed at the end, and not included in the receipt
             // the block is referenced in the storage by the block number anyway
             hash: H256(number.into()),
-            estimated_ticks: 0,
+            estimated_ticks: tick_model::block_overhead_ticks(),
         }
     }
 
-    pub fn register_transaction(
+    pub fn register_valid_transaction<Host: Runtime>(
         &mut self,
-        tx_hash: [u8; 32],
-        gas_used: U256,
+        transaction: &Transaction,
+        object_info: TransactionObjectInfo,
+        receipt_info: TransactionReceiptInfo,
+        host: &mut Host,
     ) -> Result<(), anyhow::Error> {
+        // account for gas
         self.cumulative_gas = self
             .cumulative_gas
-            .checked_add(gas_used)
+            .checked_add(object_info.gas_used)
             .ok_or(Error::Transfer(CumulativeGasUsedOverflow))?;
-        self.valid_txs.push(tx_hash);
+
+        // account for ticks
+        self.estimated_ticks +=
+            tick_model::ticks_of_valid_transaction(transaction, &receipt_info);
+
+        // register transaction as done
+        self.valid_txs.push(transaction.tx_hash);
         self.index += 1;
+
+        // store info
+        storage::store_transaction_receipt(host, &self.make_receipt(receipt_info))
+            .context("Failed to store the receipt")?;
+        storage::store_transaction_object(host, &self.make_object(object_info))
+            .context("Failed to store the transaction object")?;
         Ok(())
+    }
+
+    pub fn account_for_invalid_transaction(&mut self) {
+        self.estimated_ticks += tick_model::ticks_of_invalid_transaction();
     }
 
     pub fn finalize_and_store<Host: Runtime>(
@@ -104,26 +118,13 @@ impl BlockInProgress {
         !self.tx_queue.is_empty()
     }
 
-    pub fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
-        match &transaction.content {
-            TransactionContent::Ethereum(eth) => {
-                eth.gas_limit * TICK_PER_GAS + TICK_FOR_CRYPTO
-            }
-            TransactionContent::Deposit(_) => TICK_FOR_DEPOSIT,
-        }
-    }
-
     pub fn would_overflow(&self) -> bool {
         match self.tx_queue.front() {
             Some(transaction) => {
-                self.estimated_ticks + transaction.estimate_ticks() > MAX_TICKS
+                tick_model::estimate_would_overflow(self.estimated_ticks, transaction)
             }
             None => false, // should not happen, but false is a safe value anyway
         }
-    }
-
-    pub fn account_for_transaction(&mut self, transaction: &Transaction) {
-        self.estimated_ticks += transaction.estimate_ticks();
     }
 
     pub fn make_receipt(
