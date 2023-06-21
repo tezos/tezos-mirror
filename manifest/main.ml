@@ -7265,7 +7265,7 @@ let _octez_dal_node =
          octez_dal_node_services |> open_;
          octez_layer2_store |> open_;
          octez_crypto_dal |> open_;
-         octez_store_unix |> open_;
+         octez_store_unix;
          octez_store_shared |> open_;
          octez_gossipsub |> open_;
          octez_dal_node_gossipsub_lib |> open_;
