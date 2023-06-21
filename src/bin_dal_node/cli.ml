@@ -96,7 +96,7 @@ module Term = struct
     let doc = "The Tezos node that the DAL node should connect to." in
     Arg.(
       value
-      & opt endpoint_arg (Uri.of_string "http://localhost:9732")
+      & opt (some endpoint_arg) None
       & info ~docs ~doc ~docv:"[ADDR:PORT]" ["endpoint"])
 
   let profile_arg =
@@ -200,7 +200,7 @@ type options = {
   rpc_addr : P2p_point.Id.t option;
   expected_pow : float option;
   listen_addr : P2p_point.Id.t option;
-  endpoint : Uri.t;
+  endpoint : Uri.t option;
   profile : Services.Types.profile option;
   use_unsafe_srs_for_tests : bool;
   peers : P2p_point.Id.t list;

@@ -54,13 +54,14 @@ let run subcommand
             ~default:Configuration_file.default.expected_pow
             expected_pow;
         network_name = default.network_name;
-        endpoint = default.endpoint;
+        endpoint =
+          Option.value ~default:Configuration_file.default.endpoint endpoint;
         profile;
       }
   in
   match subcommand with
   | Cli.Run ->
-      let rpc_context = Rpc_context.make endpoint in
+      let rpc_context = Rpc_context.make default_configuration.endpoint in
       Lwt_main.run @@ Daemon.run default_configuration rpc_context
   | Config_init -> Lwt_main.run @@ Configuration_file.save default_configuration
 
