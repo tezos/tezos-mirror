@@ -38,7 +38,8 @@ let run subcommand
   let default_configuration =
     Configuration_file.
       {
-        data_dir;
+        data_dir =
+          Option.value ~default:Configuration_file.default.data_dir data_dir;
         rpc_addr;
         use_unsafe_srs = use_unsafe_srs_for_tests;
         neighbors = [];

@@ -31,7 +31,8 @@
     command. *)
 
 type options = {
-  data_dir : string;  (** Directory containing files related to the DAL node. *)
+  data_dir : string option;
+      (** Directory containing files related to the DAL node. *)
   rpc_addr : P2p_point.Id.t;
       (** The endpoint on which the DAL node can be contacted for RPCs. *)
   expected_pow : float;  (** The expected proof of work for the P2P identity. *)

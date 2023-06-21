@@ -38,14 +38,15 @@ module Term = struct
 
   let data_dir =
     let open Cmdliner in
-    let default = Configuration_file.default.data_dir in
     let doc =
       Format.sprintf
         "The directory where the octez DAL node will store all its data. \
          Parent directories are created if necessary."
     in
     Arg.(
-      value & opt file default & info ~docs ~docv:"DIR" ~doc ["data-dir"; "d"])
+      value
+      & opt (some file) None
+      & info ~docs ~docv:"DIR" ~doc ["data-dir"; "d"])
 
   let rpc_addr =
     let open Cmdliner in
@@ -198,7 +199,7 @@ module Config = struct
 end
 
 type options = {
-  data_dir : string;
+  data_dir : string option;
   rpc_addr : P2p_point.Id.t;
   expected_pow : float;
   listen_addr : P2p_point.Id.t;
