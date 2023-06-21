@@ -56,17 +56,8 @@ let create_blocks =
 let create_blocks_reception =
   "CREATE TABLE IF NOT EXISTS blocks_reception(\n\
   \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
-  \  timestamp TEXT NOT NULL, -- ISO8601 string\n\
-  \  block INTEGER NOT NULL,\n\
-  \  source INTEGER NOT NULL,\n\
-  \  FOREIGN KEY (block) REFERENCES blocks(id),\n\
-  \  FOREIGN KEY (source) REFERENCES nodes(id),\n\
-  \  UNIQUE (block, source))"
-
-let create_blocks_validation =
-  "CREATE TABLE IF NOT EXISTS blocks_validation(\n\
-  \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
-  \  timestamp TEXT NOT NULL, -- ISO8601 string\n\
+  \  validation_timestamp TEXT, -- ISO8601 string\n\
+  \  application_timestamp TEXT, -- ISO8601 string\n\
   \  block INTEGER NOT NULL,\n\
   \  source INTEGER NOT NULL,\n\
   \  FOREIGN KEY (block) REFERENCES blocks(id),\n\
@@ -124,10 +115,6 @@ let create_blocks_reception_block_idx =
   "CREATE INDEX IF NOT EXISTS blocks_reception_block_idx ON \
    blocks_reception(block)"
 
-let create_blocks_validation_block_idx =
-  "CREATE INDEX IF NOT EXISTS blocks_validation_block_idx ON \
-   blocks_validation(block)"
-
 let create_operations_reception_operation_idx =
   "CREATE INDEX IF NOT EXISTS operations_reception_operation_idx ON \
    operations_reception(operation)"
@@ -142,7 +129,6 @@ let create_tables =
     create_nodes;
     create_blocks;
     create_blocks_reception;
-    create_blocks_validation;
     create_operations;
     create_operations_reception;
     create_operations_inclusion;
@@ -150,7 +136,6 @@ let create_tables =
     create_endorsing_rights_level_idx;
     create_operations_level_idx;
     create_blocks_reception_block_idx;
-    create_blocks_validation_block_idx;
     create_operations_reception_operation_idx;
     create_operations_inclusion_operation_idx;
   ]
@@ -288,13 +273,12 @@ let insert_included_operation =
      $3) AND blocks.hash = $4 AND operations.level = $5 ON CONFLICT DO NOTHING"
 
 let insert_received_block =
-  Caqti_request.Infix.(Caqti_type.(tup3 ptime Type.block_hash string ->. unit))
-    "INSERT INTO blocks_reception (timestamp, block, source) SELECT ?, \
-     blocks.id, nodes.id FROM blocks,nodes WHERE blocks.hash = ? AND \
-     nodes.name = ? ON CONFLICT DO NOTHING"
-
-let insert_validated_block =
-  Caqti_request.Infix.(Caqti_type.(tup3 ptime Type.block_hash string ->. unit))
-    "INSERT INTO blocks_application (timestamp, block, source) SELECT ?, \
-     blocks.id, nodes.id FROM blocks,nodes WHERE blocks.hash = ? AND \
-     nodes.name = ? ON CONFLICT DO NOTHING"
+  Caqti_request.Infix.(
+    Caqti_type.(
+      tup4 (option ptime) (option ptime) Type.block_hash string ->. unit))
+    "INSERT INTO blocks_reception (validation_timestamp, \
+     application_timestamp, block, source) SELECT ?, ?, blocks.id, nodes.id \
+     FROM blocks, nodes WHERE blocks.hash = ? AND nodes.name = ? ON CONFLICT \
+     DO UPDATE SET validation_timestamp = COALESCE(validation_timestamp, \
+     excluded.validation_timestamp), application_timestamp = \
+     COALESCE(application_timestamp, excluded.application_timestamp)"

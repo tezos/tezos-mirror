@@ -88,13 +88,7 @@ val insert_included_operation :
   Caqti_request.t
 
 val insert_received_block :
-  ( Ptime.t * Tezos_crypto.Hashed.Block_hash.t * string,
-    unit,
-    [`Zero] )
-  Caqti_request.t
-
-val insert_validated_block :
-  ( Ptime.t * Tezos_crypto.Hashed.Block_hash.t * string,
+  ( Ptime.t option * Ptime.t option * Tezos_crypto.Hashed.Block_hash.t * string,
     unit,
     [`Zero] )
   Caqti_request.t
