@@ -75,16 +75,16 @@ let () =
     (function Cryptobox_initialisation_failed str -> Some str | _ -> None)
     (fun str -> Cryptobox_initialisation_failed str)
 
-let init_cryptobox unsafe_srs (proto_parameters : Dal_plugin.proto_parameters) =
+let fetch_dal_config cctxt =
+  let open Lwt_syntax in
+  let* r = Config_services.dal cctxt in
+  match r with Error e -> return_error e | Ok dal -> return_ok dal
+
+let init_cryptobox dal_config (proto_parameters : Dal_plugin.proto_parameters) =
   let open Lwt_result_syntax in
   let* () =
-    let use_mock_srs_for_testing : Cryptobox.parameters option =
-      if unsafe_srs then Some proto_parameters.cryptobox_parameters else None
-    in
     let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
-    Cryptobox.Config.init_dal
-      ~find_srs_files
-      Cryptobox.Config.{activated = true; use_mock_srs_for_testing}
+    Cryptobox.Config.init_dal ~find_srs_files dal_config
   in
   match Cryptobox.make proto_parameters.cryptobox_parameters with
   | Ok cryptobox -> return cryptobox
@@ -180,18 +180,15 @@ module Handler = struct
           let* proto_parameters =
             Dal_plugin.get_constants `Main (`Head 0) cctxt
           in
-          let* cryptobox =
-            init_cryptobox
-              config.Configuration_file.use_unsafe_srs
-              proto_parameters
-          in
+          let* dal_config = fetch_dal_config cctxt in
+          let* cryptobox = init_cryptobox dal_config proto_parameters in
           let* () =
             Option.iter_es
               (Profile_manager.add_profile
                  proto_parameters
                  (Node_context.get_store ctxt)
                  (Node_context.get_gs_worker ctxt))
-              config.profile
+              config.Configuration_file.profile
           in
           Node_context.set_ready
             ctxt
