@@ -94,18 +94,9 @@ val wait : t -> Unix.process_status Lwt.t
 
 (** Run [octez-dal-node config init].
 
-    If [use_unsafe_srs] is [true], the dal node runs with unsafe computed SRS
-    allowing tests to run faster, without the need of large file. Default is
-    [true] in tezt.
-
     [expected_pow] allows to change the PoW difficulty. Default value is 0.
 *)
-val init_config :
-  ?use_unsafe_srs:bool ->
-  ?expected_pow:float ->
-  ?peers:string list ->
-  t ->
-  unit Lwt.t
+val init_config : ?expected_pow:float -> ?peers:string list -> t -> unit Lwt.t
 
 module Config_file : sig
   (** DAL node configuration files. *)
@@ -120,7 +111,7 @@ module Config_file : sig
       running, it needs to be restarted manually.
 
       Example:
-        [Node.Config_file.update node (JSON.put ("use_unsafe_srs", "true"))] *)
+      [Node.Config_file.update node (JSON.put ("expected_pow", "0.0"))] *)
   val update : t -> (JSON.t -> JSON.t) -> unit
 end
 

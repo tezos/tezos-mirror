@@ -26,7 +26,6 @@
 type neighbor = {addr : string; port : int}
 
 type t = {
-  use_unsafe_srs : bool;
   data_dir : string;
   rpc_addr : P2p_point.Id.t;
   neighbors : neighbor list;
@@ -55,8 +54,6 @@ let default_neighbors = []
 
 let default_peers = []
 
-let default_use_unsafe_srs = false
-
 let default_expected_pow =
   Gossipsub.Transport_layer.Default_parameters.P2p_config.expected_pow
 
@@ -66,7 +63,6 @@ let default_endpoint = Uri.of_string "http://localhost:9732"
 
 let default =
   {
-    use_unsafe_srs = false;
     data_dir = default_data_dir;
     rpc_addr = default_rpc_addr;
     neighbors = default_neighbors;
@@ -103,7 +99,6 @@ let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
     (fun {
-           use_unsafe_srs;
            data_dir;
            rpc_addr;
            listen_addr;
@@ -114,8 +109,7 @@ let encoding : t Data_encoding.t =
            endpoint;
            profile;
          } ->
-      ( use_unsafe_srs,
-        data_dir,
+      ( data_dir,
         rpc_addr,
         listen_addr,
         neighbors,
@@ -124,8 +118,7 @@ let encoding : t Data_encoding.t =
         network_name,
         endpoint,
         profile ))
-    (fun ( use_unsafe_srs,
-           data_dir,
+    (fun ( data_dir,
            rpc_addr,
            listen_addr,
            neighbors,
@@ -135,7 +128,6 @@ let encoding : t Data_encoding.t =
            endpoint,
            profile ) ->
       {
-        use_unsafe_srs;
         data_dir;
         rpc_addr;
         listen_addr;
@@ -146,12 +138,7 @@ let encoding : t Data_encoding.t =
         endpoint;
         profile;
       })
-    (obj10
-       (dft
-          "use_unsafe_srs"
-          ~description:"use unsafe srs for tests"
-          bool
-          default_use_unsafe_srs)
+    (obj9
        (dft
           "data-dir"
           ~description:"Location of the data dir"

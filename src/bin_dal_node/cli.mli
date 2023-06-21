@@ -42,7 +42,6 @@ type options = {
   endpoint : Uri.t option;  (** The endpoint on which to contact the L1 node. *)
   profile : Services.Types.profile option;
       (** Profile of the DAL node used for tracking shards. *)
-  use_unsafe_srs_for_tests : bool;
   peers : P2p_point.Id.t list;  (** DAL nodes to connect to. *)
 }
 

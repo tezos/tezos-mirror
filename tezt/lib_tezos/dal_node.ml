@@ -78,8 +78,7 @@ let data_dir dal_node = dal_node.persistent_state.data_dir
 let spawn_command dal_node =
   Process.spawn ~name:dal_node.name ~color:dal_node.color dal_node.path
 
-let spawn_config_init ?(use_unsafe_srs = true) ?(expected_pow = 0.)
-    ?(peers = []) dal_node =
+let spawn_config_init ?(expected_pow = 0.) ?(peers = []) dal_node =
   spawn_command dal_node
   @@ List.filter_map
        Fun.id
@@ -92,7 +91,6 @@ let spawn_config_init ?(use_unsafe_srs = true) ?(expected_pow = 0.)
          Some (Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node));
          Some "--net-addr";
          Some (listen_addr dal_node);
-         (if use_unsafe_srs then Some "--use-unsafe-srs-for-tests" else None);
          Some "--expected-pow";
          Some (string_of_float expected_pow);
          Some "--peers";
@@ -109,10 +107,8 @@ module Config_file = struct
   let update dal_node update = read dal_node |> update |> write dal_node
 end
 
-let init_config ?use_unsafe_srs ?expected_pow ?peers dal_node =
-  let process =
-    spawn_config_init ?use_unsafe_srs ?expected_pow ?peers dal_node
-  in
+let init_config ?expected_pow ?peers dal_node =
+  let process = spawn_config_init ?expected_pow ?peers dal_node in
   Process.check process
 
 let read_identity dal_node =

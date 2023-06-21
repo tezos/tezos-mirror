@@ -122,12 +122,6 @@ module Term = struct
       & opt (some profile_arg) None
       & info ~docs ~doc ~docv:"[PKH]" ["profile"])
 
-  (* This is provided as a command line option for facility but
-     eventually it should not appear to the user. *)
-  let use_unsafe_srs_for_tests =
-    let open Cmdliner in
-    Arg.(value & flag & info ["use-unsafe-srs-for-tests"])
-
   let peers =
     let open Cmdliner in
     let default_list = Configuration_file.default.peers in
@@ -142,7 +136,7 @@ module Term = struct
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
-       $ endpoint $ profile $ use_unsafe_srs_for_tests $ peers))
+       $ endpoint $ profile $ peers))
 end
 
 module Run = struct
@@ -202,7 +196,6 @@ type options = {
   listen_addr : P2p_point.Id.t option;
   endpoint : Uri.t option;
   profile : Services.Types.profile option;
-  use_unsafe_srs_for_tests : bool;
   peers : P2p_point.Id.t list;
 }
 
@@ -210,19 +203,10 @@ type t = Run | Config_init
 
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr endpoint profile
-      use_unsafe_srs_for_tests peers =
+      peers =
     run
       subcommand
-      {
-        data_dir;
-        rpc_addr;
-        expected_pow;
-        listen_addr;
-        endpoint;
-        profile;
-        use_unsafe_srs_for_tests;
-        peers;
-      }
+      {data_dir; rpc_addr; expected_pow; listen_addr; endpoint; profile; peers}
     |> function
     | Ok v -> `Ok v
     | Error error ->
