@@ -41,6 +41,7 @@ type options = {
   profile : Services.Types.profile option;
       (** Profile of the DAL node used for tracking shards. *)
   use_unsafe_srs_for_tests : bool;
+  peers : P2p_point.Id.t list;  (** DAL nodes to connect to. *)
 }
 
 (** Subcommands that can be used by the DAL node. In the future this type

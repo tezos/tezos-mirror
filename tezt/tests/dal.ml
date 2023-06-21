@@ -2740,25 +2740,23 @@ let check_message_notified_to_app_event dal_node ~from_shard ~to_shard
       if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
       else None)
 
-(** Add [dal_node1]'s P2P point to [dal_node2], start [dal_node2] and wait until
-    a p2p connection is established between the two nodes. *)
+(** Connect [dal_node1] and [dal_node2] using the bootstrap peer mechanism.
+    [dal_node2] will use [dal_node1] as a bootstrap peer.
+
+    For this to work, [dal_node1] must already be running. *)
 let connect_nodes_via_p2p dal_node1 dal_node2 =
-  update_known_peers dal_node2 [dal_node1] ;
+  let* _config_file =
+    Dal_node.init_config ~peers:[Dal_node.listen_addr dal_node1] dal_node2
+  in
+  (* We ensure that [dal_node1] connects to [dal_node2]. *)
   let conn_ev_in_node1 =
     check_new_connection_event
       ~main_node:dal_node1
       ~other_node:dal_node2
       ~is_outbound:false
   in
-  let conn_ev_in_node2 =
-    check_new_connection_event
-      ~main_node:dal_node2
-      ~other_node:dal_node1
-      ~is_outbound:true
-  in
   let* () = Dal_node.run dal_node2 in
-  let* () = conn_ev_in_node1 and* () = conn_ev_in_node2 in
-  unit
+  conn_ev_in_node1
 
 (** This helper function makes the nodes [dal_node1] and [dal_node2] join the
     topics of the attestor [pkh], by calling the RPC for tracking the corresponding profile.
@@ -2873,7 +2871,6 @@ let waiter_successful_shards_app_notification l1_committee dal_node commitment
 let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
     _cryptobox node client dal_node1 =
   let dal_node2 = Dal_node.create ~node ~client () in
-  let* _config_file = Dal_node.init_config dal_node2 in
   (* Connect the nodes *)
   let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
   let peer_id =
@@ -2917,8 +2914,7 @@ let test_dal_node_join_topic _protocol _parameters _cryptobox _node client
 let generic_gs_messages_exchange protocol parameters _cryptobox node client
     dal_node1 ~mk_dal_node2 ~expect_app_notification ~is_first_slot_attestable =
   let* dal_node2 = mk_dal_node2 protocol parameters in
-  let* _config_file = Dal_node.init_config dal_node2 in
-  (* Connect the nodes *)
+
   let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
 
   let* params = Rollup.Dal.Parameters.from_client client in
@@ -3101,7 +3097,6 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
 
   (* Create another (invalid) DAL node *)
   let* dal_node2 = make_invalid_dal_node protocol parameters in
-  let* _config_file = Dal_node.init_config dal_node2 in
 
   (* Connect the nodes *)
   let* () = connect_nodes_via_p2p dal_node1 dal_node2 in

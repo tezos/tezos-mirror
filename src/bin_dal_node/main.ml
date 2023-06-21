@@ -33,6 +33,7 @@ let run subcommand
         listen_addr;
         profile;
         use_unsafe_srs_for_tests;
+        peers;
       } =
   match subcommand with
   | Cli.Run ->
@@ -46,7 +47,7 @@ let run subcommand
             rpc_addr;
             use_unsafe_srs = use_unsafe_srs_for_tests;
             neighbors = default.neighbors;
-            peers = default.peers;
+            peers;
             listen_addr;
             expected_pow;
             network_name = default.network_name;

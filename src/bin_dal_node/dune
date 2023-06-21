@@ -57,7 +57,6 @@
   -open Tezos_dal_node_services
   -open Tezos_layer2_store
   -open Tezos_crypto_dal
-  -open Tezos_store_unix
   -open Tezos_store_shared
   -open Tezos_gossipsub
   -open Tezos_dal_node_lib_gossipsub

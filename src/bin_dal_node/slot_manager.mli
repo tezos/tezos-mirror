@@ -89,8 +89,8 @@ val add_commitment_shards :
   (unit, [Errors.decoding | Errors.not_found | Errors.other]) result Lwt.t
 
 (** [store_slot_headers ~level_committee ~block_level ~block_hash cryptobox
-    proto_parameters slot_headers node_store] stores [slot_headers] onto the
-    [node_store] associated to the given [block_hash] baked at level
+    proto_parameters slot_headers node_store gs_worker] stores [slot_headers]
+    onto the [node_store] associated to the given [block_hash] baked at level
     [block_level].
 
     If a slot header's status becomes "waiting for attestation" after this update and
@@ -104,6 +104,7 @@ val store_slot_headers :
   Dal_plugin.proto_parameters ->
   (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
   Store.node_store ->
+  Gossipsub.Worker.t ->
   unit tzresult Lwt.t
 
 (** [update_selected_slot_headers_statuses ~block_level ~attestation_lag

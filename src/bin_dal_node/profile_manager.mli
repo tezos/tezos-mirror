@@ -30,6 +30,7 @@
 val add_profile :
   Dal_plugin.proto_parameters ->
   Store.node_store ->
+  Gossipsub.Worker.t ->
   Services.Types.profile ->
   unit tzresult Lwt.t
 

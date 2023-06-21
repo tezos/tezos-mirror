@@ -136,7 +136,11 @@ end
 module Profile_handlers = struct
   let patch_profile ctxt () profile =
     call_handler2 ctxt (fun store {proto_parameters; _} ->
-        Profile_manager.add_profile proto_parameters store profile)
+        Profile_manager.add_profile
+          proto_parameters
+          store
+          (Node_context.get_gs_worker ctxt)
+          profile)
 
   let get_profiles ctxt () () =
     call_handler1 ctxt (fun store ->

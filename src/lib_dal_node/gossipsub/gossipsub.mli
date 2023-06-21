@@ -108,7 +108,7 @@ module Transport_layer : sig
   (** [activate ?additional_points t] activates the given transport layer [t]. It
       is a wrapper on top of {!P2p.activate}. If some [additional_points] are
       given, they are added to [t]'s known points. *)
-  val activate : ?additional_points:P2p_point.Id.t list -> t -> unit
+  val activate : ?additional_points:P2p_point.Id.t list -> t -> unit Lwt.t
 end
 
 (** This module implements the list of hooks that allow interconnecting the

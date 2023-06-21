@@ -35,6 +35,8 @@ type ready_ctxt = {
   proto_parameters : Dal_plugin.proto_parameters;
   plugin : (module Dal_plugin.T);
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation;
+  activation_level : Int32.t;
+      (** The level at which the DAL node will start tracking the Octez node. *)
 }
 
 (** The status of the dal node *)
@@ -59,7 +61,7 @@ val init :
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready
 
-(** [set_ready ctxt dal_plugin cryptobox proto_parameters] updates
+(** [set_ready ctxt dal_plugin cryptobox proto_parameters level] updates
     in place the status value to [Ready], and initializes the inner
     [ready_ctxt] value with the given parameters.
 
@@ -69,6 +71,7 @@ val set_ready :
   (module Tezos_dal_node_lib.Dal_plugin.T) ->
   Cryptobox.t ->
   Dal_plugin.proto_parameters ->
+  Int32.t ->
   unit
 
 type error += Node_not_ready
@@ -86,6 +89,9 @@ val get_status : t -> status
 
 (** [get_store ctxt] returns the dal node store. *)
 val get_store : t -> Store.node_store
+
+(** [get_gs_worker ctxt] returns the Gossipsub worker state. *)
+val get_gs_worker : t -> Gossipsub.Worker.t
 
 (** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context *)
 val get_tezos_node_cctxt : t -> Tezos_rpc.Context.generic

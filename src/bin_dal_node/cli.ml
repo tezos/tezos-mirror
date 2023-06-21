@@ -130,11 +130,21 @@ module Term = struct
     let open Cmdliner in
     Arg.(value & flag & info ["use-unsafe-srs-for-tests"])
 
+  let peers =
+    let open Cmdliner in
+    let default_list = Configuration_file.default.peers in
+    let default_port = snd Configuration_file.default.listen_addr in
+    let doc = "A list of points at which peers can be reached." in
+    Arg.(
+      value
+      & opt (list (p2p_point_arg ~default_port)) default_list
+      & info ~docs ~doc ~docv:"ADDR:PORT,..." ["peers"])
+
   let term process =
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
-       $ endpoint $ profile $ use_unsafe_srs_for_tests))
+       $ endpoint $ profile $ use_unsafe_srs_for_tests $ peers))
 end
 
 module Run = struct
@@ -195,13 +205,14 @@ type options = {
   endpoint : Uri.t;
   profile : Services.Types.profile option;
   use_unsafe_srs_for_tests : bool;
+  peers : P2p_point.Id.t list;
 }
 
 type t = Run | Config_init
 
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr endpoint profile
-      use_unsafe_srs_for_tests =
+      use_unsafe_srs_for_tests peers =
     run
       subcommand
       {
@@ -212,6 +223,7 @@ let make ~run =
         endpoint;
         profile;
         use_unsafe_srs_for_tests;
+        peers;
       }
     |> function
     | Ok v -> `Ok v

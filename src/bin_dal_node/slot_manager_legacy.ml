@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* In this legacy module, we only use legacy events. *)
-module Event = Event_legacy
-
 type error +=
   | Merging_failed of string
   | Invalid_commitment of string * string
