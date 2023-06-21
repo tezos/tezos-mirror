@@ -98,6 +98,12 @@ let set_delegate_parameters ctxt delegate ~staking_over_baking_limit
     delegate
     Protocol.Alpha_context.Tez.zero
 
+(** Assert that the staking balance is the expected one. *)
+let assert_total_frozen_stake ~loc block expected =
+  let open Lwt_result_syntax in
+  let* actual = Context.get_total_frozen_stake (B block) in
+  Assert.equal_tez ~loc actual expected
+
 (* Test that:
    - the EMA of the adaptive inflation vote reaches the threshold after the
      expected duration,
