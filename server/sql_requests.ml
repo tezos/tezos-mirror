@@ -104,6 +104,12 @@ let create_endorsing_rights =
   \   FOREIGN KEY (delegate) REFERENCES delegates(id),\n\
   \   UNIQUE (level, delegate))"
 
+let create_users =
+  "CREATE TABLE IF NOT EXISTS users(\n\
+  \   id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \   username $(BYTES) UNIQUE NOT NULL,\n\
+  \   password $(BYTES) UNIQUE NOT NULL)"
+
 let create_endorsing_rights_level_idx =
   "CREATE INDEX IF NOT EXISTS endorsing_rights_level_idx ON \
    endorsing_rights(level)"
@@ -133,6 +139,7 @@ let create_tables =
     create_operations_reception;
     create_operations_inclusion;
     create_endorsing_rights;
+    create_users;
     create_endorsing_rights_level_idx;
     create_operations_level_idx;
     create_blocks_reception_block_idx;

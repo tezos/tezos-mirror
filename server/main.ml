@@ -172,6 +172,17 @@ let get_head db_pool =
     (fun head_level ->
       reply_public_json Data_encoding.(obj1 (opt "level" int32)) head_level)
 
+let get_users db_pool =
+  let query =
+    Caqti_request.Infix.(Caqti_type.(unit ->* string))
+      "SELECT username FROM users"
+  in
+  with_caqti_error
+    (Caqti_lwt.Pool.use
+       (fun (module Db : Caqti_lwt.CONNECTION) -> Db.collect_list query ())
+       db_pool)
+    (fun users -> reply_public_json Data_encoding.(list string) users)
+
 let maybe_create_tables db_pool =
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
@@ -426,6 +437,9 @@ let routes :
                   ~status:`OK
                   ~body
                   ())) );
+    ( Re.str "/users",
+      fun _g _users db_pool _header meth _body ->
+        get_only_endpoint meth (fun () -> get_users db_pool) );
     ( Re.str "/stats.json",
       fun _g _users db_pool _header _meth _body -> get_stats db_pool );
     ( Re.str "/head.json",
