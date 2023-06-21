@@ -63,7 +63,7 @@ open Cryptobox_intf
 
 (** Initial values for the parameters of the DAL cryptographic primitives.
     It used to build a value of type [t]. *)
-type parameters = {
+type parameters = Dal_config.parameters = {
   redundancy_factor : int;
   page_size : int;
   slot_size : int;
@@ -117,7 +117,6 @@ type error += Invalid_precomputation_hash of (string, string) error_container
 module Verifier :
   VERIFIER
     with type t = t
-     and type parameters = parameters
      and type commitment = commitment
      and type commitment_proof = commitment_proof
      and type page_proof = page_proof
@@ -126,7 +125,7 @@ module Verifier :
 include
   VERIFIER
     with type t := t
-     and type parameters := parameters
+     and type parameters := Dal_config.parameters
      and type commitment := commitment
      and type commitment_proof := commitment_proof
      and type page_proof := page_proof
@@ -517,23 +516,13 @@ end
 
 (** node parameters for the DAL. *)
 module Config : sig
-  type t = {
+  type t = Dal_config.t = {
     activated : bool;
-        (** [true] if the DAL is activated. This may have
-        an impact on the loading time of the node. *)
     use_mock_srs_for_testing : parameters option;
-        (** If [None], the srs is read from the srs files.
-        This is the value expected for production. For testing
-        purposes, we may want to compute the srs instead but this is
-        not secure. In this case, the size of a slot, page, the
-        erasure code redundancy factor and number of shards must be
-        specified. *)
   }
 
   val encoding : t Data_encoding.t
 
-  (** The default configuration is
-      [{activated = false; use_mock_srs_for_testing = None}]. *)
   val default : t
 
   (** [init_dal find_trusted_setup_files ?(srs_size_log2=21) config] initializes the

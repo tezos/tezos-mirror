@@ -623,26 +623,14 @@ module Inner = struct
           max_polynomial_length
           srs_g2_length)
 
-  type parameters = {
+  type parameters = Dal_config.parameters = {
     redundancy_factor : int;
     page_size : int;
     slot_size : int;
     number_of_shards : int;
   }
 
-  let parameters_encoding =
-    let open Data_encoding in
-    conv
-      (fun {redundancy_factor; page_size; slot_size; number_of_shards} ->
-        (redundancy_factor, page_size, slot_size, number_of_shards))
-      (fun (redundancy_factor, page_size, slot_size, number_of_shards) ->
-        {redundancy_factor; page_size; slot_size; number_of_shards})
-      (obj4
-         (req "redundancy_factor" uint8)
-         (req "page_size" uint16)
-         (req "slot_size" int31)
-         (req "number_of_shards" uint16))
-    [@@coverage off]
+  let parameters_encoding = Dal_config.parameters_encoding
 
   let pages_per_slot {slot_size; page_size; _} = slot_size / page_size
 
@@ -1835,35 +1823,14 @@ module Internal_for_tests = struct
 end
 
 module Config = struct
-  type t = {activated : bool; use_mock_srs_for_testing : parameters option}
+  type t = Dal_config.t = {
+    activated : bool;
+    use_mock_srs_for_testing : parameters option;
+  }
 
-  let parameters_encoding : parameters Data_encoding.t =
-    let open Data_encoding in
-    conv
-      (fun {slot_size; page_size; redundancy_factor; number_of_shards} ->
-        (slot_size, page_size, redundancy_factor, number_of_shards))
-      (fun (slot_size, page_size, redundancy_factor, number_of_shards) ->
-        {slot_size; page_size; redundancy_factor; number_of_shards})
-      (obj4
-         (req "slot_size" int31)
-         (req "page_size" int31)
-         (req "redundancy_factor" int31)
-         (req "number_of_shards" int31))
-    [@@coverage off]
+  let encoding : t Data_encoding.t = Dal_config.encoding
 
-  let encoding : t Data_encoding.t =
-    let open Data_encoding in
-    conv
-      (fun {activated; use_mock_srs_for_testing} ->
-        (activated, use_mock_srs_for_testing))
-      (fun (activated, use_mock_srs_for_testing) ->
-        {activated; use_mock_srs_for_testing})
-      (obj2
-         (req "activated" bool)
-         (req "use_mock_srs_for_testing" (option parameters_encoding)))
-    [@@coverage off]
-
-  let default = {activated = false; use_mock_srs_for_testing = None}
+  let default = Dal_config.default
 
   let init_dal ~find_srs_files ?(srs_size_log2 = 21) dal_config =
     let open Lwt_result_syntax in

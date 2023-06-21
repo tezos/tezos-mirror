@@ -67,7 +67,7 @@ module type VERIFIER = sig
   type t
 
   (** Parameters to build a value of type [t] *)
-  type parameters = {
+  type parameters = Dal_config.parameters = {
     redundancy_factor : int;
     page_size : int;
     slot_size : int;
