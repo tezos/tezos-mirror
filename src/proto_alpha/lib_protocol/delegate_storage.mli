@@ -141,8 +141,8 @@ val reset_forbidden_delegates : Raw_context.t -> Raw_context.t Lwt.t
     a given key, i.e. the sum of the spendable balance (given by [balance] or
     [Contract_storage.get_balance]) and of the frozen balance. The frozen
     balance is composed of all frozen bonds associated to the contract (given by
-    [Contract_storage.get_frozen_bonds]) and of the frozen deposits (given by
-    [frozen_deposits]).
+    [Contract_storage.get_frozen_bonds]) and of the part of the frozen deposits
+    (given by [frozen_deposits]) that belongs to the delegate.
 
     Only use this function for RPCs: this is expensive. *)
 val full_balance :

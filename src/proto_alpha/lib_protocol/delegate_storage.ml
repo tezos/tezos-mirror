@@ -269,12 +269,19 @@ let reset_forbidden_delegates ctxt =
   else set_forbidden_delegates ctxt Signature.Public_key_hash.Set.empty
 
 let full_balance ctxt delegate =
-  frozen_deposits ctxt delegate >>=? fun frozen_deposits ->
+  Staking_pseudotokens_storage.costaking_pseudotokens_balance
+    ctxt
+    (Contract_repr.Implicit delegate)
+  >>=? fun pseudotokens ->
+  Staking_pseudotokens_storage.tez_of_frozen_deposits_pseudotokens
+    ctxt
+    delegate
+    pseudotokens
+  >>=? fun own_frozen_deposits ->
   let delegate_contract = Contract_repr.Implicit delegate in
   Contract_storage.get_balance_and_frozen_bonds ctxt delegate_contract
   >>=? fun balance_and_frozen_bonds ->
-  Lwt.return
-    Tez_repr.(frozen_deposits.current_amount +? balance_and_frozen_bonds)
+  Lwt.return Tez_repr.(own_frozen_deposits +? balance_and_frozen_bonds)
 
 let delegated_balance ctxt delegate =
   staking_balance ctxt delegate >>=? fun staking_balance ->
