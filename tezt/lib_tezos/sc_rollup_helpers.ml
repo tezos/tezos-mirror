@@ -61,6 +61,35 @@ let load_kernel_file
 let read_kernel ?base name : string =
   hex_encode (load_kernel_file ?base (name ^ ".wasm"))
 
+module Installer_kernel_config = struct
+  type move_args = {from : string; to_ : string}
+
+  type reveal_args = {hash : string; to_ : string}
+
+  type set_args = {value : string; to_ : string}
+
+  type instr = Move of move_args | Reveal of reveal_args | Set of set_args
+
+  type t = instr list
+
+  let instr_to_yaml = function
+    | Move {from; to_} -> sf {|  - move:
+      from: %s
+      to: %s
+|} from to_
+    | Reveal {hash; to_} -> sf {|  - reveal: %s
+    to: %s
+|} hash to_
+    | Set {value; to_} ->
+        sf {|  - set:
+      value: %s
+      to: %s
+|} value to_
+
+  let to_yaml t =
+    "instructions:\n" ^ String.concat "" (List.map instr_to_yaml t)
+end
+
 (* Testing the installation of a larger kernel, with e2e messages.
 
    When a kernel is too large to be originated directly, we can install
@@ -70,26 +99,37 @@ let read_kernel ?base name : string =
 let prepare_installer_kernel ?runner
     ?(base_installee =
       "src/proto_alpha/lib_protocol/test/integration/wasm_kernel")
-    ~preimages_dir installee =
+    ~preimages_dir ?config installee =
   let open Tezt.Base in
   let open Lwt.Syntax in
   let installer = installee ^ "-installer.hex" in
   let output = Temp.file installer in
   let installee = (project_root // base_installee // installee) ^ ".wasm" in
+  let setup_file_args =
+    match config with
+    | Some config ->
+        let setup_file = Temp.file "setup-config.yaml" in
+        Base.write_file
+          setup_file
+          ~contents:(Installer_kernel_config.to_yaml config) ;
+        ["--setup-file"; setup_file]
+    | None -> []
+  in
   let process =
     Process.spawn
       ?runner
       ~name:installer
       (project_root // "smart-rollup-installer")
-      [
-        "get-reveal-installer";
-        "--upgrade-to";
-        installee;
-        "--output";
-        output;
-        "--preimages-dir";
-        preimages_dir;
-      ]
+      ([
+         "get-reveal-installer";
+         "--upgrade-to";
+         installee;
+         "--output";
+         output;
+         "--preimages-dir";
+         preimages_dir;
+       ]
+      @ setup_file_args)
   in
   let+ _ = Runnable.run @@ Runnable.{value = process; run = Process.check} in
   read_file output

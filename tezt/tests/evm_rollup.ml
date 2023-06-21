@@ -187,7 +187,8 @@ let send_and_wait_until_tx_mined ~sc_rollup_node ~node ~client
   in
   wait_for_application ~sc_rollup_node ~node ~client send ()
 
-let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
+let setup_evm_kernel ?config
+    ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash) protocol =
   let* node, client = setup_l1 protocol in
   let sc_rollup_node =
@@ -204,6 +205,7 @@ let setup_evm_kernel ?(originator_key = Constant.bootstrap1.public_key_hash)
       ~base_installee:"./"
       ~preimages_dir:
         (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0")
+      ?config
       "evm_kernel"
   in
   let* sc_rollup_address =
@@ -1270,6 +1272,42 @@ let test_eth_call_storage_contract_eth_cli =
         ~error_msg:"Expected result %R, but got %L" ;
       unit)
 
+let test_preinitialized_evm_kernel =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "dictator"; "config"]
+    ~title:"Creates a kernel with an initialized dictator key"
+  @@ fun protocol ->
+  let dictator_key_path = "/dictator_key" in
+  let dictator_key = Eth_account.bootstrap_accounts.(0).address in
+  let config =
+    Sc_rollup_helpers.Installer_kernel_config.
+      [
+        Set
+          {
+            value = Hex.(of_string dictator_key |> show);
+            to_ = dictator_key_path;
+          };
+      ]
+  in
+  let* {sc_rollup_client; _} = setup_evm_kernel ~config protocol in
+  let*! found_dictator_key_hex =
+    Sc_rollup_client.inspect_durable_state_value
+      sc_rollup_client
+      ~pvm_kind:"wasm_2_0_0"
+      ~operation:Sc_rollup_client.Value
+      ~key:dictator_key_path
+  in
+  let found_dictator_key =
+    Option.map
+      (fun dictator -> Hex.to_string (`Hex dictator))
+      found_dictator_key_hex
+  in
+  Check.((Some dictator_key = found_dictator_key) (option string))
+    ~error_msg:
+      (sf "Expected to read %%L as dictator key, but found %%R instead") ;
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -1294,6 +1332,7 @@ let register_evm_proxy_server ~protocols =
   test_eth_call_storage_contract_rollup_node protocols ;
   test_eth_call_storage_contract_proxy protocols ;
   test_eth_call_storage_contract_eth_cli protocols ;
-  test_eth_call_large protocols
+  test_eth_call_large protocols ;
+  test_preinitialized_evm_kernel protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
