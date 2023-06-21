@@ -28,12 +28,8 @@
     [src/proto_016_PtMumbai/lib_sc_rollup_node/store.ml], which contains the
     store for the Mumbai rollup node. *)
 
-open Protocol
 include Store_sigs
 include Store_utils
-
-(** Aggregated collection of messages from the L1 inbox *)
-open Alpha_context
 
 let version = Store_version.V0
 
@@ -62,7 +58,7 @@ module Add_empty_header = struct
   let header _ = ()
 end
 
-module Make_hash_index_key (H : Environment.S.HASH) =
+module Make_hash_index_key (H : Tezos_crypto.Intfs.HASH) =
 Indexed_store.Make_index_key (struct
   include Indexed_store.Make_fixed_encodable (H)
 
@@ -101,17 +97,16 @@ module Messages =
     (struct
       let name = "messages"
     end)
-    (Make_hash_index_key (Sc_rollup.Inbox_merkelized_payload_hashes.Hash))
+    (Make_hash_index_key (Octez_smart_rollup.Merkelized_payload_hashes_hash))
     (struct
-      type t = Sc_rollup.Inbox_message.t list
+      type t = string list
 
       let name = "messages_list"
 
-      let encoding =
-        Data_encoding.(list @@ dynamic_size Sc_rollup.Inbox_message.encoding)
+      let encoding = Data_encoding.(list @@ dynamic_size (Variable.string' Hex))
 
       module Header = struct
-        type t = Block_hash.t * Timestamp.t * int
+        type t = Block_hash.t * Time.Protocol.t * int
 
         let name = "messages_inbox_info"
 
@@ -119,7 +114,7 @@ module Messages =
           let open Data_encoding in
           obj3
             (req "predecessor" Block_hash.encoding)
-            (req "predecessor_timestamp" Timestamp.encoding)
+            (req "predecessor_timestamp" Time.Protocol.encoding)
             (req "num_messages" int31)
 
         let fixed_size =
@@ -134,13 +129,13 @@ module Inboxes =
     (struct
       let name = "inboxes"
     end)
-    (Make_hash_index_key (Sc_rollup.Inbox.Hash))
+    (Make_hash_index_key (Octez_smart_rollup.Inbox_hash))
     (struct
-      type t = Sc_rollup.Inbox.t
+      type t = Octez_smart_rollup.Inbox.V1.t
 
       let name = "inbox"
 
-      let encoding = Sc_rollup.Inbox.encoding
+      let encoding = Octez_smart_rollup.Inbox.V1.encoding
 
       include Add_empty_header
     end)
@@ -150,26 +145,26 @@ module Commitments =
     (struct
       let name = "commitments"
     end)
-    (Make_hash_index_key (Sc_rollup.Commitment.Hash))
+    (Make_hash_index_key (Octez_smart_rollup.Commitment.Hash))
     (Indexed_store.Make_index_value (Indexed_store.Make_fixed_encodable (struct
-      include Sc_rollup.Commitment
+      include Octez_smart_rollup.Commitment.V1
 
       let name = "commitment"
     end)))
 
 module Commitments_published_at_level = struct
   type element = {
-    first_published_at_level : Raw_level.t;
-    published_at_level : Raw_level.t option;
+    first_published_at_level : int32;
+    published_at_level : int32 option;
   }
 
   let element_encoding =
     let open Data_encoding in
     let opt_level_encoding =
       conv
-        (function None -> -1l | Some l -> Raw_level.to_int32 l)
-        (fun l -> if l = -1l then None else Some (Raw_level.of_int32_exn l))
-        Data_encoding.int32
+        (function None -> -1l | Some l -> l)
+        (fun l -> if l = -1l then None else Some l)
+        int32
     in
     conv
       (fun {first_published_at_level; published_at_level} ->
@@ -177,7 +172,7 @@ module Commitments_published_at_level = struct
       (fun (first_published_at_level, published_at_level) ->
         {first_published_at_level; published_at_level})
     @@ obj2
-         (req "first_published_at_level" Raw_level.encoding)
+         (req "first_published_at_level" int32)
          (req "published_at_level" opt_level_encoding)
 
   include
@@ -185,7 +180,7 @@ module Commitments_published_at_level = struct
       (struct
         let name = "commitments"
       end)
-      (Make_hash_index_key (Sc_rollup.Commitment.Hash))
+      (Make_hash_index_key (Octez_smart_rollup.Commitment.Hash))
       (Indexed_store.Make_index_value (Indexed_store.Make_fixed_encodable (struct
         type t = element
 
@@ -245,21 +240,21 @@ module Dal_slot_pages =
       let to_path_representation = Block_hash.to_b58check
     end)
     (struct
-      type key = Dal.Slot_index.t * Dal.Page.Index.t
+      type key =
+        Octez_smart_rollup.Dal.Slot_index.t
+        * Octez_smart_rollup.Dal.Page_index.t
 
       let encoding =
-        Data_encoding.(tup2 Dal.Slot_index.encoding Dal.Page.Index.encoding)
+        Data_encoding.(tup2 Dal.Slot_index.encoding Dal.Page_index.encoding)
 
-      let compare (i1, p1) (i2, p2) =
-        Compare.or_else (Dal.Slot_index.compare i1 i2) (fun () ->
-            Dal.Page.Index.compare p1 p2)
+      let compare = Stdlib.compare
 
       let name = "slot_index"
     end)
     (struct
-      type value = Dal.Page.content
+      type value = bytes
 
-      let encoding = Dal.Page.content_encoding
+      let encoding = Data_encoding.(bytes' Hex)
 
       let name = "slot_pages"
     end)
@@ -277,11 +272,11 @@ module Dal_processed_slots =
       let to_path_representation = Block_hash.to_b58check
     end)
     (struct
-      type key = Dal.Slot_index.t
+      type key = Octez_smart_rollup.Dal.Slot_index.t
 
-      let encoding = Dal.Slot_index.encoding
+      let encoding = Octez_smart_rollup.Dal.Slot_index.encoding
 
-      let compare = Dal.Slot_index.compare
+      let compare = Compare.Int.compare
 
       let name = "slot_index"
     end)
@@ -319,20 +314,20 @@ module Dal_slots_headers =
       let to_path_representation = Block_hash.to_b58check
     end)
     (struct
-      type key = Dal.Slot_index.t
+      type key = Octez_smart_rollup.Dal.Slot_index.t
 
-      let encoding = Dal.Slot_index.encoding
+      let encoding = Octez_smart_rollup.Dal.Slot_index.encoding
 
-      let compare = Dal.Slot_index.compare
+      let compare = Compare.Int.compare
 
       let name = "slot_index"
     end)
     (struct
-      type value = Dal.Slot.Header.t
+      type value = Octez_smart_rollup.Dal.Slot_header.t
 
       let name = "slot_header"
 
-      let encoding = Dal.Slot.Header.encoding
+      let encoding = Octez_smart_rollup.Dal.Slot_header.V1.encoding
     end)
 
 (* Published slot headers per block hash, stored as a list of bindings from
@@ -355,11 +350,11 @@ module Dal_confirmed_slots_history =
       let to_path_representation = Block_hash.to_b58check
     end)
     (struct
-      type value = Dal.Slots_history.t
+      type value = Octez_smart_rollup.Dal.Slot_history.t
 
       let name = "dal_slot_histories"
 
-      let encoding = Dal.Slots_history.encoding
+      let encoding = Octez_smart_rollup.Dal.Slot_history.V1.encoding
     end)
 
 (** Confirmed DAL slots histories cache. See documentation of
@@ -377,11 +372,11 @@ module Dal_confirmed_slots_histories =
         let to_path_representation = Block_hash.to_b58check
       end)
     (struct
-      type value = Dal.Slots_history.History_cache.t
+      type value = Octez_smart_rollup.Dal.Slot_history_cache.t
 
-      let name = "dal_slot_history_cache"
+      let name = "dal_slot_histories"
 
-      let encoding = Dal.Slots_history.History_cache.encoding
+      let encoding = Octez_smart_rollup.Dal.Slot_history_cache.V1.encoding
     end)
 
 type 'a store = {

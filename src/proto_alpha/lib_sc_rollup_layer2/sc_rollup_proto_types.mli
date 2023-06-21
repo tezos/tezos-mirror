@@ -116,3 +116,45 @@ module Kind : sig
 
   val to_octez : t -> Octez_smart_rollup.Kind.t
 end
+
+module Dal : sig
+  module Slot_index : sig
+    type t = Dal.Slot_index.t
+
+    val of_octez : Octez_smart_rollup.Dal.Slot_index.t -> t
+
+    val to_octez : t -> Octez_smart_rollup.Dal.Slot_index.t
+  end
+
+  module Page_index : sig
+    type t = Dal.Page.Index.t
+
+    val of_octez : Octez_smart_rollup.Dal.Page_index.t -> t
+
+    val to_octez : t -> Octez_smart_rollup.Dal.Page_index.t
+  end
+
+  module Slot_header : sig
+    type t = Dal.Slot.Header.t
+
+    val of_octez : Octez_smart_rollup.Dal.Slot_header.t -> t
+
+    val to_octez : t -> Octez_smart_rollup.Dal.Slot_header.t
+  end
+
+  module Slot_history : sig
+    type t = Dal.Slots_history.t
+
+    val of_octez : Octez_smart_rollup.Dal.Slot_history.t -> t
+
+    val to_octez : t -> Octez_smart_rollup.Dal.Slot_history.t
+  end
+
+  module Slot_history_cache : sig
+    type t = Dal.Slots_history.History_cache.t
+
+    val of_octez : Octez_smart_rollup.Dal.Slot_history_cache.t -> t
+
+    val to_octez : t -> Octez_smart_rollup.Dal.Slot_history_cache.t
+  end
+end

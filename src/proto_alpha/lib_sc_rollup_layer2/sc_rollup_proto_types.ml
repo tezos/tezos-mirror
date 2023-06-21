@@ -236,3 +236,88 @@ module Kind = struct
     | Example_arith -> Example_arith
     | Wasm_2_0_0 -> Wasm_2_0_0
 end
+
+module Dal = struct
+  module Slot_index = struct
+    type t = Dal.Slot_index.t
+
+    let of_octez (i : Octez_smart_rollup.Dal.Slot_index.t) : t =
+      match Dal.Slot_index.of_int_opt i with
+      | None -> Format.ksprintf invalid_arg "Dal.Slot_index.of_octez: %d" i
+      | Some i -> i
+
+    let to_octez : t -> Octez_smart_rollup.Dal.Slot_index.t =
+      Dal.Slot_index.to_int
+  end
+
+  module Page_index = struct
+    type t = Dal.Page.Index.t
+
+    let of_octez : Octez_smart_rollup.Dal.Page_index.t -> t = Fun.id
+
+    let to_octez : t -> Octez_smart_rollup.Dal.Page_index.t = Fun.id
+  end
+
+  module Slot_header = struct
+    type t = Dal.Slot.Header.t
+
+    let of_octez
+        Octez_smart_rollup.Dal.Slot_header.
+          {id = {published_level; index}; commitment} : t =
+      Dal.Slot.Header.
+        {
+          id =
+            {
+              published_level = Raw_level.of_int32_exn published_level;
+              index = Slot_index.of_octez index;
+            };
+          commitment;
+        }
+
+    let to_octez Dal.Slot.Header.{id = {published_level; index}; commitment} :
+        Octez_smart_rollup.Dal.Slot_header.t =
+      Octez_smart_rollup.Dal.Slot_header.
+        {
+          id =
+            {
+              published_level = Raw_level.to_int32 published_level;
+              index = Slot_index.to_octez index;
+            };
+          commitment;
+        }
+  end
+
+  module Slot_history = struct
+    type t = Dal.Slots_history.t
+
+    let of_octez (h : Octez_smart_rollup.Dal.Slot_history.t) : t =
+      h
+      |> Data_encoding.Binary.to_bytes_exn
+           Octez_smart_rollup.Dal.Slot_history.encoding
+      |> Data_encoding.Binary.of_bytes_exn Dal.Slots_history.encoding
+
+    let to_octez (h : t) : Octez_smart_rollup.Dal.Slot_history.t =
+      h
+      |> Data_encoding.Binary.to_bytes_exn Dal.Slots_history.encoding
+      |> Data_encoding.Binary.of_bytes_exn
+           Octez_smart_rollup.Dal.Slot_history.encoding
+  end
+
+  module Slot_history_cache = struct
+    type t = Dal.Slots_history.History_cache.t
+
+    let of_octez (h : Octez_smart_rollup.Dal.Slot_history_cache.t) : t =
+      h
+      |> Data_encoding.Binary.to_bytes_exn
+           Octez_smart_rollup.Dal.Slot_history_cache.encoding
+      |> Data_encoding.Binary.of_bytes_exn
+           Dal.Slots_history.History_cache.encoding
+
+    let to_octez (h : t) : Octez_smart_rollup.Dal.Slot_history_cache.t =
+      h
+      |> Data_encoding.Binary.to_bytes_exn
+           Dal.Slots_history.History_cache.encoding
+      |> Data_encoding.Binary.of_bytes_exn
+           Octez_smart_rollup.Dal.Slot_history_cache.encoding
+  end
+end

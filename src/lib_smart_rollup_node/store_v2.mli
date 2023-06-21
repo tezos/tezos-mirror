@@ -27,42 +27,79 @@
 (** This version of the store is used for the rollup nodes for protocols for and
     after Nairobi, i.e. >= 17. *)
 
-open Protocol
-open Alpha_context
 open Indexed_store
 
 include module type of struct
-  include Store_v0
+  include Store_v1
 end
 
 (** Storage for persisting messages downloaded from the L1 node. *)
 module Messages :
   INDEXED_FILE
-    with type key := Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
-     and type value := Sc_rollup.Inbox_message.t list
-     and type header := bool * Block_hash.t * Timestamp.t * int
+    with type key := Merkelized_payload_hashes_hash.t
+     and type value := string list
+     and type header := Block_hash.t
 
-module Dal_pages : sig
-  type removed_in_v1
-end
+(** Storage for persisting inboxes. *)
+module Inboxes :
+  SIMPLE_INDEXED_FILE
+    with type key := Octez_smart_rollup.Inbox.Hash.t
+     and type value := Octez_smart_rollup.Inbox.t
+     and type header := unit
 
-module Dal_processed_slots : sig
-  type removed_in_v1
-end
+(** Storage containing commitments and corresponding commitment hashes that the
+    rollup node has knowledge of. *)
+module Commitments :
+  SIMPLE_INDEXED_FILE
+    with type key := Octez_smart_rollup.Commitment.Hash.t
+     and type value := Octez_smart_rollup.Commitment.t
+     and type header := unit
 
-(** [Dal_slots_statuses] is a [Store_utils.Nested_map] used to store the
-    attestation status of DAL slots. The values of this storage module have type
-    `[`Confirmed | `Unconfirmed]`, depending on whether the content of the slot
-    has been attested on L1 or not. If an entry is not present for a
-    [(block_hash, slot_index)], this means that the corresponding block is not
-    processed yet.
-*)
-module Dal_slots_statuses :
+(** Published slot headers per block hash,
+    stored as a list of bindings from [Dal_slot_index.t]
+    to [Dal.Slot.t]. The encoding function converts this
+    list into a [Dal.Slot_index.t]-indexed map. *)
+module Dal_slots_headers :
   Store_sigs.Nested_map
     with type primary_key := Block_hash.t
      and type secondary_key := Dal.Slot_index.t
-     and type value := [`Confirmed | `Unconfirmed]
+     and type value := Dal.Slot_header.t
      and type 'a store := 'a Irmin_store.t
+
+module Dal_confirmed_slots_history :
+  Store_sigs.Append_only_map
+    with type key := Block_hash.t
+     and type value := Dal.Slot_history.t
+     and type 'a store := 'a Irmin_store.t
+
+(** Confirmed DAL slots histories cache. See documentation of
+    {!Dal_slot_repr.Slots_history} for more details. *)
+module Dal_confirmed_slots_histories :
+  Store_sigs.Append_only_map
+    with type key := Block_hash.t
+     and type value := Dal.Slot_history_cache.t
+     and type 'a store := 'a Irmin_store.t
+
+module Protocols : sig
+  type level = First_known of int32 | Activation_level of int32
+
+  (** Each element of this type represents information we have about a Tezos
+      protocol regarding its activation. *)
+  type proto_info = {
+    level : level;
+        (** The level at which we have seen the protocol for the first time,
+            either because we saw its activation or because the first block we
+            saw (at the origination of the rollup) was from this protocol. *)
+    proto_level : int;
+        (** The protocol level, i.e. its number in the sequence of protocol
+            activations on the chain. *)
+    protocol : Protocol_hash.t;  (** The protocol this information concerns. *)
+  }
+
+  val proto_info_encoding : proto_info Data_encoding.t
+
+  include SINGLETON_STORE with type value = proto_info list
+end
 
 type +'a store = {
   l2_blocks : 'a L2_blocks.t;
@@ -73,6 +110,7 @@ type +'a store = {
   l2_head : 'a L2_head.t;
   last_finalized_level : 'a Last_finalized_level.t;
   levels_to_hashes : 'a Levels_to_hashes.t;
+  protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;
 }
 

@@ -189,6 +189,67 @@ let gen_inbox =
       | Error e ->
           Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e))
 
+let gen_slot_index =
+  let open QCheck2.Gen in
+  graft_corners (int_bound 0xff) [0; 1; 2; 0xff] ()
+
+let gen_page_index =
+  let open QCheck2.Gen in
+  let max = 0xfff / 2 in
+  graft_corners (int_bound max) [0; 1; 2; max] ()
+
+let gen_slot_header_commitment =
+  let open QCheck2.Gen in
+  make_primitive
+    ~gen:(fun state ->
+      Tezos_crypto_dal.Cryptobox.Internal_for_tests.dummy_commitment ~state ())
+    ~shrink:(fun _ -> Seq.empty)
+
+let gen_slot_header =
+  let open QCheck2.Gen in
+  let* published_level = gen_level in
+  let* index = gen_slot_index in
+  let+ commitment = gen_slot_header_commitment in
+  Octez_smart_rollup.Dal.Slot_header.{id = {published_level; index}; commitment}
+
+let compare_slot_header_id (s1 : Octez_smart_rollup.Dal.Slot_header.id)
+    (s2 : Octez_smart_rollup.Dal.Slot_header.id) =
+  let c = Int32.compare s1.published_level s2.published_level in
+  if c <> 0 then c else Int.compare s1.index s2.index
+
+let gen_slot_headers =
+  let open QCheck2.Gen in
+  let size = int_bound 50 in
+  let+ l = list_size size gen_slot_header in
+  List.sort
+    (fun (h1 : Octez_smart_rollup.Dal.Slot_header.t)
+         (h2 : Octez_smart_rollup.Dal.Slot_header.t) ->
+      compare_slot_header_id h1.id h2.id)
+    l
+
+let gen_slot_history =
+  let open Protocol.Alpha_context in
+  let open QCheck2.Gen in
+  let h = Dal.Slots_history.genesis in
+  let+ l = gen_slot_headers in
+  let l = List.map Sc_rollup_proto_types.Dal.Slot_header.of_octez l in
+  Dal.Slots_history.add_confirmed_slot_headers_no_cache h l |> function
+  | Error e ->
+      Stdlib.failwith (Format.asprintf "%a" Environment.Error_monad.pp_trace e)
+  | Ok v -> Sc_rollup_proto_types.Dal.Slot_history.to_octez v
+
+let gen_slot_history_cache =
+  let open Protocol.Alpha_context in
+  let open QCheck2.Gen in
+  let h = Dal.Slots_history.genesis in
+  let c = Dal.Slots_history.History_cache.empty ~capacity:Int64.max_int in
+  let+ l = gen_slot_headers in
+  let l = List.map Sc_rollup_proto_types.Dal.Slot_header.of_octez l in
+  Dal.Slots_history.add_confirmed_slot_headers h c l |> function
+  | Error e ->
+      Stdlib.failwith (Format.asprintf "%a" Environment.Error_monad.pp_trace e)
+  | Ok (_, c) -> Sc_rollup_proto_types.Dal.Slot_history_cache.to_octez c
+
 let test_roundtrip ~count name gen to_octez from_octez octez_encoding
     proto_encoding =
   let test octez1 =
@@ -306,6 +367,56 @@ let test_inbox =
     Octez_smart_rollup.Inbox.encoding
     Protocol.Alpha_context.Sc_rollup.Inbox.encoding
 
+let test_slot_index =
+  test_roundtrip
+    ~count:100
+    "dal_slot_index"
+    gen_slot_index
+    Sc_rollup_proto_types.Dal.Slot_index.to_octez
+    Sc_rollup_proto_types.Dal.Slot_index.of_octez
+    Octez_smart_rollup.Dal.Slot_index.encoding
+    Protocol.Alpha_context.Dal.Slot_index.encoding
+
+let test_page_index =
+  test_roundtrip
+    ~count:100
+    "dal_page_index"
+    gen_page_index
+    Sc_rollup_proto_types.Dal.Page_index.to_octez
+    Sc_rollup_proto_types.Dal.Page_index.of_octez
+    Octez_smart_rollup.Dal.Page_index.encoding
+    Protocol.Alpha_context.Dal.Page.Index.encoding
+
+let test_slot_header =
+  test_roundtrip
+    ~count:1000
+    "dal_slot_header"
+    gen_slot_header
+    Sc_rollup_proto_types.Dal.Slot_header.to_octez
+    Sc_rollup_proto_types.Dal.Slot_header.of_octez
+    Octez_smart_rollup.Dal.Slot_header.encoding
+    Protocol.Alpha_context.Dal.Slot.Header.encoding
+
+let test_slot_history =
+  test_roundtrip
+    ~count:300
+    "dal_slot_history"
+    gen_slot_history
+    Sc_rollup_proto_types.Dal.Slot_history.to_octez
+    Sc_rollup_proto_types.Dal.Slot_history.of_octez
+    Octez_smart_rollup.Dal.Slot_history.encoding
+    Protocol.Alpha_context.Dal.Slots_history.encoding
+
+let test_slot_history_cache =
+  test_roundtrip
+    ~count:300
+    "dal_slot_history_cache"
+    gen_slot_history_cache
+    Sc_rollup_proto_types.Dal.Slot_history_cache.to_octez
+    Sc_rollup_proto_types.Dal.Slot_history_cache.of_octez
+    Octez_smart_rollup.Dal.Slot_history_cache.encoding
+    Protocol.Alpha_context.Dal.Slots_history.History_cache.encoding
+
 let tests =
   [
     test_address;
@@ -316,6 +427,11 @@ let tests =
     test_stakers;
     test_refutation;
     test_inbox;
+    test_slot_index;
+    test_page_index;
+    test_slot_header;
+    test_slot_history;
+    test_slot_history_cache;
   ]
 
 let () =

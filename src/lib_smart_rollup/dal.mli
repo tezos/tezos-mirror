@@ -23,45 +23,70 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Type of parameter for migration functor {!Make}. *)
-module type MIGRATION_ACTIONS = sig
-  (** Type of store from which data is migrated. *)
-  type from_store
+module Slot_index : sig
+  type t = int
 
-  (** Type of store to which the data is migrated. *)
-  type dest_store
-
-  (** Action or actions to migrate data associated to a block. NOTE:
-      [dest_store] is an empty R/W store initialized in a temporary location. *)
-  val migrate_block_action :
-    from_store -> dest_store -> Sc_rollup_block.t -> unit tzresult Lwt.t
-
-  (** The final actions to be performed in the migration. In particular, this is
-      where data from the temporary store in [dest_store] in [tmp_dir] should be
-      reported in the actual [storage_dir]. *)
-  val final_actions :
-    storage_dir:string ->
-    tmp_dir:string ->
-    from_store ->
-    dest_store ->
-    unit tzresult Lwt.t
+  (** Encoding on 1 byte, matches
+      [Protocol.Alpha_context.Dal.Slot_index.encoding]. *)
+  val encoding : t Data_encoding.t
 end
 
-module type S = sig
-  (** Migration function for the store located in [storage_dir]. *)
-  val migrate : storage_dir:string -> unit tzresult Lwt.t
+module Page_index : sig
+  type t = int
+
+  (** Encoding on 2 bytes, matches
+      [Protocol.Alpha_context.Dal.Slot.Page.Index.encoding]. *)
+  val encoding : t Data_encoding.t
 end
 
-(** Functor to create and {e register} a migration. *)
-module Make
-    (S_from : Store_sig.S)
-    (S_dest : Store_sig.S)
-    (Actions : MIGRATION_ACTIONS
-                 with type from_store := Store_sigs.ro S_from.t
-                  and type dest_store := Store_sigs.rw S_dest.t) : S
+(** A slot commitment, same as protocol slot commitments through environment. *)
+module Commitment : sig
+  type t = Tezos_crypto_dal.Cryptobox.Verifier.commitment
 
-(** Migrate store located in rollup node {e store} directory [storage_dir] if
-    needed. If there is no possible migration path registered to go from the
-    current version to the last {!Store.version}, this function resolves with an
-    error. *)
-val maybe_run_migration : storage_dir:string -> unit tzresult Lwt.t
+  val encoding : t Data_encoding.t
+end
+
+module Slot_header : sig
+  (** A slot header. *)
+  module V1 : sig
+    type id = {published_level : int32; index : Slot_index.t}
+
+    type t = {id : id; commitment : Commitment.t}
+
+    (** Encoding for [V1] matches
+      [Protocol.Alpha_context.Dal.Slot.Header.encoding]. *)
+    val encoding : t Data_encoding.t
+  end
+
+  include Versioned_data.S with type t = V1.t
+
+  include module type of V1 with type id = V1.id and type t = V1.t
+end
+
+module Slot_history : sig
+  (** V1 are serialized slot histories as they appear first in Mumbai.
+      Introduce V2 if encoding in future protocol changes. *)
+  module V1 : sig
+    type t
+
+    val encoding : t Data_encoding.t
+  end
+
+  include Versioned_data.S with type t = V1.t
+
+  include module type of V1 with type t = V1.t
+end
+
+module Slot_history_cache : sig
+  (** V1 are serialized slot history caches as they appear first in
+      Mumbai. Introduce V2 if encoding in future protocol changes. *)
+  module V1 : sig
+    type t
+
+    val encoding : t Data_encoding.t
+  end
+
+  include Versioned_data.S with type t = V1.t
+
+  include module type of V1 with type t = V1.t
+end

@@ -24,15 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
 include Store_sigs
 include Store_utils
-include Store_v1
+include Store_v0
 
-let version = Store_version.V2
+let version = Store_version.V1
 
-module Make_hash_index_key (H : Environment.S.HASH) =
+module Make_hash_index_key (H : Tezos_crypto.Intfs.HASH) =
 Indexed_store.Make_index_key (struct
   include Indexed_store.Make_fixed_encodable (H)
 
@@ -45,21 +43,26 @@ module Messages =
     (struct
       let name = "messages"
     end)
-    (Make_hash_index_key (Sc_rollup.Inbox_merkelized_payload_hashes.Hash))
+    (Make_hash_index_key (Merkelized_payload_hashes_hash))
     (struct
-      type t = Sc_rollup.Inbox_message.t list
+      type t = string list
 
       let name = "messages_list"
 
-      let encoding =
-        Data_encoding.(list @@ dynamic_size Sc_rollup.Inbox_message.encoding)
+      let encoding = Data_encoding.(list @@ dynamic_size Variable.(string' Hex))
 
       module Header = struct
-        type t = Block_hash.t
+        type t = bool * Block_hash.t * Time.Protocol.t * int
 
-        let name = "messages_block"
+        let name = "messages_inbox_info"
 
-        let encoding = Block_hash.encoding
+        let encoding =
+          let open Data_encoding in
+          obj4
+            (req "is_first_block" bool)
+            (req "predecessor" Block_hash.encoding)
+            (req "predecessor_timestamp" Time.Protocol.encoding)
+            (req "num_messages" int31)
 
         let fixed_size =
           WithExceptions.Option.get ~loc:__LOC__
@@ -67,140 +70,65 @@ module Messages =
       end
     end)
 
-module Empty_header = struct
-  type t = unit
-
-  let name = "empty"
-
-  let encoding = Data_encoding.unit
-
-  let fixed_size = 0
+module Dal_pages = struct
+  type removed_in_v1
 end
 
-module Add_empty_header = struct
-  module Header = Empty_header
-
-  let header _ = ()
+module Dal_processed_slots = struct
+  type removed_in_v1
 end
 
-(** Versioned inboxes *)
-module Inboxes =
-  Indexed_store.Make_simple_indexed_file
+(** Store attestation statuses for DAL slots on L1. *)
+module Dal_slots_statuses =
+  Irmin_store.Make_nested_map
     (struct
-      let name = "inboxes"
+      let path = ["dal"; "slots_statuses"]
     end)
-    (Make_hash_index_key (Sc_rollup.Inbox.Hash))
     (struct
-      type t = Sc_rollup.Inbox.t
+      type key = Block_hash.t
 
-      let to_repr inbox =
-        inbox
-        |> Data_encoding.Binary.to_string_exn Sc_rollup.Inbox.encoding
-        |> Data_encoding.Binary.of_string_exn Sc_rollup_inbox_repr.encoding
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type key = Dal.Slot_index.t
 
-      let of_repr inbox =
-        inbox
-        |> Data_encoding.Binary.to_string_exn Sc_rollup_inbox_repr.encoding
-        |> Data_encoding.Binary.of_string_exn Sc_rollup.Inbox.encoding
+      let encoding = Dal.Slot_index.encoding
+
+      let compare = Compare.Int.compare
+
+      let name = "slot_index"
+    end)
+    (struct
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4780.
+
+         Rename Confirm-ed/ation to Attest-ed/ation in the rollup node. *)
+      type value = [`Confirmed | `Unconfirmed]
+
+      let name = "slot_status"
 
       let encoding =
-        Data_encoding.conv
-          (fun x -> to_repr x |> Sc_rollup_inbox_repr.to_versioned)
-          (fun x -> Sc_rollup_inbox_repr.of_versioned x |> of_repr)
-          Sc_rollup_inbox_repr.versioned_encoding
-
-      let name = "inbox"
-
-      include Add_empty_header
+        (* We don't use
+           Data_encoding.string_enum because a union is more storage-efficient. *)
+        let open Data_encoding in
+        union
+          ~tag_size:`Uint8
+          [
+            case
+              ~title:"Confirmed"
+              (Tag 0)
+              (obj1 (req "kind" (constant "Confirmed")))
+              (function `Confirmed -> Some () | `Unconfirmed -> None)
+              (fun () -> `Confirmed);
+            case
+              ~title:"Unconfirmed"
+              (Tag 1)
+              (obj1 (req "kind" (constant "Unconfirmed")))
+              (function `Unconfirmed -> Some () | `Confirmed -> None)
+              (fun () -> `Unconfirmed);
+          ]
     end)
 
-(** Versioned commitments *)
-module Commitments =
-  Indexed_store.Make_simple_indexed_file
-    (struct
-      let name = "commitments"
-    end)
-    (Make_hash_index_key (Sc_rollup.Commitment.Hash))
-    (struct
-      type t = Sc_rollup.Commitment.t
-
-      let to_repr commitment =
-        commitment
-        |> Data_encoding.Binary.to_string_exn Sc_rollup.Commitment.encoding
-        |> Data_encoding.Binary.of_string_exn Sc_rollup_commitment_repr.encoding
-
-      let of_repr commitment =
-        commitment
-        |> Data_encoding.Binary.to_string_exn Sc_rollup_commitment_repr.encoding
-        |> Data_encoding.Binary.of_string_exn Sc_rollup.Commitment.encoding
-
-      let encoding =
-        Data_encoding.conv
-          (fun x -> to_repr x |> Sc_rollup_commitment_repr.to_versioned)
-          (fun x -> Sc_rollup_commitment_repr.of_versioned x |> of_repr)
-          Sc_rollup_commitment_repr.versioned_encoding
-
-      let name = "commitment"
-
-      include Add_empty_header
-    end)
-
-module Protocols = struct
-  type level = First_known of int32 | Activation_level of int32
-
-  type proto_info = {
-    level : level;
-    proto_level : int;
-    protocol : Protocol_hash.t;
-  }
-
-  type value = proto_info list
-
-  let level_encoding =
-    let open Data_encoding in
-    conv
-      (function First_known l -> (l, false) | Activation_level l -> (l, true))
-      (function l, false -> First_known l | l, true -> Activation_level l)
-    @@ obj2 (req "level" int32) (req "activates" bool)
-
-  let proto_info_encoding =
-    let open Data_encoding in
-    conv
-      (fun {level; proto_level; protocol} -> (level, proto_level, protocol))
-      (fun (level, proto_level, protocol) -> {level; proto_level; protocol})
-    @@ obj3
-         (req "level" level_encoding)
-         (req "proto_level" int31)
-         (req "protocol" Protocol_hash.encoding)
-
-  include Indexed_store.Make_singleton (struct
-    type t = value
-
-    let name = "protocols"
-
-    let level_encoding =
-      let open Data_encoding in
-      conv
-        (function
-          | First_known l -> (l, false) | Activation_level l -> (l, true))
-        (function l, false -> First_known l | l, true -> Activation_level l)
-      @@ obj2 (req "level" int32) (req "activates" bool)
-
-    let proto_info_encoding =
-      let open Data_encoding in
-      conv
-        (fun {level; proto_level; protocol} -> (level, proto_level, protocol))
-        (fun (level, proto_level, protocol) -> {level; proto_level; protocol})
-      @@ obj3
-           (req "level" level_encoding)
-           (req "proto_level" int31)
-           (req "protocol" Protocol_hash.encoding)
-
-    let encoding = Data_encoding.list proto_info_encoding
-  end)
-end
-
-type 'a store = {
+type nonrec 'a store = {
   l2_blocks : 'a L2_blocks.t;
   messages : 'a Messages.t;
   inboxes : 'a Inboxes.t;
@@ -209,7 +137,6 @@ type 'a store = {
   l2_head : 'a L2_head.t;
   last_finalized_level : 'a Last_finalized_level.t;
   levels_to_hashes : 'a Levels_to_hashes.t;
-  protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;
 }
 
@@ -229,7 +156,6 @@ let readonly
        l2_head;
        last_finalized_level;
        levels_to_hashes;
-       protocols;
        irmin_store;
      } :
       _ t) : ro =
@@ -243,7 +169,6 @@ let readonly
     l2_head = L2_head.readonly l2_head;
     last_finalized_level = Last_finalized_level.readonly last_finalized_level;
     levels_to_hashes = Levels_to_hashes.readonly levels_to_hashes;
-    protocols = Protocols.readonly protocols;
     irmin_store = Irmin_store.readonly irmin_store;
   }
 
@@ -257,7 +182,6 @@ let close
        l2_head = _;
        last_finalized_level = _;
        levels_to_hashes;
-       protocols = _;
        irmin_store;
      } :
       _ t) =
@@ -279,9 +203,7 @@ let load (type a) (mode : a mode) ~l2_blocks_cache_size data_dir :
   let* l2_blocks = L2_blocks.load mode ~path:(path "l2_blocks") ~cache_size in
   let* messages = Messages.load mode ~path:(path "messages") ~cache_size in
   let* inboxes = Inboxes.load mode ~path:(path "inboxes") ~cache_size in
-  let* commitments =
-    Commitments.load mode ~path:(path "commitments") ~cache_size
-  in
+  let* commitments = Commitments.load mode ~path:(path "commitments") in
   let* commitments_published_at_level =
     Commitments_published_at_level.load
       mode
@@ -294,7 +216,6 @@ let load (type a) (mode : a mode) ~l2_blocks_cache_size data_dir :
   let* levels_to_hashes =
     Levels_to_hashes.load mode ~path:(path "levels_to_hashes")
   in
-  let* protocols = Protocols.load mode ~path:(path "protocols") in
   let+ irmin_store = Irmin_store.load mode (path "irmin_store") in
   {
     l2_blocks;
@@ -305,7 +226,6 @@ let load (type a) (mode : a mode) ~l2_blocks_cache_size data_dir :
     l2_head;
     last_finalized_level;
     levels_to_hashes;
-    protocols;
     irmin_store;
   }
 

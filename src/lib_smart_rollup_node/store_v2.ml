@@ -24,15 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
 include Store_sigs
 include Store_utils
 include Store_v1
 
 let version = Store_version.V2
 
-module Make_hash_index_key (H : Environment.S.HASH) =
+module Make_hash_index_key (H : Tezos_crypto.Intfs.HASH) =
 Indexed_store.Make_index_key (struct
   include Indexed_store.Make_fixed_encodable (H)
 
@@ -45,14 +43,13 @@ module Messages =
     (struct
       let name = "messages"
     end)
-    (Make_hash_index_key (Sc_rollup.Inbox_merkelized_payload_hashes.Hash))
+    (Make_hash_index_key (Merkelized_payload_hashes_hash))
     (struct
-      type t = Sc_rollup.Inbox_message.t list
+      type t = string list
 
       let name = "messages_list"
 
-      let encoding =
-        Data_encoding.(list @@ dynamic_size Sc_rollup.Inbox_message.encoding)
+      let encoding = Data_encoding.(list @@ dynamic_size (Variable.string' Hex))
 
       module Header = struct
         type t = Block_hash.t
@@ -89,25 +86,15 @@ module Inboxes =
     (struct
       let name = "inboxes"
     end)
-    (Make_hash_index_key (Sc_rollup.Inbox.Hash))
+    (Make_hash_index_key (Octez_smart_rollup.Inbox.Hash))
     (struct
-      type t = Sc_rollup.Inbox.t
-
-      let to_repr inbox =
-        inbox
-        |> Data_encoding.Binary.to_string_exn Sc_rollup.Inbox.encoding
-        |> Data_encoding.Binary.of_string_exn Sc_rollup_inbox_repr.encoding
-
-      let of_repr inbox =
-        inbox
-        |> Data_encoding.Binary.to_string_exn Sc_rollup_inbox_repr.encoding
-        |> Data_encoding.Binary.of_string_exn Sc_rollup.Inbox.encoding
+      type t = Octez_smart_rollup.Inbox.t
 
       let encoding =
         Data_encoding.conv
-          (fun x -> to_repr x |> Sc_rollup_inbox_repr.to_versioned)
-          (fun x -> Sc_rollup_inbox_repr.of_versioned x |> of_repr)
-          Sc_rollup_inbox_repr.versioned_encoding
+          Octez_smart_rollup.Inbox.to_versioned
+          Octez_smart_rollup.Inbox.of_versioned
+          Octez_smart_rollup.Inbox.versioned_encoding
 
       let name = "inbox"
 
@@ -120,29 +107,99 @@ module Commitments =
     (struct
       let name = "commitments"
     end)
-    (Make_hash_index_key (Sc_rollup.Commitment.Hash))
+    (Make_hash_index_key (Octez_smart_rollup.Commitment.Hash))
     (struct
-      type t = Sc_rollup.Commitment.t
-
-      let to_repr commitment =
-        commitment
-        |> Data_encoding.Binary.to_string_exn Sc_rollup.Commitment.encoding
-        |> Data_encoding.Binary.of_string_exn Sc_rollup_commitment_repr.encoding
-
-      let of_repr commitment =
-        commitment
-        |> Data_encoding.Binary.to_string_exn Sc_rollup_commitment_repr.encoding
-        |> Data_encoding.Binary.of_string_exn Sc_rollup.Commitment.encoding
+      type t = Octez_smart_rollup.Commitment.t
 
       let encoding =
         Data_encoding.conv
-          (fun x -> to_repr x |> Sc_rollup_commitment_repr.to_versioned)
-          (fun x -> Sc_rollup_commitment_repr.of_versioned x |> of_repr)
-          Sc_rollup_commitment_repr.versioned_encoding
+          Octez_smart_rollup.Commitment.to_versioned
+          Octez_smart_rollup.Commitment.of_versioned
+          Octez_smart_rollup.Commitment.versioned_encoding
 
       let name = "commitment"
 
       include Add_empty_header
+    end)
+
+(** Versioned slot headers *)
+module Dal_slots_headers =
+  Irmin_store.Make_nested_map
+    (struct
+      let path = ["dal"; "slot_headers"]
+    end)
+    (struct
+      type key = Block_hash.t
+
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type key = Octez_smart_rollup.Dal.Slot_index.t
+
+      let encoding = Octez_smart_rollup.Dal.Slot_index.encoding
+
+      let compare = Compare.Int.compare
+
+      let name = "slot_index"
+    end)
+    (struct
+      type value = Octez_smart_rollup.Dal.Slot_header.t
+
+      let name = "slot_header"
+
+      let encoding =
+        Data_encoding.conv
+          Octez_smart_rollup.Dal.Slot_header.to_versioned
+          Octez_smart_rollup.Dal.Slot_header.of_versioned
+          Octez_smart_rollup.Dal.Slot_header.versioned_encoding
+    end)
+
+(** Versioned Confirmed DAL slots history *)
+module Dal_confirmed_slots_history =
+  Irmin_store.Make_append_only_map
+    (struct
+      let path = ["dal"; "confirmed_slots_history"]
+    end)
+    (struct
+      type key = Block_hash.t
+
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type value = Octez_smart_rollup.Dal.Slot_history.t
+
+      let name = "dal_slot_histories"
+
+      let encoding =
+        Data_encoding.conv
+          Octez_smart_rollup.Dal.Slot_history.to_versioned
+          Octez_smart_rollup.Dal.Slot_history.of_versioned
+          Octez_smart_rollup.Dal.Slot_history.versioned_encoding
+    end)
+
+(** Versioned Confirmed DAL slots histories cache. *)
+module Dal_confirmed_slots_histories =
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4390
+     Store single history points in map instead of whole history. *)
+    Irmin_store.Make_append_only_map
+      (struct
+        let path = ["dal"; "confirmed_slots_histories_cache"]
+      end)
+      (struct
+        type key = Block_hash.t
+
+        let to_path_representation = Block_hash.to_b58check
+      end)
+    (struct
+      type value = Octez_smart_rollup.Dal.Slot_history_cache.t
+
+      let name = "dal_slot_histories"
+
+      let encoding =
+        Data_encoding.conv
+          Octez_smart_rollup.Dal.Slot_history_cache.to_versioned
+          Octez_smart_rollup.Dal.Slot_history_cache.of_versioned
+          Octez_smart_rollup.Dal.Slot_history_cache.versioned_encoding
     end)
 
 module Protocols = struct

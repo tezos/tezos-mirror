@@ -462,7 +462,7 @@ let level_of_hash {l1_ctxt; store; _} hash =
   let open Lwt_result_syntax in
   let* l2_header = Store.L2_blocks.header store.l2_blocks hash in
   match l2_header with
-  | Some {level; _} -> return (Raw_level.to_int32 level)
+  | Some {level; _} -> return level
   | None ->
       let+ {level; _} = Layer1.fetch_tezos_shell_header l1_ctxt hash in
       level
@@ -538,7 +538,7 @@ let get_l2_block_predecessor node_ctxt hash =
   let+ header = Store.L2_blocks.header node_ctxt.store.l2_blocks hash in
   Option.map
     (fun {Sc_rollup_block.predecessor; level; _} ->
-      (predecessor, Int32.pred (Raw_level.to_int32 level)))
+      (predecessor, Int32.pred level))
     header
 
 let get_predecessor_opt node_ctxt (hash, level) =
@@ -610,8 +610,8 @@ let get_predecessor_header node_ctxt head =
     first look for a block before the [tick] *)
 let tick_search ~big_step_blocks node_ctxt head tick =
   let open Lwt_result_syntax in
-  if Sc_rollup.Tick.(head.Sc_rollup_block.initial_tick <= tick) then
-    if Sc_rollup.Tick.(Sc_rollup_block.final_tick head < tick) then
+  if Z.Compare.(head.Sc_rollup_block.initial_tick <= tick) then
+    if Z.Compare.(Sc_rollup_block.final_tick head < tick) then
       (* The head block does not contain the tick *)
       return_none
     else
@@ -621,20 +621,18 @@ let tick_search ~big_step_blocks node_ctxt head tick =
     let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
     let rec find_big_step (end_block : Sc_rollup_block.t) =
       let start_level =
-        Int32.sub
-          (Raw_level.to_int32 end_block.header.level)
-          (Int32.of_int big_step_blocks)
+        Int32.sub end_block.header.level (Int32.of_int big_step_blocks)
       in
       let start_level =
         if start_level < genesis_level then genesis_level else start_level
       in
       let* start_block = get_l2_block_by_level node_ctxt start_level in
-      if Sc_rollup.Tick.(start_block.initial_tick <= tick) then
+      if Z.Compare.(start_block.initial_tick <= tick) then
         return (start_block, end_block)
       else find_big_step start_block
     in
     let block_level Sc_rollup_block.{header = {level; _}; _} =
-      Raw_level.to_int32 level |> Int32.to_int
+      Int32.to_int level
     in
     let rec dicho start_block end_block =
       (* Precondition:
@@ -650,7 +648,7 @@ let tick_search ~big_step_blocks node_ctxt head tick =
         let* block_middle =
           get_l2_block_by_level node_ctxt (Int32.of_int middle_level)
         in
-        if Sc_rollup.Tick.(block_middle.initial_tick <= tick) then
+        if Z.Compare.(block_middle.initial_tick <= tick) then
           dicho block_middle end_block
         else dicho start_block block_middle
     in
@@ -673,51 +671,80 @@ let block_with_tick ({store; _} as node_ctxt) ~max_level tick =
         the refutation period as the big_step_blocks to do a dichotomy on the
         full space but we anticipate refutation to happen most of the time close
         to the head. *)
+     let max_level = Raw_level.to_int32 max_level in
      let** head =
-       if Raw_level.(head.header.level <= max_level) then return_some head
-       else find_l2_block_by_level node_ctxt (Raw_level.to_int32 max_level)
+       if head.header.level <= max_level then return_some head
+       else find_l2_block_by_level node_ctxt max_level
      in
-     tick_search ~big_step_blocks:4096 node_ctxt head tick
+     tick_search ~big_step_blocks:4096 node_ctxt head (Sc_rollup.Tick.to_z tick)
 
-let get_commitment {store; _} commitment_hash =
+let find_octez_commitment {store; _} commitment_hash =
   let open Lwt_result_syntax in
-  let* commitment = Store.Commitments.read store.commitments commitment_hash in
+  let+ commitment = Store.Commitments.read store.commitments commitment_hash in
+  Option.map fst commitment
+
+let find_commitment node_ctxt commitment_hash =
+  let open Lwt_result_syntax in
+  let commitment_hash =
+    Sc_rollup_proto_types.Commitment_hash.to_octez commitment_hash
+  in
+  let+ commitment = find_octez_commitment node_ctxt commitment_hash in
+  Option.map Sc_rollup_proto_types.Commitment.of_octez commitment
+
+let get_octez_commitment node_ctxt commitment_hash =
+  let open Lwt_result_syntax in
+  let* commitment = find_octez_commitment node_ctxt commitment_hash in
+  match commitment with
+  | None ->
+      failwith
+        "Could not retrieve commitment %a"
+        Octez_smart_rollup.Commitment.Hash.pp
+        commitment_hash
+  | Some i -> return i
+
+let get_commitment node_ctxt commitment_hash =
+  let open Lwt_result_syntax in
+  let* commitment = find_commitment node_ctxt commitment_hash in
   match commitment with
   | None ->
       failwith
         "Could not retrieve commitment %a"
         Sc_rollup.Commitment.Hash.pp
         commitment_hash
-  | Some (c, ()) -> return c
-
-let find_commitment {store; _} hash =
-  let open Lwt_result_syntax in
-  let+ commitment = Store.Commitments.read store.commitments hash in
-  Option.map fst commitment
+  | Some i -> return i
 
 let commitment_exists {store; _} hash =
+  let hash = Sc_rollup_proto_types.Commitment_hash.to_octez hash in
   Store.Commitments.mem store.commitments hash
 
 let save_commitment {store; _} commitment =
   let open Lwt_result_syntax in
-  let hash = Sc_rollup.Commitment.hash_uncarbonated commitment in
+  let commitment = Sc_rollup_proto_types.Commitment.to_octez commitment in
+  let hash = Octez_smart_rollup.Commitment.hash commitment in
   let+ () =
     Store.Commitments.append store.commitments ~key:hash ~value:commitment
   in
-  hash
+  Sc_rollup_proto_types.Commitment_hash.of_octez hash
 
 let commitment_published_at_level {store; _} commitment =
+  let commitment = Sc_rollup_proto_types.Commitment_hash.to_octez commitment in
   Store.Commitments_published_at_level.find
     store.commitments_published_at_level
     commitment
 
-let set_commitment_published_at_level {store; _} =
-  Store.Commitments_published_at_level.add store.commitments_published_at_level
+let set_commitment_published_at_level {store; _} hash =
+  let hash = Sc_rollup_proto_types.Commitment_hash.to_octez hash in
+  Store.Commitments_published_at_level.add
+    store.commitments_published_at_level
+    hash
 
 type commitment_source = Anyone | Us
 
 let commitment_was_published {store; _} ~source commitment_hash =
   let open Lwt_result_syntax in
+  let commitment_hash =
+    Sc_rollup_proto_types.Commitment_hash.to_octez commitment_hash
+  in
   match source with
   | Anyone ->
       Store.Commitments_published_at_level.mem
@@ -733,31 +760,52 @@ let commitment_was_published {store; _} ~source commitment_hash =
       | Some {published_at_level = Some _; _} -> true
       | _ -> false)
 
-let get_inbox {store; _} inbox_hash =
+let find_octez_inbox {store; _} inbox_hash =
   let open Lwt_result_syntax in
-  let* inbox = Store.Inboxes.read store.inboxes inbox_hash in
+  let+ inbox = Store.Inboxes.read store.inboxes inbox_hash in
+  Option.map fst inbox
+
+let find_inbox node_ctxt inbox_hash =
+  let open Lwt_result_syntax in
+  let inbox_hash = Sc_rollup_proto_types.Inbox_hash.to_octez inbox_hash in
+  let+ inbox = find_octez_inbox node_ctxt inbox_hash in
+  Option.map Sc_rollup_proto_types.Inbox.of_octez inbox
+
+let get_octez_inbox node_ctxt inbox_hash =
+  let open Lwt_result_syntax in
+  let* inbox = find_octez_inbox node_ctxt inbox_hash in
+  match inbox with
+  | None ->
+      failwith
+        "Could not retrieve inbox %a"
+        Octez_smart_rollup.Inbox.Hash.pp
+        inbox_hash
+  | Some i -> return i
+
+let get_inbox node_ctxt inbox_hash =
+  let open Lwt_result_syntax in
+  let* inbox = find_inbox node_ctxt inbox_hash in
   match inbox with
   | None ->
       failwith "Could not retrieve inbox %a" Sc_rollup.Inbox.Hash.pp inbox_hash
-  | Some (i, ()) -> return i
-
-let find_inbox {store; _} hash =
-  let open Lwt_result_syntax in
-  let+ inbox = Store.Inboxes.read store.inboxes hash in
-  Option.map fst inbox
+  | Some i -> return i
 
 let save_inbox {store; _} inbox =
   let open Lwt_result_syntax in
-  let hash = Sc_rollup.Inbox.hash inbox in
+  let inbox = Sc_rollup_proto_types.Inbox.to_octez inbox in
+  let hash = Octez_smart_rollup.Inbox.hash inbox in
   let+ () = Store.Inboxes.append store.inboxes ~key:hash ~value:inbox in
-  hash
+  Sc_rollup_proto_types.Inbox_hash.of_octez hash
 
 let find_inbox_by_block_hash ({store; _} as node_ctxt) block_hash =
   let open Lwt_result_syntax in
   let* header = Store.L2_blocks.header store.l2_blocks block_hash in
   match header with
   | None -> return_none
-  | Some {inbox_hash; _} -> find_inbox node_ctxt inbox_hash
+  | Some {inbox_hash; _} ->
+      find_inbox
+        node_ctxt
+        (Sc_rollup_proto_types.Inbox_hash.of_octez inbox_hash)
 
 let genesis_inbox node_ctxt =
   let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
@@ -806,12 +854,22 @@ type messages_info = {
 
 let find_messages node_ctxt messages_hash =
   let open Lwt_result_syntax in
+  let messages_hash =
+    Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez messages_hash
+  in
   let* msg = Store.Messages.read node_ctxt.store.messages messages_hash in
   match msg with
   | None -> return_none
   | Some (messages, block_hash) ->
       let* header = header_of_hash node_ctxt block_hash in
       let* pred_header = header_of_hash node_ctxt header.header.predecessor in
+      let*? messages =
+        Environment.wrap_tzresult
+        @@ List.map_e
+             (fun m ->
+               Sc_rollup.Inbox_message.(deserialize @@ unsafe_of_string m))
+             messages
+      in
       return_some
         {
           predecessor = pred_header.hash;
@@ -819,18 +877,22 @@ let find_messages node_ctxt messages_hash =
           messages;
         }
 
-let get_messages_aux find node_ctxt hash =
+let get_messages_aux find pp node_ctxt hash =
   let open Lwt_result_syntax in
   let* res = find node_ctxt hash in
   match res with
   | None ->
       failwith
         "Could not retrieve messages with payloads merkelized hash %a"
-        Sc_rollup.Inbox_merkelized_payload_hashes.Hash.pp
+        pp
         hash
   | Some res -> return res
 
-let get_messages node_ctxt = get_messages_aux find_messages node_ctxt
+let get_messages node_ctxt =
+  get_messages_aux
+    find_messages
+    Sc_rollup.Inbox_merkelized_payload_hashes.Hash.pp
+    node_ctxt
 
 let get_messages_without_proto_messages node_ctxt =
   get_messages_aux
@@ -840,30 +902,45 @@ let get_messages_without_proto_messages node_ctxt =
       match msg with
       | None -> return_none
       | Some (messages, _block_hash) -> return_some messages)
+    Tezos_crypto.Hashed.Smart_rollup_merkelized_payload_hashes_hash.pp
     node_ctxt
 
 let get_num_messages {store; _} hash =
   let open Lwt_result_syntax in
+  let hash =
+    Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez hash
+  in
   let* msg = Store.Messages.read store.messages hash in
   match msg with
   | None ->
       failwith
         "Could not retrieve number of messages for inbox witness %a"
-        Sc_rollup.Inbox_merkelized_payload_hashes.Hash.pp
+        Tezos_crypto.Hashed.Smart_rollup_merkelized_payload_hashes_hash.pp
         hash
   | Some (messages, _block_hash) -> return (List.length messages)
 
 let save_messages {store; _} key ~block_hash messages =
+  let open Lwt_result_syntax in
+  let key = Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez key in
+  let*? messages =
+    Environment.wrap_tzresult
+    @@ List.map_e
+         (fun m ->
+           let open Result_syntax in
+           let+ m = Sc_rollup.Inbox_message.serialize m in
+           Sc_rollup.Inbox_message.unsafe_to_string m)
+         messages
+  in
   Store.Messages.append store.messages ~key ~header:block_hash ~value:messages
 
 let get_full_l2_block node_ctxt block_hash =
   let open Lwt_result_syntax in
   let* block = get_l2_block node_ctxt block_hash in
-  let* inbox = get_inbox node_ctxt block.header.inbox_hash
+  let* inbox = get_octez_inbox node_ctxt block.header.inbox_hash
   and* messages =
     get_messages_without_proto_messages node_ctxt block.header.inbox_witness
   and* commitment =
-    Option.map_es (get_commitment node_ctxt) block.header.commitment_hash
+    Option.map_es (get_octez_commitment node_ctxt) block.header.commitment_hash
   in
   return {block with content = {Sc_rollup_block.inbox; messages; commitment}}
 
@@ -1022,52 +1099,77 @@ let get_slot_header {store; _} ~published_in_block_hash slot_index =
     slot_index
     Block_hash.pp
     published_in_block_hash
-  @@ Store.Dal_slots_headers.get
-       store.irmin_store
-       ~primary_key:published_in_block_hash
-       ~secondary_key:slot_index
+  @@
+  let open Lwt_result_syntax in
+  let+ header =
+    Store.Dal_slots_headers.get
+      store.irmin_store
+      ~primary_key:published_in_block_hash
+      ~secondary_key:(Dal.Slot_index.to_int slot_index)
+  in
+  Sc_rollup_proto_types.Dal.Slot_header.of_octez header
 
 let get_all_slot_headers {store; _} ~published_in_block_hash =
-  Store.Dal_slots_headers.list_values
-    store.irmin_store
-    ~primary_key:published_in_block_hash
+  let open Lwt_result_syntax in
+  let+ headers =
+    Store.Dal_slots_headers.list_values
+      store.irmin_store
+      ~primary_key:published_in_block_hash
+  in
+  List.rev_map Sc_rollup_proto_types.Dal.Slot_header.of_octez headers
+  |> List.rev
 
 let get_slot_indexes {store; _} ~published_in_block_hash =
-  Store.Dal_slots_headers.list_secondary_keys
-    store.irmin_store
-    ~primary_key:published_in_block_hash
+  let open Lwt_result_syntax in
+  let+ indexes =
+    Store.Dal_slots_headers.list_secondary_keys
+      store.irmin_store
+      ~primary_key:published_in_block_hash
+  in
+  List.rev_map Sc_rollup_proto_types.Dal.Slot_index.of_octez indexes |> List.rev
 
 let save_slot_header {store; _} ~published_in_block_hash
     (slot_header : Dal.Slot.Header.t) =
   Store.Dal_slots_headers.add
     store.irmin_store
     ~primary_key:published_in_block_hash
-    ~secondary_key:slot_header.id.index
-    slot_header
+    ~secondary_key:
+      (Sc_rollup_proto_types.Dal.Slot_index.to_octez slot_header.id.index)
+    (Sc_rollup_proto_types.Dal.Slot_header.to_octez slot_header)
 
 let processed_slot {store; _} ~confirmed_in_block_hash slot_index =
   Store.Dal_slots_statuses.find
     store.irmin_store
     ~primary_key:confirmed_in_block_hash
-    ~secondary_key:slot_index
+    ~secondary_key:(Dal.Slot_index.to_int slot_index)
 
 let list_slot_pages {store; _} ~confirmed_in_block_hash =
-  Store.Dal_slot_pages.list_secondary_keys_with_values
-    store.irmin_store
-    ~primary_key:confirmed_in_block_hash
+  let open Lwt_result_syntax in
+  let+ slot_pages =
+    Store.Dal_slot_pages.list_secondary_keys_with_values
+      store.irmin_store
+      ~primary_key:confirmed_in_block_hash
+  in
+  List.rev_map
+    (fun ((slot_index, page_index), content) ->
+      ( (Sc_rollup_proto_types.Dal.Slot_index.of_octez slot_index, page_index),
+        content ))
+    slot_pages
+  |> List.rev
 
 let find_slot_page {store; _} ~confirmed_in_block_hash ~slot_index ~page_index =
   Store.Dal_slot_pages.find
     store.irmin_store
     ~primary_key:confirmed_in_block_hash
-    ~secondary_key:(slot_index, page_index)
+    ~secondary_key:
+      (Sc_rollup_proto_types.Dal.Slot_index.to_octez slot_index, page_index)
 
 let save_unconfirmed_slot {store; _} current_block_hash slot_index =
   (* No page is actually saved *)
   Store.Dal_slots_statuses.add
     store.irmin_store
     ~primary_key:current_block_hash
-    ~secondary_key:slot_index
+    ~secondary_key:(Sc_rollup_proto_types.Dal.Slot_index.to_octez slot_index)
     `Unconfirmed
 
 let save_confirmed_slot {store; _} current_block_hash slot_index pages =
@@ -1080,27 +1182,39 @@ let save_confirmed_slot {store; _} current_block_hash slot_index pages =
         Store.Dal_slot_pages.add
           store.irmin_store
           ~primary_key:current_block_hash
-          ~secondary_key:(slot_index, page_number)
+          ~secondary_key:
+            ( Sc_rollup_proto_types.Dal.Slot_index.to_octez slot_index,
+              page_number )
           page)
       pages
   in
   Store.Dal_slots_statuses.add
     store.irmin_store
     ~primary_key:current_block_hash
-    ~secondary_key:slot_index
+    ~secondary_key:(Sc_rollup_proto_types.Dal.Slot_index.to_octez slot_index)
     `Confirmed
 
-let find_confirmed_slots_history {store; _} =
-  Store.Dal_confirmed_slots_history.find store.irmin_store
+let find_confirmed_slots_history {store; _} block =
+  let open Lwt_result_syntax in
+  let+ res = Store.Dal_confirmed_slots_history.find store.irmin_store block in
+  Option.map Sc_rollup_proto_types.Dal.Slot_history.of_octez res
 
-let save_confirmed_slots_history {store; _} =
-  Store.Dal_confirmed_slots_history.add store.irmin_store
+let save_confirmed_slots_history {store; _} block hist =
+  Store.Dal_confirmed_slots_history.add
+    store.irmin_store
+    block
+    (Sc_rollup_proto_types.Dal.Slot_history.to_octez hist)
 
-let find_confirmed_slots_histories {store; _} =
-  Store.Dal_confirmed_slots_histories.find store.irmin_store
+let find_confirmed_slots_histories {store; _} block =
+  let open Lwt_result_syntax in
+  let+ res = Store.Dal_confirmed_slots_histories.find store.irmin_store block in
+  Option.map Sc_rollup_proto_types.Dal.Slot_history_cache.of_octez res
 
-let save_confirmed_slots_histories {store; _} =
-  Store.Dal_confirmed_slots_histories.add store.irmin_store
+let save_confirmed_slots_histories {store; _} block hist =
+  Store.Dal_confirmed_slots_histories.add
+    store.irmin_store
+    block
+    (Sc_rollup_proto_types.Dal.Slot_history_cache.to_octez hist)
 
 module Internal_for_tests = struct
   let create_node_context cctxt

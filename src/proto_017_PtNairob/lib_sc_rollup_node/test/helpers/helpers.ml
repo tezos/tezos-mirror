@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Octez_smart_rollup
 open Protocol
 open Alpha_context
 
@@ -83,12 +84,22 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
       ~genesis_state_hash
   in
   let* commitment_hash = Node_context.save_commitment node_ctxt commitment in
-  let previous_commitment_hash = node_ctxt.genesis_info.commitment_hash in
+  let previous_commitment_hash =
+    node_ctxt.genesis_info.commitment_hash
+    |> Sc_rollup_proto_types.Commitment_hash.to_octez
+  in
+  let commitment_hash =
+    Sc_rollup_proto_types.Commitment_hash.to_octez commitment_hash
+  in
+  let inbox_witness =
+    Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez inbox_witness
+  in
+  let inbox_hash = Sc_rollup_proto_types.Inbox_hash.to_octez inbox_hash in
   let header =
     Sc_rollup_block.
       {
         block_hash = head.hash;
-        level = node_ctxt.genesis_info.level;
+        level = Raw_level.to_int32 node_ctxt.genesis_info.level;
         predecessor = predecessor.hash;
         commitment_hash = Some commitment_hash;
         previous_commitment_hash;
@@ -98,7 +109,13 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
       }
   in
   let l2_block =
-    Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
+    Sc_rollup_block.
+      {
+        header;
+        content = ();
+        num_ticks;
+        initial_tick = Sc_rollup.Tick.to_z initial_tick;
+      }
   in
   let* () = Node_context.save_l2_head node_ctxt l2_block in
   return l2_block
@@ -135,6 +152,7 @@ let initialize_node_context ?(constants = default_constants) kind ~boot_sector =
   let* genesis = add_l2_genesis_block ctxt ~boot_sector in
   let commitment_hash =
     WithExceptions.Option.get ~loc:__LOC__ genesis.header.commitment_hash
+    |> Sc_rollup_proto_types.Commitment_hash.of_octez
   in
   let ctxt =
     {ctxt with genesis_info = {ctxt.genesis_info with commitment_hash}}
@@ -182,7 +200,7 @@ let append_l2_block (node_ctxt : _ Node_context.t) ?(is_first_block = false)
     | None ->
         failwith "No genesis block, please add one with add_l2_genesis_block"
   in
-  let pred_level = Raw_level.to_int32 predecessor_l2_block.header.level in
+  let pred_level = predecessor_l2_block.header.level in
   let predecessor =
     head_of_level
       ~predecessor:predecessor_l2_block.header.predecessor
@@ -205,9 +223,7 @@ let append_dummy_l2_chain node_ctxt ~length =
   let open Lwt_result_syntax in
   let* head = Node_context.last_processed_head_opt node_ctxt in
   let head_level =
-    match head with
-    | None -> 0
-    | Some h -> h.header.level |> Raw_level.to_int32 |> Int32.to_int
+    match head with None -> 0 | Some h -> h.header.level |> Int32.to_int
   in
   let batches =
     Stdlib.List.init length (fun i ->

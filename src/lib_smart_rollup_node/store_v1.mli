@@ -1,6 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -23,45 +24,54 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Type of parameter for migration functor {!Make}. *)
-module type MIGRATION_ACTIONS = sig
-  (** Type of store from which data is migrated. *)
-  type from_store
+(** This version of the store is used for the rollup nodes for protocols for and
+    after Nairobi, i.e. >= 17. *)
 
-  (** Type of store to which the data is migrated. *)
-  type dest_store
+open Indexed_store
 
-  (** Action or actions to migrate data associated to a block. NOTE:
-      [dest_store] is an empty R/W store initialized in a temporary location. *)
-  val migrate_block_action :
-    from_store -> dest_store -> Sc_rollup_block.t -> unit tzresult Lwt.t
-
-  (** The final actions to be performed in the migration. In particular, this is
-      where data from the temporary store in [dest_store] in [tmp_dir] should be
-      reported in the actual [storage_dir]. *)
-  val final_actions :
-    storage_dir:string ->
-    tmp_dir:string ->
-    from_store ->
-    dest_store ->
-    unit tzresult Lwt.t
+include module type of struct
+  include Store_v0
 end
 
-module type S = sig
-  (** Migration function for the store located in [storage_dir]. *)
-  val migrate : storage_dir:string -> unit tzresult Lwt.t
+(** Storage for persisting messages downloaded from the L1 node. *)
+module Messages :
+  INDEXED_FILE
+    with type key := Merkelized_payload_hashes_hash.t
+     and type value := string list
+     and type header := bool * Block_hash.t * Time.Protocol.t * int
+
+module Dal_pages : sig
+  type removed_in_v1
 end
 
-(** Functor to create and {e register} a migration. *)
-module Make
-    (S_from : Store_sig.S)
-    (S_dest : Store_sig.S)
-    (Actions : MIGRATION_ACTIONS
-                 with type from_store := Store_sigs.ro S_from.t
-                  and type dest_store := Store_sigs.rw S_dest.t) : S
+module Dal_processed_slots : sig
+  type removed_in_v1
+end
 
-(** Migrate store located in rollup node {e store} directory [storage_dir] if
-    needed. If there is no possible migration path registered to go from the
-    current version to the last {!Store.version}, this function resolves with an
-    error. *)
-val maybe_run_migration : storage_dir:string -> unit tzresult Lwt.t
+(** [Dal_slots_statuses] is a [Store_utils.Nested_map] used to store the
+    attestation status of DAL slots. The values of this storage module have type
+    `[`Confirmed | `Unconfirmed]`, depending on whether the content of the slot
+    has been attested on L1 or not. If an entry is not present for a
+    [(block_hash, slot_index)], this means that the corresponding block is not
+    processed yet.
+*)
+module Dal_slots_statuses :
+  Store_sigs.Nested_map
+    with type primary_key := Block_hash.t
+     and type secondary_key := Dal.Slot_index.t
+     and type value := [`Confirmed | `Unconfirmed]
+     and type 'a store := 'a Irmin_store.t
+
+type +'a store = {
+  l2_blocks : 'a L2_blocks.t;
+  messages : 'a Messages.t;
+  inboxes : 'a Inboxes.t;
+  commitments : 'a Commitments.t;
+  commitments_published_at_level : 'a Commitments_published_at_level.t;
+  l2_head : 'a L2_head.t;
+  last_finalized_level : 'a Last_finalized_level.t;
+  levels_to_hashes : 'a Levels_to_hashes.t;
+  irmin_store : 'a Irmin_store.t;
+}
+
+include Store_sig.S with type 'a store := 'a store
