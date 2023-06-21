@@ -33,6 +33,13 @@ let get_head store =
   | None -> failwith "No head"
   | Some {header = {block_hash; _}; _} -> return block_hash
 
+let get_head_level store =
+  let open Lwt_result_syntax in
+  let* head = Node_context.last_processed_head_opt store in
+  match head with
+  | None -> failwith "No head"
+  | Some {header = {level; _}; _} -> return level
+
 let get_finalized node_ctxt =
   let open Lwt_result_syntax in
   let* level = Node_context.get_finalized_level node_ctxt in
@@ -50,3 +57,11 @@ let block_of_prefix node_ctxt block =
   | `Level l -> Node_context.hash_of_level node_ctxt l
   | `Finalized -> get_finalized node_ctxt
   | `Cemented -> get_last_cemented node_ctxt
+
+let block_level_of_id node_ctxt block =
+  match block with
+  | `Head -> get_head_level node_ctxt
+  | `Hash b -> Node_context.level_of_hash node_ctxt b
+  | `Level l -> return l
+  | `Finalized -> Node_context.get_finalized_level node_ctxt
+  | `Cemented -> return (Reference.get node_ctxt.lcc).level

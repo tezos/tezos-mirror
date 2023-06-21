@@ -24,9 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module is a helper to extract a block hash
-    from block reference and Node_context *)
+(** This module is a helper to convert block ids used in RPCs to useful values. *)
+
+(** Returns the block hash corresponding to a block id. *)
 val block_of_prefix :
   _ Node_context.t ->
-  [< `Cemented | `Finalized | `Hash of Block_hash.t | `Head | `Level of int32] ->
+  Rollup_node_services.Arg.block_id ->
   Block_hash.t tzresult Lwt.t
+
+(** Returns the level corresponding to a block id. *)
+val block_level_of_id :
+  _ Node_context.t -> Rollup_node_services.Arg.block_id -> int32 tzresult Lwt.t
