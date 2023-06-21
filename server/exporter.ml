@@ -40,7 +40,8 @@ let parse_block_row ((hash, predecessor, delegate), (round, timestamp)) acc =
       }
     acc
 
-let parse_block_reception_row (hash, reception_time, source) acc =
+let parse_block_reception_row (hash, validation_time, application_time, source)
+    acc =
   Tezos_crypto.Hashed.Block_hash.Map.update
     hash
     (function
@@ -62,7 +63,8 @@ let parse_block_reception_row (hash, reception_time, source) acc =
                 predecessor;
                 delegate;
                 round;
-                reception_times = (source, reception_time) :: reception_times;
+                reception_times =
+                  {source; validation_time; application_time} :: reception_times;
                 timestamp;
                 nonce;
               }
@@ -97,9 +99,15 @@ let select_blocks db_pool level =
   let reception_request =
     Caqti_request.Infix.(
       Caqti_type.int32
-      ->* Caqti_type.(tup3 Sql_requests.Type.block_hash ptime string))
-      "SELECT b.hash, r.timestamp, n.name FROM blocks b JOIN blocks_reception \
-       r ON r.block = b.id JOIN nodes n ON n.id = r.source WHERE b.level = ?"
+      ->* Caqti_type.(
+            tup4
+              Sql_requests.Type.block_hash
+              (option ptime)
+              (option ptime)
+              string))
+      "SELECT b.hash, r.validation_timestamp, r.application_timestamp, n.name \
+       FROM blocks b JOIN blocks_reception r ON r.block = b.id JOIN nodes n ON \
+       n.id = r.source WHERE b.level = ?"
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->

@@ -255,7 +255,7 @@ let endorsing_rights_callback db_pool g rights =
         ~body:"Endorsing_right noted"
         ())
 
-let block_callback db_pool g insert_request source
+let block_callback db_pool g source
     ( Teztale_lib.Data.Block.
         {delegate; timestamp; reception_times; round; hash; predecessor; _},
       (endorsements, preendorsements) ) =
@@ -271,11 +271,13 @@ let block_callback db_pool g insert_request source
                 Sql_requests.maybe_insert_block
                 ((level, timestamp, hash, round), (predecessor, delegate))
             in
-
             let* () =
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-                (fun (_, reception_time) ->
-                  Db.exec insert_request (reception_time, hash, source))
+                (fun r ->
+                  let open Teztale_lib.Data.Block in
+                  Db.exec
+                    Sql_requests.insert_received_block
+                    (r.validation_time, r.application_time, hash, source))
                 reception_times
             in
             let* () =
@@ -368,28 +370,13 @@ let routes :
               Teztale_lib.Consensus_ops.rights_encoding
               body
               (endorsing_rights_callback db_pool g)) );
-    ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block/applied"],
+    ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block"],
       fun g rights db_pool header meth body ->
         post_only_endpoint rights header meth (fun source ->
             with_data
               Teztale_lib.Data.block_data_encoding
               body
-              (block_callback
-                 db_pool
-                 g
-                 Sql_requests.insert_received_block
-                 source)) );
-    ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block/validated"],
-      fun g rights db_pool header meth body ->
-        post_only_endpoint rights header meth (fun source ->
-            with_data
-              Teztale_lib.Data.block_data_encoding
-              body
-              (block_callback
-                 db_pool
-                 g
-                 Sql_requests.insert_received_block
-                 source)) );
+              (block_callback db_pool g source)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/mempool"],
       fun g rights db_pool header meth body ->
         post_only_endpoint rights header meth (fun source ->

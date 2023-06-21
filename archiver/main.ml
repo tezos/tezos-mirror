@@ -162,7 +162,10 @@ let select_commands _ctxt Client_config.{chain; _} =
           let dumper = Server_archiver.launch state "source-not-used" in
           let main =
             General_archiver.print_failures
-              (General_archiver.Server_loops.applied_blocks chain starting cctxt)
+              (General_archiver.Server_loops.applied_blocks
+                 chain
+                 starting
+                 cctxt)
           in
           let*! out = Lwt.join [dumper; main] in
           return out);

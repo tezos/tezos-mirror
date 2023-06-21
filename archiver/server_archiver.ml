@@ -115,6 +115,7 @@ let add_mempool ?unaccurate:(_ : bool option) ~level items =
 
 let add_applied_block ~level block = chunk_feeder (Some (Block (level, block)))
 
-let add_validated_block ~level block = chunk_feeder (Some (Block (level, block)))
+let add_validated_block ~level block =
+  chunk_feeder (Some (Block (level, block)))
 
 let add_rights ~level rights = chunk_feeder (Some (Rights (level, rights)))

@@ -371,7 +371,9 @@ module Loops (Archiver : Archiver.S) = struct
                                     in
                                     return_unit
                                 in
-                                let () = Archiver.add_applied_block ~level block_data in
+                                let () =
+                                  Archiver.add_applied_block ~level block_data
+                                in
                                 return_unit
                               in
                               Lwt.return
@@ -495,7 +497,9 @@ module Loops (Archiver : Archiver.S) = struct
                                     in
                                     return_unit
                                 in
-                                let () = Archiver.add_validated_block ~level block_data in
+                                let () =
+                                  Archiver.add_validated_block ~level block_data
+                                in
                                 return_unit
                               in
                               Lwt.return
