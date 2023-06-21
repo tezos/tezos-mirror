@@ -109,7 +109,8 @@ let assert_total_frozen_stake ~loc block expected =
      expected duration,
    - the launch cycle is set as soon as the threshold is reached,
    - the launch cycle is not reset before it is reached,
-   - once the launch cycle is reached, costaking is allowed. *)
+   - once the launch cycle is reached, costaking is allowed,
+   - costaking increases total_frozen_stake. *)
 let test_launch threshold expected_vote_duration () =
   let open Lwt_result_wrap_syntax in
   let assert_ema_above_threshold ~loc
@@ -302,14 +303,14 @@ let tests =
   [
     Tztest.tztest
       "the EMA reaches the vote threshold at the expected level and adaptive \
-       inflation launch cycle is set (very low threshold)"
+       inflation launches (very low threshold)"
       `Quick
       (test_launch
          1000000l (* This means that the threshold is set at 0.05% *)
          59l);
     Tztest.tztest
       "the EMA reaches the vote threshold at the expected level and adaptive \
-       inflation launch cycle is set (realistic threshold)"
+       inflation launches (realistic threshold)"
       `Slow
       (test_launch
          Default_parameters.constants_test.adaptive_inflation
