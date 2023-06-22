@@ -679,15 +679,46 @@ let run node_ctxt configuration
     ~mode:configuration.mode
     ~genesis_level:(Raw_level.to_int32 node_ctxt.genesis_info.level)
     ~pvm_kind:(Sc_rollup.Kind.to_string node_ctxt.kind) ;
+  let fatal_error_exit e =
+    Format.eprintf "%!%a@.Exiting.@." pp_print_trace e ;
+    let*! _ = Lwt_exit.exit_and_wait 1 in
+    return_unit
+  in
+  let error_to_degraded_mode e =
+    let*! () = Daemon_event.error e in
+    degraded_refutation_mode daemon_components node_ctxt
+  in
+  let handle_preimage_not_found e =
+    (* When running/initialising a rollup node with missing preimages
+       the rollup node enter in a degraded mode where actually there
+       isn't much that can be done with a non initialised rollup node,
+       hence it should exit after printing the error logs.
+
+       A safe way to do this is to check if there was a processed head.
+       If not we can exit safely. If there was a processed head, we
+       go deeper and we check if the most recent commitment is actually
+       the genesis' one. If that's the case it means we're still on the
+       initialisation phase which means we can exit safely as well, if
+       not it means there is potential commitment(s) where refutation
+       can be played so we enter in degraded mode. *)
+    let* head = Node_context.last_processed_head_opt node_ctxt in
+    match head with
+    | Some head ->
+        if
+          Sc_rollup_block.most_recent_commitment head.header
+          = Sc_rollup_proto_types.Commitment_hash.to_octez
+              node_ctxt.genesis_info.commitment_hash
+        then fatal_error_exit e
+        else error_to_degraded_mode e
+    | None -> fatal_error_exit e
+  in
   protect start ~on_error:(function
       | Sc_rollup_node_errors.(Lost_game _ | Invalid_genesis_state _) :: _ as e
         ->
-          Format.eprintf "%!%a@.Exiting.@." pp_print_trace e ;
-          let*! _ = Lwt_exit.exit_and_wait 1 in
-          return_unit
-      | e ->
-          let*! () = Daemon_event.error e in
-          degraded_refutation_mode daemon_components node_ctxt)
+          fatal_error_exit e
+      | Sc_rollup_node_errors.Could_not_open_preimage_file _ :: _ as e ->
+          handle_preimage_not_found e
+      | e -> error_to_degraded_mode e)
 
 module Internal_for_tests = struct
   (** Same as {!process_head} but only builds and stores the L2 block
