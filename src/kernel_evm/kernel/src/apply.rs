@@ -11,114 +11,49 @@ use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::run_transaction;
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockConstants;
-use tezos_ethereum::signatures::EthereumTransactionCommon;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_smart_rollup_debug::{debug_msg, Runtime};
 
-use crate::error::{Error, TransferError};
+use crate::error::Error;
+use crate::inbox::Transaction;
 use crate::indexable_storage::IndexableStorage;
 use crate::storage::index_account;
 
-/// This defines the needed function to apply a transaction.
-pub trait ApplicableTransaction {
-    /// Returns the transaction's caller.
-    fn caller(&self) -> Result<H160, Error>;
-
-    /// Checks if the transaction's nonce is the expected caller's nonce.
-    fn check_nonce<Host: Runtime>(
-        &self,
-        caller: H160,
-        host: &mut Host,
-        evm_account_storage: &mut EthereumAccountStorage,
-    ) -> bool;
-
-    fn chain_id(&self) -> U256;
-
-    fn to(&self) -> Option<H160>;
-
-    fn data(&self) -> Vec<u8>;
-
-    fn gas_limit(&self) -> u64;
-
-    fn gas_price(&self) -> U256;
-
-    fn value(&self) -> U256;
-
-    fn nonce(&self) -> U256;
-
-    fn v(&self) -> U256;
-
-    fn r(&self) -> H256;
-
-    fn s(&self) -> H256;
-}
-
-impl ApplicableTransaction for EthereumTransactionCommon {
-    fn caller(&self) -> Result<H160, Error> {
-        self.caller()
-            .map_err(|_| Error::Transfer(TransferError::InvalidCallerAddress))
-    }
-
-    fn check_nonce<Host: Runtime>(
-        &self,
-        caller: H160,
-        host: &mut Host,
-        evm_account_storage: &mut EthereumAccountStorage,
-    ) -> bool {
-        let nonce = |caller| -> Option<U256> {
-            let caller_account_path =
-                evm_execution::account_storage::account_path(&caller).ok()?;
-            let caller_account =
-                evm_account_storage.get(host, &caller_account_path).ok()?;
-            match caller_account {
-                Some(account) => account.nonce(host).ok(),
-                None => Some(U256::zero()),
-            }
-        };
-        match nonce(caller) {
-            None => false,
-            Some(expected_nonce) => self.nonce == expected_nonce,
-        }
-    }
-
-    fn chain_id(&self) -> U256 {
-        self.chain_id
-    }
-
+impl Transaction {
     fn to(&self) -> Option<H160> {
-        self.to
+        self.tx.to
     }
 
     fn data(&self) -> Vec<u8> {
-        self.data.clone()
+        self.tx.data.clone()
     }
 
     fn gas_limit(&self) -> u64 {
-        self.gas_limit
+        self.tx.gas_limit
     }
 
     fn gas_price(&self) -> U256 {
-        self.gas_price
+        self.tx.gas_price
     }
 
     fn value(&self) -> U256 {
-        self.value
+        self.tx.value
     }
 
     fn nonce(&self) -> U256 {
-        self.nonce
+        self.tx.nonce
     }
 
     fn v(&self) -> U256 {
-        self.v
+        self.tx.v
     }
 
     fn r(&self) -> H256 {
-        self.r
+        self.tx.r
     }
 
     fn s(&self) -> H256 {
-        self.s
+        self.tx.s
     }
 }
 
@@ -164,8 +99,7 @@ fn make_receipt_info(
 
 #[inline(always)]
 fn make_object_info(
-    transaction: impl ApplicableTransaction,
-    transaction_hash: TransactionHash,
+    transaction: Transaction,
     from: H160,
     index: u32,
     gas_used: U256,
@@ -174,7 +108,7 @@ fn make_object_info(
         from,
         gas_used,
         gas_price: transaction.gas_price(),
-        hash: transaction_hash,
+        hash: transaction.tx_hash,
         input: transaction.data(),
         nonce: transaction.nonce(),
         to: transaction.to(),
@@ -207,24 +141,44 @@ fn index_new_accounts<Host: Runtime>(
     }
 }
 
+fn check_nonce<Host: Runtime>(
+    host: &mut Host,
+    caller: H160,
+    given_nonce: U256,
+    evm_account_storage: &mut EthereumAccountStorage,
+) -> bool {
+    let nonce = |caller| -> Option<U256> {
+        let caller_account_path =
+            evm_execution::account_storage::account_path(&caller).ok()?;
+        let caller_account = evm_account_storage.get(host, &caller_account_path).ok()?;
+        match caller_account {
+            Some(account) => account.nonce(host).ok(),
+            None => Some(U256::zero()),
+        }
+    };
+    match nonce(caller) {
+        None => false,
+        Some(expected_nonce) => given_nonce == expected_nonce,
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn apply_transaction<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
     precompiles: &PrecompileBTreeMap<Host>,
-    transaction: impl ApplicableTransaction,
-    transaction_hash: TransactionHash,
+    transaction: Transaction,
     index: u32,
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
 ) -> Result<Option<(TransactionReceiptInfo, TransactionObjectInfo)>, Error> {
-    let caller = match transaction.caller() {
+    let caller = match transaction.tx.caller() {
         Ok(caller) => caller,
         Err(err) => {
             debug_msg!(
                 host,
                 "{} ignored because of {:?}\n",
-                hex::encode(transaction_hash),
+                hex::encode(transaction.tx_hash),
                 err
             );
             // Transaction with undefined caller are ignored, i.e. the caller
@@ -232,7 +186,7 @@ pub fn apply_transaction<Host: Runtime>(
             return Ok(None);
         }
     };
-    if !transaction.check_nonce(caller, host, evm_account_storage) {
+    if !check_nonce(host, caller, transaction.nonce(), evm_account_storage) {
         // Transactions with invalid nonces are ignored.
         return Ok(None);
     }
@@ -267,9 +221,8 @@ pub fn apply_transaction<Host: Runtime>(
     };
 
     let receipt_info =
-        make_receipt_info(transaction_hash, index, execution_outcome, caller, to);
-    let object_info =
-        make_object_info(transaction, transaction_hash, caller, index, gas_used);
+        make_receipt_info(transaction.tx_hash, index, execution_outcome, caller, to);
+    let object_info = make_object_info(transaction, caller, index, gas_used);
     index_new_accounts(host, accounts_index, &receipt_info)?;
 
     Ok(Some((receipt_info, object_info)))
