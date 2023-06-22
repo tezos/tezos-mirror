@@ -132,8 +132,8 @@ let register_model (type a) bench_name local_model_name (model : a Model.t) :
 
 let register_model_for_code_generation local_model_name model =
   (* Expected there is no benchmark has this model.
-     So it gives the benchmark name as "dummy" *)
-  register_model (Namespace.of_string "dummy") local_model_name model
+     So it gives the benchmark name as "no_benchmark" *)
+  register_model (Namespace.of_string "no_benchmark") local_model_name model
 
 let register ?(add_timer = true) ((module Bench) : Benchmark.t) =
   if Name_table.mem bench_table Bench.name then (
