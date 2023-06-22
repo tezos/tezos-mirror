@@ -168,4 +168,3 @@ module Merkle_tree : sig
       Dac_codec with type page_store := B.page_store
   end
 end
-

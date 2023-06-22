@@ -173,15 +173,6 @@ let pp fmt = function
 
 let status_typ = Check.equalable pp ( = )
 
-let send_messages ?(src = Constant.bootstrap2.alias) ?(alter_final_msg = Fun.id)
-    client msgs =
-  let msg =
-    alter_final_msg
-    @@ Ezjsonm.(to_string ~minify:true @@ list Ezjsonm.string msgs)
-  in
-  let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
-  Client.bake_for_and_wait client
-
 let bake_levels n client = repeat n (fun () -> Client.bake_for_and_wait client)
 
 let check_valid_root_hash expected_rh actual_rh =

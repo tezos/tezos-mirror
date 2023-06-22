@@ -2719,6 +2719,39 @@ let test_reveals_fails_on_wrong_hash =
   in
   Lwt.choose [error_promise; should_not_sync]
 
+let test_reveals_fails_on_unknown_hash =
+  let kind = "arith" in
+  test_full_scenario
+    ~timeout:120
+    ~kind
+    {
+      tags = ["reveals"; "unknown"];
+      variant = None;
+      description = "reveal data fails with unknown hash";
+    }
+  @@ fun _protocol sc_rollup_node _sc_rollup_client sc_rollup node client ->
+  let unknown_hash =
+    "0027782d2a7020be332cc42c4e66592ec50305f559a4011981f1d5af81428ecafe"
+  in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let error_promise =
+    Sc_rollup_node.wait_for sc_rollup_node "sc_rollup_daemon_error.v0" (fun e ->
+        let id = JSON.(e |=> 0 |-> "id" |> as_string) in
+        if id =~ rex "could_not_open_reveal_preimage_file" then Some ()
+        else None)
+  in
+  let* () = send_text_messages client ["hash:" ^ unknown_hash] in
+  let should_not_sync =
+    let* _level =
+      Sc_rollup_node.wait_for_level
+        ~timeout:10.
+        sc_rollup_node
+        (Node.get_level node)
+    in
+    Test.fail "The rollup node processed the unknown reveal without failing"
+  in
+  Lwt.choose [error_promise; should_not_sync]
+
 let test_reveals_4k =
   let kind = "arith" in
   test_full_scenario
@@ -5613,6 +5646,7 @@ let register ~protocols =
     ~kind:"arith"
     protocols ;
   test_reveals_fails_on_wrong_hash protocols ;
+  test_reveals_fails_on_unknown_hash protocols ;
   test_reveals_4k protocols ;
   test_reveals_above_4k protocols ;
   (* Specific Wasm PVM tezts *)
