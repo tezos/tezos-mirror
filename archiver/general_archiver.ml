@@ -421,7 +421,6 @@ module Loops (Archiver : Archiver.S) = struct
         let () = Error_monad.pp_print_trace Format.err_formatter e in
         Lwt.return_unit
     | Ok (block_stream, _stopper) ->
-        let*! wallet = wallet cctx in
         let*! _ =
           Lwt_stream.fold_s
             (fun (_chain_id, hash, header, _operations) acc ->
@@ -459,42 +458,13 @@ module Loops (Archiver : Archiver.S) = struct
                                   current_protocol
                               in
                               Lwt.return ((fun _ _ _ _ _ -> return_unit), None)
-                          | Some (rights_of, get_block) ->
+                          | Some (_rights_of, get_block) ->
                               let recorder cctx level hash header reception_time
                                   =
                                 let* (( _block_info,
-                                        (endorsements, preendorsements) ) as
+                                        (_endorsements, _preendorsements) ) as
                                      block_data) =
                                   get_block cctx hash header reception_time
-                                in
-                                let* () =
-                                  if List.is_empty endorsements then return_unit
-                                  else
-                                    let* rights =
-                                      rights_of cctx (Int32.pred level)
-                                    in
-                                    let () =
-                                      maybe_add_rights
-                                        (module Archiver)
-                                        (Int32.pred level)
-                                        rights
-                                        wallet
-                                    in
-                                    return_unit
-                                in
-                                let* () =
-                                  if List.is_empty preendorsements then
-                                    return_unit
-                                  else
-                                    let* rights = rights_of cctx level in
-                                    let () =
-                                      maybe_add_rights
-                                        (module Archiver)
-                                        level
-                                        rights
-                                        wallet
-                                    in
-                                    return_unit
                                 in
                                 let () = Archiver.add_block ~level block_data in
                                 return_unit
