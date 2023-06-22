@@ -98,7 +98,8 @@ let cost_PARSE_TYPE = S.safe_int 60
 (* model UNPARSE_TYPE
    This is the cost of one iteration of unparse_ty, extracted by hand from the
    parameter fit for the UNPARSE_TYPE benchmark. *)
-let cost_UNPARSE_TYPE type_size = S.mul (S.safe_int 20) type_size
+let cost_UNPARSE_TYPE type_size =
+  S.mul (S.safe_int 20) (Script_typed_ir.Type_size.to_int type_size)
 
 (* model TYPECHECKING_CODE
    This is the cost of one iteration of parse_instr, extracted by hand from the
