@@ -503,7 +503,7 @@ let rec repr_to_string : type a. a repr -> string = function
   | L (B _ :: _ as bs) ->
       (* special case to print bytes in hex *)
       let bs = List.map (fun (B b) -> if b then true else false) bs in
-      let bs = Utils.of_bitlist bs in
+      let bs = Utils.of_bitlist ~le:false bs in
       Utils.hex_of_bytes bs
   | L l -> String.concat ";" (List.map repr_to_string l)
 

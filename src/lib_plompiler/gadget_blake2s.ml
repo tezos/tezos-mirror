@@ -106,7 +106,7 @@ functor
       with_label ~label:"Blake2s.compression"
       @@ let* constants =
            mapM
-             (fun c -> Bytes.constant (Utils.bytes_of_hex c))
+             (fun c -> Bytes.constant ~le:false (Utils.bytes_of_hex c))
              [
                "6A09E667";
                "BB67AE85";
@@ -120,16 +120,20 @@ functor
          in
          let constants = Array.of_list constants in
          let v = Array.append h constants in
-         let* tmp = Bytes.constant_uint32 Stdint.Uint64.(to_uint32 t) in
+         let* tmp =
+           Bytes.constant_uint32 ~le:false Stdint.Uint64.(to_uint32 t)
+         in
          let* tmp = Bytes.xor v.(12) tmp in
          v.(12) <- tmp ;
          let* tmp =
-           Bytes.constant_uint32 Stdint.Uint64.(to_uint32 (shift_right t 32))
+           Bytes.constant_uint32
+             ~le:false
+             Stdint.Uint64.(to_uint32 (shift_right t 32))
          in
          let* tmp = Bytes.xor v.(13) tmp in
          v.(13) <- tmp ;
          (* TODO here we assign many times the same constant *)
-         let* tmp = Bytes.constant_uint32 Stdint.Uint32.max_int in
+         let* tmp = Bytes.constant_uint32 ~le:false Stdint.Uint32.max_int in
          let* tmp = if f then Bytes.xor v.(14) tmp else ret v.(14) in
          v.(14) <- tmp ;
          let* v =
@@ -175,7 +179,7 @@ functor
       let* h =
         foldM
           (fun acc c ->
-            let* w = Bytes.constant (Utils.bytes_of_hex c) in
+            let* w = Bytes.constant ~le:false (Utils.bytes_of_hex c) in
             ret (w :: acc))
           []
           [

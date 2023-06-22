@@ -42,8 +42,8 @@ let alpha = Z.(shift_left one (Z.numbits S.order) - S.order)
   - : int = 256
 *)
 
-let bitlist : ?le:bool -> bytes -> bool list =
- fun ?(le = false) b ->
+let bitlist : le:bool -> bytes -> bool list =
+ fun ~le b ->
   let l = Bytes.length b in
   (* Depending on endianess we start, stop and step in different directions. *)
   let start = if le then 0 else l - 1 in
@@ -73,8 +73,8 @@ let bitlist : ?le:bool -> bytes -> bool list =
 (* Takes a list of booleans (typically from the Plompiler Bytes representation)
    and returns OCaml Bytes. Works only if the input length is a multiple of a
    byte. *)
-let of_bitlist : ?le:bool -> bool list -> bytes =
- fun ?(le = false) bl ->
+let of_bitlist : le:bool -> bool list -> bytes =
+ fun ~le bl ->
   assert (List.length bl mod 8 = 0) ;
   let rec loop_byte acc rest =
     match rest with

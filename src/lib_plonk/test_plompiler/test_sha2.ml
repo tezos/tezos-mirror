@@ -51,10 +51,10 @@ functor
       assert_equal z z'
 
     let tests_ch =
-      let i0 = input_bytes @@ bytes_of_hex "11" in
-      let i1 = input_bytes @@ bytes_of_hex "13" in
-      let i2 = input_bytes @@ bytes_of_hex "2A" in
-      let o = input_bytes @@ bytes_of_hex "3B" in
+      let i0 = input_bytes ~le:false @@ bytes_of_hex "11" in
+      let i1 = input_bytes ~le:false @@ bytes_of_hex "13" in
+      let i2 = input_bytes ~le:false @@ bytes_of_hex "2A" in
+      let o = input_bytes ~le:false @@ bytes_of_hex "3B" in
       [
         test ~valid:true ~name:"SHA256.test_ch" @@ test_ch i0 i1 i2 o;
         test ~valid:false ~name:"SHA256.test_ch" @@ test_ch i0 i1 i2 i2;
@@ -69,10 +69,10 @@ functor
       assert_equal z z'
 
     let tests_maj =
-      let i0 = input_bytes @@ bytes_of_hex "11" in
-      let i1 = input_bytes @@ bytes_of_hex "13" in
-      let i2 = input_bytes @@ bytes_of_hex "2A" in
-      let o = input_bytes @@ bytes_of_hex "13" in
+      let i0 = input_bytes ~le:false @@ bytes_of_hex "11" in
+      let i1 = input_bytes ~le:false @@ bytes_of_hex "13" in
+      let i2 = input_bytes ~le:false @@ bytes_of_hex "2A" in
+      let o = input_bytes ~le:false @@ bytes_of_hex "13" in
       [
         test ~valid:true ~name:"SHA256.test_maj" @@ test_maj i0 i1 i2 o;
         test ~valid:false ~name:"SHA256.test_maj" @@ test_maj i0 i1 i2 i2;
@@ -85,8 +85,8 @@ functor
       assert_equal z z'
 
     let tests_sigma0 =
-      let i = input_bytes @@ bytes_of_hex "0000002A" in
-      let o = input_bytes @@ bytes_of_hex "540A8005" in
+      let i = input_bytes ~le:false @@ bytes_of_hex "0000002A" in
+      let o = input_bytes ~le:false @@ bytes_of_hex "540A8005" in
       [
         test ~valid:true ~name:"SHA256.test_sigma0" @@ test_sigma0 i o;
         test ~valid:false ~name:"SHA256.test_sigma0" @@ test_sigma0 i i;
@@ -99,8 +99,8 @@ functor
       assert_equal z z'
 
     let tests_sigma1 =
-      let i = input_bytes @@ bytes_of_hex "0000002A" in
-      let o = input_bytes @@ bytes_of_hex "00104000" in
+      let i = input_bytes ~le:false @@ bytes_of_hex "0000002A" in
+      let o = input_bytes ~le:false @@ bytes_of_hex "00104000" in
       [
         test ~valid:true ~name:"SHA256.test_sigma1" @@ test_sigma1 i o;
         test ~valid:false ~name:"SHA256.test_sigma1" @@ test_sigma1 i i;
@@ -113,8 +113,8 @@ functor
       assert_equal z z'
 
     let tests_sum0 =
-      let i = input_bytes @@ bytes_of_hex "00000001" in
-      let o = input_bytes @@ bytes_of_hex "40080400" in
+      let i = input_bytes ~le:false @@ bytes_of_hex "00000001" in
+      let o = input_bytes ~le:false @@ bytes_of_hex "40080400" in
       [
         test ~valid:true ~name:"SHA256.test_sum0" @@ test_sum0 i o;
         test ~valid:false ~name:"SHA256.test_sum0" @@ test_sum0 i i;
@@ -127,8 +127,8 @@ functor
       assert_equal z z'
 
     let tests_sum1 =
-      let i = input_bytes @@ bytes_of_hex "00000001" in
-      let o = input_bytes @@ bytes_of_hex "04200080" in
+      let i = input_bytes ~le:false @@ bytes_of_hex "00000001" in
+      let o = input_bytes ~le:false @@ bytes_of_hex "04200080" in
       [
         test ~valid:true ~name:"SHA256.test_sum1" @@ test_sum1 i o;
         test ~valid:false ~name:"SHA256.test_sum1" @@ test_sum1 i i;
@@ -159,8 +159,8 @@ functor
         Stdlib.Bytes.(concat empty [abc; padding; length_bites])
       in
       assert (Stdlib.Bytes.length output_bytes = 512 / 8) ;
-      let i = input_bytes abc in
-      let o = input_bytes output_bytes in
+      let i = input_bytes ~le:false abc in
+      let o = input_bytes ~le:false output_bytes in
       [test ~valid:true ~name:"SHA256.test_padding" @@ test_padding i o]
 
     let test_initial_hash i o () =
@@ -169,7 +169,7 @@ functor
       assert_equal o ih.(i)
 
     let tests_initial_hash =
-      let o = input_bytes @@ bytes_of_hex "6A09E667" in
+      let o = input_bytes ~le:false @@ bytes_of_hex "6A09E667" in
       [
         test ~valid:true ~name:"SHA256.test_initial_hash"
         @@ test_initial_hash 0 o;
@@ -204,8 +204,8 @@ functor
       List.map
         (fun (i, o) ->
           let name = "SHA256.test_digest" ^ i in
-          let i = input_bytes @@ Stdlib.Bytes.of_string i in
-          let o = input_bytes @@ bytes_of_hex (String.concat "" o) in
+          let i = input_bytes ~le:false @@ Stdlib.Bytes.of_string i in
+          let o = input_bytes ~le:false @@ bytes_of_hex (String.concat "" o) in
           test ~valid:true ~name ~flamegraph:false @@ test_digest_sha256 i o)
         [
           ( "abc",
@@ -259,8 +259,8 @@ functor
       List.map
         (fun (i, o) ->
           let name = "SHA512.test_digest" ^ i in
-          let i = input_bytes @@ Stdlib.Bytes.of_string i in
-          let o = input_bytes @@ bytes_of_hex (String.concat "" o) in
+          let i = input_bytes ~le:false @@ Stdlib.Bytes.of_string i in
+          let o = input_bytes ~le:false @@ bytes_of_hex (String.concat "" o) in
           test ~valid:true ~name ~flamegraph:false @@ test_digest_sha512 i o)
         [
           ( "abc",

@@ -154,7 +154,7 @@ functor
       with_label ~label:"Sha2.ks"
       @@ let* a =
            mapM
-             (fun s -> Bytes.constant @@ Utils.bytes_of_hex s)
+             (fun s -> Bytes.constant ~le:false @@ Utils.bytes_of_hex s)
              (Array.to_list V.round_constants)
          in
          ret @@ Array.of_list a
@@ -163,7 +163,7 @@ functor
     let initial_hash : Bytes.bl repr array t =
       let* a =
         mapM
-          (fun s -> Bytes.constant @@ Utils.bytes_of_hex s)
+          (fun s -> Bytes.constant ~le:false @@ Utils.bytes_of_hex s)
           (Array.to_list V.init_hash)
       in
       ret @@ Array.of_list a
@@ -180,7 +180,7 @@ functor
       in
       let* padding =
         let bitlist = List.(init k (Fun.const false) @ [true]) in
-        Bytes.constant @@ Utils.of_bitlist bitlist
+        Bytes.constant ~le:false @@ Utils.of_bitlist ~le:false bitlist
       in
       let* binary_l =
         let ocaml_bytes = Z.of_int l |> Z.to_bits |> Stdlib.Bytes.of_string in
@@ -214,7 +214,7 @@ functor
       @@ let* rest =
            let* res =
              mapM
-               (fun _ -> Bytes.constant Stdlib.Bytes.empty)
+               (fun _ -> Bytes.constant ~le:false Stdlib.Bytes.empty)
                (List.init (V.loop_bound - 16) Fun.id)
            in
            ret @@ Array.of_list res
@@ -324,6 +324,7 @@ functor
 
     let digest : Bytes.bl repr -> L.Bytes.bl repr t =
      fun blocks ->
+      assert (Bytes.length blocks mod 8 = 0) ;
       with_label ~label:"Sha2.digest"
       @@ let* blocks = padding blocks in
          let* _ = debug "padding" blocks in
