@@ -149,6 +149,19 @@ let bool_list_of_z : ?nb_bits:int -> Z.t -> bool list =
   in
   aux [] z @@ Option.value ~default:(Z.numbits z) nb_bits
 
+let split_exactly list size_chunk =
+  let len = List.length list in
+  let nb_chunks = len / size_chunk in
+  assert (len = size_chunk * nb_chunks) ;
+  List.init nb_chunks (fun i ->
+      let array = Array.of_list list in
+      let array = Array.sub array (i * size_chunk) size_chunk in
+      Array.to_list array)
+
+let bool_list_change_endianness b =
+  assert (List.length b mod 8 = 0) ;
+  split_exactly b 8 |> List.rev |> List.concat
+
 module Z = struct
   include Z
 
