@@ -14,7 +14,7 @@
   tezos-version
   tezos-context.sigs
   tezos-context.merkle_proof_encoding
-  tezos-dal-config)
+  tezos-crypto-dal.octez-dal-config)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
@@ -23,4 +23,4 @@
   -open Tezos_base
   -open Tezos_p2p_services
   -open Tezos_version
-  -open Tezos_dal_config))
+  -open Tezos_crypto_dal_octez_dal_config))

@@ -115,7 +115,6 @@
 (package (name tezos-dal-016-PtMumbai))
 (package (name tezos-dal-017-PtNairob))
 (package (name tezos-dal-alpha))
-(package (name tezos-dal-config))
 (package (name tezos-dal-node-lib))
 (package (name tezos-dal-node-services))
 (package (name tezos-embedded-protocol-000-Ps9mPmXa))

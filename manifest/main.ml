@@ -1571,9 +1571,8 @@ let _octez_epoxy_tx_tests =
 
 let octez_dal_config =
   public_lib
-    "tezos-dal-config"
-    ~path:"src/lib_dal_config"
-    ~synopsis:"Tezos: DAL configuration"
+    "tezos-crypto-dal.octez-dal-config"
+    ~path:"src/lib_crypto_dal/dal_config"
     ~deps:[data_encoding |> open_]
     ~js_compatible:true
 
@@ -2737,7 +2736,6 @@ protocols.|}
         bls12_381;
         octez_plonk |> open_;
         octez_crypto_dal;
-        octez_dal_config;
         vdf;
         aches;
         aches_lwt;

@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_dal_config)
- (public_name tezos-dal-config)
+ (name tezos_crypto_dal_octez_dal_config)
+ (public_name tezos-crypto-dal.octez-dal-config)
  (instrumentation (backend bisect_ppx))
  (libraries
   data-encoding)

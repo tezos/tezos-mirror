@@ -8,7 +8,7 @@
   tezt.core
   tezos-stdlib
   tezos-crypto-dal
-  tezos-dal-config
+  tezos-crypto-dal.octez-dal-config
   tezos-error-monad
   data-encoding
   octez-alcotezt
@@ -22,7 +22,7 @@
   -open Tezt_core.Base
   -open Tezos_stdlib
   -open Tezos_crypto_dal
-  -open Tezos_dal_config
+  -open Tezos_crypto_dal_octez_dal_config
   -open Tezos_error_monad
   -open Data_encoding
   -open Octez_alcotezt)
