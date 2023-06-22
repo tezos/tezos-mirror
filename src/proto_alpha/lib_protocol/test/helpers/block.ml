@@ -793,9 +793,8 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
     >|=? fun (validation, result) -> (validation.context, result) )
   >>=? fun (context, result) ->
   let hash = Block_header.hash header in
-  (* This function is duplicated from Context to avoid a cyclic dependency *)
-  Alpha_services.Constants.all rpc_ctxt pred >|=? fun constants ->
-  ({hash; header; operations; context; constants = constants.parametric}, result)
+  Alpha_services.Constants.parametric rpc_ctxt pred >|=? fun constants ->
+  ({hash; header; operations; context; constants}, result)
 
 let apply header ?(operations = []) ?(allow_manager_failures = false) pred =
   apply_with_metadata
