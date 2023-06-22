@@ -61,8 +61,20 @@ module Events = struct
       ~msg:"Callback failed for message id {message_id}. Failure is {failure}"
       ~level:Warning
       ~pp1:Worker.GS.Message_id.pp
+      ~pp2:pp_print_trace
       ("message_id", Gs_interface.message_id_encoding)
-      ("failure", Data_encoding.string)
+      ("failure", trace_encoding)
+
+  let send_p2p_message_failed =
+    declare_2
+      ~section
+      ~name:(prefix "p2p_send_failed")
+      ~msg:"Sending P2P message to {peer} failed with error {failure}"
+      ~level:Warning
+      ~pp1:P2p_peer.Id.pp
+      ~pp2:pp_print_trace
+      ("peer", P2p_peer.Id.encoding)
+      ("failure", trace_encoding)
 end
 
 (** This module implements a cache of alternative peers (alternative PX)
@@ -267,21 +279,15 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
                  associated to the peer, but the peer is still registered as
                  connected on the GS side? *)
               Events.(emit no_connection_for_peer to_peer)
-          | Some conn ->
-              Error_monad.dont_wait
-                (fun () ->
-                  wrap_p2p_message p2p_layer p2p_message
-                  |> P2p.send p2p_layer conn)
-                (Format.eprintf
-                   "Uncaught error in %s: %a\n%!"
-                   __FUNCTION__
-                   Error_monad.pp_print_trace)
-                (fun exc ->
-                  Format.eprintf
-                    "Uncaught exception in %s: %s\n%!"
-                    __FUNCTION__
-                    (Printexc.to_string exc)) ;
-              return_unit)
+          | Some conn -> (
+              let* (res : unit tzresult) =
+                wrap_p2p_message p2p_layer p2p_message
+                |> P2p.send p2p_layer conn
+              in
+              match res with
+              | Ok () -> return_unit
+              | Error err ->
+                  Events.(emit send_p2p_message_failed (to_peer, err))))
       | Disconnect {peer} ->
           P2p.find_connection_by_peer_id p2p_layer peer
           |> Option.iter_s (P2p.disconnect p2p_layer)
@@ -330,11 +336,7 @@ let app_messages_handler gs_worker ~app_messages_callback =
     let* () =
       match res with
       | Ok () -> Events.(emit message_notified_to_app message_id)
-      | Error err ->
-          Events.(
-            emit
-              app_message_callback_failed
-              (message_id, Format.asprintf "%a" pp_print_trace err))
+      | Error err -> Events.(emit app_message_callback_failed (message_id, err))
     in
     loop app_output_stream
   in
