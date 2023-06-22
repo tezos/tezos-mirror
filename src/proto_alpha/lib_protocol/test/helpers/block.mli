@@ -287,10 +287,25 @@ val bake_n_with_metadata :
   block ->
   (block * block_header_metadata, Error_monad.tztrace) result Lwt.t
 
-(* Bake blocks while a predicate over the block and its metadata
-   holds. The returned block is the last one for which the predicate
-   holds; in case the predicate never holds, the input block is
-   returned. *)
+(** Bake blocks while a predicate over the block holds. The returned
+    block is the last one for which the predicate holds; in case the
+    predicate never holds, the input block is returned. When the
+    optional [invariant] argument is provided, it is checked on the
+    input block and on each baked block, including the returned one
+    (the last one satisfy the predicate); it is however not checked
+    on the next block (the first one to invalidate the predicate). *)
+val bake_while :
+  ?baking_mode:baking_mode ->
+  ?policy:baker_policy ->
+  ?liquidity_baking_toggle_vote:Toggle_votes_repr.toggle_vote ->
+  ?adaptive_inflation_vote:Toggle_votes_repr.toggle_vote ->
+  ?invariant:(block -> unit tzresult Lwt.t) ->
+  (block -> bool) ->
+  block ->
+  block tzresult Lwt.t
+
+(* Same as [bake_while] but the predicate also has access to the
+   metadata resulting from the application of the block. *)
 val bake_while_with_metadata :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
