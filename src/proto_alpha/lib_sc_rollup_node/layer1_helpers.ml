@@ -186,3 +186,41 @@ let retrieve_genesis_info cctxt rollup_address =
       commitment_hash =
         Sc_rollup_proto_types.Commitment_hash.to_octez commitment_hash;
     }
+
+let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
+  let open Protocol in
+  let open Alpha_context in
+  let open Lwt_result_syntax in
+  let exception Found_boot_sector of string in
+  let* block = fetch_tezos_block node_ctxt.l1_ctxt block_hash in
+  let missing_boot_sector () =
+    failwith "Boot sector not found in Tezos block %a" Block_hash.pp block_hash
+  in
+  Lwt.catch
+    (fun () ->
+      let apply (type kind) accu ~source:_ (operation : kind manager_operation)
+          (result : kind Apply_results.successful_manager_operation_result) =
+        match (operation, result) with
+        | ( Sc_rollup_originate {boot_sector; _},
+            Sc_rollup_originate_result {address; _} )
+          when node_ctxt.rollup_address = address ->
+            raise (Found_boot_sector boot_sector)
+        | _ -> accu
+      in
+      let apply_internal (type kind) accu ~source:_
+          (_operation : kind Apply_internal_results.internal_operation)
+          (_result :
+            kind Apply_internal_results.successful_internal_operation_result) =
+        accu
+      in
+      let*? () =
+        Layer1_services.(
+          process_applied_manager_operations
+            (Ok ())
+            block.operations
+            {apply; apply_internal})
+      in
+      missing_boot_sector ())
+    (function
+      | Found_boot_sector boot_sector -> return boot_sector
+      | _ -> missing_boot_sector ())
