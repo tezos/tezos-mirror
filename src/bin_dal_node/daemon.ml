@@ -361,7 +361,7 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store =
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
 *)
-let run ~data_dir cctxt =
+let run ~data_dir configuration_override =
   let open Lwt_result_syntax in
   let log_cfg = Tezos_base_unix.Logs_simple_config.default_cfg in
   let internal_events =
@@ -374,11 +374,18 @@ let run ~data_dir cctxt =
     Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
   let*! () = Event.(emit starting_node) () in
-  let* ({network_name; rpc_addr; peers; _} as config) =
-    Configuration_file.load ~data_dir
+  let* ({network_name; rpc_addr; peers; endpoint; _} as config) =
+    let*! result = Configuration_file.load ~data_dir in
+    match result with
+    | Ok configuration -> return (configuration_override configuration)
+    | Error _ ->
+        let*! () = Event.(emit data_dir_not_found data_dir) in
+        (* Store the default configuration if no configuration were found. *)
+        let configuration = configuration_override Configuration_file.default in
+        let* () = Configuration_file.save configuration in
+        return configuration
   in
   let*! () = Event.(emit configuration_loaded) () in
-  let config = {config with data_dir} in
   (* Create and start a GS worker *)
   let gs_worker =
     let rng =
@@ -400,6 +407,7 @@ let run ~data_dir cctxt =
     Gossipsub.Transport_layer.create p2p_config p2p_limits ~network_name
   in
   let* store = Store.init config in
+  let cctxt = Rpc_context.make endpoint in
   let ctxt = Node_context.init config store gs_worker transport_layer cctxt in
   let* rpc_server = RPC_server.(start config ctxt) in
   connect_gossipsub_with_p2p gs_worker transport_layer store ;

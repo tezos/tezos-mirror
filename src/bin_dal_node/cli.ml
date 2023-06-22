@@ -38,50 +38,48 @@ module Term = struct
 
   let data_dir =
     let open Cmdliner in
-    let default = Configuration_file.default.data_dir in
     let doc =
       Format.sprintf
         "The directory where the octez DAL node will store all its data. \
          Parent directories are created if necessary."
     in
     Arg.(
-      value & opt file default & info ~docs ~docv:"DIR" ~doc ["data-dir"; "d"])
+      value
+      & opt (some file) None
+      & info ~docs ~docv:"DIR" ~doc ["data-dir"; "d"])
 
   let rpc_addr =
     let open Cmdliner in
-    let default = Configuration_file.default.rpc_addr in
+    let default_port = Configuration_file.default.rpc_addr |> snd in
     let doc =
       Format.asprintf
         "The TCP socket point at which this RPC server of this instance can be \
-         reached. Default value is %a."
-        P2p_point.Id.pp
-        default
+         reached."
     in
     Arg.(
       value
-      & opt (p2p_point_arg ~default_port:(snd default)) default
+      & opt (some (p2p_point_arg ~default_port)) None
       & info ~docs ~doc ~docv:"ADDR:PORT" ["rpc-addr"])
 
   let expected_pow =
     let open Cmdliner in
-    let default = Configuration_file.default.expected_pow in
     let doc = "Expected level of proof-of-work for peers identity." in
     Arg.(
-      value & opt float default & info ~docs ~doc ~docv:"FLOAT" ["expected-pow"])
+      value
+      & opt (some float) None
+      & info ~docs ~doc ~docv:"FLOAT" ["expected-pow"])
 
   let net_addr =
     let open Cmdliner in
-    let default = Configuration_file.default.listen_addr in
+    let default_port = Configuration_file.default.listen_addr |> snd in
     let doc =
       Format.asprintf
         "The TCP address and port at which this instance can be reached by \
-         other P2P nodes. Default value is %a"
-        P2p_point.Id.pp
-        default
+         other P2P nodes."
     in
     Arg.(
       value
-      & opt (p2p_point_arg ~default_port:(snd default)) default
+      & opt (some (p2p_point_arg ~default_port)) None
       & info ~docs ~doc ~docv:"ADDR:PORT" ["net-addr"])
 
   let endpoint_arg =
@@ -98,7 +96,7 @@ module Term = struct
     let doc = "The Tezos node that the DAL node should connect to." in
     Arg.(
       value
-      & opt endpoint_arg (Uri.of_string "http://localhost:9732")
+      & opt (some endpoint_arg) None
       & info ~docs ~doc ~docv:"[ADDR:PORT]" ["endpoint"])
 
   let profile_arg =
@@ -198,11 +196,11 @@ module Config = struct
 end
 
 type options = {
-  data_dir : string;
-  rpc_addr : P2p_point.Id.t;
-  expected_pow : float;
-  listen_addr : P2p_point.Id.t;
-  endpoint : Uri.t;
+  data_dir : string option;
+  rpc_addr : P2p_point.Id.t option;
+  expected_pow : float option;
+  listen_addr : P2p_point.Id.t option;
+  endpoint : Uri.t option;
   profile : Services.Types.profile option;
   use_unsafe_srs_for_tests : bool;
   peers : P2p_point.Id.t list;

@@ -23,39 +23,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let run subcommand
+let merge
     Cli.
       {
         data_dir;
-        endpoint;
         rpc_addr;
         expected_pow;
         listen_addr;
+        endpoint;
         profile;
         use_unsafe_srs_for_tests;
         peers;
-      } =
+      } configuration =
+  Configuration_file.
+    {
+      configuration with
+      data_dir = Option.value ~default:configuration.data_dir data_dir;
+      rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
+      use_unsafe_srs = use_unsafe_srs_for_tests || configuration.use_unsafe_srs;
+      listen_addr = Option.value ~default:configuration.listen_addr listen_addr;
+      expected_pow =
+        Option.value ~default:configuration.expected_pow expected_pow;
+      endpoint = Option.value ~default:configuration.endpoint endpoint;
+      profile = Option.either profile configuration.profile;
+      peers = peers @ configuration.peers;
+    }
+
+let run subcommand cli_options =
   match subcommand with
   | Cli.Run ->
-      let rpc_context = Rpc_context.make endpoint in
-      Lwt_main.run @@ Daemon.run ~data_dir rpc_context
-  | Config_init ->
-      let config =
-        Configuration_file.
-          {
-            data_dir;
-            rpc_addr;
-            use_unsafe_srs = use_unsafe_srs_for_tests;
-            neighbors = default.neighbors;
-            peers;
-            listen_addr;
-            expected_pow;
-            network_name = default.network_name;
-            endpoint = default.endpoint;
-            profile;
-          }
+      let data_dir =
+        Option.value
+          ~default:Configuration_file.default.data_dir
+          cli_options.Cli.data_dir
       in
-      Lwt_main.run @@ Configuration_file.save config
+      Lwt_main.run @@ Daemon.run ~data_dir (merge cli_options)
+  | Config_init ->
+      Lwt_main.run
+      @@ Configuration_file.save (merge cli_options Configuration_file.default)
 
 let _ =
   let commands = Cli.make ~run in

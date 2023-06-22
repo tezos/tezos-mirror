@@ -72,9 +72,9 @@ let data_dir_not_found =
     ~section
     ~name:"dal_node_no_data_dir"
     ~msg:
-      "The DAL node data directory {path} doesn't exists. Create using: \
-       init-config --data-dir={path} "
-    ~level:Error
+      "The DAL node data directory {path} doesn't exist. Creating one in \
+       {path} "
+    ~level:Warning
     ("path", Data_encoding.(string))
 
 let fetched_slot =
