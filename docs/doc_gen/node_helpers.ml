@@ -57,7 +57,7 @@ let with_node f =
         target = None;
         disable_mempool = true;
         enable_testchain = false;
-        dal = Tezos_crypto_dal.Cryptobox.Config.default;
+        dal_config = Tezos_crypto_dal.Cryptobox.Config.default;
       }
     in
     let version =

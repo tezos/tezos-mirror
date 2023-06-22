@@ -442,7 +442,7 @@ module Config_file = struct
     let network =
       sandbox_network_config
       |> JSON.annotate ~origin:"set_sandbox_network_with_dal_config"
-      |> JSON.put ("dal", dal_config_json)
+      |> JSON.put ("dal_config", dal_config_json)
     in
     JSON.put ("network", network) old_config
 

@@ -40,9 +40,9 @@ module Network = struct
       ~output:User_activated.protocol_overrides_encoding
       Tezos_rpc.Path.(path / "network" / "user_activated_protocol_overrides")
 
-  let dal =
+  let dal_config =
     Tezos_rpc.Service.get_service
-      ~description:"Configuration for the DAL."
+      ~description:"Configuration for the DAL"
       ~query:Tezos_rpc.Query.empty
       ~output:Dal_config.encoding
       Tezos_rpc.Path.(path / "network" / "dal")
@@ -71,4 +71,5 @@ end
 let user_activated_upgrades cctxt =
   Tezos_rpc.Context.make_call Network.user_activated_upgrades cctxt () () ()
 
-let dal cctxt = Tezos_rpc.Context.make_call Network.dal cctxt () () ()
+let dal_config cctxt =
+  Tezos_rpc.Context.make_call Network.dal_config cctxt () () ()

@@ -53,14 +53,14 @@ type blockchain_network = {
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   default_bootstrap_peers : string list;
-  dal : Tezos_crypto_dal.Cryptobox.Config.t;
+  dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
 }
 
 let make_blockchain_network ~alias ~chain_name ?old_chain_name
     ?incompatible_chain_name ~sandboxed_chain_name
     ?(user_activated_upgrades = []) ?(user_activated_protocol_overrides = [])
     ?(default_bootstrap_peers = []) ?genesis_parameters
-    ?(dal = Tezos_crypto_dal.Cryptobox.Config.default) genesis =
+    ?(dal_config = Tezos_crypto_dal.Cryptobox.Config.default) genesis =
   let of_string = Distributed_db_version.Name.of_string in
   {
     alias = Some alias;
@@ -80,7 +80,7 @@ let make_blockchain_network ~alias ~chain_name ?old_chain_name
           (Protocol_hash.of_b58check_exn a, Protocol_hash.of_b58check_exn b))
         user_activated_protocol_overrides;
     default_bootstrap_peers;
-    dal;
+    dal_config;
   }
 
 (* The script in scripts/user_activated_upgrade.sh patches the following lines
@@ -243,7 +243,7 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
            user_activated_upgrades;
            user_activated_protocol_overrides;
            default_bootstrap_peers;
-           dal;
+           dal_config;
          } ->
       ( genesis,
         genesis_parameters,
@@ -254,7 +254,7 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
         user_activated_upgrades,
         user_activated_protocol_overrides,
         default_bootstrap_peers,
-        dal ))
+        dal_config ))
     (fun ( genesis,
            genesis_parameters,
            chain_name,
@@ -264,7 +264,7 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
            user_activated_upgrades,
            user_activated_protocol_overrides,
            default_bootstrap_peers,
-           dal ) ->
+           dal_config ) ->
       {
         alias = None;
         genesis;
@@ -276,7 +276,7 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
         user_activated_upgrades;
         user_activated_protocol_overrides;
         default_bootstrap_peers;
-        dal;
+        dal_config;
       })
     (let chain = Distributed_db_version.Name.encoding in
      obj10
@@ -298,7 +298,7 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
           (list string)
           [])
        (dft
-          "dal"
+          "dal_config"
           ~description:
             "USE FOR TESTING PURPOSE ONLY. Configuration for the \
              data-availibility layer"

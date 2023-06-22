@@ -77,8 +77,10 @@ let () =
 
 let fetch_dal_config cctxt =
   let open Lwt_syntax in
-  let* r = Config_services.dal cctxt in
-  match r with Error e -> return_error e | Ok dal -> return_ok dal
+  let* r = Config_services.dal_config cctxt in
+  match r with
+  | Error e -> return_error e
+  | Ok dal_config -> return_ok dal_config
 
 let init_cryptobox dal_config (proto_parameters : Dal_plugin.proto_parameters) =
   let open Lwt_result_syntax in

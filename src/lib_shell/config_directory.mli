@@ -26,7 +26,7 @@
 val build_rpc_directory :
   user_activated_upgrades:User_activated.upgrades ->
   user_activated_protocol_overrides:User_activated.protocol_overrides ->
-  dal:Dal_config.t ->
+  dal_config:Dal_config.t ->
   mainchain_validator:Chain_validator.t ->
   Store.t ->
   unit Tezos_rpc.Directory.t

@@ -51,7 +51,8 @@ module Network : sig
      Hence to do this we would need to extract [Config_file.blockchain_network] into a
      separate directory, as done for [lib_dal_config]. *)
 
-  val dal : ([`GET], unit, unit, unit, unit, Dal_config.t) Tezos_rpc.Service.t
+  val dal_config :
+    ([`GET], unit, unit, unit, unit, Dal_config.t) Tezos_rpc.Service.t
 end
 
 val history_mode :
@@ -78,4 +79,4 @@ end
 val user_activated_upgrades :
   #Tezos_rpc.Context.simple -> User_activated.upgrades tzresult Lwt.t
 
-val dal : #Tezos_rpc.Context.simple -> Dal_config.t tzresult Lwt.t
+val dal_config : #Tezos_rpc.Context.simple -> Dal_config.t tzresult Lwt.t

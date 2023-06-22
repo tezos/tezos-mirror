@@ -68,7 +68,7 @@ type t = {
   p2p : Distributed_db.p2p;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
-  dal : Tezos_crypto_dal.Cryptobox.Config.t;
+  dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
   operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
   (* For P2P RPCs *)
   shutdown : unit -> unit Lwt.t;
@@ -137,7 +137,7 @@ type config = {
   target : (Block_hash.t * int32) option;
   disable_mempool : bool;
   enable_testchain : bool;
-  dal : Tezos_crypto_dal.Cryptobox.Config.t;
+  dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
 }
 
 (* These protocols are linked with the node and
@@ -217,7 +217,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess ~version
       target;
       disable_mempool;
       enable_testchain;
-      dal;
+      dal_config;
     } peer_validator_limits block_validator_limits prevalidator_limits
     chain_validator_limits history_mode =
   let open Lwt_result_syntax in
@@ -271,7 +271,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess ~version
                protocol_root;
                process_path = Sys.executable_name;
                sandbox_parameters;
-               dal_config = dal;
+               dal_config;
                internal_events;
              })
       in
@@ -339,7 +339,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess ~version
       p2p;
       user_activated_upgrades;
       user_activated_protocol_overrides;
-      dal;
+      dal_config;
       operation_metadata_size_limit;
       shutdown;
     }
@@ -370,7 +370,7 @@ let build_rpc_directory ~version ~commit_info node =
     (Config_directory.build_rpc_directory
        ~user_activated_upgrades:node.user_activated_upgrades
        ~user_activated_protocol_overrides:node.user_activated_protocol_overrides
-       ~dal:node.dal
+       ~dal_config:node.dal_config
        ~mainchain_validator:node.mainchain_validator
        node.store) ;
   merge (Version_directory.rpc_directory ~version ~commit_info node.p2p) ;

@@ -315,7 +315,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess ~internal_events
       target;
       enable_testchain = config.p2p.enable_testchain;
       disable_mempool = config.p2p.disable_mempool;
-      dal = config.blockchain_network.dal;
+      dal_config = config.blockchain_network.dal_config;
     }
   in
   let* () =
@@ -542,7 +542,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
     Tezos_crypto_dal.Cryptobox.Config.init_dal
       ~find_srs_files
-      config.blockchain_network.dal
+      config.blockchain_network.dal_config
   in
   let*! node =
     init_node
