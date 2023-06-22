@@ -1609,7 +1609,8 @@ module Pending_migration = struct
       (struct
         type t = Receipt_repr.balance_updates
 
-        let encoding = Receipt_repr.balance_updates_encoding
+        let encoding =
+          Receipt_repr.balance_updates_encoding_with_legacy_attestation_name
       end)
 
   module Operation_results =

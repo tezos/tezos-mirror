@@ -241,7 +241,10 @@ module Internal_operation = struct
           (Tag 0)
           (obj9
              (opt "storage" Script.expr_encoding)
-             (dft "balance_updates" Receipt.balance_updates_encoding [])
+             (dft
+                "balance_updates"
+                Receipt.balance_updates_encoding_with_legacy_attestation_name
+                [])
              (dft "ticket_receipt" Ticket_receipt.encoding [])
              (dft "originated_contracts" (list Contract.originated_encoding) [])
              (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
@@ -568,7 +571,10 @@ module Internal_operation_result = struct
       ~op_case:Internal_operation.origination_case
       ~encoding:
         (obj6
-           (dft "balance_updates" Receipt.balance_updates_encoding [])
+           (dft
+              "balance_updates"
+              Receipt.balance_updates_encoding_with_legacy_attestation_name
+              [])
            (dft "originated_contracts" (list Contract.originated_encoding) [])
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (dft "storage_size" z Z.zero)
@@ -624,7 +630,10 @@ module Internal_operation_result = struct
         Data_encoding.(
           obj2
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-            (dft "balance_updates" Receipt.balance_updates_encoding []))
+            (dft
+               "balance_updates"
+               Receipt.balance_updates_encoding_with_legacy_attestation_name
+               []))
       ~select:(function
         | Successful_internal_operation_result (IDelegation_result _ as op) ->
             Some op
