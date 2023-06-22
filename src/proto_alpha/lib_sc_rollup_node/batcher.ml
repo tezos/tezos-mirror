@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
 open Batcher_worker_types
 module Message_queue = Hash_queue.Make (L2_message.Hash) (L2_message)
 
@@ -152,15 +150,12 @@ let produce_batches state ~only_full =
 
 let simulate node_ctxt simulation_ctxt (messages : L2_message.t list) =
   let open Lwt_result_syntax in
-  let*? ext_messages =
-    Environment.wrap_tzresult
-    @@ List.map_e
-         (fun m ->
-           let open Result_syntax in
-           let open Sc_rollup.Inbox_message in
-           let+ msg = serialize @@ External (L2_message.content m) in
-           unsafe_to_string msg)
-         messages
+  let ext_messages =
+    List.map
+      (fun m ->
+        (* Serialized external messages have the tag [01]. *)
+        "\001" ^ L2_message.content m)
+      messages
   in
   let+ simulation_ctxt, _ticks =
     Simulation.simulate_messages node_ctxt simulation_ctxt ext_messages
