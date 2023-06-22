@@ -303,6 +303,8 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
             "USE FOR TESTING PURPOSE ONLY. Configuration for the \
              data-availibility layer"
           Tezos_crypto_dal.Cryptobox.Config.encoding
+          (* We use default config unless explicitly overridden via the config file.
+             Note that such override is expected to only be used in test networks. *)
           Tezos_crypto_dal.Cryptobox.Config.default))
 
 let builtin_blockchain_networks_with_tags =
