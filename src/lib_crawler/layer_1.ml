@@ -215,7 +215,10 @@ let get_predecessor =
       (chain : Tezos_shell_services.Chain_services.chain)
       ancestor ->
     let open Lwt_result_syntax in
+    (* Don't read more than the hard limit in one RPC call. *)
     let max_read = min max_read hard_max_read in
+    (* But read at least two because the RPC also returns the head. *)
+    let max_read = max max_read 2 in
     match HM.find_opt cache ancestor with
     | Some pred -> return_some pred
     | None -> (
@@ -294,9 +297,10 @@ let get_tezos_reorg_for_new_head l1_state
     if old_head_level = new_head_level then
       return (old_head, new_head, Reorg.no_reorg)
     else if old_head_level < new_head_level then
+      let max_read = distance + 1 (* reading includes the head *) in
       let+ new_head, new_chain =
         nth_predecessor
-          ~get_predecessor:(get_predecessor ~max_read:distance l1_state)
+          ~get_predecessor:(get_predecessor ~max_read l1_state)
           distance
           new_head
       in
@@ -321,9 +325,10 @@ let get_tezos_reorg_for_new_head l1_state ?get_old_predecessor old_head new_head
       if new_head_level < l then return Reorg.no_reorg
       else
         let distance = Int32.sub new_head_level l |> Int32.to_int in
+        let max_read = distance + 1 (* reading includes the head *) in
         let* _block_at_l, new_chain =
           nth_predecessor
-            ~get_predecessor:(get_predecessor ~max_read:distance l1_state)
+            ~get_predecessor:(get_predecessor ~max_read l1_state)
             distance
             new_head
         in
