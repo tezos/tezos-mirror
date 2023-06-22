@@ -23,13 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
-module Fueled_pvm = Fueled_pvm.Free
-
 type level_position = Start | Middle | End
 
 type info_per_level = {
-  predecessor_timestamp : Timestamp.time;
+  predecessor_timestamp : Time.Protocol.t;
   predecessor : Block_hash.t;
 }
 
