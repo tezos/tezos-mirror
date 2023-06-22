@@ -44,9 +44,12 @@ WORKDIR /home/tezos/
 RUN mkdir -p /home/tezos/evm_kernel
 COPY --chown=tezos:nogroup kernels.mk evm_kernel
 COPY --chown=tezos:nogroup src evm_kernel/src
-RUN make -C evm_kernel/src/kernel_evm build-deps && make -C evm_kernel -f kernels.mk evm_kernel.wasm
+COPY --chown=tezos:nogroup scripts/evm_installer.sh evm_kernel/scripts/evm_installer.sh
+RUN make -C evm_kernel -f kernels.mk build-deps \
+  && make -C evm_kernel -f kernels.mk evm_installer.wasm
 
 # We move the EVM kernel in the final image in a dedicated stage to parallelize
 # the two builder stages.
 FROM without-evm-artifacts as with-evm-artifacts
-COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/evm_kernel.wasm evm_kernel
+COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/evm_installer.wasm evm_kernel
+COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/_evm_installer_preimages/ evm_kernel/_evm_installer_preimages
