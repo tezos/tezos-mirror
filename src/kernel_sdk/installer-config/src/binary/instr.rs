@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -96,5 +97,82 @@ pub mod owned {
         pub fn set_instr(value: OwnedBytes, to: OwnedPath) -> Self {
             OwnedConfigInstruction::Set(SetInstruction { value, to })
         }
+    }
+}
+
+#[cfg(feature = "alloc")]
+pub mod evaluation {
+    use crate::binary::instr::{
+        owned::{OwnedConfigInstruction, OwnedConfigProgram},
+        MoveInstruction, RevealInstruction, SetInstruction,
+    };
+    use crate::binary::reveal_root_hash_to_store;
+    use tezos_smart_rollup_host::runtime::Runtime;
+
+    fn eval_config_instr(
+        host: &mut impl Runtime,
+        config_instr: &OwnedConfigInstruction,
+    ) -> Result<(), &'static str> {
+        match config_instr {
+            OwnedConfigInstruction::Reveal(RevealInstruction { hash, to }) => {
+                let hash = &hash
+                    .as_ref()
+                    .try_into()
+                    .map_err(|_| "Invalid hash conversion.")?;
+                reveal_root_hash_to_store(host, hash, to)
+            }
+            OwnedConfigInstruction::Move(MoveInstruction { from, to }) => {
+                Runtime::store_move(host, from, to)
+                    .map_err(|_| "Couldn't move path during config application")
+            }
+            OwnedConfigInstruction::Set(SetInstruction { value, to }) => {
+                Runtime::store_write(host, to, &value.0, 0)
+                    .map_err(|_| "Couldn't set key during config application")
+            }
+        }
+    }
+
+    /// Configuration program evaluation
+    ///
+    /// This functions takes a config program, which is a sequence of config
+    /// instructions, and sequentially evaluates them.
+    /// Each config instruction is evaluated with the according intended behaviour.
+    ///
+    /// Here's an example of how you can use this function:
+    /// ```
+    /// use tezos_smart_rollup_installer_config::binary::evaluation::eval_config_program;
+    /// use tezos_smart_rollup_host::KERNEL_BOOT_PATH;
+    /// use tezos_smart_rollup_host::path::OwnedPath;
+    /// use tezos_smart_rollup_host::path::RefPath;
+    /// use tezos_smart_rollup_installer_config::binary::owned::OwnedConfigInstruction;
+    /// use tezos_smart_rollup_installer_config::binary::owned::OwnedConfigProgram;
+    /// use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+    /// use tezos_smart_rollup_host::runtime::Runtime;
+    ///
+    /// const TMP_REVEAL_PATH: RefPath = RefPath::assert_from(b"/__sdk/installer/reveal");
+    ///
+    /// pub fn upgrade_kernel(host: &mut impl Runtime) -> Result<(), &'static str> {
+    ///     let root_hash = [0; PREIMAGE_HASH_SIZE].to_vec();
+    ///
+    ///     // Create config consisting of a reveal instruction.
+    ///     let reveal_instruction =
+    ///     OwnedConfigProgram(vec![OwnedConfigInstruction::reveal_instr(
+    ///         root_hash.to_vec().into(),
+    ///         OwnedPath::from(&TMP_REVEAL_PATH),
+    ///     )]);
+    ///
+    ///     eval_config_program(host, &reveal_instruction)?;
+    ///     Runtime::store_move(host, &TMP_REVEAL_PATH, &KERNEL_BOOT_PATH)
+    ///         .map_err(|_| "Upgrade completion failed.")
+    /// }
+    /// ```
+    pub fn eval_config_program(
+        host: &mut impl Runtime,
+        config_program: &OwnedConfigProgram,
+    ) -> Result<(), &'static str> {
+        for config_instr in config_program.0.iter() {
+            eval_config_instr(host, config_instr)?;
+        }
+        Ok(())
     }
 }
