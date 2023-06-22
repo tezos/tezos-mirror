@@ -157,7 +157,7 @@ let start_state_of_block node_ctxt (block : Sc_rollup_block.t) =
     @ [unsafe_to_string end_of_level_serialized]
   in
   return
-    Fueled_pvm.Accounted.
+    Pvm_plugin_sig.
       {
         state;
         state_hash;
@@ -173,7 +173,7 @@ let start_state_of_block node_ctxt (block : Sc_rollup_block.t) =
 let run_to_tick node_ctxt start_state tick =
   let open Delayed_write_monad.Lwt_result_syntax in
   let tick_distance =
-    Z.sub tick start_state.Fueled_pvm.Accounted.tick |> Z.to_int64
+    Z.sub tick start_state.Pvm_plugin_sig.tick |> Z.to_int64
   in
   let>+ eval_result =
     Fueled_pvm.Accounted.eval_messages
@@ -187,7 +187,7 @@ let state_of_tick_aux node_ctxt ~start_state (event : Sc_rollup_block.t) tick =
   let* start_state =
     match start_state with
     | Some start_state
-      when start_state.Fueled_pvm.Accounted.inbox_level = event.header.level ->
+      when start_state.Pvm_plugin_sig.inbox_level = event.header.level ->
         return start_state
     | _ ->
         (* Recompute start state on level change or if we don't have a

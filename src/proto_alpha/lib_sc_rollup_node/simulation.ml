@@ -95,7 +95,7 @@ let simulate_messages_no_checks (node_ctxt : Node_context.ro)
   let*! state_hash = PVM.state_hash state in
   let*! tick = PVM.get_tick state in
   let eval_state =
-    Fueled_pvm.
+    Pvm_plugin_sig.
       {
         state;
         state_hash = Sc_rollup_proto_types.State_hash.to_octez state_hash;
@@ -110,7 +110,7 @@ let simulate_messages_no_checks (node_ctxt : Node_context.ro)
   let* eval_result =
     Fueled_pvm.eval_messages ?reveal_map node_ctxt eval_state
   in
-  let Fueled_pvm.{state = {state; _}; num_ticks; num_messages; _} =
+  let Pvm_plugin_sig.{state = {state; _}; num_ticks; num_messages; _} =
     Delayed_write_monad.ignore eval_result
   in
   let*! ctxt = PVM.State.set ctxt state in

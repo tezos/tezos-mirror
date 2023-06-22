@@ -26,74 +26,12 @@
 open Protocol
 open Alpha_context
 module Inbox = Sc_rollup.Inbox
+open Pvm_plugin_sig
 
-module type S = sig
-  type fuel
-
-  type pvm_state = Context.tree
-
-  (** Evaluation state for the PVM.  *)
-  type eval_state = {
-    state : pvm_state;  (** The actual PVM state. *)
-    state_hash : Octez_smart_rollup.State_hash.t;  (** Hash of [state]. *)
-    tick : Z.t;  (** Tick of [state]. *)
-    inbox_level : int32;  (** Inbox level in which messages are evaluated. *)
-    message_counter_offset : int;
-        (** Offset for message index, which corresponds to the number of
-            messages of the inbox already evaluated.  *)
-    remaining_fuel : fuel;
-        (** Fuel remaining for the evaluation of the inbox. *)
-    remaining_messages : string list;
-        (** Messages of the inbox that remain to be evaluated.  *)
-  }
-
-  (** Evaluation result for the PVM which contains the evaluation state and
-      additional information.  *)
-  type eval_result = {state : eval_state; num_ticks : Z.t; num_messages : int}
-
-  (** [eval_block_inbox ~fuel node_ctxt (inbox, messages) state] evaluates the
-      [messages] for the [inbox] in the given [state] of the PVM and returns the
-      evaluation result containing the new state, the number of messages, the
-      inbox level and the remaining fuel. *)
-  val eval_block_inbox :
-    fuel:fuel ->
-    _ Node_context.t ->
-    Octez_smart_rollup.Inbox.t * string list ->
-    pvm_state ->
-    eval_result Node_context.delayed_write tzresult Lwt.t
-
-  (** [eval_messages ?reveal_map ~fuel node_ctxt ~message_counter_offset state
-      inbox_level messages] evaluates the [messages] for inbox level
-      [inbox_level] in the given [state] of the PVM and returns the evaluation
-      results containing the new state, the remaining fuel, and the number of
-      ticks for the evaluation of these messages. If [messages] is empty, the
-      PVM progresses until the next input request (within the allocated
-      [fuel]). [message_counter_offset] is used when we evaluate partial
-      inboxes, such as during simulation. When [reveal_map] is provided, it is
-      used as an additional source of data for revelation ticks. *)
-  val eval_messages :
-    ?reveal_map:string Utils.Dac_plugin_hash_map.t ->
-    _ Node_context.t ->
-    eval_state ->
-    eval_result Node_context.delayed_write tzresult Lwt.t
-end
-
-module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
+module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
   type fuel = F.t
 
   type pvm_state = Context.tree
-
-  type eval_state = {
-    state : pvm_state;
-    state_hash : Octez_smart_rollup.State_hash.t;
-    tick : Z.t;
-    inbox_level : int32;
-    message_counter_offset : int;
-    remaining_fuel : fuel;
-    remaining_messages : string list;
-  }
-
-  type eval_result = {state : eval_state; num_ticks : Z.t; num_messages : int}
 
   let get_reveal ~dac_client ~data_dir ~pvm_kind reveal_map hash =
     let found_in_map =
@@ -439,7 +377,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
 
   let eval_block_inbox ~fuel (node_ctxt : _ Node_context.t) (inbox, messages)
       (state : pvm_state) :
-      eval_result Node_context.delayed_write tzresult Lwt.t =
+      fuel eval_result Node_context.delayed_write tzresult Lwt.t =
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
     let module PVM = (val Pvm.of_kind node_ctxt.kind) in
