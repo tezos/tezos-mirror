@@ -296,6 +296,7 @@ val bake_while_with_metadata :
   ?policy:baker_policy ->
   ?liquidity_baking_toggle_vote:Toggle_votes_repr.toggle_vote ->
   ?adaptive_inflation_vote:Toggle_votes_repr.toggle_vote ->
+  ?invariant:(block -> unit tzresult Lwt.t) ->
   (block -> block_header_metadata -> bool) ->
   block ->
   block tzresult Lwt.t

@@ -887,8 +887,10 @@ let bake_n ?(baking_mode = Application) ?policy ?liquidity_baking_toggle_vote
     (1 -- n)
 
 let rec bake_while_with_metadata ?(baking_mode = Application) ?policy
-    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote predicate b =
+    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote
+    ?(invariant = fun _ -> return_unit) predicate b =
   let open Lwt_result_syntax in
+  let* () = invariant b in
   let* new_block, metadata =
     bake_with_metadata
       ~baking_mode
@@ -903,6 +905,7 @@ let rec bake_while_with_metadata ?(baking_mode = Application) ?policy
       ?policy
       ?liquidity_baking_toggle_vote
       ?adaptive_inflation_vote
+      ~invariant
       predicate
       new_block
   else return b
