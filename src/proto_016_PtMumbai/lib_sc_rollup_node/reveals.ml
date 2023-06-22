@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,10 +27,7 @@
 open Protocol.Alpha_context
 module Reveal_hash = Protocol.Sc_rollup_reveal_hash
 
-type error +=
-  | Wrong_hash of {found : Reveal_hash.t; expected : Reveal_hash.t}
-  | Could_not_open_preimage_file of String.t
-  | Could_not_encode_raw_data
+type error += Wrong_hash of {found : Reveal_hash.t; expected : Reveal_hash.t}
 
 let () =
   Sc_rollup_node_errors.register_error_kind
@@ -51,34 +49,7 @@ let () =
         (req "expected" Reveal_hash.encoding))
     (function
       | Wrong_hash {found; expected} -> Some (found, expected) | _ -> None)
-    (fun (found, expected) -> Wrong_hash {found; expected}) ;
-  Sc_rollup_node_errors.register_error_kind
-    ~id:"sc_rollup.node.could_not_open_reveal_preimage_file"
-    ~title:"Could not open reveal preimage file"
-    ~description:"Could not open reveal preimage file."
-    ~pp:(fun ppf hash ->
-      Format.fprintf
-        ppf
-        "Could not open file containing preimage of reveal hash %s"
-        hash)
-    `Permanent
-    Data_encoding.(obj1 (req "hash" string))
-    (function
-      | Could_not_open_preimage_file filename -> Some filename | _ -> None)
-    (fun filename -> Could_not_open_preimage_file filename) ;
-  Sc_rollup_node_errors.register_error_kind
-    ~id:"sc_rollup.node.could_not_encode_raw_data"
-    ~title:"Could not encode raw data to reveal"
-    ~description:"Could not encode raw data to reveal."
-    ~pp:(fun ppf () ->
-      Format.pp_print_string
-        ppf
-        "Could not encode raw data to reveal with the expected protocol \
-         encoding")
-    `Permanent
-    Data_encoding.unit
-    (function Could_not_encode_raw_data -> Some () | _ -> None)
-    (fun () -> Could_not_encode_raw_data)
+    (fun (found, expected) -> Wrong_hash {found; expected})
 
 type source = String of string | File of string
 
@@ -88,7 +59,8 @@ let file_contents filename =
     (fun () ->
       let*! contents = Lwt_utils_unix.read_file filename in
       return contents)
-    (fun _ -> tzfail @@ Could_not_open_preimage_file filename)
+    (fun _ ->
+      tzfail @@ Sc_rollup_node_errors.Could_not_open_preimage_file filename)
 
 let hash_to_hex hash =
   let (`Hex hash) =
@@ -120,7 +92,7 @@ let get ~data_dir ~pvm_kind ~hash =
   let* _encoded =
     (* Check that the reveal input can be encoded within the bounds enforced by
        the protocol. *)
-    trace Could_not_encode_raw_data
+    trace Sc_rollup_node_errors.Could_not_encode_raw_data
     @@ protect
     @@ fun () ->
     Data_encoding.Binary.to_bytes_exn
