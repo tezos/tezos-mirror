@@ -3034,10 +3034,12 @@ let from_fa1_2_contract_get_total_supply_callback ?burn_cap ~contract ~from
     client
   |> Process.check
 
-let spawn_from_fa1_2_contract_transfer ?burn_cap ~contract ~amount ~from ~to_
-    ?as_ client =
+let spawn_from_fa1_2_contract_transfer ?(wait = "none") ?burn_cap ~contract
+    ~amount ~from ~to_ ?as_ client =
   spawn_command client
   @@ [
+       "--wait";
+       wait;
        "from";
        "fa1.2";
        "contract";
@@ -3052,9 +3054,10 @@ let spawn_from_fa1_2_contract_transfer ?burn_cap ~contract ~amount ~from ~to_
   @ optional_arg "as" Fun.id as_
   @ optional_arg "burn-cap" Tez.to_string burn_cap
 
-let from_fa1_2_contract_transfer ?burn_cap ~contract ~amount ~from ~to_ ?as_
-    client =
+let from_fa1_2_contract_transfer ?wait ?burn_cap ~contract ~amount ~from ~to_
+    ?as_ client =
   spawn_from_fa1_2_contract_transfer
+    ?wait
     ?burn_cap
     ~contract
     ~amount
@@ -3064,10 +3067,12 @@ let from_fa1_2_contract_transfer ?burn_cap ~contract ~amount ~from ~to_ ?as_
     client
   |> Process.check
 
-let spawn_from_fa1_2_contract_approve ?burn_cap ~contract ~as_ ~amount ~from
-    client =
+let spawn_from_fa1_2_contract_approve ?(wait = "none") ?burn_cap ~contract ~as_
+    ~amount ~from client =
   spawn_command client
   @@ [
+       "--wait";
+       wait;
        "from";
        "fa1.2";
        "contract";
@@ -3081,8 +3086,10 @@ let spawn_from_fa1_2_contract_approve ?burn_cap ~contract ~as_ ~amount ~from
      ]
   @ optional_arg "burn-cap" Tez.to_string burn_cap
 
-let from_fa1_2_contract_approve ?burn_cap ~contract ~as_ ~amount ~from client =
+let from_fa1_2_contract_approve ?wait ?burn_cap ~contract ~as_ ~amount ~from
+    client =
   spawn_from_fa1_2_contract_approve
+    ?wait
     ?burn_cap
     ~contract
     ~as_
