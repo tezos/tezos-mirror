@@ -37,6 +37,9 @@ let block_header_data_encoding =
 
 type block_header_metadata = Apply_results.block_metadata
 
+let block_header_metadata_encoding_with_legacy_attestation_name =
+  Apply_results.block_metadata_encoding_with_legacy_attestation_name
+
 let block_header_metadata_encoding = Apply_results.block_metadata_encoding
 
 type operation_data = Alpha_context.packed_protocol_data =

@@ -97,6 +97,11 @@ module type PROTOCOL = sig
       validation. *)
   type block_header_metadata
 
+  (** Encoding for economic protocol-specific block metadata. This encoding uses
+      the attestation legacy name: endorsement. *)
+  val block_header_metadata_encoding_with_legacy_attestation_name :
+    block_header_metadata Data_encoding.t
+
   (** Encoding for economic protocol-specific block metadata. *)
   val block_header_metadata_encoding : block_header_metadata Data_encoding.t
 

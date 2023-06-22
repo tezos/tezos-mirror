@@ -57,6 +57,9 @@ module type T = sig
 
   type block_header_metadata
 
+  val block_header_metadata_encoding_with_legacy_attestation_name :
+    block_header_metadata Data_encoding.t
+
   val block_header_metadata_encoding : block_header_metadata Data_encoding.t
 
   type operation_data
