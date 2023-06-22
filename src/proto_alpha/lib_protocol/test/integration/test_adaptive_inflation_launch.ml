@@ -100,6 +100,7 @@ let set_delegate_parameters ctxt delegate ~staking_over_baking_limit
     ctxt
     ~entrypoint
     ~parameters
+    ~fee:Protocol.Alpha_context.Tez.zero
     delegate
     delegate
     Protocol.Alpha_context.Tez.zero
