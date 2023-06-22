@@ -134,13 +134,12 @@ module Slots_handlers = struct
 end
 
 module Profile_handlers = struct
-  let patch_profile ctxt () profile =
+  let patch_profiles ctxt () profiles =
+    let gs_worker = Node_context.get_gs_worker ctxt in
     call_handler2 ctxt (fun store {proto_parameters; _} ->
-        Profile_manager.add_profile
-          proto_parameters
-          store
-          (Node_context.get_gs_worker ctxt)
-          profile)
+        List.iter_es
+          (Profile_manager.add_profile proto_parameters store gs_worker)
+          profiles)
 
   let get_profiles ctxt () () =
     call_handler1 ctxt (fun store ->
@@ -193,8 +192,8 @@ let register_new :
        (Slots_handlers.get_commitment_by_published_level_and_index ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
-       Services.patch_profile
-       (Profile_handlers.patch_profile ctxt)
+       Services.patch_profiles
+       (Profile_handlers.patch_profiles ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
        Services.get_profiles
