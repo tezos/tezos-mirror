@@ -296,7 +296,24 @@ let test_launch threshold expected_vote_duration () =
   let*?@ balance_to_stake = Protocol.Alpha_context.Tez.(balance -? one) in
   let* operation = stake (B block) wannabe_costaker balance_to_stake in
   let* block = Block.bake ~operation block in
-  let* block = Block.bake_until_n_cycle_end (preserved_cycles + 1) block in
+  (* The costaking operation leads to an increase of the
+     total_frozen_stake but only preserved_cycles after the
+     operation. *)
+  let start_cycle = Block.current_cycle block in
+  let* block =
+    Block.bake_while
+      ~invariant:(fun block ->
+        assert_total_frozen_stake
+          ~loc:__LOC__
+          block
+          (Protocol.Alpha_context.Tez.of_mutez_exn 2_000_000_000_000L))
+      (fun block ->
+        let current_cycle = Block.current_cycle block in
+        Protocol.Alpha_context.Cycle.(
+          current_cycle <= add start_cycle preserved_cycles))
+      block
+  in
+  let* block = Block.bake block in
   let* () =
     assert_total_frozen_stake
       ~loc:__LOC__
