@@ -375,10 +375,11 @@ let run ~data_dir configuration_override =
   in
   let*! () = Event.(emit starting_node) () in
   let* ({network_name; rpc_addr; peers; endpoint; _} as config) =
-    let*! result = Configuration_file.(load ~data_dir) in
+    let*! result = Configuration_file.load ~data_dir in
     match result with
     | Ok configuration -> return (configuration_override configuration)
     | Error _ ->
+        let*! () = Event.(emit data_dir_not_found data_dir) in
         (* Store the default configuration if no configuration were found. *)
         let configuration = configuration_override Configuration_file.default in
         let* () = Configuration_file.save configuration in

@@ -238,9 +238,7 @@ let load ~data_dir =
     let*! json = Lwt_utils_unix.Json.read_file (filename ~data_dir) in
     match json with
     | Ok json -> return json
-    | Error (Exn _ :: _ as e) ->
-        let*! () = Event.(emit data_dir_not_found data_dir) in
-        fail e
+    | Error (Exn _ :: _ as e) -> fail e
     | Error e -> fail e
   in
   let config = Data_encoding.Json.destruct encoding json in
