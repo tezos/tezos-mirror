@@ -269,11 +269,14 @@ let kill_running_vdf_computation {pid; _} =
   let open Lwt_syntax in
   let* () =
     match Unix.kill pid Sys.sigterm with
-    | () -> Events.(emit vdf_info) "VDF computation was aborted"
+    | () ->
+        Events.(emit vdf_info)
+          (Printf.sprintf "VDF computation was aborted (pid %d)" pid)
     | exception Unix.Unix_error (err, _, _) ->
         let msg = Printf.sprintf "%s (pid %d)" (Unix.error_message err) pid in
         Events.(emit vdf_daemon_cannot_kill_computation) msg
   in
+  let* _status = Lwt_unix.waitpid [] pid in
   return_unit
 
 (* Checks if the cycle of the last processed block is different from the cycle
