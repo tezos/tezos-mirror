@@ -13,7 +13,8 @@
   tezos-p2p-services
   tezos-version
   tezos-context.sigs
-  tezos-context.merkle_proof_encoding)
+  tezos-context.merkle_proof_encoding
+  tezos-crypto-dal.octez-dal-config)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
@@ -21,4 +22,5 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base
   -open Tezos_p2p_services
-  -open Tezos_version))
+  -open Tezos_version
+  -open Tezos_crypto_dal_octez_dal_config))

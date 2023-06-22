@@ -27,6 +27,7 @@
   tezos-workers
   tezos-validation
   tezos-version
+  tezos-crypto-dal.octez-dal-config
   lwt-exit)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
@@ -49,6 +50,7 @@
   -open Tezos_requester
   -open Tezos_workers
   -open Tezos_validation
-  -open Tezos_version))
+  -open Tezos_version
+  -open Tezos_crypto_dal_octez_dal_config))
 
 (documentation (package tezos-shell))

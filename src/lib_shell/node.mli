@@ -48,7 +48,7 @@ type config = {
       (** If [true], all non-empty mempools will be ignored. *)
   enable_testchain : bool;
       (** If [false], testchain related messages will be ignored. *)
-  dal : Tezos_crypto_dal.Cryptobox.Config.t;
+  dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
 }
 
 val create :

@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,40 +24,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type neighbor = {addr : string; port : int}
+(** node parameters for the DAL. *)
 
-type t = {
-  data_dir : string;  (** The path to the DAL node data directory *)
-  rpc_addr : P2p_point.Id.t;  (** The address the DAL node listens to *)
-  neighbors : neighbor list;  (** List of neighbors to reach within the DAL *)
-  listen_addr : P2p_point.Id.t;
-      (** The TCP address and port at which this instance can be reached. *)
-  peers : P2p_point.Id.t list;
-      (** A list of P2P peers to connect to at startup. *)
-  expected_pow : float;  (** Expected P2P identity's PoW. *)
-  network_name : string;
-      (** A string that identifies the network's name. E.g. dal-sandbox. *)
-  endpoint : Uri.t;  (** Endpoint of a Tezos node *)
-  profile : Services.Types.profile option;
-      (** Profile allowing to know the topics of interest. *)
+(* Parameters of the DAL cryptographic primitives. *)
+type parameters = {
+  redundancy_factor : int;
+  page_size : int;
+  slot_size : int;
+  number_of_shards : int;
 }
 
-(** [default] is the default configuration. *)
+val parameters_encoding : parameters Data_encoding.t
+
+type t = {
+  activated : bool;
+      (** [true] if the DAL is activated. This may have
+          an impact on the loading time of the node. *)
+  use_mock_srs_for_testing : parameters option;
+      (** If [None], the srs is read from the srs files.
+          This is the value expected for production. For testing
+          purposes, we may want to compute the srs instead but this is
+          not secure. In this case, the size of a slot, page, the
+          erasure code redundancy factor and number of shards must be
+          specified. *)
+}
+
+val encoding : t Data_encoding.t
+
+(** The default configuration is
+    [{activated = false; use_mock_srs_for_testing = None}]. *)
 val default : t
-
-(** [store_path config] returns a path for the store *)
-val store_path : t -> string
-
-(** [save config] writes config file in [config.data_dir] *)
-val save : t -> unit tzresult Lwt.t
-
-val load : data_dir:string -> (t, Error_monad.tztrace) result Lwt.t
-
-(** [identity_file t] returns the absolute path to the "identity.json"
-    file of the DAL node, based on the configuration [t]. *)
-val identity_file : t -> string
-
-(** [peers_file data_dir] returns the absolute path to the
-    "peers.json" file of the DAL node, based on the configuration
-    [t]. *)
-val peers_file : t -> string

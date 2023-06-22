@@ -9,6 +9,7 @@
   tezos-stdlib
   tezos-error-monad
   data-encoding
+  tezos-crypto-dal.octez-dal-config
   tezos-crypto
   octez-bls12-381-polynomial
   lwt.unix)
@@ -16,4 +17,5 @@
   (:standard)
   -open Tezos_stdlib
   -open Tezos_error_monad
-  -open Data_encoding))
+  -open Data_encoding
+  -open Tezos_crypto_dal_octez_dal_config))

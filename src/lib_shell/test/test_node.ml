@@ -59,7 +59,7 @@ let init_config (* (f : 'a -> unit -> unit Lwt.t) *) f test_dir switch () :
       target = None;
       disable_mempool = false;
       enable_testchain = true;
-      dal = Tezos_crypto_dal.Cryptobox.Config.default;
+      dal_config = Tezos_crypto_dal.Cryptobox.Config.default;
     }
   in
   f sandbox_parameters config switch ()

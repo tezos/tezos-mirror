@@ -81,16 +81,12 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 5)
   let node = Node.create nodes_args in
   let* () = Node.config_init node [] in
   let* dal_parameters = Rollup.Dal.Parameters.from_client client in
-  Node.Config_file.update node (fun json ->
-      let config : Cryptobox.Config.t =
-        {
-          activated = true;
-          use_mock_srs_for_testing = Some dal_parameters.cryptobox;
-        }
-      in
-      JSON.put
-        ("dal", Rollup.Dal.Parameters.cryptobox_config_to_json config)
-        json) ;
+  let config : Cryptobox.Config.t =
+    {activated = true; use_mock_srs_for_testing = Some dal_parameters.cryptobox}
+  in
+  Node.Config_file.update
+    node
+    (Node.Config_file.set_sandbox_network_with_dal_config config) ;
   let* () = Node.run node ~event_sections_levels node_arguments in
   let* () = Node.wait_for_ready node in
   let* client = Client.init ~endpoint:(Node node) () in

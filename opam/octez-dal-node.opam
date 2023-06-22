@@ -31,6 +31,7 @@ depends: [
   "tezos-p2p"
   "tezos-p2p-services"
   "tezos-crypto"
+  "tezos-shell-services"
   "irmin-pack" { >= "3.7.2" & < "3.8.0" }
   "irmin" { >= "3.7.2" & < "3.8.0" }
   "tezos-dal-016-PtMumbai"

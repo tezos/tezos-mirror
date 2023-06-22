@@ -39,6 +39,13 @@ module Network = struct
       ~query:Tezos_rpc.Query.empty
       ~output:User_activated.protocol_overrides_encoding
       Tezos_rpc.Path.(path / "network" / "user_activated_protocol_overrides")
+
+  let dal_config =
+    Tezos_rpc.Service.get_service
+      ~description:"Configuration for the DAL"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Dal_config.encoding
+      Tezos_rpc.Path.(path / "network" / "dal")
 end
 
 let history_mode_encoding =
@@ -63,3 +70,6 @@ end
 
 let user_activated_upgrades cctxt =
   Tezos_rpc.Context.make_call Network.user_activated_upgrades cctxt () () ()
+
+let dal_config cctxt =
+  Tezos_rpc.Context.make_call Network.dal_config cctxt () () ()

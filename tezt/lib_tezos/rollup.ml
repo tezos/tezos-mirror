@@ -68,29 +68,6 @@ module Dal = struct
           attestation_threshold;
           blocks_per_epoch;
         }
-
-    let cryptobox_config_to_json (t : Cryptobox.Config.t) =
-      let parameters =
-        match t.use_mock_srs_for_testing with
-        | Some parameters ->
-            `O
-              [
-                ("slot_size", `Float (float_of_int parameters.slot_size));
-                ("page_size", `Float (float_of_int parameters.page_size));
-                ( "redundancy_factor",
-                  `Float (float_of_int parameters.redundancy_factor) );
-                ( "number_of_shards",
-                  `Float (float_of_int parameters.number_of_shards) );
-              ]
-        | None -> `Null
-      in
-      JSON.annotate
-        ~origin:"dal_initialisation"
-        (`O
-          [
-            ("activated", `Bool t.activated);
-            ("use_mock_srs_for_testing", parameters);
-          ])
   end
 
   let endpoint dal_node =

@@ -79,6 +79,7 @@ module Acl = struct
               "GET /chains/*/mempool/pending_operations";
               "GET /config/network/user_activated_protocol_overrides";
               "GET /config/network/user_activated_upgrades";
+              "GET /config/network/dal";
               "GET /describe/**";
               "GET /errors";
               "GET /monitor/**";

@@ -25,22 +25,13 @@
 
 let merge
     Cli.
-      {
-        data_dir;
-        rpc_addr;
-        expected_pow;
-        listen_addr;
-        endpoint;
-        profile;
-        use_unsafe_srs_for_tests;
-        peers;
-      } configuration =
+      {data_dir; rpc_addr; expected_pow; listen_addr; endpoint; profile; peers}
+    configuration =
   Configuration_file.
     {
       configuration with
       data_dir = Option.value ~default:configuration.data_dir data_dir;
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
-      use_unsafe_srs = use_unsafe_srs_for_tests || configuration.use_unsafe_srs;
       listen_addr = Option.value ~default:configuration.listen_addr listen_addr;
       expected_pow =
         Option.value ~default:configuration.expected_pow expected_pow;

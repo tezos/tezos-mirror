@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,40 +24,39 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type neighbor = {addr : string; port : int}
-
-type t = {
-  data_dir : string;  (** The path to the DAL node data directory *)
-  rpc_addr : P2p_point.Id.t;  (** The address the DAL node listens to *)
-  neighbors : neighbor list;  (** List of neighbors to reach within the DAL *)
-  listen_addr : P2p_point.Id.t;
-      (** The TCP address and port at which this instance can be reached. *)
-  peers : P2p_point.Id.t list;
-      (** A list of P2P peers to connect to at startup. *)
-  expected_pow : float;  (** Expected P2P identity's PoW. *)
-  network_name : string;
-      (** A string that identifies the network's name. E.g. dal-sandbox. *)
-  endpoint : Uri.t;  (** Endpoint of a Tezos node *)
-  profile : Services.Types.profile option;
-      (** Profile allowing to know the topics of interest. *)
+type parameters = {
+  redundancy_factor : int;
+  page_size : int;
+  slot_size : int;
+  number_of_shards : int;
 }
 
-(** [default] is the default configuration. *)
-val default : t
+let parameters_encoding =
+  let open Data_encoding in
+  conv
+    (fun {redundancy_factor; page_size; slot_size; number_of_shards} ->
+      (redundancy_factor, page_size, slot_size, number_of_shards))
+    (fun (redundancy_factor, page_size, slot_size, number_of_shards) ->
+      {redundancy_factor; page_size; slot_size; number_of_shards})
+    (obj4
+       (req "redundancy_factor" uint8)
+       (req "page_size" uint16)
+       (req "slot_size" int31)
+       (req "number_of_shards" uint16))
+  [@@coverage off]
 
-(** [store_path config] returns a path for the store *)
-val store_path : t -> string
+type t = {activated : bool; use_mock_srs_for_testing : parameters option}
 
-(** [save config] writes config file in [config.data_dir] *)
-val save : t -> unit tzresult Lwt.t
+let encoding : t Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {activated; use_mock_srs_for_testing} ->
+      (activated, use_mock_srs_for_testing))
+    (fun (activated, use_mock_srs_for_testing) ->
+      {activated; use_mock_srs_for_testing})
+    (obj2
+       (req "activated" bool)
+       (req "use_mock_srs_for_testing" (option parameters_encoding)))
+  [@@coverage off]
 
-val load : data_dir:string -> (t, Error_monad.tztrace) result Lwt.t
-
-(** [identity_file t] returns the absolute path to the "identity.json"
-    file of the DAL node, based on the configuration [t]. *)
-val identity_file : t -> string
-
-(** [peers_file data_dir] returns the absolute path to the
-    "peers.json" file of the DAL node, based on the configuration
-    [t]. *)
-val peers_file : t -> string
+let default = {activated = false; use_mock_srs_for_testing = None}
