@@ -67,8 +67,8 @@ val wait_first : t -> (Block_hash.t * Block_header.t) Lwt.t
 
 (** [get_predecessor_opt ?max_read state head] returns the predecessor of block
     [head], when [head] is not the genesis block. [max_read] (by default [8]) is
-    used to cache a number of predecessors to avoid some RPC calls when one need
-    to access multiple predecessors. *)
+    used to cache a number of predecessors (including [head]) to avoid some RPC
+    calls when one need to access multiple predecessors. *)
 val get_predecessor_opt :
   ?max_read:int ->
   t ->
