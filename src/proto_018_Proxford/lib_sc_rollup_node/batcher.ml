@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
 open Batcher_worker_types
 module Message_queue = Hash_queue.Make (L2_message.Hash) (L2_message)
 
@@ -40,19 +38,10 @@ module Batched_messages = Hash_queue.Make (L2_message.Hash) (L2_batched_message)
 
 type status = Pending_batch | Batched of Injector.Inj_operation.hash
 
-(* Same as {!Configuration.batcher} with max_batch_size non optional. *)
-type conf = {
-  simulate : bool;
-  min_batch_elements : int;
-  min_batch_size : int;
-  max_batch_elements : int;
-  max_batch_size : int;
-}
-
 type state = {
   node_ctxt : Node_context.ro;
   signer : Signature.public_key_hash;
-  conf : conf;
+  conf : Configuration.batcher;
   messages : Message_queue.t;
   batched : Batched_messages.t;
   mutable simulation_ctxt : Simulation.t option;
@@ -78,6 +67,11 @@ let inject_batch state (l2_messages : L2_message.t list) =
 
 let inject_batches state = List.iter_es (inject_batch state)
 
+let max_batch_size {conf; _} =
+  Option.value
+    conf.max_batch_size
+    ~default:Batcher_constants.protocol_max_batch_size
+
 let get_batches state ~only_full =
   let ( current_rev_batch,
         current_batch_size,
@@ -94,7 +88,7 @@ let get_batches state ~only_full =
         let new_batch_size = current_batch_size + size in
         let new_batch_elements = current_batch_elements + 1 in
         if
-          new_batch_size <= state.conf.max_batch_size
+          new_batch_size <= max_batch_size state
           && new_batch_elements <= state.conf.max_batch_elements
         then
           (* We can add the message to the current batch because we are still
@@ -152,15 +146,12 @@ let produce_batches state ~only_full =
 
 let simulate node_ctxt simulation_ctxt (messages : L2_message.t list) =
   let open Lwt_result_syntax in
-  let*? ext_messages =
-    Environment.wrap_tzresult
-    @@ List.map_e
-         (fun m ->
-           let open Result_syntax in
-           let open Sc_rollup.Inbox_message in
-           let+ msg = serialize @@ External (L2_message.content m) in
-           unsafe_to_string msg)
-         messages
+  let ext_messages =
+    List.map
+      (fun m ->
+        (* Serialized external messages have the tag [01]. *)
+        "\001" ^ L2_message.content m)
+      messages
   in
   let+ simulation_ctxt, _ticks =
     Simulation.simulate_messages node_ctxt simulation_ctxt ext_messages
@@ -171,9 +162,9 @@ let on_register state (messages : string list) =
   let open Lwt_result_syntax in
   let max_size_msg =
     min
-      (Protocol.Constants_repr.sc_rollup_message_size_limit
+      (Batcher_constants.message_size_limit
      + 4 (* We add 4 because [message_size] adds 4. *))
-      state.conf.max_batch_size
+      (max_batch_size state)
   in
   let*? messages =
     List.mapi_e
@@ -232,59 +223,15 @@ let on_new_head state head =
   (* Forget failing messages *)
   List.iter (Message_queue.remove state.messages) failing
 
-(** Maximum size of an L2 batch in bytes that can fit in an operation of the
-    protocol. *)
-let protocol_max_batch_size =
-  let open Protocol in
-  let open Alpha_context in
-  let empty_message_op : _ Operation.t =
-    let open Operation in
-    {
-      shell = {branch = Block_hash.zero};
-      protocol_data =
-        {
-          signature = Some Signature.zero;
-          contents =
-            Single
-              (Manager_operation
-                 {
-                   source = Signature.Public_key_hash.zero;
-                   fee = Tez.of_mutez_exn Int64.max_int;
-                   counter = Manager_counter.Internal_for_tests.of_int max_int;
-                   gas_limit =
-                     Gas.Arith.integral_of_int_exn ((max_int - 1) / 1000);
-                   storage_limit = Z.of_int max_int;
-                   operation = Sc_rollup_add_messages {messages = [""]};
-                 });
-        };
-    }
-  in
-  Protocol.Constants_repr.max_operation_data_length
-  - Data_encoding.Binary.length
-      Operation.encoding_with_legacy_attestation_name
-      (Operation.pack empty_message_op)
-
 let init_batcher_state node_ctxt ~signer (conf : Configuration.batcher) =
-  let open Lwt_syntax in
-  let conf =
-    {
-      simulate = conf.simulate;
-      min_batch_elements = conf.min_batch_elements;
-      min_batch_size = conf.min_batch_size;
-      max_batch_elements = conf.max_batch_elements;
-      max_batch_size =
-        Option.value conf.max_batch_size ~default:protocol_max_batch_size;
-    }
-  in
-  return
-    {
-      node_ctxt;
-      signer;
-      conf;
-      messages = Message_queue.create 100_000 (* ~ 400MB *);
-      batched = Batched_messages.create 100_000 (* ~ 400MB *);
-      simulation_ctxt = None;
-    }
+  {
+    node_ctxt;
+    signer;
+    conf;
+    messages = Message_queue.create 100_000 (* ~ 400MB *);
+    batched = Batched_messages.create 100_000 (* ~ 400MB *);
+    simulation_ctxt = None;
+  }
 
 module Types = struct
   type nonrec state = state
@@ -331,7 +278,7 @@ module Handlers = struct
 
   let on_launch _w () Types.{node_ctxt; signer; conf} =
     let open Lwt_result_syntax in
-    let*! state = init_batcher_state node_ctxt ~signer conf in
+    let state = init_batcher_state node_ctxt ~signer conf in
     return state
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
@@ -364,10 +311,10 @@ let worker_promise, worker_waker = Lwt.task ()
 
 let check_batcher_config Configuration.{max_batch_size; _} =
   match max_batch_size with
-  | Some m when m > protocol_max_batch_size ->
+  | Some m when m > Batcher_constants.protocol_max_batch_size ->
       error_with
         "batcher.max_batch_size must be smaller than %d"
-        protocol_max_batch_size
+        Batcher_constants.protocol_max_batch_size
   | _ -> Ok ()
 
 let start conf ~signer node_ctxt =
