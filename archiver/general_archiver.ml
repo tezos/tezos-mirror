@@ -224,7 +224,7 @@ module Loops (Archiver : Archiver.S) = struct
           match Protocol_hash.Table.find block_machine current_protocol with
           | Some deal_with ->
               let* block_data = deal_with cctx level in
-              let () = Archiver.add_applied_block ~level block_data in
+              let () = Archiver.add_block ~level block_data in
               return_unit
           | None -> return_unit
         else return_unit
@@ -371,9 +371,7 @@ module Loops (Archiver : Archiver.S) = struct
                                     in
                                     return_unit
                                 in
-                                let () =
-                                  Archiver.add_applied_block ~level block_data
-                                in
+                                let () = Archiver.add_block ~level block_data in
                                 return_unit
                               in
                               Lwt.return
@@ -396,16 +394,17 @@ module Loops (Archiver : Archiver.S) = struct
                           in
                           Lwt.return ((fun _ _ _ _ _ -> return_unit), None))
               in
-              let reception_time = Time.System.now () in
+              let reception =
+                {
+                  Data.Block.source = "archiver";
+                  application_time = Some (Time.System.now ());
+                  validation_time = None;
+                }
+              in
               let block_level = header.Block_header.shell.Block_header.level in
               let*! () =
                 print_failures
-                  (block_recorder
-                     cctx
-                     block_level
-                     hash
-                     header
-                     [("archiver", reception_time)])
+                  (block_recorder cctx block_level hash header [reception])
               in
               Lwt.return acc')
             block_stream
@@ -497,9 +496,7 @@ module Loops (Archiver : Archiver.S) = struct
                                     in
                                     return_unit
                                 in
-                                let () =
-                                  Archiver.add_validated_block ~level block_data
-                                in
+                                let () = Archiver.add_block ~level block_data in
                                 return_unit
                               in
                               Lwt.return
@@ -522,16 +519,17 @@ module Loops (Archiver : Archiver.S) = struct
                           in
                           Lwt.return ((fun _ _ _ _ _ -> return_unit), None))
               in
-              let reception_time = Time.System.now () in
+              let reception =
+                {
+                  Data.Block.source = "archiver";
+                  application_time = None;
+                  validation_time = Some (Time.System.now ());
+                }
+              in
               let block_level = header.Block_header.shell.Block_header.level in
               let*! () =
                 print_failures
-                  (block_recorder
-                     cctx
-                     block_level
-                     hash
-                     header
-                     [("archiver", reception_time)])
+                  (block_recorder cctx block_level hash header [reception])
               in
               Lwt.return acc')
             block_stream

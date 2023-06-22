@@ -40,20 +40,11 @@ module type S = sig
   val add_mempool :
     ?unaccurate:bool -> level:Int32.t -> Consensus_ops.delegate_ops -> unit
 
-  (* [add_applied_block level block_info consensus_ops] adds information about
-     a newly applied block, like its level, hash, round, its
+  (* [add_block level block_info consensus_ops] adds information about
+     a newly received block, like its level, hash, round, its
      timestamp, its reception time, and the included consensus
      operations. *)
-  val add_applied_block :
-    level:Int32.t ->
-    Data.Block.t * (Consensus_ops.block_op list * Consensus_ops.block_op list) ->
-    unit
-
-  (* [add_validated_block level block_info consensus_ops] adds information about
-     a newly validated block, like its level, hash, round, its
-     timestamp, its reception time, and the included consensus
-     operations. *)
-  val add_validated_block :
+  val add_block :
     level:Int32.t ->
     Data.Block.t * (Consensus_ops.block_op list * Consensus_ops.block_op list) ->
     unit
