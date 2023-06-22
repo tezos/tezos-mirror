@@ -127,12 +127,14 @@ module type S = sig
   type status =
     | Halted
     | Waiting_for_input_message
-    | Waiting_for_reveal
-    | Waiting_for_metadata
+    | Waiting_for_reveal of Sc_rollup_PVM_sig.reveal
     | Parsing
     | Evaluating
 
-  val get_status : state -> status Lwt.t
+  val get_status :
+    is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
+    state ->
+    status Lwt.t
 
   val get_outbox :
     Raw_level_repr.t -> state -> Sc_rollup_PVM_sig.output list Lwt.t
@@ -187,8 +189,7 @@ module Make (Context : P) :
   type status =
     | Halted
     | Waiting_for_input_message
-    | Waiting_for_reveal
-    | Waiting_for_metadata
+    | Waiting_for_reveal of Sc_rollup_PVM_sig.reveal
     | Parsing
     | Evaluating
 
@@ -587,14 +588,57 @@ module Make (Context : P) :
       let initial = Halted
 
       let encoding =
-        Data_encoding.string_enum
+        let open Data_encoding in
+        let kind name = req "status" (constant name) in
+        let case_halted =
+          case
+            ~title:"Halted"
+            (Tag 0)
+            (obj1 (kind "halted"))
+            (function Halted -> Some () | _ -> None)
+            (fun () -> Halted)
+        in
+        let case_waiting_for_input_message =
+          case
+            ~title:"Waiting_for_input_message"
+            (Tag 1)
+            (obj1 (kind "waiting_for_input_message"))
+            (function Waiting_for_input_message -> Some () | _ -> None)
+            (fun () -> Waiting_for_input_message)
+        in
+        let case_waiting_for_reveal =
+          case
+            ~title:"Waiting_for_reveal"
+            (Tag 2)
+            (obj2
+               (kind "waiting_for_reveal")
+               (req "reveal" Sc_rollup_PVM_sig.reveal_encoding))
+            (function Waiting_for_reveal r -> Some ((), r) | _ -> None)
+            (fun ((), r) -> Waiting_for_reveal r)
+        in
+        let case_parsing =
+          case
+            ~title:"Parsing"
+            (Tag 3)
+            (obj1 (kind "parsing"))
+            (function Parsing -> Some () | _ -> None)
+            (fun () -> Parsing)
+        in
+        let case_evaluating =
+          case
+            ~title:"Evaluating"
+            (Tag 4)
+            (obj1 (kind "evaluating"))
+            (function Evaluating -> Some () | _ -> None)
+            (fun () -> Evaluating)
+        in
+        union
           [
-            ("Halted", Halted);
-            ("Waiting_for_input_message", Waiting_for_input_message);
-            ("Waiting_for_reveal", Waiting_for_reveal);
-            ("Waiting_for_metadata", Waiting_for_metadata);
-            ("Parsing", Parsing);
-            ("Evaluating", Evaluating);
+            case_halted;
+            case_waiting_for_input_message;
+            case_waiting_for_reveal;
+            case_parsing;
+            case_evaluating;
           ]
 
       let name = "status"
@@ -602,8 +646,11 @@ module Make (Context : P) :
       let string_of_status = function
         | Halted -> "Halted"
         | Waiting_for_input_message -> "Waiting for input message"
-        | Waiting_for_reveal -> "Waiting for reveal"
-        | Waiting_for_metadata -> "Waiting for metadata"
+        | Waiting_for_reveal reveal ->
+            Format.asprintf
+              "Waiting for reveal %a"
+              Sc_rollup_PVM_sig.pp_reveal
+              reveal
         | Parsing -> "Parsing"
         | Evaluating -> "Evaluating"
 
@@ -949,7 +996,7 @@ module Make (Context : P) :
     let open Monad.Syntax in
     let* () = Status.create in
     let* () = Next_message.create in
-    let* () = Status.set Waiting_for_metadata in
+    let* () = Status.set (Waiting_for_reveal Reveal_metadata) in
     return ()
 
   let result_of ~default m state =
@@ -964,9 +1011,34 @@ module Make (Context : P) :
 
   let get_tick = result_of ~default:Sc_rollup_tick_repr.initial Current_tick.get
 
-  let is_input_state_monadic =
+  let get_status ~is_reveal_enabled : status Monad.t =
     let open Monad.Syntax in
     let* status = Status.get in
+    let* level = Current_level.get in
+    (* We do not put the machine in a stuck condition if a kind of reveal
+       happens to not be supported. This is a sensible thing to do, as if
+       there is an off-by-one error in the WASM kernel one can do an
+       incorrect reveal, which can put the PVM in a stuck state with no way
+       to upgrade the kernel to fix the off-by-one. *)
+    let try_return_reveal candidate : status =
+      match (level, candidate) with
+      | _, Waiting_for_reveal candidate ->
+          let is_enabled = is_reveal_enabled level candidate in
+          if is_enabled then Waiting_for_reveal candidate
+          else
+            Waiting_for_reveal
+              (Reveal_raw_data Sc_rollup_reveal_hash.well_known_reveal_hash)
+      | _, _ -> candidate
+    in
+    return
+    @@
+    match status with
+    | Waiting_for_reveal _ -> try_return_reveal status
+    | s -> s
+
+  let is_input_state_monadic ~is_reveal_enabled =
+    let open Monad.Syntax in
+    let* status = get_status ~is_reveal_enabled in
     match status with
     | Waiting_for_input_message -> (
         let* level = Current_level.get in
@@ -974,18 +1046,28 @@ module Make (Context : P) :
         match counter with
         | Some n -> return (PS.First_after (level, n))
         | None -> return PS.Initial)
-    | Waiting_for_reveal -> (
+    | Waiting_for_reveal (Reveal_raw_data _) -> (
         let* r = Required_reveal.get in
         match r with
         | None -> internal_error "Internal error: Reveal invariant broken"
         | Some reveal -> return (PS.Needs_reveal reveal))
-    | Waiting_for_metadata -> return PS.(Needs_reveal Reveal_metadata)
+    | Waiting_for_reveal Reveal_metadata ->
+        return PS.(Needs_reveal Reveal_metadata)
+    | Waiting_for_reveal (Request_dal_page page) ->
+        return PS.(Needs_reveal (Request_dal_page page))
     | Halted | Parsing | Evaluating -> return PS.No_input_required
 
-  let is_input_state =
-    result_of ~default:PS.No_input_required @@ is_input_state_monadic
+  let is_input_state ~is_reveal_enabled =
+    result_of ~default:PS.No_input_required
+    @@ is_input_state_monadic ~is_reveal_enabled
 
-  let get_status = result_of ~default:Waiting_for_input_message @@ Status.get
+  let get_current_level state =
+    let open Lwt_syntax in
+    let* _state_, current_level = Monad.run Current_level.get state in
+    return current_level
+
+  let get_status ~is_reveal_enabled : state -> status Lwt.t =
+    result_of ~default:Waiting_for_input_message (get_status ~is_reveal_enabled)
 
   let get_outbox outbox_level state =
     let open Lwt_syntax in
@@ -1060,7 +1142,7 @@ module Make (Context : P) :
     | `Dal (published_level, index, page_index) ->
         let page_id = {Page.slot_id = {published_level; index}; page_index} in
         let* () = Required_reveal.set @@ Some (Request_dal_page page_id) in
-        Status.set Waiting_for_reveal
+        Status.set (Waiting_for_reveal (Request_dal_page page_id))
     | `Inbox_message ->
         let* () = Required_reveal.set None in
         Status.set Waiting_for_input_message
@@ -1423,8 +1505,9 @@ module Make (Context : P) :
     match Sc_rollup_reveal_hash.of_hex hash with
     | None -> stop_evaluating false
     | Some hash ->
-        let* () = Required_reveal.set (Some (Reveal_raw_data hash)) in
-        let* () = Status.set Waiting_for_reveal in
+        let reveal : Sc_rollup_PVM_sig.reveal = Reveal_raw_data hash in
+        let* () = Required_reveal.set (Some reveal) in
+        let* () = Status.set (Waiting_for_reveal reveal) in
         return ()
 
   let evaluate_dal_parameters dal_directive =
@@ -1520,8 +1603,7 @@ module Make (Context : P) :
         let* status = Status.get in
         match status with
         | Halted -> boot
-        | Waiting_for_input_message | Waiting_for_reveal | Waiting_for_metadata
-          -> (
+        | Waiting_for_input_message | Waiting_for_reveal _ -> (
             let* msg = Next_message.get in
             match msg with
             | None -> internal_error "An input state was not provided an input."
@@ -1531,10 +1613,11 @@ module Make (Context : P) :
 
   let eval state = state_of (ticked eval_step) state
 
-  let step_transition input_given state =
+  let step_transition ~is_reveal_enabled input_given state =
     let open Lwt_syntax in
-    let* request = is_input_state state in
+    let* request = is_input_state ~is_reveal_enabled state in
     let error msg = state_of (internal_error msg) state in
+
     let* state =
       match (request, input_given) with
       | PS.No_input_required, None -> eval state
@@ -1568,17 +1651,24 @@ module Make (Context : P) :
 
   type error += Arith_proof_verification_failed
 
-  let verify_proof input_given proof =
+  let verify_proof ~is_reveal_enabled input_given proof =
     let open Lwt_result_syntax in
-    let*! result = Context.verify_proof proof (step_transition input_given) in
+    let*! result =
+      Context.verify_proof
+        proof
+        (step_transition ~is_reveal_enabled input_given)
+    in
     match result with
     | None -> tzfail Arith_proof_verification_failed
     | Some (_state, request) -> return request
 
-  let produce_proof context input_given state =
+  let produce_proof context ~is_reveal_enabled input_given state =
     let open Lwt_result_syntax in
     let*! result =
-      Context.produce_proof context state (step_transition input_given)
+      Context.produce_proof
+        context
+        state
+        (step_transition ~is_reveal_enabled input_given)
     in
     match result with
     | Some (tree_proof, _requested) -> return tree_proof
@@ -1630,11 +1720,6 @@ module Make (Context : P) :
         return {output_proof; output_proof_state; output_proof_output}
     | Some (_, false) -> fail Arith_invalid_claim_about_outbox
     | None -> fail Arith_output_proof_production_failed
-
-  let get_current_level state =
-    let open Lwt_syntax in
-    let* _state_, current_level = Monad.run Current_level.get state in
-    return current_level
 
   module Internal_for_tests = struct
     let insert_failure state =

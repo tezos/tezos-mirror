@@ -2915,6 +2915,8 @@ module Sc_rollup : sig
     | Reveal_metadata
     | Request_dal_page of Dal.Page.t
 
+  type is_reveal_enabled = Sc_rollup_PVM_sig.is_reveal_enabled
+
   type input_request =
     | No_input_required
     | Initial
@@ -3200,16 +3202,27 @@ module Sc_rollup : sig
 
       val install_boot_sector : state -> string -> state Lwt.t
 
-      val is_input_state : state -> input_request Lwt.t
+      val is_input_state :
+        is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
+        state ->
+        input_request Lwt.t
 
       val set_input : input -> state -> state Lwt.t
 
       val eval : state -> state Lwt.t
 
-      val verify_proof : input option -> proof -> input_request tzresult Lwt.t
+      val verify_proof :
+        is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
+        input option ->
+        proof ->
+        input_request tzresult Lwt.t
 
       val produce_proof :
-        context -> input option -> state -> proof tzresult Lwt.t
+        context ->
+        is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
+        input option ->
+        state ->
+        proof tzresult Lwt.t
 
       type output_proof
 
@@ -3307,12 +3320,14 @@ module Sc_rollup : sig
       type status =
         | Halted
         | Waiting_for_input_message
-        | Waiting_for_reveal
-        | Waiting_for_metadata
+        | Waiting_for_reveal of Sc_rollup_PVM_sig.reveal
         | Parsing
         | Evaluating
 
-      val get_status : state -> status Lwt.t
+      val get_status :
+        is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
+        state ->
+        status Lwt.t
 
       val get_outbox : Raw_level.t -> state -> output list Lwt.t
     end
@@ -3377,12 +3392,19 @@ module Sc_rollup : sig
         | Waiting_for_input_message
         | Waiting_for_reveal of reveal
 
-      val get_status : state -> status Lwt.t
+      val get_status :
+        is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
+        state ->
+        status Lwt.t
 
       val get_outbox : Raw_level.t -> state -> output list Lwt.t
 
       val produce_proof :
-        context -> input option -> state -> proof tzresult Lwt.t
+        context ->
+        is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
+        input option ->
+        state ->
+        proof tzresult Lwt.t
     end
 
     module Protocol_implementation :
@@ -3536,6 +3558,7 @@ module Sc_rollup : sig
       Dal.Slots_history.t ->
       Dal.parameters ->
       dal_attestation_lag:int ->
+      is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
       'proof t ->
       (input option * input_request) tzresult Lwt.t
 
@@ -3543,6 +3566,7 @@ module Sc_rollup : sig
       metadata:Metadata.t ->
       (module PVM_with_context_and_state) ->
       Raw_level.t ->
+      is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
       serialized t tzresult Lwt.t
   end
 
@@ -3647,6 +3671,7 @@ module Sc_rollup : sig
       t ->
       step:step ->
       choice:Tick.t ->
+      is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
       (game_result, t) Either.t tzresult Lwt.t
 
     type timeout = {alice : int; bob : int; last_turn_level : Raw_level.t}

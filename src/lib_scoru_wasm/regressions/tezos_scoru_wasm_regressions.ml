@@ -177,7 +177,13 @@ let link_kernel import_name import_params import_results =
 
 let check_proof_size ~current_tick ~proof_size_limit context input_opt s =
   let open Lwt_syntax in
-  let* proof = Prover.produce_proof context input_opt s in
+  let* proof =
+    Prover.produce_proof
+      context
+      ~is_reveal_enabled:(fun _ _ -> true)
+      input_opt
+      s
+  in
   match proof with
   | Error _ ->
       Test.fail "Could not compute proof for tick %a" Z.pp_print current_tick

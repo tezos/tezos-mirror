@@ -867,7 +867,9 @@ module Arith_test_pvm = struct
   let eval_until_input ~fuel ~our_states start_tick state =
     let open Lwt_syntax in
     let rec go ~our_states fuel (tick : int) state =
-      let* input_request = is_input_state state in
+      let* input_request =
+        is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+      in
       match fuel with
       | Some 0 -> return (state, fuel, tick, our_states)
       | None | Some _ -> (
@@ -1336,7 +1338,13 @@ let build_proof ~player_client start_tick (game : Game.t) =
         Default_parameters.constants_test.dal.attestation_lag
     end
   end in
-  let*! proof = Sc_rollup.Proof.produce ~metadata (module P) game.inbox_level in
+  let*! proof =
+    Sc_rollup.Proof.produce
+      ~metadata
+      (module P)
+      game.inbox_level
+      ~is_reveal_enabled:(fun _ _ -> true)
+  in
   return (WithExceptions.Result.get_ok ~loc:__LOC__ proof)
 
 (** [next_move ~number_of_sections ~player_client game] produces

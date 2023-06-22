@@ -165,6 +165,7 @@ val valid :
   Dal_slot_repr.History.t ->
   Dal_slot_repr.parameters ->
   dal_attestation_lag:int ->
+  is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
   'proof t ->
   (Sc_rollup_PVM_sig.input option * Sc_rollup_PVM_sig.input_request) tzresult
   Lwt.t
@@ -252,6 +253,7 @@ val produce :
   metadata:Sc_rollup_metadata_repr.t ->
   (module PVM_with_context_and_state) ->
   Raw_level_repr.t ->
+  is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
   serialized t tzresult Lwt.t
 
 (**/**)

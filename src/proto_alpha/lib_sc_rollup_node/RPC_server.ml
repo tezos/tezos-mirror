@@ -216,7 +216,10 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
       outbox
   in
   let*! state_hash = PVM.state_hash state in
-  let*! status = PVM.get_status state in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5880
+       Fetch the real `is_reveal_enabled` definition from the context *)
+  let is_reveal_enabled _ _ = true in
+  let*! status = PVM.get_status ~is_reveal_enabled state in
   let status = PVM.string_of_status status in
   return
     Sc_rollup_services.
@@ -309,7 +312,10 @@ let () =
   let open Lwt_result_syntax in
   let* state = get_state node_ctxt block in
   let module PVM = (val node_ctxt.pvm) in
-  let*! status = PVM.get_status state in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5880
+       Fetch the real `is_reveal_enabled` definition from the context *)
+  let is_reveal_enabled _ _ = true in
+  let*! status = PVM.get_status ~is_reveal_enabled state in
   return (PVM.string_of_status status)
 
 let () =

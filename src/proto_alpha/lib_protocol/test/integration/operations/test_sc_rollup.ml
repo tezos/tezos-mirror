@@ -2143,7 +2143,11 @@ let dumb_proof ~choice =
   let*! arith_state = Arith_pvm.install_boot_sector arith_state "" in
   let input = Sc_rollup_helpers.make_external_input "c4c4" in
   let* pvm_step =
-    Arith_pvm.produce_proof context_arith_pvm (Some input) arith_state
+    Arith_pvm.produce_proof
+      context_arith_pvm
+      ~is_reveal_enabled:(fun _ _ -> true)
+      (Some input)
+      arith_state
     >|= Environment.wrap_tzresult
   in
   let pvm_step =
@@ -2426,25 +2430,37 @@ let make_arith_state ?(boot_sector = "") metadata =
   let* state_hash1 = Arith_pvm.state_hash state in
 
   (* 1. We evaluate the boot sector. *)
-  let* input_required = Arith_pvm.is_input_state state in
+  let* input_required =
+    Arith_pvm.is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+  in
   assert (input_required = Sc_rollup.No_input_required) ;
   let* state = Arith_pvm.eval state in
   let* state_hash2 = Arith_pvm.state_hash state in
   (* 2. The state now needs the metadata. *)
-  let* input_required = Arith_pvm.is_input_state state in
+  let* input_required =
+    Arith_pvm.is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+  in
   assert (input_required = Sc_rollup.Needs_reveal Reveal_metadata) ;
   (* 3. We feed the state with the metadata. *)
   let input = Sc_rollup.(Reveal (Metadata metadata)) in
   let* state = Arith_pvm.set_input input state in
   let* state_hash3 = Arith_pvm.state_hash state in
-  let* input_required = Arith_pvm.is_input_state state in
+  let* input_required =
+    Arith_pvm.is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+  in
   assert (input_required = Sc_rollup.Initial) ;
 
   return (context, state, state_hash1, state_hash2, state_hash3)
 
 let make_set_input_refutation context state input input_proof =
   let open Lwt_syntax in
-  let* proof = Arith_pvm.produce_proof context (Some input) state in
+  let* proof =
+    Arith_pvm.produce_proof
+      context
+      ~is_reveal_enabled:(fun _ _ -> true)
+      (Some input)
+      state
+  in
   let pvm_step = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
   let pvm_step =
     WithExceptions.Result.get_ok ~loc:__LOC__
@@ -2624,7 +2640,9 @@ let arith_state_before_reveal metadata hash =
   in
   let*! state = Arith_pvm.set_input input state in
   let rec eval_until_needs_reveal state =
-    let*! input_request = Arith_pvm.is_input_state state in
+    let*! input_request =
+      Arith_pvm.is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+    in
     match input_request with
     | Needs_reveal _ -> return state
     | _ ->

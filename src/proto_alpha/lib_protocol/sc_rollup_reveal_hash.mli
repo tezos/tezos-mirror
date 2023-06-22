@@ -81,3 +81,11 @@ val of_hex : string -> t option
 val to_hex : t -> string
 
 val rpc_arg : t RPC_arg.t
+
+(** The hash requested by the WASM PVM if it cannot decode the input
+      provided by the WASM kernel, that is, if the bytes value cannot
+      be decoded with {!val:encoding}. *)
+val well_known_reveal_hash : t
+
+(** The preimage of {!well_known_reveal_hash}. *)
+val well_known_reveal_preimage : string

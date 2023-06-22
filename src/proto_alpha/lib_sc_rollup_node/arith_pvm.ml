@@ -59,21 +59,26 @@ module Impl : Pvm.S = struct
 
   let new_dissection = Game_helpers.default_new_dissection
 
-  let string_of_status status =
-    match status with
+  let string_of_status = function
     | Halted -> "Halted"
     | Waiting_for_input_message -> "Waiting for input message"
-    | Waiting_for_reveal -> "Waiting for reveal"
-    | Waiting_for_metadata -> "Waiting for metadata"
+    | Waiting_for_reveal reveal ->
+        Format.asprintf
+          "Waiting for reveal %a"
+          Sc_rollup_PVM_sig.pp_reveal
+          reveal
     | Parsing -> "Parsing"
     | Evaluating -> "Evaluating"
 
-  let eval_many ~reveal_builtins:_ ~write_debug:_ ?stop_at_snapshot ~max_steps
-      initial_state =
+  (* It is safe to pass the [is_reveal_enabled_predicate]:
+     [eval_many] always stops at the beginning of a new Tezos block,
+     so no execution of several Tezos block inboxes is possible. *)
+  let eval_many ~reveal_builtins:_ ~write_debug:_ ~is_reveal_enabled
+      ?stop_at_snapshot ~max_steps initial_state =
     ignore stop_at_snapshot ;
     let rec go state step =
       let open Lwt.Syntax in
-      let* is_input_required = is_input_state state in
+      let* is_input_required = is_input_state ~is_reveal_enabled state in
 
       if is_input_required = No_input_required && step < max_steps then
         let open Lwt.Syntax in

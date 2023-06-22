@@ -121,7 +121,8 @@ let page_info_from_pvm_state (node_ctxt : _ Node_context.t) ~dal_attestation_lag
     (dal_params : Dal.parameters) start_state =
   let open Lwt_result_syntax in
   let module PVM = (val node_ctxt.pvm) in
-  let*! input_request = PVM.is_input_state start_state in
+  let is_reveal_enabled _ _ = true in
+  let*! input_request = PVM.is_input_state ~is_reveal_enabled start_state in
   match input_request with
   | Sc_rollup.(Needs_reveal (Request_dal_page page_id)) -> (
       let Dal.Page.{slot_id; page_index} = page_id in
@@ -272,9 +273,16 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
     end
   end in
   let metadata = Node_context.metadata node_ctxt in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5880
+        Fetch the real `is_reveal_enabled` definition from the context *)
+  let is_reveal_enabled _ _ = true in
   let* proof =
     trace (Sc_rollup_node_errors.Cannot_produce_proof game)
-    @@ (Sc_rollup.Proof.produce ~metadata (module P) game.inbox_level
+    @@ (Sc_rollup.Proof.produce
+          ~metadata
+          (module P)
+          game.inbox_level
+          ~is_reveal_enabled
        >|= Environment.wrap_tzresult)
   in
   let*? pvm_step =
@@ -292,6 +300,7 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
       ~dal_attestation_lag
       ~pvm:(module PVM)
       unserialized_proof
+      ~is_reveal_enabled
     >|= Environment.wrap_tzresult
   in
   if Result.is_ok res then return proof else assert false

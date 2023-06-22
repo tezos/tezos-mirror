@@ -89,12 +89,10 @@ module V2_0_0 = struct
 
   let outbox_message_limit = Z.of_int 100
 
-  let well_known_reveal_preimage = ""
+  let well_known_reveal_preimage =
+    Sc_rollup_reveal_hash.well_known_reveal_preimage
 
-  let well_known_reveal_hash =
-    Sc_rollup_reveal_hash.hash_string
-      ~scheme:Blake2B
-      [well_known_reveal_preimage]
+  let well_known_reveal_hash = Sc_rollup_reveal_hash.well_known_reveal_hash
 
   (*
     This is the state hash of reference that both the prover of the
@@ -167,8 +165,11 @@ module V2_0_0 = struct
       | Waiting_for_input_message
       | Waiting_for_reveal of Sc_rollup_PVM_sig.reveal
 
-    (** [get_status state] gives you the current execution status for the PVM. *)
-    val get_status : state -> status Lwt.t
+    (** [get_status ~is_reveal_enabled state] gives you the current execution status for the PVM. *)
+    val get_status :
+      is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
+      state ->
+      status Lwt.t
 
     val get_outbox :
       Raw_level_repr.t -> state -> Sc_rollup_PVM_sig.output list Lwt.t
@@ -294,30 +295,6 @@ module V2_0_0 = struct
 
     let get_tick : state -> Sc_rollup_tick_repr.t Lwt.t = result_of get_tick
 
-    let get_status : status Monad.t =
-      let open Monad.Syntax in
-      let open Sc_rollup_PVM_sig in
-      let* s = get in
-      let* info = lift (WASM_machine.get_info s) in
-      return
-      @@
-      match info.input_request with
-      | No_input_required -> Computing
-      | Input_required -> Waiting_for_input_message
-      | Reveal_required (Wasm_2_0_0.Reveal_raw_data hash) -> (
-          match
-            Data_encoding.Binary.of_string_opt
-              Sc_rollup_reveal_hash.encoding
-              hash
-          with
-          | Some hash -> Waiting_for_reveal (Reveal_raw_data hash)
-          | None ->
-              (* In case of an invalid hash, the rollup is
-                 blocked. Any commitment will be invalid. *)
-              Waiting_for_reveal (Reveal_raw_data well_known_reveal_hash))
-      | Reveal_required Wasm_2_0_0.Reveal_metadata ->
-          Waiting_for_reveal Reveal_metadata
-
     let get_last_message_read : _ Monad.t =
       let open Monad.Syntax in
       let* s = get in
@@ -330,9 +307,48 @@ module V2_0_0 = struct
           Some (inbox_level, message_counter)
       | _ -> None
 
-    let is_input_state =
+    let get_status ~is_reveal_enabled =
       let open Monad.Syntax in
-      let* status = get_status in
+      let open Sc_rollup_PVM_sig in
+      let* s = get in
+      let* info = lift (WASM_machine.get_info s) in
+      let* last_read = get_last_message_read in
+      (* We do not put the machine in a stuck condition if a kind of reveal
+         happens to not be supported. This is a sensible thing to do, as if
+         there is an off-by-one error in the WASM kernel one can do an
+         incorrect reveal, which can put the PVM in a stuck state with no way
+         to upgrade the kernel to fix the off-by-one. *)
+      let try_return_reveal candidate =
+        match last_read with
+        | Some (current_level, _) ->
+            let is_enabled = is_reveal_enabled current_level candidate in
+            if is_enabled then Waiting_for_reveal candidate
+            else Waiting_for_reveal (Reveal_raw_data well_known_reveal_hash)
+        | None -> Waiting_for_reveal (Reveal_raw_data well_known_reveal_hash)
+      in
+      return
+      @@
+      match info.input_request with
+      | No_input_required -> Computing
+      | Input_required -> Waiting_for_input_message
+      | Reveal_required (Wasm_2_0_0.Reveal_raw_data hash) -> (
+          match
+            Data_encoding.Binary.of_string_opt
+              Sc_rollup_reveal_hash.encoding
+              hash
+          with
+          | Some hash -> try_return_reveal (Reveal_raw_data hash)
+          | None ->
+              (* We do not put the machine in a stuck condition if a kind of reveal
+                 happens to not be supported. Insteadn we wait for the well known
+                 preimage. *)
+              Waiting_for_reveal (Reveal_raw_data well_known_reveal_hash))
+      | Reveal_required Wasm_2_0_0.Reveal_metadata ->
+          try_return_reveal Reveal_metadata
+
+    let is_input_state ~is_reveal_enabled =
+      let open Monad.Syntax in
+      let* status = get_status ~is_reveal_enabled in
       match status with
       | Waiting_for_input_message -> (
           let* last_read = get_last_message_read in
@@ -342,9 +358,11 @@ module V2_0_0 = struct
       | Computing -> return PS.No_input_required
       | Waiting_for_reveal reveal -> return (PS.Needs_reveal reveal)
 
-    let is_input_state = result_of is_input_state
+    let is_input_state ~is_reveal_enabled =
+      result_of (is_input_state ~is_reveal_enabled)
 
-    let get_status : state -> status Lwt.t = result_of get_status
+    let get_status ~is_reveal_enabled : state -> status Lwt.t =
+      result_of (get_status ~is_reveal_enabled)
 
     let get_outbox outbox_level state =
       let outbox_level_int32 =
@@ -424,9 +442,9 @@ module V2_0_0 = struct
 
     let eval state = state_of eval_step state
 
-    let step_transition input_given state =
+    let step_transition ~is_reveal_enabled input_given state =
       let open Lwt_syntax in
-      let* request = is_input_state state in
+      let* request = is_input_state ~is_reveal_enabled state in
       let* state =
         match request with
         | PS.No_input_required -> eval state
@@ -437,17 +455,24 @@ module V2_0_0 = struct
       in
       return (state, request)
 
-    let verify_proof input_given proof =
+    let verify_proof ~is_reveal_enabled input_given proof =
       let open Lwt_result_syntax in
-      let*! result = Context.verify_proof proof (step_transition input_given) in
+      let*! result =
+        Context.verify_proof
+          proof
+          (step_transition ~is_reveal_enabled input_given)
+      in
       match result with
       | None -> tzfail WASM_proof_verification_failed
       | Some (_state, request) -> return request
 
-    let produce_proof context input_given state =
+    let produce_proof context ~is_reveal_enabled input_given state =
       let open Lwt_result_syntax in
       let*! result =
-        Context.produce_proof context state (step_transition input_given)
+        Context.produce_proof
+          context
+          state
+          (step_transition ~is_reveal_enabled input_given)
       in
       match result with
       | Some (tree_proof, _requested) -> return tree_proof

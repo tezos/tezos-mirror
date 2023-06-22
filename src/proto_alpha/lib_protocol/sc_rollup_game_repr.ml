@@ -744,7 +744,7 @@ let check_proof_refute_stop_state ~stop_state input input_request proof =
 
 (** Returns the validity of the first final move on top of a dissection. *)
 let validity_final_move ~pvm ~dal_parameters ~dal_attestation_lag ~first_move
-    ~metadata ~proof ~game ~start_chunk ~stop_chunk =
+    ~metadata ~proof ~game ~start_chunk ~stop_chunk ~is_reveal_enabled =
   let open Lwt_result_syntax in
   let*! res =
     let {inbox_snapshot; inbox_level; dal_snapshot; _} = game in
@@ -760,6 +760,7 @@ let validity_final_move ~pvm ~dal_parameters ~dal_attestation_lag ~first_move
         dal_snapshot
         dal_parameters
         ~dal_attestation_lag
+        ~is_reveal_enabled
         proof
     in
     let*? () =
@@ -897,7 +898,7 @@ let cost_play ~step ~choice =
       @@ cost_N_IBlake2b overapproximated_hashing_size
 
 let play kind dal_parameters ~dal_attestation_lag ~stakers metadata game ~step
-    ~choice =
+    ~choice ~is_reveal_enabled =
   let open Lwt_result_syntax in
   let (Packed ((module PVM) as pvm)) = Sc_rollups.Kind.pvm_of kind in
   let mk_loser loser =
@@ -944,6 +945,7 @@ let play kind dal_parameters ~dal_attestation_lag ~stakers metadata game ~step
           ~game
           ~start_chunk
           ~stop_chunk
+          ~is_reveal_enabled
       in
       if player_result then return @@ mk_loser (opponent game.turn)
       else
@@ -977,6 +979,7 @@ let play kind dal_parameters ~dal_attestation_lag ~stakers metadata game ~step
           ~refuted_stop_chunk
           ~game
           ~proof
+          ~is_reveal_enabled
       in
       if player_result then
         (* If we play when the final move started, the opponent provided
