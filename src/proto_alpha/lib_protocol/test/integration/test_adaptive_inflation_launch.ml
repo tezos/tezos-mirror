@@ -63,8 +63,7 @@ let assert_cycle_eq ~loc c1 c2 =
     c2
 
 let assert_current_cycle ~loc (blk : Block.t) expected =
-  let open Lwt_result_syntax in
-  let* current_cycle = Block.current_cycle blk in
+  let current_cycle = Block.current_cycle blk in
   assert_cycle_eq ~loc current_cycle expected
 
 let stake ctxt contract amount =
