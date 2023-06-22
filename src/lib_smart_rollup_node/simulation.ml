@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Pvm = Pvm_plugin
-module Fueled_pvm = Pvm.Fueled.Free
-
 type level_position = Start | Middle | End
 
 type info_per_level = {
@@ -41,18 +38,22 @@ type t = {
   nb_messages_inbox : int;
   level_position : level_position;
   info_per_level : info_per_level;
+  plugin : (module Protocol_plugin_sig.S);
 }
 
 let simulate_info_per_level (node_ctxt : [`Read] Node_context.t) predecessor =
   let open Lwt_result_syntax in
-  let* block_info =
-    Layer1_helpers.fetch_tezos_block node_ctxt.l1_ctxt predecessor
+  let* pred_header =
+    Layer1.fetch_tezos_shell_header node_ctxt.l1_ctxt predecessor
   in
-  let predecessor_timestamp = block_info.header.shell.timestamp in
+  let predecessor_timestamp = pred_header.timestamp in
   return {predecessor_timestamp; predecessor}
 
 let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
   let open Lwt_result_syntax in
+  let inbox_level = Int32.succ level in
+  let* plugin = Protocol_plugins.proto_plugin_for_level node_ctxt inbox_level in
+  let module Plugin = (val plugin) in
   let*? () =
     error_unless
       (level >= node_ctxt.Node_context.genesis_info.level)
@@ -66,9 +67,8 @@ let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
       return (Context.empty node_ctxt.context)
     else Node_context.checkout_context node_ctxt hash
   in
-  let* ctxt, state = Interpreter.state_of_head node_ctxt ctxt head in
+  let* ctxt, state = Plugin.Interpreter.state_of_head node_ctxt ctxt head in
   let+ info_per_level = simulate_info_per_level node_ctxt hash in
-  let inbox_level = Int32.succ level in
   {
     ctxt;
     inbox_level;
@@ -77,6 +77,7 @@ let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
     nb_messages_inbox = 0;
     level_position = Start;
     info_per_level;
+    plugin;
   }
 
 let simulate_messages_no_checks (node_ctxt : Node_context.ro)
@@ -86,10 +87,12 @@ let simulate_messages_no_checks (node_ctxt : Node_context.ro)
        inbox_level;
        reveal_map;
        nb_messages_inbox;
+       plugin;
        level_position = _;
        info_per_level = _;
      } as sim) messages =
   let open Lwt_result_syntax in
+  let open (val plugin) in
   let*! state_hash = Pvm.state_hash node_ctxt.kind state in
   let*! tick = Pvm.get_tick node_ctxt.kind state in
   let eval_state =
@@ -106,7 +109,7 @@ let simulate_messages_no_checks (node_ctxt : Node_context.ro)
   in
   (* Build new state *)
   let* eval_result =
-    Fueled_pvm.eval_messages ?reveal_map node_ctxt eval_state
+    Pvm.Fueled.Free.eval_messages ?reveal_map node_ctxt eval_state
   in
   let Pvm_plugin_sig.{state = {state; _}; num_ticks; num_messages; _} =
     Delayed_write_monad.ignore eval_result
@@ -117,6 +120,7 @@ let simulate_messages_no_checks (node_ctxt : Node_context.ro)
 
 let simulate_messages (node_ctxt : Node_context.ro) sim messages =
   let open Lwt_result_syntax in
+  let open (val sim.plugin) in
   (* Build new inbox *)
   let*? () =
     error_when
@@ -136,6 +140,7 @@ let simulate_messages (node_ctxt : Node_context.ro) sim messages =
 
 let end_simulation node_ctxt sim =
   let open Lwt_result_syntax in
+  let open (val sim.plugin) in
   let*? () =
     error_when
       (sim.level_position = End)
