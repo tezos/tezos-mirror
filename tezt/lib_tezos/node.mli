@@ -109,6 +109,10 @@ type t
     whose name is derived from [name]. It will be created
     as a named pipe so that node events can be received.
 
+    Default value for [net_addr] is either [127.0.0.1] if no [runner] is
+    provided, or a value allowing the local Tezt program to connect to it
+    if it is.
+
     Default values for [net_port] or [rpc_port] are chosen automatically
     with values starting from 16384 (configurable with `--starting-port`).
     They are used by [config_init]
@@ -133,6 +137,7 @@ val create :
   ?color:Log.Color.t ->
   ?data_dir:string ->
   ?event_pipe:string ->
+  ?net_addr:string ->
   ?net_port:int ->
   ?advertised_net_port:int ->
   ?rpc_host:string ->

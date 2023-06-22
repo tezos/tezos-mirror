@@ -140,6 +140,7 @@ type 'a known = Unknown | Known of 'a
 module Parameters = struct
   type persistent_state = {
     data_dir : string;
+    net_addr : string option;
     mutable net_port : int;
     advertised_net_port : int option;
     rpc_host : string;
@@ -655,8 +656,9 @@ let wait_for_disconnections node disconnections =
   waiter
 
 let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
-    ?event_pipe ?net_port ?advertised_net_port ?(rpc_host = "localhost")
-    ?rpc_port ?rpc_tls ?(allow_all_rpc = true) arguments =
+    ?event_pipe ?net_addr ?net_port ?advertised_net_port
+    ?(rpc_host = "localhost") ?rpc_port ?rpc_tls ?(allow_all_rpc = true)
+    arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir ?runner name | Some dir -> dir
@@ -681,6 +683,7 @@ let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
       ?event_pipe
       {
         data_dir;
+        net_addr;
         net_port;
         advertised_net_port;
         rpc_host;
@@ -749,7 +752,9 @@ let remove_peers_json_file node =
 let runlike_command_arguments node command arguments =
   let net_addr, rpc_addr =
     match node.persistent_state.runner with
-    | None -> ("127.0.0.1:", node.persistent_state.rpc_host ^ ":")
+    | None ->
+        ( Option.value ~default:"127.0.0.1" node.persistent_state.net_addr ^ ":",
+          node.persistent_state.rpc_host ^ ":" )
     | Some _ ->
         (* FIXME spawn an ssh tunnel in case of remote host *)
         ("0.0.0.0:", "0.0.0.0:")
