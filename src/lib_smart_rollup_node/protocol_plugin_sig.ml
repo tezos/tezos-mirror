@@ -310,8 +310,6 @@ module type S = sig
 
   module Batcher_constants : BATCHER_CONSTANTS
 
-  module Batcher : BATCHER
-
   module Layer1_helpers : LAYER1_HELPERS
 
   module L1_processing : L1_PROCESSING

@@ -23,14 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Daemon_components.Batcher_sig
-
 (** The type for the status of messages in the batcher.  *)
 type status =
   | Pending_batch  (** The message is in the queue of the batcher. *)
   | Batched of Injector.Inj_operation.hash
       (** The message has already been batched and sent to the injector in an L1
           operation whose hash is given. *)
+
+(** [init plugin config ~signer node_ctxt] initializes and starts the batcher
+    for [signer]. If [config.simulation] is [true] (the default), messages added
+    to the batcher are simulated in an incremental simulation context. [plugin]
+    is the protocol plugin with which the batcher is started, but it will
+    automatically change plugins on protocol migrations. *)
+val init :
+  (module Protocol_plugin_sig.S) ->
+  Configuration.batcher ->
+  signer:Signature.public_key_hash ->
+  _ Node_context.t ->
+  unit tzresult Lwt.t
+
+(** Create L2 batches of operations from the queue and pack each batch in an L1
+    operation. The L1 operations (i.e. L2 batches) are queued in the injector for
+    injection on the Tezos node.
+*)
+val new_head : Layer1.head -> unit tzresult Lwt.t
+
+(** Shutdown the batcher, waiting for the ongoing request to be processed. *)
+val shutdown : unit -> unit Lwt.t
 
 (** Return [true] if the batcher was started for this node. *)
 val active : unit -> bool

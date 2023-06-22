@@ -45,13 +45,6 @@ let get_proto_plugin_of_level node_ctxt level =
   let*? plugin = Protocol_plugins.proto_plugin_for_protocol proto.protocol in
   return plugin
 
-let get_last_proto_plugin node_ctxt =
-  let open Lwt_result_syntax in
-  let* head = Node_context.last_processed_head_opt node_ctxt in
-  match head with
-  | None -> failwith "No processed head, could not determine last protocol"
-  | Some head -> get_proto_plugin_of_level node_ctxt head.header.level
-
 module Global_directory = Make_directory (struct
   include Rollup_node_services.Global
 
@@ -126,17 +119,13 @@ let () =
 
 let () =
   Local_directory.register0 Rollup_node_services.Local.injection
-  @@ fun node_ctxt () messages ->
-  let open Lwt_result_syntax in
-  let* (module Plugin) = get_last_proto_plugin node_ctxt in
-  Plugin.Batcher.register_messages messages
+  @@ fun _node_ctxt () messages -> Batcher.register_messages messages
 
 let () =
   Local_directory.register0 Rollup_node_services.Local.batcher_queue
-  @@ fun node_ctxt () () ->
+  @@ fun _node_ctxt () () ->
   let open Lwt_result_syntax in
-  let* (module Plugin) = get_last_proto_plugin node_ctxt in
-  let*? queue = Plugin.Batcher.get_queue () in
+  let*? queue = Batcher.get_queue () in
   return queue
 
 (** [commitment_level_of_inbox_level node_ctxt inbox_level] returns the level
@@ -175,8 +164,7 @@ let () =
   Local_directory.register1 Rollup_node_services.Local.batcher_message
   @@ fun node_ctxt hash () () ->
   let open Lwt_result_syntax in
-  let* (module Plugin) = get_last_proto_plugin node_ctxt in
-  let*? batch_status = Plugin.Batcher.message_status hash in
+  let*? batch_status = Batcher.message_status hash in
   let* status =
     match batch_status with
     | None -> return (None, Rollup_node_services.Unknown)

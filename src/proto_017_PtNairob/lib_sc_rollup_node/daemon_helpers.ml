@@ -55,6 +55,29 @@ let check_pvm_initial_state_hash {Node_context.cctxt; rollup_address; kind; _} =
          expected_state_hash = l1_reference_initial_state_hash;
        })
 
+(** Returns [Some c] if [their_commitment] is refutable where [c] is our
+    commitment for the same inbox level. *)
+let is_refutable_commitment node_ctxt
+    (their_commitment : Octez_smart_rollup.Commitment.t) their_commitment_hash =
+  let open Lwt_result_syntax in
+  let* l2_block =
+    Node_context.get_l2_block_by_level node_ctxt their_commitment.inbox_level
+  in
+  let* our_commitment_and_hash =
+    Option.filter_map_es
+      (fun hash ->
+        let+ commitment = Node_context.find_commitment node_ctxt hash in
+        Option.map (fun c -> (c, hash)) commitment)
+      l2_block.header.commitment_hash
+  in
+  match our_commitment_and_hash with
+  | Some (our_commitment, our_commitment_hash)
+    when Octez_smart_rollup.Commitment.Hash.(
+           their_commitment_hash <> our_commitment_hash
+           && their_commitment.predecessor = our_commitment.predecessor) ->
+      return our_commitment_and_hash
+  | _ -> return_none
+
 (** Publish a commitment when an accuser node sees a refutable commitment. *)
 let accuser_publish_commitment_when_refutable node_ctxt ~other rollup
     their_commitment their_commitment_hash =

@@ -45,6 +45,7 @@ type state = {
   messages : Message_queue.t;
   batched : Batched_messages.t;
   mutable simulation_ctxt : Simulation.t option;
+  mutable plugin : (module Protocol_plugin_sig.S);
 }
 
 let message_size s =
@@ -67,10 +68,11 @@ let inject_batch state (l2_messages : L2_message.t list) =
 
 let inject_batches state = List.iter_es (inject_batch state)
 
-let max_batch_size {conf; _} =
+let max_batch_size {conf; plugin; _} =
+  let module Plugin = (val plugin) in
   Option.value
     conf.max_batch_size
-    ~default:Batcher_constants.protocol_max_batch_size
+    ~default:Plugin.Batcher_constants.protocol_max_batch_size
 
 let get_batches state ~only_full =
   let ( current_rev_batch,
@@ -144,25 +146,25 @@ let produce_batches state ~only_full =
         to_remove ;
       return_unit
 
-let simulate node_ctxt simulation_ctxt (messages : L2_message.t list) =
+let simulate state simulation_ctxt (messages : L2_message.t list) =
   let open Lwt_result_syntax in
-  let ext_messages =
-    List.map
-      (fun m ->
-        (* Serialized external messages have the tag [01]. *)
-        "\001" ^ L2_message.content m)
+  let module Plugin = (val state.plugin) in
+  let*? ext_messages =
+    List.map_e
+      (fun m -> Plugin.Inbox.serialize_external_message (L2_message.content m))
       messages
   in
   let+ simulation_ctxt, _ticks =
-    Simulation.simulate_messages node_ctxt simulation_ctxt ext_messages
+    Simulation.simulate_messages state.node_ctxt simulation_ctxt ext_messages
   in
   simulation_ctxt
 
 let on_register state (messages : string list) =
   let open Lwt_result_syntax in
+  let module Plugin = (val state.plugin) in
   let max_size_msg =
     min
-      (Batcher_constants.message_size_limit
+      (Plugin.Batcher_constants.message_size_limit
      + 4 (* We add 4 because [message_size] adds 4. *))
       (max_batch_size state)
   in
@@ -180,9 +182,7 @@ let on_register state (messages : string list) =
       match state.simulation_ctxt with
       | None -> failwith "Simulation context of batcher not initialized"
       | Some simulation_ctxt ->
-          let+ simulation_ctxt =
-            simulate state.node_ctxt simulation_ctxt messages
-          in
+          let+ simulation_ctxt = simulate state simulation_ctxt messages in
           state.simulation_ctxt <- Some simulation_ctxt
   in
   let*! () = Batcher_events.(emit queue) (List.length messages) in
@@ -212,7 +212,7 @@ let on_new_head state head =
       (* Re-simulate one by one *)
       Message_queue.fold_es
         (fun msg_hash msg (simulation_ctxt, failing) ->
-          let*! result = simulate state.node_ctxt simulation_ctxt [msg] in
+          let*! result = simulate state simulation_ctxt [msg] in
           match result with
           | Ok simulation_ctxt -> return (simulation_ctxt, failing)
           | Error _ -> return (simulation_ctxt, msg_hash :: failing))
@@ -223,7 +223,7 @@ let on_new_head state head =
   (* Forget failing messages *)
   List.iter (Message_queue.remove state.messages) failing
 
-let init_batcher_state node_ctxt ~signer (conf : Configuration.batcher) =
+let init_batcher_state plugin node_ctxt ~signer (conf : Configuration.batcher) =
   {
     node_ctxt;
     signer;
@@ -231,6 +231,7 @@ let init_batcher_state node_ctxt ~signer (conf : Configuration.batcher) =
     messages = Message_queue.create 100_000 (* ~ 400MB *);
     batched = Batched_messages.create 100_000 (* ~ 400MB *);
     simulation_ctxt = None;
+    plugin;
   }
 
 module Types = struct
@@ -238,6 +239,7 @@ module Types = struct
 
   type parameters = {
     node_ctxt : Node_context.ro;
+    plugin : (module Protocol_plugin_sig.S);
     signer : Signature.public_key_hash;
     conf : Configuration.batcher;
   }
@@ -276,9 +278,9 @@ module Handlers = struct
 
   type launch_error = error trace
 
-  let on_launch _w () Types.{node_ctxt; signer; conf} =
+  let on_launch _w () Types.{node_ctxt; plugin; signer; conf} =
     let open Lwt_result_syntax in
-    let state = init_batcher_state node_ctxt ~signer conf in
+    let state = init_batcher_state plugin node_ctxt ~signer conf in
     return state
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
@@ -309,24 +311,25 @@ let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
-let check_batcher_config Configuration.{max_batch_size; _} =
+let check_batcher_config (module Plugin : Protocol_plugin_sig.S)
+    Configuration.{max_batch_size; _} =
   match max_batch_size with
-  | Some m when m > Batcher_constants.protocol_max_batch_size ->
+  | Some m when m > Plugin.Batcher_constants.protocol_max_batch_size ->
       error_with
         "batcher.max_batch_size must be smaller than %d"
-        Batcher_constants.protocol_max_batch_size
+        Plugin.Batcher_constants.protocol_max_batch_size
   | _ -> Ok ()
 
-let start conf ~signer node_ctxt =
+let start plugin conf ~signer node_ctxt =
   let open Lwt_result_syntax in
-  let*? () = check_batcher_config conf in
+  let*? () = check_batcher_config plugin conf in
   let node_ctxt = Node_context.readonly node_ctxt in
   let+ worker =
-    Worker.launch table () {node_ctxt; signer; conf} (module Handlers)
+    Worker.launch table () {node_ctxt; plugin; signer; conf} (module Handlers)
   in
   Lwt.wakeup worker_waker worker
 
-let init conf ~signer node_ctxt =
+let init plugin conf ~signer node_ctxt =
   let open Lwt_result_syntax in
   match Lwt.state worker_promise with
   | Lwt.Return _ ->
@@ -334,17 +337,18 @@ let init conf ~signer node_ctxt =
       return_unit
   | Lwt.Fail exn ->
       (* Worker crashed, not recoverable. *)
-      fail [Sc_rollup_node_errors.No_batcher; Exn exn]
+      fail [Rollup_node_errors.No_batcher; Exn exn]
   | Lwt.Sleep ->
       (* Never started, start it. *)
-      start conf ~signer node_ctxt
+      start plugin conf ~signer node_ctxt
 
 (* This is a batcher worker for a single scoru *)
 let worker =
   lazy
     (match Lwt.state worker_promise with
-    | Lwt.Return worker -> ok worker
-    | Lwt.Fail _ | Lwt.Sleep -> error Sc_rollup_node_errors.No_batcher)
+    | Lwt.Return worker -> Ok worker
+    | Lwt.Fail _ | Lwt.Sleep ->
+        Error (TzTrace.make Rollup_node_errors.No_batcher))
 
 let active () =
   match Lwt.state worker_promise with

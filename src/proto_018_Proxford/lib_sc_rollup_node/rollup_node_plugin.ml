@@ -33,7 +33,6 @@ module Plugin : Protocol_plugin_sig.S = struct
   module Publisher = Publisher
   module Refutation_coordinator = Refutation_coordinator
   module Batcher_constants = Batcher_constants
-  module Batcher = Batcher
   module Layer1_helpers = Layer1_helpers
   module L1_processing = Daemon_helpers
   module Pvm = Pvm_plugin

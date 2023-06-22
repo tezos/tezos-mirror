@@ -4325,7 +4325,7 @@ let octez_smart_rollup_node_lib =
     ~synopsis:"Octez: library for Smart Rollup node"
     ~deps:
       [
-        octez_base |> open_ ~m:"TzPervasives";
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_base_unix;
         octez_stdlib_unix |> open_;
         octez_crypto |> open_;
@@ -4341,6 +4341,7 @@ let octez_smart_rollup_node_lib =
         octez_version_value |> open_;
         octez_layer2_store |> open_;
         octez_crawler |> open_;
+        octez_workers |> open_;
         octez_smart_rollup_lib |> open_;
       ]
 
