@@ -911,12 +911,13 @@ let rec bake_while_with_metadata ?(baking_mode = Application) ?policy
   else return b
 
 let bake_while ?baking_mode ?policy ?liquidity_baking_toggle_vote
-    ?adaptive_inflation_vote predicate b =
+    ?adaptive_inflation_vote ?invariant predicate b =
   bake_while_with_metadata
     ?baking_mode
     ?policy
     ?liquidity_baking_toggle_vote
     ?adaptive_inflation_vote
+    ?invariant
     (fun block _metadata -> predicate block)
     b
 
