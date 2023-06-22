@@ -136,14 +136,21 @@ let test_launch threshold expected_vote_duration () =
      explicitely set a positive staking_over_baking_limit to allow
      them. Setting this limit does not immediately take effect but can
      be done before the activation. For these reasons, we set it at
-     the beginning. *)
+     the beginning.
+
+     The baking_over_staking_edge indicates the portion of the rewards
+     sent to the delegate's liquid balance. It's expressed in
+     billionth, with 0 meaning that everything is frozen and one
+     billion meaning that everything is liquid. We send all rewards to
+     the liquid part to ease reasoning about the total frozen
+     stake. *)
   let* block =
     let* operation =
       set_delegate_parameters
         (B block)
         delegate
         ~staking_over_baking_limit:1
-        ~baking_over_staking_edge:0
+        ~baking_over_staking_edge:1_000_000_000
     in
     Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
   in
