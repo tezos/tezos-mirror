@@ -167,6 +167,21 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     in
     return (public_key_hash_of_v0 metadata.protocol_data.baker)
 
+  let baking_right cctxt level round =
+    let* baking_rights =
+      Plugin.RPC.Baking_rights.get
+        ?levels:None
+        ~max_round:round
+        ~all:true
+        cctxt
+        (cctxt#chain, `Level (Int32.pred level))
+    in
+    match List.last_opt baking_rights with
+    | None -> fail_with_exn Not_found
+    | Some {delegate; round = r; _} ->
+        assert (round = r) ;
+        return (public_key_hash_of_v0 delegate)
+
   let raw_block_round shell_header =
     let wrap = Environment.wrap_tzresult in
     let open Result_syntax in

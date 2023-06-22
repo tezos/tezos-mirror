@@ -60,6 +60,8 @@ let block_machine = Protocol_hash.Table.create 10
 
 let endorsement_machine = Protocol_hash.Table.create 10
 
+let validated_block_machine = Protocol_hash.Table.create 10
+
 let live_block_machine = Protocol_hash.Table.create 10
 
 let maybe_add_rights (module A : Archiver.S) level rights =
@@ -81,20 +83,23 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
 
   let () = Protocol_hash.Table.add rights_machine Services.hash rights_of
 
-  let block_data cctx (delegate, timestamp, round, hash, predecessor)
+  let block_info_data (delegate, timestamp, round, hash, predecessor)
       reception_times =
+    Data.Block.
+      {
+        delegate;
+        timestamp;
+        round = Int32.of_int round;
+        hash;
+        predecessor;
+        nonce = None;
+        reception_times;
+      }
+
+  let block_data cctx ((_, _, _, hash, _) as info) reception_times =
     let* operations = Services.consensus_ops_info_of_block cctx hash in
     return
-      ( Data.Block.
-          {
-            delegate;
-            timestamp;
-            round = Int32.of_int round;
-            hash;
-            predecessor;
-            nonce = None;
-            reception_times;
-          },
+      ( block_info_data info reception_times,
         split_endorsements_preendorsements operations )
 
   let block_of ctxt level =
@@ -104,7 +109,25 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
 
   let () = Protocol_hash.Table.add block_machine Services.hash block_of
 
-  let get_block ctxt hash header reception_times =
+  let get_validated_block ctxt level hash header reception_times =
+    let cctx = Services.wrap_full ctxt in
+    let timestamp = header.Block_header.shell.Block_header.timestamp in
+    let*? round = Services.block_round header in
+    let* delegate = Services.baking_right cctx level round in
+    let predecessor = Some header.Block_header.shell.Block_header.predecessor in
+    return
+      ( block_info_data
+          (delegate, timestamp, round, hash, predecessor)
+          reception_times,
+        ([], []) )
+
+  let () =
+    Protocol_hash.Table.add
+      validated_block_machine
+      Services.hash
+      get_validated_block
+
+  let get_applied_block ctxt hash header reception_times =
     let cctx = Services.wrap_full ctxt in
     let timestamp = header.Block_header.shell.Block_header.timestamp in
     let*? round = Services.block_round header in
@@ -119,7 +142,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     Protocol_hash.Table.add
       live_block_machine
       Services.hash
-      (rights_of, get_block)
+      (rights_of, get_applied_block)
 
   let rec pack_by_slot i e = function
     | ((i', l) as x) :: t ->
@@ -336,13 +359,17 @@ module Loops (Archiver : Archiver.S) = struct
                                   current_protocol
                               in
                               Lwt.return ((fun _ _ _ _ _ -> return_unit), None)
-                          | Some (rights_of, get_block) ->
+                          | Some (rights_of, get_applied_block) ->
                               let recorder cctx level hash header reception_time
                                   =
                                 let* (( _block_info,
                                         (endorsements, preendorsements) ) as
                                      block_data) =
-                                  get_block cctx hash header reception_time
+                                  get_applied_block
+                                    cctx
+                                    hash
+                                    header
+                                    reception_time
                                 in
                                 let* () =
                                   if List.is_empty endorsements then return_unit
@@ -446,7 +473,7 @@ module Loops (Archiver : Archiver.S) = struct
                         then
                           let recorder =
                             Protocol_hash.Table.find
-                              live_block_machine
+                              validated_block_machine
                               next_protocol
                           in
                           match recorder with
@@ -458,13 +485,16 @@ module Loops (Archiver : Archiver.S) = struct
                                   current_protocol
                               in
                               Lwt.return ((fun _ _ _ _ _ -> return_unit), None)
-                          | Some (_rights_of, get_block) ->
+                          | Some get_validated_block ->
                               let recorder cctx level hash header reception_time
                                   =
-                                let* (( _block_info,
-                                        (_endorsements, _preendorsements) ) as
-                                     block_data) =
-                                  get_block cctx hash header reception_time
+                                let* block_data =
+                                  get_validated_block
+                                    cctx
+                                    level
+                                    hash
+                                    header
+                                    reception_time
                                 in
                                 let () = Archiver.add_block ~level block_data in
                                 return_unit

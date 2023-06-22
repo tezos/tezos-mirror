@@ -151,6 +151,21 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     in
     return (public_key_hash_of_v0 metadata.protocol_data.baker)
 
+  let baking_right cctxt level priority =
+    let* baking_rights =
+      Plugin.RPC.Baking_rights.get
+        ?levels:None
+        ~max_priority:priority
+        ~all:true
+        cctxt
+        (cctxt#chain, `Level (Int32.pred level))
+    in
+    match List.last_opt baking_rights with
+    | None -> fail_with_exn Not_found
+    | Some {delegate; priority = p; _} ->
+        assert (Compare.Int.equal priority p) ;
+        return (public_key_hash_of_v0 delegate)
+
   let block_round header =
     match
       Data_encoding.Binary.of_bytes
