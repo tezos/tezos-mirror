@@ -63,7 +63,9 @@ module Types = struct
     status : header_status;
   }
 
-  type profile = Attestor of Tezos_crypto.Signature.public_key_hash
+  type profile =
+    | Attestor of Tezos_crypto.Signature.public_key_hash
+    | Producer of {slot_index : int}
 
   type with_proof = {with_proof : bool}
 
@@ -149,8 +151,12 @@ module Types = struct
             (obj1 (req "commitment" Cryptobox.Commitment.encoding))
             header_status_encoding))
 
-  let equal_profile (Attestor p1) (Attestor p2) =
-    Tezos_crypto.Signature.Public_key_hash.( = ) p1 p2
+  let equal_profile prof1 prof2 =
+    match (prof1, prof2) with
+    | Attestor p1, Attestor p2 ->
+        Tezos_crypto.Signature.Public_key_hash.equal p1 p2
+    | Producer {slot_index = s1}, Producer {slot_index = s2} -> Int.equal s1 s2
+    | Attestor _, _ | Producer _, _ -> false
 
   let profile_encoding =
     let open Data_encoding in
@@ -164,8 +170,15 @@ module Types = struct
              (req
                 "public_key_hash"
                 Tezos_crypto.Signature.Public_key_hash.encoding))
-          (function Attestor attest -> Some ((), attest))
+          (function Attestor attest -> Some ((), attest) | _ -> None)
           (function (), attest -> Attestor attest);
+        case
+          ~title:"Slot producer"
+          (Tag 1)
+          (obj2 (req "kind" (constant "producer")) (req "slot_index" int31))
+          (function
+            | Producer {slot_index} -> Some ((), slot_index) | _ -> None)
+          (function (), slot_index -> Producer {slot_index});
       ]
 
   let with_proof_encoding =

@@ -640,6 +640,11 @@ module Legacy = struct
             |> Gossipsub.Worker.(app_input gs_worker))
           Utils.Infix.(0 -- (number_of_slots - 1)) ;
         return_unit
+    | Producer {slot_index = _} ->
+        (* TODO:
+           - topics = track committee
+        *)
+        return_unit
 
   (** Filter the given list of indices according to the values of the given slot
       level and index. *)
