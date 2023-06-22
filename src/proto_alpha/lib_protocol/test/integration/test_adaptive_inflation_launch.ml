@@ -135,6 +135,12 @@ let test_launch threshold expected_vote_duration () =
   let* block, delegate = Context.init_with_constants1 constants in
   let delegate_pkh = Context.Contract.pkh delegate in
   let* () = assert_is_not_yet_set_to_launch ~loc:__LOC__ block in
+  let* () =
+    assert_total_frozen_stake
+      ~loc:__LOC__
+      block
+      (Protocol.Alpha_context.Tez.of_mutez_exn 200_000_000_000L)
+  in
 
   (* To test that adaptive inflation is active, we test that
      costaking, a feature only available after the activation, is
