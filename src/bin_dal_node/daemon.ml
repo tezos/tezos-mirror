@@ -188,6 +188,7 @@ module Handler = struct
               (Profile_manager.add_profile
                  proto_parameters
                  (Node_context.get_store ctxt)
+                 (Node_context.get_profile_ctxt ctxt)
                  (Node_context.get_gs_worker ctxt))
               config.Configuration_file.profile
           in
@@ -271,6 +272,15 @@ module Handler = struct
                 ~number_of_slots:proto_parameters.number_of_slots
                 attested_slots
                 (Node_context.get_store ctxt)
+            in
+            let* committee =
+              Node_context.fetch_committee ctxt ~level:block_level
+            in
+            let* () =
+              Profile_manager.on_new_head
+                (Node_context.get_profile_ctxt ctxt)
+                (Node_context.get_gs_worker ctxt)
+                committee
             in
             let*! () =
               Event.(emit layer1_node_new_head (block_hash, block_level))

@@ -27,12 +27,58 @@
    Node profiles should be stored into the memory as well
    so that we can cache them *)
 
-let add_profile proto_parameters node_store gs_worker profile =
-  let open Lwt_result_syntax in
-  let*! () =
-    Store.Legacy.add_profile proto_parameters node_store gs_worker profile
+module Slot_set = Set.Make (Int)
+module Pkh_set = Signature.Public_key_hash.Set
+
+(** A profile context stores profile-specific data used by the daemon.  *)
+type t = {
+  mutable producers : Slot_set.t;
+  mutable seen_committee_members : Pkh_set.t;
+}
+
+let empty () =
+  {producers = Slot_set.empty; seen_committee_members = Pkh_set.empty}
+
+let init_attestor number_of_slots gs_worker pkh =
+  List.iter
+    (fun slot_index ->
+      Join Gossipsub.{slot_index; pkh} |> Gossipsub.Worker.(app_input gs_worker))
+    Utils.Infix.(0 -- (number_of_slots - 1))
+
+let init_producer ctxt slot_index =
+  ctxt.producers <- Slot_set.add slot_index ctxt.producers
+
+let add_profile proto_parameters node_store ctxt gs_worker profile =
+  let Dal_plugin.{number_of_slots; _} = proto_parameters in
+  (match profile with
+  | Services.Types.Attestor pkh -> init_attestor number_of_slots gs_worker pkh
+  | Services.Types.Producer {slot_index} -> init_producer ctxt slot_index) ;
+  Store.Legacy.add_profile node_store profile |> Lwt_result.ok
+
+(* TODO https://gitlab.com/tezos/tezos/-/issues/5934
+   We need a mechanism to ease the tracking of newly added/removed topics. *)
+let resolve_pending_for_producer gs_worker committee ctxt =
+  let seen_committee_members = ctxt.seen_committee_members in
+  let seen_committee_members =
+    Slot_set.fold
+      (fun slot_index seen_committee_members ->
+        Signature.Public_key_hash.Map.fold
+          (fun pkh _shards seen_committee_members ->
+            if not (Pkh_set.mem pkh seen_committee_members) then (
+              (Join Gossipsub.{slot_index; pkh}
+              |> Gossipsub.Worker.(app_input gs_worker)) ;
+              Pkh_set.add pkh seen_committee_members)
+            else seen_committee_members)
+          committee
+          seen_committee_members)
+      ctxt.producers
+      seen_committee_members
   in
-  return_unit
+  ctxt.seen_committee_members <- seen_committee_members
+
+let on_new_head ctxt gs_worker committee =
+  resolve_pending_for_producer gs_worker committee ctxt ;
+  Lwt_result_syntax.return_unit
 
 let get_profiles node_store = Store.Legacy.get_profiles node_store
 

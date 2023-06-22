@@ -138,7 +138,11 @@ module Profile_handlers = struct
     let gs_worker = Node_context.get_gs_worker ctxt in
     call_handler2 ctxt (fun store {proto_parameters; _} ->
         List.iter_es
-          (Profile_manager.add_profile proto_parameters store gs_worker)
+          (Profile_manager.add_profile
+             proto_parameters
+             store
+             (Node_context.get_profile_ctxt ctxt)
+             gs_worker)
           profiles)
 
   let get_profiles ctxt () () =

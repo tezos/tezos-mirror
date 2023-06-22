@@ -622,29 +622,13 @@ module Legacy = struct
     let* profiles = list node_store.store path in
     return @@ List.map_e (fun (p, _) -> decode_profile p) profiles
 
-  let add_profile Dal_plugin.{number_of_slots; _} node_store gs_worker profile =
-    let open Lwt_syntax in
+  let add_profile node_store profile =
     let path = Path.Profile.profile profile in
-    let* () =
-      set
-        ~msg:(Printf.sprintf "New profile added: %s" (Path.to_string path))
-        node_store.store
-        path
-        ""
-    in
-    match profile with
-    | Attestor pkh ->
-        List.iter
-          (fun slot_index ->
-            Join Gossipsub.{slot_index; pkh}
-            |> Gossipsub.Worker.(app_input gs_worker))
-          Utils.Infix.(0 -- (number_of_slots - 1)) ;
-        return_unit
-    | Producer {slot_index = _} ->
-        (* TODO:
-           - topics = track committee
-        *)
-        return_unit
+    set
+      ~msg:(Printf.sprintf "New profile added: %s" (Path.to_string path))
+      node_store.store
+      path
+      ""
 
   (** Filter the given list of indices according to the values of the given slot
       level and index. *)
