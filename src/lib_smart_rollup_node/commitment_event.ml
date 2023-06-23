@@ -23,14 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
 open Publisher_worker_types
 
 module Simple = struct
   include Internal_event.Simple
 
-  let section = [Protocol.name; "sc_rollup_node"; "commitment"]
+  let section = ["sc_rollup_node"; "commitment"]
 
   let starting =
     declare_0
@@ -58,11 +56,11 @@ module Simple = struct
          {predecessor}, inbox_level: {inbox_level}, compressed_state: \
          {compressed_state}, number_of_ticks: {number_of_ticks}"
       ~level:Notice
-      ("lcc_level", Raw_level.encoding)
-      ("predecessor", Sc_rollup.Commitment.Hash.encoding)
-      ("inbox_level", Raw_level.encoding)
-      ("compressed_state", Sc_rollup.State_hash.encoding)
-      ("number_of_ticks", Sc_rollup.Number_of_ticks.encoding)
+      ("lcc_level", Data_encoding.int32)
+      ("predecessor", Commitment.Hash.encoding)
+      ("inbox_level", Data_encoding.int32)
+      ("compressed_state", State_hash.encoding)
+      ("number_of_ticks", Data_encoding.int64)
 
   let last_cemented_commitment_updated =
     declare_2
@@ -72,7 +70,7 @@ module Simple = struct
         "Last cemented commitment was updated to hash {hash} at inbox level \
          {level}"
       ~level:Debug
-      ("hash", Octez_smart_rollup.Commitment.Hash.encoding)
+      ("hash", Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
 
   let last_published_commitment_updated =
@@ -83,7 +81,7 @@ module Simple = struct
         "Last published commitment was updated to hash {hash} at inbox level \
          {level}"
       ~level:Debug
-      ("hash", Octez_smart_rollup.Commitment.Hash.encoding)
+      ("hash", Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
 
   let compute_commitment =
@@ -100,7 +98,7 @@ module Simple = struct
       ~name:"sc_rollup_node_publish_commitment"
       ~msg:"Publishing commitment {hash} for inbox level {level}"
       ~level:Notice
-      ("hash", Octez_smart_rollup.Commitment.Hash.encoding)
+      ("hash", Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
 
   let commitment_parent_is_not_lcc =
@@ -114,9 +112,9 @@ module Simple = struct
          {lcc_hash}. This is a critical error, and the rollup node will be \
          terminated."
       ~level:Fatal
-      ("level", Raw_level.encoding)
-      ("predecessor_hash", Sc_rollup.Commitment.Hash.encoding)
-      ("lcc_hash", Sc_rollup.Commitment.Hash.encoding)
+      ("level", Data_encoding.int32)
+      ("predecessor_hash", Commitment.Hash.encoding)
+      ("lcc_hash", Commitment.Hash.encoding)
 
   let commitment_stored =
     declare_5
@@ -127,11 +125,11 @@ module Simple = struct
          inbox_level: {inbox_level}, compressed_state: {compressed_state}, \
          number_of_ticks: {number_of_ticks}"
       ~level:Notice
-      ("commitment_hash", Sc_rollup.Commitment.Hash.encoding)
-      ("predecessor", Sc_rollup.Commitment.Hash.encoding)
-      ("inbox_level", Raw_level.encoding)
-      ("compressed_state", Sc_rollup.State_hash.encoding)
-      ("number_of_ticks", Sc_rollup.Number_of_ticks.encoding)
+      ("commitment_hash", Commitment.Hash.encoding)
+      ("predecessor", Commitment.Hash.encoding)
+      ("inbox_level", Data_encoding.int32)
+      ("compressed_state", State_hash.encoding)
+      ("number_of_ticks", Data_encoding.int64)
 
   module Publisher = struct
     let section = section @ ["publisher"]
@@ -166,12 +164,10 @@ let starting = Simple.(emit starting)
 
 let stopping = Simple.(emit stopping)
 
-open Sc_rollup.Commitment
-
 let section = Simple.section
 
 let emit_commitment_event f commitment_hash
-    {predecessor; inbox_level; compressed_state; number_of_ticks} =
+    Commitment.{predecessor; inbox_level; compressed_state; number_of_ticks} =
   Simple.(
     emit
       f
@@ -182,7 +178,7 @@ let emit_commitment_event f commitment_hash
         number_of_ticks ))
 
 let commitment_will_not_be_published lcc_level
-    {predecessor; inbox_level; compressed_state; number_of_ticks} =
+    Commitment.{predecessor; inbox_level; compressed_state; number_of_ticks} =
   Simple.(
     emit
       commitment_will_not_be_published
