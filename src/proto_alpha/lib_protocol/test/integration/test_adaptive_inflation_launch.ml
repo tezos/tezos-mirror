@@ -190,12 +190,21 @@ let test_launch threshold expected_vote_duration () =
     Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
   in
   let* block =
-    let* operation = Op.revelation (B block) wannabe_costaker_account.pk in
+    let* operation =
+      Op.revelation
+        ~fee:Protocol.Alpha_context.Tez.zero
+        (B block)
+        wannabe_costaker_account.pk
+    in
     Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
   in
   let* block =
     let* operation =
-      Op.delegation (B block) wannabe_costaker (Some delegate_pkh)
+      Op.delegation
+        ~fee:Protocol.Alpha_context.Tez.zero
+        (B block)
+        wannabe_costaker
+        (Some delegate_pkh)
     in
     Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
   in
