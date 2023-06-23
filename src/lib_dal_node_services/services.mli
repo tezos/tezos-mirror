@@ -199,9 +199,9 @@ val get_published_level_headers :
   service
 
 (** Update the list of profiles tracked by the DAL node *)
-val patch_profile :
+val patch_profiles :
   < meth : [`PATCH]
-  ; input : Types.profile
+  ; input : Types.profile list
   ; output : unit
   ; prefix : unit
   ; params : unit

@@ -814,6 +814,10 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
     ~current_proposal
     delegates
   >>=? fun initial_state ->
+  Option.iter_es
+    (fun dal_ctxt -> Node_rpc.register_dal_profiles dal_ctxt delegates)
+    initial_state.global_state.dal_node_rpc_ctxt
+  >>=? fun () ->
   let cloned_block_stream = Lwt_stream.clone heads_stream in
   Baking_nonces.start_revelation_worker
     cctxt

@@ -1770,37 +1770,39 @@ let rollup_node_interprets_dal_pages ~protocol client sc_rollup sc_rollup_node =
   in
   check_saved_value_in_pvm ~name:"value" ~expected_value sc_rollup_client
 
+let check_profiles ~__LOC__ dal_node ~expected =
+  let* profiles = RPC.call dal_node (Rollup.Dal.RPC.get_profiles ()) in
+  return
+    Check.(
+      (profiles = expected)
+        Rollup.Dal.Check.profiles_typ
+        ~error_msg:
+          (__LOC__ ^ " : Unexpected profiles (Actual: %L <> Expected: %R)"))
+
 let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
     _client dal_node =
   let open Rollup.Dal.RPC in
-  let check_profiles ~__LOC__ ~expected =
-    let* profiles = RPC.call dal_node (get_profiles ()) in
-    return
-      Check.(
-        (profiles = expected)
-          Rollup.Dal.Check.profiles_typ
-          ~error_msg:
-            (__LOC__ ^ " : Unexpected profiles (Actual: %L <> Expected: %R)"))
-  in
   let check_bad_attestor_pkh_encoding profile =
-    let* response = RPC.call_raw dal_node @@ patch_profile profile in
+    let* response = RPC.call_raw dal_node @@ patch_profiles [profile] in
     return @@ RPC.check_string_response ~code:400 response
   in
-  let patch_profile_rpc profile = RPC.call dal_node (patch_profile profile) in
+  let patch_profile_rpc profile =
+    RPC.call dal_node (patch_profiles [profile])
+  in
   let profile1 = Attestor Constant.bootstrap1.public_key_hash in
   let profile2 = Attestor Constant.bootstrap2.public_key_hash in
   (* We start with empty profile list *)
-  let* () = check_profiles ~__LOC__ ~expected:[] in
+  let* () = check_profiles ~__LOC__ dal_node ~expected:[] in
   (* Adding [Attestor] profile with pkh that is not encoded as
      [Tezos_crypto.Signature.Public_key_hash.encoding] should fail. *)
   let* () = check_bad_attestor_pkh_encoding (Attestor "This is invalid PKH") in
   (* Test adding duplicate profiles stores profile only once *)
   let* () = patch_profile_rpc profile1 in
   let* () = patch_profile_rpc profile1 in
-  let* () = check_profiles ~__LOC__ ~expected:[profile1] in
+  let* () = check_profiles ~__LOC__ dal_node ~expected:[profile1] in
   (* Test adding multiple profiles *)
   let* () = patch_profile_rpc profile2 in
-  check_profiles ~__LOC__ ~expected:[profile1; profile2]
+  check_profiles ~__LOC__ dal_node ~expected:[profile1; profile2]
 
 (* Check that result of the DAL node's
    GET /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices
@@ -2783,7 +2785,7 @@ let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
       ~num_slots
       pkh1
   in
-  let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profile profile1) in
+  let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profiles [profile1]) in
   let* () = event_waiter in
 
   (* node2 joins topic {pkh} -> it sends subscribe and graft messages to
@@ -2802,7 +2804,7 @@ let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
       ~num_slots
       pkh1
   in
-  let* () = RPC.call dal_node2 (Rollup.Dal.RPC.patch_profile profile1) in
+  let* () = RPC.call dal_node2 (Rollup.Dal.RPC.patch_profiles [profile1]) in
   Lwt.join [event_waiter_subscribe; event_waiter_graft]
 
 (** This helper returns the list of promises that allow to wait for the
@@ -2894,7 +2896,7 @@ let test_dal_node_join_topic _protocol _parameters _cryptobox _node client
   let event_waiter =
     check_events_with_topic ~event_with_topic:Join dal_node1 ~num_slots pkh1
   in
-  let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profile profile1) in
+  let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profiles [profile1]) in
   event_waiter
 
 (** This generic test function is used to test messages exchanges between two
@@ -3192,6 +3194,24 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
   let* () = iwant_events_waiter and* () = ihave_events_waiter in
   unit
 
+let test_baker_registers_profiles protocol _parameters _cryptobox l1_node client
+    dal_node =
+  let delegates =
+    List.to_seq Constant.all_secret_keys |> Seq.take 3 |> List.of_seq
+  in
+  let profiles =
+    List.map
+      (fun key -> Rollup.Dal.RPC.Attestor key.Account.public_key_hash)
+      delegates
+  in
+  let delegates = List.map (fun key -> key.Account.alias) delegates in
+  let* _baker = Baker.init ~dal_node ~protocol l1_node client ~delegates in
+  (* [Baker.init] ensures that the baker daemon "started", but this event is
+     emitted before the baker builds its initial stated and registers the
+     profiles. That's why we wait a bit more, namely for a block to be baked. *)
+  let* _lvl = Node.wait_for_level l1_node 2 in
+  check_profiles ~__LOC__ dal_node ~expected:profiles
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -3302,7 +3322,6 @@ let register ~protocols =
     "GS invalid messages exchange"
     test_dal_node_gs_invalid_messages_exchange
     protocols ;
-
   (* Will be re-enabled once the debug in
      https://gitlab.com/tezos/tezos/-/merge_requests/9032 allows explaning the
      issue and how to fix
@@ -3312,6 +3331,11 @@ let register ~protocols =
        test_gs_prune_ihave_and_iwant
        protocols ;
   *)
+  scenario_with_layer1_and_dal_nodes
+    "baker registers profiles with dal node"
+    ~activation_timestamp:Now
+    test_baker_registers_profiles
+    protocols ;
 
   (* Tests with all nodes *)
   scenario_with_all_nodes

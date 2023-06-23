@@ -332,9 +332,9 @@ let get_published_level_headers :
     ~output:(Data_encoding.list Types.slot_header_encoding)
     Tezos_rpc.Path.(open_root / "levels" /: Tezos_rpc.Arg.int32 / "headers")
 
-let patch_profile :
+let patch_profiles :
     < meth : [`PATCH]
-    ; input : Types.profile
+    ; input : Types.profile list
     ; output : unit
     ; prefix : unit
     ; params : unit
@@ -343,7 +343,7 @@ let patch_profile :
   Tezos_rpc.Service.patch_service
     ~description:"Update the list of profiles tracked by the DAL node"
     ~query:Tezos_rpc.Query.empty
-    ~input:Types.profile_encoding
+    ~input:(Data_encoding.list Types.profile_encoding)
     ~output:Data_encoding.unit
     Tezos_rpc.Path.(open_root / "profiles")
 

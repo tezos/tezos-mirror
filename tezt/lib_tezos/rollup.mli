@@ -134,7 +134,7 @@ module Dal : sig
 
     (**  Call RPC "PATCH /profiles" to update the list of profiles tracked by
          the DAL node. *)
-    val patch_profile : profile -> (Dal_node.t, unit) RPC_core.t
+    val patch_profiles : profile list -> (Dal_node.t, unit) RPC_core.t
 
     (**  Call RPC "GET /profiles" to retrieve the list of profiles tracked by
          the DAL node. *)

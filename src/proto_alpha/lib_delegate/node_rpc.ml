@@ -296,3 +296,18 @@ let get_attestable_slots dal_node_rpc_ctxt pkh ~level =
     (((), pkh), level)
     ()
     ()
+
+let register_dal_profiles dal_node_rpc_ctxt delegates =
+  let profiles =
+    List.map
+      (fun consensus_key ->
+        Tezos_dal_node_services.Services.Types.Attestor
+          consensus_key.public_key_hash)
+      delegates
+  in
+  Tezos_rpc.Context.make_call
+    Tezos_dal_node_services.Services.patch_profiles
+    dal_node_rpc_ctxt
+    ()
+    ()
+    profiles
