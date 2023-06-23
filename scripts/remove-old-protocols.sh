@@ -27,17 +27,17 @@ fi
 
 all_protocols=$(find src -maxdepth 1 -type d -regex 'src/proto.*' | \
                 cut -d '_' -f2- | \
-                sed -r 's/_/-/g')
+                sed 's/_/-/g')
 
 to_be_removed=$(echo "$all_protocols" | \
                 grep -wvFf script-inputs/active_protocol_versions | \
                 grep -wvFf script-inputs/active_testing_protocol_versions | \
-                sed -r 's/-/_/g')
+                sed 's/-/_/g')
 
 for proto in $to_be_removed; do
     if [ -z "$trash_bin" ]; then
-        echo rm -r src/proto_"${proto}"
-        rm -r src/proto_"${proto}"
+        echo rm -rf src/proto_"${proto}"
+        rm -rf src/proto_"${proto}"
     else
         echo mv src/proto_"${proto}" "$trash_bin"
         mv src/proto_"${proto}" "$trash_bin"
