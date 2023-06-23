@@ -1450,6 +1450,7 @@ let _octez_plonk_test_plompiler_main =
         "test_range_checks";
         "test_schnorr";
         "test_ed25519";
+        "test_edwards25519";
         "test_serialization";
         "test_weierstrass";
         "test_utils";
