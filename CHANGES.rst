@@ -242,6 +242,14 @@ Smart Rollup client
 Smart Rollup WASM Debugger
 --------------------------
 
+Data Availability Committee (DAC)
+----------------------------------
+- Released Data Availability Committee executables which include ``octez-dac-node``
+  and ``octez-dac-client`` as part of an experimental release. Users can experiment
+  with operating and using DAC in their Smart Rollup workflow to achieve higher data
+  throughput. It is not recommended to use DAC on Mainnet but instead on testnets
+  and lower environments.
+
 Miscellaneous
 -------------
 
