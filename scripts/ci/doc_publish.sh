@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 cd "${CI_PROJECT_DIR}" || exit 1
 
 make all ;
