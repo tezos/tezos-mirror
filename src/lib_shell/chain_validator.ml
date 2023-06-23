@@ -364,7 +364,14 @@ let safe_get_prevalidator_filter hash =
             Protocol_hash.pp_short
             hash
       | Some (module Proto : Registered_protocol.T) ->
-          let* () = Events.(emit prevalidator_filter_not_found) hash in
+          let* () =
+            match Proto.environment_version with
+            | V0 ->
+                (* This is normal for protocols Genesis and 000
+                   because they don't have a plugin. *)
+                Lwt.return_unit
+            | _ -> Events.(emit prevalidator_filter_not_found) hash
+          in
           return_ok
             (module Shell_plugin.No_filter (Proto) : Shell_plugin.FILTER))
 
