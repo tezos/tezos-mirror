@@ -207,6 +207,11 @@ Node
   ``"per_block_votes"`` has two properties ``"liquidity_baking_vote"`` and ``"adaptive_inflation_vote"``.
   A vote is one of ``"on"``, ``"off"``, ``"pass"``.
 
+- Added version ``1`` to RPC ``GET ../blocks/<blocks>/metadata``. It can be used
+  by calling the RPC with the parameter ``?version=1`` (default version is still
+  ``0``). Version ``1`` of this RPC and ``GET ../blocks/<block>`` allow the RPC
+  to output ``attesting rewards`` and ``lost attesting rewards`` kinds in the
+  JSON result. (MR :gl:`!9253`)
 
 Client
 ------
