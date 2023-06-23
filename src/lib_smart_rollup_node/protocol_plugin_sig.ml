@@ -131,41 +131,6 @@ module type INTERPRETER = sig
     ('a Context.t * Context.tree) tzresult Lwt.t
 end
 
-(** Protocol specific commitments publisher. NOTE: The publisher has to be
-    stopped and the new one restarted on protocol change. *)
-module type PUBLISHER = sig
-  (** [process_head node_ctxt ~predecessor head ctxt] builds a new commitment if
-      needed, by looking at the level of [head] and checking whether it is a
-      multiple of `Commitment.sc_rollup_commitment_period` levels away from
-      [node_ctxt.initial_level]. It uses the functionalities of [PVM] to compute
-      the hash to be included in the commitment. *)
-  val process_head :
-    Node_context.rw ->
-    predecessor:Block_hash.t ->
-    Layer1.header ->
-    Context.rw ->
-    Commitment.Hash.t option tzresult Lwt.t
-
-  (** [init node_ctxt] initializes the worker for publishing and cementing
-      commitments. *)
-  val init : _ Node_context.t -> unit tzresult Lwt.t
-
-  (** [publish_commitments ()] publishes the commitments that were not
-      yet published up to the finalized head and which are after the last
-      cemented commitment. *)
-  val publish_commitments : unit -> unit tzresult Lwt.t
-
-  (** [cement_commitments ()] cements the commitments that can be
-      cemented, i.e. the commitments that are after the current last cemented
-      commitment and which have [sc_rollup_challenge_period] levels on top of
-      them since they were originally published.  *)
-  val cement_commitments : unit -> unit tzresult Lwt.t
-
-  (** [shutdown ()] stops the worker for publishing and cementing
-      commitments. *)
-  val shutdown : unit -> unit Lwt.t
-end
-
 (** Protocol specific refutation coordinator. NOTE: The refutation coordinator
     has to be stopped and the new one restarted on protocol change. *)
 module type REFUTATION_COORDINATOR = sig
@@ -303,8 +268,6 @@ module type S = sig
   module Inbox : INBOX
 
   module Interpreter : INTERPRETER
-
-  module Publisher : PUBLISHER
 
   module Refutation_coordinator : REFUTATION_COORDINATOR
 

@@ -130,7 +130,12 @@ let rec process_head (daemon_components : (module Daemon_components.S))
       in
       let*! context_hash = Context.commit ctxt in
       let* commitment_hash =
-        Publisher.process_head node_ctxt ~predecessor:predecessor.hash head ctxt
+        Publisher.process_head
+          (module Rollup_node_plugin.Plugin)
+          node_ctxt
+          ~predecessor:predecessor.hash
+          head
+          ctxt
       in
       let commitment_hash =
         Option.map
@@ -440,6 +445,7 @@ module Internal_for_tests = struct
     let*! context_hash = Context.commit ctxt in
     let* commitment_hash =
       Publisher.process_head
+        (module Rollup_node_plugin.Plugin)
         node_ctxt
         ~predecessor:predecessor.Layer1.hash
         head
