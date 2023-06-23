@@ -646,24 +646,101 @@ module Auto_build = struct
       state_tbl
       []
 
-  (* Perform the benchmark of name [bench_name] *)
-  let benchmark outdir bench_name measure_options =
-    let (module Bench) = Registration.find_benchmark_exn bench_name in
-    (* override [measure_options] for intercept and TIMER_LATENCY *)
-    let measure_options =
+  (* Assumes the data files are found in [_snoop/sapling_data] *)
+  let make_sapling_benchmark_config dest ns =
+    let open Tezos_benchmarks_proto_alpha in
+    let open Interpreter_benchmarks.Default_config in
+    let sapling_txs_file = "_snoop/sapling_data" in
+    let data_files_available =
+      let check ty =
+        try Sapling_generation.load ~filename:sapling_txs_file ty <> []
+        with _ -> false
+      in
+      check Empty && check Non_empty
+    in
+    if data_files_available then (
+      let sapling = {default_config.sapling with sapling_txs_file} in
+      let config = {default_config with sapling} in
+      let json = Data_encoding.Json.construct config_encoding config in
+      Config.(save_config dest (build [(ns, json)])) ;
+      Some dest)
+    else (
+      Format.eprintf
+        "@[<v2>WARNING: Failed to load sapling data at %s@,\
+         Auto-build's sapling benchmarks assume sapling data under this \
+         directory.@,\
+         Prepare the data by dune exec tezt/snoop/main.exe@]@."
+        sapling_txs_file ;
+      None)
+
+  (* Assumes the data file is at [mich_fn] *)
+  let make_michelson_benchmark_config dest ns mich_fn =
+    let open Tezos_benchmarks_proto_alpha in
+    let open Translator_benchmarks.Config in
+    if Sys.file_exists mich_fn then (
+      let config = {default_config with michelson_terms_file = Some mich_fn} in
+      let json = Data_encoding.Json.construct config_encoding config in
+      Config.(save_config dest (build [(ns, json)])) ;
+      Some dest)
+    else (
+      Format.eprintf
+        "@[<v2>WARNING: Michelson data file %s does not exist.@,\
+         For faster benchmarks of Michelson encoding you are recommended to@,\
+         prepare this file using dune exec tezt/snoop/main.exe@]@."
+        mich_fn ;
+      None)
+
+  (* Benchmark specific config overrides *)
+  let override_measure_options ~outdir ~bench_name measure_options =
+    let open Measure in
+    let {bench_number; nsamples; config_file; _} = measure_options in
+    (* override [config_file] for sapling and michelson encoding benchmarks *)
+    let config_file =
+      Option.either_f config_file @@ fun () ->
+      let dest =
+        Filename.concat outdir
+        @@ Namespace.to_filename bench_name
+        ^ "_benchmark.config"
+      in
+      match Namespace.to_list bench_name with
+      | "." :: "sapling" :: _ -> make_sapling_benchmark_config dest bench_name
+      | "." :: "interpreter" :: n :: _
+        when String.starts_with ~prefix:"ISapling" n ->
+          make_sapling_benchmark_config dest bench_name
+      | "." :: "translator" :: ("UNPARSING_CODE" | "TYPECHECKING_CODE") :: _
+      | "." :: "script_typed_ir_size" :: "KINSTR_SIZE" :: _ ->
+          make_michelson_benchmark_config
+            dest
+            bench_name
+            "_snoop/michelson_data/code.mich"
+      | "." :: "translator" :: ("UNPARSING_DATA" | "TYPECHECKING_DATA") :: _
+      | "." :: "encoding" :: ("ENCODING_MICHELINE" | "DECODING_MICHELINE") :: _
+      | "." :: "script_typed_ir_size" :: "VALUE_SIZE" :: _ ->
+          make_michelson_benchmark_config
+            dest
+            bench_name
+            "_snoop/michelson_data/data.mich"
+      | _ -> None
+    in
+    (* override [bench_number] and [nsamples] for intercept and TIMER_LATENCY *)
+    let bench_number, nsamples =
       match Namespace.to_list bench_name with
       | ["."; "interpreter"; "N_IOpen_chest"; "intercept"] ->
           (* Timings of [IOpen_chest] are highly affected by hidden randomness
              of [puzzle].  We need multiple [bench_number] to avoid this effect.
           *)
-          {measure_options with Measure.bench_number = 100; nsamples = 100}
+          (100, 100)
       | _ -> (
           match Namespace.basename bench_name with
-          | "intercept" -> {measure_options with Measure.bench_number = 1}
-          | "TIMER_LATENCY" ->
-              {measure_options with bench_number = 1; nsamples = 10000}
-          | _ -> measure_options)
+          | "intercept" -> (1, nsamples)
+          | "TIMER_LATENCY" -> (1, 10000)
+          | _ -> (bench_number, nsamples))
     in
+    {measure_options with config_file; bench_number; nsamples}
+
+  (* Perform the benchmark of name [bench_name] *)
+  let benchmark outdir bench_name measure_options =
+    let (module Bench) = Registration.find_benchmark_exn bench_name in
     let save_file =
       Filename.concat outdir (Namespace.to_filename bench_name ^ ".workload")
     in
@@ -672,7 +749,7 @@ module Auto_build = struct
       {
         Commands.Benchmark_cmd.default_benchmark_options with
         save_file = save_file_tmp;
-        options = measure_options;
+        options = override_measure_options ~outdir ~bench_name measure_options;
       }
     in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5471
