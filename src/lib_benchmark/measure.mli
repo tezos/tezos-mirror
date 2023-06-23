@@ -36,13 +36,12 @@ val options_encoding : options Data_encoding.t
 
 val pp_options : Format.formatter -> options -> unit
 
-type 'workload timed_workload = {
+type 'workload measured_workload = {
   workload : 'workload;  (** Workload associated to the measurement *)
   measures : Maths.vector;  (** Collected measurements *)
-  allocated_words : int option;  (** Measured allocation in words *)
 }
 
-type 'workload workload_data = 'workload timed_workload list
+type 'workload workload_data = 'workload measured_workload list
 
 type 'workload measurement = {
   bench_opts : options;
@@ -54,9 +53,9 @@ type packed_measurement =
   | Measurement : ('a, 't) Benchmark.poly * 't measurement -> packed_measurement
 
 type workloads_stats = {
-  max_time : float;
-  min_time : float;
-  mean_time : float;
+  max : float;
+  min : float;
+  mean : float;
   variance : float;
 }
 

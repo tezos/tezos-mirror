@@ -34,13 +34,12 @@ type options = {
   config_file : string option;
 }
 
-type 'workload timed_workload = {
+type 'workload measured_workload = {
   workload : 'workload;
   measures : Maths.vector;
-  allocated_words : int option;
 }
 
-type 'workload workload_data = 'workload timed_workload list
+type 'workload workload_data = 'workload measured_workload list
 
 type 'workload measurement = {
   bench_opts : options;
@@ -59,9 +58,9 @@ type serialized_workload = {
 }
 
 type workloads_stats = {
-  max_time : float;
-  min_time : float;
-  mean_time : float;
+  max : float;
+  min : float;
+  mean : float;
   variance : float;
 }
 
@@ -115,20 +114,15 @@ let rfc3339_encoding =
 let vec_encoding : Maths.vector Data_encoding.t =
   Data_encoding.(conv Maths.vector_to_array Maths.vector_of_array (array float))
 
-let timed_workload_encoding workload_encoding =
+let measured_workload_encoding workload_encoding =
   let open Data_encoding in
   conv
-    (fun {workload; measures; allocated_words} ->
-      (workload, measures, allocated_words))
-    (fun (workload, measures, allocated_words) ->
-      {workload; measures; allocated_words})
-    (obj3
-       (req "workload" workload_encoding)
-       (req "measures" vec_encoding)
-       (req "allocated_words" (option int31)))
+    (fun {workload; measures} -> (workload, measures))
+    (fun (workload, measures) -> {workload; measures})
+    (obj2 (req "workload" workload_encoding) (req "measures" vec_encoding))
 
 let workload_data_encoding workload_encoding =
-  Data_encoding.list (timed_workload_encoding workload_encoding)
+  Data_encoding.list (measured_workload_encoding workload_encoding)
 
 let measurement_encoding workload_encoding =
   let open Data_encoding in
@@ -180,13 +174,13 @@ let pp_options fmtr (options : options) =
     config_file
 
 let pp_stats : Format.formatter -> workloads_stats -> unit =
- fun fmtr {max_time; min_time; mean_time; variance} ->
+ fun fmtr {max; min; mean; variance} ->
   Format.fprintf
     fmtr
-    "@[{ max_time = %f ; min_time = %f ; mean_time = %f ; sigma = %f }@]"
-    max_time
-    min_time
-    mean_time
+    "@[{ max = %f ; min = %f ; mean = %f ; sigma = %f }@]"
+    max
+    min
+    mean
     (sqrt variance)
 
 (* ------------------------------------------------------------------------- *)
@@ -329,7 +323,7 @@ let to_csv :
   Csv.export ~filename csv
 
 (* ------------------------------------------------------------------------- *)
-(* Stats on execution times *)
+(* Stats on measures *)
 
 let fmin (x : float) (y : float) = if x < y then x else y
 
@@ -346,17 +340,17 @@ let farray_min_max (arr : float array) =
 
 let collect_stats : 'a workload_data -> workloads_stats =
  fun workload_data ->
-  let time_dist_data =
+  let dist_data =
     List.rev_map
       (fun {measures; _} -> Array.of_seq (Maths.vector_to_seq measures))
       workload_data
     |> Array.concat
   in
-  let min, max = farray_min_max time_dist_data in
-  let dist = Emp.of_raw_data time_dist_data in
+  let min, max = farray_min_max dist_data in
+  let dist = Emp.of_raw_data dist_data in
   let mean = Emp.Float.empirical_mean dist in
   let var = Emp.Float.empirical_variance dist in
-  {max_time = max; min_time = min; mean_time = mean; variance = var}
+  {max; min; mean; variance = var}
 
 (* ------------------------------------------------------------------------- *)
 (* Benchmarking *)
@@ -465,7 +459,7 @@ let perform_benchmark (type c t) (options : options)
         progress () ;
         set_gc_increment () ;
         Gc.compact () ;
-        let measure_plain_benchmark workload closure measure_allocation =
+        let measure_plain_benchmark workload closure =
           let measures =
             compute_empirical_timing_distribution
               ~closure
@@ -473,17 +467,15 @@ let perform_benchmark (type c t) (options : options)
               ~buffer
               ~index
           in
-          let allocated_words =
-            Option.bind measure_allocation (fun f -> f ())
-          in
-          {workload; measures; allocated_words} :: workload_data
+          {workload; measures} :: workload_data
         in
         match benchmark_fun () with
+        | Generator.Calculated {workload; measure} ->
+            let measures = Array.init options.nsamples (fun _ -> measure ()) in
+            let measures = Maths.vector_of_array measures in
+            {workload; measures} :: workload_data
         | Generator.Plain {workload; closure} ->
-            measure_plain_benchmark workload closure None
-        | Generator.PlainWithAllocation {workload; closure; measure_allocation}
-          ->
-            measure_plain_benchmark workload closure (Some measure_allocation)
+            measure_plain_benchmark workload closure
         | Generator.With_context {workload; closure; with_context} ->
             with_context (fun context ->
                 let measures =
@@ -493,7 +485,7 @@ let perform_benchmark (type c t) (options : options)
                     ~buffer
                     ~index
                 in
-                {workload; measures; allocated_words = None} :: workload_data)
+                {workload; measures} :: workload_data)
         | Generator.With_probe {workload; probe; closure} ->
             Tezos_stdlib.Utils.do_n_times options.nsamples (fun () ->
                 closure probe) ;
@@ -503,7 +495,7 @@ let perform_benchmark (type c t) (options : options)
                 let results = probe.Generator.get aspect in
                 let measures = Maths.vector_of_array (Array.of_list results) in
                 let workload = workload aspect in
-                {workload; measures; allocated_words = None} :: acc)
+                {workload; measures} :: acc)
               workload_data
               aspects)
       []

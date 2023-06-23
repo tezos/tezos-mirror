@@ -57,8 +57,11 @@ type parameter_info = Namespace.t list
 (* Registration functions *)
 
 (** Register a benchmark. Recursively registers any relevant model and parameter
-    included in it. *)
-val register : Benchmark.t -> unit
+    included in it. Add timer latency to the model if [add_timer] is [true] (default).
+    It is expected that [add_timer] is set to [false] when registering a benchmark
+    which uses [Calculated].
+*)
+val register : ?add_timer:bool -> Benchmark.t -> unit
 
 (** Register a {!type:Tezos_clic.command} for the command line *)
 val add_command : unit Tezos_clic.command -> unit

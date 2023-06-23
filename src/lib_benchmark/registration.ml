@@ -130,7 +130,7 @@ let register_model (type a) bench_name local_model_name (model : a Model.t) :
   | Aggregate {sub_models; _} -> List.iter register_packed_model sub_models
   | Abstract {model; _} -> register_packed_model (Model.Model model)
 
-let register ((module Bench) : Benchmark.t) =
+let register ?(add_timer = true) ((module Bench) : Benchmark.t) =
   if Name_table.mem bench_table Bench.name then (
     Format.eprintf
       "Benchmark %a already registered! exiting@."
@@ -138,20 +138,27 @@ let register ((module Bench) : Benchmark.t) =
       Bench.name ;
     exit 1)
   else () ;
-  (* We do a little benchmark edition. We add the timer latency to all models, which makes all
-     models aggregated *)
-  let module Bench = struct
-    include Bench
 
-    let models =
-      List.map
-        (fun (s, m) ->
-          ( s,
-            Model.(
-              add_model m Builtin_models.timer_model
-              |> precompose (fun w -> (w, ()))) ))
-        models
-  end in
+  let ((module Bench) : Benchmark.t) =
+    if add_timer then
+      (* We do a little benchmark edition. We add the timer latency to all models, which makes
+         models aggregated *)
+      let module Bench = struct
+        include Bench
+
+        let models =
+          List.map
+            (fun (s, m) ->
+              ( s,
+                Model.(
+                  add_model m Builtin_models.timer_model
+                  |> precompose (fun w -> (w, ()))) ))
+            models
+      end in
+      (module Bench)
+    else (module Bench)
+  in
+
   List.iter
     (fun (model_local_name, m) -> register_model Bench.name model_local_name m)
     Bench.models ;

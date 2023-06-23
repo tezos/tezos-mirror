@@ -42,8 +42,7 @@ Echo data.json file.
             "TIME",
             "TIME",
             "TIME"
-          ],
-          "allocated_words": 6
+          ]
         },
         {
           "workload": [
@@ -65,8 +64,7 @@ Echo data.json file.
             "TIME",
             "TIME",
             "TIME"
-          ],
-          "allocated_words": 6
+          ]
         }
       ],
       "date": "DATE"
