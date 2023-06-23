@@ -46,6 +46,8 @@ module Commitment = struct
   let pp = Dal.Commitment.pp
 
   let zero = Dal.Commitment.zero
+
+  let of_b58check_opt = Dal.Commitment.of_b58check_opt
 end
 
 module Commitment_proof = struct

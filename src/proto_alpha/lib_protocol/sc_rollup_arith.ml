@@ -1512,11 +1512,13 @@ module Make (Context : P) :
 
   let evaluate_dal_parameters dal_directive =
     let dal_params =
-      (* Dal pages import directive is [dal:<e>:<num_p>:<s1>:<s2>:...:<sn>]. See
+      (* Dal pages import directive is [dal:<num_slots>:<e>:<num_p>:<s1>:<s2>:...:<sn>]. See
          mli file.*)
       let open Option_syntax in
       match String.split_on_char ':' dal_directive with
-      | attestation_lag :: number_of_pages :: tracked_slots ->
+      | number_of_slots :: attestation_lag :: number_of_pages :: tracked_slots
+        ->
+          let* number_of_slots = Int32.of_string_opt number_of_slots in
           let* attestation_lag = Int32.of_string_opt attestation_lag in
           let* number_of_pages = Int32.of_string_opt number_of_pages in
           let* tracked_slots =
@@ -1525,7 +1527,11 @@ module Make (Context : P) :
               | [] -> return (List.rev acc)
               | s :: rest ->
                   let* dal_slot_int = int_of_string_opt s in
-                  let* dal_slot = Dal_slot_index_repr.of_int_opt dal_slot_int in
+                  let* dal_slot =
+                    Dal_slot_index_repr.of_int_opt
+                      ~number_of_slots:(Int32.to_int number_of_slots)
+                      dal_slot_int
+                  in
                   (aux [@tailcall]) (dal_slot :: acc) rest
             in
             aux [] tracked_slots

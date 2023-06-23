@@ -1568,13 +1568,15 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
 
   (* 3. Setting the parameters of the PVM. Rollup node subscribes to slots 0, 2,
      4 and 6. *)
+  let number_of_slots = parameters.number_of_slots in
   let attestation_lag = 1 in
   let number_of_pages = 256 in
   let subscribed_slots = "0:2:4:6" in
   let messages =
     [
       Format.sprintf
-        "dal:%d:%d:%s"
+        "dal:%d:%d:%d:%s"
+        number_of_slots
         attestation_lag
         number_of_pages
         subscribed_slots;
@@ -2285,9 +2287,15 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
      the DAL. *)
   let tracked_slot_index = 5 in
   let* () =
+    let number_of_slots = parameters.number_of_slots in
     let pages_per_slot = cryptobox.slot_size / cryptobox.page_size in
     let config =
-      sf " dal:%d:%d:%d " attestation_lag pages_per_slot tracked_slot_index
+      sf
+        " dal:%d:%d:%d:%d "
+        number_of_slots
+        attestation_lag
+        pages_per_slot
+        tracked_slot_index
     in
     send_messages ~bake:false l1_client [config]
   in

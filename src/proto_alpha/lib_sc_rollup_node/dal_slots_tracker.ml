@@ -121,14 +121,15 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
    avoid going back and forth between bitsets and lists of slot indexes. *)
 let to_slot_index_list (constants : Constants.Parametric.t) bitset =
   let open Result_syntax in
-  let all_slots = Misc.(0 --> (constants.dal.number_of_slots - 1)) in
+  let number_of_slots = constants.dal.number_of_slots in
+  let all_slots = Misc.(0 --> (number_of_slots - 1)) in
   let+ filtered = List.filter_e (Bitset.mem bitset) all_slots in
   (* Because the maximum slot index is smaller than the number_of_slots protocol
      constants, and this value is smaller than the hard limit imposed for slots,
      then Dal.Slot_index.to_int will always return a defined value. See
      `src/proto_alpha/lib_protocol/constants_repr.ml`.
   *)
-  List.filter_map Dal.Slot_index.of_int_opt filtered
+  List.filter_map (Dal.Slot_index.of_int_opt ~number_of_slots) filtered
 
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/4139.
    Use a shared storage between dal and rollup node to store slots data.

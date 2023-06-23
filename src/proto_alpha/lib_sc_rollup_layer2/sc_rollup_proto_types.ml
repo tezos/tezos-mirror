@@ -241,8 +241,9 @@ module Dal = struct
   module Slot_index = struct
     type t = Dal.Slot_index.t
 
-    let of_octez (i : Octez_smart_rollup.Dal.Slot_index.t) : t =
-      match Dal.Slot_index.of_int_opt i with
+    let of_octez ~number_of_slots (i : Octez_smart_rollup.Dal.Slot_index.t) : t
+        =
+      match Dal.Slot_index.of_int_opt ~number_of_slots i with
       | None -> Format.ksprintf invalid_arg "Dal.Slot_index.of_octez: %d" i
       | Some i -> i
 
@@ -261,7 +262,7 @@ module Dal = struct
   module Slot_header = struct
     type t = Dal.Slot.Header.t
 
-    let of_octez
+    let of_octez ~number_of_slots
         Octez_smart_rollup.Dal.Slot_header.
           {id = {published_level; index}; commitment} : t =
       Dal.Slot.Header.
@@ -269,7 +270,7 @@ module Dal = struct
           id =
             {
               published_level = Raw_level.of_int32_exn published_level;
-              index = Slot_index.of_octez index;
+              index = Slot_index.of_octez ~number_of_slots index;
             };
           commitment;
         }

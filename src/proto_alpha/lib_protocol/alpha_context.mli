@@ -2467,9 +2467,9 @@ module Dal : sig
 
     val encoding : t Data_encoding.t
 
-    val of_int_opt : int -> t option
+    val of_int_opt : number_of_slots:int -> int -> t option
 
-    val of_int : int -> t tzresult
+    val of_int : number_of_slots:int -> int -> t tzresult
 
     val to_int : t -> int
 
@@ -2479,9 +2479,11 @@ module Dal : sig
 
     val equal : t -> t -> bool
 
-    val slots_range : lower:int -> upper:int -> t list tzresult
+    val slots_range :
+      number_of_slots:int -> lower:int -> upper:int -> t list tzresult
 
-    val slots_range_opt : lower:int -> upper:int -> t list option
+    val slots_range_opt :
+      number_of_slots:int -> lower:int -> upper:int -> t list option
   end
 
   (** This module re-exports definitions from {!Dal_attestation_repr} and
@@ -2676,7 +2678,7 @@ module Dal_errors : sig
      from Dal_slot_repr or Dal_attestation_repr. *)
   type error +=
     | Dal_feature_disabled
-    | Dal_slot_index_above_hard_limit of {given : int}
+    | Dal_slot_index_above_hard_limit of {given : int; limit : int}
     | Dal_attestation_unexpected_size of {expected : int; got : int}
     | Dal_publish_slot_header_future_level of {
         provided : Raw_level.t;

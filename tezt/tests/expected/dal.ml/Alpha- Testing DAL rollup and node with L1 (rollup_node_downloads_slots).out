@@ -38,9 +38,9 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./octez-client --wait none send smart rollup message '["dal:1:256:0:2:4:6"]' from bootstrap2
+./octez-client --wait none send smart rollup message '["dal:16:1:256:0:2:4:6"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 170.835 units (will add 100 for safety)
+Estimated gas: 170.950 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -51,16 +51,16 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000277
+    Fee to the baker: ꜩ0.00028
     Expected counter: 1
     Gas limit: 271
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000277
-      payload fees(the block proposer) ....... +ꜩ0.000277
+      [PUBLIC_KEY_HASH] ... -ꜩ0.00028
+      payload fees(the block proposer) ....... +ꜩ0.00028
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 170.769
+      Consumed gas: 170.884
 
 
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/dal/slot_headers

@@ -918,3 +918,30 @@ val zk_rollup_update :
     tztrace )
   result
   Lwt.t
+
+(** Injects a DAL publish commitment operation using
+    {!Injection.inject_operation}.
+*)
+val dal_publish :
+  #Protocol_client_context.full ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  ?counter:Manager_counter.t ->
+  source:public_key_hash ->
+  slot_header:Alpha_context.Dal.Operations.Publish_slot_header.t ->
+  src_pk:public_key ->
+  src_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  unit ->
+  (Operation_hash.t
+  * Kind.dal_publish_slot_header Kind.manager contents
+  * Kind.dal_publish_slot_header Kind.manager Apply_results.contents_result)
+  tzresult
+  Lwt.t

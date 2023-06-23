@@ -254,4 +254,12 @@ module Zk_rollup_params : sig
     Tezos_clic.parameter
 end
 
+module Dal : sig
+  val commitment_parameter :
+    (Dal_slot_repr.Commitment.t, full) Tezos_clic.parameter
+
+  val commitment_proof_parameter :
+    (Dal_slot_repr.Commitment_proof.t, full) Tezos_clic.parameter
+end
+
 val fee_parameter_args : (Injection.fee_parameter, full) Tezos_clic.arg

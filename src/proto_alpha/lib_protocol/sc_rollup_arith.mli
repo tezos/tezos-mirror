@@ -48,8 +48,9 @@
    - an input [hash:<HASH>] is interpreted as a directive to request the DAC
      data whose hash is <HASH> ;
 
-   - an input [dal:<e>:<num_p>:<s1>:<s2>:...:<sn>] is interpreted as a directive
+   - an input [dal:<num_slots>:<e>:<num_p>:<s1>:<s2>:...:<sn>] is interpreted as a directive
    to provide the DAL parameters to the PVM, where:
+     - <num_slots> is the number of slots
      - <e> is the attestation lag;
      - <num_p> is the number of pages;
      - each <si> is a slot to which the PVM subscribes to for [current level -
