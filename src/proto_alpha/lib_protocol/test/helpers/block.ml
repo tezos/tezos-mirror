@@ -1032,16 +1032,6 @@ let bake_n_with_liquidity_baking_toggle_ema ?baking_mode ?policy
   in
   (b, metadata.liquidity_baking_toggle_ema)
 
-let bake_until_cycle_end ?policy b =
-  let blocks_per_cycle = b.constants.blocks_per_cycle in
-  let current_level = b.header.shell.level in
-  let current_level = Int32.rem current_level blocks_per_cycle in
-  let delta = Int32.sub blocks_per_cycle current_level in
-  bake_n ?policy (Int32.to_int delta) b
-
-let bake_until_n_cycle_end ?policy n b =
-  List.fold_left_es (fun b _ -> bake_until_cycle_end ?policy b) b (1 -- n)
-
 let current_cycle b =
   let blocks_per_cycle = b.constants.blocks_per_cycle in
   let current_level = b.header.shell.level in
@@ -1050,9 +1040,16 @@ let current_cycle b =
   current_cycle
 
 let bake_until_cycle ?policy cycle (b : t) =
-  let rec loop (b : t) =
-    let current_cycle = current_cycle b in
-    if Cycle.equal cycle current_cycle then return b
-    else bake_until_cycle_end ?policy b >>=? fun b -> loop b
+  let open Lwt_result_syntax in
+  let* final_block_of_previous_cycle =
+    bake_while ?policy (fun block -> Cycle.(current_cycle block < cycle)) b
   in
-  loop b
+  bake ?policy final_block_of_previous_cycle
+
+let bake_until_cycle_end ?policy b =
+  let cycle = current_cycle b in
+  bake_until_cycle ?policy (Cycle.succ cycle) b
+
+let bake_until_n_cycle_end ?policy n b =
+  let cycle = current_cycle b in
+  bake_until_cycle ?policy (Cycle.add cycle n) b
