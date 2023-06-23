@@ -59,7 +59,7 @@ let default_expected_pow =
 
 let default_network_name = "dal-sandbox"
 
-let default_endpoint = Uri.of_string "http://localhost:9732"
+let default_endpoint = Uri.of_string "http://localhost:8732"
 
 let default =
   {
