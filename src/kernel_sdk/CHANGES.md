@@ -12,6 +12,8 @@
 
 ### Installer client/kernel
 
+- Add option `--display-root-hash` to display the root hash of the kernel that will be installed.
+
 ## Version 0.2.0
 
 ### SDK
@@ -68,4 +70,3 @@ Initial release to [crates.io](https://crates.io/crates/tezos-smart-rollup-insta
 The installer client enables installation of kernels which are too big to fit in a `rollup origination`
 operation. Instead, the client generates an installer which immediately upgrades to desired kernel. This
 *installer kernel* may then be used to originate the rollup with.
-
