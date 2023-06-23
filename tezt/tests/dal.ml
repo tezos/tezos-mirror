@@ -1783,10 +1783,12 @@ let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
             (__LOC__ ^ " : Unexpected profiles (Actual: %L <> Expected: %R)"))
   in
   let check_bad_attestor_pkh_encoding profile =
-    let* response = RPC.call_raw dal_node @@ patch_profile profile in
+    let* response = RPC.call_raw dal_node @@ patch_profiles [profile] in
     return @@ RPC.check_string_response ~code:400 response
   in
-  let patch_profile_rpc profile = RPC.call dal_node (patch_profile profile) in
+  let patch_profile_rpc profile =
+    RPC.call dal_node (patch_profiles [profile])
+  in
   let profile1 = Attestor Constant.bootstrap1.public_key_hash in
   let profile2 = Attestor Constant.bootstrap2.public_key_hash in
   (* We start with empty profile list *)
@@ -2783,7 +2785,7 @@ let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
       ~num_slots
       pkh1
   in
-  let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profile profile1) in
+  let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profiles [profile1]) in
   let* () = event_waiter in
 
   (* node2 joins topic {pkh} -> it sends subscribe and graft messages to
@@ -2802,7 +2804,7 @@ let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
       ~num_slots
       pkh1
   in
-  let* () = RPC.call dal_node2 (Rollup.Dal.RPC.patch_profile profile1) in
+  let* () = RPC.call dal_node2 (Rollup.Dal.RPC.patch_profiles [profile1]) in
   Lwt.join [event_waiter_subscribe; event_waiter_graft]
 
 (** This helper returns the list of promises that allow to wait for the
@@ -2894,7 +2896,7 @@ let test_dal_node_join_topic _protocol _parameters _cryptobox _node client
   let event_waiter =
     check_events_with_topic ~event_with_topic:Join dal_node1 ~num_slots pkh1
   in
-  let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profile profile1) in
+  let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profiles [profile1]) in
   event_waiter
 
 (** This generic test function is used to test messages exchanges between two

@@ -254,8 +254,8 @@ module Dal = struct
                  Attestor (json_field_value ~field:"public_key_hash" obj)
              | _ -> failwith "invalid case")
 
-    let patch_profile profile =
-      let data = Client.Data (json_of_profile profile) in
+    let patch_profiles profiles =
+      let data = Client.Data (`A (List.map json_of_profile profiles)) in
       make ~data PATCH ["profiles"] as_empty_object_or_fail
 
     let get_profiles () = make GET ["profiles"] profiles_of_json
