@@ -34,6 +34,7 @@ depopts: [
   "tezos-client-015-PtLimaPt"
   "tezos-client-016-PtMumbai"
   "tezos-client-017-PtNairob"
+  "tezos-client-018-Proxford"
   "tezos-client-alpha"
 ]
 build: [

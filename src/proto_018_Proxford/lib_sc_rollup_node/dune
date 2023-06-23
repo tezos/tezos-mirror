@@ -1,0 +1,74 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_smart_rollup_node_Proxford)
+ (package octez-smart-rollup-node-Proxford)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-stdlib-unix
+  tezos-client-base
+  tezos-client-base-unix
+  tezos-client-018-Proxford
+  tezos-context.encoding
+  tezos-context.helpers
+  tezos-protocol-018-Proxford
+  tezos-protocol-plugin-018-Proxford
+  tezos-protocol-018-Proxford.parameters
+  tezos-rpc
+  tezos-rpc-http
+  tezos-rpc-http-server
+  tezos-workers
+  tezos-dal-node-services
+  tezos-dal-node-lib
+  tezos-dac-018-Proxford
+  tezos-dac-lib
+  tezos-dac-client-lib
+  tezos-shell-services
+  octez-smart-rollup
+  tezos-smart-rollup-018-Proxford
+  tezos-smart-rollup-layer2-018-Proxford
+  tezos-layer2-utils-018-Proxford
+  tezos_layer2_store
+  octez-crawler
+  tezos-tree-encoding
+  data-encoding
+  irmin-pack
+  irmin-pack.unix
+  irmin
+  aches
+  aches-lwt
+  octez-injector
+  octez-smart-rollup-node
+  tezos-scoru-wasm
+  tezos-scoru-wasm-fast
+  tezos-crypto-dal
+  tezos-version.value)
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_stdlib_unix
+  -open Tezos_client_base
+  -open Tezos_client_base_unix
+  -open Tezos_client_018_Proxford
+  -open Tezos_protocol_018_Proxford
+  -open Tezos_protocol_plugin_018_Proxford
+  -open Tezos_protocol_018_Proxford_parameters
+  -open Tezos_workers
+  -open Tezos_dal_node_lib
+  -open Tezos_dac_018_Proxford
+  -open Tezos_dac_lib
+  -open Tezos_dac_client_lib
+  -open Tezos_shell_services
+  -open Octez_smart_rollup
+  -open Tezos_smart_rollup_018_Proxford
+  -open Tezos_smart_rollup_layer2_018_Proxford
+  -open Tezos_layer2_utils_018_Proxford
+  -open Tezos_layer2_store
+  -open Octez_crawler
+  -open Octez_injector
+  -open Octez_smart_rollup_node
+  -open Tezos_crypto_dal))

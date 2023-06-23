@@ -38,6 +38,7 @@
   irmin
   tezos-dal-016-PtMumbai
   tezos-dal-017-PtNairob
+  tezos-dal-018-Proxford
   (select void_for_linking-tezos-dal-alpha from
    (tezos-dal-alpha -> void_for_linking-tezos-dal-alpha.empty)
    (-> void_for_linking-tezos-dal-alpha.empty)))

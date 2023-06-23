@@ -61,6 +61,7 @@ let test_protocol_migration_message ~from_version ~to_version
 
 let proto_name : Tezos_scoru_wasm.Pvm_input_kind.protocol -> string = function
   | Nairobi -> "Nairobi"
+  | Oxford -> "Oxford"
   | Proto_alpha -> "Proto_alpha"
 
 let tests =

@@ -1,0 +1,42 @@
+
+./octez-client --protocol ProxfordLcjScHFgpTURyTjcKR88D5juu1jGgT18pPUoGTVgxiA --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/reverse.tz on storage '{""}' and input '{ "c" ; "b" ; "a" }' --level 1 --trace-stack
+storage
+  { "a" ; "b" ; "c" }
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (just consumed gas: 7.328)
+    [ (Pair { "c" ; "b" ; "a" } { "" }) ]
+  - location: 9 (just consumed gas: 0.010)
+    [ { "c" ; "b" ; "a" } ]
+  - location: 10 (just consumed gas: 0.010)
+    [ {}
+      { "c" ; "b" ; "a" } ]
+  - location: 12 (just consumed gas: 0.010)
+    [ { "c" ; "b" ; "a" }
+      {} ]
+  - location: 13 (just consumed gas: 0)
+    [ "c"
+      {} ]
+  - location: 15 (just consumed gas: 0.010)
+    [ { "c" } ]
+  - location: 13 (just consumed gas: 0.015)
+    [ "b"
+      { "c" } ]
+  - location: 15 (just consumed gas: 0.010)
+    [ { "b" ; "c" } ]
+  - location: 13 (just consumed gas: 0.015)
+    [ "a"
+      { "b" ; "c" } ]
+  - location: 15 (just consumed gas: 0.010)
+    [ { "a" ; "b" ; "c" } ]
+  - location: 13 (just consumed gas: 0.015)
+    [ { "a" ; "b" ; "c" } ]
+  - location: 16 (just consumed gas: 0.010)
+    [ {}
+      { "a" ; "b" ; "c" } ]
+  - location: 18 (just consumed gas: 0.010)
+    [ (Pair {} { "a" ; "b" ; "c" }) ]
+

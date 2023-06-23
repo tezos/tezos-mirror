@@ -1,0 +1,33 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_018_Proxford_test_helpers)
+ (public_name tezos-018-Proxford-test-helpers)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  qcheck-alcotest
+  tezos-test-helpers
+  tezos-base
+  tezos-micheline
+  tezos-stdlib-unix
+  tezos-protocol-018-Proxford
+  tezos-client-018-Proxford
+  tezos-protocol-018-Proxford.parameters
+  tezos-protocol-environment
+  tezos-protocol-plugin-018-Proxford
+  tezos-shell-services
+  octez-plompiler
+  tezos-crypto-dal)
+ (flags
+  (:standard)
+  -open Tezos_test_helpers
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_micheline
+  -open Tezos_stdlib_unix
+  -open Tezos_protocol_018_Proxford
+  -open Tezos_client_018_Proxford
+  -open Tezos_protocol_plugin_018_Proxford
+  -open Tezos_shell_services
+  -open Tezos_crypto_dal))

@@ -36,6 +36,7 @@ depends: [
   "irmin" { >= "3.7.2" & < "3.8.0" }
   "tezos-dal-016-PtMumbai"
   "tezos-dal-017-PtNairob"
+  "tezos-dal-018-Proxford"
 ]
 depopts: [
   "tezos-dal-alpha"

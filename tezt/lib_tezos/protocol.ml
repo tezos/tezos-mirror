@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Mumbai | Nairobi | Alpha
+type t = Mumbai | Nairobi | Oxford | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
@@ -33,13 +33,19 @@ let name = function
   | Alpha -> "Alpha"
   | Mumbai -> "Mumbai"
   | Nairobi -> "Nairobi"
+  | Oxford -> "Oxford"
 
-let number = function Mumbai -> 016 | Nairobi -> 017 | Alpha -> 018
+let number = function
+  | Mumbai -> 016
+  | Nairobi -> 017
+  | Oxford -> 018
+  | Alpha -> 019
 
 let directory = function
   | Alpha -> "proto_alpha"
   | Mumbai -> "proto_016_PtMumbai"
   | Nairobi -> "proto_017_PtNairob"
+  | Oxford -> "proto_018_Proxford"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
@@ -48,6 +54,7 @@ let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | Mumbai -> "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
   | Nairobi -> "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
+  | Oxford -> "ProxfordLcjScHFgpTURyTjcKR88D5juu1jGgT18pPUoGTVgxiA"
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
@@ -242,14 +249,16 @@ let write_parameter_file :
 let next_protocol = function
   | Mumbai -> Some Nairobi
   | Nairobi -> Some Alpha
+  | Oxford -> None
   | Alpha -> None
 
 let previous_protocol = function
   | Alpha -> Some Nairobi
+  | Oxford -> Some Nairobi
   | Nairobi -> Some Mumbai
   | Mumbai -> None
 
-let all = [Alpha; Mumbai; Nairobi]
+let all = [Mumbai; Nairobi; Oxford; Alpha]
 
 type supported_protocols =
   | Any_protocol

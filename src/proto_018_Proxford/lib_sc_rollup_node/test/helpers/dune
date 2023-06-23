@@ -1,0 +1,30 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_smart_rollup_node_Proxford_test_helpers)
+ (package tezos-sc-rollup-node-test)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-018-Proxford
+  tezos-protocol-018-Proxford.parameters
+  tezos-client-018-Proxford
+  tezos-test-helpers
+  qcheck-alcotest
+  qcheck-core
+  logs.lwt
+  tezos-smart-rollup-layer2-018-Proxford
+  octez_smart_rollup_node_Proxford
+  octez-alcotezt)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_018_Proxford
+  -open Tezos_protocol_018_Proxford_parameters
+  -open Tezos_client_018_Proxford
+  -open Tezos_test_helpers
+  -open Tezos_smart_rollup_layer2_018_Proxford
+  -open Octez_smart_rollup_node_Proxford
+  -open Octez_alcotezt))
