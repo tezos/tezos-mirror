@@ -1082,7 +1082,6 @@ let test_eth_call_large =
         [
           ("to", Ezjsonm.encode_string sender.address);
           ("data", Ezjsonm.encode_string ("0x" ^ String.make 12_000 'a'));
-          ("gas", `String "111111");
         ]
       in
 
@@ -1132,7 +1131,6 @@ let test_eth_call_storage_contract_rollup_node =
         [
           ("to", Ezjsonm.encode_string address);
           ("data", Ezjsonm.encode_string data);
-          ("gas", `String "111111");
         ]
       in
 

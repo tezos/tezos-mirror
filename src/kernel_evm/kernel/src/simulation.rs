@@ -23,6 +23,9 @@ pub const SIMULATION_SIMPLE_TAG: u8 = 1;
 pub const SIMULATION_CREATE_TAG: u8 = 2;
 // SIMULATION/CHUNK/NUM 2B/CHUNK
 pub const SIMULATION_CHUNK_TAG: u8 = 3;
+/// Maximum gas used by the simulation. Bounded to limit DOS on the rollup node
+/// Is used as default value if no gas is set.
+pub const MAX_SIMULATION_GAS: u64 = 1_000_000_000u64;
 
 /// Container for eth_call data, used in messages sent by the rollup node
 /// simulation.
@@ -85,7 +88,9 @@ impl Simulation {
             self.to,
             self.from.unwrap_or(default_caller),
             self.data.clone(),
-            self.gas,
+            self.gas
+                .map(|gas| u64::max(gas, MAX_SIMULATION_GAS))
+                .or(Some(MAX_SIMULATION_GAS)), // gas could be omitted
             self.value,
         )
         .map_err(Error::Simulation)?;
@@ -381,6 +386,32 @@ mod tests {
             to: Some(new_address),
             data: hex::decode(STORAGE_CONTRACT_CALL_GET).unwrap(),
             gas: Some(10000),
+            value: None,
+        };
+        let outcome = simulation.run(&mut host);
+
+        assert!(outcome.is_ok(), "simulation should have succeeded");
+        let outcome = outcome.unwrap();
+        assert_eq!(
+            Some(vec![0u8; 32]),
+            outcome.result,
+            "simulation result should be 0"
+        );
+    }
+
+    #[test]
+    fn simulation_result_no_gas() {
+        // setup
+        let mut host = MockHost::default();
+        let new_address = create_contract(&mut host);
+
+        // run simulation num
+        let simulation = Simulation {
+            from: None,
+            gas_price: None,
+            to: Some(new_address),
+            data: hex::decode(STORAGE_CONTRACT_CALL_NUM).unwrap(),
+            gas: None,
             value: None,
         };
         let outcome = simulation.run(&mut host);
