@@ -69,6 +69,13 @@ Node
   matter its fee (e.g. if it is a non-manager operation). (MRs
   :gl:`!6787`, :gl:`!8640`)
 
+- Updated the message of the mempool's
+  ``prevalidation.operation_conflict`` error. It now provides the
+  minimal fee that the operation would need to replace the
+  pre-existing conflicting operation, when such a fee exists. (This
+  fee indication used to be available before V16-rc1, where it had
+  been removed for technical reasons.) (MR :gl:`!9016`)
+
 - RPC ``/helpers/forge/operations`` can now take JSON formatted operations with
   ``attestation``, ``preattestation``, ``double_attestation_evidence`` and
   ``double_preattestation_evidence`` kinds. Note that the existing kinds

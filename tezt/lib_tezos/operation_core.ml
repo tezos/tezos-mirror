@@ -124,8 +124,7 @@ let hash t client : [`OpHash of string] Lwt.t =
   let hash = Tezos_base.Operation.hash op in
   return (`OpHash (Tezos_crypto.Hashed.Operation_hash.to_b58check hash))
 
-let inject ?(request = `Inject) ?(force = false) ?protocol ?signature ?error t
-    client : [`OpHash of string] Lwt.t =
+let spawn_inject ?(force = false) ?protocol ?signature t client =
   let* signature =
     match signature with
     | None -> sign t client
@@ -136,6 +135,10 @@ let inject ?(request = `Inject) ?(force = false) ?protocol ?signature ?error t
     if force then RPC.post_private_injection_operation
     else RPC.post_injection_operation
   in
+  return (RPC.Client.spawn client @@ inject_rpc (Data (`String op)))
+
+let inject ?(request = `Inject) ?force ?protocol ?signature ?error t client :
+    [`OpHash of string] Lwt.t =
   let waiter =
     let mode = Client.get_mode client in
     match Client.mode_to_endpoint mode with
@@ -146,7 +149,7 @@ let inject ?(request = `Inject) ?(force = false) ?protocol ?signature ?error t
            foreign endpoint"
     | Some (Node node) -> Node.wait_for_request ~request node
   in
-  let runnable = RPC.Client.spawn client @@ inject_rpc (Data (`String op)) in
+  let* runnable = spawn_inject ?force ?protocol ?signature t client in
   match error with
   | None ->
       let* () = waiter in
@@ -156,6 +159,18 @@ let inject ?(request = `Inject) ?(force = false) ?protocol ?signature ?error t
       let*? process = runnable in
       let* () = Process.check_error ~msg process in
       hash t client
+
+let inject_and_capture2_stderr ~rex ?force ?protocol ?signature t client =
+  let* runnable = spawn_inject ?force ?protocol ?signature t client in
+  let*? process = runnable in
+  let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
+  match stderr =~** rex with
+  | None ->
+      Test.fail
+        "Injection was expected to fail with:\n%s\nbut instead failed with:\n%s"
+        (show_rex rex)
+        stderr
+  | Some groups -> return groups
 
 let inject_operations ?protocol ?(request = `Inject) ?(force = false) ?error
     ?use_tmp_file t client : [`OpHash of string] list Lwt.t =
@@ -691,6 +706,15 @@ module Manager = struct
     RPC.Client.call client @@ RPC.get_chain_block_hash ?chain ~block ()
 end
 
-let conflict_error =
+let gas_limit_exceeded =
   rex
-    {|The operation [\w\d]+ cannot be added because the mempool already contains a conflicting operation that should not be replaced \(e\.g\. an operation from the same manager with better fees\)\.|}
+    "Gas limit exceeded during typechecking or execution.\n\
+     Try again with a higher gas limit."
+
+let conflict_error_with_needed_fee =
+  rex
+    {|The operation ([\w\d]+) cannot be added because the mempool already contains a conflicting operation\. To replace the latter, this particular operation would need a total fee of at least ([\d]+) mutez\.|}
+
+let rejected_by_full_mempool_with_needed_fee =
+  rex
+    {|Operation ([\w\d]+) has been rejected because the mempool is full\. This specific operation would need a total fee of at least ([\d]+) mutez to be considered and propagated by the mempool of this particular node right now\. Note that if the node receives operations with a better fee over gas limit ratio in the future, the operation may be rejected even with the indicated fee, or it may be successfully injected but removed at a later date\.|}

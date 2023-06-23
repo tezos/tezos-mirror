@@ -147,6 +147,25 @@ val inject :
   Client.t ->
   [`OpHash of string] Lwt.t
 
+(** Same as [inject], but do not wait for the process to exit. *)
+val spawn_inject :
+  ?force:bool ->
+  ?protocol:Protocol.t ->
+  ?signature:Tezos_crypto.Signature.t ->
+  t ->
+  Client.t ->
+  JSON.t Runnable.process Lwt.t
+
+(** Run [spawn_inject] then capture two groups on stderr with [rex]. *)
+val inject_and_capture2_stderr :
+  rex:rex ->
+  ?force:bool ->
+  ?protocol:Protocol.t ->
+  ?signature:Tezos_crypto.Signature.t ->
+  t ->
+  Client.t ->
+  (string * string) Lwt.t
+
 (** [inject_operations ?protocol ?request ?force ?error ?use_tmp_file ops
     client] is similar as [inject] for a list of operations. This function calls
     the RPC {!val:RPC.post_private_injection_operations} which is faster than
@@ -554,8 +573,27 @@ module Manager : sig
   val get_branch : ?chain:string -> ?offset:int -> Client.t -> string Lwt.t
 end
 
-(** Regular expression recognizing the mempool error that arises when
-    the operation conflicts with another previously validated operation.
+(** Regular expressions for specific error messages.
 
-    Intended to be provided as the [error] argument to {!val:inject}. *)
-val conflict_error : rex
+    Can be used as e.g.
+    - the [error] argument of {!val:inject}
+    - the [rex] argument of {!val:inject_and_capture2_stderr}
+    - the [msg] argument of {!val:Process.check_error}. *)
+
+(** Matches the client message for the [Operation_quota_exceeded]
+    protocol error. *)
+val gas_limit_exceeded : rex
+
+(** Matches the message produced by
+    [Operation_conflict {new_hash; needed_fee_in_mutez = Some fee}]
+    from [src/lib_shell_services/validation_errors].
+
+    Captures [new_hash] and [fee]. *)
+val conflict_error_with_needed_fee : rex
+
+(** Matches the message produced by
+    [Rejected_by_full_mempool {hash; needed_fee_in_mutez = Some fee}]
+    from [src/lib_shell_services/validation_errors].
+
+    Captures [hash] and [fee]. *)
+val rejected_by_full_mempool_with_needed_fee : rex

@@ -24,7 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Type of a protocol-specific mempool filter plugin. *)
+(** Type of a protocol-specific mempool filter plugin.
+
+    Implementations for such a plugin can be found in
+    [src/proto_xxx/lib_plugin/mempool.ml]. *)
 module type FILTER = sig
   module Proto : Registered_protocol.T
 
@@ -88,9 +91,38 @@ module type FILTER = sig
         implementation of this function relies). *)
     val conflict_handler : config -> Proto.Mempool.conflict_handler
 
-    (** If the operation is a manager operation, return its source,
-        otherwise return [None]. *)
-    val find_manager : Proto.operation -> Signature.Public_key_hash.t option
+    (** The purpose of this module is to provide the
+        [fee_needed_to_replace_by_fee] function. For this function to
+        be correct, the caller must maintain the state of type [t] by
+        calling [update] on each successfully validated operation and
+        its induced replacements. *)
+    module Conflict_map : sig
+      (** Internal state needed by [fee_needed_to_replace_by_fee]. *)
+      type t
+
+      (** Initial state. *)
+      val empty : t
+
+      (** Removes all the [replacements] from the state then adds
+          [new_operation]. *)
+      val update :
+        t ->
+        new_operation:Proto.operation ->
+        replacements:Proto.operation list ->
+        t
+
+      (** This function should be called when
+          [Proto.Mempool.add_operation] has returned [Unchanged]. This
+          means that the [candidate_op] has been rejected because there
+          was a conflict with an pre-existing operation and the
+          {!val-conflict_handler} has returned [`Keep]. This function
+          returns the minimal fee (in mutez) that [candidate_op] would
+          need so that the {!val-conflict_handler} would return
+          [`Replace] instead. If no such fee exists, then the function
+          returns [None]. *)
+      val fee_needed_to_replace_by_fee :
+        config -> candidate_op:Proto.operation -> conflict_map:t -> int64 option
+    end
 
     (** Compute the minimal fee (expressed in mutez) that [candidate_op]
         would need to have in order to be strictly greater than
@@ -104,22 +136,6 @@ module type FILTER = sig
         been successfully validated by the protocol. *)
     val fee_needed_to_overtake :
       op_to_overtake:Proto.operation ->
-      candidate_op:Proto.operation ->
-      int64 option
-
-    (** Compute the minimal fee (expressed in mutez) that [candidate_op]
-        would need to have in order for the {!conflict_handler} to let it
-        replace [op_to_replace], when both operations are manager operations.
-
-        Return [None] when at least one operation is not a manager operation.
-
-        Also return [None] if both operations are manager operations but
-        there was an error while computing the needed fee. However,
-        note that this cannot happen when both manager operations have
-        been successfully validated by the protocol. *)
-    val fee_needed_to_replace_by_fee :
-      config ->
-      op_to_replace:Proto.operation ->
       candidate_op:Proto.operation ->
       int64 option
   end
