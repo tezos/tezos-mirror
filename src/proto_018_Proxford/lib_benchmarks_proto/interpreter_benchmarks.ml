@@ -178,32 +178,10 @@ let benchmark_from_kinstr_and_stack :
     Interpreter_workload.ir_sized_step list Generator.benchmark =
  fun ?amplification ctxt step_constants stack_kinstr ->
   let ctxt = Gas_helpers.set_limit ctxt in
-  let measure_allocation ~outdated_ctxt ~step_constants ~kinstr ~bef_top ~bef ()
-      =
-    let result =
-      Lwt_main.run
-      @@ Script_interpreter.Internals.step
-           (outdated_ctxt, step_constants)
-           (Local_gas_counter 9_999_999_999)
-           kinstr
-           bef_top
-           bef
-    in
-    Option.map (fun (stack_top, stack, _, _) ->
-        let size_after =
-          Obj.reachable_words (Obj.repr (stack_top, stack, bef_top, bef))
-        in
-        let size_before =
-          Obj.reachable_words (Obj.repr (bef_top, bef, bef_top, bef))
-        in
-
-        size_after - size_before)
-    @@ Result.to_option result
-  in
 
   match stack_kinstr with
   | Ex_stack_and_kinstr {stack = bef_top, bef; stack_type; kinstr} ->
-      let workload, closure, measure_allocation =
+      let workload, closure =
         match amplification with
         | None ->
             let workload =
@@ -227,15 +205,7 @@ let benchmark_from_kinstr_and_stack :
                    bef_top
                    bef)
             in
-            let measure_allocation =
-              measure_allocation
-                ~outdated_ctxt
-                ~step_constants
-                ~kinstr
-                ~bef_top
-                ~bef
-            in
-            (workload, closure, measure_allocation)
+            (workload, closure)
         | Some amplification_factor ->
             assert (amplification_factor > 0) ;
             let workload =
@@ -264,17 +234,9 @@ let benchmark_from_kinstr_and_stack :
                      bef)
               done
             in
-            let measure_allocation =
-              measure_allocation
-                ~outdated_ctxt
-                ~step_constants
-                ~kinstr
-                ~bef_top
-                ~bef
-            in
-            (workload, closure, measure_allocation)
+            (workload, closure)
       in
-      Generator.PlainWithAllocation {workload; closure; measure_allocation}
+      Generator.Plain {workload; closure}
 
 let make_benchmark :
     ?amplification:int ->
