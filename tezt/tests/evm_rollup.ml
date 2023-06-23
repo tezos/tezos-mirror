@@ -1193,7 +1193,7 @@ let test_inject_100_transactions =
 let test_eth_call_large =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "eth_call"; "simulate"; "large"; "try"]
+    ~tags:["evm"; "eth_call"; "simulate"; "large"]
     ~title:"Try to call with a large amount of data"
     (fun protocol ->
       (* setup *)
@@ -1242,6 +1242,46 @@ let test_estimate_gas =
       (* large request *)
       let data = read_file simple_storage.bin in
       let eth_call = [("data", Ezjsonm.encode_string @@ "0x" ^ data)] in
+
+      (* make call to proxy *)
+      let* call_result =
+        Evm_proxy_server.(
+          call_evm_rpc
+            evm_proxy_server
+            {method_ = "eth_estimateGas"; parameters = `A [`O eth_call]})
+      in
+
+      (* Check the RPC returns a `result`. *)
+      let r = call_result |> Evm_proxy_server.extract_result in
+      Check.((JSON.as_int r = 21123) int)
+        ~error_msg:"Expected result greater than %R, but got %L" ;
+
+      unit)
+
+let test_estimate_gas_additionnal_field =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "eth_estimategas"; "simulate"; "remix"]
+    ~title:"eth_estimateGas allows additional fields"
+    (fun protocol ->
+      (* setup *)
+      let* {evm_proxy_server; _} =
+        setup_past_genesis protocol ~deposit_admin:None
+      in
+
+      (* large request *)
+      let data = read_file simple_storage.bin in
+      let eth_call =
+        [
+          ( "from",
+            Ezjsonm.encode_string
+            @@ "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c" );
+          ("data", Ezjsonm.encode_string @@ "0x" ^ data);
+          ("value", Ezjsonm.encode_string @@ "0x0");
+          (* for some reason remix adds the "type" field *)
+          ("type", Ezjsonm.encode_string @@ "0x1");
+        ]
+      in
 
       (* make call to proxy *)
       let* call_result =
@@ -1569,6 +1609,7 @@ let register_evm_proxy_server ~protocols =
   test_eth_call_large protocols ;
   test_preinitialized_evm_kernel protocols ;
   test_deposit_fa12 protocols ;
-  test_estimate_gas protocols
+  test_estimate_gas protocols ;
+  test_estimate_gas_additionnal_field protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols

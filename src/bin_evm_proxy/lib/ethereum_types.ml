@@ -708,22 +708,32 @@ type call = {
   data : hash option;
 }
 
-let call_encoding =
+let call_extendable_encoding =
   let open Data_encoding in
-  conv
-    (fun {from; to_; gas; gasPrice; value; data} ->
-      (from, Some to_, gas, gasPrice, value, data))
-    (fun (from, to_, gas, gasPrice, value, data) ->
-      {from; to_ = Option.join to_; gas; gasPrice; value; data})
-    (obj6
-       (opt "from" address_encoding)
-       (opt "to" (option address_encoding))
-       (* `call` is also used for estimateGas, which allows all fields to be
-          empty, hence `to` can be `null` or absent. *)
-       (opt "gas" quantity_encoding)
-       (opt "gasPrice" quantity_encoding)
-       (opt "value" quantity_encoding)
-       (opt "data" hash_encoding))
+  (* `merge_objs <obj> unit` allows the encoding to accept any number of
+      unspecified fields from JSON. *)
+  merge_objs
+    (conv
+       (fun {from; to_; gas; gasPrice; value; data} ->
+         (from, Some to_, gas, gasPrice, value, data))
+       (fun (from, to_, gas, gasPrice, value, data) ->
+         {from; to_ = Option.join to_; gas; gasPrice; value; data})
+       (obj6
+          (opt "from" address_encoding)
+          (opt "to" (option address_encoding))
+          (* `call` is also used for estimateGas, which allows all fields to be
+             empty, hence `to` can be `null` or absent. *)
+          (opt "gas" quantity_encoding)
+          (opt "gasPrice" quantity_encoding)
+          (opt "value" quantity_encoding)
+          (opt "data" hash_encoding)))
+    unit
+
+let call_encoding =
+  Data_encoding.conv
+    (fun call -> (call, ()))
+    (fun (call, ()) -> call)
+    call_extendable_encoding
 
 (** The txpool encoding can be found in
     https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-txpool#txpool-content.
