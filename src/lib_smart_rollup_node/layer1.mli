@@ -30,6 +30,8 @@
    subscribing to the head monitoring RPC offered by the Tezos node.
 *)
 
+type error += Cannot_find_block of Block_hash.t
+
 type header = {
   hash : Block_hash.t;
   level : int32;
@@ -45,6 +47,19 @@ val head_encoding : head Data_encoding.t
 val head_of_header : header -> head
 
 type t
+
+(** An extensible type for the protocol specific full blocks. This allows to
+    have a single cache for blocks from all protocols. *)
+type block = ..
+
+(** Type of protocol specific functions for fetching protocol specific blocks. *)
+type fetch_block_rpc =
+  Client_context.full ->
+  ?metadata:[`Always | `Never] ->
+  ?chain:Tezos_shell_services.Block_services.chain ->
+  ?block:Tezos_shell_services.Block_services.block ->
+  unit ->
+  block tzresult Lwt.t
 
 (** [start ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols cctxt]
     connects to a Tezos node and starts monitoring new heads. One can iterate on
@@ -64,9 +79,6 @@ val start :
 
 (** [shutdown t] properly shuts the layer 1 down. *)
 val shutdown : t -> unit Lwt.t
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3311
-   Allow to retrieve L1 blocks through Tezos node storage locally. *)
 
 (** [iter_heads t f] calls [f] on all new heads appearing in the layer 1
     chain. In case of a disconnection with the layer 1 node, it reconnects
@@ -100,19 +112,27 @@ val get_tezos_reorg_for_new_head :
 
 (** {2 Helpers } *)
 
+(** Register a block header in the cache. *)
+val cache_shell_header : t -> Block_hash.t -> Block_header.shell_header -> unit
+
+(** Returns the client context used by the L1 monitor. *)
+val client_context : t -> Client_context.full
+
 (** [fetch_tezos_shell_header cctxt hash] returns the block shell header of
     [hash]. Looks for the block in the blocks cache first, and fetches it from
     the L1 node otherwise. *)
 val fetch_tezos_shell_header :
   t -> Block_hash.t -> Block_header.shell_header tzresult Lwt.t
 
-(** [fetch_tezos_block cctxt hash] returns a block info given a block hash.
-    Looks for the block in the blocks cache first, and fetches it from the L1
-    node otherwise. *)
+(** [fetch_tezos_block fetch extract_header cctxt hash] returns a block info
+    given a block hash. Looks for the block in the blocks cache first, and
+    fetches it from the L1 node otherwise. *)
 val fetch_tezos_block :
+  fetch_block_rpc ->
+  (block -> Block_header.shell_header) ->
   t ->
   Block_hash.t ->
-  Protocol_client_context.Alpha_block_services.block_info tzresult Lwt.t
+  block tzresult Lwt.t
 
 (** [make_prefetching_schedule l1_ctxt blocks] returns the list [blocks] with
     each element associated to a list of blocks to prefetch of at most
@@ -121,10 +141,15 @@ val fetch_tezos_block :
     [b4;b5;b6]); ...]. *)
 val make_prefetching_schedule : t -> 'block trace -> ('block * 'block list) list
 
-(** [prefetch_tezos_blocks l1_ctxt blocks] prefetches the blocks
-    asynchronously. NOTE: the number of blocks to prefetch must not be greater
-    than the size of the blocks cache otherwise they will be lost. *)
-val prefetch_tezos_blocks : t -> head list -> unit
+(** [prefetch_tezos_blocks fetch extract_header l1_ctxt  blocks] prefetches the
+    blocks asynchronously. NOTE: the number of blocks to prefetch must not be
+    greater than the size of the blocks cache otherwise they will be lost. *)
+val prefetch_tezos_blocks :
+  fetch_block_rpc ->
+  (block -> Block_header.shell_header) ->
+  t ->
+  head list ->
+  unit
 
 (**/**)
 

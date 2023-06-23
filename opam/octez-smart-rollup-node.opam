@@ -20,8 +20,9 @@ depends: [
   "prometheus-app" { >= "1.2" }
   "octez-injector"
   "tezos-version"
-  "octez-smart-rollup"
   "tezos-layer2-store"
+  "octez-crawler"
+  "octez-smart-rollup"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
