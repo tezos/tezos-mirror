@@ -265,7 +265,7 @@ let get_vdf_solution_if_ready cctxt state proc setup chain_id hash
       in
       return_unit
 
-let kill_running_vdf_computation {pid; _} =
+let kill_forked_process {pid; _} =
   let open Lwt_syntax in
   let* () =
     match Unix.kill pid Sys.sigterm with
@@ -278,6 +278,15 @@ let kill_running_vdf_computation {pid; _} =
   in
   let* _status = Lwt_unix.waitpid [] pid in
   return_unit
+
+(* Kill the VDF computation process if one was launched. *)
+let maybe_kill_running_vdf_computation state =
+  let open Lwt_syntax in
+  match state.computation_status with
+  | Started (_, proc) ->
+      let* () = kill_forked_process proc in
+      return_unit
+  | _ -> return_unit
 
 (* Checks if the cycle of the last processed block is different from the cycle
  * of the block at [level_info]. *)
@@ -299,7 +308,7 @@ let check_new_cycle state (level_info : Level.t) =
           match state.computation_status with
           | Injected -> return_unit
           | Started ((_ : vdf_setup), proc) ->
-              let*! () = kill_running_vdf_computation proc in
+              let*! () = kill_forked_process proc in
               emit_revelation_not_injected cycle
           | Not_started | Finished _ | Invalid ->
               emit_revelation_not_injected cycle
@@ -401,7 +410,7 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
               (* The chain is no longer in the VDF revelation stage because
                * the solution has already been injected: abort the running
                * computation. *)
-              let*! () = kill_running_vdf_computation proc in
+              let*! () = kill_forked_process proc in
               let*! () =
                 emit_with_level
                   "VDF solution already injected, aborting VDF computation"
@@ -454,6 +463,7 @@ let start_vdf_worker (cctxt : Protocol_client_context.full) ~canceler constants
     }
   in
   Lwt_canceler.on_cancel canceler (fun () ->
+      let*! () = maybe_kill_running_vdf_computation state in
       stop_block_stream state ;
       Lwt.return_unit) ;
   let rec worker_loop () =
