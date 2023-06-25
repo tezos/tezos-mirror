@@ -122,11 +122,11 @@ let extract_anomalies path level infos =
       List.fold_left
         (fun acc
              Data.Delegate_operations.
-               {delegate; endorsing_power = _; operations} ->
+               {delegate; first_slot = _; endorsing_power = _; operations} ->
           List.fold_left
             (fun acc
                  Data.Delegate_operations.
-                   {kind; round; mempool_inclusion; block_inclusion} ->
+                   {hash = _; kind; round; mempool_inclusion; block_inclusion} ->
               match (kind, mempool_inclusion, block_inclusion) with
               | Endorsement, [], [] ->
                   Data.Anomaly.
@@ -167,7 +167,7 @@ let extract_anomalies path level infos =
    preendorsements or endorsements in [ops] that were included in block
    [block_hash] to the list of operations already known for operation's
    producer. *)
-let add_to_operations block_hash ops_kind ?ops_round operations =
+let add_to_operations block_hash ops_hash ops_kind ?ops_round operations =
   match
     List.partition
       (fun Data.Delegate_operations.{kind; round; _} ->
@@ -180,11 +180,12 @@ let add_to_operations block_hash ops_kind ?ops_round operations =
       operations
   with
   | ( Data.Delegate_operations.
-        {kind; round = _; mempool_inclusion; block_inclusion}
+        {hash; kind; round = _; mempool_inclusion; block_inclusion}
       :: _,
       operations' ) ->
       Data.Delegate_operations.
         {
+          hash;
           kind;
           round = ops_round;
           mempool_inclusion;
@@ -193,6 +194,7 @@ let add_to_operations block_hash ops_kind ?ops_round operations =
       :: operations'
   | [], _ ->
       {
+        hash = ops_hash;
         kind = ops_kind;
         round = ops_round;
         mempool_inclusion = [];
@@ -207,7 +209,8 @@ let add_inclusion_in_block block_hash validators delegate_operations =
     List.fold_left
       (fun (acc, missing)
            Data.Delegate_operations.(
-             {delegate; endorsing_power; operations} as delegate_ops) ->
+             {delegate; first_slot; endorsing_power; operations} as delegate_ops)
+           ->
         match
           List.partition
             (fun op ->
@@ -221,10 +224,12 @@ let add_inclusion_in_block block_hash validators delegate_operations =
             ( Data.Delegate_operations.
                 {
                   delegate;
+                  first_slot;
                   endorsing_power;
                   operations =
                     add_to_operations
                       block_hash
+                      op.op.hash
                       op.op.kind
                       ?ops_round:op.op.round
                       operations;
@@ -244,10 +249,12 @@ let add_inclusion_in_block block_hash validators delegate_operations =
           Data.Delegate_operations.
             {
               delegate;
+              first_slot = 0;
               endorsing_power = op.Consensus_ops.power;
               operations =
                 [
                   {
+                    hash = op.op.hash;
                     kind = op.op.kind;
                     round = op.op.round;
                     mempool_inclusion = [];
@@ -338,10 +345,7 @@ let dump_included_in_block path block_level block_hash block_predecessor
    first reception time. *)
 let merge_operations =
   List.fold_left
-    (fun
-      acc
-      Consensus_ops.{op = {hash = _; kind; round}; errors; reception_time}
-    ->
+    (fun acc Consensus_ops.{op = {hash; kind; round}; errors; reception_time} ->
       match
         List.partition
           (fun Data.Delegate_operations.{round = r; kind = k; _} ->
@@ -353,6 +357,7 @@ let merge_operations =
           acc' ) ->
           Data.Delegate_operations.
             {
+              hash;
               kind;
               round;
               mempool_inclusion =
@@ -363,6 +368,7 @@ let merge_operations =
       | _ :: _, _ -> acc
       | [], _ ->
           {
+            hash;
             kind;
             round;
             mempool_inclusion = [{source = "archiver"; reception_time; errors}];
@@ -380,7 +386,8 @@ let dump_received path ?unaccurate level received_ops =
           List.fold_left
             (fun (acc, missing)
                  Data.Delegate_operations.(
-                   {delegate; endorsing_power; operations} as delegate_ops) ->
+                   {delegate; first_slot; endorsing_power; operations} as
+                   delegate_ops) ->
               match
                 List.partition
                   (fun (pkh, _) ->
@@ -392,6 +399,7 @@ let dump_received path ?unaccurate level received_ops =
                   ( Data.Delegate_operations.
                       {
                         delegate;
+                        first_slot;
                         endorsing_power;
                         operations = merge_operations operations new_operations;
                       }
@@ -411,16 +419,18 @@ let dump_received path ?unaccurate level received_ops =
                      Data.Delegate_operations.
                        {
                          delegate;
+                         first_slot = 0;
                          endorsing_power = 0;
                          operations =
                            List.rev_map
                              (fun Consensus_ops.
                                     {
-                                      op = {hash = _; kind; round};
+                                      op = {hash; kind; round};
                                       errors;
                                       reception_time;
                                     } ->
                                {
+                                 hash;
                                  kind;
                                  round;
                                  mempool_inclusion =

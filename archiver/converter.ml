@@ -37,19 +37,30 @@ let to_received_ops ctx endpoint auth level data =
   (*fake operation hash*)
   let received_ops =
     List.map
-      (fun Data.Delegate_operations.{delegate; endorsing_power = _; operations} ->
+      (fun Data.Delegate_operations.
+             {delegate; first_slot = _; endorsing_power = _; operations} ->
         ( delegate,
           List.flatten
             (List.map
                (fun Data.Delegate_operations.
-                      {kind; round; mempool_inclusion; block_inclusion = _} ->
+                      {
+                        hash;
+                        kind;
+                        round;
+                        mempool_inclusion;
+                        block_inclusion = _;
+                      } ->
                  List.map
                    (fun Data.Delegate_operations.
                           {source = _; reception_time; errors} ->
-                     let fake_hash = fake_hash level round delegate kind in
+                     let maybe_faked_hash =
+                       if Operation_hash.equal hash Operation_hash.zero then
+                         fake_hash level round delegate kind
+                       else hash
+                     in
                      Consensus_ops.
                        {
-                         op = {kind; round; hash = fake_hash};
+                         op = {kind; round; hash = maybe_faked_hash};
                          errors;
                          reception_time;
                        })
@@ -88,19 +99,25 @@ let block_map_append x e m =
 
 let included_ops_map level data =
   List.fold_left
-    (fun acc Data.Delegate_operations.{delegate; endorsing_power; operations} ->
+    (fun acc
+         Data.Delegate_operations.
+           {delegate; first_slot = _; endorsing_power; operations} ->
       List.fold_left
         (fun acc
              Data.Delegate_operations.
-               {kind; round; mempool_inclusion = _; block_inclusion} ->
+               {hash; kind; round; mempool_inclusion = _; block_inclusion} ->
           List.fold_left
             (fun acc block ->
-              let fake_hash = fake_hash level round delegate kind in
+              let maybe_faked_hash =
+                if Operation_hash.equal hash Operation_hash.zero then
+                  fake_hash level round delegate kind
+                else hash
+              in
               block_map_append
                 block
                 Consensus_ops.
                   {
-                    op = {kind; round; hash = fake_hash};
+                    op = {kind; round; hash = maybe_faked_hash};
                     delegate;
                     power = endorsing_power;
                   }

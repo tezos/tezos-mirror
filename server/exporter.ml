@@ -114,25 +114,9 @@ let select_blocks db_pool level =
       Db.fold reception_request parse_block_reception_row level blocks)
     db_pool
 
-module Op_key = struct
-  type t = {
-    kind : Teztale_lib.Consensus_ops.operation_kind;
-    round : Int32.t option;
-  }
-
-  let compare op1 op2 =
-    let c = Option.compare Int32.compare op1.round op2.round in
-    if c = 0 then
-      match (op1.kind, op2.kind) with
-      | Preendorsement, Endorsement -> -1
-      | Endorsement, Preendorsement -> 1
-      | _ -> 0
-    else c
-end
-
-module Pkh_ops = Map.Make (Op_key)
-
 type op_info = {
+  kind : Teztale_lib.Consensus_ops.operation_kind;
+  round : Int32.t option;
   included : Tezos_crypto.Hashed.Block_hash.t list;
   received : Teztale_lib.Data.Delegate_operations.reception list;
 }
@@ -170,59 +154,72 @@ let select_ops db_pool level =
   let q_rights =
     Caqti_request.Infix.(
       Caqti_type.int32
-      ->* Caqti_type.(tup2 Sql_requests.Type.public_key_hash int))
-      "SELECT d.address, e.endorsing_power FROM endorsing_rights e JOIN \
-       delegates d ON e.delegate = d.id WHERE e.level = ?"
+      ->* Caqti_type.(tup3 Sql_requests.Type.public_key_hash int int))
+      "SELECT d.address, e.first_slot, e.endorsing_power FROM endorsing_rights \
+       e JOIN delegates d ON e.delegate = d.id WHERE e.level = ?"
   in
   let q_included =
     Caqti_request.Infix.(
       Caqti_type.int32
       ->* Caqti_type.(
-            tup4
-              Sql_requests.Type.public_key_hash
-              bool
-              (option int32)
+            tup2
+              (tup4
+                 Sql_requests.Type.public_key_hash
+                 bool
+                 (option int32)
+                 Sql_requests.Type.operation_hash)
               Sql_requests.Type.block_hash))
-      "SELECT d.address, o.endorsement, o.round, b.hash FROM operations o JOIN \
-       operations_inclusion i ON i.operation = o.id JOIN delegates d ON \
-       o.endorser = d.id JOIN blocks b ON i.block = b.id WHERE o.level = ?"
+      "SELECT d.address, o.endorsement, o.round, o.hash, b.hash FROM \
+       operations o JOIN operations_inclusion i ON i.operation = o.id JOIN \
+       delegates d ON o.endorser = d.id JOIN blocks b ON i.block = b.id WHERE \
+       o.level = ?"
   in
   let q_received =
     Caqti_request.Infix.(
       Caqti_type.int32
       ->* Caqti_type.(
             tup2
-              (tup2 Sql_requests.Type.public_key_hash ptime)
+              (tup3
+                 Sql_requests.Type.public_key_hash
+                 ptime
+                 Sql_requests.Type.operation_hash)
               (tup4 Sql_requests.Type.errors string bool (option int32))))
-      "SELECT d.address, r.timestamp, r.errors, n.name, o.endorsement, o.round \
-       FROM operations o JOIN operations_reception r ON r.operation = o.id \
-       JOIN delegates d ON o.endorser = d.id JOIN nodes n ON n.id = r.source \
-       WHERE o.level = ?"
+      "SELECT d.address, r.timestamp, o.hash, r.errors, n.name, o.endorsement, \
+       o.round FROM operations o JOIN operations_reception r ON r.operation = \
+       o.id JOIN delegates d ON o.endorser = d.id JOIN nodes n ON n.id = \
+       r.source WHERE o.level = ?"
   in
   let module Ops = Tezos_crypto.Signature.Public_key_hash.Map in
-  let cb_rights (delegate, power) info =
-    Ops.add delegate (power, Pkh_ops.empty) info
+  let cb_rights (delegate, first_slot, power) info =
+    Ops.add
+      delegate
+      (first_slot, power, Tezos_crypto.Hashed.Operation_hash.Map.empty)
+      info
   in
-  let cb_included (delegate, endorsement, round, block_hash) info =
+  let cb_included ((delegate, endorsement, round, op_hash), block_hash) info =
     let kind = kind_of_bool endorsement in
     Ops.update
       delegate
       (function
-        | Some (power, ops) ->
-            let op_key = Op_key.{kind; round} in
+        | Some (first_slot, power, ops) ->
             let op =
-              match Pkh_ops.find_opt op_key ops with
+              match
+                Tezos_crypto.Hashed.Operation_hash.Map.find_opt op_hash ops
+              with
               | Some op_info ->
                   {op_info with included = block_hash :: op_info.included}
-              | None -> {included = [block_hash]; received = []}
+              | None -> {kind; round; included = [block_hash]; received = []}
             in
-            let ops' = Pkh_ops.add op_key op ops in
-            Some (power, ops')
+            let ops' =
+              Tezos_crypto.Hashed.Operation_hash.Map.add op_hash op ops
+            in
+            Some (first_slot, power, ops')
         | None -> None)
       info
   in
   let cb_received
-      ((delegate, reception_time), (errors, source, endorsement, round)) info =
+      ((delegate, reception_time, op_hash), (errors, source, endorsement, round))
+      info =
     let kind = kind_of_bool endorsement in
     let received_info =
       Teztale_lib.Data.Delegate_operations.{source; reception_time; errors}
@@ -230,16 +227,19 @@ let select_ops db_pool level =
     Ops.update
       delegate
       (function
-        | Some (power, ops) ->
-            let op_key = Op_key.{kind; round} in
+        | Some (first_slot, power, ops) ->
             let op =
-              match Pkh_ops.find_opt op_key ops with
+              match
+                Tezos_crypto.Hashed.Operation_hash.Map.find_opt op_hash ops
+              with
               | Some op_info ->
                   {op_info with received = received_info :: op_info.received}
-              | None -> {included = []; received = [received_info]}
+              | None -> {kind; round; included = []; received = [received_info]}
             in
-            let ops' = Pkh_ops.add op_key op ops in
-            Some (power, ops')
+            let ops' =
+              Tezos_crypto.Hashed.Operation_hash.Map.add op_hash op ops
+            in
+            Some (first_slot, power, ops')
         | None -> None)
       info
   in
@@ -262,24 +262,26 @@ let select_ops db_pool level =
 
 let translate_ops info =
   let translate pkh_ops =
-    Pkh_ops.fold
-      (fun Op_key.{kind; round} op_info acc ->
+    Tezos_crypto.Hashed.Operation_hash.Map.fold
+      (fun hash {kind; round; included; received} acc ->
         Teztale_lib.Data.Delegate_operations.
           {
+            hash;
             kind;
             round;
-            mempool_inclusion = op_info.received;
-            block_inclusion = op_info.included;
+            mempool_inclusion = received;
+            block_inclusion = included;
           }
         :: acc)
       pkh_ops
       []
   in
   Tezos_crypto.Signature.Public_key_hash.Map.fold
-    (fun pkh (power, pkh_ops) acc ->
+    (fun pkh (first_slot, power, pkh_ops) acc ->
       Teztale_lib.Data.Delegate_operations.
         {
           delegate = pkh;
+          first_slot;
           endorsing_power = power;
           operations = translate pkh_ops;
         }
@@ -294,8 +296,8 @@ let translate_ops info =
 let anomalies level ops =
   let extract_anomalies delegate pkh_ops =
     let open Teztale_lib.Data.Anomaly in
-    Pkh_ops.fold
-      (fun Op_key.{kind; round} {received; included} acc ->
+    Tezos_crypto.Hashed.Operation_hash.Map.fold
+      (fun _op_hash {kind; round; received; included} acc ->
         let problem =
           match (received, included) with
           | [], [] -> Some Missed
@@ -310,7 +312,8 @@ let anomalies level ops =
       []
   in
   Tezos_crypto.Signature.Public_key_hash.Map.fold
-    (fun pkh (_power, pkh_ops) acc -> extract_anomalies pkh pkh_ops @ acc)
+    (fun pkh (_first_slot, _power, pkh_ops) acc ->
+      extract_anomalies pkh pkh_ops @ acc)
     ops
     []
 

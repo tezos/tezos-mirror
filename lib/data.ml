@@ -41,6 +41,7 @@ module Delegate_operations = struct
          (dft "errors" Tezos_rpc.Error.opt_encoding None))
 
   type operation = {
+    hash : Operation_hash.t;
     kind : Consensus_ops.operation_kind;
     round : Int32.t option;
     mempool_inclusion : reception list;
@@ -58,7 +59,13 @@ module Delegate_operations = struct
           | Some reception_time ->
               [{source = "archiver"; reception_time; errors}]
         in
-        {kind; round; mempool_inclusion; block_inclusion})
+        {
+          hash = Operation_hash.zero;
+          kind;
+          round;
+          mempool_inclusion;
+          block_inclusion;
+        })
       (obj5
          (dft
             "kind"
@@ -72,11 +79,12 @@ module Delegate_operations = struct
   let operation_encoding =
     let open Data_encoding in
     conv
-      (fun {kind; round; mempool_inclusion; block_inclusion} ->
-        (kind, round, mempool_inclusion, block_inclusion))
-      (fun (kind, round, mempool_inclusion, block_inclusion) ->
-        {kind; round; mempool_inclusion; block_inclusion})
-      (obj4
+      (fun {hash; kind; round; mempool_inclusion; block_inclusion} ->
+        (hash, kind, round, mempool_inclusion, block_inclusion))
+      (fun (hash, kind, round, mempool_inclusion, block_inclusion) ->
+        {hash; kind; round; mempool_inclusion; block_inclusion})
+      (obj5
+         (dft "hash" Operation_hash.encoding Operation_hash.zero)
          (dft
             "kind"
             Consensus_ops.operation_kind_encoding
@@ -108,6 +116,7 @@ module Delegate_operations = struct
 
   type t = {
     delegate : Tezos_crypto.Signature.public_key_hash;
+    first_slot : int;
     endorsing_power : int;
     operations : operation list;
   }
@@ -118,7 +127,8 @@ module Delegate_operations = struct
       (fun _ -> assert false)
       (fun (delegate, reception_time, errors, block_inclusion) ->
         match (reception_time, block_inclusion) with
-        | None, [] -> {delegate; endorsing_power = 0; operations = []}
+        | None, [] ->
+            {delegate; first_slot = 0; endorsing_power = 0; operations = []}
         | _, _ ->
             let mempool_inclusion =
               match reception_time with
@@ -128,10 +138,12 @@ module Delegate_operations = struct
             in
             {
               delegate;
+              first_slot = 0;
               endorsing_power = 0;
               operations =
                 [
                   {
+                    hash = Operation_hash.zero;
                     kind = Endorsement;
                     mempool_inclusion;
                     round = None;
@@ -148,12 +160,13 @@ module Delegate_operations = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {delegate; endorsing_power; operations} ->
-        (delegate, endorsing_power, operations))
-      (fun (delegate, endorsing_power, operations) ->
-        {delegate; endorsing_power; operations})
-      (obj3
+      (fun {delegate; first_slot; endorsing_power; operations} ->
+        (delegate, first_slot, endorsing_power, operations))
+      (fun (delegate, first_slot, endorsing_power, operations) ->
+        {delegate; first_slot; endorsing_power; operations})
+      (obj4
          (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
+         (dft "first_slot" int16 0)
          (dft "endorsing_power" int16 0)
          (dft "operations" (list operation_encoding) []))
 
