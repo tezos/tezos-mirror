@@ -445,6 +445,164 @@ let operations_callback db_pool g source operations =
         ~body:"Received operations stored"
         ())
 
+let import_callback db_pool g data =
+  let level = Int32.of_string (Re.Group.get g 1) in
+  let out =
+    let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
+    Caqti_lwt.Pool.use
+      (fun (module Db : Caqti_lwt.CONNECTION) ->
+        Db.with_transaction (fun () ->
+            (* delegates *)
+            let* () =
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun slot ->
+                  Db.exec
+                    Sql_requests.maybe_insert_delegate
+                    slot.Teztale_lib.Data.Delegate_operations.delegate)
+                data.Teztale_lib.Data.delegate_operations
+            in
+            let* () =
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun block ->
+                  Db.exec
+                    Sql_requests.maybe_insert_delegate
+                    block.Teztale_lib.Data.Block.delegate)
+                data.Teztale_lib.Data.blocks
+            in
+            (* sources *)
+            let* () =
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun slot ->
+                  Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                    (fun op ->
+                      Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                        (fun inc ->
+                          Db.exec
+                            Sql_requests.maybe_insert_source
+                            inc.Teztale_lib.Data.Delegate_operations.source)
+                        op
+                          .Teztale_lib.Data.Delegate_operations
+                           .mempool_inclusion)
+                    slot.Teztale_lib.Data.Delegate_operations.operations)
+                data.Teztale_lib.Data.delegate_operations
+            in
+            let* () =
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun block ->
+                  Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                    (fun Teztale_lib.Data.Block.{source; _} ->
+                      Db.exec Sql_requests.maybe_insert_source source)
+                    block.Teztale_lib.Data.Block.reception_times)
+                data.Teztale_lib.Data.blocks
+            in
+            (* rights *)
+            let* () =
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun Teztale_lib.Data.Delegate_operations.
+                       {delegate; first_slot; endorsing_power; _} ->
+                  Db.exec
+                    Sql_requests.maybe_insert_endorsing_right
+                    (level, first_slot, endorsing_power, delegate))
+                data.Teztale_lib.Data.delegate_operations
+            in
+            (* blocks *)
+            let* () =
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun block ->
+                  Db.exec
+                    Sql_requests.maybe_insert_block
+                    Teztale_lib.Data.Block.
+                      ( (level, block.timestamp, block.hash, block.round),
+                        (block.predecessor, block.delegate) ))
+                data.Teztale_lib.Data.blocks
+            in
+            (* operations *)
+            let* () =
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun Teztale_lib.Data.Delegate_operations.
+                       {delegate; operations; _} ->
+                  Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                    (fun Teztale_lib.Data.Delegate_operations.
+                           {hash; kind; round; _} ->
+                      Db.exec
+                        Sql_requests.maybe_insert_operation
+                        ( ( level,
+                            hash,
+                            kind = Teztale_lib.Consensus_ops.Endorsement,
+                            round ),
+                          delegate ))
+                    operations)
+                data.Teztale_lib.Data.delegate_operations
+            in
+            (* block reception *)
+            let* () =
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun block ->
+                  Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                    (fun Teztale_lib.Data.Block.
+                           {source; application_time; validation_time} ->
+                      Db.exec
+                        Sql_requests.insert_received_block
+                        ( application_time,
+                          validation_time,
+                          block.Teztale_lib.Data.Block.hash,
+                          source ))
+                    block.Teztale_lib.Data.Block.reception_times)
+                data.Teztale_lib.Data.blocks
+            in
+            (* operation reception *)
+            let* () =
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun Teztale_lib.Data.Delegate_operations.
+                       {delegate; operations; _} ->
+                  Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                    (fun Teztale_lib.Data.Delegate_operations.
+                           {kind; round; mempool_inclusion; _} ->
+                      Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                        (fun Teztale_lib.Data.Delegate_operations.
+                               {source; reception_time; errors} ->
+                          Db.exec
+                            Sql_requests.insert_received_operation
+                            ( ( reception_time,
+                                errors,
+                                delegate,
+                                kind = Teztale_lib.Consensus_ops.Endorsement ),
+                              (round, source, level) ))
+                        mempool_inclusion)
+                    operations)
+                data.Teztale_lib.Data.delegate_operations
+            in
+            (* operation inclusion *)
+            let* () =
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun Teztale_lib.Data.Delegate_operations.
+                       {delegate; operations; _} ->
+                  Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                    (fun Teztale_lib.Data.Delegate_operations.
+                           {kind; round; block_inclusion; _} ->
+                      Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                        (fun block_hash ->
+                          Db.exec
+                            Sql_requests.insert_included_operation
+                            ( ( delegate,
+                                kind = Teztale_lib.Consensus_ops.Endorsement,
+                                round ),
+                              (block_hash, level) ))
+                        block_inclusion)
+                    operations)
+                data.Teztale_lib.Data.delegate_operations
+            in
+            return_unit))
+      db_pool
+  in
+  with_caqti_error out (fun () ->
+      Cohttp_lwt_unix.Server.respond_string
+        ~headers:
+          (Cohttp.Header.init_with "content-type" "text/plain; charset=UTF-8")
+        ~status:`OK
+        ~body:"Level imported"
+        ())
+
 let routes :
     (Re.re
     * (Re.Group.t ->
@@ -478,6 +636,11 @@ let routes :
               Teztale_lib.Consensus_ops.delegate_ops_encoding
               body
               (operations_callback db_pool g source)) );
+    ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/import"],
+      fun g ~admins ~users:_ db_pool header meth body ->
+        post_only_endpoint admins header meth (fun _source ->
+            with_data Teztale_lib.Data.encoding body (import_callback db_pool g))
+    );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str ".json"],
       fun g ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () ->
