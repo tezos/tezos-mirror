@@ -30,9 +30,7 @@ module Encodings =
 Tezos_shell_benchmarks.Encoding_benchmarks_helpers.Make (struct
   let file = __FILE__
 
-  let purpose =
-    Benchmark.Generate_code
-      "src/proto_alpha/lib_protocol/michelson_v1_gas_costs_generated.ml"
+  let purpose = Benchmark.Generate_code "michelson_v1_gas"
 end)
 
 module Size = Gas_input_size
@@ -208,9 +206,7 @@ module Typechecking_data : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let purpose =
-    Benchmark.Generate_code
-      "src/proto_alpha/lib_protocol/michelson_v1_gas_costs_generated.ml"
+  let purpose = Benchmark.Generate_code "michelson_v1_gas"
 
   let typechecking_data_benchmark rng_state (node : Protocol.Script_repr.expr)
       (michelson_type : Script_repr.expr) =
@@ -286,9 +282,7 @@ module Unparsing_data : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let purpose =
-    Benchmark.Generate_code
-      "src/proto_alpha/lib_protocol/michelson_v1_gas_costs_generated.ml"
+  let purpose = Benchmark.Generate_code "michelson_v1_gas"
 
   let unparsing_data_benchmark rng_state (node : Protocol.Script_repr.expr)
       (michelson_type : Protocol.Script_repr.expr) =
@@ -371,9 +365,7 @@ module Typechecking_code : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let purpose =
-    Benchmark.Generate_code
-      "src/proto_alpha/lib_protocol/michelson_v1_gas_costs_generated.ml"
+  let purpose = Benchmark.Generate_code "michelson_v1_gas"
 
   let typechecking_code_benchmark rng_state (node : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =
@@ -453,9 +445,7 @@ module Unparsing_code : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let purpose =
-    Benchmark.Generate_code
-      "src/proto_alpha/lib_protocol/michelson_v1_gas_costs_generated.ml"
+  let purpose = Benchmark.Generate_code "michelson_v1_gas"
 
   let unparsing_code_benchmark rng_state (node : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =

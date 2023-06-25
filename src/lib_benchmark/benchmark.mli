@@ -38,7 +38,9 @@
 type group = Standalone | Group of string | Generic
 
 (** Described the purpose of the benchmark.
-      * [Generate_code of destination]: generates code at the given [destination] file.
+      * [Generate_code of destination]: generates code at the given
+        [destination] file, prefixed by "src/proto_alpha/lib_protocol/" and
+        suffixed by "_costs_generated.ml".
       * [Other_purpose of purpose]: any other purpose. The goal is to explain why the function is benchmarked since it does not produce a cost function.
   *)
 type purpose = Other_purpose of string | Generate_code of string

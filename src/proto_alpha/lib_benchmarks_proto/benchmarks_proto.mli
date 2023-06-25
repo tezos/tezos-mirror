@@ -75,11 +75,9 @@ module Benchmark : sig
     (** Cost model *)
     val model : name:Namespace.t -> workload Model.t
 
-    (** benchmark purpose, automatically prefix by
-        "src/proto_alpha/lib_protocol/"
-        and suffixed by
-        "_costs_generated.ml" when [Generate_code of location] is used.
-        Otherwise, the developer can submit an explanation as to what the benchmark is for with [Other_purpose of string]. *)
+    (** Benchmark purpose.
+        The developer can submit an explanation as to what the benchmark is for when it's not generating code
+        (i.e. in the case of [Other_purpose]). *)
     val purpose : Benchmark_base.purpose
 
     (** Creates a  benchmark, ready to be run.

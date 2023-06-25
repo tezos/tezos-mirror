@@ -135,9 +135,7 @@ module Micheline_strip_locations : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let purpose =
-    Benchmark.Generate_code
-      "src/proto_alpha/lib_protocol/script_repr_costs_generated.ml"
+  let purpose = Benchmark.Generate_code "script_repr"
 
   let tags = ["micheline"]
 
