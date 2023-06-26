@@ -201,31 +201,12 @@ fn read_nth_block_timestamp<Host: Runtime>(
     read_timestamp_path(host, &path)
 }
 
-fn read_current_block_nodebug<Host: Runtime>(host: &mut Host) -> Result<L2Block, Error> {
+pub fn read_current_block<Host: Runtime>(host: &mut Host) -> Result<L2Block, Error> {
     let number = read_current_block_number(host)?;
     let block_path = block_path(number)?;
     let transactions = read_nth_block_transactions(host, &block_path)?;
     let timestamp = read_nth_block_timestamp(host, &block_path)?;
     Ok(L2Block::new(number, transactions, timestamp))
-}
-
-pub fn read_current_block<Host: Runtime>(host: &mut Host) -> Result<L2Block, Error> {
-    match read_current_block_nodebug(host) {
-        Ok(block) => {
-            debug_msg!(
-                host,
-                "Reading block {} at number {} containing {} transaction(s).\n",
-                block.hash.as_bytes().encode_hex::<String>(),
-                block.number,
-                block.transactions.len()
-            );
-            Ok(block)
-        }
-        Err(e) => {
-            debug_msg!(host, "Block reading failed: {:?}\n", e);
-            Err(e)
-        }
-    }
 }
 
 fn store_block_number<Host: Runtime>(

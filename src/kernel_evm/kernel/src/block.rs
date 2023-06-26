@@ -172,7 +172,15 @@ fn compute<Host: Runtime>(
 }
 
 pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error> {
-    let mut current_block = storage::read_current_block(host)?;
+    let (mut current_constants, mut current_block_number) =
+        match storage::read_current_block(host) {
+            Ok(block) => (block.constants(), block.number + 1),
+            Err(_) => {
+                let timestamp = current_timestamp(host);
+                let timestamp = U256::from(timestamp.as_u64());
+                (BlockConstants::first_block(timestamp), U256::zero())
+            }
+        };
     let mut evm_account_storage =
         init_account_storage().map_err(|_| Error::Storage(AccountInitialisation))?;
     let mut accounts_index = init_account_index()?;
@@ -182,13 +190,16 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
         compute(
             host,
             proposal,
-            &current_block.constants(),
-            current_block.number + 1,
+            &current_constants,
+            current_block_number,
             &precompiles,
             &mut evm_account_storage,
             &mut accounts_index,
         )
-        .map(|new_block| current_block = new_block)?;
+        .map(|new_block| {
+            current_block_number = new_block.number + 1;
+            current_constants = new_block.constants()
+        })?;
     }
     Ok(())
 }
@@ -197,7 +208,6 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
 mod tests {
     use super::*;
     use crate::blueprint::Blueprint;
-    use crate::genesis;
     use crate::inbox::{Transaction, TransactionContent::Ethereum};
     use crate::indexable_storage::internal_for_tests::length;
     use crate::storage::internal_for_tests::{
@@ -339,8 +349,6 @@ mod tests {
         host: &mut MockHost,
         evm_account_storage: &mut EthereumAccountStorage,
     ) {
-        let _ = genesis::init_block(host);
-
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
 
@@ -384,7 +392,6 @@ mod tests {
     // Test if the invalid transactions are producing receipts with invalid status
     fn test_invalid_transactions_receipt_status() {
         let mut host = MockHost::default();
-        let _ = genesis::init_block(&mut host);
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
 
@@ -410,7 +417,6 @@ mod tests {
     // Test if a valid transaction is producing a receipt with a success status
     fn test_valid_transactions_receipt_status() {
         let mut host = MockHost::default();
-        let _ = genesis::init_block(&mut host);
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
 
@@ -445,7 +451,6 @@ mod tests {
     // Test if a valid transaction is producing a receipt with a contract address
     fn test_valid_transactions_receipt_contract_address() {
         let mut host = MockHost::default();
-        let _ = genesis::init_block(&mut host);
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
         let tx = dummy_eth_transaction_deploy();
@@ -508,7 +513,6 @@ mod tests {
     // Test if several valid proposals can produce valid blocks
     fn test_several_valid_proposals() {
         let mut host = MockHost::default();
-        let _ = genesis::init_block(&mut host);
 
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
@@ -558,7 +562,6 @@ mod tests {
     // Test transfers gas consumption consistency
     fn test_cumulative_transfers_gas_consumption() {
         let mut host = MockHost::default();
-        let _ = genesis::init_block(&mut host);
         let base_gas = U256::from(21000);
 
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
@@ -603,22 +606,6 @@ mod tests {
     }
 
     #[test]
-    // Test if we're able to read current block (with an empty queue) after
-    // a block production
-    fn test_read_storage_current_block_after_block_production_with_empty_queue() {
-        let mut host = MockHost::default();
-        let _ = genesis::init_block(&mut host);
-        let queue = Queue {
-            proposals: vec![],
-            kernel_upgrade: None,
-        };
-
-        produce(&mut host, queue).expect("The block production failed.");
-
-        assert_current_block_reading_validity(&mut host);
-    }
-
-    #[test]
     // Test if we're able to read current block (with a filled queue) after
     // a block production
     fn test_read_storage_current_block_after_block_production_with_filled_queue() {
@@ -634,7 +621,6 @@ mod tests {
     // Test that the same transaction can not be replayed twice
     fn test_replay_attack() {
         let mut host = MockHost::default();
-        let _ = genesis::init_block(&mut host);
 
         let tx = Transaction {
             tx_hash: [0; TRANSACTION_HASH_SIZE],
@@ -679,7 +665,6 @@ mod tests {
     fn test_accounts_are_indexed() {
         let mut host = MockHost::default();
         let accounts_index = init_account_index().unwrap();
-        let _ = genesis::init_block(&mut host);
 
         let tx = Transaction {
             tx_hash: [0; TRANSACTION_HASH_SIZE],
@@ -713,7 +698,6 @@ mod tests {
     fn test_accounts_are_indexed_once() {
         let mut host = MockHost::default();
         let accounts_index = init_account_index().unwrap();
-        let _ = genesis::init_block(&mut host);
 
         let tx = Transaction {
             tx_hash: [0; TRANSACTION_HASH_SIZE],

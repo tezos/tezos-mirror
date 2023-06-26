@@ -9,11 +9,12 @@
 
 use crate::{error::Error, error::StorageError, storage};
 
-use crate::{parsable, parsing, CONFIG};
+use crate::{current_timestamp, parsable, parsing, CONFIG};
 
 use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Rlp};
+use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::rlp_helpers::{decode_field, decode_option, next};
 use tezos_smart_rollup_debug::{debug_msg, Runtime};
 
@@ -75,14 +76,16 @@ impl Simulation {
 
     /// Execute the simulation
     pub fn run<Host: Runtime>(&self, host: &mut Host) -> Result<ExecutionOutcome, Error> {
-        let current_block = storage::read_current_block(host)?;
+        let timestamp = current_timestamp(host);
+        let timestamp = U256::from(timestamp.as_u64());
+        let block_constants = BlockConstants::first_block(timestamp);
         let mut evm_account_storage = account_storage::init_account_storage()
             .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
         let precompiles = precompiles::precompile_set::<Host>();
         let default_caller = H160::zero();
         let outcome = evm_execution::run_transaction(
             host,
-            &current_block.constants(),
+            &block_constants,
             &mut evm_account_storage,
             &precompiles,
             CONFIG,
@@ -247,7 +250,7 @@ mod tests {
     use tezos_ethereum::block::BlockConstants;
     use tezos_smart_rollup_mock::MockHost;
 
-    use crate::genesis::init_block;
+    use crate::current_timestamp;
 
     use super::*;
 
@@ -327,10 +330,9 @@ mod tests {
     where
         Host: Runtime,
     {
-        // setup
-        assert!(init_block(host).is_ok());
-
-        let block = BlockConstants::first_block();
+        let timestamp = current_timestamp(host);
+        let timestamp = U256::from(timestamp.as_u64());
+        let block = BlockConstants::first_block(timestamp);
         let precompiles = precompiles::precompile_set::<Host>();
         let mut evm_account_storage = account_storage::init_account_storage().unwrap();
 
